@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [catalog-service, content-service, amendment-service, identity-service, editor-service, search-service, ingestion-service, audit-service]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v3
+      - name: Test ${{ matrix.service }}
+        run: |
+          cd services/${{ matrix.service }}
+          gradle test
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: |
+          cd apps/gateway-web
+          npm ci
+          npm run lint
+          npm run build

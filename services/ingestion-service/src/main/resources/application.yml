@@ -1,0 +1,11 @@
+spring:
+  application:
+    name: ingestion-service
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+logging:
+  level:
+    root: INFO

@@ -1,0 +1,8 @@
+{
+    "chat.tools.terminal.autoApprove": {
+        "/^for f in services/\\*/build\\.gradle\\.kts; do \n  perl -0pi -e 's/runtimeOnly\\\\\\(\"org\\\\\\.postgresql:postgresql\"\\\\\\)\\\\n\\\\n  testImplementation\\\\\\(\"org\\\\\\.springframework\\\\\\.boot:spring-boot-starter-test\"\\\\\\)/runtimeOnly\\(\"org\\.postgresql:postgresql\"\\)\\\\n  implementation\\(\"org\\.flywaydb:flyway-core\"\\)\\\\n\\\\n  testImplementation\\(\"org\\.springframework\\.boot:spring-boot-starter-test\"\\)\\\\n  testImplementation\\(\"org\\.testcontainers:junit-jupiter\"\\)\\\\n  testImplementation\\(\"org\\.testcontainers:postgresql\"\\)/s' \"\\$f\";\ndone$/": {
+            "approve": true,
+            "matchCommandLine": true
+        }
+    }
+}

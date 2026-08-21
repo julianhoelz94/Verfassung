@@ -1,0 +1,47 @@
+:80 {
+  encode gzip
+
+  route /api/docs/catalog* {
+    uri strip_prefix /api/docs/catalog
+    reverse_proxy catalog-service:8080
+  }
+
+  route /api/docs/content* {
+    uri strip_prefix /api/docs/content
+    reverse_proxy content-service:8080
+  }
+
+  route /api/docs/amendment* {
+    uri strip_prefix /api/docs/amendment
+    reverse_proxy amendment-service:8080
+  }
+
+  route /api/docs/identity* {
+    uri strip_prefix /api/docs/identity
+    reverse_proxy identity-service:8080
+  }
+
+  route /api/docs/editor* {
+    uri strip_prefix /api/docs/editor
+    reverse_proxy editor-service:8080
+  }
+
+  route /api/docs/search* {
+    uri strip_prefix /api/docs/search
+    reverse_proxy search-service:8080
+  }
+
+  route /api/docs/ingestion* {
+    uri strip_prefix /api/docs/ingestion
+    reverse_proxy ingestion-service:8080
+  }
+
+  route /api/docs/audit* {
+    uri strip_prefix /api/docs/audit
+    reverse_proxy audit-service:8080
+  }
+
+  route {
+    reverse_proxy gateway-web:3000
+  }
+}

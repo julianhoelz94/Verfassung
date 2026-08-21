@@ -1,0 +1,12 @@
+---
+description: Next.js gateway-web conventions
+globs: apps/gateway-web/**/*.{ts,tsx,js,json}
+alwaysApply: false
+---
+
+# gateway-web
+
+- App Router under `apps/gateway-web/app/`.
+- No database clients here. Call backend HTTP APIs (via Caddy in local stack).
+- Prefer server components for public pages; client components only for interactive editor UI.
+- Match existing TypeScript style: explicit props types, no extra UI libraries unless asked.

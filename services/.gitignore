@@ -1,0 +1,19 @@
+# Gradle
+.gradle/
+build/
+bin/
+out/
+.kotlin/
+
+# JVM
+*.class
+*.jar
+!**/gradle-wrapper.jar
+*.war
+*.ear
+hs_err_pid*
+replay_pid*
+
+# IntelliJ per-service modules
+.idea/
+*.iml

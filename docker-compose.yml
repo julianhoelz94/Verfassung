@@ -1,0 +1,132 @@
+services:
+  edge-proxy:
+    build: ./infra/caddy
+    container_name: edge-proxy
+    ports:
+      - "${CADDY_PORT:-80}:80"
+    depends_on:
+      - gateway-web
+
+  gateway-web:
+    build: ./apps/gateway-web
+    environment:
+      - NODE_ENV=development
+    container_name: gateway-web
+    ports:
+      - "${GATEWAY_PORT:-3000}:3000"
+
+  catalog-service:
+    build: ./services/catalog-service
+    environment:
+      - SPRING_PROFILES_ACTIVE=${PROFILE:-local-stack}
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://catalog-db:5432/catalog_db
+      - SPRING_DATASOURCE_USERNAME=postgres
+      - SPRING_DATASOURCE_PASSWORD=postgres
+    depends_on: [catalog-db]
+
+  content-service:
+    build: ./services/content-service
+    environment:
+      - SPRING_PROFILES_ACTIVE=${PROFILE:-local-stack}
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://content-db:5432/content_db
+      - SPRING_DATASOURCE_USERNAME=postgres
+      - SPRING_DATASOURCE_PASSWORD=postgres
+    depends_on: [content-db]
+
+  amendment-service:
+    build: ./services/amendment-service
+    environment:
+      - SPRING_PROFILES_ACTIVE=${PROFILE:-local-stack}
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://amendment-db:5432/amendment_db
+      - SPRING_DATASOURCE_USERNAME=postgres
+      - SPRING_DATASOURCE_PASSWORD=postgres
+    depends_on: [amendment-db]
+
+  identity-service:
+    build: ./services/identity-service
+    environment:
+      - SPRING_PROFILES_ACTIVE=${PROFILE:-local-stack}
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://identity-db:5432/identity_db
+      - SPRING_DATASOURCE_USERNAME=postgres
+      - SPRING_DATASOURCE_PASSWORD=postgres
+    depends_on: [identity-db]
+
+  editor-service:
+    build: ./services/editor-service
+    environment:
+      - SPRING_PROFILES_ACTIVE=${PROFILE:-local-stack}
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://editor-db:5432/editor_db
+      - SPRING_DATASOURCE_USERNAME=postgres
+      - SPRING_DATASOURCE_PASSWORD=postgres
+    depends_on: [editor-db]
+
+  audit-service:
+    build: ./services/audit-service
+    environment:
+      - SPRING_PROFILES_ACTIVE=${PROFILE:-local-stack}
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://audit-db:5432/audit_db
+      - SPRING_DATASOURCE_USERNAME=postgres
+      - SPRING_DATASOURCE_PASSWORD=postgres
+    depends_on: [audit-db]
+
+  ingestion-service:
+    build: ./services/ingestion-service
+    environment:
+      - SPRING_PROFILES_ACTIVE=${PROFILE:-local-stack}
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://ingestion-db:5432/ingestion_db
+      - SPRING_DATASOURCE_USERNAME=postgres
+      - SPRING_DATASOURCE_PASSWORD=postgres
+    depends_on: [ingestion-db]
+
+  search-service:
+    build: ./services/search-service
+    environment:
+      - SPRING_PROFILES_ACTIVE=${PROFILE:-local-stack}
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://search-db:5432/search_db
+      - SPRING_DATASOURCE_USERNAME=postgres
+      - SPRING_DATASOURCE_PASSWORD=postgres
+    depends_on: [search-db]
+
+  backup-service:
+    image: postgres:16
+    container_name: backup-service
+    command: ["sh", "/backup/backup.sh"]
+    volumes:
+      - ./infra/backup:/backup
+      - ./backups:/backups
+    environment:
+      - PGPASSWORD=postgres
+    depends_on:
+      - catalog-db
+      - content-db
+      - amendment-db
+      - identity-db
+      - editor-db
+      - audit-db
+      - ingestion-db
+      - search-db
+
+  catalog-db:
+    image: postgres:16
+    environment: { POSTGRES_DB: catalog_db, POSTGRES_USER: postgres, POSTGRES_PASSWORD: postgres }
+  content-db:
+    image: postgres:16
+    environment: { POSTGRES_DB: content_db, POSTGRES_USER: postgres, POSTGRES_PASSWORD: postgres }
+  amendment-db:
+    image: postgres:16
+    environment: { POSTGRES_DB: amendment_db, POSTGRES_USER: postgres, POSTGRES_PASSWORD: postgres }
+  identity-db:
+    image: postgres:16
+    environment: { POSTGRES_DB: identity_db, POSTGRES_USER: postgres, POSTGRES_PASSWORD: postgres }
+  editor-db:
+    image: postgres:16
+    environment: { POSTGRES_DB: editor_db, POSTGRES_USER: postgres, POSTGRES_PASSWORD: postgres }
+  audit-db:
+    image: postgres:16
+    environment: { POSTGRES_DB: audit_db, POSTGRES_USER: postgres, POSTGRES_PASSWORD: postgres }
+  ingestion-db:
+    image: postgres:16
+    environment: { POSTGRES_DB: ingestion_db, POSTGRES_USER: postgres, POSTGRES_PASSWORD: postgres }
+  search-db:
+    image: postgres:16
+    environment: { POSTGRES_DB: search_db, POSTGRES_USER: postgres, POSTGRES_PASSWORD: postgres }

@@ -1,0 +1,48 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# Secrets — keep committed *.env.example profiles
+.env
+.env.*
+*.env
+!.env.example
+!**/*.env.example
+
+# Local Compose override
+docker-compose.override.yml
+docker-compose.override.yaml
+
+# Backup dumps from infra/backup (compose volume ./backups)
+backups/
+
+# Logs
+*.log
+logs/
+
+# Editors / IDE (keep .vscode if you choose to commit shared settings)
+.idea/
+*.iml
+*.ipr
+*.iws
+*.swp
+*~
+.project
+.classpath
+.settings/
+
+# Coverage and test output
+coverage/
+.nyc_output/
+*.lcov
+test-results/
+.scannerwork/
+
+# Belt-and-suspenders for Gradle / Node anywhere in the monorepo
+.gradle/
+build/
+out/
+bin/
+.kotlin/
+node_modules/
+.next/

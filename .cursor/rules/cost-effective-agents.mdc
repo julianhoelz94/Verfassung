@@ -1,0 +1,12 @@
+---
+description: Keep agent work cheap — narrow scope, no extra subagents, no backlog dumps
+alwaysApply: true
+---
+
+# Cheap agent work
+
+- Implement in the smallest path: one service, or `gateway-web` plus Caddy if routing changed.
+- Do not launch project subagents for edits under ~3 files. Use `/kotlin-service`, `/frontend`, `/infra`, `/verifier`, or `/reviewer` only when the task spans many files or needs isolated context.
+- Never fan out one subagent per microservice unless the user asked for a swarm.
+- Do not read `backlog.md` in full. Grep for a story ID (`ARCH-`, `SRV-`, `UI-`) if needed.
+- Run `gradle test` only in the changed service directory. Do not rebuild the Compose stack unless the task is about local orchestration.

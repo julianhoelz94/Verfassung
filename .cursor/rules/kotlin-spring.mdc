@@ -1,0 +1,14 @@
+---
+description: Kotlin Spring Boot service conventions
+globs: services/**/*.{kt,kts,yml,sql}
+alwaysApply: false
+---
+
+# Kotlin services
+
+- Spring Boot 3.3, Kotlin JVM, Java 21 toolchain, Flyway, springdoc, actuator health.
+- Controllers stay thin. Domain rules live in services, not `@RestController`.
+- Public JSON is DTOs, not JDBC/row types.
+- New tables belong in a new Flyway version in that service only.
+- Keep `/internal/ping` until a real health/read API exists; then add domain routes without sharing another service’s database.
+- Tests: JUnit 5 + Testcontainers `postgres:16-alpine`. Extend `SmokeTest` rather than adding a second Postgres container per class unless isolation is required.

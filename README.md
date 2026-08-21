@@ -1,49 +1,67 @@
 # Constitution Atlas
 
-Monorepo scaffold for a constitution platform with Kotlin Spring Boot microservices, a Next.js frontend, Docker Compose local stack, Caddy reverse proxy, backup job, and CI.
+Public site for versioned constitutions: countries → versions → articles, with amendment history, search, and an authenticated editor.
+
+This repo is a **monorepo**: Kotlin Spring Boot services, a Next.js gateway, Docker Compose, and Caddy as the local entry point. Each stateful service has its own Postgres database (never shared).
+
+Product work and sprint status live in [`backlog.md`](backlog.md). This file is only how to run and navigate the repo.
 
 ## Quick start
 
-1. Copy env profile:
-   - `cp env/local-stack.env.example env/local-stack.env`
-2. Start local stack:
-   - `./manageLocalStack.sh --start`
-3. Open:
-   - App: `http://localhost`
-   - Catalog API docs: `http://localhost/api/docs/catalog/swagger-ui/index.html`
-   - Content API docs: `http://localhost/api/docs/content/swagger-ui/index.html`
+```bash
+cp env/local-stack.env.example env/local-stack.env   # once
+./manageLocalStack.sh --start
+```
 
-Stop the stack:
+Then open:
 
-- `./manageLocalStack.sh --stop`
+- App: <http://localhost>
+- API docs: `http://localhost/api/docs/<service>/swagger-ui/index.html`
 
-Reset the stack (destructive Docker prune):
+Service names: `catalog`, `content`, `amendment`, `identity`, `editor`, `search`, `ingestion`, `audit`.
 
-- `./manageLocalStack.sh --reset`
+```bash
+./manageLocalStack.sh --stop    # keeps named database volumes
+./manageLocalStack.sh --reset   # destructive: compose down -v, then Docker prune
+```
 
-## Profiles
+`--start` builds images one service at a time (avoids Docker Desktop OOM). First start is slow because each Kotlin image runs `gradle bootJar` inside Docker.
 
-- `env/local-stack.env.example`
-- `env/ci.env.example`
-- `env/testing.env.example`
-- `env/production.env.example`
+## Layout
 
-Each profile has dedicated seeded user accounts and credentials placeholders.
+| Path | Owns |
+| --- | --- |
+| `apps/gateway-web/` | Public UI (Next.js 14) |
+| `services/<name>/` | One Spring Boot service + Gradle project |
+| `infra/caddy/` | Edge proxy |
+| `infra/backup/` | `pg_dump` helper (writes to `./backups`, gitignored) |
+| `env/` | Profile templates |
+| `.github/workflows/ci.yml` | Per-service `gradle test` + frontend lint/build |
 
-## Sprint 0 — Foundation status
+## Environment profiles
 
-Sprint 0 is focused on a runnable multi-service foundation with local orchestration and CI.
+Copy the matching `env/*.env.example` file. Do not commit real `*.env` files.
 
-Implemented:
+| Profile | Use |
+| --- | --- |
+| `local-stack` | Day-to-day Compose |
+| `ci` | GitHub Actions / automation |
+| `testing` | Staging-like |
+| `production` | Live (placeholders only in git) |
 
-- Kotlin Spring Boot service skeletons for all core services.
-- Docker Compose topology for gateway, edge proxy, services, and per-service Postgres instances.
-- Flyway baseline migration per service (`db/migration/V1__init.sql`).
-- CI pipeline running backend tests per service and frontend lint/build.
-- Testcontainers-based smoke tests that boot each service and verify PostgreSQL connectivity.
+Examples include local user emails/passwords for later identity work. They are not wired up yet.
 
-Remaining to start Sprint 1 feature work:
+## Tests
 
-- Replace placeholder internal ping endpoints with domain APIs.
-- Add service-specific schema migrations and repositories.
-- Add contract and integration tests for first real read/write use cases.
+```bash
+cd services/<name> && gradle test
+cd apps/gateway-web && npm ci && npm run lint && npm run build
+```
+
+Backend smoke tests use Testcontainers (`postgres:16-alpine`). CI discovers every `services/*/build.gradle.kts` and runs `gradle test` there.
+
+## What the scaffold includes
+
+Runnable skeletons only: actuator health, `/internal/ping`, Flyway `V1__init.sql` marker, named Postgres volumes, Caddy routes for Swagger. There are **no domain APIs or seed constitutions** yet.
+
+For current sprint scope and task IDs, see [`backlog.md`](backlog.md) (grep `CAT-`, `CNT-`, `OPS-`, `UI-`).

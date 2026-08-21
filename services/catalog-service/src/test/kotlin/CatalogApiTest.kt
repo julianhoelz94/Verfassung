@@ -3,10 +3,12 @@ import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.http.MediaType
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
+import org.springframework.test.web.servlet.post
 import org.testcontainers.containers.PostgreSQLContainer
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
@@ -24,8 +26,7 @@ class CatalogApiTest {
         mockMvc.get("/countries")
             .andExpect {
                 status { isOk() }
-                jsonPath("$[0].isoCode") { value("DE") }
-                jsonPath("$[0].name") { value("Germany") }
+                jsonPath("$[*].isoCode") { value(org.hamcrest.Matchers.hasItem("DE")) }
             }
     }
 
@@ -50,6 +51,52 @@ class CatalogApiTest {
     fun unknownConstitutionReturns404() {
         mockMvc.get("/constitutions/${UUID.fromString("00000000-0000-4000-8000-000000000099")}/versions")
             .andExpect { status { isNotFound() } }
+    }
+
+    @Test
+    fun createCountryAndDraftVersionThenPublish() {
+        mockMvc.post("/countries") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"isoCode":"fr","name":"France"}"""
+        }.andExpect {
+            status { isCreated() }
+            jsonPath("$.isoCode") { value("FR") }
+        }
+
+        val constitutionId = mockMvc.post("/countries/FR/constitutions") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"slug":"1958","title":"Constitution of 1958"}"""
+        }.andExpect {
+            status { isCreated() }
+            jsonPath("$.slug") { value("1958") }
+        }.andReturn().response.contentAsString.let {
+            Regex("\"id\":\"([^\"]+)\"").find(it)!!.groupValues[1]
+        }
+
+        mockMvc.get("/countries/FR").andExpect {
+            status { isOk() }
+            jsonPath("$.constitutions[0].versions.length()") { value(0) }
+        }
+
+        val versionId = mockMvc.post("/constitutions/$constitutionId/versions") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"versionLabel":"1958","effectiveDate":"1958-10-04"}"""
+        }.andExpect {
+            status { isCreated() }
+            jsonPath("$.publicationStatus") { value("draft") }
+        }.andReturn().response.contentAsString.let {
+            Regex("\"id\":\"([^\"]+)\"").find(it)!!.groupValues[1]
+        }
+
+        mockMvc.post("/versions/$versionId/publish").andExpect {
+            status { isOk() }
+            jsonPath("$.publicationStatus") { value("published") }
+        }
+
+        mockMvc.get("/countries/FR").andExpect {
+            status { isOk() }
+            jsonPath("$.constitutions[0].versions[0].versionLabel") { value("1958") }
+        }
     }
 
     companion object {

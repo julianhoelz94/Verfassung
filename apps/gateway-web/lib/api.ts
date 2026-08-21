@@ -44,6 +44,25 @@ export type ArticleDetail = {
   sortOrder: number;
 };
 
+export type AmendmentChange = {
+  id: string;
+  articleId: string | null;
+  articleNumber: string | null;
+  changeType: string;
+  note: string | null;
+};
+
+export type Amendment = {
+  id: string;
+  title: string;
+  summary: string;
+  enactedOn: string | null;
+  sourceReference: string | null;
+  sourceVersionId: string;
+  targetVersionId: string;
+  changes: AmendmentChange[];
+};
+
 export class ApiUnavailableError extends Error {
   constructor(service: string) {
     super(`${service} is unavailable`);
@@ -75,6 +94,10 @@ export function contentBaseUrl(): string {
   return process.env.CONTENT_API_URL ?? 'http://localhost/api/content';
 }
 
+export function amendmentBaseUrl(): string {
+  return process.env.AMENDMENT_API_URL ?? 'http://localhost/api/amendment';
+}
+
 export function listCountries(): Promise<CountrySummary[] | null> {
   return readJson<CountrySummary[]>(`${catalogBaseUrl()}/countries`, 'catalog');
 }
@@ -97,5 +120,12 @@ export function getArticle(articleId: string): Promise<ArticleDetail | null> {
   return readJson<ArticleDetail>(
     `${contentBaseUrl()}/articles/${encodeURIComponent(articleId)}`,
     'content',
+  );
+}
+
+export function listAmendments(versionId: string): Promise<Amendment[] | null> {
+  return readJson<Amendment[]>(
+    `${amendmentBaseUrl()}/versions/${encodeURIComponent(versionId)}/amendments`,
+    'amendment',
   );
 }

@@ -13,6 +13,7 @@ services:
       - NODE_ENV=development
       - CATALOG_API_URL=http://catalog-service:8080
       - CONTENT_API_URL=http://content-service:8080
+      - AMENDMENT_API_URL=http://amendment-service:8080
     container_name: gateway-web
     ports:
       - "${GATEWAY_PORT:-3000}:3000"
@@ -20,6 +21,8 @@ services:
       catalog-service:
         condition: service_started
       content-service:
+        condition: service_started
+      amendment-service:
         condition: service_started
 
   catalog-service:
@@ -95,9 +98,15 @@ services:
       - SPRING_DATASOURCE_URL=jdbc:postgresql://ingestion-db:5432/ingestion_db
       - SPRING_DATASOURCE_USERNAME=postgres
       - SPRING_DATASOURCE_PASSWORD=postgres
+      - CATALOG_API_URL=http://catalog-service:8080
+      - CONTENT_API_URL=http://content-service:8080
     depends_on:
       ingestion-db:
         condition: service_healthy
+      catalog-service:
+        condition: service_started
+      content-service:
+        condition: service_started
 
   search-service:
     build: ./services/search-service

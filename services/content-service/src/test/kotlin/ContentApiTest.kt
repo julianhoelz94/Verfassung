@@ -3,10 +3,12 @@ import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.http.MediaType
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
+import org.springframework.test.web.servlet.put
 import org.testcontainers.containers.PostgreSQLContainer
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
@@ -53,6 +55,24 @@ class ContentApiTest {
                 status { isOk() }
                 jsonPath("$.length()") { value(0) }
             }
+    }
+
+    @Test
+    fun replaceArticlesForNewVersion() {
+        val versionId = "01900000-0000-4000-8000-000000000099"
+        mockMvc.put("/versions/$versionId/articles") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """
+                [
+                  {"articleNumber":"1","title":"One","body":"First.","sortOrder":1},
+                  {"articleNumber":"2","title":"Two","body":"Second.","sortOrder":2}
+                ]
+            """.trimIndent()
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.length()") { value(2) }
+            jsonPath("$[0].articleNumber") { value("1") }
+        }
     }
 
     companion object {

@@ -31,3 +31,28 @@ data class CountryDetail(
     val name: String,
     val constitutions: List<ConstitutionSummary>,
 )
+
+data class CreateCountryRequest(
+    val isoCode: String,
+    val name: String,
+)
+
+data class CreateConstitutionRequest(
+    val slug: String,
+    val title: String,
+)
+
+data class CreateVersionRequest(
+    val versionLabel: String,
+    val effectiveDate: LocalDate? = null,
+    val languageCode: String = "en",
+    val sourceUrl: String? = null,
+    val gazetteReference: String? = null,
+)
+
+data class VersionCreated(
+    val id: UUID,
+    val constitutionId: UUID,
+    val versionLabel: String,
+    val publicationStatus: String,
+)

@@ -36,6 +36,9 @@ export default async function CountryPage({ params }: CountryPageProps) {
         <a href="/">Countries</a>
       </p>
       <h1>{country.name}</h1>
+      <p>
+        <a href={`/countries/${country.isoCode}/timeline`}>Amendment timeline</a>
+      </p>
       {country.constitutions.map((constitution) => (
         <section key={constitution.id}>
           <h2>{constitution.title}</h2>

@@ -1,6 +1,12 @@
 spring:
   application:
     name: ingestion-service
+catalog:
+  api:
+    url: ${CATALOG_API_URL:http://localhost/api/catalog}
+content:
+  api:
+    url: ${CONTENT_API_URL:http://localhost/api/content}
 management:
   endpoints:
     web:

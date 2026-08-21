@@ -2,6 +2,7 @@ package com.constitutionatlas.content.repo
 
 import com.constitutionatlas.content.api.ArticleDetail
 import com.constitutionatlas.content.api.ArticleSummary
+import com.constitutionatlas.content.api.ArticleWrite
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.jdbc.core.RowMapper
 import org.springframework.stereotype.Repository
@@ -31,6 +32,25 @@ class ArticleRepository(private val jdbc: JdbcTemplate) {
             detailMapper,
             id,
         ).firstOrNull()
+
+    fun replaceForVersion(versionId: UUID, articles: List<ArticleWrite>): List<ArticleSummary> {
+        jdbc.update("DELETE FROM articles WHERE version_id = ?", versionId)
+        articles.forEach { article ->
+            jdbc.update(
+                """
+                INSERT INTO articles (id, version_id, article_number, title, body, sort_order)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """.trimIndent(),
+                UUID.randomUUID(),
+                versionId,
+                article.articleNumber,
+                article.title,
+                article.body,
+                article.sortOrder,
+            )
+        }
+        return listByVersion(versionId)
+    }
 
     private val summaryMapper = RowMapper { rs, _ ->
         ArticleSummary(

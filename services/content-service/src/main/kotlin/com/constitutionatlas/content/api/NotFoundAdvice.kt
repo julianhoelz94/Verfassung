@@ -11,4 +11,8 @@ class NotFoundAdvice {
     @ExceptionHandler(NotFoundException::class)
     fun handle(ex: NotFoundException): ResponseEntity<Map<String, String>> =
         ResponseEntity.status(HttpStatus.NOT_FOUND).body(mapOf("error" to (ex.message ?: "Not found")))
+
+    @ExceptionHandler(IllegalArgumentException::class)
+    fun badRequest(ex: IllegalArgumentException): ResponseEntity<Map<String, String>> =
+        ResponseEntity.status(HttpStatus.BAD_REQUEST).body(mapOf("error" to (ex.message ?: "Bad request")))
 }

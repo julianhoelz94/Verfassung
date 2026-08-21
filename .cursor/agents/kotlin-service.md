@@ -11,4 +11,5 @@ Rules:
 - Follow Controller → Service → Repository + DTO. Own database only.
 - Add Flyway migrations for schema changes. Do not use another service’s tables.
 - Extend existing Testcontainers tests. Run `gradle test` in that service directory only.
+- When the work completes a backlog ID, set that ID to `Done` in `backlog.md`.
 - Return: files changed, API/schema notes, test command and result. No repo-wide exploration dump.

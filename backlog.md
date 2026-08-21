@@ -244,14 +244,15 @@ These are useful, but they should stay out of the initial implementation scope u
  - Use the MCP server later to transport constitutional texts from the old HTML website into the new platform under controlled migration commands.
  - Add request validation and schema checks so tool inputs cannot bypass normal domain constraints.
  - Keep the first MCP version intentionally read-only, with write support deferred until the migration workflow is ready.
-- `articles`: article number, title, order, and version linkage.
-- `article_blocks`: optional structured blocks for paragraphs, clauses, or subclauses.
+- `articles`: article number, title, order, and version linkage (current snapshot; later a view over tree nodes).
+- `content_nodes` (ARCH-5): flexible tree per version; node `kind` constrained by the constitution’s outline in catalog.
+- `constitution_outlines` (catalog, ARCH-5): per-constitution node kinds and allowed parent/child relations.
 - `article_content_revisions`: editor-friendly rich-text payloads and published snapshots.
 - `article_links`: explicit cross-references between articles when the source text refers to other provisions.
 
 ### `amendment-service`
 - `amendments`: amendment metadata, dates, and source references.
-- `amendment_changes`: one row per affected article or block.
+- `amendment_changes`: one row per affected content node (article or any descendant).
 - `version_transitions`: links between old and new constitution versions.
  - Prefer a small number of backend calls per page and fetch aggregates from the gateway instead of chaining through the UI.
 - `change_summaries`: human-readable summaries of what changed and why.
@@ -519,9 +520,8 @@ These are useful, but they should stay out of the initial implementation scope u
 ## Domain Model Assumptions
 - A country can have one or more constitutional document families.
 - Each constitution has many versions.
-- Each version contains many articles.
-- Amendments describe changes between versions and can affect one or more articles.
-- Articles may later be split into paragraphs, clauses, or subclauses if source texts require finer granularity.
+- Each version contains many articles (top-level provisions). Substructure is a **per-constitution tree**, not a global Artikel/Absatz/Satz schema.
+- Amendments describe changes between versions and can target a whole article or any node in that constitution’s tree.
 
 ## Scrum Board Structure
 
@@ -555,8 +555,8 @@ These are useful, but they should stay out of the initial implementation scope u
 | ARCH-1 | Story | P0 | Done | L | catalog + content + amendment | Canonical model for countries, constitutions, versions, articles, amendments. | Logical model in this file; physical tables land in CAT-1, CNT-1, AMD-1. One country with two versions can be stored. | None |
 | ARCH-2 | Story | P0 | Done | M | content-service | Version is a full snapshot of articles in force. | `GET` articles by version returns the complete ordered set; later versions do not mutate older rows. | ARCH-1, CNT-1 |
 | ARCH-3 | Story | P0 | Done | M | content-service | Each article is independently addressable. | Stable `article_id` (or equivalent) unique within a version; fetch by id. | ARCH-1, CNT-1 |
-| ARCH-4 | Story | P0 | Ready | M | amendment-service | Amendments link version changes and affected articles. | Amendment row references opaque source/target version ids and a list of affected article ids. | ARCH-2, ARCH-3, AMD-1 |
-| ARCH-5 | Story | P1 | Ideas | L | content-service | Paragraphs/clauses under articles. | Model can add blocks without breaking article list/get. | ARCH-3 |
+| ARCH-4 | Story | P0 | Done | M | amendment-service | Amendments link version changes and affected articles. | Amendment row references opaque source/target version ids and a list of affected article ids. | ARCH-2, ARCH-3, AMD-1 |
+| ARCH-5 | Story | P1 | Ideas | L | catalog + content | Per-constitution content tree (not a fixed Artikel/Absatz/Satz model). | Catalog stores an outline for each constitution: ordered node kinds, allowed parent/child kinds, and whether a kind may hold text, children, or both. Depth and labels are data (e.g. DE `article → paragraph → sentence`; US `article → section`; a short charter may be articles only). Content stores an adjacency-list (or equivalent) tree per version: each node has `kind` from that outline, optional `label`/`number`, optional `body`, `parent_id`, `sort_order`. Existing article list/get stay valid: today’s `articles` rows are the configured top provision nodes (or a read model over them). A constitution with no sub-kinds still works as a flat list. | ARCH-3 |
 
 ## Epic 1B: Service Architecture and Contracts
 
@@ -576,20 +576,21 @@ These are useful, but they should stay out of the initial implementation scope u
 
 | ID | Type | Priority | Status | Size | Owner | Task | Acceptance Criteria | Dependencies |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| DB-1 | Task | P0 | Ready | L | split | Umbrella: countries … amendment_changes. | Done when CAT-1, CNT-1, and AMD-1 are Done. | ARCH-1 |
+| DB-1 | Task | P0 | Done | L | split | Umbrella: countries … amendment_changes. | Done when CAT-1, CNT-1, and AMD-1 are Done. | ARCH-1 |
 | DB-2 | Task | P0 | Ready | S | CAT-1 / CNT-1 | Uniqueness (country code, slug, version label, article number in version). | Enforced in those Flyway files, not a separate migration elsewhere. | CAT-1, CNT-1 |
 | DB-3 | Task | P0 | Ready | S | catalog-service | Provenance columns on versions/sources. | Included in CAT-1 (`source_url`, gazette ref, `language_code`, timestamps). | CAT-1 |
 | DB-4 | Task | P1 | Ideas | M | search-service | Full-text index tables / tsvector. | Keyword search over published articles; derived data only. | SRC-1, SRCH-1 |
-| DB-5 | Task | P1 | Ideas | M | amendment-service | Change ops: added / modified / deleted / renumbered. | `amendment_changes.change_type` + payload; not required for first browse. | AMD-1 |
+| DB-5 | Task | P1 | Ideas | M | amendment-service | Change ops: added / modified / deleted / renumbered. | Folded into AMD-3 (`added` / `changed` / `removed`). Keep this ID only as a pointer. | AMD-1, AMD-3 |
 | DB-6 | Task | P0 | Ready | S | docs | Schema pattern (normalized + JSONB metadata + outbox later). | Short note in `docs/adr` or QLT-1; no shared DB. | SRV-2 |
 | CAT-1 | Task | P0 | Done | M | catalog-service | Flyway `V2__catalog_domain.sql`: `countries`, `constitutions`, `constitution_versions`, `constitution_sources`. | Unique ISO/slug/version_label; provenance fields; Testcontainers insert+query. | ARCH-1 |
 | CNT-1 | Task | P0 | Done | M | content-service | Flyway `V2__content_domain.sql`: `articles` (+ optional `article_blocks`). | Unique (version_id, article_number); ordered list; snapshot rows immutable. | ARCH-2, ARCH-3 |
-| AMD-1 | Task | P1 | Ready | M | amendment-service | Flyway `V2__amendment_domain.sql`: `amendments`, `amendment_changes`, `version_transitions`. | Opaque catalog/content ids only; no FK across DBs. | ARCH-4 |
+| AMD-1 | Task | P1 | Done | M | amendment-service | Flyway `V2__amendment_domain.sql`: `amendments`, `amendment_changes`, `version_transitions`. | Opaque catalog/content ids only; no FK across DBs. | ARCH-4 |
+| AMD-3 | Story | P1 | Ideas | M | amendment-service | Richer amendment-change records: typed ops, dates, amending-law citation, tree target. | New Flyway (do not edit AMD-1). `change_type` is a constrained enum with at least `added`, `changed`, `removed` (optional extras like `renumbered` ok). Each change has `changed_on` (enactment of the amending law) and `effective_on` (when the change took effect; null if same as `changed_on`). Each change stores an opaque `amending_law_citation_id` for a citation-service object (no SQL FK; citation-service may still be SRV-5). Each change targets an opaque content **node** id (whole article or any descendant in that constitution’s tree); whole-article change remains valid when the act replaces or repeals the article. AMD-2 read API returns these fields. Depends on ARCH-5 for sub-article targets. Supersedes the thin `DB-5` enum-only slice. | AMD-1, AMD-2, ARCH-5, SRV-5 |
 | IDN-1 | Task | P1 | Ready | M | identity-service | Flyway `V2__identity.sql`: `users`, `roles`, `user_roles`. | Can store local-editor from env; password hash column. | SRV-2 |
 | ED-1 | Task | P1 | Ideas | M | editor-service | Drafts: `edit_sessions`, `draft_changes`, `edit_revisions`. | After IDN-1 and CNT-1. | IDN-1, CNT-1 |
 | AUD-1 | Task | P1 | Ready | M | audit-service | `audit_events` append-only. | Insert + list by entity; updates/deletes rejected. | GOV-1 |
 | SRCH-1 | Task | P1 | Ideas | M | search-service | `search_documents`, `index_sync_state`. | Rebuild from content API/events, never catalog SQL. | CNT-2, SRC-1 |
-| ING-DB | Task | P1 | Ready | M | ingestion-service | `import_jobs`, `import_errors`, `import_staging_records`. | Job row + error log; no write to catalog except via catalog API. | ING-1, CAT-2 |
+| ING-DB | Task | P1 | Done | M | ingestion-service | `import_jobs`, `import_errors`, `import_staging_records`. | Job row + error log; no write to catalog except via catalog API. | ING-1, CAT-2 |
 
 ## Epic 2B: Local Development and Orchestration
 
@@ -602,14 +603,14 @@ These are useful, but they should stay out of the initial implementation scope u
 | OPS-5 | Task | P0 | Done | S | infra | Compose `healthcheck` + `depends_on: condition: service_healthy` for DBs and apps. | Unhealthy container is visible; apps wait for Postgres. | OPS-1 |
 | OPS-6 | Task | P0 | Done | S | infra | Build `edge-proxy` in `BUILD_ORDER` (or `compose build` before `up --no-build`). | `--start` does not fail with missing `verfassung-edge-proxy`. | OPS-2 |
 | OPS-7 | Task | P0 | Done | S | infra | Named Postgres volumes; `--reset` uses `down -v`. | `--stop` keeps data; `--reset` wipes `*-db-data`. | OPS-1 |
-| OPS-8 | Task | P1 | Ready | M | each Kotlin Dockerfile | Cache Gradle deps: copy `build.gradle.kts` first, then sources; optional BuildKit cache mount. | Rebuild after a Kotlin-only change does not re-download Maven. | OPS-2 |
+| OPS-8 | Task | P1 | Done | M | each Kotlin Dockerfile | Cache Gradle deps: copy `build.gradle.kts` first, then sources; optional BuildKit cache mount. | Rebuild after a Kotlin-only change does not re-download Maven. | OPS-2 |
 
 ## Epic 3: Content Ingestion and Editorial Workflow
 
 | ID | Type | Priority | Status | Size | Owner | Story | Acceptance Criteria | Dependencies |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| ING-1 | Story | P0 | Ready | L | ingestion-service | Import a version from structured input (JSON/YAML). | Calls catalog + content APIs in one job; rollback/fail leaves no partial public version. Sprint 2, not required for OPS-4 seed. | CAT-2, CNT-2, ING-DB |
-| ING-2 | Story | P0 | Ready | M | ingestion-service | Validate article order and numbering. | Invalid numbering → job `failed` + `import_errors`; no catalog write. | ING-1, CNT-1 |
+| ING-1 | Story | P0 | Done | L | ingestion-service | Import a version from structured input (JSON/YAML). | Calls catalog + content APIs in one job; rollback/fail leaves no partial public version. Sprint 2, not required for OPS-4 seed. | CAT-2, CNT-2, ING-DB |
+| ING-2 | Story | P0 | Done | M | ingestion-service | Validate article order and numbering. | Invalid numbering → job `failed` + `import_errors`; no catalog write. | ING-1, CNT-1 |
 | ING-3 | Story | P1 | Ideas | M | ingestion-service | Attach sources/citations on import. | Forwards provenance to catalog `constitution_sources`. | ING-1, CAT-1 |
 | ING-4 | Story | P1 | Ideas | L | amendment-service | Amendments as change sets → new version. | New content snapshot + amendment rows. | DB-5, AMD-1, CNT-2 |
 | ING-5 | Story | P2 | Ideas | L | later | Translation import. | Out of Sprint 1–2. | ARCH-5 |
@@ -622,7 +623,7 @@ These are useful, but they should stay out of the initial implementation scope u
 | UI-2 | Story | P0 | Done | M | gateway-web | Read a version’s articles in order. | `/countries/[code]/versions/[id]` lists articles; article page shows body. | CNT-2, UI-1 |
 | UI-3 | Story | P0 | Done | S | gateway-web | Article permalink + heading anchor. | Stable URL; in-page `#` for article number. | UI-2, ARCH-3 |
 | UI-4 | Story | P1 | Ideas | L | gateway-web | Side-by-side version compare. | After AMD-1 + DB-5. | ARCH-4, DB-5 |
-| UI-5 | Story | P1 | Ideas | M | gateway-web | Amendment timeline. | After AMD-2. | ARCH-4, AMD-2 |
+| UI-5 | Story | P1 | Done | M | gateway-web | Amendment timeline. | After AMD-2. | ARCH-4, AMD-2 |
 
 ## Epic 4B: First domain APIs (executable)
 
@@ -633,7 +634,7 @@ Replace `/internal/ping` only on the services in this table. Leave identity/edit
 | CAT-2 | Task | P0 | Done | M | catalog-service | Read API: list countries, get country, list versions for a constitution. | OpenAPI; 404 on unknown; Testcontainers API test; unpublished versions omitted. | CAT-1 |
 | CNT-2 | Task | P0 | Done | M | content-service | Read API: list articles for `versionId`, get article by id. | Ordered list; 404; API test. `versionId` is an opaque catalog id (no catalog SQL). | CNT-1 |
 | GW-1 | Task | P0 | Done | M | gateway-web | HTTP clients for CAT-2 and CNT-2 (env base URLs via Caddy or Compose DNS). | Server components fetch; empty/error states if API down. | CAT-2, CNT-2 |
-| AMD-2 | Task | P1 | Ready | M | amendment-service | Read API: list amendments for a version transition. | After AMD-1; not Sprint 1. | AMD-1 |
+| AMD-2 | Task | P1 | Done | M | amendment-service | Read API: list amendments for a version transition. | After AMD-1; not Sprint 1. | AMD-1 |
 | IDN-2 | Task | P1 | Ready | M | identity-service | Login (session or JWT) for editor role. | After IDN-1. | IDN-1 |
 | ED-2 | Task | P1 | Ideas | L | editor-service | Draft save/preview commands. | After ED-1, IDN-2, CNT-2. | ED-1, IDN-2 |
 
@@ -651,7 +652,7 @@ Replace `/internal/ping` only on the services in this table. Leave identity/edit
 | ID | Type | Priority | Status | Size | Owner | Task | Acceptance Criteria | Dependencies |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | GOV-1 | Task | P1 | Ready | M | audit-service | Record actor + action + entity + time. | AUD-1 schema + append API used by editor/ingestion (Sprint 3). | AUD-1 |
-| GOV-2 | Task | P0 | Ready | M | ingestion-service | Validate before persist. | Same sprint as ING-1; not Sprint 1 seed. | ING-1 |
+| GOV-2 | Task | P0 | Done | M | ingestion-service | Validate before persist. | Same sprint as ING-1; not Sprint 1 seed. | ING-1 |
 | GOV-3 | Task | P1 | Ideas | L | editor-service | Review then publish as separate events. | Same role may do both; two audit event types. | GOV-1, ED-2 |
 | GOV-4 | Task | P1 | Ideas | M | infra | Restore drill from `infra/backup`. | Script dumps all eight DBs (include `search`); documented restore. Current script is incomplete. | OPS-7 |
 | GOV-5 | Task | P2 | Ideas | S | catalog-service | Verification flags on sources. | Later. | CAT-1 |
@@ -715,8 +716,11 @@ Done: OPS-6, CAT-1, CAT-2, CNT-1, CNT-2, OPS-4, GW-1, UI-1, UI-2, UI-3, OPS-5, Q
 
 Out of Sprint 1: search, editor, identity, ingestion job, amendments, Renovate, image-build CI, MCP.
 
-### Sprint 2: History + import
-AMD-1, AMD-2, ARCH-4, ING-DB, ING-1, ING-2, GOV-2, UI-5 (or UI-4 if compare is in), SRC-1/SRCH-1 if capacity, OPS-8, CI-5.
+### Sprint 2: History + import — closed
+Done: AMD-1, AMD-2, ARCH-4, DB-1, ING-DB, ING-1, ING-2, GOV-2, UI-5, OPS-8.
+Catalog/content gained write APIs so ingestion can publish a version via HTTP only (draft → articles → publish).
+
+Deferred (capacity): SRC-1 / SRCH-1, CI-5 (Gradle wrappers). UI-4 (compare) stays later with DB-5.
 
 ### Sprint 3: Editor
 IDN-1, IDN-2, ED-1, ED-2, SRV-6/UI editor routes, AUD-1, GOV-1, GOV-3.
@@ -725,7 +729,7 @@ IDN-1, IDN-2, ED-1, ED-2, SRV-6/UI editor routes, AUD-1, GOV-1, GOV-3.
 DEP-1, DEP-7, CI-3, CI-4, QLT-1, QLT-3, QLT-8, GOV-4, PLAT-2, PLAT-4.
 
 ### Later / Ideas
-ARCH-5, SRV-5, SRV-7, ING-5, SRC-2–4, PLAT-3, QLT-5, DEP-2–6.
+ARCH-5, SRV-5, SRV-7, AMD-3, ING-5, SRC-2–4, PLAT-3, QLT-5, DEP-2–6.
 
 ## Open Product Questions
 - Should published constitutional versions be immutable snapshots only, or do you want official errata and corrections modeled separately?

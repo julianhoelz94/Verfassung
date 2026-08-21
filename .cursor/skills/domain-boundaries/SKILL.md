@@ -10,8 +10,8 @@ Ownership:
 
 | Service | Writes |
 | --- | --- |
-| catalog | countries, constitutions, versions, sources |
-| content | articles, blocks, revisions, article links |
+| catalog | countries, constitutions, versions, sources, constitution outlines (node kinds / tree rules) |
+| content | articles, content tree nodes, revisions, article links |
 | amendment | amendments, changes, version transitions |
 | identity | users, roles, sessions |
 | editor | drafts, edit sessions, publish actions |

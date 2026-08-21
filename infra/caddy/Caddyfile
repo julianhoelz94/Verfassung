@@ -51,6 +51,16 @@
     reverse_proxy content-service:8080
   }
 
+  route /api/amendment* {
+    uri strip_prefix /api/amendment
+    reverse_proxy amendment-service:8080
+  }
+
+  route /api/ingestion* {
+    uri strip_prefix /api/ingestion
+    reverse_proxy ingestion-service:8080
+  }
+
   route {
     reverse_proxy gateway-web:3000
   }

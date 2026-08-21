@@ -18,7 +18,7 @@ Public site for versioned constitutions: countries → constitution versions →
 | `services/<name>/` | One Spring Boot service + its Gradle project |
 | `infra/` | Caddy, backup script |
 | `env/` | Profile templates (`local-stack`, `ci`, `testing`, `production`) |
-| `backlog.md` | Product + sprint backlog (large). **Grep for IDs** (`ARCH-`, `CAT-`, `CNT-`, `UI-`, `OPS-`); do not read the whole file. |
+| `backlog.md` | Product + sprint backlog (large). **Grep for IDs** (`ARCH-`, `CAT-`, `CNT-`, `AMD-`, `ING-`, `UI-`, `OPS-`); do not read the whole file. |
 
 ## Commands
 
@@ -26,16 +26,18 @@ Public site for versioned constitutions: countries → constitution versions →
 cp env/local-stack.env.example env/local-stack.env   # once
 ./manageLocalStack.sh --start                         # http://localhost
 ./manageLocalStack.sh --stop
-cd services/<name> && gradle test                     # one service only
+cd services/<name> && gradle test                     # one service only; CI pins Gradle 8.10.2
 cd apps/gateway-web && npm ci && npm run lint && npm run build
 ```
 
 Swagger (via Caddy): `http://localhost/api/docs/<service>/swagger-ui/index.html`  
 Service names: `catalog`, `content`, `amendment`, `identity`, `editor`, `search`, `ingestion`, `audit`.
 
-## Current state (Sprint 0)
+## Current sprint
 
-Scaffolds exist plus Sprint 1 browse APIs on catalog and content. Other services still expose `/internal/ping` only.
+See `backlog.md` **Suggested Sprint Breakdown**. Sprint 0–2 are closed. Work the next open sprint (currently Sprint 3: editor). Do not pull later-sprint or `Ideas` items unless the user asks.
+
+**When a story/task is finished, update `backlog.md` in the same change:** set Status to `Done`, add the ID to that sprint’s Done list, and keep the board snapshot accurate. Do not leave completed work as `Ready`.
 
 ## Cost rules for agents
 

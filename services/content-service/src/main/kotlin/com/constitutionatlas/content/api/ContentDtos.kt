@@ -18,3 +18,10 @@ data class ArticleDetail(
     val body: String,
     val sortOrder: Int,
 )
+
+data class ArticleWrite(
+    val articleNumber: String,
+    val title: String,
+    val body: String,
+    val sortOrder: Int,
+)

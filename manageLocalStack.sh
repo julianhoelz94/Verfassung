@@ -56,8 +56,8 @@ Usage: $0 [--start|--stop|--reset]
 
 Options:
   --start   Start the local stack (detached)
-  --stop    Stop the local stack
-  --reset   Stop the stack and run docker prune (destructive)
+  --stop    Stop the local stack (keeps named database volumes)
+  --reset   Stop the stack, remove database volumes, and prune Docker (destructive)
 EOF
   exit 1
 }
@@ -89,12 +89,13 @@ case "$1" in
 
   --reset)
     ensure_docker_running
-    echo "Resetting local stack (this will prune unused Docker resources)..."
-    ${COMPOSE_CMD} --env-file "${ENV_FILE}" down || true
-    echo "Pruning unused containers, networks, images (dangling), and build cache..."
+    echo "Resetting local stack (this removes named database volumes and prunes Docker)..."
+    # -v removes compose-declared volumes (Postgres data). Plain `down` keeps them.
+    ${COMPOSE_CMD} --env-file "${ENV_FILE}" down -v --remove-orphans || true
+    echo "Pruning unused containers, networks, images, and build cache..."
     docker system prune -af
-    echo "Pruning unused volumes..."
-    docker volume prune -f
+    echo "Pruning leftover unused volumes..."
+    docker volume prune -af
     echo "Reset complete."
     ;;
 

@@ -109,24 +109,42 @@ services:
   catalog-db:
     image: postgres:16
     environment: { POSTGRES_DB: catalog_db, POSTGRES_USER: postgres, POSTGRES_PASSWORD: postgres }
+    volumes: [catalog-db-data:/var/lib/postgresql/data]
   content-db:
     image: postgres:16
     environment: { POSTGRES_DB: content_db, POSTGRES_USER: postgres, POSTGRES_PASSWORD: postgres }
+    volumes: [content-db-data:/var/lib/postgresql/data]
   amendment-db:
     image: postgres:16
     environment: { POSTGRES_DB: amendment_db, POSTGRES_USER: postgres, POSTGRES_PASSWORD: postgres }
+    volumes: [amendment-db-data:/var/lib/postgresql/data]
   identity-db:
     image: postgres:16
     environment: { POSTGRES_DB: identity_db, POSTGRES_USER: postgres, POSTGRES_PASSWORD: postgres }
+    volumes: [identity-db-data:/var/lib/postgresql/data]
   editor-db:
     image: postgres:16
     environment: { POSTGRES_DB: editor_db, POSTGRES_USER: postgres, POSTGRES_PASSWORD: postgres }
+    volumes: [editor-db-data:/var/lib/postgresql/data]
   audit-db:
     image: postgres:16
     environment: { POSTGRES_DB: audit_db, POSTGRES_USER: postgres, POSTGRES_PASSWORD: postgres }
+    volumes: [audit-db-data:/var/lib/postgresql/data]
   ingestion-db:
     image: postgres:16
     environment: { POSTGRES_DB: ingestion_db, POSTGRES_USER: postgres, POSTGRES_PASSWORD: postgres }
+    volumes: [ingestion-db-data:/var/lib/postgresql/data]
   search-db:
     image: postgres:16
     environment: { POSTGRES_DB: search_db, POSTGRES_USER: postgres, POSTGRES_PASSWORD: postgres }
+    volumes: [search-db-data:/var/lib/postgresql/data]
+
+volumes:
+  catalog-db-data:
+  content-db-data:
+  amendment-db-data:
+  identity-db-data:
+  editor-db-data:
+  audit-db-data:
+  ingestion-db-data:
+  search-db-data:

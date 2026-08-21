@@ -526,212 +526,214 @@ These are useful, but they should stay out of the initial implementation scope u
 ## Scrum Board Structure
 
 ### Backlog Columns
-- `Ideas`: Not yet refined.
-- `Ready`: Refined enough for a sprint.
+- `Ideas`: Not yet refined; do not pull into a sprint.
+- `Ready`: One owner, testable acceptance, small enough for a sprint.
 - `In Progress`: Actively being implemented.
 - `Review`: Implementation complete, awaiting validation.
-- `Done`: Accepted and shipped.
+- `Done`: Accepted in the current repo (scaffold or feature).
 
 ### Priority Scale
-- `P0`: Must-have for initial launch.
-- `P1`: High value, should follow soon after launch.
-- `P2`: Important but not blocking.
+- `P0`: Must-have for the first public browse + seed constitution.
+- `P1`: Needed for editor, search, or amendments after browse works.
+- `P2`: Important but not blocking those paths.
 - `P3`: Nice to have.
+
+### Refinement rules
+- One **owner** (service or `gateway-web` / `infra`). No task spans two databases.
+- **Size** S/M/L: S ≤ half day, M ≤ two days, L is a full sprint item (split if two L items share a sprint).
+- Umbrella IDs (`DB-1`, `SRV-3`) stay for traceability; executable work is the child tasks (`CAT-*`, `CNT-*`, …).
+- Do not pull `Ideas` or L items from later epics into Sprint 1.
+
+### Board snapshot (repo as of Sprint 0 close)
+- **Done:** SRV-1, SRV-2, OPS-1, OPS-2, OPS-3, OPS-7, CI-1, CI-2 (smoke tests only).
+- **Not done (were listed under Sprint 0):** ARCH-1–3 physical schema, DB-1–3, DB-6, ING-1, UI-1, SRV-3 domain contracts, SRV-6, QLT-1.
 
 ## Epic 1: Information Architecture and Domain Modeling
 
-| ID | Type | Priority | Status | Story | Acceptance Criteria | Dependencies |
-| --- | --- | --- | --- | --- | --- | --- |
-| ARCH-1 | Story | P0 | Ready | As a product owner, I want a canonical schema for countries, constitutions, versions, articles, and amendments so that the content model is stable from the start. | Schema exists, supports one-to-many relationships, and can represent at least one country with multiple constitution versions. | None |
-| ARCH-2 | Story | P0 | Ready | As a historian, I want each constitution version stored as a full snapshot so that I can browse the exact text in force at a given time. | A version can be queried independently and returns all articles for that revision. | ARCH-1 |
-| ARCH-3 | Story | P0 | Ready | As a researcher, I want each article stored separately so that I can link, search, and compare at article level. | Articles have stable identifiers within a version and can be retrieved directly. | ARCH-1, ARCH-2 |
-| ARCH-4 | Story | P0 | Ready | As a maintainer, I want amendment records linked to version changes so that I can track how constitutional text evolved over time. | An amendment can reference source and target versions and affected articles. | ARCH-2, ARCH-3 |
-| ARCH-5 | Story | P1 | Ideas | As a future editor, I want support for paragraphs and clauses beneath articles so that complex constitutional text can be represented precisely. | Data model can be extended without breaking article queries. | ARCH-3 |
+| ID | Type | Priority | Status | Size | Owner | Story | Acceptance Criteria | Dependencies |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| ARCH-1 | Story | P0 | Ready | L | catalog + content + amendment | Canonical model for countries, constitutions, versions, articles, amendments. | Logical model in this file; physical tables land in CAT-1, CNT-1, AMD-1. One country with two versions can be stored. | None |
+| ARCH-2 | Story | P0 | Ready | M | content-service | Version is a full snapshot of articles in force. | `GET` articles by version returns the complete ordered set; later versions do not mutate older rows. | ARCH-1, CNT-1 |
+| ARCH-3 | Story | P0 | Ready | M | content-service | Each article is independently addressable. | Stable `article_id` (or equivalent) unique within a version; fetch by id. | ARCH-1, CNT-1 |
+| ARCH-4 | Story | P0 | Ready | M | amendment-service | Amendments link version changes and affected articles. | Amendment row references opaque source/target version ids and a list of affected article ids. | ARCH-2, ARCH-3, AMD-1 |
+| ARCH-5 | Story | P1 | Ideas | L | content-service | Paragraphs/clauses under articles. | Model can add blocks without breaking article list/get. | ARCH-3 |
 
 ## Epic 1B: Service Architecture and Contracts
 
-| ID | Type | Priority | Status | Story | Acceptance Criteria | Dependencies |
-| --- | --- | --- | --- | --- | --- | --- |
-| SRV-1 | Story | P0 | Ready | As an architect, I want clear service boundaries so that each bounded context can evolve independently. | Service responsibilities are documented and do not overlap in ownership. | ARCH-1 |
-| SRV-2 | Story | P0 | Ready | As an engineer, I want each stateful service to own its database so that service autonomy is preserved. | Database ownership is mapped one service to one database where persistence is required. | SRV-1 |
-| SRV-3 | Story | P0 | Ready | As a developer, I want explicit API contracts between services so that integration remains stable. | Contracts are versioned and documented for all service-to-service calls. | SRV-1 |
-| SRV-4 | Story | P1 | Ideas | As a platform engineer, I want event contracts for major content changes so that downstream services can update asynchronously. | Key events are defined for version published, amendment created, and article updated. | SRV-3, ARCH-4 |
-| SRV-5 | Story | P1 | Ideas | As a platform engineer, I want dedicated supporting services for identity, translation, citations, auditing, and document processing so that core services stay focused. | Each supporting service has a clearly bounded responsibility and no overlapping ownership. | SRV-1 |
-| SRV-6 | Story | P0 | Ready | As an editor, I want a WYSIWYG editing service with authenticated access so that I can manipulate constitution content directly on the website. | An authenticated editor can create and modify content through the UI and changes are persisted through service APIs. | SRV-2, SRV-3, ARCH-3 |
-| SRV-7 | Story | P1 | Ideas | As an editor or automation client, I want an MCP server so that approved tools can inspect and operate on the platform safely. | The MCP server exposes only whitelisted actions, respects authentication, and audits every write. | SRV-2, SRV-3, SRV-6, GOV-1 |
+| ID | Type | Priority | Status | Size | Owner | Story | Acceptance Criteria | Dependencies |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| SRV-1 | Story | P0 | Done | M | docs | Clear service boundaries. | Ownership is documented (`AGENTS.md`, this backlog) and DBs are not shared. | ARCH-1 |
+| SRV-2 | Story | P0 | Done | M | infra | Each stateful service owns its database. | Compose: one `*-db` + named volume per service. | SRV-1 |
+| SRV-3 | Story | P0 | Ready | L | per API task | Versioned OpenAPI for real routes (not only `/internal/ping`). | Catalog and content public read APIs published via springdoc; gateway uses those contracts. | SRV-1, CAT-2, CNT-2 |
+| SRV-4 | Story | P1 | Ideas | M | amendment + content | Events: version published, amendment created, article updated. | Event names and JSON schemas documented; no broker required yet. | SRV-3, ARCH-4 |
+| SRV-5 | Story | P1 | Ideas | L | n/a | Extra services (translation, citation, document-processing). | Out of scope until browse + editor exist. Core eight services already scaffolded. | SRV-1 |
+| SRV-6 | Story | P0 | Ready | L | editor-service + gateway-web | Authenticated WYSIWYG edit/publish. | Split in Sprint 3: IDN-1, ED-1–3, UI-ED-1. Not Sprint 1. | SRV-2, IDN-1, CNT-2 |
+| SRV-7 | Story | P1 | Ideas | L | mcp-server | Whitelisted MCP tools. | After editor + audit exist; read-only first. | SRV-6, GOV-1 |
 
 ## Epic 2: Database and Persistence Layer
 
-| ID | Type | Priority | Status | Story | Acceptance Criteria | Dependencies |
-| --- | --- | --- | --- | --- | --- | --- |
-| DB-1 | Task | P0 | Ready | Create the database schema for countries, constitutions, constitution_versions, articles, amendments, and amendment_changes. | Tables, keys, and indexes are defined and migration-ready. | ARCH-1 |
-| DB-2 | Task | P0 | Ready | Add uniqueness rules for country codes, constitution slugs, version labels, and article numbers within a version. | Duplicate records are rejected according to the domain rules. | DB-1 |
-| DB-3 | Task | P0 | Ready | Add provenance fields for source URLs, official gazette references, language codes, and timestamps. | Source metadata can be stored and queried with each version and article. | DB-1 |
-| DB-4 | Task | P1 | Ideas | Add full-text search support for article and version text. | Search can find constitution text by keyword across the corpus. | DB-1, DB-3 |
-| DB-5 | Task | P1 | Ideas | Add change representation for added, modified, deleted, and renumbered articles. | Amendment changes can describe text and structural edits. | DB-1 |
-| DB-6 | Task | P0 | Ready | Define the PostgreSQL schema pattern for each stateful service, including normalized tables, JSONB metadata, and outbox or audit tables where needed. | Each service has a documented schema approach that matches its ownership and avoids storing authoritative content as blobs. | SRV-2, DB-1 |
+`DB-1`–`DB-3` and `DB-6` are umbrellas. Implement the per-service tasks.
+
+| ID | Type | Priority | Status | Size | Owner | Task | Acceptance Criteria | Dependencies |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| DB-1 | Task | P0 | Ready | L | split | Umbrella: countries … amendment_changes. | Done when CAT-1, CNT-1, and AMD-1 are Done. | ARCH-1 |
+| DB-2 | Task | P0 | Ready | S | CAT-1 / CNT-1 | Uniqueness (country code, slug, version label, article number in version). | Enforced in those Flyway files, not a separate migration elsewhere. | CAT-1, CNT-1 |
+| DB-3 | Task | P0 | Ready | S | catalog-service | Provenance columns on versions/sources. | Included in CAT-1 (`source_url`, gazette ref, `language_code`, timestamps). | CAT-1 |
+| DB-4 | Task | P1 | Ideas | M | search-service | Full-text index tables / tsvector. | Keyword search over published articles; derived data only. | SRC-1, SRCH-1 |
+| DB-5 | Task | P1 | Ideas | M | amendment-service | Change ops: added / modified / deleted / renumbered. | `amendment_changes.change_type` + payload; not required for first browse. | AMD-1 |
+| DB-6 | Task | P0 | Ready | S | docs | Schema pattern (normalized + JSONB metadata + outbox later). | Short note in `docs/adr` or QLT-1; no shared DB. | SRV-2 |
+| CAT-1 | Task | P0 | Ready | M | catalog-service | Flyway `V2__catalog_domain.sql`: `countries`, `constitutions`, `constitution_versions`, `constitution_sources`. | Unique ISO/slug/version_label; provenance fields; Testcontainers insert+query. | ARCH-1 |
+| CNT-1 | Task | P0 | Ready | M | content-service | Flyway `V2__content_domain.sql`: `articles` (+ optional `article_blocks`). | Unique (version_id, article_number); ordered list; snapshot rows immutable. | ARCH-2, ARCH-3 |
+| AMD-1 | Task | P1 | Ready | M | amendment-service | Flyway `V2__amendment_domain.sql`: `amendments`, `amendment_changes`, `version_transitions`. | Opaque catalog/content ids only; no FK across DBs. | ARCH-4 |
+| IDN-1 | Task | P1 | Ready | M | identity-service | Flyway `V2__identity.sql`: `users`, `roles`, `user_roles`. | Can store local-editor from env; password hash column. | SRV-2 |
+| ED-1 | Task | P1 | Ideas | M | editor-service | Drafts: `edit_sessions`, `draft_changes`, `edit_revisions`. | After IDN-1 and CNT-1. | IDN-1, CNT-1 |
+| AUD-1 | Task | P1 | Ready | M | audit-service | `audit_events` append-only. | Insert + list by entity; updates/deletes rejected. | GOV-1 |
+| SRCH-1 | Task | P1 | Ideas | M | search-service | `search_documents`, `index_sync_state`. | Rebuild from content API/events, never catalog SQL. | CNT-2, SRC-1 |
+| ING-DB | Task | P1 | Ready | M | ingestion-service | `import_jobs`, `import_errors`, `import_staging_records`. | Job row + error log; no write to catalog except via catalog API. | ING-1, CAT-2 |
 
 ## Epic 2B: Local Development and Orchestration
 
-| ID | Type | Priority | Status | Story | Acceptance Criteria | Dependencies |
-| --- | --- | --- | --- | --- | --- | --- |
-| OPS-1 | Task | P0 | Ready | Create a `docker-compose` file that starts the full local stack. | The stack can be brought up with one command and includes all required services. | SRV-1, DB-1 |
-| OPS-2 | Task | P0 | Ready | Containerize each service with a reproducible runtime image. | Every runnable service has a Dockerfile and starts consistently. | SRV-1 |
-| OPS-3 | Task | P0 | Ready | Define local environment variables and service wiring. | Services can discover each other and connect to their own databases locally. | OPS-1, OPS-2 |
-| OPS-4 | Task | P1 | Ideas | Add seed data and fixtures for demo constitutions and countries. | A fresh local stack contains usable sample content. | OPS-1, ING-1 |
-| OPS-5 | Task | P1 | Ideas | Add health checks and startup ordering for dependent services. | Compose starts services in a stable order and surfaces unhealthy containers. | OPS-1 |
+| ID | Type | Priority | Status | Size | Owner | Task | Acceptance Criteria | Dependencies |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| OPS-1 | Task | P0 | Done | M | infra | Compose stack. | `./manageLocalStack.sh --start` brings up services + DBs. | SRV-1 |
+| OPS-2 | Task | P0 | Done | M | infra | Dockerfile per runnable service. | Images exist; start is slow (see OPS-8). | SRV-1 |
+| OPS-3 | Task | P0 | Done | S | infra | Env profiles and JDBC wiring in Compose. | `env/*.env.example`; each app points at its `*-db`. | OPS-1 |
+| OPS-4 | Task | P0 | Ready | M | catalog + content | Seed one demo country (two versions, ~10 articles) without full ingestion. | Fresh volume + migrate + seed SQL or `application` runner; UI-1 can render it. Do not wait for ING-1. | CAT-1, CNT-1 |
+| OPS-5 | Task | P0 | Ready | S | infra | Compose `healthcheck` + `depends_on: condition: service_healthy` for DBs and apps. | Unhealthy container is visible; apps wait for Postgres. | OPS-1 |
+| OPS-6 | Task | P0 | Ready | S | infra | Build `edge-proxy` in `BUILD_ORDER` (or `compose build` before `up --no-build`). | `--start` does not fail with missing `verfassung-edge-proxy`. | OPS-2 |
+| OPS-7 | Task | P0 | Done | S | infra | Named Postgres volumes; `--reset` uses `down -v`. | `--stop` keeps data; `--reset` wipes `*-db-data`. | OPS-1 |
+| OPS-8 | Task | P1 | Ready | M | each Kotlin Dockerfile | Cache Gradle deps: copy `build.gradle.kts` first, then sources; optional BuildKit cache mount. | Rebuild after a Kotlin-only change does not re-download Maven. | OPS-2 |
 
 ## Epic 3: Content Ingestion and Editorial Workflow
 
-| ID | Type | Priority | Status | Story | Acceptance Criteria | Dependencies |
-| --- | --- | --- | --- | --- | --- | --- |
-| ING-1 | Story | P0 | Ready | As an editor, I want to import a constitution version from structured input so that new content can be added consistently. | Import creates a version and its articles in one atomic workflow. | DB-1 |
-| ING-2 | Story | P0 | Ready | As an editor, I want to validate article ordering and numbering so that source texts are imported accurately. | Invalid numbering or missing articles cause a validation error. | ING-1, DB-2 |
-| ING-3 | Story | P1 | Ideas | As an editor, I want to attach sources and citations during import so that every text can be traced back to an official document. | Every imported version can carry one or more references. | DB-3 |
-| ING-4 | Story | P1 | Ideas | As an editor, I want to create amendments as change sets so that I can preserve constitutional history. | A change set can create a new version from an existing one and record article-level diffs. | DB-5 |
-| ING-5 | Story | P2 | Ideas | As an editor, I want translation import support so that the same constitution can be displayed in multiple languages. | A version can store translated article content by language. | DB-3, ARCH-5 |
+| ID | Type | Priority | Status | Size | Owner | Story | Acceptance Criteria | Dependencies |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| ING-1 | Story | P0 | Ready | L | ingestion-service | Import a version from structured input (JSON/YAML). | Calls catalog + content APIs in one job; rollback/fail leaves no partial public version. Sprint 2, not required for OPS-4 seed. | CAT-2, CNT-2, ING-DB |
+| ING-2 | Story | P0 | Ready | M | ingestion-service | Validate article order and numbering. | Invalid numbering → job `failed` + `import_errors`; no catalog write. | ING-1, CNT-1 |
+| ING-3 | Story | P1 | Ideas | M | ingestion-service | Attach sources/citations on import. | Forwards provenance to catalog `constitution_sources`. | ING-1, CAT-1 |
+| ING-4 | Story | P1 | Ideas | L | amendment-service | Amendments as change sets → new version. | New content snapshot + amendment rows. | DB-5, AMD-1, CNT-2 |
+| ING-5 | Story | P2 | Ideas | L | later | Translation import. | Out of Sprint 1–2. | ARCH-5 |
 
 ## Epic 4: Public Browsing Experience
 
-| ID | Type | Priority | Status | Story | Acceptance Criteria | Dependencies |
-| --- | --- | --- | --- | --- | --- | --- |
-| UI-1 | Story | P0 | Ready | As a visitor, I want to browse constitutions by country so that I can quickly find a legal system of interest. | Country listing and country detail pages are available. | DB-1 |
-| UI-2 | Story | P0 | Ready | As a visitor, I want to open a constitution version and read all articles in order. | Version pages render article list and article detail navigation. | ARCH-2, ARCH-3 |
-| UI-3 | Story | P0 | Ready | As a visitor, I want article-level anchors and permalinks so that I can cite specific provisions. | Each article has a stable URL and anchor. | ARCH-3 |
-| UI-4 | Story | P1 | Ideas | As a visitor, I want to compare two versions side by side so that I can see what changed. | The comparison view highlights added, removed, and modified articles. | ARCH-4, DB-5 |
-| UI-5 | Story | P1 | Ideas | As a visitor, I want to inspect an amendment timeline so that I can understand constitutional evolution. | Timeline shows version succession and amendment metadata. | ARCH-4 |
+| ID | Type | Priority | Status | Size | Owner | Story | Acceptance Criteria | Dependencies |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| UI-1 | Story | P0 | Ready | M | gateway-web | Browse by country. | `/` lists countries; `/countries/[code]` lists constitutions/versions. Data from catalog API. | CAT-2, OPS-4 |
+| UI-2 | Story | P0 | Ready | M | gateway-web | Read a version’s articles in order. | `/countries/[code]/versions/[id]` lists articles; article page shows body. | CNT-2, UI-1 |
+| UI-3 | Story | P0 | Ready | S | gateway-web | Article permalink + heading anchor. | Stable URL; in-page `#` for article number. | UI-2, ARCH-3 |
+| UI-4 | Story | P1 | Ideas | L | gateway-web | Side-by-side version compare. | After AMD-1 + DB-5. | ARCH-4, DB-5 |
+| UI-5 | Story | P1 | Ideas | M | gateway-web | Amendment timeline. | After AMD-2. | ARCH-4, AMD-2 |
+
+## Epic 4B: First domain APIs (executable)
+
+Replace `/internal/ping` only on the services in this table. Leave identity/editor/search/ingestion/audit on ping until their sprint.
+
+| ID | Type | Priority | Status | Size | Owner | Task | Acceptance Criteria | Dependencies |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| CAT-2 | Task | P0 | Ready | M | catalog-service | Read API: list countries, get country, list versions for a constitution. | OpenAPI; 404 on unknown; Testcontainers API test; unpublished versions omitted. | CAT-1 |
+| CNT-2 | Task | P0 | Ready | M | content-service | Read API: list articles for `versionId`, get article by id. | Ordered list; 404; API test. `versionId` is an opaque catalog id (no catalog SQL). | CNT-1 |
+| GW-1 | Task | P0 | Ready | M | gateway-web | HTTP clients for CAT-2 and CNT-2 (env base URLs via Caddy or Compose DNS). | Server components fetch; empty/error states if API down. | CAT-2, CNT-2 |
+| AMD-2 | Task | P1 | Ready | M | amendment-service | Read API: list amendments for a version transition. | After AMD-1; not Sprint 1. | AMD-1 |
+| IDN-2 | Task | P1 | Ready | M | identity-service | Login (session or JWT) for editor role. | After IDN-1. | IDN-1 |
+| ED-2 | Task | P1 | Ideas | L | editor-service | Draft save/preview commands. | After ED-1, IDN-2, CNT-2. | ED-1, IDN-2 |
 
 ## Epic 5: Search, Navigation, and Discovery
 
-| ID | Type | Priority | Status | Story | Acceptance Criteria | Dependencies |
-| --- | --- | --- | --- | --- | --- | --- |
-| SRC-1 | Story | P0 | Ready | As a visitor, I want to search across constitution articles so that I can find concepts quickly. | Search returns relevant articles and supports filtering by country and version. | DB-4 |
-| SRC-2 | Story | P1 | Ideas | As a visitor, I want to filter by country, constitution, version, and amendment date so that I can narrow results. | Filters can be combined without breaking search results. | SRC-1 |
-| SRC-3 | Story | P1 | Ideas | As a visitor, I want to jump between linked articles and cross-references so that I can follow internal references. | Linked article references resolve correctly. | UI-2, ARCH-3 |
-| SRC-4 | Story | P2 | Ideas | As a visitor, I want a global index of constitutional terms so that I can explore recurring themes. | Index pages aggregate terms across the corpus. | DB-4 |
+| ID | Type | Priority | Status | Size | Owner | Story | Acceptance Criteria | Dependencies |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| SRC-1 | Story | P0 | Ready | L | search-service + gateway-web | Keyword search across articles. | Sprint 2+; needs SRCH-1 and published content. Do not block UI-1. | SRCH-1, CNT-2 |
+| SRC-2 | Story | P1 | Ideas | M | search-service | Facet filters (country, version, date). | After SRC-1. | SRC-1 |
+| SRC-3 | Story | P1 | Ideas | M | gateway-web | In-text cross-reference links. | Needs `article_links` or similar. | UI-2, ARCH-3 |
+| SRC-4 | Story | P2 | Ideas | L | search-service | Global term index. | Later. | DB-4 |
 
 ## Epic 6: Trust, Quality, and Governance
 
-| ID | Type | Priority | Status | Story | Acceptance Criteria | Dependencies |
-| --- | --- | --- | --- | --- | --- | --- |
-| GOV-1 | Task | P0 | Ready | Add audit metadata for who imported or edited a record and when. | Changes are attributable to a user or service account. | DB-1 |
-| GOV-2 | Task | P0 | Ready | Add content validation rules for required fields and version consistency. | Bad imports fail before persisting partial data. | ING-1 |
-| GOV-3 | Task | P1 | Ideas | Add review workflow for editorial approval before publishing new versions. | Draft content can be reviewed and approved before public visibility. | GOV-1, ING-1 |
-| GOV-4 | Task | P1 | Ideas | Add backups and recovery strategy for the legal corpus. | Data can be restored from backup with version integrity preserved. | DB-1 |
-| GOV-5 | Task | P2 | Ideas | Add source confidence and verification flags for uncertain text. | Records can be marked verified, pending, or disputed. | DB-3 |
+| ID | Type | Priority | Status | Size | Owner | Task | Acceptance Criteria | Dependencies |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| GOV-1 | Task | P1 | Ready | M | audit-service | Record actor + action + entity + time. | AUD-1 schema + append API used by editor/ingestion (Sprint 3). | AUD-1 |
+| GOV-2 | Task | P0 | Ready | M | ingestion-service | Validate before persist. | Same sprint as ING-1; not Sprint 1 seed. | ING-1 |
+| GOV-3 | Task | P1 | Ideas | L | editor-service | Review then publish as separate events. | Same role may do both; two audit event types. | GOV-1, ED-2 |
+| GOV-4 | Task | P1 | Ideas | M | infra | Restore drill from `infra/backup`. | Script dumps all eight DBs (include `search`); documented restore. Current script is incomplete. | OPS-7 |
+| GOV-5 | Task | P2 | Ideas | S | catalog-service | Verification flags on sources. | Later. | CAT-1 |
 
 ## Epic 7: Platform and Performance
 
-| ID | Type | Priority | Status | Story | Acceptance Criteria | Dependencies |
-| --- | --- | --- | --- | --- | --- | --- |
-| PLAT-1 | Task | P0 | Ready | Set up a performant read path for public pages. | Country, version, and article pages load quickly under normal traffic. | UI-1, UI-2 |
-| PLAT-2 | Task | P0 | Ready | Add pagination and caching for long constitutions and large country indexes. | Large constitutions remain usable on mobile and desktop. | UI-2, SRC-1 |
-| PLAT-3 | Task | P1 | Ideas | Add localization-ready rendering for multilingual text. | UI can switch between available languages without data loss. | ING-5 |
-| PLAT-4 | Task | P1 | Ideas | Add observability for import failures, search latency, and page errors. | Core system metrics and logs are available. | DB-1, ING-1, UI-1 |
+| ID | Type | Priority | Status | Size | Owner | Task | Acceptance Criteria | Dependencies |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| PLAT-1 | Task | P0 | Ready | S | gateway-web | SSR country/version/article pages; no N+1 in the page. | After UI-2; measure locally, no CDN required. | UI-1, UI-2 |
+| PLAT-2 | Task | P1 | Ready | M | content + gateway-web | Paginate long article lists. | After a large seed exists; not Sprint 1 (~10 articles). | UI-2 |
+| PLAT-3 | Task | P1 | Ideas | M | gateway-web | Language switcher. | After ING-5. | ING-5 |
+| PLAT-4 | Task | P1 | Ideas | M | all services | JSON logs + correlation id. | After browse works. | UI-1 |
 
 ## Epic 8: CI and Delivery Automation
 
-| ID | Type | Priority | Status | Story | Acceptance Criteria | Dependencies |
-| --- | --- | --- | --- | --- | --- | --- |
-| CI-1 | Task | P0 | Ready | Create a CI pipeline that runs on push. | A push triggers the workflow automatically. | None |
-| CI-2 | Task | P0 | Ready | Run the full test suite in CI. | All service test suites execute in the pipeline and report failures clearly. | CI-1, SRV-1 |
-| CI-3 | Task | P0 | Ready | Add build validation for each service image. | CI verifies that each Docker image builds successfully. | CI-1, OPS-2 |
-| CI-4 | Task | P1 | Ideas | Add linting, type checking, and dependency audit steps. | Static checks run on every push and fail the pipeline on errors. | CI-1 |
-| CI-5 | Task | P1 | Ideas | Add artifact or cache strategy to speed up repeated runs. | Common dependencies are cached without weakening validation. | CI-1 |
+| ID | Type | Priority | Status | Size | Owner | Task | Acceptance Criteria | Dependencies |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| CI-1 | Task | P0 | Done | S | .github | Pipeline on push/PR. | Workflow exists. | None |
+| CI-2 | Task | P0 | Done | M | .github | `gradle test` per microservice + frontend lint/build. | Matrix/discover all `services/*/build.gradle.kts`. Domain API tests still missing (add with CAT-2/CNT-2). | CI-1 |
+| CI-3 | Task | P1 | Ready | M | .github | `docker build` (or compose) per service image. | Separate job; do not block merge on 8× full `bootJar` until OPS-8. | OPS-2, OPS-8 |
+| CI-4 | Task | P1 | Ideas | M | .github | ktlint/detekt + `tsc` already via next lint. | Fail on errors. | CI-1 |
+| CI-5 | Task | P1 | Ready | S | .github | Gradle wrapper or setup-gradle cache (already partially true). | Add wrappers so local and CI match. | CI-2 |
 
 ## Epic 9: Dependency Tracking and Manual Maintenance
 
-| ID | Type | Priority | Status | Story | Acceptance Criteria | Dependencies |
-| --- | --- | --- | --- | --- | --- | --- |
-| DEP-1 | Task | P0 | Ready | Create a dependency inventory for every service and for shared platform tooling. | Every service has a documented list of runtime, build, and container dependencies. | SRV-1, OPS-2 |
-| DEP-2 | Task | P0 | Ready | Add ownership metadata for each dependency so updates are easy to assign. | Each dependency records the owner, current version, and review cadence. | DEP-1 |
-| DEP-3 | Task | P0 | Ready | Define a quick manual maintenance workflow for dependency upgrades. | A maintainer can follow a short checklist to update, test, and publish a dependency change. | DEP-1, CI-2 |
-| DEP-4 | Task | P1 | Ideas | Add automated dependency scanning and a review queue for outdated packages. | Outdated dependencies are surfaced before they become hard to maintain. | CI-4, DEP-1 |
-| DEP-5 | Task | P1 | Ideas | Track base image versions and platform tooling versions in the same inventory. | Docker base images and CI tools appear in the same maintenance view as libraries. | OPS-2, CI-3 |
-| DEP-6 | Task | P1 | Ideas | Add a maintenance runbook for emergency updates and security fixes. | A maintainer can apply a critical fix with minimal context switching. | DEP-3, GOV-4 |
-| DEP-7 | Task | P0 | Ready | Configure Renovate Bot to update dependency manifests and open pull requests automatically. | Renovate creates grouped or single-dependency update PRs with clear labels and owners. | DEP-1, CI-1 |
+Keep this epic **out of Sprint 1**. One hygiene sprint later is enough.
+
+| ID | Type | Priority | Status | Size | Owner | Task | Acceptance Criteria | Dependencies |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| DEP-1 | Task | P1 | Ready | M | docs | Inventory of runtime/build/image deps. | One markdown table or Renovate dashboard. | OPS-2 |
+| DEP-2 | Task | P2 | Ideas | S | docs | Owner + review cadence per dependency. | After DEP-1. | DEP-1 |
+| DEP-3 | Task | P2 | Ideas | S | docs | Upgrade checklist (test one service, then CI). | After DEP-1. | DEP-1, CI-2 |
+| DEP-4 | Task | P1 | Ideas | S | GitHub | Dependabot or Renovate alerts. | After DEP-7 or instead of it. | DEP-1 |
+| DEP-5 | Task | P2 | Ideas | S | docs | Base images in the same inventory. | After DEP-1. | DEP-1 |
+| DEP-6 | Task | P2 | Ideas | S | docs | Emergency patch runbook. | After DEP-3. | DEP-3 |
+| DEP-7 | Task | P1 | Ready | S | GitHub | Renovate (or Dependabot) on Gradle + npm. | Opens PRs; humans merge. | CI-1 |
 
 ## Epic 10: Code Quality and Technical Debt Prevention
 
-| ID | Type | Priority | Status | Story | Acceptance Criteria | Dependencies |
-| --- | --- | --- | --- | --- | --- | --- |
-| QLT-1 | Task | P0 | Ready | Establish architecture decision records for major platform choices. | Significant decisions are recorded with context, options, and consequences. | SRV-1 |
-| QLT-2 | Task | P0 | Ready | Enforce quality gates in CI for tests, linting, and type checks. | No merge can happen unless core checks pass. | CI-1, CI-2, CI-4 |
-| QLT-3 | Task | P0 | Ready | Add contract tests for service APIs and events. | Breaking service changes are caught before deployment. | SRV-3, SRV-4 |
-| QLT-4 | Task | P0 | Ready | Define a migration policy for database changes. | Migrations are versioned, reviewed, and safe to apply incrementally. | DB-1, GOV-2 |
-| QLT-5 | Task | P1 | Ideas | Introduce feature flags for incomplete or risky functionality. | New behavior can be rolled out safely and disabled quickly. | PLAT-1 |
-| QLT-6 | Task | P1 | Ideas | Add a baseline observability standard for every service. | Each service exposes logs, health checks, and core metrics. | PLAT-4 |
-| QLT-7 | Task | P1 | Ideas | Reserve recurring refactoring capacity in sprint planning. | A portion of capacity is always available for cleanup and simplification. | None |
-| QLT-8 | Task | P1 | Ideas | Standardize formatting and static analysis across backend and frontend projects. | Formatting and linting run automatically and are consistent across repos. | CI-4 |
+| ID | Type | Priority | Status | Size | Owner | Task | Acceptance Criteria | Dependencies |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| QLT-1 | Task | P1 | Ready | S | docs | ADR: DB-per-service, Caddy entry, no shared DB. | `docs/adr/0001-….md`. Not a Sprint 1 blocker. | SRV-1 |
+| QLT-2 | Task | P1 | Ideas | M | GitHub | Branch protection requiring CI. | After CI-2 is green on main. | CI-2 |
+| QLT-3 | Task | P1 | Ideas | M | catalog + content | Consumer tests for CAT-2/CNT-2. | After those APIs exist. | CAT-2, CNT-2 |
+| QLT-4 | Task | P0 | Ready | S | docs | Flyway forward-only; new `V{n}` per change; no edit of applied files. | Document in AGENTS or ADR. | CAT-1 |
+| QLT-5 | Task | P1 | Ideas | M | editor | Feature flag for publish. | Sprint 3. | ED-2 |
+| QLT-6 | Task | P1 | Ideas | S | all | Actuator health already on; add `info` + log correlation. | With PLAT-4. | PLAT-4 |
+| QLT-7 | Task | P2 | Ideas | S | process | 10% sprint capacity for cleanup. | Planning habit, not a ticket to “finish”. | None |
+| QLT-8 | Task | P1 | Ideas | M | repo | Spotless/ktlint + existing Next lint. | With CI-4. | CI-4 |
 
 ## Suggested Sprint Breakdown
 
-### Sprint 0: Foundation
-- ARCH-1
-- ARCH-2
-- ARCH-3
-- SRV-1
-- SRV-2
-- SRV-3
-- DB-1
-- DB-2
-- OPS-1
-- OPS-2
-- ING-1
-- UI-1
-- SRV-6
-- DB-6
-- QLT-1
+Pull **only Ready P0 tasks** listed under each sprint. Do not re-open Done IDs.
 
-### Sprint 1: Content Delivery
-- ARCH-4
-- DB-3
-- OPS-3
-- UI-2
-- UI-3
-- SRC-1
-- GOV-2
-- CI-1
-- CI-2
-- OPS-5
-- DEP-1
+### Sprint 0: Foundation — closed
+Done: SRV-1, SRV-2, OPS-1, OPS-2, OPS-3, OPS-7, CI-1, CI-2.
+Deferred out of Sprint 0 (were overscoped): ARCH physical schema, DB-*, ING-1, UI-1, SRV-6, QLT-1.
 
-### Sprint 2: Amendment and Comparison
-- DB-5
-- UI-4
-- UI-5
-- ING-4
-- PLAT-2
-- SRC-3
-- QLT-3
+### Sprint 1: Public browse + seed (one vertical slice)
+Goal: `http://localhost` shows a seeded country → version → articles.
 
-### Sprint 3: Editorial and Scale
-- ING-3
-- ING-5
-- GOV-3
-- PLAT-3
-- PLAT-4
-- CI-3
-- CI-4
-- SRV-7
-- QLT-5
+1. OPS-6 (Caddy image on start) — S
+2. CAT-1 → CAT-2 — M + M
+3. CNT-1 → CNT-2 — M + M
+4. OPS-4 seed — M
+5. GW-1 → UI-1 → UI-2 → UI-3 — M + M + M + S
+6. OPS-5 healthchecks — S
+7. QLT-4 Flyway policy — S
 
-### Sprint 4: Dependency Hygiene
-- DEP-1
-- DEP-2
-- DEP-3
-- DEP-5
-- DEP-6
-- DEP-7
-- QLT-8
+Out of Sprint 1: search, editor, identity, ingestion job, amendments, Renovate, image-build CI, MCP.
 
-### Sprint 5: Quality Guardrails
-- QLT-1
-- QLT-2
-- QLT-3
-- QLT-4
-- QLT-6
-- QLT-8
+### Sprint 2: History + import
+AMD-1, AMD-2, ARCH-4, ING-DB, ING-1, ING-2, GOV-2, UI-5 (or UI-4 if compare is in), SRC-1/SRCH-1 if capacity, OPS-8, CI-5.
+
+### Sprint 3: Editor
+IDN-1, IDN-2, ED-1, ED-2, SRV-6/UI editor routes, AUD-1, GOV-1, GOV-3.
+
+### Sprint 4: Hygiene
+DEP-1, DEP-7, CI-3, CI-4, QLT-1, QLT-3, QLT-8, GOV-4, PLAT-2, PLAT-4.
+
+### Later / Ideas
+ARCH-5, SRV-5, SRV-7, ING-5, SRC-2–4, PLAT-3, QLT-5, DEP-2–6.
 
 ## Open Product Questions
 - Should published constitutional versions be immutable snapshots only, or do you want official errata and corrections modeled separately?

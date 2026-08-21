@@ -17,7 +17,7 @@ Public site for versioned constitutions: countries → constitution versions →
 | `services/<name>/` | One Spring Boot service + its Gradle project |
 | `infra/` | Caddy, backup script |
 | `env/` | Profile templates (`local-stack`, `ci`, `testing`, `production`) |
-| `backlog.md` | Product + sprint backlog (large). **Do not read unless implementing a named story or schema.** |
+| `backlog.md` | Product + sprint backlog (large). **Grep for IDs** (`ARCH-`, `CAT-`, `CNT-`, `UI-`, `OPS-`); do not read the whole file. |
 
 ## Commands
 

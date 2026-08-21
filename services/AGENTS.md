@@ -19,7 +19,7 @@ Writes go only to the owning service. Cross-service data via REST/events, never 
 
 - Layers: Controller → Service → Repository + DTOs. No persistence entities as public API.
 - Package: `com.constitutionatlas.<service>`
-- Schema: Flyway in `src/main/resources/db/migration/`
+- Schema: Flyway in `src/main/resources/db/migration/`. Forward-only: add `V{n}__….sql`, never edit a migration that may already have been applied.
 - Tests: Testcontainers Postgres smoke already exists; add API tests next to it
 - Structured JSON logs; no secrets in logs
 

@@ -6,6 +6,28 @@ This repo is a **monorepo**: Kotlin Spring Boot services, a Next.js gateway, Doc
 
 Product work and sprint status live in [`backlog.md`](backlog.md). This file is only how to run and navigate the repo.
 
+## Host prerequisites (install yourself)
+
+These are not provided by the repo. Docker Compose images already contain Java, Gradle, Node, Caddy, and Postgres; you still need Docker on the host.
+
+| Tool | Version | Needed for | Install |
+| --- | --- | --- | --- |
+| Docker Desktop | current, with the engine running | Local stack (`./manageLocalStack.sh`) and Testcontainers | [Docker Desktop for Mac](https://www.docker.com/products/docker-desktop/) |
+| Temurin JDK | **21** (LTS) | `cd services/<name> && gradle test` on the host | [Adoptium Temurin 21](https://adoptium.net/temurin/releases/?version=21) (macOS `.pkg` needs admin). Without sudo: unpack the macOS aarch64/x64 `.tar.gz` under `~/.local/java/temurin-21` (`Contents/Home`) and set `JAVA_HOME` + `PATH` in `~/.zshrc`. |
+| Gradle | **8.10.2** (matches CI and service Dockerfiles) | Host `gradle test` / `bootJar` | [Gradle 8.10.2](https://gradle.org/releases/) binary zip; put `bin` on `PATH`. Homebrew’s `gradle` formula is currently 9.x and is **not** the version this repo uses. |
+| Node.js + npm | **20** | `cd apps/gateway-web && npm ci && npm run lint && npm run build` | [Node 20](https://nodejs.org/) or `nvm install 20` |
+
+Check:
+
+```bash
+docker info
+java -version    # OpenJDK 21, Temurin
+gradle -v        # 8.10.x
+node -v          # v20.x
+```
+
+You do **not** install Postgres, Caddy, or Spring Boot on the host for the Compose workflow.
+
 ## Quick start
 
 ```bash

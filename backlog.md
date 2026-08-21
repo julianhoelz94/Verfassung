@@ -545,16 +545,16 @@ These are useful, but they should stay out of the initial implementation scope u
 - Do not pull `Ideas` or L items from later epics into Sprint 1.
 
 ### Board snapshot (repo as of Sprint 0 close)
-- **Done:** SRV-1, SRV-2, OPS-1, OPS-2, OPS-3, OPS-7, CI-1, CI-2 (smoke tests only).
+- **Done:** SRV-1, SRV-2, OPS-1, OPS-2, OPS-3, OPS-5, OPS-6, OPS-7, CI-1, CI-2, CAT-1, CAT-2, CNT-1, CNT-2, OPS-4, GW-1, UI-1, UI-2, UI-3, QLT-4.
 - **Not done (were listed under Sprint 0):** ARCH-1–3 physical schema, DB-1–3, DB-6, ING-1, UI-1, SRV-3 domain contracts, SRV-6, QLT-1.
 
 ## Epic 1: Information Architecture and Domain Modeling
 
 | ID | Type | Priority | Status | Size | Owner | Story | Acceptance Criteria | Dependencies |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| ARCH-1 | Story | P0 | Ready | L | catalog + content + amendment | Canonical model for countries, constitutions, versions, articles, amendments. | Logical model in this file; physical tables land in CAT-1, CNT-1, AMD-1. One country with two versions can be stored. | None |
-| ARCH-2 | Story | P0 | Ready | M | content-service | Version is a full snapshot of articles in force. | `GET` articles by version returns the complete ordered set; later versions do not mutate older rows. | ARCH-1, CNT-1 |
-| ARCH-3 | Story | P0 | Ready | M | content-service | Each article is independently addressable. | Stable `article_id` (or equivalent) unique within a version; fetch by id. | ARCH-1, CNT-1 |
+| ARCH-1 | Story | P0 | Done | L | catalog + content + amendment | Canonical model for countries, constitutions, versions, articles, amendments. | Logical model in this file; physical tables land in CAT-1, CNT-1, AMD-1. One country with two versions can be stored. | None |
+| ARCH-2 | Story | P0 | Done | M | content-service | Version is a full snapshot of articles in force. | `GET` articles by version returns the complete ordered set; later versions do not mutate older rows. | ARCH-1, CNT-1 |
+| ARCH-3 | Story | P0 | Done | M | content-service | Each article is independently addressable. | Stable `article_id` (or equivalent) unique within a version; fetch by id. | ARCH-1, CNT-1 |
 | ARCH-4 | Story | P0 | Ready | M | amendment-service | Amendments link version changes and affected articles. | Amendment row references opaque source/target version ids and a list of affected article ids. | ARCH-2, ARCH-3, AMD-1 |
 | ARCH-5 | Story | P1 | Ideas | L | content-service | Paragraphs/clauses under articles. | Model can add blocks without breaking article list/get. | ARCH-3 |
 
@@ -582,8 +582,8 @@ These are useful, but they should stay out of the initial implementation scope u
 | DB-4 | Task | P1 | Ideas | M | search-service | Full-text index tables / tsvector. | Keyword search over published articles; derived data only. | SRC-1, SRCH-1 |
 | DB-5 | Task | P1 | Ideas | M | amendment-service | Change ops: added / modified / deleted / renumbered. | `amendment_changes.change_type` + payload; not required for first browse. | AMD-1 |
 | DB-6 | Task | P0 | Ready | S | docs | Schema pattern (normalized + JSONB metadata + outbox later). | Short note in `docs/adr` or QLT-1; no shared DB. | SRV-2 |
-| CAT-1 | Task | P0 | Ready | M | catalog-service | Flyway `V2__catalog_domain.sql`: `countries`, `constitutions`, `constitution_versions`, `constitution_sources`. | Unique ISO/slug/version_label; provenance fields; Testcontainers insert+query. | ARCH-1 |
-| CNT-1 | Task | P0 | Ready | M | content-service | Flyway `V2__content_domain.sql`: `articles` (+ optional `article_blocks`). | Unique (version_id, article_number); ordered list; snapshot rows immutable. | ARCH-2, ARCH-3 |
+| CAT-1 | Task | P0 | Done | M | catalog-service | Flyway `V2__catalog_domain.sql`: `countries`, `constitutions`, `constitution_versions`, `constitution_sources`. | Unique ISO/slug/version_label; provenance fields; Testcontainers insert+query. | ARCH-1 |
+| CNT-1 | Task | P0 | Done | M | content-service | Flyway `V2__content_domain.sql`: `articles` (+ optional `article_blocks`). | Unique (version_id, article_number); ordered list; snapshot rows immutable. | ARCH-2, ARCH-3 |
 | AMD-1 | Task | P1 | Ready | M | amendment-service | Flyway `V2__amendment_domain.sql`: `amendments`, `amendment_changes`, `version_transitions`. | Opaque catalog/content ids only; no FK across DBs. | ARCH-4 |
 | IDN-1 | Task | P1 | Ready | M | identity-service | Flyway `V2__identity.sql`: `users`, `roles`, `user_roles`. | Can store local-editor from env; password hash column. | SRV-2 |
 | ED-1 | Task | P1 | Ideas | M | editor-service | Drafts: `edit_sessions`, `draft_changes`, `edit_revisions`. | After IDN-1 and CNT-1. | IDN-1, CNT-1 |
@@ -598,9 +598,9 @@ These are useful, but they should stay out of the initial implementation scope u
 | OPS-1 | Task | P0 | Done | M | infra | Compose stack. | `./manageLocalStack.sh --start` brings up services + DBs. | SRV-1 |
 | OPS-2 | Task | P0 | Done | M | infra | Dockerfile per runnable service. | Images exist; start is slow (see OPS-8). | SRV-1 |
 | OPS-3 | Task | P0 | Done | S | infra | Env profiles and JDBC wiring in Compose. | `env/*.env.example`; each app points at its `*-db`. | OPS-1 |
-| OPS-4 | Task | P0 | Ready | M | catalog + content | Seed one demo country (two versions, ~10 articles) without full ingestion. | Fresh volume + migrate + seed SQL or `application` runner; UI-1 can render it. Do not wait for ING-1. | CAT-1, CNT-1 |
-| OPS-5 | Task | P0 | Ready | S | infra | Compose `healthcheck` + `depends_on: condition: service_healthy` for DBs and apps. | Unhealthy container is visible; apps wait for Postgres. | OPS-1 |
-| OPS-6 | Task | P0 | Ready | S | infra | Build `edge-proxy` in `BUILD_ORDER` (or `compose build` before `up --no-build`). | `--start` does not fail with missing `verfassung-edge-proxy`. | OPS-2 |
+| OPS-4 | Task | P0 | Done | M | catalog + content | Seed one demo country (two versions, ~10 articles) without full ingestion. | Fresh volume + migrate + seed SQL or `application` runner; UI-1 can render it. Do not wait for ING-1. | CAT-1, CNT-1 |
+| OPS-5 | Task | P0 | Done | S | infra | Compose `healthcheck` + `depends_on: condition: service_healthy` for DBs and apps. | Unhealthy container is visible; apps wait for Postgres. | OPS-1 |
+| OPS-6 | Task | P0 | Done | S | infra | Build `edge-proxy` in `BUILD_ORDER` (or `compose build` before `up --no-build`). | `--start` does not fail with missing `verfassung-edge-proxy`. | OPS-2 |
 | OPS-7 | Task | P0 | Done | S | infra | Named Postgres volumes; `--reset` uses `down -v`. | `--stop` keeps data; `--reset` wipes `*-db-data`. | OPS-1 |
 | OPS-8 | Task | P1 | Ready | M | each Kotlin Dockerfile | Cache Gradle deps: copy `build.gradle.kts` first, then sources; optional BuildKit cache mount. | Rebuild after a Kotlin-only change does not re-download Maven. | OPS-2 |
 
@@ -618,9 +618,9 @@ These are useful, but they should stay out of the initial implementation scope u
 
 | ID | Type | Priority | Status | Size | Owner | Story | Acceptance Criteria | Dependencies |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| UI-1 | Story | P0 | Ready | M | gateway-web | Browse by country. | `/` lists countries; `/countries/[code]` lists constitutions/versions. Data from catalog API. | CAT-2, OPS-4 |
-| UI-2 | Story | P0 | Ready | M | gateway-web | Read a version’s articles in order. | `/countries/[code]/versions/[id]` lists articles; article page shows body. | CNT-2, UI-1 |
-| UI-3 | Story | P0 | Ready | S | gateway-web | Article permalink + heading anchor. | Stable URL; in-page `#` for article number. | UI-2, ARCH-3 |
+| UI-1 | Story | P0 | Done | M | gateway-web | Browse by country. | `/` lists countries; `/countries/[code]` lists constitutions/versions. Data from catalog API. | CAT-2, OPS-4 |
+| UI-2 | Story | P0 | Done | M | gateway-web | Read a version’s articles in order. | `/countries/[code]/versions/[id]` lists articles; article page shows body. | CNT-2, UI-1 |
+| UI-3 | Story | P0 | Done | S | gateway-web | Article permalink + heading anchor. | Stable URL; in-page `#` for article number. | UI-2, ARCH-3 |
 | UI-4 | Story | P1 | Ideas | L | gateway-web | Side-by-side version compare. | After AMD-1 + DB-5. | ARCH-4, DB-5 |
 | UI-5 | Story | P1 | Ideas | M | gateway-web | Amendment timeline. | After AMD-2. | ARCH-4, AMD-2 |
 
@@ -630,9 +630,9 @@ Replace `/internal/ping` only on the services in this table. Leave identity/edit
 
 | ID | Type | Priority | Status | Size | Owner | Task | Acceptance Criteria | Dependencies |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| CAT-2 | Task | P0 | Ready | M | catalog-service | Read API: list countries, get country, list versions for a constitution. | OpenAPI; 404 on unknown; Testcontainers API test; unpublished versions omitted. | CAT-1 |
-| CNT-2 | Task | P0 | Ready | M | content-service | Read API: list articles for `versionId`, get article by id. | Ordered list; 404; API test. `versionId` is an opaque catalog id (no catalog SQL). | CNT-1 |
-| GW-1 | Task | P0 | Ready | M | gateway-web | HTTP clients for CAT-2 and CNT-2 (env base URLs via Caddy or Compose DNS). | Server components fetch; empty/error states if API down. | CAT-2, CNT-2 |
+| CAT-2 | Task | P0 | Done | M | catalog-service | Read API: list countries, get country, list versions for a constitution. | OpenAPI; 404 on unknown; Testcontainers API test; unpublished versions omitted. | CAT-1 |
+| CNT-2 | Task | P0 | Done | M | content-service | Read API: list articles for `versionId`, get article by id. | Ordered list; 404; API test. `versionId` is an opaque catalog id (no catalog SQL). | CNT-1 |
+| GW-1 | Task | P0 | Done | M | gateway-web | HTTP clients for CAT-2 and CNT-2 (env base URLs via Caddy or Compose DNS). | Server components fetch; empty/error states if API down. | CAT-2, CNT-2 |
 | AMD-2 | Task | P1 | Ready | M | amendment-service | Read API: list amendments for a version transition. | After AMD-1; not Sprint 1. | AMD-1 |
 | IDN-2 | Task | P1 | Ready | M | identity-service | Login (session or JWT) for editor role. | After IDN-1. | IDN-1 |
 | ED-2 | Task | P1 | Ideas | L | editor-service | Draft save/preview commands. | After ED-1, IDN-2, CNT-2. | ED-1, IDN-2 |
@@ -696,7 +696,7 @@ Keep this epic **out of Sprint 1**. One hygiene sprint later is enough.
 | QLT-1 | Task | P1 | Ready | S | docs | ADR: DB-per-service, Caddy entry, no shared DB. | `docs/adr/0001-….md`. Not a Sprint 1 blocker. | SRV-1 |
 | QLT-2 | Task | P1 | Ideas | M | GitHub | Branch protection requiring CI. | After CI-2 is green on main. | CI-2 |
 | QLT-3 | Task | P1 | Ideas | M | catalog + content | Consumer tests for CAT-2/CNT-2. | After those APIs exist. | CAT-2, CNT-2 |
-| QLT-4 | Task | P0 | Ready | S | docs | Flyway forward-only; new `V{n}` per change; no edit of applied files. | Document in AGENTS or ADR. | CAT-1 |
+| QLT-4 | Task | P0 | Done | S | docs | Flyway forward-only; new `V{n}` per change; no edit of applied files. | Document in AGENTS or ADR. | CAT-1 |
 | QLT-5 | Task | P1 | Ideas | M | editor | Feature flag for publish. | Sprint 3. | ED-2 |
 | QLT-6 | Task | P1 | Ideas | S | all | Actuator health already on; add `info` + log correlation. | With PLAT-4. | PLAT-4 |
 | QLT-7 | Task | P2 | Ideas | S | process | 10% sprint capacity for cleanup. | Planning habit, not a ticket to “finish”. | None |
@@ -710,16 +710,8 @@ Pull **only Ready P0 tasks** listed under each sprint. Do not re-open Done IDs.
 Done: SRV-1, SRV-2, OPS-1, OPS-2, OPS-3, OPS-7, CI-1, CI-2.
 Deferred out of Sprint 0 (were overscoped): ARCH physical schema, DB-*, ING-1, UI-1, SRV-6, QLT-1.
 
-### Sprint 1: Public browse + seed (one vertical slice)
-Goal: `http://localhost` shows a seeded country → version → articles.
-
-1. OPS-6 (Caddy image on start) — S
-2. CAT-1 → CAT-2 — M + M
-3. CNT-1 → CNT-2 — M + M
-4. OPS-4 seed — M
-5. GW-1 → UI-1 → UI-2 → UI-3 — M + M + M + S
-6. OPS-5 healthchecks — S
-7. QLT-4 Flyway policy — S
+### Sprint 1: Public browse + seed — closed
+Done: OPS-6, CAT-1, CAT-2, CNT-1, CNT-2, OPS-4, GW-1, UI-1, UI-2, UI-3, OPS-5, QLT-4.
 
 Out of Sprint 1: search, editor, identity, ingestion job, amendments, Renovate, image-build CI, MCP.
 

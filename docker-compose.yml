@@ -11,9 +11,16 @@ services:
     build: ./apps/gateway-web
     environment:
       - NODE_ENV=development
+      - CATALOG_API_URL=http://catalog-service:8080
+      - CONTENT_API_URL=http://content-service:8080
     container_name: gateway-web
     ports:
       - "${GATEWAY_PORT:-3000}:3000"
+    depends_on:
+      catalog-service:
+        condition: service_started
+      content-service:
+        condition: service_started
 
   catalog-service:
     build: ./services/catalog-service
@@ -22,7 +29,9 @@ services:
       - SPRING_DATASOURCE_URL=jdbc:postgresql://catalog-db:5432/catalog_db
       - SPRING_DATASOURCE_USERNAME=postgres
       - SPRING_DATASOURCE_PASSWORD=postgres
-    depends_on: [catalog-db]
+    depends_on:
+      catalog-db:
+        condition: service_healthy
 
   content-service:
     build: ./services/content-service
@@ -31,7 +40,9 @@ services:
       - SPRING_DATASOURCE_URL=jdbc:postgresql://content-db:5432/content_db
       - SPRING_DATASOURCE_USERNAME=postgres
       - SPRING_DATASOURCE_PASSWORD=postgres
-    depends_on: [content-db]
+    depends_on:
+      content-db:
+        condition: service_healthy
 
   amendment-service:
     build: ./services/amendment-service
@@ -40,7 +51,9 @@ services:
       - SPRING_DATASOURCE_URL=jdbc:postgresql://amendment-db:5432/amendment_db
       - SPRING_DATASOURCE_USERNAME=postgres
       - SPRING_DATASOURCE_PASSWORD=postgres
-    depends_on: [amendment-db]
+    depends_on:
+      amendment-db:
+        condition: service_healthy
 
   identity-service:
     build: ./services/identity-service
@@ -49,7 +62,9 @@ services:
       - SPRING_DATASOURCE_URL=jdbc:postgresql://identity-db:5432/identity_db
       - SPRING_DATASOURCE_USERNAME=postgres
       - SPRING_DATASOURCE_PASSWORD=postgres
-    depends_on: [identity-db]
+    depends_on:
+      identity-db:
+        condition: service_healthy
 
   editor-service:
     build: ./services/editor-service
@@ -58,7 +73,9 @@ services:
       - SPRING_DATASOURCE_URL=jdbc:postgresql://editor-db:5432/editor_db
       - SPRING_DATASOURCE_USERNAME=postgres
       - SPRING_DATASOURCE_PASSWORD=postgres
-    depends_on: [editor-db]
+    depends_on:
+      editor-db:
+        condition: service_healthy
 
   audit-service:
     build: ./services/audit-service
@@ -67,7 +84,9 @@ services:
       - SPRING_DATASOURCE_URL=jdbc:postgresql://audit-db:5432/audit_db
       - SPRING_DATASOURCE_USERNAME=postgres
       - SPRING_DATASOURCE_PASSWORD=postgres
-    depends_on: [audit-db]
+    depends_on:
+      audit-db:
+        condition: service_healthy
 
   ingestion-service:
     build: ./services/ingestion-service
@@ -76,7 +95,9 @@ services:
       - SPRING_DATASOURCE_URL=jdbc:postgresql://ingestion-db:5432/ingestion_db
       - SPRING_DATASOURCE_USERNAME=postgres
       - SPRING_DATASOURCE_PASSWORD=postgres
-    depends_on: [ingestion-db]
+    depends_on:
+      ingestion-db:
+        condition: service_healthy
 
   search-service:
     build: ./services/search-service
@@ -85,7 +106,9 @@ services:
       - SPRING_DATASOURCE_URL=jdbc:postgresql://search-db:5432/search_db
       - SPRING_DATASOURCE_USERNAME=postgres
       - SPRING_DATASOURCE_PASSWORD=postgres
-    depends_on: [search-db]
+    depends_on:
+      search-db:
+        condition: service_healthy
 
   backup-service:
     image: postgres:16
@@ -97,47 +120,103 @@ services:
     environment:
       - PGPASSWORD=postgres
     depends_on:
-      - catalog-db
-      - content-db
-      - amendment-db
-      - identity-db
-      - editor-db
-      - audit-db
-      - ingestion-db
-      - search-db
+      catalog-db:
+        condition: service_healthy
+      content-db:
+        condition: service_healthy
+      amendment-db:
+        condition: service_healthy
+      identity-db:
+        condition: service_healthy
+      editor-db:
+        condition: service_healthy
+      audit-db:
+        condition: service_healthy
+      ingestion-db:
+        condition: service_healthy
+      search-db:
+        condition: service_healthy
 
   catalog-db:
     image: postgres:16
     environment: { POSTGRES_DB: catalog_db, POSTGRES_USER: postgres, POSTGRES_PASSWORD: postgres }
     volumes: [catalog-db-data:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
   content-db:
     image: postgres:16
     environment: { POSTGRES_DB: content_db, POSTGRES_USER: postgres, POSTGRES_PASSWORD: postgres }
     volumes: [content-db-data:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
   amendment-db:
     image: postgres:16
     environment: { POSTGRES_DB: amendment_db, POSTGRES_USER: postgres, POSTGRES_PASSWORD: postgres }
     volumes: [amendment-db-data:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
   identity-db:
     image: postgres:16
     environment: { POSTGRES_DB: identity_db, POSTGRES_USER: postgres, POSTGRES_PASSWORD: postgres }
     volumes: [identity-db-data:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
   editor-db:
     image: postgres:16
     environment: { POSTGRES_DB: editor_db, POSTGRES_USER: postgres, POSTGRES_PASSWORD: postgres }
     volumes: [editor-db-data:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
   audit-db:
     image: postgres:16
     environment: { POSTGRES_DB: audit_db, POSTGRES_USER: postgres, POSTGRES_PASSWORD: postgres }
     volumes: [audit-db-data:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
   ingestion-db:
     image: postgres:16
     environment: { POSTGRES_DB: ingestion_db, POSTGRES_USER: postgres, POSTGRES_PASSWORD: postgres }
     volumes: [ingestion-db-data:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
   search-db:
     image: postgres:16
     environment: { POSTGRES_DB: search_db, POSTGRES_USER: postgres, POSTGRES_PASSWORD: postgres }
     volumes: [search-db-data:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
 
 volumes:
   catalog-db-data:

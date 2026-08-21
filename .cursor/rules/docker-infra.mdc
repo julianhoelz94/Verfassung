@@ -7,7 +7,8 @@ alwaysApply: false
 # Infra
 
 - Single public entry: Caddy `:80` → `gateway-web:3000`; docs routes under `/api/docs/<service>*`.
-- Each stateful service has its own `*-db` Postgres 16 instance in `docker-compose.yml`, with a named volume (`<service>-db-data` → `/var/lib/postgresql/data`). `--stop` keeps volumes; `--reset` uses `docker compose down -v`.
+- Each stateful service has its own `*-db` Postgres 16 instance in `docker-compose.yml`, with a named volume (`<service>-db-data` → `/var/lib/postgresql/data`) and `pg_isready` healthcheck. Apps wait with `depends_on: condition: service_healthy`. `--stop` keeps volumes; `--reset` uses `docker compose down -v`.
+- Public catalog/content APIs are proxied at `/api/catalog*` and `/api/content*` (docs stay under `/api/docs/<service>*`).
 - Env profiles live in `env/*.env.example`. Do not commit real `env/local-stack.env`.
 - Image builds are sequential in `manageLocalStack.sh` to avoid Docker Desktop OOM. Keep that order if adding services.
 - CI: `.github/workflows/ci.yml` — Gradle `test` per service, frontend `lint` + `build`.

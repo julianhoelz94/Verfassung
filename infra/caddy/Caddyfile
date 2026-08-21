@@ -41,6 +41,16 @@
     reverse_proxy audit-service:8080
   }
 
+  route /api/catalog* {
+    uri strip_prefix /api/catalog
+    reverse_proxy catalog-service:8080
+  }
+
+  route /api/content* {
+    uri strip_prefix /api/content
+    reverse_proxy content-service:8080
+  }
+
   route {
     reverse_proxy gateway-web:3000
   }

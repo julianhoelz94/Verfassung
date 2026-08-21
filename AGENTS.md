@@ -8,6 +8,7 @@ Public site for versioned constitutions: countries → constitution versions →
 - Next.js 14 (App Router) + TypeScript in `apps/gateway-web`
 - Docker Compose + Caddy (`infra/caddy`) as the single local entry point
 - One Postgres database per stateful service (never share DBs)
+- Flyway: new `V{n}__….sql` only; do not edit applied migrations
 
 ## Layout
 
@@ -34,7 +35,7 @@ Service names: `catalog`, `content`, `amendment`, `identity`, `editor`, `search`
 
 ## Current state (Sprint 0)
 
-Scaffolds exist: health/actuator, `/internal/ping`, Flyway `V1__init.sql` bootstrap marker, Testcontainers smoke tests, CI matrix. **No domain APIs yet.** Next work: replace pings with owned REST + real migrations, keep DBs isolated.
+Scaffolds exist plus Sprint 1 browse APIs on catalog and content. Other services still expose `/internal/ping` only.
 
 ## Cost rules for agents
 

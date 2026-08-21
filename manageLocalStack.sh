@@ -5,10 +5,12 @@ set -euo pipefail
 # Usage: manageLocalStack.sh --start|--stop|--reset
 
 ENV_FILE="env/local-stack.env"
-COMPOSE_CMD="docker compose"
+COMPOSE_CMD="docker compose --progress=plain --verbose"
 
 # Build memory-heavy images sequentially to avoid Docker Desktop OOM during startup.
+# edge-proxy is cheap but must be built: `up --no-build` will not create it.
 BUILD_ORDER=(
+  edge-proxy
   gateway-web
   catalog-service
   content-service
@@ -69,14 +71,22 @@ fi
 case "$1" in
   --start)
     ensure_docker_running
+    if [ ! -f "${ENV_FILE}" ]; then
+      echo "Missing ${ENV_FILE}; copying from ${ENV_FILE}.example"
+      cp "${ENV_FILE}.example" "${ENV_FILE}"
+    fi
     echo "Starting local stack using ${ENV_FILE}..."
+    echo "Compose command: ${COMPOSE_CMD}"
 
     for service in "${BUILD_ORDER[@]}"; do
-      echo "Building ${service}..."
+      echo "======== Building ${service} ========"
       ${COMPOSE_CMD} --env-file "${ENV_FILE}" build "${service}"
     done
 
+    echo "======== Starting containers (no rebuild) ========"
     ${COMPOSE_CMD} --env-file "${ENV_FILE}" up -d --no-build
+    echo "======== Container status ========"
+    ${COMPOSE_CMD} --env-file "${ENV_FILE}" ps
     echo "Started."
     ;;
 

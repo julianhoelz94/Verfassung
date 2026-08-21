@@ -1,12 +1,28 @@
-export default function Page() {
+import { ApiUnavailableError, listCountries, type CountrySummary } from '../lib/api';
+
+export default async function Page() {
+  let countries: CountrySummary[] = [];
+  let error: string | null = null;
+  try {
+    countries = (await listCountries()) ?? [];
+  } catch (e) {
+    error = e instanceof ApiUnavailableError ? e.message : 'Catalog is unavailable';
+    countries = [];
+  }
+
   return (
-    <main style={{ padding: 24, fontFamily: 'Georgia, serif' }}>
-      <h1>Constitution Atlas</h1>
-      <p>Local stack scaffold is running.</p>
+    <main style={{ padding: 24, maxWidth: 720 }}>
+      <h1>Countries</h1>
+      {error ? <p>{error}.</p> : null}
+      {!error && countries.length === 0 ? <p>No countries are published yet.</p> : null}
       <ul>
-        <li>Public app available through the edge proxy</li>
-        <li>Microservice stack configured in docker-compose</li>
-        <li>Backlog-driven architecture in place</li>
+        {countries.map((country) => (
+          <li key={country.id}>
+            <a href={`/countries/${country.isoCode}`}>{country.name}</a>
+            {' '}
+            ({country.isoCode})
+          </li>
+        ))}
       </ul>
     </main>
   );

@@ -42,6 +42,12 @@ export default async function CountryPage({ params }: CountryPageProps) {
       {country.constitutions.map((constitution) => (
         <section key={constitution.id}>
           <h2>{constitution.title}</h2>
+          {constitution.contentOutline && constitution.contentOutline.kinds.length > 0 ? (
+            <p style={{ color: '#555' }}>
+              Structure:{' '}
+              {constitution.contentOutline.kinds.map((kind) => kind.displayLabel).join(' → ')}
+            </p>
+          ) : null}
           <ul>
             {constitution.versions.map((version) => (
               <li key={version.id}>

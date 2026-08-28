@@ -29,7 +29,20 @@ class ContentApiTest {
                 jsonPath("$.length()") { value(10) }
                 jsonPath("$[0].articleNumber") { value("1") }
                 jsonPath("$[5].articleNumber") { value("16a") }
+                header { string("X-Total-Count", "10") }
             }
+    }
+
+    @Test
+    fun listArticlesHonorsLimitAndOffset() {
+        mockMvc.get("/versions/01900000-0000-4000-8000-000000000004/articles") {
+            param("offset", "0")
+            param("limit", "2")
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.length()") { value(2) }
+                header { string("X-Total-Count", "10") }
+        }
     }
 
     @Test
@@ -39,6 +52,9 @@ class ContentApiTest {
                 status { isOk() }
                 jsonPath("$.title") { value("Human dignity") }
                 jsonPath("$.body") { exists() }
+                jsonPath("$.children.length()") { value(2) }
+                jsonPath("$.children[0].kind") { value("paragraph") }
+                jsonPath("$.children[1].children[0].kind") { value("sentence") }
             }
     }
 

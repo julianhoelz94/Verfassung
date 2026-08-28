@@ -39,6 +39,20 @@ class CatalogApiTest {
                 jsonPath("$.constitutions[0].versions.length()") { value(2) }
                 jsonPath("$.constitutions[0].versions[0].versionLabel") { value("1949") }
                 jsonPath("$.constitutions[0].versions[1].versionLabel") { value("2022") }
+                jsonPath("$.constitutions[0].contentOutline.kinds.length()") { value(3) }
+                jsonPath("$.constitutions[0].contentOutline.kinds[0].kindCode") { value("article") }
+                jsonPath("$.constitutions[0].contentOutline.kinds[0].allowedChildKinds[0]") { value("paragraph") }
+            }
+    }
+
+    @Test
+    fun germanyOutlineIsArticleParagraphSentence() {
+        mockMvc.get("/constitutions/01900000-0000-4000-8000-000000000002/content-outline")
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.kinds[1].kindCode") { value("paragraph") }
+                jsonPath("$.kinds[2].kindCode") { value("sentence") }
+                jsonPath("$.kinds[2].mayHoldChildren") { value(false) }
             }
     }
 
@@ -69,6 +83,8 @@ class CatalogApiTest {
         }.andExpect {
             status { isCreated() }
             jsonPath("$.slug") { value("1958") }
+            jsonPath("$.contentOutline.kinds.length()") { value(1) }
+            jsonPath("$.contentOutline.kinds[0].kindCode") { value("article") }
         }.andReturn().response.contentAsString.let {
             Regex("\"id\":\"([^\"]+)\"").find(it)!!.groupValues[1]
         }

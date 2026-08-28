@@ -18,11 +18,25 @@ data class VersionSummary(
     val gazetteReference: String?,
 )
 
+data class NodeKindDto(
+    val kindCode: String,
+    val displayLabel: String,
+    val sortOrder: Int,
+    val mayHoldText: Boolean,
+    val mayHoldChildren: Boolean,
+    val allowedChildKinds: List<String>,
+)
+
+data class ContentOutlineDto(
+    val kinds: List<NodeKindDto>,
+)
+
 data class ConstitutionSummary(
     val id: UUID,
     val slug: String,
     val title: String,
     val versions: List<VersionSummary>,
+    val contentOutline: ContentOutlineDto,
 )
 
 data class CountryDetail(

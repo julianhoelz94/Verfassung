@@ -1,0 +1,54 @@
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+  - package-ecosystem: npm
+    directory: /apps/gateway-web
+    schedule:
+      interval: weekly
+  - package-ecosystem: docker
+    directory: /infra/caddy
+    schedule:
+      interval: weekly
+  - package-ecosystem: docker
+    directory: /apps/gateway-web
+    schedule:
+      interval: weekly
+  - package-ecosystem: gradle
+    directory: /services/catalog-service
+    schedule:
+      interval: weekly
+  - package-ecosystem: gradle
+    directory: /services/content-service
+    schedule:
+      interval: weekly
+  - package-ecosystem: gradle
+    directory: /services/amendment-service
+    schedule:
+      interval: weekly
+  - package-ecosystem: gradle
+    directory: /services/identity-service
+    schedule:
+      interval: weekly
+  - package-ecosystem: gradle
+    directory: /services/editor-service
+    schedule:
+      interval: weekly
+  - package-ecosystem: gradle
+    directory: /services/audit-service
+    schedule:
+      interval: weekly
+  - package-ecosystem: gradle
+    directory: /services/ingestion-service
+    schedule:
+      interval: weekly
+  - package-ecosystem: gradle
+    directory: /services/search-service
+    schedule:
+      interval: weekly
+  - package-ecosystem: docker
+    directory: /services/catalog-service
+    schedule:
+      interval: weekly

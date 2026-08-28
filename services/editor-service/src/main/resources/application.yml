@@ -1,6 +1,12 @@
 spring:
   application:
     name: editor-service
+identity:
+  api:
+    url: ${IDENTITY_API_URL:http://localhost/api/identity}
+audit:
+  api:
+    url: ${AUDIT_API_URL:http://localhost/api/audit}
 management:
   endpoints:
     web:

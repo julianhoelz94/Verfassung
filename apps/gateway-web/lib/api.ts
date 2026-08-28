@@ -7,11 +7,45 @@ export type VersionSummary = {
   gazetteReference: string | null;
 };
 
+export type ContentNode = {
+  id: string;
+  kind: string;
+  label: string | null;
+  number: string | null;
+  title: string | null;
+  body: string | null;
+  sortOrder: number;
+  children: ContentNode[];
+};
+
+export type ArticleDetail = {
+  id: string;
+  versionId: string;
+  articleNumber: string;
+  title: string;
+  body: string;
+  sortOrder: number;
+  kind?: string;
+  children?: ContentNode[];
+};
+
+export type ContentOutline = {
+  kinds: {
+    kindCode: string;
+    displayLabel: string;
+    sortOrder: number;
+    mayHoldText: boolean;
+    mayHoldChildren: boolean;
+    allowedChildKinds: string[];
+  }[];
+};
+
 export type ConstitutionSummary = {
   id: string;
   slug: string;
   title: string;
   versions: VersionSummary[];
+  contentOutline?: ContentOutline;
 };
 
 export type CountrySummary = {
@@ -35,21 +69,16 @@ export type ArticleSummary = {
   sortOrder: number;
 };
 
-export type ArticleDetail = {
-  id: string;
-  versionId: string;
-  articleNumber: string;
-  title: string;
-  body: string;
-  sortOrder: number;
-};
-
 export type AmendmentChange = {
   id: string;
   articleId: string | null;
   articleNumber: string | null;
   changeType: string;
   note: string | null;
+  nodeId?: string | null;
+  changedOn?: string | null;
+  effectiveOn?: string | null;
+  amendingLawCitationId?: string | null;
 };
 
 export type Amendment = {
@@ -98,6 +127,30 @@ export function amendmentBaseUrl(): string {
   return process.env.AMENDMENT_API_URL ?? 'http://localhost/api/amendment';
 }
 
+export function searchBaseUrl(): string {
+  return process.env.SEARCH_API_URL ?? 'http://localhost/api/search';
+}
+
+export type SearchHit = {
+  articleId: string;
+  versionId: string;
+  countryCode: string;
+  articleNumber: string;
+  title: string;
+  snippet: string;
+  rank: number;
+};
+
+export function searchArticles(query: string): Promise<SearchHit[] | null> {
+  if (!query.trim()) {
+    return Promise.resolve([]);
+  }
+  return readJson<SearchHit[]>(
+    `${searchBaseUrl()}/search?q=${encodeURIComponent(query)}`,
+    'search',
+  );
+}
+
 export function listCountries(): Promise<CountrySummary[] | null> {
   return readJson<CountrySummary[]>(`${catalogBaseUrl()}/countries`, 'catalog');
 }
@@ -109,11 +162,51 @@ export function getCountry(isoCode: string): Promise<CountryDetail | null> {
   );
 }
 
-export function listArticles(versionId: string): Promise<ArticleSummary[] | null> {
-  return readJson<ArticleSummary[]>(
-    `${contentBaseUrl()}/versions/${encodeURIComponent(versionId)}/articles`,
-    'content',
-  );
+export type ArticlePage = {
+  items: ArticleSummary[];
+  total: number;
+  offset: number;
+  limit: number | null;
+};
+
+export async function listArticles(
+  versionId: string,
+  offset?: number,
+  limit?: number,
+): Promise<ArticleSummary[] | null> {
+  const page = await listArticlePage(versionId, offset, limit);
+  return page?.items ?? null;
+}
+
+export async function listArticlePage(
+  versionId: string,
+  offset?: number,
+  limit?: number,
+): Promise<ArticlePage | null> {
+  const params = new URLSearchParams();
+  if (offset !== undefined) {
+    params.set('offset', String(offset));
+  }
+  if (limit !== undefined) {
+    params.set('limit', String(limit));
+  }
+  const query = params.toString();
+  const url = `${contentBaseUrl()}/versions/${encodeURIComponent(versionId)}/articles${query ? `?${query}` : ''}`;
+  let response: Response;
+  try {
+    response = await fetch(url, { cache: 'no-store' });
+  } catch {
+    throw new ApiUnavailableError('content');
+  }
+  if (response.status === 404) {
+    return null;
+  }
+  if (!response.ok) {
+    throw new ApiUnavailableError('content');
+  }
+  const items = (await response.json()) as ArticleSummary[];
+  const total = Number(response.headers.get('X-Total-Count') ?? items.length);
+  return { items, total, offset: offset ?? 0, limit: limit ?? null };
 }
 
 export function getArticle(articleId: string): Promise<ArticleDetail | null> {

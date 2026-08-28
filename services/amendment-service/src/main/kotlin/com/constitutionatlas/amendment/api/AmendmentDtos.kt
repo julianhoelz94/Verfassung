@@ -9,6 +9,10 @@ data class AmendmentChangeDto(
     val articleNumber: String?,
     val changeType: String,
     val note: String?,
+    val nodeId: UUID?,
+    val changedOn: LocalDate?,
+    val effectiveOn: LocalDate?,
+    val amendingLawCitationId: UUID?,
 )
 
 data class AmendmentDto(

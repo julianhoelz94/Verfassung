@@ -36,7 +36,13 @@ class CatalogWriteService(private val catalogRepository: CatalogRepository) {
             throw ConflictException("Constitution '$slug' already exists")
         }
         val id = catalogRepository.insertConstitution(country.id, slug, request.title.trim())
-        return ConstitutionSummary(id, slug, request.title.trim(), emptyList())
+        return ConstitutionSummary(
+            id,
+            slug,
+            request.title.trim(),
+            emptyList(),
+            catalogRepository.findOutline(id),
+        )
     }
 
     @Transactional

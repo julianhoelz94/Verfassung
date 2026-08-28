@@ -57,3 +57,22 @@ jobs:
           npm ci
           npm run lint
           npm run build
+
+  images:
+    needs: backend-services
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service: ${{ fromJson(needs.backend-services.outputs.services) }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build ${{ matrix.service }} image
+        run: docker build -t constitution-atlas/${{ matrix.service }}:ci services/${{ matrix.service }}
+
+  gateway-image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t constitution-atlas/gateway-web:ci apps/gateway-web
+      - run: docker build -t constitution-atlas/edge-proxy:ci infra/caddy

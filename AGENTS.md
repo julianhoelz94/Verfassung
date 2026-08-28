@@ -35,7 +35,7 @@ Service names: `catalog`, `content`, `amendment`, `identity`, `editor`, `search`
 
 ## Current sprint
 
-See `backlog.md` **Suggested Sprint Breakdown**. Sprint 0–2 are closed. Work the next open sprint (currently Sprint 3: editor). Do not pull later-sprint or `Ideas` items unless the user asks.
+See `backlog.md` **Suggested Sprint Breakdown**. Sprint 0–6 are closed. Pull from **Later / Ideas** only if the user asks.
 
 **When a story/task is finished, update `backlog.md` in the same change:** set Status to `Done`, add the ID to that sprint’s Done list, and keep the board snapshot accurate. Do not leave completed work as `Ready`.
 

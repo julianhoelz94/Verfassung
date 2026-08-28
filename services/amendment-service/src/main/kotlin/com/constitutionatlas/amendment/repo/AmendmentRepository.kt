@@ -38,10 +38,11 @@ class AmendmentRepository(private val jdbc: JdbcTemplate) {
     private fun listChanges(amendmentId: UUID): List<AmendmentChangeDto> =
         jdbc.query(
             """
-            SELECT id, article_id, article_number, change_type, note
+            SELECT id, article_id, article_number, change_type, note,
+                   node_id, changed_on, effective_on, amending_law_citation_id
             FROM amendment_changes
             WHERE amendment_id = ?
-            ORDER BY article_number NULLS LAST
+            ORDER BY article_number NULLS LAST, change_type
             """.trimIndent(),
             { rs, _ ->
                 AmendmentChangeDto(
@@ -50,6 +51,10 @@ class AmendmentRepository(private val jdbc: JdbcTemplate) {
                     articleNumber = rs.getString("article_number"),
                     changeType = rs.getString("change_type"),
                     note = rs.getString("note"),
+                    nodeId = rs.getObject("node_id", UUID::class.java),
+                    changedOn = rs.getDate("changed_on")?.toLocalDate(),
+                    effectiveOn = rs.getDate("effective_on")?.toLocalDate(),
+                    amendingLawCitationId = rs.getObject("amending_law_citation_id", UUID::class.java),
                 )
             },
             amendmentId,

@@ -25,7 +25,12 @@ class AmendmentApiTest {
                 status { isOk() }
                 jsonPath("$.length()") { value(1) }
                 jsonPath("$[0].targetVersionId") { value("01900000-0000-4000-8000-000000000004") }
-                jsonPath("$[0].changes.length()") { value(4) }
+                jsonPath("$[0].changes.length()") { value(5) }
+                jsonPath("$[0].changes[0].changeType") { value("added") }
+                jsonPath("$[0].changes[0].nodeId") { value("01900000-0000-4000-8000-000000000225") }
+                jsonPath("$[0].changes[0].changedOn") { value("2022-12-19") }
+                jsonPath("$[0].changes[1].changeType") { value("changed") }
+                jsonPath("$[0].changes[0].amendingLawCitationId") { value("01900000-0000-4000-8000-000000000380") }
             }
     }
 

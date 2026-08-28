@@ -1,6 +1,14 @@
 spring:
   application:
     name: identity-service
+identity:
+  seed:
+    editor-email: ${LOCAL_EDITOR_EMAIL:}
+    editor-password: ${LOCAL_EDITOR_PASSWORD:}
+    admin-email: ${LOCAL_ADMIN_EMAIL:}
+    admin-password: ${LOCAL_ADMIN_PASSWORD:}
+    viewer-email: ${LOCAL_VIEWER_EMAIL:}
+    viewer-password: ${LOCAL_VIEWER_PASSWORD:}
 management:
   endpoints:
     web:

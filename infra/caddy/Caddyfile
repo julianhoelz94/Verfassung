@@ -61,6 +61,26 @@
     reverse_proxy ingestion-service:8080
   }
 
+  route /api/identity* {
+    uri strip_prefix /api/identity
+    reverse_proxy identity-service:8080
+  }
+
+  route /api/editor* {
+    uri strip_prefix /api/editor
+    reverse_proxy editor-service:8080
+  }
+
+  route /api/audit* {
+    uri strip_prefix /api/audit
+    reverse_proxy audit-service:8080
+  }
+
+  route /api/search* {
+    uri strip_prefix /api/search
+    reverse_proxy search-service:8080
+  }
+
   route {
     reverse_proxy gateway-web:3000
   }

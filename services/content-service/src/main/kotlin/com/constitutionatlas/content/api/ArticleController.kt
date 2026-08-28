@@ -1,18 +1,29 @@
 package com.constitutionatlas.content.api
 
 import com.constitutionatlas.content.service.ArticleQueryService
+import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
+import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
 import java.util.UUID
 
 @RestController
 class ArticleController(private val articleQueryService: ArticleQueryService) {
     @GetMapping("/versions/{versionId}/articles")
-    fun listArticles(@PathVariable versionId: UUID): List<ArticleSummary> =
-        articleQueryService.listByVersion(versionId)
+    fun listArticles(
+        @PathVariable versionId: UUID,
+        @RequestParam(required = false) offset: Int?,
+        @RequestParam(required = false) limit: Int?,
+    ): ResponseEntity<List<ArticleSummary>> {
+        val off = (offset ?: 0).coerceAtLeast(0)
+        val lim = limit?.coerceIn(1, 200)
+        val items = articleQueryService.listByVersion(versionId, off, lim)
+        val total = articleQueryService.countByVersion(versionId)
+        return ResponseEntity.ok().header("X-Total-Count", total.toString()).body(items)
+    }
 
     @PutMapping("/versions/{versionId}/articles")
     fun replaceArticles(

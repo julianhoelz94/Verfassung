@@ -1,6 +1,14 @@
 spring:
   application:
     name: search-service
+catalog:
+  api:
+    url: ${CATALOG_API_URL:http://localhost/api/catalog}
+content:
+  api:
+    url: ${CONTENT_API_URL:http://localhost/api/content}
+search:
+  reindex-on-startup: ${SEARCH_REINDEX_ON_STARTUP:false}
 management:
   endpoints:
     web:

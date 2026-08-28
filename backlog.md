@@ -556,7 +556,7 @@ These are useful, but they should stay out of the initial implementation scope u
 | ARCH-2 | Story | P0 | Done | M | content-service | Version is a full snapshot of articles in force. | `GET` articles by version returns the complete ordered set; later versions do not mutate older rows. | ARCH-1, CNT-1 |
 | ARCH-3 | Story | P0 | Done | M | content-service | Each article is independently addressable. | Stable `article_id` (or equivalent) unique within a version; fetch by id. | ARCH-1, CNT-1 |
 | ARCH-4 | Story | P0 | Done | M | amendment-service | Amendments link version changes and affected articles. | Amendment row references opaque source/target version ids and a list of affected article ids. | ARCH-2, ARCH-3, AMD-1 |
-| ARCH-5 | Story | P1 | Ideas | L | catalog + content | Per-constitution content tree (not a fixed Artikel/Absatz/Satz model). | Catalog stores an outline for each constitution: ordered node kinds, allowed parent/child kinds, and whether a kind may hold text, children, or both. Depth and labels are data (e.g. DE `article → paragraph → sentence`; US `article → section`; a short charter may be articles only). Content stores an adjacency-list (or equivalent) tree per version: each node has `kind` from that outline, optional `label`/`number`, optional `body`, `parent_id`, `sort_order`. Existing article list/get stay valid: today’s `articles` rows are the configured top provision nodes (or a read model over them). A constitution with no sub-kinds still works as a flat list. | ARCH-3 |
+| ARCH-5 | Story | P1 | Done | L | catalog + content | Per-constitution content tree (not a fixed Artikel/Absatz/Satz model). | Catalog stores an outline for each constitution: ordered node kinds, allowed parent/child kinds, and whether a kind may hold text, children, or both. Depth and labels are data (e.g. DE `article → paragraph → sentence`; US `article → section`; a short charter may be articles only). Content stores an adjacency-list (or equivalent) tree per version: each node has `kind` from that outline, optional `label`/`number`, optional `body`, `parent_id`, `sort_order`. Existing article list/get stay valid: today’s `articles` rows are the configured top provision nodes (or a read model over them). A constitution with no sub-kinds still works as a flat list. | ARCH-3 |
 
 ## Epic 1B: Service Architecture and Contracts
 
@@ -567,7 +567,7 @@ These are useful, but they should stay out of the initial implementation scope u
 | SRV-3 | Story | P0 | Ready | L | per API task | Versioned OpenAPI for real routes (not only `/internal/ping`). | Catalog and content public read APIs published via springdoc; gateway uses those contracts. | SRV-1, CAT-2, CNT-2 |
 | SRV-4 | Story | P1 | Ideas | M | amendment + content | Events: version published, amendment created, article updated. | Event names and JSON schemas documented; no broker required yet. | SRV-3, ARCH-4 |
 | SRV-5 | Story | P1 | Ideas | L | n/a | Extra services (translation, citation, document-processing). | Out of scope until browse + editor exist. Core eight services already scaffolded. | SRV-1 |
-| SRV-6 | Story | P0 | Ready | L | editor-service + gateway-web | Authenticated WYSIWYG edit/publish. | Split in Sprint 3: IDN-1, ED-1–3, UI-ED-1. Not Sprint 1. | SRV-2, IDN-1, CNT-2 |
+| SRV-6 | Story | P0 | Done | L | editor-service + gateway-web | Authenticated WYSIWYG edit/publish. | Split in Sprint 3: IDN-1, ED-1–3, UI-ED-1. Not Sprint 1. | SRV-2, IDN-1, CNT-2 |
 | SRV-7 | Story | P1 | Ideas | L | mcp-server | Whitelisted MCP tools. | After editor + audit exist; read-only first. | SRV-6, GOV-1 |
 
 ## Epic 2: Database and Persistence Layer
@@ -579,17 +579,17 @@ These are useful, but they should stay out of the initial implementation scope u
 | DB-1 | Task | P0 | Done | L | split | Umbrella: countries … amendment_changes. | Done when CAT-1, CNT-1, and AMD-1 are Done. | ARCH-1 |
 | DB-2 | Task | P0 | Ready | S | CAT-1 / CNT-1 | Uniqueness (country code, slug, version label, article number in version). | Enforced in those Flyway files, not a separate migration elsewhere. | CAT-1, CNT-1 |
 | DB-3 | Task | P0 | Ready | S | catalog-service | Provenance columns on versions/sources. | Included in CAT-1 (`source_url`, gazette ref, `language_code`, timestamps). | CAT-1 |
-| DB-4 | Task | P1 | Ideas | M | search-service | Full-text index tables / tsvector. | Keyword search over published articles; derived data only. | SRC-1, SRCH-1 |
+| DB-4 | Task | P1 | Done | M | search-service | Full-text index tables / tsvector. | Keyword search over published articles; derived data only. | SRC-1, SRCH-1 |
 | DB-5 | Task | P1 | Ideas | M | amendment-service | Change ops: added / modified / deleted / renumbered. | Folded into AMD-3 (`added` / `changed` / `removed`). Keep this ID only as a pointer. | AMD-1, AMD-3 |
-| DB-6 | Task | P0 | Ready | S | docs | Schema pattern (normalized + JSONB metadata + outbox later). | Short note in `docs/adr` or QLT-1; no shared DB. | SRV-2 |
+| DB-6 | Task | P0 | Done | S | docs | Schema pattern (normalized + JSONB metadata + outbox later). | Short note in `docs/adr` or QLT-1; no shared DB. | SRV-2 |
 | CAT-1 | Task | P0 | Done | M | catalog-service | Flyway `V2__catalog_domain.sql`: `countries`, `constitutions`, `constitution_versions`, `constitution_sources`. | Unique ISO/slug/version_label; provenance fields; Testcontainers insert+query. | ARCH-1 |
 | CNT-1 | Task | P0 | Done | M | content-service | Flyway `V2__content_domain.sql`: `articles` (+ optional `article_blocks`). | Unique (version_id, article_number); ordered list; snapshot rows immutable. | ARCH-2, ARCH-3 |
 | AMD-1 | Task | P1 | Done | M | amendment-service | Flyway `V2__amendment_domain.sql`: `amendments`, `amendment_changes`, `version_transitions`. | Opaque catalog/content ids only; no FK across DBs. | ARCH-4 |
-| AMD-3 | Story | P1 | Ideas | M | amendment-service | Richer amendment-change records: typed ops, dates, amending-law citation, tree target. | New Flyway (do not edit AMD-1). `change_type` is a constrained enum with at least `added`, `changed`, `removed` (optional extras like `renumbered` ok). Each change has `changed_on` (enactment of the amending law) and `effective_on` (when the change took effect; null if same as `changed_on`). Each change stores an opaque `amending_law_citation_id` for a citation-service object (no SQL FK; citation-service may still be SRV-5). Each change targets an opaque content **node** id (whole article or any descendant in that constitution’s tree); whole-article change remains valid when the act replaces or repeals the article. AMD-2 read API returns these fields. Depends on ARCH-5 for sub-article targets. Supersedes the thin `DB-5` enum-only slice. | AMD-1, AMD-2, ARCH-5, SRV-5 |
-| IDN-1 | Task | P1 | Ready | M | identity-service | Flyway `V2__identity.sql`: `users`, `roles`, `user_roles`. | Can store local-editor from env; password hash column. | SRV-2 |
-| ED-1 | Task | P1 | Ideas | M | editor-service | Drafts: `edit_sessions`, `draft_changes`, `edit_revisions`. | After IDN-1 and CNT-1. | IDN-1, CNT-1 |
-| AUD-1 | Task | P1 | Ready | M | audit-service | `audit_events` append-only. | Insert + list by entity; updates/deletes rejected. | GOV-1 |
-| SRCH-1 | Task | P1 | Ideas | M | search-service | `search_documents`, `index_sync_state`. | Rebuild from content API/events, never catalog SQL. | CNT-2, SRC-1 |
+| AMD-3 | Story | P1 | Done | M | amendment-service | Richer amendment-change records: typed ops, dates, amending-law citation, tree target. | New Flyway (do not edit AMD-1). `change_type` is a constrained enum with at least `added`, `changed`, `removed` (optional extras like `renumbered` ok). Each change has `changed_on` (enactment of the amending law) and `effective_on` (when the change took effect; null if same as `changed_on`). Each change stores an opaque `amending_law_citation_id` for a citation-service object (no SQL FK; citation-service may still be SRV-5). Each change targets an opaque content **node** id (whole article or any descendant in that constitution’s tree); whole-article change remains valid when the act replaces or repeals the article. AMD-2 read API returns these fields. Depends on ARCH-5 for sub-article targets. Supersedes the thin `DB-5` enum-only slice. | AMD-1, AMD-2, ARCH-5, SRV-5 |
+| IDN-1 | Task | P1 | Done | M | identity-service | Flyway `V2__identity.sql`: `users`, `roles`, `user_roles`. | Can store local-editor from env; password hash column. | SRV-2 |
+| ED-1 | Task | P1 | Done | M | editor-service | Drafts: `edit_sessions`, `draft_changes`, `edit_revisions`. | After IDN-1 and CNT-1. | IDN-1, CNT-1 |
+| AUD-1 | Task | P1 | Done | M | audit-service | `audit_events` append-only. | Insert + list by entity; updates/deletes rejected. | GOV-1 |
+| SRCH-1 | Task | P1 | Done | M | search-service | `search_documents`, `index_sync_state`. | Rebuild from content API/events, never catalog SQL. | CNT-2, SRC-1 |
 | ING-DB | Task | P1 | Done | M | ingestion-service | `import_jobs`, `import_errors`, `import_staging_records`. | Job row + error log; no write to catalog except via catalog API. | ING-1, CAT-2 |
 
 ## Epic 2B: Local Development and Orchestration
@@ -627,7 +627,7 @@ These are useful, but they should stay out of the initial implementation scope u
 
 ## Epic 4B: First domain APIs (executable)
 
-Replace `/internal/ping` only on the services in this table. Leave identity/editor/search/ingestion/audit on ping until their sprint.
+Replace `/internal/ping` only on the services in this table. Leave search/audit on ping until their sprint.
 
 | ID | Type | Priority | Status | Size | Owner | Task | Acceptance Criteria | Dependencies |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -635,14 +635,15 @@ Replace `/internal/ping` only on the services in this table. Leave identity/edit
 | CNT-2 | Task | P0 | Done | M | content-service | Read API: list articles for `versionId`, get article by id. | Ordered list; 404; API test. `versionId` is an opaque catalog id (no catalog SQL). | CNT-1 |
 | GW-1 | Task | P0 | Done | M | gateway-web | HTTP clients for CAT-2 and CNT-2 (env base URLs via Caddy or Compose DNS). | Server components fetch; empty/error states if API down. | CAT-2, CNT-2 |
 | AMD-2 | Task | P1 | Done | M | amendment-service | Read API: list amendments for a version transition. | After AMD-1; not Sprint 1. | AMD-1 |
-| IDN-2 | Task | P1 | Ready | M | identity-service | Login (session or JWT) for editor role. | After IDN-1. | IDN-1 |
-| ED-2 | Task | P1 | Ideas | L | editor-service | Draft save/preview commands. | After ED-1, IDN-2, CNT-2. | ED-1, IDN-2 |
+| UI-ED-1 | Task | P1 | Done | M | gateway-web | Editor login page and a signed-in `/editor` shell. | Form posts to identity-service; httpOnly session cookie; unauthenticated `/editor` redirects to `/login`. WYSIWYG is still SRV-6. | IDN-2 |
+| IDN-2 | Task | P1 | Done | M | identity-service | Login (session or JWT) for editor role. | After IDN-1. | IDN-1 |
+| ED-2 | Task | P1 | Done | L | editor-service | Draft save/preview commands. | After ED-1, IDN-2, CNT-2. | ED-1, IDN-2 |
 
 ## Epic 5: Search, Navigation, and Discovery
 
 | ID | Type | Priority | Status | Size | Owner | Story | Acceptance Criteria | Dependencies |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| SRC-1 | Story | P0 | Ready | L | search-service + gateway-web | Keyword search across articles. | Sprint 2+; needs SRCH-1 and published content. Do not block UI-1. | SRCH-1, CNT-2 |
+| SRC-1 | Story | P0 | Done | L | search-service + gateway-web | Keyword search across articles. | Sprint 2+; needs SRCH-1 and published content. Do not block UI-1. | SRCH-1, CNT-2 |
 | SRC-2 | Story | P1 | Ideas | M | search-service | Facet filters (country, version, date). | After SRC-1. | SRC-1 |
 | SRC-3 | Story | P1 | Ideas | M | gateway-web | In-text cross-reference links. | Needs `article_links` or similar. | UI-2, ARCH-3 |
 | SRC-4 | Story | P2 | Ideas | L | search-service | Global term index. | Later. | DB-4 |
@@ -651,10 +652,10 @@ Replace `/internal/ping` only on the services in this table. Leave identity/edit
 
 | ID | Type | Priority | Status | Size | Owner | Task | Acceptance Criteria | Dependencies |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| GOV-1 | Task | P1 | Ready | M | audit-service | Record actor + action + entity + time. | AUD-1 schema + append API used by editor/ingestion (Sprint 3). | AUD-1 |
+| GOV-1 | Task | P1 | Done | M | audit-service | Record actor + action + entity + time. | AUD-1 schema + append API used by editor/ingestion (Sprint 3). | AUD-1 |
 | GOV-2 | Task | P0 | Done | M | ingestion-service | Validate before persist. | Same sprint as ING-1; not Sprint 1 seed. | ING-1 |
-| GOV-3 | Task | P1 | Ideas | L | editor-service | Review then publish as separate events. | Same role may do both; two audit event types. | GOV-1, ED-2 |
-| GOV-4 | Task | P1 | Ideas | M | infra | Restore drill from `infra/backup`. | Script dumps all eight DBs (include `search`); documented restore. Current script is incomplete. | OPS-7 |
+| GOV-3 | Task | P1 | Done | L | editor-service | Review then publish as separate events. | Same role may do both; two audit event types. | GOV-1, ED-2 |
+| GOV-4 | Task | P1 | Done | M | infra | Restore drill from `infra/backup`. | Script dumps all eight DBs (include `search`); documented restore. Current script is incomplete. | OPS-7 |
 | GOV-5 | Task | P2 | Ideas | S | catalog-service | Verification flags on sources. | Later. | CAT-1 |
 
 ## Epic 7: Platform and Performance
@@ -662,7 +663,7 @@ Replace `/internal/ping` only on the services in this table. Leave identity/edit
 | ID | Type | Priority | Status | Size | Owner | Task | Acceptance Criteria | Dependencies |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | PLAT-1 | Task | P0 | Ready | S | gateway-web | SSR country/version/article pages; no N+1 in the page. | After UI-2; measure locally, no CDN required. | UI-1, UI-2 |
-| PLAT-2 | Task | P1 | Ready | M | content + gateway-web | Paginate long article lists. | After a large seed exists; not Sprint 1 (~10 articles). | UI-2 |
+| PLAT-2 | Task | P1 | Done | M | content + gateway-web | Paginate long article lists. | After a large seed exists; not Sprint 1 (~10 articles). | UI-2 |
 | PLAT-3 | Task | P1 | Ideas | M | gateway-web | Language switcher. | After ING-5. | ING-5 |
 | PLAT-4 | Task | P1 | Ideas | M | all services | JSON logs + correlation id. | After browse works. | UI-1 |
 
@@ -672,8 +673,8 @@ Replace `/internal/ping` only on the services in this table. Leave identity/edit
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | CI-1 | Task | P0 | Done | S | .github | Pipeline on push/PR. | Workflow exists. | None |
 | CI-2 | Task | P0 | Done | M | .github | `gradle test` per microservice + frontend lint/build. | Matrix/discover all `services/*/build.gradle.kts`. Domain API tests still missing (add with CAT-2/CNT-2). | CI-1 |
-| CI-3 | Task | P1 | Ready | M | .github | `docker build` (or compose) per service image. | Separate job; do not block merge on 8× full `bootJar` until OPS-8. | OPS-2, OPS-8 |
-| CI-4 | Task | P1 | Ideas | M | .github | ktlint/detekt + `tsc` already via next lint. | Fail on errors. | CI-1 |
+| CI-3 | Task | P1 | Done | M | .github | `docker build` (or compose) per service image. | Separate job; do not block merge on 8× full `bootJar` until OPS-8. | OPS-2, OPS-8 |
+| CI-4 | Task | P1 | Done | M | .github | ktlint/detekt + `tsc` already via next lint. | Fail on errors. | CI-1 |
 | CI-5 | Task | P1 | Ready | S | .github | Gradle wrapper or setup-gradle cache (already partially true). | Add wrappers so local and CI match. | CI-2 |
 
 ## Epic 9: Dependency Tracking and Manual Maintenance
@@ -682,19 +683,19 @@ Keep this epic **out of Sprint 1**. One hygiene sprint later is enough.
 
 | ID | Type | Priority | Status | Size | Owner | Task | Acceptance Criteria | Dependencies |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| DEP-1 | Task | P1 | Ready | M | docs | Inventory of runtime/build/image deps. | One markdown table or Renovate dashboard. | OPS-2 |
+| DEP-1 | Task | P1 | Done | M | docs | Inventory of runtime/build/image deps. | One markdown table or Renovate dashboard. | OPS-2 |
 | DEP-2 | Task | P2 | Ideas | S | docs | Owner + review cadence per dependency. | After DEP-1. | DEP-1 |
 | DEP-3 | Task | P2 | Ideas | S | docs | Upgrade checklist (test one service, then CI). | After DEP-1. | DEP-1, CI-2 |
 | DEP-4 | Task | P1 | Ideas | S | GitHub | Dependabot or Renovate alerts. | After DEP-7 or instead of it. | DEP-1 |
 | DEP-5 | Task | P2 | Ideas | S | docs | Base images in the same inventory. | After DEP-1. | DEP-1 |
 | DEP-6 | Task | P2 | Ideas | S | docs | Emergency patch runbook. | After DEP-3. | DEP-3 |
-| DEP-7 | Task | P1 | Ready | S | GitHub | Renovate (or Dependabot) on Gradle + npm. | Opens PRs; humans merge. | CI-1 |
+| DEP-7 | Task | P1 | Done | S | GitHub | Renovate (or Dependabot) on Gradle + npm. | Opens PRs; humans merge. | CI-1 |
 
 ## Epic 10: Code Quality and Technical Debt Prevention
 
 | ID | Type | Priority | Status | Size | Owner | Task | Acceptance Criteria | Dependencies |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| QLT-1 | Task | P1 | Ready | S | docs | ADR: DB-per-service, Caddy entry, no shared DB. | `docs/adr/0001-….md`. Not a Sprint 1 blocker. | SRV-1 |
+| QLT-1 | Task | P1 | Done | S | docs | ADR: DB-per-service, Caddy entry, no shared DB. | `docs/adr/0001-….md`. Not a Sprint 1 blocker. | SRV-1 |
 | QLT-2 | Task | P1 | Ideas | M | GitHub | Branch protection requiring CI. | After CI-2 is green on main. | CI-2 |
 | QLT-3 | Task | P1 | Ideas | M | catalog + content | Consumer tests for CAT-2/CNT-2. | After those APIs exist. | CAT-2, CNT-2 |
 | QLT-4 | Task | P0 | Done | S | docs | Flyway forward-only; new `V{n}` per change; no edit of applied files. | Document in AGENTS or ADR. | CAT-1 |
@@ -720,16 +721,28 @@ Out of Sprint 1: search, editor, identity, ingestion job, amendments, Renovate, 
 Done: AMD-1, AMD-2, ARCH-4, DB-1, ING-DB, ING-1, ING-2, GOV-2, UI-5, OPS-8.
 Catalog/content gained write APIs so ingestion can publish a version via HTTP only (draft → articles → publish).
 
-Deferred (capacity): SRC-1 / SRCH-1, CI-5 (Gradle wrappers). UI-4 (compare) stays later with DB-5.
+Deferred (capacity): CI-5 (Gradle wrappers). UI-4 (compare) stays later with DB-5. Search moved to Sprint 5.
 
-### Sprint 3: Editor
-IDN-1, IDN-2, ED-1, ED-2, SRV-6/UI editor routes, AUD-1, GOV-1, GOV-3.
+### Sprint 3: Editor — closed
+Done: IDN-1, IDN-2, ED-1, ED-2, UI-ED-1, SRV-6, AUD-1, GOV-1, GOV-3.
+Editor login, in-page article edit, save/review/publish commands (publish is an audit + session status; public content rewrite is QLT-5).
 
-### Sprint 4: Hygiene
-DEP-1, DEP-7, CI-3, CI-4, QLT-1, QLT-3, QLT-8, GOV-4, PLAT-2, PLAT-4.
+### Sprint 4: Hygiene — closed
+Done: DEP-1, DEP-7, CI-3, CI-4, QLT-1, DB-6, GOV-4, PLAT-2.
+TypeScript is enforced via `next build`. Deferred: QLT-3 (Pact-style consumer tests), QLT-8 (ktlint/Spotless on all Kotlin services), PLAT-4 (JSON logs everywhere).
+
+### Sprint 5: Search — closed
+Done: SRC-1, SRCH-1, DB-4.
+Keyword search over a derived Postgres tsvector index rebuilt from catalog + content HTTP (never catalog SQL). Gateway `/search` fails open if the index is down. Facets stay SRC-2.
+
+### Sprint 6: Content tree + amendment records — closed
+Done: ARCH-5, AMD-3.
+Catalog stores a per-constitution outline; new constitutions default to a flat `article` kind. Content keeps `articles` as the top-provision read model and adds an adjacency-list `content_nodes` tree (DE seed: Article 1 as article → paragraph → sentence). Amendment changes use `added`/`changed`/`removed`, `changed_on` + `effective_on`, opaque citation ids, and a content `node_id`.
+
+Out of Sprint 6: QLT-5 (editor public rewrite), UI-4 (compare), SRC-2 (search facets), CI-5, citation-service (SRV-5). DB-5 remains a pointer at AMD-3.
 
 ### Later / Ideas
-ARCH-5, SRV-5, SRV-7, AMD-3, ING-5, SRC-2–4, PLAT-3, QLT-5, DEP-2–6.
+SRV-5, SRV-7, ING-5, SRC-2–4, PLAT-3, PLAT-4, QLT-3, QLT-5, QLT-8, DEP-2–6.
 
 ## Open Product Questions
 - Should published constitutional versions be immutable snapshots only, or do you want official errata and corrections modeled separately?

@@ -14,6 +14,9 @@ services:
       - CATALOG_API_URL=http://catalog-service:8080
       - CONTENT_API_URL=http://content-service:8080
       - AMENDMENT_API_URL=http://amendment-service:8080
+      - IDENTITY_API_URL=http://identity-service:8080
+      - EDITOR_API_URL=http://editor-service:8080
+      - SEARCH_API_URL=http://search-service:8080
     container_name: gateway-web
     ports:
       - "${GATEWAY_PORT:-3000}:3000"
@@ -23,6 +26,12 @@ services:
       content-service:
         condition: service_started
       amendment-service:
+        condition: service_started
+      identity-service:
+        condition: service_started
+      editor-service:
+        condition: service_started
+      search-service:
         condition: service_started
 
   catalog-service:
@@ -65,6 +74,12 @@ services:
       - SPRING_DATASOURCE_URL=jdbc:postgresql://identity-db:5432/identity_db
       - SPRING_DATASOURCE_USERNAME=postgres
       - SPRING_DATASOURCE_PASSWORD=postgres
+      - LOCAL_EDITOR_EMAIL=${LOCAL_EDITOR_EMAIL:-local-editor@example.local}
+      - LOCAL_EDITOR_PASSWORD=${LOCAL_EDITOR_PASSWORD:-change-me}
+      - LOCAL_ADMIN_EMAIL=${LOCAL_ADMIN_EMAIL:-local-admin@example.local}
+      - LOCAL_ADMIN_PASSWORD=${LOCAL_ADMIN_PASSWORD:-change-me}
+      - LOCAL_VIEWER_EMAIL=${LOCAL_VIEWER_EMAIL:-local-viewer@example.local}
+      - LOCAL_VIEWER_PASSWORD=${LOCAL_VIEWER_PASSWORD:-change-me}
     depends_on:
       identity-db:
         condition: service_healthy
@@ -76,9 +91,15 @@ services:
       - SPRING_DATASOURCE_URL=jdbc:postgresql://editor-db:5432/editor_db
       - SPRING_DATASOURCE_USERNAME=postgres
       - SPRING_DATASOURCE_PASSWORD=postgres
+      - IDENTITY_API_URL=http://identity-service:8080
+      - AUDIT_API_URL=http://audit-service:8080
     depends_on:
       editor-db:
         condition: service_healthy
+      identity-service:
+        condition: service_started
+      audit-service:
+        condition: service_started
 
   audit-service:
     build: ./services/audit-service
@@ -115,9 +136,16 @@ services:
       - SPRING_DATASOURCE_URL=jdbc:postgresql://search-db:5432/search_db
       - SPRING_DATASOURCE_USERNAME=postgres
       - SPRING_DATASOURCE_PASSWORD=postgres
+      - CATALOG_API_URL=http://catalog-service:8080
+      - CONTENT_API_URL=http://content-service:8080
+      - SEARCH_REINDEX_ON_STARTUP=true
     depends_on:
       search-db:
         condition: service_healthy
+      catalog-service:
+        condition: service_started
+      content-service:
+        condition: service_started
 
   backup-service:
     image: postgres:16

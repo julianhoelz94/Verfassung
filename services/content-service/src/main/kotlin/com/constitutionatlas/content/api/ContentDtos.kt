@@ -10,6 +10,17 @@ data class ArticleSummary(
     val sortOrder: Int,
 )
 
+data class ContentNodeDto(
+    val id: UUID,
+    val kind: String,
+    val label: String?,
+    val number: String?,
+    val title: String?,
+    val body: String?,
+    val sortOrder: Int,
+    val children: List<ContentNodeDto>,
+)
+
 data class ArticleDetail(
     val id: UUID,
     val versionId: UUID,
@@ -17,6 +28,8 @@ data class ArticleDetail(
     val title: String,
     val body: String,
     val sortOrder: Int,
+    val kind: String = "article",
+    val children: List<ContentNodeDto> = emptyList(),
 )
 
 data class ArticleWrite(

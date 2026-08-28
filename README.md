@@ -49,6 +49,19 @@ Service names: `catalog`, `content`, `amendment`, `identity`, `editor`, `search`
 
 `--start` builds images one service at a time (avoids Docker Desktop OOM). First start is slow because each Kotlin image runs `gradle bootJar` inside Docker.
 
+## Backup and restore
+
+`infra/backup/backup.sh` dumps all eight databases (including `search`) into `./backups/<timestamp>/`. Compose runs it on the `backup-service` container.
+
+Restore drill (destroys current rows in those databases):
+
+```bash
+# after a dump exists, e.g. backups/20260828-120000/
+docker compose --env-file env/local-stack.env run --rm --entrypoint sh backup-service /backup/restore.sh /backups/20260828-120000
+```
+
+Then restart the app containers so they reconnect. Flyway history is part of each dump.
+
 ## Layout
 
 | Path | Owns |
@@ -58,7 +71,7 @@ Service names: `catalog`, `content`, `amendment`, `identity`, `editor`, `search`
 | `infra/caddy/` | Edge proxy |
 | `infra/backup/` | `pg_dump` helper (writes to `./backups`, gitignored) |
 | `env/` | Profile templates |
-| `.github/workflows/ci.yml` | Per-service `gradle test` + frontend lint/build |
+| `.github/workflows/ci.yml` | Per-service `gradle test`, frontend lint/build, and image builds |
 
 ## Environment profiles
 
@@ -71,7 +84,7 @@ Copy the matching `env/*.env.example` file. Do not commit real `*.env` files.
 | `testing` | Staging-like |
 | `production` | Live (placeholders only in git) |
 
-Examples include local user emails/passwords for later identity work. They are not wired up yet.
+Examples include local user emails/passwords. Identity seeds those users on startup (`POST /api/identity/login`).
 
 ## Tests
 
@@ -82,8 +95,8 @@ cd apps/gateway-web && npm ci && npm run lint && npm run build
 
 Backend smoke tests use Testcontainers (`postgres:16-alpine`). CI discovers every `services/*/build.gradle.kts` and runs `gradle test` there.
 
-## What the scaffold includes
+## Current shape
 
-Runnable skeletons only: actuator health, `/internal/ping`, Flyway `V1__init.sql` marker, named Postgres volumes, Caddy routes for Swagger. There are **no domain APIs or seed constitutions** yet.
+Browse APIs and seed data exist for catalog and content; identity login, editor drafts, and audit append are in later sprints’ Done lists. See [`backlog.md`](backlog.md).
 
-For current sprint scope and task IDs, see [`backlog.md`](backlog.md) (grep `CAT-`, `CNT-`, `OPS-`, `UI-`).
+For current sprint scope and task IDs, see [`backlog.md`](backlog.md) (grep `CAT-`, `CNT-`, `OPS-`, `UI-`). Platform decisions: [`docs/adr/0001-platform-boundaries.md`](docs/adr/0001-platform-boundaries.md). Dependency pins: [`docs/dependencies.md`](docs/dependencies.md).

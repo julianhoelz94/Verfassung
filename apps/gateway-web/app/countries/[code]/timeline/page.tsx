@@ -65,6 +65,9 @@ export default async function TimelinePage({ params }: TimelinePageProps) {
                 <li key={change.id}>
                   {change.changeType}
                   {change.articleNumber ? ` Art. ${change.articleNumber}` : ''}
+                  {change.nodeId && change.nodeId !== change.articleId ? ' (sub-article)' : ''}
+                  {change.changedOn ? ` · ${change.changedOn}` : ''}
+                  {change.effectiveOn ? ` effective ${change.effectiveOn}` : ''}
                   {change.note ? `: ${change.note}` : ''}
                 </li>
               ))}

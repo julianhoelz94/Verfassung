@@ -3,6 +3,7 @@ import {
   getArticle,
   getCountry,
   type ArticleDetail,
+  type ContentNode,
   type CountryDetail,
 } from '../../../../../../../lib/api';
 
@@ -59,8 +60,32 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
         <p>
           <a href={`${permalink}#article-${article.articleNumber}`}>Permalink</a>
         </p>
-        <p>{article.body}</p>
+        {article.children && article.children.length > 0 ? (
+          <NodeTree nodes={article.children} />
+        ) : (
+          <p>{article.body}</p>
+        )}
       </article>
     </main>
+  );
+}
+
+function NodeTree({ nodes }: { nodes: ContentNode[] }) {
+  return (
+    <div>
+      {nodes.map((node) => (
+        <section key={node.id} style={{ marginLeft: node.kind === 'article' ? 0 : 16, marginTop: 8 }}>
+          {node.label || node.title ? (
+            <p style={{ margin: 0, fontWeight: 600 }}>
+              {node.kind}
+              {node.label ? ` ${node.label}` : ''}
+              {node.title ? ` — ${node.title}` : ''}
+            </p>
+          ) : null}
+          {node.body ? <p style={{ margin: '4px 0' }}>{node.body}</p> : null}
+          {node.children.length > 0 ? <NodeTree nodes={node.children} /> : null}
+        </section>
+      ))}
+    </div>
   );
 }

@@ -1,8 +1,10 @@
 package com.constitutionatlas.catalog.repo
 
 import com.constitutionatlas.catalog.api.ConstitutionSummary
+import com.constitutionatlas.catalog.api.ContentOutlineDto
 import com.constitutionatlas.catalog.api.CountryDetail
 import com.constitutionatlas.catalog.api.CountrySummary
+import com.constitutionatlas.catalog.api.NodeKindDto
 import com.constitutionatlas.catalog.api.VersionCreated
 import com.constitutionatlas.catalog.api.VersionSummary
 import org.springframework.jdbc.core.JdbcTemplate
@@ -49,7 +51,7 @@ class CatalogRepository(private val jdbc: JdbcTemplate) {
             },
             country.id,
         ).map { (id, slug, title) ->
-            ConstitutionSummary(id, slug, title, listPublishedVersions(id))
+            ConstitutionSummary(id, slug, title, listPublishedVersions(id), findOutline(id))
         }
 
         return CountryDetail(country.id, country.isoCode, country.name, constitutions)
@@ -112,7 +114,53 @@ class CatalogRepository(private val jdbc: JdbcTemplate) {
             slug,
             title,
         )
+        insertDefaultOutline(id)
         return id
+    }
+
+    fun insertDefaultOutline(constitutionId: UUID) {
+        jdbc.update(
+            """
+            INSERT INTO constitution_node_kinds (
+              id, constitution_id, kind_code, display_label, sort_order, may_hold_text, may_hold_children
+            ) VALUES (?, ?, 'article', 'Article', 1, TRUE, FALSE)
+            """.trimIndent(),
+            UUID.randomUUID(),
+            constitutionId,
+        )
+    }
+
+    fun findOutline(constitutionId: UUID): ContentOutlineDto {
+        val edges = jdbc.query(
+            """
+            SELECT parent_kind_code, child_kind_code
+            FROM constitution_node_kind_edges
+            WHERE constitution_id = ?
+            """.trimIndent(),
+            { rs, _ -> rs.getString("parent_kind_code") to rs.getString("child_kind_code") },
+            constitutionId,
+        ).groupBy({ it.first }, { it.second })
+        val kinds = jdbc.query(
+            """
+            SELECT kind_code, display_label, sort_order, may_hold_text, may_hold_children
+            FROM constitution_node_kinds
+            WHERE constitution_id = ?
+            ORDER BY sort_order
+            """.trimIndent(),
+            { rs, _ ->
+                val code = rs.getString("kind_code")
+                NodeKindDto(
+                    kindCode = code,
+                    displayLabel = rs.getString("display_label"),
+                    sortOrder = rs.getInt("sort_order"),
+                    mayHoldText = rs.getBoolean("may_hold_text"),
+                    mayHoldChildren = rs.getBoolean("may_hold_children"),
+                    allowedChildKinds = edges[code].orEmpty(),
+                )
+            },
+            constitutionId,
+        )
+        return ContentOutlineDto(kinds)
     }
 
     fun versionLabelExists(constitutionId: UUID, versionLabel: String): Boolean {

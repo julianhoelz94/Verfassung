@@ -1,6 +1,7 @@
 package com.constitutionatlas.catalog.service
 
 import com.constitutionatlas.catalog.NotFoundException
+import com.constitutionatlas.catalog.api.ContentOutlineDto
 import com.constitutionatlas.catalog.api.CountryDetail
 import com.constitutionatlas.catalog.api.CountrySummary
 import com.constitutionatlas.catalog.api.VersionSummary
@@ -21,5 +22,12 @@ class CatalogQueryService(private val catalogRepository: CatalogRepository) {
             throw NotFoundException("Unknown constitution '$constitutionId'")
         }
         return catalogRepository.listPublishedVersions(constitutionId)
+    }
+
+    fun getOutline(constitutionId: UUID): ContentOutlineDto {
+        if (!catalogRepository.constitutionExists(constitutionId)) {
+            throw NotFoundException("Unknown constitution '$constitutionId'")
+        }
+        return catalogRepository.findOutline(constitutionId)
     }
 }

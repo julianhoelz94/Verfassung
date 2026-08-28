@@ -11,10 +11,15 @@ import java.util.UUID
 
 @Service
 class ArticleQueryService(private val articleRepository: ArticleRepository) {
-    fun listByVersion(versionId: UUID): List<ArticleSummary> = articleRepository.listByVersion(versionId)
+    fun listByVersion(versionId: UUID, offset: Int = 0, limit: Int? = null): List<ArticleSummary> =
+        articleRepository.listByVersion(versionId, offset, limit)
 
-    fun getById(id: UUID): ArticleDetail =
-        articleRepository.findById(id) ?: throw NotFoundException("Unknown article '$id'")
+    fun countByVersion(versionId: UUID): Int = articleRepository.countByVersion(versionId)
+
+    fun getById(id: UUID): ArticleDetail {
+        val article = articleRepository.findById(id) ?: throw NotFoundException("Unknown article '$id'")
+        return article.copy(children = articleRepository.listChildren(id))
+    }
 
     @Transactional
     fun replaceForVersion(versionId: UUID, articles: List<ArticleWrite>): List<ArticleSummary> {

@@ -27,6 +27,10 @@ class CatalogController(
     fun listVersions(@PathVariable constitutionId: UUID): List<VersionSummary> =
         catalogQueryService.listVersions(constitutionId)
 
+    @GetMapping("/constitutions/{constitutionId}/content-outline")
+    fun getOutline(@PathVariable constitutionId: UUID): ContentOutlineDto =
+        catalogQueryService.getOutline(constitutionId)
+
     @PostMapping("/countries")
     @ResponseStatus(HttpStatus.CREATED)
     fun createCountry(@RequestBody request: CreateCountryRequest): CountrySummary =

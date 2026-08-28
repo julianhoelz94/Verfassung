@@ -1,4 +1,4 @@
-FROM gradle:8.10-jdk21 AS build
+FROM gradle:9.7-jdk21 AS build
 WORKDIR /workspace
 COPY build.gradle.kts settings.gradle.kts ./
 RUN gradle --no-daemon -Dorg.gradle.jvmargs="-Xms128m -Xmx384m" dependencies || true

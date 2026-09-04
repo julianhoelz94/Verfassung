@@ -4,6 +4,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties
 
 @ConfigurationProperties(prefix = "identity.seed")
 data class IdentitySeedProperties(
+    var mode: String = "off",
     var editorEmail: String = "",
     var editorPassword: String = "",
     var reviewerEmail: String = "",

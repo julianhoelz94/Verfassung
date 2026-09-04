@@ -11,6 +11,7 @@ export type SessionUser = {
 export type LoginResult = {
   token: string;
   user: SessionUser;
+  expiresInSeconds?: number;
 };
 
 type FetchLike = typeof fetch;

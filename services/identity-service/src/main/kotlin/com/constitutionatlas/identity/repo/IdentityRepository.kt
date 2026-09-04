@@ -1,9 +1,13 @@
 package com.constitutionatlas.identity.repo
 
+import com.constitutionatlas.identity.api.SessionInfoDto
 import com.constitutionatlas.identity.api.UserDto
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Repository
+import java.sql.Timestamp
+import java.time.Instant
 import java.time.OffsetDateTime
+import java.time.ZoneOffset
 import java.util.UUID
 
 data class StoredUser(
@@ -11,6 +15,11 @@ data class StoredUser(
     val email: String,
     val passwordHash: String,
     val enabled: Boolean = true,
+)
+
+data class StoredThrottle(
+    val failureCount: Int,
+    val lockedUntil: Instant?,
 )
 
 @Repository
@@ -77,14 +86,23 @@ class IdentityRepository(private val jdbc: JdbcTemplate) {
 
     fun toUserDto(user: StoredUser): UserDto = UserDto(user.id, user.email, rolesForUser(user.id))
 
-    fun insertSession(userId: UUID, tokenHash: String, expiresAt: OffsetDateTime): UUID {
+    fun insertSession(
+        userId: UUID,
+        tokenHash: String,
+        expiresAt: OffsetDateTime,
+        lastSeenAt: OffsetDateTime,
+    ): UUID {
         val id = UUID.randomUUID()
         jdbc.update(
-            "INSERT INTO sessions (id, user_id, token_hash, expires_at) VALUES (?, ?, ?, ?)",
+            """
+            INSERT INTO sessions (id, user_id, token_hash, expires_at, last_seen_at)
+            VALUES (?, ?, ?, ?, ?)
+            """.trimIndent(),
             id,
             userId,
             tokenHash,
-            java.sql.Timestamp.from(expiresAt.toInstant()),
+            Timestamp.from(expiresAt.toInstant()),
+            Timestamp.from(lastSeenAt.toInstant()),
         )
         return id
     }
@@ -110,7 +128,102 @@ class IdentityRepository(private val jdbc: JdbcTemplate) {
             tokenHash,
         ).firstOrNull()
 
+    fun findSessionIdByTokenHash(tokenHash: String): UUID? =
+        jdbc.query(
+            "SELECT id FROM sessions WHERE token_hash = ?",
+            { rs, _ -> rs.getObject("id", UUID::class.java) },
+            tokenHash,
+        ).firstOrNull()
+
+    fun lastSeenAt(tokenHash: String): Instant? =
+        jdbc.query(
+            "SELECT last_seen_at FROM sessions WHERE token_hash = ?",
+            { rs, _ -> rs.getTimestamp("last_seen_at").toInstant() },
+            tokenHash,
+        ).firstOrNull()
+
+    fun touchSession(tokenHash: String) {
+        jdbc.update("UPDATE sessions SET last_seen_at = NOW() WHERE token_hash = ?", tokenHash)
+    }
+
+    fun listSessions(userId: UUID, currentTokenHash: String): List<SessionInfoDto> =
+        jdbc.query(
+            """
+            SELECT id, created_at, last_seen_at, token_hash
+            FROM sessions
+            WHERE user_id = ?
+            ORDER BY created_at DESC
+            """.trimIndent(),
+            { rs, _ ->
+                SessionInfoDto(
+                    id = rs.getObject("id", UUID::class.java),
+                    createdAt = rs.getTimestamp("created_at").toInstant().atOffset(ZoneOffset.UTC),
+                    lastSeenAt = rs.getTimestamp("last_seen_at").toInstant().atOffset(ZoneOffset.UTC),
+                    current = rs.getString("token_hash") == currentTokenHash,
+                )
+            },
+            userId,
+        )
+
+    fun sessionBelongsToUser(sessionId: UUID, userId: UUID): Boolean {
+        val count =
+            jdbc.queryForObject(
+                "SELECT COUNT(*) FROM sessions WHERE id = ? AND user_id = ?",
+                Int::class.java,
+                sessionId,
+                userId,
+            )
+        return (count ?: 0) > 0
+    }
+
+    fun deleteSessionById(sessionId: UUID) {
+        jdbc.update("DELETE FROM sessions WHERE id = ?", sessionId)
+    }
+
+    fun deleteSessionsForUser(userId: UUID) {
+        jdbc.update("DELETE FROM sessions WHERE user_id = ?", userId)
+    }
+
     fun deleteSessionByTokenHash(tokenHash: String) {
         jdbc.update("DELETE FROM sessions WHERE token_hash = ?", tokenHash)
+    }
+
+    fun deleteExpiredSessions(idleCutoff: Instant) {
+        jdbc.update(
+            "DELETE FROM sessions WHERE expires_at < NOW() OR last_seen_at < ?",
+            Timestamp.from(idleCutoff),
+        )
+    }
+
+    fun findThrottle(key: String): StoredThrottle? =
+        jdbc.query(
+            "SELECT failure_count, locked_until FROM login_throttle WHERE throttle_key = ?",
+            { rs, _ ->
+                StoredThrottle(
+                    failureCount = rs.getInt("failure_count"),
+                    lockedUntil = rs.getTimestamp("locked_until")?.toInstant(),
+                )
+            },
+            key,
+        ).firstOrNull()
+
+    fun upsertThrottle(key: String, failureCount: Int, lockedUntil: Instant?) {
+        jdbc.update(
+            """
+            INSERT INTO login_throttle (throttle_key, failure_count, locked_until, updated_at)
+            VALUES (?, ?, ?, NOW())
+            ON CONFLICT (throttle_key) DO UPDATE SET
+              failure_count = EXCLUDED.failure_count,
+              locked_until = EXCLUDED.locked_until,
+              updated_at = NOW()
+            """.trimIndent(),
+            key,
+            failureCount,
+            lockedUntil?.let { Timestamp.from(it) },
+        )
+    }
+
+    fun clearThrottle(key: String) {
+        jdbc.update("DELETE FROM login_throttle WHERE throttle_key = ?", key)
     }
 }

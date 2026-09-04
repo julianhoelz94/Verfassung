@@ -1,0 +1,16 @@
+identity:
+  seed:
+    mode: off
+    editor-email: ${PROD_EDITOR_EMAIL:}
+    editor-password: ${PROD_EDITOR_PASSWORD:}
+    reviewer-email: ${PROD_REVIEWER_EMAIL:}
+    reviewer-password: ${PROD_REVIEWER_PASSWORD:}
+    publisher-email: ${PROD_PUBLISHER_EMAIL:}
+    publisher-password: ${PROD_PUBLISHER_PASSWORD:}
+    admin-email: ${PROD_ADMIN_EMAIL:}
+    admin-password: ${PROD_ADMIN_PASSWORD:}
+    viewer-email: ${PROD_VIEWER_EMAIL:}
+    viewer-password: ${PROD_VIEWER_PASSWORD:}
+  session:
+    idle-timeout: 15m
+    absolute-timeout: 12h

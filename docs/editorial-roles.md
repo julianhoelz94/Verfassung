@@ -14,7 +14,7 @@ Flow: `open` → save → submit (`reviewing`) → approve (`approved`) → publ
 
 Publish (QLT-5) patches existing public articles in place so content-tree children stay intact, then requests `POST /reindex` on search. Set `EDITOR_PUBLISH_PUBLIC=false` to keep the old audit-only publish.
 
-Local seed (`identity.seed.*` / `LOCAL_*` env):
+Local seed (`identity.seed.mode`: `create-only` on local-stack/ci/testing, `off` in production; `LOCAL_*` / `CI_*` / `TEST_*` env). Ordinary startup never resets an existing password hash. Production rejects demo emails and `change-me` passwords.
 
 - `local-editor@example.local` — `editor` + `reviewer` + `publisher` (one-login path)
 - `local-reviewer@example.local` — `reviewer` only

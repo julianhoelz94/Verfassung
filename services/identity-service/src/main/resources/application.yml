@@ -3,16 +3,22 @@ spring:
     name: identity-service
 identity:
   seed:
-    editor-email: ${LOCAL_EDITOR_EMAIL:}
-    editor-password: ${LOCAL_EDITOR_PASSWORD:}
-    reviewer-email: ${LOCAL_REVIEWER_EMAIL:}
-    reviewer-password: ${LOCAL_REVIEWER_PASSWORD:}
-    publisher-email: ${LOCAL_PUBLISHER_EMAIL:}
-    publisher-password: ${LOCAL_PUBLISHER_PASSWORD:}
-    admin-email: ${LOCAL_ADMIN_EMAIL:}
-    admin-password: ${LOCAL_ADMIN_PASSWORD:}
-    viewer-email: ${LOCAL_VIEWER_EMAIL:}
-    viewer-password: ${LOCAL_VIEWER_PASSWORD:}
+    mode: ${IDENTITY_SEED_MODE:off}
+    editor-email: ${IDENTITY_EDITOR_EMAIL:${LOCAL_EDITOR_EMAIL:}}
+    editor-password: ${IDENTITY_EDITOR_PASSWORD:${LOCAL_EDITOR_PASSWORD:}}
+    reviewer-email: ${IDENTITY_REVIEWER_EMAIL:${LOCAL_REVIEWER_EMAIL:}}
+    reviewer-password: ${IDENTITY_REVIEWER_PASSWORD:${LOCAL_REVIEWER_PASSWORD:}}
+    publisher-email: ${IDENTITY_PUBLISHER_EMAIL:${LOCAL_PUBLISHER_EMAIL:}}
+    publisher-password: ${IDENTITY_PUBLISHER_PASSWORD:${LOCAL_PUBLISHER_PASSWORD:}}
+    admin-email: ${IDENTITY_ADMIN_EMAIL:${LOCAL_ADMIN_EMAIL:}}
+    admin-password: ${IDENTITY_ADMIN_PASSWORD:${LOCAL_ADMIN_PASSWORD:}}
+    viewer-email: ${IDENTITY_VIEWER_EMAIL:${LOCAL_VIEWER_EMAIL:}}
+    viewer-password: ${IDENTITY_VIEWER_PASSWORD:${LOCAL_VIEWER_PASSWORD:}}
+  session:
+    idle-timeout: ${IDENTITY_SESSION_IDLE:30m}
+    absolute-timeout: ${IDENTITY_SESSION_ABSOLUTE:24h}
+  login:
+    failure-threshold: ${IDENTITY_LOGIN_FAILURE_THRESHOLD:5}
 management:
   endpoints:
     web:

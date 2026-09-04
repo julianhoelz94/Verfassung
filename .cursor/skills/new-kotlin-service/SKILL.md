@@ -9,7 +9,7 @@ disable-model-invocation: true
 Copy a sibling under `services/` (e.g. `catalog-service`). Do not invent a new Gradle layout.
 
 Checklist:
-1. Folder `services/<name>/` with `build.gradle.kts` (Spotless plugin + `apply` of `gradle/service-conventions.gradle`), `settings.gradle.kts`, stub `gradlew` (copy a sibling), Dockerfile, `Application.kt`, `CorrelationIdFilter.kt`, `application.yml`, `logback-spring.xml`, `V1__init.sql`, `SmokeTest.kt`.
+1. Folder `services/<name>/` with `build.gradle.kts` (Spotless plugin + `apply` of `gradle/service-conventions.gradle`), `settings.gradle.kts`, stub `gradlew` (copy a sibling), Dockerfile (`COPY build/libs/app.jar` onto `eclipse-temurin:21-jre`), `Application.kt`, `CorrelationIdFilter.kt`, `application.yml`, `logback-spring.xml`, `V1__init.sql`, `SmokeTest.kt`.
 2. Package `com.constitutionatlas.<short>`.
 3. Own `*-db` in `docker-compose.yml` if it has state.
 4. Add to `BUILD_ORDER` in `manageLocalStack.sh`.

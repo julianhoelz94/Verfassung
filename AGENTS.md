@@ -24,7 +24,7 @@ Public site for versioned constitutions: countries → constitution versions →
 
 ```bash
 cp env/local-stack.env.example env/local-stack.env   # once
-./manageLocalStack.sh --start                         # http://localhost
+./manageLocalStack.sh --start                         # host bootJar + images, then http://localhost
 ./manageLocalStack.sh --start --no-build
 ./manageLocalStack.sh --rebuild <service...>          # after Flyway / gateway changes
 ./manageLocalStack.sh --stop

@@ -5,7 +5,9 @@ Pinned versions we actually use. Upgrade one service (or the gateway) then CI, n
 | Area | Component | Version / pin | Where |
 | --- | --- | --- | --- |
 | JDK | Eclipse Temurin | 21 | Host, CI `setup-java`, Kotlin Dockerfiles (`eclipse-temurin:21-jre`) |
-| Gradle | Gradle | 8.10.2 | CI `setup-gradle`, service Dockerfiles (`gradle:8.10-jdk21`) |
+| Gradle | Gradle | 8.10.2 | Repo wrapper (`gradle/wrapper`), CI `setup-gradle`, service Dockerfiles (`gradle:8.10-jdk21`) |
+| Lint | Spotless + ktlint | Spotless 6.25.0 / ktlint 1.3.1 | `gradle/service-conventions.gradle`, `./gradlew check` |
+| Logs | logstash-logback-encoder | 7.4 | JSON console logs + MDC `correlationId` |
 | Kotlin | `kotlin("jvm")` / Spring plugin | 1.9.24 | `services/*/build.gradle.kts` |
 | Spring | Spring Boot | 3.3.2 | `services/*/build.gradle.kts` |
 | Spring | Dependency management plugin | 1.1.6 | `services/*/build.gradle.kts` |

@@ -1,3 +1,4 @@
+import { Breadcrumbs } from '../../../../components/Breadcrumbs';
 import {
   ApiUnavailableError,
   getCountry,
@@ -5,6 +6,8 @@ import {
   type ArticleSummary,
   type CountryDetail,
 } from '../../../../../lib/api';
+import { orderVersions } from '../../../../../lib/compare';
+import { CompareForm } from '../../CompareForm';
 
 type VersionPageProps = {
   params: { code: string; versionId: string };
@@ -33,7 +36,7 @@ export default async function VersionPage({ params, searchParams }: VersionPageP
 
   if (error) {
     return (
-      <main style={{ padding: 24 }}>
+      <main>
         <p>{error}.</p>
       </main>
     );
@@ -45,21 +48,52 @@ export default async function VersionPage({ params, searchParams }: VersionPageP
 
   if (!country || !version) {
     return (
-      <main style={{ padding: 24 }}>
+      <main>
         <p>Unknown constitution version.</p>
       </main>
     );
   }
 
+  const line = orderVersions(version.constitution.versions);
+  const later = line.find((item) => item.id !== params.versionId && line.indexOf(item) > line.findIndex((v) => v.id === params.versionId));
+  const earlier = [...line].reverse().find((item) => item.id !== params.versionId && line.indexOf(item) < line.findIndex((v) => v.id === params.versionId));
+
   return (
-    <main style={{ padding: 24, maxWidth: 800 }}>
-      <p>
-        <a href="/">Countries</a>
-        {' · '}
-        <a href={`/countries/${country.isoCode}`}>{country.name}</a>
-      </p>
+    <main>
+      <Breadcrumbs
+        items={[
+          { href: '/', label: 'Countries' },
+          { href: `/countries/${country.isoCode}`, label: country.name },
+          { label: version.version.versionLabel },
+        ]}
+      />
       <h1>{version.constitution.title}</h1>
       <p>Version {version.version.versionLabel}</p>
+      <div className="actions">
+        <a href={`/countries/${country.isoCode}/timeline`}>Amendment timeline</a>
+        {later ? (
+          <a
+            href={`/countries/${country.isoCode}/compare?from=${encodeURIComponent(params.versionId)}&to=${encodeURIComponent(later.id)}`}
+          >
+            Compare with {later.versionLabel}
+          </a>
+        ) : null}
+        {earlier && !later ? (
+          <a
+            href={`/countries/${country.isoCode}/compare?from=${encodeURIComponent(earlier.id)}&to=${encodeURIComponent(params.versionId)}`}
+          >
+            Compare with {earlier.versionLabel}
+          </a>
+        ) : null}
+      </div>
+      {line.length > 2 ? (
+        <CompareForm
+          code={country.isoCode}
+          versions={line}
+          fromId={params.versionId}
+          toId={later?.id ?? line[line.length - 1]?.id}
+        />
+      ) : null}
       <ol>
         {articles.map((article) => (
           <li key={article.id}>

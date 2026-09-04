@@ -8,31 +8,39 @@ import java.util.UUID
 
 @Repository
 class AmendmentRepository(private val jdbc: JdbcTemplate) {
-    fun listForTargetVersion(targetVersionId: UUID): List<AmendmentDto> {
-        val amendments = jdbc.query(
+    fun listForTargetVersion(targetVersionId: UUID, sourceVersionId: UUID? = null): List<AmendmentDto> {
+        val sql = StringBuilder(
             """
             SELECT a.id, a.title, a.summary, a.enacted_on, a.source_reference,
                    t.source_version_id, t.target_version_id
             FROM amendments a
             JOIN version_transitions t ON t.id = a.version_transition_id
             WHERE t.target_version_id = ?
-            ORDER BY a.enacted_on NULLS LAST, a.title
             """.trimIndent(),
-            { rs, _ ->
-                AmendmentDto(
-                    id = rs.getObject("id", UUID::class.java),
-                    title = rs.getString("title"),
-                    summary = rs.getString("summary"),
-                    enactedOn = rs.getDate("enacted_on")?.toLocalDate(),
-                    sourceReference = rs.getString("source_reference"),
-                    sourceVersionId = rs.getObject("source_version_id", UUID::class.java),
-                    targetVersionId = rs.getObject("target_version_id", UUID::class.java),
-                    changes = emptyList(),
-                )
-            },
-            targetVersionId,
         )
+        if (sourceVersionId != null) {
+            sql.append(" AND t.source_version_id = ?")
+        }
+        sql.append(" ORDER BY a.enacted_on NULLS LAST, a.title")
+        val amendments = if (sourceVersionId != null) {
+            jdbc.query(sql.toString(), amendmentRowMapper, targetVersionId, sourceVersionId)
+        } else {
+            jdbc.query(sql.toString(), amendmentRowMapper, targetVersionId)
+        }
         return amendments.map { it.copy(changes = listChanges(it.id)) }
+    }
+
+    private val amendmentRowMapper = org.springframework.jdbc.core.RowMapper { rs, _ ->
+        AmendmentDto(
+            id = rs.getObject("id", UUID::class.java),
+            title = rs.getString("title"),
+            summary = rs.getString("summary"),
+            enactedOn = rs.getDate("enacted_on")?.toLocalDate(),
+            sourceReference = rs.getString("source_reference"),
+            sourceVersionId = rs.getObject("source_version_id", UUID::class.java),
+            targetVersionId = rs.getObject("target_version_id", UUID::class.java),
+            changes = emptyList(),
+        )
     }
 
     private fun listChanges(amendmentId: UUID): List<AmendmentChangeDto> =

@@ -1,4 +1,7 @@
+import { Breadcrumbs } from '../../components/Breadcrumbs';
 import { ApiUnavailableError, getCountry, type CountryDetail } from '../../../lib/api';
+import { orderVersions } from '../../../lib/compare';
+import { CompareForm } from './CompareForm';
 
 type CountryPageProps = {
   params: { code: string };
@@ -16,7 +19,7 @@ export default async function CountryPage({ params }: CountryPageProps) {
 
   if (error) {
     return (
-      <main style={{ padding: 24 }}>
+      <main>
         <p>{error}.</p>
       </main>
     );
@@ -24,42 +27,45 @@ export default async function CountryPage({ params }: CountryPageProps) {
 
   if (!country) {
     return (
-      <main style={{ padding: 24 }}>
+      <main>
         <p>Unknown country.</p>
       </main>
     );
   }
 
   return (
-    <main style={{ padding: 24, maxWidth: 800 }}>
-      <p>
-        <a href="/">Countries</a>
-      </p>
+    <main>
+      <Breadcrumbs items={[{ href: '/', label: 'Countries' }, { label: country.name }]} />
       <h1>{country.name}</h1>
-      <p>
+      <div className="actions">
         <a href={`/countries/${country.isoCode}/timeline`}>Amendment timeline</a>
-      </p>
-      {country.constitutions.map((constitution) => (
-        <section key={constitution.id}>
-          <h2>{constitution.title}</h2>
-          {constitution.contentOutline && constitution.contentOutline.kinds.length > 0 ? (
-            <p style={{ color: '#555' }}>
-              Structure:{' '}
-              {constitution.contentOutline.kinds.map((kind) => kind.displayLabel).join(' → ')}
-            </p>
-          ) : null}
-          <ul>
-            {constitution.versions.map((version) => (
-              <li key={version.id}>
-                <a href={`/countries/${country.isoCode}/versions/${version.id}`}>
-                  {version.versionLabel}
-                  {version.effectiveDate ? ` (${version.effectiveDate})` : ''}
-                </a>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ))}
+      </div>
+      {country.constitutions.map((constitution) => {
+        const versions = orderVersions(constitution.versions);
+        return (
+          <section key={constitution.id}>
+            <h2>{constitution.title}</h2>
+            {constitution.contentOutline && constitution.contentOutline.kinds.length > 0 ? (
+              <p className="muted">
+                Structure:{' '}
+                {constitution.contentOutline.kinds.map((kind) => kind.displayLabel).join(' → ')}
+              </p>
+            ) : null}
+            <ul>
+              {versions.map((version) => (
+                <li key={version.id}>
+                  <a href={`/countries/${country.isoCode}/versions/${version.id}`}>
+                    {version.versionLabel}
+                    {version.effectiveDate ? ` (${version.effectiveDate})` : ''}
+                  </a>
+                </li>
+              ))}
+            </ul>
+            <h3>Compare versions</h3>
+            <CompareForm code={country.isoCode} versions={versions} />
+          </section>
+        );
+      })}
     </main>
   );
 }

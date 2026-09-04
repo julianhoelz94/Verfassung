@@ -7,11 +7,25 @@ identity:
 audit:
   api:
     url: ${AUDIT_API_URL:http://localhost/api/audit}
+content:
+  api:
+    url: ${CONTENT_API_URL:http://localhost/api/content}
+search:
+  api:
+    url: ${SEARCH_API_URL:http://localhost/api/search}
+editor:
+  publish:
+    rewrite-public-content: ${EDITOR_PUBLISH_PUBLIC:true}
 management:
   endpoints:
     web:
       exposure:
         include: health,info
+  info:
+    build:
+      enabled: true
+    env:
+      enabled: true
 logging:
   level:
     root: INFO

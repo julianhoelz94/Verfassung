@@ -11,8 +11,13 @@ import java.util.UUID
 
 @Service
 class ArticleQueryService(private val articleRepository: ArticleRepository) {
-    fun listByVersion(versionId: UUID, offset: Int = 0, limit: Int? = null): List<ArticleSummary> =
-        articleRepository.listByVersion(versionId, offset, limit)
+    fun listByVersion(
+        versionId: UUID,
+        offset: Int = 0,
+        limit: Int? = null,
+        includeBody: Boolean = false,
+    ): List<ArticleSummary> =
+        articleRepository.listByVersion(versionId, offset, limit, includeBody)
 
     fun countByVersion(versionId: UUID): Int = articleRepository.countByVersion(versionId)
 
@@ -32,5 +37,15 @@ class ArticleQueryService(private val articleRepository: ArticleRepository) {
             throw IllegalArgumentException("sortOrder values must be unique")
         }
         return articleRepository.replaceForVersion(versionId, articles)
+    }
+
+    @Transactional
+    fun updateText(id: UUID, title: String, body: String): ArticleDetail {
+        if (title.isBlank()) {
+            throw IllegalArgumentException("title must not be blank")
+        }
+        val article = articleRepository.updateText(id, title, body)
+            ?: throw NotFoundException("Unknown article '$id'")
+        return article.copy(children = articleRepository.listChildren(id))
     }
 }

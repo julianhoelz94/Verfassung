@@ -76,6 +76,10 @@ services:
       - SPRING_DATASOURCE_PASSWORD=postgres
       - LOCAL_EDITOR_EMAIL=${LOCAL_EDITOR_EMAIL:-local-editor@example.local}
       - LOCAL_EDITOR_PASSWORD=${LOCAL_EDITOR_PASSWORD:-change-me}
+      - LOCAL_REVIEWER_EMAIL=${LOCAL_REVIEWER_EMAIL:-local-reviewer@example.local}
+      - LOCAL_REVIEWER_PASSWORD=${LOCAL_REVIEWER_PASSWORD:-change-me}
+      - LOCAL_PUBLISHER_EMAIL=${LOCAL_PUBLISHER_EMAIL:-local-publisher@example.local}
+      - LOCAL_PUBLISHER_PASSWORD=${LOCAL_PUBLISHER_PASSWORD:-change-me}
       - LOCAL_ADMIN_EMAIL=${LOCAL_ADMIN_EMAIL:-local-admin@example.local}
       - LOCAL_ADMIN_PASSWORD=${LOCAL_ADMIN_PASSWORD:-change-me}
       - LOCAL_VIEWER_EMAIL=${LOCAL_VIEWER_EMAIL:-local-viewer@example.local}
@@ -93,12 +97,19 @@ services:
       - SPRING_DATASOURCE_PASSWORD=postgres
       - IDENTITY_API_URL=http://identity-service:8080
       - AUDIT_API_URL=http://audit-service:8080
+      - CONTENT_API_URL=http://content-service:8080
+      - SEARCH_API_URL=http://search-service:8080
+      - EDITOR_PUBLISH_PUBLIC=${EDITOR_PUBLISH_PUBLIC:-true}
     depends_on:
       editor-db:
         condition: service_healthy
       identity-service:
         condition: service_started
       audit-service:
+        condition: service_started
+      content-service:
+        condition: service_started
+      search-service:
         condition: service_started
 
   audit-service:

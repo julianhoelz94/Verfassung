@@ -1,4 +1,8 @@
 import com.constitutionatlas.catalog.CatalogServiceApplication
+import com.constitutionatlas.catalog.CorrelationIdFilter
+import com.fasterxml.jackson.databind.JsonNode
+import com.fasterxml.jackson.databind.ObjectMapper
+import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
@@ -12,6 +16,7 @@ import org.springframework.test.web.servlet.post
 import org.testcontainers.containers.PostgreSQLContainer
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
+import java.io.File
 import java.util.UUID
 
 @Testcontainers
@@ -115,7 +120,58 @@ class CatalogApiTest {
         }
     }
 
+    @Test
+    fun countryListMatchesGatewayContract() {
+        val json = mockMvc.get("/countries").andReturn().response.contentAsString
+        val countries = objectMapper.readTree(json)
+        val germany = countries.first { it.get("isoCode").asText() == "DE" }
+        assertThat(germany).isEqualTo(gatewayContract("catalog-countries.json").get(0))
+    }
+
+    @Test
+    fun countryDetailMatchesGatewayContract() {
+        val json = mockMvc.get("/countries/DE").andReturn().response.contentAsString
+        assertJsonEquals("catalog-country-DE.json", json)
+    }
+
+    @Test
+    fun echoesProvidedCorrelationId() {
+        mockMvc.get("/countries") {
+            header(CorrelationIdFilter.HEADER, "test-corr-1")
+        }.andExpect {
+            status { isOk() }
+            header { string(CorrelationIdFilter.HEADER, "test-corr-1") }
+        }
+    }
+
+    @Test
+    fun generatesCorrelationIdWhenMissing() {
+        mockMvc.get("/countries").andExpect {
+            status { isOk() }
+            header { exists(CorrelationIdFilter.HEADER) }
+        }
+    }
+
+    @Test
+    fun actuatorInfoExposesBuild() {
+        mockMvc.get("/actuator/info").andExpect {
+            status { isOk() }
+            jsonPath("$.build.artifact") { value("catalog-service") }
+        }
+    }
+
     companion object {
+        private val objectMapper = ObjectMapper()
+
+        private fun gatewayContract(contractFile: String): JsonNode =
+            objectMapper.readTree(File("../../apps/gateway-web/lib/contracts/$contractFile"))
+
+        private fun assertJsonEquals(contractFile: String, actualJson: String) {
+            val expected: JsonNode = gatewayContract(contractFile)
+            val actual: JsonNode = objectMapper.readTree(actualJson)
+            assertThat(actual).isEqualTo(expected)
+        }
+
         @Container
         @JvmStatic
         val postgres: PostgreSQLContainer<*> = PostgreSQLContainer("postgres:16-alpine")

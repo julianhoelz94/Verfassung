@@ -1,0 +1,58 @@
+{
+  "id": "01900000-0000-4000-8000-000000000001",
+  "isoCode": "DE",
+  "name": "Germany",
+  "constitutions": [
+    {
+      "id": "01900000-0000-4000-8000-000000000002",
+      "slug": "basic-law",
+      "title": "Basic Law for the Federal Republic of Germany",
+      "versions": [
+        {
+          "id": "01900000-0000-4000-8000-000000000003",
+          "versionLabel": "1949",
+          "effectiveDate": "1949-05-23",
+          "languageCode": "en",
+          "sourceUrl": "https://www.gesetze-im-internet.de/gg/",
+          "gazetteReference": "BGBl. 1949"
+        },
+        {
+          "id": "01900000-0000-4000-8000-000000000004",
+          "versionLabel": "2022",
+          "effectiveDate": "2022-12-19",
+          "languageCode": "en",
+          "sourceUrl": "https://www.gesetze-im-internet.de/gg/",
+          "gazetteReference": "BGBl. I 2022"
+        }
+      ],
+      "contentOutline": {
+        "kinds": [
+          {
+            "kindCode": "article",
+            "displayLabel": "Article",
+            "sortOrder": 1,
+            "mayHoldText": true,
+            "mayHoldChildren": true,
+            "allowedChildKinds": ["paragraph"]
+          },
+          {
+            "kindCode": "paragraph",
+            "displayLabel": "Paragraph",
+            "sortOrder": 2,
+            "mayHoldText": true,
+            "mayHoldChildren": true,
+            "allowedChildKinds": ["sentence"]
+          },
+          {
+            "kindCode": "sentence",
+            "displayLabel": "Sentence",
+            "sortOrder": 3,
+            "mayHoldText": true,
+            "mayHoldChildren": false,
+            "allowedChildKinds": []
+          }
+        ]
+      }
+    }
+  ]
+}

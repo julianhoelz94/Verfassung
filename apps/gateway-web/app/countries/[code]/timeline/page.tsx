@@ -1,3 +1,4 @@
+import { Breadcrumbs } from '../../../components/Breadcrumbs';
 import {
   ApiUnavailableError,
   getCountry,
@@ -5,6 +6,7 @@ import {
   type Amendment,
   type CountryDetail,
 } from '../../../../lib/api';
+import { orderVersions } from '../../../../lib/compare';
 
 type TimelinePageProps = {
   params: { code: string };
@@ -30,7 +32,7 @@ export default async function TimelinePage({ params }: TimelinePageProps) {
 
   if (error) {
     return (
-      <main style={{ padding: 24 }}>
+      <main>
         <p>{error}.</p>
       </main>
     );
@@ -38,18 +40,31 @@ export default async function TimelinePage({ params }: TimelinePageProps) {
 
   if (!country) {
     return (
-      <main style={{ padding: 24 }}>
+      <main>
         <p>Unknown country.</p>
       </main>
     );
   }
 
+  const labelById = new Map(
+    country.constitutions.flatMap((constitution) =>
+      orderVersions(constitution.versions).map((version) => [version.id, version.versionLabel]),
+    ),
+  );
+
   return (
-    <main style={{ padding: 24, maxWidth: 800 }}>
-      <p>
-        <a href={`/countries/${country.isoCode}`}>{country.name}</a>
-      </p>
+    <main>
+      <Breadcrumbs
+        items={[
+          { href: '/', label: 'Countries' },
+          { href: `/countries/${country.isoCode}`, label: country.name },
+          { label: 'Timeline' },
+        ]}
+      />
       <h1>Amendment timeline</h1>
+      <div className="actions">
+        <a href={`/countries/${country.isoCode}`}>Versions</a>
+      </div>
       {amendments.length === 0 ? <p>No recorded amendments for published versions.</p> : null}
       <ol>
         {amendments.map((amendment) => (
@@ -60,10 +75,18 @@ export default async function TimelinePage({ params }: TimelinePageProps) {
               {amendment.sourceReference ? ` · ${amendment.sourceReference}` : ''}
             </p>
             <p>{amendment.summary}</p>
+            <p>
+              <a
+                href={`/countries/${country.isoCode}/compare?from=${encodeURIComponent(amendment.sourceVersionId)}&to=${encodeURIComponent(amendment.targetVersionId)}`}
+              >
+                Compare {labelById.get(amendment.sourceVersionId) ?? 'source'} →{' '}
+                {labelById.get(amendment.targetVersionId) ?? 'target'}
+              </a>
+            </p>
             <ul>
               {amendment.changes.map((change) => (
                 <li key={change.id}>
-                  {change.changeType}
+                  <span className={`tag tag-${change.changeType}`}>{change.changeType}</span>
                   {change.articleNumber ? ` Art. ${change.articleNumber}` : ''}
                   {change.nodeId && change.nodeId !== change.articleId ? ' (sub-article)' : ''}
                   {change.changedOn ? ` · ${change.changedOn}` : ''}

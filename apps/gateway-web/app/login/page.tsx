@@ -13,9 +13,9 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   }
 
   return (
-    <main style={{ padding: 24, maxWidth: 420 }}>
+    <main>
       <h1>Editor login</h1>
-      <p>Use a seeded local account (for example local-editor@example.local).</p>
+      <p>Use a seeded local account. local-editor@example.local can edit, review, and publish. Dedicated reviewer and publisher accounts exist for separated duties.</p>
       {searchParams.error ? <p>Invalid email or password.</p> : null}
       <form action={loginAction}>
         <p>

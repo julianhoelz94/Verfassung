@@ -14,16 +14,18 @@ class IdentitySeedRunner(
     private val passwordEncoder: PasswordEncoder,
 ) : ApplicationRunner {
     override fun run(args: ApplicationArguments) {
-        upsert("editor", properties.editorEmail, properties.editorPassword)
-        upsert("admin", properties.adminEmail, properties.adminPassword)
-        upsert("viewer", properties.viewerEmail, properties.viewerPassword)
+        // Combined local-editor account keeps review + publish for one-login tests.
+        upsert(properties.editorEmail, properties.editorPassword, listOf("editor", "reviewer", "publisher"))
+        upsert(properties.reviewerEmail, properties.reviewerPassword, listOf("reviewer"))
+        upsert(properties.publisherEmail, properties.publisherPassword, listOf("publisher"))
+        upsert(properties.adminEmail, properties.adminPassword, listOf("admin"))
+        upsert(properties.viewerEmail, properties.viewerPassword, listOf("viewer"))
     }
 
-    private fun upsert(roleName: String, email: String, password: String) {
+    private fun upsert(email: String, password: String, roleNames: List<String>) {
         if (email.isBlank() || password.isBlank()) {
             return
         }
-        val roleId = identityRepository.findRoleId(roleName) ?: return
         val existing = identityRepository.findUserByEmail(email)
         val userId = if (existing == null) {
             identityRepository.insertUser(email, passwordEncoder.encode(password))
@@ -31,6 +33,9 @@ class IdentitySeedRunner(
             identityRepository.updatePasswordHash(existing.id, passwordEncoder.encode(password))
             existing.id
         }
-        identityRepository.assignRole(userId, roleId)
+        roleNames.forEach { roleName ->
+            val roleId = identityRepository.findRoleId(roleName) ?: return@forEach
+            identityRepository.assignRole(userId, roleId)
+        }
     }
 }

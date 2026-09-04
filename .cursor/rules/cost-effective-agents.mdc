@@ -10,4 +10,4 @@ alwaysApply: true
 - Never fan out one subagent per microservice unless the user asked for a swarm.
 - Do not read `backlog.md` in full. Grep for a story ID (`ARCH-`, `SRV-`, `UI-`, `CAT-`, `CNT-`, `AMD-`, `ING-`, `OPS-`) if needed.
 - When you complete a backlog item, set it to `Done` in `backlog.md` in the same change.
-- Run `gradle test` only in the changed service directory. Do not rebuild the Compose stack unless the task is about local orchestration.
+- Run `gradle test` only in the changed service directory. Do not rebuild the Compose stack unless the task is about local orchestration. Prefer `./gradlew test` (wrapper 8.10.2).

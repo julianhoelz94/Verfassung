@@ -35,6 +35,24 @@ class AmendmentApiTest {
     }
 
     @Test
+    fun listAmendmentsCanFilterBySourceVersion() {
+        mockMvc.get("/versions/01900000-0000-4000-8000-000000000004/amendments") {
+            param("sourceVersionId", "01900000-0000-4000-8000-000000000003")
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.length()") { value(1) }
+            jsonPath("$[0].sourceVersionId") { value("01900000-0000-4000-8000-000000000003") }
+        }
+
+        mockMvc.get("/versions/01900000-0000-4000-8000-000000000004/amendments") {
+            param("sourceVersionId", "00000000-0000-4000-8000-000000000099")
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.length()") { value(0) }
+        }
+    }
+
+    @Test
     fun unknownVersionReturnsEmptyList() {
         mockMvc.get("/versions/00000000-0000-4000-8000-000000000099/amendments")
             .andExpect {

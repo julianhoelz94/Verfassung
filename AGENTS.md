@@ -25,8 +25,11 @@ Public site for versioned constitutions: countries → constitution versions →
 ```bash
 cp env/local-stack.env.example env/local-stack.env   # once
 ./manageLocalStack.sh --start                         # http://localhost
+./manageLocalStack.sh --start --no-build
+./manageLocalStack.sh --rebuild <service...>          # after Flyway / gateway changes
 ./manageLocalStack.sh --stop
-cd services/<name> && gradle test                     # one service only; CI pins Gradle 8.10.2
+cd services/<name> && ./gradlew test                     # one service only; wrapper pins Gradle 8.10.2
+./gradlew -p services/<name> check                       # tests + Spotless/ktlint
 cd apps/gateway-web && npm ci && npm run lint && npm run build
 ```
 
@@ -35,7 +38,7 @@ Service names: `catalog`, `content`, `amendment`, `identity`, `editor`, `search`
 
 ## Current sprint
 
-See `backlog.md` **Suggested Sprint Breakdown**. Sprint 0–6 are closed. Pull from **Later / Ideas** only if the user asks.
+See `backlog.md` **Suggested Sprint Breakdown**. Sprint 0–9 are closed. **Sprint 10** (search facets, SRC-2) is next. Sprints 11–14 are planned. Pull from **Later / Ideas** only if the user asks. Do not start SRV-7 (MCP) until asked.
 
 **When a story/task is finished, update `backlog.md` in the same change:** set Status to `Done`, add the ID to that sprint’s Done list, and keep the board snapshot accurate. Do not leave completed work as `Ready`.
 
@@ -45,4 +48,4 @@ See `backlog.md` **Suggested Sprint Breakdown**. Sprint 0–6 are closed. Pull f
 - Do **not** spawn parallel subagents for a one-file or one-service change.
 - Prefer built-in `explore` for search. Use project subagents only when the description matches.
 - Read `README.md` and this file first. Open `backlog.md` only for the relevant epic/story IDs.
-- Run tests only for the service you changed: `cd services/<name> && gradle test`.
+- Run tests only for the service you changed: `cd services/<name> && ./gradlew test`.

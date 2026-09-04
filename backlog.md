@@ -564,7 +564,7 @@ These are useful, but they should stay out of the initial implementation scope u
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | SRV-1 | Story | P0 | Done | M | docs | Clear service boundaries. | Ownership is documented (`AGENTS.md`, this backlog) and DBs are not shared. | ARCH-1 |
 | SRV-2 | Story | P0 | Done | M | infra | Each stateful service owns its database. | Compose: one `*-db` + named volume per service. | SRV-1 |
-| SRV-3 | Story | P0 | Ready | L | per API task | Versioned OpenAPI for real routes (not only `/internal/ping`). | Catalog and content public read APIs published via springdoc; gateway uses those contracts. | SRV-1, CAT-2, CNT-2 |
+| SRV-3 | Story | P0 | Done | L | per API task | Versioned OpenAPI for real routes (not only `/internal/ping`). | Catalog and content public read APIs published via springdoc; gateway uses those contracts. | SRV-1, CAT-2, CNT-2 |
 | SRV-4 | Story | P1 | Ideas | M | amendment + content | Events: version published, amendment created, article updated. | Event names and JSON schemas documented; no broker required yet. | SRV-3, ARCH-4 |
 | SRV-5 | Story | P1 | Ideas | L | n/a | Extra services (translation, citation, document-processing). | Out of scope until browse + editor exist. Core eight services already scaffolded. | SRV-1 |
 | SRV-6 | Story | P0 | Done | L | editor-service + gateway-web | Authenticated WYSIWYG edit/publish. | Split in Sprint 3: IDN-1, ED-1–3, UI-ED-1. Not Sprint 1. | SRV-2, IDN-1, CNT-2 |
@@ -577,8 +577,8 @@ These are useful, but they should stay out of the initial implementation scope u
 | ID | Type | Priority | Status | Size | Owner | Task | Acceptance Criteria | Dependencies |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | DB-1 | Task | P0 | Done | L | split | Umbrella: countries … amendment_changes. | Done when CAT-1, CNT-1, and AMD-1 are Done. | ARCH-1 |
-| DB-2 | Task | P0 | Ready | S | CAT-1 / CNT-1 | Uniqueness (country code, slug, version label, article number in version). | Enforced in those Flyway files, not a separate migration elsewhere. | CAT-1, CNT-1 |
-| DB-3 | Task | P0 | Ready | S | catalog-service | Provenance columns on versions/sources. | Included in CAT-1 (`source_url`, gazette ref, `language_code`, timestamps). | CAT-1 |
+| DB-2 | Task | P0 | Done | S | CAT-1 / CNT-1 | Uniqueness (country code, slug, version label, article number in version). | Enforced in those Flyway files, not a separate migration elsewhere. | CAT-1, CNT-1 |
+| DB-3 | Task | P0 | Done | S | catalog-service | Provenance columns on versions/sources. | Included in CAT-1 (`source_url`, gazette ref, `language_code`, timestamps). | CAT-1 |
 | DB-4 | Task | P1 | Done | M | search-service | Full-text index tables / tsvector. | Keyword search over published articles; derived data only. | SRC-1, SRCH-1 |
 | DB-5 | Task | P1 | Ideas | M | amendment-service | Change ops: added / modified / deleted / renumbered. | Folded into AMD-3 (`added` / `changed` / `removed`). Keep this ID only as a pointer. | AMD-1, AMD-3 |
 | DB-6 | Task | P0 | Done | S | docs | Schema pattern (normalized + JSONB metadata + outbox later). | Short note in `docs/adr` or QLT-1; no shared DB. | SRV-2 |
@@ -622,8 +622,19 @@ These are useful, but they should stay out of the initial implementation scope u
 | UI-1 | Story | P0 | Done | M | gateway-web | Browse by country. | `/` lists countries; `/countries/[code]` lists constitutions/versions. Data from catalog API. | CAT-2, OPS-4 |
 | UI-2 | Story | P0 | Done | M | gateway-web | Read a version’s articles in order. | `/countries/[code]/versions/[id]` lists articles; article page shows body. | CNT-2, UI-1 |
 | UI-3 | Story | P0 | Done | S | gateway-web | Article permalink + heading anchor. | Stable URL; in-page `#` for article number. | UI-2, ARCH-3 |
-| UI-4 | Story | P1 | Ideas | L | gateway-web | Side-by-side version compare. | After AMD-1 + DB-5. | ARCH-4, DB-5 |
+| UI-4 | Story | P1 | Done | L | gateway-web | Side-by-side version compare. | Linear single branch: `from` → `to` is a path of published versions ordered by effective date (then version label). Endpoints: `/countries/[code]/compare?from=&to=`. **Ends:** side-by-side of `from` and `to`, aligned by article number. **Path:** every recorded amendment hop on that path (AMD-2/AMD-3: `added`/`changed`/`removed`, dates, node vs whole article), in order, so the reader can trace the constitution’s changes. **Intermediates:** each hop’s affected articles (and optional full intermediate snapshot) start collapsed; the reader can expand/collapse per hop or per article. Gateway composes catalog + content + amendment over HTTP; no message queue. | ARCH-4, AMD-2, AMD-3 |
 | UI-5 | Story | P1 | Done | M | gateway-web | Amendment timeline. | After AMD-2. | ARCH-4, AMD-2 |
+| UI-6 | Task | P0 | Ready | S | gateway-web | Public UI survives identity outages. | `currentUser()` treats identity network/5xx failures as signed-out for public routes; stale/unauthorized cookies are cleared; catalog/content pages still render when identity is unavailable; test covers the failure path. | UI-1, IDN-2 |
+| UI-7 | Story | P0 | Ready | M | gateway-web | Accessible application shell. | Skip link, visible `:focus-visible`, semantic landmarks, `aria-current`, 44px targets, keyboard-complete compare/editor flows, announced form/status errors, and non-color-only change labels. Automated axe checks cover representative public and editor pages. | UI-4, UI-ED-1 |
+| UI-8 | Story | P0 | Ready | M | gateway-web | Explicit loading, empty, not-found, and error states. | Route-level loading/error/not-found UI distinguishes missing data from unavailable services, preserves useful navigation and form input, exposes retry/recovery actions, and never replaces the whole public site with an identity/search failure. | GW-1, UI-6 |
+| UI-9 | Story | P0 | Ready | M | gateway-web + content | Correct and scalable version comparison. | Compare selectors use canonical version order; same/backward/cross-constitution pairs are rejected before fetching; all articles are loaded without the current 200-row truncation; net status across multiple amendment hops is deterministic; every hop is collapsed by default; change rows have stable deep links and text labels. | UI-4, PLAT-2 |
+| UI-10 | Story | P1 | Ready | L | gateway-web | Structured text diff. | Changed articles show node- or sentence-level additions/removals while retaining authoritative AMD-3 change records and complete before/after text. Whole-article and sub-article changes render consistently. | UI-9, AMD-3, UI-11 |
+| UI-11 | Task | P1 | Ready | M | gateway-web | Shared constitutional text renderer. | Public article, comparison, editor preview, and print views use one renderer for flat articles and nested content nodes; no duplicated `NodeTree`; inline presentation styles move to reusable classes/tokens. | ARCH-5, UI-2 |
+| UI-12 | Story | P1 | Ready | M | gateway-web | Sources and trust cues. | Country/version/article pages show language, effective date, gazette reference, source link, verification state when available, and a clear distinction between official, imported, and demo text. Latest published version is marked. | DB-3, GOV-5 |
+| UI-13 | Task | P1 | Ready | M | gateway-web | Reusable design system. | Shared Button, Input, Select, Alert, Card, Breadcrumb, Status, and layout primitives use documented tokens and responsive behavior; public/editor pages remove scattered inline styles; light/dark theming is not required. | UI-7 |
+| UI-14 | Story | P1 | Ready | M | gateway-web + CI | Frontend journey and visual tests. | Playwright covers browse → article, search, linear compare, login/logout, edit/review/publish; axe runs on critical routes; visual regression covers narrow/wide public and editor layouts; failures run in CI. | CI-2, UI-7, QLT-5 |
+| UI-15 | Story | P2 | Ideas | M | gateway-web | Discovery, print, and sharing. | Per-route metadata and canonical URLs, meaningful social previews, stable compare links, copy-link feedback, and print styles for article/compare pages. | UI-2, UI-9 |
+| UI-16 | Task | P0 | Ready | S | gateway-web | Chronology and navigation corrections. | Timeline is sorted by enactment date (nulls last); middle versions expose previous and next compare shortcuts; mobile compare labels remain paired with their stacked from/to text; regression tests cover each bug. | UI-4, UI-5 |
 
 ## Epic 4B: First domain APIs (executable)
 
@@ -639,12 +650,31 @@ Replace `/internal/ping` only on the services in this table. Leave search/audit 
 | IDN-2 | Task | P1 | Done | M | identity-service | Login (session or JWT) for editor role. | After IDN-1. | IDN-1 |
 | ED-2 | Task | P1 | Done | L | editor-service | Draft save/preview commands. | After ED-1, IDN-2, CNT-2. | ED-1, IDN-2 |
 
+## Epic 4C: Identity and Access Management
+
+Keep opaque, server-side sessions until deployment scale demonstrates a need for another model. Authentication and authorization decisions stay synchronous; audit delivery may become asynchronous only after an outbox/event design exists.
+
+| ID | Type | Priority | Status | Size | Owner | Story | Acceptance Criteria | Dependencies |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| IDN-3 | Task | P0 | Ready | M | identity-service + gateway-web | Session hardening. | Tokens contain at least 256 bits from a cryptographic RNG and are stored only as hashes; login rotates the session; configurable idle and absolute expiry are enforced; users can revoke one/all sessions; expired sessions are purged; production cookie is `Secure`, `HttpOnly`, `SameSite`, path-scoped, and aligned with server expiry. | IDN-2 |
+| IDN-4 | Task | P0 | Ready | M | identity-service | Login abuse protection. | Rate-limit by normalized account and client address with progressive backoff; unknown-email and bad-password responses are indistinguishable; lockout/recovery behavior is tested; metrics contain no passwords, bearer tokens, or reset tokens. | IDN-2, PLAT-4 |
+| IDN-5 | Story | P0 | Ready | M | identity-service + gateway-web | Account lifecycle. | Admin can invite, activate, disable, and inspect users; disabled users cannot log in or reuse an existing session; disabling immediately revokes sessions; there is no public self-registration; administrative actions are audited. | IDN-2, GOV-1 |
+| IDN-6 | Task | P0 | Ready | S | identity-service + infra | Safe seed policy. | Seed accounts run only in explicit local/testing profiles; existing password hashes are never reset on ordinary startup; production rejects default/demo credentials; seed mode is explicit (`off`, `create-only`, or deliberate reset). | IDN-1, OPS-3 |
+| IDN-7 | Story | P1 | Ready | M | identity-service + gateway-web | Password management. | Authenticated password change and single-use hashed expiring reset tokens are supported; reset revokes active sessions; password policy rejects common/compromised choices without exposing whether an email exists. | IDN-3, IDN-5 |
+| IDN-8 | Story | P1 | Done | M | identity-service + editor-service + gateway-web | Separation of editorial duties. | Editor, reviewer, publisher, and admin capabilities are documented and enforced by the owning backend; review and publish can be granted separately; UI controls reflect but do not replace backend authorization; role matrix tests cover all commands. | IDN-2, GOV-3 |
+| IDN-9 | Task | P1 | Ready | M | identity-service + audit-service | Authentication audit events. | Login success/failure, logout, password reset, account disablement, role change, MFA change, and session revocation append privacy-safe events with actor (when known), time, client context, and correlation ID. | AUD-1, PLAT-4 |
+| IDN-10 | Story | P1 | Ready | M | identity-service + gateway-web | MFA for privileged users. | TOTP or WebAuthn enrollment, recovery, and revocation are available; MFA is mandatory for admin/publisher; publish and role changes require recent step-up authentication; recovery is audited. | IDN-5, IDN-8, IDN-9 |
+| IDN-11 | Story | P2 | Ideas | L | identity-service | External identity provider. | OIDC can map trusted external identities to existing users/roles behind the current internal user/session contract; local auth remains for development and documented break-glass use; account linking cannot elevate roles implicitly. | IDN-5, IDN-8 |
+| IDN-12 | Task | P0 | Ready | M | identity-service + infra | Profile-aware identity configuration. | `LOCAL_*`, `CI_*`, `TEST_*`, and `PROD_*` templates map consistently through Spring profiles; session TTL and seed mode are explicit per profile; unused `JWT_SECRET` is removed unless JWT is actually implemented; promotion smoke verifies all four profiles. | OPS-3, IDN-6 |
+| IDN-13 | Task | P1 | Ready | M | identity-service + editor-service + gateway-web | Identity contracts and integration tests. | OpenAPI documents login/me/logout, Bearer security, and error examples; tests cover logout, expiry, revocation, disabled users, and role behavior; one real editor → identity `/me` contract/integration test and one gateway login/logout journey run in CI. | IDN-3, QLT-3 |
+| IDN-14 | Story | P2 | Ideas | M | identity-service + ingestion + CI | Scoped machine authentication. | CI/import automation uses a rotatable scoped service credential instead of human passwords; ingestion write routes require a dedicated capability; credentials are not seeded in production or reused for MCP. | IDN-8, ING-1 |
+
 ## Epic 5: Search, Navigation, and Discovery
 
 | ID | Type | Priority | Status | Size | Owner | Story | Acceptance Criteria | Dependencies |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | SRC-1 | Story | P0 | Done | L | search-service + gateway-web | Keyword search across articles. | Sprint 2+; needs SRCH-1 and published content. Do not block UI-1. | SRCH-1, CNT-2 |
-| SRC-2 | Story | P1 | Ideas | M | search-service | Facet filters (country, version, date). | After SRC-1. | SRC-1 |
+| SRC-2 | Story | P1 | Ready | M | search-service | Facet filters (country, version, date). | After SRC-1. | SRC-1 |
 | SRC-3 | Story | P1 | Ideas | M | gateway-web | In-text cross-reference links. | Needs `article_links` or similar. | UI-2, ARCH-3 |
 | SRC-4 | Story | P2 | Ideas | L | search-service | Global term index. | Later. | DB-4 |
 
@@ -656,16 +686,16 @@ Replace `/internal/ping` only on the services in this table. Leave search/audit 
 | GOV-2 | Task | P0 | Done | M | ingestion-service | Validate before persist. | Same sprint as ING-1; not Sprint 1 seed. | ING-1 |
 | GOV-3 | Task | P1 | Done | L | editor-service | Review then publish as separate events. | Same role may do both; two audit event types. | GOV-1, ED-2 |
 | GOV-4 | Task | P1 | Done | M | infra | Restore drill from `infra/backup`. | Script dumps all eight DBs (include `search`); documented restore. Current script is incomplete. | OPS-7 |
-| GOV-5 | Task | P2 | Ideas | S | catalog-service | Verification flags on sources. | Later. | CAT-1 |
+| GOV-5 | Task | P2 | Ready | S | catalog-service | Verification flags on sources. | Sources expose verification state and verifier/time metadata without claiming imported or demo text is official. Sprint 13. | CAT-1 |
 
 ## Epic 7: Platform and Performance
 
 | ID | Type | Priority | Status | Size | Owner | Task | Acceptance Criteria | Dependencies |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| PLAT-1 | Task | P0 | Ready | S | gateway-web | SSR country/version/article pages; no N+1 in the page. | After UI-2; measure locally, no CDN required. | UI-1, UI-2 |
+| PLAT-1 | Task | P0 | Done | S | gateway-web | SSR country/version/article pages; no N+1 in the page. | After UI-2; measure locally, no CDN required. | UI-1, UI-2 |
 | PLAT-2 | Task | P1 | Done | M | content + gateway-web | Paginate long article lists. | After a large seed exists; not Sprint 1 (~10 articles). | UI-2 |
 | PLAT-3 | Task | P1 | Ideas | M | gateway-web | Language switcher. | After ING-5. | ING-5 |
-| PLAT-4 | Task | P1 | Ideas | M | all services | JSON logs + correlation id. | After browse works. | UI-1 |
+| PLAT-4 | Task | P1 | Done | M | all services | JSON logs + correlation id. | After browse works. Sprint 8. | UI-1 |
 
 ## Epic 8: CI and Delivery Automation
 
@@ -675,7 +705,7 @@ Replace `/internal/ping` only on the services in this table. Leave search/audit 
 | CI-2 | Task | P0 | Done | M | .github | `gradle test` per microservice + frontend lint/build. | Matrix/discover all `services/*/build.gradle.kts`. Domain API tests still missing (add with CAT-2/CNT-2). | CI-1 |
 | CI-3 | Task | P1 | Done | M | .github | `docker build` (or compose) per service image. | Separate job; do not block merge on 8× full `bootJar` until OPS-8. | OPS-2, OPS-8 |
 | CI-4 | Task | P1 | Done | M | .github | ktlint/detekt + `tsc` already via next lint. | Fail on errors. | CI-1 |
-| CI-5 | Task | P1 | Ready | S | .github | Gradle wrapper or setup-gradle cache (already partially true). | Add wrappers so local and CI match. | CI-2 |
+| CI-5 | Task | P1 | Done | S | .github | Gradle wrapper or setup-gradle cache (already partially true). | Add wrappers so local and CI match. Sprint 8. | CI-2 |
 
 ## Epic 9: Dependency Tracking and Manual Maintenance
 
@@ -697,12 +727,12 @@ Keep this epic **out of Sprint 1**. One hygiene sprint later is enough.
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | QLT-1 | Task | P1 | Done | S | docs | ADR: DB-per-service, Caddy entry, no shared DB. | `docs/adr/0001-….md`. Not a Sprint 1 blocker. | SRV-1 |
 | QLT-2 | Task | P1 | Ideas | M | GitHub | Branch protection requiring CI. | After CI-2 is green on main. | CI-2 |
-| QLT-3 | Task | P1 | Ideas | M | catalog + content | Consumer tests for CAT-2/CNT-2. | After those APIs exist. | CAT-2, CNT-2 |
+| QLT-3 | Task | P1 | Done | M | catalog + content | Consumer tests for CAT-2/CNT-2. | After those APIs exist. Sprint 8. | CAT-2, CNT-2 |
 | QLT-4 | Task | P0 | Done | S | docs | Flyway forward-only; new `V{n}` per change; no edit of applied files. | Document in AGENTS or ADR. | CAT-1 |
-| QLT-5 | Task | P1 | Ideas | M | editor | Feature flag for publish. | Sprint 3. | ED-2 |
-| QLT-6 | Task | P1 | Ideas | S | all | Actuator health already on; add `info` + log correlation. | With PLAT-4. | PLAT-4 |
+| QLT-5 | Task | P1 | Done | M | editor | Feature flag for publish. | Editor publish rewrites public content (not only audit + session status). Sprint 9, after publish authorization is explicit. | ED-2, IDN-8 |
+| QLT-6 | Task | P1 | Done | S | all | Actuator health already on; add `info` + log correlation. | With PLAT-4. | PLAT-4 |
 | QLT-7 | Task | P2 | Ideas | S | process | 10% sprint capacity for cleanup. | Planning habit, not a ticket to “finish”. | None |
-| QLT-8 | Task | P1 | Ideas | M | repo | Spotless/ktlint + existing Next lint. | With CI-4. | CI-4 |
+| QLT-8 | Task | P1 | Done | M | repo | Spotless/ktlint + existing Next lint. | With CI-4. Sprint 8. | CI-4 |
 
 ## Suggested Sprint Breakdown
 
@@ -739,10 +769,43 @@ Keyword search over a derived Postgres tsvector index rebuilt from catalog + con
 Done: ARCH-5, AMD-3.
 Catalog stores a per-constitution outline; new constitutions default to a flat `article` kind. Content keeps `articles` as the top-provision read model and adds an adjacency-list `content_nodes` tree (DE seed: Article 1 as article → paragraph → sentence). Amendment changes use `added`/`changed`/`removed`, `changed_on` + `effective_on`, opaque citation ids, and a content `node_id`.
 
-Out of Sprint 6: QLT-5 (editor public rewrite), UI-4 (compare), SRC-2 (search facets), CI-5, citation-service (SRV-5). DB-5 remains a pointer at AMD-3.
+Out of Sprint 6: compare, editor public rewrite, search facets, Gradle wrappers, citation-service. DB-5 remains a pointer at AMD-3. MCP (SRV-7) stays postponed.
+
+### Sprint 7: Compare + public UX — closed
+Done: UI-4, PLAT-1, DB-2, DB-3, SRV-3.
+Linear `from` → `to` compare at `/countries/[code]/compare`. Path hops list every recorded amendment; touched articles and intermediate snapshots use collapsed `<details>`. Ends are side by side (article number). Content `includeBody` and amendment `sourceVersionId` avoid N+1. Public header, breadcrumbs, timeline/compare entry points. No message queue. MCP still postponed.
+
+Out of Sprint 7: QLT-5, SRC-2, CI-5, MCP (SRV-7).
+
+### Sprint 8: Technical debt — closed
+Done: CI-5, QLT-8, QLT-3, PLAT-4, QLT-6.
+Shared Gradle 8.10.2 wrapper (`./gradlew` / `cd services/<name> && ./gradlew`). Spotless/ktlint on Kotlin via `check`. Gateway CAT-2/CNT-2 JSON fixtures type-checked in Next and asserted from catalog/content MockMvc. JSON logs + `X-Correlation-Id` MDC and actuator `info` (build) on all eight services.
+
+### Sprint 9: Editor publish is public — closed
+Done: IDN-8, QLT-5.
+`reviewer` and `publisher` roles are separate from `editor`; editor-service returns 403 when the actor lacks the command capability. Approving a review is `POST .../approval`; publish requires `approved` and patches public articles in place (content trees kept), then `POST /reindex`. `EDITOR_PUBLISH_PUBLIC=false` keeps audit-only publish. Roles: `docs/editorial-roles.md`.
+
+### Sprint 10: Search facets
+**SRC-2** — filter search by country, version, date.
+
+### Sprint 11: Identity foundations
+**IDN-3**, **IDN-4**, **IDN-6**, **IDN-12**, **UI-6**.
+Harden opaque sessions and login abuse controls; make seed/profile configuration safe; remove dead JWT configuration; keep public reading available when identity is down.
+
+### Sprint 12: Public correctness and accessibility
+**UI-7**, **UI-8**, **UI-9**, **UI-16**, **IDN-13**.
+Establish the accessibility and route-state baseline; fix comparison truncation, invalid paths, multi-hop classification, chronology, and mobile navigation; lock identity consumer contracts with integration tests.
+
+### Sprint 13: Accounts, trust, and shared UI
+**IDN-5**, **IDN-7**, **IDN-9**, **GOV-5**, **UI-11**, **UI-12**, **UI-13**.
+Add account lifecycle, password recovery, and auth audit events. Show provenance/verification to readers and consolidate rendering and UI primitives before extending the editor.
+
+### Sprint 14: Editor quality and confidence
+**IDN-10**, **UI-10**, **UI-14**.
+Require MFA/step-up for privileged actions, render structured diffs, and add end-to-end, accessibility, and visual-regression coverage for critical public/editor journeys.
 
 ### Later / Ideas
-SRV-5, SRV-7, ING-5, SRC-2–4, PLAT-3, PLAT-4, QLT-3, QLT-5, QLT-8, DEP-2–6.
+SRV-5, **SRV-7 (MCP, postponed)**, IDN-11, IDN-14, UI-15, ING-3–5, SRC-3–4, PLAT-3, QLT-2, DEP-2–6.
 
 ## Open Product Questions
 - Should published constitutional versions be immutable snapshots only, or do you want official errata and corrections modeled separately?

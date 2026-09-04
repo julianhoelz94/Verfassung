@@ -1,3 +1,5 @@
+import './contracts';
+
 export type VersionSummary = {
   id: string;
   versionLabel: string;
@@ -67,6 +69,7 @@ export type ArticleSummary = {
   articleNumber: string;
   title: string;
   sortOrder: number;
+  body?: string | null;
 };
 
 export type AmendmentChange = {
@@ -182,6 +185,7 @@ export async function listArticlePage(
   versionId: string,
   offset?: number,
   limit?: number,
+  includeBody?: boolean,
 ): Promise<ArticlePage | null> {
   const params = new URLSearchParams();
   if (offset !== undefined) {
@@ -189,6 +193,9 @@ export async function listArticlePage(
   }
   if (limit !== undefined) {
     params.set('limit', String(limit));
+  }
+  if (includeBody) {
+    params.set('includeBody', 'true');
   }
   const query = params.toString();
   const url = `${contentBaseUrl()}/versions/${encodeURIComponent(versionId)}/articles${query ? `?${query}` : ''}`;
@@ -216,9 +223,17 @@ export function getArticle(articleId: string): Promise<ArticleDetail | null> {
   );
 }
 
-export function listAmendments(versionId: string): Promise<Amendment[] | null> {
+export function listAmendments(
+  versionId: string,
+  sourceVersionId?: string,
+): Promise<Amendment[] | null> {
+  const params = new URLSearchParams();
+  if (sourceVersionId) {
+    params.set('sourceVersionId', sourceVersionId);
+  }
+  const query = params.toString();
   return readJson<Amendment[]>(
-    `${amendmentBaseUrl()}/versions/${encodeURIComponent(versionId)}/amendments`,
+    `${amendmentBaseUrl()}/versions/${encodeURIComponent(versionId)}/amendments${query ? `?${query}` : ''}`,
     'amendment',
   );
 }

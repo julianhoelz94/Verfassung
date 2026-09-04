@@ -1,7 +1,7 @@
 package com.constitutionatlas.ingestion.client
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import com.constitutionatlas.ingestion.api.ImportArticle
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import java.time.LocalDate
 import java.util.UUID
 

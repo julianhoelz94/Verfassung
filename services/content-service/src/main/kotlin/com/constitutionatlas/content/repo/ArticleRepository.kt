@@ -11,20 +11,32 @@ import java.util.UUID
 
 @Repository
 class ArticleRepository(private val jdbc: JdbcTemplate) {
-    fun listByVersion(versionId: UUID, offset: Int = 0, limit: Int? = null): List<ArticleSummary> {
+    fun listByVersion(
+        versionId: UUID,
+        offset: Int = 0,
+        limit: Int? = null,
+        includeBody: Boolean = false,
+    ): List<ArticleSummary> {
+        val columns =
+            if (includeBody) {
+                "id, version_id, article_number, title, sort_order, body"
+            } else {
+                "id, version_id, article_number, title, sort_order"
+            }
         val sql = StringBuilder(
             """
-            SELECT id, version_id, article_number, title, sort_order
+            SELECT $columns
             FROM articles
             WHERE version_id = ?
             ORDER BY sort_order, article_number
             """.trimIndent(),
         )
+        val mapper = if (includeBody) summaryWithBodyMapper else summaryMapper
         if (limit != null) {
             sql.append(" LIMIT ? OFFSET ?")
-            return jdbc.query(sql.toString(), summaryMapper, versionId, limit, offset)
+            return jdbc.query(sql.toString(), mapper, versionId, limit, offset)
         }
-        return jdbc.query(sql.toString(), summaryMapper, versionId)
+        return jdbc.query(sql.toString(), mapper, versionId)
     }
 
     fun countByVersion(versionId: UUID): Int =
@@ -79,6 +91,25 @@ class ArticleRepository(private val jdbc: JdbcTemplate) {
         return listByVersion(versionId)
     }
 
+    fun updateText(id: UUID, title: String, body: String): ArticleDetail? {
+        val updated = jdbc.update(
+            "UPDATE articles SET title = ?, body = ? WHERE id = ?",
+            title,
+            body,
+            id,
+        )
+        if (updated == 0) {
+            return null
+        }
+        jdbc.update(
+            "UPDATE content_nodes SET title = ?, body = ? WHERE id = ?",
+            title,
+            body,
+            id,
+        )
+        return findById(id)
+    }
+
     fun listChildren(parentId: UUID): List<ContentNodeDto> {
         val rows = jdbc.query(
             """
@@ -131,6 +162,17 @@ class ArticleRepository(private val jdbc: JdbcTemplate) {
             articleNumber = rs.getString("article_number"),
             title = rs.getString("title"),
             sortOrder = rs.getInt("sort_order"),
+        )
+    }
+
+    private val summaryWithBodyMapper = RowMapper { rs, _ ->
+        ArticleSummary(
+            id = rs.getObject("id", UUID::class.java),
+            versionId = rs.getObject("version_id", UUID::class.java),
+            articleNumber = rs.getString("article_number"),
+            title = rs.getString("title"),
+            sortOrder = rs.getInt("sort_order"),
+            body = rs.getString("body"),
         )
     }
 

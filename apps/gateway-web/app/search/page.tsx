@@ -1,3 +1,4 @@
+import { Breadcrumbs } from '../components/Breadcrumbs';
 import { ApiUnavailableError, searchArticles, type SearchHit } from '../../lib/api';
 
 type SearchPageProps = {
@@ -18,22 +19,25 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
   }
 
   return (
-    <main style={{ padding: 24, maxWidth: 800 }}>
+    <main>
+      <Breadcrumbs items={[{ href: '/', label: 'Countries' }, { label: 'Search' }]} />
       <h1>Search</h1>
-      <form action="/search" method="get" style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
-        <input
-          type="search"
-          name="q"
-          defaultValue={query}
-          placeholder="Keyword across published articles"
-          aria-label="Search articles"
-          style={{ flex: 1, padding: 8 }}
-        />
+      <form className="compare-form" action="/search" method="get">
+        <label style={{ flex: 1, minWidth: 200 }}>
+          Keyword
+          <input
+            type="search"
+            name="q"
+            defaultValue={query}
+            placeholder="Across published articles"
+            aria-label="Search articles"
+          />
+        </label>
         <button type="submit">Search</button>
       </form>
       {error ? <p>{error}. Browse countries instead while the index is down.</p> : null}
       {!error && query && hits.length === 0 ? <p>No articles match “{query}”.</p> : null}
-      {!query ? <p>Enter a keyword to search published article text.</p> : null}
+      {!query ? <p className="lede">Enter a keyword to search published article text.</p> : null}
       <ul style={{ listStyle: 'none', padding: 0 }}>
         {hits.map((hit) => (
           <li key={`${hit.articleId}-${hit.versionId}`} style={{ marginBottom: 16 }}>
@@ -42,7 +46,9 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
             >
               Article {hit.articleNumber} — {hit.title}
             </a>
-            <p style={{ margin: '4px 0 0', color: '#444' }}>{hit.snippet}</p>
+            <p className="muted" style={{ margin: '4px 0 0' }}>
+              {hit.snippet}
+            </p>
           </li>
         ))}
       </ul>

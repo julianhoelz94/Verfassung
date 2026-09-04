@@ -1,0 +1,5 @@
+#!/bin/sh
+# Shared Gradle 8.10.2 wrapper lives at the repository root.
+REPO_ROOT="$(CDPATH= cd -- "$(dirname "$0")/../.." && pwd)"
+PROJECT_DIR="$(CDPATH= cd -- "$(dirname "$0")" && pwd)"
+exec "$REPO_ROOT/gradlew" -p "$PROJECT_DIR" "$@"

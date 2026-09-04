@@ -1,5 +1,6 @@
 package com.constitutionatlas.editor.repo
 
+import com.constitutionatlas.editor.api.DraftArticleDto
 import com.constitutionatlas.editor.api.EditSessionDto
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.springframework.jdbc.core.JdbcTemplate
@@ -91,7 +92,7 @@ class EditorRepository(
         jdbc.query(
             """
             SELECT id FROM edit_sessions
-            WHERE actor_id = ? AND version_id = ? AND status IN ('open', 'reviewing')
+            WHERE actor_id = ? AND version_id = ? AND status IN ('open', 'reviewing', 'approved')
             ORDER BY updated_at DESC
             LIMIT 1
             """.trimIndent(),
@@ -120,4 +121,24 @@ class EditorRepository(
             { rs, _ -> rs.getString(1) },
             sessionId,
         ).firstOrNull()
+
+    fun listLatestDrafts(sessionId: UUID): List<DraftArticleDto> =
+        jdbc.query(
+            """
+            SELECT DISTINCT ON (article_id) article_id, payload
+            FROM draft_changes
+            WHERE session_id = ? AND change_kind = 'save' AND article_id IS NOT NULL
+            ORDER BY article_id, created_at DESC
+            """.trimIndent(),
+            { rs, _ ->
+                val articleId = rs.getObject("article_id", UUID::class.java)
+                val node = objectMapper.readTree(rs.getString("payload"))
+                DraftArticleDto(
+                    articleId = articleId,
+                    title = node.path("title").asText(""),
+                    body = node.path("body").asText(""),
+                )
+            },
+            sessionId,
+        )
 }

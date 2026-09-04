@@ -17,6 +17,10 @@ updates:
     schedule:
       interval: weekly
   - package-ecosystem: gradle
+    directory: /
+    schedule:
+      interval: weekly
+  - package-ecosystem: gradle
     directory: /services/catalog-service
     schedule:
       interval: weekly

@@ -1,5 +1,6 @@
 package com.constitutionatlas.editor.client
 
+import com.constitutionatlas.editor.ForbiddenException
 import com.constitutionatlas.editor.UnauthorizedException
 import com.constitutionatlas.editor.api.Actor
 import org.springframework.beans.factory.annotation.Value
@@ -31,8 +32,9 @@ class RestIdentityClient(
             }
             throw ex
         } ?: throw UnauthorizedException("Invalid session")
-        if ("editor" !in user.roles && "admin" !in user.roles) {
-            throw UnauthorizedException("Editor role required")
+        val editorial = setOf("admin", "editor", "reviewer", "publisher")
+        if (user.roles.none { it in editorial }) {
+            throw ForbiddenException("Editorial role required")
         }
         return Actor(user.id, user.email, user.roles)
     }

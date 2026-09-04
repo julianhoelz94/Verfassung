@@ -8,6 +8,14 @@ data class Actor(
     val roles: List<String>,
 )
 
+fun Actor.isAdmin(): Boolean = "admin" in roles
+
+fun Actor.canEdit(): Boolean = isAdmin() || "editor" in roles
+
+fun Actor.canReview(): Boolean = isAdmin() || "reviewer" in roles
+
+fun Actor.canPublish(): Boolean = isAdmin() || "publisher" in roles
+
 data class CreateSessionRequest(
     val versionId: UUID,
 )
@@ -26,7 +34,15 @@ data class EditSessionDto(
     val revisionCount: Int,
 )
 
+data class DraftArticleDto(
+    val articleId: UUID,
+    val title: String,
+    val body: String,
+)
+
 data class DraftPreviewDto(
     val session: EditSessionDto,
     val latestSnapshot: String?,
+    val drafts: List<DraftArticleDto> = emptyList(),
+    val publicContentUpdated: Boolean? = null,
 )

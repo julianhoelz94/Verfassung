@@ -9,8 +9,10 @@ disable-model-invocation: true
 ```bash
 cp env/local-stack.env.example env/local-stack.env   # first time only
 ./manageLocalStack.sh --start
+./manageLocalStack.sh --start --no-build
+./manageLocalStack.sh --rebuild content-service gateway-web
 ./manageLocalStack.sh --stop
-./manageLocalStack.sh --reset   # destructive prune; only if asked
+./manageLocalStack.sh --reset           # down -v; add --prune only if asked
 ```
 
 - App: `http://localhost`

@@ -1,0 +1,63 @@
+{
+  "id": "01900000-0000-4000-8000-000000000201",
+  "versionId": "01900000-0000-4000-8000-000000000004",
+  "articleNumber": "1",
+  "title": "Human dignity",
+  "body": "Human dignity shall be inviolable. To respect and protect it shall be the duty of all state authority. The German people therefore acknowledge inviolable and inalienable human rights as the basis of every community, of peace and of justice in the world.",
+  "sortOrder": 1,
+  "kind": "article",
+  "children": [
+    {
+      "id": "01900000-0000-4000-8000-000000000221",
+      "kind": "paragraph",
+      "label": "(1)",
+      "number": null,
+      "title": null,
+      "body": null,
+      "sortOrder": 1,
+      "children": [
+        {
+          "id": "01900000-0000-4000-8000-000000000222",
+          "kind": "sentence",
+          "label": "1",
+          "number": null,
+          "title": null,
+          "body": "Human dignity shall be inviolable.",
+          "sortOrder": 1,
+          "children": []
+        },
+        {
+          "id": "01900000-0000-4000-8000-000000000223",
+          "kind": "sentence",
+          "label": "2",
+          "number": null,
+          "title": null,
+          "body": "To respect and protect it shall be the duty of all state authority.",
+          "sortOrder": 2,
+          "children": []
+        }
+      ]
+    },
+    {
+      "id": "01900000-0000-4000-8000-000000000224",
+      "kind": "paragraph",
+      "label": "(2)",
+      "number": null,
+      "title": null,
+      "body": null,
+      "sortOrder": 2,
+      "children": [
+        {
+          "id": "01900000-0000-4000-8000-000000000225",
+          "kind": "sentence",
+          "label": "1",
+          "number": null,
+          "title": null,
+          "body": "The German people therefore acknowledge inviolable and inalienable human rights as the basis of every community, of peace and of justice in the world.",
+          "sortOrder": 1,
+          "children": []
+        }
+      ]
+    }
+  ]
+}

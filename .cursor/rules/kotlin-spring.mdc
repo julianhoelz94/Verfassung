@@ -6,7 +6,8 @@ alwaysApply: false
 
 # Kotlin services
 
-- Spring Boot 3.3, Kotlin JVM, Java 21 toolchain, Flyway, springdoc, actuator health.
+- Spring Boot 3.3, Kotlin JVM, Java 21 toolchain, Flyway, springdoc, actuator health + info.
+- JSON console logs (Logstash) and `X-Correlation-Id` (echo or generate) via MDC `correlationId`.
 - Controllers stay thin. Domain rules live in services, not `@RestController`.
 - Public JSON is DTOs, not JDBC/row types.
 - New tables belong in a new Flyway version in that service only.

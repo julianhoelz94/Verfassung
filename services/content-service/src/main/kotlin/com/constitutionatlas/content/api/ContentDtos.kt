@@ -1,13 +1,16 @@
 package com.constitutionatlas.content.api
 
+import com.fasterxml.jackson.annotation.JsonInclude
 import java.util.UUID
 
+@JsonInclude(JsonInclude.Include.NON_NULL)
 data class ArticleSummary(
     val id: UUID,
     val versionId: UUID,
     val articleNumber: String,
     val title: String,
     val sortOrder: Int,
+    val body: String? = null,
 )
 
 data class ContentNodeDto(
@@ -37,4 +40,9 @@ data class ArticleWrite(
     val title: String,
     val body: String,
     val sortOrder: Int,
+)
+
+data class ArticlePatch(
+    val title: String,
+    val body: String,
 )

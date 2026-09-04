@@ -1,3 +1,4 @@
+import { Breadcrumbs } from '../../../../../../components/Breadcrumbs';
 import {
   ApiUnavailableError,
   getArticle,
@@ -26,7 +27,7 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
 
   if (error) {
     return (
-      <main style={{ padding: 24 }}>
+      <main>
         <p>{error}.</p>
       </main>
     );
@@ -34,7 +35,7 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
 
   if (!country || !article || article.versionId !== params.versionId) {
     return (
-      <main style={{ padding: 24 }}>
+      <main>
         <p>Unknown article.</p>
       </main>
     );
@@ -43,14 +44,15 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
   const permalink = `/countries/${country.isoCode}/versions/${params.versionId}/articles/${article.id}`;
 
   return (
-    <main style={{ padding: 24, maxWidth: 800 }}>
-      <p>
-        <a href="/">Countries</a>
-        {' · '}
-        <a href={`/countries/${country.isoCode}`}>{country.name}</a>
-        {' · '}
-        <a href={`/countries/${country.isoCode}/versions/${params.versionId}`}>Articles</a>
-      </p>
+    <main>
+      <Breadcrumbs
+        items={[
+          { href: '/', label: 'Countries' },
+          { href: `/countries/${country.isoCode}`, label: country.name },
+          { href: `/countries/${country.isoCode}/versions/${params.versionId}`, label: 'Articles' },
+          { label: `Article ${article.articleNumber}` },
+        ]}
+      />
       <article>
         <h1 id={`article-${article.articleNumber}`}>
           Article {article.articleNumber}

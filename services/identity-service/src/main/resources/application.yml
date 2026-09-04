@@ -5,6 +5,10 @@ identity:
   seed:
     editor-email: ${LOCAL_EDITOR_EMAIL:}
     editor-password: ${LOCAL_EDITOR_PASSWORD:}
+    reviewer-email: ${LOCAL_REVIEWER_EMAIL:}
+    reviewer-password: ${LOCAL_REVIEWER_PASSWORD:}
+    publisher-email: ${LOCAL_PUBLISHER_EMAIL:}
+    publisher-password: ${LOCAL_PUBLISHER_PASSWORD:}
     admin-email: ${LOCAL_ADMIN_EMAIL:}
     admin-password: ${LOCAL_ADMIN_PASSWORD:}
     viewer-email: ${LOCAL_VIEWER_EMAIL:}
@@ -14,6 +18,11 @@ management:
     web:
       exposure:
         include: health,info
+  info:
+    build:
+      enabled: true
+    env:
+      enabled: true
 logging:
   level:
     root: INFO

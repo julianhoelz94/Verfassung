@@ -1,4 +1,8 @@
 import com.constitutionatlas.content.ContentServiceApplication
+import com.constitutionatlas.content.CorrelationIdFilter
+import com.fasterxml.jackson.databind.JsonNode
+import com.fasterxml.jackson.databind.ObjectMapper
+import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
@@ -8,10 +12,12 @@ import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
+import org.springframework.test.web.servlet.patch
 import org.springframework.test.web.servlet.put
 import org.testcontainers.containers.PostgreSQLContainer
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
+import java.io.File
 import java.util.UUID
 
 @Testcontainers
@@ -41,7 +47,18 @@ class ContentApiTest {
         }.andExpect {
             status { isOk() }
             jsonPath("$.length()") { value(2) }
-                header { string("X-Total-Count", "10") }
+            header { string("X-Total-Count", "10") }
+        }
+    }
+
+    @Test
+    fun listArticlesCanIncludeBody() {
+        mockMvc.get("/versions/01900000-0000-4000-8000-000000000004/articles") {
+            param("includeBody", "true")
+            param("limit", "1")
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$[0].body") { exists() }
         }
     }
 
@@ -62,6 +79,29 @@ class ContentApiTest {
     fun unknownArticleReturns404() {
         mockMvc.get("/articles/${UUID.fromString("00000000-0000-4000-8000-000000000099")}")
             .andExpect { status { isNotFound() } }
+    }
+
+    @Test
+    fun patchArticleUpdatesTextAndKeepsTree() {
+        val original = objectMapper.readTree(
+            mockMvc.get("/articles/01900000-0000-4000-8000-000000000201")
+                .andReturn().response.contentAsString,
+        )
+        mockMvc.patch("/articles/01900000-0000-4000-8000-000000000201") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"title":"Dignity","body":"Updated dignity text."}"""
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.id") { value("01900000-0000-4000-8000-000000000201") }
+            jsonPath("$.title") { value("Dignity") }
+            jsonPath("$.body") { value("Updated dignity text.") }
+            jsonPath("$.children.length()") { value(2) }
+            jsonPath("$.children[0].kind") { value("paragraph") }
+        }
+        mockMvc.patch("/articles/01900000-0000-4000-8000-000000000201") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"title":${objectMapper.writeValueAsString(original.get("title").asText())},"body":${objectMapper.writeValueAsString(original.get("body").asText())}}"""
+        }.andExpect { status { isOk() } }
     }
 
     @Test
@@ -91,7 +131,41 @@ class ContentApiTest {
         }
     }
 
+    @Test
+    fun articleListMatchesGatewayContract() {
+        val json = mockMvc.get("/versions/01900000-0000-4000-8000-000000000004/articles")
+            .andReturn().response.contentAsString
+        assertJsonEquals("content-articles.json", json)
+    }
+
+    @Test
+    fun articleDetailMatchesGatewayContract() {
+        val json = mockMvc.get("/articles/01900000-0000-4000-8000-000000000201")
+            .andReturn().response.contentAsString
+        assertJsonEquals("content-article.json", json)
+    }
+
+    @Test
+    fun echoesProvidedCorrelationId() {
+        mockMvc.get("/versions/01900000-0000-4000-8000-000000000004/articles") {
+            header(CorrelationIdFilter.HEADER, "test-corr-1")
+        }.andExpect {
+            status { isOk() }
+            header { string(CorrelationIdFilter.HEADER, "test-corr-1") }
+        }
+    }
+
     companion object {
+        private val objectMapper = ObjectMapper()
+
+        private fun assertJsonEquals(contractFile: String, actualJson: String) {
+            val expected: JsonNode = objectMapper.readTree(
+                File("../../apps/gateway-web/lib/contracts/$contractFile"),
+            )
+            val actual: JsonNode = objectMapper.readTree(actualJson)
+            assertThat(actual).isEqualTo(expected)
+        }
+
         @Container
         @JvmStatic
         val postgres: PostgreSQLContainer<*> = PostgreSQLContainer("postgres:16-alpine")

@@ -1,0 +1,72 @@
+[
+  {
+    "id": "01900000-0000-4000-8000-000000000201",
+    "versionId": "01900000-0000-4000-8000-000000000004",
+    "articleNumber": "1",
+    "title": "Human dignity",
+    "sortOrder": 1
+  },
+  {
+    "id": "01900000-0000-4000-8000-000000000202",
+    "versionId": "01900000-0000-4000-8000-000000000004",
+    "articleNumber": "2",
+    "title": "Personal freedoms",
+    "sortOrder": 2
+  },
+  {
+    "id": "01900000-0000-4000-8000-000000000203",
+    "versionId": "01900000-0000-4000-8000-000000000004",
+    "articleNumber": "3",
+    "title": "Equality before the law",
+    "sortOrder": 3
+  },
+  {
+    "id": "01900000-0000-4000-8000-000000000204",
+    "versionId": "01900000-0000-4000-8000-000000000004",
+    "articleNumber": "4",
+    "title": "Freedom of faith and conscience",
+    "sortOrder": 4
+  },
+  {
+    "id": "01900000-0000-4000-8000-000000000205",
+    "versionId": "01900000-0000-4000-8000-000000000004",
+    "articleNumber": "5",
+    "title": "Freedom of expression",
+    "sortOrder": 5
+  },
+  {
+    "id": "01900000-0000-4000-8000-000000000206",
+    "versionId": "01900000-0000-4000-8000-000000000004",
+    "articleNumber": "16a",
+    "title": "Right of asylum",
+    "sortOrder": 6
+  },
+  {
+    "id": "01900000-0000-4000-8000-000000000207",
+    "versionId": "01900000-0000-4000-8000-000000000004",
+    "articleNumber": "20",
+    "title": "Constitutional principles",
+    "sortOrder": 7
+  },
+  {
+    "id": "01900000-0000-4000-8000-000000000208",
+    "versionId": "01900000-0000-4000-8000-000000000004",
+    "articleNumber": "23",
+    "title": "European Union",
+    "sortOrder": 8
+  },
+  {
+    "id": "01900000-0000-4000-8000-000000000209",
+    "versionId": "01900000-0000-4000-8000-000000000004",
+    "articleNumber": "79",
+    "title": "Amendment of the Basic Law",
+    "sortOrder": 9
+  },
+  {
+    "id": "01900000-0000-4000-8000-000000000210",
+    "versionId": "01900000-0000-4000-8000-000000000004",
+    "articleNumber": "146",
+    "title": "Duration of the Basic Law",
+    "sortOrder": 10
+  }
+]

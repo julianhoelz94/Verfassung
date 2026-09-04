@@ -38,7 +38,7 @@ Service names: `catalog`, `content`, `amendment`, `identity`, `editor`, `search`
 
 ## Current sprint
 
-See `backlog.md` **Suggested Sprint Breakdown**. Sprint 0–9 are closed. **Sprint 10** (search facets SRC-2, result provenance SRC-5) is next. Sprints 11–14 are planned. Pull from **Later / Ideas** only if the user asks. Do not start SRV-7 (MCP) until asked.
+See `backlog.md` **Suggested Sprint Breakdown**. Sprint 0–10 are closed. **Sprint 11** (identity foundations: IDN-3, IDN-4, IDN-6, IDN-12, UI-6) is next. Sprints 12–14 are planned. Pull from **Later / Ideas** only if the user asks. Do not start SRV-7 (MCP) until asked.
 
 **When a story/task is finished, update `backlog.md` in the same change:** set Status to `Done`, add the ID to that sprint’s Done list, and keep the board snapshot accurate. Do not leave completed work as `Ready`.
 

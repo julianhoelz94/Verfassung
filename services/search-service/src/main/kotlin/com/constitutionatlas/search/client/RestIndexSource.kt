@@ -7,6 +7,7 @@ import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.core.ParameterizedTypeReference
 import org.springframework.web.client.RestClient
+import java.time.LocalDate
 import java.util.UUID
 
 class RestIndexSource(
@@ -31,20 +32,24 @@ class RestIndexSource(
                 ?: continue
             for (constitution in detail.constitutions) {
                 for (version in constitution.versions) {
-                    out += loadArticles(country.isoCode, version.id)
+                    out += loadArticles(country.isoCode, constitution.title, version)
                 }
             }
         }
         return out
     }
 
-    private fun loadArticles(countryCode: String, versionId: UUID): List<IndexableArticle> {
+    private fun loadArticles(
+        countryCode: String,
+        constitutionTitle: String,
+        version: VersionWire,
+    ): List<IndexableArticle> {
         val pageSize = 200
         var offset = 0
         val articles = mutableListOf<IndexableArticle>()
         while (true) {
             val summaries = content.get()
-                .uri("/versions/{id}/articles?offset={offset}&limit={limit}", versionId, offset, pageSize)
+                .uri("/versions/{id}/articles?offset={offset}&limit={limit}", version.id, offset, pageSize)
                 .retrieve()
                 .body(object : ParameterizedTypeReference<List<ArticleSummaryWire>>() {})
                 .orEmpty()
@@ -61,6 +66,9 @@ class RestIndexSource(
                     articleId = detail.id,
                     versionId = detail.versionId,
                     countryCode = countryCode,
+                    constitutionTitle = constitutionTitle,
+                    versionLabel = version.versionLabel,
+                    effectiveDate = version.effectiveDate,
                     articleNumber = detail.articleNumber,
                     title = detail.title,
                     body = detail.body,
@@ -86,12 +94,15 @@ class RestIndexSource(
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     private data class ConstitutionWire(
+        val title: String = "",
         val versions: List<VersionWire> = emptyList(),
     )
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     private data class VersionWire(
         val id: UUID,
+        val versionLabel: String = "",
+        val effectiveDate: LocalDate? = null,
     )
 
     @JsonIgnoreProperties(ignoreUnknown = true)

@@ -676,8 +676,8 @@ Keep opaque, server-side sessions until deployment scale demonstrates a need for
 | ID | Type | Priority | Status | Size | Owner | Story | Acceptance Criteria | Dependencies |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | SRC-1 | Story | P0 | Done | L | search-service + gateway-web | Keyword search across articles. | Sprint 2+; needs SRCH-1 and published content. Do not block UI-1. | SRCH-1, CNT-2 |
-| SRC-2 | Story | P1 | Ready | M | search-service | Facet filters (country, version, date). | After SRC-1. | SRC-1 |
-| SRC-5 | Story | P1 | Ready | M | search-service + gateway-web | Search hits name constitution and version. | Each hit returns constitution title and version label (not only `countryCode` and opaque `versionId`). `/search` shows those labels on every result. Labels are stored in the derived index at reindex from catalog HTTP; the gateway does not N+1 catalog per hit. API test asserts the fields; DE seed hits show Basic Law and the matching version (1949 or 2022). | SRC-1 |
+| SRC-2 | Story | P1 | Done | M | search-service | Facet filters (country, version, date). | After SRC-1. | SRC-1 |
+| SRC-5 | Story | P1 | Done | M | search-service + gateway-web | Search hits name constitution and version. | Each hit returns constitution title and version label (not only `countryCode` and opaque `versionId`). `/search` shows those labels on every result. Labels are stored in the derived index at reindex from catalog HTTP; the gateway does not N+1 catalog per hit. API test asserts the fields; DE seed hits show Basic Law and the matching version (1949 or 2022). | SRC-1 |
 | SRC-3 | Story | P1 | Ideas | M | gateway-web | In-text cross-reference links. | Needs `article_links` or similar. | UI-2, ARCH-3 |
 | SRC-4 | Story | P2 | Ideas | L | search-service | Global term index. | Later. | DB-4 |
 
@@ -766,7 +766,7 @@ TypeScript is enforced via `next build`. Deferred: QLT-3 (Pact-style consumer te
 
 ### Sprint 5: Search — closed
 Done: SRC-1, SRCH-1, DB-4.
-Keyword search over a derived Postgres tsvector index rebuilt from catalog + content HTTP (never catalog SQL). Gateway `/search` fails open if the index is down. Facets stay SRC-2.
+Keyword search over a derived Postgres tsvector index rebuilt from catalog + content HTTP (never catalog SQL). Gateway `/search` fails open if the index is down. Facets and hit provenance are SRC-2/SRC-5 (Sprint 10).
 
 ### Sprint 6: Content tree + amendment records — closed
 Done: ARCH-5, AMD-3.
@@ -788,9 +788,9 @@ Shared Gradle 8.10.2 wrapper (`./gradlew` / `cd services/<name> && ./gradlew`). 
 Done: IDN-8, QLT-5.
 `reviewer` and `publisher` roles are separate from `editor`; editor-service returns 403 when the actor lacks the command capability. Approving a review is `POST .../approval`; publish requires `approved` and patches public articles in place (content trees kept), then `POST /reindex`. `EDITOR_PUBLISH_PUBLIC=false` keeps audit-only publish. Roles: `docs/editorial-roles.md`.
 
-### Sprint 10: Search facets and result provenance
-**SRC-2** — filter search by country, version, date.
-**SRC-5** — each result shows which constitution and version it came from.
+### Sprint 10: Search facets and result provenance — closed
+Done: SRC-2, SRC-5.
+`GET /search` accepts `country`, `versionId`, and `effectiveDate` filters. `GET /search/facets` lists indexed countries, versions, and dates. Hits include constitution title, version label, and effective date stored at reindex from catalog HTTP. Gateway `/search` shows those labels and facet controls.
 
 ### Sprint 11: Identity foundations
 **IDN-3**, **IDN-4**, **IDN-6**, **IDN-12**, **UI-6**.

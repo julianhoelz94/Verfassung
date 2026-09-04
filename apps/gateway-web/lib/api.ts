@@ -138,20 +138,65 @@ export type SearchHit = {
   articleId: string;
   versionId: string;
   countryCode: string;
+  constitutionTitle: string;
+  versionLabel: string;
+  effectiveDate: string | null;
   articleNumber: string;
   title: string;
   snippet: string;
   rank: number;
 };
 
-export function searchArticles(query: string): Promise<SearchHit[] | null> {
+export type SearchFilters = {
+  country?: string;
+  versionId?: string;
+  effectiveDate?: string;
+};
+
+export type CountryFacet = {
+  code: string;
+  count: number;
+};
+
+export type VersionFacet = {
+  id: string;
+  label: string;
+  constitutionTitle: string;
+  countryCode: string;
+  count: number;
+};
+
+export type DateFacet = {
+  effectiveDate: string;
+  count: number;
+};
+
+export type SearchFacets = {
+  countries: CountryFacet[];
+  versions: VersionFacet[];
+  dates: DateFacet[];
+};
+
+export function searchArticles(query: string, filters: SearchFilters = {}): Promise<SearchHit[] | null> {
   if (!query.trim()) {
     return Promise.resolve([]);
   }
-  return readJson<SearchHit[]>(
-    `${searchBaseUrl()}/search?q=${encodeURIComponent(query)}`,
-    'search',
-  );
+  const params = new URLSearchParams();
+  params.set('q', query);
+  if (filters.country) {
+    params.set('country', filters.country);
+  }
+  if (filters.versionId) {
+    params.set('versionId', filters.versionId);
+  }
+  if (filters.effectiveDate) {
+    params.set('effectiveDate', filters.effectiveDate);
+  }
+  return readJson<SearchHit[]>(`${searchBaseUrl()}/search?${params.toString()}`, 'search');
+}
+
+export function searchFacets(): Promise<SearchFacets | null> {
+  return readJson<SearchFacets>(`${searchBaseUrl()}/search/facets`, 'search');
 }
 
 export function listCountries(): Promise<CountrySummary[] | null> {

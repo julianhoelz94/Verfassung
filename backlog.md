@@ -635,6 +635,7 @@ These are useful, but they should stay out of the initial implementation scope u
 | UI-14 | Story | P1 | Ready | M | gateway-web + CI | Frontend journey and visual tests. | Playwright covers browse → article, search, linear compare, login/logout, edit/review/publish; axe runs on critical routes; visual regression covers narrow/wide public and editor layouts; failures run in CI. | CI-2, UI-7, QLT-5 |
 | UI-15 | Story | P2 | Ideas | M | gateway-web | Discovery, print, and sharing. | Per-route metadata and canonical URLs, meaningful social previews, stable compare links, copy-link feedback, and print styles for article/compare pages. | UI-2, UI-9 |
 | UI-16 | Task | P0 | Ready | S | gateway-web | Chronology and navigation corrections. | Timeline is sorted by enactment date (nulls last); middle versions expose previous and next compare shortcuts; mobile compare labels remain paired with their stacked from/to text; regression tests cover each bug. | UI-4, UI-5 |
+| UI-17 | Story | P1 | Ready | M | gateway-web | Rights-aware site menu. | One primary menu lists every top-level destination the current principal may visit and omits the rest. Anonymous visitors see public browse/search and login, not Editor or API docs. Signed-in `viewer` keeps public links and sign-out, not Editor. `editor` / `reviewer` / `publisher` see Editor. `admin` sees every privileged destination, including GW-2 API docs when that page exists. Hiding a link is not authorization: protected routes still reject unauthorized users. Current page is marked (`aria-current`); keyboard and mobile access match UI-7. Tests cover anonymous, viewer, editor, and admin link sets. | IDN-8, UI-ED-1, UI-7 |
 
 ## Epic 4B: First domain APIs (executable)
 
@@ -645,6 +646,7 @@ Replace `/internal/ping` only on the services in this table. Leave search/audit 
 | CAT-2 | Task | P0 | Done | M | catalog-service | Read API: list countries, get country, list versions for a constitution. | OpenAPI; 404 on unknown; Testcontainers API test; unpublished versions omitted. | CAT-1 |
 | CNT-2 | Task | P0 | Done | M | content-service | Read API: list articles for `versionId`, get article by id. | Ordered list; 404; API test. `versionId` is an opaque catalog id (no catalog SQL). | CNT-1 |
 | GW-1 | Task | P0 | Done | M | gateway-web | HTTP clients for CAT-2 and CNT-2 (env base URLs via Caddy or Compose DNS). | Server components fetch; empty/error states if API down. | CAT-2, CNT-2 |
+| GW-2 | Task | P2 | Ready | S | gateway-web | API docs index with Swagger links. | A `/api-docs` page lists all eight services (catalog, content, amendment, identity, editor, search, ingestion, audit) with a direct link to each Caddy Swagger UI (`/api/docs/<service>/swagger-ui/index.html`). The page is reachable from the site header or footer. Links are static so the index still renders when a service is down. | SRV-3 |
 | AMD-2 | Task | P1 | Done | M | amendment-service | Read API: list amendments for a version transition. | After AMD-1; not Sprint 1. | AMD-1 |
 | UI-ED-1 | Task | P1 | Done | M | gateway-web | Editor login page and a signed-in `/editor` shell. | Form posts to identity-service; httpOnly session cookie; unauthenticated `/editor` redirects to `/login`. WYSIWYG is still SRV-6. | IDN-2 |
 | IDN-2 | Task | P1 | Done | M | identity-service | Login (session or JWT) for editor role. | After IDN-1. | IDN-1 |
@@ -795,8 +797,8 @@ Done: IDN-8, QLT-5.
 Harden opaque sessions and login abuse controls; make seed/profile configuration safe; remove dead JWT configuration; keep public reading available when identity is down.
 
 ### Sprint 12: Public correctness and accessibility
-**UI-7**, **UI-8**, **UI-9**, **UI-16**, **IDN-13**.
-Establish the accessibility and route-state baseline; fix comparison truncation, invalid paths, multi-hop classification, chronology, and mobile navigation; lock identity consumer contracts with integration tests.
+**UI-7**, **UI-8**, **UI-9**, **UI-16**, **UI-17**, **IDN-13**.
+Establish the accessibility and route-state baseline; fix comparison truncation, invalid paths, multi-hop classification, chronology, and mobile navigation; add a rights-aware site menu; lock identity consumer contracts with integration tests.
 
 ### Sprint 13: Accounts, trust, and shared UI
 **IDN-5**, **IDN-7**, **IDN-9**, **GOV-5**, **UI-11**, **UI-12**, **UI-13**.
@@ -807,7 +809,7 @@ Add account lifecycle, password recovery, and auth audit events. Show provenance
 Require MFA/step-up for privileged actions, render structured diffs, and add end-to-end, accessibility, and visual-regression coverage for critical public/editor journeys.
 
 ### Later / Ideas
-SRV-5, **SRV-7 (MCP, postponed)**, IDN-11, IDN-14, UI-15, ING-3–5, SRC-3–4, PLAT-3, QLT-2, DEP-2–6.
+SRV-5, **SRV-7 (MCP, postponed)**, **GW-2**, IDN-11, IDN-14, UI-15, ING-3–5, SRC-3–4, PLAT-3, QLT-2, DEP-2–6.
 
 ## Open Product Questions
 - Should published constitutional versions be immutable snapshots only, or do you want official errata and corrections modeled separately?

@@ -54,6 +54,7 @@ jobs:
           cd apps/gateway-web
           npm ci
           npm run lint
+          npm test
           npm run build
 
   images:

@@ -1,15 +1,23 @@
 package com.constitutionatlas.identity
 
+import com.constitutionatlas.identity.config.IdentityLoginProperties
 import com.constitutionatlas.identity.config.IdentitySeedProperties
+import com.constitutionatlas.identity.config.IdentitySessionProperties
 import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.boot.runApplication
+import org.springframework.scheduling.annotation.EnableScheduling
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
 
 @SpringBootApplication
-@EnableConfigurationProperties(IdentitySeedProperties::class)
+@EnableScheduling
+@EnableConfigurationProperties(
+    IdentitySeedProperties::class,
+    IdentitySessionProperties::class,
+    IdentityLoginProperties::class,
+)
 class IdentityServiceApplication
 
 fun main(args: Array<String>) {

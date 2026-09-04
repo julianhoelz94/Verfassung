@@ -1,0 +1,16 @@
+identity:
+  seed:
+    mode: create-only
+    editor-email: ${TEST_EDITOR_EMAIL:}
+    editor-password: ${TEST_EDITOR_PASSWORD:}
+    reviewer-email: ${TEST_REVIEWER_EMAIL:}
+    reviewer-password: ${TEST_REVIEWER_PASSWORD:}
+    publisher-email: ${TEST_PUBLISHER_EMAIL:}
+    publisher-password: ${TEST_PUBLISHER_PASSWORD:}
+    admin-email: ${TEST_ADMIN_EMAIL:}
+    admin-password: ${TEST_ADMIN_PASSWORD:}
+    viewer-email: ${TEST_VIEWER_EMAIL:}
+    viewer-password: ${TEST_VIEWER_PASSWORD:}
+  session:
+    idle-timeout: 15m
+    absolute-timeout: 8h

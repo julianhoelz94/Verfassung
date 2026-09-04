@@ -1,5 +1,6 @@
 package com.constitutionatlas.identity.api
 
+import java.time.OffsetDateTime
 import java.util.UUID
 
 data class LoginRequest(
@@ -16,4 +17,12 @@ data class UserDto(
 data class SessionDto(
     val token: String,
     val user: UserDto,
+    val expiresInSeconds: Long,
+)
+
+data class SessionInfoDto(
+    val id: UUID,
+    val createdAt: OffsetDateTime,
+    val lastSeenAt: OffsetDateTime,
+    val current: Boolean,
 )

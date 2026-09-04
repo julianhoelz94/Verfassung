@@ -1,0 +1,16 @@
+identity:
+  seed:
+    mode: create-only
+    editor-email: ${CI_EDITOR_EMAIL:}
+    editor-password: ${CI_EDITOR_PASSWORD:}
+    reviewer-email: ${CI_REVIEWER_EMAIL:}
+    reviewer-password: ${CI_REVIEWER_PASSWORD:}
+    publisher-email: ${CI_PUBLISHER_EMAIL:}
+    publisher-password: ${CI_PUBLISHER_PASSWORD:}
+    admin-email: ${CI_ADMIN_EMAIL:}
+    admin-password: ${CI_ADMIN_PASSWORD:}
+    viewer-email: ${CI_VIEWER_EMAIL:}
+    viewer-password: ${CI_VIEWER_PASSWORD:}
+  session:
+    idle-timeout: 30m
+    absolute-timeout: 12h

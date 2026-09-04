@@ -1,4 +1,5 @@
 import com.constitutionatlas.identity.IdentityServiceApplication
+import com.fasterxml.jackson.databind.ObjectMapper
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
@@ -13,6 +14,7 @@ import org.springframework.test.web.servlet.post
 import org.testcontainers.containers.PostgreSQLContainer
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
+import java.io.File
 
 @Testcontainers
 @AutoConfigureMockMvc
@@ -23,6 +25,8 @@ class IdentityApiTest {
 
     @Autowired
     lateinit var jdbcTemplate: JdbcTemplate
+
+    private val objectMapper = ObjectMapper()
 
     @Test
     fun seedStoresSeparableEditorialRoles() {
@@ -50,6 +54,76 @@ class IdentityApiTest {
     fun reviewerAndPublisherCanLoginWithOnlyTheirRole() {
         login("local-reviewer@example.local", "change-me")
         login("local-publisher@example.local", "change-me")
+    }
+
+    @Test
+    fun logoutRevokesTheSession() {
+        val token = login("local-editor@example.local", "change-me")
+        mockMvc.post("/logout") {
+            header("Authorization", "Bearer $token")
+        }.andExpect { status { isNoContent() } }
+        mockMvc.get("/me") {
+            header("Authorization", "Bearer $token")
+        }.andExpect { status { isUnauthorized() } }
+    }
+
+    @Test
+    fun expiredSessionCannotReadMe() {
+        val token = login("local-editor@example.local", "change-me")
+        jdbcTemplate.update("UPDATE sessions SET expires_at = NOW() - INTERVAL '1 hour'")
+        mockMvc.get("/me") {
+            header("Authorization", "Bearer $token")
+        }.andExpect { status { isUnauthorized() } }
+    }
+
+    @Test
+    fun disabledUserCannotLogin() {
+        jdbcTemplate.update("UPDATE users SET enabled = FALSE WHERE email = ?", "local-editor@example.local")
+        try {
+            mockMvc.post("/login") {
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"email":"local-editor@example.local","password":"change-me"}"""
+            }.andExpect { status { isUnauthorized() } }
+        } finally {
+            jdbcTemplate.update("UPDATE users SET enabled = TRUE WHERE email = ?", "local-editor@example.local")
+        }
+    }
+
+    @Test
+    fun disabledUserCannotReadMe() {
+        val token = login("local-editor@example.local", "change-me")
+        jdbcTemplate.update("UPDATE users SET enabled = FALSE WHERE email = ?", "local-editor@example.local")
+        try {
+            mockMvc.get("/me") {
+                header("Authorization", "Bearer $token")
+            }.andExpect { status { isUnauthorized() } }
+        } finally {
+            jdbcTemplate.update("UPDATE users SET enabled = TRUE WHERE email = ?", "local-editor@example.local")
+        }
+    }
+
+    @Test
+    fun openApiDocumentsLoginMeLogoutAndBearer() {
+        mockMvc.get("/v3/api-docs").andExpect {
+            status { isOk() }
+            jsonPath("$.paths./login.post") { exists() }
+            jsonPath("$.paths./me.get") { exists() }
+            jsonPath("$.paths./logout.post") { exists() }
+            jsonPath("$.components.securitySchemes.bearer-session.scheme") { value("bearer") }
+        }
+    }
+
+    @Test
+    fun meMatchesGatewayContractShape() {
+        val token = login("local-editor@example.local", "change-me")
+        val json =
+            mockMvc.get("/me") {
+                header("Authorization", "Bearer $token")
+            }.andExpect { status { isOk() } }.andReturn().response.contentAsString
+        val actual = objectMapper.readTree(json)
+        val expected = objectMapper.readTree(File("../../apps/gateway-web/lib/contracts/identity-me.json"))
+        check(actual.get("email").asText() == expected.get("email").asText())
+        check(actual.get("roles").toString() == expected.get("roles").toString())
     }
 
     @Test

@@ -33,6 +33,30 @@ a:hover {
   text-decoration-thickness: 2px;
 }
 
+:focus {
+  outline: none;
+}
+
+:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.skip-link {
+  position: absolute;
+  left: 12px;
+  top: -48px;
+  z-index: 20;
+  padding: 10px 14px;
+  background: #fff;
+  border: 1px solid var(--line);
+}
+
+.skip-link:focus,
+.skip-link:focus-visible {
+  top: 12px;
+}
+
 .site-header {
   display: flex;
   flex-wrap: wrap;
@@ -48,12 +72,29 @@ a:hover {
   text-decoration: none;
   font-weight: 700;
   letter-spacing: 0.01em;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
 }
 
 .site-nav {
   display: flex;
-  gap: 14px;
+  flex-wrap: wrap;
+  gap: 8px 14px;
   align-items: center;
+}
+
+.site-nav a,
+.header-account button,
+.header-search button,
+.compare-form button,
+.actions a,
+button {
+  min-height: 44px;
+  min-width: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .header-search {
@@ -64,12 +105,31 @@ a:hover {
   max-width: 420px;
 }
 
-.header-search input {
-  flex: 1;
+.header-search input,
+.compare-form select,
+input,
+select,
+textarea {
+  min-height: 44px;
   padding: 8px 10px;
   border: 1px solid var(--line);
   border-radius: 4px;
   font: inherit;
+}
+
+.header-spacer {
+  flex: 1;
+}
+
+.header-account {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  align-items: center;
+}
+
+.header-status {
+  margin: 0;
 }
 
 button,
@@ -93,6 +153,10 @@ main {
 
 main.wide {
   max-width: 1100px;
+}
+
+main:focus {
+  outline: none;
 }
 
 .lede {
@@ -177,6 +241,17 @@ main.wide {
   border-bottom: 1px solid var(--line);
 }
 
+.compare-cell-label {
+  display: none;
+  margin: 0 0 8px;
+  font-weight: 700;
+}
+
+.compare-kind {
+  margin: 0 0 8px;
+  font-size: 0.9rem;
+}
+
 .compare-row {
   display: contents;
 }
@@ -218,6 +293,9 @@ details {
 
 summary {
   cursor: pointer;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
 }
 
 .actions {
@@ -227,9 +305,21 @@ summary {
   margin: 12px 0 24px;
 }
 
+.status-panel {
+  max-width: 42em;
+}
+
 @media (max-width: 800px) {
   .compare-grid {
     grid-template-columns: 1fr;
+  }
+
+  .compare-head {
+    display: none;
+  }
+
+  .compare-cell-label {
+    display: block;
   }
 
   .compare-row {

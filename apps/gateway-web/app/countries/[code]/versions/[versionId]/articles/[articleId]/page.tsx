@@ -1,4 +1,7 @@
+import { notFound } from 'next/navigation';
 import { Breadcrumbs } from '../../../../../../components/Breadcrumbs';
+import { PageMain } from '../../../../../../components/PageMain';
+import { ServiceUnavailable } from '../../../../../../components/StatusMessage';
 import {
   ApiUnavailableError,
   getArticle,
@@ -27,24 +30,20 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
 
   if (error) {
     return (
-      <main>
-        <p>{error}.</p>
-      </main>
+      <PageMain>
+        <ServiceUnavailable service="Content" retryHref={`/countries/${params.code}/versions/${params.versionId}/articles/${params.articleId}`} />
+      </PageMain>
     );
   }
 
   if (!country || !article || article.versionId !== params.versionId) {
-    return (
-      <main>
-        <p>Unknown article.</p>
-      </main>
-    );
+    notFound();
   }
 
   const permalink = `/countries/${country.isoCode}/versions/${params.versionId}/articles/${article.id}`;
 
   return (
-    <main>
+    <PageMain>
       <Breadcrumbs
         items={[
           { href: '/', label: 'Countries' },
@@ -68,7 +67,7 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
           <p>{article.body}</p>
         )}
       </article>
-    </main>
+    </PageMain>
   );
 }
 

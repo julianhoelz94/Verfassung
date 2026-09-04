@@ -53,6 +53,7 @@ jobs:
       - run: |
           cd apps/gateway-web
           npm ci
+          npm test
           npm run lint
           npm run build
 

@@ -20,7 +20,7 @@ class AuthService(
     fun login(email: String, password: String): SessionDto {
         val user = identityRepository.findUserByEmail(email.trim())
             ?: throw UnauthorizedException("Invalid credentials")
-        if (!passwordEncoder.matches(password, user.passwordHash)) {
+        if (!user.enabled || !passwordEncoder.matches(password, user.passwordHash)) {
             throw UnauthorizedException("Invalid credentials")
         }
         val token = UUID.randomUUID().toString() + UUID.randomUUID().toString().replace("-", "")

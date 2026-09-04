@@ -1,15 +1,26 @@
+import { notFound } from 'next/navigation';
 import { Breadcrumbs } from '../../../components/Breadcrumbs';
+import { PageMain } from '../../../components/PageMain';
+import { ServiceUnavailable } from '../../../components/StatusMessage';
 import {
   ApiUnavailableError,
+  listAllArticles,
   listAmendments,
-  listArticlePage,
   getCountry,
   type Amendment,
   type ArticleSummary,
   type CountryDetail,
   type VersionSummary,
 } from '../../../../lib/api';
-import { compareArticleNumbers, versionPath } from '../../../../lib/compare';
+import {
+  COMPARE_KIND_LABEL,
+  compareArticleNumbers,
+  compareRequestError,
+  compareRowId,
+  netArticleKind,
+  orderVersions,
+  versionPath,
+} from '../../../../lib/compare';
 import { CompareForm } from '../CompareForm';
 
 type ComparePageProps = {
@@ -47,79 +58,74 @@ export default async function ComparePage({ params, searchParams }: ComparePageP
 
   if (error) {
     return (
-      <main>
-        <p>{error}.</p>
-      </main>
+      <PageMain className="wide">
+        <ServiceUnavailable service="Catalog" retryHref={`/countries/${params.code}/compare`} />
+      </PageMain>
     );
   }
 
   if (!country) {
-    return (
-      <main>
-        <p>Unknown country.</p>
-      </main>
-    );
+    notFound();
   }
 
   const constitution =
     country.constitutions.find((item) =>
       item.versions.some((version) => version.id === searchParams.from || version.id === searchParams.to),
     ) ?? country.constitutions[0];
-  const versions = constitution?.versions ?? [];
+  const versions = orderVersions(constitution?.versions ?? []);
   const fromId = searchParams.from ?? versions[0]?.id;
   const toId = searchParams.to ?? versions[versions.length - 1]?.id;
-  const path = fromId && toId ? versionPath(versions, fromId, toId) : null;
+  const selectedError = compareRequestError(country.constitutions, fromId, toId);
+  const path = fromId && toId && constitution && !selectedError ? versionPath(versions, fromId, toId) : null;
 
   let fromArticles: ArticleSummary[] = [];
   let toArticles: ArticleSummary[] = [];
   let hops: Hop[] = [];
-  let pathError: string | null = null;
+  let loadError: string | null = selectedError;
 
-  if (!path || path.length < 2) {
-    pathError =
-      fromId && toId && fromId === toId
-        ? 'Choose two different versions along the published line.'
-        : 'Those versions are not a forward path on this constitution’s published line.';
-  } else {
+  if (path && path.length >= 2 && !selectedError) {
     try {
       const hopPairs = path.slice(0, -1).map((source, index) => ({
         source,
         target: path[index + 1],
       }));
-      const [fromPage, toPage] = await Promise.all([
-        listArticlePage(path[0].id, 0, 200, true),
-        listArticlePage(path[path.length - 1].id, 0, 200, true),
+      const [fromList, toList] = await Promise.all([
+        listAllArticles(path[0].id, true),
+        listAllArticles(path[path.length - 1].id, true),
       ]);
       hops = await Promise.all(
         hopPairs.map(async (pair) => {
           const [amendments, articles] = await Promise.all([
             listAmendments(pair.target.id, pair.source.id),
-            listArticlePage(pair.target.id, 0, 200, true),
+            listAllArticles(pair.target.id, true),
           ]);
           return {
             source: pair.source,
             target: pair.target,
             amendments: amendments ?? [],
-            articles: articles?.items ?? [],
+            articles,
           };
         }),
       );
-      fromArticles = fromPage?.items ?? [];
-      toArticles = toPage?.items ?? [];
+      fromArticles = fromList;
+      toArticles = toList;
+      loadError = null;
     } catch (e) {
-      pathError = e instanceof ApiUnavailableError ? e.message : 'A backend service is unavailable';
+      loadError = e instanceof ApiUnavailableError ? e.message : 'A backend service is unavailable';
     }
   }
 
   const fromMap = new Map(fromArticles.map((article) => [article.articleNumber, article]));
   const toMap = new Map(toArticles.map((article) => [article.articleNumber, article]));
   const numbers = [...new Set([...fromMap.keys(), ...toMap.keys()])].sort(compareArticleNumbers);
-  const recorded = new Map<string, string>();
+  const recorded = new Map<string, string[]>();
   for (const hop of hops) {
     for (const amendment of hop.amendments) {
       for (const change of amendment.changes) {
         if (change.articleNumber) {
-          recorded.set(change.articleNumber, change.changeType);
+          const types = recorded.get(change.articleNumber) ?? [];
+          types.push(change.changeType);
+          recorded.set(change.articleNumber, types);
         }
       }
     }
@@ -129,7 +135,7 @@ export default async function ComparePage({ params, searchParams }: ComparePageP
   const toVersion = path?.[path.length - 1];
 
   return (
-    <main className="wide">
+    <PageMain className="wide">
       <Breadcrumbs
         items={[
           { href: '/', label: 'Countries' },
@@ -143,25 +149,24 @@ export default async function ComparePage({ params, searchParams }: ComparePageP
         from one snapshot to a later one.
       </p>
       <CompareForm code={country.isoCode} versions={versions} fromId={fromId} toId={toId} />
-      {pathError ? <p>{pathError}.</p> : null}
-      {path && fromVersion && toVersion && !pathError ? (
+      {loadError ? <p role="alert">{loadError.endsWith('.') ? loadError : `${loadError}.`}</p> : null}
+      {path && fromVersion && toVersion && !loadError ? (
         <>
-          <p className="muted">
-            Path:{' '}
-            {path.map((version) => version.versionLabel).join(' → ')}
-          </p>
+          <p className="muted">Path: {path.map((version) => version.versionLabel).join(' → ')}</p>
           <h2>Recorded changes along the path</h2>
           {hops.every((hop) => hop.amendments.length === 0) ? (
-            <p>No amendment records are stored for these hops. The side-by-side text below still compares the snapshots.</p>
+            <p>
+              No amendment records are stored for these hops. The side-by-side text below still compares the snapshots.
+            </p>
           ) : null}
           {hops.map((hop) => {
             const touched = affectedNumbers(hop.amendments);
             const intermediate = hop.target.id !== toVersion.id;
             return (
-              <section key={`${hop.source.id}-${hop.target.id}`} className="hop">
-                <h3>
+              <details key={`${hop.source.id}-${hop.target.id}`} className="hop">
+                <summary>
                   {hop.source.versionLabel} → {hop.target.versionLabel}
-                </h3>
+                </summary>
                 {hop.amendments.map((amendment) => (
                   <article key={amendment.id}>
                     <p>
@@ -186,9 +191,7 @@ export default async function ComparePage({ params, searchParams }: ComparePageP
                 ))}
                 {touched.length > 0 ? (
                   <details>
-                    <summary>
-                      Articles touched in this hop ({touched.length})
-                    </summary>
+                    <summary>Articles touched in this hop ({touched.length})</summary>
                     <ul>
                       {touched.map((number) => {
                         const after = hop.articles.find((article) => article.articleNumber === number);
@@ -226,7 +229,7 @@ export default async function ComparePage({ params, searchParams }: ComparePageP
                     </ol>
                   </details>
                 ) : null}
-              </section>
+              </details>
             );
           })}
 
@@ -239,20 +242,15 @@ export default async function ComparePage({ params, searchParams }: ComparePageP
             {numbers.map((number) => {
               const left = fromMap.get(number);
               const right = toMap.get(number);
-              const recordedType = recorded.get(number);
-              let kind = 'same';
-              if (!left && right) {
-                kind = 'added';
-              } else if (left && !right) {
-                kind = 'removed';
-              } else if (recordedType) {
-                kind = recordedType;
-              } else if ((left?.body ?? '') !== (right?.body ?? '')) {
-                kind = 'changed';
-              }
+              const kind = netArticleKind(left, right, recorded.get(number) ?? []);
+              const rowId = compareRowId(number);
               return (
-                <article key={number} className={`compare-row kind-${kind}`}>
+                <article key={number} id={rowId} className={`compare-row kind-${kind}`}>
                   <div>
+                    <p className="compare-cell-label">{fromVersion.versionLabel}</p>
+                    <p className="compare-kind">
+                      <a href={`#${rowId}`}>{COMPARE_KIND_LABEL[kind]}</a>
+                    </p>
                     {left ? (
                       <>
                         <h3>
@@ -265,6 +263,7 @@ export default async function ComparePage({ params, searchParams }: ComparePageP
                     )}
                   </div>
                   <div>
+                    <p className="compare-cell-label">{toVersion.versionLabel}</p>
                     {right ? (
                       <>
                         <h3>
@@ -282,6 +281,6 @@ export default async function ComparePage({ params, searchParams }: ComparePageP
           </div>
         </>
       ) : null}
-    </main>
+    </PageMain>
   );
 }

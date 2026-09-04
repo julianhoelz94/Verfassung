@@ -1,28 +1,13 @@
 import { cookies } from 'next/headers';
+import { identityBaseUrl, requestLogin, requestLogout, requestMe, type SessionUser } from './identity-client';
 
 export const SESSION_COOKIE = 'ca_session';
+export type { SessionUser };
 
-export type SessionUser = {
-  id: string;
-  email: string;
-  roles: string[];
-};
-
-export function identityBaseUrl(): string {
-  return process.env.IDENTITY_API_URL ?? 'http://localhost/api/identity';
-}
+export { identityBaseUrl };
 
 export async function login(email: string, password: string): Promise<SessionUser> {
-  const response = await fetch(`${identityBaseUrl()}/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password }),
-    cache: 'no-store',
-  });
-  if (!response.ok) {
-    throw new Error('Invalid credentials');
-  }
-  const body = (await response.json()) as { token: string; user: SessionUser };
+  const body = await requestLogin(email, password);
   cookies().set(SESSION_COOKIE, body.token, {
     httpOnly: true,
     sameSite: 'lax',
@@ -35,26 +20,24 @@ export async function login(email: string, password: string): Promise<SessionUse
 export async function logout(): Promise<void> {
   const token = cookies().get(SESSION_COOKIE)?.value;
   if (token) {
-    await fetch(`${identityBaseUrl()}/logout`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}` },
-      cache: 'no-store',
-    }).catch(() => undefined);
+    await requestLogout(token).catch(() => undefined);
   }
   cookies().delete(SESSION_COOKIE);
 }
 
 export async function currentUser(): Promise<SessionUser | null> {
+  const session = await currentSession();
+  return session.user;
+}
+
+export async function currentSession(): Promise<{ user: SessionUser | null; identityUnavailable: boolean }> {
   const token = cookies().get(SESSION_COOKIE)?.value;
   if (!token) {
-    return null;
+    return { user: null, identityUnavailable: false };
   }
-  const response = await fetch(`${identityBaseUrl()}/me`, {
-    headers: { Authorization: `Bearer ${token}` },
-    cache: 'no-store',
-  });
-  if (!response.ok) {
-    return null;
+  try {
+    return { user: await requestMe(token), identityUnavailable: false };
+  } catch {
+    return { user: null, identityUnavailable: true };
   }
-  return (await response.json()) as SessionUser;
 }

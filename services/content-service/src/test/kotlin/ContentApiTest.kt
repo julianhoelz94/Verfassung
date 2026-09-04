@@ -52,6 +52,31 @@ class ContentApiTest {
     }
 
     @Test
+    fun listArticlesReportsTotalWhenPageIsCapped() {
+        val versionId = "01900000-0000-4000-8000-000000000198"
+        val articles =
+            (1..201).joinToString(",") { index ->
+                """{"articleNumber":"$index","title":"A$index","body":"Body $index.","sortOrder":$index}"""
+            }
+        mockMvc.put("/versions/$versionId/articles") {
+            contentType = MediaType.APPLICATION_JSON
+            content = "[$articles]"
+        }.andExpect { status { isOk() } }
+        mockMvc.get("/versions/$versionId/articles") {
+            param("limit", "200")
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.length()") { value(200) }
+            header { string("X-Total-Count", "201") }
+        }
+        mockMvc.get("/versions/$versionId/articles").andExpect {
+            status { isOk() }
+            jsonPath("$.length()") { value(201) }
+            header { string("X-Total-Count", "201") }
+        }
+    }
+
+    @Test
     fun listArticlesCanIncludeBody() {
         mockMvc.get("/versions/01900000-0000-4000-8000-000000000004/articles") {
             param("includeBody", "true")

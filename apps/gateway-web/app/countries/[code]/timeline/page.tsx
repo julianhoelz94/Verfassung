@@ -1,4 +1,7 @@
+import { notFound } from 'next/navigation';
 import { Breadcrumbs } from '../../../components/Breadcrumbs';
+import { PageMain } from '../../../components/PageMain';
+import { ServiceUnavailable } from '../../../components/StatusMessage';
 import {
   ApiUnavailableError,
   getCountry,
@@ -7,6 +10,7 @@ import {
   type CountryDetail,
 } from '../../../../lib/api';
 import { orderVersions } from '../../../../lib/compare';
+import { sortAmendmentsByEnactment } from '../../../../lib/timeline';
 
 type TimelinePageProps = {
   params: { code: string };
@@ -24,7 +28,7 @@ export default async function TimelinePage({ params }: TimelinePageProps) {
           constitution.versions.map((version) => listAmendments(version.id)),
         ),
       );
-      amendments = groups.flatMap((group) => group ?? []);
+      amendments = sortAmendmentsByEnactment(groups.flatMap((group) => group ?? []));
     }
   } catch (e) {
     error = e instanceof ApiUnavailableError ? e.message : 'Services are unavailable';
@@ -32,18 +36,14 @@ export default async function TimelinePage({ params }: TimelinePageProps) {
 
   if (error) {
     return (
-      <main>
-        <p>{error}.</p>
-      </main>
+      <PageMain>
+        <ServiceUnavailable service="Amendment" retryHref={`/countries/${params.code}/timeline`} />
+      </PageMain>
     );
   }
 
   if (!country) {
-    return (
-      <main>
-        <p>Unknown country.</p>
-      </main>
-    );
+    notFound();
   }
 
   const labelById = new Map(
@@ -53,7 +53,7 @@ export default async function TimelinePage({ params }: TimelinePageProps) {
   );
 
   return (
-    <main>
+    <PageMain>
       <Breadcrumbs
         items={[
           { href: '/', label: 'Countries' },
@@ -98,6 +98,6 @@ export default async function TimelinePage({ params }: TimelinePageProps) {
           </li>
         ))}
       </ol>
-    </main>
+    </PageMain>
   );
 }

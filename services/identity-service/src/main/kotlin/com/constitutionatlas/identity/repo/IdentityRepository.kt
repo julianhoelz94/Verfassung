@@ -10,6 +10,7 @@ data class StoredUser(
     val id: UUID,
     val email: String,
     val passwordHash: String,
+    val enabled: Boolean = true,
 )
 
 @Repository
@@ -23,12 +24,13 @@ class IdentityRepository(private val jdbc: JdbcTemplate) {
 
     fun findUserByEmail(email: String): StoredUser? =
         jdbc.query(
-            "SELECT id, email, password_hash FROM users WHERE lower(email) = lower(?)",
+            "SELECT id, email, password_hash, enabled FROM users WHERE lower(email) = lower(?)",
             { rs, _ ->
                 StoredUser(
                     rs.getObject("id", UUID::class.java),
                     rs.getString("email"),
                     rs.getString("password_hash"),
+                    rs.getBoolean("enabled"),
                 )
             },
             email,
@@ -90,17 +92,19 @@ class IdentityRepository(private val jdbc: JdbcTemplate) {
     fun findUserByValidTokenHash(tokenHash: String): StoredUser? =
         jdbc.query(
             """
-            SELECT u.id, u.email, u.password_hash
+            SELECT u.id, u.email, u.password_hash, u.enabled
             FROM sessions s
             JOIN users u ON u.id = s.user_id
             WHERE s.token_hash = ?
               AND s.expires_at > NOW()
+              AND u.enabled = TRUE
             """.trimIndent(),
             { rs, _ ->
                 StoredUser(
                     rs.getObject("id", UUID::class.java),
                     rs.getString("email"),
                     rs.getString("password_hash"),
+                    rs.getBoolean("enabled"),
                 )
             },
             tokenHash,

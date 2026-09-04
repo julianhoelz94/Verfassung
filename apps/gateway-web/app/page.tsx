@@ -1,4 +1,6 @@
 import { ApiUnavailableError, listCountries, type CountrySummary } from '../lib/api';
+import { PageMain } from './components/PageMain';
+import { ServiceUnavailable } from './components/StatusMessage';
 
 export default async function Page() {
   let countries: CountrySummary[] = [];
@@ -10,14 +12,21 @@ export default async function Page() {
     countries = [];
   }
 
+  if (error) {
+    return (
+      <PageMain>
+        <ServiceUnavailable service="Catalog" retryHref="/" />
+      </PageMain>
+    );
+  }
+
   return (
-    <main>
+    <PageMain>
       <h1>Countries</h1>
       <p className="lede">
         Read official constitutional texts by country and version, follow amendment history, and compare how the text changed.
       </p>
-      {error ? <p>{error}.</p> : null}
-      {!error && countries.length === 0 ? <p>No countries are published yet.</p> : null}
+      {countries.length === 0 ? <p>No countries are published yet.</p> : null}
       <ul>
         {countries.map((country) => (
           <li key={country.id}>
@@ -27,6 +36,6 @@ export default async function Page() {
           </li>
         ))}
       </ul>
-    </main>
+    </PageMain>
   );
 }

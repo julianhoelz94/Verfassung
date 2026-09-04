@@ -261,6 +261,27 @@ export async function listArticlePage(
   return { items, total, offset: offset ?? 0, limit: limit ?? null };
 }
 
+const ARTICLE_PAGE_SIZE = 200;
+
+export async function listAllArticles(versionId: string, includeBody?: boolean): Promise<ArticleSummary[]> {
+  const all: ArticleSummary[] = [];
+  let offset = 0;
+  let total = Number.POSITIVE_INFINITY;
+  while (offset < total) {
+    const page = await listArticlePage(versionId, offset, ARTICLE_PAGE_SIZE, includeBody);
+    if (!page) {
+      return all;
+    }
+    all.push(...page.items);
+    total = page.total;
+    if (page.items.length === 0) {
+      break;
+    }
+    offset += ARTICLE_PAGE_SIZE;
+  }
+  return all;
+}
+
 export function getArticle(articleId: string): Promise<ArticleDetail | null> {
   return readJson<ArticleDetail>(
     `${contentBaseUrl()}/articles/${encodeURIComponent(articleId)}`,

@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation';
+import { PageMain } from '../components/PageMain';
 import { getArticle, getCountry, listArticles, listCountries, type ArticleSummary, type CountryDetail, type CountrySummary } from '../../lib/api';
 import { getDraftPreview } from '../../lib/editor-api';
 import { currentUser } from '../../lib/session';
@@ -32,9 +33,9 @@ export default async function EditorPage({ searchParams }: EditorPageProps) {
   const canPublish = hasRole(user.roles, 'publisher');
   if (!canEdit && !canReview && !canPublish) {
     return (
-      <main>
+      <PageMain>
         <p>Signed in as {user.email}, but this account has no editorial role.</p>
-      </main>
+      </PageMain>
     );
   }
 
@@ -65,16 +66,16 @@ export default async function EditorPage({ searchParams }: EditorPageProps) {
     : undefined;
 
   return (
-    <main style={{ padding: 24, maxWidth: 900 }}>
+    <PageMain>
       <h1>Editor</h1>
       <p>
         Signed in as {user.email}. Roles: {user.roles.join(', ')}.
       </p>
       {searchParams.error ? <p role="alert">{searchParams.error}</p> : null}
-      {searchParams.saved ? <p>Draft saved.</p> : null}
-      {searchParams.reviewed ? <p>Submitted for review.</p> : null}
-      {searchParams.approved ? <p>Review approved. A publisher can now publish.</p> : null}
-      {searchParams.published ? <p>Published. Public article text for this version was updated.</p> : null}
+      {searchParams.saved ? <p role="status">Draft saved.</p> : null}
+      {searchParams.reviewed ? <p role="status">Submitted for review.</p> : null}
+      {searchParams.approved ? <p role="status">Review approved. A publisher can now publish.</p> : null}
+      {searchParams.published ? <p role="status">Published. Public article text for this version was updated.</p> : null}
       {session ? <p>Session {session.id} is {session.status}.</p> : null}
 
       {canEdit && versions.length > 0 ? (
@@ -159,6 +160,6 @@ export default async function EditorPage({ searchParams }: EditorPageProps) {
           ) : null}
         </>
       ) : null}
-    </main>
+    </PageMain>
   );
 }

@@ -14,3 +14,5 @@ export const catalogCountriesContract: CountrySummary[] = catalogCountries;
 export const catalogCountryDetailContract: CountryDetail = catalogCountryDe;
 export const contentArticleListContract: ArticleSummary[] = contentArticles;
 export const contentArticleDetailContract: ArticleDetail = contentArticle;
+export { default as identityMeContract } from './contracts/identity-me.json';
+export { default as identityErrorContract } from './contracts/identity-error.json';

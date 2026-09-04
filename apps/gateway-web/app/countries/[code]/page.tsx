@@ -1,4 +1,7 @@
+import { notFound } from 'next/navigation';
 import { Breadcrumbs } from '../../components/Breadcrumbs';
+import { PageMain } from '../../components/PageMain';
+import { ServiceUnavailable } from '../../components/StatusMessage';
 import { ApiUnavailableError, getCountry, type CountryDetail } from '../../../lib/api';
 import { orderVersions } from '../../../lib/compare';
 import { CompareForm } from './CompareForm';
@@ -19,22 +22,18 @@ export default async function CountryPage({ params }: CountryPageProps) {
 
   if (error) {
     return (
-      <main>
-        <p>{error}.</p>
-      </main>
+      <PageMain>
+        <ServiceUnavailable service="Catalog" retryHref={`/countries/${params.code}`} />
+      </PageMain>
     );
   }
 
   if (!country) {
-    return (
-      <main>
-        <p>Unknown country.</p>
-      </main>
-    );
+    notFound();
   }
 
   return (
-    <main>
+    <PageMain>
       <Breadcrumbs items={[{ href: '/', label: 'Countries' }, { label: country.name }]} />
       <h1>{country.name}</h1>
       <div className="actions">
@@ -66,6 +65,6 @@ export default async function CountryPage({ params }: CountryPageProps) {
           </section>
         );
       })}
-    </main>
+    </PageMain>
   );
 }

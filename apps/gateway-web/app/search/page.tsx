@@ -1,4 +1,5 @@
 import { Breadcrumbs } from '../components/Breadcrumbs';
+import { PageMain } from '../components/PageMain';
 import {
   ApiUnavailableError,
   searchArticles,
@@ -51,23 +52,23 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
     : facets.versions;
 
   return (
-    <main>
+    <PageMain>
       <Breadcrumbs items={[{ href: '/', label: 'Countries' }, { label: 'Search' }]} />
       <h1>Search</h1>
       <form className="compare-form" action="/search" method="get">
-        <label style={{ flex: 1, minWidth: 200 }}>
+        <label htmlFor="search-q" style={{ flex: 1, minWidth: 200 }}>
           Keyword
           <input
+            id="search-q"
             type="search"
             name="q"
             defaultValue={query}
             placeholder="Across published articles"
-            aria-label="Search articles"
           />
         </label>
-        <label>
+        <label htmlFor="search-country">
           Country
-          <select name="country" defaultValue={country} aria-label="Filter by country">
+          <select id="search-country" name="country" defaultValue={country}>
             <option value="">Any country</option>
             {facets.countries.map((facet) => (
               <option key={facet.code} value={facet.code}>
@@ -76,9 +77,9 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
             ))}
           </select>
         </label>
-        <label>
+        <label htmlFor="search-version">
           Version
-          <select name="versionId" defaultValue={versionId} aria-label="Filter by version">
+          <select id="search-version" name="versionId" defaultValue={versionId}>
             <option value="">Any version</option>
             {versions.map((facet) => (
               <option key={facet.id} value={facet.id}>
@@ -87,9 +88,9 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
             ))}
           </select>
         </label>
-        <label>
+        <label htmlFor="search-date">
           Effective date
-          <select name="effectiveDate" defaultValue={effectiveDate} aria-label="Filter by effective date">
+          <select id="search-date" name="effectiveDate" defaultValue={effectiveDate}>
             <option value="">Any date</option>
             {facets.dates.map((facet) => (
               <option key={facet.effectiveDate} value={facet.effectiveDate}>
@@ -100,7 +101,12 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
         </label>
         <button type="submit">Search</button>
       </form>
-      {error ? <p>{error}. Browse countries instead while the index is down.</p> : null}
+      {error ? (
+        <p role="alert">
+          {error}. Browse countries instead while the index is down.{' '}
+          <a href="/">Countries</a>
+        </p>
+      ) : null}
       {!error && query && hits.length === 0 ? <p>No articles match “{query}”.</p> : null}
       {!query ? <p className="lede">Enter a keyword to search published article text.</p> : null}
       <ul style={{ listStyle: 'none', padding: 0 }}>
@@ -121,6 +127,6 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
           </li>
         ))}
       </ul>
-    </main>
+    </PageMain>
   );
 }

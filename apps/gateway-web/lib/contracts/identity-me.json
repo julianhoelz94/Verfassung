@@ -1,0 +1,5 @@
+{
+  "id": "01900000-0000-4000-8000-000000000410",
+  "email": "local-editor@example.local",
+  "roles": ["editor", "publisher", "reviewer"]
+}

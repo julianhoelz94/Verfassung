@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation';
 import { Breadcrumbs } from '../../../components/Breadcrumbs';
+import { ConstitutionText } from '../../../components/ConstitutionText';
 import { PageMain } from '../../../components/PageMain';
 import { ServiceUnavailable } from '../../../components/StatusMessage';
 import {
@@ -202,7 +203,16 @@ export default async function ComparePage({ params, searchParams }: ComparePageP
                                 Article {number}
                                 {after ? ` — ${after.title}` : ''}
                               </summary>
-                              {after?.body ? <p>{after.body}</p> : <p className="muted">No text in the later snapshot.</p>}
+                              {after ? (
+                                <ConstitutionText
+                                  article={after}
+                                  headingLevel="h3"
+                                  showHeading={false}
+                                  outline={constitution?.contentOutline}
+                                />
+                              ) : (
+                                <p className="muted">No text in the later snapshot.</p>
+                              )}
                             </details>
                           </li>
                         );
@@ -222,7 +232,12 @@ export default async function ComparePage({ params, searchParams }: ComparePageP
                             <summary>
                               Article {article.articleNumber} — {article.title}
                             </summary>
-                            <p>{article.body}</p>
+                            <ConstitutionText
+                              article={article}
+                              headingLevel="h3"
+                              showHeading={false}
+                              outline={constitution?.contentOutline}
+                            />
                           </details>
                         </li>
                       ))}
@@ -252,12 +267,7 @@ export default async function ComparePage({ params, searchParams }: ComparePageP
                       <a href={`#${rowId}`}>{COMPARE_KIND_LABEL[kind]}</a>
                     </p>
                     {left ? (
-                      <>
-                        <h3>
-                          Article {left.articleNumber} — {left.title}
-                        </h3>
-                        <p>{left.body}</p>
-                      </>
+                      <ConstitutionText article={left} headingLevel="h3" outline={constitution?.contentOutline} />
                     ) : (
                       <p className="muted">Not in {fromVersion.versionLabel}</p>
                     )}
@@ -265,12 +275,7 @@ export default async function ComparePage({ params, searchParams }: ComparePageP
                   <div>
                     <p className="compare-cell-label">{toVersion.versionLabel}</p>
                     {right ? (
-                      <>
-                        <h3>
-                          Article {right.articleNumber} — {right.title}
-                        </h3>
-                        <p>{right.body}</p>
-                      </>
+                      <ConstitutionText article={right} headingLevel="h3" outline={constitution?.contentOutline} />
                     ) : (
                       <p className="muted">Not in {toVersion.versionLabel}</p>
                     )}

@@ -14,3 +14,5 @@ identity:
   session:
     idle-timeout: 30m
     absolute-timeout: 24h
+  password:
+    log-reset-token: true

@@ -63,6 +63,7 @@ class AuthController(private val authService: AuthService) {
             email = request.email,
             password = request.password,
             clientIp = clientIp(httpRequest),
+            userAgent = httpRequest.getHeader("User-Agent"),
             existingAuthorization = authorization,
         )
 
@@ -117,8 +118,11 @@ class AuthController(private val authService: AuthService) {
             ],
         ),
     )
-    fun logout(@RequestHeader(value = "Authorization", required = false) authorization: String?) {
-        authService.logout(authorization)
+    fun logout(
+        @RequestHeader(value = "Authorization", required = false) authorization: String?,
+        httpRequest: HttpServletRequest,
+    ) {
+        authService.logout(authorization, clientIp(httpRequest), httpRequest.getHeader("User-Agent"))
     }
 
     @GetMapping("/sessions")
@@ -131,16 +135,18 @@ class AuthController(private val authService: AuthService) {
     fun revokeSession(
         @PathVariable sessionId: UUID,
         @RequestHeader(value = "Authorization", required = false) authorization: String?,
+        httpRequest: HttpServletRequest,
     ) {
-        authService.revokeSession(authorization, sessionId)
+        authService.revokeSession(authorization, sessionId, clientIp(httpRequest), httpRequest.getHeader("User-Agent"))
     }
 
     @DeleteMapping("/sessions")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     fun revokeAllSessions(
         @RequestHeader(value = "Authorization", required = false) authorization: String?,
+        httpRequest: HttpServletRequest,
     ) {
-        authService.revokeAllSessions(authorization)
+        authService.revokeAllSessions(authorization, clientIp(httpRequest), httpRequest.getHeader("User-Agent"))
     }
 
     private fun clientIp(request: HttpServletRequest): String {

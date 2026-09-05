@@ -1,0 +1,2 @@
+ALTER TABLE audit_events ALTER COLUMN actor_id DROP NOT NULL;
+ALTER TABLE audit_events ALTER COLUMN actor_email DROP NOT NULL;

@@ -15,6 +15,11 @@ const v = (id: string, label: string, effectiveDate: string | null = null): Vers
   languageCode: 'de',
   sourceUrl: null,
   gazetteReference: null,
+  provenance: 'imported',
+  verificationState: 'unverified',
+  verifiedBy: null,
+  verifiedAt: null,
+  latestPublished: false,
 });
 
 const constitution = (id: string, versions: VersionSummary[]): ConstitutionSummary => ({

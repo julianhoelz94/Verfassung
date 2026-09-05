@@ -13,6 +13,7 @@ import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.post
+import org.springframework.test.web.servlet.put
 import org.testcontainers.containers.PostgreSQLContainer
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
@@ -43,7 +44,12 @@ class CatalogApiTest {
                 jsonPath("$.constitutions[0].slug") { value("basic-law") }
                 jsonPath("$.constitutions[0].versions.length()") { value(2) }
                 jsonPath("$.constitutions[0].versions[0].versionLabel") { value("1949") }
+                jsonPath("$.constitutions[0].versions[0].provenance") { value("demo") }
+                jsonPath("$.constitutions[0].versions[0].verificationState") { value("unverified") }
+                jsonPath("$.constitutions[0].versions[0].latestPublished") { value(false) }
                 jsonPath("$.constitutions[0].versions[1].versionLabel") { value("2022") }
+                jsonPath("$.constitutions[0].versions[1].provenance") { value("demo") }
+                jsonPath("$.constitutions[0].versions[1].latestPublished") { value(true) }
                 jsonPath("$.constitutions[0].contentOutline.kinds.length()") { value(3) }
                 jsonPath("$.constitutions[0].contentOutline.kinds[0].kindCode") { value("article") }
                 jsonPath("$.constitutions[0].contentOutline.kinds[0].allowedChildKinds[0]") { value("paragraph") }
@@ -58,7 +64,41 @@ class CatalogApiTest {
                 jsonPath("$.kinds[1].kindCode") { value("paragraph") }
                 jsonPath("$.kinds[2].kindCode") { value("sentence") }
                 jsonPath("$.kinds[2].mayHoldChildren") { value(false) }
+                jsonPath("$.kinds[0].presentation") { value("section") }
+                jsonPath("$.kinds[0].showKind") { value(true) }
+                jsonPath("$.kinds[1].showLabel") { value(true) }
+                jsonPath("$.kinds[1].showTitle") { value(true) }
+                jsonPath("$.kinds[1].showKind") { value(false) }
+                jsonPath("$.kinds[2].presentation") { value("concatenated") }
             }
+    }
+
+    @Test
+    fun putOutlineReplacesLayers() {
+        mockMvc.put("/constitutions/01900000-0000-4000-8000-000000000002/content-outline") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """
+                {"kinds":[
+                  {"kindCode":"article","displayLabel":"Article","presentation":"section","showLabel":true,"showTitle":true,"showKind":true},
+                  {"kindCode":"paragraph","displayLabel":"Paragraph","presentation":"section","showLabel":true,"showTitle":false,"showKind":false}
+                ]}
+            """.trimIndent()
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.outline.kinds.length()") { value(2) }
+            jsonPath("$.outline.kinds[1].kindCode") { value("paragraph") }
+            jsonPath("$.versionIds.length()") { value(3) }
+        }
+        mockMvc.put("/constitutions/01900000-0000-4000-8000-000000000002/content-outline") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """
+                {"kinds":[
+                  {"kindCode":"article","displayLabel":"Article","presentation":"section","showLabel":true,"showTitle":true,"showKind":true},
+                  {"kindCode":"paragraph","displayLabel":"Paragraph","presentation":"section","showLabel":true,"showTitle":true,"showKind":false},
+                  {"kindCode":"sentence","displayLabel":"Sentence","presentation":"concatenated","showLabel":false,"showTitle":false,"showKind":false}
+                ]}
+            """.trimIndent()
+        }.andExpect { status { isOk() } }
     }
 
     @Test
@@ -117,6 +157,9 @@ class CatalogApiTest {
         mockMvc.get("/countries/FR").andExpect {
             status { isOk() }
             jsonPath("$.constitutions[0].versions[0].versionLabel") { value("1958") }
+            jsonPath("$.constitutions[0].versions[0].provenance") { value("imported") }
+            jsonPath("$.constitutions[0].versions[0].verificationState") { value("unverified") }
+            jsonPath("$.constitutions[0].versions[0].latestPublished") { value(true) }
         }
     }
 

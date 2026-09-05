@@ -13,6 +13,7 @@ import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.patch
+import org.springframework.test.web.servlet.post
 import org.springframework.test.web.servlet.put
 import org.testcontainers.containers.PostgreSQLContainer
 import org.testcontainers.junit.jupiter.Container
@@ -84,6 +85,8 @@ class ContentApiTest {
         }.andExpect {
             status { isOk() }
             jsonPath("$[0].body") { exists() }
+            jsonPath("$[0].children.length()") { value(2) }
+            jsonPath("$[0].children[0].kind") { value("paragraph") }
         }
     }
 
@@ -107,19 +110,19 @@ class ContentApiTest {
     }
 
     @Test
-    fun patchArticleUpdatesTextAndKeepsTree() {
+    fun patchTitleKeepsTreeWhenBodyUnchanged() {
         val original = objectMapper.readTree(
             mockMvc.get("/articles/01900000-0000-4000-8000-000000000201")
                 .andReturn().response.contentAsString,
         )
         mockMvc.patch("/articles/01900000-0000-4000-8000-000000000201") {
             contentType = MediaType.APPLICATION_JSON
-            content = """{"title":"Dignity","body":"Updated dignity text."}"""
+            content = """{"title":"Dignity","body":${objectMapper.writeValueAsString(original.get("body").asText())}}"""
         }.andExpect {
             status { isOk() }
             jsonPath("$.id") { value("01900000-0000-4000-8000-000000000201") }
             jsonPath("$.title") { value("Dignity") }
-            jsonPath("$.body") { value("Updated dignity text.") }
+            jsonPath("$.body") { value(original.get("body").asText()) }
             jsonPath("$.children.length()") { value(2) }
             jsonPath("$.children[0].kind") { value("paragraph") }
         }
@@ -127,6 +130,72 @@ class ContentApiTest {
             contentType = MediaType.APPLICATION_JSON
             content = """{"title":${objectMapper.writeValueAsString(original.get("title").asText())},"body":${objectMapper.writeValueAsString(original.get("body").asText())}}"""
         }.andExpect { status { isOk() } }
+    }
+
+    @Test
+    fun patchBodyReplacesTreeWithRootText() {
+        val original = objectMapper.readTree(
+            mockMvc.get("/articles/01900000-0000-4000-8000-000000000101")
+                .andReturn().response.contentAsString,
+        )
+        mockMvc.patch("/articles/01900000-0000-4000-8000-000000000101") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"title":"Dignity","body":"Updated dignity text."}"""
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.title") { value("Dignity") }
+            jsonPath("$.body") { value("Updated dignity text.") }
+            jsonPath("$.children.length()") { value(0) }
+        }
+        mockMvc.patch("/articles/01900000-0000-4000-8000-000000000101") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"title":${objectMapper.writeValueAsString(original.get("title").asText())},"body":${objectMapper.writeValueAsString(original.get("body").asText())}}"""
+        }.andExpect { status { isOk() } }
+        restore1949Article1Tree()
+    }
+
+    @Test
+    fun restructureMergesRemovedKindIntoParent() {
+        mockMvc.post("/versions/01900000-0000-4000-8000-000000000003/restructure") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"keepKinds":["article","paragraph"]}"""
+        }.andExpect {
+            status { isOk() }
+        }
+        mockMvc.get("/articles/01900000-0000-4000-8000-000000000101")
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.children.length()") { value(1) }
+                jsonPath("$.children[0].kind") { value("paragraph") }
+                jsonPath("$.children[0].children.length()") { value(0) }
+                jsonPath("$.children[0].body") { value("Human dignity shall be inviolable. To respect and protect it shall be the duty of all state authority.") }
+            }
+        restore1949Article1Tree()
+    }
+
+    @Test
+    fun patchNestedNodeTitle() {
+        mockMvc.patch("/nodes/01900000-0000-4000-8000-000000000121") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"title":"Dignity of the person"}"""
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.id") { value("01900000-0000-4000-8000-000000000121") }
+            jsonPath("$.kind") { value("paragraph") }
+            jsonPath("$.title") { value("Dignity of the person") }
+        }
+        mockMvc.get("/articles/01900000-0000-4000-8000-000000000101")
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.children[0].title") { value("Dignity of the person") }
+            }
+        mockMvc.patch("/nodes/01900000-0000-4000-8000-000000000121") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"title":""}"""
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.title") { value(null) }
+        }
     }
 
     @Test
@@ -182,6 +251,27 @@ class ContentApiTest {
 
     companion object {
         private val objectMapper = ObjectMapper()
+
+        private fun restore1949Article1Tree() {
+            postgres.createConnection("").use { connection ->
+                connection.createStatement().use { statement ->
+                    statement.execute(
+                        "DELETE FROM content_nodes WHERE parent_id = '01900000-0000-4000-8000-000000000101' OR parent_id = '01900000-0000-4000-8000-000000000121'",
+                    )
+                    statement.execute(
+                        """
+                        INSERT INTO content_nodes (id, version_id, kind, parent_id, label, number, title, body, sort_order) VALUES
+                          ('01900000-0000-4000-8000-000000000121', '01900000-0000-4000-8000-000000000003', 'paragraph', '01900000-0000-4000-8000-000000000101', '(1)', NULL, NULL, NULL, 1),
+                          ('01900000-0000-4000-8000-000000000122', '01900000-0000-4000-8000-000000000003', 'sentence', '01900000-0000-4000-8000-000000000121', '1', NULL, NULL, 'Human dignity shall be inviolable.', 1),
+                          ('01900000-0000-4000-8000-000000000123', '01900000-0000-4000-8000-000000000003', 'sentence', '01900000-0000-4000-8000-000000000121', '2', NULL, NULL, 'To respect and protect it shall be the duty of all state authority.', 2)
+                        """.trimIndent(),
+                    )
+                    statement.execute(
+                        "UPDATE content_nodes SET title = 'Human dignity', body = NULL WHERE id = '01900000-0000-4000-8000-000000000101'",
+                    )
+                }
+            }
+        }
 
         private fun assertJsonEquals(contractFile: String, actualJson: String) {
             val expected: JsonNode = objectMapper.readTree(

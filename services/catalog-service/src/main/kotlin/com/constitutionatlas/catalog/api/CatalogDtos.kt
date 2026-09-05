@@ -16,6 +16,11 @@ data class VersionSummary(
     val languageCode: String,
     val sourceUrl: String?,
     val gazetteReference: String?,
+    val provenance: String,
+    val verificationState: String,
+    val verifiedBy: String?,
+    val verifiedAt: java.time.OffsetDateTime?,
+    val latestPublished: Boolean = false,
 )
 
 data class NodeKindDto(
@@ -25,6 +30,10 @@ data class NodeKindDto(
     val mayHoldText: Boolean,
     val mayHoldChildren: Boolean,
     val allowedChildKinds: List<String>,
+    val presentation: String = "section",
+    val showLabel: Boolean = true,
+    val showTitle: Boolean = false,
+    val showKind: Boolean = false,
 )
 
 data class ContentOutlineDto(
@@ -54,6 +63,25 @@ data class CreateCountryRequest(
 data class CreateConstitutionRequest(
     val slug: String,
     val title: String,
+    val outline: List<OutlineKindWrite>? = null,
+)
+
+data class OutlineKindWrite(
+    val kindCode: String,
+    val displayLabel: String,
+    val presentation: String = "section",
+    val showLabel: Boolean = true,
+    val showTitle: Boolean = false,
+    val showKind: Boolean = false,
+)
+
+data class ContentOutlineWrite(
+    val kinds: List<OutlineKindWrite>,
+)
+
+data class OutlineUpdateResult(
+    val outline: ContentOutlineDto,
+    val versionIds: List<java.util.UUID>,
 )
 
 data class CreateVersionRequest(

@@ -10,7 +10,7 @@ describe('primaryNavLinks', () => {
 
   it('keeps public links and omits Editor for a signed-in viewer', () => {
     const links = primaryNavLinks({ email: 'viewer@example.local', roles: ['viewer'] });
-    expect(links.map((link) => link.href)).toEqual(['/', '/search']);
+    expect(links.map((link) => link.href)).toEqual(['/', '/search', '/account']);
   });
 
   it('shows Editor for editor, reviewer, and publisher', () => {
@@ -19,15 +19,31 @@ describe('primaryNavLinks', () => {
         '/',
         '/search',
         '/editor',
+        '/account',
       ]);
     }
   });
 
   it('shows every privileged destination for admin, including API docs when that page exists', () => {
     const withoutDocs = primaryNavLinks({ email: 'admin@example.local', roles: ['admin'] });
-    expect(withoutDocs.map((link) => link.href)).toEqual(['/', '/search', '/editor']);
+    expect(withoutDocs.map((link) => link.href)).toEqual([
+      '/',
+      '/search',
+      '/editor',
+      '/account',
+      '/admin/users',
+      '/admin/constitutions',
+    ]);
     const withDocs = primaryNavLinks({ email: 'admin@example.local', roles: ['admin'] }, true);
-    expect(withDocs.map((link) => link.href)).toEqual(['/', '/search', '/editor', '/api-docs']);
+    expect(withDocs.map((link) => link.href)).toEqual([
+      '/',
+      '/search',
+      '/editor',
+      '/account',
+      '/admin/users',
+      '/admin/constitutions',
+      '/api-docs',
+    ]);
   });
 });
 

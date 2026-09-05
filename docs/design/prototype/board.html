@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Device board — Constitution Atlas prototype</title>
+<style>
+  body { margin: 0; padding: 24px; background: #dedbd3; font-family: system-ui, sans-serif; color: #16201f; }
+  h1 { font-size: 18px; margin: 0 0 16px; font-weight: 600; }
+  .board { display: flex; gap: 24px; align-items: flex-start; }
+  .device { background: #16201f; border-radius: 22px; padding: 12px; box-shadow: 0 12px 40px rgba(0,0,0,.25); }
+  .device figcaption { color: #fff; font-size: 12px; text-align: center; padding: 8px 0 0; opacity: .8; }
+  .screen { overflow: hidden; border-radius: 12px; background: #fff; }
+  iframe { border: 0; display: block; transform-origin: 0 0; }
+  .phone .screen { width: 390px; height: 844px; }
+  .phone iframe { width: 390px; height: 844px; }
+  .tablet .screen { width: 492px; height: 708px; }
+  .tablet iframe { width: 820px; height: 1180px; transform: scale(.6); }
+  .desktop .screen { width: 720px; height: 450px; }
+  .desktop iframe { width: 1440px; height: 900px; transform: scale(.5); }
+</style>
+</head>
+<body>
+<h1 id="title">Prototype</h1>
+<div class="board">
+  <figure class="device phone"><div class="screen"><iframe id="f1" title="Phone 390px"></iframe></div><figcaption>Phone · 390 × 844</figcaption></figure>
+  <figure class="device tablet"><div class="screen"><iframe id="f2" title="Tablet 820px"></iframe></div><figcaption>Tablet · 820 × 1180 (60%)</figcaption></figure>
+  <figure class="device desktop"><div class="screen"><iframe id="f3" title="Desktop 1440px"></iframe></div><figcaption>Desktop · 1440 × 900 (50%)</figcaption></figure>
+</div>
+<script>
+  const page = new URLSearchParams(location.search).get('page') || 'home';
+  const src = page + '.html';
+  document.getElementById('title').textContent = 'Prototype · ' + page + '.html';
+  for (const id of ['f1', 'f2', 'f3']) document.getElementById(id).src = src;
+</script>
+</body>
+</html>

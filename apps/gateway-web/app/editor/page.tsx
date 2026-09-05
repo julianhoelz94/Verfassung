@@ -1,5 +1,7 @@
 import { redirect } from 'next/navigation';
+import { ConstitutionText } from '../components/ConstitutionText';
 import { PageMain } from '../components/PageMain';
+import { Alert, Button, Input, Select } from '../components/ui';
 import { getArticle, getCountry, listArticles, listCountries, type ArticleSummary, type CountryDetail, type CountrySummary } from '../../lib/api';
 import { getDraftPreview } from '../../lib/editor-api';
 import { currentUser } from '../../lib/session';
@@ -58,12 +60,19 @@ export default async function EditorPage({ searchParams }: EditorPageProps) {
     })),
   ) ?? [];
   const versionId = searchParams.versionId ?? session?.versionId ?? versions[0]?.id;
+  const selectedConstitution = country?.constitutions.find((constitution) =>
+    constitution.versions.some((version) => version.id === versionId),
+  );
   const articles: ArticleSummary[] = versionId ? ((await listArticles(versionId)) ?? []) : [];
   const selectedId = searchParams.articleId ?? articles[0]?.id;
   const selected = selectedId ? await getArticle(selectedId) : null;
   const draft = selected
     ? preview?.drafts?.find((item) => item.articleId === selected.id)
     : undefined;
+  const editorReturnTo =
+    versionId && searchParams.sessionId && selected
+      ? `/editor?versionId=${encodeURIComponent(versionId)}&sessionId=${encodeURIComponent(searchParams.sessionId)}&articleId=${encodeURIComponent(selected.id)}`
+      : '/editor';
 
   return (
     <PageMain>
@@ -71,33 +80,31 @@ export default async function EditorPage({ searchParams }: EditorPageProps) {
       <p>
         Signed in as {user.email}. Roles: {user.roles.join(', ')}.
       </p>
-      {searchParams.error ? <p role="alert">{searchParams.error}</p> : null}
-      {searchParams.saved ? <p role="status">Draft saved.</p> : null}
-      {searchParams.reviewed ? <p role="status">Submitted for review.</p> : null}
-      {searchParams.approved ? <p role="status">Review approved. A publisher can now publish.</p> : null}
-      {searchParams.published ? <p role="status">Published. Public article text for this version was updated.</p> : null}
+      {searchParams.error ? <Alert tone="error">{searchParams.error}</Alert> : null}
+      {searchParams.saved ? <Alert tone="success">Draft saved.</Alert> : null}
+      {searchParams.reviewed ? <Alert tone="success">Submitted for review.</Alert> : null}
+      {searchParams.approved ? <Alert tone="success">Review approved. A publisher can now publish.</Alert> : null}
+      {searchParams.published ? <Alert tone="success">Published. Public article text for this version was updated.</Alert> : null}
       {session ? <p>Session {session.id} is {session.status}.</p> : null}
 
       {canEdit && versions.length > 0 ? (
         <form action={openEditorAction}>
-          <label htmlFor="versionId">Version</label>{' '}
-          <select id="versionId" name="versionId" defaultValue={versionId}>
+          <Select id="versionId" name="versionId" label="Version" defaultValue={versionId}>
             {versions.map((version) => (
               <option key={version.id} value={version.id}>
                 {version.constitutionTitle} {version.versionLabel}
               </option>
             ))}
-          </select>{' '}
-          <button type="submit">Open session</button>
+          </Select>
+          <Button variant="primary">Open session</Button>
         </form>
       ) : null}
 
       {canReview || canPublish ? (
-        <form action={loadSessionAction} style={{ marginTop: 12 }}>
+        <form action={loadSessionAction} className="form-row">
           <input type="hidden" name="versionId" value={versionId ?? ''} />
-          <label htmlFor="loadSessionId">Session id</label>{' '}
-          <input id="loadSessionId" name="sessionId" defaultValue={searchParams.sessionId ?? ''} style={{ width: 320, padding: 8 }} />{' '}
-          <button type="submit">Load session</button>
+          <Input id="loadSessionId" name="sessionId" label="Session id" defaultValue={searchParams.sessionId ?? ''} />
+          <Button>Load session</Button>
         </form>
       ) : null}
 
@@ -118,44 +125,67 @@ export default async function EditorPage({ searchParams }: EditorPageProps) {
             ))}
           </ul>
           {selected && versionId && searchParams.sessionId && canEdit && session?.status === 'open' ? (
-            <ArticleEditor
-              sessionId={searchParams.sessionId}
-              versionId={versionId}
-              articleId={selected.id}
-              title={draft?.title ?? selected.title}
-              body={draft?.body ?? selected.body}
-            />
+            <>
+              <ArticleEditor
+                sessionId={searchParams.sessionId}
+                versionId={versionId}
+                articleId={selected.id}
+                title={draft?.title ?? selected.title}
+                body={draft?.body ?? selected.body}
+              />
+              {selected.children && selected.children.length > 0 ? (
+                <section>
+                  <h2>Section titles</h2>
+                  <p className="muted">Name nested layers such as paragraphs. Titles are stored on the published tree.</p>
+                  <ConstitutionText
+                    nodes={selected.children}
+                    showHeading={false}
+                    outline={selectedConstitution?.contentOutline}
+                    canEditTitles
+                    returnTo={editorReturnTo}
+                  />
+                </section>
+              ) : null}
+            </>
           ) : null}
           {selected && (!canEdit || session?.status !== 'open') ? (
             <section>
-              <h3>{draft?.title ?? selected.title}</h3>
-              <pre style={{ whiteSpace: 'pre-wrap', fontFamily: 'Georgia, serif' }}>
-                {draft?.body ?? selected.body}
-              </pre>
+              <ConstitutionText
+                article={{
+                  articleNumber: selected.articleNumber,
+                  title: draft?.title ?? selected.title,
+                  body: draft?.body ?? selected.body,
+                  children: draft ? undefined : selected.children,
+                }}
+                headingLevel="h3"
+                outline={selectedConstitution?.contentOutline}
+                canEditTitles
+                returnTo={editorReturnTo}
+              />
             </section>
           ) : null}
           {canEdit && session?.status === 'open' ? (
-            <form action={reviewAction} style={{ display: 'inline', marginRight: 12 }}>
+            <form action={reviewAction} className="form-row">
               <input type="hidden" name="sessionId" value={searchParams.sessionId} />
               <input type="hidden" name="versionId" value={versionId} />
               <input type="hidden" name="articleId" value={selectedId ?? ''} />
-              <button type="submit">Submit for review</button>
+              <Button>Submit for review</Button>
             </form>
           ) : null}
           {canReview && session?.status === 'reviewing' ? (
-            <form action={approveAction} style={{ display: 'inline', marginRight: 12 }}>
+            <form action={approveAction} className="form-row">
               <input type="hidden" name="sessionId" value={searchParams.sessionId} />
               <input type="hidden" name="versionId" value={versionId} />
               <input type="hidden" name="articleId" value={selectedId ?? ''} />
-              <button type="submit">Approve review</button>
+              <Button>Approve review</Button>
             </form>
           ) : null}
           {canPublish && session?.status === 'approved' ? (
-            <form action={publishAction} style={{ display: 'inline' }}>
+            <form action={publishAction} className="form-row">
               <input type="hidden" name="sessionId" value={searchParams.sessionId} />
               <input type="hidden" name="versionId" value={versionId} />
               <input type="hidden" name="articleId" value={selectedId ?? ''} />
-              <button type="submit">Publish</button>
+              <Button variant="primary">Publish</Button>
             </form>
           ) : null}
         </>

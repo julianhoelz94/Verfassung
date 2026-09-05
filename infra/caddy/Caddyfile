@@ -1,87 +1,90 @@
+# Swagger UI loads config from a root-absolute /v3/api-docs/swagger-config URL.
+# After strip_prefix the service would emit that host-root path, which Caddy
+# sends to gateway-web (404 HTML → "Failed to load remote configuration.").
+# X-Forwarded-Prefix makes springdoc prefix those URLs with /api/docs/<service>.
+(docs_upstream) {
+	uri strip_prefix /api/docs/{args[0]}
+	reverse_proxy {args[1]}:8080 {
+		header_up X-Forwarded-Prefix /api/docs/{args[0]}
+	}
+}
+
 :80 {
-  encode gzip
+	encode gzip
 
-  route /api/docs/catalog* {
-    uri strip_prefix /api/docs/catalog
-    reverse_proxy catalog-service:8080
-  }
+	route /api/docs/catalog* {
+		import docs_upstream catalog catalog-service
+	}
 
-  route /api/docs/content* {
-    uri strip_prefix /api/docs/content
-    reverse_proxy content-service:8080
-  }
+	route /api/docs/content* {
+		import docs_upstream content content-service
+	}
 
-  route /api/docs/amendment* {
-    uri strip_prefix /api/docs/amendment
-    reverse_proxy amendment-service:8080
-  }
+	route /api/docs/amendment* {
+		import docs_upstream amendment amendment-service
+	}
 
-  route /api/docs/identity* {
-    uri strip_prefix /api/docs/identity
-    reverse_proxy identity-service:8080
-  }
+	route /api/docs/identity* {
+		import docs_upstream identity identity-service
+	}
 
-  route /api/docs/editor* {
-    uri strip_prefix /api/docs/editor
-    reverse_proxy editor-service:8080
-  }
+	route /api/docs/editor* {
+		import docs_upstream editor editor-service
+	}
 
-  route /api/docs/search* {
-    uri strip_prefix /api/docs/search
-    reverse_proxy search-service:8080
-  }
+	route /api/docs/search* {
+		import docs_upstream search search-service
+	}
 
-  route /api/docs/ingestion* {
-    uri strip_prefix /api/docs/ingestion
-    reverse_proxy ingestion-service:8080
-  }
+	route /api/docs/ingestion* {
+		import docs_upstream ingestion ingestion-service
+	}
 
-  route /api/docs/audit* {
-    uri strip_prefix /api/docs/audit
-    reverse_proxy audit-service:8080
-  }
+	route /api/docs/audit* {
+		import docs_upstream audit audit-service
+	}
 
-  route /api/catalog* {
-    uri strip_prefix /api/catalog
-    reverse_proxy catalog-service:8080
-  }
+	route /api/catalog* {
+		uri strip_prefix /api/catalog
+		reverse_proxy catalog-service:8080
+	}
 
-  route /api/content* {
-    uri strip_prefix /api/content
-    reverse_proxy content-service:8080
-  }
+	route /api/content* {
+		uri strip_prefix /api/content
+		reverse_proxy content-service:8080
+	}
 
-  route /api/amendment* {
-    uri strip_prefix /api/amendment
-    reverse_proxy amendment-service:8080
-  }
+	route /api/amendment* {
+		uri strip_prefix /api/amendment
+		reverse_proxy amendment-service:8080
+	}
 
-  route /api/ingestion* {
-    uri strip_prefix /api/ingestion
-    reverse_proxy ingestion-service:8080
-  }
+	route /api/ingestion* {
+		uri strip_prefix /api/ingestion
+		reverse_proxy ingestion-service:8080
+	}
 
-  route /api/identity* {
-    uri strip_prefix /api/identity
-    reverse_proxy identity-service:8080
-  }
+	route /api/identity* {
+		uri strip_prefix /api/identity
+		reverse_proxy identity-service:8080
+	}
 
-  route /api/editor* {
-    uri strip_prefix /api/editor
-    reverse_proxy editor-service:8080
-  }
+	route /api/editor* {
+		uri strip_prefix /api/editor
+		reverse_proxy editor-service:8080
+	}
 
-  route /api/audit* {
-    uri strip_prefix /api/audit
-    reverse_proxy audit-service:8080
-  }
+	route /api/audit* {
+		uri strip_prefix /api/audit
+		reverse_proxy audit-service:8080
+	}
 
-  route /api/search* {
-    uri strip_prefix /api/search
-    reverse_proxy search-service:8080
-  }
+	route /api/search* {
+		uri strip_prefix /api/search
+		reverse_proxy search-service:8080
+	}
 
-  route {
-    reverse_proxy gateway-web:3000
-  }
+	route {
+		reverse_proxy gateway-web:3000
+	}
 }

@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Version reader — Constitution Atlas prototype</title>
+<link rel="stylesheet" href="prototype.css">
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to main content</a>
+
+<!-- Shell: signed-in viewer (no editorial role) -->
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="home.html"><span class="brand-mark" aria-hidden="true">§</span><span class="brand-name">Constitution Atlas</span></a>
+    <nav class="nav-primary" aria-label="Primary">
+      <a href="home.html" aria-current="page">Countries</a>
+      <a href="#">Search</a>
+      <a href="#">About</a>
+    </nav>
+    <div class="topbar-actions">
+      <form class="search-inline" role="search" action="#"><input type="search" name="q" placeholder="Search articles" aria-label="Search articles"></form>
+      <details class="menu">
+        <summary class="icon-btn" aria-label="Account and menu"><span class="avatar" aria-hidden="true">V</span></summary>
+        <div class="menu-panel">
+          <div class="menu-user">viewer@example.org<br><span class="badge">viewer</span></div>
+          <div class="menu-group nav-dup"><a href="home.html" aria-current="page">Countries</a><a href="#">Search</a><a href="#">About</a></div>
+          <div class="menu-group"><a href="#">Account</a><button type="button">Sign out</button></div>
+        </div>
+      </details>
+    </div>
+  </div>
+  <div class="search-row"><form role="search" action="#"><input type="search" name="q" placeholder="Search in this version" aria-label="Search in this version"><button class="btn btn-primary" type="submit">Search</button></form></div>
+</header>
+
+<main id="main" class="page">
+  <nav class="crumbs" aria-label="Breadcrumb"><ol><li><a href="home.html">Countries</a></li><li><a href="#">Germany</a></li><li aria-current="page">Basic Law · 2022</li></ol></nav>
+  <div class="page-header">
+    <div>
+      <p class="eyebrow">Germany · Basic Law for the Federal Republic of Germany</p>
+      <h1 class="page-title text">Version in force since 28 June 2022</h1>
+      <div class="page-meta"><span class="badge badge-accent">Latest</span><span class="badge badge-info">Imported · verified 12 Mar 2026</span><span>German</span><span>BGBl. I S. 968</span><a href="#">Source</a></div>
+    </div>
+    <div class="page-actions"><a class="btn" href="#">Timeline</a><a class="btn" href="compare.html">Compare with 1949</a><a class="btn btn-ghost" href="#">Print</a></div>
+  </div>
+
+  <div class="reader">
+    <aside class="reader-aside">
+      <nav class="toc" aria-label="Table of contents">
+        <h2>Contents</h2>
+        <ol>
+          <li><a href="#a1" aria-current="true">I. Basic Rights</a>
+            <ol style="padding-left: 12px;">
+              <li><a href="#a1">Art. 1 Human dignity</a></li><li><a href="#a2">Art. 2 Personal freedoms</a></li><li><a href="#">Art. 3 Equality</a></li><li><a href="#">Art. 4 Freedom of faith</a></li><li><a href="#">Art. 5 Freedom of expression</a></li>
+            </ol>
+          </li>
+          <li><a href="#">II. The Federation and the Länder</a></li>
+          <li><a href="#">III. The Bundestag</a></li>
+          <li><a href="#">IV. The Bundesrat</a></li>
+          <li><a href="#">V. The Federal President</a></li>
+        </ol>
+      </nav>
+    </aside>
+
+    <section>
+      <div class="toolbar" role="toolbar" aria-label="Reading options">
+        <button class="btn btn-sm toc-button" type="button">☰ Contents</button>
+        <div class="segmented" role="group" aria-label="Detail level">
+          <button type="button" aria-pressed="false">Articles</button>
+          <button type="button" aria-pressed="false">Paragraphs</button>
+          <button type="button" aria-pressed="true">Full text</button>
+        </div>
+        <span class="toolbar-spacer"></span>
+        <span class="muted" style="font-size: var(--text-sm);">146 articles</span>
+      </div>
+
+      <div class="text-column">
+        <article class="article" id="a1">
+          <div class="article-head"><span class="num">Art. 1</span><h2>Human dignity – Human rights – Legally binding force of basic rights</h2></div>
+          <div class="para"><span class="num">(1)</span><p>Human dignity shall be inviolable. To respect and protect it shall be the duty of all state authority.</p></div>
+          <div class="para"><span class="num">(2)</span><p>The German people therefore acknowledge inviolable and inalienable human rights as the basis of every community, of peace and of justice in the world.</p></div>
+          <div class="para"><span class="num">(3)</span><p>The following basic rights shall bind the legislature, the executive and the judiciary as directly applicable law.</p></div>
+          <div class="article-foot"><a href="#">Permalink</a><a href="#">History of Art. 1</a><span class="muted">Unchanged since 1949</span></div>
+        </article>
+        <article class="article" id="a2">
+          <div class="article-head"><span class="num">Art. 2</span><h2>Personal freedoms</h2></div>
+          <div class="para"><span class="num">(1)</span><p>Every person shall have the right to free development of his personality insofar as he does not violate the rights of others or offend against the constitutional order or the moral law.</p></div>
+          <div class="para"><span class="num">(2)</span><p>Every person shall have the right to life and physical integrity. Freedom of the person shall be inviolable. These rights may be interfered with only pursuant to a law.</p></div>
+          <div class="article-foot"><a href="#">Permalink</a><a href="#">History of Art. 2</a><span class="muted">Unchanged since 1949</span></div>
+        </article>
+        <article class="article">
+          <button class="article-toggle" type="button" aria-expanded="false"><span class="num" style="color: var(--color-accent-strong); font-family: var(--font-ui); font-size: var(--text-sm); font-weight: 600;">Art. 3</span><h2 style="font-family: var(--font-text); font-size: var(--text-xl); font-weight: 600;">Equality before the law</h2></button>
+        </article>
+        <article class="article">
+          <button class="article-toggle" type="button" aria-expanded="false"><span class="num" style="color: var(--color-accent-strong); font-family: var(--font-ui); font-size: var(--text-sm); font-weight: 600;">Art. 4</span><h2 style="font-family: var(--font-text); font-size: var(--text-xl); font-weight: 600;">Freedom of faith and conscience</h2></button>
+        </article>
+      </div>
+
+      <nav class="pager" aria-label="Sections"><a class="btn" href="#">← Preamble</a><a class="btn" href="#">II. The Federation and the Länder →</a></nav>
+    </section>
+  </div>
+</main>
+
+<footer class="footer"><div class="footer-inner"><span>Constitution Atlas · texts carry their own source and verification labels</span><span><a href="#">About</a> · <a href="#">Sources</a> · <a href="#">Accessibility</a></span></div></footer>
+</body>
+</html>

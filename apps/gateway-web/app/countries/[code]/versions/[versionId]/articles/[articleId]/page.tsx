@@ -1,15 +1,19 @@
 import { notFound } from 'next/navigation';
 import { Breadcrumbs } from '../../../../../../components/Breadcrumbs';
+import { ConstitutionText } from '../../../../../../components/ConstitutionText';
 import { PageMain } from '../../../../../../components/PageMain';
+import { PrintLink } from '../../../../../../components/PrintLink';
+import { Provenance } from '../../../../../../components/Provenance';
 import { ServiceUnavailable } from '../../../../../../components/StatusMessage';
 import {
   ApiUnavailableError,
   getArticle,
   getCountry,
   type ArticleDetail,
-  type ContentNode,
   type CountryDetail,
 } from '../../../../../../../lib/api';
+import { canVisitEditor } from '../../../../../../../lib/nav';
+import { currentUser } from '../../../../../../../lib/session';
 
 type ArticlePageProps = {
   params: { code: string; versionId: string; articleId: string };
@@ -41,6 +45,13 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
   }
 
   const permalink = `/countries/${country.isoCode}/versions/${params.versionId}/articles/${article.id}`;
+  const constitution = country.constitutions.find((item) =>
+    item.versions.some((itemVersion) => itemVersion.id === params.versionId),
+  );
+  const version = constitution?.versions.find((item) => item.id === params.versionId);
+  const user = await currentUser();
+  const canEditTitles = Boolean(user && canVisitEditor(user.roles));
+  const returnTo = `/countries/${country.isoCode}/versions/${params.versionId}/articles/${article.id}`;
 
   return (
     <PageMain>
@@ -53,40 +64,19 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
         ]}
       />
       <article>
-        <h1 id={`article-${article.articleNumber}`}>
-          Article {article.articleNumber}
-          {' — '}
-          {article.title}
-        </h1>
-        <p>
+        <div className="actions print-hide">
           <a href={`${permalink}#article-${article.articleNumber}`}>Permalink</a>
-        </p>
-        {article.children && article.children.length > 0 ? (
-          <NodeTree nodes={article.children} />
-        ) : (
-          <p>{article.body}</p>
-        )}
+          <PrintLink />
+        </div>
+        {version ? <Provenance version={version} /> : null}
+        <ConstitutionText
+          article={article}
+          nodes={article.children}
+          outline={constitution?.contentOutline}
+          canEditTitles={canEditTitles}
+          returnTo={returnTo}
+        />
       </article>
     </PageMain>
-  );
-}
-
-function NodeTree({ nodes }: { nodes: ContentNode[] }) {
-  return (
-    <div>
-      {nodes.map((node) => (
-        <section key={node.id} style={{ marginLeft: node.kind === 'article' ? 0 : 16, marginTop: 8 }}>
-          {node.label || node.title ? (
-            <p style={{ margin: 0, fontWeight: 600 }}>
-              {node.kind}
-              {node.label ? ` ${node.label}` : ''}
-              {node.title ? ` — ${node.title}` : ''}
-            </p>
-          ) : null}
-          {node.body ? <p style={{ margin: '4px 0' }}>{node.body}</p> : null}
-          {node.children.length > 0 ? <NodeTree nodes={node.children} /> : null}
-        </section>
-      ))}
-    </div>
   );
 }

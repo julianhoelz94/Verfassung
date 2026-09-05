@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Home — Constitution Atlas prototype</title>
+<link rel="stylesheet" href="prototype.css">
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to main content</a>
+
+<!-- Shell: anonymous visitor -->
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="home.html"><span class="brand-mark" aria-hidden="true">§</span><span class="brand-name">Constitution Atlas</span></a>
+    <nav class="nav-primary" aria-label="Primary">
+      <a href="home.html" aria-current="page">Countries</a>
+      <a href="#">Search</a>
+      <a href="#">About</a>
+    </nav>
+    <div class="topbar-actions">
+      <form class="search-inline" role="search" action="#"><input type="search" name="q" placeholder="Search articles" aria-label="Search articles"></form>
+      <a class="btn btn-sm" href="#">Log in</a>
+      <details class="menu">
+        <summary class="icon-btn" aria-label="Menu">☰</summary>
+        <div class="menu-panel">
+          <div class="menu-group nav-dup"><a href="home.html" aria-current="page">Countries</a><a href="#">Search</a><a href="#">About</a></div>
+          <div class="menu-group"><a href="#">Log in</a></div>
+        </div>
+      </details>
+    </div>
+  </div>
+  <div class="search-row"><form role="search" action="#"><input type="search" name="q" placeholder="Search published articles" aria-label="Search articles"><button class="btn btn-primary" type="submit">Search</button></form></div>
+</header>
+
+<main id="main" class="page">
+  <section class="hero">
+    <p class="eyebrow">Versioned constitutions</p>
+    <h1 class="page-title">Read a constitution as it stood on any date.</h1>
+    <p class="lede">Browse official texts by country and version, follow every amendment, and compare how a constitution changed over time.</p>
+    <form class="hero-search" role="search" action="#">
+      <input type="search" name="q" placeholder="Try “human dignity” or “Art. 20”" aria-label="Search published articles">
+      <button class="btn btn-primary" type="submit">Search</button>
+    </form>
+    <div class="stats">
+      <div><strong>2</strong>countries</div>
+      <div><strong>3</strong>published versions</div>
+      <div><strong>216</strong>articles</div>
+      <div><strong>31</strong>amendments recorded</div>
+    </div>
+  </section>
+
+  <h2 class="section-title">Countries</h2>
+  <div class="card-grid">
+    <article class="card country-card">
+      <div class="iso" aria-hidden="true">DE</div>
+      <div>
+        <h3 class="card-title"><a href="version.html">Germany</a></h3>
+        <p class="muted">Basic Law for the Federal Republic of Germany</p>
+        <div class="card-meta"><span class="badge badge-accent">Latest: 2022</span><span>2 versions</span><span>146 articles</span><span>German</span></div>
+        <div class="card-actions"><a class="btn btn-sm" href="version.html">Read latest</a><a class="btn btn-sm btn-ghost" href="compare.html">Compare 1949 → 2022</a></div>
+      </div>
+    </article>
+    <article class="card country-card">
+      <div class="iso" aria-hidden="true">US</div>
+      <div>
+        <h3 class="card-title"><a href="#">United States</a></h3>
+        <p class="muted">Constitution of the United States</p>
+        <div class="card-meta"><span class="badge badge-accent">Latest: 1992</span><span>1 version</span><span>7 articles, 27 amendments</span><span>English</span></div>
+        <div class="card-actions"><a class="btn btn-sm" href="#">Read latest</a><a class="btn btn-sm btn-ghost" href="#">Timeline</a></div>
+      </div>
+    </article>
+    <article class="card country-card" style="border-style: dashed; box-shadow: none;">
+      <div class="iso" aria-hidden="true">+</div>
+      <div>
+        <h3 class="card-title">More countries are being added</h3>
+        <p class="muted">Texts are imported from official sources and marked by verification state.</p>
+        <div class="card-meta"><span class="badge">Official</span><span class="badge badge-info">Imported</span><span class="badge badge-changed">Demo</span></div>
+      </div>
+    </article>
+  </div>
+
+  <h2 class="section-title">Recently changed</h2>
+  <div class="stack">
+    <div class="change-row"><span class="badge badge-changed">changed</span><a href="#">Art. 20a GG</a><span class="muted">Protection of the natural foundations of life and animals · 26 Jul 2002</span></div>
+    <div class="change-row"><span class="badge badge-added">added</span><a href="#">Art. 143h GG</a><span class="muted">Transitional provision · 28 Jun 2022</span></div>
+    <div class="change-row"><span class="badge badge-removed">removed</span><a href="#">Art. 23 GG (1949)</a><span class="muted">Scope of application · 23 Sep 1990</span></div>
+  </div>
+</main>
+
+<footer class="footer"><div class="footer-inner"><span>Constitution Atlas · texts carry their own source and verification labels</span><span><a href="#">About</a> · <a href="#">Sources</a> · <a href="#">Accessibility</a></span></div></footer>
+</body>
+</html>

@@ -56,7 +56,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
       <Breadcrumbs items={[{ href: '/', label: 'Countries' }, { label: 'Search' }]} />
       <h1>Search</h1>
       <form className="compare-form" action="/search" method="get">
-        <label htmlFor="search-q" style={{ flex: 1, minWidth: 200 }}>
+        <label htmlFor="search-q" className="flex-grow">
           Keyword
           <input
             id="search-q"
@@ -109,19 +109,19 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
       ) : null}
       {!error && query && hits.length === 0 ? <p>No articles match “{query}”.</p> : null}
       {!query ? <p className="lede">Enter a keyword to search published article text.</p> : null}
-      <ul style={{ listStyle: 'none', padding: 0 }}>
+      <ul className="search-hits">
         {hits.map((hit) => (
-          <li key={`${hit.articleId}-${hit.versionId}`} style={{ marginBottom: 16 }}>
+          <li key={`${hit.articleId}-${hit.versionId}`} className="search-hit">
             <a
               href={`/countries/${hit.countryCode}/versions/${hit.versionId}/articles/${hit.articleId}`}
             >
               Article {hit.articleNumber} — {hit.title}
             </a>
-            <p className="muted" style={{ margin: '4px 0 0' }}>
+            <p className="muted">
               {hit.constitutionTitle} · {hit.versionLabel}
               {hit.effectiveDate ? ` (${hit.effectiveDate})` : ''} · {hit.countryCode}
             </p>
-            <p className="muted" style={{ margin: '4px 0 0' }}>
+            <p className="muted">
               {hit.snippet}
             </p>
           </li>

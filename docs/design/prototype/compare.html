@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Compare — Constitution Atlas prototype</title>
+<link rel="stylesheet" href="prototype.css">
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to main content</a>
+
+<!-- Shell: anonymous visitor -->
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="home.html"><span class="brand-mark" aria-hidden="true">§</span><span class="brand-name">Constitution Atlas</span></a>
+    <nav class="nav-primary" aria-label="Primary">
+      <a href="home.html" aria-current="page">Countries</a>
+      <a href="#">Search</a>
+      <a href="#">About</a>
+    </nav>
+    <div class="topbar-actions">
+      <form class="search-inline" role="search" action="#"><input type="search" name="q" placeholder="Search articles" aria-label="Search articles"></form>
+      <a class="btn btn-sm" href="#">Log in</a>
+      <details class="menu">
+        <summary class="icon-btn" aria-label="Menu">☰</summary>
+        <div class="menu-panel">
+          <div class="menu-group nav-dup"><a href="home.html" aria-current="page">Countries</a><a href="#">Search</a><a href="#">About</a></div>
+          <div class="menu-group"><a href="#">Log in</a></div>
+        </div>
+      </details>
+    </div>
+  </div>
+</header>
+
+<main id="main" class="page">
+  <nav class="crumbs" aria-label="Breadcrumb"><ol><li><a href="home.html">Countries</a></li><li><a href="#">Germany</a></li><li aria-current="page">Compare</li></ol></nav>
+  <div class="page-header">
+    <div>
+      <p class="eyebrow">Germany · Basic Law</p>
+      <h1 class="page-title">Compare versions</h1>
+    </div>
+    <div class="page-actions"><a class="btn btn-ghost" href="#">Copy link</a><a class="btn btn-ghost" href="#">Print</a></div>
+  </div>
+
+  <form class="compare-bar" action="#">
+    <label>From<select name="from"><option>1949 · in force 23 May 1949</option><option>2022 · in force 28 Jun 2022</option></select></label>
+    <label>To<select name="to"><option>1949 · in force 23 May 1949</option><option selected>2022 · in force 28 Jun 2022</option></select></label>
+    <button class="btn btn-primary" type="submit">Compare</button>
+  </form>
+
+  <div class="compare-summary">
+    <span class="badge badge-changed">61 changed</span><span class="badge badge-added">42 added</span><span class="badge badge-removed">9 removed</span><span class="badge">1 amendment hop</span>
+    <span class="muted" style="font-size: var(--text-sm); align-self: center;">Only changed articles are shown. <a href="#">Show all 146</a></span>
+  </div>
+
+  <div class="tabs" role="tablist" aria-label="Compare view">
+    <button role="tab" aria-selected="true" type="button">Changes</button>
+    <button role="tab" aria-selected="false" type="button">1949</button>
+    <button role="tab" aria-selected="false" type="button">2022</button>
+  </div>
+
+  <details class="hop">
+    <summary><span class="badge badge-accent">Hop 1</span> 1949 → 2022 <span class="muted" style="font-weight: 400;">· 67 amending laws · last: BGBl. I S. 968 (28 Jun 2022)</span></summary>
+    <div class="stack" style="margin-top: var(--space-3);">
+      <div class="change-row"><span class="badge badge-changed">changed</span><a href="#">Art. 20a</a><span class="muted">Protection of the natural foundations of life · 27 Oct 1994, extended 26 Jul 2002</span></div>
+      <div class="change-row"><span class="badge badge-added">added</span><a href="#">Art. 23 (new)</a><span class="muted">European Union · 21 Dec 1992</span></div>
+      <div class="change-row"><span class="badge badge-removed">removed</span><a href="#">Art. 23 (1949)</a><span class="muted">Scope of application · 23 Sep 1990</span></div>
+    </div>
+  </details>
+
+  <h2 class="section-title" style="margin-top: var(--space-5);">Art. 20a · Protection of the natural foundations of life and animals</h2>
+  <div class="compare-grid">
+    <section class="compare-col is-hidden" aria-label="1949">
+      <div class="compare-col-head">1949 <span class="badge badge-removed" style="margin-left: 8px;">not present</span></div>
+      <div class="text-column"><p class="muted" style="font-family: var(--font-ui);">This article did not exist in the 1949 text.</p></div>
+    </section>
+    <section class="compare-col" aria-label="2022">
+      <div class="compare-col-head">2022 <span class="badge badge-added" style="margin-left: 8px;">added 1994 · changed 2002</span></div>
+      <div class="text-column">
+        <p>Mindful also of its responsibility towards future generations, the state shall protect the natural foundations of life <ins>and animals</ins> by legislation and, in accordance with law and justice, by executive and judicial action, all within the framework of the constitutional order.</p>
+      </div>
+    </section>
+  </div>
+
+  <h2 class="section-title">Art. 3 · Equality before the law</h2>
+  <div class="compare-grid">
+    <section class="compare-col is-hidden" aria-label="1949">
+      <div class="compare-col-head">1949</div>
+      <div class="text-column">
+        <div class="para"><span class="num">(2)</span><p>Men and women shall have equal rights.</p></div>
+        <div class="para"><span class="num">(3)</span><p>No person shall be favoured or disfavoured because of sex, parentage, race, language, homeland and origin, faith, or religious or political opinions.</p></div>
+      </div>
+    </section>
+    <section class="compare-col" aria-label="2022">
+      <div class="compare-col-head">2022 <span class="badge badge-changed" style="margin-left: 8px;">changed 1994</span></div>
+      <div class="text-column">
+        <div class="para"><span class="num">(2)</span><p>Men and women shall have equal rights. <ins>The state shall promote the actual implementation of equal rights for women and men and take steps to eliminate disadvantages that now exist.</ins></p></div>
+        <div class="para"><span class="num">(3)</span><p>No person shall be favoured or disfavoured because of sex, parentage, race, language, homeland and origin, faith, or religious or political opinions. <ins>No person shall be disfavoured because of disability.</ins></p></div>
+      </div>
+    </section>
+  </div>
+</main>
+
+<footer class="footer"><div class="footer-inner"><span>Constitution Atlas · texts carry their own source and verification labels</span><span><a href="#">About</a> · <a href="#">Sources</a> · <a href="#">Accessibility</a></span></div></footer>
+</body>
+</html>

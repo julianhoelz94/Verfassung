@@ -17,6 +17,10 @@ export function canVisitEditor(roles: string[]): boolean {
   return roles.includes('admin') || roles.includes('editor') || roles.includes('reviewer') || roles.includes('publisher');
 }
 
+export function canVisitAdmin(roles: string[]): boolean {
+  return roles.includes('admin');
+}
+
 export function canVisitApiDocs(roles: string[]): boolean {
   return roles.includes('admin');
 }
@@ -29,6 +33,11 @@ export function primaryNavLinks(user: NavUser | null, apiDocsAvailable = false):
   }
   if (canVisitEditor(user.roles)) {
     links.push({ href: '/editor', label: 'Editor' });
+  }
+  links.push({ href: '/account', label: 'Account' });
+  if (canVisitAdmin(user.roles)) {
+    links.push({ href: '/admin/users', label: 'Users' });
+    links.push({ href: '/admin/constitutions', label: 'Outlines' });
   }
   if (apiDocsAvailable && canVisitApiDocs(user.roles)) {
     links.push({ href: '/api-docs', label: 'API docs' });

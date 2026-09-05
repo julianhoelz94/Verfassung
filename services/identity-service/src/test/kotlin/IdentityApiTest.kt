@@ -1,11 +1,16 @@
 import com.constitutionatlas.identity.IdentityServiceApplication
+import com.constitutionatlas.identity.client.AuditClient
+import com.constitutionatlas.identity.client.AuthAudit
+import com.constitutionatlas.identity.service.AccountService
 import com.constitutionatlas.identity.service.IdentitySeedRunner
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.junit.jupiter.api.Test
+import org.mockito.Mockito
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.DefaultApplicationArguments
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.boot.test.mock.mockito.MockBean
 import org.springframework.http.MediaType
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.context.ActiveProfiles
@@ -15,6 +20,7 @@ import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.delete
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.post
+import org.springframework.test.web.servlet.put
 import org.testcontainers.containers.PostgreSQLContainer
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
@@ -33,6 +39,15 @@ class IdentityApiTest {
 
     @Autowired
     lateinit var identitySeedRunner: IdentitySeedRunner
+
+    @Autowired
+    lateinit var accountService: AccountService
+
+    @Autowired
+    lateinit var authAudit: AuthAudit
+
+    @MockBean
+    lateinit var auditClient: AuditClient
 
     private val objectMapper = ObjectMapper()
 
@@ -205,6 +220,8 @@ class IdentityApiTest {
             jsonPath("$.paths./me.get") { exists() }
             jsonPath("$.paths./logout.post") { exists() }
             jsonPath("$.components.securitySchemes.bearer-session.scheme") { value("bearer") }
+            jsonPath("$.paths./users/invites.post") { exists() }
+            jsonPath("$.paths./password/reset.post") { exists() }
         }
     }
 
@@ -230,6 +247,254 @@ class IdentityApiTest {
         }.andExpect { status { isUnauthorized() } }
     }
 
+    @Test
+    fun noPublicSelfRegistration() {
+        mockMvc.post("/register") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"email":"new@example.local","password":"not-a-public-password"}"""
+        }.andExpect { status { isNotFound() } }
+        mockMvc.post("/users/invites") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"email":"new@example.local","roles":["viewer"]}"""
+        }.andExpect { status { isUnauthorized() } }
+    }
+
+    @Test
+    fun editorCannotListUsers() {
+        val token = login("local-editor@example.local", "change-me")
+        mockMvc.get("/users") {
+            header("Authorization", "Bearer $token")
+        }.andExpect { status { isForbidden() } }
+    }
+
+    @Test
+    fun adminCanInviteActivateDisableAndInspect() {
+        val admin = login("local-admin@example.local", "change-me")
+        val email = "invitee-${System.nanoTime()}@example.local"
+        val created =
+            mockMvc.post("/users/invites") {
+                header("Authorization", "Bearer $admin")
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"email":"$email","roles":["editor"]}"""
+            }.andExpect {
+                status { isCreated() }
+                jsonPath("$.user.email") { value(email) }
+                jsonPath("$.user.status") { value("invited") }
+                jsonPath("$.user.enabled") { value(false) }
+                jsonPath("$.inviteToken") { exists() }
+            }.andReturn().response.contentAsString
+        val inviteToken = Regex("\"inviteToken\":\"([^\"]+)\"").find(created)!!.groupValues[1]
+        val userId = Regex("\"id\":\"([^\"]+)\"").find(created)!!.groupValues[1]
+        mockMvc.post("/invites/accept") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"token":"$inviteToken","password":"not-a-common-pass"}"""
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.status") { value("active") }
+            jsonPath("$.enabled") { value(true) }
+        }
+        val member = login(email, "not-a-common-pass")
+        mockMvc.get("/users/$userId") {
+            header("Authorization", "Bearer $admin")
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.roles[0]") { value("editor") }
+        }
+        mockMvc.post("/users/$userId/disable") {
+            header("Authorization", "Bearer $admin")
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.status") { value("disabled") }
+        }
+        mockMvc.get("/me") {
+            header("Authorization", "Bearer $member")
+        }.andExpect { status { isUnauthorized() } }
+        mockMvc.post("/login") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"email":"$email","password":"not-a-common-pass"}"""
+        }.andExpect { status { isUnauthorized() } }
+        mockMvc.post("/users/$userId/enable") {
+            header("Authorization", "Bearer $admin")
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.enabled") { value(true) }
+        }
+        mockMvc.put("/users/$userId/roles") {
+            header("Authorization", "Bearer $admin")
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"roles":["reviewer"]}"""
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.roles[0]") { value("reviewer") }
+        }
+    }
+
+    @Test
+    fun passwordChangeAndResetRevokeSessionsAndHideAccountExistence() {
+        val admin = login("local-admin@example.local", "change-me")
+        val email = "reset-${System.nanoTime()}@example.local"
+        val created =
+            mockMvc.post("/users/invites") {
+                header("Authorization", "Bearer $admin")
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"email":"$email","roles":["viewer"]}"""
+            }.andExpect { status { isCreated() } }.andReturn().response.contentAsString
+        val inviteToken = Regex("\"inviteToken\":\"([^\"]+)\"").find(created)!!.groupValues[1]
+        mockMvc.post("/invites/accept") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"token":"$inviteToken","password":"not-a-common-pass"}"""
+        }.andExpect { status { isOk() } }
+        mockMvc.post("/invites/accept") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"token":"$inviteToken","password":"password1234"}"""
+        }.andExpect { status { isBadRequest() } }
+        val token = login(email, "not-a-common-pass")
+        mockMvc.post("/password/change") {
+            header("Authorization", "Bearer $token")
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"currentPassword":"not-a-common-pass","newPassword":"fresh-stable-phrase"}"""
+        }.andExpect { status { isNoContent() } }
+        login(email, "fresh-stable-phrase")
+        val unknown =
+            mockMvc.post("/password/reset") {
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"email":"missing-${System.nanoTime()}@example.local"}"""
+            }.andExpect { status { isNoContent() } }.andReturn().response.contentAsString
+        val known =
+            mockMvc.post("/password/reset") {
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"email":"$email"}"""
+            }.andExpect { status { isNoContent() } }.andReturn().response.contentAsString
+        check(unknown == known)
+        val resetToken = "reset-token-${System.nanoTime()}-aaaa"
+        val userId = jdbcTemplate.queryForObject("SELECT id FROM users WHERE email = ?", java.util.UUID::class.java, email)
+        jdbcTemplate.update(
+            """
+            INSERT INTO password_resets (id, user_id, token_hash, expires_at)
+            VALUES (?, ?, ?, NOW() + INTERVAL '1 hour')
+            """.trimIndent(),
+            java.util.UUID.randomUUID(),
+            userId,
+            accountService.hashToken(resetToken),
+        )
+        val session = login(email, "fresh-stable-phrase")
+        mockMvc.post("/password/reset/confirm") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"token":"$resetToken","newPassword":"after-reset-phrase"}"""
+        }.andExpect { status { isNoContent() } }
+        mockMvc.get("/me") {
+            header("Authorization", "Bearer $session")
+        }.andExpect { status { isUnauthorized() } }
+        login(email, "after-reset-phrase")
+    }
+
+    @Test
+    fun authenticationEventsAreAuditedWithoutSecrets() {
+        login("local-editor@example.local", "change-me")
+        val afterLogin =
+            Mockito.mockingDetails(auditClient).invocations.map { invocation ->
+                invocation.arguments[0] as String
+            }
+        check(afterLogin.contains("login_succeeded"))
+        authAudit.recordMfaChange(
+            java.util.UUID.fromString("01900000-0000-4000-8000-000000000410"),
+            "local-editor@example.local",
+            "127.0.0.1",
+            "JUnit",
+        )
+        val payloads =
+            Mockito.mockingDetails(auditClient).invocations.map { invocation ->
+                invocation.arguments.joinToString(" ")
+            }
+        check(Mockito.mockingDetails(auditClient).invocations.any { it.arguments[0] == "mfa_changed" })
+        check(payloads.none { it.contains("change-me") })
+    }
+
+    @Test
+    fun commonPasswordIsRejectedOnInviteAccept() {
+        val admin = login("local-admin@example.local", "change-me")
+        val email = "weak-${System.nanoTime()}@example.local"
+        val created =
+            mockMvc.post("/users/invites") {
+                header("Authorization", "Bearer $admin")
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"email":"$email","roles":["viewer"]}"""
+            }.andExpect { status { isCreated() } }.andReturn().response.contentAsString
+        val inviteToken = Regex("\"inviteToken\":\"([^\"]+)\"").find(created)!!.groupValues[1]
+        mockMvc.post("/invites/accept") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"token":"$inviteToken","password":"change-me"}"""
+        }.andExpect { status { isBadRequest() } }
+    }
+
+    @Test
+    fun cannotEnableInvitedUserOrStripOwnAdminRole() {
+        val admin = login("local-admin@example.local", "change-me")
+        val email = "pending-${System.nanoTime()}@example.local"
+        val created =
+            mockMvc.post("/users/invites") {
+                header("Authorization", "Bearer $admin")
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"email":"$email","roles":["viewer"]}"""
+            }.andExpect { status { isCreated() } }.andReturn().response.contentAsString
+        val userId = Regex("\"id\":\"([^\"]+)\"").find(created)!!.groupValues[1]
+        mockMvc.post("/users/$userId/enable") {
+            header("Authorization", "Bearer $admin")
+        }.andExpect { status { isBadRequest() } }
+        val resent =
+            mockMvc.post("/users/invites") {
+                header("Authorization", "Bearer $admin")
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"email":"$email","roles":["editor"]}"""
+            }.andExpect {
+                status { isCreated() }
+                jsonPath("$.user.status") { value("invited") }
+                jsonPath("$.inviteToken") { exists() }
+            }.andReturn().response.contentAsString
+        check(Regex("\"inviteToken\":\"([^\"]+)\"").find(resent)!!.groupValues[1].isNotBlank())
+        val me =
+            mockMvc.get("/me") {
+                header("Authorization", "Bearer $admin")
+            }.andExpect { status { isOk() } }.andReturn().response.contentAsString
+        val adminId = Regex("\"id\":\"([^\"]+)\"").find(me)!!.groupValues[1]
+        mockMvc.put("/users/$adminId/roles") {
+            header("Authorization", "Bearer $admin")
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"roles":["viewer"]}"""
+        }.andExpect { status { isBadRequest() } }
+    }
+
+    @Test
+    fun adminCanIssueResetTokenForDelivery() {
+        val admin = login("local-admin@example.local", "change-me")
+        val email = "issued-reset-${System.nanoTime()}@example.local"
+        val created =
+            mockMvc.post("/users/invites") {
+                header("Authorization", "Bearer $admin")
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"email":"$email","roles":["viewer"]}"""
+            }.andExpect { status { isCreated() } }.andReturn().response.contentAsString
+        val inviteToken = Regex("\"inviteToken\":\"([^\"]+)\"").find(created)!!.groupValues[1]
+        val userId = Regex("\"id\":\"([^\"]+)\"").find(created)!!.groupValues[1]
+        mockMvc.post("/invites/accept") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"token":"$inviteToken","password":"not-a-common-pass"}"""
+        }.andExpect { status { isOk() } }
+        val issued =
+            mockMvc.post("/users/$userId/password-resets") {
+                header("Authorization", "Bearer $admin")
+            }.andExpect {
+                status { isCreated() }
+                jsonPath("$.resetToken") { exists() }
+            }.andReturn().response.contentAsString
+        val resetToken = Regex("\"resetToken\":\"([^\"]+)\"").find(issued)!!.groupValues[1]
+        mockMvc.post("/password/reset/confirm") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"token":"$resetToken","newPassword":"after-admin-reset-phrase"}"""
+        }.andExpect { status { isNoContent() } }
+        login(email, "after-admin-reset-phrase")
+    }
+
     private fun hashFor(email: String): String =
         jdbcTemplate.queryForObject(
             "SELECT password_hash FROM users WHERE email = ?",
@@ -250,24 +515,16 @@ class IdentityApiTest {
             email,
         )
 
-    private fun login(email: String, password: String): String {
-        val expectedRole = when (email) {
-            "local-reviewer@example.local" -> "reviewer"
-            "local-publisher@example.local" -> "publisher"
-            else -> "editor"
-        }
-        return mockMvc.post("/login") {
-            contentType = MediaType.APPLICATION_JSON
-            content = """{"email":"$email","password":"$password"}"""
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.user.email") { value(email) }
-            jsonPath("$.user.roles[0]") { value(expectedRole) }
-            jsonPath("$.token") { exists() }
-            jsonPath("$.expiresInSeconds") { exists() }
-        }.andReturn().response.contentAsString.let {
-            Regex("\"token\":\"([^\"]+)\"").find(it)!!.groupValues[1]
-        }
+    private fun login(email: String, password: String): String = mockMvc.post("/login") {
+        contentType = MediaType.APPLICATION_JSON
+        content = """{"email":"$email","password":"$password"}"""
+    }.andExpect {
+        status { isOk() }
+        jsonPath("$.user.email") { value(email) }
+        jsonPath("$.token") { exists() }
+        jsonPath("$.expiresInSeconds") { exists() }
+    }.andReturn().response.contentAsString.let {
+        Regex("\"token\":\"([^\"]+)\"").find(it)!!.groupValues[1]
     }
 
     companion object {

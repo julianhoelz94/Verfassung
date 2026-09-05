@@ -11,6 +11,7 @@ data class ArticleSummary(
     val title: String,
     val sortOrder: Int,
     val body: String? = null,
+    val children: List<ContentNodeDto>? = null,
 )
 
 data class ContentNodeDto(
@@ -45,4 +46,12 @@ data class ArticleWrite(
 data class ArticlePatch(
     val title: String,
     val body: String,
+)
+
+data class RestructureRequest(
+    val keepKinds: List<String>,
+)
+
+data class NodePatch(
+    val title: String? = null,
 )

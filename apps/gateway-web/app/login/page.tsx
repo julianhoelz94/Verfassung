@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation';
+import { Alert, Button, Card, Input } from '../components/ui';
 import { PageMain } from '../components/PageMain';
 import { canVisitEditor } from '../../lib/nav';
 import { currentUser } from '../../lib/session';
@@ -17,46 +18,43 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   return (
     <PageMain>
       <h1>Log in</h1>
-      <p>
+      <p className="lede">
         Use a seeded local account. local-editor@example.local can edit, review, and publish. Dedicated
         reviewer and publisher accounts exist for separated duties.
       </p>
       {searchParams.error ? (
-        <p id="login-error" role="alert" aria-live="assertive">
-          Invalid email or password.
-        </p>
+        <Alert tone="error">
+          <span id="login-error">Invalid email or password.</span>
+        </Alert>
       ) : null}
-      <form action={loginAction}>
-        <p>
-          <label htmlFor="email">Email</label>
-          <br />
-          <input
+      <Card>
+        <form action={loginAction}>
+          <Input
+            label="Email"
             id="email"
             name="email"
             type="email"
             required
             aria-required="true"
             autoComplete="username"
-            style={{ width: '100%', padding: 8 }}
             aria-invalid={searchParams.error ? true : undefined}
             aria-describedby={searchParams.error ? 'login-error' : undefined}
           />
-        </p>
-        <p>
-          <label htmlFor="password">Password</label>
-          <br />
-          <input
+          <Input
+            label="Password"
             id="password"
             name="password"
             type="password"
             required
             aria-required="true"
             autoComplete="current-password"
-            style={{ width: '100%', padding: 8 }}
           />
-        </p>
-        <button type="submit">Sign in</button>
-      </form>
+          <Button variant="primary">Sign in</Button>
+        </form>
+      </Card>
+      <p>
+        <a href="/reset">Forgot password</a>
+      </p>
     </PageMain>
   );
 }

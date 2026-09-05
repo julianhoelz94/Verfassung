@@ -7,6 +7,11 @@ export type VersionSummary = {
   languageCode: string;
   sourceUrl: string | null;
   gazetteReference: string | null;
+  provenance: string;
+  verificationState: string;
+  verifiedBy: string | null;
+  verifiedAt: string | null;
+  latestPublished: boolean;
 };
 
 export type ContentNode = {
@@ -39,6 +44,10 @@ export type ContentOutline = {
     mayHoldText: boolean;
     mayHoldChildren: boolean;
     allowedChildKinds: string[];
+    presentation: string;
+    showLabel: boolean;
+    showTitle: boolean;
+    showKind: boolean;
   }[];
 };
 
@@ -70,6 +79,7 @@ export type ArticleSummary = {
   title: string;
   sortOrder: number;
   body?: string | null;
+  children?: ContentNode[];
 };
 
 export type AmendmentChange = {
@@ -286,6 +296,97 @@ export function getArticle(articleId: string): Promise<ArticleDetail | null> {
   return readJson<ArticleDetail>(
     `${contentBaseUrl()}/articles/${encodeURIComponent(articleId)}`,
     'content',
+  );
+}
+
+export function patchContentNode(nodeId: string, title: string): Promise<ContentNode> {
+  return sendJson<ContentNode>(
+    `${contentBaseUrl()}/nodes/${encodeURIComponent(nodeId)}`,
+    'content',
+    'PATCH',
+    { title },
+  );
+}
+
+export type OutlineKindWrite = {
+  kindCode: string;
+  displayLabel: string;
+  presentation: 'section' | 'concatenated';
+  showLabel: boolean;
+  showTitle: boolean;
+  showKind: boolean;
+};
+
+export type OutlineUpdateResult = {
+  outline: ContentOutline;
+  versionIds: string[];
+};
+
+async function sendJson<T>(url: string, service: string, method: string, body: unknown): Promise<T> {
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method,
+      cache: 'no-store',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  } catch {
+    throw new ApiUnavailableError(service);
+  }
+  if (!response.ok) {
+    throw new ApiUnavailableError(service);
+  }
+  return (await response.json()) as T;
+}
+
+export function putContentOutline(
+  constitutionId: string,
+  kinds: OutlineKindWrite[],
+): Promise<OutlineUpdateResult> {
+  return sendJson<OutlineUpdateResult>(
+    `${catalogBaseUrl()}/constitutions/${encodeURIComponent(constitutionId)}/content-outline`,
+    'catalog',
+    'PUT',
+    { kinds },
+  );
+}
+
+export async function restructureVersion(versionId: string, keepKinds: string[]): Promise<void> {
+  await sendJson<{ absorbed: number }>(
+    `${contentBaseUrl()}/versions/${encodeURIComponent(versionId)}/restructure`,
+    'content',
+    'POST',
+    { keepKinds },
+  );
+}
+
+export async function createCountry(isoCode: string, name: string): Promise<CountrySummary> {
+  return sendJson<CountrySummary>(`${catalogBaseUrl()}/countries`, 'catalog', 'POST', {
+    isoCode,
+    name,
+  });
+}
+
+export async function ensureCountry(isoCode: string, name: string): Promise<void> {
+  const existing = await getCountry(isoCode);
+  if (existing) {
+    return;
+  }
+  await createCountry(isoCode, name);
+}
+
+export async function createConstitution(
+  isoCode: string,
+  slug: string,
+  title: string,
+  outline?: OutlineKindWrite[],
+): Promise<ConstitutionSummary> {
+  return sendJson<ConstitutionSummary>(
+    `${catalogBaseUrl()}/countries/${encodeURIComponent(isoCode)}/constitutions`,
+    'catalog',
+    'POST',
+    { slug, title, outline },
   );
 }
 

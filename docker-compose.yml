@@ -39,6 +39,7 @@ services:
     build: ./services/catalog-service
     environment:
       - SPRING_PROFILES_ACTIVE=${PROFILE:-local-stack}
+      - SERVER_FORWARD_HEADERS_STRATEGY=framework
       - SPRING_DATASOURCE_URL=jdbc:postgresql://catalog-db:5432/catalog_db
       - SPRING_DATASOURCE_USERNAME=postgres
       - SPRING_DATASOURCE_PASSWORD=postgres
@@ -50,6 +51,7 @@ services:
     build: ./services/content-service
     environment:
       - SPRING_PROFILES_ACTIVE=${PROFILE:-local-stack}
+      - SERVER_FORWARD_HEADERS_STRATEGY=framework
       - SPRING_DATASOURCE_URL=jdbc:postgresql://content-db:5432/content_db
       - SPRING_DATASOURCE_USERNAME=postgres
       - SPRING_DATASOURCE_PASSWORD=postgres
@@ -61,6 +63,7 @@ services:
     build: ./services/amendment-service
     environment:
       - SPRING_PROFILES_ACTIVE=${PROFILE:-local-stack}
+      - SERVER_FORWARD_HEADERS_STRATEGY=framework
       - SPRING_DATASOURCE_URL=jdbc:postgresql://amendment-db:5432/amendment_db
       - SPRING_DATASOURCE_USERNAME=postgres
       - SPRING_DATASOURCE_PASSWORD=postgres
@@ -75,6 +78,7 @@ services:
       - SPRING_DATASOURCE_URL=jdbc:postgresql://identity-db:5432/identity_db
       - SPRING_DATASOURCE_USERNAME=postgres
       - SPRING_DATASOURCE_PASSWORD=postgres
+      - SERVER_FORWARD_HEADERS_STRATEGY=framework
       - LOCAL_EDITOR_EMAIL=${LOCAL_EDITOR_EMAIL:-local-editor@example.local}
       - LOCAL_EDITOR_PASSWORD=${LOCAL_EDITOR_PASSWORD:-change-me}
       - LOCAL_REVIEWER_EMAIL=${LOCAL_REVIEWER_EMAIL:-local-reviewer@example.local}
@@ -85,6 +89,7 @@ services:
       - LOCAL_ADMIN_PASSWORD=${LOCAL_ADMIN_PASSWORD:-change-me}
       - LOCAL_VIEWER_EMAIL=${LOCAL_VIEWER_EMAIL:-local-viewer@example.local}
       - LOCAL_VIEWER_PASSWORD=${LOCAL_VIEWER_PASSWORD:-change-me}
+      - AUDIT_API_URL=http://audit-service:8080
       - CI_EDITOR_EMAIL=${CI_EDITOR_EMAIL:-}
       - CI_EDITOR_PASSWORD=${CI_EDITOR_PASSWORD:-}
       - CI_REVIEWER_EMAIL=${CI_REVIEWER_EMAIL:-}
@@ -118,6 +123,8 @@ services:
     depends_on:
       identity-db:
         condition: service_healthy
+      audit-service:
+        condition: service_started
 
   editor-service:
     build: ./services/editor-service
@@ -126,6 +133,7 @@ services:
       - SPRING_DATASOURCE_URL=jdbc:postgresql://editor-db:5432/editor_db
       - SPRING_DATASOURCE_USERNAME=postgres
       - SPRING_DATASOURCE_PASSWORD=postgres
+      - SERVER_FORWARD_HEADERS_STRATEGY=framework
       - IDENTITY_API_URL=http://identity-service:8080
       - AUDIT_API_URL=http://audit-service:8080
       - CONTENT_API_URL=http://content-service:8080
@@ -147,6 +155,7 @@ services:
     build: ./services/audit-service
     environment:
       - SPRING_PROFILES_ACTIVE=${PROFILE:-local-stack}
+      - SERVER_FORWARD_HEADERS_STRATEGY=framework
       - SPRING_DATASOURCE_URL=jdbc:postgresql://audit-db:5432/audit_db
       - SPRING_DATASOURCE_USERNAME=postgres
       - SPRING_DATASOURCE_PASSWORD=postgres
@@ -161,6 +170,7 @@ services:
       - SPRING_DATASOURCE_URL=jdbc:postgresql://ingestion-db:5432/ingestion_db
       - SPRING_DATASOURCE_USERNAME=postgres
       - SPRING_DATASOURCE_PASSWORD=postgres
+      - SERVER_FORWARD_HEADERS_STRATEGY=framework
       - CATALOG_API_URL=http://catalog-service:8080
       - CONTENT_API_URL=http://content-service:8080
     depends_on:
@@ -178,6 +188,7 @@ services:
       - SPRING_DATASOURCE_URL=jdbc:postgresql://search-db:5432/search_db
       - SPRING_DATASOURCE_USERNAME=postgres
       - SPRING_DATASOURCE_PASSWORD=postgres
+      - SERVER_FORWARD_HEADERS_STRATEGY=framework
       - CATALOG_API_URL=http://catalog-service:8080
       - CONTENT_API_URL=http://content-service:8080
       - SEARCH_REINDEX_ON_STARTUP=true

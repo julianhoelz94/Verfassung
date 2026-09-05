@@ -14,7 +14,12 @@
           "effectiveDate": "1949-05-23",
           "languageCode": "en",
           "sourceUrl": "https://www.gesetze-im-internet.de/gg/",
-          "gazetteReference": "BGBl. 1949"
+          "gazetteReference": "BGBl. 1949",
+          "provenance": "demo",
+          "verificationState": "unverified",
+          "verifiedBy": null,
+          "verifiedAt": null,
+          "latestPublished": false
         },
         {
           "id": "01900000-0000-4000-8000-000000000004",
@@ -22,7 +27,12 @@
           "effectiveDate": "2022-12-19",
           "languageCode": "en",
           "sourceUrl": "https://www.gesetze-im-internet.de/gg/",
-          "gazetteReference": "BGBl. I 2022"
+          "gazetteReference": "BGBl. I 2022",
+          "provenance": "demo",
+          "verificationState": "unverified",
+          "verifiedBy": null,
+          "verifiedAt": null,
+          "latestPublished": true
         }
       ],
       "contentOutline": {
@@ -33,7 +43,11 @@
             "sortOrder": 1,
             "mayHoldText": true,
             "mayHoldChildren": true,
-            "allowedChildKinds": ["paragraph"]
+            "allowedChildKinds": ["paragraph"],
+            "presentation": "section",
+            "showLabel": true,
+            "showTitle": true,
+            "showKind": true
           },
           {
             "kindCode": "paragraph",
@@ -41,7 +55,11 @@
             "sortOrder": 2,
             "mayHoldText": true,
             "mayHoldChildren": true,
-            "allowedChildKinds": ["sentence"]
+            "allowedChildKinds": ["sentence"],
+            "presentation": "section",
+            "showLabel": true,
+            "showTitle": true,
+            "showKind": false
           },
           {
             "kindCode": "sentence",
@@ -49,7 +67,11 @@
             "sortOrder": 3,
             "mayHoldText": true,
             "mayHoldChildren": false,
-            "allowedChildKinds": []
+            "allowedChildKinds": [],
+            "presentation": "concatenated",
+            "showLabel": false,
+            "showTitle": false,
+            "showKind": false
           }
         ]
       }

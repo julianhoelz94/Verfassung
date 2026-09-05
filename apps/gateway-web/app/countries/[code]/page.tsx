@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import { Breadcrumbs } from '../../components/Breadcrumbs';
 import { PageMain } from '../../components/PageMain';
+import { Provenance } from '../../components/Provenance';
 import { ServiceUnavailable } from '../../components/StatusMessage';
 import { ApiUnavailableError, getCountry, type CountryDetail } from '../../../lib/api';
 import { orderVersions } from '../../../lib/compare';
@@ -56,7 +57,9 @@ export default async function CountryPage({ params }: CountryPageProps) {
                   <a href={`/countries/${country.isoCode}/versions/${version.id}`}>
                     {version.versionLabel}
                     {version.effectiveDate ? ` (${version.effectiveDate})` : ''}
+                    {version.latestPublished ? ' · latest published' : ''}
                   </a>
+                  <Provenance version={version} />
                 </li>
               ))}
             </ul>

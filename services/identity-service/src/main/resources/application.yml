@@ -19,6 +19,14 @@ identity:
     absolute-timeout: ${IDENTITY_SESSION_ABSOLUTE:24h}
   login:
     failure-threshold: ${IDENTITY_LOGIN_FAILURE_THRESHOLD:5}
+  invite:
+    ttl: ${IDENTITY_INVITE_TTL:7d}
+  password:
+    reset-ttl: ${IDENTITY_PASSWORD_RESET_TTL:1h}
+    log-reset-token: ${IDENTITY_PASSWORD_LOG_RESET_TOKEN:false}
+audit:
+  api:
+    url: ${AUDIT_API_URL:http://localhost/api/audit}
 management:
   endpoints:
     web:

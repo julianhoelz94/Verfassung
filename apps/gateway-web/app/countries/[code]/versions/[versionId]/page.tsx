@@ -1,36 +1,26 @@
 import { notFound } from 'next/navigation';
 import { Breadcrumbs } from '../../../../components/Breadcrumbs';
 import { PageMain } from '../../../../components/PageMain';
+import { Provenance } from '../../../../components/Provenance';
 import { ServiceUnavailable } from '../../../../components/StatusMessage';
-import {
-  ApiUnavailableError,
-  listArticlePage,
-  getCountry,
-  type ArticleSummary,
-  type CountryDetail,
-} from '../../../../../lib/api';
+import { VersionReader } from '../../../../components/VersionReader';
+import { ApiUnavailableError, listAllArticles, getCountry, type ArticleSummary, type CountryDetail } from '../../../../../lib/api';
 import { neighborCompareLinks, orderVersions } from '../../../../../lib/compare';
+import { canVisitEditor } from '../../../../../lib/nav';
+import { currentUser } from '../../../../../lib/session';
 import { CompareForm } from '../../CompareForm';
 
 type VersionPageProps = {
   params: { code: string; versionId: string };
-  searchParams: { page?: string };
 };
 
-const PAGE_SIZE = 50;
-
-export default async function VersionPage({ params, searchParams }: VersionPageProps) {
-  const page = Math.max(1, Number(searchParams.page ?? '1') || 1);
-  const offset = (page - 1) * PAGE_SIZE;
+export default async function VersionPage({ params }: VersionPageProps) {
   let country: CountryDetail | null = null;
   let articles: ArticleSummary[] = [];
-  let total = 0;
   let error: string | null = null;
   try {
     country = await getCountry(params.code);
-    const articlePage = await listArticlePage(params.versionId, offset, PAGE_SIZE);
-    articles = articlePage?.items ?? [];
-    total = articlePage?.total ?? 0;
+    articles = await listAllArticles(params.versionId, true);
   } catch (e) {
     error = e instanceof ApiUnavailableError ? e.message : 'A backend service is unavailable';
     country = null;
@@ -55,6 +45,8 @@ export default async function VersionPage({ params, searchParams }: VersionPageP
 
   const line = orderVersions(version.constitution.versions);
   const neighbors = neighborCompareLinks(country.isoCode, line, params.versionId);
+  const user = await currentUser();
+  const canEditTitles = Boolean(user && canVisitEditor(user.roles));
 
   return (
     <PageMain>
@@ -67,6 +59,7 @@ export default async function VersionPage({ params, searchParams }: VersionPageP
       />
       <h1>{version.constitution.title}</h1>
       <p>Version {version.version.versionLabel}</p>
+      <Provenance version={version.version} />
       <div className="actions">
         <a href={`/countries/${country.isoCode}/timeline`}>Amendment timeline</a>
         {neighbors.previous ? <a href={neighbors.previous.href}>{neighbors.previous.label}</a> : null}
@@ -84,33 +77,17 @@ export default async function VersionPage({ params, searchParams }: VersionPageP
           }
         />
       ) : null}
-      {articles.length === 0 ? <p>No articles are published in this version.</p> : null}
-      <ol>
-        {articles.map((article) => (
-          <li key={article.id}>
-            <a
-              href={`/countries/${country.isoCode}/versions/${params.versionId}/articles/${article.id}#article-${article.articleNumber}`}
-            >
-              Article {article.articleNumber}
-              {' — '}
-              {article.title}
-            </a>
-          </li>
-        ))}
-      </ol>
-      {total > PAGE_SIZE ? (
-        <p>
-          {page > 1 ? (
-            <a href={`/countries/${country.isoCode}/versions/${params.versionId}?page=${page - 1}`}>Previous</a>
-          ) : null}
-          {page * PAGE_SIZE < total ? (
-            <>
-              {page > 1 ? ' · ' : ''}
-              <a href={`/countries/${country.isoCode}/versions/${params.versionId}?page=${page + 1}`}>Next</a>
-            </>
-          ) : null}
-        </p>
-      ) : null}
+      {articles.length === 0 ? (
+        <p>No articles are published in this version.</p>
+      ) : (
+        <VersionReader
+          code={country.isoCode}
+          versionId={params.versionId}
+          articles={articles}
+          outline={version.constitution.contentOutline}
+          canEditTitles={canEditTitles}
+        />
+      )}
     </PageMain>
   );
 }

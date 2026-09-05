@@ -3,6 +3,7 @@ package com.constitutionatlas.identity.repo
 import com.constitutionatlas.identity.api.SessionInfoDto
 import com.constitutionatlas.identity.api.UserDto
 import org.springframework.jdbc.core.JdbcTemplate
+import org.springframework.jdbc.core.RowMapper
 import org.springframework.stereotype.Repository
 import java.sql.Timestamp
 import java.time.Instant
@@ -15,11 +16,26 @@ data class StoredUser(
     val email: String,
     val passwordHash: String,
     val enabled: Boolean = true,
+    val createdAt: OffsetDateTime = OffsetDateTime.now(ZoneOffset.UTC),
 )
 
 data class StoredThrottle(
     val failureCount: Int,
     val lockedUntil: Instant?,
+)
+
+data class StoredInvite(
+    val id: UUID,
+    val userId: UUID,
+    val expiresAt: Instant,
+    val usedAt: Instant?,
+)
+
+data class StoredPasswordReset(
+    val id: UUID,
+    val userId: UUID,
+    val expiresAt: Instant,
+    val usedAt: Instant?,
 )
 
 @Repository
@@ -33,25 +49,32 @@ class IdentityRepository(private val jdbc: JdbcTemplate) {
 
     fun findUserByEmail(email: String): StoredUser? =
         jdbc.query(
-            "SELECT id, email, password_hash, enabled FROM users WHERE lower(email) = lower(?)",
-            { rs, _ ->
-                StoredUser(
-                    rs.getObject("id", UUID::class.java),
-                    rs.getString("email"),
-                    rs.getString("password_hash"),
-                    rs.getBoolean("enabled"),
-                )
-            },
+            "SELECT id, email, password_hash, enabled, created_at FROM users WHERE lower(email) = lower(?)",
+            userMapper,
             email,
         ).firstOrNull()
 
-    fun insertUser(email: String, passwordHash: String): UUID {
+    fun findUserById(id: UUID): StoredUser? =
+        jdbc.query(
+            "SELECT id, email, password_hash, enabled, created_at FROM users WHERE id = ?",
+            userMapper,
+            id,
+        ).firstOrNull()
+
+    fun listUsers(): List<StoredUser> =
+        jdbc.query(
+            "SELECT id, email, password_hash, enabled, created_at FROM users ORDER BY email",
+            userMapper,
+        )
+
+    fun insertUser(email: String, passwordHash: String, enabled: Boolean = true): UUID {
         val id = UUID.randomUUID()
         jdbc.update(
-            "INSERT INTO users (id, email, password_hash) VALUES (?, ?, ?)",
+            "INSERT INTO users (id, email, password_hash, enabled) VALUES (?, ?, ?, ?)",
             id,
             email.lowercase(),
             passwordHash,
+            enabled,
         )
         return id
     }
@@ -110,21 +133,14 @@ class IdentityRepository(private val jdbc: JdbcTemplate) {
     fun findUserByValidTokenHash(tokenHash: String): StoredUser? =
         jdbc.query(
             """
-            SELECT u.id, u.email, u.password_hash, u.enabled
+            SELECT u.id, u.email, u.password_hash, u.enabled, u.created_at
             FROM sessions s
             JOIN users u ON u.id = s.user_id
             WHERE s.token_hash = ?
               AND s.expires_at > NOW()
               AND u.enabled = TRUE
             """.trimIndent(),
-            { rs, _ ->
-                StoredUser(
-                    rs.getObject("id", UUID::class.java),
-                    rs.getString("email"),
-                    rs.getString("password_hash"),
-                    rs.getBoolean("enabled"),
-                )
-            },
+            userMapper,
             tokenHash,
         ).firstOrNull()
 
@@ -225,5 +241,113 @@ class IdentityRepository(private val jdbc: JdbcTemplate) {
 
     fun clearThrottle(key: String) {
         jdbc.update("DELETE FROM login_throttle WHERE throttle_key = ?", key)
+    }
+
+    fun setEnabled(userId: UUID, enabled: Boolean) {
+        jdbc.update("UPDATE users SET enabled = ? WHERE id = ?", enabled, userId)
+    }
+
+    fun clearRoles(userId: UUID) {
+        jdbc.update("DELETE FROM user_roles WHERE user_id = ?", userId)
+    }
+
+    fun insertInvite(userId: UUID, tokenHash: String, expiresAt: Instant): UUID {
+        val id = UUID.randomUUID()
+        jdbc.update(
+            """
+            INSERT INTO invites (id, user_id, token_hash, expires_at)
+            VALUES (?, ?, ?, ?)
+            """.trimIndent(),
+            id,
+            userId,
+            tokenHash,
+            Timestamp.from(expiresAt),
+        )
+        return id
+    }
+
+    fun findInviteByTokenHash(tokenHash: String): StoredInvite? =
+        jdbc.query(
+            "SELECT id, user_id, expires_at, used_at FROM invites WHERE token_hash = ?",
+            inviteMapper,
+            tokenHash,
+        ).firstOrNull()
+
+    fun findUnusedInvite(userId: UUID): StoredInvite? =
+        jdbc.query(
+            """
+            SELECT id, user_id, expires_at, used_at
+            FROM invites
+            WHERE user_id = ? AND used_at IS NULL
+            ORDER BY created_at DESC
+            """.trimIndent(),
+            inviteMapper,
+            userId,
+        ).firstOrNull()
+
+    fun deleteUnusedInvites(userId: UUID) {
+        jdbc.update("DELETE FROM invites WHERE user_id = ? AND used_at IS NULL", userId)
+    }
+
+    fun markInviteUsed(id: UUID) {
+        jdbc.update("UPDATE invites SET used_at = NOW() WHERE id = ?", id)
+    }
+
+    fun insertPasswordReset(userId: UUID, tokenHash: String, expiresAt: Instant): UUID {
+        val id = UUID.randomUUID()
+        jdbc.update(
+            """
+            INSERT INTO password_resets (id, user_id, token_hash, expires_at)
+            VALUES (?, ?, ?, ?)
+            """.trimIndent(),
+            id,
+            userId,
+            tokenHash,
+            Timestamp.from(expiresAt),
+        )
+        return id
+    }
+
+    fun findPasswordResetByTokenHash(tokenHash: String): StoredPasswordReset? =
+        jdbc.query(
+            "SELECT id, user_id, expires_at, used_at FROM password_resets WHERE token_hash = ?",
+            resetMapper,
+            tokenHash,
+        ).firstOrNull()
+
+    fun deleteUnusedResets(userId: UUID) {
+        jdbc.update("DELETE FROM password_resets WHERE user_id = ? AND used_at IS NULL", userId)
+    }
+
+    fun markPasswordResetUsed(id: UUID) {
+        jdbc.update("UPDATE password_resets SET used_at = NOW() WHERE id = ?", id)
+    }
+
+    private val userMapper = RowMapper { rs, _ ->
+        StoredUser(
+            id = rs.getObject("id", UUID::class.java),
+            email = rs.getString("email"),
+            passwordHash = rs.getString("password_hash"),
+            enabled = rs.getBoolean("enabled"),
+            createdAt = rs.getTimestamp("created_at").toInstant().atOffset(ZoneOffset.UTC),
+        )
+    }
+
+    private val inviteMapper = RowMapper { rs, _ ->
+        StoredInvite(
+            id = rs.getObject("id", UUID::class.java),
+            userId = rs.getObject("user_id", UUID::class.java),
+            expiresAt = rs.getTimestamp("expires_at").toInstant(),
+            usedAt = rs.getTimestamp("used_at")?.toInstant(),
+        )
+    }
+
+    private val resetMapper = RowMapper { rs, _ ->
+        StoredPasswordReset(
+            id = rs.getObject("id", UUID::class.java),
+            userId = rs.getObject("user_id", UUID::class.java),
+            expiresAt = rs.getTimestamp("expires_at").toInstant(),
+            usedAt = rs.getTimestamp("used_at")?.toInstant(),
+        )
     }
 }

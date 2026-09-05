@@ -7,6 +7,8 @@ import com.constitutionatlas.catalog.api.CountrySummary
 import com.constitutionatlas.catalog.api.CreateConstitutionRequest
 import com.constitutionatlas.catalog.api.CreateCountryRequest
 import com.constitutionatlas.catalog.api.CreateVersionRequest
+import com.constitutionatlas.catalog.api.OutlineKindWrite
+import com.constitutionatlas.catalog.api.OutlineUpdateResult
 import com.constitutionatlas.catalog.api.VersionCreated
 import com.constitutionatlas.catalog.repo.CatalogRepository
 import org.springframework.stereotype.Service
@@ -36,6 +38,9 @@ class CatalogWriteService(private val catalogRepository: CatalogRepository) {
             throw ConflictException("Constitution '$slug' already exists")
         }
         val id = catalogRepository.insertConstitution(country.id, slug, request.title.trim())
+        if (!request.outline.isNullOrEmpty()) {
+            catalogRepository.replaceOutline(id, normalizeOutline(request.outline))
+        }
         return ConstitutionSummary(
             id,
             slug,
@@ -72,5 +77,50 @@ class CatalogWriteService(private val catalogRepository: CatalogRepository) {
         }
         return catalogRepository.findVersionCreated(versionId)
             ?: throw NotFoundException("Unknown version '$versionId'")
+    }
+
+    @Transactional
+    fun replaceOutline(constitutionId: UUID, kinds: List<OutlineKindWrite>): OutlineUpdateResult {
+        if (!catalogRepository.constitutionExists(constitutionId)) {
+            throw NotFoundException("Unknown constitution '$constitutionId'")
+        }
+        catalogRepository.replaceOutline(constitutionId, normalizeOutline(kinds))
+        return OutlineUpdateResult(
+            catalogRepository.findOutline(constitutionId),
+            catalogRepository.listAllVersionIds(constitutionId),
+        )
+    }
+
+    companion object {
+        private val KIND_CODE = Regex("^[a-z][a-z0-9_-]{0,31}$")
+
+        fun normalizeOutline(kinds: List<OutlineKindWrite>): List<OutlineKindWrite> {
+            if (kinds.isEmpty()) {
+                throw IllegalArgumentException("outline must have at least one layer")
+            }
+            val normalized = kinds.mapIndexed { index, kind ->
+                val code = kind.kindCode.trim().lowercase()
+                val label = kind.displayLabel.trim()
+                val presentation = kind.presentation.trim().lowercase()
+                if (!KIND_CODE.matches(code)) {
+                    throw IllegalArgumentException("kindCode '$code' must be a lowercase slug")
+                }
+                if (label.isBlank()) {
+                    throw IllegalArgumentException("displayLabel is required for layer ${index + 1}")
+                }
+                if (presentation != "section" && presentation != "concatenated") {
+                    throw IllegalArgumentException("presentation must be section or concatenated")
+                }
+                kind.copy(
+                    kindCode = code,
+                    displayLabel = label,
+                    presentation = presentation,
+                )
+            }
+            if (normalized.map { it.kindCode }.toSet().size != normalized.size) {
+                throw IllegalArgumentException("kindCode values must be unique")
+            }
+            return normalized
+        }
     }
 }

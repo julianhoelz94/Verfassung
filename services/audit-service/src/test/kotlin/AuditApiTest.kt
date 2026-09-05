@@ -55,6 +55,26 @@ class AuditApiTest {
     }
 
     @Test
+    fun appendAllowsUnknownActor() {
+        mockMvc.post("/events") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """
+                {
+                  "action": "login_failed",
+                  "entityType": "user",
+                  "entityId": "00000000-0000-4000-8000-000000000000",
+                  "payload": {"correlationId": "corr-1", "clientIp": "198.51.100.20"}
+                }
+            """.trimIndent()
+        }.andExpect {
+            status { isCreated() }
+            jsonPath("$.action") { value("login_failed") }
+            jsonPath("$.actorId") { value(null as String?) }
+            jsonPath("$.actorEmail") { value(null as String?) }
+        }
+    }
+
+    @Test
     fun updatesAndDeletesAreRejected() {
         mockMvc.put("/events/01900000-0000-4000-8000-000000000501") {
             contentType = MediaType.APPLICATION_JSON

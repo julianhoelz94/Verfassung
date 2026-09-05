@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Editor workspace — Constitution Atlas prototype</title>
+<link rel="stylesheet" href="prototype.css">
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to main content</a>
+
+<!-- Shell: signed-in editor + reviewer -->
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="home.html"><span class="brand-mark" aria-hidden="true">§</span><span class="brand-name">Constitution Atlas</span></a>
+    <nav class="nav-primary" aria-label="Primary">
+      <a href="home.html">Countries</a>
+      <a href="#">Search</a>
+      <a href="editor.html" aria-current="page">Editor</a>
+    </nav>
+    <div class="topbar-actions">
+      <form class="search-inline" role="search" action="#"><input type="search" name="q" placeholder="Search articles" aria-label="Search articles"></form>
+      <details class="menu">
+        <summary class="icon-btn" aria-label="Account and menu"><span class="avatar" aria-hidden="true">E</span></summary>
+        <div class="menu-panel">
+          <div class="menu-user">editor@example.org<br><span class="badge">editor</span> <span class="badge">reviewer</span></div>
+          <div class="menu-group nav-dup"><a href="home.html">Countries</a><a href="#">Search</a><a href="editor.html" aria-current="page">Editor</a></div>
+          <div class="menu-group"><p class="menu-label">Editorial</p><a href="#">My sessions</a><a href="#">Review queue <span class="badge badge-changed">2</span></a></div>
+          <div class="menu-group"><a href="#">Account</a><button type="button">Sign out</button></div>
+        </div>
+      </details>
+    </div>
+  </div>
+</header>
+
+<main id="main" class="page">
+  <nav class="crumbs" aria-label="Breadcrumb"><ol><li><a href="#">Editor</a></li><li><a href="#">Germany · Basic Law 2022</a></li><li aria-current="page">Session 4f2c</li></ol></nav>
+  <div class="page-header">
+    <div>
+      <p class="eyebrow">Edit session · opened 2 h ago by you</p>
+      <h1 class="page-title">Basic Law · 2022</h1>
+      <div class="status-steps" aria-label="Workflow"><ol><li class="is-done">Draft</li><li class="is-current">In review</li><li>Approved</li><li>Published</li></ol></div>
+    </div>
+    <div class="page-actions"><a class="btn btn-ghost" href="version.html">View public page</a></div>
+  </div>
+
+  <div class="alert alert-success" role="status">Draft saved 12 seconds ago.</div>
+
+  <div class="workspace">
+    <aside class="panel" aria-label="Articles">
+      <p class="panel-title">Articles · 3 changed</p>
+      <input class="field-control" type="search" placeholder="Filter articles" aria-label="Filter articles" style="margin-bottom: var(--space-3);">
+      <ul class="article-list">
+        <li><a href="#">Art. 1 Human dignity</a></li>
+        <li><a href="#">Art. 2 Personal freedoms</a></li>
+        <li><a href="#" aria-current="true">Art. 3 Equality before the law <span class="badge badge-changed">draft</span></a></li>
+        <li><a href="#">Art. 4 Freedom of faith</a></li>
+        <li><a href="#">Art. 5 Freedom of expression <span class="badge badge-changed">draft</span></a></li>
+        <li><a href="#">Art. 6 Marriage and family</a></li>
+        <li><a href="#">Art. 7 School system</a></li>
+        <li><a href="#">Art. 20a Natural foundations of life <span class="badge badge-added">new</span></a></li>
+      </ul>
+    </aside>
+
+    <section class="panel" aria-labelledby="edit-title">
+      <p class="panel-title" id="edit-title">Article 3</p>
+      <label class="field"><span class="field-label">Title</span><input class="field-control" value="Equality before the law"></label>
+      <label class="field"><span class="field-label">Text</span><textarea class="field-control">(1) All persons shall be equal before the law.
+
+(2) Men and women shall have equal rights. The state shall promote the actual implementation of equal rights for women and men and take steps to eliminate disadvantages that now exist.
+
+(3) No person shall be favoured or disfavoured because of sex, parentage, race, language, homeland and origin, faith, or religious or political opinions. No person shall be disfavoured because of disability.</textarea></label>
+      <details>
+        <summary class="btn btn-sm" style="display: inline-flex;">Section titles (3 paragraphs)</summary>
+        <div class="stack" style="margin-top: var(--space-3);">
+          <label class="field" style="margin: 0;"><span class="field-label">(1)</span><input class="field-control" placeholder="Optional title"></label>
+          <label class="field" style="margin: 0;"><span class="field-label">(2)</span><input class="field-control" value="Equal rights"></label>
+          <label class="field" style="margin: 0;"><span class="field-label">(3)</span><input class="field-control" value="Non-discrimination"></label>
+        </div>
+      </details>
+      <div class="action-bar"><button class="btn" type="button">Discard changes</button><button class="btn" type="button">Save draft</button><button class="btn btn-primary" type="button">Submit for review</button></div>
+    </section>
+
+    <aside class="panel panel-side" aria-label="Session">
+      <p class="panel-title">Session</p>
+      <dl class="provenance" style="grid-template-columns: 1fr; margin: 0 0 var(--space-3); border: 0; padding: 0; background: transparent;">
+        <div><dt>Status</dt><dd><span class="badge badge-changed">in review</span></dd></div>
+        <div><dt>Opened</dt><dd>Today, 09:14 · editor@example.org</dd></div>
+        <div><dt>Changed articles</dt><dd>Art. 3, Art. 5, Art. 20a</dd></div>
+        <div><dt>Reviewer</dt><dd class="muted">Not yet assigned</dd></div>
+      </dl>
+      <p class="panel-title">Preview</p>
+      <div class="text-column" style="font-size: var(--text-base);">
+        <div class="para"><span class="num">(2)</span><p>Men and women shall have equal rights. <ins style="background: var(--color-added-bg);">The state shall promote…</ins></p></div>
+      </div>
+      <p class="muted" style="font-size: var(--text-sm); margin-top: var(--space-3);">You can review but not publish. A publisher completes the last step.</p>
+    </aside>
+  </div>
+</main>
+</body>
+</html>

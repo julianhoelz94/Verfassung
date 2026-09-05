@@ -5,6 +5,7 @@ import com.constitutionatlas.identity.UnauthorizedException
 import com.constitutionatlas.identity.api.SessionDto
 import com.constitutionatlas.identity.api.SessionInfoDto
 import com.constitutionatlas.identity.api.UserDto
+import com.constitutionatlas.identity.client.AuthAudit
 import com.constitutionatlas.identity.config.IdentityLoginProperties
 import com.constitutionatlas.identity.config.IdentitySessionProperties
 import com.constitutionatlas.identity.repo.IdentityRepository
@@ -27,6 +28,7 @@ class AuthService(
     private val passwordEncoder: PasswordEncoder,
     private val sessionProperties: IdentitySessionProperties,
     private val loginProperties: IdentityLoginProperties,
+    private val authAudit: AuthAudit,
     meterRegistry: MeterRegistry,
 ) {
     private val random = SecureRandom()
@@ -35,7 +37,13 @@ class AuthService(
     private val loginFailures = meterRegistry.counter("identity.login.failures")
     private val loginLockouts = meterRegistry.counter("identity.login.lockouts")
 
-    fun login(email: String, password: String, clientIp: String, existingAuthorization: String?): SessionDto {
+    fun login(
+        email: String,
+        password: String,
+        clientIp: String,
+        userAgent: String?,
+        existingAuthorization: String?,
+    ): SessionDto {
         val normalized = email.trim().lowercase()
         val ipKey = "ip:${clientIp.ifBlank { "unknown" }}"
         val emailKey = "email:$normalized"
@@ -49,6 +57,14 @@ class AuthService(
             loginFailures.increment()
             recordFailure(emailKey)
             recordFailure(ipKey)
+            authAudit.record(
+                "login_failed",
+                user?.id ?: UNKNOWN_ACTOR,
+                user?.id,
+                user?.email,
+                clientIp,
+                userAgent,
+            )
             throw UnauthorizedException("Invalid credentials")
         }
 
@@ -63,6 +79,7 @@ class AuthService(
         val expiresAt = now.plus(sessionProperties.absoluteTimeout)
         val token = newSessionToken()
         identityRepository.insertSession(user.id, sha256(token), expiresAt, now)
+        authAudit.record("login_succeeded", user.id, user.id, user.email, clientIp, userAgent)
         return SessionDto(
             token = token,
             user = identityRepository.toUserDto(user),
@@ -78,8 +95,13 @@ class AuthService(
         return identityRepository.toUserDto(user)
     }
 
-    fun logout(bearerToken: String?) {
-        identityRepository.deleteSessionByTokenHash(sha256(requireToken(bearerToken)))
+    fun logout(bearerToken: String?, clientIp: String, userAgent: String?) {
+        val hash = sha256(requireToken(bearerToken))
+        val user = identityRepository.findUserByValidTokenHash(hash)
+        identityRepository.deleteSessionByTokenHash(hash)
+        if (user != null) {
+            authAudit.record("logout", user.id, user.id, user.email, clientIp, userAgent)
+        }
     }
 
     fun listSessions(bearerToken: String?): List<SessionInfoDto> {
@@ -89,17 +111,19 @@ class AuthService(
         return identityRepository.listSessions(user.id, hash)
     }
 
-    fun revokeSession(bearerToken: String?, sessionId: UUID) {
+    fun revokeSession(bearerToken: String?, sessionId: UUID, clientIp: String, userAgent: String?) {
         val user = requireActiveSession(sha256(requireToken(bearerToken)))
         if (!identityRepository.sessionBelongsToUser(sessionId, user.id)) {
             throw UnauthorizedException("Invalid or expired session")
         }
         identityRepository.deleteSessionById(sessionId)
+        authAudit.record("session_revoked", user.id, user.id, user.email, clientIp, userAgent)
     }
 
-    fun revokeAllSessions(bearerToken: String?) {
+    fun revokeAllSessions(bearerToken: String?, clientIp: String, userAgent: String?) {
         val user = requireActiveSession(sha256(requireToken(bearerToken)))
         identityRepository.deleteSessionsForUser(user.id)
+        authAudit.record("session_revoked", user.id, user.id, user.email, clientIp, userAgent, mapOf("scope" to "all"))
     }
 
     fun purgeExpired() {
@@ -159,5 +183,9 @@ class AuthService(
     private fun sha256(value: String): String {
         val digest = MessageDigest.getInstance("SHA-256").digest(value.toByteArray(StandardCharsets.UTF_8))
         return HexFormat.of().formatHex(digest)
+    }
+
+    companion object {
+        private val UNKNOWN_ACTOR = UUID.fromString("00000000-0000-4000-8000-000000000000")
     }
 }

@@ -6,6 +6,7 @@ import org.springframework.http.HttpStatus
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
+import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
@@ -30,6 +31,12 @@ class CatalogController(
     @GetMapping("/constitutions/{constitutionId}/content-outline")
     fun getOutline(@PathVariable constitutionId: UUID): ContentOutlineDto =
         catalogQueryService.getOutline(constitutionId)
+
+    @PutMapping("/constitutions/{constitutionId}/content-outline")
+    fun putOutline(
+        @PathVariable constitutionId: UUID,
+        @RequestBody request: ContentOutlineWrite,
+    ): OutlineUpdateResult = catalogWriteService.replaceOutline(constitutionId, request.kinds)
 
     @PostMapping("/countries")
     @ResponseStatus(HttpStatus.CREATED)

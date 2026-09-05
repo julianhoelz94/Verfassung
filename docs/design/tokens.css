@@ -1,0 +1,88 @@
+/*
+ * Constitution Atlas — design tokens (proposal, see ui-concept.md §6).
+ * Copy into apps/gateway-web/app/globals.css in UI-29. Keep names stable;
+ * components reference tokens, never raw values.
+ */
+:root {
+  /* Colour — ink and paper */
+  --color-ink: #16201f;
+  --color-ink-2: #4b5654;
+  --color-ink-3: #7b8583;
+  --color-paper: #f7f5f0;
+  --color-surface: #ffffff;
+  --color-surface-2: #f1eee7;
+  --color-line: #e2ded6;
+  --color-line-strong: #c9c3b8;
+
+  /* Colour — brand */
+  --color-accent: #0f5e5e;
+  --color-accent-strong: #0a4747;
+  --color-accent-soft: #e3f0ee;
+  --color-on-accent: #ffffff;
+
+  /* Colour — semantic (background / foreground pairs, AA on each other) */
+  --color-added-bg: #e6f6ec;
+  --color-added-fg: #14532d;
+  --color-removed-bg: #fbe9e9;
+  --color-removed-fg: #7f1d1d;
+  --color-changed-bg: #fff4d6;
+  --color-changed-fg: #713f12;
+  --color-info-bg: #e8f1fb;
+  --color-info-fg: #1e3a8a;
+  --color-danger: #b42318;
+  --color-success: #1a7f4b;
+  --color-focus: #d97706;
+
+  /* Typography */
+  --font-ui: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-text: 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, 'Times New Roman', serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-md: 1.0625rem; /* reading body */
+  --text-lg: 1.125rem;
+  --text-xl: 1.375rem;
+  --text-2xl: clamp(1.5rem, 1.15rem + 1.4vw, 2.125rem);
+  --text-3xl: clamp(1.875rem, 1.3rem + 2.2vw, 2.75rem);
+  --leading-tight: 1.2;
+  --leading-normal: 1.5;
+  --leading-reading: 1.65;
+
+  /* Spacing (4px base) */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 64px;
+
+  /* Shape and elevation */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-pill: 999px;
+  --shadow-1: 0 1px 2px rgba(22, 32, 31, 0.06), 0 1px 1px rgba(22, 32, 31, 0.04);
+  --shadow-2: 0 6px 20px rgba(22, 32, 31, 0.1);
+
+  /* Layout */
+  --control-min: 44px;
+  --topbar-h: 56px;
+  --measure: 68ch; /* reading column */
+  --content-max: 1200px;
+  --sidebar-w: 280px;
+  --gutter: clamp(16px, 4vw, 32px);
+
+  /* Z-index scale */
+  --z-sticky: 10;
+  --z-menu: 20;
+  --z-skip: 30;
+}
+
+/* Breakpoints (cannot be tokens in CSS; documented for consistency):
+ *   phone   <  640px
+ *   tablet  640px – 1023px
+ *   desktop >= 1024px
+ */

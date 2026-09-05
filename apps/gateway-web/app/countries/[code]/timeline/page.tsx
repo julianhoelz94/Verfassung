@@ -68,7 +68,7 @@ export default async function TimelinePage({ params }: TimelinePageProps) {
       {amendments.length === 0 ? <p>No recorded amendments for published versions.</p> : null}
       <ol>
         {amendments.map((amendment) => (
-          <li key={amendment.id} style={{ marginBottom: 24 }}>
+          <li key={amendment.id} className="timeline-item">
             <h2>{amendment.title}</h2>
             <p>
               {amendment.enactedOn ?? 'Date unknown'}

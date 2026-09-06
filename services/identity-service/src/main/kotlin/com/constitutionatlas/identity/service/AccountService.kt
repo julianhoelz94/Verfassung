@@ -175,13 +175,15 @@ class AccountService(
         clientIp: String,
         userAgent: String?,
     ) {
-        val user = identityRepository.findUserByValidTokenHash(sha256(requireToken(authorization)))
+        val tokenHash = sha256(requireToken(authorization))
+        val user = identityRepository.findUserByValidTokenHash(tokenHash)
             ?: throw UnauthorizedException("Invalid or expired session")
         if (!passwordEncoder.matches(currentPassword, user.passwordHash)) {
             throw UnauthorizedException("Invalid credentials")
         }
         validatePassword(newPassword, user.email)
         identityRepository.updatePasswordHash(user.id, passwordEncoder.encode(newPassword))
+        identityRepository.deleteOtherSessions(user.id, tokenHash)
         authAudit.record("password_changed", user.id, user.id, user.email, clientIp, userAgent)
     }
 

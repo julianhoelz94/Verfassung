@@ -60,7 +60,10 @@ export function VersionReader({
           aria-valuemax={max}
           aria-valuenow={depth}
           aria-valuetext={labels[depth - 1]}
-          onChange={(event) => setDepth(Number(event.target.value))}
+          onChange={(event) => {
+            setDepth(Number(event.target.value));
+            setExpanded(new Set());
+          }}
         />
         <ol className="depth-ticks">
           {labels.map((label, index) => (

@@ -1,7 +1,8 @@
 import type { VersionSummary } from '../../lib/api';
-import { provenanceLabel, verificationLabel } from '../../lib/provenance';
+import { httpUrl, provenanceLabel, verificationLabel } from '../../lib/provenance';
 
 export function Provenance({ version }: { version: VersionSummary }) {
+  const sourceHref = httpUrl(version.sourceUrl);
   return (
     <aside className="provenance" aria-label="Source and trust">
       <dl className="provenance-list">
@@ -20,12 +21,12 @@ export function Provenance({ version }: { version: VersionSummary }) {
         <div>
           <dt>Source</dt>
           <dd>
-            {version.sourceUrl ? (
-              <a href={version.sourceUrl} rel="noreferrer">
+            {sourceHref ? (
+              <a href={sourceHref} rel="noreferrer">
                 {version.sourceUrl}
               </a>
             ) : (
-              'Not recorded'
+              version.sourceUrl ?? 'Not recorded'
             )}
           </dd>
         </div>

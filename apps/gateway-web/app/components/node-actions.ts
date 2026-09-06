@@ -35,14 +35,14 @@ export async function saveNodeTitleAction(formData: FormData): Promise<void> {
   const pathname = returnTo.split('?')[0] || '/';
   if (!nodeId) {
     const errorUrl = new URL(returnTo, 'http://atlas.local');
-    errorUrl.searchParams.set('error', '1');
+    errorUrl.searchParams.set('error', 'title');
     redirect(`${errorUrl.pathname}${errorUrl.search}`);
   }
   try {
     await patchContentNode(nodeId, title);
   } catch {
     const errorUrl = new URL(returnTo, 'http://atlas.local');
-    errorUrl.searchParams.set('error', '1');
+    errorUrl.searchParams.set('error', 'title');
     redirect(`${errorUrl.pathname}${errorUrl.search}`);
   }
   revalidatePath(pathname);

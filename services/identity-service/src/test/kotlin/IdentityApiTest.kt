@@ -348,13 +348,19 @@ class IdentityApiTest {
             contentType = MediaType.APPLICATION_JSON
             content = """{"token":"$inviteToken","password":"password1234"}"""
         }.andExpect { status { isBadRequest() } }
-        val token = login(email, "not-a-common-pass")
+        val firstSession = login(email, "not-a-common-pass")
+        val currentSession = login(email, "not-a-common-pass")
         mockMvc.post("/password/change") {
-            header("Authorization", "Bearer $token")
+            header("Authorization", "Bearer $currentSession")
             contentType = MediaType.APPLICATION_JSON
             content = """{"currentPassword":"not-a-common-pass","newPassword":"fresh-stable-phrase"}"""
         }.andExpect { status { isNoContent() } }
-        login(email, "fresh-stable-phrase")
+        mockMvc.get("/me") {
+            header("Authorization", "Bearer $firstSession")
+        }.andExpect { status { isUnauthorized() } }
+        mockMvc.get("/me") {
+            header("Authorization", "Bearer $currentSession")
+        }.andExpect { status { isOk() } }
         val unknown =
             mockMvc.post("/password/reset") {
                 contentType = MediaType.APPLICATION_JSON

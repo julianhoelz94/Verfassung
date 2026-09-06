@@ -12,12 +12,25 @@ import {
   requestIssueReset,
   requestPasswordReset,
 } from '../../lib/identity-client';
-import { SESSION_COOKIE } from '../../lib/session';
+import { canVisitAdmin } from '../../lib/nav';
+import { SESSION_COOKIE, currentUser } from '../../lib/session';
 
 function tokenOrRedirect(): string {
   const token = cookies().get(SESSION_COOKIE)?.value;
   if (!token) {
     redirect('/login');
+  }
+  return token;
+}
+
+async function requireAdminToken(): Promise<string> {
+  const token = tokenOrRedirect();
+  const user = await currentUser();
+  if (!user) {
+    redirect('/login');
+  }
+  if (!canVisitAdmin(user.roles)) {
+    redirect('/admin/users?error=forbidden');
   }
   return token;
 }
@@ -61,7 +74,7 @@ export async function acceptInviteAction(formData: FormData): Promise<void> {
 }
 
 export async function inviteUserAction(formData: FormData): Promise<void> {
-  const token = tokenOrRedirect();
+  const token = await requireAdminToken();
   const roles = String(formData.get('roles') ?? 'viewer')
     .split(',')
     .map((role) => role.trim())
@@ -77,7 +90,7 @@ export async function inviteUserAction(formData: FormData): Promise<void> {
 }
 
 export async function disableUserAction(formData: FormData): Promise<void> {
-  const token = tokenOrRedirect();
+  const token = await requireAdminToken();
   try {
     await requestDisableUser(token, String(formData.get('userId') ?? ''));
   } catch {
@@ -87,7 +100,7 @@ export async function disableUserAction(formData: FormData): Promise<void> {
 }
 
 export async function enableUserAction(formData: FormData): Promise<void> {
-  const token = tokenOrRedirect();
+  const token = await requireAdminToken();
   try {
     await requestEnableUser(token, String(formData.get('userId') ?? ''));
   } catch {
@@ -97,7 +110,7 @@ export async function enableUserAction(formData: FormData): Promise<void> {
 }
 
 export async function issueResetAction(formData: FormData): Promise<void> {
-  const token = tokenOrRedirect();
+  const token = await requireAdminToken();
   let resetToken: string;
   try {
     const issued = await requestIssueReset(token, String(formData.get('userId') ?? ''));

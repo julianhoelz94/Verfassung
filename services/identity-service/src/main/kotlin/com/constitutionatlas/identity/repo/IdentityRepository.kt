@@ -200,6 +200,10 @@ class IdentityRepository(private val jdbc: JdbcTemplate) {
         jdbc.update("DELETE FROM sessions WHERE user_id = ?", userId)
     }
 
+    fun deleteOtherSessions(userId: UUID, keepTokenHash: String) {
+        jdbc.update("DELETE FROM sessions WHERE user_id = ? AND token_hash <> ?", userId, keepTokenHash)
+    }
+
     fun deleteSessionByTokenHash(tokenHash: String) {
         jdbc.update("DELETE FROM sessions WHERE token_hash = ?", tokenHash)
     }

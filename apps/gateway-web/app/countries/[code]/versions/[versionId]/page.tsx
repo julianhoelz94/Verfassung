@@ -3,6 +3,7 @@ import { Breadcrumbs } from '../../../../components/Breadcrumbs';
 import { PageMain } from '../../../../components/PageMain';
 import { Provenance } from '../../../../components/Provenance';
 import { ServiceUnavailable } from '../../../../components/StatusMessage';
+import { Alert } from '../../../../components/ui';
 import { VersionReader } from '../../../../components/VersionReader';
 import { ApiUnavailableError, listAllArticles, getCountry, type ArticleSummary, type CountryDetail } from '../../../../../lib/api';
 import { neighborCompareLinks, orderVersions } from '../../../../../lib/compare';
@@ -12,9 +13,10 @@ import { CompareForm } from '../../CompareForm';
 
 type VersionPageProps = {
   params: { code: string; versionId: string };
+  searchParams: { error?: string };
 };
 
-export default async function VersionPage({ params }: VersionPageProps) {
+export default async function VersionPage({ params, searchParams }: VersionPageProps) {
   let country: CountryDetail | null = null;
   let articles: ArticleSummary[] = [];
   let error: string | null = null;
@@ -59,6 +61,9 @@ export default async function VersionPage({ params }: VersionPageProps) {
       />
       <h1>{version.constitution.title}</h1>
       <p>Version {version.version.versionLabel}</p>
+      {searchParams.error === 'title' ? (
+        <Alert tone="error">The section title could not be saved.</Alert>
+      ) : null}
       <Provenance version={version.version} />
       <div className="actions">
         <a href={`/countries/${country.isoCode}/timeline`}>Amendment timeline</a>

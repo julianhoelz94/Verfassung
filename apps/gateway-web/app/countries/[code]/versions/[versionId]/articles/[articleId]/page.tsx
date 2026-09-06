@@ -5,6 +5,7 @@ import { PageMain } from '../../../../../../components/PageMain';
 import { PrintLink } from '../../../../../../components/PrintLink';
 import { Provenance } from '../../../../../../components/Provenance';
 import { ServiceUnavailable } from '../../../../../../components/StatusMessage';
+import { Alert } from '../../../../../../components/ui';
 import {
   ApiUnavailableError,
   getArticle,
@@ -17,9 +18,10 @@ import { currentUser } from '../../../../../../../lib/session';
 
 type ArticlePageProps = {
   params: { code: string; versionId: string; articleId: string };
+  searchParams: { error?: string };
 };
 
-export default async function ArticlePage({ params }: ArticlePageProps) {
+export default async function ArticlePage({ params, searchParams }: ArticlePageProps) {
   let country: CountryDetail | null = null;
   let article: ArticleDetail | null = null;
   let error: string | null = null;
@@ -68,6 +70,9 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
           <a href={`${permalink}#article-${article.articleNumber}`}>Permalink</a>
           <PrintLink />
         </div>
+        {searchParams.error === 'title' ? (
+          <Alert tone="error">The section title could not be saved.</Alert>
+        ) : null}
         {version ? <Provenance version={version} /> : null}
         <ConstitutionText
           article={article}

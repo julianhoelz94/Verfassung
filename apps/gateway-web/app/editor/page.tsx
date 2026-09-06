@@ -80,7 +80,11 @@ export default async function EditorPage({ searchParams }: EditorPageProps) {
       <p>
         Signed in as {user.email}. Roles: {user.roles.join(', ')}.
       </p>
-      {searchParams.error ? <Alert tone="error">{searchParams.error}</Alert> : null}
+      {searchParams.error === 'title' ? (
+        <Alert tone="error">The section title could not be saved.</Alert>
+      ) : searchParams.error ? (
+        <Alert tone="error">{searchParams.error}</Alert>
+      ) : null}
       {searchParams.saved ? <Alert tone="success">Draft saved.</Alert> : null}
       {searchParams.reviewed ? <Alert tone="success">Submitted for review.</Alert> : null}
       {searchParams.approved ? <Alert tone="success">Review approved. A publisher can now publish.</Alert> : null}

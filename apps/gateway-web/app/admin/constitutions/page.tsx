@@ -42,7 +42,11 @@ export default async function AdminConstitutionsPage({ searchParams }: AdminCons
         Each constitution has an ordered tree of layers (for example Article → Paragraph → Sentence). The public
         reader uses these labels and presentation rules. Removing a layer later merges that text into the parent layer.
       </p>
-      {searchParams.error ? <Alert tone="error">That outline change could not be saved.</Alert> : null}
+      {searchParams.error === 'forbidden' ? (
+        <Alert tone="error">Administrator role required.</Alert>
+      ) : searchParams.error ? (
+        <Alert tone="error">That outline change could not be saved.</Alert>
+      ) : null}
       <Card>
         <h2>New constitution</h2>
         <p>

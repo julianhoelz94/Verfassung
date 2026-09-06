@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation';
 import { Alert, Button, Card, Input } from '../../components/ui';
 import { PageMain } from '../../components/PageMain';
 import { disableUserAction, enableUserAction, inviteUserAction, issueResetAction } from '../../account/actions';
-import { requestUsers } from '../../../lib/identity-client';
+import { requestUsers, type AdminUser } from '../../../lib/identity-client';
 import { canVisitAdmin } from '../../../lib/nav';
 import { SESSION_COOKIE, currentUser } from '../../../lib/session';
 
@@ -25,11 +25,24 @@ export default async function AdminUsersPage({ searchParams }: AdminUsersPagePro
     );
   }
   const token = cookies().get(SESSION_COOKIE)?.value;
-  const users = token ? await requestUsers(token).catch(() => []) : [];
+  let users: AdminUser[] = [];
+  let usersError = false;
+  if (token) {
+    try {
+      users = await requestUsers(token);
+    } catch {
+      usersError = true;
+    }
+  }
   return (
     <PageMain>
       <h1>Users</h1>
-      {searchParams.error ? <Alert tone="error">That account action could not be completed.</Alert> : null}
+      {searchParams.error === 'forbidden' ? (
+        <Alert tone="error">Administrator role required.</Alert>
+      ) : searchParams.error ? (
+        <Alert tone="error">That account action could not be completed.</Alert>
+      ) : null}
+      {usersError ? <Alert tone="error">The user list could not be loaded.</Alert> : null}
       {searchParams.invited ? (
         <Alert tone="success">Invite created. One-time token: {searchParams.invited}</Alert>
       ) : null}

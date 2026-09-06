@@ -38,7 +38,7 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v6
       - name: Check ${{ matrix.service }}
         working-directory: services/${{ matrix.service }}
         run: ./gradlew check
@@ -95,7 +95,7 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v6
       - name: BootJar ${{ matrix.service }}
         run: ./gradlew -p services/${{ matrix.service }} bootJar -x test
       - name: Build ${{ matrix.service }} image

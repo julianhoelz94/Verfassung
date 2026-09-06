@@ -91,8 +91,9 @@ class AuthAudit(
         actorEmail: String,
         clientIp: String,
         userAgent: String?,
+        extra: Map<String, Any?> = emptyMap(),
     ) {
-        record("mfa_changed", actorId, actorId, actorEmail, clientIp, userAgent)
+        record("mfa_changed", actorId, actorId, actorEmail, clientIp, userAgent, extra)
     }
 }
 

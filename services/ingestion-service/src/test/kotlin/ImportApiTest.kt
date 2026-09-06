@@ -18,6 +18,7 @@ import org.springframework.test.web.servlet.post
 import org.testcontainers.containers.PostgreSQLContainer
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
+import java.time.LocalDate
 import java.util.UUID
 
 @Testcontainers
@@ -63,17 +64,7 @@ class ImportApiTest {
     fun validImportPublishesDraftThenArticles() {
         val constitutionId = UUID.fromString("01900000-0000-4000-8000-000000000501")
         val versionId = UUID.fromString("01900000-0000-4000-8000-000000000502")
-        Mockito.`when`(catalogClient.getCountry("FR")).thenReturn(null)
-        Mockito.`when`(catalogClient.createCountry("FR", "France"))
-            .thenReturn(DownstreamCountry(UUID.randomUUID(), "FR", "France"))
-        Mockito.`when`(catalogClient.findConstitution("FR", "1958")).thenReturn(null)
-        Mockito.`when`(catalogClient.createConstitution("FR", "1958", "Constitution of 1958"))
-            .thenReturn(DownstreamConstitution(constitutionId, "1958", "Constitution of 1958"))
-        Mockito.`when`(
-            catalogClient.createDraftVersion(constitutionId, "1958", null, "en", null, null),
-        ).thenReturn(DownstreamVersion(versionId, constitutionId, "draft"))
-        Mockito.`when`(catalogClient.publishVersion(versionId))
-            .thenReturn(DownstreamVersion(versionId, constitutionId, "published"))
+        stubCatalog("FR", "France", "1958", "Constitution of 1958", "1958", constitutionId, versionId)
 
         mockMvc.post("/import-jobs") {
             contentType = MediaType.APPLICATION_JSON
@@ -93,8 +84,125 @@ class ImportApiTest {
             status { isCreated() }
             jsonPath("$.status") { value("completed") }
             jsonPath("$.versionId") { value(versionId.toString()) }
+            jsonPath("$.isoCode") { value("FR") }
         }
         Mockito.verify(catalogClient).publishVersion(versionId)
+        Mockito.verify(catalogClient, Mockito.never()).replaceOutline(Mockito.any(), Mockito.anyList())
+    }
+
+    @Test
+    fun treeFixtureImportAppliesOutlineAndSources() {
+        val constitutionId = UUID.fromString("01900000-0000-4000-8000-000000000601")
+        val versionId = UUID.fromString("01900000-0000-4000-8000-000000000602")
+        stubCatalog(
+            iso = "US",
+            countryName = "United States",
+            slug = "constitution",
+            title = "Constitution of the United States",
+            versionLabel = "1789",
+            constitutionId = constitutionId,
+            versionId = versionId,
+            effectiveDate = LocalDate.parse("1789-03-04"),
+            languageCode = "en",
+            sourceUrl = "https://www.archives.gov/founding-docs/constitution-transcript",
+            gazetteReference = "U.S. Const.",
+        )
+
+        mockMvc.post("/import-jobs") {
+            contentType = MediaType.APPLICATION_JSON
+            content = usFixture()
+        }.andExpect {
+            status { isCreated() }
+            jsonPath("$.status") { value("completed") }
+            jsonPath("$.versionId") { value(versionId.toString()) }
+            jsonPath("$.isoCode") { value("US") }
+        }
+        Mockito.verify(catalogClient).replaceOutline(
+            Mockito.eq(constitutionId),
+            Mockito.argThat { kinds -> kinds.any { it.kindCode == "section" } },
+        )
+        Mockito.verify(catalogClient).createDraftVersion(
+            constitutionId,
+            "1789",
+            LocalDate.parse("1789-03-04"),
+            "en",
+            "https://www.archives.gov/founding-docs/constitution-transcript",
+            "U.S. Const.",
+        )
+        Mockito.verify(contentClient).replaceArticles(
+            Mockito.eq(versionId),
+            Mockito.argThat { articles -> articles.any { it.nodes.any { node -> node.kind == "section" } } },
+        )
+        Mockito.verify(catalogClient).publishVersion(versionId)
+    }
+
+    @Test
+    fun unknownKindFailsWithoutCatalogWrites() {
+        mockMvc.post("/import-jobs") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """
+                {
+                  "isoCode": "US",
+                  "countryName": "United States",
+                  "constitutionSlug": "constitution",
+                  "constitutionTitle": "Constitution of the United States",
+                  "versionLabel": "1789",
+                  "outline": {
+                    "kinds": [
+                      {"kindCode":"article","displayLabel":"Article","presentation":"section","showLabel":true,"showTitle":true,"showKind":true}
+                    ]
+                  },
+                  "articles": [
+                    {
+                      "articleNumber": "I",
+                      "title": "Legislative Power",
+                      "body": "",
+                      "sortOrder": 1,
+                      "nodes": [{"kind":"chapter","body":"All legislative Powers herein granted."}]
+                    }
+                  ]
+                }
+            """.trimIndent()
+        }.andExpect {
+            status { isCreated() }
+            jsonPath("$.status") { value("failed") }
+            jsonPath("$.errors[0].code") { value("UNKNOWN_KIND") }
+        }
+        Mockito.verifyNoInteractions(catalogClient)
+        Mockito.verifyNoInteractions(contentClient)
+    }
+
+    private fun stubCatalog(
+        iso: String,
+        countryName: String,
+        slug: String,
+        title: String,
+        versionLabel: String,
+        constitutionId: UUID,
+        versionId: UUID,
+        effectiveDate: LocalDate? = null,
+        languageCode: String = "en",
+        sourceUrl: String? = null,
+        gazetteReference: String? = null,
+    ) {
+        Mockito.`when`(catalogClient.getCountry(iso)).thenReturn(null)
+        Mockito.`when`(catalogClient.createCountry(iso, countryName))
+            .thenReturn(DownstreamCountry(UUID.randomUUID(), iso, countryName))
+        Mockito.`when`(catalogClient.findConstitution(iso, slug)).thenReturn(null)
+        Mockito.`when`(catalogClient.createConstitution(iso, slug, title))
+            .thenReturn(DownstreamConstitution(constitutionId, slug, title))
+        Mockito.`when`(
+            catalogClient.createDraftVersion(
+                constitutionId,
+                versionLabel,
+                effectiveDate,
+                languageCode,
+                sourceUrl,
+                gazetteReference,
+            ),
+        ).thenReturn(DownstreamVersion(versionId, constitutionId, "draft"))
+        Mockito.`when`(catalogClient.publishVersion(versionId))
+            .thenReturn(DownstreamVersion(versionId, constitutionId, "published"))
     }
 
     companion object {
@@ -109,5 +217,8 @@ class ImportApiTest {
             registry.add("spring.datasource.username", postgres::getUsername)
             registry.add("spring.datasource.password", postgres::getPassword)
         }
+
+        private fun usFixture(): String =
+            checkNotNull(ImportApiTest::class.java.getResource("/fixtures/us-constitution.json")).readText()
     }
 }

@@ -226,6 +226,38 @@ class ContentApiTest {
     }
 
     @Test
+    fun replaceArticlesWritesChildNodes() {
+        val versionId = "01900000-0000-4000-8000-000000000098"
+        mockMvc.put("/versions/$versionId/articles") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """
+                [
+                  {
+                    "articleNumber":"I",
+                    "title":"Legislative Power",
+                    "body":"",
+                    "sortOrder":1,
+                    "nodes":[
+                      {"kind":"section","label":"1","title":"Congress","body":"All legislative Powers herein granted shall be vested in a Congress."}
+                    ]
+                  }
+                ]
+            """.trimIndent()
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.length()") { value(1) }
+        }
+        mockMvc.get("/versions/$versionId/articles?includeBody=true")
+            .andExpect {
+                status { isOk() }
+                jsonPath("$[0].children.length()") { value(1) }
+                jsonPath("$[0].children[0].kind") { value("section") }
+                jsonPath("$[0].children[0].title") { value("Congress") }
+                jsonPath("$[0].body") { value("All legislative Powers herein granted shall be vested in a Congress.") }
+            }
+    }
+
+    @Test
     fun articleListMatchesGatewayContract() {
         val json = mockMvc.get("/versions/01900000-0000-4000-8000-000000000004/articles")
             .andReturn().response.contentAsString

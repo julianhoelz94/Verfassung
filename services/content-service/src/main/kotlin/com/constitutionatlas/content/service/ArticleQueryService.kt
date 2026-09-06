@@ -22,20 +22,14 @@ class ArticleQueryService(private val articleRepository: ArticleRepository) {
         if (!includeBody) {
             return items
         }
-        return items.map { item ->
-            val children = articleRepository.listChildren(item.id)
-            val body = if (children.isNotEmpty()) ArticleRepository.flattenText(children) else item.body
-            item.copy(body = body, children = children)
-        }
+        return items.map { attachChildren(it) }
     }
 
     fun countByVersion(versionId: UUID): Int = articleRepository.countByVersion(versionId)
 
     fun getById(id: UUID): ArticleDetail {
         val article = articleRepository.findById(id) ?: throw NotFoundException("Unknown article '$id'")
-        val children = articleRepository.listChildren(id)
-        val body = if (children.isNotEmpty()) ArticleRepository.flattenText(children) else article.body
-        return article.copy(body = body, children = children)
+        return attachChildren(article)
     }
 
     @Transactional
@@ -57,7 +51,7 @@ class ArticleQueryService(private val articleRepository: ArticleRepository) {
             throw IllegalArgumentException("title must not be blank")
         }
         val children = articleRepository.listChildren(id)
-        val flattened = ArticleRepository.flattenText(children)
+        val flattened = projectedBody(null, children).orEmpty()
         val keepTree = children.isNotEmpty() && body.trim() == flattened.trim()
         articleRepository.updateText(id, title, body, replaceChildren = !keepTree)
             ?: throw NotFoundException("Unknown article '$id'")
@@ -76,4 +70,17 @@ class ArticleQueryService(private val articleRepository: ArticleRepository) {
         }
         return articleRepository.restructureKeepingKinds(versionId, kinds)
     }
+
+    private fun attachChildren(item: ArticleSummary): ArticleSummary {
+        val children = articleRepository.listChildren(item.id)
+        return item.copy(body = projectedBody(item.body, children), children = children)
+    }
+
+    private fun attachChildren(article: ArticleDetail): ArticleDetail {
+        val children = articleRepository.listChildren(article.id)
+        return article.copy(body = projectedBody(article.body, children).orEmpty(), children = children)
+    }
+
+    private fun projectedBody(stored: String?, children: List<ContentNodeDto>): String? =
+        if (children.isNotEmpty()) ArticleRepository.flattenText(children) else stored
 }

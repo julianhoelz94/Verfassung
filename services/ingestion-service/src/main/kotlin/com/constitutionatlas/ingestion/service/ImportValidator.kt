@@ -1,8 +1,11 @@
 package com.constitutionatlas.ingestion.service
 
+import com.constitutionatlas.ingestion.api.ImportNode
 import com.constitutionatlas.ingestion.api.ImportRequest
 
 object ImportValidator {
+    private val DEFAULT_KINDS = setOf("article")
+
     fun validate(request: ImportRequest): List<Pair<String, String>> {
         val errors = mutableListOf<Pair<String, String>>()
         if (request.isoCode.trim().length != 2) {
@@ -38,6 +41,29 @@ object ImportValidator {
         if (request.articles.isNotEmpty() && orders.toSet() != expected) {
             errors += "ORDER_GAPS" to "sortOrder must be a contiguous sequence starting at 1"
         }
+        unknownKinds(request).distinct().forEach { kind ->
+            errors += "UNKNOWN_KIND" to "kind '$kind' is not in the outline"
+        }
         return errors
     }
+
+    fun allowedKinds(request: ImportRequest): Set<String> {
+        val fromOutline =
+            request.outline
+                ?.kinds
+                .orEmpty()
+                .map { it.kindCode.trim().lowercase() }
+                .filter { it.isNotBlank() }
+        return if (fromOutline.isEmpty()) DEFAULT_KINDS else fromOutline.toSet()
+    }
+
+    private fun unknownKinds(request: ImportRequest): List<String> {
+        val allowed = allowedKinds(request)
+        return request.articles.flatMap { article -> collectKinds(article.nodes) }.filter { it !in allowed }
+    }
+
+    private fun collectKinds(nodes: List<ImportNode>): List<String> =
+        nodes.flatMap { node ->
+            listOf(node.kind.trim().lowercase()) + collectKinds(node.children)
+        }
 }

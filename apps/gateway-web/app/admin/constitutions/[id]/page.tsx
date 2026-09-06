@@ -1,10 +1,10 @@
-import { notFound, redirect } from 'next/navigation';
+import { notFound } from 'next/navigation';
+import { AdminForbidden } from '../../../components/AdminForbidden';
 import { Alert } from '../../../components/ui';
 import { PageMain } from '../../../components/PageMain';
-import { getCountry, listCountries } from '../../../../lib/api';
-import { canVisitAdmin } from '../../../../lib/nav';
+import { loadCountriesWithDetails } from '../../../../lib/api';
+import { requireAdminPage } from '../../../../lib/admin';
 import { toOutlineKindWrite } from '../../../../lib/outline';
-import { currentUser } from '../../../../lib/session';
 import { OutlineEditor } from '../OutlineEditor';
 
 type AdminOutlinePageProps = {
@@ -13,20 +13,10 @@ type AdminOutlinePageProps = {
 };
 
 export default async function AdminOutlinePage({ params, searchParams }: AdminOutlinePageProps) {
-  const user = await currentUser();
-  if (!user) {
-    redirect('/login');
+  if (!(await requireAdminPage())) {
+    return <AdminForbidden title="Outline" />;
   }
-  if (!canVisitAdmin(user.roles)) {
-    return (
-      <PageMain>
-        <h1>Outline</h1>
-        <Alert tone="error">Administrator role required.</Alert>
-      </PageMain>
-    );
-  }
-  const countries = (await listCountries().catch(() => [])) ?? [];
-  const details = await Promise.all(countries.map((country) => getCountry(country.isoCode).catch(() => null)));
+  const { details } = await loadCountriesWithDetails();
   const match = details
     .flatMap((country) =>
       (country?.constitutions ?? []).map((constitution) => ({ country, constitution })),

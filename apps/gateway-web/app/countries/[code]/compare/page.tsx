@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import { Breadcrumbs } from '../../../components/Breadcrumbs';
 import { ConstitutionText } from '../../../components/ConstitutionText';
+import { DiffConstitutionText } from '../../../components/DiffConstitutionText';
 import { PageMain } from '../../../components/PageMain';
 import { ServiceUnavailable } from '../../../components/StatusMessage';
 import {
@@ -266,16 +267,42 @@ export default async function ComparePage({ params, searchParams }: ComparePageP
                     <p className="compare-kind">
                       <a href={`#${rowId}`}>{COMPARE_KIND_LABEL[kind]}</a>
                     </p>
-                    {left ? (
-                      <ConstitutionText article={left} headingLevel="h3" outline={constitution?.contentOutline} />
+                    {kind === 'changed' && (left || right) ? (
+                      <DiffConstitutionText
+                        left={left}
+                        right={right}
+                        side="from"
+                        headingLevel="h3"
+                        outline={constitution?.contentOutline}
+                      />
+                    ) : left ? (
+                      <ConstitutionText
+                        article={left}
+                        headingLevel="h3"
+                        headingIdPrefix="article-from"
+                        outline={constitution?.contentOutline}
+                      />
                     ) : (
                       <p className="muted">Not in {fromVersion.versionLabel}</p>
                     )}
                   </div>
                   <div>
                     <p className="compare-cell-label">{toVersion.versionLabel}</p>
-                    {right ? (
-                      <ConstitutionText article={right} headingLevel="h3" outline={constitution?.contentOutline} />
+                    {kind === 'changed' && (left || right) ? (
+                      <DiffConstitutionText
+                        left={left}
+                        right={right}
+                        side="to"
+                        headingLevel="h3"
+                        outline={constitution?.contentOutline}
+                      />
+                    ) : right ? (
+                      <ConstitutionText
+                        article={right}
+                        headingLevel="h3"
+                        headingIdPrefix="article-to"
+                        outline={constitution?.contentOutline}
+                      />
                     ) : (
                       <p className="muted">Not in {toVersion.versionLabel}</p>
                     )}

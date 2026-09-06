@@ -131,22 +131,45 @@ export function concatenatedText(nodes: ContentNode[]): string {
     .join(' ');
 }
 
+export type DepthStop = {
+  label: string;
+  throughKindIndex: number;
+  includeText: boolean;
+};
+
+function isTitledSectionKind(kind: OutlineKind): boolean {
+  return asOutlinePresentation(kind.presentation) !== 'concatenated' && Boolean(kind.showTitle);
+}
+
+export function depthStops(outline?: ContentOutline): DepthStop[] {
+  const kinds = outline?.kinds ?? [];
+  const stops: DepthStop[] = [{ label: 'Overview', throughKindIndex: 0, includeText: false }];
+  kinds.forEach((kind, index) => {
+    if (index === 0 || !isTitledSectionKind(kind)) {
+      return;
+    }
+    stops.push({ label: kind.displayLabel, throughKindIndex: index, includeText: false });
+  });
+  stops.push({
+    label: 'Full text',
+    throughKindIndex: Math.max(0, kinds.length - 1),
+    includeText: true,
+  });
+  return stops;
+}
+
 export function depthStopCount(outline?: ContentOutline): number {
-  return Math.max(2, outline?.kinds.length ?? 1);
+  return depthStops(outline).length;
 }
 
 export function depthStopLabels(outline?: ContentOutline): string[] {
-  const max = depthStopCount(outline);
-  return Array.from({ length: max }, (_, index) => {
-    const depth = index + 1;
-    if (depth === 1) {
-      return 'Overview';
-    }
-    if (depth === max) {
-      return 'Full text';
-    }
-    return outline?.kinds[depth - 1]?.displayLabel ?? `Level ${depth}`;
-  });
+  return depthStops(outline).map((stop) => stop.label);
+}
+
+function stopAt(outline: ContentOutline | undefined, depth: number): DepthStop {
+  const stops = depthStops(outline);
+  const index = Math.min(Math.max(depth, 1), stops.length) - 1;
+  return stops[index] ?? stops[0]!;
 }
 
 function nodeKindIndex(outline: ContentOutline | undefined, kindCode: string): number {
@@ -163,11 +186,17 @@ export function clipNodes(
   outline: ContentOutline | undefined,
   depth: number,
 ): ContentNode[] {
-  const max = depthStopCount(outline);
-  const includeText = depth >= max;
+  return clipVisible(nodes, outline, stopAt(outline, depth));
+}
+
+function clipVisible(
+  nodes: ContentNode[],
+  outline: ContentOutline | undefined,
+  stop: DepthStop,
+): ContentNode[] {
   const clipped: ContentNode[] = [];
   for (const node of nodes) {
-    const next = clipNode(node, outline, depth, includeText);
+    const next = clipNode(node, outline, stop);
     if (next) {
       clipped.push(next);
     }
@@ -178,20 +207,18 @@ export function clipNodes(
 function clipNode(
   node: ContentNode,
   outline: ContentOutline | undefined,
-  depth: number,
-  includeText: boolean,
+  stop: DepthStop,
 ): ContentNode | null {
-  if (nodeKindIndex(outline, node.kind) >= depth) {
+  if (!stop.includeText && nodeKindIndex(outline, node.kind) > stop.throughKindIndex) {
     return null;
   }
   const presentation = asOutlinePresentation(kindByCode(outline, node.kind)?.presentation);
-  if (presentation === 'concatenated' && !includeText) {
+  if (presentation === 'concatenated' && !stop.includeText) {
     return null;
   }
-  const children = clipNodes(node.children, outline, depth);
   return {
     ...node,
-    body: includeText ? node.body : null,
-    children,
+    body: stop.includeText ? node.body : null,
+    children: clipVisible(node.children, outline, stop),
   };
 }

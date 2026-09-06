@@ -1,0 +1,61 @@
+{
+  "isoCode": "US",
+  "countryName": "United States",
+  "constitutionSlug": "constitution",
+  "constitutionTitle": "Constitution of the United States",
+  "versionLabel": "1789",
+  "effectiveDate": "1789-03-04",
+  "languageCode": "en",
+  "sourceUrl": "https://www.archives.gov/founding-docs/constitution-transcript",
+  "gazetteReference": "U.S. Const.",
+  "outline": {
+    "kinds": [
+      {
+        "kindCode": "article",
+        "displayLabel": "Article",
+        "presentation": "section",
+        "showLabel": true,
+        "showTitle": true,
+        "showKind": true
+      },
+      {
+        "kindCode": "section",
+        "displayLabel": "Section",
+        "presentation": "section",
+        "showLabel": true,
+        "showTitle": true,
+        "showKind": true
+      }
+    ]
+  },
+  "articles": [
+    {
+      "articleNumber": "I",
+      "title": "Legislative Power",
+      "body": "",
+      "sortOrder": 1,
+      "nodes": [
+        {
+          "kind": "section",
+          "label": "1",
+          "title": "Congress",
+          "body": "All legislative Powers herein granted shall be vested in a Congress of the United States, which shall consist of a Senate and House of Representatives."
+        }
+      ]
+    },
+    {
+      "articleNumber": "II",
+      "title": "Executive Power",
+      "body": "",
+      "sortOrder": 2,
+      "nodes": [
+        {
+          "kind": "section",
+          "label": "1",
+          "title": "President",
+          "body": "The executive Power shall be vested in a President of the United States of America."
+        }
+      ]
+    }
+  ]
+}

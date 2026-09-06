@@ -38,6 +38,15 @@ data class StoredPasswordReset(
     val usedAt: Instant?,
 )
 
+data class StoredMfaChallenge(
+    val id: UUID,
+    val userId: UUID,
+    val purpose: String,
+    val pendingSecretCipher: String?,
+    val revokeTokenHash: String?,
+    val expiresAt: Instant,
+)
+
 @Repository
 class IdentityRepository(private val jdbc: JdbcTemplate) {
     fun findRoleId(name: String): UUID? =
@@ -107,25 +116,52 @@ class IdentityRepository(private val jdbc: JdbcTemplate) {
             userId,
         )
 
-    fun toUserDto(user: StoredUser): UserDto = UserDto(user.id, user.email, rolesForUser(user.id))
+    fun toUserDto(
+        user: StoredUser,
+        tokenHash: String? = null,
+        stepUpTtl: java.time.Duration = java.time.Duration.ofMinutes(5),
+    ): UserDto {
+        val roles = rolesForUser(user.id)
+        val enabled = mfaEnabled(user.id)
+        val required = roles.any { it == "admin" || it == "publisher" }
+        val stepUpFresh =
+            if (!required) {
+                true
+            } else {
+                val stepUpAt = tokenHash?.let { stepUpAt(it) }
+                stepUpAt != null && stepUpAt.isAfter(Instant.now().minus(stepUpTtl))
+            }
+        return UserDto(
+            id = user.id,
+            email = user.email,
+            roles = roles,
+            mfaEnabled = enabled,
+            mfaRequired = required,
+            stepUpFresh = stepUpFresh,
+        )
+    }
 
     fun insertSession(
         userId: UUID,
         tokenHash: String,
         expiresAt: OffsetDateTime,
         lastSeenAt: OffsetDateTime,
+        mfaVerifiedAt: OffsetDateTime? = null,
+        stepUpAt: OffsetDateTime? = lastSeenAt,
     ): UUID {
         val id = UUID.randomUUID()
         jdbc.update(
             """
-            INSERT INTO sessions (id, user_id, token_hash, expires_at, last_seen_at)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO sessions (id, user_id, token_hash, expires_at, last_seen_at, mfa_verified_at, step_up_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
             """.trimIndent(),
             id,
             userId,
             tokenHash,
             Timestamp.from(expiresAt.toInstant()),
             Timestamp.from(lastSeenAt.toInstant()),
+            mfaVerifiedAt?.let { Timestamp.from(it.toInstant()) },
+            stepUpAt?.let { Timestamp.from(it.toInstant()) },
         )
         return id
     }
@@ -325,6 +361,173 @@ class IdentityRepository(private val jdbc: JdbcTemplate) {
 
     fun markPasswordResetUsed(id: UUID) {
         jdbc.update("UPDATE password_resets SET used_at = NOW() WHERE id = ?", id)
+    }
+
+    fun mfaEnabled(userId: UUID): Boolean {
+        val count =
+            jdbc.queryForObject(
+                "SELECT COUNT(*) FROM user_mfa WHERE user_id = ?",
+                Int::class.java,
+                userId,
+            )
+        return (count ?: 0) > 0
+    }
+
+    fun findMfaSecretCipher(userId: UUID): String? =
+        jdbc.query(
+            "SELECT totp_secret_cipher FROM user_mfa WHERE user_id = ?",
+            { rs, _ -> rs.getString("totp_secret_cipher") },
+            userId,
+        ).firstOrNull()
+
+    fun upsertMfaSecret(userId: UUID, cipher: String) {
+        jdbc.update(
+            """
+            INSERT INTO user_mfa (user_id, totp_secret_cipher, enrolled_at)
+            VALUES (?, ?, NOW())
+            ON CONFLICT (user_id) DO UPDATE SET
+              totp_secret_cipher = EXCLUDED.totp_secret_cipher,
+              enrolled_at = NOW()
+            """.trimIndent(),
+            userId,
+            cipher,
+        )
+    }
+
+    fun deleteMfa(userId: UUID) {
+        jdbc.update("DELETE FROM mfa_recovery_codes WHERE user_id = ?", userId)
+        jdbc.update("DELETE FROM user_mfa WHERE user_id = ?", userId)
+    }
+
+    fun insertRecoveryCode(userId: UUID, codeHash: String): UUID {
+        val id = UUID.randomUUID()
+        jdbc.update(
+            """
+            INSERT INTO mfa_recovery_codes (id, user_id, code_hash)
+            VALUES (?, ?, ?)
+            """.trimIndent(),
+            id,
+            userId,
+            codeHash,
+        )
+        return id
+    }
+
+    fun deleteRecoveryCodes(userId: UUID) {
+        jdbc.update("DELETE FROM mfa_recovery_codes WHERE user_id = ?", userId)
+    }
+
+    fun findUnusedRecovery(codeHash: String): UUID? =
+        jdbc.query(
+            """
+            SELECT id FROM mfa_recovery_codes
+            WHERE code_hash = ? AND used_at IS NULL
+            """.trimIndent(),
+            { rs, _ -> rs.getObject("id", UUID::class.java) },
+            codeHash,
+        ).firstOrNull()
+
+    fun recoveryBelongsToUser(id: UUID, userId: UUID): Boolean {
+        val count =
+            jdbc.queryForObject(
+                "SELECT COUNT(*) FROM mfa_recovery_codes WHERE id = ? AND user_id = ?",
+                Int::class.java,
+                id,
+                userId,
+            )
+        return (count ?: 0) > 0
+    }
+
+    fun markRecoveryUsed(id: UUID) {
+        jdbc.update("UPDATE mfa_recovery_codes SET used_at = NOW() WHERE id = ?", id)
+    }
+
+    fun insertChallenge(
+        userId: UUID,
+        tokenHash: String,
+        purpose: String,
+        expiresAt: Instant,
+        pendingSecretCipher: String? = null,
+        revokeTokenHash: String? = null,
+    ): UUID {
+        val id = UUID.randomUUID()
+        jdbc.update(
+            """
+            INSERT INTO mfa_challenges (
+              id, user_id, token_hash, purpose, pending_secret_cipher, revoke_token_hash, expires_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """.trimIndent(),
+            id,
+            userId,
+            tokenHash,
+            purpose,
+            pendingSecretCipher,
+            revokeTokenHash,
+            Timestamp.from(expiresAt),
+        )
+        return id
+    }
+
+    fun findChallengeByTokenHash(tokenHash: String): StoredMfaChallenge? =
+        jdbc.query(
+            """
+            SELECT id, user_id, purpose, pending_secret_cipher, revoke_token_hash, expires_at
+            FROM mfa_challenges
+            WHERE token_hash = ?
+            """.trimIndent(),
+            challengeMapper,
+            tokenHash,
+        ).firstOrNull()
+
+    fun setChallengePendingSecret(id: UUID, cipher: String) {
+        jdbc.update("UPDATE mfa_challenges SET pending_secret_cipher = ? WHERE id = ?", cipher, id)
+    }
+
+    fun deleteChallenge(id: UUID) {
+        jdbc.update("DELETE FROM mfa_challenges WHERE id = ?", id)
+    }
+
+    fun deleteChallengesForUser(userId: UUID, purpose: String? = null) {
+        if (purpose == null) {
+            jdbc.update("DELETE FROM mfa_challenges WHERE user_id = ?", userId)
+        } else {
+            jdbc.update("DELETE FROM mfa_challenges WHERE user_id = ? AND purpose = ?", userId, purpose)
+        }
+    }
+
+    fun stepUpAt(tokenHash: String): Instant? =
+        jdbc.query(
+            "SELECT step_up_at FROM sessions WHERE token_hash = ?",
+            { rs, _ -> rs.getTimestamp("step_up_at")?.toInstant() },
+            tokenHash,
+        ).firstOrNull()
+
+    fun markSessionMfa(tokenHash: String, at: Instant) {
+        jdbc.update(
+            "UPDATE sessions SET mfa_verified_at = ?, step_up_at = ? WHERE token_hash = ?",
+            Timestamp.from(at),
+            Timestamp.from(at),
+            tokenHash,
+        )
+    }
+
+    fun clearSessionMfa(userId: UUID) {
+        jdbc.update(
+            "UPDATE sessions SET mfa_verified_at = NULL, step_up_at = NULL WHERE user_id = ?",
+            userId,
+        )
+    }
+
+    private val challengeMapper = RowMapper { rs, _ ->
+        StoredMfaChallenge(
+            id = rs.getObject("id", UUID::class.java),
+            userId = rs.getObject("user_id", UUID::class.java),
+            purpose = rs.getString("purpose"),
+            pendingSecretCipher = rs.getString("pending_secret_cipher"),
+            revokeTokenHash = rs.getString("revoke_token_hash"),
+            expiresAt = rs.getTimestamp("expires_at").toInstant(),
+        )
     }
 
     private val userMapper = RowMapper { rs, _ ->

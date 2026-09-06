@@ -20,7 +20,8 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
       <h1>Log in</h1>
       <p className="lede">
         Use a seeded local account. local-editor@example.local can edit, review, and publish. Dedicated
-        reviewer and publisher accounts exist for separated duties.
+        reviewer and publisher accounts exist for separated duties. Seeded admin and publisher accounts
+        require the authenticator secret <code>CAATLASMFASEED22</code>.
       </p>
       {searchParams.error ? (
         <Alert tone="error">

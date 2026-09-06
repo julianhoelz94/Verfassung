@@ -18,6 +18,7 @@ services:
       - IDENTITY_API_URL=http://identity-service:8080
       - EDITOR_API_URL=http://editor-service:8080
       - SEARCH_API_URL=http://search-service:8080
+      - INGESTION_API_URL=http://ingestion-service:8080
     container_name: gateway-web
     ports:
       - "${GATEWAY_PORT:-3000}:3000"
@@ -33,6 +34,8 @@ services:
       editor-service:
         condition: service_started
       search-service:
+        condition: service_started
+      ingestion-service:
         condition: service_started
 
   catalog-service:
@@ -89,6 +92,8 @@ services:
       - LOCAL_ADMIN_PASSWORD=${LOCAL_ADMIN_PASSWORD:-change-me}
       - LOCAL_VIEWER_EMAIL=${LOCAL_VIEWER_EMAIL:-local-viewer@example.local}
       - LOCAL_VIEWER_PASSWORD=${LOCAL_VIEWER_PASSWORD:-change-me}
+      - IDENTITY_SEED_TOTP_SECRET=${IDENTITY_SEED_TOTP_SECRET:-CAATLASMFASEED22}
+      - IDENTITY_MFA_ENCRYPTION_KEY=${IDENTITY_MFA_ENCRYPTION_KEY:-local-mfa-dev-key}
       - AUDIT_API_URL=http://audit-service:8080
       - CI_EDITOR_EMAIL=${CI_EDITOR_EMAIL:-}
       - CI_EDITOR_PASSWORD=${CI_EDITOR_PASSWORD:-}

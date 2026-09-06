@@ -208,6 +208,24 @@ class EditorApiTest {
     }
 
     @Test
+    fun publishWithoutFreshStepUpIsForbidden() {
+        val versionId = UUID.randomUUID()
+        val articleId = UUID.randomUUID()
+        val sessionId = openSession(versionId)
+        saveDraft(sessionId, articleId)
+        postCommand(sessionId, "review", "reviewing")
+        stub(reviewer)
+        postCommand(sessionId, "approval", "approved")
+        stub(Actor(publisher.id, publisher.email, publisher.roles, stepUpFresh = false))
+        mockMvc.post("/edit-sessions/$sessionId/publish") {
+            header("Authorization", TOKEN)
+        }.andExpect {
+            status { isForbidden() }
+            jsonPath("$.code") { value("step_up_required") }
+        }
+    }
+
+    @Test
     fun missingTokenIsUnauthorized() {
         mockMvc.post("/edit-sessions") {
             contentType = MediaType.APPLICATION_JSON

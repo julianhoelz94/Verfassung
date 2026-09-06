@@ -33,6 +33,7 @@ describe('primaryNavLinks', () => {
       '/account',
       '/admin/users',
       '/admin/constitutions',
+      '/admin/import',
     ]);
     const withDocs = primaryNavLinks({ email: 'admin@example.local', roles: ['admin'] }, true);
     expect(withDocs.map((link) => link.href)).toEqual([
@@ -42,6 +43,7 @@ describe('primaryNavLinks', () => {
       '/account',
       '/admin/users',
       '/admin/constitutions',
+      '/admin/import',
       '/api-docs',
     ]);
   });

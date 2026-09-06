@@ -1,12 +1,31 @@
 package com.constitutionatlas.ingestion.client
 
 import com.constitutionatlas.ingestion.api.ImportArticle
+import com.constitutionatlas.ingestion.api.ImportOutlineKind
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import org.springframework.http.HttpStatus
+import org.springframework.http.MediaType
 import org.springframework.web.client.RestClient
 import org.springframework.web.client.RestClientResponseException
 import java.time.LocalDate
 import java.util.UUID
+
+private fun <T> RestClient.postJson(path: String, body: Any, type: Class<T>, vararg uriVars: Any): T =
+    post()
+        .uri(path, *uriVars)
+        .contentType(MediaType.APPLICATION_JSON)
+        .body(body)
+        .retrieve()
+        .body(type)!!
+
+private fun RestClient.putJson(path: String, body: Any, vararg uriVars: Any) {
+    put()
+        .uri(path, *uriVars)
+        .contentType(MediaType.APPLICATION_JSON)
+        .body(body)
+        .retrieve()
+        .toBodilessEntity()
+}
 
 class RestCatalogClient(
     catalogUrl: String,
@@ -21,12 +40,7 @@ class RestCatalogClient(
         }
 
     override fun createCountry(isoCode: String, name: String): DownstreamCountry =
-        client.post()
-            .uri("/countries")
-            .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
-            .body(mapOf("isoCode" to isoCode, "name" to name))
-            .retrieve()
-            .body(DownstreamCountry::class.java)!!
+        client.postJson("/countries", mapOf("isoCode" to isoCode, "name" to name), DownstreamCountry::class.java)
 
     override fun findConstitution(isoCode: String, slug: String): DownstreamConstitution? {
         val detail = try {
@@ -38,12 +52,12 @@ class RestCatalogClient(
     }
 
     override fun createConstitution(isoCode: String, slug: String, title: String): DownstreamConstitution =
-        client.post()
-            .uri("/countries/{iso}/constitutions", isoCode)
-            .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
-            .body(mapOf("slug" to slug, "title" to title))
-            .retrieve()
-            .body(DownstreamConstitution::class.java)!!
+        client.postJson(
+            "/countries/{iso}/constitutions",
+            mapOf("slug" to slug, "title" to title),
+            DownstreamConstitution::class.java,
+            isoCode,
+        )
 
     override fun createDraftVersion(
         constitutionId: UUID,
@@ -52,27 +66,29 @@ class RestCatalogClient(
         languageCode: String,
         sourceUrl: String?,
         gazetteReference: String?,
-    ): DownstreamVersion {
-        val body = mapOf(
-            "versionLabel" to versionLabel,
-            "effectiveDate" to effectiveDate,
-            "languageCode" to languageCode,
-            "sourceUrl" to sourceUrl,
-            "gazetteReference" to gazetteReference,
+    ): DownstreamVersion =
+        client.postJson(
+            "/constitutions/{id}/versions",
+            mapOf(
+                "versionLabel" to versionLabel,
+                "effectiveDate" to effectiveDate,
+                "languageCode" to languageCode,
+                "sourceUrl" to sourceUrl,
+                "gazetteReference" to gazetteReference,
+            ),
+            DownstreamVersion::class.java,
+            constitutionId,
         )
-        return client.post()
-            .uri("/constitutions/{id}/versions", constitutionId)
-            .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
-            .body(body)
-            .retrieve()
-            .body(DownstreamVersion::class.java)!!
-    }
 
     override fun publishVersion(versionId: UUID): DownstreamVersion =
         client.post()
             .uri("/versions/{id}/publish", versionId)
             .retrieve()
             .body(DownstreamVersion::class.java)!!
+
+    override fun replaceOutline(constitutionId: UUID, kinds: List<ImportOutlineKind>) {
+        client.putJson("/constitutions/{id}/content-outline", mapOf("kinds" to kinds), constitutionId)
+    }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     private data class CountryDetailWire(
@@ -86,11 +102,6 @@ class RestContentClient(
     private val client: RestClient = RestClient.builder().baseUrl(contentUrl).build()
 
     override fun replaceArticles(versionId: UUID, articles: List<ImportArticle>) {
-        client.put()
-            .uri("/versions/{id}/articles", versionId)
-            .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
-            .body(articles)
-            .retrieve()
-            .toBodilessEntity()
+        client.putJson("/versions/{id}/articles", articles, versionId)
     }
 }

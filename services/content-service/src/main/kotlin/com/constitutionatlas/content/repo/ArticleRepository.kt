@@ -4,6 +4,7 @@ import com.constitutionatlas.content.api.ArticleDetail
 import com.constitutionatlas.content.api.ArticleSummary
 import com.constitutionatlas.content.api.ArticleWrite
 import com.constitutionatlas.content.api.ContentNodeDto
+import com.constitutionatlas.content.api.NodeWrite
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.jdbc.core.RowMapper
 import org.springframework.stereotype.Repository
@@ -64,6 +65,8 @@ class ArticleRepository(private val jdbc: JdbcTemplate) {
         jdbc.update("DELETE FROM articles WHERE version_id = ?", versionId)
         articles.forEach { article ->
             val id = UUID.randomUUID()
+            val hasNodes = article.nodes.isNotEmpty()
+            val storedBody = if (hasNodes) flattenWrite(article.nodes).ifBlank { article.body } else article.body
             jdbc.update(
                 """
                 INSERT INTO articles (id, version_id, article_number, title, body, sort_order)
@@ -73,24 +76,70 @@ class ArticleRepository(private val jdbc: JdbcTemplate) {
                 versionId,
                 article.articleNumber,
                 article.title,
-                article.body,
+                storedBody,
                 article.sortOrder,
             )
-            jdbc.update(
-                """
-                INSERT INTO content_nodes (id, version_id, kind, parent_id, label, number, title, body, sort_order)
-                VALUES (?, ?, 'article', NULL, ?, ?, ?, ?, ?)
-                """.trimIndent(),
-                id,
-                versionId,
-                article.articleNumber,
-                article.articleNumber,
-                article.title,
-                article.body,
-                article.sortOrder,
+            insertContentNode(
+                versionId = versionId,
+                kind = "article",
+                parentId = null,
+                label = article.articleNumber,
+                number = article.articleNumber,
+                title = article.title,
+                body = if (hasNodes) null else article.body,
+                sortOrder = article.sortOrder,
+                id = id,
             )
+            article.nodes.forEachIndexed { index, node ->
+                insertNode(versionId, id, node, index + 1)
+            }
         }
         return listByVersion(versionId)
+    }
+
+    private fun insertNode(versionId: UUID, parentId: UUID, node: NodeWrite, sortOrder: Int) {
+        val id = insertContentNode(
+            versionId = versionId,
+            kind = node.kind,
+            parentId = parentId,
+            label = node.label,
+            number = node.label,
+            title = node.title,
+            body = if (node.children.isNotEmpty()) null else node.body,
+            sortOrder = sortOrder,
+        )
+        node.children.forEachIndexed { index, child ->
+            insertNode(versionId, id, child, index + 1)
+        }
+    }
+
+    private fun insertContentNode(
+        versionId: UUID,
+        kind: String,
+        parentId: UUID?,
+        label: String?,
+        number: String?,
+        title: String?,
+        body: String?,
+        sortOrder: Int,
+        id: UUID = UUID.randomUUID(),
+    ): UUID {
+        jdbc.update(
+            """
+            INSERT INTO content_nodes (id, version_id, kind, parent_id, label, number, title, body, sort_order)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """.trimIndent(),
+            id,
+            versionId,
+            kind,
+            parentId,
+            label,
+            number,
+            title,
+            body,
+            sortOrder,
+        )
+        return id
     }
 
     fun updateText(id: UUID, title: String, body: String, replaceChildren: Boolean): ArticleDetail? {
@@ -136,31 +185,10 @@ class ArticleRepository(private val jdbc: JdbcTemplate) {
             WHERE parent_id = ?
             ORDER BY sort_order, COALESCE(number, label, '')
             """.trimIndent(),
-            { rs, _ ->
-                ContentNodeRow(
-                    id = rs.getObject("id", UUID::class.java),
-                    kind = rs.getString("kind"),
-                    label = rs.getString("label"),
-                    number = rs.getString("number"),
-                    title = rs.getString("title"),
-                    body = rs.getString("body"),
-                    sortOrder = rs.getInt("sort_order"),
-                )
-            },
+            nodeRowMapper,
             parentId,
         )
-        return rows.map { row ->
-            ContentNodeDto(
-                id = row.id,
-                kind = row.kind,
-                label = row.label,
-                number = row.number,
-                title = row.title,
-                body = row.body,
-                sortOrder = row.sortOrder,
-                children = listChildren(row.id),
-            )
-        }
+        return rows.map(::toDto)
     }
 
     fun findNode(id: UUID): ContentNodeDto? {
@@ -170,29 +198,10 @@ class ArticleRepository(private val jdbc: JdbcTemplate) {
             FROM content_nodes
             WHERE id = ?
             """.trimIndent(),
-            { rs, _ ->
-                ContentNodeRow(
-                    id = rs.getObject("id", UUID::class.java),
-                    kind = rs.getString("kind"),
-                    label = rs.getString("label"),
-                    number = rs.getString("number"),
-                    title = rs.getString("title"),
-                    body = rs.getString("body"),
-                    sortOrder = rs.getInt("sort_order"),
-                )
-            },
+            nodeRowMapper,
             id,
         ).firstOrNull() ?: return null
-        return ContentNodeDto(
-            id = row.id,
-            kind = row.kind,
-            label = row.label,
-            number = row.number,
-            title = row.title,
-            body = row.body,
-            sortOrder = row.sortOrder,
-            children = listChildren(row.id),
-        )
+        return toDto(row)
     }
 
     fun updateNodeTitle(id: UUID, title: String?): ContentNodeDto? {
@@ -369,15 +378,48 @@ class ArticleRepository(private val jdbc: JdbcTemplate) {
         )
     }
 
-    companion object {
-        fun flattenText(nodes: List<ContentNodeDto>): String =
-            nodes.flatMap { collectText(it) }.joinToString(" ")
+    private fun toDto(row: ContentNodeRow): ContentNodeDto =
+        ContentNodeDto(
+            id = row.id,
+            kind = row.kind,
+            label = row.label,
+            number = row.number,
+            title = row.title,
+            body = row.body,
+            sortOrder = row.sortOrder,
+            children = listChildren(row.id),
+        )
 
-        private fun collectText(node: ContentNodeDto): List<String> {
-            val parts = mutableListOf<String>()
-            node.body?.trim()?.takeIf { it.isNotEmpty() }?.let { parts.add(it) }
-            node.children.forEach { parts.addAll(collectText(it)) }
-            return parts
+    private val nodeRowMapper = RowMapper { rs, _ ->
+        ContentNodeRow(
+            id = rs.getObject("id", UUID::class.java),
+            kind = rs.getString("kind"),
+            label = rs.getString("label"),
+            number = rs.getString("number"),
+            title = rs.getString("title"),
+            body = rs.getString("body"),
+            sortOrder = rs.getInt("sort_order"),
+        )
+    }
+
+    companion object {
+        fun flattenText(nodes: List<ContentNodeDto>): String = flatten(nodes, { it.body }, { it.children })
+
+        private fun flattenWrite(nodes: List<NodeWrite>): String = flatten(nodes, { it.body }, { it.children })
+
+        private fun <T> flatten(
+            nodes: List<T>,
+            body: (T) -> String?,
+            children: (T) -> List<T>,
+        ): String = nodes.flatMap { collect(it, body, children) }.joinToString(" ")
+
+        private fun <T> collect(
+            node: T,
+            body: (T) -> String?,
+            children: (T) -> List<T>,
+        ): List<String> {
+            val own = body(node)?.trim()?.takeIf { it.isNotEmpty() }
+            return listOfNotNull(own) + children(node).flatMap { collect(it, body, children) }
         }
     }
 }

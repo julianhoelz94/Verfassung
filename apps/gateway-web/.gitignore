@@ -16,3 +16,9 @@ yarn-error.log*
 
 # Local env (repo-wide *.env also covers this)
 .env*.local
+
+# Playwright
+/playwright-report/
+/test-results/
+/blob-report/
+/playwright/.cache/

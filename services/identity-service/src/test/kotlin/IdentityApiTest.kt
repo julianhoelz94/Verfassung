@@ -1,6 +1,7 @@
 import com.constitutionatlas.identity.IdentityServiceApplication
 import com.constitutionatlas.identity.client.AuditClient
 import com.constitutionatlas.identity.client.AuthAudit
+import com.constitutionatlas.identity.crypto.Totp
 import com.constitutionatlas.identity.service.AccountService
 import com.constitutionatlas.identity.service.IdentitySeedRunner
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -78,24 +79,28 @@ class IdentityApiTest {
         val first = login("local-editor@example.local", "change-me")
         check(first.length >= 43)
         check(!first.contains("-") || first.length != 36)
-        val second =
+        val challengeJson =
             mockMvc.post("/login") {
                 contentType = MediaType.APPLICATION_JSON
                 header("Authorization", "Bearer $first")
                 content = """{"email":"local-editor@example.local","password":"change-me"}"""
             }.andExpect {
                 status { isOk() }
-                jsonPath("$.expiresInSeconds") { value(86400) }
-                jsonPath("$.token") { exists() }
-            }.andReturn().response.contentAsString.let {
-                Regex("\"token\":\"([^\"]+)\"").find(it)!!.groupValues[1]
-            }
+                jsonPath("$.mfaRequired") { value(true) }
+                jsonPath("$.challengeToken") { exists() }
+            }.andReturn().response.contentAsString
+        val challenge = objectMapper.readTree(challengeJson).get("challengeToken").asText()
+        val second = completeMfa(challenge)
         mockMvc.get("/me") {
             header("Authorization", "Bearer $first")
         }.andExpect { status { isUnauthorized() } }
         mockMvc.get("/me") {
             header("Authorization", "Bearer $second")
-        }.andExpect { status { isOk() } }
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.mfaEnabled") { value(true) }
+            jsonPath("$.stepUpFresh") { value(true) }
+        }
     }
 
     @Test
@@ -222,6 +227,9 @@ class IdentityApiTest {
             jsonPath("$.components.securitySchemes.bearer-session.scheme") { value("bearer") }
             jsonPath("$.paths./users/invites.post") { exists() }
             jsonPath("$.paths./password/reset.post") { exists() }
+            jsonPath("$.paths./login/mfa.post") { exists() }
+            jsonPath("$.paths./mfa/enroll/start.post") { exists() }
+            jsonPath("$.paths./mfa/step-up.post") { exists() }
         }
     }
 
@@ -501,6 +509,124 @@ class IdentityApiTest {
         login(email, "after-admin-reset-phrase")
     }
 
+    @Test
+    fun privilegedLoginRequiresTotpAndStepUpForRoleChanges() {
+        val challengeJson =
+            mockMvc.post("/login") {
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"email":"local-admin@example.local","password":"change-me"}"""
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.mfaRequired") { value(true) }
+                jsonPath("$.token") { doesNotExist() }
+            }.andReturn().response.contentAsString
+        mockMvc.post("/login/mfa") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"challengeToken":"${objectMapper.readTree(challengeJson).get("challengeToken").asText()}","code":"000000"}"""
+        }.andExpect { status { isUnauthorized() } }
+        val admin = login("local-admin@example.local", "change-me")
+        mockMvc.delete("/mfa") {
+            header("Authorization", "Bearer $admin")
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"code":"${Totp.generate(SEED_TOTP)}"}"""
+        }.andExpect { status { isConflict() } }
+        jdbcTemplate.update("UPDATE sessions SET step_up_at = NOW() - INTERVAL '10 minutes'")
+        val target =
+            mockMvc.get("/users") {
+                header("Authorization", "Bearer $admin")
+            }.andExpect { status { isOk() } }.andReturn().response.contentAsString.let { body ->
+                objectMapper.readTree(body).first { it.get("email").asText() == "local-viewer@example.local" }.get("id").asText()
+            }
+        mockMvc.put("/users/$target/roles") {
+            header("Authorization", "Bearer $admin")
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"roles":["viewer"]}"""
+        }.andExpect {
+            status { isForbidden() }
+            jsonPath("$.code") { value("step_up_required") }
+        }
+        mockMvc.post("/mfa/step-up") {
+            header("Authorization", "Bearer $admin")
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"code":"${Totp.generate(SEED_TOTP)}"}"""
+        }.andExpect { status { isNoContent() } }
+        mockMvc.put("/users/$target/roles") {
+            header("Authorization", "Bearer $admin")
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"roles":["viewer"]}"""
+        }.andExpect { status { isOk() } }
+    }
+
+    @Test
+    fun totpEnrollmentRecoveryAndRevocationAreAudited() {
+        val viewer = login("local-viewer@example.local", "change-me")
+        val started =
+            mockMvc.post("/mfa/enroll/start") {
+                header("Authorization", "Bearer $viewer")
+                contentType = MediaType.APPLICATION_JSON
+                content = "{}"
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.secret") { exists() }
+                jsonPath("$.otpauthUrl") { exists() }
+                jsonPath("$.challengeToken") { exists() }
+            }.andReturn().response.contentAsString
+        val startTree = objectMapper.readTree(started)
+        val secret = startTree.get("secret").asText()
+        val enrollToken = startTree.get("challengeToken").asText()
+        mockMvc.post("/mfa/enroll/start") {
+            header("Authorization", "Bearer $viewer")
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"challengeToken":"$enrollToken"}"""
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.secret") { value(secret) }
+            jsonPath("$.challengeToken") { value(enrollToken) }
+        }
+        val confirmed =
+            mockMvc.post("/mfa/enroll/confirm") {
+                header("Authorization", "Bearer $viewer")
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"challengeToken":"$enrollToken","code":"${Totp.generate(secret)}"}"""
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.recoveryCodes.length()") { value(10) }
+            }.andReturn().response.contentAsString
+        mockMvc.post("/mfa/enroll/start") {
+            header("Authorization", "Bearer $viewer")
+            contentType = MediaType.APPLICATION_JSON
+            content = "{}"
+        }.andExpect { status { isConflict() } }
+        val recoveryCode = objectMapper.readTree(confirmed).get("recoveryCodes").get(0).asText()
+        mockMvc.post("/logout") {
+            header("Authorization", "Bearer $viewer")
+        }.andExpect { status { isNoContent() } }
+        val challengeJson =
+            mockMvc.post("/login") {
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"email":"local-viewer@example.local","password":"change-me"}"""
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.mfaRequired") { value(true) }
+            }.andReturn().response.contentAsString
+        val recovered =
+            mockMvc.post("/login/mfa") {
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"challengeToken":"${objectMapper.readTree(challengeJson).get("challengeToken").asText()}","recoveryCode":"$recoveryCode"}"""
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.token") { exists() }
+            }.andReturn().response.contentAsString
+        val recoveredToken = objectMapper.readTree(recovered).get("token").asText()
+        check(Mockito.mockingDetails(auditClient).invocations.any { it.arguments[0] == "mfa_changed" })
+        mockMvc.delete("/mfa") {
+            header("Authorization", "Bearer $recoveredToken")
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"code":"${Totp.generate(secret)}"}"""
+        }.andExpect { status { isNoContent() } }
+        login("local-viewer@example.local", "change-me")
+    }
+
     private fun hashFor(email: String): String =
         jdbcTemplate.queryForObject(
             "SELECT password_hash FROM users WHERE email = ?",
@@ -521,19 +647,39 @@ class IdentityApiTest {
             email,
         )
 
-    private fun login(email: String, password: String): String = mockMvc.post("/login") {
-        contentType = MediaType.APPLICATION_JSON
-        content = """{"email":"$email","password":"$password"}"""
-    }.andExpect {
-        status { isOk() }
-        jsonPath("$.user.email") { value(email) }
-        jsonPath("$.token") { exists() }
-        jsonPath("$.expiresInSeconds") { exists() }
-    }.andReturn().response.contentAsString.let {
-        Regex("\"token\":\"([^\"]+)\"").find(it)!!.groupValues[1]
+    private fun login(email: String, password: String): String {
+        val json =
+            mockMvc.post("/login") {
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"email":"$email","password":"$password"}"""
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.user.email") { value(email) }
+            }.andReturn().response.contentAsString
+        val tree = objectMapper.readTree(json)
+        if (tree.path("mfaRequired").asBoolean(false)) {
+            return completeMfa(tree.get("challengeToken").asText())
+        }
+        val token = tree.path("token").asText("")
+        check(token.isNotBlank()) { "expected a session token for $email" }
+        return token
     }
 
+    private fun completeMfa(challengeToken: String): String =
+        mockMvc.post("/login/mfa") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"challengeToken":"$challengeToken","code":"${Totp.generate(SEED_TOTP)}"}"""
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.token") { exists() }
+            jsonPath("$.expiresInSeconds") { exists() }
+        }.andReturn().response.contentAsString.let {
+            objectMapper.readTree(it).get("token").asText()
+        }
+
     companion object {
+        private const val SEED_TOTP = "CAATLASMFASEED22"
+
         @Container
         @JvmStatic
         val postgres: PostgreSQLContainer<*> = PostgreSQLContainer("postgres:16-alpine")
@@ -555,6 +701,8 @@ class IdentityApiTest {
             registry.add("identity.seed.admin-password") { "change-me" }
             registry.add("identity.seed.viewer-email") { "local-viewer@example.local" }
             registry.add("identity.seed.viewer-password") { "change-me" }
+            registry.add("identity.seed.totp-secret") { SEED_TOTP }
+            registry.add("identity.mfa.encryption-key") { "test-mfa-key" }
             registry.add("LOCAL_EDITOR_EMAIL") { "local-editor@example.local" }
             registry.add("LOCAL_EDITOR_PASSWORD") { "change-me" }
             registry.add("LOCAL_REVIEWER_EMAIL") { "local-reviewer@example.local" }

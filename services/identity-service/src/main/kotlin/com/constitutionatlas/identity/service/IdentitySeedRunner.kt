@@ -15,6 +15,7 @@ class IdentitySeedRunner(
     private val properties: IdentitySeedProperties,
     private val identityRepository: IdentityRepository,
     private val passwordEncoder: PasswordEncoder,
+    private val mfaService: MfaService,
 ) : ApplicationRunner {
     private val log = LoggerFactory.getLogger(javaClass)
 
@@ -51,6 +52,12 @@ class IdentitySeedRunner(
         roleNames.forEach { roleName ->
             val roleId = identityRepository.findRoleId(roleName) ?: return@forEach
             identityRepository.assignRole(userId, roleId)
+        }
+        if (
+            properties.totpSecret.isNotBlank() &&
+            roleNames.any { it == "admin" || it == "publisher" }
+        ) {
+            mfaService.ensureSeedTotp(userId, properties.totpSecret)
         }
     }
 }

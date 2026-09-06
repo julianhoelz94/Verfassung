@@ -11,6 +11,7 @@ identity:
     admin-password: ${TEST_ADMIN_PASSWORD:}
     viewer-email: ${TEST_VIEWER_EMAIL:}
     viewer-password: ${TEST_VIEWER_PASSWORD:}
+    totp-secret: ${IDENTITY_SEED_TOTP_SECRET:CAATLASMFASEED22}
   session:
     idle-timeout: 15m
     absolute-timeout: 8h

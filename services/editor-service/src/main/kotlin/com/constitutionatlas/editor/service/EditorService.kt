@@ -3,6 +3,7 @@ package com.constitutionatlas.editor.service
 import com.constitutionatlas.editor.ConflictException
 import com.constitutionatlas.editor.ForbiddenException
 import com.constitutionatlas.editor.NotFoundException
+import com.constitutionatlas.editor.StepUpRequiredException
 import com.constitutionatlas.editor.api.Actor
 import com.constitutionatlas.editor.api.CreateSessionRequest
 import com.constitutionatlas.editor.api.DraftPreviewDto
@@ -144,6 +145,9 @@ class EditorService(
     private fun requirePublish(actor: Actor) {
         if (!actor.canPublish()) {
             throw ForbiddenException("Publisher role required")
+        }
+        if (!actor.stepUpFresh) {
+            throw StepUpRequiredException()
         }
     }
 

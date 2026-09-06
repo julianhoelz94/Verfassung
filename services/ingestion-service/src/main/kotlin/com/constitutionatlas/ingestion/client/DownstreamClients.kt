@@ -1,6 +1,7 @@
 package com.constitutionatlas.ingestion.client
 
 import com.constitutionatlas.ingestion.api.ImportArticle
+import com.constitutionatlas.ingestion.api.ImportOutlineKind
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import java.time.LocalDate
 import java.util.UUID
@@ -28,6 +29,7 @@ interface CatalogClient {
         gazetteReference: String?,
     ): DownstreamVersion
     fun publishVersion(versionId: UUID): DownstreamVersion
+    fun replaceOutline(constitutionId: UUID, kinds: List<ImportOutlineKind>)
 }
 
 interface ContentClient {

@@ -15,4 +15,5 @@ data class IdentitySeedProperties(
     var adminPassword: String = "",
     var viewerEmail: String = "",
     var viewerPassword: String = "",
+    var totpSecret: String = "",
 )

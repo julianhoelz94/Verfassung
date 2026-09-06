@@ -33,11 +33,15 @@ class AuthController(private val authService: AuthService) {
             content = [
                 Content(
                     mediaType = "application/json",
-                    schema = Schema(implementation = SessionDto::class),
+                    schema = Schema(implementation = LoginResponse::class),
                     examples = [
                         ExampleObject(
                             name = "session",
-                            value = """{"token":"opaque-session-token","user":{"id":"01900000-0000-4000-8000-000000000410","email":"local-editor@example.local","roles":["editor","publisher","reviewer"]},"expiresInSeconds":86400}""",
+                            value = """{"token":"opaque-session-token","user":{"id":"01900000-0000-4000-8000-000000000410","email":"local-editor@example.local","roles":["editor","publisher","reviewer"],"mfaEnabled":true,"mfaRequired":true,"stepUpFresh":true},"expiresInSeconds":86400}""",
+                        ),
+                        ExampleObject(
+                            name = "mfa-challenge",
+                            value = """{"user":{"id":"01900000-0000-4000-8000-000000000410","email":"local-editor@example.local","roles":["editor","publisher","reviewer"],"mfaEnabled":true,"mfaRequired":true,"stepUpFresh":false},"mfaRequired":true,"challengeToken":"opaque-mfa-challenge"}""",
                         ),
                     ],
                 ),
@@ -58,7 +62,7 @@ class AuthController(private val authService: AuthService) {
         @RequestBody request: LoginRequest,
         httpRequest: HttpServletRequest,
         @RequestHeader(value = "Authorization", required = false) authorization: String?,
-    ): SessionDto =
+    ): LoginResponse =
         authService.login(
             email = request.email,
             password = request.password,
@@ -81,7 +85,7 @@ class AuthController(private val authService: AuthService) {
                     examples = [
                         ExampleObject(
                             name = "me",
-                            value = """{"id":"01900000-0000-4000-8000-000000000410","email":"local-editor@example.local","roles":["editor","publisher","reviewer"]}""",
+                            value = """{"id":"01900000-0000-4000-8000-000000000410","email":"local-editor@example.local","roles":["editor","publisher","reviewer"],"mfaEnabled":true,"mfaRequired":true,"stepUpFresh":true}""",
                         ),
                     ],
                 ),
@@ -147,6 +151,88 @@ class AuthController(private val authService: AuthService) {
         httpRequest: HttpServletRequest,
     ) {
         authService.revokeAllSessions(authorization, clientIp(httpRequest), httpRequest.getHeader("User-Agent"))
+    }
+
+    @PostMapping("/login/mfa")
+    @Operation(summary = "Complete login with TOTP or a recovery code")
+    fun completeMfaLogin(
+        @RequestBody request: MfaLoginRequest,
+        httpRequest: HttpServletRequest,
+    ): LoginResponse =
+        authService.completeMfaLogin(
+            challengeToken = request.challengeToken,
+            code = request.code,
+            recoveryCode = request.recoveryCode,
+            clientIp = clientIp(httpRequest),
+            userAgent = httpRequest.getHeader("User-Agent"),
+        )
+
+    @PostMapping("/mfa/enroll/start")
+    @Operation(summary = "Begin TOTP enrollment")
+    fun startEnroll(
+        @RequestBody(required = false) request: MfaEnrollStartRequest?,
+        httpRequest: HttpServletRequest,
+        @RequestHeader(value = "Authorization", required = false) authorization: String?,
+    ): MfaEnrollStartDto =
+        authService.startEnroll(
+            authorization,
+            request?.challengeToken,
+            clientIp(httpRequest),
+            httpRequest.getHeader("User-Agent"),
+        )
+
+    @PostMapping("/mfa/enroll/confirm")
+    @Operation(summary = "Confirm TOTP enrollment and issue recovery codes")
+    fun confirmEnroll(
+        @RequestBody request: MfaEnrollConfirmRequest,
+        httpRequest: HttpServletRequest,
+        @RequestHeader(value = "Authorization", required = false) authorization: String?,
+    ): MfaEnrollConfirmDto =
+        authService.confirmEnroll(
+            authorization,
+            request.challengeToken,
+            request.code,
+            clientIp(httpRequest),
+            httpRequest.getHeader("User-Agent"),
+        )
+
+    @PostMapping("/mfa/step-up")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @SecurityRequirement(name = "bearer-session")
+    @Operation(summary = "Refresh step-up authentication with TOTP")
+    fun stepUp(
+        @RequestBody request: MfaCodeRequest,
+        httpRequest: HttpServletRequest,
+        @RequestHeader(value = "Authorization", required = false) authorization: String?,
+    ) {
+        authService.stepUp(authorization, request.code, clientIp(httpRequest), httpRequest.getHeader("User-Agent"))
+    }
+
+    @PostMapping("/mfa/recovery/regenerate")
+    @SecurityRequirement(name = "bearer-session")
+    @Operation(summary = "Replace recovery codes after TOTP verification")
+    fun regenerateRecovery(
+        @RequestBody request: MfaCodeRequest,
+        httpRequest: HttpServletRequest,
+        @RequestHeader(value = "Authorization", required = false) authorization: String?,
+    ): MfaRecoveryDto =
+        authService.regenerateRecovery(
+            authorization,
+            request.code,
+            clientIp(httpRequest),
+            httpRequest.getHeader("User-Agent"),
+        )
+
+    @DeleteMapping("/mfa")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @SecurityRequirement(name = "bearer-session")
+    @Operation(summary = "Revoke enrolled MFA")
+    fun revokeMfa(
+        @RequestBody request: MfaCodeRequest,
+        httpRequest: HttpServletRequest,
+        @RequestHeader(value = "Authorization", required = false) authorization: String?,
+    ) {
+        authService.revokeMfa(authorization, request.code, clientIp(httpRequest), httpRequest.getHeader("User-Agent"))
     }
 
     private fun clientIp(request: HttpServletRequest): String {

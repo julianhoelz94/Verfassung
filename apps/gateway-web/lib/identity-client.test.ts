@@ -32,9 +32,32 @@ describe('gateway login/logout journey', () => {
     const login = await requestLogin('local-editor@example.local', 'change-me', fetchImpl);
     expect(login.token).toBe('session-token');
     expect(login.user.email).toBe(me.email);
-    const user = await requestMe(login.token, fetchImpl);
+    const token = login.token as string;
+    const user = await requestMe(token, fetchImpl);
     expect(user?.roles).toEqual(me.roles);
-    await requestLogout(login.token, fetchImpl);
+    expect(user?.mfaEnabled).toBe(true);
+    await requestLogout(token, fetchImpl);
     expect(calls).toEqual(['login', 'me', 'logout']);
+  });
+
+  it('returns an MFA challenge instead of a session token', async () => {
+    const fetchImpl: typeof fetch = async (input, init) => {
+      const url = String(input);
+      if (url.endsWith('/login') && (init?.method ?? 'GET') === 'POST') {
+        return new Response(
+          JSON.stringify({
+            user: me,
+            mfaRequired: true,
+            challengeToken: 'challenge-token',
+          }),
+          { status: 200 },
+        );
+      }
+      throw new Error(`unexpected ${init?.method ?? 'GET'} ${url}`);
+    };
+    const login = await requestLogin('local-editor@example.local', 'change-me', fetchImpl);
+    expect(login.token).toBeUndefined();
+    expect(login.mfaRequired).toBe(true);
+    expect(login.challengeToken).toBe('challenge-token');
   });
 });

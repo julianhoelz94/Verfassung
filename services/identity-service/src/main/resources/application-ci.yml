@@ -11,6 +11,7 @@ identity:
     admin-password: ${CI_ADMIN_PASSWORD:}
     viewer-email: ${CI_VIEWER_EMAIL:}
     viewer-password: ${CI_VIEWER_PASSWORD:}
+    totp-secret: ${IDENTITY_SEED_TOTP_SECRET:CAATLASMFASEED22}
   session:
     idle-timeout: 30m
     absolute-timeout: 12h

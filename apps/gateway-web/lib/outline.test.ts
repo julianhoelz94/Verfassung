@@ -25,7 +25,7 @@ const de: ContentOutline = {
       allowedChildKinds: ['sentence'],
       presentation: 'section',
       showLabel: true,
-      showTitle: true,
+      showTitle: false,
       showKind: false,
     },
     {
@@ -51,6 +51,12 @@ describe('nodeHeading', () => {
     expect(nodeHeading(de.kinds[1], { kind: 'paragraph', label: '(1)', number: null, title: null })).toBe('(1)');
     expect(
       nodeHeading(de.kinds[1], { kind: 'paragraph', label: '(1)', number: null, title: 'Dignity of the person' }),
+    ).toBe('(1)');
+    expect(
+      nodeHeading(
+        { ...de.kinds[1], showTitle: true },
+        { kind: 'paragraph', label: '(1)', number: null, title: 'Dignity of the person' },
+      ),
     ).toBe('(1) — Dignity of the person');
     expect(nodeHeading(de.kinds[2], { kind: 'sentence', label: '1', number: null, title: null })).toBeNull();
   });
@@ -145,10 +151,20 @@ const paragraph: ContentNode = {
 
 describe('depth stops', () => {
   it('always includes overview and full text', () => {
-    expect(depthStopCount(de)).toBe(3);
-    expect(depthStopLabels(de)).toEqual(['Overview', 'Paragraph', 'Full text']);
+    expect(depthStopCount(de)).toBe(2);
+    expect(depthStopLabels(de)).toEqual(['Overview', 'Full text']);
     expect(depthStopCount({ kinds: [] })).toBe(2);
     expect(depthStopLabels({ kinds: [] })).toEqual(['Overview', 'Full text']);
+  });
+
+  it('adds a stop only for nested layers that show titles', () => {
+    const titledParagraphs: ContentOutline = {
+      kinds: de.kinds.map((kind) =>
+        kind.kindCode === 'paragraph' ? { ...kind, showTitle: true } : kind,
+      ),
+    };
+    expect(depthStopCount(titledParagraphs)).toBe(3);
+    expect(depthStopLabels(titledParagraphs)).toEqual(['Overview', 'Paragraph', 'Full text']);
   });
 });
 
@@ -157,8 +173,20 @@ describe('clipNodes', () => {
     expect(clipNodes([paragraph], de, 1)).toEqual([]);
   });
 
-  it('keeps paragraph headings without sentence text at the middle stop', () => {
-    expect(clipNodes([paragraph], de, 2)).toEqual([
+  it('skips untitled paragraph headings and jumps to full text', () => {
+    const clipped = clipNodes([paragraph], de, 2);
+    expect(clipped).toHaveLength(1);
+    expect(clipped[0]?.children).toHaveLength(1);
+    expect(clipped[0]?.children[0]?.body).toBe('Human dignity shall be inviolable.');
+  });
+
+  it('keeps titled paragraph headings without sentence text at the middle stop', () => {
+    const titledParagraphs: ContentOutline = {
+      kinds: de.kinds.map((kind) =>
+        kind.kindCode === 'paragraph' ? { ...kind, showTitle: true } : kind,
+      ),
+    };
+    expect(clipNodes([paragraph], titledParagraphs, 2)).toEqual([
       {
         ...paragraph,
         body: null,
@@ -167,8 +195,13 @@ describe('clipNodes', () => {
     ]);
   });
 
-  it('keeps concatenated sentences at full text', () => {
-    const clipped = clipNodes([paragraph], de, 3);
+  it('keeps concatenated sentences at full text when a titled paragraph stop exists', () => {
+    const titledParagraphs: ContentOutline = {
+      kinds: de.kinds.map((kind) =>
+        kind.kindCode === 'paragraph' ? { ...kind, showTitle: true } : kind,
+      ),
+    };
+    const clipped = clipNodes([paragraph], titledParagraphs, 3);
     expect(clipped).toHaveLength(1);
     expect(clipped[0]?.children).toHaveLength(1);
     expect(clipped[0]?.children[0]?.body).toBe('Human dignity shall be inviolable.');

@@ -16,7 +16,7 @@ class OpenApiConfig {
                 Info()
                     .title("Identity API")
                     .version("1")
-                    .description("Login, sessions, account lifecycle, and password recovery with opaque Bearer tokens."),
+                    .description("Login, MFA (TOTP), sessions, account lifecycle, and password recovery with opaque Bearer tokens."),
             )
             .components(
                 Components().addSecuritySchemes(

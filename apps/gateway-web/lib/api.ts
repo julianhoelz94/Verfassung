@@ -112,7 +112,7 @@ export class ApiUnavailableError extends Error {
   }
 }
 
-async function readJson<T>(url: string, service: string): Promise<T | null> {
+export async function readJson<T>(url: string, service: string): Promise<T | null> {
   let response: Response;
   try {
     response = await fetch(url, { cache: 'no-store' });
@@ -142,6 +142,10 @@ export function amendmentBaseUrl(): string {
 
 export function searchBaseUrl(): string {
   return process.env.SEARCH_API_URL ?? 'http://localhost/api/search';
+}
+
+export function ingestionBaseUrl(): string {
+  return process.env.INGESTION_API_URL ?? 'http://localhost/api/ingestion';
 }
 
 export type SearchHit = {
@@ -218,6 +222,22 @@ export function getCountry(isoCode: string): Promise<CountryDetail | null> {
     `${catalogBaseUrl()}/countries/${encodeURIComponent(isoCode)}`,
     'catalog',
   );
+}
+
+export async function loadCountriesWithDetails(): Promise<{
+  countries: CountrySummary[];
+  details: Array<CountryDetail | null>;
+}> {
+  let countries: CountrySummary[] = [];
+  try {
+    countries = (await listCountries()) ?? [];
+  } catch (error) {
+    if (!(error instanceof ApiUnavailableError)) {
+      throw error;
+    }
+  }
+  const details = await Promise.all(countries.map((country) => getCountry(country.isoCode).catch(() => null)));
+  return { countries, details };
 }
 
 export type ArticlePage = {
@@ -322,7 +342,7 @@ export type OutlineUpdateResult = {
   versionIds: string[];
 };
 
-async function sendJson<T>(url: string, service: string, method: string, body: unknown): Promise<T> {
+export async function sendJson<T>(url: string, service: string, method: string, body: unknown): Promise<T> {
   let response: Response;
   try {
     response = await fetch(url, {

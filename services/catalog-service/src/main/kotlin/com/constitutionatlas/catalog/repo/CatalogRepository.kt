@@ -258,6 +258,19 @@ class CatalogRepository(private val jdbc: JdbcTemplate) {
             sourceUrl,
             gazetteReference,
         )
+        if (!sourceUrl.isNullOrBlank() || !gazetteReference.isNullOrBlank()) {
+            jdbc.update(
+                """
+                INSERT INTO constitution_sources (
+                  id, constitution_version_id, source_url, gazette_reference, provenance, verification_state
+                ) VALUES (?, ?, ?, ?, 'imported', 'unverified')
+                """.trimIndent(),
+                UUID.randomUUID(),
+                id,
+                sourceUrl,
+                gazetteReference,
+            )
+        }
         return id
     }
 

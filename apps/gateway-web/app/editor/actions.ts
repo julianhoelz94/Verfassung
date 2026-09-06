@@ -32,6 +32,9 @@ async function runCommand(formData: FormData, command: () => Promise<unknown>, s
   try {
     await command();
   } catch (error) {
+    if (error instanceof EditorApiError && error.code === 'step_up_required') {
+      redirect(`/account/step-up?returnTo=${encodeURIComponent(editorPath(formData))}`);
+    }
     if (error instanceof EditorApiError) {
       redirectEditor(formData, { error: error.message });
     }

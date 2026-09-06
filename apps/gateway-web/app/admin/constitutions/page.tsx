@@ -1,10 +1,9 @@
-import { redirect } from 'next/navigation';
+import { AdminForbidden } from '../../components/AdminForbidden';
 import { Alert, Card, Input } from '../../components/ui';
 import { PageMain } from '../../components/PageMain';
-import { ApiUnavailableError, getCountry, listCountries, type CountrySummary } from '../../../lib/api';
-import { canVisitAdmin } from '../../../lib/nav';
+import { loadCountriesWithDetails } from '../../../lib/api';
+import { requireAdminPage } from '../../../lib/admin';
 import { DEFAULT_NEW_OUTLINE } from '../../../lib/outline';
-import { currentUser } from '../../../lib/session';
 import { createConstitutionAction } from './actions';
 import { ConstitutionCountryFields } from './ConstitutionCountryFields';
 import { OutlineEditor } from './OutlineEditor';
@@ -14,27 +13,10 @@ type AdminConstitutionsPageProps = {
 };
 
 export default async function AdminConstitutionsPage({ searchParams }: AdminConstitutionsPageProps) {
-  const user = await currentUser();
-  if (!user) {
-    redirect('/login');
+  if (!(await requireAdminPage())) {
+    return <AdminForbidden title="Outlines" />;
   }
-  if (!canVisitAdmin(user.roles)) {
-    return (
-      <PageMain>
-        <h1>Outlines</h1>
-        <Alert tone="error">Administrator role required.</Alert>
-      </PageMain>
-    );
-  }
-  let countries: CountrySummary[] = [];
-  try {
-    countries = (await listCountries()) ?? [];
-  } catch (error) {
-    if (!(error instanceof ApiUnavailableError)) {
-      throw error;
-    }
-  }
-  const details = await Promise.all(countries.map((country) => getCountry(country.isoCode).catch(() => null)));
+  const { countries, details } = await loadCountriesWithDetails();
   return (
     <PageMain>
       <h1>Constitution outlines</h1>

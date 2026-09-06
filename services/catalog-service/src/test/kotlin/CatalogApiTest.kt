@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.http.MediaType
+import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.web.servlet.MockMvc
@@ -26,6 +27,9 @@ import java.util.UUID
 class CatalogApiTest {
     @Autowired
     lateinit var mockMvc: MockMvc
+
+    @Autowired
+    lateinit var jdbcTemplate: JdbcTemplate
 
     @Test
     fun listCountriesIncludesGermany() {
@@ -67,7 +71,7 @@ class CatalogApiTest {
                 jsonPath("$.kinds[0].presentation") { value("section") }
                 jsonPath("$.kinds[0].showKind") { value(true) }
                 jsonPath("$.kinds[1].showLabel") { value(true) }
-                jsonPath("$.kinds[1].showTitle") { value(true) }
+                jsonPath("$.kinds[1].showTitle") { value(false) }
                 jsonPath("$.kinds[1].showKind") { value(false) }
                 jsonPath("$.kinds[2].presentation") { value("concatenated") }
             }
@@ -161,6 +165,53 @@ class CatalogApiTest {
             jsonPath("$.constitutions[0].versions[0].verificationState") { value("unverified") }
             jsonPath("$.constitutions[0].versions[0].latestPublished") { value(true) }
         }
+    }
+
+    @Test
+    fun draftVersionWithCitationsWritesSourceRow() {
+        mockMvc.post("/countries") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"isoCode":"us","name":"United States"}"""
+        }.andExpect { status { isCreated() } }
+        val constitutionId =
+            mockMvc.post("/countries/US/constitutions") {
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"slug":"constitution","title":"Constitution of the United States"}"""
+            }.andExpect { status { isCreated() } }
+                .andReturn()
+                .response
+                .contentAsString
+                .let { Regex("\"id\":\"([^\"]+)\"").find(it)!!.groupValues[1] }
+        val versionId =
+            mockMvc.post("/constitutions/$constitutionId/versions") {
+                contentType = MediaType.APPLICATION_JSON
+                content = """
+                    {
+                      "versionLabel":"1789",
+                      "languageCode":"en",
+                      "sourceUrl":"https://www.archives.gov/founding-docs/constitution-transcript",
+                      "gazetteReference":"U.S. Const."
+                    }
+                """.trimIndent()
+            }.andExpect { status { isCreated() } }
+                .andReturn()
+                .response
+                .contentAsString
+                .let { Regex("\"id\":\"([^\"]+)\"").find(it)!!.groupValues[1] }
+        val count =
+            jdbcTemplate.queryForObject(
+                """
+                SELECT COUNT(*) FROM constitution_sources
+                WHERE constitution_version_id = ?::uuid
+                  AND source_url = ?
+                  AND gazette_reference = ?
+                """.trimIndent(),
+                Int::class.java,
+                versionId,
+                "https://www.archives.gov/founding-docs/constitution-transcript",
+                "U.S. Const.",
+            )
+        assertThat(count).isEqualTo(1)
     }
 
     @Test

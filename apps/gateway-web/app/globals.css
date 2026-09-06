@@ -296,6 +296,17 @@ main:focus {
   padding-right: 8px;
 }
 
+ins.diff-add {
+  background: var(--added);
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+}
+
+del.diff-remove {
+  background: var(--removed);
+  text-decoration: line-through;
+}
+
 details {
   margin-top: 12px;
 }

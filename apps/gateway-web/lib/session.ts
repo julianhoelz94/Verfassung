@@ -1,8 +1,16 @@
 import { cookies, headers } from 'next/headers';
-import { identityBaseUrl, requestLogout, type SessionUser } from './identity-client';
+import {
+  identityBaseUrl,
+  requestCompleteMfaLogin,
+  requestConfirmMfaEnroll,
+  requestLogin,
+  requestLogout,
+  type SessionUser,
+} from './identity-client';
 import { interpretMeResponse } from './interpret-me';
 
 export const SESSION_COOKIE = 'ca_session';
+export const MFA_CHALLENGE_COOKIE = 'ca_mfa_challenge';
 export type { SessionUser };
 
 export { identityBaseUrl };
@@ -26,38 +34,93 @@ function incomingClientIp(): string | undefined {
   return incoming.get('x-real-ip')?.trim() || undefined;
 }
 
-export async function login(email: string, password: string): Promise<SessionUser> {
+export async function login(
+  email: string,
+  password: string,
+): Promise<{ user: SessionUser } | { mfa: 'challenge' | 'enroll' }> {
+  const extraHeaders: Record<string, string> = {};
   const existing = cookies().get(SESSION_COOKIE)?.value;
-  const requestHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
   if (existing) {
-    requestHeaders.Authorization = `Bearer ${existing}`;
+    extraHeaders.Authorization = `Bearer ${existing}`;
   }
   const clientIp = incomingClientIp();
   if (clientIp) {
-    requestHeaders['X-Forwarded-For'] = clientIp;
+    extraHeaders['X-Forwarded-For'] = clientIp;
   }
-  const response = await fetch(`${identityBaseUrl()}/login`, {
-    method: 'POST',
-    headers: requestHeaders,
-    body: JSON.stringify({ email, password }),
-    cache: 'no-store',
-  });
-  if (!response.ok) {
+  const body = await requestLogin(email, password, fetch, identityBaseUrl(), extraHeaders);
+  if (body.mfaRequired && body.challengeToken) {
+    setChallengeCookie(body.challengeToken);
+    return { mfa: 'challenge' };
+  }
+  if (body.mfaEnrollmentRequired && body.challengeToken) {
+    setChallengeCookie(body.challengeToken);
+    return { mfa: 'enroll' };
+  }
+  if (!body.token) {
     throw new Error('Invalid credentials');
   }
-  const body = (await response.json()) as {
-    token: string;
-    user: SessionUser;
-    expiresInSeconds?: number;
+  clearChallengeCookie();
+  setSessionCookie(body.token, body.expiresInSeconds);
+  return { user: body.user };
+}
+
+export async function completeMfaLogin(code: string, recoveryCode?: string): Promise<SessionUser> {
+  const challengeToken = cookies().get(MFA_CHALLENGE_COOKIE)?.value;
+  if (!challengeToken) {
+    throw new Error('MFA challenge expired');
+  }
+  const body = await requestCompleteMfaLogin(challengeToken, code || undefined, recoveryCode || undefined);
+  if (!body.token) {
+    throw new Error('Invalid credentials');
+  }
+  clearChallengeCookie();
+  setSessionCookie(body.token, body.expiresInSeconds);
+  return body.user;
+}
+
+export async function confirmMfaEnrollment(code: string): Promise<{ user: SessionUser; recoveryCodes: string[] }> {
+  const challengeToken = cookies().get(MFA_CHALLENGE_COOKIE)?.value;
+  const sessionToken = cookies().get(SESSION_COOKIE)?.value;
+  const body = await requestConfirmMfaEnroll(code, challengeToken, sessionToken);
+  clearChallengeCookie();
+  if (body.token) {
+    setSessionCookie(body.token, body.expiresInSeconds);
+  }
+  if (!body.user && !sessionToken) {
+    throw new Error('Unable to confirm MFA enrollment');
+  }
+  return {
+    user: body.user ?? { id: '', email: '', roles: [] },
+    recoveryCodes: body.recoveryCodes,
   };
-  cookies().set(SESSION_COOKIE, body.token, {
+}
+
+function setSessionCookie(token: string, expiresInSeconds?: number) {
+  cookies().set(SESSION_COOKIE, token, {
     httpOnly: true,
     sameSite: 'lax',
     path: '/',
     secure: cookieSecure(),
-    maxAge: body.expiresInSeconds ?? 60 * 60 * 24,
+    maxAge: expiresInSeconds ?? 60 * 60 * 24,
   });
-  return body.user;
+}
+
+function setChallengeCookie(token: string) {
+  cookies().set(MFA_CHALLENGE_COOKIE, token, {
+    httpOnly: true,
+    sameSite: 'lax',
+    path: '/',
+    secure: cookieSecure(),
+    maxAge: 5 * 60,
+  });
+}
+
+function clearChallengeCookie() {
+  cookies().delete(MFA_CHALLENGE_COOKIE);
+}
+
+export function mfaChallengeToken(): string | undefined {
+  return cookies().get(MFA_CHALLENGE_COOKIE)?.value;
 }
 
 export async function logout(): Promise<void> {
@@ -66,6 +129,7 @@ export async function logout(): Promise<void> {
     await requestLogout(token).catch(() => undefined);
   }
   cookies().delete(SESSION_COOKIE);
+  clearChallengeCookie();
 }
 
 export async function currentUser(): Promise<SessionUser | null> {

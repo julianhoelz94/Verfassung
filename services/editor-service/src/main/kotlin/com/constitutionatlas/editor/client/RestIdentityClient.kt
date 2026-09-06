@@ -36,7 +36,7 @@ class RestIdentityClient(
         if (user.roles.none { it in editorial }) {
             throw ForbiddenException("Editorial role required")
         }
-        return Actor(user.id, user.email, user.roles)
+        return Actor(user.id, user.email, user.roles, user.stepUpFresh)
     }
 }
 

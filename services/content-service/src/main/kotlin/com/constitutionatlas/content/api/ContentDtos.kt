@@ -36,11 +36,20 @@ data class ArticleDetail(
     val children: List<ContentNodeDto> = emptyList(),
 )
 
+data class NodeWrite(
+    val kind: String,
+    val label: String? = null,
+    val title: String? = null,
+    val body: String? = null,
+    val children: List<NodeWrite> = emptyList(),
+)
+
 data class ArticleWrite(
     val articleNumber: String,
     val title: String,
-    val body: String,
+    val body: String = "",
     val sortOrder: Int,
+    val nodes: List<NodeWrite> = emptyList(),
 )
 
 data class ArticlePatch(

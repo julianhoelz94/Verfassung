@@ -1,5 +1,6 @@
 package com.constitutionatlas.identity.service
 
+import com.constitutionatlas.identity.config.IdentityMfaProperties
 import com.constitutionatlas.identity.config.IdentitySeedProperties
 import org.springframework.boot.ApplicationArguments
 import org.springframework.boot.ApplicationRunner
@@ -13,11 +14,15 @@ import org.springframework.stereotype.Component
 @Order(Ordered.HIGHEST_PRECEDENCE)
 class ProductionIdentityGuard(
     private val seedProperties: IdentitySeedProperties,
+    private val mfaProperties: IdentityMfaProperties = IdentityMfaProperties(),
 ) : ApplicationRunner {
     override fun run(args: ApplicationArguments) {
         val mode = seedProperties.mode.trim().lowercase()
         if (mode != "off") {
             throw IllegalStateException("Production identity.seed.mode must be off")
+        }
+        if (mfaProperties.encryptionKey.isBlank() || mfaProperties.encryptionKey == "local-mfa-dev-key") {
+            throw IllegalStateException("Production requires IDENTITY_MFA_ENCRYPTION_KEY")
         }
         val demoEmails =
             listOf(

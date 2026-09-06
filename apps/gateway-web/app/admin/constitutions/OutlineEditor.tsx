@@ -150,7 +150,7 @@ export function OutlineEditor({
                       checked={layer.showTitle}
                       onChange={(event) => update(index, { showTitle: event.target.checked })}
                     />{' '}
-                    Show title (name each node, e.g. a paragraph heading)
+                    Show title (named headings appear on the version detail slider)
                   </span>
                 </label>
               </>

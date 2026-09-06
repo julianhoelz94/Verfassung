@@ -22,7 +22,7 @@ export function canVisitAdmin(roles: string[]): boolean {
 }
 
 export function canVisitApiDocs(roles: string[]): boolean {
-  return roles.includes('admin');
+  return canVisitAdmin(roles);
 }
 
 export function primaryNavLinks(user: NavUser | null, apiDocsAvailable = false): NavLink[] {
@@ -38,6 +38,7 @@ export function primaryNavLinks(user: NavUser | null, apiDocsAvailable = false):
   if (canVisitAdmin(user.roles)) {
     links.push({ href: '/admin/users', label: 'Users' });
     links.push({ href: '/admin/constitutions', label: 'Outlines' });
+    links.push({ href: '/admin/import', label: 'Import' });
   }
   if (apiDocsAvailable && canVisitApiDocs(user.roles)) {
     links.push({ href: '/api-docs', label: 'API docs' });

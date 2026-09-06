@@ -2,19 +2,12 @@
 
 import { redirect } from 'next/navigation';
 import { createConstitution, ensureCountry, putContentOutline, restructureVersion, type OutlineKindWrite } from '../../../lib/api';
+import { requireAdminUser } from '../../../lib/admin';
 import { constitutionIsoCode, countryToCreate } from '../../../lib/create-constitution';
-import { canVisitAdmin } from '../../../lib/nav';
 import { toOutlineKindWrite } from '../../../lib/outline';
-import { currentUser } from '../../../lib/session';
 
 async function requireAdmin(): Promise<void> {
-  const user = await currentUser();
-  if (!user) {
-    redirect('/login');
-  }
-  if (!canVisitAdmin(user.roles)) {
-    redirect('/admin/constitutions?error=forbidden');
-  }
+  await requireAdminUser('/admin/constitutions?error=forbidden');
 }
 
 function parseOutline(raw: string): OutlineKindWrite[] {

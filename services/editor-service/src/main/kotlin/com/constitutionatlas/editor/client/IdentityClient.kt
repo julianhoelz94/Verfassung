@@ -11,4 +11,5 @@ data class IdentityUserWire(
     val id: UUID,
     val email: String,
     val roles: List<String> = emptyList(),
+    val stepUpFresh: Boolean = true,
 )

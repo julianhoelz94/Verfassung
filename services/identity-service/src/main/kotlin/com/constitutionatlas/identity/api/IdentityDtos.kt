@@ -1,5 +1,6 @@
 package com.constitutionatlas.identity.api
 
+import com.fasterxml.jackson.annotation.JsonInclude
 import java.time.OffsetDateTime
 import java.util.UUID
 
@@ -12,12 +13,62 @@ data class UserDto(
     val id: UUID,
     val email: String,
     val roles: List<String>,
+    val mfaEnabled: Boolean = false,
+    val mfaRequired: Boolean = false,
+    val stepUpFresh: Boolean = false,
 )
 
 data class SessionDto(
     val token: String,
     val user: UserDto,
     val expiresInSeconds: Long,
+)
+
+@JsonInclude(JsonInclude.Include.NON_NULL)
+data class LoginResponse(
+    val token: String? = null,
+    val user: UserDto,
+    val expiresInSeconds: Long? = null,
+    val mfaRequired: Boolean = false,
+    val mfaEnrollmentRequired: Boolean = false,
+    val challengeToken: String? = null,
+)
+
+data class MfaLoginRequest(
+    val challengeToken: String,
+    val code: String? = null,
+    val recoveryCode: String? = null,
+)
+
+data class MfaEnrollStartRequest(
+    val challengeToken: String? = null,
+)
+
+data class MfaEnrollStartDto(
+    val secret: String,
+    val otpauthUrl: String,
+    val challengeToken: String,
+)
+
+data class MfaEnrollConfirmRequest(
+    val code: String,
+    val challengeToken: String? = null,
+)
+
+@JsonInclude(JsonInclude.Include.NON_NULL)
+data class MfaEnrollConfirmDto(
+    val recoveryCodes: List<String>,
+    val token: String? = null,
+    val user: UserDto? = null,
+    val expiresInSeconds: Long? = null,
+)
+
+data class MfaCodeRequest(
+    val code: String,
+)
+
+data class MfaRecoveryDto(
+    val recoveryCodes: List<String>,
 )
 
 data class SessionInfoDto(

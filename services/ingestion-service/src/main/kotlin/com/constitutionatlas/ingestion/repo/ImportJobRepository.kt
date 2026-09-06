@@ -58,12 +58,16 @@ class ImportJobRepository(
 
     fun find(jobId: UUID): ImportJobDto? {
         val job = jdbc.query(
-            "SELECT id, status, version_id FROM import_jobs WHERE id = ?",
+            "SELECT id, status, version_id, payload FROM import_jobs WHERE id = ?",
             { rs, _ ->
-                Triple(
+                val payload = rs.getString("payload")
+                val iso =
+                    runCatching { objectMapper.readTree(payload).path("isoCode").asText(null) }.getOrNull()
+                JobRow(
                     rs.getObject("id", UUID::class.java),
                     rs.getString("status"),
                     rs.getObject("version_id", UUID::class.java),
+                    iso?.ifBlank { null },
                 )
             },
             jobId,
@@ -73,6 +77,13 @@ class ImportJobRepository(
             { rs, _ -> ImportErrorDto(rs.getString("code"), rs.getString("message")) },
             jobId,
         )
-        return ImportJobDto(job.first, job.second, job.third, errors)
+        return ImportJobDto(job.id, job.status, job.versionId, errors, job.isoCode)
     }
+
+    private data class JobRow(
+        val id: UUID,
+        val status: String,
+        val versionId: UUID?,
+        val isoCode: String?,
+    )
 }

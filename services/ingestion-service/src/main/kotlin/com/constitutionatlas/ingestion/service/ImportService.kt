@@ -45,6 +45,9 @@ class ImportService(
         }
         val constitution = catalogClient.findConstitution(iso, request.constitutionSlug)
             ?: catalogClient.createConstitution(iso, request.constitutionSlug, request.constitutionTitle)
+        request.outline?.takeIf { it.kinds.isNotEmpty() }?.let { outline ->
+            catalogClient.replaceOutline(constitution.id, outline.kinds)
+        }
         val version = catalogClient.createDraftVersion(
             constitution.id,
             request.versionLabel.trim(),

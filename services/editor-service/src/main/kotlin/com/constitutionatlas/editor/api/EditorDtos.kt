@@ -6,6 +6,7 @@ data class Actor(
     val id: UUID,
     val email: String,
     val roles: List<String>,
+    val stepUpFresh: Boolean = true,
 )
 
 fun Actor.isAdmin(): Boolean = "admin" in roles

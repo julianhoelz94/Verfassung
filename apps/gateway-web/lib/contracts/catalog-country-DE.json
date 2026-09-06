@@ -58,7 +58,7 @@
             "allowedChildKinds": ["sentence"],
             "presentation": "section",
             "showLabel": true,
-            "showTitle": true,
+            "showTitle": false,
             "showKind": false
           },
           {

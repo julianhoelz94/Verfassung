@@ -13,6 +13,7 @@ type ConstitutionTextProps = {
   outline?: ContentOutline;
   canEditTitles?: boolean;
   returnTo?: string;
+  headingIdPrefix?: string;
 };
 
 export function ConstitutionText({
@@ -24,6 +25,7 @@ export function ConstitutionText({
   outline,
   canEditTitles = false,
   returnTo,
+  headingIdPrefix = 'article',
 }: ConstitutionTextProps) {
   const Heading = headingLevel;
   const children = nodes ?? (article && 'children' in article ? article.children : undefined);
@@ -31,7 +33,7 @@ export function ConstitutionText({
   return (
     <div className="constitution-text">
       {showHeading && article ? (
-        <Heading id={`article-${article.articleNumber}`}>
+        <Heading id={`${headingIdPrefix}-${article.articleNumber}`}>
           {articleHeading(outline, {
             articleNumber: article.articleNumber,
             title: article.title,

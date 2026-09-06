@@ -6,13 +6,30 @@ export type SessionUser = {
   id: string;
   email: string;
   roles: string[];
+  mfaEnabled?: boolean;
+  mfaRequired?: boolean;
+  stepUpFresh?: boolean;
 };
 
 export type LoginResult = {
-  token: string;
+  token?: string;
   user: SessionUser;
   expiresInSeconds?: number;
+  mfaRequired?: boolean;
+  mfaEnrollmentRequired?: boolean;
+  challengeToken?: string;
 };
+
+export class IdentityApiError extends Error {
+  constructor(
+    message: string,
+    readonly status?: number,
+    readonly code?: string,
+  ) {
+    super(message);
+    this.name = 'IdentityApiError';
+  }
+}
 
 type FetchLike = typeof fetch;
 
@@ -21,15 +38,16 @@ export async function requestLogin(
   password: string,
   fetchImpl: FetchLike = fetch,
   baseUrl: string = identityBaseUrl(),
+  extraHeaders: Record<string, string> = {},
 ): Promise<LoginResult> {
   const response = await fetchImpl(`${baseUrl}/login`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { ...extraHeaders, 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, password }),
     cache: 'no-store',
   });
   if (!response.ok) {
-    throw new Error('Invalid credentials');
+    throw new IdentityApiError('Invalid credentials', response.status);
   }
   return (await response.json()) as LoginResult;
 }
@@ -72,7 +90,18 @@ export type AdminUser = {
 
 async function readOk<T>(response: Response, fallback: string): Promise<T> {
   if (!response.ok) {
-    throw new Error(fallback);
+    let code: string | undefined;
+    let message = fallback;
+    try {
+      const body = (await response.json()) as { error?: string; code?: string };
+      if (body.error) {
+        message = body.error;
+      }
+      code = body.code;
+    } catch {
+      // Keep the fallback message when the body is not JSON.
+    }
+    throw new IdentityApiError(message, response.status, code);
   }
   if (response.status === 204) {
     return undefined as T;
@@ -190,4 +219,142 @@ export async function requestAcceptInvite(
     cache: 'no-store',
   });
   return readOk(response, 'Unable to accept invite');
+}
+
+async function postJson<T>(
+  path: string,
+  fallback: string,
+  body: unknown,
+  options: {
+    token?: string;
+    method?: string;
+    fetchImpl?: FetchLike;
+    baseUrl?: string;
+  } = {},
+): Promise<T> {
+  const fetchImpl = options.fetchImpl ?? fetch;
+  const baseUrl = options.baseUrl ?? identityBaseUrl();
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (options.token) {
+    headers.Authorization = `Bearer ${options.token}`;
+  }
+  const response = await fetchImpl(`${baseUrl}${path}`, {
+    method: options.method ?? 'POST',
+    headers,
+    body: JSON.stringify(body),
+    cache: 'no-store',
+  });
+  return readOk(response, fallback);
+}
+
+export async function requestCompleteMfaLogin(
+  challengeToken: string,
+  code?: string,
+  recoveryCode?: string,
+  fetchImpl: FetchLike = fetch,
+  baseUrl = identityBaseUrl(),
+): Promise<LoginResult> {
+  return postJson(
+    '/login/mfa',
+    'Invalid authenticator or recovery code',
+    { challengeToken, code, recoveryCode },
+    { fetchImpl, baseUrl },
+  );
+}
+
+export type MfaEnrollStart = {
+  secret: string;
+  otpauthUrl: string;
+  challengeToken: string;
+};
+
+export async function requestStartMfaEnroll(
+  challengeToken?: string,
+  sessionToken?: string,
+  fetchImpl: FetchLike = fetch,
+  baseUrl = identityBaseUrl(),
+): Promise<MfaEnrollStart> {
+  return postJson('/mfa/enroll/start', 'Unable to start MFA enrollment', { challengeToken }, {
+    token: sessionToken,
+    fetchImpl,
+    baseUrl,
+  });
+}
+
+export type MfaEnrollConfirm = {
+  recoveryCodes: string[];
+  token?: string;
+  user?: SessionUser;
+  expiresInSeconds?: number;
+};
+
+export async function requestConfirmMfaEnroll(
+  code: string,
+  challengeToken?: string,
+  sessionToken?: string,
+  fetchImpl: FetchLike = fetch,
+  baseUrl = identityBaseUrl(),
+): Promise<MfaEnrollConfirm> {
+  return postJson(
+    '/mfa/enroll/confirm',
+    'Unable to confirm MFA enrollment',
+    { code, challengeToken },
+    { token: sessionToken, fetchImpl, baseUrl },
+  );
+}
+
+export async function requestStepUp(
+  token: string,
+  code: string,
+  fetchImpl: FetchLike = fetch,
+  baseUrl = identityBaseUrl(),
+): Promise<void> {
+  await postJson('/mfa/step-up', 'Unable to confirm step-up authentication', { code }, {
+    token,
+    fetchImpl,
+    baseUrl,
+  });
+}
+
+export async function requestRevokeMfa(
+  token: string,
+  code: string,
+  fetchImpl: FetchLike = fetch,
+  baseUrl = identityBaseUrl(),
+): Promise<void> {
+  await postJson('/mfa', 'Unable to revoke MFA', { code }, {
+    token,
+    method: 'DELETE',
+    fetchImpl,
+    baseUrl,
+  });
+}
+
+export async function requestRegenerateRecovery(
+  token: string,
+  code: string,
+  fetchImpl: FetchLike = fetch,
+  baseUrl = identityBaseUrl(),
+): Promise<{ recoveryCodes: string[] }> {
+  return postJson('/mfa/recovery/regenerate', 'Unable to replace recovery codes', { code }, {
+    token,
+    fetchImpl,
+    baseUrl,
+  });
+}
+
+export async function requestUpdateRoles(
+  token: string,
+  userId: string,
+  roles: string[],
+  fetchImpl: FetchLike = fetch,
+  baseUrl = identityBaseUrl(),
+): Promise<AdminUser> {
+  const response = await fetchImpl(`${baseUrl}/users/${userId}/roles`, {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ roles }),
+    cache: 'no-store',
+  });
+  return readOk(response, 'Unable to update roles');
 }

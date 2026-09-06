@@ -9,6 +9,7 @@ import com.constitutionatlas.identity.api.InviteRequest
 import com.constitutionatlas.identity.api.PasswordResetIssuedDto
 import com.constitutionatlas.identity.api.UserAdminDto
 import com.constitutionatlas.identity.client.AuthAudit
+import com.constitutionatlas.identity.crypto.Tokens
 import com.constitutionatlas.identity.repo.IdentityRepository
 import com.constitutionatlas.identity.repo.StoredUser
 import org.slf4j.LoggerFactory
@@ -16,14 +17,10 @@ import org.springframework.beans.factory.annotation.Value
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
-import java.nio.charset.StandardCharsets
-import java.security.MessageDigest
 import java.security.SecureRandom
 import java.time.Duration
 import java.time.Instant
 import java.time.ZoneOffset
-import java.util.Base64
-import java.util.HexFormat
 import java.util.UUID
 
 @Service
@@ -31,6 +28,7 @@ class AccountService(
     private val identityRepository: IdentityRepository,
     private val passwordEncoder: PasswordEncoder,
     private val authAudit: AuthAudit,
+    private val authService: AuthService,
     @Value("\${identity.invite.ttl:7d}") private val inviteTtl: Duration,
     @Value("\${identity.password.reset-ttl:1h}") private val resetTtl: Duration,
     @Value("\${identity.password.log-reset-token:false}") private val logResetToken: Boolean,
@@ -72,7 +70,7 @@ class AccountService(
                 assignRoles(existing.id, roleNames)
                 existing.id
             } else {
-                val id = identityRepository.insertUser(email, passwordEncoder.encode(newSecret()), enabled = false)
+                val id = identityRepository.insertUser(email, passwordEncoder.encode(Tokens.urlToken(random)), enabled = false)
                 assignRoles(id, roleNames)
                 id
             }
@@ -96,7 +94,7 @@ class AccountService(
 
     @Transactional
     fun acceptInvite(token: String, password: String, clientIp: String, userAgent: String?): UserAdminDto {
-        val invite = identityRepository.findInviteByTokenHash(sha256(token.trim()))
+        val invite = identityRepository.findInviteByTokenHash(Tokens.sha256Hex(token.trim()))
             ?: throw BadRequestException("Invalid or expired invite")
         if (invite.usedAt != null || invite.expiresAt.isBefore(Instant.now())) {
             throw BadRequestException("Invalid or expired invite")
@@ -145,6 +143,7 @@ class AccountService(
         userAgent: String?,
     ): UserAdminDto {
         val admin = requireAdmin(authorization)
+        authService.requireFreshStepUp(authorization)
         identityRepository.findUserById(userId) ?: throw BadRequestException("Unknown user")
         val roleNames = normalizeRoles(roles)
         if (admin.id == userId && "admin" !in roleNames) {
@@ -175,7 +174,7 @@ class AccountService(
         clientIp: String,
         userAgent: String?,
     ) {
-        val tokenHash = sha256(requireToken(authorization))
+        val tokenHash = Tokens.sha256Hex(Tokens.requireBearer(authorization))
         val user = identityRepository.findUserByValidTokenHash(tokenHash)
             ?: throw UnauthorizedException("Invalid or expired session")
         if (!passwordEncoder.matches(currentPassword, user.passwordHash)) {
@@ -223,7 +222,7 @@ class AccountService(
 
     @Transactional
     fun confirmPasswordReset(token: String, newPassword: String, clientIp: String, userAgent: String?) {
-        val reset = identityRepository.findPasswordResetByTokenHash(sha256(token.trim()))
+        val reset = identityRepository.findPasswordResetByTokenHash(Tokens.sha256Hex(token.trim()))
             ?: throw BadRequestException("Invalid or expired reset token")
         if (reset.usedAt != null || reset.expiresAt.isBefore(Instant.now())) {
             throw BadRequestException("Invalid or expired reset token")
@@ -249,7 +248,7 @@ class AccountService(
     }
 
     private fun requireAdmin(authorization: String?): StoredUser {
-        val user = identityRepository.findUserByValidTokenHash(sha256(requireToken(authorization)))
+        val user = identityRepository.findUserByValidTokenHash(Tokens.sha256Hex(Tokens.requireBearer(authorization)))
             ?: throw UnauthorizedException("Invalid or expired session")
         if ("admin" !in identityRepository.rolesForUser(user.id)) {
             throw ForbiddenException("Administrator role required")
@@ -298,45 +297,24 @@ class AccountService(
 
     private fun issueInviteToken(userId: UUID): Pair<String, Instant> {
         identityRepository.deleteUnusedInvites(userId)
-        val token = newSecret()
+        val token = Tokens.urlToken(random)
         val expiresAt = Instant.now().plus(inviteTtl)
-        identityRepository.insertInvite(userId, sha256(token), expiresAt)
+        identityRepository.insertInvite(userId, Tokens.sha256Hex(token), expiresAt)
         return token to expiresAt
     }
 
     private fun issueResetToken(user: StoredUser): Pair<String, Instant> {
         identityRepository.deleteUnusedResets(user.id)
-        val token = newSecret()
+        val token = Tokens.urlToken(random)
         val expiresAt = Instant.now().plus(resetTtl)
-        identityRepository.insertPasswordReset(user.id, sha256(token), expiresAt)
+        identityRepository.insertPasswordReset(user.id, Tokens.sha256Hex(token), expiresAt)
         if (logResetToken) {
             log.info("Password reset token issued for {} (non-production): {}", user.email, token)
         }
         return token to expiresAt
     }
 
-    private fun requireToken(authorization: String?): String {
-        val value = authorization?.trim().orEmpty()
-        if (!value.startsWith("Bearer ")) {
-            throw UnauthorizedException("Missing session")
-        }
-        return value.removePrefix("Bearer ").trim().ifBlank {
-            throw UnauthorizedException("Missing session")
-        }
-    }
-
-    private fun newSecret(): String {
-        val bytes = ByteArray(32)
-        random.nextBytes(bytes)
-        return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes)
-    }
-
-    fun hashToken(value: String): String = sha256(value)
-
-    private fun sha256(value: String): String {
-        val digest = MessageDigest.getInstance("SHA-256").digest(value.toByteArray(StandardCharsets.UTF_8))
-        return HexFormat.of().formatHex(digest)
-    }
+    fun hashToken(value: String): String = Tokens.sha256Hex(value)
 
     companion object {
         private val COMMON_PASSWORDS =

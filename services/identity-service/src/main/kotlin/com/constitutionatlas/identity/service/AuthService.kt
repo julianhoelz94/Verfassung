@@ -1,25 +1,30 @@
 package com.constitutionatlas.identity.service
 
+import com.constitutionatlas.identity.ConflictException
+import com.constitutionatlas.identity.StepUpRequiredException
 import com.constitutionatlas.identity.TooManyRequestsException
 import com.constitutionatlas.identity.UnauthorizedException
-import com.constitutionatlas.identity.api.SessionDto
+import com.constitutionatlas.identity.api.LoginResponse
+import com.constitutionatlas.identity.api.MfaEnrollConfirmDto
+import com.constitutionatlas.identity.api.MfaEnrollStartDto
+import com.constitutionatlas.identity.api.MfaRecoveryDto
 import com.constitutionatlas.identity.api.SessionInfoDto
 import com.constitutionatlas.identity.api.UserDto
 import com.constitutionatlas.identity.client.AuthAudit
 import com.constitutionatlas.identity.config.IdentityLoginProperties
+import com.constitutionatlas.identity.config.IdentityMfaProperties
 import com.constitutionatlas.identity.config.IdentitySessionProperties
+import com.constitutionatlas.identity.crypto.Tokens
+import com.constitutionatlas.identity.crypto.Totp
 import com.constitutionatlas.identity.repo.IdentityRepository
+import com.constitutionatlas.identity.repo.StoredUser
 import io.micrometer.core.instrument.MeterRegistry
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.stereotype.Service
-import java.nio.charset.StandardCharsets
-import java.security.MessageDigest
 import java.security.SecureRandom
 import java.time.Instant
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
-import java.util.Base64
-import java.util.HexFormat
 import java.util.UUID
 
 @Service
@@ -28,6 +33,8 @@ class AuthService(
     private val passwordEncoder: PasswordEncoder,
     private val sessionProperties: IdentitySessionProperties,
     private val loginProperties: IdentityLoginProperties,
+    private val mfaProperties: IdentityMfaProperties,
+    private val mfaService: MfaService,
     private val authAudit: AuthAudit,
     meterRegistry: MeterRegistry,
 ) {
@@ -43,7 +50,7 @@ class AuthService(
         clientIp: String,
         userAgent: String?,
         existingAuthorization: String?,
-    ): SessionDto {
+    ): LoginResponse {
         val normalized = email.trim().lowercase()
         val ipKey = "ip:${clientIp.ifBlank { "unknown" }}"
         val emailKey = "email:$normalized"
@@ -71,32 +78,182 @@ class AuthService(
         identityRepository.clearThrottle(emailKey)
         identityRepository.clearThrottle(ipKey)
         loginAttempts.increment()
-        existingAuthorization?.let { token ->
-            runCatching { identityRepository.deleteSessionByTokenHash(sha256(requireToken(token))) }
+        val revokeHash = existingAuthorization?.let { token ->
+            runCatching { Tokens.sha256Hex(Tokens.requireBearer(token)) }.getOrNull()
         }
-        purgeExpired()
-        val now = OffsetDateTime.now(ZoneOffset.UTC)
-        val expiresAt = now.plus(sessionProperties.absoluteTimeout)
-        val token = newSessionToken()
-        identityRepository.insertSession(user.id, sha256(token), expiresAt, now)
-        authAudit.record("login_succeeded", user.id, user.id, user.email, clientIp, userAgent)
-        return SessionDto(
-            token = token,
-            user = identityRepository.toUserDto(user),
-            expiresInSeconds = sessionProperties.absoluteTimeout.seconds,
+        val dto = identityRepository.toUserDto(user)
+        if (dto.mfaRequired && !dto.mfaEnabled) {
+            val challenge = mfaService.createChallenge(user.id, "enroll", revokeHash)
+            return LoginResponse(
+                user = dto,
+                mfaEnrollmentRequired = true,
+                challengeToken = challenge,
+            )
+        }
+        if (dto.mfaEnabled) {
+            val challenge = mfaService.createChallenge(user.id, "login", revokeHash)
+            return LoginResponse(
+                user = dto,
+                mfaRequired = true,
+                challengeToken = challenge,
+            )
+        }
+        return issueSession(user, clientIp, userAgent, mfaVerified = false, revokeTokenHash = revokeHash)
+    }
+
+    fun completeMfaLogin(
+        challengeToken: String,
+        code: String?,
+        recoveryCode: String?,
+        clientIp: String,
+        userAgent: String?,
+    ): LoginResponse {
+        val challenge = mfaService.requireChallenge(challengeToken, "login")
+        val user =
+            identityRepository.findUserById(challenge.userId)
+                ?: throw UnauthorizedException("Invalid credentials")
+        if (!user.enabled) {
+            throw UnauthorizedException("Invalid credentials")
+        }
+        val totpOk = !code.isNullOrBlank() && mfaService.verifyEnrolledTotp(user.id, code)
+        val recoveryOk =
+            !totpOk &&
+                !recoveryCode.isNullOrBlank() &&
+                mfaService.useRecoveryCode(user.id, recoveryCode, clientIp, userAgent, user.email)
+        if (!totpOk && !recoveryOk) {
+            authAudit.record("login_failed", user.id, user.id, user.email, clientIp, userAgent)
+            throw UnauthorizedException("Invalid credentials")
+        }
+        identityRepository.deleteChallenge(challenge.id)
+        return issueSession(
+            user,
+            clientIp,
+            userAgent,
+            mfaVerified = true,
+            revokeTokenHash = challenge.revokeTokenHash,
         )
     }
 
+    fun startEnroll(
+        authorization: String?,
+        challengeToken: String?,
+        clientIp: String,
+        userAgent: String?,
+    ): MfaEnrollStartDto {
+        val (user, token) = enrollActor(authorization, challengeToken)
+        val (secret, issuedToken) = mfaService.startEnroll(user.id, token)
+        authAudit.recordMfaChange(user.id, user.email, clientIp, userAgent, mapOf("kind" to "enroll_started"))
+        return MfaEnrollStartDto(
+            secret = secret,
+            otpauthUrl = mfaService.otpauthUrl(user.email, secret),
+            challengeToken = issuedToken,
+        )
+    }
+
+    fun confirmEnroll(
+        authorization: String?,
+        challengeToken: String?,
+        code: String,
+        clientIp: String,
+        userAgent: String?,
+    ): MfaEnrollConfirmDto {
+        val token = challengeToken?.trim().orEmpty().ifBlank { null }
+        val challenge = mfaService.requireChallenge(token ?: "", "enroll")
+        val user =
+            identityRepository.findUserById(challenge.userId)
+                ?: throw UnauthorizedException("Invalid credentials")
+        if (authorization != null) {
+            val sessionUser = requireActiveSession(Tokens.sha256Hex(Tokens.requireBearer(authorization)))
+            if (sessionUser.id != user.id) {
+                throw UnauthorizedException("Invalid or expired session")
+            }
+        }
+        val secret = mfaService.pendingSecret(challenge)
+        if (!Totp.matches(secret, code)) {
+            throw UnauthorizedException("Invalid credentials")
+        }
+        val recovery = mfaService.enrollConfirmed(user.id, secret)
+        identityRepository.deleteChallenge(challenge.id)
+        authAudit.recordMfaChange(user.id, user.email, clientIp, userAgent, mapOf("kind" to "enrolled"))
+        val session =
+            if (authorization == null) {
+                issueSession(
+                    user,
+                    clientIp,
+                    userAgent,
+                    mfaVerified = true,
+                    revokeTokenHash = challenge.revokeTokenHash,
+                )
+            } else {
+                val hash = Tokens.sha256Hex(Tokens.requireBearer(authorization))
+                identityRepository.markSessionMfa(hash, Instant.now())
+                null
+            }
+        return MfaEnrollConfirmDto(
+            recoveryCodes = recovery,
+            token = session?.token,
+            user = session?.user ?: identityRepository.toUserDto(user, null, mfaProperties.stepUpTtl),
+            expiresInSeconds = session?.expiresInSeconds,
+        )
+    }
+
+    fun stepUp(
+        authorization: String?,
+        code: String,
+        clientIp: String,
+        userAgent: String?,
+    ) {
+        val hash = Tokens.sha256Hex(Tokens.requireBearer(authorization))
+        val user = requireActiveSession(hash)
+        if (!mfaService.verifyEnrolledTotp(user.id, code)) {
+            throw UnauthorizedException("Invalid credentials")
+        }
+        identityRepository.markSessionMfa(hash, Instant.now())
+        authAudit.recordMfaChange(user.id, user.email, clientIp, userAgent, mapOf("kind" to "step_up"))
+    }
+
+    fun revokeMfa(
+        authorization: String?,
+        code: String,
+        clientIp: String,
+        userAgent: String?,
+    ) {
+        val user = requireActiveSession(Tokens.sha256Hex(Tokens.requireBearer(authorization)))
+        if (identityRepository.toUserDto(user).mfaRequired) {
+            throw ConflictException("MFA is required for this account")
+        }
+        if (!mfaService.verifyEnrolledTotp(user.id, code)) {
+            throw UnauthorizedException("Invalid credentials")
+        }
+        mfaService.revoke(user.id)
+        authAudit.recordMfaChange(user.id, user.email, clientIp, userAgent, mapOf("kind" to "revoked"))
+    }
+
+    fun regenerateRecovery(
+        authorization: String?,
+        code: String,
+        clientIp: String,
+        userAgent: String?,
+    ): MfaRecoveryDto {
+        val user = requireActiveSession(Tokens.sha256Hex(Tokens.requireBearer(authorization)))
+        if (!mfaService.verifyEnrolledTotp(user.id, code)) {
+            throw UnauthorizedException("Invalid credentials")
+        }
+        val codes = mfaService.replaceRecoveryCodes(user.id)
+        authAudit.recordMfaChange(user.id, user.email, clientIp, userAgent, mapOf("kind" to "recovery_rotated"))
+        return MfaRecoveryDto(codes)
+    }
+
     fun me(bearerToken: String?): UserDto {
-        val token = requireToken(bearerToken)
-        val hash = sha256(token)
+        val token = Tokens.requireBearer(bearerToken)
+        val hash = Tokens.sha256Hex(token)
         val user = requireActiveSession(hash)
         identityRepository.touchSession(hash)
-        return identityRepository.toUserDto(user)
+        return identityRepository.toUserDto(user, hash, mfaProperties.stepUpTtl)
     }
 
     fun logout(bearerToken: String?, clientIp: String, userAgent: String?) {
-        val hash = sha256(requireToken(bearerToken))
+        val hash = Tokens.sha256Hex(Tokens.requireBearer(bearerToken))
         val user = identityRepository.findUserByValidTokenHash(hash)
         identityRepository.deleteSessionByTokenHash(hash)
         if (user != null) {
@@ -105,14 +262,14 @@ class AuthService(
     }
 
     fun listSessions(bearerToken: String?): List<SessionInfoDto> {
-        val token = requireToken(bearerToken)
-        val hash = sha256(token)
+        val token = Tokens.requireBearer(bearerToken)
+        val hash = Tokens.sha256Hex(token)
         val user = requireActiveSession(hash)
         return identityRepository.listSessions(user.id, hash)
     }
 
     fun revokeSession(bearerToken: String?, sessionId: UUID, clientIp: String, userAgent: String?) {
-        val user = requireActiveSession(sha256(requireToken(bearerToken)))
+        val user = requireActiveSession(Tokens.sha256Hex(Tokens.requireBearer(bearerToken)))
         if (!identityRepository.sessionBelongsToUser(sessionId, user.id)) {
             throw UnauthorizedException("Invalid or expired session")
         }
@@ -121,7 +278,7 @@ class AuthService(
     }
 
     fun revokeAllSessions(bearerToken: String?, clientIp: String, userAgent: String?) {
-        val user = requireActiveSession(sha256(requireToken(bearerToken)))
+        val user = requireActiveSession(Tokens.sha256Hex(Tokens.requireBearer(bearerToken)))
         identityRepository.deleteSessionsForUser(user.id)
         authAudit.record("session_revoked", user.id, user.id, user.email, clientIp, userAgent, mapOf("scope" to "all"))
     }
@@ -129,6 +286,62 @@ class AuthService(
     fun purgeExpired() {
         val idleCutoff = Instant.now().minus(sessionProperties.idleTimeout)
         identityRepository.deleteExpiredSessions(idleCutoff)
+    }
+
+    fun requireFreshStepUp(authorization: String?): StoredUser {
+        val hash = Tokens.sha256Hex(Tokens.requireBearer(authorization))
+        val user = requireActiveSession(hash)
+        val dto = identityRepository.toUserDto(user, hash, mfaProperties.stepUpTtl)
+        if (!dto.stepUpFresh) {
+            throw StepUpRequiredException()
+        }
+        return user
+    }
+
+    private fun issueSession(
+        user: StoredUser,
+        clientIp: String,
+        userAgent: String?,
+        mfaVerified: Boolean,
+        revokeTokenHash: String?,
+    ): LoginResponse {
+        if (!revokeTokenHash.isNullOrBlank()) {
+            identityRepository.deleteSessionByTokenHash(revokeTokenHash)
+        }
+        purgeExpired()
+        val now = OffsetDateTime.now(ZoneOffset.UTC)
+        val expiresAt = now.plus(sessionProperties.absoluteTimeout)
+        val token = Tokens.urlToken(random)
+        val hash = Tokens.sha256Hex(token)
+        identityRepository.insertSession(
+            user.id,
+            hash,
+            expiresAt,
+            now,
+            mfaVerifiedAt = if (mfaVerified) now else null,
+            stepUpAt = now,
+        )
+        authAudit.record("login_succeeded", user.id, user.id, user.email, clientIp, userAgent)
+        return LoginResponse(
+            token = token,
+            user = identityRepository.toUserDto(user, hash, mfaProperties.stepUpTtl),
+            expiresInSeconds = sessionProperties.absoluteTimeout.seconds,
+        )
+    }
+
+    private fun enrollActor(
+        authorization: String?,
+        challengeToken: String?,
+    ): Pair<StoredUser, String?> {
+        if (!challengeToken.isNullOrBlank()) {
+            val challenge = mfaService.requireChallenge(challengeToken, "enroll")
+            val user =
+                identityRepository.findUserById(challenge.userId)
+                    ?: throw UnauthorizedException("Invalid credentials")
+            return user to challengeToken
+        }
+        val user = requireActiveSession(Tokens.sha256Hex(Tokens.requireBearer(authorization)))
+        return user to null
     }
 
     private fun requireActiveSession(tokenHash: String) =
@@ -162,27 +375,6 @@ class AuthService(
                 null
             }
         identityRepository.upsertThrottle(key, failures, lockedUntil)
-    }
-
-    private fun newSessionToken(): String {
-        val bytes = ByteArray(32)
-        random.nextBytes(bytes)
-        return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes)
-    }
-
-    private fun requireToken(authorization: String?): String {
-        val value = authorization?.trim().orEmpty()
-        if (!value.startsWith("Bearer ")) {
-            throw UnauthorizedException("Missing session")
-        }
-        return value.removePrefix("Bearer ").trim().ifBlank {
-            throw UnauthorizedException("Missing session")
-        }
-    }
-
-    private fun sha256(value: String): String {
-        val digest = MessageDigest.getInstance("SHA-256").digest(value.toByteArray(StandardCharsets.UTF_8))
-        return HexFormat.of().formatHex(digest)
     }
 
     companion object {

@@ -1,4 +1,4 @@
-import com.constitutionatlas.editor.client.RestIdentityClient
+import com.constitutionatlas.platform.RestIdentityClient
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.sun.net.httpserver.HttpServer
 import org.assertj.core.api.Assertions.assertThat

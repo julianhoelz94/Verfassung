@@ -62,31 +62,7 @@ export function diffText(left: string, right: string): DiffSeg[] {
   if (left === right) {
     return left ? [{ type: 'equal', text: left }] : [];
   }
-  const leftSentences = splitSentences(left);
-  const rightSentences = splitSentences(right);
-  if (leftSentences.length <= 1 && rightSentences.length <= 1) {
-    return joinWordDiff(left, right);
-  }
-  const sentenceDiff = diffTokens(leftSentences, rightSentences);
-  const merged: DiffSeg[] = [];
-  for (let index = 0; index < sentenceDiff.length; index += 1) {
-    const current = sentenceDiff[index];
-    const next = sentenceDiff[index + 1];
-    if (current.type === 'remove' && next?.type === 'add') {
-      joinWordDiff(current.text, next.text).forEach((part) => pushSeg(merged, part.type, part.text));
-      index += 1;
-      continue;
-    }
-    if (current.type === 'equal') {
-      pushSeg(merged, 'equal', current.text);
-    } else {
-      pushSeg(merged, current.type, current.text);
-    }
-  }
-  return merged.map((seg, index) => ({
-    ...seg,
-    text: index === 0 ? seg.text : prefixSpace(seg),
-  }));
+  return joinWordDiff(left, right);
 }
 
 export function segsForSide(segs: DiffSeg[], side: 'from' | 'to'): DiffSeg[] {
@@ -149,11 +125,4 @@ function pushSeg(segs: DiffSeg[], type: DiffSeg['type'], text: string) {
     return;
   }
   segs.push({ type, text });
-}
-
-function prefixSpace(seg: DiffSeg): string {
-  if (seg.text.startsWith(' ') || seg.text.startsWith('\n')) {
-    return seg.text;
-  }
-  return ` ${seg.text}`;
 }

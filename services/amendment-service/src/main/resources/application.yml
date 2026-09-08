@@ -18,3 +18,12 @@ management:
 logging:
   level:
     root: INFO
+identity:
+  api:
+    url: ${IDENTITY_API_URL:http://localhost/api/identity}
+content:
+  api:
+    url: ${CONTENT_API_URL:http://localhost/api/content}
+catalog:
+  api:
+    url: ${CATALOG_API_URL:http://localhost/api/catalog}

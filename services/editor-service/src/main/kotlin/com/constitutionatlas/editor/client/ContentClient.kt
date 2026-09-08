@@ -5,12 +5,14 @@ import java.util.UUID
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 data class ContentTreeNode(
+    val id: UUID,
     val kind: String,
     val label: String? = null,
     val number: String? = null,
     val title: String? = null,
     val body: String? = null,
     val children: List<ContentTreeNode> = emptyList(),
+    val predecessorId: UUID? = null,
 )
 
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -22,6 +24,7 @@ data class ContentTreeArticle(
     val sortOrder: Int,
     val body: String? = null,
     val children: List<ContentTreeNode> = emptyList(),
+    val predecessorId: UUID? = null,
 )
 
 data class ArticleWritePayload(
@@ -30,6 +33,8 @@ data class ArticleWritePayload(
     val body: String = "",
     val sortOrder: Int,
     val nodes: List<NodeWritePayload> = emptyList(),
+    val id: UUID? = null,
+    val predecessorId: UUID? = null,
 )
 
 data class NodeWritePayload(
@@ -38,6 +43,8 @@ data class NodeWritePayload(
     val title: String? = null,
     val body: String? = null,
     val children: List<NodeWritePayload> = emptyList(),
+    val id: UUID? = null,
+    val predecessorId: UUID? = null,
 )
 
 interface ContentClient {

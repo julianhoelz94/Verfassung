@@ -49,7 +49,7 @@ Service names: `catalog`, `content`, `amendment`, `identity`, `editor`, `search`
 
 ## Current sprint
 
-See `backlog.md` **Suggested Sprint Breakdown**. Sprint 0–23 and **28** are closed. **Sprint 24** (one content write model: CNT-5, CNT-6, ED-5) is next — [quality review](backlog.md#quality-review-2026-09-06). Pull from **Later / Ideas** only if the user asks. Do not start SRV-7 (MCP) until asked.
+See `backlog.md` **Suggested Sprint Breakdown**. Sprint 0–26 and **28** are closed. **Sprint 27** (outbox and a real publish journey: SRV-4, PLAT-6, CI-6) is next — [quality review](backlog.md#quality-review-2026-09-06). Pull from **Later / Ideas** only if the user asks. Do not start SRV-7 (MCP) until asked.
 
 **When a story/task is finished, update `backlog.md` in the same change:** set Status to `Done`, add the ID to that sprint’s Done list, and keep the board snapshot accurate. Do not leave completed work as `Ready`.
 

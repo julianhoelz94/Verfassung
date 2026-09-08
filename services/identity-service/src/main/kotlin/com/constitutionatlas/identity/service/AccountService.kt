@@ -2,8 +2,8 @@ package com.constitutionatlas.identity.service
 
 import com.constitutionatlas.identity.BadRequestException
 import com.constitutionatlas.identity.ConflictException
-import com.constitutionatlas.identity.ForbiddenException
-import com.constitutionatlas.identity.UnauthorizedException
+import com.constitutionatlas.platform.ForbiddenException
+import com.constitutionatlas.platform.UnauthorizedException
 import com.constitutionatlas.identity.api.InviteCreatedDto
 import com.constitutionatlas.identity.api.InviteRequest
 import com.constitutionatlas.identity.api.PasswordResetIssuedDto

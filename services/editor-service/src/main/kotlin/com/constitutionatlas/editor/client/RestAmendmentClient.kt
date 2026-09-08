@@ -39,7 +39,7 @@ class RestAmendmentClient(
                 .retrieve()
                 .toBodilessEntity()
         } catch (ex: RestClientException) {
-            log.warn("amendment transition not recorded (until AMD-5): {}", ex.message)
+            log.warn("amendment transition not recorded: {}", ex.message)
         }
     }
 }

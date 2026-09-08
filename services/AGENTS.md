@@ -23,7 +23,7 @@ Route and table maps: [`docs/CODEMAPS/backend.md`](../docs/CODEMAPS/backend.md),
 - Package: `com.constitutionatlas.<service>`
 - Schema: Flyway in `src/main/resources/db/migration/`. Forward-only: add `V{n}__….sql`, never edit a migration that may already have been applied.
 - Tests: Testcontainers Postgres smoke already exists; add API tests next to it
-- Structured JSON logs (`logback-spring.xml`); `X-Correlation-Id` echoed or generated; actuator `/health` and `/info`
+- Structured JSON logs (`logback-spring.xml`); actuator `/health` and `/info`; `X-Correlation-Id` (allow-listed) and problem JSON for 401/403/404 come from `services/platform` (`includeBuild("../platform")` + `com.constitutionatlas:platform:0.1.0`). Do not copy `CorrelationIdFilter`, `NotFoundException`, or the identity Bearer client.
 - Gradle: Spotless/ktlint via `gradle/service-conventions.gradle`; `cd services/<name> && ./gradlew test`
 
-Change one service at a time. Copy a sibling service rather than inventing a new Gradle layout.
+Change one service at a time. New services depend on `services/platform` for the shared filter, exceptions, and identity client; copy a sibling only for Gradle/Docker layout.

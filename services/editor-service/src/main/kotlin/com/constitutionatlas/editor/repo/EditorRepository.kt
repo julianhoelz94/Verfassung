@@ -2,6 +2,7 @@ package com.constitutionatlas.editor.repo
 
 import com.constitutionatlas.editor.api.DraftArticleDto
 import com.constitutionatlas.editor.api.EditSessionDto
+import com.constitutionatlas.editor.api.EditSessionStatus
 import com.constitutionatlas.editor.api.EditSessionSummaryDto
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.springframework.jdbc.core.JdbcTemplate
@@ -18,10 +19,11 @@ class EditorRepository(
     fun insertSession(actorId: UUID, versionId: UUID): UUID {
         val id = UUID.randomUUID()
         jdbc.update(
-            "INSERT INTO edit_sessions (id, actor_id, version_id, status) VALUES (?, ?, ?, 'open')",
+            "INSERT INTO edit_sessions (id, actor_id, version_id, status) VALUES (?, ?, ?, ?)",
             id,
             actorId,
             versionId,
+            EditSessionStatus.OPEN.toJson(),
         )
         return id
     }
@@ -51,10 +53,16 @@ class EditorRepository(
             Int::class.java,
             sessionId,
         ) ?: 0
-        return EditSessionDto(row.first, row.second, row.third.first, row.third.second, revisionCount)
+        return EditSessionDto(
+            row.first,
+            row.second,
+            row.third.first,
+            EditSessionStatus.fromDb(row.third.second),
+            revisionCount,
+        )
     }
 
-    fun listSessions(status: String?, openedBy: UUID?, versionId: UUID?): List<EditSessionSummaryDto> {
+    fun listSessions(status: EditSessionStatus?, openedBy: UUID?, versionId: UUID?): List<EditSessionSummaryDto> {
         val sql = StringBuilder(
             """
             SELECT s.id, s.actor_id, s.version_id, s.status, s.created_at, s.updated_at,
@@ -70,7 +78,7 @@ class EditorRepository(
         val args = mutableListOf<Any>()
         if (status != null) {
             sql.append(" AND s.status = ?")
-            args.add(status)
+            args.add(status.toJson())
         }
         if (openedBy != null) {
             sql.append(" AND s.actor_id = ?")
@@ -85,7 +93,7 @@ class EditorRepository(
             EditSessionSummaryDto(
                 id = rs.getObject("id", UUID::class.java),
                 versionId = rs.getObject("version_id", UUID::class.java),
-                status = rs.getString("status"),
+                status = EditSessionStatus.fromDb(rs.getString("status")),
                 openedBy = rs.getObject("actor_id", UUID::class.java),
                 openedAt = toInstant(rs.getTimestamp("created_at")),
                 updatedAt = toInstant(rs.getTimestamp("updated_at")),
@@ -131,23 +139,25 @@ class EditorRepository(
         )
     }
 
-    fun findOpenSession(actorId: UUID, versionId: UUID): UUID? =
-        jdbc.query(
+    fun findOpenSession(actorId: UUID, versionId: UUID): UUID? {
+        val statuses = EditSessionStatus.inProgress
+        val placeholders = statuses.joinToString(",") { "?" }
+        return jdbc.query(
             """
             SELECT id FROM edit_sessions
-            WHERE actor_id = ? AND version_id = ? AND status IN ('open', 'reviewing', 'approved')
+            WHERE actor_id = ? AND version_id = ? AND status IN ($placeholders)
             ORDER BY updated_at DESC
             LIMIT 1
             """.trimIndent(),
             { rs, _ -> rs.getObject("id", UUID::class.java) },
-            actorId,
-            versionId,
+            *listOf(actorId, versionId).plus(statuses.map { it.toJson() }).toTypedArray(),
         ).firstOrNull()
+    }
 
-    fun updateStatus(sessionId: UUID, status: String) {
+    fun updateStatus(sessionId: UUID, status: EditSessionStatus) {
         jdbc.update(
             "UPDATE edit_sessions SET status = ?, updated_at = NOW() WHERE id = ?",
-            status,
+            status.toJson(),
             sessionId,
         )
     }

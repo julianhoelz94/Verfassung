@@ -1,14 +1,10 @@
 package com.constitutionatlas.editor.api
 
+import com.constitutionatlas.platform.Actor
+import com.fasterxml.jackson.annotation.JsonCreator
+import com.fasterxml.jackson.annotation.JsonValue
 import java.time.Instant
 import java.util.UUID
-
-data class Actor(
-    val id: UUID,
-    val email: String,
-    val roles: List<String>,
-    val stepUpFresh: Boolean = true,
-)
 
 fun Actor.isAdmin(): Boolean = "admin" in roles
 
@@ -19,6 +15,29 @@ fun Actor.canReview(): Boolean = isAdmin() || "reviewer" in roles
 fun Actor.canPublish(): Boolean = isAdmin() || "publisher" in roles
 
 fun Actor.isEditorial(): Boolean = canEdit() || canReview() || canPublish()
+
+enum class EditSessionStatus {
+    OPEN,
+    REVIEWING,
+    APPROVED,
+    PUBLISHED,
+    ;
+
+    @JsonValue
+    fun toJson(): String = name.lowercase()
+
+    companion object {
+        val inProgress: List<EditSessionStatus> = listOf(OPEN, REVIEWING, APPROVED)
+
+        fun fromDb(value: String): EditSessionStatus =
+            entries.find { it.toJson() == value.lowercase() }
+                ?: throw IllegalArgumentException("Unknown session status '$value'")
+
+        @JvmStatic
+        @JsonCreator
+        fun fromJson(value: String): EditSessionStatus = fromDb(value)
+    }
+}
 
 data class CreateSessionRequest(
     val versionId: UUID,
@@ -34,14 +53,14 @@ data class EditSessionDto(
     val id: UUID,
     val actorId: UUID,
     val versionId: UUID,
-    val status: String,
+    val status: EditSessionStatus,
     val revisionCount: Int,
 )
 
 data class EditSessionSummaryDto(
     val id: UUID,
     val versionId: UUID,
-    val status: String,
+    val status: EditSessionStatus,
     val openedBy: UUID,
     val openedAt: Instant,
     val updatedAt: Instant,

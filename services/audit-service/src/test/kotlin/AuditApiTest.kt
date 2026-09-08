@@ -1,7 +1,7 @@
 import com.constitutionatlas.audit.AuditServiceApplication
-import com.constitutionatlas.audit.client.Actor
-import com.constitutionatlas.audit.client.IdentityClient
-import com.constitutionatlas.audit.client.UnauthorizedException
+import com.constitutionatlas.platform.Actor
+import com.constitutionatlas.platform.IdentityClient
+import com.constitutionatlas.platform.UnauthorizedException
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito

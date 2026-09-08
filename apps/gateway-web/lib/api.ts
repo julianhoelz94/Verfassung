@@ -95,6 +95,8 @@ export type AmendmentChange = {
   changedOn?: string | null;
   effectiveOn?: string | null;
   amendingLawCitationId?: string | null;
+  amendingLawTitle?: string | null;
+  amendingLawCitation?: string | null;
 };
 
 export type Amendment = {

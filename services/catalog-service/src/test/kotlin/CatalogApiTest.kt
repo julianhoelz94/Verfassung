@@ -1,8 +1,8 @@
 import com.constitutionatlas.catalog.CatalogServiceApplication
-import com.constitutionatlas.catalog.CorrelationIdFilter
-import com.constitutionatlas.catalog.UnauthorizedException
-import com.constitutionatlas.catalog.client.Actor
-import com.constitutionatlas.catalog.client.IdentityClient
+import com.constitutionatlas.platform.Actor
+import com.constitutionatlas.platform.CorrelationIdFilter
+import com.constitutionatlas.platform.IdentityClient
+import com.constitutionatlas.platform.UnauthorizedException
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.assertj.core.api.Assertions.assertThat

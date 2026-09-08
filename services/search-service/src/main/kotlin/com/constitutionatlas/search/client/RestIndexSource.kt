@@ -76,6 +76,7 @@ class RestIndexSource(
                     articleNumber = detail.articleNumber,
                     title = detail.title,
                     body = detail.body,
+                    languageCode = version.languageCode.ifBlank { "en" },
                 )
             }
             if (summaries.size < pageSize) {
@@ -109,6 +110,7 @@ class RestIndexSource(
         val id: UUID,
         val versionLabel: String = "",
         val effectiveDate: LocalDate? = null,
+        val languageCode: String = "en",
     )
 
     @JsonIgnoreProperties(ignoreUnknown = true)

@@ -12,6 +12,7 @@ data class ArticleSummary(
     val sortOrder: Int,
     val body: String? = null,
     val children: List<ContentNodeDto>? = null,
+    val predecessorId: UUID? = null,
 )
 
 data class ContentNodeDto(
@@ -23,6 +24,8 @@ data class ContentNodeDto(
     val body: String?,
     val sortOrder: Int,
     val children: List<ContentNodeDto>,
+    @get:JsonInclude(JsonInclude.Include.NON_NULL)
+    val predecessorId: UUID? = null,
 )
 
 data class ArticleDetail(
@@ -34,6 +37,8 @@ data class ArticleDetail(
     val sortOrder: Int,
     val kind: String = "article",
     val children: List<ContentNodeDto> = emptyList(),
+    @get:JsonInclude(JsonInclude.Include.NON_NULL)
+    val predecessorId: UUID? = null,
 )
 
 data class NodeWrite(
@@ -42,6 +47,8 @@ data class NodeWrite(
     val title: String? = null,
     val body: String? = null,
     val children: List<NodeWrite> = emptyList(),
+    val id: UUID? = null,
+    val predecessorId: UUID? = null,
 )
 
 data class ArticleWrite(
@@ -50,6 +57,8 @@ data class ArticleWrite(
     val body: String = "",
     val sortOrder: Int,
     val nodes: List<NodeWrite> = emptyList(),
+    val id: UUID? = null,
+    val predecessorId: UUID? = null,
 )
 
 data class ArticlePatch(

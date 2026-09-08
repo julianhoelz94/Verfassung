@@ -21,22 +21,28 @@ Tests: `CatalogApiTest.kt`. Seed DE: `V3__seed_germany.sql`.
 
 ## content — `services/content-service`
 
-`api/ArticleController.kt` → `ArticleQueryService` → `ArticleRepository`
+`api/ArticleController.kt` → `ArticleQueryService` → `ArticleRepository` (SQL only)
 
 | Method | Path |
 | --- | --- |
 | GET | `/versions/{id}/articles?offset&limit&includeBody` (`X-Total-Count`) |
-| PUT | `/versions/{id}/articles` (replace) |
+| PUT | `/versions/{id}/articles` (replace; optional client `id` / `predecessorId`) |
 | GET | `/articles/{id}` |
 | PATCH | `/articles/{id}`, `/nodes/{id}` |
 | POST | `/versions/{id}/restructure` |
 
-Tree in `content_nodes` is display source of truth; `articles` still used for list/patch.
+Tree in `content_nodes` is the only write model; `articles` is a view of roots. Latest Flyway: V7.
 
 ## amendment — `services/amendment-service`
 
-`AmendmentController` → `AmendmentRepository`  
-`GET /versions/{id}/amendments?sourceVersionId`
+`AmendmentController` → `AmendmentService` → `AmendmentRepository`  
+Clients: identity (mutating Bearer), content (`includeBody=true` trees), catalog (`constitutionId`).
+
+| Method | Path |
+| --- | --- |
+| GET | `/versions/{id}/amendments?sourceVersionId` |
+| GET | `/amendments?constitutionId&articleNumber` |
+| POST | `/transitions` (editor/publisher/admin or `content:write`; computes added/changed/removed) |
 
 ## identity — `services/identity-service`
 
@@ -59,6 +65,7 @@ Bearer `Authorization`. Tests: `IdentityApiTest.kt`.
 Clients: identity, catalog, content, amendment, search, audit. Publish copies onto a new catalog version (ADR 0002).
 
 Flow: `POST /edit-sessions` → `/saves` → `/review` → `/approval` → `/publish`  
+Session `status` is `EditSessionStatus` (`open`/`reviewing`/`approved`/`published`).  
 `GET /edit-sessions` = list (status, openedBy, versionId; `openedBy=me`)  
 `GET /edit-sessions/{id}` = preview. Roles enforced in service, not Spring Security.
 
@@ -83,7 +90,8 @@ PUT/PATCH/DELETE → 405; DB rules block update/delete.
 
 ## Shared conventions
 
-- New service: copy a sibling (`.cursor/skills/new-kotlin-service`).
+- Shared Kotlin module: `services/platform` (`com.constitutionatlas:platform:0.1.0`). Each service `includeBuild("../platform")`. It owns `CorrelationIdFilter` (SEC-9 allow-list), `NotFoundException` / `UnauthorizedException` / `ForbiddenException` + `ProblemAdvice`, and the identity Bearer `IdentityClient`. Do not copy those into a service.
+- New service: copy a sibling for Gradle/Docker layout (`.cursor/skills/new-kotlin-service`), then depend on platform.
 - Gradle: `gradle/service-conventions.gradle` (Spotless/ktlint, `bootJar` → `app.jar`).
 - Tests: Testcontainers `postgres:16-alpine`; extend `SmokeTest` unless isolation is required.
 - Run: `cd services/<name> && ./gradlew test` (wrapper **9.7.1**).

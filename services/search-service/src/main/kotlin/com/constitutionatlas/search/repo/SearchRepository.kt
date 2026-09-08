@@ -24,9 +24,9 @@ class SearchRepository(private val jdbcTemplate: JdbcTemplate) {
                 """
                 INSERT INTO search_documents (
                   document_id, version_id, country_code, country_name, constitution_title, version_label,
-                  effective_date, article_number, title, body
+                  effective_date, article_number, title, body, language_code
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """.trimIndent(),
                 doc.articleId,
                 doc.versionId,
@@ -38,6 +38,7 @@ class SearchRepository(private val jdbcTemplate: JdbcTemplate) {
                 doc.articleNumber,
                 doc.title,
                 doc.body,
+                doc.languageCode,
             )
         }
         jdbcTemplate.update(
@@ -57,16 +58,18 @@ class SearchRepository(private val jdbcTemplate: JdbcTemplate) {
         if (query.text.isBlank()) {
             return SearchPage(hits = emptyList(), total = 0, limit = query.limit, offset = query.offset)
         }
+        val tsQuery = "plainto_tsquery('simple', ?) || plainto_tsquery('german', ?)"
         val filterSql =
             """
             FROM search_documents
-            WHERE tsv @@ plainto_tsquery('simple', ?)
+            WHERE tsv @@ ($tsQuery)
               AND (?::text IS NULL OR country_code = ?)
               AND (?::uuid IS NULL OR version_id = ?)
               AND (?::date IS NULL OR effective_date = ?)
             """.trimIndent()
         val filterArgs =
             arrayOf(
+                query.text,
                 query.text,
                 query.countryCode,
                 query.countryCode,
@@ -89,10 +92,10 @@ class SearchRepository(private val jdbcTemplate: JdbcTemplate) {
                        ts_headline(
                          'simple',
                          body,
-                         plainto_tsquery('simple', ?),
+                         plainto_tsquery('simple', ?) || plainto_tsquery('german', ?),
                          'MaxWords=24, MinWords=12, StartSel=<mark>, StopSel=</mark>'
                        ) AS snippet,
-                       ts_rank(tsv, plainto_tsquery('simple', ?)) AS rank
+                       ts_rank(tsv, plainto_tsquery('simple', ?) || plainto_tsquery('german', ?)) AS rank
                 $filterSql
                 ORDER BY rank DESC, article_number
                 LIMIT ?
@@ -112,6 +115,8 @@ class SearchRepository(private val jdbcTemplate: JdbcTemplate) {
                         rank = rs.getDouble("rank"),
                     )
                 },
+                query.text,
+                query.text,
                 query.text,
                 query.text,
                 *filterArgs,

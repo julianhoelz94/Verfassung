@@ -1,7 +1,7 @@
+import com.constitutionatlas.platform.Actor
+import com.constitutionatlas.platform.IdentityClient
+import com.constitutionatlas.platform.UnauthorizedException
 import com.constitutionatlas.search.SearchServiceApplication
-import com.constitutionatlas.search.auth.Actor
-import com.constitutionatlas.search.auth.IdentityClient
-import com.constitutionatlas.search.auth.UnauthorizedException
 import com.constitutionatlas.search.client.IndexSource
 import com.constitutionatlas.search.client.IndexableArticle
 import org.junit.jupiter.api.BeforeEach
@@ -171,6 +171,31 @@ class SearchApiTest {
         mockMvc.post("/reindex").andExpect { status { isUnauthorized() } }
     }
 
+    @Test
+    fun germanInflectedQueryHitsGermanBody() {
+        reindexFixture()
+        mockMvc.get("/search") {
+            param("q", "unantastbaren")
+            param("country", "DE")
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.hits.length()") { value(1) }
+            jsonPath("$.hits[0].articleNumber") { value("79") }
+        }
+    }
+
+    @Test
+    fun articleNumberQueryMatchesArtPrefix() {
+        reindexFixture()
+        mockMvc.get("/search") {
+            param("q", "Art. 1")
+            param("versionId", DE_2022.toString())
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.hits[0].articleNumber") { value("1") }
+        }
+    }
+
     private fun reindexFixture() {
         Mockito.`when`(indexSource.loadPublishedArticles()).thenReturn(
             listOf(
@@ -211,6 +236,19 @@ class SearchApiTest {
                     body = "Every person shall have the right to free development of their personality.",
                 ),
                 article(
+                    articleId = UUID.fromString("01900000-0000-4000-8000-000000000209"),
+                    versionId = DE_2022,
+                    countryCode = "DE",
+                    countryName = "Germany",
+                    constitutionTitle = "Basic Law for the Federal Republic of Germany",
+                    versionLabel = "2022",
+                    effectiveDate = LocalDate.of(2022, 12, 19),
+                    articleNumber = "79",
+                    title = "Eternity clause",
+                    body = "Die Würde des Menschen ist unantastbar.",
+                    languageCode = "de",
+                ),
+                article(
                     articleId = UUID.fromString("01900000-0000-4000-8000-000000000301"),
                     versionId = FR_1958,
                     countryCode = "FR",
@@ -229,7 +267,7 @@ class SearchApiTest {
             header("Authorization", TOKEN)
         }.andExpect {
             status { isOk() }
-            jsonPath("$.documentCount") { value(4) }
+            jsonPath("$.documentCount") { value(5) }
             jsonPath("$.status") { value("ready") }
         }
     }
@@ -263,6 +301,7 @@ class SearchApiTest {
             articleNumber: String,
             title: String,
             body: String,
+            languageCode: String = "en",
         ) = IndexableArticle(
             articleId = articleId,
             versionId = versionId,
@@ -274,6 +313,7 @@ class SearchApiTest {
             articleNumber = articleNumber,
             title = title,
             body = body,
+            languageCode = languageCode,
         )
     }
 }

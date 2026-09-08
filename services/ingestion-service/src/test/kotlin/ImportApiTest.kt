@@ -1,14 +1,14 @@
 import com.constitutionatlas.ingestion.api.ImportArticle
 import com.constitutionatlas.ingestion.api.ImportOutlineKind
 import com.constitutionatlas.ingestion.IngestionServiceApplication
-import com.constitutionatlas.ingestion.client.Actor
 import com.constitutionatlas.ingestion.client.CatalogClient
 import com.constitutionatlas.ingestion.client.ContentClient
 import com.constitutionatlas.ingestion.client.DownstreamConstitution
 import com.constitutionatlas.ingestion.client.DownstreamCountry
 import com.constitutionatlas.ingestion.client.DownstreamVersion
-import com.constitutionatlas.ingestion.client.IdentityClient
-import com.constitutionatlas.ingestion.client.UnauthorizedException
+import com.constitutionatlas.platform.Actor
+import com.constitutionatlas.platform.IdentityClient
+import com.constitutionatlas.platform.UnauthorizedException
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito

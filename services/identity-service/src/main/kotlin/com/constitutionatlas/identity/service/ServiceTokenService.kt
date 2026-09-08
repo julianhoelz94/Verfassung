@@ -2,7 +2,7 @@ package com.constitutionatlas.identity.service
 
 import com.constitutionatlas.identity.BadRequestException
 import com.constitutionatlas.identity.ConflictException
-import com.constitutionatlas.identity.ForbiddenException
+import com.constitutionatlas.platform.ForbiddenException
 import com.constitutionatlas.identity.api.CreateServiceTokenRequest
 import com.constitutionatlas.identity.api.RotateServiceTokenRequest
 import com.constitutionatlas.identity.api.ServiceTokenCreatedDto

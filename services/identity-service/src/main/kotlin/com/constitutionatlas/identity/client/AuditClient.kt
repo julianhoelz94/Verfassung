@@ -1,6 +1,6 @@
 package com.constitutionatlas.identity.client
 
-import com.constitutionatlas.identity.CorrelationIdFilter
+import com.constitutionatlas.platform.CorrelationIdFilter
 import org.slf4j.LoggerFactory
 import org.slf4j.MDC
 import org.springframework.beans.factory.annotation.Value

@@ -1,7 +1,7 @@
 package com.constitutionatlas.editor.client
 
 import com.constitutionatlas.editor.DownstreamException
-import com.constitutionatlas.editor.api.Actor
+import com.constitutionatlas.platform.Actor
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.context.annotation.Bean

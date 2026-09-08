@@ -1,17 +1,22 @@
-import com.constitutionatlas.editor.EditorServiceApplication
 import com.constitutionatlas.editor.DownstreamException
-import com.constitutionatlas.editor.UnauthorizedException
-import com.constitutionatlas.editor.api.Actor
+import com.constitutionatlas.editor.EditorServiceApplication
 import com.constitutionatlas.editor.client.AmendmentClient
+import com.constitutionatlas.editor.client.ArticleWritePayload
 import com.constitutionatlas.editor.client.AuditClient
 import com.constitutionatlas.editor.client.CatalogClient
 import com.constitutionatlas.editor.client.CatalogVersion
 import com.constitutionatlas.editor.client.ContentClient
 import com.constitutionatlas.editor.client.ContentTreeArticle
-import com.constitutionatlas.editor.client.IdentityClient
 import com.constitutionatlas.editor.client.SearchIndexClient
+import com.constitutionatlas.platform.Actor
+import com.constitutionatlas.platform.IdentityClient
+import com.constitutionatlas.platform.UnauthorizedException
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNotEquals
+import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import org.mockito.ArgumentCaptor
 import org.mockito.Mockito
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
@@ -98,6 +103,13 @@ class EditorApiTest {
             jsonPath("$.newVersionId") { value(NEW_VERSION_ID.toString()) }
             jsonPath("$.newVersionLabel") { value("2022-1") }
         }
+        @Suppress("UNCHECKED_CAST")
+        val copied = ArgumentCaptor.forClass(List::class.java) as ArgumentCaptor<List<ArticleWritePayload>>
+        Mockito.verify(contentClient).replaceArticles(eqNonNull(NEW_VERSION_ID), captureList(copied))
+        assertEquals(1, copied.value.size)
+        assertEquals(articleId, copied.value[0].predecessorId)
+        assertNotNull(copied.value[0].id)
+        assertNotEquals(articleId, copied.value[0].id)
         Mockito.verify(contentClient).updateArticle(copyId, "Human dignity", "Draft body.")
         Mockito.verify(contentClient, Mockito.never()).updateArticle(
             eqNonNull(articleId),
@@ -427,9 +439,16 @@ class EditorApiTest {
         private fun nestedJson(depth: Int): String = (1..depth).fold("1") { acc, _ -> """{"x":$acc}""" }
 
         private fun actor(id: String, role: String) =
-            Actor(UUID.fromString(id), "local-$role@example.local", listOf(role))
+            Actor(UUID.fromString(id), "local-$role@example.local", listOf(role), stepUpFresh = true)
 
         private fun <T : Any> eqNonNull(value: T): T = Mockito.eq(value) ?: value
+
+        private fun captureList(
+            captor: ArgumentCaptor<List<ArticleWritePayload>>,
+        ): List<ArticleWritePayload> {
+            captor.capture()
+            return emptyList()
+        }
 
         @Container
         @JvmStatic

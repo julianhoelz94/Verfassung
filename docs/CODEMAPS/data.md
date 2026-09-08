@@ -22,14 +22,14 @@ Latest: V8 untitled paragraphs. Seed: `V3__seed_germany.sql` (demo provenance, n
 
 | Table | Role |
 | --- | --- |
-| `articles` | version_id + article_number; list/patch API |
-| `content_nodes` | tree (`parent_id`, kind, body). Display SoT (V6: parent body null if children) |
+| `articles` | View over root `content_nodes` (`parent_id IS NULL`); V7 dropped the table |
+| `content_nodes` | Tree (`parent_id`, kind, body, `predecessor_id` V7). Display and write SoT |
 
 Seed: `V3__seed_germany_articles.sql`, `V5__seed_article1_tree.sql`.
 
 ## amendment_db
 
-`version_transitions` (source→target UUIDs), `amendments`, `amendment_changes` (V4 change records). Seed: `V3__seed_basic_law_transition.sql`.
+`version_transitions` (source→target UUIDs, `constitution_id`), `amendments`, `amendment_changes` (V4 change records; V6 `amending_law_title` / `amending_law_citation` text, `amending_law_citation_id` still nullable). Seed: `V3__seed_basic_law_transition.sql`. Latest: V6.
 
 ## identity_db
 
@@ -39,11 +39,11 @@ Roles seeded: `admin`, `editor`, `viewer`, then `reviewer`, `publisher` (V3).
 
 ## editor_db
 
-`edit_sessions` (status `open→reviewing→approved→published`), `draft_changes` (JSONB), `edit_revisions` (snapshot JSONB).
+`edit_sessions` (status enum `open→reviewing→approved→published`, CHECK V3), `draft_changes` (JSONB), `edit_revisions` (snapshot JSONB).
 
 ## search_db
 
-`search_documents` (GIN `tsv`, facets V3: country, version, effective_date, titles), `index_sync_state`. Rebuilt; not authoritative.
+`search_documents` (GIN `tsv`; V5 `language_code`, german vs simple + article-number simple vector), `index_sync_state`. Rebuilt; not authoritative. Latest: V5.
 
 ## ingestion_db
 

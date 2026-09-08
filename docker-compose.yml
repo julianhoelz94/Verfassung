@@ -86,9 +86,18 @@ services:
       - SPRING_DATASOURCE_URL=jdbc:postgresql://amendment-db:5432/amendment_db
       - SPRING_DATASOURCE_USERNAME=postgres
       - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - IDENTITY_API_URL=http://identity-service:8080
+      - CONTENT_API_URL=http://content-service:8080
+      - CATALOG_API_URL=http://catalog-service:8080
     depends_on:
       amendment-db:
         condition: service_healthy
+      identity-service:
+        condition: service_started
+      content-service:
+        condition: service_started
+      catalog-service:
+        condition: service_started
 
   identity-service:
     build: ./services/identity-service

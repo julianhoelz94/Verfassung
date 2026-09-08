@@ -3,7 +3,7 @@ package com.constitutionatlas.identity.service
 import com.constitutionatlas.identity.ConflictException
 import com.constitutionatlas.identity.StepUpRequiredException
 import com.constitutionatlas.identity.TooManyRequestsException
-import com.constitutionatlas.identity.UnauthorizedException
+import com.constitutionatlas.platform.UnauthorizedException
 import com.constitutionatlas.identity.api.LoginResponse
 import com.constitutionatlas.identity.api.MfaEnrollConfirmDto
 import com.constitutionatlas.identity.api.MfaEnrollStartDto

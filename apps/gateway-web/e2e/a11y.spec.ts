@@ -9,7 +9,7 @@ async function expectNoAxeViolations(page: Page): Promise<void> {
   await page.addScriptTag({ path: axePath });
   const results = await page.evaluate(async () => {
     // @ts-expect-error axe is injected onto window
-    return window.axe.run(document, { rules: { 'color-contrast': { enabled: false } } });
+    return window.axe.run(document);
   });
   expect(results.violations, JSON.stringify(results.violations, null, 2)).toEqual([]);
 }

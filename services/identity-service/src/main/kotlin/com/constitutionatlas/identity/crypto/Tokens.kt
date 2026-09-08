@@ -1,6 +1,6 @@
 package com.constitutionatlas.identity.crypto
 
-import com.constitutionatlas.identity.UnauthorizedException
+import com.constitutionatlas.platform.UnauthorizedException
 import java.security.MessageDigest
 import java.security.SecureRandom
 import java.util.Base64

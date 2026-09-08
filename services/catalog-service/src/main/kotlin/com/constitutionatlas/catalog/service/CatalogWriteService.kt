@@ -1,7 +1,7 @@
 package com.constitutionatlas.catalog.service
 
 import com.constitutionatlas.catalog.ConflictException
-import com.constitutionatlas.catalog.NotFoundException
+import com.constitutionatlas.platform.NotFoundException
 import com.constitutionatlas.catalog.api.ConstitutionSummary
 import com.constitutionatlas.catalog.api.CountrySummary
 import com.constitutionatlas.catalog.api.CreateConstitutionRequest

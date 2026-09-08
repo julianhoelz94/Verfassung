@@ -132,7 +132,11 @@ export default async function ArticleHistoryPage(props: HistoryPageProps) {
                             </>
                           ) : null}
                           {amendment.sourceReference ? ` · ${amendment.sourceReference}` : ''}
-                          {change.amendingLawCitationId && !amendment.sourceReference
+                          {change.amendingLawTitle ? ` · ${change.amendingLawTitle}` : ''}
+                          {change.amendingLawCitation ? ` · ${change.amendingLawCitation}` : ''}
+                          {change.amendingLawCitationId &&
+                          !change.amendingLawCitation &&
+                          !amendment.sourceReference
                             ? ` · ${change.amendingLawCitationId}`
                             : ''}
                           {change.note ? ` · ${change.note}` : ''}

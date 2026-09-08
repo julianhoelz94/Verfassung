@@ -2,13 +2,32 @@ package com.constitutionatlas.content.repo
 
 import com.constitutionatlas.content.api.ArticleDetail
 import com.constitutionatlas.content.api.ArticleSummary
-import com.constitutionatlas.content.api.ArticleWrite
 import com.constitutionatlas.content.api.ContentNodeDto
-import com.constitutionatlas.content.api.NodeWrite
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.jdbc.core.RowMapper
 import org.springframework.stereotype.Repository
 import java.util.UUID
+
+data class ContentNodeInsert(
+    val id: UUID,
+    val versionId: UUID,
+    val kind: String,
+    val parentId: UUID?,
+    val label: String?,
+    val number: String?,
+    val title: String?,
+    val body: String?,
+    val sortOrder: Int,
+    val predecessorId: UUID? = null,
+)
+
+data class ContentNodeRecord(
+    val id: UUID,
+    val kind: String,
+    val parentId: UUID?,
+    val body: String?,
+    val sortOrder: Int,
+)
 
 @Repository
 class ArticleRepository(private val jdbc: JdbcTemplate) {
@@ -20,9 +39,9 @@ class ArticleRepository(private val jdbc: JdbcTemplate) {
     ): List<ArticleSummary> {
         val columns =
             if (includeBody) {
-                "id, version_id, COALESCE(number, label, '') AS article_number, title, sort_order, body"
+                "id, version_id, COALESCE(number, label, '') AS article_number, title, sort_order, body, predecessor_id"
             } else {
-                "id, version_id, COALESCE(number, label, '') AS article_number, title, sort_order"
+                "id, version_id, COALESCE(number, label, '') AS article_number, title, sort_order, predecessor_id"
             }
         val sql = StringBuilder(
             """
@@ -51,7 +70,8 @@ class ArticleRepository(private val jdbc: JdbcTemplate) {
     fun findById(id: UUID): ArticleDetail? =
         jdbc.query(
             """
-            SELECT id, version_id, COALESCE(number, label, '') AS article_number, title, COALESCE(body, '') AS body, sort_order
+            SELECT id, version_id, COALESCE(number, label, '') AS article_number, title,
+                   COALESCE(body, '') AS body, sort_order, predecessor_id
             FROM content_nodes
             WHERE id = ?
               AND parent_id IS NULL
@@ -67,127 +87,81 @@ class ArticleRepository(private val jdbc: JdbcTemplate) {
             id,
         ).firstOrNull()
 
-    fun replaceForVersion(versionId: UUID, articles: List<ArticleWrite>): List<ArticleSummary> {
+    fun deleteForVersion(versionId: UUID) {
         jdbc.update("DELETE FROM content_nodes WHERE version_id = ? AND parent_id IS NULL", versionId)
-        jdbc.update("DELETE FROM articles WHERE version_id = ?", versionId)
-        articles.forEach { article ->
-            val id = UUID.randomUUID()
-            val hasNodes = article.nodes.isNotEmpty()
-            val storedBody = if (hasNodes) flattenWrite(article.nodes).ifBlank { article.body } else article.body
-            jdbc.update(
-                """
-                INSERT INTO articles (id, version_id, article_number, title, body, sort_order)
-                VALUES (?, ?, ?, ?, ?, ?)
-                """.trimIndent(),
-                id,
-                versionId,
-                article.articleNumber,
-                article.title,
-                storedBody,
-                article.sortOrder,
-            )
-            insertContentNode(
-                versionId = versionId,
-                kind = "article",
-                parentId = null,
-                label = article.articleNumber,
-                number = article.articleNumber,
-                title = article.title,
-                body = if (hasNodes) null else article.body,
-                sortOrder = article.sortOrder,
-                id = id,
-            )
-            article.nodes.forEachIndexed { index, node ->
-                insertNode(versionId, id, node, index + 1)
-            }
-        }
-        return listByVersion(versionId)
     }
 
-    private fun insertNode(versionId: UUID, parentId: UUID, node: NodeWrite, sortOrder: Int) {
-        val id = insertContentNode(
-            versionId = versionId,
-            kind = node.kind,
-            parentId = parentId,
-            label = node.label,
-            number = node.label,
-            title = node.title,
-            body = if (node.children.isNotEmpty()) null else node.body,
-            sortOrder = sortOrder,
-        )
-        node.children.forEachIndexed { index, child ->
-            insertNode(versionId, id, child, index + 1)
-        }
-    }
-
-    private fun insertContentNode(
-        versionId: UUID,
-        kind: String,
-        parentId: UUID?,
-        label: String?,
-        number: String?,
-        title: String?,
-        body: String?,
-        sortOrder: Int,
-        id: UUID = UUID.randomUUID(),
-    ): UUID {
+    fun insertNode(node: ContentNodeInsert) {
         jdbc.update(
             """
-            INSERT INTO content_nodes (id, version_id, kind, parent_id, label, number, title, body, sort_order)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO content_nodes
+              (id, version_id, kind, parent_id, label, number, title, body, sort_order, predecessor_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """.trimIndent(),
-            id,
-            versionId,
-            kind,
-            parentId,
-            label,
-            number,
-            title,
-            body,
-            sortOrder,
+            node.id,
+            node.versionId,
+            node.kind,
+            node.parentId,
+            node.label,
+            node.number,
+            node.title,
+            node.body,
+            node.sortOrder,
+            node.predecessorId,
         )
-        return id
     }
 
-    fun updateText(id: UUID, title: String, body: String, replaceChildren: Boolean): ArticleDetail? {
-        if (findById(id) == null) {
-            return null
-        }
-        if (replaceChildren) {
-            jdbc.update("DELETE FROM content_nodes WHERE parent_id = ?", id)
-        }
-        val nodeUpdated =
-            if (replaceChildren) {
+    fun deleteChildren(parentId: UUID) {
+        jdbc.update("DELETE FROM content_nodes WHERE parent_id = ?", parentId)
+    }
+
+    fun updateRoot(id: UUID, title: String, body: String?): Boolean {
+        val updated =
+            if (body == null) {
+                jdbc.update(
+                    "UPDATE content_nodes SET title = ? WHERE id = ? AND parent_id IS NULL",
+                    title,
+                    id,
+                )
+            } else {
                 jdbc.update(
                     "UPDATE content_nodes SET title = ?, body = ? WHERE id = ? AND parent_id IS NULL",
                     title,
                     body,
                     id,
                 )
-            } else {
-                jdbc.update(
-                    "UPDATE content_nodes SET title = ? WHERE id = ? AND parent_id IS NULL",
-                    title,
-                    id,
-                )
             }
-        if (nodeUpdated == 0) {
-            return null
-        }
-        val projectedBody = if (replaceChildren) body else projectedBody(id)
-        jdbc.update(
-            "UPDATE articles SET title = ?, body = ? WHERE id = ?",
-            title,
-            projectedBody,
+        return updated > 0
+    }
+
+    fun updateNodeTitle(id: UUID, title: String?): Boolean =
+        jdbc.update("UPDATE content_nodes SET title = ? WHERE id = ?", title, id) > 0
+
+    fun parentIdOf(id: UUID): UUID? {
+        val found = jdbc.query(
+            "SELECT parent_id FROM content_nodes WHERE id = ?",
+            { rs, _ -> rs.getObject("parent_id", UUID::class.java) },
             id,
         )
-        return findById(id)
+        if (found.isEmpty()) {
+            return null
+        }
+        return found.first()
     }
+
+    fun nodeExists(id: UUID): Boolean =
+        (
+            jdbc.queryForObject(
+                "SELECT COUNT(*) FROM content_nodes WHERE id = ?",
+                Int::class.java,
+                id,
+            ) ?: 0
+            ) > 0
 
     fun listChildren(parentId: UUID): List<ContentNodeDto> {
         val rows = jdbc.query(
             """
-            SELECT id, kind, label, number, title, body, sort_order
+            SELECT id, kind, label, number, title, body, sort_order, predecessor_id
             FROM content_nodes
             WHERE parent_id = ?
             ORDER BY sort_order, COALESCE(number, label, '')
@@ -201,7 +175,7 @@ class ArticleRepository(private val jdbc: JdbcTemplate) {
     fun findNode(id: UUID): ContentNodeDto? {
         val row = jdbc.query(
             """
-            SELECT id, kind, label, number, title, body, sort_order
+            SELECT id, kind, label, number, title, body, sort_order, predecessor_id
             FROM content_nodes
             WHERE id = ?
             """.trimIndent(),
@@ -211,137 +185,69 @@ class ArticleRepository(private val jdbc: JdbcTemplate) {
         return toDto(row)
     }
 
-    fun updateNodeTitle(id: UUID, title: String?): ContentNodeDto? {
-        val found = jdbc.query(
-            "SELECT parent_id FROM content_nodes WHERE id = ?",
-            { rs, _ -> rs.getObject("parent_id", UUID::class.java) },
-            id,
+    fun listNodesOutsideKinds(versionId: UUID, keepKinds: List<String>): List<ContentNodeRecord> =
+        jdbc.query(
+            """
+            SELECT id, kind, parent_id, body, sort_order
+            FROM content_nodes
+            WHERE version_id = ?
+              AND kind NOT IN (${keepKinds.joinToString(",") { "?" }})
+            """.trimIndent(),
+            { rs, _ ->
+                ContentNodeRecord(
+                    id = rs.getObject("id", UUID::class.java),
+                    kind = rs.getString("kind"),
+                    parentId = rs.getObject("parent_id", UUID::class.java),
+                    body = rs.getString("body"),
+                    sortOrder = rs.getInt("sort_order"),
+                )
+            },
+            *listOf(versionId).plus(keepKinds).toTypedArray(),
         )
-        if (found.isEmpty()) {
-            return null
-        }
-        val parentId = found.first()
-        val stored = title?.trim()?.takeIf { it.isNotEmpty() }
-        if (parentId == null) {
-            val required = stored ?: throw IllegalArgumentException("title must not be blank")
-            jdbc.update("UPDATE content_nodes SET title = ? WHERE id = ?", required, id)
-            jdbc.update("UPDATE articles SET title = ? WHERE id = ?", required, id)
-        } else {
-            jdbc.update("UPDATE content_nodes SET title = ? WHERE id = ?", stored, id)
-        }
-        return findNode(id)
-    }
 
-    fun projectedBody(id: UUID): String {
-        val children = listChildren(id)
-        if (children.isNotEmpty()) {
-            return flattenText(children)
-        }
-        return findById(id)?.body.orEmpty()
-    }
-
-    fun restructureKeepingKinds(versionId: UUID, keepKinds: List<String>): Int {
-        var absorbed = 0
-        while (true) {
-            val removed = jdbc.query(
-                """
-                SELECT id, kind, parent_id, body, sort_order
-                FROM content_nodes
-                WHERE version_id = ?
-                  AND kind NOT IN (${keepKinds.joinToString(",") { "?" }})
-                """.trimIndent(),
-                { rs, _ ->
-                    NodeRow(
-                        id = rs.getObject("id", UUID::class.java),
-                        kind = rs.getString("kind"),
-                        parentId = rs.getObject("parent_id", UUID::class.java),
-                        body = rs.getString("body"),
-                        sortOrder = rs.getInt("sort_order"),
-                    )
-                },
-                *listOf(versionId).plus(keepKinds).toTypedArray(),
-            )
-            if (removed.isEmpty()) {
-                break
-            }
-            val depths = nodeDepths(versionId)
-            absorb(nextVictim(removed, depths), keepKinds.first())
-            absorbed += 1
-        }
-        listByVersion(versionId).forEach { root ->
-            jdbc.update("UPDATE articles SET body = ? WHERE id = ?", projectedBody(root.id), root.id)
-        }
-        return absorbed
-    }
-
-    private fun nextVictim(removed: List<NodeRow>, depths: Map<UUID, Int>): NodeRow {
-        val maxDepth = removed.maxOf { depths[it.id] ?: 0 }
-        return removed
-            .filter { (depths[it.id] ?: 0) == maxDepth }
-            .sortedWith(compareBy<NodeRow> { it.sortOrder }.thenBy { it.id.toString() })
-            .first()
-    }
-
-    private fun nodeDepths(versionId: UUID): Map<UUID, Int> {
-        val parents = jdbc.query(
+    fun parentMap(versionId: UUID): Map<UUID, UUID?> =
+        jdbc.query(
             "SELECT id, parent_id FROM content_nodes WHERE version_id = ?",
             { rs, _ ->
                 rs.getObject("id", UUID::class.java) to rs.getObject("parent_id", UUID::class.java)
             },
             versionId,
         ).toMap()
-        val memo = mutableMapOf<UUID, Int>()
-        fun depth(id: UUID): Int {
-            memo[id]?.let { return it }
-            val parent = parents[id] ?: return 0.also { memo[id] = 0 }
-            val value = depth(parent) + 1
-            memo[id] = value
-            return value
-        }
-        parents.keys.forEach { depth(it) }
-        return memo
+
+    fun updateKind(id: UUID, kind: String) {
+        jdbc.update("UPDATE content_nodes SET kind = ? WHERE id = ?", kind, id)
     }
 
-    private fun absorb(node: NodeRow, fallbackRootKind: String) {
-        val parentId = node.parentId
-        if (parentId == null) {
-            jdbc.update("UPDATE content_nodes SET kind = ? WHERE id = ?", fallbackRootKind, node.id)
-            return
-        }
-        val extra = node.body?.trim().orEmpty()
-        if (extra.isNotEmpty()) {
-            val parentBody =
-                jdbc.query(
-                    "SELECT body FROM content_nodes WHERE id = ?",
-                    { rs, _ -> rs.getString("body") },
-                    parentId,
-                ).firstOrNull()
-            val joined = listOf(parentBody?.trim().orEmpty(), extra).filter { it.isNotEmpty() }.joinToString(" ")
-            jdbc.update("UPDATE content_nodes SET body = ? WHERE id = ?", joined, parentId)
-        }
-        val children = jdbc.query(
+    fun bodyOf(id: UUID): String? =
+        jdbc.query(
+            "SELECT body FROM content_nodes WHERE id = ?",
+            { rs, _ -> rs.getString("body") },
+            id,
+        ).firstOrNull()
+
+    fun updateBody(id: UUID, body: String) {
+        jdbc.update("UPDATE content_nodes SET body = ? WHERE id = ?", body, id)
+    }
+
+    fun listChildOrders(parentId: UUID): List<Pair<UUID, Int>> =
+        jdbc.query(
             "SELECT id, sort_order FROM content_nodes WHERE parent_id = ? ORDER BY sort_order",
             { rs, _ -> rs.getObject("id", UUID::class.java) to rs.getInt("sort_order") },
-            node.id,
+            parentId,
         )
-        children.forEach { (childId, childOrder) ->
-            jdbc.update(
-                "UPDATE content_nodes SET parent_id = ?, sort_order = ? WHERE id = ?",
-                parentId,
-                node.sortOrder * 1_000 + childOrder,
-                childId,
-            )
-        }
-        jdbc.update("DELETE FROM content_nodes WHERE id = ?", node.id)
+
+    fun reparent(id: UUID, parentId: UUID, sortOrder: Int) {
+        jdbc.update(
+            "UPDATE content_nodes SET parent_id = ?, sort_order = ? WHERE id = ?",
+            parentId,
+            sortOrder,
+            id,
+        )
     }
 
-    private data class NodeRow(
-        val id: UUID,
-        val kind: String,
-        val parentId: UUID?,
-        val body: String?,
-        val sortOrder: Int,
-    )
+    fun deleteNode(id: UUID) {
+        jdbc.update("DELETE FROM content_nodes WHERE id = ?", id)
+    }
 
     private data class ContentNodeRow(
         val id: UUID,
@@ -351,6 +257,7 @@ class ArticleRepository(private val jdbc: JdbcTemplate) {
         val title: String?,
         val body: String?,
         val sortOrder: Int,
+        val predecessorId: UUID?,
     )
 
     private val summaryMapper = RowMapper { rs, _ ->
@@ -360,6 +267,7 @@ class ArticleRepository(private val jdbc: JdbcTemplate) {
             articleNumber = rs.getString("article_number"),
             title = rs.getString("title"),
             sortOrder = rs.getInt("sort_order"),
+            predecessorId = rs.getObject("predecessor_id", UUID::class.java),
         )
     }
 
@@ -371,6 +279,7 @@ class ArticleRepository(private val jdbc: JdbcTemplate) {
             title = rs.getString("title"),
             sortOrder = rs.getInt("sort_order"),
             body = rs.getString("body"),
+            predecessorId = rs.getObject("predecessor_id", UUID::class.java),
         )
     }
 
@@ -382,6 +291,7 @@ class ArticleRepository(private val jdbc: JdbcTemplate) {
             title = rs.getString("title"),
             body = rs.getString("body"),
             sortOrder = rs.getInt("sort_order"),
+            predecessorId = rs.getObject("predecessor_id", UUID::class.java),
         )
     }
 
@@ -395,6 +305,7 @@ class ArticleRepository(private val jdbc: JdbcTemplate) {
             body = row.body,
             sortOrder = row.sortOrder,
             children = listChildren(row.id),
+            predecessorId = row.predecessorId,
         )
 
     private val nodeRowMapper = RowMapper { rs, _ ->
@@ -406,27 +317,7 @@ class ArticleRepository(private val jdbc: JdbcTemplate) {
             title = rs.getString("title"),
             body = rs.getString("body"),
             sortOrder = rs.getInt("sort_order"),
+            predecessorId = rs.getObject("predecessor_id", UUID::class.java),
         )
-    }
-
-    companion object {
-        fun flattenText(nodes: List<ContentNodeDto>): String = flatten(nodes, { it.body }, { it.children })
-
-        private fun flattenWrite(nodes: List<NodeWrite>): String = flatten(nodes, { it.body }, { it.children })
-
-        private fun <T> flatten(
-            nodes: List<T>,
-            body: (T) -> String?,
-            children: (T) -> List<T>,
-        ): String = nodes.flatMap { collect(it, body, children) }.joinToString(" ")
-
-        private fun <T> collect(
-            node: T,
-            body: (T) -> String?,
-            children: (T) -> List<T>,
-        ): List<String> {
-            val own = body(node)?.trim()?.takeIf { it.isNotEmpty() }
-            return listOfNotNull(own) + children(node).flatMap { collect(it, body, children) }
-        }
     }
 }

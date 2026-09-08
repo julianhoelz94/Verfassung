@@ -1,3 +1,5 @@
 package com.constitutionatlas.amendment
 
-class NotFoundException(message: String) : RuntimeException(message)
+class ConflictException(message: String) : RuntimeException(message)
+
+class ContentUnavailableException(message: String, cause: Throwable? = null) : RuntimeException(message, cause)

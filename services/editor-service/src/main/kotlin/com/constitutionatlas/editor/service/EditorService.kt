@@ -1,13 +1,11 @@
 package com.constitutionatlas.editor.service
 
 import com.constitutionatlas.editor.ConflictException
-import com.constitutionatlas.editor.ForbiddenException
-import com.constitutionatlas.editor.NotFoundException
 import com.constitutionatlas.editor.StepUpRequiredException
-import com.constitutionatlas.editor.api.Actor
 import com.constitutionatlas.editor.api.CreateSessionRequest
 import com.constitutionatlas.editor.api.DraftPreviewDto
 import com.constitutionatlas.editor.api.EditSessionDto
+import com.constitutionatlas.editor.api.EditSessionStatus
 import com.constitutionatlas.editor.api.EditSessionSummaryDto
 import com.constitutionatlas.editor.api.SaveDraftRequest
 import com.constitutionatlas.editor.api.canEdit
@@ -23,10 +21,13 @@ import com.constitutionatlas.editor.client.CatalogVersion
 import com.constitutionatlas.editor.client.ContentClient
 import com.constitutionatlas.editor.client.ContentTreeArticle
 import com.constitutionatlas.editor.client.ContentTreeNode
-import com.constitutionatlas.editor.client.IdentityClient
 import com.constitutionatlas.editor.client.NodeWritePayload
 import com.constitutionatlas.editor.client.SearchIndexClient
 import com.constitutionatlas.editor.repo.EditorRepository
+import com.constitutionatlas.platform.Actor
+import com.constitutionatlas.platform.ForbiddenException
+import com.constitutionatlas.platform.IdentityClient
+import com.constitutionatlas.platform.NotFoundException
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -44,7 +45,13 @@ class EditorService(
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
-    fun actor(authorization: String?): Actor = identityClient.authenticate(authorization)
+    fun actor(authorization: String?): Actor {
+        val actor = identityClient.authenticate(authorization)
+        if (!actor.isEditorial()) {
+            throw ForbiddenException("Editorial role required")
+        }
+        return actor
+    }
 
     @Transactional
     fun createSession(authorization: String?, request: CreateSessionRequest): EditSessionDto {
@@ -80,7 +87,9 @@ class EditorService(
                         throw IllegalArgumentException("openedBy must be a user id or 'me'")
                     }
             }
-        return editorRepository.listSessions(status?.ifBlank { null }, owner, versionId)
+        val statusFilter =
+            status?.ifBlank { null }?.let { EditSessionStatus.fromJson(it) }
+        return editorRepository.listSessions(statusFilter, owner, versionId)
     }
 
     fun preview(authorization: String?, sessionId: UUID): DraftPreviewDto {
@@ -94,7 +103,7 @@ class EditorService(
         val actor = actor(authorization)
         requireEdit(actor)
         val session = requireOwned(actor, sessionId)
-        requireStatus(session, "open")
+        requireStatus(session, EditSessionStatus.OPEN)
         val payload = mapOf(
             "articleId" to request.articleId,
             "title" to request.title,
@@ -112,8 +121,8 @@ class EditorService(
         val actor = actor(authorization)
         requireEdit(actor)
         val session = requireOwned(actor, sessionId)
-        requireStatus(session, "open")
-        editorRepository.updateStatus(session.id, "reviewing")
+        requireStatus(session, EditSessionStatus.OPEN)
+        editorRepository.updateStatus(session.id, EditSessionStatus.REVIEWING)
         auditClient.record(actor, "review_submitted", "edit_session", session.id)
         return previewDto(session.id)
     }
@@ -123,11 +132,11 @@ class EditorService(
         val actor = actor(authorization)
         requireReview(actor)
         val session = requireVisible(actor, sessionId)
-        requireStatus(session, "reviewing")
+        requireStatus(session, EditSessionStatus.REVIEWING)
         if (session.actorId == actor.id && !actor.isAdmin()) {
             throw ForbiddenException("A different reviewer must approve this draft")
         }
-        editorRepository.updateStatus(session.id, "approved")
+        editorRepository.updateStatus(session.id, EditSessionStatus.APPROVED)
         auditClient.record(actor, "review_approved", "edit_session", session.id)
         return previewDto(session.id)
     }
@@ -137,7 +146,7 @@ class EditorService(
         val actor = actor(authorization)
         requirePublish(actor)
         val session = requireVisible(actor, sessionId)
-        requireStatus(session, "approved")
+        requireStatus(session, EditSessionStatus.APPROVED)
         val drafts = editorRepository.listLatestDrafts(session.id)
         if (drafts.isEmpty()) {
             throw IllegalArgumentException("No draft article changes to publish")
@@ -159,7 +168,7 @@ class EditorService(
         }
         val published = catalogClient.publishVersion(successor.id)
         amendmentClient.recordTransition(session.versionId, published.id)
-        editorRepository.updateStatus(session.id, "published")
+        editorRepository.updateStatus(session.id, EditSessionStatus.PUBLISHED)
         try {
             auditClient.record(
                 actor,
@@ -222,9 +231,9 @@ class EditorService(
         throw ForbiddenException("Not your session")
     }
 
-    private fun requireStatus(session: EditSessionDto, expected: String) {
+    private fun requireStatus(session: EditSessionDto, expected: EditSessionStatus) {
         if (session.status != expected) {
-            throw ConflictException("Session is ${session.status}, expected $expected")
+            throw ConflictException("Session is ${session.status.toJson()}, expected ${expected.toJson()}")
         }
     }
 
@@ -260,22 +269,30 @@ class EditorService(
     }
 
     companion object {
-        private fun toWrite(article: ContentTreeArticle): ArticleWritePayload =
-            ArticleWritePayload(
+        private fun toWrite(article: ContentTreeArticle): ArticleWritePayload {
+            val newId = UUID.randomUUID()
+            return ArticleWritePayload(
                 articleNumber = article.articleNumber,
                 title = article.title,
                 body = article.body.orEmpty(),
                 sortOrder = article.sortOrder,
                 nodes = article.children.map(::toNodeWrite),
+                id = newId,
+                predecessorId = article.id,
             )
+        }
 
-        private fun toNodeWrite(node: ContentTreeNode): NodeWritePayload =
-            NodeWritePayload(
+        private fun toNodeWrite(node: ContentTreeNode): NodeWritePayload {
+            val newId = UUID.randomUUID()
+            return NodeWritePayload(
                 kind = node.kind,
                 label = node.label ?: node.number,
                 title = node.title,
                 body = node.body,
                 children = node.children.map(::toNodeWrite),
+                id = newId,
+                predecessorId = node.id,
             )
+        }
     }
 }

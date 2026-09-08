@@ -2,7 +2,7 @@ package com.constitutionatlas.identity.service
 
 import com.constitutionatlas.identity.BadRequestException
 import com.constitutionatlas.identity.ConflictException
-import com.constitutionatlas.identity.UnauthorizedException
+import com.constitutionatlas.platform.UnauthorizedException
 import com.constitutionatlas.identity.client.AuthAudit
 import com.constitutionatlas.identity.config.IdentityMfaProperties
 import com.constitutionatlas.identity.crypto.Base32

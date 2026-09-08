@@ -1,6 +1,6 @@
 package com.constitutionatlas.identity
 
-open class ForbiddenException(message: String) : RuntimeException(message)
+import com.constitutionatlas.platform.ForbiddenException
 
 class StepUpRequiredException : ForbiddenException("Recent step-up authentication required")
 

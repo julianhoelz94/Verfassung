@@ -1,6 +1,6 @@
 package com.constitutionatlas.editor.client
 
-import com.constitutionatlas.editor.api.Actor
+import com.constitutionatlas.platform.Actor
 import java.util.UUID
 
 interface AuditClient {

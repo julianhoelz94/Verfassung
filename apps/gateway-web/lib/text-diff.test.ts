@@ -54,4 +54,31 @@ describe('alignNodes', () => {
     expect(aligned[0]?.right?.id).toBe('p1');
     expect(aligned[1]?.right?.id).toBe('p2');
   });
+
+  it('does not treat Abs. or Art. as sentence boundaries when one sentence node changes', () => {
+    const left = [
+      node({ id: 's1', kind: 'sentence', label: '1', body: 'Art. 1 Abs. 1 remains.' }),
+      node({ id: 's2', kind: 'sentence', label: '2', body: 'Art. 1 Abs. 2 is old.' }),
+    ];
+    const right = [
+      node({ id: 's1', kind: 'sentence', label: '1', body: 'Art. 1 Abs. 1 remains.' }),
+      node({ id: 's2', kind: 'sentence', label: '2', body: 'Art. 1 Abs. 2 is new.' }),
+    ];
+    const aligned = alignNodes(left, right);
+    expect(aligned).toHaveLength(2);
+    const changed = diffText(aligned[1]?.left?.body ?? '', aligned[1]?.right?.body ?? '');
+    expect(changed.some((seg) => seg.type === 'equal' && seg.text.includes('Abs.'))).toBe(true);
+    expect(changed.some((seg) => seg.type === 'remove' && seg.text.includes('old'))).toBe(true);
+    expect(changed.some((seg) => seg.type === 'add' && seg.text.includes('new'))).toBe(true);
+    expect(changed.every((seg) => !seg.text.includes('Art.') || seg.type === 'equal')).toBe(true);
+  });
+});
+
+describe('diffText word-diff', () => {
+  it('word-diffs a single unsplit paragraph', () => {
+    const segs = diffText('Human dignity shall be inviolable.', 'Human dignity shall be protected.');
+    expect(segs.some((seg) => seg.type === 'equal' && seg.text.includes('Human dignity shall be'))).toBe(true);
+    expect(segs.some((seg) => seg.type === 'remove' && seg.text.includes('inviolable'))).toBe(true);
+    expect(segs.some((seg) => seg.type === 'add' && seg.text.includes('protected'))).toBe(true);
+  });
 });

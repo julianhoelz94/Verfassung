@@ -1,11 +1,11 @@
 import com.constitutionatlas.content.CatalogUnavailableException
 import com.constitutionatlas.content.ContentServiceApplication
-import com.constitutionatlas.content.CorrelationIdFilter
-import com.constitutionatlas.content.UnauthorizedException
-import com.constitutionatlas.content.client.Actor
 import com.constitutionatlas.content.client.CatalogClient
 import com.constitutionatlas.content.client.CatalogVersion
-import com.constitutionatlas.content.client.IdentityClient
+import com.constitutionatlas.platform.Actor
+import com.constitutionatlas.platform.CorrelationIdFilter
+import com.constitutionatlas.platform.IdentityClient
+import com.constitutionatlas.platform.UnauthorizedException
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.assertj.core.api.Assertions.assertThat
@@ -376,6 +376,73 @@ class ContentApiTest {
             .andExpect {
                 status { isOk() }
                 jsonPath("$.title") { value(original.get("title").asText()) }
+            }
+    }
+
+    @Test
+    fun replaceArticlesKeepsClientIdsAndPredecessor() {
+        val versionId = "01900000-0000-4000-8000-000000000097"
+        val articleId = "01900000-0000-4000-8000-000000000701"
+        val nodeId = "01900000-0000-4000-8000-000000000702"
+        val predecessorId = "01900000-0000-4000-8000-000000000201"
+        mockMvc.put("/versions/$versionId/articles") {
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = """
+                [
+                  {
+                    "id":"$articleId",
+                    "predecessorId":"$predecessorId",
+                    "articleNumber":"1",
+                    "title":"Copied",
+                    "body":"",
+                    "sortOrder":1,
+                    "nodes":[
+                      {"id":"$nodeId","kind":"paragraph","label":"(1)","body":"Copied paragraph."}
+                    ]
+                  }
+                ]
+            """.trimIndent()
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$[0].id") { value(articleId) }
+            jsonPath("$[0].predecessorId") { value(predecessorId) }
+        }
+        mockMvc.get("/versions/$versionId/articles") {
+            param("includeBody", "true")
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$[0].id") { value(articleId) }
+            jsonPath("$[0].predecessorId") { value(predecessorId) }
+            jsonPath("$[0].children[0].id") { value(nodeId) }
+        }
+        mockMvc.get("/articles/$articleId")
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.id") { value(articleId) }
+                jsonPath("$.predecessorId") { value(predecessorId) }
+                jsonPath("$.children[0].id") { value(nodeId) }
+            }
+    }
+
+    @Test
+    fun replaceArticlesGeneratesIdWhenOmitted() {
+        val versionId = "01900000-0000-4000-8000-000000000096"
+        val json = mockMvc.put("/versions/$versionId/articles") {
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = """[{"articleNumber":"1","title":"One","body":"First.","sortOrder":1}]"""
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$[0].id") { exists() }
+            jsonPath("$[0].articleNumber") { value("1") }
+        }.andReturn().response.contentAsString
+        val id = objectMapper.readTree(json).get(0).get("id").asText()
+        UUID.fromString(id)
+        mockMvc.get("/articles/$id")
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.title") { value("One") }
             }
     }
 

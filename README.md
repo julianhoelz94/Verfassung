@@ -14,7 +14,7 @@ These are not provided by the repo. Compose images contain a JRE (Kotlin service
 | --- | --- | --- | --- |
 | Docker Desktop | current, with the engine running | Local stack (`./manageLocalStack.sh`) and Testcontainers | [Docker Desktop for Mac](https://www.docker.com/products/docker-desktop/) |
 | Temurin JDK | **21** (LTS) | Host `./gradlew test` / `bootJar` (local stack Kotlin images) | [Adoptium Temurin 21](https://adoptium.net/temurin/releases/?version=21) (macOS `.pkg` needs admin). Without sudo: unpack the macOS aarch64/x64 `.tar.gz` under `~/.local/java/temurin-21` (`Contents/Home`) and set `JAVA_HOME` + `PATH` in `~/.zshrc`. |
-| Gradle | **8.10.2** (matches CI and the repo wrapper) | Host `./gradlew test` / `bootJar` | Wrapper at repo root (`./gradlew`); each `services/<name>/gradlew` delegates to it. Homebrew’s `gradle` formula is currently 9.x and is **not** the version this repo uses. |
+| Gradle | **9.7.1** (matches CI and the repo wrapper) | Host `./gradlew test` / `bootJar` | Wrapper at repo root (`./gradlew`); each `services/<name>/gradlew` delegates to it. Prefer the wrapper over Homebrew’s `gradle` formula so the patch version stays pinned. |
 | Node.js + npm | **20** | `cd apps/gateway-web && npm ci && npm run lint && npm run build` | [Node 20](https://nodejs.org/) or `nvm install 20` |
 
 Check:
@@ -22,7 +22,7 @@ Check:
 ```bash
 docker info
 java -version    # OpenJDK 21, Temurin
-gradle -v        # optional; prefer ./gradlew -v (8.10.2)
+gradle -v        # optional; prefer ./gradlew -v (9.7.1)
 node -v          # v20.x
 ```
 
@@ -76,6 +76,7 @@ Then restart the app containers so they reconnect. Flyway history is part of eac
 | `infra/caddy/` | Edge proxy |
 | `infra/backup/` | `pg_dump` helper (writes to `./backups`, gitignored) |
 | `env/` | Profile templates |
+| `docs/CODEMAPS/` | Agent navigation maps (start at [`INDEX.md`](docs/CODEMAPS/INDEX.md)) |
 | `.github/workflows/ci.yml` | Per-service `./gradlew check`, frontend lint/build, and image builds |
 
 ## Environment profiles
@@ -99,7 +100,7 @@ cd services/<name> && ./gradlew test
 cd apps/gateway-web && npm ci && npm run lint && npm run build
 ```
 
-Backend smoke tests use Testcontainers (`postgres:16-alpine`). CI discovers every `services/*/build.gradle.kts` and runs `./gradlew check` there (JUnit + Spotless/ktlint). The Gradle wrapper at the repo root is 8.10.2; service `gradlew` scripts call it with `-p`.
+Backend smoke tests use Testcontainers (`postgres:16-alpine`). CI discovers every `services/*/build.gradle.kts` and runs `./gradlew check` there (JUnit + Spotless/ktlint). The Gradle wrapper at the repo root is 9.7.1; service `gradlew` scripts call it with `-p`.
 
 ## Current shape
 

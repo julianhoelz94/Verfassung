@@ -4,6 +4,7 @@ import com.constitutionatlas.ingestion.api.ImportJobDto
 import com.constitutionatlas.ingestion.api.ImportRequest
 import com.constitutionatlas.ingestion.client.CatalogClient
 import com.constitutionatlas.ingestion.client.ContentClient
+import com.constitutionatlas.ingestion.client.DownstreamAuth
 import com.constitutionatlas.ingestion.repo.ImportJobRepository
 import org.springframework.stereotype.Service
 import org.springframework.web.client.RestClientException
@@ -15,7 +16,7 @@ class ImportService(
     private val catalogClient: CatalogClient,
     private val contentClient: ContentClient,
 ) {
-    fun importVersion(request: ImportRequest): ImportJobDto {
+    fun importVersion(authorization: String?, request: ImportRequest): ImportJobDto {
         val jobId = importJobRepository.insertRunning(request)
         importJobRepository.stage(jobId, "request", request)
 
@@ -26,7 +27,9 @@ class ImportService(
         }
 
         return try {
-            persist(jobId, request)
+            DownstreamAuth.withAuthorization(authorization) {
+                persist(jobId, request)
+            }
         } catch (ex: RestClientException) {
             importJobRepository.fail(jobId, listOf("DOWNSTREAM" to (ex.message ?: "catalog or content call failed")))
             importJobRepository.find(jobId)!!

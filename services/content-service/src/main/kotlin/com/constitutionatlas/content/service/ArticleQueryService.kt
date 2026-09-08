@@ -5,13 +5,17 @@ import com.constitutionatlas.content.api.ArticleDetail
 import com.constitutionatlas.content.api.ArticleSummary
 import com.constitutionatlas.content.api.ArticleWrite
 import com.constitutionatlas.content.api.ContentNodeDto
+import com.constitutionatlas.content.client.PublicationGuard
 import com.constitutionatlas.content.repo.ArticleRepository
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.util.UUID
 
 @Service
-class ArticleQueryService(private val articleRepository: ArticleRepository) {
+class ArticleQueryService(
+    private val articleRepository: ArticleRepository,
+    private val publicationGuard: PublicationGuard,
+) {
     fun listByVersion(
         versionId: UUID,
         offset: Int = 0,
@@ -34,6 +38,7 @@ class ArticleQueryService(private val articleRepository: ArticleRepository) {
 
     @Transactional
     fun replaceForVersion(versionId: UUID, articles: List<ArticleWrite>): List<ArticleSummary> {
+        publicationGuard.requireWritable(versionId)
         val numbers = articles.map { it.articleNumber.trim() }
         if (numbers.toSet().size != numbers.size) {
             throw IllegalArgumentException("articleNumber values must be unique")
@@ -50,6 +55,8 @@ class ArticleQueryService(private val articleRepository: ArticleRepository) {
         if (title.isBlank()) {
             throw IllegalArgumentException("title must not be blank")
         }
+        val current = articleRepository.findById(id) ?: throw NotFoundException("Unknown article '$id'")
+        publicationGuard.requireWritable(current.versionId)
         val children = articleRepository.listChildren(id)
         val flattened = projectedBody(null, children).orEmpty()
         val keepTree = children.isNotEmpty() && body.trim() == flattened.trim()
@@ -59,8 +66,13 @@ class ArticleQueryService(private val articleRepository: ArticleRepository) {
     }
 
     @Transactional
-    fun updateNodeTitle(id: UUID, title: String?): ContentNodeDto = articleRepository.updateNodeTitle(id, title)
-        ?: throw NotFoundException("Unknown node '$id'")
+    fun updateNodeTitle(id: UUID, title: String?): ContentNodeDto {
+        val versionId = articleRepository.versionIdOfNode(id)
+            ?: throw NotFoundException("Unknown node '$id'")
+        publicationGuard.requireWritable(versionId)
+        return articleRepository.updateNodeTitle(id, title)
+            ?: throw NotFoundException("Unknown node '$id'")
+    }
 
     @Transactional
     fun restructure(versionId: UUID, keepKinds: List<String>): Int {
@@ -68,6 +80,7 @@ class ArticleQueryService(private val articleRepository: ArticleRepository) {
         if (kinds.isEmpty()) {
             throw IllegalArgumentException("keepKinds must not be empty")
         }
+        publicationGuard.requireWritable(versionId)
         return articleRepository.restructureKeepingKinds(versionId, kinds)
     }
 

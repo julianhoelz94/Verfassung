@@ -14,6 +14,8 @@ spotless {
 
 dependencies {
     implementation("net.logstash.logback:logstash-logback-encoder:7.4")
+    // Gradle 9 no longer ships JUnit Platform on the test runtime classpath.
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
 tasks.named("bootJar") {
@@ -26,4 +28,10 @@ tasks.named("jar") {
 
 tasks.named("check") {
     dependsOn("spotlessCheck")
+}
+
+tasks.withType(Test).configureEach {
+    useJUnitPlatform()
+    // Docker Engine 29 rejects docker-java's default API 1.32 (Testcontainers 1.19.x).
+    systemProperty("api.version", "1.44")
 }

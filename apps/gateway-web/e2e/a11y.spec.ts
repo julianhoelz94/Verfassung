@@ -1,7 +1,7 @@
 /* eslint-disable */
 import { test, expect, type Page } from '@playwright/test';
 import path from 'node:path';
-import { signInEditor } from './helpers';
+import { signInAdmin, signInEditor } from './helpers';
 
 const axePath = path.join(process.cwd(), 'node_modules/axe-core/axe.min.js');
 
@@ -24,6 +24,9 @@ test('axe passes on public and editor routes', async ({ page }) => {
   await page.goto('/login');
   await expectNoAxeViolations(page);
 
+  await page.goto('/about');
+  await expectNoAxeViolations(page);
+
   await page.goto('/countries/DE/versions/01900000-0000-4000-8000-000000000004');
   await expectNoAxeViolations(page);
 
@@ -32,9 +35,18 @@ test('axe passes on public and editor routes', async ({ page }) => {
   );
   await expectNoAxeViolations(page);
 
+  await page.goto('/countries/DE/articles/1');
+  await expectNoAxeViolations(page);
+
   await page.goto('/countries/DE/compare');
   await expectNoAxeViolations(page);
 
   await signInEditor(page);
+  await expectNoAxeViolations(page);
+
+  await page.getByRole('button', { name: 'Account menu' }).click();
+  await page.getByRole('button', { name: 'Sign out' }).click();
+  await signInAdmin(page);
+  await page.goto('/admin/users');
   await expectNoAxeViolations(page);
 });

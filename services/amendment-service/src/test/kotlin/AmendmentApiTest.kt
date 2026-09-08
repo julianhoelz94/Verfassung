@@ -53,6 +53,31 @@ class AmendmentApiTest {
     }
 
     @Test
+    fun listAmendmentsByArticleAcrossTwoVersions() {
+        mockMvc.get("/amendments") {
+            param("constitutionId", "01900000-0000-4000-8000-000000000002")
+            param("articleNumber", "1")
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.length()") { value(2) }
+            jsonPath("$[0].targetVersionId") { value("01900000-0000-4000-8000-000000000004") }
+            jsonPath("$[0].changes[0].changedOn") { value("2022-12-19") }
+            jsonPath("$[0].changes[0].articleNumber") { value("1") }
+            jsonPath("$[1].targetVersionId") { value("01900000-0000-4000-8000-000000000005") }
+            jsonPath("$[1].changes.length()") { value(1) }
+            jsonPath("$[1].changes[0].changedOn") { value("2023-06-01") }
+            jsonPath("$[1].changes[0].articleNumber") { value("1") }
+        }
+    }
+
+    @Test
+    fun listAmendmentsByArticleRequiresQuery() {
+        mockMvc.get("/amendments").andExpect {
+            status { isBadRequest() }
+        }
+    }
+
+    @Test
     fun unknownVersionReturnsEmptyList() {
         mockMvc.get("/versions/00000000-0000-4000-8000-000000000099/amendments")
             .andExpect {

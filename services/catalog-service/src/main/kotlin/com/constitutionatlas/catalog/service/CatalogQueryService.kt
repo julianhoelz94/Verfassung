@@ -4,6 +4,7 @@ import com.constitutionatlas.catalog.NotFoundException
 import com.constitutionatlas.catalog.api.ContentOutlineDto
 import com.constitutionatlas.catalog.api.CountryDetail
 import com.constitutionatlas.catalog.api.CountrySummary
+import com.constitutionatlas.catalog.api.VersionDetail
 import com.constitutionatlas.catalog.api.VersionSummary
 import com.constitutionatlas.catalog.repo.CatalogRepository
 import org.springframework.stereotype.Service
@@ -23,6 +24,10 @@ class CatalogQueryService(private val catalogRepository: CatalogRepository) {
         }
         return catalogRepository.listPublishedVersions(constitutionId)
     }
+
+    fun getVersion(versionId: UUID): VersionDetail =
+        catalogRepository.findVersion(versionId)
+            ?: throw NotFoundException("Unknown version '$versionId'")
 
     fun getOutline(constitutionId: UUID): ContentOutlineDto {
         if (!catalogRepository.constitutionExists(constitutionId)) {

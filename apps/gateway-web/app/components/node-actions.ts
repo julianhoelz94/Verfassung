@@ -4,22 +4,8 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { patchContentNode } from '../../lib/api';
 import { canVisitEditor } from '../../lib/nav';
-import { currentUser } from '../../lib/session';
-
-function safeReturnTo(raw: string): string {
-  if (!raw.startsWith('/') || raw.startsWith('//') || raw.includes('\\')) {
-    return '/';
-  }
-  try {
-    const url = new URL(raw, 'http://atlas.local');
-    if (url.username || url.password || url.host !== 'atlas.local') {
-      return '/';
-    }
-    return `${url.pathname}${url.search}`;
-  } catch {
-    return '/';
-  }
-}
+import { safeReturnTo } from '../../lib/return-to';
+import { currentUser, requireSessionBearer } from '../../lib/session';
 
 export async function saveNodeTitleAction(formData: FormData): Promise<void> {
   const user = await currentUser();
@@ -39,7 +25,7 @@ export async function saveNodeTitleAction(formData: FormData): Promise<void> {
     redirect(`${errorUrl.pathname}${errorUrl.search}`);
   }
   try {
-    await patchContentNode(nodeId, title);
+    await patchContentNode(nodeId, title, requireSessionBearer());
   } catch {
     const errorUrl = new URL(returnTo, 'http://atlas.local');
     errorUrl.searchParams.set('error', 'title');

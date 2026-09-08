@@ -1,9 +1,15 @@
+import com.constitutionatlas.ingestion.api.ImportArticle
+import com.constitutionatlas.ingestion.api.ImportOutlineKind
 import com.constitutionatlas.ingestion.IngestionServiceApplication
+import com.constitutionatlas.ingestion.client.Actor
 import com.constitutionatlas.ingestion.client.CatalogClient
 import com.constitutionatlas.ingestion.client.ContentClient
 import com.constitutionatlas.ingestion.client.DownstreamConstitution
 import com.constitutionatlas.ingestion.client.DownstreamCountry
 import com.constitutionatlas.ingestion.client.DownstreamVersion
+import com.constitutionatlas.ingestion.client.IdentityClient
+import com.constitutionatlas.ingestion.client.UnauthorizedException
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito
 import org.springframework.beans.factory.annotation.Autowired
@@ -34,9 +40,27 @@ class ImportApiTest {
     @MockBean
     lateinit var contentClient: ContentClient
 
+    @MockBean
+    lateinit var identityClient: IdentityClient
+
+    private val admin =
+        Actor(UUID.fromString("01900000-0000-4000-8000-000000000413"), "local-admin@example.local", listOf("admin"))
+
+    @BeforeEach
+    fun stubIdentity() {
+        Mockito.reset(identityClient)
+        Mockito.`when`(identityClient.authenticate(null)).thenThrow(UnauthorizedException("Missing session"))
+        Mockito.`when`(identityClient.authenticate(TOKEN)).thenReturn(admin)
+    }
+
+    private fun anyUuid(): UUID = Mockito.any(UUID::class.java) ?: UUID(0, 0)
+
+    private fun <T : Any> eqNonNull(value: T): T = Mockito.eq(value) ?: value
+
     @Test
     fun invalidNumberingFailsWithoutCatalogWrites() {
         mockMvc.post("/import-jobs") {
+            header("Authorization", TOKEN)
             contentType = MediaType.APPLICATION_JSON
             content = """
                 {
@@ -67,6 +91,7 @@ class ImportApiTest {
         stubCatalog("FR", "France", "1958", "Constitution of 1958", "1958", constitutionId, versionId)
 
         mockMvc.post("/import-jobs") {
+            header("Authorization", TOKEN)
             contentType = MediaType.APPLICATION_JSON
             content = """
                 {
@@ -87,7 +112,7 @@ class ImportApiTest {
             jsonPath("$.isoCode") { value("FR") }
         }
         Mockito.verify(catalogClient).publishVersion(versionId)
-        Mockito.verify(catalogClient, Mockito.never()).replaceOutline(Mockito.any(), Mockito.anyList())
+        Mockito.verify(catalogClient, Mockito.never()).replaceOutline(anyUuid(), Mockito.anyList())
     }
 
     @Test
@@ -109,6 +134,7 @@ class ImportApiTest {
         )
 
         mockMvc.post("/import-jobs") {
+            header("Authorization", TOKEN)
             contentType = MediaType.APPLICATION_JSON
             content = usFixture()
         }.andExpect {
@@ -118,8 +144,9 @@ class ImportApiTest {
             jsonPath("$.isoCode") { value("US") }
         }
         Mockito.verify(catalogClient).replaceOutline(
-            Mockito.eq(constitutionId),
-            Mockito.argThat { kinds -> kinds.any { it.kindCode == "section" } },
+            eqNonNull(constitutionId),
+            Mockito.argThat<List<ImportOutlineKind>> { kinds -> kinds.any { it.kindCode == "section" } }
+                ?: emptyList(),
         )
         Mockito.verify(catalogClient).createDraftVersion(
             constitutionId,
@@ -130,8 +157,10 @@ class ImportApiTest {
             "U.S. Const.",
         )
         Mockito.verify(contentClient).replaceArticles(
-            Mockito.eq(versionId),
-            Mockito.argThat { articles -> articles.any { it.nodes.any { node -> node.kind == "section" } } },
+            eqNonNull(versionId),
+            Mockito.argThat<List<ImportArticle>> { articles ->
+                articles.any { article -> article.nodes.any { node -> node.kind == "section" } }
+            } ?: emptyList(),
         )
         Mockito.verify(catalogClient).publishVersion(versionId)
     }
@@ -139,6 +168,7 @@ class ImportApiTest {
     @Test
     fun unknownKindFailsWithoutCatalogWrites() {
         mockMvc.post("/import-jobs") {
+            header("Authorization", TOKEN)
             contentType = MediaType.APPLICATION_JSON
             content = """
                 {
@@ -168,6 +198,27 @@ class ImportApiTest {
             jsonPath("$.status") { value("failed") }
             jsonPath("$.errors[0].code") { value("UNKNOWN_KIND") }
         }
+        Mockito.verifyNoInteractions(catalogClient)
+        Mockito.verifyNoInteractions(contentClient)
+    }
+
+    @Test
+    fun importRequiresIdentityBearer() {
+        mockMvc.post("/import-jobs") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """
+                {
+                  "isoCode": "FR",
+                  "countryName": "France",
+                  "constitutionSlug": "1958",
+                  "constitutionTitle": "Constitution of 1958",
+                  "versionLabel": "1958",
+                  "articles": [
+                    {"articleNumber": "1", "title": "A", "body": "a", "sortOrder": 1}
+                  ]
+                }
+            """.trimIndent()
+        }.andExpect { status { isUnauthorized() } }
         Mockito.verifyNoInteractions(catalogClient)
         Mockito.verifyNoInteractions(contentClient)
     }
@@ -206,6 +257,8 @@ class ImportApiTest {
     }
 
     companion object {
+        private const val TOKEN = "Bearer test-token"
+
         @Container
         @JvmStatic
         val postgres: PostgreSQLContainer<*> = PostgreSQLContainer("postgres:16-alpine")

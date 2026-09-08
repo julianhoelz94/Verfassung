@@ -1,9 +1,12 @@
 import { notFound } from 'next/navigation';
-import { Breadcrumbs } from '../../../components/Breadcrumbs';
+import { CompareView } from '../../../components/CompareView';
 import { ConstitutionText } from '../../../components/ConstitutionText';
+import { CopyLink } from '../../../components/CopyLink';
 import { DiffConstitutionText } from '../../../components/DiffConstitutionText';
 import { PageMain } from '../../../components/PageMain';
+import { PrintLink } from '../../../components/PrintLink';
 import { ServiceUnavailable } from '../../../components/StatusMessage';
+import { Badge, PageHeader } from '../../../components/ui';
 import {
   ApiUnavailableError,
   listAllArticles,
@@ -22,12 +25,13 @@ import {
   netArticleKind,
   orderVersions,
   versionPath,
+  type CompareKind,
 } from '../../../../lib/compare';
 import { CompareForm } from '../CompareForm';
 
 type ComparePageProps = {
   params: { code: string };
-  searchParams: { from?: string; to?: string };
+  searchParams: { from?: string; to?: string; all?: string };
 };
 
 type Hop = {
@@ -37,16 +41,24 @@ type Hop = {
   articles: ArticleSummary[];
 };
 
-function affectedNumbers(amendments: Amendment[]): string[] {
-  const numbers = new Set<string>();
-  for (const amendment of amendments) {
-    for (const change of amendment.changes) {
-      if (change.articleNumber) {
-        numbers.add(change.articleNumber);
-      }
-    }
+function columnBadge(kind: CompareKind, side: 'from' | 'to'): { tone: 'added' | 'removed' | 'changed' | 'neutral'; label: string } {
+  if (kind === 'added') {
+    return side === 'from' ? { tone: 'removed', label: 'not present' } : { tone: 'added', label: 'added' };
   }
-  return [...numbers].sort(compareArticleNumbers);
+  if (kind === 'removed') {
+    return side === 'from' ? { tone: 'removed', label: 'removed' } : { tone: 'removed', label: 'not present' };
+  }
+  if (kind === 'changed') {
+    return { tone: 'changed', label: 'changed' };
+  }
+  return { tone: 'neutral', label: 'unchanged' };
+}
+
+function hopChangeTone(changeType: string): 'added' | 'removed' | 'changed' | 'neutral' {
+  if (changeType === 'added' || changeType === 'removed' || changeType === 'changed') {
+    return changeType;
+  }
+  return 'neutral';
 }
 
 export default async function ComparePage({ params, searchParams }: ComparePageProps) {
@@ -77,6 +89,7 @@ export default async function ComparePage({ params, searchParams }: ComparePageP
   const versions = orderVersions(constitution?.versions ?? []);
   const fromId = searchParams.from ?? versions[0]?.id;
   const toId = searchParams.to ?? versions[versions.length - 1]?.id;
+  const showAll = searchParams.all === '1';
   const selectedError = compareRequestError(country.constitutions, fromId, toId);
   const path = fromId && toId && constitution && !selectedError ? versionPath(versions, fromId, toId) : null;
 
@@ -135,182 +148,202 @@ export default async function ComparePage({ params, searchParams }: ComparePageP
 
   const fromVersion = path?.[0];
   const toVersion = path?.[path.length - 1];
+  const rows = numbers.map((number) => {
+    const left = fromMap.get(number);
+    const right = toMap.get(number);
+    const kind = netArticleKind(left, right, recorded.get(number) ?? []);
+    return { number, left, right, kind, rowId: compareRowId(number) };
+  });
+  const visible = showAll ? rows : rows.filter((row) => row.kind !== 'same');
+  const changedCount = rows.filter((row) => row.kind === 'changed').length;
+  const addedCount = rows.filter((row) => row.kind === 'added').length;
+  const removedCount = rows.filter((row) => row.kind === 'removed').length;
+  const compareQuery =
+    fromId && toId
+      ? `from=${encodeURIComponent(fromId)}&to=${encodeURIComponent(toId)}`
+      : '';
+  const showAllHref = `/countries/${country.isoCode}/compare?${compareQuery}&all=1`;
+  const hideUnchangedHref = `/countries/${country.isoCode}/compare?${compareQuery}`;
 
   return (
     <PageMain className="wide">
-      <Breadcrumbs
-        items={[
+      <PageHeader
+        breadcrumbs={[
           { href: '/', label: 'Countries' },
           { href: `/countries/${country.isoCode}`, label: country.name },
           { label: 'Compare' },
         ]}
+        eyebrow={`${country.name}${constitution?.title ? ` · ${constitution.title}` : ''}`}
+        title="Compare versions"
+        actions={
+          <>
+            <CopyLink />
+            <PrintLink />
+          </>
+        }
       />
-      <h1>Compare versions</h1>
-      <p className="lede">
-        {constitution?.title}. Published versions form a single line; this page traces every recorded hop
-        from one snapshot to a later one.
-      </p>
-      <CompareForm code={country.isoCode} versions={versions} fromId={fromId} toId={toId} />
+      <CompareForm
+        code={country.isoCode}
+        versions={versions}
+        fromId={fromId}
+        toId={toId}
+        showAll={showAll}
+      />
       {loadError ? <p role="alert">{loadError.endsWith('.') ? loadError : `${loadError}.`}</p> : null}
       {path && fromVersion && toVersion && !loadError ? (
         <>
-          <p className="muted">Path: {path.map((version) => version.versionLabel).join(' → ')}</p>
-          <h2>Recorded changes along the path</h2>
-          {hops.every((hop) => hop.amendments.length === 0) ? (
-            <p>
-              No amendment records are stored for these hops. The side-by-side text below still compares the snapshots.
-            </p>
-          ) : null}
-          {hops.map((hop) => {
-            const touched = affectedNumbers(hop.amendments);
-            const intermediate = hop.target.id !== toVersion.id;
-            return (
-              <details key={`${hop.source.id}-${hop.target.id}`} className="hop">
-                <summary>
-                  {hop.source.versionLabel} → {hop.target.versionLabel}
-                </summary>
-                {hop.amendments.map((amendment) => (
-                  <article key={amendment.id}>
-                    <p>
-                      <strong>{amendment.title}</strong>
-                      {amendment.enactedOn ? ` · ${amendment.enactedOn}` : ''}
-                      {amendment.sourceReference ? ` · ${amendment.sourceReference}` : ''}
-                    </p>
-                    <p>{amendment.summary}</p>
-                    <ul>
-                      {amendment.changes.map((change) => (
-                        <li key={change.id}>
-                          <span className={`tag tag-${change.changeType}`}>{change.changeType}</span>
-                          {change.articleNumber ? ` Article ${change.articleNumber}` : ''}
-                          {change.nodeId && change.nodeId !== change.articleId ? ' (sub-article)' : ''}
-                          {change.changedOn ? ` · changed ${change.changedOn}` : ''}
-                          {change.effectiveOn ? ` · effective ${change.effectiveOn}` : ''}
-                          {change.note ? ` — ${change.note}` : ''}
-                        </li>
-                      ))}
-                    </ul>
-                  </article>
-                ))}
-                {touched.length > 0 ? (
-                  <details>
-                    <summary>Articles touched in this hop ({touched.length})</summary>
-                    <ul>
-                      {touched.map((number) => {
-                        const after = hop.articles.find((article) => article.articleNumber === number);
-                        return (
-                          <li key={number}>
-                            <details>
-                              <summary>
-                                Article {number}
-                                {after ? ` — ${after.title}` : ''}
-                              </summary>
-                              {after ? (
-                                <ConstitutionText
-                                  article={after}
-                                  headingLevel="h3"
-                                  showHeading={false}
-                                  outline={constitution?.contentOutline}
-                                />
-                              ) : (
-                                <p className="muted">No text in the later snapshot.</p>
-                              )}
-                            </details>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  </details>
-                ) : null}
-                {intermediate && hop.articles.length > 0 ? (
-                  <details>
-                    <summary>
-                      Intermediate snapshot {hop.target.versionLabel} ({hop.articles.length} articles)
-                    </summary>
-                    <ol>
-                      {hop.articles.map((article) => (
-                        <li key={article.id}>
-                          <details>
-                            <summary>
-                              Article {article.articleNumber} — {article.title}
-                            </summary>
-                            <ConstitutionText
-                              article={article}
-                              headingLevel="h3"
-                              showHeading={false}
-                              outline={constitution?.contentOutline}
-                            />
-                          </details>
-                        </li>
-                      ))}
-                    </ol>
-                  </details>
-                ) : null}
-              </details>
-            );
-          })}
+          <div className="compare-summary">
+            <Badge tone="changed">{changedCount} changed</Badge>
+            <Badge tone="added">{addedCount} added</Badge>
+            <Badge tone="removed">{removedCount} removed</Badge>
+            <Badge>
+              {hops.length} amendment hop{hops.length === 1 ? '' : 's'}
+            </Badge>
+            <span className="muted">
+              {showAll ? (
+                <>
+                  All articles are shown. <a href={hideUnchangedHref}>Only changed</a>
+                </>
+              ) : (
+                <>
+                  Only changed articles are shown.{' '}
+                  <a href={showAllHref}>Show all {rows.length}</a>
+                </>
+              )}
+            </span>
+          </div>
 
-          <h2>
-            {fromVersion.versionLabel} and {toVersion.versionLabel} side by side
-          </h2>
-          <div className="compare-grid">
-            <div className="compare-head">{fromVersion.versionLabel}</div>
-            <div className="compare-head">{toVersion.versionLabel}</div>
-            {numbers.map((number) => {
-              const left = fromMap.get(number);
-              const right = toMap.get(number);
-              const kind = netArticleKind(left, right, recorded.get(number) ?? []);
-              const rowId = compareRowId(number);
+          <CompareView fromLabel={fromVersion.versionLabel} toLabel={toVersion.versionLabel}>
+            {hops.every((hop) => hop.amendments.length === 0) ? (
+              <p>
+                No amendment records are stored for these hops. The side-by-side text below still compares the snapshots.
+              </p>
+            ) : null}
+            {hops.map((hop, hopIndex) => {
+              const intermediate = hop.target.id !== toVersion.id;
+              const lawCount = hop.amendments.length;
+              const lastLaw = hop.amendments[hop.amendments.length - 1];
               return (
-                <article key={number} id={rowId} className={`compare-row kind-${kind}`}>
-                  <div>
-                    <p className="compare-cell-label">{fromVersion.versionLabel}</p>
-                    <p className="compare-kind">
-                      <a href={`#${rowId}`}>{COMPARE_KIND_LABEL[kind]}</a>
-                    </p>
-                    {kind === 'changed' && (left || right) ? (
-                      <DiffConstitutionText
-                        left={left}
-                        right={right}
-                        side="from"
-                        headingLevel="h3"
-                        outline={constitution?.contentOutline}
-                      />
-                    ) : left ? (
-                      <ConstitutionText
-                        article={left}
-                        headingLevel="h3"
-                        headingIdPrefix="article-from"
-                        outline={constitution?.contentOutline}
-                      />
-                    ) : (
-                      <p className="muted">Not in {fromVersion.versionLabel}</p>
+                <details key={`${hop.source.id}-${hop.target.id}`} className="hop">
+                  <summary>
+                    <Badge tone="accent">Hop {hopIndex + 1}</Badge>
+                    <span>
+                      {hop.source.versionLabel} → {hop.target.versionLabel}
+                    </span>
+                    <span className="muted">
+                      · {lawCount} amending law{lawCount === 1 ? '' : 's'}
+                      {lastLaw?.sourceReference
+                        ? ` · last: ${lastLaw.sourceReference}${lastLaw.enactedOn ? ` (${lastLaw.enactedOn})` : ''}`
+                        : ''}
+                    </span>
+                  </summary>
+                  <div className="stack">
+                    {hop.amendments.map((amendment) =>
+                      amendment.changes.map((change) => (
+                          <div key={change.id} className="change-row">
+                            <Badge tone={hopChangeTone(change.changeType)}>{change.changeType}</Badge>
+                            {change.articleNumber ? (
+                              <a href={`/countries/${country.isoCode}/articles/${encodeURIComponent(change.articleNumber)}`}>
+                                Art. {change.articleNumber}
+                              </a>
+                            ) : null}
+                            <span className="muted">
+                              {amendment.title}
+                              {change.note ? ` · ${change.note}` : ''}
+                              {change.changedOn ? ` · ${change.changedOn}` : ''}
+                            </span>
+                          </div>
+                      )),
                     )}
+                    {intermediate && hop.articles.length > 0 ? (
+                      <details>
+                        <summary>
+                          Intermediate snapshot {hop.target.versionLabel} ({hop.articles.length} articles)
+                        </summary>
+                        <ol>
+                          {hop.articles.map((article) => (
+                            <li key={article.id}>
+                              Article {article.articleNumber} — {article.title}
+                            </li>
+                          ))}
+                        </ol>
+                      </details>
+                    ) : null}
                   </div>
-                  <div>
-                    <p className="compare-cell-label">{toVersion.versionLabel}</p>
-                    {kind === 'changed' && (left || right) ? (
-                      <DiffConstitutionText
-                        left={left}
-                        right={right}
-                        side="to"
-                        headingLevel="h3"
-                        outline={constitution?.contentOutline}
-                      />
-                    ) : right ? (
-                      <ConstitutionText
-                        article={right}
-                        headingLevel="h3"
-                        headingIdPrefix="article-to"
-                        outline={constitution?.contentOutline}
-                      />
-                    ) : (
-                      <p className="muted">Not in {toVersion.versionLabel}</p>
-                    )}
-                  </div>
-                </article>
+                </details>
               );
             })}
-          </div>
+
+            <h2>
+              {fromVersion.versionLabel} and {toVersion.versionLabel} side by side
+            </h2>
+            {visible.map((row) => {
+              const title = row.right?.title ?? row.left?.title ?? '';
+              const fromBadge = columnBadge(row.kind, 'from');
+              const toBadge = columnBadge(row.kind, 'to');
+              return (
+                <section key={row.number} className={`compare-article kind-${row.kind}`}>
+                  <h2 className="section-title" id={row.rowId}>
+                    Art. {row.number}
+                    {title ? ` · ${title}` : ''}{' '}
+                    <a href={`#${row.rowId}`}>{COMPARE_KIND_LABEL[row.kind]}</a>
+                  </h2>
+                  <div className="compare-grid">
+                    <section className="compare-col compare-col-from" aria-label={fromVersion.versionLabel}>
+                      <div className="compare-col-head">
+                        {fromVersion.versionLabel}{' '}
+                        <Badge tone={fromBadge.tone}>{fromBadge.label}</Badge>
+                      </div>
+                      {row.kind === 'changed' && (row.left || row.right) ? (
+                        <DiffConstitutionText
+                          left={row.left}
+                          right={row.right}
+                          side="from"
+                          showHeading={false}
+                          outline={constitution?.contentOutline}
+                        />
+                      ) : row.left ? (
+                        <ConstitutionText
+                          article={row.left}
+                          headingLevel="h3"
+                          showHeading={false}
+                          headingIdPrefix="article-from"
+                          outline={constitution?.contentOutline}
+                        />
+                      ) : (
+                        <p className="muted">This article did not exist in the {fromVersion.versionLabel} text.</p>
+                      )}
+                    </section>
+                    <section className="compare-col compare-col-to" aria-label={toVersion.versionLabel}>
+                      <div className="compare-col-head">
+                        {toVersion.versionLabel}{' '}
+                        <Badge tone={toBadge.tone}>{toBadge.label}</Badge>
+                      </div>
+                      {row.kind === 'changed' && (row.left || row.right) ? (
+                        <DiffConstitutionText
+                          left={row.left}
+                          right={row.right}
+                          side="to"
+                          showHeading={false}
+                          outline={constitution?.contentOutline}
+                        />
+                      ) : row.right ? (
+                        <ConstitutionText
+                          article={row.right}
+                          headingLevel="h3"
+                          showHeading={false}
+                          headingIdPrefix="article-to"
+                          outline={constitution?.contentOutline}
+                        />
+                      ) : (
+                        <p className="muted">This article did not exist in the {toVersion.versionLabel} text.</p>
+                      )}
+                    </section>
+                  </div>
+                </section>
+              );
+            })}
+          </CompareView>
         </>
       ) : null}
     </PageMain>

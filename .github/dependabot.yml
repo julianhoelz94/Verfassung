@@ -53,6 +53,14 @@ updates:
     schedule:
       interval: weekly
   - package-ecosystem: docker
-    directory: /services/catalog-service
+    directories:
+      - /services/catalog-service
+      - /services/content-service
+      - /services/amendment-service
+      - /services/identity-service
+      - /services/editor-service
+      - /services/audit-service
+      - /services/ingestion-service
+      - /services/search-service
     schedule:
       interval: weekly

@@ -1,12 +1,18 @@
 import com.constitutionatlas.catalog.CatalogServiceApplication
 import com.constitutionatlas.catalog.CorrelationIdFilter
+import com.constitutionatlas.catalog.UnauthorizedException
+import com.constitutionatlas.catalog.client.Actor
+import com.constitutionatlas.catalog.client.IdentityClient
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import org.mockito.Mockito
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.boot.test.mock.mockito.MockBean
 import org.springframework.http.MediaType
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.context.DynamicPropertyRegistry
@@ -30,6 +36,22 @@ class CatalogApiTest {
 
     @Autowired
     lateinit var jdbcTemplate: JdbcTemplate
+
+    @MockBean
+    lateinit var identityClient: IdentityClient
+
+    private val editor =
+        Actor(UUID.fromString("01900000-0000-4000-8000-000000000410"), "local-editor@example.local", listOf("editor"))
+    private val viewer =
+        Actor(UUID.fromString("01900000-0000-4000-8000-000000000414"), "local-viewer@example.local", listOf("viewer"))
+
+    @BeforeEach
+    fun stubIdentity() {
+        Mockito.reset(identityClient)
+        Mockito.`when`(identityClient.authenticate(null)).thenThrow(UnauthorizedException("Missing session"))
+        Mockito.`when`(identityClient.authenticate(TOKEN)).thenReturn(editor)
+        Mockito.`when`(identityClient.authenticate(VIEWER_TOKEN)).thenReturn(viewer)
+    }
 
     @Test
     fun listCountriesIncludesGermany() {
@@ -80,6 +102,7 @@ class CatalogApiTest {
     @Test
     fun putOutlineReplacesLayers() {
         mockMvc.put("/constitutions/01900000-0000-4000-8000-000000000002/content-outline") {
+            header("Authorization", TOKEN)
             contentType = MediaType.APPLICATION_JSON
             content = """
                 {"kinds":[
@@ -94,6 +117,7 @@ class CatalogApiTest {
             jsonPath("$.versionIds.length()") { value(3) }
         }
         mockMvc.put("/constitutions/01900000-0000-4000-8000-000000000002/content-outline") {
+            header("Authorization", TOKEN)
             contentType = MediaType.APPLICATION_JSON
             content = """
                 {"kinds":[
@@ -117,9 +141,45 @@ class CatalogApiTest {
     }
 
     @Test
+    fun getPublishedVersionById() {
+        mockMvc.get("/versions/01900000-0000-4000-8000-000000000004")
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.id") { value("01900000-0000-4000-8000-000000000004") }
+                jsonPath("$.constitutionId") { value("01900000-0000-4000-8000-000000000002") }
+                jsonPath("$.versionLabel") { value("2022") }
+                jsonPath("$.publicationStatus") { value("published") }
+                jsonPath("$.effectiveDate") { value("2022-12-19") }
+            }
+    }
+
+    @Test
+    fun getDraftVersionByIdWhenCallerIsAllowed() {
+        mockMvc.get("/versions/01900000-0000-4000-8000-000000000005") {
+            header("Authorization", TOKEN)
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.versionLabel") { value("draft-internal") }
+            jsonPath("$.publicationStatus") { value("draft") }
+        }
+        mockMvc.get("/countries/DE")
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.constitutions[0].versions.length()") { value(2) }
+            }
+    }
+
+    @Test
+    fun unknownVersionByIdReturns404() {
+        mockMvc.get("/versions/${UUID.fromString("00000000-0000-4000-8000-000000000099")}")
+            .andExpect { status { isNotFound() } }
+    }
+
+    @Test
     fun createCountryAndDraftVersionThenPublish() {
         mockMvc.post("/countries") {
             contentType = MediaType.APPLICATION_JSON
+            header("Authorization", TOKEN)
             content = """{"isoCode":"fr","name":"France"}"""
         }.andExpect {
             status { isCreated() }
@@ -127,6 +187,7 @@ class CatalogApiTest {
         }
 
         val constitutionId = mockMvc.post("/countries/FR/constitutions") {
+            header("Authorization", TOKEN)
             contentType = MediaType.APPLICATION_JSON
             content = """{"slug":"1958","title":"Constitution of 1958"}"""
         }.andExpect {
@@ -144,6 +205,7 @@ class CatalogApiTest {
         }
 
         val versionId = mockMvc.post("/constitutions/$constitutionId/versions") {
+            header("Authorization", TOKEN)
             contentType = MediaType.APPLICATION_JSON
             content = """{"versionLabel":"1958","effectiveDate":"1958-10-04"}"""
         }.andExpect {
@@ -153,7 +215,9 @@ class CatalogApiTest {
             Regex("\"id\":\"([^\"]+)\"").find(it)!!.groupValues[1]
         }
 
-        mockMvc.post("/versions/$versionId/publish").andExpect {
+        mockMvc.post("/versions/$versionId/publish") {
+            header("Authorization", TOKEN)
+        }.andExpect {
             status { isOk() }
             jsonPath("$.publicationStatus") { value("published") }
         }
@@ -171,10 +235,12 @@ class CatalogApiTest {
     fun draftVersionWithCitationsWritesSourceRow() {
         mockMvc.post("/countries") {
             contentType = MediaType.APPLICATION_JSON
+            header("Authorization", TOKEN)
             content = """{"isoCode":"us","name":"United States"}"""
         }.andExpect { status { isCreated() } }
         val constitutionId =
             mockMvc.post("/countries/US/constitutions") {
+                header("Authorization", TOKEN)
                 contentType = MediaType.APPLICATION_JSON
                 content = """{"slug":"constitution","title":"Constitution of the United States"}"""
             }.andExpect { status { isCreated() } }
@@ -184,6 +250,7 @@ class CatalogApiTest {
                 .let { Regex("\"id\":\"([^\"]+)\"").find(it)!!.groupValues[1] }
         val versionId =
             mockMvc.post("/constitutions/$constitutionId/versions") {
+                header("Authorization", TOKEN)
                 contentType = MediaType.APPLICATION_JSON
                 content = """
                     {
@@ -254,7 +321,26 @@ class CatalogApiTest {
         }
     }
 
+    @Test
+    fun mutatingWritesRequireIdentityBearer() {
+        mockMvc.post("/countries") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"isoCode":"xx","name":"Example"}"""
+        }.andExpect { status { isUnauthorized() } }
+    }
+
+    @Test
+    fun viewerCannotWriteCatalog() {
+        mockMvc.post("/countries") {
+            header("Authorization", VIEWER_TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"isoCode":"xx","name":"Example"}"""
+        }.andExpect { status { isForbidden() } }
+    }
+
     companion object {
+        private const val TOKEN = "Bearer test-token"
+        private const val VIEWER_TOKEN = "Bearer viewer-token"
         private val objectMapper = ObjectMapper()
 
         private fun gatewayContract(contractFile: String): JsonNode =

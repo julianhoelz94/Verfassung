@@ -7,6 +7,9 @@ catalog:
 content:
   api:
     url: ${CONTENT_API_URL:http://localhost/api/content}
+identity:
+  api:
+    url: ${IDENTITY_API_URL:http://localhost/api/identity}
 management:
   endpoints:
     web:

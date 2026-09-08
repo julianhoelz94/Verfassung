@@ -12,3 +12,4 @@ alwaysApply: false
 - Env profiles live in `env/*.env.example`. Do not commit real `env/local-stack.env`.
 - Image builds: Kotlin services `bootJar` on the host then `COPY` onto `eclipse-temurin:21-jre`. Gateway and Caddy still build in Docker.
 - CI: `.github/workflows/ci.yml` — per-service `./gradlew check` (tests + Spotless), frontend `lint` + `build`, images via host `bootJar` then `docker build`.
+- Compose/Caddy map: `docs/CODEMAPS/infra.md`.

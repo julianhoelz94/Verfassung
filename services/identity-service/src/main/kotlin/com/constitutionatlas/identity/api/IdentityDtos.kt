@@ -16,6 +16,8 @@ data class UserDto(
     val mfaEnabled: Boolean = false,
     val mfaRequired: Boolean = false,
     val stepUpFresh: Boolean = false,
+    @get:JsonInclude(JsonInclude.Include.NON_EMPTY)
+    val scopes: List<String> = emptyList(),
 )
 
 data class SessionDto(
@@ -124,4 +126,27 @@ data class PasswordResetConfirmRequest(
 data class PasswordResetIssuedDto(
     val resetToken: String,
     val expiresAt: OffsetDateTime,
+)
+
+data class CreateServiceTokenRequest(
+    val name: String,
+    val scopes: List<String> = emptyList(),
+)
+
+data class ServiceTokenCreatedDto(
+    val id: UUID,
+    val name: String,
+    val token: String,
+    val scopes: List<String>,
+    val createdAt: OffsetDateTime,
+)
+
+@JsonInclude(JsonInclude.Include.NON_NULL)
+data class ServiceTokenDto(
+    val id: UUID,
+    val name: String,
+    val scopes: List<String>,
+    val createdAt: OffsetDateTime,
+    val lastUsedAt: OffsetDateTime? = null,
+    val revokedAt: OffsetDateTime? = null,
 )

@@ -1,6 +1,10 @@
+import type { ReactNode } from 'react';
 import type { ArticleDetail, ArticleSummary, ContentNode, ContentOutline } from '../../lib/api';
+import { linkifyReferences, type CrossRefContext } from '../../lib/crossrefs';
 import { articleHeading, concatenatedText, groupNodes, kindByCode, nodeHeading } from '../../lib/outline';
 import { NodeTitleForm } from './NodeTitleForm';
+
+export type ConstitutionCrossRefs = Omit<CrossRefContext, 'kindLabel'>;
 
 type ConstitutionTextProps = {
   article?:
@@ -14,6 +18,8 @@ type ConstitutionTextProps = {
   canEditTitles?: boolean;
   returnTo?: string;
   headingIdPrefix?: string;
+  lang?: string;
+  crossRefs?: ConstitutionCrossRefs;
 };
 
 export function ConstitutionText({
@@ -26,12 +32,22 @@ export function ConstitutionText({
   canEditTitles = false,
   returnTo,
   headingIdPrefix = 'article',
+  lang,
+  crossRefs,
 }: ConstitutionTextProps) {
   const Heading = headingLevel;
   const children = nodes ?? (article && 'children' in article ? article.children : undefined);
   const text = body !== undefined ? body : (article?.body ?? null);
+  const kindLabel =
+    kindByCode(outline, outline?.kinds[0]?.kindCode ?? 'article')?.displayLabel ?? 'Article';
+  function withRefs(value: string): ReactNode {
+    if (!crossRefs) {
+      return value;
+    }
+    return linkifyReferences(value, { ...crossRefs, kindLabel });
+  }
   return (
-    <div className="constitution-text">
+    <div className="constitution-text text-column" lang={lang}>
       {showHeading && article ? (
         <Heading id={`${headingIdPrefix}-${article.articleNumber}`}>
           {articleHeading(outline, {
@@ -42,9 +58,15 @@ export function ConstitutionText({
         </Heading>
       ) : null}
       {children && children.length > 0 ? (
-        <NodeTree nodes={children} outline={outline} canEditTitles={canEditTitles} returnTo={returnTo} />
+        <NodeTree
+          nodes={children}
+          outline={outline}
+          canEditTitles={canEditTitles}
+          returnTo={returnTo}
+          withRefs={withRefs}
+        />
       ) : text ? (
-        <p className="constitution-body">{text}</p>
+        <p className="constitution-body">{withRefs(text)}</p>
       ) : null}
     </div>
   );
@@ -55,15 +77,22 @@ type NodeTreeProps = {
   outline?: ContentOutline;
   canEditTitles?: boolean;
   returnTo?: string;
+  withRefs?: (text: string) => ReactNode;
 };
 
-export function NodeTree({ nodes, outline, canEditTitles = false, returnTo }: NodeTreeProps) {
+export function NodeTree({
+  nodes,
+  outline,
+  canEditTitles = false,
+  returnTo,
+  withRefs = (text) => text,
+}: NodeTreeProps) {
   return (
     <div className="node-tree">
       {groupNodes(nodes, outline).map((group, index) =>
         group.type === 'concatenated' ? (
           <p key={group.nodes.map((node) => node.id).join('-') || index} className="constitution-body constitution-concat">
-            {concatenatedText(group.nodes)}
+            {withRefs(concatenatedText(group.nodes))}
           </p>
         ) : (
           <SectionNode
@@ -72,6 +101,7 @@ export function NodeTree({ nodes, outline, canEditTitles = false, returnTo }: No
             outline={outline}
             canEditTitles={canEditTitles}
             returnTo={returnTo}
+            withRefs={withRefs}
           />
         ),
       )}
@@ -84,11 +114,13 @@ function SectionNode({
   outline,
   canEditTitles = false,
   returnTo,
+  withRefs = (text) => text,
 }: {
   node: ContentNode;
   outline?: ContentOutline;
   canEditTitles?: boolean;
   returnTo?: string;
+  withRefs?: (text: string) => ReactNode;
 }) {
   const kind = kindByCode(outline, node.kind);
   const heading = nodeHeading(kind, node);
@@ -99,9 +131,20 @@ function SectionNode({
       {canEditTitles && returnTo ? (
         <NodeTitleForm nodeId={node.id} title={node.title} label={label} returnTo={returnTo} />
       ) : null}
-      {node.body ? <p className="constitution-body">{node.body}</p> : null}
+      {node.body ? (
+        <div className="para">
+          <span className="num">{node.label ?? node.number ?? ''}</span>
+          <p className="constitution-body">{withRefs(node.body)}</p>
+        </div>
+      ) : null}
       {node.children.length > 0 ? (
-        <NodeTree nodes={node.children} outline={outline} canEditTitles={canEditTitles} returnTo={returnTo} />
+        <NodeTree
+          nodes={node.children}
+          outline={outline}
+          canEditTitles={canEditTitles}
+          returnTo={returnTo}
+          withRefs={withRefs}
+        />
       ) : null}
     </section>
   );

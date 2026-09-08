@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
-import { Alert, Button, Card, Input } from '../components/ui';
+import { Alert, Button, Card, Input, PageHeader } from '../components/ui';
 import { PageMain } from '../components/PageMain';
 import { canVisitEditor } from '../../lib/nav';
 import { currentUser } from '../../lib/session';
@@ -9,6 +9,11 @@ type LoginPageProps = {
   searchParams: { error?: string };
 };
 
+/** Seed-account hint is shown only while identity seeding is on (never in production). */
+function seedHintEnabled(): boolean {
+  return (process.env.IDENTITY_SEED_MODE ?? 'off') !== 'off';
+}
+
 export default async function LoginPage({ searchParams }: LoginPageProps) {
   const user = await currentUser();
   if (user) {
@@ -17,12 +22,20 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
 
   return (
     <PageMain>
-      <h1>Log in</h1>
-      <p className="lede">
-        Use a seeded local account. local-editor@example.local can edit, review, and publish. Dedicated
-        reviewer and publisher accounts exist for separated duties. Seeded admin and publisher accounts
-        require the authenticator secret <code>CAATLASMFASEED22</code>.
-      </p>
+      <PageHeader
+        title="Log in"
+        meta={
+          seedHintEnabled() ? (
+            <>
+              Use a seeded local account. local-editor@example.local can edit, review, and publish. Dedicated
+              reviewer and publisher accounts exist for separated duties. Seeded admin and publisher accounts use the
+              authenticator secret from <code>IDENTITY_SEED_TOTP_SECRET</code> in your <code>env/</code> profile.
+            </>
+          ) : (
+            'Sign in with your editorial account.'
+          )
+        }
+      />
       {searchParams.error ? (
         <Alert tone="error">
           <span id="login-error">Invalid email or password.</span>

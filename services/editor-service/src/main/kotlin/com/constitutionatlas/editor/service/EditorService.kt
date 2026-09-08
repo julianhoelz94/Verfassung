@@ -8,16 +8,26 @@ import com.constitutionatlas.editor.api.Actor
 import com.constitutionatlas.editor.api.CreateSessionRequest
 import com.constitutionatlas.editor.api.DraftPreviewDto
 import com.constitutionatlas.editor.api.EditSessionDto
+import com.constitutionatlas.editor.api.EditSessionSummaryDto
 import com.constitutionatlas.editor.api.SaveDraftRequest
 import com.constitutionatlas.editor.api.canEdit
 import com.constitutionatlas.editor.api.canPublish
 import com.constitutionatlas.editor.api.canReview
+import com.constitutionatlas.editor.api.isAdmin
+import com.constitutionatlas.editor.api.isEditorial
+import com.constitutionatlas.editor.client.AmendmentClient
+import com.constitutionatlas.editor.client.ArticleWritePayload
 import com.constitutionatlas.editor.client.AuditClient
+import com.constitutionatlas.editor.client.CatalogClient
+import com.constitutionatlas.editor.client.CatalogVersion
 import com.constitutionatlas.editor.client.ContentClient
+import com.constitutionatlas.editor.client.ContentTreeArticle
+import com.constitutionatlas.editor.client.ContentTreeNode
 import com.constitutionatlas.editor.client.IdentityClient
+import com.constitutionatlas.editor.client.NodeWritePayload
 import com.constitutionatlas.editor.client.SearchIndexClient
-import com.constitutionatlas.editor.config.EditorPublishProperties
 import com.constitutionatlas.editor.repo.EditorRepository
+import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.util.UUID
@@ -27,10 +37,13 @@ class EditorService(
     private val identityClient: IdentityClient,
     private val auditClient: AuditClient,
     private val contentClient: ContentClient,
+    private val catalogClient: CatalogClient,
+    private val amendmentClient: AmendmentClient,
     private val searchIndexClient: SearchIndexClient,
-    private val publishProperties: EditorPublishProperties,
     private val editorRepository: EditorRepository,
 ) {
+    private val log = LoggerFactory.getLogger(javaClass)
+
     fun actor(authorization: String?): Actor = identityClient.authenticate(authorization)
 
     @Transactional
@@ -44,6 +57,30 @@ class EditorService(
             auditClient.record(actor, "session_opened", "edit_session", id, mapOf("versionId" to request.versionId))
         }
         return session
+    }
+
+    fun listSessions(
+        authorization: String?,
+        status: String?,
+        openedBy: String?,
+        versionId: UUID?,
+    ): List<EditSessionSummaryDto> {
+        val actor = actor(authorization)
+        if (!actor.isEditorial()) {
+            throw ForbiddenException("Editorial role required")
+        }
+        val owner =
+            when {
+                openedBy.isNullOrBlank() -> null
+                openedBy == "me" -> actor.id
+                else ->
+                    try {
+                        UUID.fromString(openedBy)
+                    } catch (_: IllegalArgumentException) {
+                        throw IllegalArgumentException("openedBy must be a user id or 'me'")
+                    }
+            }
+        return editorRepository.listSessions(status?.ifBlank { null }, owner, versionId)
     }
 
     fun preview(authorization: String?, sessionId: UUID): DraftPreviewDto {
@@ -87,6 +124,9 @@ class EditorService(
         requireReview(actor)
         val session = requireVisible(actor, sessionId)
         requireStatus(session, "reviewing")
+        if (session.actorId == actor.id && !actor.isAdmin()) {
+            throw ForbiddenException("A different reviewer must approve this draft")
+        }
         editorRepository.updateStatus(session.id, "approved")
         auditClient.record(actor, "review_approved", "edit_session", session.id)
         return previewDto(session.id)
@@ -102,32 +142,45 @@ class EditorService(
         if (drafts.isEmpty()) {
             throw IllegalArgumentException("No draft article changes to publish")
         }
-        val rewritten = if (publishProperties.rewritePublicContent) {
-            drafts.forEach { draft ->
-                val current = contentClient.getArticle(draft.articleId)
-                if (current.versionId != session.versionId) {
-                    throw ConflictException("Article ${draft.articleId} is not on this version")
-                }
-                contentClient.updateArticle(draft.articleId, draft.title, draft.body)
-            }
-            searchIndexClient.reindex()
-            true
-        } else {
-            false
+        val source = catalogClient.getVersion(session.versionId)
+        val sourceTree = contentClient.listArticles(session.versionId)
+        if (sourceTree.isEmpty()) {
+            throw ConflictException("Source version ${session.versionId} has no articles to copy")
         }
+        val successor = createSuccessor(source)
+        contentClient.replaceArticles(successor.id, sourceTree.map { toWrite(it) })
+        val copies = contentClient.listArticles(successor.id).associateBy { it.articleNumber }
+        drafts.forEach { draft ->
+            val sourceArticle = sourceTree.find { it.id == draft.articleId }
+                ?: throw ConflictException("Article ${draft.articleId} is not on this version")
+            val copy = copies[sourceArticle.articleNumber]
+                ?: throw ConflictException("Copied article ${sourceArticle.articleNumber} is missing")
+            contentClient.updateArticle(copy.id, draft.title, draft.body)
+        }
+        val published = catalogClient.publishVersion(successor.id)
+        amendmentClient.recordTransition(session.versionId, published.id)
         editorRepository.updateStatus(session.id, "published")
-        auditClient.record(
-            actor,
-            "version_published",
-            "edit_session",
-            session.id,
-            mapOf(
-                "versionId" to session.versionId,
-                "publicContentUpdated" to rewritten,
-                "articleIds" to drafts.map { it.articleId },
-            ),
-        )
-        return previewDto(session.id, rewritten)
+        try {
+            auditClient.record(
+                actor,
+                "version_published",
+                "edit_session",
+                session.id,
+                mapOf(
+                    "sourceVersionId" to session.versionId,
+                    "newVersionId" to published.id,
+                    "articleIds" to drafts.map { it.articleId },
+                ),
+            )
+        } catch (ex: RuntimeException) {
+            log.warn("audit append failed after successor {} was published: {}", published.id, ex.message)
+        }
+        try {
+            searchIndexClient.reindex()
+        } catch (ex: RuntimeException) {
+            log.warn("search reindex failed after successor {} was published: {}", published.id, ex.message)
+        }
+        return previewDto(session.id, published)
     }
 
     private fun requireEdit(actor: Actor) {
@@ -175,14 +228,54 @@ class EditorService(
         }
     }
 
-    private fun previewDto(sessionId: UUID, publicContentUpdated: Boolean? = null): DraftPreviewDto {
+    private fun previewDto(sessionId: UUID, published: CatalogVersion? = null): DraftPreviewDto {
         val session = editorRepository.findSession(sessionId)
             ?: throw NotFoundException("Unknown session '$sessionId'")
         return DraftPreviewDto(
             session = session,
             latestSnapshot = editorRepository.latestSnapshot(sessionId),
             drafts = editorRepository.listLatestDrafts(sessionId),
-            publicContentUpdated = publicContentUpdated,
+            publicContentUpdated = if (published != null) true else null,
+            sourceVersionId = published?.let { session.versionId },
+            newVersionId = published?.id,
+            newVersionLabel = published?.versionLabel,
         )
+    }
+
+    private fun createSuccessor(source: CatalogVersion): CatalogVersion {
+        for (n in 1..50) {
+            val label = "${source.versionLabel}-$n"
+            try {
+                return catalogClient.createDraftVersion(
+                    source.constitutionId,
+                    label,
+                    source.effectiveDate,
+                    source.languageCode,
+                )
+            } catch (_: ConflictException) {
+                continue
+            }
+        }
+        throw ConflictException("Could not allocate a successor label for '${source.versionLabel}'")
+    }
+
+    companion object {
+        private fun toWrite(article: ContentTreeArticle): ArticleWritePayload =
+            ArticleWritePayload(
+                articleNumber = article.articleNumber,
+                title = article.title,
+                body = article.body.orEmpty(),
+                sortOrder = article.sortOrder,
+                nodes = article.children.map(::toNodeWrite),
+            )
+
+        private fun toNodeWrite(node: ContentTreeNode): NodeWritePayload =
+            NodeWritePayload(
+                kind = node.kind,
+                label = node.label ?: node.number,
+                title = node.title,
+                body = node.body,
+                children = node.children.map(::toNodeWrite),
+            )
     }
 }

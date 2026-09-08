@@ -9,6 +9,7 @@ alwaysApply: true
 - Do not launch project subagents for edits under ~3 files. Use `/kotlin-service`, `/frontend`, `/infra`, `/verifier`, or `/reviewer` only when the task spans many files or needs isolated context.
 - Exception: a sprint close-out (see `AGENTS.md`) must run `/reviewer`, a dead/duplicate-code pass, and `/verifier` when the sprint spanned multiple files. Still do not fan out one subagent per microservice.
 - Never fan out one subagent per microservice unless the user asked for a swarm.
+- For navigation, read `docs/CODEMAPS/INDEX.md` then the matching area map. Do not walk the whole repo to find an owner.
 - Do not read `backlog.md` in full. Grep for a story ID (`ARCH-`, `SRV-`, `UI-`, `CAT-`, `CNT-`, `AMD-`, `ING-`, `OPS-`) if needed.
 - When you complete a backlog item, set it to `Done` in `backlog.md` in the same change.
-- Run `gradle test` only in the changed service directory. Do not rebuild the Compose stack unless the task is about local orchestration. Prefer `./gradlew test` (wrapper 8.10.2).
+- Run `gradle test` only in the changed service directory. Do not rebuild the Compose stack unless the task is about local orchestration. Prefer `./gradlew test` (wrapper 9.7.1).

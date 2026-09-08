@@ -7,6 +7,7 @@ data class IndexableArticle(
     val articleId: UUID,
     val versionId: UUID,
     val countryCode: String,
+    val countryName: String,
     val constitutionTitle: String,
     val versionLabel: String,
     val effectiveDate: LocalDate?,

@@ -32,10 +32,14 @@ export function parseImportJson(raw: string): unknown {
   return JSON.parse(raw);
 }
 
-export function createImportJob(payload: unknown): Promise<ImportJob> {
-  return sendJson<ImportJob>(`${ingestionBaseUrl()}/import-jobs`, 'ingestion', 'POST', payload);
+export function createImportJob(payload: unknown, authorization?: string): Promise<ImportJob> {
+  return sendJson<ImportJob>(`${ingestionBaseUrl()}/import-jobs`, 'ingestion', 'POST', payload, authorization);
 }
 
-export function getImportJob(jobId: string): Promise<ImportJob | null> {
-  return readJson<ImportJob>(`${ingestionBaseUrl()}/import-jobs/${encodeURIComponent(jobId)}`, 'ingestion');
+export function getImportJob(jobId: string, authorization?: string): Promise<ImportJob | null> {
+  return readJson<ImportJob>(
+    `${ingestionBaseUrl()}/import-jobs/${encodeURIComponent(jobId)}`,
+    'ingestion',
+    authorization,
+  );
 }

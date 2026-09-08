@@ -12,7 +12,7 @@ Identity owns users and roles. Editor-service enforces capabilities on each comm
 
 Flow: `open` → save → submit (`reviewing`) → approve (`approved`) → publish (`published`).
 
-Publish (QLT-5) patches existing public articles in place so content-tree children stay intact, then requests `POST /reindex` on search. Set `EDITOR_PUBLISH_PUBLIC=false` to keep the old audit-only publish.
+Publish (ED-4) copies the session’s version onto a **new** catalog version, applies drafts only to that copy, publishes the successor, then requests `POST /reindex`. The source version’s public bytes do not change.
 
 Local seed (`identity.seed.mode`: `create-only` on local-stack/ci/testing, `off` in production; `LOCAL_*` / `CI_*` / `TEST_*` env). Ordinary startup never resets an existing password hash. Production rejects demo emails and `change-me` passwords.
 

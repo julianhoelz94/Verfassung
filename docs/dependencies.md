@@ -5,12 +5,12 @@ Pinned versions we actually use. Upgrade one service (or the gateway) then CI, n
 | Area | Component | Version / pin | Where |
 | --- | --- | --- | --- |
 | JDK | Eclipse Temurin | 21 | Host, CI `setup-java`, Kotlin Dockerfiles (`eclipse-temurin:21-jre`) |
-| Gradle | Gradle | 8.10.2 | Repo wrapper (`gradle/wrapper`), CI `setup-gradle`, host `bootJar` for Kotlin images |
+| Gradle | Gradle | 9.7.1 | Repo wrapper (`gradle/wrapper`), CI `setup-gradle`, host `bootJar` for Kotlin images |
 | Lint | Spotless + ktlint | Spotless 6.25.0 / ktlint 1.3.1 | `gradle/service-conventions.gradle`, `./gradlew check` |
 | Logs | logstash-logback-encoder | 7.4 | JSON console logs + MDC `correlationId` |
 | Kotlin | `kotlin("jvm")` / Spring plugin | 1.9.24 | `services/*/build.gradle.kts` |
-| Spring | Spring Boot | 3.3.2 | `services/*/build.gradle.kts` |
-| Spring | Dependency management plugin | 1.1.6 | `services/*/build.gradle.kts` |
+| Spring | Spring Boot | 3.5.16 | `services/*/build.gradle.kts` (needed for Gradle 9 `bootJar`) |
+| Spring | Dependency management plugin | 1.1.7 | `services/*/build.gradle.kts` |
 | API docs | springdoc OpenAPI UI | 2.6.0 | `services/*/build.gradle.kts` |
 | DB | PostgreSQL | 16 / `postgres:16-alpine` in tests | Compose `postgres:16`, Testcontainers |
 | Migrations | Flyway | via Spring Boot BOM | `flyway-core`, `flyway-database-postgresql` |
@@ -24,4 +24,4 @@ Pinned versions we actually use. Upgrade one service (or the gateway) then CI, n
 | CI | GitHub Actions | `actions/*@v4`, `gradle/actions/setup-gradle@v4` | `.github/workflows/ci.yml` |
 | Alerts | Dependabot | weekly | `.github/dependabot.yml` |
 
-Kotlin runtime libraries (Jackson, Actuator, Validation, JDBC, Testcontainers) follow the Spring Boot 3.3.2 BOM unless overridden.
+Kotlin runtime libraries (Jackson, Actuator, Validation, JDBC, Testcontainers) follow the Spring Boot 3.5.16 BOM unless overridden.

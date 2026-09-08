@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
 import { AdminForbidden } from '../../../components/AdminForbidden';
-import { Alert } from '../../../components/ui';
+import { Alert, PageHeader } from '../../../components/ui';
 import { PageMain } from '../../../components/PageMain';
 import { loadCountriesWithDetails } from '../../../../lib/api';
 import { requireAdminPage } from '../../../../lib/admin';
@@ -27,9 +27,16 @@ export default async function AdminOutlinePage({ params, searchParams }: AdminOu
   }
   const kinds = (match.constitution.contentOutline?.kinds ?? []).map(toOutlineKindWrite);
   return (
-    <PageMain>
-      <h1>{match.constitution.title}</h1>
-      <p className="muted">{match.country?.name}</p>
+    <PageMain className="wide">
+      <PageHeader
+        breadcrumbs={[
+          { href: '/admin', label: 'Admin' },
+          { href: '/admin/constitutions', label: 'Outlines' },
+          { label: match.constitution.title },
+        ]}
+        title={match.constitution.title}
+        meta={match.country?.name}
+      />
       {searchParams.saved ? (
         <Alert tone="success">Outline saved. Existing versions were restructured if layers were removed.</Alert>
       ) : null}

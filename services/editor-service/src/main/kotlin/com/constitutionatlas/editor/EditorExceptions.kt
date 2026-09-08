@@ -9,3 +9,5 @@ class StepUpRequiredException : ForbiddenException("Recent step-up authenticatio
 class NotFoundException(message: String) : RuntimeException(message)
 
 class ConflictException(message: String) : RuntimeException(message)
+
+class DownstreamException(message: String, cause: Throwable? = null) : RuntimeException(message, cause)

@@ -15,6 +15,7 @@ identity:
     viewer-email: ${IDENTITY_VIEWER_EMAIL:${LOCAL_VIEWER_EMAIL:}}
     viewer-password: ${IDENTITY_VIEWER_PASSWORD:${LOCAL_VIEWER_PASSWORD:}}
     totp-secret: ${IDENTITY_SEED_TOTP_SECRET:}
+    service-token: ${IDENTITY_SEED_SERVICE_TOKEN:}
   session:
     idle-timeout: ${IDENTITY_SESSION_IDLE:30m}
     absolute-timeout: ${IDENTITY_SESSION_ABSOLUTE:24h}
@@ -26,12 +27,13 @@ identity:
     reset-ttl: ${IDENTITY_PASSWORD_RESET_TTL:1h}
     log-reset-token: ${IDENTITY_PASSWORD_LOG_RESET_TOKEN:false}
   mfa:
-    encryption-key: ${IDENTITY_MFA_ENCRYPTION_KEY:local-mfa-dev-key}
+    encryption-key: ${IDENTITY_MFA_ENCRYPTION_KEY:}
     step-up-ttl: ${IDENTITY_MFA_STEP_UP_TTL:5m}
     challenge-ttl: ${IDENTITY_MFA_CHALLENGE_TTL:5m}
 audit:
   api:
     url: ${AUDIT_API_URL:http://localhost/api/audit}
+    bearer: ${AUDIT_API_BEARER:}
 management:
   endpoints:
     web:

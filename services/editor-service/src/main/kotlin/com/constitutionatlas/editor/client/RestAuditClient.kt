@@ -1,19 +1,20 @@
 package com.constitutionatlas.editor.client
 
+import com.constitutionatlas.editor.DownstreamException
 import com.constitutionatlas.editor.api.Actor
-import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.http.MediaType
 import org.springframework.web.client.RestClient
+import org.springframework.web.client.RestClientException
 import java.util.UUID
 
 class RestAuditClient(
     auditUrl: String,
+    private val bearerToken: String? = null,
 ) : AuditClient {
-    private val log = LoggerFactory.getLogger(javaClass)
     private val client: RestClient = RestClient.builder().baseUrl(auditUrl).build()
 
     override fun record(
@@ -24,9 +25,13 @@ class RestAuditClient(
         payload: Map<String, Any?>,
     ) {
         try {
-            client.post()
+            val request = client.post()
                 .uri("/events")
                 .contentType(MediaType.APPLICATION_JSON)
+            if (!bearerToken.isNullOrBlank()) {
+                request.header("Authorization", bearerHeader(bearerToken))
+            }
+            request
                 .body(
                     mapOf(
                         "actorId" to actor.id,
@@ -39,8 +44,8 @@ class RestAuditClient(
                 )
                 .retrieve()
                 .toBodilessEntity()
-        } catch (ex: Exception) {
-            log.warn("audit append failed: {}", ex.message)
+        } catch (ex: RestClientException) {
+            throw DownstreamException("audit append failed", ex)
         }
     }
 }
@@ -49,6 +54,8 @@ class RestAuditClient(
 class AuditClientConfig {
     @Bean
     @ConditionalOnMissingBean(AuditClient::class)
-    fun auditClient(@Value("\${audit.api.url}") auditUrl: String): AuditClient =
-        RestAuditClient(auditUrl)
+    fun auditClient(
+        @Value("\${audit.api.url}") auditUrl: String,
+        @Value("\${editor.downstream.bearer:}") bearer: String,
+    ): AuditClient = RestAuditClient(auditUrl, bearer.trim().ifBlank { null })
 }

@@ -3,6 +3,7 @@
 import { redirect } from 'next/navigation';
 import { createConstitution, ensureCountry, putContentOutline, restructureVersion, type OutlineKindWrite } from '../../../lib/api';
 import { requireAdminUser } from '../../../lib/admin';
+import { requireSessionBearer } from '../../../lib/session';
 import { constitutionIsoCode, countryToCreate } from '../../../lib/create-constitution';
 import { toOutlineKindWrite } from '../../../lib/outline';
 
@@ -30,6 +31,7 @@ function parseOutline(raw: string): OutlineKindWrite[] {
 
 export async function saveOutlineAction(formData: FormData): Promise<void> {
   await requireAdmin();
+  const authorization = requireSessionBearer();
   const constitutionId = String(formData.get('constitutionId') ?? '');
   let kinds: OutlineKindWrite[];
   try {
@@ -38,10 +40,10 @@ export async function saveOutlineAction(formData: FormData): Promise<void> {
     redirect(`/admin/constitutions/${encodeURIComponent(constitutionId)}?error=1`);
   }
   try {
-    const result = await putContentOutline(constitutionId, kinds);
+    const result = await putContentOutline(constitutionId, kinds, authorization);
     const keepKinds = kinds.map((kind) => kind.kindCode);
     for (const versionId of result.versionIds) {
-      await restructureVersion(versionId, keepKinds);
+      await restructureVersion(versionId, keepKinds, authorization);
     }
   } catch {
     redirect(`/admin/constitutions/${encodeURIComponent(constitutionId)}?error=1`);
@@ -51,6 +53,7 @@ export async function saveOutlineAction(formData: FormData): Promise<void> {
 
 export async function createConstitutionAction(formData: FormData): Promise<void> {
   await requireAdmin();
+  const authorization = requireSessionBearer();
   const slug = String(formData.get('slug') ?? '');
   const title = String(formData.get('title') ?? '');
   let isoCode: string;
@@ -66,9 +69,9 @@ export async function createConstitutionAction(formData: FormData): Promise<void
   let createdId: string;
   try {
     if (newCountry) {
-      await ensureCountry(newCountry.isoCode, newCountry.name);
+      await ensureCountry(newCountry.isoCode, newCountry.name, authorization);
     }
-    const created = await createConstitution(isoCode, slug, title, outline);
+    const created = await createConstitution(isoCode, slug, title, outline, authorization);
     createdId = created.id;
   } catch {
     redirect('/admin/constitutions?error=1');

@@ -226,6 +226,7 @@ class IdentityApiTest {
             jsonPath("$.paths./logout.post") { exists() }
             jsonPath("$.components.securitySchemes.bearer-session.scheme") { value("bearer") }
             jsonPath("$.paths./users/invites.post") { exists() }
+            jsonPath("$.paths./service-tokens.post") { exists() }
             jsonPath("$.paths./password/reset.post") { exists() }
             jsonPath("$.paths./login/mfa.post") { exists() }
             jsonPath("$.paths./mfa/enroll/start.post") { exists() }
@@ -244,6 +245,59 @@ class IdentityApiTest {
         val expected = objectMapper.readTree(File("../../apps/gateway-web/lib/contracts/identity-me.json"))
         check(actual.get("email").asText() == expected.get("email").asText())
         check(actual.get("roles").toString() == expected.get("roles").toString())
+        check(actual.path("scopes").isMissingNode || actual.get("scopes").size() == 0)
+    }
+
+    @Test
+    fun adminCanIssueAndRevokeServiceTokenForMe() {
+        val admin = login("local-admin@example.local", "change-me")
+        val createdJson =
+            mockMvc.post("/service-tokens") {
+                header("Authorization", "Bearer $admin")
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"name":"ingestion-ci","scopes":["catalog:write","content:write","ingestion:import"]}"""
+            }.andExpect {
+                status { isCreated() }
+                jsonPath("$.token") { exists() }
+                jsonPath("$.scopes.length()") { value(3) }
+            }.andReturn().response.contentAsString
+        val token = objectMapper.readTree(createdJson).get("token").asText()
+        val tokenId = objectMapper.readTree(createdJson).get("id").asText()
+        mockMvc.get("/me") {
+            header("Authorization", "Bearer $token")
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.email") { value("service:ingestion-ci") }
+            jsonPath("$.scopes[0]") { value("catalog:write") }
+            jsonPath("$.roles.length()") { value(0) }
+        }
+        mockMvc.get("/service-tokens") {
+            header("Authorization", "Bearer $admin")
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$[0].name") { value("ingestion-ci") }
+            jsonPath("$[0].token") { doesNotExist() }
+        }
+        mockMvc.delete("/service-tokens/$tokenId") {
+            header("Authorization", "Bearer $admin")
+        }.andExpect { status { isNoContent() } }
+        mockMvc.get("/me") {
+            header("Authorization", "Bearer $token")
+        }.andExpect { status { isUnauthorized() } }
+    }
+
+    @Test
+    fun serviceTokenIssueRequiresAdminAndBearer() {
+        mockMvc.post("/service-tokens") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"name":"nope","scopes":["audit:append"]}"""
+        }.andExpect { status { isUnauthorized() } }
+        val viewer = login("local-viewer@example.local", "change-me")
+        mockMvc.post("/service-tokens") {
+            header("Authorization", "Bearer $viewer")
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"name":"nope","scopes":["audit:append"]}"""
+        }.andExpect { status { isForbidden() } }
     }
 
     @Test

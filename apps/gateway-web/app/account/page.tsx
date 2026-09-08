@@ -1,17 +1,17 @@
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
-import { Alert, Button, Card, Input } from '../components/ui';
+import { Alert, Button, Card, Input, PageHeader } from '../components/ui';
 import { PageMain } from '../components/PageMain';
 import { requestStartMfaEnroll } from '../../lib/identity-client';
-import { SESSION_COOKIE, currentUser } from '../../lib/session';
-import { changePasswordAction, confirmAccountMfaAction, regenerateRecoveryAction, revokeMfaAction, startMfaEnrollAction } from './actions';
+import { SESSION_COOKIE, currentUser, mfaChallengeToken } from '../../lib/session';
+import { ConfirmEnrollForm, RegenerateRecoveryForm } from './MfaForms';
+import { changePasswordAction, revokeMfaAction, startMfaEnrollAction } from './actions';
 
 type AccountPageProps = {
   searchParams: {
     error?: string;
     saved?: string;
-    recovery?: string;
-    enrollChallenge?: string;
+    enroll?: string;
     mfaRevoked?: string;
   };
 };
@@ -21,9 +21,11 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
   if (!user) {
     redirect('/login');
   }
-  const recoveryCodes = searchParams.recovery ? searchParams.recovery.split(',').filter(Boolean) : [];
+  // The enrollment challenge lives in the httpOnly `ca_mfa_challenge` cookie set by
+  // `startMfaEnrollAction`; `?enroll=1` only marks that enrollment was requested.
+  const enrollRequested = searchParams.enroll === '1';
   let enrollSecret: string | null = null;
-  let enrollChallenge: string | null = searchParams.enrollChallenge ?? null;
+  let enrollChallenge: string | null = enrollRequested ? mfaChallengeToken() ?? null : null;
   if (!user.mfaEnabled && enrollChallenge) {
     const token = cookies().get(SESSION_COOKIE)?.value;
     try {
@@ -36,8 +38,7 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
   }
   return (
     <PageMain>
-      <h1>Account</h1>
-      <p className="lede">Signed in as {user.email}.</p>
+      <PageHeader title="Account" meta={`Signed in as ${user.email}.`} />
       {searchParams.error === 'mfa' ? (
         <Alert tone="error">Authenticator action failed. Check the code and try again.</Alert>
       ) : searchParams.error ? (
@@ -45,14 +46,6 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
       ) : null}
       {searchParams.saved ? <Alert tone="success">Password updated.</Alert> : null}
       {searchParams.mfaRevoked ? <Alert tone="success">Authenticator enrollment was revoked.</Alert> : null}
-      {recoveryCodes.length > 0 ? (
-        <Alert tone="success">
-          Store these recovery codes now; they are shown only once.{' '}
-          {recoveryCodes.map((code) => (
-            <code key={code}>{code} </code>
-          ))}
-        </Alert>
-      ) : null}
       <Card>
         <h2>Authenticator</h2>
         {user.mfaRequired && !user.mfaEnabled ? (
@@ -69,25 +62,18 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
                 <Button>Revoke authenticator</Button>
               </form>
             )}
-            <form action={regenerateRecoveryAction}>
-              <Input label="Authenticator code" id="recoveryRotateCode" name="code" inputMode="numeric" required />
-              <Button>Replace recovery codes</Button>
-            </form>
+            <RegenerateRecoveryForm />
           </>
         ) : enrollSecret && enrollChallenge ? (
           <>
             <p>
               Authenticator secret: <code>{enrollSecret}</code>
             </p>
-            <form action={confirmAccountMfaAction}>
-              <input type="hidden" name="challengeToken" value={enrollChallenge} />
-              <Input label="Authenticator code" id="enrollCode" name="code" inputMode="numeric" required />
-              <Button variant="primary">Confirm enrollment</Button>
-            </form>
+            <ConfirmEnrollForm challengeToken={enrollChallenge} />
           </>
         ) : (
           <>
-            {searchParams.enrollChallenge ? (
+            {enrollRequested ? (
               <Alert tone="error">Enrollment could not be started. Try again.</Alert>
             ) : null}
             <form action={startMfaEnrollAction}>
@@ -95,8 +81,6 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
             </form>
           </>
         )}
-      </Card>
-      <Card>
         <h2>Change password</h2>
         <form action={changePasswordAction}>
           <Input

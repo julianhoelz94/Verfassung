@@ -4,6 +4,10 @@ on:
   push:
   pull_request:
 
+# Least privilege for the default GITHUB_TOKEN; no job needs write access.
+permissions:
+  contents: read
+
 jobs:
   backend-services:
     runs-on: ubuntu-latest

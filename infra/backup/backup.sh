@@ -1,8 +1,12 @@
 #!/bin/sh
 set -eu
 
+# Dumps contain password hashes and encrypted MFA secrets: owner-only files.
+umask 077
+
 TS="$(date +%Y%m%d-%H%M%S)"
 OUT_DIR="/backups/$TS"
+RETENTION_DAYS="${BACKUP_RETENTION_DAYS:-30}"
 mkdir -p "$OUT_DIR"
 
 wait_for_postgres() {
@@ -29,3 +33,9 @@ for name in catalog content amendment identity editor audit ingestion search; do
 done
 
 echo "Backup completed at $OUT_DIR"
+
+# Rotate: drop timestamped dump directories older than the retention window.
+if [ "$RETENTION_DAYS" -gt 0 ] 2>/dev/null; then
+  find /backups -mindepth 1 -maxdepth 1 -type d -mtime "+${RETENTION_DAYS}" -exec rm -rf {} +
+  echo "Pruned backups older than ${RETENTION_DAYS} days"
+fi

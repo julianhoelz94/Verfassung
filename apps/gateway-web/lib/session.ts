@@ -1,4 +1,5 @@
 import { cookies, headers } from 'next/headers';
+import { redirect } from 'next/navigation';
 import {
   identityBaseUrl,
   requestCompleteMfaLogin,
@@ -14,6 +15,19 @@ export const MFA_CHALLENGE_COOKIE = 'ca_mfa_challenge';
 export type { SessionUser };
 
 export { identityBaseUrl };
+
+function sessionBearer(): string | undefined {
+  const token = cookies().get(SESSION_COOKIE)?.value;
+  return token ? `Bearer ${token}` : undefined;
+}
+
+export function requireSessionBearer(): string {
+  const header = sessionBearer();
+  if (!header) {
+    redirect('/login');
+  }
+  return header;
+}
 
 function cookieSecure(): boolean {
   if (process.env.SESSION_COOKIE_SECURE === 'true') {
@@ -105,7 +119,7 @@ function setSessionCookie(token: string, expiresInSeconds?: number) {
   });
 }
 
-function setChallengeCookie(token: string) {
+export function setChallengeCookie(token: string) {
   cookies().set(MFA_CHALLENGE_COOKIE, token, {
     httpOnly: true,
     sameSite: 'lax',
@@ -115,7 +129,7 @@ function setChallengeCookie(token: string) {
   });
 }
 
-function clearChallengeCookie() {
+export function clearChallengeCookie() {
   cookies().delete(MFA_CHALLENGE_COOKIE);
 }
 

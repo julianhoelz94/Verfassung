@@ -4,7 +4,7 @@ Public site for versioned constitutions: countries → constitution versions →
 
 ## Stack
 
-- Kotlin 1.9 / Java 21 / Spring Boot 3.3, Flyway, Testcontainers, OpenAPI (`springdoc`)
+- Kotlin 1.9 / Java 21 / Spring Boot 3.5, Flyway, Testcontainers, OpenAPI (`springdoc`)
 - Next.js 14 (App Router) + TypeScript in `apps/gateway-web`
 - Docker Compose + Caddy (`infra/caddy`) as the single local entry point
 - One Postgres database per stateful service (never share DBs)
@@ -18,7 +18,18 @@ Public site for versioned constitutions: countries → constitution versions →
 | `services/<name>/` | One Spring Boot service + its Gradle project |
 | `infra/` | Caddy, backup script |
 | `env/` | Profile templates (`local-stack`, `ci`, `testing`, `production`) |
+| `docs/CODEMAPS/` | Agent navigation maps. Start at [`docs/CODEMAPS/INDEX.md`](docs/CODEMAPS/INDEX.md). |
 | `backlog.md` | Product + sprint backlog (large). **Grep for IDs** (`ARCH-`, `CAT-`, `CNT-`, `AMD-`, `ING-`, `UI-`, `OPS-`); do not read the whole file. |
+
+## Repo map
+
+Do not explore the whole tree to find an owner. After this file:
+
+1. Read [`docs/CODEMAPS/INDEX.md`](docs/CODEMAPS/INDEX.md) (jump table).
+2. Read only the one area map that matches the task: `architecture`, `backend`, `frontend`, `data`, or `infra`.
+3. Open the files listed there.
+
+Maps are navigation, not instructions. If they conflict with code, trust the code.
 
 ## Commands
 
@@ -28,7 +39,7 @@ cp env/local-stack.env.example env/local-stack.env   # once
 ./manageLocalStack.sh --start --no-build
 ./manageLocalStack.sh --rebuild <service...>          # after Flyway / gateway changes
 ./manageLocalStack.sh --stop
-cd services/<name> && ./gradlew test                     # one service only; wrapper pins Gradle 8.10.2
+cd services/<name> && ./gradlew test                     # one service only; wrapper pins Gradle 9.7.1
 ./gradlew -p services/<name> check                       # tests + Spotless/ktlint
 cd apps/gateway-web && npm ci && npm run lint && npm run build
 ```
@@ -38,7 +49,7 @@ Service names: `catalog`, `content`, `amendment`, `identity`, `editor`, `search`
 
 ## Current sprint
 
-See `backlog.md` **Suggested Sprint Breakdown**. Sprint 0–15 are closed. **Sprint 22** (lock the public write surface: GOV-6, OPS-9, IDN-14, IDN-15) is next — [quality review](backlog.md#quality-review-2026-09-06). Then Sprint 23 (immutable publish). Pull from **Later / Ideas** only if the user asks. Do not start SRV-7 (MCP) until asked.
+See `backlog.md` **Suggested Sprint Breakdown**. Sprint 0–17 and 19–23 are closed. **Sprint 18** (discovery, sharing, and language: UI-15, UI-26, UI-27, UI-28) is next — [quality review](backlog.md#quality-review-2026-09-06). Pull from **Later / Ideas** only if the user asks. Do not start SRV-7 (MCP) until asked.
 
 **When a story/task is finished, update `backlog.md` in the same change:** set Status to `Done`, add the ID to that sprint’s Done list, and keep the board snapshot accurate. Do not leave completed work as `Ready`.
 
@@ -62,5 +73,5 @@ Keep cost rules: one `/reviewer` and one cleanup pass over the combined sprint d
 - Touch **one service** (or gateway + Caddy) per task unless the user asks for a cross-cut.
 - Do **not** spawn parallel subagents for a one-file or one-service change.
 - Prefer built-in `explore` for search. Use project subagents only when the description matches.
-- Read `README.md` and this file first. Open `backlog.md` only for the relevant epic/story IDs.
+- Read this file, then `docs/CODEMAPS/INDEX.md` and one area map. Open `backlog.md` only for the relevant epic/story IDs.
 - Run tests only for the service you changed: `cd services/<name> && ./gradlew test`.

@@ -14,3 +14,6 @@ management:
 logging:
   level:
     root: INFO
+identity:
+  api:
+    url: ${IDENTITY_API_URL:http://localhost/api/identity}

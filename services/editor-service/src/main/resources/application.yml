@@ -10,12 +10,18 @@ audit:
 content:
   api:
     url: ${CONTENT_API_URL:http://localhost/api/content}
+catalog:
+  api:
+    url: ${CATALOG_API_URL:http://localhost/api/catalog}
+amendment:
+  api:
+    url: ${AMENDMENT_API_URL:http://localhost/api/amendment}
 search:
   api:
     url: ${SEARCH_API_URL:http://localhost/api/search}
 editor:
-  publish:
-    rewrite-public-content: ${EDITOR_PUBLISH_PUBLIC:true}
+  downstream:
+    bearer: ${EDITOR_SERVICE_TOKEN:}
 management:
   endpoints:
     web:

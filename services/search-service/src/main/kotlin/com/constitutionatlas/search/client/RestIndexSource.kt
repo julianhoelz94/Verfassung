@@ -30,9 +30,10 @@ class RestIndexSource(
                 .retrieve()
                 .body(CountryDetailWire::class.java)
                 ?: continue
+            val countryName = detail.name.ifBlank { country.name }.ifBlank { country.isoCode }
             for (constitution in detail.constitutions) {
                 for (version in constitution.versions) {
-                    out += loadArticles(country.isoCode, constitution.title, version)
+                    out += loadArticles(country.isoCode, countryName, constitution.title, version)
                 }
             }
         }
@@ -41,6 +42,7 @@ class RestIndexSource(
 
     private fun loadArticles(
         countryCode: String,
+        countryName: String,
         constitutionTitle: String,
         version: VersionWire,
     ): List<IndexableArticle> {
@@ -66,6 +68,7 @@ class RestIndexSource(
                     articleId = detail.id,
                     versionId = detail.versionId,
                     countryCode = countryCode,
+                    countryName = countryName,
                     constitutionTitle = constitutionTitle,
                     versionLabel = version.versionLabel,
                     effectiveDate = version.effectiveDate,
@@ -85,10 +88,12 @@ class RestIndexSource(
     @JsonIgnoreProperties(ignoreUnknown = true)
     private data class CountrySummaryWire(
         val isoCode: String,
+        val name: String = "",
     )
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     private data class CountryDetailWire(
+        val name: String = "",
         val constitutions: List<ConstitutionWire> = emptyList(),
     )
 

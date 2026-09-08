@@ -25,6 +25,7 @@ interface AuditClient {
 
 class RestAuditClient(
     auditUrl: String,
+    private val bearerToken: String? = null,
 ) : AuditClient {
     private val log = LoggerFactory.getLogger(javaClass)
     private val client: RestClient = RestClient.builder().baseUrl(auditUrl).build()
@@ -50,10 +51,14 @@ class RestAuditClient(
             if (actorEmail != null) {
                 body["actorEmail"] = actorEmail
             }
-            client.post()
+            val request = client.post()
                 .uri("/events")
                 .contentType(MediaType.APPLICATION_JSON)
-                .body(body)
+            if (!bearerToken.isNullOrBlank()) {
+                val header = if (bearerToken.startsWith("Bearer ")) bearerToken else "Bearer $bearerToken"
+                request.header("Authorization", header)
+            }
+            request.body(body)
                 .retrieve()
                 .toBodilessEntity()
         } catch (ex: Exception) {
@@ -101,6 +106,8 @@ class AuthAudit(
 class AuditClientConfig {
     @Bean
     @ConditionalOnMissingBean(AuditClient::class)
-    fun auditClient(@Value("\${audit.api.url}") auditUrl: String): AuditClient =
-        RestAuditClient(auditUrl)
+    fun auditClient(
+        @Value("\${audit.api.url}") auditUrl: String,
+        @Value("\${audit.api.bearer:}") bearer: String,
+    ): AuditClient = RestAuditClient(auditUrl, bearer.trim().ifBlank { null })
 }

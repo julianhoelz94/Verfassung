@@ -1,8 +1,14 @@
 import com.constitutionatlas.audit.AuditServiceApplication
+import com.constitutionatlas.audit.client.Actor
+import com.constitutionatlas.audit.client.IdentityClient
+import com.constitutionatlas.audit.client.UnauthorizedException
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import org.mockito.Mockito
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.boot.test.mock.mockito.MockBean
 import org.springframework.http.MediaType
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.context.DynamicPropertyRegistry
@@ -15,6 +21,7 @@ import org.springframework.test.web.servlet.put
 import org.testcontainers.containers.PostgreSQLContainer
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
+import java.util.UUID
 
 @Testcontainers
 @AutoConfigureMockMvc
@@ -26,9 +33,31 @@ class AuditApiTest {
     @Autowired
     lateinit var jdbcTemplate: JdbcTemplate
 
+    @MockBean
+    lateinit var identityClient: IdentityClient
+
+    private val editor =
+        Actor(UUID.fromString("01900000-0000-4000-8000-000000000410"), "local-editor@example.local", listOf("editor"))
+    private val machine =
+        Actor(
+            UUID.fromString("01900000-0000-4000-8000-000000000499"),
+            "service:audit",
+            emptyList(),
+            listOf("audit:append"),
+        )
+
+    @BeforeEach
+    fun stubIdentity() {
+        Mockito.reset(identityClient)
+        Mockito.`when`(identityClient.authenticate(null)).thenThrow(UnauthorizedException("Missing session"))
+        Mockito.`when`(identityClient.authenticate(TOKEN)).thenReturn(editor)
+        Mockito.`when`(identityClient.authenticate(MACHINE)).thenReturn(machine)
+    }
+
     @Test
     fun appendAndListByEntity() {
         mockMvc.post("/events") {
+            header("Authorization", TOKEN)
             contentType = MediaType.APPLICATION_JSON
             content = """
                 {
@@ -57,6 +86,7 @@ class AuditApiTest {
     @Test
     fun appendAllowsUnknownActor() {
         mockMvc.post("/events") {
+            header("Authorization", MACHINE)
             contentType = MediaType.APPLICATION_JSON
             content = """
                 {
@@ -77,12 +107,14 @@ class AuditApiTest {
     @Test
     fun updatesAndDeletesAreRejected() {
         mockMvc.put("/events/01900000-0000-4000-8000-000000000501") {
+            header("Authorization", TOKEN)
             contentType = MediaType.APPLICATION_JSON
             content = "{}"
         }.andExpect { status { isMethodNotAllowed() } }
 
-        mockMvc.delete("/events/01900000-0000-4000-8000-000000000501")
-            .andExpect { status { isMethodNotAllowed() } }
+        mockMvc.delete("/events/01900000-0000-4000-8000-000000000501") {
+            header("Authorization", TOKEN)
+        }.andExpect { status { isMethodNotAllowed() } }
 
         jdbcTemplate.update(
             """
@@ -96,7 +128,17 @@ class AuditApiTest {
         check(afterRule == 1)
     }
 
+    @Test
+    fun appendRequiresIdentityBearer() {
+        mockMvc.post("/events") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"action":"login_failed","entityType":"user","entityId":"00000000-0000-4000-8000-000000000000"}"""
+        }.andExpect { status { isUnauthorized() } }
+    }
+
     companion object {
+        private const val TOKEN = "Bearer test-token"
+        private const val MACHINE = "Bearer machine-token"
         @Container
         @JvmStatic
         val postgres: PostgreSQLContainer<*> = PostgreSQLContainer("postgres:16-alpine")

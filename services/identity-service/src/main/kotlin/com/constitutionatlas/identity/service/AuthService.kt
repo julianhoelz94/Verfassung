@@ -18,6 +18,7 @@ import com.constitutionatlas.identity.crypto.Tokens
 import com.constitutionatlas.identity.crypto.Totp
 import com.constitutionatlas.identity.repo.IdentityRepository
 import com.constitutionatlas.identity.repo.StoredUser
+import com.constitutionatlas.identity.repo.toUserDto
 import io.micrometer.core.instrument.MeterRegistry
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.stereotype.Service
@@ -115,15 +116,18 @@ class AuthService(
         if (!user.enabled) {
             throw UnauthorizedException("Invalid credentials")
         }
+        rejectMfaThrottle(user.id, clientIp)
         val totpOk = !code.isNullOrBlank() && mfaService.verifyEnrolledTotp(user.id, code)
         val recoveryOk =
             !totpOk &&
                 !recoveryCode.isNullOrBlank() &&
                 mfaService.useRecoveryCode(user.id, recoveryCode, clientIp, userAgent, user.email)
         if (!totpOk && !recoveryOk) {
+            recordMfaFailure(user.id, clientIp, challenge.id)
             authAudit.record("login_failed", user.id, user.id, user.email, clientIp, userAgent)
             throw UnauthorizedException("Invalid credentials")
         }
+        clearMfaThrottle(user.id, clientIp)
         identityRepository.deleteChallenge(challenge.id)
         return issueSession(
             user,
@@ -168,10 +172,13 @@ class AuthService(
                 throw UnauthorizedException("Invalid or expired session")
             }
         }
+        rejectMfaThrottle(user.id, clientIp)
         val secret = mfaService.pendingSecret(challenge)
         if (!Totp.matches(secret, code)) {
+            recordMfaFailure(user.id, clientIp, challenge.id)
             throw UnauthorizedException("Invalid credentials")
         }
+        clearMfaThrottle(user.id, clientIp)
         val recovery = mfaService.enrollConfirmed(user.id, secret)
         identityRepository.deleteChallenge(challenge.id)
         authAudit.recordMfaChange(user.id, user.email, clientIp, userAgent, mapOf("kind" to "enrolled"))
@@ -205,9 +212,12 @@ class AuthService(
     ) {
         val hash = Tokens.sha256Hex(Tokens.requireBearer(authorization))
         val user = requireActiveSession(hash)
+        rejectMfaThrottle(user.id, clientIp)
         if (!mfaService.verifyEnrolledTotp(user.id, code)) {
+            recordMfaFailure(user.id, clientIp)
             throw UnauthorizedException("Invalid credentials")
         }
+        clearMfaThrottle(user.id, clientIp)
         identityRepository.markSessionMfa(hash, Instant.now())
         authAudit.recordMfaChange(user.id, user.email, clientIp, userAgent, mapOf("kind" to "step_up"))
     }
@@ -222,9 +232,12 @@ class AuthService(
         if (identityRepository.toUserDto(user).mfaRequired) {
             throw ConflictException("MFA is required for this account")
         }
+        rejectMfaThrottle(user.id, clientIp)
         if (!mfaService.verifyEnrolledTotp(user.id, code)) {
+            recordMfaFailure(user.id, clientIp)
             throw UnauthorizedException("Invalid credentials")
         }
+        clearMfaThrottle(user.id, clientIp)
         mfaService.revoke(user.id)
         authAudit.recordMfaChange(user.id, user.email, clientIp, userAgent, mapOf("kind" to "revoked"))
     }
@@ -236,9 +249,12 @@ class AuthService(
         userAgent: String?,
     ): MfaRecoveryDto {
         val user = requireActiveSession(Tokens.sha256Hex(Tokens.requireBearer(authorization)))
+        rejectMfaThrottle(user.id, clientIp)
         if (!mfaService.verifyEnrolledTotp(user.id, code)) {
+            recordMfaFailure(user.id, clientIp)
             throw UnauthorizedException("Invalid credentials")
         }
+        clearMfaThrottle(user.id, clientIp)
         val codes = mfaService.replaceRecoveryCodes(user.id)
         authAudit.recordMfaChange(user.id, user.email, clientIp, userAgent, mapOf("kind" to "recovery_rotated"))
         return MfaRecoveryDto(codes)
@@ -247,9 +263,16 @@ class AuthService(
     fun me(bearerToken: String?): UserDto {
         val token = Tokens.requireBearer(bearerToken)
         val hash = Tokens.sha256Hex(token)
-        val user = requireActiveSession(hash)
-        identityRepository.touchSession(hash)
-        return identityRepository.toUserDto(user, hash, mfaProperties.stepUpTtl)
+        if (identityRepository.findUserByValidTokenHash(hash) != null) {
+            val user = requireActiveSession(hash)
+            identityRepository.touchSession(hash)
+            return identityRepository.toUserDto(user, hash, mfaProperties.stepUpTtl)
+        }
+        val service =
+            identityRepository.findValidServiceTokenByHash(hash)
+                ?: throw UnauthorizedException("Invalid or expired session")
+        identityRepository.touchServiceToken(service.id)
+        return service.toUserDto()
     }
 
     fun logout(bearerToken: String?, clientIp: String, userAgent: String?) {
@@ -319,7 +342,7 @@ class AuthService(
             expiresAt,
             now,
             mfaVerifiedAt = if (mfaVerified) now else null,
-            stepUpAt = now,
+            stepUpAt = if (mfaVerified) now else null,
         )
         authAudit.record("login_succeeded", user.id, user.id, user.email, clientIp, userAgent)
         return LoginResponse(
@@ -342,6 +365,44 @@ class AuthService(
         }
         val user = requireActiveSession(Tokens.sha256Hex(Tokens.requireBearer(authorization)))
         return user to null
+    }
+
+    fun requireSession(authorization: String?): StoredUser =
+        requireActiveSession(Tokens.sha256Hex(Tokens.requireBearer(authorization)))
+
+    fun rejectLocked(vararg keys: String) {
+        keys.forEach { rejectIfLocked(it) }
+    }
+
+    fun recordLockedFailure(vararg keys: String) {
+        keys.forEach { recordFailure(it) }
+    }
+
+    private fun mfaKeys(userId: UUID, clientIp: String): Pair<String, String> =
+        "mfa:$userId" to "mfa-ip:${clientIp.ifBlank { "unknown" }}"
+
+    private fun rejectMfaThrottle(userId: UUID, clientIp: String) {
+        val (userKey, ipKey) = mfaKeys(userId, clientIp)
+        rejectIfLocked(userKey)
+        rejectIfLocked(ipKey)
+    }
+
+    private fun clearMfaThrottle(userId: UUID, clientIp: String) {
+        val (userKey, ipKey) = mfaKeys(userId, clientIp)
+        identityRepository.clearThrottle(userKey)
+        identityRepository.clearThrottle(ipKey)
+    }
+
+    private fun recordMfaFailure(userId: UUID, clientIp: String, challengeId: UUID? = null) {
+        val (userKey, ipKey) = mfaKeys(userId, clientIp)
+        recordFailure(userKey)
+        recordFailure(ipKey)
+        if (challengeId != null) {
+            val lockedUntil = identityRepository.findThrottle(userKey)?.lockedUntil
+            if (lockedUntil != null && lockedUntil.isAfter(Instant.now())) {
+                identityRepository.deleteChallenge(challengeId)
+            }
+        }
     }
 
     private fun requireActiveSession(tokenHash: String) =

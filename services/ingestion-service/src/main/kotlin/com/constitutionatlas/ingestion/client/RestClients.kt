@@ -3,12 +3,22 @@ package com.constitutionatlas.ingestion.client
 import com.constitutionatlas.ingestion.api.ImportArticle
 import com.constitutionatlas.ingestion.api.ImportOutlineKind
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
+import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
 import org.springframework.web.client.RestClient
 import org.springframework.web.client.RestClientResponseException
 import java.time.LocalDate
 import java.util.UUID
+
+private fun restClient(baseUrl: String): RestClient =
+    RestClient.builder()
+        .baseUrl(baseUrl)
+        .requestInterceptor { request, body, execution ->
+            DownstreamAuth.header()?.let { request.headers.set(HttpHeaders.AUTHORIZATION, it) }
+            execution.execute(request, body)
+        }
+        .build()
 
 private fun <T> RestClient.postJson(path: String, body: Any, type: Class<T>, vararg uriVars: Any): T =
     post()
@@ -30,7 +40,7 @@ private fun RestClient.putJson(path: String, body: Any, vararg uriVars: Any) {
 class RestCatalogClient(
     catalogUrl: String,
 ) : CatalogClient {
-    private val client: RestClient = RestClient.builder().baseUrl(catalogUrl).build()
+    private val client: RestClient = restClient(catalogUrl)
 
     override fun getCountry(isoCode: String): DownstreamCountry? =
         try {
@@ -99,7 +109,7 @@ class RestCatalogClient(
 class RestContentClient(
     contentUrl: String,
 ) : ContentClient {
-    private val client: RestClient = RestClient.builder().baseUrl(contentUrl).build()
+    private val client: RestClient = restClient(contentUrl)
 
     override fun replaceArticles(versionId: UUID, articles: List<ImportArticle>) {
         client.putJson("/versions/{id}/articles", articles, versionId)

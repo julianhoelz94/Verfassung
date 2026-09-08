@@ -2,6 +2,8 @@
 
 Next.js 14 App Router, TypeScript. Public reading experience and later editor routes.
 
+**Repo map:** [`docs/CODEMAPS/INDEX.md`](../../docs/CODEMAPS/INDEX.md) (jump table for the whole repo). Gateway pages and clients: [`docs/CODEMAPS/frontend.md`](../../docs/CODEMAPS/frontend.md).
+
 - Keep this app a composition layer: fetch via service HTTP clients, no direct DB.
 - SSR for public content pages when adding real routes.
 - Fail optional backend data gracefully; do not block the whole page on a down search index.

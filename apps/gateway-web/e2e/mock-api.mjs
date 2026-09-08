@@ -11,6 +11,8 @@ const germany = JSON.parse(readFileSync(join(root, 'lib/contracts/catalog-countr
 const articles2022 = JSON.parse(readFileSync(join(root, 'lib/contracts/content-articles.json'), 'utf8'));
 const article1_2022 = JSON.parse(readFileSync(join(root, 'lib/contracts/content-article.json'), 'utf8'));
 const identityMe = JSON.parse(readFileSync(join(root, 'lib/contracts/identity-me.json'), 'utf8'));
+const searchFacets = JSON.parse(readFileSync(join(root, 'lib/contracts/search-facets.json'), 'utf8'));
+const searchPage = JSON.parse(readFileSync(join(root, 'lib/contracts/search-page.json'), 'utf8'));
 
 const VERSION_1949 = '01900000-0000-4000-8000-000000000003';
 const VERSION_2022 = '01900000-0000-4000-8000-000000000004';
@@ -93,35 +95,6 @@ function to1949(article) {
   };
 }
 
-const searchFacets = {
-  countries: [{ code: 'DE', count: 1 }],
-  versions: [
-    {
-      id: VERSION_2022,
-      label: '2022',
-      constitutionTitle: 'Basic Law for the Federal Republic of Germany',
-      countryCode: 'DE',
-      count: 10,
-    },
-  ],
-  dates: [{ effectiveDate: '2022-12-19', count: 10 }],
-};
-
-const searchHits = [
-  {
-    articleId: article1_2022.id,
-    versionId: VERSION_2022,
-    countryCode: 'DE',
-    constitutionTitle: 'Basic Law for the Federal Republic of Germany',
-    versionLabel: '2022',
-    effectiveDate: '2022-12-19',
-    articleNumber: '1',
-    title: 'Human dignity',
-    snippet: 'Human dignity shall be inviolable.',
-    rank: 1,
-  },
-];
-
 const amendment = {
   id: '01900000-0000-4000-8000-000000000301',
   title: 'Update to Article 1',
@@ -147,6 +120,19 @@ const amendment = {
 const editorState = {
   session: null,
 };
+
+let pendingMfaEmail = identityMe.email;
+let currentUser = { ...identityMe };
+
+function userForEmail(email) {
+  if (email === 'local-admin@example.local') {
+    return { ...identityMe, email, roles: ['admin'] };
+  }
+  if (email === 'local-publisher@example.local') {
+    return { ...identityMe, email, roles: ['publisher'] };
+  }
+  return { ...identityMe, email };
+}
 
 function json(res, status, body, extraHeaders = {}) {
   const payload = body === undefined ? '' : JSON.stringify(body);
@@ -193,6 +179,8 @@ function preview() {
     latestSnapshot: editorState.session ? 'snapshot' : null,
     drafts: editorState.session?.drafts ?? [],
     publicContentUpdated: editorState.session?.status === 'published' ? true : null,
+    newVersionId: editorState.session?.status === 'published' ? '01900000-0000-4000-8000-000000000501' : null,
+    newVersionLabel: editorState.session?.status === 'published' ? '2022-1' : null,
   };
 }
 
@@ -237,6 +225,17 @@ const server = createServer(async (req, res) => {
     json(res, 200, [amendment]);
     return;
   }
+  if (method === 'GET' && pathname === '/api/amendment/amendments') {
+    const articleNumber = searchParams.get('articleNumber');
+    json(
+      res,
+      200,
+      articleNumber && amendment.changes.some((change) => change.articleNumber === articleNumber)
+        ? [amendment]
+        : [],
+    );
+    return;
+  }
 
   if (method === 'GET' && pathname === '/api/search/search/facets') {
     json(res, 200, searchFacets);
@@ -244,7 +243,16 @@ const server = createServer(async (req, res) => {
   }
   if (method === 'GET' && pathname === '/api/search/search') {
     const query = (searchParams.get('q') ?? '').toLowerCase();
-    json(res, 200, query.includes('dignity') || query.includes('human') ? searchHits : []);
+    const limit = Math.max(1, Number(searchParams.get('limit') ?? searchPage.limit) || searchPage.limit);
+    const offset = Math.max(0, Number(searchParams.get('offset') ?? 0) || 0);
+    const hits =
+      query.includes('dignity') || query.includes('human') ? searchPage.hits : [];
+    json(res, 200, {
+      hits: hits.slice(offset, offset + limit),
+      total: hits.length,
+      limit,
+      offset,
+    });
     return;
   }
 
@@ -255,8 +263,9 @@ const server = createServer(async (req, res) => {
       return;
     }
     if (MFA_EMAILS.has(body.email)) {
+      pendingMfaEmail = body.email;
       json(res, 200, {
-        user: { ...identityMe, email: body.email },
+        user: userForEmail(body.email),
         mfaRequired: true,
         challengeToken: MFA_CHALLENGE,
       });
@@ -275,10 +284,11 @@ const server = createServer(async (req, res) => {
       json(res, 401, { error: 'Invalid authenticator or recovery code' });
       return;
     }
+    currentUser = userForEmail(pendingMfaEmail);
     json(res, 200, {
       token: SESSION_TOKEN,
       expiresInSeconds: 86400,
-      user: identityMe,
+      user: currentUser,
     });
     return;
   }
@@ -287,7 +297,24 @@ const server = createServer(async (req, res) => {
       json(res, 401, { error: 'Unauthorized' });
       return;
     }
-    json(res, 200, identityMe);
+    json(res, 200, currentUser);
+    return;
+  }
+  if (method === 'GET' && pathname === '/api/identity/users') {
+    if (bearer(req) !== SESSION_TOKEN) {
+      json(res, 401, { error: 'Unauthorized' });
+      return;
+    }
+    json(res, 200, [
+      {
+        id: currentUser.id,
+        email: currentUser.email,
+        roles: currentUser.roles,
+        enabled: true,
+        status: 'active',
+        createdAt: '2026-01-01T00:00:00Z',
+      },
+    ]);
     return;
   }
   if (method === 'POST' && pathname === '/api/identity/logout') {
@@ -304,6 +331,27 @@ const server = createServer(async (req, res) => {
     return;
   }
 
+  if (method === 'GET' && pathname === '/api/editor/edit-sessions') {
+    let sessions = editorState.session
+      ? [
+          {
+            id: editorState.session.id,
+            versionId: editorState.session.versionId,
+            status: editorState.session.status,
+            openedBy: editorState.session.actorId,
+            openedAt: '2026-01-01T00:00:00Z',
+            updatedAt: '2026-01-01T00:00:00Z',
+            changedArticleCount: editorState.session.drafts.length,
+          },
+        ]
+      : [];
+    const status = searchParams.get('status');
+    if (status) {
+      sessions = sessions.filter((session) => session.status === status);
+    }
+    json(res, 200, sessions);
+    return;
+  }
   if (method === 'POST' && pathname === '/api/editor/edit-sessions') {
     const body = await readBody(req);
     editorState.session = {

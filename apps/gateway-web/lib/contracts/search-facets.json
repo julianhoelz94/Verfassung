@@ -1,0 +1,13 @@
+{
+  "countries": [{ "code": "DE", "countryName": "Germany", "count": 1 }],
+  "versions": [
+    {
+      "id": "01900000-0000-4000-8000-000000000004",
+      "label": "2022",
+      "constitutionTitle": "Basic Law for the Federal Republic of Germany",
+      "countryCode": "DE",
+      "count": 10
+    }
+  ],
+  "dates": [{ "effectiveDate": "2022-12-19", "count": 10 }]
+}

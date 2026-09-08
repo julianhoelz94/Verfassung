@@ -2,18 +2,24 @@
 import { test, expect, type Page } from '@playwright/test';
 import { signInEditor } from './helpers';
 
-const NARROW = { width: 390, height: 844 };
-const WIDE = { width: 1280, height: 800 };
+const PHONE = { width: 390, height: 844 };
+const TABLET = { width: 820, height: 1180 };
+const DESKTOP = { width: 1440, height: 900 };
 
 async function snapshot(page: Page, name: string): Promise<void> {
   await expect(page).toHaveScreenshot(name, { fullPage: true });
 }
 
-test('public and editor layouts at narrow and wide viewports', async ({ page }) => {
-  test.skip(process.platform !== 'linux', 'Visual snapshots are Linux Chromium (Playwright Docker / CI).');
+test('public and editor layouts at 390, 820 and 1440', async ({ page }) => {
+  test.setTimeout(120_000);
+  test.skip(
+    process.platform !== 'linux',
+    'Visual snapshots are Linux Chromium (Playwright Docker / CI). Re-baseline with mcr.microsoft.com/playwright:v1.49.1-jammy.',
+  );
   for (const viewport of [
-    { size: NARROW, suffix: 'narrow' },
-    { size: WIDE, suffix: 'wide' },
+    { size: PHONE, suffix: 'narrow' },
+    { size: TABLET, suffix: 'tablet' },
+    { size: DESKTOP, suffix: 'wide' },
   ]) {
     await page.setViewportSize(viewport.size);
 
@@ -30,8 +36,10 @@ test('public and editor layouts at narrow and wide viewports', async ({ page }) 
   }
 
   await signInEditor(page);
-  await page.setViewportSize(NARROW);
+  await page.setViewportSize(PHONE);
   await snapshot(page, 'editor-narrow.png');
-  await page.setViewportSize(WIDE);
+  await page.setViewportSize(TABLET);
+  await snapshot(page, 'editor-tablet.png');
+  await page.setViewportSize(DESKTOP);
   await snapshot(page, 'editor-wide.png');
 });

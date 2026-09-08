@@ -1,9 +1,10 @@
 import { redirect } from 'next/navigation';
-import { Alert, Button, Card, Input } from '../../components/ui';
+import { Alert, Button, Card, Input, PageHeader } from '../../components/ui';
 import { PageMain } from '../../components/PageMain';
 import { currentUser, mfaChallengeToken } from '../../../lib/session';
 import { requestStartMfaEnroll } from '../../../lib/identity-client';
-import { completeMfaAction, confirmEnrollAction } from '../actions';
+import { LoginEnrollForm } from '../../account/MfaForms';
+import { completeMfaAction } from '../actions';
 
 type MfaPageProps = {
   searchParams: { error?: string; enroll?: string };
@@ -34,12 +35,14 @@ export default async function MfaPage({ searchParams }: MfaPageProps) {
 
   return (
     <PageMain>
-      <h1>{enroll ? 'Set up authenticator' : 'Authenticator code'}</h1>
-      <p className="lede">
-        {enroll
-          ? 'Admin and publisher accounts must enroll TOTP before signing in.'
-          : 'Enter a 6-digit authenticator code or a recovery code.'}
-      </p>
+      <PageHeader
+        title={enroll ? 'Set up authenticator' : 'Authenticator code'}
+        meta={
+          enroll
+            ? 'Admin and publisher accounts must enroll TOTP before signing in.'
+            : 'Enter a 6-digit authenticator code or a recovery code.'
+        }
+      />
       {searchParams.error ? (
         <Alert tone="error">That code could not be verified.</Alert>
       ) : null}
@@ -59,17 +62,7 @@ export default async function MfaPage({ searchParams }: MfaPageProps) {
           ) : (
             <Alert tone="error">Enrollment could not be started. Sign in again.</Alert>
           )}
-          <form action={confirmEnrollAction}>
-            <Input
-              label="Authenticator code"
-              id="code"
-              name="code"
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              required
-            />
-            <Button variant="primary">Confirm enrollment</Button>
-          </form>
+          <LoginEnrollForm />
         </Card>
       ) : (
         <Card>

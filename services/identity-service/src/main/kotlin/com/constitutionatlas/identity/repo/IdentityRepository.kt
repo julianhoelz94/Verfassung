@@ -1,5 +1,6 @@
 package com.constitutionatlas.identity.repo
 
+import com.constitutionatlas.identity.api.ServiceTokenDto
 import com.constitutionatlas.identity.api.SessionInfoDto
 import com.constitutionatlas.identity.api.UserDto
 import org.springframework.jdbc.core.JdbcTemplate
@@ -46,6 +47,38 @@ data class StoredMfaChallenge(
     val revokeTokenHash: String?,
     val expiresAt: Instant,
 )
+
+data class StoredServiceToken(
+    val id: UUID,
+    val name: String,
+    val tokenHash: String,
+    val scopes: List<String>,
+    val createdBy: UUID,
+    val createdAt: OffsetDateTime,
+    val lastUsedAt: OffsetDateTime?,
+    val revokedAt: OffsetDateTime?,
+)
+
+fun StoredServiceToken.toDto(): ServiceTokenDto =
+    ServiceTokenDto(
+        id = id,
+        name = name,
+        scopes = scopes,
+        createdAt = createdAt,
+        lastUsedAt = lastUsedAt,
+        revokedAt = revokedAt,
+    )
+
+fun StoredServiceToken.toUserDto(): UserDto =
+    UserDto(
+        id = id,
+        email = "service:$name",
+        roles = emptyList(),
+        scopes = scopes,
+        mfaEnabled = false,
+        mfaRequired = false,
+        stepUpFresh = true,
+    )
 
 @Repository
 class IdentityRepository(private val jdbc: JdbcTemplate) {
@@ -197,6 +230,84 @@ class IdentityRepository(private val jdbc: JdbcTemplate) {
     fun touchSession(tokenHash: String) {
         jdbc.update("UPDATE sessions SET last_seen_at = NOW() WHERE token_hash = ?", tokenHash)
     }
+
+    fun insertServiceToken(
+        name: String,
+        tokenHash: String,
+        scopes: List<String>,
+        createdBy: UUID,
+    ): UUID {
+        val id = UUID.randomUUID()
+        jdbc.update { connection ->
+            val statement =
+                connection.prepareStatement(
+                    """
+                    INSERT INTO service_tokens (id, name, token_hash, scopes, created_by)
+                    VALUES (?, ?, ?, ?, ?)
+                    """.trimIndent(),
+                )
+            statement.setObject(1, id)
+            statement.setString(2, name)
+            statement.setString(3, tokenHash)
+            statement.setArray(4, connection.createArrayOf("text", scopes.toTypedArray()))
+            statement.setObject(5, createdBy)
+            statement
+        }
+        return id
+    }
+
+    fun findValidServiceTokenByHash(tokenHash: String): StoredServiceToken? =
+        jdbc.query(
+            """
+            SELECT id, name, token_hash, scopes, created_by, created_at, last_used_at, revoked_at
+            FROM service_tokens
+            WHERE token_hash = ? AND revoked_at IS NULL
+            """.trimIndent(),
+            serviceTokenMapper,
+            tokenHash,
+        ).firstOrNull()
+
+    fun findServiceTokenById(id: UUID): StoredServiceToken? =
+        jdbc.query(
+            """
+            SELECT id, name, token_hash, scopes, created_by, created_at, last_used_at, revoked_at
+            FROM service_tokens
+            WHERE id = ?
+            """.trimIndent(),
+            serviceTokenMapper,
+            id,
+        ).firstOrNull()
+
+    fun findActiveServiceTokenByName(name: String): StoredServiceToken? =
+        jdbc.query(
+            """
+            SELECT id, name, token_hash, scopes, created_by, created_at, last_used_at, revoked_at
+            FROM service_tokens
+            WHERE name = ? AND revoked_at IS NULL
+            """.trimIndent(),
+            serviceTokenMapper,
+            name,
+        ).firstOrNull()
+
+    fun listServiceTokens(): List<StoredServiceToken> =
+        jdbc.query(
+            """
+            SELECT id, name, token_hash, scopes, created_by, created_at, last_used_at, revoked_at
+            FROM service_tokens
+            ORDER BY created_at DESC
+            """.trimIndent(),
+            serviceTokenMapper,
+        )
+
+    fun touchServiceToken(id: UUID) {
+        jdbc.update("UPDATE service_tokens SET last_used_at = NOW() WHERE id = ?", id)
+    }
+
+    fun revokeServiceToken(id: UUID): Boolean =
+        jdbc.update(
+            "UPDATE service_tokens SET revoked_at = NOW() WHERE id = ? AND revoked_at IS NULL",
+            id,
+        ) > 0
 
     fun listSessions(userId: UUID, currentTokenHash: String): List<SessionInfoDto> =
         jdbc.query(
@@ -528,6 +639,26 @@ class IdentityRepository(private val jdbc: JdbcTemplate) {
             revokeTokenHash = rs.getString("revoke_token_hash"),
             expiresAt = rs.getTimestamp("expires_at").toInstant(),
         )
+    }
+
+    private val serviceTokenMapper = RowMapper { rs, _ ->
+        StoredServiceToken(
+            id = rs.getObject("id", UUID::class.java),
+            name = rs.getString("name"),
+            tokenHash = rs.getString("token_hash"),
+            scopes = scopesFrom(rs.getArray("scopes")),
+            createdBy = rs.getObject("created_by", UUID::class.java),
+            createdAt = rs.getTimestamp("created_at").toInstant().atOffset(ZoneOffset.UTC),
+            lastUsedAt = rs.getTimestamp("last_used_at")?.toInstant()?.atOffset(ZoneOffset.UTC),
+            revokedAt = rs.getTimestamp("revoked_at")?.toInstant()?.atOffset(ZoneOffset.UTC),
+        )
+    }
+
+    private fun scopesFrom(array: java.sql.Array?): List<String> {
+        if (array == null) {
+            return emptyList()
+        }
+        return (array.array as Array<*>).map { it.toString() }
     }
 
     private val userMapper = RowMapper { rs, _ ->

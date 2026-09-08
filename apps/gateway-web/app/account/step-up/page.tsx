@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
-import { Alert, Button, Card, Input } from '../../components/ui';
+import { Alert, Button, Card, Input, PageHeader } from '../../components/ui';
 import { PageMain } from '../../components/PageMain';
 import { currentUser } from '../../../lib/session';
 import { stepUpAction } from '../actions';
@@ -15,8 +15,7 @@ export default async function StepUpPage({ searchParams }: StepUpPageProps) {
   }
   return (
     <PageMain>
-      <h1>Confirm it is you</h1>
-      <p className="lede">Publishing and role changes need a recent authenticator code.</p>
+      <PageHeader title="Confirm it is you" meta="Publishing and role changes need a recent authenticator code." />
       {searchParams.error ? <Alert tone="error">That authenticator code could not be verified.</Alert> : null}
       <Card>
         <form action={stepUpAction}>

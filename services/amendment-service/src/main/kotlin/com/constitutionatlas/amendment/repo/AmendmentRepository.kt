@@ -30,6 +30,42 @@ class AmendmentRepository(private val jdbc: JdbcTemplate) {
         return amendments.map { it.copy(changes = listChanges(it.id)) }
     }
 
+    fun listForArticle(constitutionId: UUID, articleNumber: String): List<AmendmentDto> {
+        val number = articleNumber.trim()
+        if (number.isEmpty()) {
+            return emptyList()
+        }
+        val amendments =
+            jdbc.query(
+                """
+                SELECT DISTINCT a.id, a.title, a.summary, a.enacted_on, a.source_reference,
+                       t.source_version_id, t.target_version_id
+                FROM amendments a
+                JOIN version_transitions t ON t.id = a.version_transition_id
+                JOIN amendment_changes c ON c.amendment_id = a.id
+                WHERE t.constitution_id = ?
+                  AND lower(c.article_number) = lower(?)
+                """.trimIndent(),
+                amendmentRowMapper,
+                constitutionId,
+                number,
+            )
+        return amendments
+            .map { amendment ->
+                amendment.copy(
+                    changes =
+                    listChanges(amendment.id).filter { change ->
+                        change.articleNumber.equals(number, ignoreCase = true)
+                    },
+                )
+            }
+            .sortedWith(
+                compareBy(nullsLast()) { amendment ->
+                    amendment.changes.mapNotNull { it.changedOn }.minOrNull()
+                },
+            )
+    }
+
     private val amendmentRowMapper = org.springframework.jdbc.core.RowMapper { rs, _ ->
         AmendmentDto(
             id = rs.getObject("id", UUID::class.java),

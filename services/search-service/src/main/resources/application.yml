@@ -9,6 +9,9 @@ content:
     url: ${CONTENT_API_URL:http://localhost/api/content}
 search:
   reindex-on-startup: ${SEARCH_REINDEX_ON_STARTUP:false}
+identity:
+  api:
+    url: ${IDENTITY_API_URL:http://localhost/api/identity}
 management:
   endpoints:
     web:

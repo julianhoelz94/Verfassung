@@ -60,6 +60,13 @@ class ArticleRepository(private val jdbc: JdbcTemplate) {
             id,
         ).firstOrNull()
 
+    fun versionIdOfNode(id: UUID): UUID? =
+        jdbc.query(
+            "SELECT version_id FROM content_nodes WHERE id = ?",
+            { rs, _ -> rs.getObject("version_id", UUID::class.java) },
+            id,
+        ).firstOrNull()
+
     fun replaceForVersion(versionId: UUID, articles: List<ArticleWrite>): List<ArticleSummary> {
         jdbc.update("DELETE FROM content_nodes WHERE version_id = ? AND parent_id IS NULL", versionId)
         jdbc.update("DELETE FROM articles WHERE version_id = ?", versionId)

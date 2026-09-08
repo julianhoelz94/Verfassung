@@ -7,6 +7,7 @@ import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestHeader
+import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
 import java.util.UUID
@@ -19,6 +20,14 @@ class EditorController(private val editorService: EditorService) {
         @RequestHeader(value = "Authorization", required = false) authorization: String?,
         @RequestBody request: CreateSessionRequest,
     ): EditSessionDto = editorService.createSession(authorization, request)
+
+    @GetMapping("/edit-sessions")
+    fun list(
+        @RequestHeader(value = "Authorization", required = false) authorization: String?,
+        @RequestParam(required = false) status: String?,
+        @RequestParam(required = false) openedBy: String?,
+        @RequestParam(required = false) versionId: UUID?,
+    ): List<EditSessionSummaryDto> = editorService.listSessions(authorization, status, openedBy, versionId)
 
     @GetMapping("/edit-sessions/{sessionId}")
     fun preview(

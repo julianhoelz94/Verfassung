@@ -19,3 +19,4 @@ cp env/local-stack.env.example env/local-stack.env   # first time only
 - Docs: `http://localhost/api/docs/<catalog|content|amendment|identity|editor|search|ingestion|audit>/swagger-ui/index.html`
 - Compose file: `docker-compose.yml`. Kotlin images: host `./gradlew bootJar` then copy `app.jar` onto a JRE. Gateway and Caddy still build in Docker.
 - Profiles: `env/local-stack.env.example`, `ci.env.example`, `testing.env.example`, `production.env.example`.
+- Map: `docs/CODEMAPS/infra.md`.

@@ -4,6 +4,7 @@ import com.constitutionatlas.search.api.CountryFacet
 import com.constitutionatlas.search.api.DateFacet
 import com.constitutionatlas.search.api.SearchFacets
 import com.constitutionatlas.search.api.SearchHit
+import com.constitutionatlas.search.api.SearchPage
 import com.constitutionatlas.search.api.SearchQuery
 import com.constitutionatlas.search.api.VersionFacet
 import com.constitutionatlas.search.client.IndexableArticle
@@ -22,14 +23,15 @@ class SearchRepository(private val jdbcTemplate: JdbcTemplate) {
             jdbcTemplate.update(
                 """
                 INSERT INTO search_documents (
-                  document_id, version_id, country_code, constitution_title, version_label,
+                  document_id, version_id, country_code, country_name, constitution_title, version_label,
                   effective_date, article_number, title, body
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """.trimIndent(),
                 doc.articleId,
                 doc.versionId,
                 doc.countryCode,
+                doc.countryName,
                 doc.constitutionTitle,
                 doc.versionLabel,
                 doc.effectiveDate?.let { Date.valueOf(it) },
@@ -51,61 +53,79 @@ class SearchRepository(private val jdbcTemplate: JdbcTemplate) {
         )
     }
 
-    fun search(query: SearchQuery): List<SearchHit> {
+    fun search(query: SearchQuery): SearchPage {
         if (query.text.isBlank()) {
-            return emptyList()
+            return SearchPage(hits = emptyList(), total = 0, limit = query.limit, offset = query.offset)
         }
-        return jdbcTemplate.query(
+        val filterSql =
             """
-            SELECT document_id, version_id, country_code, constitution_title, version_label,
-                   effective_date, article_number, title,
-                   ts_headline(
-                     'simple',
-                     body,
-                     plainto_tsquery('simple', ?),
-                     'MaxWords=24, MinWords=12, StartSel=<<, StopSel=>>'
-                   ) AS snippet,
-                   ts_rank(tsv, plainto_tsquery('simple', ?)) AS rank
             FROM search_documents
             WHERE tsv @@ plainto_tsquery('simple', ?)
-              AND (? IS NULL OR country_code = ?)
+              AND (?::text IS NULL OR country_code = ?)
               AND (?::uuid IS NULL OR version_id = ?)
               AND (?::date IS NULL OR effective_date = ?)
-            ORDER BY rank DESC, article_number
-            LIMIT ?
-            """.trimIndent(),
-            { rs, _ ->
-                SearchHit(
-                    articleId = rs.getObject("document_id", UUID::class.java),
-                    versionId = rs.getObject("version_id", UUID::class.java),
-                    countryCode = rs.getString("country_code"),
-                    constitutionTitle = rs.getString("constitution_title"),
-                    versionLabel = rs.getString("version_label"),
-                    effectiveDate = rs.getDate("effective_date")?.toLocalDate(),
-                    articleNumber = rs.getString("article_number"),
-                    title = rs.getString("title"),
-                    snippet = (rs.getString("snippet") ?: "").replace("<<", "").replace(">>", ""),
-                    rank = rs.getDouble("rank"),
-                )
-            },
-            query.text,
-            query.text,
-            query.text,
-            query.countryCode,
-            query.countryCode,
-            query.versionId,
-            query.versionId,
-            query.effectiveDate?.let { Date.valueOf(it) },
-            query.effectiveDate?.let { Date.valueOf(it) },
-            query.limit,
-        )
+            """.trimIndent()
+        val filterArgs =
+            arrayOf(
+                query.text,
+                query.countryCode,
+                query.countryCode,
+                query.versionId,
+                query.versionId,
+                query.effectiveDate?.let { Date.valueOf(it) },
+                query.effectiveDate?.let { Date.valueOf(it) },
+            )
+        val total =
+            jdbcTemplate.queryForObject(
+                "SELECT COUNT(*)::int $filterSql",
+                Int::class.java,
+                *filterArgs,
+            ) ?: 0
+        val hits =
+            jdbcTemplate.query(
+                """
+                SELECT document_id, version_id, country_code, constitution_title, version_label,
+                       effective_date, article_number, title,
+                       ts_headline(
+                         'simple',
+                         body,
+                         plainto_tsquery('simple', ?),
+                         'MaxWords=24, MinWords=12, StartSel=<mark>, StopSel=</mark>'
+                       ) AS snippet,
+                       ts_rank(tsv, plainto_tsquery('simple', ?)) AS rank
+                $filterSql
+                ORDER BY rank DESC, article_number
+                LIMIT ?
+                OFFSET ?
+                """.trimIndent(),
+                { rs, _ ->
+                    SearchHit(
+                        articleId = rs.getObject("document_id", UUID::class.java),
+                        versionId = rs.getObject("version_id", UUID::class.java),
+                        countryCode = rs.getString("country_code"),
+                        constitutionTitle = rs.getString("constitution_title"),
+                        versionLabel = rs.getString("version_label"),
+                        effectiveDate = rs.getDate("effective_date")?.toLocalDate(),
+                        articleNumber = rs.getString("article_number"),
+                        title = rs.getString("title"),
+                        snippet = rs.getString("snippet") ?: "",
+                        rank = rs.getDouble("rank"),
+                    )
+                },
+                query.text,
+                query.text,
+                *filterArgs,
+                query.limit,
+                query.offset,
+            )
+        return SearchPage(hits = hits, total = total, limit = query.limit, offset = query.offset)
     }
 
     fun facets(): SearchFacets {
         val countries =
             jdbcTemplate.query(
                 """
-                SELECT country_code AS code, COUNT(*)::int AS count
+                SELECT country_code AS code, MAX(country_name) AS country_name, COUNT(*)::int AS count
                 FROM search_documents
                 GROUP BY country_code
                 ORDER BY country_code
@@ -113,6 +133,7 @@ class SearchRepository(private val jdbcTemplate: JdbcTemplate) {
             ) { rs, _ ->
                 CountryFacet(
                     code = rs.getString("code"),
+                    countryName = rs.getString("country_name") ?: "",
                     count = rs.getInt("count"),
                 )
             }

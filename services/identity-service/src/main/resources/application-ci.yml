@@ -15,3 +15,5 @@ identity:
   session:
     idle-timeout: 30m
     absolute-timeout: 12h
+  mfa:
+    encryption-key: ${IDENTITY_MFA_ENCRYPTION_KEY:local-mfa-dev-key}

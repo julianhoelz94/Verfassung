@@ -2,6 +2,7 @@
 
 import { redirect } from 'next/navigation';
 import { requireAdminUser } from '../../../lib/admin';
+import { requireSessionBearer } from '../../../lib/session';
 import { createImportJob, isImportRequest, parseImportJson } from '../../../lib/ingestion-api';
 
 export async function createImportAction(formData: FormData): Promise<void> {
@@ -23,7 +24,7 @@ export async function createImportAction(formData: FormData): Promise<void> {
   }
   let jobId: string;
   try {
-    const job = await createImportJob(payload);
+    const job = await createImportJob(payload, requireSessionBearer());
     jobId = job.id;
   } catch {
     redirect('/admin/import?error=1');

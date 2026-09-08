@@ -20,7 +20,8 @@ import {
   requestUpdateRoles,
 } from '../../lib/identity-client';
 import { requireAdminUser } from '../../lib/admin';
-import { SESSION_COOKIE } from '../../lib/session';
+import { safeReturnTo } from '../../lib/return-to';
+import { SESSION_COOKIE, clearChallengeCookie, setChallengeCookie } from '../../lib/session';
 
 function tokenOrRedirect(): string {
   const token = cookies().get(SESSION_COOKIE)?.value;
@@ -80,17 +81,23 @@ function parseRoles(formData: FormData, fallback = ''): string[] {
     .filter(Boolean);
 }
 
-export async function inviteUserAction(formData: FormData): Promise<void> {
+export type TokenRevealState = {
+  token?: string;
+  error?: boolean;
+};
+
+export async function inviteUserAction(
+  _prev: TokenRevealState,
+  formData: FormData,
+): Promise<TokenRevealState> {
   const token = await requireAdminToken();
   const roles = parseRoles(formData, 'viewer');
-  let inviteToken: string;
   try {
     const created = await requestInvite(token, String(formData.get('email') ?? ''), roles);
-    inviteToken = created.inviteToken;
+    return { token: created.inviteToken };
   } catch {
-    redirect('/admin/users?error=1');
+    return { error: true };
   }
-  redirect(`/admin/users?invited=${encodeURIComponent(inviteToken)}`);
 }
 
 export async function disableUserAction(formData: FormData): Promise<void> {
@@ -113,36 +120,46 @@ export async function enableUserAction(formData: FormData): Promise<void> {
   redirect('/admin/users');
 }
 
-export async function issueResetAction(formData: FormData): Promise<void> {
+export async function issueResetAction(
+  _prev: TokenRevealState,
+  formData: FormData,
+): Promise<TokenRevealState> {
   const token = await requireAdminToken();
-  let resetToken: string;
   try {
     const issued = await requestIssueReset(token, String(formData.get('userId') ?? ''));
-    resetToken = issued.resetToken;
+    return { token: issued.resetToken };
   } catch {
-    redirect('/admin/users?error=1');
+    return { error: true };
   }
-  redirect(`/admin/users?reset=${encodeURIComponent(resetToken)}`);
 }
 
-function safeReturnTo(value: string): string {
-  if (value.startsWith('/') && !value.startsWith('//')) {
-    return value;
-  }
-  return '/account';
-}
+/**
+ * Recovery codes are bearer credentials: they are returned as form state and rendered
+ * once by the submitting form, never carried in a redirect URL (history, proxy logs).
+ */
+export type RecoveryRevealState = {
+  recoveryCodes?: string[];
+  error?: boolean;
+};
 
 export async function startMfaEnrollAction(): Promise<void> {
   const token = tokenOrRedirect();
+  let challengeToken: string;
   try {
     const started = await requestStartMfaEnroll(undefined, token);
-    redirect(`/account?enrollChallenge=${encodeURIComponent(started.challengeToken)}`);
+    challengeToken = started.challengeToken;
   } catch {
     redirect('/account?error=mfa');
   }
+  // Same httpOnly cookie the login enrollment flow uses; keeps the challenge out of the URL.
+  setChallengeCookie(challengeToken);
+  redirect('/account?enroll=1');
 }
 
-export async function confirmAccountMfaAction(formData: FormData): Promise<void> {
+export async function confirmAccountMfaAction(
+  _prev: RecoveryRevealState,
+  formData: FormData,
+): Promise<RecoveryRevealState> {
   const token = tokenOrRedirect();
   try {
     const confirmed = await requestConfirmMfaEnroll(
@@ -150,9 +167,10 @@ export async function confirmAccountMfaAction(formData: FormData): Promise<void>
       String(formData.get('challengeToken') ?? ''),
       token,
     );
-    redirect(`/account?recovery=${encodeURIComponent(confirmed.recoveryCodes.join(','))}`);
+    clearChallengeCookie();
+    return { recoveryCodes: confirmed.recoveryCodes };
   } catch {
-    redirect('/account?error=mfa');
+    return { error: true };
   }
 }
 
@@ -166,19 +184,22 @@ export async function revokeMfaAction(formData: FormData): Promise<void> {
   redirect('/account?mfaRevoked=1');
 }
 
-export async function regenerateRecoveryAction(formData: FormData): Promise<void> {
+export async function regenerateRecoveryAction(
+  _prev: RecoveryRevealState,
+  formData: FormData,
+): Promise<RecoveryRevealState> {
   const token = tokenOrRedirect();
   try {
     const result = await requestRegenerateRecovery(token, String(formData.get('code') ?? ''));
-    redirect(`/account?recovery=${encodeURIComponent(result.recoveryCodes.join(','))}`);
+    return { recoveryCodes: result.recoveryCodes };
   } catch {
-    redirect('/account?error=mfa');
+    return { error: true };
   }
 }
 
 export async function stepUpAction(formData: FormData): Promise<void> {
   const token = tokenOrRedirect();
-  const returnTo = safeReturnTo(String(formData.get('returnTo') ?? '/account'));
+  const returnTo = safeReturnTo(String(formData.get('returnTo') ?? '/account'), '/account');
   try {
     await requestStepUp(token, String(formData.get('code') ?? ''));
   } catch {

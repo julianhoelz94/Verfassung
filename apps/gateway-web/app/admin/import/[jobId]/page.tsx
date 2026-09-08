@@ -1,9 +1,10 @@
 import { notFound } from 'next/navigation';
 import { AdminForbidden } from '../../../components/AdminForbidden';
-import { Alert, Card } from '../../../components/ui';
+import { Alert, Card, PageHeader } from '../../../components/ui';
 import { PageMain } from '../../../components/PageMain';
 import { requireAdminPage } from '../../../../lib/admin';
 import { getImportJob } from '../../../../lib/ingestion-api';
+import { requireSessionBearer } from '../../../../lib/session';
 
 type ImportJobPageProps = {
   params: { jobId: string };
@@ -15,11 +16,11 @@ export default async function ImportJobPage({ params }: ImportJobPageProps) {
   }
   let job;
   try {
-    job = await getImportJob(params.jobId);
+    job = await getImportJob(params.jobId, requireSessionBearer());
   } catch {
     return (
       <PageMain>
-        <h1>Import job</h1>
+        <PageHeader title="Import job" />
         <Alert tone="error">The import service is unavailable.</Alert>
       </PageMain>
     );
@@ -32,10 +33,9 @@ export default async function ImportJobPage({ params }: ImportJobPageProps) {
       ? `/countries/${encodeURIComponent(job.isoCode)}/versions/${encodeURIComponent(job.versionId)}`
       : null;
   return (
-    <PageMain>
+    <PageMain className="wide">
       {job.status === 'running' ? <meta httpEquiv="refresh" content="2" /> : null}
-      <h1>Import job</h1>
-      <p className="lede">Status: {job.status}</p>
+      <PageHeader title="Import job" meta={`Status: ${job.status}`} />
       {job.status === 'running' ? <Alert>The import is still running. This page refreshes automatically.</Alert> : null}
       {job.status === 'failed' ? <Alert tone="error">The import failed.</Alert> : null}
       {job.status === 'completed' && versionHref ? (

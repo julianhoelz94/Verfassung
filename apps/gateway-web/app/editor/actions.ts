@@ -36,7 +36,7 @@ async function runCommand(formData: FormData, command: () => Promise<unknown>, s
       redirect(`/account/step-up?returnTo=${encodeURIComponent(editorPath(formData))}`);
     }
     if (error instanceof EditorApiError) {
-      redirectEditor(formData, { error: error.message });
+      redirectEditor(formData, { error: error.key });
     }
     throw error;
   }
@@ -50,7 +50,7 @@ export async function openEditorAction(formData: FormData): Promise<void> {
     redirect(`/editor?versionId=${encodeURIComponent(versionId)}&sessionId=${encodeURIComponent(session.id)}`);
   } catch (error) {
     if (error instanceof EditorApiError) {
-      redirect(`/editor?versionId=${encodeURIComponent(versionId)}&error=${encodeURIComponent(error.message)}`);
+      redirect(`/editor?versionId=${encodeURIComponent(versionId)}&error=${error.key}`);
     }
     throw error;
   }
@@ -60,7 +60,7 @@ export async function loadSessionAction(formData: FormData): Promise<void> {
   const sessionId = String(formData.get('sessionId') ?? '').trim();
   const versionId = String(formData.get('versionId') ?? '');
   if (!sessionId) {
-    redirect(`/editor?error=${encodeURIComponent('Enter a session id.')}`);
+    redirect('/editor?error=session_id');
   }
   const params = new URLSearchParams({ sessionId });
   if (versionId) params.set('versionId', versionId);
@@ -90,5 +90,23 @@ export async function approveAction(formData: FormData): Promise<void> {
 }
 
 export async function publishAction(formData: FormData): Promise<void> {
-  await runCommand(formData, () => publishSession(String(formData.get('sessionId') ?? '')), { published: '1' });
+  try {
+    const preview = await publishSession(String(formData.get('sessionId') ?? ''));
+    const extra: Record<string, string> = { published: '1' };
+    if (preview.newVersionLabel) {
+      extra.newVersionLabel = preview.newVersionLabel;
+    }
+    if (preview.newVersionId) {
+      extra.newVersionId = preview.newVersionId;
+    }
+    redirectEditor(formData, extra);
+  } catch (error) {
+    if (error instanceof EditorApiError && error.code === 'step_up_required') {
+      redirect(`/account/step-up?returnTo=${encodeURIComponent(editorPath(formData))}`);
+    }
+    if (error instanceof EditorApiError) {
+      redirectEditor(formData, { error: error.key });
+    }
+    throw error;
+  }
 }

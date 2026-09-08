@@ -2,9 +2,12 @@ package com.constitutionatlas.editor.repo
 
 import com.constitutionatlas.editor.api.DraftArticleDto
 import com.constitutionatlas.editor.api.EditSessionDto
+import com.constitutionatlas.editor.api.EditSessionSummaryDto
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Repository
+import java.sql.Timestamp
+import java.time.Instant
 import java.util.UUID
 
 @Repository
@@ -49,6 +52,46 @@ class EditorRepository(
             sessionId,
         ) ?: 0
         return EditSessionDto(row.first, row.second, row.third.first, row.third.second, revisionCount)
+    }
+
+    fun listSessions(status: String?, openedBy: UUID?, versionId: UUID?): List<EditSessionSummaryDto> {
+        val sql = StringBuilder(
+            """
+            SELECT s.id, s.actor_id, s.version_id, s.status, s.created_at, s.updated_at,
+              (
+                SELECT COUNT(DISTINCT c.article_id)
+                FROM draft_changes c
+                WHERE c.session_id = s.id AND c.article_id IS NOT NULL
+              ) AS changed_article_count
+            FROM edit_sessions s
+            WHERE 1 = 1
+            """.trimIndent(),
+        )
+        val args = mutableListOf<Any>()
+        if (status != null) {
+            sql.append(" AND s.status = ?")
+            args.add(status)
+        }
+        if (openedBy != null) {
+            sql.append(" AND s.actor_id = ?")
+            args.add(openedBy)
+        }
+        if (versionId != null) {
+            sql.append(" AND s.version_id = ?")
+            args.add(versionId)
+        }
+        sql.append(" ORDER BY s.updated_at DESC LIMIT 100")
+        return jdbc.query(sql.toString(), { rs, _ ->
+            EditSessionSummaryDto(
+                id = rs.getObject("id", UUID::class.java),
+                versionId = rs.getObject("version_id", UUID::class.java),
+                status = rs.getString("status"),
+                openedBy = rs.getObject("actor_id", UUID::class.java),
+                openedAt = toInstant(rs.getTimestamp("created_at")),
+                updatedAt = toInstant(rs.getTimestamp("updated_at")),
+                changedArticleCount = rs.getInt("changed_article_count"),
+            )
+        }, *args.toTypedArray())
     }
 
     fun insertChange(sessionId: UUID, articleId: UUID?, changeKind: String, payload: Any) {
@@ -142,3 +185,5 @@ class EditorRepository(
             sessionId,
         )
 }
+
+private fun toInstant(value: Timestamp?): Instant = value?.toInstant() ?: Instant.EPOCH

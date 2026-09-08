@@ -1,10 +1,17 @@
 import type { VersionSummary } from '../../lib/api';
 import { httpUrl, provenanceLabel, verificationLabel } from '../../lib/provenance';
+import { Badge } from './ui';
 
-export function Provenance({ version }: { version: VersionSummary }) {
+export function Provenance({
+  version,
+  label = 'Source and trust',
+}: {
+  version: VersionSummary;
+  label?: string;
+}) {
   const sourceHref = httpUrl(version.sourceUrl);
   return (
-    <aside className="provenance" aria-label="Source and trust">
+    <aside className="provenance" aria-label={label}>
       <dl className="provenance-list">
         <div>
           <dt>Language</dt>
@@ -34,7 +41,7 @@ export function Provenance({ version }: { version: VersionSummary }) {
           <dt>Text kind</dt>
           <dd>
             {provenanceLabel(version.provenance)}
-            {version.latestPublished ? <span className="tag">Latest published</span> : null}
+            {version.latestPublished ? <Badge tone="accent">Latest published</Badge> : null}
           </dd>
         </div>
         <div>

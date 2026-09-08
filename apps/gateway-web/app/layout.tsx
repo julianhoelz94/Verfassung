@@ -2,6 +2,7 @@ import './globals.css';
 import type { ReactNode } from 'react';
 import type { Metadata } from 'next';
 import { currentSession } from '../lib/session';
+import { SiteFooter } from './components/SiteFooter';
 import { SiteHeader } from './components/SiteHeader';
 
 export const metadata: Metadata = {
@@ -23,6 +24,7 @@ export default async function RootLayout({ children }: RootLayoutProps) {
         </a>
         <SiteHeader user={session.user} identityUnavailable={session.identityUnavailable} />
         {children}
+        <SiteFooter />
       </body>
     </html>
   );

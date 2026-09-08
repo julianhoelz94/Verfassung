@@ -1,4 +1,4 @@
-import { Alert, Button, Card, Input } from '../components/ui';
+import { Alert, Button, Card, Input, PageHeader } from '../components/ui';
 import { PageMain } from '../components/PageMain';
 import { acceptInviteAction } from '../account/actions';
 
@@ -9,8 +9,10 @@ type InvitePageProps = {
 export default function InvitePage({ searchParams }: InvitePageProps) {
   return (
     <PageMain>
-      <h1>Accept invite</h1>
-      <p className="lede">Set a password to activate the invited account. There is no public self-registration.</p>
+      <PageHeader
+        title="Accept invite"
+        meta="Set a password to activate the invited account. There is no public self-registration."
+      />
       {searchParams.error ? <Alert tone="error">That invite is invalid or the password does not meet policy.</Alert> : null}
       <Card>
         <form action={acceptInviteAction}>

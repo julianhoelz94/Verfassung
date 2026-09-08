@@ -25,4 +25,6 @@ Rules:
 - Published versions are immutable snapshots.
 - Prefer OpenAPI on each service over ad-hoc JSON.
 
+File and table maps: `docs/CODEMAPS/backend.md`, `docs/CODEMAPS/data.md`. Jump table: `docs/CODEMAPS/INDEX.md`.
+
 For story IDs and table-level detail, grep `backlog.md` for the owning epic (`ARCH-`, `SRV-`, `DB-`). Do not load the whole file.

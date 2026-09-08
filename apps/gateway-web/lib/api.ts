@@ -112,10 +112,13 @@ export class ApiUnavailableError extends Error {
   }
 }
 
-export async function readJson<T>(url: string, service: string): Promise<T | null> {
+export async function readJson<T>(url: string, service: string, authorization?: string): Promise<T | null> {
   let response: Response;
   try {
-    response = await fetch(url, { cache: 'no-store' });
+    response = await fetch(url, {
+      cache: 'no-store',
+      headers: authorization ? { Authorization: authorization } : undefined,
+    });
   } catch {
     throw new ApiUnavailableError(service);
   }
@@ -161,14 +164,24 @@ export type SearchHit = {
   rank: number;
 };
 
+export type SearchPage = {
+  hits: SearchHit[];
+  total: number;
+  limit: number;
+  offset: number;
+};
+
 export type SearchFilters = {
   country?: string;
   versionId?: string;
   effectiveDate?: string;
+  limit?: number;
+  offset?: number;
 };
 
 export type CountryFacet = {
   code: string;
+  countryName: string;
   count: number;
 };
 
@@ -191,9 +204,11 @@ export type SearchFacets = {
   dates: DateFacet[];
 };
 
-export function searchArticles(query: string, filters: SearchFilters = {}): Promise<SearchHit[] | null> {
+export function searchArticles(query: string, filters: SearchFilters = {}): Promise<SearchPage | null> {
+  const limit = filters.limit ?? 20;
+  const offset = filters.offset ?? 0;
   if (!query.trim()) {
-    return Promise.resolve([]);
+    return Promise.resolve({ hits: [], total: 0, limit, offset });
   }
   const params = new URLSearchParams();
   params.set('q', query);
@@ -206,7 +221,9 @@ export function searchArticles(query: string, filters: SearchFilters = {}): Prom
   if (filters.effectiveDate) {
     params.set('effectiveDate', filters.effectiveDate);
   }
-  return readJson<SearchHit[]>(`${searchBaseUrl()}/search?${params.toString()}`, 'search');
+  params.set('limit', String(limit));
+  params.set('offset', String(offset));
+  return readJson<SearchPage>(`${searchBaseUrl()}/search?${params.toString()}`, 'search');
 }
 
 export function searchFacets(): Promise<SearchFacets | null> {
@@ -319,12 +336,17 @@ export function getArticle(articleId: string): Promise<ArticleDetail | null> {
   );
 }
 
-export function patchContentNode(nodeId: string, title: string): Promise<ContentNode> {
+export function patchContentNode(
+  nodeId: string,
+  title: string,
+  authorization?: string,
+): Promise<ContentNode> {
   return sendJson<ContentNode>(
     `${contentBaseUrl()}/nodes/${encodeURIComponent(nodeId)}`,
     'content',
     'PATCH',
     { title },
+    authorization,
   );
 }
 
@@ -342,13 +364,23 @@ export type OutlineUpdateResult = {
   versionIds: string[];
 };
 
-export async function sendJson<T>(url: string, service: string, method: string, body: unknown): Promise<T> {
+export async function sendJson<T>(
+  url: string,
+  service: string,
+  method: string,
+  body: unknown,
+  authorization?: string,
+): Promise<T> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (authorization) {
+    headers.Authorization = authorization;
+  }
   let response: Response;
   try {
     response = await fetch(url, {
       method,
       cache: 'no-store',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify(body),
     });
   } catch {
@@ -363,37 +395,48 @@ export async function sendJson<T>(url: string, service: string, method: string, 
 export function putContentOutline(
   constitutionId: string,
   kinds: OutlineKindWrite[],
+  authorization?: string,
 ): Promise<OutlineUpdateResult> {
   return sendJson<OutlineUpdateResult>(
     `${catalogBaseUrl()}/constitutions/${encodeURIComponent(constitutionId)}/content-outline`,
     'catalog',
     'PUT',
     { kinds },
+    authorization,
   );
 }
 
-export async function restructureVersion(versionId: string, keepKinds: string[]): Promise<void> {
+export async function restructureVersion(
+  versionId: string,
+  keepKinds: string[],
+  authorization?: string,
+): Promise<void> {
   await sendJson<{ absorbed: number }>(
     `${contentBaseUrl()}/versions/${encodeURIComponent(versionId)}/restructure`,
     'content',
     'POST',
     { keepKinds },
+    authorization,
   );
 }
 
-export async function createCountry(isoCode: string, name: string): Promise<CountrySummary> {
+export async function createCountry(
+  isoCode: string,
+  name: string,
+  authorization?: string,
+): Promise<CountrySummary> {
   return sendJson<CountrySummary>(`${catalogBaseUrl()}/countries`, 'catalog', 'POST', {
     isoCode,
     name,
-  });
+  }, authorization);
 }
 
-export async function ensureCountry(isoCode: string, name: string): Promise<void> {
+export async function ensureCountry(isoCode: string, name: string, authorization?: string): Promise<void> {
   const existing = await getCountry(isoCode);
   if (existing) {
     return;
   }
-  await createCountry(isoCode, name);
+  await createCountry(isoCode, name, authorization);
 }
 
 export async function createConstitution(
@@ -401,12 +444,14 @@ export async function createConstitution(
   slug: string,
   title: string,
   outline?: OutlineKindWrite[],
+  authorization?: string,
 ): Promise<ConstitutionSummary> {
   return sendJson<ConstitutionSummary>(
     `${catalogBaseUrl()}/countries/${encodeURIComponent(isoCode)}/constitutions`,
     'catalog',
     'POST',
     { slug, title, outline },
+    authorization,
   );
 }
 
@@ -423,4 +468,15 @@ export function listAmendments(
     `${amendmentBaseUrl()}/versions/${encodeURIComponent(versionId)}/amendments${query ? `?${query}` : ''}`,
     'amendment',
   );
+}
+
+export function listAmendmentsByArticle(
+  constitutionId: string,
+  articleNumber: string,
+): Promise<Amendment[] | null> {
+  const params = new URLSearchParams({
+    constitutionId,
+    articleNumber,
+  });
+  return readJson<Amendment[]>(`${amendmentBaseUrl()}/amendments?${params.toString()}`, 'amendment');
 }

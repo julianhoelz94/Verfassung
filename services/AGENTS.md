@@ -15,6 +15,8 @@ Each folder is an independent Gradle project (`com.constitutionatlas.<service>`)
 
 Writes go only to the owning service. Cross-service data via REST/events, never another service’s schema.
 
+Route and table maps: [`docs/CODEMAPS/backend.md`](../docs/CODEMAPS/backend.md), [`docs/CODEMAPS/data.md`](../docs/CODEMAPS/data.md). Jump table: [`docs/CODEMAPS/INDEX.md`](../docs/CODEMAPS/INDEX.md).
+
 ## Conventions
 
 - Layers: Controller → Service → Repository + DTOs. No persistence entities as public API.

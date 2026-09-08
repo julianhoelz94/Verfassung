@@ -16,16 +16,25 @@ data class SearchHit(
     val rank: Double,
 )
 
+data class SearchPage(
+    val hits: List<SearchHit>,
+    val total: Int,
+    val limit: Int,
+    val offset: Int,
+)
+
 data class SearchQuery(
     val text: String,
     val countryCode: String? = null,
     val versionId: UUID? = null,
     val effectiveDate: LocalDate? = null,
     val limit: Int = 20,
+    val offset: Int = 0,
 )
 
 data class CountryFacet(
     val code: String,
+    val countryName: String,
     val count: Int,
 )
 

@@ -36,14 +36,25 @@ export async function completeMfaAction(formData: FormData): Promise<void> {
   redirect(canVisitEditor(user.roles) ? '/editor' : '/');
 }
 
-export async function confirmEnrollAction(formData: FormData): Promise<void> {
+export type EnrollConfirmState = {
+  recoveryCodes?: string[];
+  continueTo?: string;
+  error?: boolean;
+};
+
+/**
+ * Returns the one-time recovery codes as form state (rendered by `MfaForms.LoginEnrollForm`)
+ * instead of redirecting with them in the URL.
+ */
+export async function confirmEnrollAction(_prev: EnrollConfirmState, formData: FormData): Promise<EnrollConfirmState> {
   const code = String(formData.get('code') ?? '');
-  let recoveryCodes: string[];
   try {
     const confirmed = await confirmMfaEnrollment(code);
-    recoveryCodes = confirmed.recoveryCodes;
+    return {
+      recoveryCodes: confirmed.recoveryCodes,
+      continueTo: canVisitEditor(confirmed.user.roles) ? '/editor' : '/',
+    };
   } catch {
-    redirect('/login/mfa?enroll=1&error=1');
+    return { error: true };
   }
-  redirect(`/account?recovery=${encodeURIComponent(recoveryCodes.join(','))}`);
 }

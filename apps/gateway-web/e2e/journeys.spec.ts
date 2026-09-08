@@ -8,10 +8,14 @@ test('browse from countries to an article', async ({ page }) => {
   await page.getByRole('link', { name: 'Germany' }).click();
   await expect(page.getByRole('heading', { name: 'Germany', exact: true })).toBeVisible();
   await page.getByRole('link', { name: /2022/ }).click();
-  await expect(page.getByRole('heading', { name: 'Basic Law for the Federal Republic of Germany' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /Version in force since/ })).toBeVisible();
   await page.getByRole('link', { name: 'Permalink' }).first().click();
   await expect(page.getByRole('heading', { name: /Human dignity/ })).toBeVisible();
   await expect(page).toHaveURL(new RegExp(`/countries/DE/versions/${VERSION_2022}/articles/${ARTICLE_1}`));
+  await expect(page.getByRole('navigation', { name: 'Article navigation' })).toBeVisible();
+  await page.getByRole('link', { name: 'History of Article 1' }).click();
+  await expect(page.getByRole('heading', { name: 'History of Article 1' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Compare with previous' })).toBeVisible();
 });
 
 test('search finds a published article', async ({ page }) => {
@@ -31,6 +35,7 @@ test('linear compare shows a structured change', async ({ page }) => {
 
 test('login with MFA then logout', async ({ page }) => {
   await signInEditor(page);
+  await page.getByRole('button', { name: 'Account menu' }).click();
   await expect(page.getByText('local-editor@example.local', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Sign out' }).click();
   await expect(page.getByRole('link', { name: 'Log in' })).toBeVisible();
@@ -49,5 +54,5 @@ test('edit, review, and publish a draft', async ({ page }) => {
   await page.getByRole('button', { name: 'Approve review' }).click();
   await expect(page.getByText('Review approved.')).toBeVisible();
   await page.getByRole('button', { name: 'Publish' }).click();
-  await expect(page.getByText('Published. Public article text for this version was updated.')).toBeVisible();
+  await expect(page.getByText('Published as version 2022-1.')).toBeVisible();
 });

@@ -1,11 +1,13 @@
 package com.constitutionatlas.identity.api
 
 import com.constitutionatlas.identity.service.AccountService
+import com.constitutionatlas.identity.service.ServiceTokenService
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.security.SecurityRequirement
 import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.servlet.http.HttpServletRequest
 import org.springframework.http.HttpStatus
+import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
@@ -18,7 +20,10 @@ import java.util.UUID
 
 @RestController
 @Tag(name = "Accounts")
-class AccountController(private val accountService: AccountService) {
+class AccountController(
+    private val accountService: AccountService,
+    private val serviceTokenService: ServiceTokenService,
+) {
     @GetMapping("/users")
     @SecurityRequirement(name = "bearer-session")
     @Operation(summary = "List users (admin)")
@@ -84,6 +89,33 @@ class AccountController(private val accountService: AccountService) {
         @RequestHeader(value = "Authorization", required = false) authorization: String?,
     ): PasswordResetIssuedDto =
         accountService.issuePasswordReset(authorization, userId, clientIp(httpRequest), userAgent(httpRequest))
+
+    @GetMapping("/service-tokens")
+    @SecurityRequirement(name = "bearer-session")
+    @Operation(summary = "List machine tokens (admin)")
+    fun listServiceTokens(
+        @RequestHeader(value = "Authorization", required = false) authorization: String?,
+    ): List<ServiceTokenDto> = serviceTokenService.list(authorization)
+
+    @PostMapping("/service-tokens")
+    @ResponseStatus(HttpStatus.CREATED)
+    @SecurityRequirement(name = "bearer-session")
+    @Operation(summary = "Issue a rotatable machine token (admin)")
+    fun createServiceToken(
+        @RequestBody request: CreateServiceTokenRequest,
+        @RequestHeader(value = "Authorization", required = false) authorization: String?,
+    ): ServiceTokenCreatedDto = serviceTokenService.create(authorization, request)
+
+    @DeleteMapping("/service-tokens/{tokenId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @SecurityRequirement(name = "bearer-session")
+    @Operation(summary = "Revoke a machine token (admin)")
+    fun revokeServiceToken(
+        @PathVariable tokenId: UUID,
+        @RequestHeader(value = "Authorization", required = false) authorization: String?,
+    ) {
+        serviceTokenService.revoke(authorization, tokenId)
+    }
 
     @PostMapping("/invites/accept")
     @Operation(summary = "Accept an invite and set a password")

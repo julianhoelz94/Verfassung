@@ -1,8 +1,20 @@
-FROM node:20-alpine
+# Build stage: reproducible install from the lockfile, full dev toolchain for `next build`.
+FROM node:20-alpine AS build
 WORKDIR /app
-COPY package.json .
-RUN npm install
+COPY package.json package-lock.json ./
+RUN npm ci
 COPY . .
-RUN npm run build
+# `public/` is empty in git; make sure it exists so the runtime COPY below never fails.
+RUN mkdir -p public && npm run build && npm prune --omit=dev
+
+# Runtime stage: production deps only, non-root user.
+FROM node:20-alpine
+ENV NODE_ENV=production
+WORKDIR /app
+COPY --from=build --chown=node:node /app/package.json /app/package-lock.json /app/next.config.js ./
+COPY --from=build --chown=node:node /app/node_modules ./node_modules
+COPY --from=build --chown=node:node /app/.next ./.next
+COPY --from=build --chown=node:node /app/public ./public
+USER node
 EXPOSE 3000
 CMD ["npm", "run", "start"]

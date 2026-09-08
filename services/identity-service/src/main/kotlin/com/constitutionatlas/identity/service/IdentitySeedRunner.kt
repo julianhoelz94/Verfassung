@@ -1,6 +1,7 @@
 package com.constitutionatlas.identity.service
 
 import com.constitutionatlas.identity.config.IdentitySeedProperties
+import com.constitutionatlas.identity.crypto.Tokens
 import com.constitutionatlas.identity.repo.IdentityRepository
 import org.slf4j.LoggerFactory
 import org.springframework.boot.ApplicationArguments
@@ -33,6 +34,32 @@ class IdentitySeedRunner(
         upsert(properties.publisherEmail, properties.publisherPassword, listOf("publisher"), mode)
         upsert(properties.adminEmail, properties.adminPassword, listOf("admin"), mode)
         upsert(properties.viewerEmail, properties.viewerPassword, listOf("viewer"), mode)
+        seedServiceToken()
+    }
+
+    private fun seedServiceToken() {
+        val plaintext = properties.serviceToken.trim()
+        if (plaintext.isEmpty()) {
+            return
+        }
+        val hash = Tokens.sha256Hex(plaintext)
+        if (identityRepository.findValidServiceTokenByHash(hash) != null) {
+            return
+        }
+        if (identityRepository.findActiveServiceTokenByName(SEED_TOKEN_NAME) != null) {
+            return
+        }
+        val createdBy =
+            identityRepository.findUserByEmail(properties.adminEmail)
+                ?: identityRepository.listUsers().firstOrNull()
+                ?: return
+        identityRepository.insertServiceToken(
+            SEED_TOKEN_NAME,
+            hash,
+            ServiceTokenService.ALLOWED_SCOPES,
+            createdBy.id,
+        )
+        log.info("Seeded automation service token '{}'", SEED_TOKEN_NAME)
     }
 
     private fun upsert(email: String, password: String, roleNames: List<String>, mode: String) {
@@ -59,5 +86,9 @@ class IdentitySeedRunner(
         ) {
             mfaService.ensureSeedTotp(userId, properties.totpSecret)
         }
+    }
+
+    companion object {
+        const val SEED_TOKEN_NAME = "seeded-automation"
     }
 }

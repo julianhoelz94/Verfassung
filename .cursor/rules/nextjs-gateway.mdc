@@ -10,3 +10,4 @@ alwaysApply: false
 - No database clients here. Call backend HTTP APIs (via Caddy in local stack).
 - Prefer server components for public pages; client components only for interactive editor UI.
 - Match existing TypeScript style: explicit props types, no extra UI libraries unless asked.
+- Pages/clients: `docs/CODEMAPS/frontend.md`.

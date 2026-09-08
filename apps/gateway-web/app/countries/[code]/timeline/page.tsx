@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation';
-import { Breadcrumbs } from '../../../components/Breadcrumbs';
 import { PageMain } from '../../../components/PageMain';
 import { ServiceUnavailable } from '../../../components/StatusMessage';
+import { Badge, PageHeader, type BadgeTone } from '../../../components/ui';
 import {
   ApiUnavailableError,
   getCountry,
@@ -10,11 +10,25 @@ import {
   type CountryDetail,
 } from '../../../../lib/api';
 import { orderVersions } from '../../../../lib/compare';
+import { latestVersion } from '../../../../lib/reading';
 import { sortAmendmentsByEnactment } from '../../../../lib/timeline';
 
 type TimelinePageProps = {
   params: { code: string };
 };
+
+function changeTone(changeType: string): BadgeTone {
+  if (changeType === 'added') {
+    return 'added';
+  }
+  if (changeType === 'removed') {
+    return 'removed';
+  }
+  if (changeType === 'changed') {
+    return 'changed';
+  }
+  return 'neutral';
+}
 
 export default async function TimelinePage({ params }: TimelinePageProps) {
   let country: CountryDetail | null = null;
@@ -36,7 +50,7 @@ export default async function TimelinePage({ params }: TimelinePageProps) {
 
   if (error) {
     return (
-      <PageMain>
+      <PageMain className="wide">
         <ServiceUnavailable service="Amendment" retryHref={`/countries/${params.code}/timeline`} />
       </PageMain>
     );
@@ -46,57 +60,77 @@ export default async function TimelinePage({ params }: TimelinePageProps) {
     notFound();
   }
 
-  const labelById = new Map(
+  const versionsById = new Map(
     country.constitutions.flatMap((constitution) =>
-      orderVersions(constitution.versions).map((version) => [version.id, version.versionLabel]),
+      orderVersions(constitution.versions).map((version) => [version.id, version]),
     ),
   );
+  const latest = country.constitutions[0] ? latestVersion(country.constitutions[0].versions) : undefined;
 
   return (
-    <PageMain>
-      <Breadcrumbs
-        items={[
+    <PageMain className="wide">
+      <PageHeader
+        breadcrumbs={[
           { href: '/', label: 'Countries' },
           { href: `/countries/${country.isoCode}`, label: country.name },
           { label: 'Timeline' },
         ]}
+        title="Amendment timeline"
+        actions={
+          latest ? (
+            <a className="btn" href={`/countries/${country.isoCode}/versions/${latest.id}`}>
+              Read latest
+            </a>
+          ) : (
+            <a className="btn" href={`/countries/${country.isoCode}`}>
+              Versions
+            </a>
+          )
+        }
       />
-      <h1>Amendment timeline</h1>
-      <div className="actions">
-        <a href={`/countries/${country.isoCode}`}>Versions</a>
-      </div>
       {amendments.length === 0 ? <p>No recorded amendments for published versions.</p> : null}
-      <ol>
-        {amendments.map((amendment) => (
-          <li key={amendment.id} className="timeline-item">
-            <h2>{amendment.title}</h2>
-            <p>
-              {amendment.enactedOn ?? 'Date unknown'}
-              {amendment.sourceReference ? ` · ${amendment.sourceReference}` : ''}
-            </p>
-            <p>{amendment.summary}</p>
-            <p>
-              <a
-                href={`/countries/${country.isoCode}/compare?from=${encodeURIComponent(amendment.sourceVersionId)}&to=${encodeURIComponent(amendment.targetVersionId)}`}
-              >
-                Compare {labelById.get(amendment.sourceVersionId) ?? 'source'} →{' '}
-                {labelById.get(amendment.targetVersionId) ?? 'target'}
-              </a>
-            </p>
-            <ul>
-              {amendment.changes.map((change) => (
-                <li key={change.id}>
-                  <span className={`tag tag-${change.changeType}`}>{change.changeType}</span>
-                  {change.articleNumber ? ` Art. ${change.articleNumber}` : ''}
-                  {change.nodeId && change.nodeId !== change.articleId ? ' (sub-article)' : ''}
-                  {change.changedOn ? ` · ${change.changedOn}` : ''}
-                  {change.effectiveOn ? ` effective ${change.effectiveOn}` : ''}
-                  {change.note ? `: ${change.note}` : ''}
-                </li>
-              ))}
-            </ul>
-          </li>
-        ))}
+      <ol className="timeline">
+        {amendments.map((amendment) => {
+          const source = versionsById.get(amendment.sourceVersionId);
+          const target = versionsById.get(amendment.targetVersionId);
+          return (
+            <li key={amendment.id} className="timeline-item">
+              <time className="timeline-date" dateTime={amendment.enactedOn ?? undefined}>
+                {amendment.enactedOn ?? 'Date unknown'}
+              </time>
+              <article className="card">
+                <h2 className="card-title">{amendment.title}</h2>
+                <p className="muted">
+                  {target ? `Version ${target.versionLabel}` : 'Version'}
+                  {amendment.sourceReference ? ` · ${amendment.sourceReference}` : ''}
+                </p>
+                {amendment.summary ? <p>{amendment.summary}</p> : null}
+                <div className="chip-row">
+                  {amendment.changes.map((change) => (
+                    <Badge key={change.id} tone={changeTone(change.changeType)}>
+                      {change.changeType}
+                      {change.articleNumber ? ` Art. ${change.articleNumber}` : ''}
+                    </Badge>
+                  ))}
+                </div>
+                <div className="card-actions">
+                  <a
+                    className="btn btn-sm"
+                    href={`/countries/${country.isoCode}/compare?from=${encodeURIComponent(amendment.sourceVersionId)}&to=${encodeURIComponent(amendment.targetVersionId)}`}
+                  >
+                    Compare with previous
+                    {source && target ? ` (${source.versionLabel} → ${target.versionLabel})` : ''}
+                  </a>
+                  {target ? (
+                    <a className="btn btn-sm btn-ghost" href={`/countries/${country.isoCode}/versions/${target.id}`}>
+                      Read
+                    </a>
+                  ) : null}
+                </div>
+              </article>
+            </li>
+          );
+        })}
       </ol>
     </PageMain>
   );

@@ -17,6 +17,7 @@ class RestIdentityClientTest {
             val status = if (authorized) 200 else 401
             val body = if (authorized) contract else """{"error":"Invalid or expired session"}"""
             val bytes = body.toByteArray()
+            exchange.responseHeaders.set("Content-Type", "application/json")
             exchange.sendResponseHeaders(status, bytes.size.toLong())
             exchange.responseBody.use { it.write(bytes) }
         }

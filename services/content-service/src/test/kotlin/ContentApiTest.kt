@@ -1,12 +1,21 @@
+import com.constitutionatlas.content.CatalogUnavailableException
 import com.constitutionatlas.content.ContentServiceApplication
 import com.constitutionatlas.content.CorrelationIdFilter
+import com.constitutionatlas.content.UnauthorizedException
+import com.constitutionatlas.content.client.Actor
+import com.constitutionatlas.content.client.CatalogClient
+import com.constitutionatlas.content.client.CatalogVersion
+import com.constitutionatlas.content.client.IdentityClient
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import org.mockito.Mockito
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.boot.test.mock.mockito.MockBean
 import org.springframework.http.MediaType
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
@@ -27,6 +36,22 @@ import java.util.UUID
 class ContentApiTest {
     @Autowired
     lateinit var mockMvc: MockMvc
+
+    @MockBean
+    lateinit var identityClient: IdentityClient
+
+    @MockBean
+    lateinit var catalogClient: CatalogClient
+
+    private val editor =
+        Actor(UUID.fromString("01900000-0000-4000-8000-000000000410"), "local-editor@example.local", listOf("editor"))
+
+    @BeforeEach
+    fun stubIdentity() {
+        Mockito.reset(identityClient, catalogClient)
+        Mockito.`when`(identityClient.authenticate(null)).thenThrow(UnauthorizedException("Missing session"))
+        Mockito.`when`(identityClient.authenticate(TOKEN)).thenReturn(editor)
+    }
 
     @Test
     fun listArticlesFor2022VersionIsOrdered() {
@@ -60,6 +85,7 @@ class ContentApiTest {
                 """{"articleNumber":"$index","title":"A$index","body":"Body $index.","sortOrder":$index}"""
             }
         mockMvc.put("/versions/$versionId/articles") {
+            header("Authorization", TOKEN)
             contentType = MediaType.APPLICATION_JSON
             content = "[$articles]"
         }.andExpect { status { isOk() } }
@@ -72,7 +98,14 @@ class ContentApiTest {
         }
         mockMvc.get("/versions/$versionId/articles").andExpect {
             status { isOk() }
-            jsonPath("$.length()") { value(201) }
+            jsonPath("$.length()") { value(200) }
+            header { string("X-Total-Count", "201") }
+        }
+        mockMvc.get("/versions/$versionId/articles") {
+            param("limit", "500")
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.length()") { value(200) }
             header { string("X-Total-Count", "201") }
         }
     }
@@ -116,6 +149,7 @@ class ContentApiTest {
                 .andReturn().response.contentAsString,
         )
         mockMvc.patch("/articles/01900000-0000-4000-8000-000000000201") {
+            header("Authorization", TOKEN)
             contentType = MediaType.APPLICATION_JSON
             content = """{"title":"Dignity","body":${objectMapper.writeValueAsString(original.get("body").asText())}}"""
         }.andExpect {
@@ -127,6 +161,7 @@ class ContentApiTest {
             jsonPath("$.children[0].kind") { value("paragraph") }
         }
         mockMvc.patch("/articles/01900000-0000-4000-8000-000000000201") {
+            header("Authorization", TOKEN)
             contentType = MediaType.APPLICATION_JSON
             content = """{"title":${objectMapper.writeValueAsString(original.get("title").asText())},"body":${objectMapper.writeValueAsString(original.get("body").asText())}}"""
         }.andExpect { status { isOk() } }
@@ -139,6 +174,7 @@ class ContentApiTest {
                 .andReturn().response.contentAsString,
         )
         mockMvc.patch("/articles/01900000-0000-4000-8000-000000000101") {
+            header("Authorization", TOKEN)
             contentType = MediaType.APPLICATION_JSON
             content = """{"title":"Dignity","body":"Updated dignity text."}"""
         }.andExpect {
@@ -148,6 +184,7 @@ class ContentApiTest {
             jsonPath("$.children.length()") { value(0) }
         }
         mockMvc.patch("/articles/01900000-0000-4000-8000-000000000101") {
+            header("Authorization", TOKEN)
             contentType = MediaType.APPLICATION_JSON
             content = """{"title":${objectMapper.writeValueAsString(original.get("title").asText())},"body":${objectMapper.writeValueAsString(original.get("body").asText())}}"""
         }.andExpect { status { isOk() } }
@@ -157,6 +194,7 @@ class ContentApiTest {
     @Test
     fun restructureMergesRemovedKindIntoParent() {
         mockMvc.post("/versions/01900000-0000-4000-8000-000000000003/restructure") {
+            header("Authorization", TOKEN)
             contentType = MediaType.APPLICATION_JSON
             content = """{"keepKinds":["article","paragraph"]}"""
         }.andExpect {
@@ -176,6 +214,7 @@ class ContentApiTest {
     @Test
     fun patchNestedNodeTitle() {
         mockMvc.patch("/nodes/01900000-0000-4000-8000-000000000121") {
+            header("Authorization", TOKEN)
             contentType = MediaType.APPLICATION_JSON
             content = """{"title":"Dignity of the person"}"""
         }.andExpect {
@@ -190,6 +229,7 @@ class ContentApiTest {
                 jsonPath("$.children[0].title") { value("Dignity of the person") }
             }
         mockMvc.patch("/nodes/01900000-0000-4000-8000-000000000121") {
+            header("Authorization", TOKEN)
             contentType = MediaType.APPLICATION_JSON
             content = """{"title":""}"""
         }.andExpect {
@@ -211,6 +251,7 @@ class ContentApiTest {
     fun replaceArticlesForNewVersion() {
         val versionId = "01900000-0000-4000-8000-000000000099"
         mockMvc.put("/versions/$versionId/articles") {
+            header("Authorization", TOKEN)
             contentType = MediaType.APPLICATION_JSON
             content = """
                 [
@@ -229,6 +270,7 @@ class ContentApiTest {
     fun replaceArticlesWritesChildNodes() {
         val versionId = "01900000-0000-4000-8000-000000000098"
         mockMvc.put("/versions/$versionId/articles") {
+            header("Authorization", TOKEN)
             contentType = MediaType.APPLICATION_JSON
             content = """
                 [
@@ -281,7 +323,64 @@ class ContentApiTest {
         }
     }
 
+    @Test
+    fun mutatingWritesRequireIdentityBearer() {
+        mockMvc.patch("/articles/01900000-0000-4000-8000-000000000201") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"title":"X","body":"Y"}"""
+        }.andExpect { status { isUnauthorized() } }
+    }
+
+    @Test
+    fun publishedVersionRejectsWritesWith409() {
+        val versionId = UUID.fromString("01900000-0000-4000-8000-000000000004")
+        Mockito.`when`(catalogClient.getVersion(versionId)).thenReturn(
+            CatalogVersion(versionId, "published"),
+        )
+        val original = objectMapper.readTree(
+            mockMvc.get("/articles/01900000-0000-4000-8000-000000000201")
+                .andReturn().response.contentAsString,
+        )
+        mockMvc.patch("/articles/01900000-0000-4000-8000-000000000201") {
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"title":"Mutated","body":"should not persist"}"""
+        }.andExpect {
+            status { isConflict() }
+            jsonPath("$.code") { value("version_published") }
+        }
+        mockMvc.get("/articles/01900000-0000-4000-8000-000000000201")
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.title") { value(original.get("title").asText()) }
+                jsonPath("$.body") { value(original.get("body").asText()) }
+            }
+    }
+
+    @Test
+    fun catalogDownRejectsWritesWith503() {
+        val versionId = UUID.fromString("01900000-0000-4000-8000-000000000004")
+        Mockito.`when`(catalogClient.getVersion(versionId)).thenThrow(
+            CatalogUnavailableException("catalog version lookup failed"),
+        )
+        val original = objectMapper.readTree(
+            mockMvc.get("/articles/01900000-0000-4000-8000-000000000201")
+                .andReturn().response.contentAsString,
+        )
+        mockMvc.patch("/articles/01900000-0000-4000-8000-000000000201") {
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"title":"Mutated","body":"should not persist"}"""
+        }.andExpect { status { isServiceUnavailable() } }
+        mockMvc.get("/articles/01900000-0000-4000-8000-000000000201")
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.title") { value(original.get("title").asText()) }
+            }
+    }
+
     companion object {
+        private const val TOKEN = "Bearer test-token"
         private val objectMapper = ObjectMapper()
 
         private fun restore1949Article1Tree() {

@@ -98,3 +98,12 @@ data class VersionCreated(
     val versionLabel: String,
     val publicationStatus: String,
 )
+
+data class VersionDetail(
+    val id: UUID,
+    val constitutionId: UUID,
+    val versionLabel: String,
+    val publicationStatus: String,
+    val effectiveDate: LocalDate?,
+    val languageCode: String,
+)

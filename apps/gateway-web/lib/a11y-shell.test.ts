@@ -1,12 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import axe from 'axe-core';
+import * as axeCore from 'axe-core';
 import { primaryNavLinks } from './nav';
+
+const axeRun =
+  typeof axeCore.run === 'function'
+    ? axeCore.run.bind(axeCore)
+    : (axeCore as unknown as { default: { run: typeof axeCore.run } }).default.run;
 
 async function runAxe(bodyHtml: string) {
   document.documentElement.lang = 'en';
   document.title = 'Constitution Atlas';
   document.body.innerHTML = bodyHtml;
-  return axe.run(document, { rules: { 'color-contrast': { enabled: false } } });
+  return axeRun(document, { rules: { 'color-contrast': { enabled: false } } });
 }
 
 const publicNav = primaryNavLinks(null)
@@ -23,10 +28,20 @@ describe('accessible application shell', () => {
       <header>
         <a href="/">Constitution Atlas</a>
         <nav aria-label="Primary">${publicNav}</nav>
+        <form role="search" action="/search" method="get">
+          <label for="header-q">Search articles</label>
+          <input id="header-q" type="search" name="q" />
+          <button type="submit">Search</button>
+        </form>
       </header>
       <main id="main-content">
         <h1>Countries</h1>
       </main>
+      <footer>
+        <nav aria-label="Footer">
+          <a href="/about">About</a>
+        </nav>
+      </footer>
     `);
     expect(results.violations, JSON.stringify(results.violations, null, 2)).toEqual([]);
   });
@@ -49,6 +64,11 @@ describe('accessible application shell', () => {
           <button type="submit">Save draft</button>
         </form>
       </main>
+      <footer>
+        <nav aria-label="Footer">
+          <a href="/about">About</a>
+        </nav>
+      </footer>
     `);
     expect(results.violations, JSON.stringify(results.violations, null, 2)).toEqual([]);
   });

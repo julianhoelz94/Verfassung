@@ -1,5 +1,6 @@
 package com.constitutionatlas.editor.api
 
+import java.time.Instant
 import java.util.UUID
 
 data class Actor(
@@ -16,6 +17,8 @@ fun Actor.canEdit(): Boolean = isAdmin() || "editor" in roles
 fun Actor.canReview(): Boolean = isAdmin() || "reviewer" in roles
 
 fun Actor.canPublish(): Boolean = isAdmin() || "publisher" in roles
+
+fun Actor.isEditorial(): Boolean = canEdit() || canReview() || canPublish()
 
 data class CreateSessionRequest(
     val versionId: UUID,
@@ -35,6 +38,16 @@ data class EditSessionDto(
     val revisionCount: Int,
 )
 
+data class EditSessionSummaryDto(
+    val id: UUID,
+    val versionId: UUID,
+    val status: String,
+    val openedBy: UUID,
+    val openedAt: Instant,
+    val updatedAt: Instant,
+    val changedArticleCount: Int,
+)
+
 data class DraftArticleDto(
     val articleId: UUID,
     val title: String,
@@ -46,4 +59,7 @@ data class DraftPreviewDto(
     val latestSnapshot: String?,
     val drafts: List<DraftArticleDto> = emptyList(),
     val publicContentUpdated: Boolean? = null,
+    val sourceVersionId: UUID? = null,
+    val newVersionId: UUID? = null,
+    val newVersionLabel: String? = null,
 )

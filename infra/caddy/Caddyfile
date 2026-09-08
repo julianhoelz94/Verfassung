@@ -12,6 +12,28 @@
 :80 {
 	encode gzip
 
+	# Baseline browser hardening for every response (UI and API). A Content-Security-Policy
+	# is tracked separately (SEC-2) because Next.js 14 needs nonce wiring for inline scripts.
+	header {
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy strict-origin-when-cross-origin
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		-Server
+		defer
+	}
+
+	# Mutating catalog/content/amendment/audit/search/ingestion routes need an
+	# Authorization header. Caddy does not validate the token; identity /me (GOV-6) does.
+	@missing_write_auth {
+		method POST PUT PATCH DELETE
+		header !Authorization
+		path /api/catalog* /api/content* /api/amendment* /api/audit* /api/search* /api/ingestion*
+	}
+	route @missing_write_auth {
+		respond 401
+	}
+
 	route /api/docs/catalog* {
 		import docs_upstream catalog catalog-service
 	}
@@ -85,6 +107,9 @@
 	}
 
 	route {
-		reverse_proxy gateway-web:3000
+		# Pin Host so Next.js server actions cannot follow a client-controlled Host (GHSA-89xv-2m56-2m9x).
+		reverse_proxy gateway-web:3000 {
+			header_up Host {upstream_hostport}
+		}
 	}
 }

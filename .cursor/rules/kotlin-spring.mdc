@@ -6,10 +6,11 @@ alwaysApply: false
 
 # Kotlin services
 
-- Spring Boot 3.3, Kotlin JVM, Java 21 toolchain, Flyway, springdoc, actuator health + info.
+- Spring Boot 3.5, Kotlin JVM, Java 21 toolchain, Flyway, springdoc, actuator health + info.
 - JSON console logs (Logstash) and `X-Correlation-Id` (echo or generate) via MDC `correlationId`.
 - Controllers stay thin. Domain rules live in services, not `@RestController`.
 - Public JSON is DTOs, not JDBC/row types.
 - New tables belong in a new Flyway version in that service only.
 - Keep `/internal/ping` until a real health/read API exists; then add domain routes without sharing another service’s database.
 - Tests: JUnit 5 + Testcontainers `postgres:16-alpine`. Extend `SmokeTest` rather than adding a second Postgres container per class unless isolation is required.
+- Routes/tables: `docs/CODEMAPS/backend.md`, `docs/CODEMAPS/data.md`.

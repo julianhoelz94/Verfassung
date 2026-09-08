@@ -55,6 +55,7 @@ class AccountService(
         userAgent: String?,
     ): InviteCreatedDto {
         val admin = requireAdmin(authorization)
+        authService.requireFreshStepUp(authorization)
         val email = request.email.trim().lowercase()
         if (email.isBlank() || !email.contains("@")) {
             throw BadRequestException("A valid email is required")
@@ -112,6 +113,7 @@ class AccountService(
     @Transactional
     fun disable(authorization: String?, userId: UUID, clientIp: String, userAgent: String?): UserAdminDto {
         val admin = requireAdmin(authorization)
+        authService.requireFreshStepUp(authorization)
         if (admin.id == userId) {
             throw BadRequestException("Cannot disable your own account")
         }
@@ -125,6 +127,7 @@ class AccountService(
     @Transactional
     fun enable(authorization: String?, userId: UUID, clientIp: String, userAgent: String?): UserAdminDto {
         val admin = requireAdmin(authorization)
+        authService.requireFreshStepUp(authorization)
         val user = identityRepository.findUserById(userId) ?: throw BadRequestException("Unknown user")
         if (identityRepository.findUnusedInvite(userId) != null) {
             throw BadRequestException("Invite has not been accepted")
@@ -175,8 +178,7 @@ class AccountService(
         userAgent: String?,
     ) {
         val tokenHash = Tokens.sha256Hex(Tokens.requireBearer(authorization))
-        val user = identityRepository.findUserByValidTokenHash(tokenHash)
-            ?: throw UnauthorizedException("Invalid or expired session")
+        val user = authService.requireSession(authorization)
         if (!passwordEncoder.matches(currentPassword, user.passwordHash)) {
             throw UnauthorizedException("Invalid credentials")
         }
@@ -187,7 +189,12 @@ class AccountService(
     }
 
     fun requestPasswordReset(email: String, clientIp: String, userAgent: String?) {
-        val user = identityRepository.findUserByEmail(email.trim().lowercase())
+        val normalized = email.trim().lowercase()
+        val emailKey = "reset:$normalized"
+        val ipKey = "reset-ip:${clientIp.ifBlank { "unknown" }}"
+        authService.rejectLocked(emailKey, ipKey)
+        authService.recordLockedFailure(emailKey, ipKey)
+        val user = identityRepository.findUserByEmail(normalized)
         if (user == null || !user.enabled) {
             return
         }
@@ -203,6 +210,7 @@ class AccountService(
         userAgent: String?,
     ): PasswordResetIssuedDto {
         val admin = requireAdmin(authorization)
+        authService.requireFreshStepUp(authorization)
         val user = identityRepository.findUserById(userId) ?: throw BadRequestException("Unknown user")
         if (!user.enabled) {
             throw BadRequestException("Cannot reset a disabled or invited account")
@@ -248,8 +256,7 @@ class AccountService(
     }
 
     private fun requireAdmin(authorization: String?): StoredUser {
-        val user = identityRepository.findUserByValidTokenHash(Tokens.sha256Hex(Tokens.requireBearer(authorization)))
-            ?: throw UnauthorizedException("Invalid or expired session")
+        val user = authService.requireSession(authorization)
         if ("admin" !in identityRepository.rolesForUser(user.id)) {
             throw ForbiddenException("Administrator role required")
         }

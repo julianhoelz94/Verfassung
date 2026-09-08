@@ -17,3 +17,5 @@ identity:
     absolute-timeout: 8h
   password:
     log-reset-token: true
+  mfa:
+    encryption-key: ${IDENTITY_MFA_ENCRYPTION_KEY:local-mfa-dev-key}

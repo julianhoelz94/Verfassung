@@ -7,6 +7,7 @@ import com.constitutionatlas.catalog.api.CountrySummary
 import com.constitutionatlas.catalog.api.NodeKindDto
 import com.constitutionatlas.catalog.api.OutlineKindWrite
 import com.constitutionatlas.catalog.api.VersionCreated
+import com.constitutionatlas.catalog.api.VersionDetail
 import com.constitutionatlas.catalog.api.VersionSummary
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.jdbc.core.RowMapper
@@ -281,18 +282,25 @@ class CatalogRepository(private val jdbc: JdbcTemplate) {
         ) > 0
 
     fun findVersionCreated(versionId: UUID): VersionCreated? =
+        findVersion(versionId)?.let {
+            VersionCreated(it.id, it.constitutionId, it.versionLabel, it.publicationStatus)
+        }
+
+    fun findVersion(versionId: UUID): VersionDetail? =
         jdbc.query(
             """
-            SELECT id, constitution_id, version_label, publication_status
+            SELECT id, constitution_id, version_label, publication_status, effective_date, language_code
             FROM constitution_versions
             WHERE id = ?
             """.trimIndent(),
             { rs, _ ->
-                VersionCreated(
+                VersionDetail(
                     id = rs.getObject("id", UUID::class.java),
                     constitutionId = rs.getObject("constitution_id", UUID::class.java),
                     versionLabel = rs.getString("version_label"),
                     publicationStatus = rs.getString("publication_status"),
+                    effectiveDate = rs.getDate("effective_date")?.toLocalDate(),
+                    languageCode = rs.getString("language_code"),
                 )
             },
             versionId,

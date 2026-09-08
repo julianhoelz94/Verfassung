@@ -1,5 +1,5 @@
 import { AdminForbidden } from '../../components/AdminForbidden';
-import { Alert, Card, Input } from '../../components/ui';
+import { Alert, Card, DataList, DataRow, Input, PageHeader } from '../../components/ui';
 import { PageMain } from '../../components/PageMain';
 import { loadCountriesWithDetails } from '../../../lib/api';
 import { requireAdminPage } from '../../../lib/admin';
@@ -17,24 +17,30 @@ export default async function AdminConstitutionsPage({ searchParams }: AdminCons
     return <AdminForbidden title="Outlines" />;
   }
   const { countries, details } = await loadCountriesWithDetails();
+  const rows = details.flatMap((country) =>
+    country
+      ? country.constitutions.map((constitution) => ({
+          countryName: country.name,
+          constitution,
+        }))
+      : [],
+  );
   return (
-    <PageMain>
-      <h1>Constitution outlines</h1>
-      <p className="lede">
-        Each constitution has an ordered tree of layers (for example Article → Paragraph → Sentence). The public
-        reader uses these labels and presentation rules. Removing a layer later merges that text into the parent layer.
-      </p>
+    <PageMain className="wide">
+      <PageHeader
+        title="Constitution outlines"
+        meta="Each constitution has an ordered tree of layers. The public reader uses these labels and presentation rules."
+      />
       {searchParams.error === 'forbidden' ? (
         <Alert tone="error">Administrator role required.</Alert>
       ) : searchParams.error ? (
         <Alert tone="error">That outline change could not be saved.</Alert>
       ) : null}
       <Card>
-        <h2>New constitution</h2>
+        <h2 className="card-title">New constitution</h2>
         <p>
           Choose an existing country or add a new one in this form. Then set the tree: the constitution is the parent,
-          then each layer below it (article, paragraph, sentence, or whatever this document uses). Concatenated layers
-          have no heading and are joined in the reader.
+          then each layer below it. Concatenated layers have no heading and are joined in the reader.
         </p>
         <OutlineEditor action={createConstitutionAction} initial={DEFAULT_NEW_OUTLINE} submitLabel="Create">
           <ConstitutionCountryFields countries={countries} />
@@ -42,26 +48,26 @@ export default async function AdminConstitutionsPage({ searchParams }: AdminCons
           <Input label="Title" name="title" required />
         </OutlineEditor>
       </Card>
-      {details.map((country) =>
-        country ? (
-          <section key={country.id}>
-            <h2>{country.name}</h2>
-            <ul className="search-hits">
-              {country.constitutions.map((constitution) => (
-                <li key={constitution.id} className="card">
-                  <p>
-                    <a href={`/admin/constitutions/${constitution.id}`}>{constitution.title}</a>
-                  </p>
-                  <p className="muted">
-                    {(constitution.contentOutline?.kinds ?? []).map((kind) => kind.displayLabel).join(' → ') ||
-                      'No layers'}
-                  </p>
-                </li>
-              ))}
-            </ul>
-          </section>
-        ) : null,
-      )}
+      <DataList columns={3}>
+        {rows.map((row) => (
+          <DataRow
+            key={row.constitution.id}
+            cells={[
+              { label: 'Country', value: row.countryName },
+              {
+                label: 'Title',
+                value: <a href={`/admin/constitutions/${row.constitution.id}`}>{row.constitution.title}</a>,
+              },
+              {
+                label: 'Layers',
+                value:
+                  (row.constitution.contentOutline?.kinds ?? []).map((kind) => kind.displayLabel).join(' → ') ||
+                  'No layers',
+              },
+            ]}
+          />
+        ))}
+      </DataList>
     </PageMain>
   );
 }

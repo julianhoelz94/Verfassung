@@ -1,5 +1,5 @@
 import { AdminForbidden } from '../../components/AdminForbidden';
-import { Alert, Button, Card, Input, TextArea } from '../../components/ui';
+import { Alert, Button, Card, Input, PageHeader, TextArea } from '../../components/ui';
 import { PageMain } from '../../components/PageMain';
 import { requireAdminPage } from '../../../lib/admin';
 import { createImportAction } from './actions';
@@ -13,13 +13,11 @@ export default async function AdminImportPage({ searchParams }: AdminImportPageP
     return <AdminForbidden title="Import" />;
   }
   return (
-    <PageMain>
-      <h1>Import a constitution</h1>
-      <p className="lede">
-        Paste or upload import JSON. The payload must include country, constitution, version, and at least one article.
-        Nested <code>nodes</code> and an <code>outline</code> are optional. The US fixture used in tests is a valid
-        example.
-      </p>
+    <PageMain className="wide">
+      <PageHeader
+        title="Import a constitution"
+        meta="Paste or upload import JSON. The payload must include country, constitution, version, and at least one article."
+      />
       {searchParams.error === 'forbidden' ? (
         <Alert tone="error">Administrator role required.</Alert>
       ) : searchParams.error === 'json' ? (

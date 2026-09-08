@@ -15,4 +15,10 @@ class AmendmentController(private val amendmentRepository: AmendmentRepository) 
         @RequestParam(required = false) sourceVersionId: UUID?,
     ): List<AmendmentDto> =
         amendmentRepository.listForTargetVersion(versionId, sourceVersionId)
+
+    @GetMapping("/amendments")
+    fun listForArticle(
+        @RequestParam constitutionId: UUID,
+        @RequestParam articleNumber: String,
+    ): List<AmendmentDto> = amendmentRepository.listForArticle(constitutionId, articleNumber)
 }

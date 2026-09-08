@@ -1,15 +1,22 @@
 import { notFound } from 'next/navigation';
-import { Breadcrumbs } from '../../../../components/Breadcrumbs';
 import { PageMain } from '../../../../components/PageMain';
-import { Provenance } from '../../../../components/Provenance';
+import { PrintLink } from '../../../../components/PrintLink';
+import { SiteSearchForm } from '../../../../components/SiteSearchForm';
 import { ServiceUnavailable } from '../../../../components/StatusMessage';
-import { Alert } from '../../../../components/ui';
+import { Alert, Badge, PageHeader, Pager } from '../../../../components/ui';
 import { VersionReader } from '../../../../components/VersionReader';
-import { ApiUnavailableError, listAllArticles, getCountry, type ArticleSummary, type CountryDetail } from '../../../../../lib/api';
+import {
+  ApiUnavailableError,
+  listAllArticles,
+  listAmendments,
+  getCountry,
+  type ArticleSummary,
+  type CountryDetail,
+} from '../../../../../lib/api';
 import { neighborCompareLinks, orderVersions } from '../../../../../lib/compare';
 import { canVisitEditor } from '../../../../../lib/nav';
+import { httpUrl, provenanceLabel, verificationLabel } from '../../../../../lib/provenance';
 import { currentUser } from '../../../../../lib/session';
-import { CompareForm } from '../../CompareForm';
 
 type VersionPageProps = {
   params: { code: string; versionId: string };
@@ -31,7 +38,7 @@ export default async function VersionPage({ params, searchParams }: VersionPageP
 
   if (error) {
     return (
-      <PageMain>
+      <PageMain className="wide">
         <ServiceUnavailable service="Content" retryHref={`/countries/${params.code}/versions/${params.versionId}`} />
       </PageMain>
     );
@@ -46,41 +53,78 @@ export default async function VersionPage({ params, searchParams }: VersionPageP
   }
 
   const line = orderVersions(version.constitution.versions);
+  const currentIndex = line.findIndex((item) => item.id === params.versionId);
+  const previousPublished = currentIndex > 0 ? line[currentIndex - 1] : undefined;
+  const nextPublished = currentIndex >= 0 ? line[currentIndex + 1] : undefined;
   const neighbors = neighborCompareLinks(country.isoCode, line, params.versionId);
   const user = await currentUser();
   const canEditTitles = Boolean(user && canVisitEditor(user.roles));
+  const changeByArticle: Record<string, string> = {};
+  try {
+    for (const amendment of (await listAmendments(params.versionId)) ?? []) {
+      for (const change of amendment.changes) {
+        if (change.articleNumber && !changeByArticle[change.articleNumber]) {
+          changeByArticle[change.articleNumber] = change.changeType;
+        }
+      }
+    }
+  } catch {
+    /* amendment history is optional on the reader */
+  }
+
+  const sourceHref = httpUrl(version.version.sourceUrl);
+  const title = version.version.effectiveDate
+    ? `Version in force since ${version.version.effectiveDate}`
+    : `Version ${version.version.versionLabel}`;
 
   return (
-    <PageMain>
-      <Breadcrumbs
-        items={[
+    <PageMain className="wide">
+      <PageHeader
+        breadcrumbs={[
           { href: '/', label: 'Countries' },
           { href: `/countries/${country.isoCode}`, label: country.name },
           { label: version.version.versionLabel },
         ]}
+        eyebrow={`${country.name} · ${version.constitution.title}`}
+        title={title}
+        meta={
+          <>
+            {version.version.latestPublished ? <Badge tone="accent">Latest</Badge> : null}
+            <Badge tone="info">{verificationLabel(version.version)}</Badge>
+            <span>{version.version.languageCode}</span>
+            {version.version.gazetteReference ? <span>{version.version.gazetteReference}</span> : null}
+            <span>{provenanceLabel(version.version.provenance)}</span>
+            {sourceHref ? (
+              <a href={sourceHref} rel="noreferrer">
+                Source
+              </a>
+            ) : null}
+          </>
+        }
+        actions={
+          <>
+            <a className="btn" href={`/countries/${country.isoCode}/timeline`}>
+              Timeline
+            </a>
+            {neighbors.previous ? (
+              <a className="btn" href={neighbors.previous.href}>
+                Compare with previous
+              </a>
+            ) : null}
+            <PrintLink />
+          </>
+        }
       />
-      <h1>{version.constitution.title}</h1>
-      <p>Version {version.version.versionLabel}</p>
+      <SiteSearchForm
+        id="version-search"
+        className="version-search"
+        country={country.isoCode}
+        versionId={params.versionId}
+        visibleLabel
+        submitClassName="btn"
+      />
       {searchParams.error === 'title' ? (
         <Alert tone="error">The section title could not be saved.</Alert>
-      ) : null}
-      <Provenance version={version.version} />
-      <div className="actions">
-        <a href={`/countries/${country.isoCode}/timeline`}>Amendment timeline</a>
-        {neighbors.previous ? <a href={neighbors.previous.href}>{neighbors.previous.label}</a> : null}
-        {neighbors.next ? <a href={neighbors.next.href}>{neighbors.next.label}</a> : null}
-      </div>
-      {line.length > 2 ? (
-        <CompareForm
-          code={country.isoCode}
-          versions={line}
-          fromId={params.versionId}
-          toId={
-            neighbors.next
-              ? line[line.findIndex((item) => item.id === params.versionId) + 1]?.id
-              : line[line.length - 1]?.id
-          }
-        />
       ) : null}
       {articles.length === 0 ? (
         <p>No articles are published in this version.</p>
@@ -91,8 +135,29 @@ export default async function VersionPage({ params, searchParams }: VersionPageP
           articles={articles}
           outline={version.constitution.contentOutline}
           canEditTitles={canEditTitles}
+          language={version.version.languageCode}
+          changeByArticle={changeByArticle}
+          unchangedSinceLabel={previousPublished?.versionLabel}
         />
       )}
+      <Pager
+        previous={
+          previousPublished
+            ? {
+                href: `/countries/${country.isoCode}/versions/${previousPublished.id}`,
+                label: `← ${previousPublished.versionLabel}`,
+              }
+            : undefined
+        }
+        next={
+          nextPublished
+            ? {
+                href: `/countries/${country.isoCode}/versions/${nextPublished.id}`,
+                label: `${nextPublished.versionLabel} →`,
+              }
+            : undefined
+        }
+      />
     </PageMain>
   );
 }

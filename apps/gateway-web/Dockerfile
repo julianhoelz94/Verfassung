@@ -1,5 +1,5 @@
 # Build stage: reproducible install from the lockfile, full dev toolchain for `next build`.
-FROM node:20-alpine AS build
+FROM node:26-alpine AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
@@ -8,7 +8,7 @@ COPY . .
 RUN mkdir -p public && npm run build && npm prune --omit=dev
 
 # Runtime stage: production deps only, non-root user.
-FROM node:20-alpine
+FROM node:26-alpine
 ENV NODE_ENV=production
 WORKDIR /app
 COPY --from=build --chown=node:node /app/package.json /app/package-lock.json /app/next.config.js ./

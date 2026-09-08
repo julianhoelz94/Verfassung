@@ -1,4 +1,5 @@
 import type { VersionSummary } from '../../lib/api';
+import { FormattedDate } from '../../lib/format-date';
 import { httpUrl, provenanceLabel, verificationLabel } from '../../lib/provenance';
 import { Badge } from './ui';
 
@@ -19,7 +20,9 @@ export function Provenance({
         </div>
         <div>
           <dt>Effective</dt>
-          <dd>{version.effectiveDate ?? 'Not recorded'}</dd>
+          <dd>
+            <FormattedDate value={version.effectiveDate} />
+          </dd>
         </div>
         <div>
           <dt>Gazette</dt>

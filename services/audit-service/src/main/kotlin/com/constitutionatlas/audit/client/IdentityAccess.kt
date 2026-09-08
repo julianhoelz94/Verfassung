@@ -24,6 +24,9 @@ data class Actor(
 fun Actor.canAppendAudit(): Boolean =
     "admin" in roles || "editor" in roles || "audit:append" in scopes
 
+fun Actor.canReadAudit(): Boolean =
+    "admin" in roles || "audit:read" in scopes
+
 interface IdentityClient {
     fun authenticate(authorizationHeader: String?): Actor
 }
@@ -38,7 +41,7 @@ data class IdentityUserWire(
 class RestIdentityClient(
     identityUrl: String,
 ) : IdentityClient {
-    private val client: RestClient = RestClient.builder().baseUrl(identityUrl).build()
+    private val client: RestClient = timedRestClient(identityUrl)
 
     override fun authenticate(authorizationHeader: String?): Actor {
         if (authorizationHeader.isNullOrBlank()) {
@@ -67,6 +70,14 @@ class WriteAccess(private val identityClient: IdentityClient) {
         val actor = identityClient.authenticate(authorization)
         if (!actor.canAppendAudit()) {
             throw ForbiddenException("audit append requires editor, admin, or audit:append")
+        }
+        return actor
+    }
+
+    fun requireAuditReader(authorization: String?): Actor {
+        val actor = identityClient.authenticate(authorization)
+        if (!actor.canReadAudit()) {
+            throw ForbiddenException("audit read requires admin or audit:read")
         }
         return actor
     }

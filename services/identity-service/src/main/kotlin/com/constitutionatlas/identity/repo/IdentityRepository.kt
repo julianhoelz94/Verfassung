@@ -55,6 +55,7 @@ data class StoredServiceToken(
     val scopes: List<String>,
     val createdBy: UUID,
     val createdAt: OffsetDateTime,
+    val expiresAt: OffsetDateTime,
     val lastUsedAt: OffsetDateTime?,
     val revokedAt: OffsetDateTime?,
 )
@@ -65,6 +66,7 @@ fun StoredServiceToken.toDto(): ServiceTokenDto =
         name = name,
         scopes = scopes,
         createdAt = createdAt,
+        expiresAt = expiresAt,
         lastUsedAt = lastUsedAt,
         revokedAt = revokedAt,
     )
@@ -236,14 +238,15 @@ class IdentityRepository(private val jdbc: JdbcTemplate) {
         tokenHash: String,
         scopes: List<String>,
         createdBy: UUID,
+        expiresAt: OffsetDateTime,
     ): UUID {
         val id = UUID.randomUUID()
         jdbc.update { connection ->
             val statement =
                 connection.prepareStatement(
                     """
-                    INSERT INTO service_tokens (id, name, token_hash, scopes, created_by)
-                    VALUES (?, ?, ?, ?, ?)
+                    INSERT INTO service_tokens (id, name, token_hash, scopes, created_by, expires_at)
+                    VALUES (?, ?, ?, ?, ?, ?)
                     """.trimIndent(),
                 )
             statement.setObject(1, id)
@@ -251,17 +254,36 @@ class IdentityRepository(private val jdbc: JdbcTemplate) {
             statement.setString(3, tokenHash)
             statement.setArray(4, connection.createArrayOf("text", scopes.toTypedArray()))
             statement.setObject(5, createdBy)
+            statement.setTimestamp(6, Timestamp.from(expiresAt.toInstant()))
             statement
         }
         return id
     }
 
+    fun replaceActiveServiceTokenScopes(name: String, scopes: List<String>): Boolean {
+        val updated =
+            jdbc.update { connection ->
+                val statement =
+                    connection.prepareStatement(
+                        """
+                        UPDATE service_tokens
+                        SET scopes = ?
+                        WHERE name = ? AND revoked_at IS NULL
+                        """.trimIndent(),
+                    )
+                statement.setArray(1, connection.createArrayOf("text", scopes.toTypedArray()))
+                statement.setString(2, name)
+                statement
+            }
+        return updated > 0
+    }
+
     fun findValidServiceTokenByHash(tokenHash: String): StoredServiceToken? =
         jdbc.query(
             """
-            SELECT id, name, token_hash, scopes, created_by, created_at, last_used_at, revoked_at
+            SELECT id, name, token_hash, scopes, created_by, created_at, expires_at, last_used_at, revoked_at
             FROM service_tokens
-            WHERE token_hash = ? AND revoked_at IS NULL
+            WHERE token_hash = ? AND revoked_at IS NULL AND expires_at > NOW()
             """.trimIndent(),
             serviceTokenMapper,
             tokenHash,
@@ -270,7 +292,7 @@ class IdentityRepository(private val jdbc: JdbcTemplate) {
     fun findServiceTokenById(id: UUID): StoredServiceToken? =
         jdbc.query(
             """
-            SELECT id, name, token_hash, scopes, created_by, created_at, last_used_at, revoked_at
+            SELECT id, name, token_hash, scopes, created_by, created_at, expires_at, last_used_at, revoked_at
             FROM service_tokens
             WHERE id = ?
             """.trimIndent(),
@@ -281,7 +303,7 @@ class IdentityRepository(private val jdbc: JdbcTemplate) {
     fun findActiveServiceTokenByName(name: String): StoredServiceToken? =
         jdbc.query(
             """
-            SELECT id, name, token_hash, scopes, created_by, created_at, last_used_at, revoked_at
+            SELECT id, name, token_hash, scopes, created_by, created_at, expires_at, last_used_at, revoked_at
             FROM service_tokens
             WHERE name = ? AND revoked_at IS NULL
             """.trimIndent(),
@@ -292,12 +314,31 @@ class IdentityRepository(private val jdbc: JdbcTemplate) {
     fun listServiceTokens(): List<StoredServiceToken> =
         jdbc.query(
             """
-            SELECT id, name, token_hash, scopes, created_by, created_at, last_used_at, revoked_at
+            SELECT id, name, token_hash, scopes, created_by, created_at, expires_at, last_used_at, revoked_at
             FROM service_tokens
             ORDER BY created_at DESC
             """.trimIndent(),
             serviceTokenMapper,
         )
+
+    fun renewActiveServiceTokenExpiry(name: String, expiresAt: OffsetDateTime): Boolean =
+        jdbc.update(
+            "UPDATE service_tokens SET expires_at = ? WHERE name = ? AND revoked_at IS NULL",
+            Timestamp.from(expiresAt.toInstant()),
+            name,
+        ) > 0
+
+    fun rotateServiceToken(id: UUID, tokenHash: String, expiresAt: OffsetDateTime): Boolean =
+        jdbc.update(
+            """
+            UPDATE service_tokens
+            SET token_hash = ?, expires_at = ?, last_used_at = NULL
+            WHERE id = ? AND revoked_at IS NULL
+            """.trimIndent(),
+            tokenHash,
+            Timestamp.from(expiresAt.toInstant()),
+            id,
+        ) > 0
 
     fun touchServiceToken(id: UUID) {
         jdbc.update("UPDATE service_tokens SET last_used_at = NOW() WHERE id = ?", id)
@@ -649,6 +690,7 @@ class IdentityRepository(private val jdbc: JdbcTemplate) {
             scopes = scopesFrom(rs.getArray("scopes")),
             createdBy = rs.getObject("created_by", UUID::class.java),
             createdAt = rs.getTimestamp("created_at").toInstant().atOffset(ZoneOffset.UTC),
+            expiresAt = rs.getTimestamp("expires_at").toInstant().atOffset(ZoneOffset.UTC),
             lastUsedAt = rs.getTimestamp("last_used_at")?.toInstant()?.atOffset(ZoneOffset.UTC),
             revokedAt = rs.getTimestamp("revoked_at")?.toInstant()?.atOffset(ZoneOffset.UTC),
         )

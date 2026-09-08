@@ -5,10 +5,11 @@ import { requireAdminPage } from '../../../lib/admin';
 import { createImportAction } from './actions';
 
 type AdminImportPageProps = {
-  searchParams: { error?: string };
+  searchParams: Promise<{ error?: string }>;
 };
 
-export default async function AdminImportPage({ searchParams }: AdminImportPageProps) {
+export default async function AdminImportPage(props: AdminImportPageProps) {
+  const searchParams = await props.searchParams;
   if (!(await requireAdminPage())) {
     return <AdminForbidden title="Import" />;
   }

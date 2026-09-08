@@ -13,7 +13,7 @@
 	encode gzip
 
 	# Baseline browser hardening for every response (UI and API). A Content-Security-Policy
-	# is tracked separately (SEC-2) because Next.js 14 needs nonce wiring for inline scripts.
+	# for the Next.js UI is set in gateway middleware (SEC-2). Swagger stays exempt below.
 	header {
 		X-Content-Type-Options nosniff
 		X-Frame-Options DENY
@@ -33,6 +33,13 @@
 	route @missing_write_auth {
 		respond 401
 	}
+
+	# OpenAPI/Swagger is local-only unless CADDY_EXPOSE_API_DOCS=true (SEC-3).
+	@docs_closed {
+		path /api/docs/*
+		expression `{env.CADDY_EXPOSE_API_DOCS} != "true"`
+	}
+	respond @docs_closed 404
 
 	route /api/docs/catalog* {
 		import docs_upstream catalog catalog-service

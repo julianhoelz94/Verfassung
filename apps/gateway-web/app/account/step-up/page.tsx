@@ -5,10 +5,11 @@ import { currentUser } from '../../../lib/session';
 import { stepUpAction } from '../actions';
 
 type StepUpPageProps = {
-  searchParams: { error?: string; returnTo?: string };
+  searchParams: Promise<{ error?: string; returnTo?: string }>;
 };
 
-export default async function StepUpPage({ searchParams }: StepUpPageProps) {
+export default async function StepUpPage(props: StepUpPageProps) {
+  const searchParams = await props.searchParams;
   const user = await currentUser();
   if (!user) {
     redirect('/login');

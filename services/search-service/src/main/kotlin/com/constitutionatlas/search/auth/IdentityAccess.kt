@@ -1,5 +1,6 @@
 package com.constitutionatlas.search.auth
 
+import com.constitutionatlas.search.timedRestClient
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.context.annotation.Bean
@@ -38,7 +39,7 @@ data class IdentityUserWire(
 class RestIdentityClient(
     identityUrl: String,
 ) : IdentityClient {
-    private val client: RestClient = RestClient.builder().baseUrl(identityUrl).build()
+    private val client: RestClient = timedRestClient(identityUrl)
 
     override fun authenticate(authorizationHeader: String?): Actor {
         if (authorizationHeader.isNullOrBlank()) {

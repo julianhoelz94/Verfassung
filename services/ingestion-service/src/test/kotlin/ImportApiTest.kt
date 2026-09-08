@@ -203,6 +203,15 @@ class ImportApiTest {
     }
 
     @Test
+    fun importRejectsDeeplyNestedJson() {
+        mockMvc.post("/import-jobs") {
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = nestedJson(40)
+        }.andExpect { status { isBadRequest() } }
+    }
+
+    @Test
     fun importRequiresIdentityBearer() {
         mockMvc.post("/import-jobs") {
             contentType = MediaType.APPLICATION_JSON
@@ -258,6 +267,8 @@ class ImportApiTest {
 
     companion object {
         private const val TOKEN = "Bearer test-token"
+
+        private fun nestedJson(depth: Int): String = (1..depth).fold("1") { acc, _ -> """{"x":$acc}""" }
 
         @Container
         @JvmStatic

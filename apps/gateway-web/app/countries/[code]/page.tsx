@@ -1,21 +1,43 @@
 import { notFound } from 'next/navigation';
+import type { Metadata } from 'next';
 import { PageMain } from '../../components/PageMain';
 import { ServiceUnavailable } from '../../components/StatusMessage';
 import { Badge, Chip, PageHeader } from '../../components/ui';
 import { ApiUnavailableError, getCountry, type CountryDetail } from '../../../lib/api';
 import { orderVersions } from '../../../lib/compare';
+import { atlasTitle, metaDescription, pageMetadata } from '../../../lib/page-meta';
 import { latestVersion, previousVersion } from '../../../lib/reading';
 import { CompareForm } from './CompareForm';
 
 type CountryPageProps = {
-  params: { code: string };
+  params: Promise<{ code: string }>;
 };
 
-export default async function CountryPage({ params }: CountryPageProps) {
+export async function generateMetadata(props: CountryPageProps): Promise<Metadata> {
+  const params = await props.params;
+  try {
+    const { code } = params;
+    const country = await getCountry(code);
+    if (!country) {
+      return { title: atlasTitle('Country') };
+    }
+    return pageMetadata({
+      title: atlasTitle(country.name),
+      description: metaDescription(`Browse constitutions and versions for ${country.name}.`),
+      path: `/countries/${country.isoCode}`,
+    });
+  } catch {
+    return { title: atlasTitle('Country') };
+  }
+}
+
+export default async function CountryPage(props: CountryPageProps) {
+  const params = await props.params;
+  const { code } = params;
   let country: CountryDetail | null = null;
   let error: string | null = null;
   try {
-    country = await getCountry(params.code);
+    country = await getCountry(code);
   } catch (e) {
     error = e instanceof ApiUnavailableError ? e.message : 'Catalog is unavailable';
     country = null;
@@ -24,7 +46,7 @@ export default async function CountryPage({ params }: CountryPageProps) {
   if (error) {
     return (
       <PageMain className="wide">
-        <ServiceUnavailable service="Catalog" retryHref={`/countries/${params.code}`} />
+        <ServiceUnavailable service="Catalog" retryHref={`/countries/${code}`} />
       </PageMain>
     );
   }

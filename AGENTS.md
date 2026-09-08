@@ -5,7 +5,7 @@ Public site for versioned constitutions: countries → constitution versions →
 ## Stack
 
 - Kotlin 1.9 / Java 21 / Spring Boot 3.5, Flyway, Testcontainers, OpenAPI (`springdoc`)
-- Next.js 14 (App Router) + TypeScript in `apps/gateway-web`
+- Next.js 15 (App Router) + TypeScript in `apps/gateway-web`
 - Docker Compose + Caddy (`infra/caddy`) as the single local entry point
 - One Postgres database per stateful service (never share DBs)
 - Flyway: new `V{n}__….sql` only; do not edit applied migrations
@@ -49,7 +49,7 @@ Service names: `catalog`, `content`, `amendment`, `identity`, `editor`, `search`
 
 ## Current sprint
 
-See `backlog.md` **Suggested Sprint Breakdown**. Sprint 0–17 and 19–23 are closed. **Sprint 18** (discovery, sharing, and language: UI-15, UI-26, UI-27, UI-28) is next — [quality review](backlog.md#quality-review-2026-09-06). Pull from **Later / Ideas** only if the user asks. Do not start SRV-7 (MCP) until asked.
+See `backlog.md` **Suggested Sprint Breakdown**. Sprint 0–23 and **28** are closed. **Sprint 24** (one content write model: CNT-5, CNT-6, ED-5) is next — [quality review](backlog.md#quality-review-2026-09-06). Pull from **Later / Ideas** only if the user asks. Do not start SRV-7 (MCP) until asked.
 
 **When a story/task is finished, update `backlog.md` in the same change:** set Status to `Done`, add the ID to that sprint’s Done list, and keep the board snapshot accurate. Do not leave completed work as `Ready`.
 

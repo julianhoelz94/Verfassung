@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { ConstitutionSummary, VersionSummary } from './api';
 import {
+  canonicalCompareQuery,
   compareRequestError,
   neighborCompareLinks,
   netArticleKind,
@@ -98,5 +99,20 @@ describe('neighborCompareLinks', () => {
     expect(links.previous?.href).toContain('to=b');
     expect(links.next?.href).toContain('from=b');
     expect(links.next?.href).toContain('to=c');
+  });
+});
+
+describe('canonicalCompareQuery', () => {
+  const versions = [v('a', '1949', '1949-05-23'), v('b', '1956', '1956-03-19'), v('c', '2022', '2022-01-01')];
+
+  it('orders ids with the earlier version as from', () => {
+    expect(canonicalCompareQuery('c', 'a', versions)).toEqual({ from: 'a', to: 'c' });
+    expect(canonicalCompareQuery('a', 'c', versions)).toEqual({ from: 'a', to: 'c' });
+  });
+
+  it('returns null for unknown or identical ids', () => {
+    expect(canonicalCompareQuery('a', 'a', versions)).toBeNull();
+    expect(canonicalCompareQuery('missing', 'a', versions)).toBeNull();
+    expect(canonicalCompareQuery(undefined, 'a', versions)).toBeNull();
   });
 });

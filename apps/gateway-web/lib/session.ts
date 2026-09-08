@@ -16,13 +16,13 @@ export type { SessionUser };
 
 export { identityBaseUrl };
 
-function sessionBearer(): string | undefined {
-  const token = cookies().get(SESSION_COOKIE)?.value;
+async function sessionBearer(): Promise<string | undefined> {
+  const token = (await cookies()).get(SESSION_COOKIE)?.value;
   return token ? `Bearer ${token}` : undefined;
 }
 
-export function requireSessionBearer(): string {
-  const header = sessionBearer();
+export async function requireSessionBearer(): Promise<string> {
+  const header = await sessionBearer();
   if (!header) {
     redirect('/login');
   }
@@ -39,8 +39,8 @@ function cookieSecure(): boolean {
   return process.env.NODE_ENV === 'production';
 }
 
-function incomingClientIp(): string | undefined {
-  const incoming = headers();
+async function incomingClientIp(): Promise<string | undefined> {
+  const incoming = await headers();
   const forwarded = incoming.get('x-forwarded-for')?.split(',')[0]?.trim();
   if (forwarded) {
     return forwarded;
@@ -53,33 +53,33 @@ export async function login(
   password: string,
 ): Promise<{ user: SessionUser } | { mfa: 'challenge' | 'enroll' }> {
   const extraHeaders: Record<string, string> = {};
-  const existing = cookies().get(SESSION_COOKIE)?.value;
+  const existing = (await cookies()).get(SESSION_COOKIE)?.value;
   if (existing) {
     extraHeaders.Authorization = `Bearer ${existing}`;
   }
-  const clientIp = incomingClientIp();
+  const clientIp = await incomingClientIp();
   if (clientIp) {
     extraHeaders['X-Forwarded-For'] = clientIp;
   }
   const body = await requestLogin(email, password, fetch, identityBaseUrl(), extraHeaders);
   if (body.mfaRequired && body.challengeToken) {
-    setChallengeCookie(body.challengeToken);
+    await setChallengeCookie(body.challengeToken);
     return { mfa: 'challenge' };
   }
   if (body.mfaEnrollmentRequired && body.challengeToken) {
-    setChallengeCookie(body.challengeToken);
+    await setChallengeCookie(body.challengeToken);
     return { mfa: 'enroll' };
   }
   if (!body.token) {
     throw new Error('Invalid credentials');
   }
-  clearChallengeCookie();
-  setSessionCookie(body.token, body.expiresInSeconds);
+  await clearChallengeCookie();
+  await setSessionCookie(body.token, body.expiresInSeconds);
   return { user: body.user };
 }
 
 export async function completeMfaLogin(code: string, recoveryCode?: string): Promise<SessionUser> {
-  const challengeToken = cookies().get(MFA_CHALLENGE_COOKIE)?.value;
+  const challengeToken = (await cookies()).get(MFA_CHALLENGE_COOKIE)?.value;
   if (!challengeToken) {
     throw new Error('MFA challenge expired');
   }
@@ -87,18 +87,19 @@ export async function completeMfaLogin(code: string, recoveryCode?: string): Pro
   if (!body.token) {
     throw new Error('Invalid credentials');
   }
-  clearChallengeCookie();
-  setSessionCookie(body.token, body.expiresInSeconds);
+  await clearChallengeCookie();
+  await setSessionCookie(body.token, body.expiresInSeconds);
   return body.user;
 }
 
 export async function confirmMfaEnrollment(code: string): Promise<{ user: SessionUser; recoveryCodes: string[] }> {
-  const challengeToken = cookies().get(MFA_CHALLENGE_COOKIE)?.value;
-  const sessionToken = cookies().get(SESSION_COOKIE)?.value;
+  const store = await cookies();
+  const challengeToken = store.get(MFA_CHALLENGE_COOKIE)?.value;
+  const sessionToken = store.get(SESSION_COOKIE)?.value;
   const body = await requestConfirmMfaEnroll(code, challengeToken, sessionToken);
-  clearChallengeCookie();
+  await clearChallengeCookie();
   if (body.token) {
-    setSessionCookie(body.token, body.expiresInSeconds);
+    await setSessionCookie(body.token, body.expiresInSeconds);
   }
   if (!body.user && !sessionToken) {
     throw new Error('Unable to confirm MFA enrollment');
@@ -109,8 +110,8 @@ export async function confirmMfaEnrollment(code: string): Promise<{ user: Sessio
   };
 }
 
-function setSessionCookie(token: string, expiresInSeconds?: number) {
-  cookies().set(SESSION_COOKIE, token, {
+async function setSessionCookie(token: string, expiresInSeconds?: number) {
+  (await cookies()).set(SESSION_COOKIE, token, {
     httpOnly: true,
     sameSite: 'lax',
     path: '/',
@@ -119,8 +120,8 @@ function setSessionCookie(token: string, expiresInSeconds?: number) {
   });
 }
 
-export function setChallengeCookie(token: string) {
-  cookies().set(MFA_CHALLENGE_COOKIE, token, {
+export async function setChallengeCookie(token: string) {
+  (await cookies()).set(MFA_CHALLENGE_COOKIE, token, {
     httpOnly: true,
     sameSite: 'lax',
     path: '/',
@@ -129,21 +130,21 @@ export function setChallengeCookie(token: string) {
   });
 }
 
-export function clearChallengeCookie() {
-  cookies().delete(MFA_CHALLENGE_COOKIE);
+export async function clearChallengeCookie() {
+  (await cookies()).delete(MFA_CHALLENGE_COOKIE);
 }
 
-export function mfaChallengeToken(): string | undefined {
-  return cookies().get(MFA_CHALLENGE_COOKIE)?.value;
+export async function mfaChallengeToken(): Promise<string | undefined> {
+  return (await cookies()).get(MFA_CHALLENGE_COOKIE)?.value;
 }
 
 export async function logout(): Promise<void> {
-  const token = cookies().get(SESSION_COOKIE)?.value;
+  const token = (await cookies()).get(SESSION_COOKIE)?.value;
   if (token) {
     await requestLogout(token).catch(() => undefined);
   }
-  cookies().delete(SESSION_COOKIE);
-  clearChallengeCookie();
+  (await cookies()).delete(SESSION_COOKIE);
+  await clearChallengeCookie();
 }
 
 export async function currentUser(): Promise<SessionUser | null> {
@@ -152,7 +153,8 @@ export async function currentUser(): Promise<SessionUser | null> {
 }
 
 export async function currentSession(): Promise<{ user: SessionUser | null; identityUnavailable: boolean }> {
-  const token = cookies().get(SESSION_COOKIE)?.value;
+  const store = await cookies();
+  const token = store.get(SESSION_COOKIE)?.value;
   if (!token) {
     return { user: null, identityUnavailable: false };
   }
@@ -164,7 +166,7 @@ export async function currentSession(): Promise<{ user: SessionUser | null; iden
     const decision = interpretMeResponse({ networkError: false, status: response.status });
     if (decision.clearCookie) {
       try {
-        cookies().delete(SESSION_COOKIE);
+        store.delete(SESSION_COOKIE);
       } catch {
         // App Router layouts cannot mutate cookies; signed-out rendering still proceeds.
       }

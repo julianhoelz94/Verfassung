@@ -751,6 +751,10 @@ button.article-toggle[aria-expanded='false']::after {
     display: none !important;
   }
 
+  .compare-grid {
+    grid-template-columns: 1fr !important;
+  }
+
   main,
   .page {
     max-width: none;

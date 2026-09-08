@@ -10,7 +10,7 @@ import { ArticleEditor } from './ArticleEditor';
 import { approveAction, loadSessionAction, openEditorAction, publishAction, reviewAction } from './actions';
 
 type EditorPageProps = {
-  searchParams: {
+  searchParams: Promise<{
     versionId?: string;
     sessionId?: string;
     articleId?: string;
@@ -23,7 +23,7 @@ type EditorPageProps = {
     error?: string;
     mine?: string;
     status?: string;
-  };
+  }>;
 };
 
 function hasRole(roles: string[], role: string): boolean {
@@ -83,7 +83,8 @@ function SessionTable({
   );
 }
 
-export default async function EditorPage({ searchParams }: EditorPageProps) {
+export default async function EditorPage(props: EditorPageProps) {
+  const searchParams = await props.searchParams;
   const user = await currentUser();
   if (!user) {
     redirect('/login');

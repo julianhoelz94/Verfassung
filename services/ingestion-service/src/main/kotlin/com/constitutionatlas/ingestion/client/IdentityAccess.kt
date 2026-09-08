@@ -37,7 +37,7 @@ data class IdentityUserWire(
 class RestIdentityClient(
     identityUrl: String,
 ) : IdentityClient {
-    private val client: RestClient = RestClient.builder().baseUrl(identityUrl).build()
+    private val client: RestClient = timedRestClient(identityUrl)
 
     override fun authenticate(authorizationHeader: String?): Actor {
         if (authorizationHeader.isNullOrBlank()) {

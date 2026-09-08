@@ -38,6 +38,8 @@ class AuditApiTest {
 
     private val editor =
         Actor(UUID.fromString("01900000-0000-4000-8000-000000000410"), "local-editor@example.local", listOf("editor"))
+    private val admin =
+        Actor(UUID.fromString("01900000-0000-4000-8000-000000000400"), "local-admin@example.local", listOf("admin"))
     private val machine =
         Actor(
             UUID.fromString("01900000-0000-4000-8000-000000000499"),
@@ -45,13 +47,22 @@ class AuditApiTest {
             emptyList(),
             listOf("audit:append"),
         )
+    private val reader =
+        Actor(
+            UUID.fromString("01900000-0000-4000-8000-000000000498"),
+            "service:audit-read",
+            emptyList(),
+            listOf("audit:read"),
+        )
 
     @BeforeEach
     fun stubIdentity() {
         Mockito.reset(identityClient)
         Mockito.`when`(identityClient.authenticate(null)).thenThrow(UnauthorizedException("Missing session"))
         Mockito.`when`(identityClient.authenticate(TOKEN)).thenReturn(editor)
+        Mockito.`when`(identityClient.authenticate(ADMIN)).thenReturn(admin)
         Mockito.`when`(identityClient.authenticate(MACHINE)).thenReturn(machine)
+        Mockito.`when`(identityClient.authenticate(READER)).thenReturn(reader)
     }
 
     @Test
@@ -74,6 +85,7 @@ class AuditApiTest {
         }
 
         mockMvc.get("/events") {
+            header("Authorization", ADMIN)
             param("entityType", "edit_session")
             param("entityId", "01900000-0000-4000-8000-000000000501")
         }.andExpect {
@@ -136,9 +148,31 @@ class AuditApiTest {
         }.andExpect { status { isUnauthorized() } }
     }
 
+    @Test
+    fun listRequiresAdminOrAuditRead() {
+        mockMvc.get("/events") {
+            param("entityType", "edit_session")
+            param("entityId", "01900000-0000-4000-8000-000000000501")
+        }.andExpect { status { isUnauthorized() } }
+
+        mockMvc.get("/events") {
+            header("Authorization", TOKEN)
+            param("entityType", "edit_session")
+            param("entityId", "01900000-0000-4000-8000-000000000501")
+        }.andExpect { status { isForbidden() } }
+
+        mockMvc.get("/events") {
+            header("Authorization", READER)
+            param("entityType", "edit_session")
+            param("entityId", "01900000-0000-4000-8000-000000000501")
+        }.andExpect { status { isOk() } }
+    }
+
     companion object {
         private const val TOKEN = "Bearer test-token"
+        private const val ADMIN = "Bearer admin-token"
         private const val MACHINE = "Bearer machine-token"
+        private const val READER = "Bearer reader-token"
         @Container
         @JvmStatic
         val postgres: PostgreSQLContainer<*> = PostgreSQLContainer("postgres:16-alpine")

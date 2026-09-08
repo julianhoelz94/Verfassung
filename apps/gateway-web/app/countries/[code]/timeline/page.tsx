@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation';
+import type { Metadata } from 'next';
 import { PageMain } from '../../../components/PageMain';
 import { ServiceUnavailable } from '../../../components/StatusMessage';
 import { Badge, PageHeader, type BadgeTone } from '../../../components/ui';
@@ -10,12 +11,31 @@ import {
   type CountryDetail,
 } from '../../../../lib/api';
 import { orderVersions } from '../../../../lib/compare';
+import { FormattedDate } from '../../../../lib/format-date';
+import { atlasTitle, metaDescription, pageMetadata } from '../../../../lib/page-meta';
 import { latestVersion } from '../../../../lib/reading';
 import { sortAmendmentsByEnactment } from '../../../../lib/timeline';
 
 type TimelinePageProps = {
-  params: { code: string };
+  params: Promise<{ code: string }>;
 };
+
+export async function generateMetadata(props: TimelinePageProps): Promise<Metadata> {
+  const params = await props.params;
+  try {
+    const country = await getCountry(params.code);
+    if (!country) {
+      return { title: atlasTitle('Timeline') };
+    }
+    return pageMetadata({
+      title: atlasTitle('Timeline', country.name),
+      description: metaDescription(`Amendment timeline for ${country.name}.`),
+      path: `/countries/${country.isoCode}/timeline`,
+    });
+  } catch {
+    return { title: atlasTitle('Timeline') };
+  }
+}
 
 function changeTone(changeType: string): BadgeTone {
   if (changeType === 'added') {
@@ -30,7 +50,8 @@ function changeTone(changeType: string): BadgeTone {
   return 'neutral';
 }
 
-export default async function TimelinePage({ params }: TimelinePageProps) {
+export default async function TimelinePage(props: TimelinePageProps) {
+  const params = await props.params;
   let country: CountryDetail | null = null;
   let amendments: Amendment[] = [];
   let error: string | null = null;
@@ -95,9 +116,7 @@ export default async function TimelinePage({ params }: TimelinePageProps) {
           const target = versionsById.get(amendment.targetVersionId);
           return (
             <li key={amendment.id} className="timeline-item">
-              <time className="timeline-date" dateTime={amendment.enactedOn ?? undefined}>
-                {amendment.enactedOn ?? 'Date unknown'}
-              </time>
+              <FormattedDate className="timeline-date" value={amendment.enactedOn} fallback="Date unknown" />
               <article className="card">
                 <h2 className="card-title">{amendment.title}</h2>
                 <p className="muted">

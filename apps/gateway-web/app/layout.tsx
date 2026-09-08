@@ -1,14 +1,23 @@
 import './globals.css';
 import type { ReactNode } from 'react';
 import type { Metadata } from 'next';
+import { publicBaseUrl } from '../lib/site-url';
 import { currentSession } from '../lib/session';
 import { SiteFooter } from './components/SiteFooter';
 import { SiteHeader } from './components/SiteHeader';
 
-export const metadata: Metadata = {
-  title: 'Constitution Atlas',
-  description: 'Browse versioned constitutions',
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const base = publicBaseUrl();
+  return {
+    metadataBase: new URL(base),
+    title: 'Constitution Atlas',
+    description: 'Browse versioned constitutions',
+    openGraph: {
+      title: 'Constitution Atlas',
+      description: 'Browse versioned constitutions',
+    },
+  };
+}
 
 type RootLayoutProps = {
   children: ReactNode;

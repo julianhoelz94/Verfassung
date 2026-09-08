@@ -2,6 +2,9 @@
   {
     "id": "01900000-0000-4000-8000-000000000001",
     "isoCode": "DE",
-    "name": "Germany"
+    "name": "Germany",
+    "latestVersionLabel": "2022",
+    "latestEffectiveDate": "2022-12-19",
+    "versionCount": 2
   }
 ]

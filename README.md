@@ -71,7 +71,7 @@ Then restart the app containers so they reconnect. Flyway history is part of eac
 
 | Path | Owns |
 | --- | --- |
-| `apps/gateway-web/` | Public UI (Next.js 14) |
+| `apps/gateway-web/` | Public UI (Next.js 15) |
 | `services/<name>/` | One Spring Boot service + Gradle project |
 | `infra/caddy/` | Edge proxy |
 | `infra/backup/` | `pg_dump` helper (writes to `./backups`, gitignored) |

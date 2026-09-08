@@ -19,7 +19,7 @@ class RestAmendmentClient(
     private val bearerToken: String? = null,
 ) : AmendmentClient {
     private val log = LoggerFactory.getLogger(javaClass)
-    private val client: RestClient = RestClient.builder().baseUrl(amendmentUrl).build()
+    private val client: RestClient = timedRestClient(amendmentUrl)
 
     override fun recordTransition(sourceVersionId: UUID, targetVersionId: UUID) {
         try {

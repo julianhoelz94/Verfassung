@@ -358,3 +358,72 @@ export async function requestUpdateRoles(
   });
   return readOk(response, 'Unable to update roles');
 }
+
+export type ServiceToken = {
+  id: string;
+  name: string;
+  scopes: string[];
+  createdAt: string;
+  expiresAt: string;
+  lastUsedAt?: string | null;
+  revokedAt?: string | null;
+};
+
+export type ServiceTokenCreated = ServiceToken & { token: string };
+
+export async function requestServiceTokens(
+  token: string,
+  fetchImpl: FetchLike = fetch,
+  baseUrl = identityBaseUrl(),
+): Promise<ServiceToken[]> {
+  const response = await fetchImpl(`${baseUrl}/service-tokens`, {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: 'no-store',
+  });
+  return readOk(response, 'Unable to list service tokens');
+}
+
+export async function requestCreateServiceToken(
+  token: string,
+  name: string,
+  scopes: string[],
+  fetchImpl: FetchLike = fetch,
+  baseUrl = identityBaseUrl(),
+): Promise<ServiceTokenCreated> {
+  const response = await fetchImpl(`${baseUrl}/service-tokens`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, scopes }),
+    cache: 'no-store',
+  });
+  return readOk(response, 'Unable to create service token');
+}
+
+export async function requestRotateServiceToken(
+  token: string,
+  tokenId: string,
+  fetchImpl: FetchLike = fetch,
+  baseUrl = identityBaseUrl(),
+): Promise<ServiceTokenCreated> {
+  const response = await fetchImpl(`${baseUrl}/service-tokens/${tokenId}/rotate`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: '{}',
+    cache: 'no-store',
+  });
+  return readOk(response, 'Unable to rotate service token');
+}
+
+export async function requestRevokeServiceToken(
+  token: string,
+  tokenId: string,
+  fetchImpl: FetchLike = fetch,
+  baseUrl = identityBaseUrl(),
+): Promise<void> {
+  const response = await fetchImpl(`${baseUrl}/service-tokens/${tokenId}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+    cache: 'no-store',
+  });
+  await readOk(response, 'Unable to revoke service token');
+}

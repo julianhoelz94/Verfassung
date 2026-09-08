@@ -131,6 +131,11 @@ data class PasswordResetIssuedDto(
 data class CreateServiceTokenRequest(
     val name: String,
     val scopes: List<String> = emptyList(),
+    val expiresAt: OffsetDateTime? = null,
+)
+
+data class RotateServiceTokenRequest(
+    val expiresAt: OffsetDateTime? = null,
 )
 
 data class ServiceTokenCreatedDto(
@@ -139,6 +144,7 @@ data class ServiceTokenCreatedDto(
     val token: String,
     val scopes: List<String>,
     val createdAt: OffsetDateTime,
+    val expiresAt: OffsetDateTime,
 )
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
@@ -147,6 +153,7 @@ data class ServiceTokenDto(
     val name: String,
     val scopes: List<String>,
     val createdAt: OffsetDateTime,
+    val expiresAt: OffsetDateTime,
     val lastUsedAt: OffsetDateTime? = null,
     val revokedAt: OffsetDateTime? = null,
 )

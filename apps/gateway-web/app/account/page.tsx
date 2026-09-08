@@ -8,15 +8,16 @@ import { ConfirmEnrollForm, RegenerateRecoveryForm } from './MfaForms';
 import { changePasswordAction, revokeMfaAction, startMfaEnrollAction } from './actions';
 
 type AccountPageProps = {
-  searchParams: {
+  searchParams: Promise<{
     error?: string;
     saved?: string;
     enroll?: string;
     mfaRevoked?: string;
-  };
+  }>;
 };
 
-export default async function AccountPage({ searchParams }: AccountPageProps) {
+export default async function AccountPage(props: AccountPageProps) {
+  const searchParams = await props.searchParams;
   const user = await currentUser();
   if (!user) {
     redirect('/login');
@@ -25,9 +26,9 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
   // `startMfaEnrollAction`; `?enroll=1` only marks that enrollment was requested.
   const enrollRequested = searchParams.enroll === '1';
   let enrollSecret: string | null = null;
-  let enrollChallenge: string | null = enrollRequested ? mfaChallengeToken() ?? null : null;
+  let enrollChallenge: string | null = enrollRequested ? (await mfaChallengeToken()) ?? null : null;
   if (!user.mfaEnabled && enrollChallenge) {
-    const token = cookies().get(SESSION_COOKIE)?.value;
+    const token = (await cookies()).get(SESSION_COOKIE)?.value;
     try {
       const started = await requestStartMfaEnroll(enrollChallenge, token);
       enrollSecret = started.secret;

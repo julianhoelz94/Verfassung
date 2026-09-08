@@ -9,10 +9,11 @@ import { ConstitutionCountryFields } from './ConstitutionCountryFields';
 import { OutlineEditor } from './OutlineEditor';
 
 type AdminConstitutionsPageProps = {
-  searchParams: { error?: string };
+  searchParams: Promise<{ error?: string }>;
 };
 
-export default async function AdminConstitutionsPage({ searchParams }: AdminConstitutionsPageProps) {
+export default async function AdminConstitutionsPage(props: AdminConstitutionsPageProps) {
+  const searchParams = await props.searchParams;
   if (!(await requireAdminPage())) {
     return <AdminForbidden title="Outlines" />;
   }

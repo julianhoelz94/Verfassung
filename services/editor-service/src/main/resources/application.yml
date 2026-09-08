@@ -1,6 +1,10 @@
 spring:
   application:
     name: editor-service
+  http:
+    client:
+      connect-timeout: 2s
+      read-timeout: 5s
 identity:
   api:
     url: ${IDENTITY_API_URL:http://localhost/api/identity}

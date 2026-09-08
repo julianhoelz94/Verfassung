@@ -7,12 +7,13 @@ import { LoginEnrollForm } from '../../account/MfaForms';
 import { completeMfaAction } from '../actions';
 
 type MfaPageProps = {
-  searchParams: { error?: string; enroll?: string };
+  searchParams: Promise<{ error?: string; enroll?: string }>;
 };
 
-export default async function MfaPage({ searchParams }: MfaPageProps) {
+export default async function MfaPage(props: MfaPageProps) {
+  const searchParams = await props.searchParams;
   const user = await currentUser();
-  const challenge = mfaChallengeToken();
+  const challenge = await mfaChallengeToken();
   const enroll = searchParams.enroll === '1';
   if (user && !enroll) {
     redirect('/');

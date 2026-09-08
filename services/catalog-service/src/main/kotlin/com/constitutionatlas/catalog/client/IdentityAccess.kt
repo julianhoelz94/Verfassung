@@ -22,6 +22,9 @@ data class Actor(
 fun Actor.canWriteCatalog(): Boolean =
     "admin" in roles || "editor" in roles || "catalog:write" in scopes
 
+fun Actor.canPublishCatalog(): Boolean =
+    "admin" in roles || "publisher" in roles || "catalog:publish" in scopes
+
 interface IdentityClient {
     fun authenticate(authorizationHeader: String?): Actor
 }
@@ -36,7 +39,7 @@ data class IdentityUserWire(
 class RestIdentityClient(
     identityUrl: String,
 ) : IdentityClient {
-    private val client: RestClient = RestClient.builder().baseUrl(identityUrl).build()
+    private val client: RestClient = timedRestClient(identityUrl)
 
     override fun authenticate(authorizationHeader: String?): Actor {
         if (authorizationHeader.isNullOrBlank()) {
@@ -65,6 +68,14 @@ class WriteAccess(private val identityClient: IdentityClient) {
         val actor = identityClient.authenticate(authorization)
         if (!actor.canWriteCatalog()) {
             throw ForbiddenException("catalog write requires editor, admin, or catalog:write")
+        }
+        return actor
+    }
+
+    fun requireCatalogPublisher(authorization: String?): Actor {
+        val actor = identityClient.authenticate(authorization)
+        if (!actor.canPublishCatalog()) {
+            throw ForbiddenException("catalog publish requires publisher, admin, or catalog:publish")
         }
         return actor
     }

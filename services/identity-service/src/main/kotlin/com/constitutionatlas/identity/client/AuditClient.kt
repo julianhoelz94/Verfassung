@@ -28,7 +28,7 @@ class RestAuditClient(
     private val bearerToken: String? = null,
 ) : AuditClient {
     private val log = LoggerFactory.getLogger(javaClass)
-    private val client: RestClient = RestClient.builder().baseUrl(auditUrl).build()
+    private val client: RestClient = timedRestClient(auditUrl)
 
     override fun record(
         action: String,

@@ -11,6 +11,7 @@ type DiffConstitutionTextProps = {
   headingLevel?: 'h1' | 'h2' | 'h3';
   showHeading?: boolean;
   outline?: ContentOutline;
+  lang?: string;
 };
 
 export function DiffConstitutionText({
@@ -20,6 +21,7 @@ export function DiffConstitutionText({
   headingLevel = 'h3',
   showHeading = true,
   outline,
+  lang,
 }: DiffConstitutionTextProps) {
   const Heading = headingLevel;
   const article = side === 'from' ? left : right;
@@ -27,7 +29,7 @@ export function DiffConstitutionText({
   const rightChildren = right?.children ?? [];
   const hasTree = leftChildren.length > 0 || rightChildren.length > 0;
   return (
-    <div className="constitution-text text-column">
+    <div className="constitution-text text-column" lang={lang}>
       {showHeading && article ? (
         <Heading id={`article-${side}-${article.articleNumber}`}>
           {articleHeading(outline, {

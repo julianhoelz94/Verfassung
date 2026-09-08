@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import { FiltersPanel } from '../components/FiltersPanel';
 import { PageMain } from '../components/PageMain';
 import { SearchSnippet } from '../components/SearchSnippet';
@@ -9,17 +10,34 @@ import {
   type SearchFacets,
   type SearchHit,
 } from '../../lib/api';
+import { FormattedDate } from '../../lib/format-date';
+import { atlasTitle, metaDescription, pageMetadata } from '../../lib/page-meta';
 import { SEARCH_PAGE_SIZE, parseSearchOffset, searchUrl } from '../../lib/search-url';
 
 type SearchPageProps = {
-  searchParams: {
+  searchParams: Promise<{
     q?: string;
     country?: string;
     versionId?: string;
     effectiveDate?: string;
     offset?: string;
-  };
+  }>;
 };
+
+export async function generateMetadata(props: SearchPageProps): Promise<Metadata> {
+  const searchParams = await props.searchParams;
+  const query = searchParams.q?.trim() ?? '';
+  const title = query ? atlasTitle('Search', query) : atlasTitle('Search');
+  return pageMetadata({
+    title,
+    description: metaDescription(
+      query
+        ? `Search results for “${query}” across published constitutions.`
+        : 'Search published constitutional articles.',
+    ),
+    path: '/search',
+  });
+}
 
 const EMPTY_FACETS: SearchFacets = { countries: [], versions: [], dates: [] };
 
@@ -83,7 +101,8 @@ function SearchFilters({
   );
 }
 
-export default async function SearchPage({ searchParams }: SearchPageProps) {
+export default async function SearchPage(props: SearchPageProps) {
+  const searchParams = await props.searchParams;
   const query = searchParams.q?.trim() ?? '';
   const country = searchParams.country?.trim() ?? '';
   const versionId = searchParams.versionId?.trim() ?? '';
@@ -181,7 +200,13 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
                     </h2>
                     <p className="muted">
                       {hit.constitutionTitle} · {hit.versionLabel}
-                      {hit.effectiveDate ? ` · ${hit.effectiveDate}` : ''} · {hit.countryCode}
+                      {hit.effectiveDate ? (
+                        <>
+                          {' · '}
+                          <FormattedDate value={hit.effectiveDate} />
+                        </>
+                      ) : null}{' '}
+                      · {hit.countryCode}
                     </p>
                     {hit.snippet ? <SearchSnippet snippet={hit.snippet} /> : null}
                   </Card>

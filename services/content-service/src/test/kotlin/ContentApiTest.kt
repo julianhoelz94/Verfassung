@@ -379,9 +379,20 @@ class ContentApiTest {
             }
     }
 
+    @Test
+    fun replaceArticlesRejectsDeeplyNestedJson() {
+        mockMvc.put("/versions/01900000-0000-4000-8000-000000000099/articles") {
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = nestedJson(40)
+        }.andExpect { status { isBadRequest() } }
+    }
+
     companion object {
         private const val TOKEN = "Bearer test-token"
         private val objectMapper = ObjectMapper()
+
+        private fun nestedJson(depth: Int): String = (1..depth).fold("1") { acc, _ -> """{"x":$acc}""" }
 
         private fun restore1949Article1Tree() {
             postgres.createConnection("").use { connection ->

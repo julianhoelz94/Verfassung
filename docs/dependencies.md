@@ -16,12 +16,12 @@ Pinned versions we actually use. Upgrade one service (or the gateway) then CI, n
 | Migrations | Flyway | via Spring Boot BOM | `flyway-core`, `flyway-database-postgresql` |
 | JDBC | PostgreSQL driver | via Spring Boot BOM | `runtimeOnly postgresql` |
 | Frontend | Node | 20 | CI, `apps/gateway-web/Dockerfile` (`node:20-alpine`) |
-| Frontend | Next.js | 14.2.5 | `apps/gateway-web/package.json` |
+| Frontend | Next.js | 15.5.24 | `apps/gateway-web/package.json` |
 | Frontend | React / react-dom | 18.3.1 | `apps/gateway-web/package.json` |
 | Frontend | TypeScript | 5.5.4 | `apps/gateway-web/package.json` |
-| Frontend | ESLint + `eslint-config-next` | 8.57.0 / 14.2.5 | `apps/gateway-web/package.json` |
+| Frontend | ESLint + `eslint-config-next` | 8.57.0 / 15.5.24 | `apps/gateway-web/package.json` |
 | Edge | Caddy | 2.9 | `infra/caddy/Dockerfile` |
-| CI | GitHub Actions | `actions/*@v4`, `gradle/actions/setup-gradle@v4` | `.github/workflows/ci.yml` |
+| CI | GitHub Actions | SHA-pinned `actions/*@v4`, `gradle/actions/setup-gradle@v4` | `.github/workflows/ci.yml` |
 | Alerts | Dependabot | weekly | `.github/dependabot.yml` |
 
 Kotlin runtime libraries (Jackson, Actuator, Validation, JDBC, Testcontainers) follow the Spring Boot 3.5.16 BOM unless overridden.

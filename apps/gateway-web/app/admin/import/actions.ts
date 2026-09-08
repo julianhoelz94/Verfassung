@@ -24,7 +24,7 @@ export async function createImportAction(formData: FormData): Promise<void> {
   }
   let jobId: string;
   try {
-    const job = await createImportJob(payload, requireSessionBearer());
+    const job = await createImportJob(payload, await requireSessionBearer());
     jobId = job.id;
   } catch {
     redirect('/admin/import?error=1');

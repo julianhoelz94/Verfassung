@@ -3,10 +3,11 @@ import { PageMain } from '../components/PageMain';
 import { confirmResetAction, requestResetAction } from '../account/actions';
 
 type ResetPageProps = {
-  searchParams: { token?: string; sent?: string; error?: string };
+  searchParams: Promise<{ token?: string; sent?: string; error?: string }>;
 };
 
-export default function ResetPage({ searchParams }: ResetPageProps) {
+export default async function ResetPage(props: ResetPageProps) {
+  const searchParams = await props.searchParams;
   return (
     <PageMain>
       <PageHeader

@@ -3,10 +3,11 @@ import { PageMain } from '../components/PageMain';
 import { acceptInviteAction } from '../account/actions';
 
 type InvitePageProps = {
-  searchParams: { token?: string; error?: string };
+  searchParams: Promise<{ token?: string; error?: string }>;
 };
 
-export default function InvitePage({ searchParams }: InvitePageProps) {
+export default async function InvitePage(props: InvitePageProps) {
+  const searchParams = await props.searchParams;
   return (
     <PageMain>
       <PageHeader

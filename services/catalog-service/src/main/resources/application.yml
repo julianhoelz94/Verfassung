@@ -1,6 +1,10 @@
 spring:
   application:
     name: catalog-service
+  http:
+    client:
+      connect-timeout: 2s
+      read-timeout: 5s
 management:
   endpoints:
     web:

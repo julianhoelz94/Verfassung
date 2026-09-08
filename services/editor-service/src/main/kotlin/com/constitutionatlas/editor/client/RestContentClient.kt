@@ -18,7 +18,7 @@ class RestContentClient(
     contentUrl: String,
     private val bearerToken: String? = null,
 ) : ContentClient {
-    private val client: RestClient = RestClient.builder().baseUrl(contentUrl).build()
+    private val client: RestClient = timedRestClient(contentUrl)
 
     override fun listArticles(versionId: UUID): List<ContentTreeArticle> =
         try {

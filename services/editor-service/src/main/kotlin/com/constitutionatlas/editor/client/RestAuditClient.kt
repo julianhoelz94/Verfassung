@@ -15,7 +15,7 @@ class RestAuditClient(
     auditUrl: String,
     private val bearerToken: String? = null,
 ) : AuditClient {
-    private val client: RestClient = RestClient.builder().baseUrl(auditUrl).build()
+    private val client: RestClient = timedRestClient(auditUrl)
 
     override fun record(
         actor: Actor,

@@ -15,9 +15,10 @@ import {
   type VersionSummary,
 } from '../../../../../lib/api';
 import { orderVersions } from '../../../../../lib/compare';
+import { FormattedDate } from '../../../../../lib/format-date';
 
 type HistoryPageProps = {
-  params: { code: string; articleNumber: string };
+  params: Promise<{ code: string; articleNumber: string }>;
 };
 
 type ArticleSnapshot = {
@@ -33,7 +34,8 @@ function changeTone(changeType: string): 'added' | 'removed' | 'changed' | 'neut
   return 'neutral';
 }
 
-export default async function ArticleHistoryPage({ params }: HistoryPageProps) {
+export default async function ArticleHistoryPage(props: HistoryPageProps) {
+  const params = await props.params;
   const articleNumber = decodeURIComponent(params.articleNumber);
   let country: CountryDetail | null = null;
   let error: string | null = null;
@@ -118,8 +120,17 @@ export default async function ArticleHistoryPage({ params }: HistoryPageProps) {
                       <div key={change.id} className="change-row">
                         <Badge tone={changeTone(change.changeType)}>{change.changeType}</Badge>
                         <span className="muted">
-                          {change.changedOn ? `changed ${change.changedOn}` : ''}
-                          {change.effectiveOn ? ` · effective ${change.effectiveOn}` : ''}
+                          {change.changedOn ? (
+                            <>
+                              changed <FormattedDate value={change.changedOn} />
+                            </>
+                          ) : null}
+                          {change.effectiveOn ? (
+                            <>
+                              {change.changedOn ? ' · ' : ''}
+                              effective <FormattedDate value={change.effectiveOn} />
+                            </>
+                          ) : null}
                           {amendment.sourceReference ? ` · ${amendment.sourceReference}` : ''}
                           {change.amendingLawCitationId && !amendment.sourceReference
                             ? ` · ${change.amendingLawCitationId}`
@@ -139,7 +150,12 @@ export default async function ArticleHistoryPage({ params }: HistoryPageProps) {
               ) : null}
               <h2>
                 {snapshot.version.versionLabel}
-                {snapshot.version.effectiveDate ? ` · ${snapshot.version.effectiveDate}` : ''}
+                {snapshot.version.effectiveDate ? (
+                  <>
+                    {' · '}
+                    <FormattedDate value={snapshot.version.effectiveDate} />
+                  </>
+                ) : null}
               </h2>
               <Provenance
                 version={snapshot.version}

@@ -29,7 +29,7 @@ Compose services: `edge-proxy`, `gateway-web`, eight `*-service`, eight `*-db` (
 | `/api/catalog\|content\|amendment\|identity\|editor\|search\|ingestion\|audit*` | matching service, strip `/api/<svc>` |
 | everything else | `gateway-web:3000` |
 
-Docs: `http://localhost/api/docs/<svc>/swagger-ui/index.html`.
+Docs: `http://localhost/api/docs/<svc>/swagger-ui/index.html` when `CADDY_EXPOSE_API_DOCS=true` (local-stack/ci). Other profiles 404 that path.
 
 ## Gradle
 

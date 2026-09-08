@@ -40,9 +40,13 @@ class AuditController(
 
     @GetMapping("/events")
     fun list(
+        @RequestHeader(value = "Authorization", required = false) authorization: String?,
         @RequestParam entityType: String,
         @RequestParam entityId: UUID,
-    ): List<AuditEventDto> = auditRepository.listByEntity(entityType, entityId)
+    ): List<AuditEventDto> {
+        writeAccess.requireAuditReader(authorization)
+        return auditRepository.listByEntity(entityType, entityId)
+    }
 
     @PutMapping("/events", "/events/{id}")
     @PatchMapping("/events", "/events/{id}")

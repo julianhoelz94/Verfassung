@@ -147,6 +147,7 @@ export function VersionReader({
                       headingLevel="h2"
                       canEditTitles={canEditTitles}
                       returnTo={`/countries/${code}/versions/${versionId}`}
+                      lang={language}
                       crossRefs={{ code, versionId, articlesByNumber }}
                     />
                   </div>

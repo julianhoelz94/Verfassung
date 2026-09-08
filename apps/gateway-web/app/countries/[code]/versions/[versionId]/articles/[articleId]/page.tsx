@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation';
+import type { Metadata } from 'next';
 import { ArticleNav } from '../../../../../../components/ArticleNav';
 import { ConstitutionText } from '../../../../../../components/ConstitutionText';
 import { PageMain } from '../../../../../../components/PageMain';
@@ -17,12 +18,34 @@ import {
 } from '../../../../../../../lib/api';
 import { neighborsOf } from '../../../../../../../lib/article-nav';
 import { canVisitEditor } from '../../../../../../../lib/nav';
+import { atlasTitle, metaDescription, pageMetadata } from '../../../../../../../lib/page-meta';
 import { currentUser } from '../../../../../../../lib/session';
 
 type ArticlePageProps = {
-  params: { code: string; versionId: string; articleId: string };
-  searchParams: { error?: string };
+  params: Promise<{ code: string; versionId: string; articleId: string }>;
+  searchParams: Promise<{ error?: string }>;
 };
+
+export async function generateMetadata(props: ArticlePageProps): Promise<Metadata> {
+  const params = await props.params;
+  try {
+    const [country, article] = await Promise.all([getCountry(params.code), getArticle(params.articleId)]);
+    const constitution = country?.constitutions.find((item) =>
+      item.versions.some((itemVersion) => itemVersion.id === params.versionId),
+    );
+    const version = constitution?.versions.find((item) => item.id === params.versionId);
+    if (!country || !article || article.versionId !== params.versionId || !version) {
+      return { title: atlasTitle('Article') };
+    }
+    return pageMetadata({
+      title: atlasTitle(`Article ${article.articleNumber}`, version.versionLabel, country.name),
+      description: metaDescription(article.body),
+      path: `/countries/${country.isoCode}/versions/${params.versionId}/articles/${article.id}`,
+    });
+  } catch {
+    return { title: atlasTitle('Article') };
+  }
+}
 
 function articleHref(
   code: string,
@@ -32,7 +55,9 @@ function articleHref(
   return `/countries/${code}/versions/${versionId}/articles/${articleId}`;
 }
 
-export default async function ArticlePage({ params, searchParams }: ArticlePageProps) {
+export default async function ArticlePage(props: ArticlePageProps) {
+  const params = await props.params;
+  const searchParams = await props.searchParams;
   let country: CountryDetail | null = null;
   let article: ArticleDetail | null = null;
   let siblings: ArticleSummary[] = [];

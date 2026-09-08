@@ -1,5 +1,6 @@
 import type { VersionSummary } from '../../../lib/api';
 import { orderVersions } from '../../../lib/compare';
+import { formatDate } from '../../../lib/format-date';
 import { Button } from '../../components/ui';
 
 type CompareFormProps = {
@@ -38,7 +39,7 @@ export function CompareForm({
           {ordered.map((version) => (
             <option key={version.id} value={version.id}>
               {version.versionLabel}
-              {version.effectiveDate ? ` · in force ${version.effectiveDate}` : ''}
+              {version.effectiveDate ? ` · in force ${formatDate(version.effectiveDate)}` : ''}
             </option>
           ))}
         </select>
@@ -49,7 +50,7 @@ export function CompareForm({
           {ordered.map((version) => (
             <option key={`to-${version.id}`} value={version.id}>
               {version.versionLabel}
-              {version.effectiveDate ? ` · in force ${version.effectiveDate}` : ''}
+              {version.effectiveDate ? ` · in force ${formatDate(version.effectiveDate)}` : ''}
             </option>
           ))}
         </select>

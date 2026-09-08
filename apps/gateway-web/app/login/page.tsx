@@ -6,7 +6,7 @@ import { currentUser } from '../../lib/session';
 import { loginAction } from './actions';
 
 type LoginPageProps = {
-  searchParams: { error?: string };
+  searchParams: Promise<{ error?: string }>;
 };
 
 /** Seed-account hint is shown only while identity seeding is on (never in production). */
@@ -14,7 +14,8 @@ function seedHintEnabled(): boolean {
   return (process.env.IDENTITY_SEED_MODE ?? 'off') !== 'off';
 }
 
-export default async function LoginPage({ searchParams }: LoginPageProps) {
+export default async function LoginPage(props: LoginPageProps) {
+  const searchParams = await props.searchParams;
   const user = await currentUser();
   if (user) {
     redirect(canVisitEditor(user.roles) ? '/editor' : '/');

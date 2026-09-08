@@ -42,6 +42,8 @@ class CatalogApiTest {
 
     private val editor =
         Actor(UUID.fromString("01900000-0000-4000-8000-000000000410"), "local-editor@example.local", listOf("editor"))
+    private val publisher =
+        Actor(UUID.fromString("01900000-0000-4000-8000-000000000412"), "local-publisher@example.local", listOf("publisher"))
     private val viewer =
         Actor(UUID.fromString("01900000-0000-4000-8000-000000000414"), "local-viewer@example.local", listOf("viewer"))
 
@@ -50,6 +52,7 @@ class CatalogApiTest {
         Mockito.reset(identityClient)
         Mockito.`when`(identityClient.authenticate(null)).thenThrow(UnauthorizedException("Missing session"))
         Mockito.`when`(identityClient.authenticate(TOKEN)).thenReturn(editor)
+        Mockito.`when`(identityClient.authenticate(PUBLISHER_TOKEN)).thenReturn(publisher)
         Mockito.`when`(identityClient.authenticate(VIEWER_TOKEN)).thenReturn(viewer)
     }
 
@@ -59,6 +62,9 @@ class CatalogApiTest {
             .andExpect {
                 status { isOk() }
                 jsonPath("$[*].isoCode") { value(org.hamcrest.Matchers.hasItem("DE")) }
+                jsonPath("$[?(@.isoCode=='DE')].latestVersionLabel") { value(org.hamcrest.Matchers.hasItem("2022")) }
+                jsonPath("$[?(@.isoCode=='DE')].latestEffectiveDate") { value(org.hamcrest.Matchers.hasItem("2022-12-19")) }
+                jsonPath("$[?(@.isoCode=='DE')].versionCount") { value(org.hamcrest.Matchers.hasItem(2)) }
             }
     }
 
@@ -217,6 +223,10 @@ class CatalogApiTest {
 
         mockMvc.post("/versions/$versionId/publish") {
             header("Authorization", TOKEN)
+        }.andExpect { status { isForbidden() } }
+
+        mockMvc.post("/versions/$versionId/publish") {
+            header("Authorization", PUBLISHER_TOKEN)
         }.andExpect {
             status { isOk() }
             jsonPath("$.publicationStatus") { value("published") }
@@ -340,6 +350,7 @@ class CatalogApiTest {
 
     companion object {
         private const val TOKEN = "Bearer test-token"
+        private const val PUBLISHER_TOKEN = "Bearer publisher-token"
         private const val VIEWER_TOKEN = "Bearer viewer-token"
         private val objectMapper = ObjectMapper()
 

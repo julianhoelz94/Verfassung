@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation';
+import type { Metadata } from 'next';
 import { PageMain } from '../../../../components/PageMain';
 import { PrintLink } from '../../../../components/PrintLink';
 import { SiteSearchForm } from '../../../../components/SiteSearchForm';
@@ -14,16 +15,42 @@ import {
   type CountryDetail,
 } from '../../../../../lib/api';
 import { neighborCompareLinks, orderVersions } from '../../../../../lib/compare';
+import { FormattedDate } from '../../../../../lib/format-date';
 import { canVisitEditor } from '../../../../../lib/nav';
+import { atlasTitle, metaDescription, pageMetadata } from '../../../../../lib/page-meta';
 import { httpUrl, provenanceLabel, verificationLabel } from '../../../../../lib/provenance';
 import { currentUser } from '../../../../../lib/session';
 
 type VersionPageProps = {
-  params: { code: string; versionId: string };
-  searchParams: { error?: string };
+  params: Promise<{ code: string; versionId: string }>;
+  searchParams: Promise<{ error?: string }>;
 };
 
-export default async function VersionPage({ params, searchParams }: VersionPageProps) {
+export async function generateMetadata(props: VersionPageProps): Promise<Metadata> {
+  const params = await props.params;
+  try {
+    const country = await getCountry(params.code);
+    const version = country?.constitutions
+      .flatMap((c) => c.versions.map((v) => ({ constitution: c, version: v })))
+      .find((row) => row.version.id === params.versionId);
+    if (!country || !version) {
+      return { title: atlasTitle('Version') };
+    }
+    return pageMetadata({
+      title: atlasTitle(version.version.versionLabel, version.constitution.title, country.name),
+      description: metaDescription(
+        `Read ${version.constitution.title} version ${version.version.versionLabel} for ${country.name}.`,
+      ),
+      path: `/countries/${country.isoCode}/versions/${params.versionId}`,
+    });
+  } catch {
+    return { title: atlasTitle('Version') };
+  }
+}
+
+export default async function VersionPage(props: VersionPageProps) {
+  const params = await props.params;
+  const searchParams = await props.searchParams;
   let country: CountryDetail | null = null;
   let articles: ArticleSummary[] = [];
   let error: string | null = null;
@@ -73,9 +100,13 @@ export default async function VersionPage({ params, searchParams }: VersionPageP
   }
 
   const sourceHref = httpUrl(version.version.sourceUrl);
-  const title = version.version.effectiveDate
-    ? `Version in force since ${version.version.effectiveDate}`
-    : `Version ${version.version.versionLabel}`;
+  const title = version.version.effectiveDate ? (
+    <>
+      Version in force since <FormattedDate value={version.version.effectiveDate} />
+    </>
+  ) : (
+    `Version ${version.version.versionLabel}`
+  );
 
   return (
     <PageMain className="wide">

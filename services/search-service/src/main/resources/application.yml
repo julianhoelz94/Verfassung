@@ -1,6 +1,10 @@
 spring:
   application:
     name: search-service
+  http:
+    client:
+      connect-timeout: 2s
+      read-timeout: 5s
 catalog:
   api:
     url: ${CATALOG_API_URL:http://localhost/api/catalog}

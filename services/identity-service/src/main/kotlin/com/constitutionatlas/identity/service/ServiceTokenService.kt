@@ -4,6 +4,7 @@ import com.constitutionatlas.identity.BadRequestException
 import com.constitutionatlas.identity.ConflictException
 import com.constitutionatlas.identity.ForbiddenException
 import com.constitutionatlas.identity.api.CreateServiceTokenRequest
+import com.constitutionatlas.identity.api.RotateServiceTokenRequest
 import com.constitutionatlas.identity.api.ServiceTokenCreatedDto
 import com.constitutionatlas.identity.api.ServiceTokenDto
 import com.constitutionatlas.identity.crypto.Tokens
@@ -12,6 +13,8 @@ import com.constitutionatlas.identity.repo.StoredUser
 import com.constitutionatlas.identity.repo.toDto
 import org.springframework.stereotype.Service
 import java.security.SecureRandom
+import java.time.OffsetDateTime
+import java.time.ZoneOffset
 import java.util.UUID
 
 @Service
@@ -37,7 +40,8 @@ class ServiceTokenService(
             throw ConflictException("A service token named '$name' already exists")
         }
         val plaintext = Tokens.urlToken(random)
-        val id = identityRepository.insertServiceToken(name, Tokens.sha256Hex(plaintext), scopes, admin.id)
+        val expiresAt = resolveExpiry(request.expiresAt)
+        val id = identityRepository.insertServiceToken(name, Tokens.sha256Hex(plaintext), scopes, admin.id, expiresAt)
         val stored =
             identityRepository.findServiceTokenById(id)
                 ?: throw IllegalStateException("Token missing after insert")
@@ -47,6 +51,34 @@ class ServiceTokenService(
             token = plaintext,
             scopes = stored.scopes,
             createdAt = stored.createdAt,
+            expiresAt = stored.expiresAt,
+        )
+    }
+
+    fun rotate(authorization: String?, tokenId: UUID, request: RotateServiceTokenRequest?): ServiceTokenCreatedDto {
+        requireAdmin(authorization)
+        authService.requireFreshStepUp(authorization)
+        val stored =
+            identityRepository.findServiceTokenById(tokenId)
+                ?: throw BadRequestException("Unknown service token")
+        if (stored.revokedAt != null) {
+            throw BadRequestException("Token is revoked")
+        }
+        val plaintext = Tokens.urlToken(random)
+        val expiresAt = resolveExpiry(request?.expiresAt)
+        if (!identityRepository.rotateServiceToken(tokenId, Tokens.sha256Hex(plaintext), expiresAt)) {
+            throw BadRequestException("Unknown service token")
+        }
+        val rotated =
+            identityRepository.findServiceTokenById(tokenId)
+                ?: throw IllegalStateException("Token missing after rotate")
+        return ServiceTokenCreatedDto(
+            id = rotated.id,
+            name = rotated.name,
+            token = plaintext,
+            scopes = rotated.scopes,
+            createdAt = rotated.createdAt,
+            expiresAt = rotated.expiresAt,
         )
     }
 
@@ -68,7 +100,15 @@ class ServiceTokenService(
 
     companion object {
         val ALLOWED_SCOPES =
-            listOf("catalog:write", "content:write", "search:reindex", "audit:append", "ingestion:import")
+            listOf(
+                "catalog:write",
+                "catalog:publish",
+                "content:write",
+                "search:reindex",
+                "audit:append",
+                "audit:read",
+                "ingestion:import",
+            )
 
         fun parseScopes(raw: List<String>): List<String> {
             val scopes = raw.map { it.trim() }.filter { it.isNotEmpty() }.distinct()
@@ -76,6 +116,19 @@ class ServiceTokenService(
                 throw BadRequestException("Scopes must be a non-empty subset of ${ALLOWED_SCOPES.joinToString()}")
             }
             return scopes
+        }
+
+        const val DEFAULT_TTL_DAYS: Long = 90
+        const val MAX_TTL_DAYS: Long = 365
+
+        fun resolveExpiry(requested: OffsetDateTime?): OffsetDateTime {
+            val now = OffsetDateTime.now(ZoneOffset.UTC)
+            val max = now.plusDays(MAX_TTL_DAYS)
+            val expiresAt = requested ?: now.plusDays(DEFAULT_TTL_DAYS)
+            if (!expiresAt.isAfter(now) || expiresAt.isAfter(max)) {
+                throw BadRequestException("expiresAt must be in the future and within $MAX_TTL_DAYS days")
+            }
+            return expiresAt
         }
     }
 }

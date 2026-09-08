@@ -51,7 +51,7 @@ export function Chip({ href, active, children }: ChipProps) {
 type PageHeaderProps = {
   breadcrumbs?: { href?: string; label: string }[];
   eyebrow?: string;
-  title: string;
+  title: ReactNode;
   meta?: ReactNode;
   actions?: ReactNode;
 };

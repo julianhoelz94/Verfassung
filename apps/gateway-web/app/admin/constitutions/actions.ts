@@ -31,7 +31,7 @@ function parseOutline(raw: string): OutlineKindWrite[] {
 
 export async function saveOutlineAction(formData: FormData): Promise<void> {
   await requireAdmin();
-  const authorization = requireSessionBearer();
+  const authorization = await requireSessionBearer();
   const constitutionId = String(formData.get('constitutionId') ?? '');
   let kinds: OutlineKindWrite[];
   try {
@@ -53,7 +53,7 @@ export async function saveOutlineAction(formData: FormData): Promise<void> {
 
 export async function createConstitutionAction(formData: FormData): Promise<void> {
   await requireAdmin();
-  const authorization = requireSessionBearer();
+  const authorization = await requireSessionBearer();
   const slug = String(formData.get('slug') ?? '');
   const title = String(formData.get('title') ?? '');
   let isoCode: string;

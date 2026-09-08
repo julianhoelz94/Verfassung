@@ -12,7 +12,7 @@ class RestSearchIndexClient(
     searchUrl: String,
     private val bearerToken: String? = null,
 ) : SearchIndexClient {
-    private val client: RestClient = RestClient.builder().baseUrl(searchUrl).build()
+    private val client: RestClient = timedRestClient(searchUrl)
 
     override fun reindex() {
         try {

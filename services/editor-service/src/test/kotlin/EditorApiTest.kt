@@ -402,6 +402,15 @@ class EditorApiTest {
         }
     }
 
+    @Test
+    fun saveRejectsDeeplyNestedJson() {
+        mockMvc.post("/edit-sessions/${UUID.randomUUID()}/saves") {
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = nestedJson(40)
+        }.andExpect { status { isBadRequest() } }
+    }
+
     private fun postCommand(sessionId: String, command: String, expectedStatus: String) {
         mockMvc.post("/edit-sessions/$sessionId/$command") {
             header("Authorization", TOKEN)
@@ -414,6 +423,8 @@ class EditorApiTest {
     companion object {
         private const val TOKEN = "Bearer test-token"
         private val NEW_VERSION_ID = UUID.fromString("01900000-0000-4000-8000-000000000501")
+
+        private fun nestedJson(depth: Int): String = (1..depth).fold("1") { acc, _ -> """{"x":$acc}""" }
 
         private fun actor(id: String, role: String) =
             Actor(UUID.fromString(id), "local-$role@example.local", listOf(role))

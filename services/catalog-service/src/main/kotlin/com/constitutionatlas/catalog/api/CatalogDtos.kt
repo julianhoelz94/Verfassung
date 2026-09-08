@@ -7,6 +7,9 @@ data class CountrySummary(
     val id: UUID,
     val isoCode: String,
     val name: String,
+    val latestVersionLabel: String? = null,
+    val latestEffectiveDate: LocalDate? = null,
+    val versionCount: Int = 0,
 )
 
 data class VersionSummary(

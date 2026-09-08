@@ -1,5 +1,6 @@
 package com.constitutionatlas.search.client
 
+import com.constitutionatlas.search.timedRestClient
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
@@ -14,8 +15,8 @@ class RestIndexSource(
     catalogUrl: String,
     contentUrl: String,
 ) : IndexSource {
-    private val catalog: RestClient = RestClient.builder().baseUrl(catalogUrl).build()
-    private val content: RestClient = RestClient.builder().baseUrl(contentUrl).build()
+    private val catalog: RestClient = timedRestClient(catalogUrl)
+    private val content: RestClient = timedRestClient(contentUrl)
 
     override fun loadPublishedArticles(): List<IndexableArticle> {
         val countries = catalog.get()

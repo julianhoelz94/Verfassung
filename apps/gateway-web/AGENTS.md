@@ -1,6 +1,6 @@
 # gateway-web
 
-Next.js 14 App Router, TypeScript. Public reading experience and later editor routes.
+Next.js 15 App Router, TypeScript. Public reading experience and later editor routes.
 
 **Repo map:** [`docs/CODEMAPS/INDEX.md`](../../docs/CODEMAPS/INDEX.md) (jump table for the whole repo). Gateway pages and clients: [`docs/CODEMAPS/frontend.md`](../../docs/CODEMAPS/frontend.md).
 
@@ -9,5 +9,5 @@ Next.js 14 App Router, TypeScript. Public reading experience and later editor ro
 - Fail optional backend data gracefully; do not block the whole page on a down search index.
 - Reuse the same article renderer for public and preview once the editor exists.
 - After UI changes: `npm run lint` and `npm run build` in this directory only.
-- Journey, axe, and visual tests: `npx playwright install --with-deps chromium && npm run build && npm run test:e2e`. Visual snapshots under `e2e/snapshots/` are Linux Chromium; regenerate them with `mcr.microsoft.com/playwright:v1.49.1-jammy`.
+- Journey, axe, and visual tests: `npx playwright install --with-deps chromium && npm run build && npm run test:e2e`. Visual snapshots under `e2e/snapshots/` are Linux Chromium; regenerate them with `mcr.microsoft.com/playwright:v1.51.1-jammy`.
 - When the work completes a backlog ID, set that ID to `Done` in `backlog.md`.

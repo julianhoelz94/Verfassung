@@ -86,7 +86,7 @@ class CatalogController(
         @RequestHeader(value = "Authorization", required = false) authorization: String?,
         @PathVariable versionId: UUID,
     ): VersionCreated {
-        writeAccess.requireCatalogWriter(authorization)
+        writeAccess.requireCatalogPublisher(authorization)
         return catalogWriteService.publishVersion(versionId)
     }
 }

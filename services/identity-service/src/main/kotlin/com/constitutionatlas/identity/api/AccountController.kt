@@ -117,6 +117,15 @@ class AccountController(
         serviceTokenService.revoke(authorization, tokenId)
     }
 
+    @PostMapping("/service-tokens/{tokenId}/rotate")
+    @SecurityRequirement(name = "bearer-session")
+    @Operation(summary = "Rotate a machine token (admin)")
+    fun rotateServiceToken(
+        @PathVariable tokenId: UUID,
+        @RequestBody(required = false) request: RotateServiceTokenRequest?,
+        @RequestHeader(value = "Authorization", required = false) authorization: String?,
+    ): ServiceTokenCreatedDto = serviceTokenService.rotate(authorization, tokenId, request)
+
     @PostMapping("/invites/accept")
     @Operation(summary = "Accept an invite and set a password")
     fun acceptInvite(

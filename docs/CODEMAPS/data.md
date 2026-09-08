@@ -33,7 +33,7 @@ Seed: `V3__seed_germany_articles.sql`, `V5__seed_article1_tree.sql`.
 
 ## identity_db
 
-`roles`, `users` (+ `enabled` V5), `user_roles`, `sessions` (+ `last_seen_at` V4), `login_throttle`, `invites`, `password_resets`, `user_mfa`, `mfa_recovery_codes`, `mfa_challenges`, `service_tokens` (V8).
+`roles`, `users` (+ `enabled` V5), `user_roles`, `sessions` (+ `last_seen_at` V4), `login_throttle`, `invites`, `password_resets`, `user_mfa`, `mfa_recovery_codes`, `mfa_challenges`, `service_tokens` (V8, `expires_at` V9).
 
 Roles seeded: `admin`, `editor`, `viewer`, then `reviewer`, `publisher` (V3).
 

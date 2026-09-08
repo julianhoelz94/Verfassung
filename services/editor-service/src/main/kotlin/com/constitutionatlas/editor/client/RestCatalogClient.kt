@@ -43,7 +43,7 @@ class RestCatalogClient(
     catalogUrl: String,
     private val bearerToken: String? = null,
 ) : CatalogClient {
-    private val client: RestClient = RestClient.builder().baseUrl(catalogUrl).build()
+    private val client: RestClient = timedRestClient(catalogUrl)
 
     override fun getVersion(versionId: UUID): CatalogVersion {
         val body = try {

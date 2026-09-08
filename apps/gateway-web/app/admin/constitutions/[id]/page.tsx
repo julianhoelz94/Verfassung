@@ -8,11 +8,13 @@ import { toOutlineKindWrite } from '../../../../lib/outline';
 import { OutlineEditor } from '../OutlineEditor';
 
 type AdminOutlinePageProps = {
-  params: { id: string };
-  searchParams: { saved?: string; error?: string };
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ saved?: string; error?: string }>;
 };
 
-export default async function AdminOutlinePage({ params, searchParams }: AdminOutlinePageProps) {
+export default async function AdminOutlinePage(props: AdminOutlinePageProps) {
+  const params = await props.params;
+  const searchParams = await props.searchParams;
   if (!(await requireAdminPage())) {
     return <AdminForbidden title="Outline" />;
   }

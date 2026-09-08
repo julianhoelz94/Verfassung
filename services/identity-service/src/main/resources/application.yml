@@ -1,6 +1,10 @@
 spring:
   application:
     name: identity-service
+  http:
+    client:
+      connect-timeout: 2s
+      read-timeout: 5s
 identity:
   seed:
     mode: ${IDENTITY_SEED_MODE:off}

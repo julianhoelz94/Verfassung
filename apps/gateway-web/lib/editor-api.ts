@@ -80,8 +80,8 @@ export class EditorApiError extends Error {
   }
 }
 
-function authHeader(): string {
-  const token = cookies().get(SESSION_COOKIE)?.value;
+async function authHeader(): Promise<string> {
+  const token = (await cookies()).get(SESSION_COOKIE)?.value;
   if (!token) {
     throw new EditorApiError('sign_in');
   }
@@ -93,7 +93,7 @@ async function editorFetch(path: string, init: RequestInit = {}): Promise<Respon
     ...init,
     cache: 'no-store',
     headers: {
-      Authorization: authHeader(),
+      Authorization: await authHeader(),
       'Content-Type': 'application/json',
       ...(init.headers ?? {}),
     },

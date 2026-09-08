@@ -5,24 +5,26 @@ import {
   listArticlePage,
   listCountries,
   type CountryDetail,
+  type CountrySummary,
 } from '../lib/api';
+import { orderVersions } from '../lib/compare';
+import { FormattedDate } from '../lib/format-date';
 import { PageMain } from './components/PageMain';
 import { SiteSearchForm } from './components/SiteSearchForm';
 import { ServiceUnavailable } from './components/StatusMessage';
 import { Badge } from './components/ui';
 import {
-  latestVersion,
   newestChanges,
-  previousVersion,
   recentChangesFromAmendments,
   type RecentChange,
 } from '../lib/reading';
 
 export default async function Page() {
   let error: string | null = null;
+  let countries: CountrySummary[] = [];
   let details: CountryDetail[] = [];
   try {
-    const countries = (await listCountries()) ?? [];
+    countries = (await listCountries()) ?? [];
     const loaded = await Promise.all(countries.map((country) => getCountry(country.isoCode)));
     details = loaded.filter((country): country is CountryDetail => country != null);
   } catch (e) {
@@ -100,33 +102,44 @@ export default async function Page() {
         </div>
       </section>
       <h2 className="section-title">Countries</h2>
-      {details.length === 0 ? (
+      {countries.length === 0 ? (
         <p>No countries are published yet.</p>
       ) : (
         <div className="card-grid">
-          {details.map((country) => {
-            const constitution = country.constitutions[0];
-            const versions = constitution?.versions ?? [];
-            const latest = latestVersion(versions);
-            const previous = previousVersion(versions);
-            const countryArticles = articlesByCountry.get(country.isoCode);
+          {countries.map((summary) => {
+            const country = details.find((item) => item.isoCode === summary.isoCode);
+            const versions = country
+              ? orderVersions(country.constitutions.flatMap((item) => item.versions))
+              : [];
+            const latest = versions[versions.length - 1];
+            const previous = versions.length >= 2 ? versions[versions.length - 2] : undefined;
+            const countryArticles = country ? articlesByCountry.get(country.isoCode) : undefined;
             return (
-              <article key={country.id} className="card country-card">
+              <article key={summary.id} className="card country-card">
                 <div className="iso" aria-hidden="true">
-                  {country.isoCode}
+                  {summary.isoCode}
                 </div>
                 <div>
                   <h3 className="card-title">
-                    <a href={`/countries/${country.isoCode}`}>{country.name}</a>
+                    <a href={`/countries/${summary.isoCode}`}>{summary.name}</a>
                   </h3>
-                  {country.constitutions.length > 0 ? (
+                  {country && country.constitutions.length > 0 ? (
                     <p className="muted">{country.constitutions.map((item) => item.title).join(' · ')}</p>
                   ) : null}
                   <div className="card-meta">
-                    {latest ? <Badge tone="accent">Latest: {latest.versionLabel}</Badge> : null}
+                    {summary.latestVersionLabel ? (
+                      <Badge tone="accent">Latest: {summary.latestVersionLabel}</Badge>
+                    ) : latest ? (
+                      <Badge tone="accent">Latest: {latest.versionLabel}</Badge>
+                    ) : null}
                     <span>
-                      {versions.length} version{versions.length === 1 ? '' : 's'}
+                      {summary.versionCount} version{summary.versionCount === 1 ? '' : 's'}
                     </span>
+                    {summary.latestEffectiveDate ? (
+                      <span>
+                        In force since <FormattedDate value={summary.latestEffectiveDate} />
+                      </span>
+                    ) : null}
                     {countryArticles != null ? (
                       <span>
                         {countryArticles} article{countryArticles === 1 ? '' : 's'}
@@ -136,14 +149,14 @@ export default async function Page() {
                   </div>
                   <div className="card-actions">
                     {latest ? (
-                      <a className="btn btn-sm" href={`/countries/${country.isoCode}/versions/${latest.id}`}>
+                      <a className="btn btn-sm" href={`/countries/${summary.isoCode}/versions/${latest.id}`}>
                         Read latest
                       </a>
                     ) : null}
-                    {latest && previous ? (
+                    {summary.versionCount >= 2 && latest && previous ? (
                       <a
                         className="btn btn-sm btn-ghost"
-                        href={`/countries/${country.isoCode}/compare?from=${previous.id}&to=${latest.id}`}
+                        href={`/countries/${summary.isoCode}/compare?from=${previous.id}&to=${latest.id}`}
                       >
                         Compare {previous.versionLabel} → {latest.versionLabel}
                       </a>

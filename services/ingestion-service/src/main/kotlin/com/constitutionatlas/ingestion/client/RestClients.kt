@@ -12,8 +12,7 @@ import java.time.LocalDate
 import java.util.UUID
 
 private fun restClient(baseUrl: String): RestClient =
-    RestClient.builder()
-        .baseUrl(baseUrl)
+    timedRestClientBuilder(baseUrl)
         .requestInterceptor { request, body, execution ->
             DownstreamAuth.header()?.let { request.headers.set(HttpHeaders.AUTHORIZATION, it) }
             execution.execute(request, body)

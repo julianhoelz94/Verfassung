@@ -18,13 +18,16 @@ import {
   requestStartMfaEnroll,
   requestStepUp,
   requestUpdateRoles,
+  requestCreateServiceToken,
+  requestRotateServiceToken,
+  requestRevokeServiceToken,
 } from '../../lib/identity-client';
 import { requireAdminUser } from '../../lib/admin';
 import { safeReturnTo } from '../../lib/return-to';
 import { SESSION_COOKIE, clearChallengeCookie, setChallengeCookie } from '../../lib/session';
 
-function tokenOrRedirect(): string {
-  const token = cookies().get(SESSION_COOKIE)?.value;
+async function tokenOrRedirect(): Promise<string> {
+  const token = (await cookies()).get(SESSION_COOKIE)?.value;
   if (!token) {
     redirect('/login');
   }
@@ -37,7 +40,7 @@ async function requireAdminToken(): Promise<string> {
 }
 
 export async function changePasswordAction(formData: FormData): Promise<void> {
-  const token = tokenOrRedirect();
+  const token = await tokenOrRedirect();
   try {
     await requestChangePassword(
       token,
@@ -143,7 +146,7 @@ export type RecoveryRevealState = {
 };
 
 export async function startMfaEnrollAction(): Promise<void> {
-  const token = tokenOrRedirect();
+  const token = await tokenOrRedirect();
   let challengeToken: string;
   try {
     const started = await requestStartMfaEnroll(undefined, token);
@@ -152,7 +155,7 @@ export async function startMfaEnrollAction(): Promise<void> {
     redirect('/account?error=mfa');
   }
   // Same httpOnly cookie the login enrollment flow uses; keeps the challenge out of the URL.
-  setChallengeCookie(challengeToken);
+  await setChallengeCookie(challengeToken);
   redirect('/account?enroll=1');
 }
 
@@ -160,14 +163,14 @@ export async function confirmAccountMfaAction(
   _prev: RecoveryRevealState,
   formData: FormData,
 ): Promise<RecoveryRevealState> {
-  const token = tokenOrRedirect();
+  const token = await tokenOrRedirect();
   try {
     const confirmed = await requestConfirmMfaEnroll(
       String(formData.get('code') ?? ''),
       String(formData.get('challengeToken') ?? ''),
       token,
     );
-    clearChallengeCookie();
+    await clearChallengeCookie();
     return { recoveryCodes: confirmed.recoveryCodes };
   } catch {
     return { error: true };
@@ -175,7 +178,7 @@ export async function confirmAccountMfaAction(
 }
 
 export async function revokeMfaAction(formData: FormData): Promise<void> {
-  const token = tokenOrRedirect();
+  const token = await tokenOrRedirect();
   try {
     await requestRevokeMfa(token, String(formData.get('code') ?? ''));
   } catch {
@@ -188,7 +191,7 @@ export async function regenerateRecoveryAction(
   _prev: RecoveryRevealState,
   formData: FormData,
 ): Promise<RecoveryRevealState> {
-  const token = tokenOrRedirect();
+  const token = await tokenOrRedirect();
   try {
     const result = await requestRegenerateRecovery(token, String(formData.get('code') ?? ''));
     return { recoveryCodes: result.recoveryCodes };
@@ -198,7 +201,7 @@ export async function regenerateRecoveryAction(
 }
 
 export async function stepUpAction(formData: FormData): Promise<void> {
-  const token = tokenOrRedirect();
+  const token = await tokenOrRedirect();
   const returnTo = safeReturnTo(String(formData.get('returnTo') ?? '/account'), '/account');
   try {
     await requestStepUp(token, String(formData.get('code') ?? ''));
@@ -214,6 +217,56 @@ export async function updateRolesAction(formData: FormData): Promise<void> {
   const roles = parseRoles(formData);
   try {
     await requestUpdateRoles(token, userId, roles);
+  } catch (error) {
+    if (error instanceof IdentityApiError && error.code === 'step_up_required') {
+      redirect(`/account/step-up?returnTo=${encodeURIComponent('/admin/users')}`);
+    }
+    redirect('/admin/users?error=1');
+  }
+  redirect('/admin/users');
+}
+
+export async function createServiceTokenAction(
+  _prev: TokenRevealState,
+  formData: FormData,
+): Promise<TokenRevealState> {
+  const token = await requireAdminToken();
+  const name = String(formData.get('name') ?? '').trim();
+  const scopes = String(formData.get('scopes') ?? '')
+    .split(',')
+    .map((scope) => scope.trim())
+    .filter(Boolean);
+  try {
+    const created = await requestCreateServiceToken(token, name, scopes);
+    return { token: created.token };
+  } catch (error) {
+    if (error instanceof IdentityApiError && error.code === 'step_up_required') {
+      redirect(`/account/step-up?returnTo=${encodeURIComponent('/admin/users')}`);
+    }
+    return { error: true };
+  }
+}
+
+export async function rotateServiceTokenAction(
+  _prev: TokenRevealState,
+  formData: FormData,
+): Promise<TokenRevealState> {
+  const token = await requireAdminToken();
+  try {
+    const rotated = await requestRotateServiceToken(token, String(formData.get('tokenId') ?? ''));
+    return { token: rotated.token };
+  } catch (error) {
+    if (error instanceof IdentityApiError && error.code === 'step_up_required') {
+      redirect(`/account/step-up?returnTo=${encodeURIComponent('/admin/users')}`);
+    }
+    return { error: true };
+  }
+}
+
+export async function revokeServiceTokenAction(formData: FormData): Promise<void> {
+  const token = await requireAdminToken();
+  try {
+    await requestRevokeServiceToken(token, String(formData.get('tokenId') ?? ''));
   } catch (error) {
     if (error instanceof IdentityApiError && error.code === 'step_up_required') {
       redirect(`/account/step-up?returnTo=${encodeURIComponent('/admin/users')}`);

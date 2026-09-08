@@ -7,16 +7,17 @@ import { getImportJob } from '../../../../lib/ingestion-api';
 import { requireSessionBearer } from '../../../../lib/session';
 
 type ImportJobPageProps = {
-  params: { jobId: string };
+  params: Promise<{ jobId: string }>;
 };
 
-export default async function ImportJobPage({ params }: ImportJobPageProps) {
+export default async function ImportJobPage(props: ImportJobPageProps) {
+  const params = await props.params;
   if (!(await requireAdminPage())) {
     return <AdminForbidden title="Import" />;
   }
   let job;
   try {
-    job = await getImportJob(params.jobId, requireSessionBearer());
+    job = await getImportJob(params.jobId, await requireSessionBearer());
   } catch {
     return (
       <PageMain>

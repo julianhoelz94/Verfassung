@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation';
+import type { Metadata } from 'next';
 import { CompareView } from '../../../components/CompareView';
 import { ConstitutionText } from '../../../components/ConstitutionText';
 import { CopyLink } from '../../../components/CopyLink';
@@ -19,6 +20,7 @@ import {
 } from '../../../../lib/api';
 import {
   COMPARE_KIND_LABEL,
+  canonicalCompareQuery,
   compareArticleNumbers,
   compareRequestError,
   compareRowId,
@@ -27,12 +29,49 @@ import {
   versionPath,
   type CompareKind,
 } from '../../../../lib/compare';
+import { FormattedDate } from '../../../../lib/format-date';
+import { atlasTitle, metaDescription, pageMetadata } from '../../../../lib/page-meta';
 import { CompareForm } from '../CompareForm';
 
 type ComparePageProps = {
-  params: { code: string };
-  searchParams: { from?: string; to?: string; all?: string };
+  params: Promise<{ code: string }>;
+  searchParams: Promise<{ from?: string; to?: string; all?: string }>;
 };
+
+export async function generateMetadata(props: ComparePageProps): Promise<Metadata> {
+  const params = await props.params;
+  const searchParams = await props.searchParams;
+  try {
+    const country = await getCountry(params.code);
+    if (!country) {
+      return { title: atlasTitle('Compare') };
+    }
+    const constitution =
+      country.constitutions.find((item) =>
+        item.versions.some(
+          (version) => version.id === searchParams.from || version.id === searchParams.to,
+        ),
+      ) ?? country.constitutions[0];
+    const versions = orderVersions(constitution?.versions ?? []);
+    const fromId = searchParams.from ?? versions[0]?.id;
+    const toId = searchParams.to ?? versions[versions.length - 1]?.id;
+    const canonical = canonicalCompareQuery(fromId, toId, versions);
+    const fromVersion = versions.find((version) => version.id === (canonical?.from ?? fromId));
+    const toVersion = versions.find((version) => version.id === (canonical?.to ?? toId));
+    const fromLabel = fromVersion?.versionLabel ?? '…';
+    const toLabel = toVersion?.versionLabel ?? '…';
+    const path = canonical
+      ? `/countries/${country.isoCode}/compare?from=${encodeURIComponent(canonical.from)}&to=${encodeURIComponent(canonical.to)}`
+      : `/countries/${country.isoCode}/compare`;
+    return pageMetadata({
+      title: atlasTitle(`Compare ${fromLabel} → ${toLabel}`, country.name),
+      description: metaDescription(`Compare constitutional versions for ${country.name}.`),
+      path,
+    });
+  } catch {
+    return { title: atlasTitle('Compare') };
+  }
+}
 
 type Hop = {
   source: VersionSummary;
@@ -61,7 +100,9 @@ function hopChangeTone(changeType: string): 'added' | 'removed' | 'changed' | 'n
   return 'neutral';
 }
 
-export default async function ComparePage({ params, searchParams }: ComparePageProps) {
+export default async function ComparePage(props: ComparePageProps) {
+  const params = await props.params;
+  const searchParams = await props.searchParams;
   let country: CountryDetail | null = null;
   let error: string | null = null;
   try {
@@ -232,9 +273,19 @@ export default async function ComparePage({ params, searchParams }: ComparePageP
                     </span>
                     <span className="muted">
                       · {lawCount} amending law{lawCount === 1 ? '' : 's'}
-                      {lastLaw?.sourceReference
-                        ? ` · last: ${lastLaw.sourceReference}${lastLaw.enactedOn ? ` (${lastLaw.enactedOn})` : ''}`
-                        : ''}
+                      {lastLaw?.sourceReference ? (
+                        <>
+                          {' · last: '}
+                          {lastLaw.sourceReference}
+                          {lastLaw.enactedOn ? (
+                            <>
+                              {' ('}
+                              <FormattedDate value={lastLaw.enactedOn} />
+                              {')'}
+                            </>
+                          ) : null}
+                        </>
+                      ) : null}
                     </span>
                   </summary>
                   <div className="stack">
@@ -250,7 +301,12 @@ export default async function ComparePage({ params, searchParams }: ComparePageP
                             <span className="muted">
                               {amendment.title}
                               {change.note ? ` · ${change.note}` : ''}
-                              {change.changedOn ? ` · ${change.changedOn}` : ''}
+                              {change.changedOn ? (
+                                <>
+                                  {' · '}
+                                  <FormattedDate value={change.changedOn} />
+                                </>
+                              ) : null}
                             </span>
                           </div>
                       )),
@@ -301,6 +357,7 @@ export default async function ComparePage({ params, searchParams }: ComparePageP
                           side="from"
                           showHeading={false}
                           outline={constitution?.contentOutline}
+                          lang={fromVersion.languageCode}
                         />
                       ) : row.left ? (
                         <ConstitutionText
@@ -309,6 +366,7 @@ export default async function ComparePage({ params, searchParams }: ComparePageP
                           showHeading={false}
                           headingIdPrefix="article-from"
                           outline={constitution?.contentOutline}
+                          lang={fromVersion.languageCode}
                         />
                       ) : (
                         <p className="muted">This article did not exist in the {fromVersion.versionLabel} text.</p>
@@ -326,6 +384,7 @@ export default async function ComparePage({ params, searchParams }: ComparePageP
                           side="to"
                           showHeading={false}
                           outline={constitution?.contentOutline}
+                          lang={toVersion.languageCode}
                         />
                       ) : row.right ? (
                         <ConstitutionText
@@ -334,6 +393,7 @@ export default async function ComparePage({ params, searchParams }: ComparePageP
                           showHeading={false}
                           headingIdPrefix="article-to"
                           outline={constitution?.contentOutline}
+                          lang={toVersion.languageCode}
                         />
                       ) : (
                         <p className="muted">This article did not exist in the {toVersion.versionLabel} text.</p>

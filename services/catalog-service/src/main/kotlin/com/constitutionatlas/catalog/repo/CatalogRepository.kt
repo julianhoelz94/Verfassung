@@ -19,11 +19,33 @@ class CatalogRepository(private val jdbc: JdbcTemplate) {
     fun listCountries(): List<CountrySummary> =
         jdbc.query(
             """
-            SELECT id, iso_code, name
-            FROM countries
-            ORDER BY name
+            SELECT
+              c.id,
+              c.iso_code,
+              c.name,
+              latest.version_label AS latest_version_label,
+              latest.effective_date AS latest_effective_date,
+              COALESCE(counts.version_count, 0) AS version_count
+            FROM countries c
+            LEFT JOIN LATERAL (
+              SELECT cv.version_label, cv.effective_date
+              FROM constitutions cons
+              JOIN constitution_versions cv ON cv.constitution_id = cons.id
+              WHERE cons.country_id = c.id
+                AND cv.publication_status = 'published'
+              ORDER BY cv.effective_date DESC NULLS LAST, cv.version_label DESC
+              LIMIT 1
+            ) latest ON TRUE
+            LEFT JOIN (
+              SELECT cons.country_id, COUNT(*)::int AS version_count
+              FROM constitutions cons
+              JOIN constitution_versions cv ON cv.constitution_id = cons.id
+              WHERE cv.publication_status = 'published'
+              GROUP BY cons.country_id
+            ) counts ON counts.country_id = c.id
+            ORDER BY c.name
             """.trimIndent(),
-            countrySummaryMapper,
+            countryListMapper,
         )
 
     fun findCountryDetail(isoCode: String): CountryDetail? {
@@ -33,7 +55,7 @@ class CatalogRepository(private val jdbc: JdbcTemplate) {
             FROM countries
             WHERE iso_code = ?
             """.trimIndent(),
-            countrySummaryMapper,
+            countryIdNameMapper,
             isoCode.uppercase(),
         ).firstOrNull() ?: return null
 
@@ -94,7 +116,7 @@ class CatalogRepository(private val jdbc: JdbcTemplate) {
     fun findCountrySummary(isoCode: String): CountrySummary? =
         jdbc.query(
             "SELECT id, iso_code, name FROM countries WHERE iso_code = ?",
-            countrySummaryMapper,
+            countryIdNameMapper,
             isoCode.uppercase(),
         ).firstOrNull()
 
@@ -306,11 +328,22 @@ class CatalogRepository(private val jdbc: JdbcTemplate) {
             versionId,
         ).firstOrNull()
 
-    private val countrySummaryMapper = RowMapper { rs, _ ->
+    private val countryIdNameMapper = RowMapper { rs, _ ->
         CountrySummary(
             id = rs.getObject("id", UUID::class.java),
             isoCode = rs.getString("iso_code"),
             name = rs.getString("name"),
+        )
+    }
+
+    private val countryListMapper = RowMapper { rs, _ ->
+        CountrySummary(
+            id = rs.getObject("id", UUID::class.java),
+            isoCode = rs.getString("iso_code"),
+            name = rs.getString("name"),
+            latestVersionLabel = rs.getString("latest_version_label"),
+            latestEffectiveDate = rs.getDate("latest_effective_date")?.toLocalDate(),
+            versionCount = rs.getInt("version_count"),
         )
     }
 

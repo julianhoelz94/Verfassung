@@ -63,6 +63,9 @@ export type CountrySummary = {
   id: string;
   isoCode: string;
   name: string;
+  latestVersionLabel: string | null;
+  latestEffectiveDate: string | null;
+  versionCount: number;
 };
 
 export type CountryDetail = {

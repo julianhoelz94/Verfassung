@@ -277,6 +277,7 @@ class IdentityApiTest {
             status { isOk() }
             jsonPath("$[0].name") { value("ingestion-ci") }
             jsonPath("$[0].token") { doesNotExist() }
+            jsonPath("$[0].expiresAt") { exists() }
         }
         mockMvc.delete("/service-tokens/$tokenId") {
             header("Authorization", "Bearer $admin")
@@ -284,6 +285,58 @@ class IdentityApiTest {
         mockMvc.get("/me") {
             header("Authorization", "Bearer $token")
         }.andExpect { status { isUnauthorized() } }
+    }
+
+    @Test
+    fun expiredServiceTokenCannotCallMe() {
+        val admin = login("local-admin@example.local", "change-me")
+        val createdJson =
+            mockMvc.post("/service-tokens") {
+                header("Authorization", "Bearer $admin")
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"name":"expired-ci","scopes":["audit:read"]}"""
+            }.andExpect { status { isCreated() } }.andReturn().response.contentAsString
+        val tree = objectMapper.readTree(createdJson)
+        val token = tree.get("token").asText()
+        val tokenId = tree.get("id").asText()
+        jdbcTemplate.update("UPDATE service_tokens SET expires_at = NOW() - INTERVAL '1 hour' WHERE id = ?::uuid", tokenId)
+        mockMvc.get("/me") {
+            header("Authorization", "Bearer $token")
+        }.andExpect { status { isUnauthorized() } }
+    }
+
+    @Test
+    fun adminCanRotateServiceToken() {
+        val admin = login("local-admin@example.local", "change-me")
+        val createdJson =
+            mockMvc.post("/service-tokens") {
+                header("Authorization", "Bearer $admin")
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"name":"rotate-ci","scopes":["audit:append"]}"""
+            }.andExpect { status { isCreated() } }.andReturn().response.contentAsString
+        val created = objectMapper.readTree(createdJson)
+        val oldToken = created.get("token").asText()
+        val tokenId = created.get("id").asText()
+        val rotatedJson =
+            mockMvc.post("/service-tokens/$tokenId/rotate") {
+                header("Authorization", "Bearer $admin")
+                contentType = MediaType.APPLICATION_JSON
+                content = "{}"
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.token") { exists() }
+                jsonPath("$.expiresAt") { exists() }
+            }.andReturn().response.contentAsString
+        val newToken = objectMapper.readTree(rotatedJson).get("token").asText()
+        mockMvc.get("/me") {
+            header("Authorization", "Bearer $oldToken")
+        }.andExpect { status { isUnauthorized() } }
+        mockMvc.get("/me") {
+            header("Authorization", "Bearer $newToken")
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.email") { value("service:rotate-ci") }
+        }
     }
 
     @Test

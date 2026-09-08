@@ -2,14 +2,15 @@ import { cookies } from 'next/headers';
 import { AdminForbidden } from '../../components/AdminForbidden';
 import { Alert, Badge, Button, Card, DataList, DataRow, Input, PageHeader } from '../../components/ui';
 import { PageMain } from '../../components/PageMain';
-import { disableUserAction, enableUserAction, updateRolesAction } from '../../account/actions';
-import { InviteUserForm, IssueResetForm } from './TokenForms';
+import { disableUserAction, enableUserAction, updateRolesAction, revokeServiceTokenAction } from '../../account/actions';
+import { InviteUserForm, IssueResetForm, CreateServiceTokenForm, RotateServiceTokenForm } from './TokenForms';
 import { requireAdminPage } from '../../../lib/admin';
-import { requestUsers, type AdminUser } from '../../../lib/identity-client';
+import { requestUsers, requestServiceTokens, type AdminUser, type ServiceToken } from '../../../lib/identity-client';
+import { FormattedDate } from '../../../lib/format-date';
 import { SESSION_COOKIE } from '../../../lib/session';
 
 type AdminUsersPageProps = {
-  searchParams: { error?: string };
+  searchParams: Promise<{ error?: string }>;
 };
 
 function statusTone(user: AdminUser): 'added' | 'removed' | 'info' | 'neutral' {
@@ -22,23 +23,30 @@ function statusTone(user: AdminUser): 'added' | 'removed' | 'info' | 'neutral' {
   return 'removed';
 }
 
-export default async function AdminUsersPage({ searchParams }: AdminUsersPageProps) {
+export default async function AdminUsersPage(props: AdminUsersPageProps) {
+  const searchParams = await props.searchParams;
   if (!(await requireAdminPage())) {
     return <AdminForbidden title="Users" />;
   }
-  const token = cookies().get(SESSION_COOKIE)?.value;
+  const token = (await cookies()).get(SESSION_COOKIE)?.value;
   let users: AdminUser[] = [];
   let usersError = false;
+  let tokens: ServiceToken[] = [];
   if (token) {
     try {
       users = await requestUsers(token);
     } catch {
       usersError = true;
     }
+    try {
+      tokens = await requestServiceTokens(token);
+    } catch {
+      tokens = [];
+    }
   }
   return (
     <PageMain className="wide">
-      <PageHeader title="Users" meta="Invite accounts, set roles, and revoke access." />
+      <PageHeader title="Users" meta="Invite accounts, set roles, rotate machine tokens, and revoke access." />
       {searchParams.error === 'forbidden' ? (
         <Alert tone="error">Administrator role required.</Alert>
       ) : searchParams.error ? (
@@ -89,6 +97,44 @@ export default async function AdminUsersPage({ searchParams }: AdminUsersPagePro
                       <Button variant="primary">Activate</Button>
                     </form>
                   ),
+              },
+            ]}
+          />
+        ))}
+      </DataList>
+      <Card>
+        <h2 className="card-title">Service tokens</h2>
+        <p className="muted">Machine tokens expire after 90 days unless rotated. The plaintext secret is shown once.</p>
+        <CreateServiceTokenForm />
+      </Card>
+      <DataList columns={4}>
+        {tokens.map((item) => (
+          <DataRow
+            key={item.id}
+            cells={[
+              { label: 'Name', value: item.name },
+              { label: 'Scopes', value: item.scopes.join(', ') },
+              {
+                label: 'Expires',
+                value: item.revokedAt ? (
+                  <Badge tone="removed">Revoked</Badge>
+                ) : (
+                  <FormattedDate value={item.expiresAt} />
+                ),
+              },
+              {
+                label: 'Actions',
+                value: item.revokedAt ? (
+                  <span className="muted">Revoked</span>
+                ) : (
+                  <div className="form-row">
+                    <RotateServiceTokenForm tokenId={item.id} />
+                    <form action={revokeServiceTokenAction}>
+                      <input type="hidden" name="tokenId" value={item.id} />
+                      <Button>Revoke</Button>
+                    </form>
+                  </div>
+                ),
               },
             ]}
           />

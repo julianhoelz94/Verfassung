@@ -25,7 +25,7 @@ export async function saveNodeTitleAction(formData: FormData): Promise<void> {
     redirect(`${errorUrl.pathname}${errorUrl.search}`);
   }
   try {
-    await patchContentNode(nodeId, title, requireSessionBearer());
+    await patchContentNode(nodeId, title, await requireSessionBearer());
   } catch {
     const errorUrl = new URL(returnTo, 'http://atlas.local');
     errorUrl.searchParams.set('error', 'title');

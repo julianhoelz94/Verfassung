@@ -120,3 +120,25 @@ export function compareRowId(articleNumber: string): string {
 export function compareArticleNumbers(a: string, b: string): number {
   return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
 }
+
+export function canonicalCompareQuery(
+  fromId: string | undefined,
+  toId: string | undefined,
+  versions: VersionSummary[],
+): { from: string; to: string } | null {
+  if (!fromId || !toId || fromId === toId) {
+    return null;
+  }
+  const ordered = orderVersions(versions);
+  const fromIndex = ordered.findIndex((version) => version.id === fromId);
+  const toIndex = ordered.findIndex((version) => version.id === toId);
+  if (fromIndex < 0 || toIndex < 0) {
+    return null;
+  }
+  const earlierIndex = Math.min(fromIndex, toIndex);
+  const laterIndex = Math.max(fromIndex, toIndex);
+  return {
+    from: ordered[earlierIndex].id,
+    to: ordered[laterIndex].id,
+  };
+}

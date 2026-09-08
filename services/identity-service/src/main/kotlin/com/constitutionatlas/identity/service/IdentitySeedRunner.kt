@@ -9,6 +9,8 @@ import org.springframework.boot.ApplicationRunner
 import org.springframework.core.annotation.Order
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.stereotype.Component
+import java.time.OffsetDateTime
+import java.time.ZoneOffset
 
 @Component
 @Order(1)
@@ -44,9 +46,13 @@ class IdentitySeedRunner(
         }
         val hash = Tokens.sha256Hex(plaintext)
         if (identityRepository.findValidServiceTokenByHash(hash) != null) {
+            identityRepository.replaceActiveServiceTokenScopes(SEED_TOKEN_NAME, ServiceTokenService.ALLOWED_SCOPES)
+            identityRepository.renewActiveServiceTokenExpiry(SEED_TOKEN_NAME, seedTokenExpiry())
             return
         }
         if (identityRepository.findActiveServiceTokenByName(SEED_TOKEN_NAME) != null) {
+            identityRepository.replaceActiveServiceTokenScopes(SEED_TOKEN_NAME, ServiceTokenService.ALLOWED_SCOPES)
+            identityRepository.renewActiveServiceTokenExpiry(SEED_TOKEN_NAME, seedTokenExpiry())
             return
         }
         val createdBy =
@@ -58,6 +64,7 @@ class IdentitySeedRunner(
             hash,
             ServiceTokenService.ALLOWED_SCOPES,
             createdBy.id,
+            seedTokenExpiry(),
         )
         log.info("Seeded automation service token '{}'", SEED_TOKEN_NAME)
     }
@@ -87,6 +94,9 @@ class IdentitySeedRunner(
             mfaService.ensureSeedTotp(userId, properties.totpSecret)
         }
     }
+
+    private fun seedTokenExpiry(): OffsetDateTime =
+        OffsetDateTime.now(ZoneOffset.UTC).plusDays(ServiceTokenService.MAX_TTL_DAYS)
 
     companion object {
         const val SEED_TOKEN_NAME = "seeded-automation"

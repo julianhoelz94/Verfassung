@@ -1,7 +1,7 @@
 <!-- Generated: 2026-09-06 | Files scanned: ~250 | Token estimate: ~800 -->
 # Frontend (`apps/gateway-web`)
 
-Next.js 14 App Router, React 18, TypeScript. **No DB** — HTTP clients only. Prefer server components; client components for editor widgets.
+Next.js 15 App Router, React 18, TypeScript. **No DB** — HTTP clients only. Prefer server components; client components for editor widgets.
 
 **Rules:** `apps/gateway-web/AGENTS.md`, `.cursor/rules/nextjs-gateway.mdc`  
 **Design:** `docs/design/ui-concept.md`, tokens in `app/globals.css` (from `docs/design/tokens.css`)  
@@ -57,8 +57,8 @@ Env in Compose: `CATALOG_API_URL=http://catalog-service:8080` (service root, not
 | Unit | `npm test` — vitest on `lib/*.test.ts` + `lib/interpret-me.test.cjs` |
 | Lint/build | `npm run lint`, `npm run build` |
 | E2E | `npm run test:e2e` — `e2e/journeys.spec.ts`, `a11y.spec.ts`, `visual.spec.ts` |
-| Snapshots | `e2e/snapshots/` Linux Chromium `mcr.microsoft.com/playwright:v1.49.1-jammy` |
+| Snapshots | `e2e/snapshots/` Linux Chromium `mcr.microsoft.com/playwright:v1.51.1-jammy` |
 
 Journeys: browse DE article, search “dignity”, compare, MFA login, edit→review→publish.
 
-No `middleware.ts`. Swagger is Caddy `/api/docs/<service>/swagger-ui/index.html`, not a Next route (`nav.ts` may link `/api-docs` for admins).
+`middleware.ts` sets a per-request CSP nonce (`script-src 'self' 'nonce-…' 'strict-dynamic'`, `frame-ancestors 'none'`). Styles still allow `'unsafe-inline'` until App Router emits style nonces. Swagger is Caddy `/api/docs/<service>/swagger-ui/index.html`, not a Next route (`nav.ts` may link `/api-docs` for admins).

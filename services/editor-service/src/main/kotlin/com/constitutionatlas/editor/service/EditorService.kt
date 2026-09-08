@@ -22,7 +22,6 @@ import com.constitutionatlas.editor.client.ContentClient
 import com.constitutionatlas.editor.client.ContentTreeArticle
 import com.constitutionatlas.editor.client.ContentTreeNode
 import com.constitutionatlas.editor.client.NodeWritePayload
-import com.constitutionatlas.editor.client.SearchIndexClient
 import com.constitutionatlas.editor.repo.EditorRepository
 import com.constitutionatlas.platform.Actor
 import com.constitutionatlas.platform.ForbiddenException
@@ -31,6 +30,7 @@ import com.constitutionatlas.platform.NotFoundException
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import java.time.Instant
 import java.util.UUID
 
 @Service
@@ -40,7 +40,6 @@ class EditorService(
     private val contentClient: ContentClient,
     private val catalogClient: CatalogClient,
     private val amendmentClient: AmendmentClient,
-    private val searchIndexClient: SearchIndexClient,
     private val editorRepository: EditorRepository,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
@@ -73,9 +72,6 @@ class EditorService(
         versionId: UUID?,
     ): List<EditSessionSummaryDto> {
         val actor = actor(authorization)
-        if (!actor.isEditorial()) {
-            throw ForbiddenException("Editorial role required")
-        }
         val owner =
             when {
                 openedBy.isNullOrBlank() -> null
@@ -167,8 +163,37 @@ class EditorService(
             contentClient.updateArticle(copy.id, draft.title, draft.body)
         }
         val published = catalogClient.publishVersion(successor.id)
-        amendmentClient.recordTransition(session.versionId, published.id)
+        val transitionId = amendmentClient.recordTransition(session.versionId, published.id)
         editorRepository.updateStatus(session.id, EditSessionStatus.PUBLISHED)
+        editorRepository.insertOutboxEvent(
+            session.id,
+            DomainEvents.VERSION_PUBLISHED,
+            mapOf(
+                "sourceVersionId" to session.versionId,
+                "newVersionId" to published.id,
+                "constitutionId" to source.constitutionId,
+                "actorId" to actor.id,
+                "versionLabel" to published.versionLabel,
+            ),
+            publishedAt = Instant.now(),
+        )
+        if (transitionId != null) {
+            editorRepository.insertOutboxEvent(
+                session.id,
+                DomainEvents.AMENDMENT_RECORDED,
+                mapOf(
+                    "transitionId" to transitionId,
+                    "sourceVersionId" to session.versionId,
+                    "targetVersionId" to published.id,
+                ),
+                publishedAt = Instant.now(),
+            )
+        }
+        editorRepository.insertOutboxEvent(
+            session.id,
+            DomainEvents.SEARCH_REINDEX_REQUESTED,
+            mapOf("versionId" to published.id),
+        )
         try {
             auditClient.record(
                 actor,
@@ -184,12 +209,7 @@ class EditorService(
         } catch (ex: RuntimeException) {
             log.warn("audit append failed after successor {} was published: {}", published.id, ex.message)
         }
-        try {
-            searchIndexClient.reindex()
-        } catch (ex: RuntimeException) {
-            log.warn("search reindex failed after successor {} was published: {}", published.id, ex.message)
-        }
-        return previewDto(session.id, published)
+        return previewDto(session.id)
     }
 
     private fun requireEdit(actor: Actor) {
@@ -237,17 +257,19 @@ class EditorService(
         }
     }
 
-    private fun previewDto(sessionId: UUID, published: CatalogVersion? = null): DraftPreviewDto {
+    private fun previewDto(sessionId: UUID): DraftPreviewDto {
         val session = editorRepository.findSession(sessionId)
             ?: throw NotFoundException("Unknown session '$sessionId'")
+        val published = editorRepository.findPublishedPreview(sessionId)
         return DraftPreviewDto(
             session = session,
             latestSnapshot = editorRepository.latestSnapshot(sessionId),
             drafts = editorRepository.listLatestDrafts(sessionId),
-            publicContentUpdated = if (published != null) true else null,
-            sourceVersionId = published?.let { session.versionId },
-            newVersionId = published?.id,
+            publicContentUpdated = if (session.status == EditSessionStatus.PUBLISHED) true else null,
+            sourceVersionId = published?.sourceVersionId,
+            newVersionId = published?.newVersionId,
             newVersionLabel = published?.versionLabel,
+            searchIndexStatus = editorRepository.searchIndexStatus(sessionId),
         )
     }
 

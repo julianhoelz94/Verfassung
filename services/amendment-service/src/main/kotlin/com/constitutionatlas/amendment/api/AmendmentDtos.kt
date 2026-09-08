@@ -22,6 +22,7 @@ data class AmendmentChangeDto(
 
 data class AmendmentDto(
     val id: UUID,
+    val transitionId: UUID,
     val title: String,
     val summary: String,
     val enactedOn: LocalDate?,

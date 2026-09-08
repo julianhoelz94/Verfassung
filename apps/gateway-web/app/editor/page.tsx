@@ -347,6 +347,24 @@ export default async function EditorPage(props: EditorPageProps) {
                 <dt>Revisions</dt>
                 <dd>{session.revisionCount}</dd>
               </div>
+              {preview.searchIndexStatus ? (
+                <div>
+                  <dt>Search index</dt>
+                  <dd>
+                    <Badge
+                      tone={
+                        preview.searchIndexStatus === 'ready'
+                          ? 'added'
+                          : preview.searchIndexStatus === 'failed'
+                            ? 'removed'
+                            : 'changed'
+                      }
+                    >
+                      {preview.searchIndexStatus}
+                    </Badge>
+                  </dd>
+                </div>
+              ) : null}
             </dl>
             {selected ? (
               <>

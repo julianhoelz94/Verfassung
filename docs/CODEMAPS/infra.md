@@ -46,8 +46,9 @@ Shared: `gradle/service-conventions.gradle`. New service: copy sibling (`.cursor
 
 1. Discover `services/*/build.gradle.kts` → matrix `./gradlew check`
 2. `apps/gateway-web`: `npm test`, `lint`, `build`
-3. Playwright e2e
+3. Playwright e2e (mock API)
 4. Image builds (host bootJar + `docker build`)
+5. `publish-journey`: Compose identity+catalog+content+editor (CI-6) and `scripts/publish_journey.py`
 
 Dependabot: `.github/dependabot.yml`.
 

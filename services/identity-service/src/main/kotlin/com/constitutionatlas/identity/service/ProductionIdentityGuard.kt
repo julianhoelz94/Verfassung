@@ -1,5 +1,6 @@
 package com.constitutionatlas.identity.service
 
+import com.constitutionatlas.identity.config.IdentityMailProperties
 import com.constitutionatlas.identity.config.IdentityMfaProperties
 import com.constitutionatlas.identity.config.IdentitySeedProperties
 import org.springframework.beans.factory.annotation.Value
@@ -18,6 +19,7 @@ class ProductionIdentityGuard(
     private val seedProperties: IdentitySeedProperties,
     private val mfaProperties: IdentityMfaProperties = IdentityMfaProperties(),
     @Value("\${identity.password.log-reset-token:false}") private val logResetToken: Boolean = false,
+    private val mailProperties: IdentityMailProperties = IdentityMailProperties(),
 ) : ApplicationRunner {
     override fun run(args: ApplicationArguments) {
         val mode = seedProperties.mode.trim().lowercase()
@@ -34,6 +36,11 @@ class ProductionIdentityGuard(
         }
         if (logResetToken) {
             throw IllegalStateException("Production must not log password reset tokens")
+        }
+        if (!mailProperties.configured()) {
+            throw IllegalStateException(
+                "Production requires SMTP_HOST, IDENTITY_MAIL_FROM, and PUBLIC_BASE_URL",
+            )
         }
         val demoEmails =
             listOf(

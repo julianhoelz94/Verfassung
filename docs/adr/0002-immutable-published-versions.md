@@ -20,5 +20,5 @@ ARCH-2 remains the logical rule. QLT-5 in-place rewrite is removed (ED-4 / QLT-9
 ## Consequences
 
 - Public `GET` of a published version’s articles is stable across later editorial publish.
-- Search reindex and audit append after catalog publish are best-effort. Failures are logged; the session is already `published` so retry cannot mint another successor. Outbox retry is PLAT-6.
-- Amendment records between source and successor land in AMD-5; until then editor logs a failed `POST /transitions` and continues.
+- Search reindex after catalog publish is written to the editor outbox as `search.reindex-requested` (ADR 0003 / PLAT-6) and retried by a scheduler. The session may already be `published`; retry does not mint another successor. Audit append after publish is still best-effort HTTP (logged on failure).
+- Amendment records between source and successor land via `POST /transitions` (AMD-5); a failed call is logged and the publish still commits. On success the editor also records `amendment.recorded` on the outbox.

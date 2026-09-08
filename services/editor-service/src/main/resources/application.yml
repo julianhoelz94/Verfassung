@@ -26,6 +26,8 @@ search:
 editor:
   downstream:
     bearer: ${EDITOR_SERVICE_TOKEN:}
+  outbox:
+    poll-ms: ${EDITOR_OUTBOX_POLL_MS:5000}
 management:
   endpoints:
     web:

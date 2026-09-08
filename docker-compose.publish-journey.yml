@@ -1,0 +1,14 @@
+# Host ports for CI-6 (`scripts/publish_journey.py`). Not used by the local stack.
+services:
+  identity-service:
+    ports:
+      - "127.0.0.1:18081:8080"
+  catalog-service:
+    ports:
+      - "127.0.0.1:18082:8080"
+  content-service:
+    ports:
+      - "127.0.0.1:18083:8080"
+  editor-service:
+    ports:
+      - "127.0.0.1:18084:8080"

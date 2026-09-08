@@ -12,7 +12,8 @@ export function InviteUserForm() {
     <>
       {state.token ? (
         <Alert tone="success">
-          Invite created. One-time token: <code>{state.token}</code>
+          Invite created. If outbound mail is configured, the recipient also received this link. One-time token:{' '}
+          <code>{state.token}</code>
         </Alert>
       ) : null}
       {state.error ? <Alert tone="error">That account action could not be completed.</Alert> : null}
@@ -31,7 +32,8 @@ export function IssueResetForm({ userId }: { userId: string }) {
     <>
       {state.token ? (
         <Alert tone="success">
-          Reset token issued. One-time token: <code>{state.token}</code>
+          Reset token issued. If outbound mail is configured, the user also received this link. One-time token:{' '}
+          <code>{state.token}</code>
         </Alert>
       ) : null}
       {state.error ? <Alert tone="error">That account action could not be completed.</Alert> : null}

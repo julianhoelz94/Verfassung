@@ -2,16 +2,17 @@ package com.constitutionatlas.identity.service
 
 import com.constitutionatlas.identity.BadRequestException
 import com.constitutionatlas.identity.ConflictException
-import com.constitutionatlas.platform.ForbiddenException
-import com.constitutionatlas.platform.UnauthorizedException
 import com.constitutionatlas.identity.api.InviteCreatedDto
 import com.constitutionatlas.identity.api.InviteRequest
 import com.constitutionatlas.identity.api.PasswordResetIssuedDto
 import com.constitutionatlas.identity.api.UserAdminDto
 import com.constitutionatlas.identity.client.AuthAudit
 import com.constitutionatlas.identity.crypto.Tokens
+import com.constitutionatlas.identity.mail.OutboundMailer
 import com.constitutionatlas.identity.repo.IdentityRepository
 import com.constitutionatlas.identity.repo.StoredUser
+import com.constitutionatlas.platform.ForbiddenException
+import com.constitutionatlas.platform.UnauthorizedException
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.security.crypto.password.PasswordEncoder
@@ -29,6 +30,7 @@ class AccountService(
     private val passwordEncoder: PasswordEncoder,
     private val authAudit: AuthAudit,
     private val authService: AuthService,
+    private val outboundMailer: OutboundMailer,
     @Value("\${identity.invite.ttl:7d}") private val inviteTtl: Duration,
     @Value("\${identity.password.reset-ttl:1h}") private val resetTtl: Duration,
     @Value("\${identity.password.log-reset-token:false}") private val logResetToken: Boolean,
@@ -77,6 +79,7 @@ class AccountService(
             }
         val (token, expiresAt) = issueInviteToken(userId)
         val user = identityRepository.findUserById(userId) ?: throw BadRequestException("Unknown user")
+        deliverInvite(user.email, token)
         authAudit.record(
             "user_invited",
             userId,
@@ -198,7 +201,8 @@ class AccountService(
         if (user == null || !user.enabled) {
             return
         }
-        issueResetToken(user)
+        val (token, _) = issueResetToken(user)
+        deliverReset(user, token)
         authAudit.record("password_reset_requested", user.id, user.id, user.email, clientIp, userAgent)
     }
 
@@ -216,6 +220,7 @@ class AccountService(
             throw BadRequestException("Cannot reset a disabled or invited account")
         }
         val (token, expiresAt) = issueResetToken(user)
+        deliverReset(user, token)
         authAudit.record(
             "password_reset_requested",
             user.id,
@@ -315,10 +320,28 @@ class AccountService(
         val token = Tokens.urlToken(random)
         val expiresAt = Instant.now().plus(resetTtl)
         identityRepository.insertPasswordReset(user.id, Tokens.sha256Hex(token), expiresAt)
-        if (logResetToken) {
-            log.info("Password reset token issued for {} (non-production): {}", user.email, token)
-        }
         return token to expiresAt
+    }
+
+    private fun deliverInvite(email: String, token: String) {
+        outboundMailer.sendInvite(email, token)
+        if (!outboundMailer.enabled) {
+            log.warn("Invite issued for {} but SMTP is not configured; deliver the token out of band", email)
+        }
+    }
+
+    private fun deliverReset(user: StoredUser, token: String) {
+        outboundMailer.sendPasswordReset(user.email, token)
+        when {
+            outboundMailer.enabled -> return
+            logResetToken ->
+                log.info("Password reset token issued for {} (non-production): {}", user.email, token)
+            else ->
+                log.warn(
+                    "Password reset issued for {} but SMTP is not configured; token was not delivered",
+                    user.email,
+                )
+        }
     }
 
     fun hashToken(value: String): String = Tokens.sha256Hex(value)

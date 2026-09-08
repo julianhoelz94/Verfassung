@@ -1,6 +1,7 @@
 package com.constitutionatlas.identity
 
 import com.constitutionatlas.identity.config.IdentityLoginProperties
+import com.constitutionatlas.identity.config.IdentityMailProperties
 import com.constitutionatlas.identity.config.IdentityMfaProperties
 import com.constitutionatlas.identity.config.IdentitySeedProperties
 import com.constitutionatlas.identity.config.IdentitySessionProperties
@@ -18,6 +19,7 @@ import org.springframework.web.bind.annotation.RestController
     IdentitySeedProperties::class,
     IdentitySessionProperties::class,
     IdentityLoginProperties::class,
+    IdentityMailProperties::class,
     IdentityMfaProperties::class,
 )
 class IdentityServiceApplication

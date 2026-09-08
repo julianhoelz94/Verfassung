@@ -4,6 +4,8 @@ import com.constitutionatlas.editor.api.DraftArticleDto
 import com.constitutionatlas.editor.api.EditSessionDto
 import com.constitutionatlas.editor.api.EditSessionStatus
 import com.constitutionatlas.editor.api.EditSessionSummaryDto
+import com.constitutionatlas.editor.api.SearchIndexStatus
+import com.constitutionatlas.editor.service.DomainEvents
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Repository
@@ -29,21 +31,19 @@ class EditorRepository(
     }
 
     fun findSession(sessionId: UUID): EditSessionDto? {
-        val row = jdbc.query(
+        val session = jdbc.query(
             """
             SELECT id, actor_id, version_id, status
             FROM edit_sessions
             WHERE id = ?
             """.trimIndent(),
             { rs, _ ->
-                Triple(
-                    rs.getObject("id", UUID::class.java),
-                    rs.getObject("actor_id", UUID::class.java),
-                    Triple(
-                        rs.getObject("version_id", UUID::class.java),
-                        rs.getString("status"),
-                        0,
-                    ),
+                EditSessionDto(
+                    id = rs.getObject("id", UUID::class.java),
+                    actorId = rs.getObject("actor_id", UUID::class.java),
+                    versionId = rs.getObject("version_id", UUID::class.java),
+                    status = EditSessionStatus.fromDb(rs.getString("status")),
+                    revisionCount = 0,
                 )
             },
             sessionId,
@@ -53,13 +53,7 @@ class EditorRepository(
             Int::class.java,
             sessionId,
         ) ?: 0
-        return EditSessionDto(
-            row.first,
-            row.second,
-            row.third.first,
-            EditSessionStatus.fromDb(row.third.second),
-            revisionCount,
-        )
+        return session.copy(revisionCount = revisionCount)
     }
 
     fun listSessions(status: EditSessionStatus?, openedBy: UUID?, versionId: UUID?): List<EditSessionSummaryDto> {
@@ -194,6 +188,121 @@ class EditorRepository(
             },
             sessionId,
         )
+
+    fun insertOutboxEvent(
+        sessionId: UUID,
+        eventName: String,
+        payload: Map<String, Any?>,
+        publishedAt: Instant? = null,
+    ) {
+        jdbc.update(
+            """
+            INSERT INTO outbox_events (id, session_id, event_name, payload, published_at)
+            VALUES (?, ?, ?, ?::jsonb, ?)
+            """.trimIndent(),
+            UUID.randomUUID(),
+            sessionId,
+            eventName,
+            objectMapper.writeValueAsString(payload),
+            publishedAt?.let { Timestamp.from(it) },
+        )
+    }
+
+    fun findPublishedPreview(sessionId: UUID): PublishedPreview? =
+        jdbc.query(
+            """
+            SELECT payload
+            FROM outbox_events
+            WHERE session_id = ? AND event_name = ?
+            ORDER BY created_at DESC
+            LIMIT 1
+            """.trimIndent(),
+            { rs, _ ->
+                val node = objectMapper.readTree(rs.getString("payload"))
+                val source = node.path("sourceVersionId").asText("")
+                val next = node.path("newVersionId").asText("")
+                if (source.isBlank() || next.isBlank()) {
+                    null
+                } else {
+                    val labelNode = node.get("versionLabel")
+                    PublishedPreview(
+                        sourceVersionId = UUID.fromString(source),
+                        newVersionId = UUID.fromString(next),
+                        versionLabel = if (labelNode == null || labelNode.isNull) null else labelNode.asText(),
+                    )
+                }
+            },
+            sessionId,
+            DomainEvents.VERSION_PUBLISHED,
+        ).firstOrNull()
+
+    fun searchIndexStatus(sessionId: UUID): SearchIndexStatus? {
+        val row = jdbc.query(
+            """
+            SELECT published_at, last_error
+            FROM outbox_events
+            WHERE session_id = ? AND event_name = ?
+            ORDER BY created_at DESC
+            LIMIT 1
+            """.trimIndent(),
+            { rs, _ ->
+                Pair(rs.getTimestamp("published_at"), rs.getString("last_error"))
+            },
+            sessionId,
+            DomainEvents.SEARCH_REINDEX_REQUESTED,
+        ).firstOrNull() ?: return null
+        if (row.first != null) {
+            return SearchIndexStatus.READY
+        }
+        if (!row.second.isNullOrBlank()) {
+            return SearchIndexStatus.FAILED
+        }
+        return SearchIndexStatus.PENDING
+    }
+
+    fun claimUnpublishedSearchReindex(limit: Int): List<UUID> =
+        jdbc.query(
+            """
+            SELECT id
+            FROM outbox_events
+            WHERE event_name = ? AND published_at IS NULL
+            ORDER BY created_at
+            LIMIT ?
+            FOR UPDATE SKIP LOCKED
+            """.trimIndent(),
+            { rs, _ -> rs.getObject("id", UUID::class.java) },
+            DomainEvents.SEARCH_REINDEX_REQUESTED,
+            limit,
+        )
+
+    fun markOutboxPublished(id: UUID) {
+        jdbc.update(
+            """
+            UPDATE outbox_events
+            SET published_at = NOW(), last_error = NULL
+            WHERE id = ?
+            """.trimIndent(),
+            id,
+        )
+    }
+
+    fun markOutboxFailed(id: UUID, error: String) {
+        jdbc.update(
+            """
+            UPDATE outbox_events
+            SET last_error = ?, attempt_count = attempt_count + 1
+            WHERE id = ?
+            """.trimIndent(),
+            error.take(2000),
+            id,
+        )
+    }
 }
+
+data class PublishedPreview(
+    val sourceVersionId: UUID,
+    val newVersionId: UUID,
+    val versionLabel: String?,
+)
 
 private fun toInstant(value: Timestamp?): Instant = value?.toInstant() ?: Instant.EPOCH

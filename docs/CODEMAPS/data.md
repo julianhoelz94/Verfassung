@@ -39,7 +39,7 @@ Roles seeded: `admin`, `editor`, `viewer`, then `reviewer`, `publisher` (V3).
 
 ## editor_db
 
-`edit_sessions` (status enum `open→reviewing→approved→published`, CHECK V3), `draft_changes` (JSONB), `edit_revisions` (snapshot JSONB).
+`edit_sessions` (status enum `open→reviewing→approved→published`, CHECK V3), `draft_changes` (JSONB), `edit_revisions` (snapshot JSONB), `outbox_events` (V4: `event_name`, `payload` JSONB, `created_at`, `published_at`; scheduler publishes `search.reindex-requested`). Latest: V4.
 
 ## search_db
 
@@ -66,6 +66,6 @@ Roles seeded: `admin`, `editor`, `viewer`, then `reviewer`, `publisher` (V3).
 | Import job fields | ingestion |
 | Audit event shape | audit (append-only — extra columns only if needed) |
 
-JSONB is used for drafts, import staging, audit payloads. Outbox tables are allowed later per ADR; none required yet.
+JSONB is used for drafts, import staging, audit payloads, and the editor outbox. Other services may add their own outbox later (ADR 0001 / 0003).
 
 Backup: `infra/backup/backup.sh` dumps all eight DBs into `./backups/<timestamp>/`.

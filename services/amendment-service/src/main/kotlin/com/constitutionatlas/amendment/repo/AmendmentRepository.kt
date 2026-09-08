@@ -42,7 +42,7 @@ class AmendmentRepository(private val jdbc: JdbcTemplate) {
     fun listForTargetVersion(targetVersionId: UUID, sourceVersionId: UUID? = null): List<AmendmentDto> {
         val sql = StringBuilder(
             """
-            SELECT a.id, a.title, a.summary, a.enacted_on, a.source_reference,
+            SELECT a.id, t.id AS transition_id, a.title, a.summary, a.enacted_on, a.source_reference,
                    t.source_version_id, t.target_version_id
             FROM amendments a
             JOIN version_transitions t ON t.id = a.version_transition_id
@@ -69,7 +69,7 @@ class AmendmentRepository(private val jdbc: JdbcTemplate) {
         val amendments =
             jdbc.query(
                 """
-                SELECT DISTINCT a.id, a.title, a.summary, a.enacted_on, a.source_reference,
+                SELECT DISTINCT a.id, t.id AS transition_id, a.title, a.summary, a.enacted_on, a.source_reference,
                        t.source_version_id, t.target_version_id
                 FROM amendments a
                 JOIN version_transitions t ON t.id = a.version_transition_id
@@ -164,6 +164,7 @@ class AmendmentRepository(private val jdbc: JdbcTemplate) {
     private val amendmentRowMapper = org.springframework.jdbc.core.RowMapper { rs, _ ->
         AmendmentDto(
             id = rs.getObject("id", UUID::class.java),
+            transitionId = rs.getObject("transition_id", UUID::class.java),
             title = rs.getString("title"),
             summary = rs.getString("summary"),
             enactedOn = rs.getDate("enacted_on")?.toLocalDate(),

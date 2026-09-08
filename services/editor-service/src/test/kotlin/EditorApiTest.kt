@@ -8,6 +8,7 @@ import com.constitutionatlas.editor.client.CatalogVersion
 import com.constitutionatlas.editor.client.ContentClient
 import com.constitutionatlas.editor.client.ContentTreeArticle
 import com.constitutionatlas.editor.client.SearchIndexClient
+import com.constitutionatlas.editor.service.OutboxPublisher
 import com.constitutionatlas.platform.Actor
 import com.constitutionatlas.platform.IdentityClient
 import com.constitutionatlas.platform.UnauthorizedException
@@ -23,6 +24,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.test.mock.mockito.MockBean
 import org.springframework.http.MediaType
+import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.web.servlet.MockMvc
@@ -40,6 +42,12 @@ import java.util.UUID
 class EditorApiTest {
     @Autowired
     lateinit var mockMvc: MockMvc
+
+    @Autowired
+    lateinit var outboxPublisher: OutboxPublisher
+
+    @Autowired
+    lateinit var jdbcTemplate: JdbcTemplate
 
     @MockBean
     lateinit var identityClient: IdentityClient
@@ -102,6 +110,7 @@ class EditorApiTest {
             jsonPath("$.sourceVersionId") { value(versionId.toString()) }
             jsonPath("$.newVersionId") { value(NEW_VERSION_ID.toString()) }
             jsonPath("$.newVersionLabel") { value("2022-1") }
+            jsonPath("$.searchIndexStatus") { value("pending") }
         }
         @Suppress("UNCHECKED_CAST")
         val copied = ArgumentCaptor.forClass(List::class.java) as ArgumentCaptor<List<ArticleWritePayload>>
@@ -117,8 +126,26 @@ class EditorApiTest {
             Mockito.anyString() ?: "",
         )
         Mockito.verify(catalogClient).publishVersion(NEW_VERSION_ID)
-        Mockito.verify(searchIndexClient).reindex()
+        Mockito.verify(searchIndexClient, Mockito.never()).reindex()
         Mockito.verify(amendmentClient).recordTransition(versionId, NEW_VERSION_ID)
+        val eventNames = jdbcTemplate.queryForList(
+            "SELECT event_name FROM outbox_events WHERE session_id = ?::uuid ORDER BY event_name",
+            String::class.java,
+            sessionId,
+        )
+        assertEquals(
+            listOf("amendment.recorded", "search.reindex-requested", "version.published"),
+            eventNames,
+        )
+        outboxPublisher.processDue()
+        mockMvc.get("/edit-sessions/$sessionId") {
+            header("Authorization", TOKEN)
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.searchIndexStatus") { value("ready") }
+            jsonPath("$.newVersionId") { value(NEW_VERSION_ID.toString()) }
+        }
+        Mockito.verify(searchIndexClient).reindex()
     }
 
     @Test
@@ -198,17 +225,63 @@ class EditorApiTest {
         stub(reviewer)
         postCommand(sessionId, "approval", "approved")
         stub(publisher)
-        Mockito.doThrow(DownstreamException("reindex denied")).`when`(searchIndexClient).reindex()
         mockMvc.post("/edit-sessions/$sessionId/publish") {
             header("Authorization", TOKEN)
         }.andExpect {
             status { isOk() }
             jsonPath("$.session.status") { value("published") }
             jsonPath("$.newVersionId") { value(NEW_VERSION_ID.toString()) }
+            jsonPath("$.searchIndexStatus") { value("pending") }
+        }
+        Mockito.doThrow(DownstreamException("reindex denied")).`when`(searchIndexClient).reindex()
+        outboxPublisher.processDue()
+        mockMvc.get("/edit-sessions/$sessionId") {
+            header("Authorization", TOKEN)
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.session.status") { value("published") }
+            jsonPath("$.searchIndexStatus") { value("failed") }
+        }
+        Mockito.doNothing().`when`(searchIndexClient).reindex()
+        outboxPublisher.processDue()
+        mockMvc.get("/edit-sessions/$sessionId") {
+            header("Authorization", TOKEN)
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.searchIndexStatus") { value("ready") }
         }
         mockMvc.post("/edit-sessions/$sessionId/publish") {
             header("Authorization", TOKEN)
         }.andExpect { status { isConflict() } }
+    }
+
+    @Test
+    fun publishOmitsAmendmentRecordedWhenTransitionFails() {
+        val versionId = UUID.randomUUID()
+        val articleId = UUID.fromString("01900000-0000-4000-8000-000000000201")
+        stubSuccessorPublish(versionId, articleId)
+        Mockito.doReturn(null).`when`(amendmentClient).recordTransition(
+            eqNonNull(versionId),
+            eqNonNull(NEW_VERSION_ID),
+        )
+        val sessionId = openSession(versionId)
+        saveDraft(sessionId, articleId)
+        postCommand(sessionId, "review", "reviewing")
+        stub(reviewer)
+        postCommand(sessionId, "approval", "approved")
+        stub(publisher)
+        mockMvc.post("/edit-sessions/$sessionId/publish") {
+            header("Authorization", TOKEN)
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.session.status") { value("published") }
+        }
+        val eventNames = jdbcTemplate.queryForList(
+            "SELECT event_name FROM outbox_events WHERE session_id = ?::uuid ORDER BY event_name",
+            String::class.java,
+            sessionId,
+        )
+        assertEquals(listOf("search.reindex-requested", "version.published"), eventNames)
     }
 
     @Test
@@ -369,6 +442,9 @@ class EditorApiTest {
             ),
         ).thenReturn(draft)
         Mockito.`when`(catalogClient.publishVersion(NEW_VERSION_ID)).thenReturn(published)
+        Mockito.`when`(
+            amendmentClient.recordTransition(eqNonNull(sourceVersionId), eqNonNull(NEW_VERSION_ID)),
+        ).thenReturn(TRANSITION_ID)
         val sourceTree =
             listOf(
                 ContentTreeArticle(sourceArticleId, sourceVersionId, "1", title, 1, sourceBody),
@@ -435,6 +511,7 @@ class EditorApiTest {
     companion object {
         private const val TOKEN = "Bearer test-token"
         private val NEW_VERSION_ID = UUID.fromString("01900000-0000-4000-8000-000000000501")
+        private val TRANSITION_ID = UUID.fromString("01900000-0000-4000-8000-000000000701")
 
         private fun nestedJson(depth: Int): String = (1..depth).fold("1") { acc, _ -> """{"x":$acc}""" }
 
@@ -460,6 +537,7 @@ class EditorApiTest {
             registry.add("spring.datasource.url", postgres::getJdbcUrl)
             registry.add("spring.datasource.username", postgres::getUsername)
             registry.add("spring.datasource.password", postgres::getPassword)
+            registry.add("spring.task.scheduling.enabled") { "false" }
         }
     }
 }

@@ -12,7 +12,7 @@ Constitution Atlas is a public site over versioned constitutions. Several servic
 - Each stateful Spring service owns **one** Postgres database. There are no cross-service foreign keys or SQL joins.
 - Composition happens in `gateway-web` over HTTP, or later via events. Search and audit are derived, not authorities for article text.
 - Local and (later) hosted entry is a **single Caddy reverse proxy**. Browsers talk to `http://localhost` (or the public host), not to individual service ports.
-- Schema changes are Flyway forward-only (`V{n}__….sql`). JSONB is allowed for payloads (import staging, draft snapshots, audit). An outbox table can be added later per service; it is not required yet.
+- Schema changes are Flyway forward-only (`V{n}__….sql`). JSONB is allowed for payloads (import staging, draft snapshots, audit, outbox). Editor-service owns `outbox_events` (ADR 0003 / PLAT-6). Other services may add their own outbox later; there is no shared event store.
 
 ## Consequences
 

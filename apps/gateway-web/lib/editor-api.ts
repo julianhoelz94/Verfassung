@@ -37,6 +37,7 @@ export type DraftPreview = {
   sourceVersionId?: string | null;
   newVersionId?: string | null;
   newVersionLabel?: string | null;
+  searchIndexStatus?: 'pending' | 'ready' | 'failed' | null;
 };
 
 /**

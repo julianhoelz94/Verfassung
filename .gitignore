@@ -1,6 +1,11 @@
 # OS
 .DS_Store
 Thumbs.db
+# macOS Finder "duplicate file" copies (e.g. ArticleRepository 2.kt)
+* 2.kt
+* 2.java
+* 2.ts
+* 2.tsx
 
 # Secrets — keep committed *.env.example profiles
 .env

@@ -38,7 +38,7 @@ Admin gates: `lib/admin.ts` (`requireAdminPage`). Editor/admin links: `lib/nav.t
 | --- | --- |
 | `api.ts` | catalog, content, amendment, search (`CATALOG_API_URL` …) |
 | `identity-client.ts` + `session.ts` | identity; cookies `ca_session`, `ca_mfa_challenge` |
-| `editor-api.ts` | editor-service |
+| `editor-api.ts` | editor-service (`searchIndexStatus` on preview after publish) |
 | `ingestion-api.ts` | ingestion |
 | `outline.ts` | render groups from catalog outline + content nodes |
 | `compare.ts`, `text-diff.ts` | compare page |

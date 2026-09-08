@@ -12,9 +12,11 @@ export default async function ResetPage(props: ResetPageProps) {
     <PageMain>
       <PageHeader
         title="Reset password"
-        meta="Enter your email to request a reset. The response is the same whether or not that account exists. In this local stack, an administrator can also issue a one-time token from Users and send it to you."
+        meta="Enter your email to request a reset. The response is the same whether or not that account exists. When outbound mail is configured, a link is emailed; an administrator can also issue a one-time token from Users."
       />
-      {searchParams.sent ? <Alert>If that account exists, a reset token was issued for an administrator to deliver.</Alert> : null}
+      {searchParams.sent ? (
+        <Alert>If that account exists, a reset was issued. Check email when mail is configured, or ask an administrator for a token.</Alert>
+      ) : null}
       {searchParams.error ? <Alert tone="error">That reset link is invalid or the password does not meet policy.</Alert> : null}
       <Card>
         <form action={requestResetAction}>

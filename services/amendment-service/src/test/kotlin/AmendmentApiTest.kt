@@ -157,6 +157,7 @@ class AmendmentApiTest {
             jsonPath("$.sourceVersionId") { value(SOURCE_ID.toString()) }
             jsonPath("$.targetVersionId") { value(TARGET_ID.toString()) }
             jsonPath("$.title") { value("Gesetz zur Änderung des Grundgesetzes") }
+            jsonPath("$.transitionId") { exists() }
             jsonPath("$.sourceReference") { value("BGBl. I 2024, 1") }
             jsonPath("$.summary") { value("2 added, 1 changed, 1 removed") }
             jsonPath("$.changes.length()") { value(4) }

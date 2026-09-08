@@ -30,6 +30,18 @@ identity:
   password:
     reset-ttl: ${IDENTITY_PASSWORD_RESET_TTL:1h}
     log-reset-token: ${IDENTITY_PASSWORD_LOG_RESET_TOKEN:false}
+  mail:
+    enabled: ${IDENTITY_MAIL_ENABLED:true}
+    from: ${IDENTITY_MAIL_FROM:}
+    from-name: ${IDENTITY_MAIL_FROM_NAME:Constitution Atlas}
+    public-base-url: ${PUBLIC_BASE_URL:}
+    host: ${SMTP_HOST:}
+    port: ${SMTP_PORT:587}
+    username: ${SMTP_USERNAME:}
+    password: ${SMTP_PASSWORD:}
+    auth: ${SMTP_AUTH:true}
+    starttls: ${SMTP_STARTTLS:true}
+    ssl: ${SMTP_SSL:false}
   mfa:
     encryption-key: ${IDENTITY_MFA_ENCRYPTION_KEY:}
     step-up-ttl: ${IDENTITY_MFA_STEP_UP_TTL:5m}

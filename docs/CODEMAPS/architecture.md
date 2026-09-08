@@ -51,7 +51,7 @@ Caddy → `gateway-web` page → `lib/api.ts` → catalog `GET /countries/{code}
 `app/login/actions.ts` → `lib/session.ts` → identity `POST /login` → cookie `ca_session` (Bearer token). MFA uses `ca_mfa_challenge`.
 
 **Publish draft**  
-Editor UI → editor `POST /edit-sessions/{id}/publish` → identity `/me` (role + step-up) → content `PATCH /articles/{id}` → search `POST /reindex` → audit `POST /events`.
+Editor UI → editor `POST /edit-sessions/{id}/publish` → identity `/me` (role + step-up) → content copy onto a new catalog version → catalog `POST /versions/{id}/publish` → editor `outbox_events` (`version.published`, `search.reindex-requested`) → scheduler `POST` search `/reindex`. Audit `POST /events` is still best-effort HTTP.
 
 **Import**  
 Admin → ingestion `POST /import-jobs` → catalog create country/constitution/version → content `PUT /versions/{id}/articles` → catalog `POST /versions/{id}/publish`.
@@ -61,7 +61,7 @@ Admin → ingestion `POST /import-jobs` → catalog create country/constitution/
 | From | Calls |
 | --- | --- |
 | gateway-web | all public APIs (server-side) |
-| editor | identity `/me`, content patch, search `/reindex`, audit `/events` |
+| editor | identity `/me`, catalog create+publish, content replace/patch, amendment `/transitions`, audit `/events`; search `/reindex` via outbox scheduler |
 | identity | audit `/events` |
 | ingestion | catalog + content writes |
 | search | catalog + content reads (reindex on startup if `SEARCH_REINDEX_ON_STARTUP`) |

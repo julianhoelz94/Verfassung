@@ -73,6 +73,16 @@ data class DraftArticleDto(
     val body: String,
 )
 
+enum class SearchIndexStatus {
+    PENDING,
+    READY,
+    FAILED,
+    ;
+
+    @JsonValue
+    fun toJson(): String = name.lowercase()
+}
+
 data class DraftPreviewDto(
     val session: EditSessionDto,
     val latestSnapshot: String?,
@@ -81,4 +91,5 @@ data class DraftPreviewDto(
     val sourceVersionId: UUID? = null,
     val newVersionId: UUID? = null,
     val newVersionLabel: String? = null,
+    val searchIndexStatus: SearchIndexStatus? = null,
 )

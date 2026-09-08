@@ -2,6 +2,7 @@ import com.constitutionatlas.identity.IdentityServiceApplication
 import com.constitutionatlas.identity.client.AuditClient
 import com.constitutionatlas.identity.client.AuthAudit
 import com.constitutionatlas.identity.crypto.Totp
+import com.constitutionatlas.identity.mail.OutboundMailer
 import com.constitutionatlas.identity.service.AccountService
 import com.constitutionatlas.identity.service.IdentitySeedRunner
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -49,6 +50,9 @@ class IdentityApiTest {
 
     @MockBean
     lateinit var auditClient: AuditClient
+
+    @MockBean
+    lateinit var outboundMailer: OutboundMailer
 
     private val objectMapper = ObjectMapper()
 
@@ -617,6 +621,34 @@ class IdentityApiTest {
     }
 
     @Test
+    fun inviteAndPasswordResetSendMail() {
+        val admin = login("local-admin@example.local", "change-me")
+        val email = "mailed-${System.nanoTime()}@example.local"
+        val created =
+            mockMvc.post("/users/invites") {
+                header("Authorization", "Bearer $admin")
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"email":"$email","roles":["viewer"]}"""
+            }.andExpect { status { isCreated() } }.andReturn().response.contentAsString
+        val inviteToken = Regex("\"inviteToken\":\"([^\"]+)\"").find(created)!!.groupValues[1]
+        Mockito.verify(outboundMailer).sendInvite(eqValue(email), anyStr())
+        mockMvc.post("/invites/accept") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"token":"$inviteToken","password":"not-a-common-pass"}"""
+        }.andExpect { status { isOk() } }
+        mockMvc.post("/password/reset") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"email":"$email"}"""
+        }.andExpect { status { isNoContent() } }
+        Mockito.verify(outboundMailer).sendPasswordReset(eqValue(email), anyStr())
+        mockMvc.post("/password/reset") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"email":"missing-${System.nanoTime()}@example.local"}"""
+        }.andExpect { status { isNoContent() } }
+        Mockito.verify(outboundMailer, Mockito.times(1)).sendPasswordReset(anyStr(), anyStr())
+    }
+
+    @Test
     fun privilegedLoginRequiresTotpAndStepUpForRoleChanges() {
         val challengeJson =
             mockMvc.post("/login") {
@@ -783,6 +815,10 @@ class IdentityApiTest {
         }.andReturn().response.contentAsString.let {
             objectMapper.readTree(it).get("token").asText()
         }
+
+    private fun <T> eqValue(value: T): T = Mockito.eq(value) ?: value
+
+    private fun anyStr(): String = Mockito.any(String::class.java) ?: ""
 
     companion object {
         private const val SEED_TOTP = "CAATLASMFASEED22"

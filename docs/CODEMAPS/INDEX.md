@@ -34,6 +34,7 @@ Navigation only. Rules stay in `AGENTS.md`. If a path here disagrees with code, 
 | Editorial capabilities | — | `docs/editorial-roles.md` |
 | Why separate DBs | — | `docs/adr/0001-platform-boundaries.md` |
 | Published versions immutable | — | `docs/adr/0002-immutable-published-versions.md` |
+| Domain event names / outbox | — | `docs/adr/0003-domain-events.md` |
 | Version pins | — | `docs/dependencies.md` |
 | UI concept / tokens | frontend | `docs/design/`, `app/globals.css` |
 | Sprint / story status | — | grep `backlog.md` for `CAT-` `CNT-` `UI-` `IDN-` `OPS-` |

@@ -1,5 +1,6 @@
 package com.constitutionatlas.editor.client
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
@@ -11,8 +12,13 @@ import org.springframework.web.client.RestClientException
 import java.util.UUID
 
 interface AmendmentClient {
-    fun recordTransition(sourceVersionId: UUID, targetVersionId: UUID)
+    fun recordTransition(sourceVersionId: UUID, targetVersionId: UUID): UUID?
 }
+
+@JsonIgnoreProperties(ignoreUnknown = true)
+data class RecordedAmendment(
+    val transitionId: UUID? = null,
+)
 
 class RestAmendmentClient(
     amendmentUrl: String,
@@ -21,26 +27,26 @@ class RestAmendmentClient(
     private val log = LoggerFactory.getLogger(javaClass)
     private val client: RestClient = timedRestClient(amendmentUrl)
 
-    override fun recordTransition(sourceVersionId: UUID, targetVersionId: UUID) {
-        try {
-            val request = client.post()
-                .uri("/transitions")
-                .contentType(MediaType.APPLICATION_JSON)
-            if (!bearerToken.isNullOrBlank()) {
-                request.header("Authorization", bearerHeader(bearerToken))
-            }
-            request
-                .body(
-                    mapOf(
-                        "sourceVersionId" to sourceVersionId,
-                        "targetVersionId" to targetVersionId,
-                    ),
-                )
-                .retrieve()
-                .toBodilessEntity()
-        } catch (ex: RestClientException) {
-            log.warn("amendment transition not recorded: {}", ex.message)
+    override fun recordTransition(sourceVersionId: UUID, targetVersionId: UUID): UUID? = try {
+        val request = client.post()
+            .uri("/transitions")
+            .contentType(MediaType.APPLICATION_JSON)
+        if (!bearerToken.isNullOrBlank()) {
+            request.header("Authorization", bearerHeader(bearerToken))
         }
+        request
+            .body(
+                mapOf(
+                    "sourceVersionId" to sourceVersionId,
+                    "targetVersionId" to targetVersionId,
+                ),
+            )
+            .retrieve()
+            .body(RecordedAmendment::class.java)
+            ?.transitionId
+    } catch (ex: RestClientException) {
+        log.warn("amendment transition not recorded: {}", ex.message)
+        null
     }
 }
 

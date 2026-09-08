@@ -62,10 +62,11 @@ Bearer `Authorization`. Tests: `IdentityApiTest.kt`.
 ## editor — `services/editor-service`
 
 `EditorController` → `EditorService` → `EditorRepository`  
-Clients: identity, catalog, content, amendment, search, audit. Publish copies onto a new catalog version (ADR 0002).
+Clients: identity, catalog, content, amendment, search, audit. Publish copies onto a new catalog version (ADR 0002), writes editor `outbox_events` (ADR 0003), and a scheduler delivers `search.reindex-requested`.
 
 Flow: `POST /edit-sessions` → `/saves` → `/review` → `/approval` → `/publish`  
 Session `status` is `EditSessionStatus` (`open`/`reviewing`/`approved`/`published`).  
+Preview JSON includes `searchIndexStatus` (`pending`/`ready`/`failed`) after publish.  
 `GET /edit-sessions` = list (status, openedBy, versionId; `openedBy=me`)  
 `GET /edit-sessions/{id}` = preview. Roles enforced in service, not Spring Security.
 

@@ -2,7 +2,7 @@ plugins {
   kotlin("jvm") version "1.9.24"
   kotlin("plugin.spring") version "1.9.24"
   id("io.spring.dependency-management") version "1.1.7"
-  id("com.diffplug.spotless") version "6.25.0"
+  id("com.diffplug.spotless") version "8.10.2"
 }
 
 group = "com.constitutionatlas"

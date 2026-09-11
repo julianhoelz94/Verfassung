@@ -1,6 +1,6 @@
 # 0002 — Immutable published versions
 
-Status: Accepted  
+Status: Accepted (permalinks and no in-place rewrite unchanged). Successor topology is two-axis as of [0005](0005-two-axis-versions.md) (2026-09-11).  
 Date: 2026-09-06
 
 ## Context
@@ -21,4 +21,4 @@ ARCH-2 remains the logical rule. QLT-5 in-place rewrite is removed (ED-4 / QLT-9
 
 - Public `GET` of a published version’s articles is stable across later editorial publish.
 - Search reindex after catalog publish is written to the editor outbox as `search.reindex-requested` (ADR 0003 / PLAT-6) and retried by a scheduler. The session may already be `published`; retry does not mint another successor. Audit append after publish is still best-effort HTTP (logged on failure).
-- A successor is a new snapshot on a **linear chain** (ADR 0004 / CAT-5). It is not automatically a legal amendment. Until ED-6, editor publish may still call `POST /transitions` (AMD-5); that path is deprecated. Curated laws live on `amendment_revisions` (AMD-7). Editorial hops (`editorial_correction`) update public “latest” text without appearing on the public timeline.
+- A successor is a new snapshot (never a rewrite of published bytes). ADR 0005 / CAT-6: editorial successors append to **that legal version’s** editorial chain; legal successors append only from the legal tip. Public “latest” is the editorial tip of the legal tip. Permalink `GET` by snapshot id stays `200` for staff hops. Curated instruments are change records on `amendment_revisions` (AMD-7 / AMD-11). `editorial_correction` does not appear on the public timeline.

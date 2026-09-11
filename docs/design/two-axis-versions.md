@@ -1,10 +1,10 @@
 # Two-axis versions (legal × editorial)
 
-Status: planned (Sprints 34–39). Supersedes ADR 0004 points 2–4 once **ARCH-8** lands.
+Status: Accepted ([ADR 0005](../adr/0005-two-axis-versions.md) / ARCH-8). Implementation: Sprints 35–39.
 
 **Working graph (Cursor canvas, not in git):** [legal vs editorial chain](/Users/julianhoelz/.cursor/projects/Users-julianhoelz-Documents-Verfassung/canvases/legal-vs-editorial-chain.canvas.tsx)
 
-That canvas is the source of truth for the model and for staff/public processes P1–P14. This note is the git-tracked pointer for `backlog.md` and CODEMAPS. Configured UI mocks for Sprints 34–39: **[Sprint UI reference](#sprint-ui-reference)**.
+That canvas is the working graph for staff/public processes P1–P14. [ADR 0005](../adr/0005-two-axis-versions.md) is the accepted decision. This note is the git-tracked pointer for `backlog.md` and CODEMAPS. Configured UI mocks for Sprints 34–39: **[Sprint UI reference](#sprint-ui-reference)**.
 
 ## Why
 
@@ -27,7 +27,7 @@ Do **not** distinguish `legal_amendment` vs `official_errata` as hop kinds, badg
 
 `editorial_correction` is `listing = staff`. Public lists show legal identities, not every snapshot.
 
-`409 not_tip` splits: append a legal hop only from the current legal tip’s editorial tip; append an editorial hop only from the editorial tip of **that** legal version.
+`409` splits: append a legal hop only from the current legal tip’s editorial tip (`not_legal_tip`); append an editorial hop only from the editorial tip of **that** legal version (`not_editorial_tip`).
 
 ## Change records (amendment-service objects)
 

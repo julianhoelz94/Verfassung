@@ -99,7 +99,7 @@ Each item lists layout, key components, and what changes versus today.
 - Per changed article: section title, then two `compare-col` cards with a grey column head (version label + badge) and serif text; `<ins>`/`<del>` styled with the added/removed pairs, ready for UI-10 structured diff.
 
 ### 4.6 Timeline `/countries/[code]/timeline`
-- Vertical timeline: date on the left, card on the right with version label, amending law citation, changed-article badges, and **Compare with previous** / **Read** actions. One column on phones (date above card).
+- Vertical timeline: date on the left, card on the right with version label, change-record comment and document links, changed-article badges, and **Compare with previous** / **Read** actions. One column on phones (date above card). No errata kind badge (ADR 0005 / UI-54).
 
 ### 4.7 Search `/search`
 - Header with the query in the `h1` ("Results for “dignity”").
@@ -111,11 +111,11 @@ Each item lists layout, key components, and what changes versus today.
 - Workspace grid: articles panel (filter input + list with draft/new badges, `aria-current`), editor panel (title, text area in the serif reading face, collapsible section-title fields), session panel (status, opened by, changed articles, reviewer, live preview).
 - Action bar: Discard / Save draft / Submit for review (editor), Approve (reviewer), Publish (publisher). Sticky at the bottom on phone and tablet.
 - Landing state when no session is open: cards **Open a session** (version select) and **Load a session** (id), plus for reviewers/publishers a **Review queue** list (sessions in `reviewing` / `approved`).
-- Publish names a hop kind (amending law / official errata / transcription fix). Legal hops link a curated law; transcription fixes do not appear on the public timeline (ADR 0004).
+- Publish names a hop by how the session was opened (ADR 0005): **Record the next legal change** vs **Correct this text**. Legal hops attach a change record (title, comment, documents); transcription fixes do not appear on the public timeline. UI-52 replaces the three-way hop-kind Publish dialog.
 
-### 4.8.1 Amending laws `/editor/amendments`
-- Editorial workspace for curated laws, not article text. Constitution select, list of draft/published/withdrawn amending laws, and a form with title, kind, citation, dates, summary, and a change table.
-- Publisher actions: **Publish law** / **Withdraw**. Reviewers see the same pages read-only. Public timeline lists only published laws and official errata.
+### 4.8.1 Legal changes `/editor/amendments`
+- Editorial workspace for change records, not article text. Inbox, quote review, and documenting a hop between two chips that already exist (P1). Constitution select, list of draft/published/withdrawn records, and a form with title, required comment, documents (URL and/or archived file), dates, and a change table. Creating the **next** public version is P2 on the article session (UI-52), not this list.
+- Publisher actions: **Publish** / **Withdraw**. Reviewers see the same pages read-only. Public timeline lists only published change records (title, comment, document links). **Needs review** is staff-only until a re-pin is published.
 
 ### 4.9 Admin `/admin/*`
 - Users, Outlines, Import share one layout: page header with a primary action, `.data-list` rows (table on tablet+, cards on phone), inline status badges, and the existing forms wrapped in `Card`s.

@@ -156,7 +156,7 @@ class CatalogApiTest {
                 jsonPath("$.versionLabel") { value("2022") }
                 jsonPath("$.publicationStatus") { value("published") }
                 jsonPath("$.effectiveDate") { value("2022-12-19") }
-                jsonPath("$.hopKind") { value("legal_amendment") }
+                jsonPath("$.hopKind") { value("legal") }
                 jsonPath("$.listing") { value("public") }
                 jsonPath("$.predecessorVersionId") { value("01900000-0000-4000-8000-000000000003") }
             }
@@ -407,7 +407,7 @@ class CatalogApiTest {
             """.trimIndent()
         }.andExpect {
             status { isConflict() }
-            jsonPath("$.code") { value("not_tip") }
+            jsonPath("$.code") { value("not_legal_tip") }
         }
     }
 
@@ -455,7 +455,7 @@ class CatalogApiTest {
             content = """{"versionLabel":"orphan-root"}"""
         }.andExpect {
             status { isConflict() }
-            jsonPath("$.code") { value("not_tip") }
+            jsonPath("$.code") { value("not_legal_tip") }
         }
     }
 
@@ -544,7 +544,7 @@ class CatalogApiTest {
                 jsonPath("$[*].versionLabel") {
                     value(org.hamcrest.Matchers.not(org.hamcrest.Matchers.hasItem(editorialLabel)))
                 }
-                jsonPath("$[?(@.versionLabel=='2020')].latestPublished") { value(false) }
+                jsonPath("$[?(@.versionLabel=='2020')].latestPublished") { value(true) }
             }
 
         mockMvc.get("/constitutions/$constitutionId/versions?listing=all")
@@ -575,10 +575,142 @@ class CatalogApiTest {
             .andExpect {
                 status { isOk() }
                 jsonPath("$[?(@.isoCode=='AT')].latestVersionLabel") {
-                    value(org.hamcrest.Matchers.hasItem(editorialLabel))
+                    value(org.hamcrest.Matchers.hasItem("2020"))
                 }
                 jsonPath("$[?(@.isoCode=='AT')].latestVersionId") { value(org.hamcrest.Matchers.hasItem(versionId)) }
                 jsonPath("$[?(@.isoCode=='AT')].versionCount") { value(org.hamcrest.Matchers.hasItem(2)) }
+            }
+    }
+
+    @Test
+    fun editorialHopOnOlderLawAfterLaterLegalExists() {
+        mockMvc.post("/countries") {
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"isoCode":"be","name":"Belgium"}"""
+        }.andExpect { status { isCreated() } }
+
+        val constitutionId =
+            mockMvc.post("/countries/BE/constitutions") {
+                header("Authorization", TOKEN)
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"slug":"constitution","title":"Belgian Constitution"}"""
+            }.andExpect { status { isCreated() } }
+                .andReturn().response.contentAsString.let {
+                    Regex("\"id\":\"([^\"]+)\"").find(it)!!.groupValues[1]
+                }
+
+        val law1949 =
+            mockMvc.post("/constitutions/$constitutionId/versions") {
+                header("Authorization", TOKEN)
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"versionLabel":"1949","effectiveDate":"1949-01-01"}"""
+            }.andExpect { status { isCreated() } }
+                .andReturn().response.contentAsString.let {
+                    Regex("\"id\":\"([^\"]+)\"").find(it)!!.groupValues[1]
+                }
+        mockMvc.post("/versions/$law1949/publish") {
+            header("Authorization", PUBLISHER_TOKEN)
+        }.andExpect { status { isOk() } }
+
+        val law2022 =
+            mockMvc.post("/constitutions/$constitutionId/versions") {
+                header("Authorization", TOKEN)
+                contentType = MediaType.APPLICATION_JSON
+                content = """
+                    {
+                      "versionLabel":"2022",
+                      "effectiveDate":"2022-01-01",
+                      "predecessorVersionId":"$law1949",
+                      "hopKind":"legal"
+                    }
+                """.trimIndent()
+            }.andExpect { status { isCreated() } }
+                .andReturn().response.contentAsString.let {
+                    Regex("\"id\":\"([^\"]+)\"").find(it)!!.groupValues[1]
+                }
+        mockMvc.post("/versions/$law2022/publish") {
+            header("Authorization", PUBLISHER_TOKEN)
+        }.andExpect { status { isOk() } }
+
+        val editorialId =
+            mockMvc.post("/constitutions/$constitutionId/versions") {
+                header("Authorization", TOKEN)
+                contentType = MediaType.APPLICATION_JSON
+                content = """
+                    {
+                      "versionLabel":"1949-typo",
+                      "effectiveDate":"2024-01-01",
+                      "predecessorVersionId":"$law1949",
+                      "hopKind":"editorial_correction"
+                    }
+                """.trimIndent()
+            }.andExpect {
+                status { isCreated() }
+                jsonPath("$.hopKind") { value("editorial_correction") }
+                jsonPath("$.listing") { value("staff") }
+                jsonPath("$.legalVersionId") { value(law1949) }
+            }.andReturn().response.contentAsString.let {
+                Regex("\"id\":\"([^\"]+)\"").find(it)!!.groupValues[1]
+            }
+
+        mockMvc.post("/versions/$editorialId/publish") {
+            header("Authorization", PUBLISHER_TOKEN)
+        }.andExpect { status { isOk() } }
+
+        mockMvc.get("/constitutions/$constitutionId/versions")
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.length()") { value(2) }
+                jsonPath("$[?(@.versionLabel=='1949')].currentVersionId") {
+                    value(org.hamcrest.Matchers.hasItem(editorialId))
+                }
+                jsonPath("$[*].versionLabel") {
+                    value(org.hamcrest.Matchers.not(org.hamcrest.Matchers.hasItem("1949-typo")))
+                }
+            }
+
+        mockMvc.post("/constitutions/$constitutionId/versions") {
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = """
+                {
+                  "versionLabel":"1949-typo-2",
+                  "predecessorVersionId":"$law1949",
+                  "hopKind":"editorial_correction"
+                }
+            """.trimIndent()
+        }.andExpect {
+            status { isConflict() }
+            jsonPath("$.code") { value("not_editorial_tip") }
+        }
+
+        mockMvc.post("/constitutions/$constitutionId/versions") {
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = """
+                {
+                  "versionLabel":"2025",
+                  "predecessorVersionId":"$law1949",
+                  "hopKind":"legal"
+                }
+            """.trimIndent()
+        }.andExpect {
+            status { isConflict() }
+            jsonPath("$.code") { value("not_legal_tip") }
+        }
+
+        mockMvc.get("/versions/$law1949")
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.currentVersionId") { value(editorialId) }
+            }
+
+        mockMvc.get("/countries/BE")
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.constitutions[0].versions.length()") { value(2) }
+                jsonPath("$.constitutions[0].latestVersionId") { value(law2022) }
             }
     }
 

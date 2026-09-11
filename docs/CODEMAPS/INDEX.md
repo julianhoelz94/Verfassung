@@ -35,8 +35,8 @@ Navigation only. Rules stay in `AGENTS.md`. If a path here disagrees with code, 
 | Why separate DBs | — | `docs/adr/0001-platform-boundaries.md` |
 | Published versions immutable | — | `docs/adr/0002-immutable-published-versions.md` |
 | Domain event names / outbox | — | `docs/adr/0003-domain-events.md` |
-| Amendments vs editorial hops | — | `docs/adr/0004-amendments-and-editorial-history.md` (Sprints 29–33). Planned two-axis model: **ARCH-8**, [`docs/design/two-axis-versions.md`](../design/two-axis-versions.md) (**Sprint UI reference** for configured mocks), canvas [legal vs editorial chain](/Users/julianhoelz/.cursor/projects/Users-julianhoelz-Documents-Verfassung/canvases/legal-vs-editorial-chain.canvas.tsx) |
-| Implement two-axis staff UI (Sprints 37–39) | frontend | [`docs/design/two-axis-versions.md`](../design/two-axis-versions.md) § Sprint UI reference, then `docs/design/prototype/editor-constitution.html` (`#timeline`, `#legal`, `#correct-1949`, `#hop-1956`, `#hop-2022`) |
+| Amendments vs editorial hops | — | [ADR 0005](../adr/0005-two-axis-versions.md) (two axes). ADR 0004 points 1 and 5–7 still apply. Design: [`docs/design/two-axis-versions.md`](../design/two-axis-versions.md) (**Sprint UI reference**), canvas [legal vs editorial chain](/Users/julianhoelz/.cursor/projects/Users-julianhoelz-Documents-Verfassung/canvases/legal-vs-editorial-chain.canvas.tsx) |
+| Implement two-axis staff UI (Sprints 37–39) | frontend | [ADR 0005](../adr/0005-two-axis-versions.md), [`docs/design/two-axis-versions.md`](../design/two-axis-versions.md) § Sprint UI reference, then `docs/design/prototype/editor-constitution.html` (`#timeline`, `#legal`, `#correct-1949`, `#hop-1956`, `#hop-2022`) |
 | Version pins | — | `docs/dependencies.md` |
 | UI concept / tokens | frontend | `docs/design/`, `app/globals.css` |
 | Sprint / story status | — | grep `backlog.md` for `CAT-` `CNT-` `UI-` `IDN-` `OPS-` |

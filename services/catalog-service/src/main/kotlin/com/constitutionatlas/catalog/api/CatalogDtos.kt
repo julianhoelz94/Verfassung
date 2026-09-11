@@ -28,6 +28,10 @@ data class VersionSummary(
     val hopKind: String = "initial",
     val listing: String = "public",
     val latestPublished: Boolean = false,
+    val legalVersionId: UUID? = null,
+    val currentVersionId: UUID? = null,
+    val legalPredecessorVersionId: UUID? = null,
+    val editorialPredecessorVersionId: UUID? = null,
 )
 
 data class NodeKindDto(
@@ -110,6 +114,10 @@ data class VersionCreated(
     val predecessorVersionId: UUID? = null,
     val hopKind: String = "initial",
     val listing: String = "public",
+    val legalVersionId: UUID? = null,
+    val currentVersionId: UUID? = null,
+    val legalPredecessorVersionId: UUID? = null,
+    val editorialPredecessorVersionId: UUID? = null,
 )
 
 data class VersionDetail(
@@ -122,4 +130,8 @@ data class VersionDetail(
     val predecessorVersionId: UUID? = null,
     val hopKind: String = "initial",
     val listing: String = "public",
+    val legalVersionId: UUID? = null,
+    val currentVersionId: UUID? = null,
+    val legalPredecessorVersionId: UUID? = null,
+    val editorialPredecessorVersionId: UUID? = null,
 )

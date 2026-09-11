@@ -51,7 +51,7 @@ Caddy → `gateway-web` page → `lib/api.ts` → catalog `GET /countries/{code}
 `app/login/actions.ts` → `lib/session.ts` → identity `POST /login` → cookie `ca_session` (Bearer token). MFA uses `ca_mfa_challenge`.
 
 **Publish draft**  
-Editor UI → editor `POST /edit-sessions/{id}/publish` → identity `/me` (role + step-up) → content copy onto a new catalog version (CAT-5 predecessor + hop kind) → catalog `POST /versions/{id}/publish` → editor `outbox_events` (`version.published`, `search.reindex-requested`) → scheduler `POST` search `/reindex`. Audit `POST /events` is still best-effort HTTP. Until ED-6, editor may still `POST /transitions`; that does not make every hop a public law (ADR 0004).
+Editor UI → editor `POST /edit-sessions/{id}/publish` → identity `/me` (role + step-up) → content copy onto a new catalog version (CAT-5 predecessor + hop kind today; CAT-6 / ED-7 two-axis tips) → catalog `POST /versions/{id}/publish` → editor `outbox_events` (`version.published`, `search.reindex-requested`) → scheduler `POST` search `/reindex`. Audit `POST /events` is still best-effort HTTP. Editor names the hop and never auto-records a law (ADR 0004 point 6 / ADR 0005).
 
 **Import**  
 Admin → ingestion `POST /import-jobs` → catalog create country/constitution/version → content `PUT /versions/{id}/articles` → catalog `POST /versions/{id}/publish`.

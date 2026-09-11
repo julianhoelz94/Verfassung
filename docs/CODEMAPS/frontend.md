@@ -23,15 +23,15 @@ Next.js 15 App Router, React 18, TypeScript. **No DB** — HTTP clients only. Pr
 | `/reset`, `/invite` | password reset, invite accept |
 | `/account`, `/account/step-up` | self-service + MFA step-up |
 | `/editor` | drafts (`ArticleEditor.tsx`, `ArticleFilterList`, `WorkflowSteps`, `actions.ts`, `PublishForm.tsx`) |
-| `/editor/amendments` | staff amending-law list (`page.tsx`) |
-| `/editor/amendments/[id]` | create (`new`) or edit form with revision panel (`AmendmentEditorLayout.tsx`, `AmendmentRevisionPanel.tsx`, `AmendmentForm.tsx`, `AmendmentChangesTable.tsx`, `actions.ts`) |
+| `/editor/amendments` | staff Legal changes inbox (`page.tsx`; was “Amending laws”) |
+| `/editor/amendments/[id]` | create (`new`) or edit form with revision panel (`AmendmentEditorLayout.tsx`, `AmendmentRevisionPanel.tsx`, `AmendmentForm.tsx`, `AmendmentChangesTable.tsx`, `actions.ts`); quote review (UI-56) |
 | `/editor/history` | staff snapshot history (`page.tsx`; `listing=all` version chain) |
 | `/admin` | admin index (Users, Outlines, Import) |
 | `/admin/users` | identity admin |
 | `/admin/constitutions`, `/admin/constitutions/[id]` | outlines |
 | `/admin/import`, `/admin/import/[jobId]` | ingestion |
 
-Shell: `layout.tsx` → skip link + `SiteHeader` + `SiteFooter`. Shared UI: `app/components/` (`ConstitutionText`, `DiffConstitutionText`, `VersionReader`, `ui.tsx`, `MenuDisclosure`, `Segmented`, `Tabs`, `Toc`, `FiltersPanel`, `ArticleFilterList`). Nav: `lib/nav.ts` (`primaryNavLinks`, `menuSections`, `editorialLinks` includes Amending laws and Snapshot history). Amendment detail: revision panel (read-only browse, restore as new draft); **Fill from two versions** calls `POST /amendments/suggest`. Home/country helpers: `lib/reading.ts` (`publicVersions`, `chainTipId`). Timeline lists constitution-level published laws via `listConstitutionAmendments`. Editor publish uses `PublishForm` (hop kind + linked law; links to `/editor/amendments` when no law exists).
+Shell: `layout.tsx` → skip link + `SiteHeader` + `SiteFooter`. Shared UI: `app/components/` (`ConstitutionText`, `DiffConstitutionText`, `VersionReader`, `ui.tsx`, `MenuDisclosure`, `Segmented`, `Tabs`, `Toc`, `FiltersPanel`, `ArticleFilterList`). Nav: `lib/nav.ts` (`primaryNavLinks`, `menuSections`, `editorialLinks` includes Legal changes — still labelled “Amending laws” in the gateway until UI-57 — and Snapshot history). Amendment detail: revision panel (read-only browse, restore as new draft); **Fill from two versions** calls `POST /amendments/suggest`. Home/country helpers: `lib/reading.ts` (`publicVersions`, `chainTipId`). Timeline lists constitution-level published laws via `listConstitutionAmendments`. Editor publish uses `PublishForm` (hop kind + linked law until UI-52 / ED-7: session job is P2 vs P3, not a two-choice dialog).
 
 Admin gates: `lib/admin.ts` (`requireAdminPage`). Editor/admin links: `lib/nav.ts` (UI only).
 

@@ -68,7 +68,7 @@ Constitution Atlas
 ├── Editor [nav]                            /editor
 │   ├── Open a session                      /editor  (version select → POST open)
 │   ├── My sessions                         /editor?mine=1   (sessions I opened, any status)
-│   ├── Amending laws                       /editor/amendments   (UI-ED-2 / UI-43; draft laws, not article text)
+│   ├── Legal changes                       /editor/amendments   (UI-ED-2 / UI-43 / UI-57; change records, not article text)
 │   ├── Snapshot history                    /editor/history?constitutionId=   (UI-47; staff version chain)
 │   └── Session                             /editor?sessionId=
 │       ├── Article list (filter, draft/new badges)
@@ -78,7 +78,7 @@ Constitution Atlas
 └── ● editor@example.org  [editor]
     ├── Editorial
     │   ├── My sessions
-    │   ├── Amending laws                   /editor/amendments
+    │   ├── Legal changes                   /editor/amendments
     │   ├── Snapshot history                /editor/history
     │   └── Review queue                    (visible, read-only: shows count, cannot approve)
     ├── Account
@@ -97,7 +97,7 @@ Constitution Atlas
 ├── Search [nav]
 ├── Editor [nav]                            /editor
 │   ├── Review queue                        /editor?status=reviewing   (default landing for reviewers)
-│   ├── Amending laws                       /editor/amendments   (read-only)
+│   ├── Legal changes                       /editor/amendments   (read-only)
 │   ├── Snapshot history                    /editor/history
 │   ├── Load a session by id                /editor?sessionId=
 │   └── Session (read-only text + preview)
@@ -105,7 +105,7 @@ Constitution Atlas
 └── ● reviewer@example.org  [reviewer]
     ├── Editorial
     │   ├── Review queue
-    │   ├── Amending laws                   /editor/amendments
+    │   ├── Legal changes                   /editor/amendments
     │   └── Snapshot history                /editor/history
     ├── Account
     └── Sign out
@@ -123,7 +123,7 @@ Constitution Atlas
 ├── Search [nav]
 ├── Editor [nav]                            /editor
 │   ├── Ready to publish                    /editor?status=approved   (default landing for publishers)
-│   ├── Amending laws                       /editor/amendments
+│   ├── Legal changes                       /editor/amendments
 │   ├── Snapshot history                    /editor/history
 │   ├── Load a session by id
 │   └── Session (read-only text + preview)
@@ -131,7 +131,7 @@ Constitution Atlas
 └── ● publisher@example.org  [publisher]
     ├── Editorial
     │   ├── Ready to publish
-    │   ├── Amending laws                   /editor/amendments
+    │   ├── Legal changes                   /editor/amendments
     │   └── Snapshot history                /editor/history
     ├── Account
     └── Sign out
@@ -165,7 +165,7 @@ Constitution Atlas
     │   ├── My sessions
     │   ├── Review queue
     │   ├── Ready to publish
-    │   └── Amending laws                   /editor/amendments
+    │   └── Legal changes                   /editor/amendments
     ├── Admin
     │   ├── Users
     │   ├── Outlines
@@ -191,12 +191,14 @@ The menu disclosure always renders sections in this order and skips empty ones:
 
 ## Test matrix for `lib/nav.test.ts`
 
+Copy **Legal changes** (was “Amending laws”) lands in `nav.ts` with UI-57. Until then the gateway label is still “Amending laws”; the trees above are the product name.
+
 | Principal | Primary bar | Menu sections present |
 | --- | --- | --- |
 | anonymous | Countries, Search, About | Primary (phone), Log in |
 | viewer | Countries, Search, About | Identity, Primary (phone), Account/Sign out |
-| editor | + Editor | + Editorial (My sessions, Review queue, Amending laws, Snapshot history) |
-| reviewer | + Editor | + Editorial (Review queue, Amending laws, Snapshot history) |
-| publisher | + Editor | + Editorial (Ready to publish, Amending laws, Snapshot history) |
+| editor | + Editor | + Editorial (My sessions, Review queue, Legal changes, Snapshot history) |
+| reviewer | + Editor | + Editorial (Review queue, Legal changes, Snapshot history) |
+| publisher | + Editor | + Editorial (Ready to publish, Legal changes, Snapshot history) |
 | editor+reviewer+publisher | + Editor | + Editorial (all five) |
 | admin | + Editor, Admin, API docs | + Editorial (all), Admin (Users, Outlines, Import), API docs |

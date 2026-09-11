@@ -26,7 +26,7 @@ Emitted after catalog `POST /versions/{id}/publish` succeeds for an editorial su
 
 ### `amendment.recorded`
 
-Emitted for `legal_amendment` and `official_errata` publish hops after the editor links and publishes the named amendment. Not emitted for `editorial_correction`.
+Emitted for `legal` publish hops after the editor links and publishes the named change record (ADR 0005 / ED-7). Not emitted for `editorial_correction`. Until ED-7, the editor still sends CAT-5 hop kinds `legal_amendment` / `official_errata` for the same event.
 
 | Field | Type |
 | --- | --- |

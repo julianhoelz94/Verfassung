@@ -23,7 +23,11 @@
           "predecessorVersionId": null,
           "hopKind": "initial",
           "listing": "public",
-          "latestPublished": false
+          "latestPublished": false,
+          "legalVersionId": "01900000-0000-4000-8000-000000000003",
+          "currentVersionId": "01900000-0000-4000-8000-000000000003",
+          "legalPredecessorVersionId": null,
+          "editorialPredecessorVersionId": null
         },
         {
           "id": "01900000-0000-4000-8000-000000000004",
@@ -37,9 +41,13 @@
           "verifiedBy": null,
           "verifiedAt": null,
           "predecessorVersionId": "01900000-0000-4000-8000-000000000003",
-          "hopKind": "legal_amendment",
+          "hopKind": "legal",
           "listing": "public",
-          "latestPublished": true
+          "latestPublished": true,
+          "legalVersionId": "01900000-0000-4000-8000-000000000004",
+          "currentVersionId": "01900000-0000-4000-8000-000000000004",
+          "legalPredecessorVersionId": "01900000-0000-4000-8000-000000000003",
+          "editorialPredecessorVersionId": null
         }
       ],
       "contentOutline": {

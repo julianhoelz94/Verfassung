@@ -11,12 +11,12 @@ Flyway: `services/<name>/src/main/resources/db/migration/`. Forward-only `V{n}__
 | --- | --- |
 | `countries` | iso_code PK-unique |
 | `constitutions` | per country, slug unique |
-| `constitution_versions` | label, dates, `publication_status`, `predecessor_version_id`, `hop_kind`, `listing` (V9) |
+| `constitution_versions` | label, dates, `publication_status`, chain (V9: `predecessor_version_id`, `hop_kind`, `listing`). ADR 0005 / CAT-6: `legal_version_id`, legal vs editorial predecessors; `hop_kind` `initial`/`legal`/`editorial_correction` |
 | `constitution_sources` | citations + verification |
 | `constitution_node_kinds` | outline: kind_code, flags, presentation `section\|concatenated` (V6) |
 | `constitution_node_kind_edges` | allowed parent→child kinds |
 
-Latest: V9 version chain. Seed: `V3__seed_germany.sql` (demo provenance, not official); V9 sets 1949 `initial` and 2022 `legal_amendment`.
+Latest: V10 two-axis chains. Seed: `V3__seed_germany.sql` (demo provenance, not official); V9 sets 1949 `initial` and 2022 `legal_amendment`; V10 migrates that hop to `legal` and fills `legal_version_id`.
 
 ## content_db
 
@@ -29,7 +29,7 @@ Seed: `V3__seed_germany_articles.sql`, `V5__seed_article1_tree.sql`.
 
 ## amendment_db
 
-`version_transitions` (source→target UUIDs, `constitution_id`), `amendments` (`constitution_id`, `kind`, `status`, nullable `version_transition_id`, `published_revision_id`), `amendment_revisions` (linear chain), `amendment_changes` (hang off `revision_id`; V6 amending-law text). Seed: `V3__seed_basic_law_transition.sql`. Latest: V7.
+`version_transitions` (source→target UUIDs, `constitution_id`), `amendments` (`constitution_id`, `kind` until AMD-11, `status`, nullable `version_transition_id`, `published_revision_id`), `amendment_revisions` (linear chain), `amendment_changes` (hang off `revision_id`; V6 amending-law text). Seed: `V3__seed_basic_law_transition.sql`. Latest: V7. **ADR 0005 / AMD-11** (next Flyway, do not edit V7): drop `kind`; revision `comment` + `documents` JSONB; published pins; `review_status`.
 
 ## identity_db
 

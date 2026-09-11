@@ -49,7 +49,7 @@ Service names: `catalog`, `content`, `amendment`, `identity`, `editor`, `search`
 
 ## Current sprint
 
-See `backlog.md` **Suggested Sprint Breakdown**. Sprint 0–33 are closed. Pull from **Later / Ideas** only if the user asks. Do not start SRV-7 (MCP) until asked.
+See `backlog.md` **Suggested Sprint Breakdown**. Sprint 0–33 are closed. Next is **Sprint 34 (ARCH-8)** — two-axis legal × editorial versions; design at `docs/design/two-axis-versions.md` (**Sprint UI reference** = configured prototype hashes) and the Cursor canvas linked there. Do not start CAT-6 / AMD-11 / ED-7 until ARCH-8 is Done. Pull from **Later / Ideas** only if the user asks. Do not start SRV-7 (MCP) until asked.
 
 **When a story/task is finished, update `backlog.md` in the same change:** set Status to `Done`, add the ID to that sprint’s Done list, and keep the board snapshot accurate. Do not leave completed work as `Ready`.
 

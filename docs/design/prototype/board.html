@@ -27,10 +27,14 @@
   <figure class="device desktop"><div class="screen"><iframe id="f3" title="Desktop 1440px"></iframe></div><figcaption>Desktop · 1440 × 900 (50%)</figcaption></figure>
 </div>
 <script>
-  const page = new URLSearchParams(location.search).get('page') || 'home';
-  const src = page + '.html';
-  document.getElementById('title').textContent = 'Prototype · ' + page + '.html';
-  for (const id of ['f1', 'f2', 'f3']) document.getElementById(id).src = src;
+  function loadFrames() {
+    const page = new URLSearchParams(location.search).get('page') || 'home';
+    const src = page + '.html' + location.hash;
+    document.getElementById('title').textContent = 'Prototype · ' + page + '.html' + location.hash;
+    for (const id of ['f1', 'f2', 'f3']) document.getElementById(id).src = src;
+  }
+  loadFrames();
+  window.addEventListener('hashchange', loadFrames);
 </script>
 </body>
 </html>

@@ -4,7 +4,7 @@
 Next.js 15 App Router, React 18, TypeScript. **No DB** — HTTP clients only. Prefer server components; client components for editor widgets.
 
 **Rules:** `apps/gateway-web/AGENTS.md`, `.cursor/rules/nextjs-gateway.mdc`  
-**Design:** `docs/design/ui-concept.md`, tokens in `app/globals.css` (from `docs/design/tokens.css`)  
+**Design:** `docs/design/ui-concept.md`, tokens in `app/globals.css` (from `docs/design/tokens.css`). **Sprints 34–39 two-axis UI:** [`docs/design/two-axis-versions.md`](../design/two-axis-versions.md) § Sprint UI reference — configured mocks in `docs/design/prototype/editor-constitution.html` (`#timeline`, `#correct-1949`, `#legal`, `#hop-1956`, `#hop-2022`, `#hop-1994`). Do not copy `prototype/home.html` / `version.html` / `compare.html` / `editor.html` for versioning behaviour.  
 **Nav by role:** `docs/design/role-link-trees.md` + `lib/nav.ts`
 
 ## Page tree (`app/`)

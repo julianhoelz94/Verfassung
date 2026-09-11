@@ -163,11 +163,12 @@ Defined in [`tokens.css`](tokens.css); copy into `globals.css` in UI-29 and dele
 
 | File | Shows |
 | --- | --- |
-| `prototype/home.html` | Anonymous shell, hero, country cards, recently changed |
-| `prototype/version.html` | Viewer shell, TOC + toolbar + text column, collapsed articles, pager |
-| `prototype/compare.html` | Compare bar, summary badges, phone tabs, hop, two-column diff |
-| `prototype/editor.html` | Editor/reviewer shell with Editorial menu group, workflow steps, three-panel workspace, sticky action bar |
-| `prototype/board.html?page=…` | Renders any page in phone (390), tablet (820) and desktop (1440) frames |
+| `prototype/home.html` | Sprint 19–21 anonymous shell. **Not** the two-axis public-chip contract (still 1949 / 2022 only). |
+| `prototype/version.html` | Sprint 19–21 reader shell (TOC, toolbar, text column). **Not** UI-53. |
+| `prototype/compare.html` | Sprint 19–21 compare chrome. **Not** UI-54 / UI-58 (still “amending laws”, skips 1956 / 1994). |
+| `prototype/editor.html` | Sprint 19–21 editor workspace chrome. **Not** UI-52 (still a generic session, not P2 vs P3). |
+| `prototype/editor-constitution.html` | **Configured two-axis mocks** for Sprints 34–39. Hashes: `#timeline` staff legal timeline; `#correct-1949` (also 1956 / 1994 / 2022) P3 transcription; `#legal` P2 next legal change; `#hop-1956` / `#review` quote review stale source; `#hop-2022` stale target; `#hop-1994` pins match. Table: [`two-axis-versions.md`](two-axis-versions.md) § Sprint UI reference. |
+| `prototype/board.html?page=…` | Renders any page in phone (390), tablet (820) and desktop (1440) frames. For two-axis views: `board.html?page=editor-constitution#legal` (hash is forwarded to the iframes). |
 | `prototype/prototype.css` | All component styles; class names are the implementation contract |
 
 ## 8. Migration plan (maps to Sprints 19–21)

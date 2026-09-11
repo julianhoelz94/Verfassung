@@ -1,0 +1,776 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Editor · Basic Law — Constitution Atlas UI draft</title>
+<link rel="stylesheet" href="prototype.css?v=quote-review">
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to main content</a>
+<div class="mock-banner">UI draft · two-axis editor · not wired to APIs</div>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="home.html"><span class="brand-mark" aria-hidden="true">§</span><span class="brand-name">Constitution Atlas</span></a>
+    <nav class="nav-primary" aria-label="Primary">
+      <a href="home.html">Countries</a>
+      <a href="#">Search</a>
+      <a href="editor-constitution.html" aria-current="page">Editor</a>
+    </nav>
+    <div class="topbar-actions">
+      <form class="search-inline" role="search" action="#"><input type="search" name="q" placeholder="Search articles" aria-label="Search articles"></form>
+      <details class="menu">
+        <summary class="icon-btn" aria-label="Account and menu"><span class="avatar" aria-hidden="true">P</span></summary>
+        <div class="menu-panel">
+          <div class="menu-user">publisher@example.org<br><span class="badge">editor</span> <span class="badge">publisher</span></div>
+          <div class="menu-group nav-dup"><a href="home.html">Countries</a><a href="#">Search</a><a href="editor-constitution.html" aria-current="page">Editor</a></div>
+          <div class="menu-group">
+            <p class="menu-label">Editorial</p>
+            <a href="editor-constitution.html" aria-current="page">Constitutions</a>
+            <a href="#review">Quote review <span class="badge badge-changed">2</span></a>
+            <a href="#">Review queue</a>
+          </div>
+          <div class="menu-group"><a href="#">Account</a><button type="button">Sign out</button></div>
+        </div>
+      </details>
+    </div>
+  </div>
+</header>
+
+<main id="main" class="page wide">
+
+  <!-- ===== View: constitution timeline ===== -->
+  <div id="view-timeline">
+    <nav class="crumbs" aria-label="Breadcrumb">
+      <ol>
+        <li><a href="editor.html">Editor</a></li>
+        <li aria-current="page">Germany · Basic Law</li>
+      </ol>
+    </nav>
+    <div class="page-header">
+      <div>
+        <p class="eyebrow">Germany · DE</p>
+        <h1 class="page-title">Basic Law</h1>
+        <p class="lede">This constitution has a public legal timeline and, under each version, a numbered correction history (r1, r2, r3…). Those are different jobs. A correction does not change the year on the chip.</p>
+      </div>
+      <div class="page-actions">
+        <a class="btn btn-ghost" href="version.html">Read as the public sees it</a>
+      </div>
+    </div>
+
+    <div class="job-pair">
+      <div class="job-card">
+        <h2>Correct a transcription</h2>
+        <p class="muted">Fix typos, OCR, and omitted words <strong>inside one public version</strong>. The chips stay 1949, 1956, 1994, 2022. Readers of that chip get the new r-number; the public timeline does not gain an event.</p>
+        <p style="margin-top: var(--space-3); font-size: var(--text-sm);">Pick a version on the timeline → <strong>Correct this text</strong>.</p>
+      </div>
+      <div class="job-card job-legal">
+        <h2>Record a legal change</h2>
+        <p>Add the <strong>next public version of the law</strong> after 2022. Opens an editor on 2022 r3 with the change record in the sidebar. One publish creates the new chip and the instrument between them.</p>
+        <p style="margin-top: var(--space-3);"><button class="btn btn-primary" type="button" id="jump-legal">Record the next legal change</button></p>
+      </div>
+    </div>
+
+    <div class="axis-caption">
+      <span>Correction history is closed until you open it</span>
+      <span>Public legal versions, oldest → newest →</span>
+    </div>
+
+    <div class="timeline" role="list" aria-label="Legal timeline of the Basic Law">
+      <article class="timeline-card" role="listitem" data-law="1949">
+        <p class="kind-badge kind-version">Public version</p>
+        <p class="year">1949</p>
+        <p class="current-rev">Current transcription <strong>r3</strong></p>
+        <p class="byline">Anna Keller · <time datetime="2024-03-12">12 Mar 2024</time></p>
+        <details class="rev-history">
+          <summary>History <span class="muted">(3)</span></summary>
+          <ol class="stack-list">
+            <li class="is-tip">
+              <span>r3 · Restored missing word in Art. 20</span>
+              <span class="byline">Anna Keller · <time datetime="2024-03-12">12 Mar 2024</time></span>
+            </li>
+            <li>
+              <span>r2 · OCR: Würde in Art. 1</span>
+              <span class="byline">Mira Shah · <time datetime="2020-06-18">18 Jun 2020</time></span>
+            </li>
+            <li>
+              <span>r1 · Original transcription</span>
+              <span class="byline">Klaus Weber · <time datetime="2019-04-03">3 Apr 2019</time></span>
+            </li>
+          </ol>
+        </details>
+        <button class="btn" type="button" data-correct="1949">Correct this text</button>
+      </article>
+
+      <article class="timeline-card is-hop is-stale" role="listitem">
+        <p class="kind-badge kind-change">Legal change</p>
+        <p class="hop-title">1956 Wehrverfassung</p>
+        <p class="hop-copy">Defence articles inserted into the 1949 text.</p>
+        <p class="badge-slot"><span class="badge badge-changed">Needs quote review</span></p>
+        <p class="byline">Lina Vogt · <time datetime="2024-09-11">11 Sep 2024</time></p>
+        <button class="btn" type="button" data-hop="1956">Review quotes</button>
+      </article>
+
+      <article class="timeline-card" role="listitem" data-law="1956">
+        <p class="kind-badge kind-version">Public version</p>
+        <p class="year">1956</p>
+        <p class="current-rev">Current transcription <strong>r1</strong></p>
+        <p class="byline">Klaus Weber · <time datetime="2019-11-14">14 Nov 2019</time></p>
+        <details class="rev-history">
+          <summary>History <span class="muted">(1)</span></summary>
+          <ol class="stack-list">
+            <li class="is-tip">
+              <span>r1 · Original transcription</span>
+              <span class="byline">Klaus Weber · <time datetime="2019-11-14">14 Nov 2019</time></span>
+            </li>
+          </ol>
+        </details>
+        <button class="btn" type="button" data-correct="1956">Correct this text</button>
+      </article>
+
+      <article class="timeline-card is-hop" role="listitem">
+        <p class="kind-badge kind-change">Legal change</p>
+        <p class="hop-title">1994 Art. 3</p>
+        <p class="hop-copy">Equal-rights amendment. Quotes match 1956 r1 and 1994 r2.</p>
+        <p class="badge-slot"></p>
+        <p class="byline">Jonas Berg · <time datetime="2021-03-21">21 Mar 2021</time></p>
+        <button class="btn" type="button" data-hop="1994">Open record</button>
+      </article>
+
+      <article class="timeline-card" role="listitem" data-law="1994">
+        <p class="kind-badge kind-version">Public version</p>
+        <p class="year">1994</p>
+        <p class="current-rev">Current transcription <strong>r2</strong></p>
+        <p class="byline">Anna Keller · <time datetime="2021-03-21">21 Mar 2021</time></p>
+        <details class="rev-history">
+          <summary>History <span class="muted">(2)</span></summary>
+          <ol class="stack-list">
+            <li class="is-tip">
+              <span>r2 · Omitted word in Art. 3</span>
+              <span class="byline">Anna Keller · <time datetime="2021-03-21">21 Mar 2021</time></span>
+            </li>
+            <li>
+              <span>r1 · Original transcription</span>
+              <span class="byline">Jonas Berg · <time datetime="2019-09-02">2 Sep 2019</time></span>
+            </li>
+          </ol>
+        </details>
+        <button class="btn" type="button" data-correct="1994">Correct this text</button>
+      </article>
+
+      <article class="timeline-card is-hop is-stale" role="listitem">
+        <p class="kind-badge kind-change">Legal change</p>
+        <p class="hop-title">2022 Art. 104c</p>
+        <p class="hop-copy">Education infrastructure. Quotes still pin 2022 r1, not 2022 r3.</p>
+        <p class="badge-slot"><span class="badge badge-changed">Needs quote review</span></p>
+        <p class="byline">Mira Shah · <time datetime="2025-02-02">2 Feb 2025</time></p>
+        <button class="btn" type="button" data-hop="2022">Review quotes</button>
+      </article>
+
+      <article class="timeline-card is-tip" role="listitem" data-law="2022">
+        <p class="kind-badge kind-version">Public version</p>
+        <p class="year">2022</p>
+        <p class="current-rev">Legal tip · current transcription <strong>r3</strong></p>
+        <p class="byline">Anna Keller · <time datetime="2025-01-15">15 Jan 2025</time></p>
+        <details class="rev-history">
+          <summary>History <span class="muted">(3)</span></summary>
+          <ol class="stack-list">
+            <li class="is-tip">
+              <span>r3 · Restored clause in Art. 1</span>
+              <span class="byline">Anna Keller · <time datetime="2025-01-15">15 Jan 2025</time></span>
+            </li>
+            <li>
+              <span>r2 · Spelling: Staates</span>
+              <span class="byline">Mira Shah · <time datetime="2023-08-03">3 Aug 2023</time></span>
+            </li>
+            <li>
+              <span>r1 · Original transcription</span>
+              <span class="byline">Jonas Berg · <time datetime="2022-06-28">28 Jun 2022</time></span>
+            </li>
+          </ol>
+        </details>
+        <button class="btn" type="button" data-correct="2022">Correct this text</button>
+      </article>
+
+      <article class="timeline-card is-add" role="listitem" id="next-legal">
+        <p class="kind-badge kind-next">Next public version</p>
+        <p class="year">Next</p>
+        <p class="current-rev">A new public version of the law, after 2022.</p>
+        <p class="byline muted">No editor yet</p>
+        <button class="btn btn-primary" type="button" id="open-legal">Record a legal change</button>
+      </article>
+    </div>
+  </div>
+
+  <!-- ===== View: correct transcription ===== -->
+  <div id="view-correct" hidden>
+    <nav class="crumbs" aria-label="Breadcrumb">
+      <ol>
+        <li><a href="editor.html">Editor</a></li>
+        <li><a href="#timeline" id="crumb-timeline">Germany · Basic Law</a></li>
+        <li aria-current="page" id="crumb-correct">Correct 1949</li>
+      </ol>
+    </nav>
+    <div class="page-header">
+      <div>
+        <p class="eyebrow">Transcription · not a new law</p>
+        <h1 class="page-title" id="correct-title">Correct the 1949 text</h1>
+        <p class="page-meta" id="correct-meta">Public chip stays “1949”. You are editing 1949 r3. This will not appear on the public timeline.</p>
+        <div class="status-steps" aria-label="Workflow" style="margin-top: var(--space-3);">
+          <ol>
+            <li class="is-done">Draft</li>
+            <li class="is-done">In review</li>
+            <li class="is-current">Approved</li>
+            <li>Published</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+    <div class="task-banner is-transcription">
+      <strong>Task: correct a transcription.</strong>
+      <span>To add a new public chip, go back and use Record a legal change — that is a different publish.</span>
+    </div>
+    <div class="alert alert-info" id="correct-alert" role="status"></div>
+    <div class="workspace">
+      <aside class="panel" aria-label="Articles">
+        <p class="panel-title">Articles · <span id="changed-count">1</span> changed</p>
+        <input class="field-control" type="search" id="article-filter" placeholder="Filter articles" aria-label="Filter articles" style="margin-bottom: var(--space-3);">
+        <ul class="article-list" id="article-list"></ul>
+      </aside>
+      <section class="panel" aria-labelledby="edit-title">
+        <p class="panel-title" id="edit-title">Article 20</p>
+        <label class="field">
+          <span class="field-label">Title</span>
+          <input class="field-control" id="article-title">
+        </label>
+        <label class="field">
+          <span class="field-label">Text</span>
+          <textarea class="field-control" id="article-body" lang="de" spellcheck="false"></textarea>
+        </label>
+        <div class="action-bar">
+          <button class="btn" type="button" id="back-from-correct">Back to timeline</button>
+          <button class="btn" type="button">Save draft</button>
+          <button class="btn btn-primary" type="button" id="publish-transcription">Publish transcription</button>
+        </div>
+      </section>
+      <aside class="panel panel-side" aria-label="Session">
+        <p class="panel-title">Wikipedia comment</p>
+        <label class="field">
+          <span class="field-label">Why this correction <span aria-hidden="true">*</span></span>
+          <input class="field-control" id="edit-comment" required aria-required="true" value="Restored missing word “sozialer” in Art. 20 after checking BGBl. 1949.">
+        </label>
+        <p class="panel-title">This version’s correction history</p>
+        <ol class="stack-list" id="editorial-stack"></ol>
+        <p class="panel-title" style="margin-top: var(--space-4);">Preview</p>
+        <div class="text-column" id="preview" lang="de" style="font-size: var(--text-base);"></div>
+      </aside>
+    </div>
+  </div>
+
+  <!-- ===== View: record legal change ===== -->
+  <div id="view-legal" hidden>
+    <nav class="crumbs" aria-label="Breadcrumb">
+      <ol>
+        <li><a href="editor.html">Editor</a></li>
+        <li><a href="#timeline" class="back-timeline">Germany · Basic Law</a></li>
+        <li aria-current="page">Next public version</li>
+      </ol>
+    </nav>
+    <div class="page-header">
+      <div>
+        <p class="eyebrow">Legal change · new public chip after 2022</p>
+        <h1 class="page-title">Record a legal change</h1>
+        <p class="lede">This is not a typo fix. You are adding the next public version of the Basic Law and the instrument that produced it.</p>
+      </div>
+    </div>
+    <div class="task-banner is-legal">
+      <strong>Task: new public version of the law.</strong>
+      <span>Source is 2022 r3. The instrument sits in the sidebar — not a step after you finish the articles.</span>
+    </div>
+    <div class="workspace">
+      <aside class="panel" aria-label="Articles">
+        <p class="panel-title">Articles · copied from 2022 r3</p>
+        <ul class="article-list">
+          <li><a href="#legal-edit-title">Art. 1 Human dignity</a></li>
+          <li><a href="#legal-edit-title" aria-current="true">Art. 104c Financial assistance for education <span class="badge badge-changed">draft</span></a></li>
+        </ul>
+      </aside>
+      <section class="panel" aria-labelledby="legal-edit-title">
+        <p class="panel-title" id="legal-edit-title">Article 104c</p>
+        <label class="field">
+          <span class="field-label">Title</span>
+          <input class="field-control" value="Finanzhilfen für die Bildungsinfrastruktur">
+        </label>
+        <label class="field">
+          <span class="field-label">Text</span>
+          <textarea class="field-control" lang="de" spellcheck="false">Der Bund kann den Ländern Finanzhilfen für gesamtstaatlich bedeutsame Investitionen der Länder und Gemeinden im Bereich der kommunalen Bildungsinfrastruktur gewähren.</textarea>
+        </label>
+        <div class="action-bar">
+          <button class="btn back-timeline" type="button">Back to timeline</button>
+          <button class="btn" type="button">Save draft</button>
+          <button class="btn btn-primary" type="button" id="publish-legal">Publish new legal version</button>
+        </div>
+      </section>
+      <aside class="panel panel-side" aria-label="Change record">
+        <p class="panel-title">Change record · required to publish</p>
+        <p class="muted" style="margin-bottom: var(--space-3);">The instrument between 2022 and this new chip. Not a hop-kind dropdown.</p>
+        <label class="field">
+          <span class="field-label">Title (timeline heading) <span aria-hidden="true">*</span></span>
+          <input class="field-control" value="Amendment of Art. 104c — draft">
+        </label>
+        <label class="field">
+          <span class="field-label">Comment <span aria-hidden="true">*</span></span>
+          <textarea class="field-control" id="legal-comment" style="min-height: 6rem;" required aria-required="true" aria-describedby="legal-comment-hint"></textarea>
+        </label>
+        <p class="muted" id="legal-comment-hint" style="margin: calc(-1 * var(--space-3)) 0 var(--space-4);">What this instrument is: “28th Amendment Act”, gazette notice, or similar.</p>
+        <label class="field">
+          <span class="field-label">Source document</span>
+          <input class="field-control" placeholder="URL or archived file label" value="https://www.bgbl.de/…">
+        </label>
+        <p class="muted">Quoted article rows can be filled from 2022 r3 and this draft after the text exists.</p>
+      </aside>
+    </div>
+  </div>
+
+  <!-- ===== View: quote review ===== -->
+  <div id="view-hop" hidden>
+    <nav class="crumbs" aria-label="Breadcrumb">
+      <ol>
+        <li><a href="editor.html">Editor</a></li>
+        <li><a href="#timeline" class="back-timeline">Germany · Basic Law</a></li>
+        <li aria-current="page" id="hop-crumb">Change record</li>
+      </ol>
+    </nav>
+    <div class="page-header">
+      <div>
+        <p class="eyebrow">Quote review · not a new law</p>
+        <h1 class="page-title" id="hop-title">1956 Wehrverfassung</h1>
+        <p class="lede">The instrument sits between the two public versions. Last-reviewed transcriptions are shown beside the latest when a chip has moved.</p>
+      </div>
+    </div>
+    <div class="alert alert-info" id="hop-alert" role="status"></div>
+    <div class="quote-board">
+      <article class="quote-pane is-version" aria-labelledby="quote-from-year">
+        <p class="kind-badge kind-version">Public version</p>
+        <p class="year" id="quote-from-year">1949</p>
+        <p class="quote-role" id="quote-from-role">Source · before this change</p>
+        <div class="quote-snaps" id="quote-from-snaps"></div>
+      </article>
+      <article class="quote-pane is-change" aria-labelledby="hop-title">
+        <p class="kind-badge kind-change">Legal change</p>
+        <p class="hop-title" id="hop-heading">1956 Wehrverfassung</p>
+        <p class="quote-pins" id="hop-pins">Last reviewed 1949 r2 → 1956 r1</p>
+        <p id="hop-comment"></p>
+        <p class="panel-title">Quoted articles</p>
+        <ul class="quote-rows" id="hop-quotes"></ul>
+        <p class="muted">Public readers still see these quotes until you publish a new revision of this record. That does not mint a new law chip.</p>
+        <div class="action-bar">
+          <button class="btn back-timeline" type="button">Back to timeline</button>
+          <button class="btn btn-primary" type="button" id="confirm-quotes">Confirm quotes against live tips</button>
+        </div>
+      </article>
+      <article class="quote-pane is-version" aria-labelledby="quote-to-year">
+        <p class="kind-badge kind-version">Public version</p>
+        <p class="year" id="quote-to-year">1956</p>
+        <p class="quote-role" id="quote-to-role">Target · after this change</p>
+        <div class="quote-snaps" id="quote-to-snaps"></div>
+      </article>
+    </div>
+  </div>
+
+</main>
+
+<footer class="footer">
+  <div class="footer-inner">
+    <p>Constitution Atlas · UI draft for Sprints 34–39 · <a href="../two-axis-versions.md">Sprint UI reference</a></p>
+    <p>
+      <a href="#timeline">Timeline</a>
+      · <a href="#correct-1949">Correct 1949</a>
+      · <a href="#legal">Next legal change</a>
+      · <a href="#hop-1956">Quote review (stale source)</a>
+      · <a href="#hop-1994">Quote review (in sync)</a>
+      · <a href="#hop-2022">Quote review (stale target)</a>
+      · <a href="board.html?page=editor-constitution">Three widths</a>
+    </p>
+  </div>
+</footer>
+
+<script>
+const LAWS = {
+  "1949": {
+    title: "Correct the 1949 text",
+    meta: "Public chip stays “1949”. You are editing 1949 r3. This will not appear on the public timeline.",
+    alert: "After you publish, the 1956 Wehrverfassung record will need quote review: it still pins 1949 r2, not this 1949 r3.",
+    comment: "Restored missing word “sozialer” in Art. 20 after checking BGBl. 1949.",
+    editorial: [
+      { rev: "r3", note: "this session (tip)", editor: "Anna Keller", date: "12 Mar 2024", dateIso: "2024-03-12", tip: true },
+      { rev: "r2", note: "OCR: Würde restored in Art. 1", editor: "Mira Shah", date: "18 Jun 2020", dateIso: "2020-06-18" },
+      { rev: "r1", note: "original transcription", editor: "Klaus Weber", date: "3 Apr 2019", dateIso: "2019-04-03" },
+    ],
+    articles: [
+      { n: "1", title: "Human dignity", changed: false, heading: "Die Würde des Menschen", body: "(1) Die Würde des Menschen ist unantastbar. Sie zu achten und zu schützen ist Verpflichtung aller staatlichen Gewalt." },
+      { n: "20", title: "Constitutional principles", changed: true, heading: "Constitutional principles — the federal state", body: "(1) Die Bundesrepublik Deutschland ist ein demokratischer und sozialer Bundesstaat.", preview: '<div class="para"><span class="num">(1)</span><p>Die Bundesrepublik Deutschland ist ein demokratischer und <ins style="background: var(--color-added-bg);">sozialer</ins> Bundesstaat.</p></div>' },
+    ],
+  },
+  "1956": {
+    title: "Correct the 1956 text",
+    meta: "Public chip stays “1956”. No later correction exists yet.",
+    alert: "",
+    comment: "",
+    editorial: [{ rev: "r1", note: "original = current tip", editor: "Klaus Weber", date: "14 Nov 2019", dateIso: "2019-11-14", tip: true }],
+    articles: [
+      { n: "73", title: "Exclusive legislative power", changed: true, heading: "Ausschließliche Gesetzgebung des Bundes", body: "(1) Der Bund hat die ausschließliche Gesetzgebung über die Verteidigung." },
+    ],
+  },
+  "1994": {
+    title: "Correct the 1994 text",
+    meta: "Public chip stays “1994”. You are editing 1994 r2.",
+    alert: "",
+    comment: "Restored omitted word in Art. 3 Abs. 2.",
+    editorial: [
+      { rev: "r2", note: "omitted word (tip)", editor: "Anna Keller", date: "21 Mar 2021", dateIso: "2021-03-21", tip: true },
+      { rev: "r1", note: "original transcription", editor: "Jonas Berg", date: "2 Sep 2019", dateIso: "2019-09-02" },
+    ],
+    articles: [
+      { n: "3", title: "Equality before the law", changed: true, heading: "Gleichheit vor dem Gesetz", body: "(2) Männer und Frauen sind gleichberechtigt. Der Staat fördert die tatsächliche Durchsetzung der Gleichberechtigung von Frauen und Männern." },
+    ],
+  },
+  "2022": {
+    title: "Correct the 2022 text",
+    meta: "Public chip stays “2022”. You are editing 2022 r3. Recording a new law is a different task, from the timeline.",
+    alert: "The 2022 Art. 104c change record still quotes 2022 r1, not this 2022 r3.",
+    comment: "Restored dropped clause in Art. 1.",
+    editorial: [
+      { rev: "r3", note: "this session (tip)", editor: "Anna Keller", date: "15 Jan 2025", dateIso: "2025-01-15", tip: true },
+      { rev: "r2", note: "spelling: Staates", editor: "Mira Shah", date: "3 Aug 2023", dateIso: "2023-08-03" },
+      { rev: "r1", note: "original transcription", editor: "Jonas Berg", date: "28 Jun 2022", dateIso: "2022-06-28" },
+    ],
+    articles: [
+      { n: "104c", title: "Financial assistance for education", changed: true, heading: "Finanzhilfen für die Bildungsinfrastruktur", body: "Der Bund kann den Ländern Finanzhilfen für gesamtstaatlich bedeutsame Investitionen der Länder und Gemeinden im Bereich der kommunalen Bildungsinfrastruktur gewähren." },
+    ],
+  },
+};
+
+const HOPS = {
+  "1956": {
+    title: "1956 Wehrverfassung",
+    comment: "Wehrverfassung: defence articles inserted into the 1949 Basic Law.",
+    document: "BGBl. I 1956 S. 111",
+    alert: "Stale source pin. 1949 has moved to r3 since this record was last reviewed. Confirm or update quotes. This does not create a new public version of the law.",
+    quotes: [
+      { article: "Art. 73 · inserted", html: "(1) Der Bund hat die ausschließliche Gesetzgebung über die Verteidigung." },
+    ],
+    from: {
+      chip: "1949",
+      role: "Source · before this change",
+      pinned: "r2",
+      live: "r3",
+      article: "Art. 20 · Constitutional principles",
+      pinnedHtml: "(1) Die Bundesrepublik Deutschland ist ein demokratischer Bundesstaat.",
+      liveHtml: "(1) Die Bundesrepublik Deutschland ist ein demokratischer und <ins>sozialer</ins> Bundesstaat.",
+    },
+    to: {
+      chip: "1956",
+      role: "Target · after this change",
+      pinned: "r1",
+      live: "r1",
+      article: "Art. 73 · Exclusive legislative power",
+      pinnedHtml: "(1) Der Bund hat die ausschließliche Gesetzgebung über die Verteidigung.",
+      liveHtml: "(1) Der Bund hat die ausschließliche Gesetzgebung über die Verteidigung.",
+    },
+  },
+  "1994": {
+    title: "1994 Art. 3",
+    comment: "Equal-rights amendment of Art. 3. Quotes already match the live transcriptions.",
+    document: "BGBl. I 1994 S. 3146",
+    alert: "",
+    quotes: [
+      { article: "Art. 3 Abs. 2 · amended", html: "(2) Männer und Frauen sind gleichberechtigt. Der Staat fördert die tatsächliche Durchsetzung der Gleichberechtigung von Frauen und Männern." },
+    ],
+    from: {
+      chip: "1956",
+      role: "Source · before this change",
+      pinned: "r1",
+      live: "r1",
+      article: "Art. 73 · Exclusive legislative power",
+      pinnedHtml: "(1) Der Bund hat die ausschließliche Gesetzgebung über die Verteidigung.",
+      liveHtml: "(1) Der Bund hat die ausschließliche Gesetzgebung über die Verteidigung.",
+    },
+    to: {
+      chip: "1994",
+      role: "Target · after this change",
+      pinned: "r2",
+      live: "r2",
+      article: "Art. 3 · Equality before the law",
+      pinnedHtml: "(2) Männer und Frauen sind gleichberechtigt. Der Staat fördert die tatsächliche Durchsetzung der Gleichberechtigung von Frauen und Männern.",
+      liveHtml: "(2) Männer und Frauen sind gleichberechtigt. Der Staat fördert die tatsächliche Durchsetzung der Gleichberechtigung von Frauen und Männern.",
+    },
+  },
+  "2022": {
+    title: "2022 Art. 104c",
+    comment: "Financial assistance for education infrastructure.",
+    document: "BGBl. I 2022 S. 968",
+    alert: "Stale target pin. The 2022 law’s current transcription is 2022 r3, not the r1 this record still quotes.",
+    quotes: [
+      { article: "Art. 104c · inserted", html: "Der Bund kann den Ländern Finanzhilfen für gesamtstaatlich bedeutsame Investitionen der Länder und Gemeinden im Bereich der kommunalen Bildungsinfrastruktur gewähren." },
+    ],
+    from: {
+      chip: "1994",
+      role: "Source · before this change",
+      pinned: "r2",
+      live: "r2",
+      article: "Art. 3 · Equality before the law",
+      pinnedHtml: "(2) Männer und Frauen sind gleichberechtigt. Der Staat fördert die tatsächliche Durchsetzung der Gleichberechtigung von Frauen und Männern.",
+      liveHtml: "(2) Männer und Frauen sind gleichberechtigt. Der Staat fördert die tatsächliche Durchsetzung der Gleichberechtigung von Frauen und Männern.",
+    },
+    to: {
+      chip: "2022",
+      role: "Target · after this change",
+      pinned: "r1",
+      live: "r3",
+      article: "Art. 1 · Human dignity",
+      pinnedHtml: "(1) Die Würde des Menschen ist unantastbar.",
+      liveHtml: "(1) Die Würde des Menschen ist unantastbar. <ins>Sie zu achten und zu schützen ist Verpflichtung aller staatlichen Gewalt.</ins>",
+    },
+  },
+};
+
+let lawId = "1949";
+let articleIndex = 0;
+
+const views = {
+  timeline: document.getElementById("view-timeline"),
+  correct: document.getElementById("view-correct"),
+  legal: document.getElementById("view-legal"),
+  hop: document.getElementById("view-hop"),
+};
+
+function show(name) {
+  Object.entries(views).forEach(([key, node]) => {
+    node.hidden = key !== name;
+  });
+  window.scrollTo(0, 0);
+}
+
+function currentArticle() {
+  const list = LAWS[lawId].articles;
+  return list[Math.min(articleIndex, list.length - 1)];
+}
+
+function renderArticles() {
+  const data = LAWS[lawId];
+  const current = currentArticle();
+  const list = document.getElementById("article-list");
+  const q = document.getElementById("article-filter").value.trim().toLowerCase();
+  list.replaceChildren();
+  data.articles.forEach((article, index) => {
+    const hay = `art. ${article.n} ${article.title}`.toLowerCase();
+    if (q && !hay.includes(q)) return;
+    const li = document.createElement("li");
+    const a = document.createElement("a");
+    a.href = "#edit-title";
+    if (article === current) a.setAttribute("aria-current", "true");
+    a.innerHTML = `Art. ${article.n} ${article.title}${article.changed ? ' <span class="badge badge-changed">draft</span>' : ""}`;
+    a.addEventListener("click", (event) => {
+      event.preventDefault();
+      articleIndex = index;
+      renderCorrect();
+    });
+    li.appendChild(a);
+    list.appendChild(li);
+  });
+}
+
+function renderCorrect() {
+  const data = LAWS[lawId];
+  const article = currentArticle();
+  document.getElementById("correct-title").textContent = data.title;
+  document.getElementById("correct-meta").textContent = data.meta;
+  document.getElementById("crumb-correct").textContent = data.title;
+  document.getElementById("edit-title").textContent = `Article ${article.n}`;
+  document.getElementById("article-title").value = article.heading;
+  document.getElementById("article-body").value = article.body;
+  document.getElementById("edit-comment").value = data.comment;
+  document.getElementById("changed-count").textContent = String(data.articles.filter((item) => item.changed).length);
+  document.getElementById("preview").innerHTML = article.preview || `<div class="para"><span class="num"></span><p>${article.body.split("\n")[0]}</p></div>`;
+  const alert = document.getElementById("correct-alert");
+  alert.className = "alert alert-info";
+  if (data.alert) {
+    alert.hidden = false;
+    alert.textContent = data.alert;
+  } else {
+    alert.hidden = true;
+  }
+  const stack = document.getElementById("editorial-stack");
+  stack.replaceChildren();
+  data.editorial.forEach((item) => {
+    const li = document.createElement("li");
+    if (item.tip) li.className = "is-tip";
+    const label = document.createElement("span");
+    label.textContent = `${item.rev} · ${item.note}`;
+    const byline = document.createElement("span");
+    byline.className = "byline";
+    byline.append(item.editor, " · ");
+    const time = document.createElement("time");
+    time.dateTime = item.dateIso;
+    time.textContent = item.date;
+    byline.appendChild(time);
+    li.append(label, byline);
+    stack.appendChild(li);
+  });
+  renderArticles();
+}
+
+function openCorrect(id) {
+  lawId = id;
+  articleIndex = LAWS[id].articles.findIndex((item) => item.changed);
+  if (articleIndex < 0) articleIndex = 0;
+  document.querySelectorAll(".timeline-card[data-law]").forEach((node) => {
+    node.classList.toggle("is-selected", node.dataset.law === id);
+  });
+  renderCorrect();
+  show("correct");
+  location.hash = "correct-" + id;
+}
+
+function openLegal() {
+  show("legal");
+  location.hash = "legal";
+}
+
+function renderSnaps(container, side) {
+  container.replaceChildren();
+  const same = side.pinned === side.live;
+  const snaps = same
+    ? [{ kind: "reviewed", label: `Latest · ${side.chip} ${side.live} · reviewed`, html: side.liveHtml }]
+    : [
+        { kind: "reviewed", label: `Last reviewed · ${side.chip} ${side.pinned}`, html: side.pinnedHtml },
+        { kind: "unreviewed", label: `Latest · ${side.chip} ${side.live} · not reviewed`, html: side.liveHtml },
+      ];
+  snaps.forEach((snap) => {
+    const article = document.createElement("article");
+    article.className = snap.kind === "unreviewed" ? "quote-snap is-unreviewed" : "quote-snap";
+    const head = document.createElement("p");
+    head.className = "quote-snap-head";
+    head.textContent = snap.label;
+    const art = document.createElement("p");
+    art.className = "quote-snap-art";
+    art.textContent = side.article;
+    const body = document.createElement("div");
+    body.className = "text-column";
+    body.lang = "de";
+    const p = document.createElement("p");
+    p.innerHTML = snap.html;
+    body.appendChild(p);
+    article.append(head, art, body);
+    container.appendChild(article);
+  });
+}
+
+function renderQuotes(list, quotes) {
+  list.replaceChildren();
+  quotes.forEach((row) => {
+    const li = document.createElement("li");
+    const label = document.createElement("p");
+    label.className = "quote-art";
+    label.textContent = row.article;
+    const body = document.createElement("div");
+    body.className = "text-column";
+    body.lang = "de";
+    const p = document.createElement("p");
+    p.textContent = row.html;
+    body.appendChild(p);
+    li.append(label, body);
+    list.appendChild(li);
+  });
+}
+
+function openHop(id) {
+  const hop = HOPS[id];
+  document.getElementById("hop-title").textContent = hop.title;
+  document.getElementById("hop-heading").textContent = hop.title;
+  document.getElementById("hop-crumb").textContent = hop.title;
+  document.getElementById("hop-comment").textContent = hop.comment;
+  const pinFrom = `${hop.from.chip} ${hop.from.pinned}`;
+  const pinTo = `${hop.to.chip} ${hop.to.pinned}`;
+  const liveFrom = `${hop.from.chip} ${hop.from.live}`;
+  const liveTo = `${hop.to.chip} ${hop.to.live}`;
+  document.getElementById("hop-pins").textContent =
+    `Last reviewed ${pinFrom} → ${pinTo}. Live tips now ${liveFrom} → ${liveTo}.`;
+  document.getElementById("quote-from-year").textContent = hop.from.chip;
+  document.getElementById("quote-from-role").textContent = hop.from.role;
+  document.getElementById("quote-to-year").textContent = hop.to.chip;
+  document.getElementById("quote-to-role").textContent = hop.to.role;
+  renderSnaps(document.getElementById("quote-from-snaps"), hop.from);
+  renderSnaps(document.getElementById("quote-to-snaps"), hop.to);
+  renderQuotes(document.getElementById("hop-quotes"), hop.quotes);
+  const alert = document.getElementById("hop-alert");
+  if (hop.alert) {
+    alert.hidden = false;
+    alert.className = "alert alert-info";
+    alert.textContent = hop.alert;
+  } else {
+    alert.hidden = true;
+  }
+  show("hop");
+  location.hash = "hop-" + id;
+}
+
+function openTimeline() {
+  show("timeline");
+  location.hash = "timeline";
+}
+
+document.querySelectorAll("[data-correct]").forEach((button) => {
+  button.addEventListener("click", () => openCorrect(button.dataset.correct));
+});
+document.querySelectorAll("[data-hop]").forEach((button) => {
+  button.addEventListener("click", () => openHop(button.dataset.hop));
+});
+document.getElementById("open-legal").addEventListener("click", openLegal);
+document.getElementById("jump-legal").addEventListener("click", openLegal);
+document.getElementById("back-from-correct").addEventListener("click", openTimeline);
+document.getElementById("crumb-timeline").addEventListener("click", (event) => {
+  event.preventDefault();
+  openTimeline();
+});
+document.querySelectorAll(".back-timeline").forEach((el) => {
+  el.addEventListener("click", (event) => {
+    event.preventDefault();
+    openTimeline();
+  });
+});
+document.getElementById("article-filter").addEventListener("input", renderArticles);
+document.getElementById("publish-transcription").addEventListener("click", () => {
+  const alert = document.getElementById("correct-alert");
+  alert.hidden = false;
+  alert.className = "alert alert-success";
+  alert.textContent = "Would publish an editorial_correction on this chip only. Public timeline unchanged. Returning to the timeline would still show the same legal versions.";
+});
+document.getElementById("publish-legal").addEventListener("click", () => {
+  openTimeline();
+  const banner = document.querySelector(".lede");
+  banner.textContent = "Would mint a new public chip after 2022, linked to the change record you just published. Transcription work stays on Correct this text.";
+});
+document.getElementById("confirm-quotes").addEventListener("click", () => {
+  const alert = document.getElementById("hop-alert");
+  alert.hidden = false;
+  alert.className = "alert alert-success";
+  alert.textContent = "Would append a revision of this change record, pinned to the live tips. No new law chip.";
+});
+
+function route() {
+  const hash = location.hash.replace("#", "");
+  if (hash.startsWith("correct-")) openCorrect(hash.slice(8));
+  else if (hash.startsWith("hop-")) openHop(hash.slice(4));
+  else if (hash === "legal") openLegal();
+  else if (hash === "review") openHop("1956");
+  else openTimeline();
+}
+
+window.addEventListener("hashchange", route);
+route();
+</script>
+</body>
+</html>

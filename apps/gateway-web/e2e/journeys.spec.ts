@@ -1,6 +1,6 @@
 /* eslint-disable */
 import { test, expect } from '@playwright/test';
-import { ARTICLE_1, VERSION_2022, signInEditor } from './helpers';
+import { ARTICLE_1, VERSION_2022, signInEditor, signOut } from './helpers';
 
 test('browse from countries to an article', async ({ page }) => {
   await page.goto('/');
@@ -53,6 +53,51 @@ test('edit, review, and publish a draft', async ({ page }) => {
   await expect(page.getByText('Submitted for review.')).toBeVisible();
   await page.getByRole('button', { name: 'Approve review' }).click();
   await expect(page.getByText('Review approved.')).toBeVisible();
+  await page.getByLabel('What kind of change is this?').selectOption('editorial_correction');
   await page.getByRole('button', { name: 'Publish' }).click();
   await expect(page.getByText('Published as version 2022-1.')).toBeVisible();
+});
+
+test('recorded amending law appears on the public timeline', async ({ page }) => {
+  await signInEditor(page);
+  await page.goto('/editor/amendments');
+  await page.getByRole('link', { name: 'Add amending law' }).click();
+  await page.getByLabel('Title', { exact: true }).fill('E2E amending law');
+  await page.getByRole('button', { name: 'Save draft' }).click();
+  await expect(page.getByText('Draft saved.')).toBeVisible();
+  await page.getByRole('button', { name: 'Publish law' }).click();
+  await expect(page.getByText('Amending law published.')).toBeVisible();
+  await signOut(page);
+  await page.goto('/countries/DE/timeline');
+  await expect(page.getByRole('heading', { name: 'Amendment timeline' })).toBeVisible();
+  await expect(page.getByText('E2E amending law')).toBeVisible();
+});
+
+test('editorial correction hop stays off the public timeline', async ({ page }) => {
+  await page.goto('/countries/DE/timeline');
+  const timelineCount = await page.locator('.timeline-item').count();
+  await signInEditor(page);
+  await page.getByRole('button', { name: 'Open session' }).click();
+  await expect(page.getByRole('heading', { name: 'Articles' })).toBeVisible();
+  await page.getByLabel('Title', { exact: true }).fill('Human dignity (typo fix)');
+  await page.getByLabel('Article text').fill('Corrected transcription.');
+  await page.getByRole('button', { name: 'Save draft' }).click();
+  await expect(page.getByText('Draft saved.')).toBeVisible();
+  await page.getByRole('button', { name: 'Submit for review' }).click();
+  await expect(page.getByText('Submitted for review.')).toBeVisible();
+  await page.getByRole('button', { name: 'Approve review' }).click();
+  await expect(page.getByText('Review approved.')).toBeVisible();
+  await page.getByLabel('What kind of change is this?').selectOption('editorial_correction');
+  await page.getByRole('button', { name: 'Publish' }).click();
+  await expect(page.getByText('Published as version 2022-1.')).toBeVisible();
+  await signOut(page);
+  await page.goto('/countries/DE/timeline');
+  await expect(page.locator('.timeline-item')).toHaveCount(timelineCount);
+  await expect(page.getByText('Update to Article 1')).toBeVisible();
+  await signInEditor(page);
+  await page.goto('/editor/history');
+  await expect(page.getByRole('heading', { name: 'Snapshot history' })).toBeVisible();
+  await expect(page.getByText('2022-1')).toBeVisible();
+  await expect(page.getByText('Editorial correction')).toBeVisible();
+  await expect(page.getByText('Staff only')).toBeVisible();
 });

@@ -91,13 +91,25 @@ export async function approveAction(formData: FormData): Promise<void> {
 
 export async function publishAction(formData: FormData): Promise<void> {
   try {
-    const preview = await publishSession(String(formData.get('sessionId') ?? ''));
+    const hopKind = String(formData.get('hopKind') ?? '');
+    const amendmentId = String(formData.get('amendmentId') ?? '').trim();
+    const amendmentTitle = String(formData.get('amendmentTitle') ?? '').trim();
+    const preview = await publishSession(String(formData.get('sessionId') ?? ''), {
+      hopKind,
+      amendmentId: amendmentId || undefined,
+    });
     const extra: Record<string, string> = { published: '1' };
     if (preview.newVersionLabel) {
       extra.newVersionLabel = preview.newVersionLabel;
     }
     if (preview.newVersionId) {
       extra.newVersionId = preview.newVersionId;
+    }
+    if (
+      amendmentTitle &&
+      (hopKind === 'legal_amendment' || hopKind === 'official_errata')
+    ) {
+      extra.amendmentTitle = amendmentTitle;
     }
     redirectEditor(formData, extra);
   } catch (error) {

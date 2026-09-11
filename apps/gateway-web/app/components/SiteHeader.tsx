@@ -1,6 +1,7 @@
 'use client';
 
 import { usePathname } from 'next/navigation';
+import Link from 'next/link';
 import { logoutAction } from '../login/actions';
 import {
   avatarInitial,
@@ -76,12 +77,12 @@ export function SiteHeader({ user, identityUnavailable = false }: SiteHeaderProp
   return (
     <header className="topbar">
       <div className="topbar-inner">
-        <a className="brand" href="/">
+        <Link className="brand" href="/">
           <span className="brand-mark" aria-hidden="true">
             §
           </span>
           <span className="brand-name">Constitution Atlas</span>
-        </a>
+        </Link>
         <nav className="nav-primary" aria-label="Primary">
           {links.map((link) => (
             <a

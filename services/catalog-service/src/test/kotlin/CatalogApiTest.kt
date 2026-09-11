@@ -156,6 +156,9 @@ class CatalogApiTest {
                 jsonPath("$.versionLabel") { value("2022") }
                 jsonPath("$.publicationStatus") { value("published") }
                 jsonPath("$.effectiveDate") { value("2022-12-19") }
+                jsonPath("$.hopKind") { value("legal_amendment") }
+                jsonPath("$.listing") { value("public") }
+                jsonPath("$.predecessorVersionId") { value("01900000-0000-4000-8000-000000000003") }
             }
     }
 
@@ -346,6 +349,237 @@ class CatalogApiTest {
             contentType = MediaType.APPLICATION_JSON
             content = """{"isoCode":"xx","name":"Example"}"""
         }.andExpect { status { isForbidden() } }
+    }
+
+    @Test
+    fun secondSuccessorOfSamePredecessorReturnsNotTip() {
+        mockMvc.post("/countries") {
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"isoCode":"ch","name":"Chain Test"}"""
+        }.andExpect { status { isCreated() } }
+
+        val constitutionId =
+            mockMvc.post("/countries/CH/constitutions") {
+                header("Authorization", TOKEN)
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"slug":"test","title":"Chain Test Constitution"}"""
+            }.andExpect { status { isCreated() } }
+                .andReturn().response.contentAsString.let {
+                    Regex("\"id\":\"([^\"]+)\"").find(it)!!.groupValues[1]
+                }
+
+        val rootId =
+            mockMvc.post("/constitutions/$constitutionId/versions") {
+                header("Authorization", TOKEN)
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"versionLabel":"v1","effectiveDate":"2000-01-01"}"""
+            }.andExpect { status { isCreated() } }
+                .andReturn().response.contentAsString.let {
+                    Regex("\"id\":\"([^\"]+)\"").find(it)!!.groupValues[1]
+                }
+
+        mockMvc.post("/versions/$rootId/publish") {
+            header("Authorization", PUBLISHER_TOKEN)
+        }.andExpect { status { isOk() } }
+
+        mockMvc.post("/constitutions/$constitutionId/versions") {
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = """
+                {
+                  "versionLabel":"v2-a",
+                  "predecessorVersionId":"$rootId",
+                  "hopKind":"legal_amendment"
+                }
+            """.trimIndent()
+        }.andExpect { status { isCreated() } }
+
+        mockMvc.post("/constitutions/$constitutionId/versions") {
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = """
+                {
+                  "versionLabel":"v2-b",
+                  "predecessorVersionId":"$rootId",
+                  "hopKind":"legal_amendment"
+                }
+            """.trimIndent()
+        }.andExpect {
+            status { isConflict() }
+            jsonPath("$.code") { value("not_tip") }
+        }
+    }
+
+    @Test
+    fun unknownPredecessorReturnsUnknownPredecessor() {
+        val constitutionId = "01900000-0000-4000-8000-000000000002"
+        val unknownPredecessor = "00000000-0000-4000-8000-000000000099"
+        mockMvc.post("/constitutions/$constitutionId/versions") {
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = """
+                {
+                  "versionLabel":"orphan",
+                  "predecessorVersionId":"$unknownPredecessor",
+                  "hopKind":"legal_amendment"
+                }
+            """.trimIndent()
+        }.andExpect {
+            status { isConflict() }
+            jsonPath("$.code") { value("unknown_predecessor") }
+        }
+    }
+
+    @Test
+    fun hopKindRequiredWhenPredecessorSet() {
+        val constitutionId = "01900000-0000-4000-8000-000000000002"
+        val predecessorId = "01900000-0000-4000-8000-000000000004"
+        mockMvc.post("/constitutions/$constitutionId/versions") {
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = """
+                {
+                  "versionLabel":"missing-hop",
+                  "predecessorVersionId":"$predecessorId"
+                }
+            """.trimIndent()
+        }.andExpect { status { isBadRequest() } }
+    }
+
+    @Test
+    fun existingChainRequiresPredecessor() {
+        mockMvc.post("/constitutions/01900000-0000-4000-8000-000000000002/versions") {
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"versionLabel":"orphan-root"}"""
+        }.andExpect {
+            status { isConflict() }
+            jsonPath("$.code") { value("not_tip") }
+        }
+    }
+
+    @Test
+    fun editorialCorrectionHiddenFromPublicListButReadableAndTipsCountry() {
+        mockMvc.post("/countries") {
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"isoCode":"at","name":"Austria"}"""
+        }.andExpect { status { isCreated() } }
+
+        val constitutionId =
+            mockMvc.post("/countries/AT/constitutions") {
+                header("Authorization", TOKEN)
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"slug":"federal","title":"Federal Constitutional Law"}"""
+            }.andExpect { status { isCreated() } }
+                .andReturn().response.contentAsString.let {
+                    Regex("\"id\":\"([^\"]+)\"").find(it)!!.groupValues[1]
+                }
+
+        val rootId =
+            mockMvc.post("/constitutions/$constitutionId/versions") {
+                header("Authorization", TOKEN)
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"versionLabel":"1920","effectiveDate":"1920-10-01"}"""
+            }.andExpect { status { isCreated() } }
+                .andReturn().response.contentAsString.let {
+                    Regex("\"id\":\"([^\"]+)\"").find(it)!!.groupValues[1]
+                }
+
+        mockMvc.post("/versions/$rootId/publish") {
+            header("Authorization", PUBLISHER_TOKEN)
+        }.andExpect { status { isOk() } }
+
+        val publicTipId =
+            mockMvc.post("/constitutions/$constitutionId/versions") {
+                header("Authorization", TOKEN)
+                contentType = MediaType.APPLICATION_JSON
+                content = """
+                    {
+                      "versionLabel":"2020",
+                      "effectiveDate":"2020-01-01",
+                      "predecessorVersionId":"$rootId",
+                      "hopKind":"legal_amendment"
+                    }
+                """.trimIndent()
+            }.andExpect { status { isCreated() } }
+                .andReturn().response.contentAsString.let {
+                    Regex("\"id\":\"([^\"]+)\"").find(it)!!.groupValues[1]
+                }
+
+        mockMvc.post("/versions/$publicTipId/publish") {
+            header("Authorization", PUBLISHER_TOKEN)
+        }.andExpect { status { isOk() } }
+
+        val editorialLabel = "2023-editorial"
+        val versionId =
+            mockMvc.post("/constitutions/$constitutionId/versions") {
+                header("Authorization", TOKEN)
+                contentType = MediaType.APPLICATION_JSON
+                content = """
+                    {
+                      "versionLabel":"$editorialLabel",
+                      "effectiveDate":"2023-01-01",
+                      "predecessorVersionId":"$publicTipId",
+                      "hopKind":"editorial_correction"
+                    }
+                """.trimIndent()
+            }.andExpect {
+                status { isCreated() }
+                jsonPath("$.hopKind") { value("editorial_correction") }
+                jsonPath("$.listing") { value("staff") }
+            }.andReturn().response.contentAsString.let {
+                Regex("\"id\":\"([^\"]+)\"").find(it)!!.groupValues[1]
+            }
+
+        mockMvc.post("/versions/$versionId/publish") {
+            header("Authorization", PUBLISHER_TOKEN)
+        }.andExpect { status { isOk() } }
+
+        mockMvc.get("/constitutions/$constitutionId/versions")
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.length()") { value(2) }
+                jsonPath("$[*].versionLabel") {
+                    value(org.hamcrest.Matchers.not(org.hamcrest.Matchers.hasItem(editorialLabel)))
+                }
+                jsonPath("$[?(@.versionLabel=='2020')].latestPublished") { value(false) }
+            }
+
+        mockMvc.get("/constitutions/$constitutionId/versions?listing=all")
+            .andExpect { status { isUnauthorized() } }
+
+        mockMvc.get("/constitutions/$constitutionId/versions?listing=all") {
+            header("Authorization", VIEWER_TOKEN)
+        }.andExpect { status { isForbidden() } }
+
+        mockMvc.get("/constitutions/$constitutionId/versions?listing=all") {
+            header("Authorization", TOKEN)
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.length()") { value(3) }
+            jsonPath("$[2].versionLabel") { value(editorialLabel) }
+            jsonPath("$[2].listing") { value("staff") }
+            jsonPath("$[2].latestPublished") { value(true) }
+        }
+
+        mockMvc.get("/versions/$versionId")
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.versionLabel") { value(editorialLabel) }
+                jsonPath("$.listing") { value("staff") }
+            }
+
+        mockMvc.get("/countries")
+            .andExpect {
+                status { isOk() }
+                jsonPath("$[?(@.isoCode=='AT')].latestVersionLabel") {
+                    value(org.hamcrest.Matchers.hasItem(editorialLabel))
+                }
+                jsonPath("$[?(@.isoCode=='AT')].latestVersionId") { value(org.hamcrest.Matchers.hasItem(versionId)) }
+                jsonPath("$[?(@.isoCode=='AT')].versionCount") { value(org.hamcrest.Matchers.hasItem(2)) }
+            }
     }
 
     companion object {

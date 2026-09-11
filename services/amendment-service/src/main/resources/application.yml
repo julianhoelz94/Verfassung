@@ -24,6 +24,3 @@ identity:
 content:
   api:
     url: ${CONTENT_API_URL:http://localhost/api/content}
-catalog:
-  api:
-    url: ${CATALOG_API_URL:http://localhost/api/catalog}

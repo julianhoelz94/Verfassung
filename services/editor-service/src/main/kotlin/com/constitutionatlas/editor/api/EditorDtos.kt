@@ -49,6 +49,11 @@ data class SaveDraftRequest(
     val body: String?,
 )
 
+data class PublishRequest(
+    val hopKind: String,
+    val amendmentId: UUID? = null,
+)
+
 data class EditSessionDto(
     val id: UUID,
     val actorId: UUID,

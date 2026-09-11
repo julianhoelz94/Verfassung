@@ -12,12 +12,12 @@ Paths below are **service paths**. Public: prefix `/api/<short>`.
 | Method | Path |
 | --- | --- |
 | GET | `/countries`, `/countries/{isoCode}` |
-| GET | `/constitutions/{id}/versions`, `/versions/{id}`, `/constitutions/{id}/content-outline` |
+| GET | `/constitutions/{id}/versions` (`?listing=all` staff), `/versions/{id}`, `/constitutions/{id}/content-outline` |
 | PUT | `/constitutions/{id}/content-outline` |
 | POST | `/countries`, `/countries/{iso}/constitutions`, `/constitutions/{id}/versions` |
 | POST | `/versions/{id}/publish` |
 
-Tests: `CatalogApiTest.kt`. Seed DE: `V3__seed_germany.sql`.
+Tests: `CatalogApiTest.kt`. Seed DE: `V3__seed_germany.sql`. Versions: linear `predecessorVersionId`, `hopKind`, `listing` (ADR 0004 / CAT-5). Public lists omit `editorial_correction`; country `latestVersionId` is the published chain tip.
 
 ## content — `services/content-service`
 
@@ -36,13 +36,22 @@ Tree in `content_nodes` is the only write model; `articles` is a view of roots. 
 ## amendment — `services/amendment-service`
 
 `AmendmentController` → `AmendmentService` → `AmendmentRepository`  
-Clients: identity (mutating Bearer), content (`includeBody=true` trees), catalog (`constitutionId`).
+Clients: identity (mutating Bearer), content (`includeBody=true` trees). Public reads use the published revision (AMD-7). `POST /transitions` returns 410; write via create/revision/publish/link-target. `POST /amendments/suggest` diffs two content trees and returns change rows without inserting.
 
 | Method | Path |
 | --- | --- |
+| GET | `/constitutions/{id}/amendments` (published; `?status=all` staff) |
+| GET | `/amendments/{id}` (published; staff see draft/withdrawn tip; `publishedRevisionId`) |
+| GET | `/amendments/{id}/revisions` (editorial staff) |
 | GET | `/versions/{id}/amendments?sourceVersionId` |
 | GET | `/amendments?constitutionId&articleNumber` |
-| POST | `/transitions` (editor/publisher/admin or `content:write`; computes added/changed/removed) |
+| POST | `/constitutions/{id}/amendments` (editor/admin draft create) |
+| POST | `/amendments/{id}/revisions` (editor/admin append) |
+| POST | `/amendments/{id}/publish` (publisher/admin) |
+| POST | `/amendments/{id}/withdraw` (publisher/admin) |
+| POST | `/amendments/{id}/link-target` (editor/publisher/admin) |
+| POST | `/amendments/suggest` (editor/admin; no persist) |
+| POST | `/transitions` (410 `use_amendment_write_api`) |
 
 ## identity — `services/identity-service`
 
@@ -64,7 +73,8 @@ Bearer `Authorization`. Tests: `IdentityApiTest.kt`.
 `EditorController` → `EditorService` → `EditorRepository`  
 Clients: identity, catalog, content, amendment, search, audit. Publish copies onto a new catalog version (ADR 0002), writes editor `outbox_events` (ADR 0003), and a scheduler delivers `search.reindex-requested`.
 
-Flow: `POST /edit-sessions` → `/saves` → `/review` → `/approval` → `/publish`  
+Flow: `POST /edit-sessions` → `/saves` → `/review` → `/approval` → `/publish` (body: `hopKind`, optional `amendmentId`).  
+Publish requires session `versionId` to be the catalog chain tip; `editorial_correction` forbids `amendmentId`; `legal_amendment` / `official_errata` require a matching draft or published amendment and call amendment `link-target` + `publish`.  
 Session `status` is `EditSessionStatus` (`open`/`reviewing`/`approved`/`published`).  
 Preview JSON includes `searchIndexStatus` (`pending`/`ready`/`failed`) after publish.  
 `GET /edit-sessions` = list (status, openedBy, versionId; `openedBy=me`)  

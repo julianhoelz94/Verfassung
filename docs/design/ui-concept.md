@@ -111,6 +111,11 @@ Each item lists layout, key components, and what changes versus today.
 - Workspace grid: articles panel (filter input + list with draft/new badges, `aria-current`), editor panel (title, text area in the serif reading face, collapsible section-title fields), session panel (status, opened by, changed articles, reviewer, live preview).
 - Action bar: Discard / Save draft / Submit for review (editor), Approve (reviewer), Publish (publisher). Sticky at the bottom on phone and tablet.
 - Landing state when no session is open: cards **Open a session** (version select) and **Load a session** (id), plus for reviewers/publishers a **Review queue** list (sessions in `reviewing` / `approved`).
+- Publish names a hop kind (amending law / official errata / transcription fix). Legal hops link a curated law; transcription fixes do not appear on the public timeline (ADR 0004).
+
+### 4.8.1 Amending laws `/editor/amendments`
+- Editorial workspace for curated laws, not article text. Constitution select, list of draft/published/withdrawn amending laws, and a form with title, kind, citation, dates, summary, and a change table.
+- Publisher actions: **Publish law** / **Withdraw**. Reviewers see the same pages read-only. Public timeline lists only published laws and official errata.
 
 ### 4.9 Admin `/admin/*`
 - Users, Outlines, Import share one layout: page header with a primary action, `.data-list` rows (table on tablet+, cards on phone), inline status badges, and the existing forms wrapped in `Card`s.

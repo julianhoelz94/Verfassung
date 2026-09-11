@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { FiltersPanel } from '../components/FiltersPanel';
 import { PageMain } from '../components/PageMain';
 import { SearchSnippet } from '../components/SearchSnippet';
@@ -182,7 +183,7 @@ export default async function SearchPage(props: SearchPageProps) {
           <div>
             {error ? (
               <p role="alert">
-                {error}. Browse countries instead while the index is down. <a href="/">Countries</a>
+                {error}. Browse countries instead while the index is down. <Link href="/">Countries</Link>
               </p>
             ) : null}
             {!error && query && hits.length === 0 ? <p>No articles match “{query}”.</p> : null}

@@ -13,8 +13,12 @@ type FormattedDateProps = {
 };
 
 export function FormattedDate({ value, fallback = 'Not recorded', children, className }: FormattedDateProps) {
+  const content = children ?? fallback;
   if (!value) {
-    return createElement(className ? 'span' : Fragment, className ? { className } : null, children ?? fallback);
+    if (className) {
+      return createElement('span', { className }, content);
+    }
+    return createElement(Fragment, null, content);
   }
   return createElement('time', { dateTime: value, className }, formatDate(value));
 }

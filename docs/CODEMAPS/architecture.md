@@ -23,7 +23,7 @@ Eight Spring Boot apps, each with its own Postgres. Gateway has **no database**.
 | --- | --- | --- |
 | catalog | countries, constitutions, versions, sources, outlines | no |
 | content | articles, `content_nodes` tree | no |
-| amendment | transitions, amendments, changes | no |
+| amendment | transitions, amendments, revisions, changes | no |
 | identity | users, roles, sessions, MFA, invites, service tokens | no |
 | editor | edit sessions, draft changes, revisions; **commands** publish | no |
 | search | `search_documents` index | yes — rebuilt from catalog+content |
@@ -51,7 +51,7 @@ Caddy → `gateway-web` page → `lib/api.ts` → catalog `GET /countries/{code}
 `app/login/actions.ts` → `lib/session.ts` → identity `POST /login` → cookie `ca_session` (Bearer token). MFA uses `ca_mfa_challenge`.
 
 **Publish draft**  
-Editor UI → editor `POST /edit-sessions/{id}/publish` → identity `/me` (role + step-up) → content copy onto a new catalog version → catalog `POST /versions/{id}/publish` → editor `outbox_events` (`version.published`, `search.reindex-requested`) → scheduler `POST` search `/reindex`. Audit `POST /events` is still best-effort HTTP.
+Editor UI → editor `POST /edit-sessions/{id}/publish` → identity `/me` (role + step-up) → content copy onto a new catalog version (CAT-5 predecessor + hop kind) → catalog `POST /versions/{id}/publish` → editor `outbox_events` (`version.published`, `search.reindex-requested`) → scheduler `POST` search `/reindex`. Audit `POST /events` is still best-effort HTTP. Until ED-6, editor may still `POST /transitions`; that does not make every hop a public law (ADR 0004).
 
 **Import**  
 Admin → ingestion `POST /import-jobs` → catalog create country/constitution/version → content `PUT /versions/{id}/articles` → catalog `POST /versions/{id}/publish`.

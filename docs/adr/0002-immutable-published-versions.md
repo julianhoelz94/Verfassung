@@ -21,4 +21,4 @@ ARCH-2 remains the logical rule. QLT-5 in-place rewrite is removed (ED-4 / QLT-9
 
 - Public `GET` of a published version’s articles is stable across later editorial publish.
 - Search reindex after catalog publish is written to the editor outbox as `search.reindex-requested` (ADR 0003 / PLAT-6) and retried by a scheduler. The session may already be `published`; retry does not mint another successor. Audit append after publish is still best-effort HTTP (logged on failure).
-- Amendment records between source and successor land via `POST /transitions` (AMD-5); a failed call is logged and the publish still commits. On success the editor also records `amendment.recorded` on the outbox.
+- A successor is a new snapshot on a **linear chain** (ADR 0004 / CAT-5). It is not automatically a legal amendment. Until ED-6, editor publish may still call `POST /transitions` (AMD-5); that path is deprecated. Curated laws live on `amendment_revisions` (AMD-7). Editorial hops (`editorial_correction`) update public “latest” text without appearing on the public timeline.

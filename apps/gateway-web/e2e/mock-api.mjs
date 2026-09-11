@@ -95,12 +95,18 @@ function to1949(article) {
   };
 }
 
+const CONSTITUTION_ID = '01900000-0000-4000-8000-000000000002';
+
 const amendment = {
   id: '01900000-0000-4000-8000-000000000301',
   title: 'Update to Article 1',
   summary: 'Expanded the dignity clause.',
   enactedOn: '2022-12-19',
   sourceReference: 'BGBl. I 2022',
+  constitutionId: CONSTITUTION_ID,
+  kind: 'legal_amendment',
+  status: 'published',
+  publishedRevisionId: '01900000-0000-4000-8000-000000000321',
   sourceVersionId: VERSION_1949,
   targetVersionId: VERSION_2022,
   changes: [
@@ -116,6 +122,43 @@ const amendment = {
     },
   ],
 };
+
+const amendmentDraft = {
+  ...amendment,
+  id: '01900000-0000-4000-8000-000000000302',
+  title: 'Draft amending law',
+  status: 'draft',
+  publishedRevisionId: null,
+};
+
+
+const amendmentRevision = {
+  id: '01900000-0000-4000-8000-000000000321',
+  predecessorRevisionId: null,
+  createdBy: identityMe.id,
+  createdAt: '2022-12-19T12:00:00Z',
+  title: amendment.title,
+  summary: amendment.summary,
+  enactedOn: amendment.enactedOn,
+  effectiveOn: null,
+  sourceReference: amendment.sourceReference,
+  sourceVersionId: amendment.sourceVersionId,
+  targetVersionId: amendment.targetVersionId,
+  kind: amendment.kind,
+  changes: amendment.changes.map(({ articleNumber, changeType, note }) => ({
+    articleNumber,
+    changeType,
+    note,
+  })),
+};
+
+const mockAmendments = new Map([
+  [amendment.id, amendment],
+  [amendmentDraft.id, amendmentDraft],
+]);
+
+const extraVersions = [];
+const EDITORIAL_VERSION_ID = '01900000-0000-4000-8000-000000000501';
 
 const editorState = {
   session: null,
@@ -203,6 +246,19 @@ const server = createServer(async (req, res) => {
     return;
   }
 
+  const constitutionVersionsMatch = pathname.match(/^\/api\/catalog\/constitutions\/([^/]+)\/versions$/);
+  if (method === 'GET' && constitutionVersionsMatch) {
+    const constitution = germany.constitutions.find((item) => item.id === constitutionVersionsMatch[1]);
+    const versions = [...(constitution?.versions ?? []), ...extraVersions];
+    const listing = searchParams.get('listing');
+    const filtered =
+      listing === 'all'
+        ? versions
+        : versions.filter((version) => version.listing !== 'staff' && version.hopKind !== 'editorial_correction');
+    json(res, 200, filtered);
+    return;
+  }
+
   const versionArticles = pathname.match(/^\/api\/content\/versions\/([^/]+)\/articles$/);
   if (method === 'GET' && versionArticles) {
     const items = articlesFor(versionArticles[1], searchParams.get('includeBody') === 'true');
@@ -225,6 +281,127 @@ const server = createServer(async (req, res) => {
     json(res, 200, [amendment]);
     return;
   }
+
+  const constitutionAmendmentsMatch = pathname.match(/^\/api\/amendment\/constitutions\/([^/]+)\/amendments$/);
+  if (method === 'GET' && constitutionAmendmentsMatch) {
+    if (constitutionAmendmentsMatch[1] !== CONSTITUTION_ID) {
+      json(res, 200, []);
+      return;
+    }
+    const items = [...mockAmendments.values()];
+    const staff = searchParams.get('status') === 'all';
+    json(res, 200, staff ? items : items.filter((item) => item.status === 'published'));
+    return;
+  }
+
+  const amendmentByIdMatch = pathname.match(/^\/api\/amendment\/amendments\/([^/]+)$/);
+  if (method === 'GET' && amendmentByIdMatch) {
+    const item = mockAmendments.get(amendmentByIdMatch[1]);
+    if (!item) {
+      json(res, 404, { error: 'Not found' });
+      return;
+    }
+    json(res, 200, item);
+    return;
+  }
+
+  if (method === 'POST' && constitutionAmendmentsMatch) {
+    const body = await readBody(req);
+    const created = {
+      ...amendmentDraft,
+      id: '01900000-0000-4000-8000-000000000303',
+      title: body.title ?? amendmentDraft.title,
+      summary: body.summary ?? amendmentDraft.summary,
+      kind: body.kind ?? amendmentDraft.kind,
+      status: 'draft',
+      constitutionId: constitutionAmendmentsMatch[1],
+      enactedOn: body.enactedOn ?? null,
+      effectiveOn: body.effectiveOn ?? null,
+      sourceReference: body.sourceReference ?? null,
+      sourceVersionId: body.sourceVersionId ?? null,
+      targetVersionId: body.targetVersionId ?? null,
+      changes: body.changes ?? [],
+    };
+    mockAmendments.set(created.id, created);
+    json(res, 201, created);
+    return;
+  }
+
+  const amendmentRevisionMatch = pathname.match(/^\/api\/amendment\/amendments\/([^/]+)\/revisions$/);
+
+  if (method === 'GET' && amendmentRevisionMatch) {
+    const existing = mockAmendments.get(amendmentRevisionMatch[1]);
+    if (!existing) {
+      json(res, 404, { error: 'Not found' });
+      return;
+    }
+    json(res, 200, [{ ...amendmentRevision, title: existing.title, summary: existing.summary, changes: existing.changes.map(({ articleNumber, changeType, note }) => ({ articleNumber, changeType, note })) }]);
+    return;
+  }
+
+  if (method === 'POST' && pathname === '/api/amendment/amendments/suggest') {
+    const body = await readBody(req);
+    if (!body.sourceVersionId || !body.targetVersionId) {
+      json(res, 400, { error: 'Missing versions' });
+      return;
+    }
+    json(res, 200, {
+      changes: amendment.changes.map(({ articleNumber, changeType, note, nodeId, articleId }) => ({
+        articleNumber,
+        changeType,
+        note,
+        nodeId,
+        articleId,
+      })),
+    });
+    return;
+  }
+
+  if (method === 'POST' && amendmentRevisionMatch) {
+    const existing = mockAmendments.get(amendmentRevisionMatch[1]);
+    if (!existing) {
+      json(res, 404, { error: 'Not found' });
+      return;
+    }
+    const body = await readBody(req);
+    const updated = {
+      ...existing,
+      ...body,
+      id: existing.id,
+      status: existing.status,
+      constitutionId: existing.constitutionId,
+    };
+    mockAmendments.set(updated.id, updated);
+    json(res, 200, updated);
+    return;
+  }
+
+  const amendmentPublishMatch = pathname.match(/^\/api\/amendment\/amendments\/([^/]+)\/publish$/);
+  if (method === 'POST' && amendmentPublishMatch) {
+    const existing = mockAmendments.get(amendmentPublishMatch[1]);
+    if (!existing) {
+      json(res, 404, { error: 'Not found' });
+      return;
+    }
+    const updated = { ...existing, status: 'published', publishedRevisionId: existing.publishedRevisionId ?? amendmentRevision.id };
+    mockAmendments.set(updated.id, updated);
+    json(res, 200, updated);
+    return;
+  }
+
+  const amendmentWithdrawMatch = pathname.match(/^\/api\/amendment\/amendments\/([^/]+)\/withdraw$/);
+  if (method === 'POST' && amendmentWithdrawMatch) {
+    const existing = mockAmendments.get(amendmentWithdrawMatch[1]);
+    if (!existing) {
+      json(res, 404, { error: 'Not found' });
+      return;
+    }
+    const updated = { ...existing, status: 'withdrawn' };
+    mockAmendments.set(updated.id, updated);
+    json(res, 200, updated);
+    return;
+  }
+
   if (method === 'GET' && pathname === '/api/amendment/amendments') {
     const articleNumber = searchParams.get('articleNumber');
     json(
@@ -388,7 +565,26 @@ const server = createServer(async (req, res) => {
     } else if (command === 'approval') {
       editorState.session.status = 'approved';
     } else if (command === 'publish') {
+      const body = await readBody(req);
       editorState.session.status = 'published';
+      if (body.hopKind === 'editorial_correction' && !extraVersions.some((version) => version.id === EDITORIAL_VERSION_ID)) {
+        extraVersions.push({
+          id: EDITORIAL_VERSION_ID,
+          versionLabel: '2022-1',
+          effectiveDate: '2022-12-20',
+          languageCode: 'en',
+          sourceUrl: null,
+          gazetteReference: null,
+          provenance: 'editorial',
+          verificationState: 'unverified',
+          verifiedBy: null,
+          verifiedAt: null,
+          predecessorVersionId: VERSION_2022,
+          hopKind: 'editorial_correction',
+          listing: 'staff',
+          latestPublished: true,
+        });
+      }
     }
     json(res, 200, preview());
     return;

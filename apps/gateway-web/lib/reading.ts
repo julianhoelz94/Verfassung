@@ -1,5 +1,18 @@
-import type { Amendment, CountryDetail, VersionSummary } from './api';
+import type { Amendment, ConstitutionSummary, CountryDetail, VersionSummary } from './api';
 import { orderVersions } from './compare';
+
+export function publicVersions(versions: VersionSummary[]): VersionSummary[] {
+  return versions.filter(
+    (version) => version.listing !== 'staff' && version.hopKind !== 'editorial_correction',
+  );
+}
+
+export function chainTipId(constitution: ConstitutionSummary): string | undefined {
+  if (constitution.latestVersionId) {
+    return constitution.latestVersionId;
+  }
+  return latestVersion(publicVersions(constitution.versions))?.id;
+}
 
 export function latestVersion(versions: VersionSummary[]): VersionSummary | undefined {
   const ordered = orderVersions(versions);
@@ -23,17 +36,21 @@ export type RecentChange = {
 
 export function recentChangesFromAmendments(
   country: CountryDetail,
-  version: VersionSummary,
+  constitution: ConstitutionSummary,
   amendments: Amendment[],
 ): RecentChange[] {
+  const versionsById = new Map(constitution.versions.map((version) => [version.id, version]));
   const rows: RecentChange[] = [];
   for (const amendment of amendments) {
+    const target = amendment.targetVersionId
+      ? versionsById.get(amendment.targetVersionId)
+      : undefined;
     for (const change of amendment.changes) {
       rows.push({
         countryName: country.name,
         isoCode: country.isoCode,
-        versionId: version.id,
-        versionLabel: version.versionLabel,
+        versionId: target?.id ?? amendment.targetVersionId ?? '',
+        versionLabel: target?.versionLabel ?? '',
         articleNumber: change.articleNumber,
         changeType: change.changeType,
         date: change.changedOn ?? amendment.enactedOn,

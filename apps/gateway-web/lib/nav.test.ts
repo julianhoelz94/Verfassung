@@ -66,17 +66,22 @@ describe('menuSections', () => {
   it('shows Editorial My sessions and Review queue for an editor', () => {
     const editor = { email: 'editor@example.local', roles: ['editor'] };
     expect(sectionIds(editor)).toEqual(['identity', 'primary', 'editorial', 'account']);
-    expect(sectionHrefs(editor, 'editorial')).toEqual(['/editor?mine=1', '/editor?status=reviewing']);
+    expect(sectionHrefs(editor, 'editorial')).toEqual([
+      '/editor?mine=1',
+      '/editor?status=reviewing',
+      '/editor/amendments',
+      '/editor/history',
+    ]);
   });
 
-  it('shows only Review queue for a reviewer', () => {
+  it('shows Review queue and Amending laws for a reviewer', () => {
     const reviewer = { email: 'reviewer@example.local', roles: ['reviewer'] };
-    expect(sectionHrefs(reviewer, 'editorial')).toEqual(['/editor?status=reviewing']);
+    expect(sectionHrefs(reviewer, 'editorial')).toEqual(['/editor?status=reviewing', '/editor/amendments', '/editor/history']);
   });
 
-  it('shows only Ready to publish for a publisher', () => {
+  it('shows Ready to publish and Amending laws for a publisher', () => {
     const publisher = { email: 'publisher@example.local', roles: ['publisher'] };
-    expect(sectionHrefs(publisher, 'editorial')).toEqual(['/editor?status=approved']);
+    expect(sectionHrefs(publisher, 'editorial')).toEqual(['/editor?status=approved', '/editor/amendments', '/editor/history']);
   });
 
   it('unions editorial destinations for combined roles', () => {
@@ -88,6 +93,8 @@ describe('menuSections', () => {
       '/editor?mine=1',
       '/editor?status=reviewing',
       '/editor?status=approved',
+      '/editor/amendments',
+      '/editor/history',
     ]);
   });
 
@@ -98,6 +105,8 @@ describe('menuSections', () => {
       '/editor?mine=1',
       '/editor?status=reviewing',
       '/editor?status=approved',
+      '/editor/amendments',
+      '/editor/history',
     ]);
     expect(sectionHrefs(admin, 'admin', true)).toEqual([
       '/admin/users',
@@ -117,6 +126,7 @@ describe('isCurrentNavHref', () => {
 
   it('marks nested editor routes as current', () => {
     expect(isCurrentNavHref('/editor', '/editor')).toBe(true);
+    expect(isCurrentNavHref('/editor/amendments', '/editor/amendments')).toBe(true);
     expect(isCurrentNavHref('/login', '/editor')).toBe(false);
   });
 

@@ -7,6 +7,7 @@
       "id": "01900000-0000-4000-8000-000000000002",
       "slug": "basic-law",
       "title": "Basic Law for the Federal Republic of Germany",
+      "latestVersionId": "01900000-0000-4000-8000-000000000004",
       "versions": [
         {
           "id": "01900000-0000-4000-8000-000000000003",
@@ -19,6 +20,9 @@
           "verificationState": "unverified",
           "verifiedBy": null,
           "verifiedAt": null,
+          "predecessorVersionId": null,
+          "hopKind": "initial",
+          "listing": "public",
           "latestPublished": false
         },
         {
@@ -32,6 +36,9 @@
           "verificationState": "unverified",
           "verifiedBy": null,
           "verifiedAt": null,
+          "predecessorVersionId": "01900000-0000-4000-8000-000000000003",
+          "hopKind": "legal_amendment",
+          "listing": "public",
           "latestPublished": true
         }
       ],

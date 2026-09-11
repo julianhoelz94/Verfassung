@@ -68,6 +68,8 @@ Constitution Atlas
 ├── Editor [nav]                            /editor
 │   ├── Open a session                      /editor  (version select → POST open)
 │   ├── My sessions                         /editor?mine=1   (sessions I opened, any status)
+│   ├── Amending laws                       /editor/amendments   (UI-ED-2 / UI-43; draft laws, not article text)
+│   ├── Snapshot history                    /editor/history?constitutionId=   (UI-47; staff version chain)
 │   └── Session                             /editor?sessionId=
 │       ├── Article list (filter, draft/new badges)
 │       ├── Edit article  → Save draft · Discard
@@ -76,6 +78,8 @@ Constitution Atlas
 └── ● editor@example.org  [editor]
     ├── Editorial
     │   ├── My sessions
+    │   ├── Amending laws                   /editor/amendments
+    │   ├── Snapshot history                /editor/history
     │   └── Review queue                    (visible, read-only: shows count, cannot approve)
     ├── Account
     └── Sign out
@@ -93,12 +97,16 @@ Constitution Atlas
 ├── Search [nav]
 ├── Editor [nav]                            /editor
 │   ├── Review queue                        /editor?status=reviewing   (default landing for reviewers)
+│   ├── Amending laws                       /editor/amendments   (read-only)
+│   ├── Snapshot history                    /editor/history
 │   ├── Load a session by id                /editor?sessionId=
 │   └── Session (read-only text + preview)
 │       └── → Approve review                (status reviewing → approved)
 └── ● reviewer@example.org  [reviewer]
     ├── Editorial
-    │   └── Review queue
+    │   ├── Review queue
+    │   ├── Amending laws                   /editor/amendments
+    │   └── Snapshot history                /editor/history
     ├── Account
     └── Sign out
 ```
@@ -115,12 +123,16 @@ Constitution Atlas
 ├── Search [nav]
 ├── Editor [nav]                            /editor
 │   ├── Ready to publish                    /editor?status=approved   (default landing for publishers)
+│   ├── Amending laws                       /editor/amendments
+│   ├── Snapshot history                    /editor/history
 │   ├── Load a session by id
 │   └── Session (read-only text + preview)
 │       └── → Publish                       (status approved → published; step-up auth once IDN-10 lands)
 └── ● publisher@example.org  [publisher]
     ├── Editorial
-    │   └── Ready to publish
+    │   ├── Ready to publish
+    │   ├── Amending laws                   /editor/amendments
+    │   └── Snapshot history                /editor/history
     ├── Account
     └── Sign out
 ```
@@ -152,7 +164,8 @@ Constitution Atlas
     ├── Editorial
     │   ├── My sessions
     │   ├── Review queue
-    │   └── Ready to publish
+    │   ├── Ready to publish
+    │   └── Amending laws                   /editor/amendments
     ├── Admin
     │   ├── Users
     │   ├── Outlines
@@ -182,8 +195,8 @@ The menu disclosure always renders sections in this order and skips empty ones:
 | --- | --- | --- |
 | anonymous | Countries, Search, About | Primary (phone), Log in |
 | viewer | Countries, Search, About | Identity, Primary (phone), Account/Sign out |
-| editor | + Editor | + Editorial (My sessions, Review queue read-only) |
-| reviewer | + Editor | + Editorial (Review queue) |
-| publisher | + Editor | + Editorial (Ready to publish) |
-| editor+reviewer+publisher | + Editor | + Editorial (all three) |
+| editor | + Editor | + Editorial (My sessions, Review queue, Amending laws, Snapshot history) |
+| reviewer | + Editor | + Editorial (Review queue, Amending laws, Snapshot history) |
+| publisher | + Editor | + Editorial (Ready to publish, Amending laws, Snapshot history) |
+| editor+reviewer+publisher | + Editor | + Editorial (all five) |
 | admin | + Editor, Admin, API docs | + Editorial (all), Admin (Users, Outlines, Import), API docs |

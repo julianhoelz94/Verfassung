@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { PageMain } from './components/PageMain';
 
 type ErrorPageProps = {
@@ -17,7 +18,7 @@ export default function ErrorPage({ error, reset }: ErrorPageProps) {
         <button type="button" onClick={() => reset()}>
           Try again
         </button>{' '}
-        <a href="/">Countries</a>
+        <Link href="/">Countries</Link>
       </section>
     </PageMain>
   );

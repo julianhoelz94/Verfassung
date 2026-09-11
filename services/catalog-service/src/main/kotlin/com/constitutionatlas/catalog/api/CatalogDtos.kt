@@ -9,6 +9,7 @@ data class CountrySummary(
     val name: String,
     val latestVersionLabel: String? = null,
     val latestEffectiveDate: LocalDate? = null,
+    val latestVersionId: UUID? = null,
     val versionCount: Int = 0,
 )
 
@@ -23,6 +24,9 @@ data class VersionSummary(
     val verificationState: String,
     val verifiedBy: String?,
     val verifiedAt: java.time.OffsetDateTime?,
+    val predecessorVersionId: UUID? = null,
+    val hopKind: String = "initial",
+    val listing: String = "public",
     val latestPublished: Boolean = false,
 )
 
@@ -47,6 +51,7 @@ data class ConstitutionSummary(
     val id: UUID,
     val slug: String,
     val title: String,
+    val latestVersionId: UUID? = null,
     val versions: List<VersionSummary>,
     val contentOutline: ContentOutlineDto,
 )
@@ -93,6 +98,8 @@ data class CreateVersionRequest(
     val languageCode: String = "en",
     val sourceUrl: String? = null,
     val gazetteReference: String? = null,
+    val predecessorVersionId: UUID? = null,
+    val hopKind: String? = null,
 )
 
 data class VersionCreated(
@@ -100,6 +107,9 @@ data class VersionCreated(
     val constitutionId: UUID,
     val versionLabel: String,
     val publicationStatus: String,
+    val predecessorVersionId: UUID? = null,
+    val hopKind: String = "initial",
+    val listing: String = "public",
 )
 
 data class VersionDetail(
@@ -109,4 +119,7 @@ data class VersionDetail(
     val publicationStatus: String,
     val effectiveDate: LocalDate?,
     val languageCode: String,
+    val predecessorVersionId: UUID? = null,
+    val hopKind: String = "initial",
+    val listing: String = "public",
 )

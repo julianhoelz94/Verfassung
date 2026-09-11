@@ -58,5 +58,6 @@ class EditorController(private val editorService: EditorService) {
     fun publish(
         @RequestHeader(value = "Authorization", required = false) authorization: String?,
         @PathVariable sessionId: UUID,
-    ): DraftPreviewDto = editorService.publish(authorization, sessionId)
+        @RequestBody request: PublishRequest,
+    ): DraftPreviewDto = editorService.publish(authorization, sessionId, request)
 }

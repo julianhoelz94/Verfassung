@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import type { ConstitutionSummary, VersionSummary } from './api';
+import type { Amendment, ConstitutionSummary, VersionSummary } from './api';
 import {
+  amendmentsBetween,
   canonicalCompareQuery,
   compareRequestError,
   neighborCompareLinks,
@@ -114,5 +115,49 @@ describe('canonicalCompareQuery', () => {
     expect(canonicalCompareQuery('a', 'a', versions)).toBeNull();
     expect(canonicalCompareQuery('missing', 'a', versions)).toBeNull();
     expect(canonicalCompareQuery(undefined, 'a', versions)).toBeNull();
+  });
+});
+
+
+const amendment = (
+  id: string,
+  sourceId: string,
+  targetId: string,
+  status = 'published',
+): Amendment => ({
+  id,
+  title: id,
+  summary: '',
+  enactedOn: '2022-01-01',
+  sourceReference: null,
+  sourceVersionId: sourceId,
+  targetVersionId: targetId,
+  status,
+  changes: [],
+});
+
+describe('amendmentsBetween', () => {
+  const versions = [v('a', '1949', '1949-05-23'), v('b', '1956', '1956-03-19'), v('c', '2022', '2022-01-01')];
+
+  it('returns published laws on the forward public path between two versions', () => {
+    const laws = [
+      amendment('law-1', 'a', 'b'),
+      amendment('law-2', 'b', 'c'),
+      amendment('outside', 'a', 'c'),
+    ];
+    expect(amendmentsBetween(laws, 'a', 'c', versions).map((item) => item.id)).toEqual([
+      'law-1',
+      'outside',
+      'law-2',
+    ]);
+  });
+
+  it('skips amendments missing source or target ids and non-published rows', () => {
+    const laws = [
+      amendment('draft', 'a', 'b', 'draft'),
+      { ...amendment('missing', 'a', 'b'), sourceVersionId: null },
+      amendment('kept', 'a', 'b'),
+    ];
+    expect(amendmentsBetween(laws, 'a', 'b', versions).map((item) => item.id)).toEqual(['kept']);
   });
 });

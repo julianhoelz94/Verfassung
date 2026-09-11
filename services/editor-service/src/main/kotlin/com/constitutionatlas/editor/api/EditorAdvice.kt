@@ -20,8 +20,11 @@ class EditorAdvice {
         )
 
     @ExceptionHandler(ConflictException::class)
-    fun conflict(ex: ConflictException): ResponseEntity<Map<String, String>> =
-        ResponseEntity.status(HttpStatus.CONFLICT).body(mapOf("error" to (ex.message ?: "Conflict")))
+    fun conflict(ex: ConflictException): ResponseEntity<Map<String, String>> {
+        val body = mutableMapOf("error" to (ex.message ?: "Conflict"))
+        ex.code?.let { body["code"] = it }
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(body)
+    }
 
     @ExceptionHandler(DownstreamException::class)
     fun downstream(ex: DownstreamException): ResponseEntity<Map<String, String>> =

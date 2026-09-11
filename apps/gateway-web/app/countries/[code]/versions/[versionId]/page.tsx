@@ -120,7 +120,11 @@ export default async function VersionPage(props: VersionPageProps) {
         title={title}
         meta={
           <>
-            {version.version.latestPublished ? <Badge tone="accent">Latest</Badge> : null}
+            {(version.constitution.latestVersionId
+              ? params.versionId === version.constitution.latestVersionId
+              : version.version.latestPublished) ? (
+              <Badge tone="accent">Latest</Badge>
+            ) : null}
             <Badge tone="info">{verificationLabel(version.version)}</Badge>
             <span>{version.version.languageCode}</span>
             {version.version.gazetteReference ? <span>{version.version.gazetteReference}</span> : null}

@@ -1,6 +1,7 @@
 import type { MetadataRoute } from 'next';
 import { getCountry, listAllArticles, listCountries } from '../lib/api';
 import { absoluteUrl } from '../lib/site-url';
+import { publicVersions } from '../lib/reading';
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const entries: MetadataRoute.Sitemap = [{ url: absoluteUrl('/'), lastModified: new Date() }];
@@ -29,7 +30,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     }
 
     for (const constitution of detail.constitutions) {
-      for (const version of constitution.versions) {
+      for (const version of publicVersions(constitution.versions)) {
         entries.push({
           url: absoluteUrl(`/countries/${country.isoCode}/versions/${version.id}`),
           lastModified: new Date(),

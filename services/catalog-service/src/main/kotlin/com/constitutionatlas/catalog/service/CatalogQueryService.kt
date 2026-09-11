@@ -22,7 +22,14 @@ class CatalogQueryService(private val catalogRepository: CatalogRepository) {
         if (!catalogRepository.constitutionExists(constitutionId)) {
             throw NotFoundException("Unknown constitution '$constitutionId'")
         }
-        return catalogRepository.listPublishedVersions(constitutionId)
+        return catalogRepository.listPublishedPublicVersions(constitutionId)
+    }
+
+    fun listAllPublishedVersions(constitutionId: UUID): List<VersionSummary> {
+        if (!catalogRepository.constitutionExists(constitutionId)) {
+            throw NotFoundException("Unknown constitution '$constitutionId'")
+        }
+        return catalogRepository.listAllPublishedVersions(constitutionId)
     }
 
     fun getVersion(versionId: UUID): VersionDetail =

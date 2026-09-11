@@ -50,6 +50,7 @@ export const EDITOR_ERROR_MESSAGES = {
   step_up: 'Recent authenticator confirmation is required.',
   forbidden: 'You do not have permission for that action.',
   not_ready: 'This draft is not ready for that action.',
+  not_tip: 'Publish only from the latest snapshot in the chain.',
   invalid: 'The draft could not be published.',
   open_failed: 'Could not open an edit session.',
   list_failed: 'Could not list edit sessions.',
@@ -122,7 +123,7 @@ async function throwIfNotOk(response: Response, fallback: EditorErrorKey): Promi
     throw new EditorApiError('forbidden', code);
   }
   if (response.status === 409) {
-    throw new EditorApiError('not_ready', code);
+    throw new EditorApiError(code === 'not_tip' ? 'not_tip' : 'not_ready', code);
   }
   if (response.status === 400) {
     throw new EditorApiError('invalid', code);
@@ -198,9 +199,17 @@ export async function approveReview(sessionId: string): Promise<DraftPreview> {
   return (await response.json()) as DraftPreview;
 }
 
-export async function publishSession(sessionId: string): Promise<DraftPreview> {
+export async function publishSession(
+  sessionId: string,
+  options: { hopKind: string; amendmentId?: string },
+): Promise<DraftPreview> {
+  const body: { hopKind: string; amendmentId?: string } = { hopKind: options.hopKind };
+  if (options.amendmentId) {
+    body.amendmentId = options.amendmentId;
+  }
   const response = await editorFetch(`/edit-sessions/${encodeURIComponent(sessionId)}/publish`, {
     method: 'POST',
+    body: JSON.stringify(body),
   });
   await throwIfNotOk(response, 'publish_failed');
   return (await response.json()) as DraftPreview;

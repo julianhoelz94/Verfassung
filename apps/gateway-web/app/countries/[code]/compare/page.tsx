@@ -11,7 +11,7 @@ import { Badge, PageHeader } from '../../../components/ui';
 import {
   ApiUnavailableError,
   listAllArticles,
-  listAmendments,
+  listConstitutionAmendments,
   getCountry,
   type Amendment,
   type ArticleSummary,
@@ -20,6 +20,7 @@ import {
 } from '../../../../lib/api';
 import {
   COMPARE_KIND_LABEL,
+  amendmentsBetween,
   canonicalCompareQuery,
   compareArticleNumbers,
   compareRequestError,
@@ -31,6 +32,7 @@ import {
 } from '../../../../lib/compare';
 import { FormattedDate } from '../../../../lib/format-date';
 import { atlasTitle, metaDescription, pageMetadata } from '../../../../lib/page-meta';
+import { publicVersions } from '../../../../lib/reading';
 import { CompareForm } from '../CompareForm';
 
 type ComparePageProps = {
@@ -52,7 +54,7 @@ export async function generateMetadata(props: ComparePageProps): Promise<Metadat
           (version) => version.id === searchParams.from || version.id === searchParams.to,
         ),
       ) ?? country.constitutions[0];
-    const versions = orderVersions(constitution?.versions ?? []);
+    const versions = orderVersions(publicVersions(constitution?.versions ?? []));
     const fromId = searchParams.from ?? versions[0]?.id;
     const toId = searchParams.to ?? versions[versions.length - 1]?.id;
     const canonical = canonicalCompareQuery(fromId, toId, versions);
@@ -73,11 +75,10 @@ export async function generateMetadata(props: ComparePageProps): Promise<Metadat
   }
 }
 
-type Hop = {
-  source: VersionSummary;
-  target: VersionSummary;
-  amendments: Amendment[];
-  articles: ArticleSummary[];
+type LawHop = {
+  amendment: Amendment;
+  source?: VersionSummary;
+  target?: VersionSummary;
 };
 
 function columnBadge(kind: CompareKind, side: 'from' | 'to'): { tone: 'added' | 'removed' | 'changed' | 'neutral'; label: string } {
@@ -127,7 +128,7 @@ export default async function ComparePage(props: ComparePageProps) {
     country.constitutions.find((item) =>
       item.versions.some((version) => version.id === searchParams.from || version.id === searchParams.to),
     ) ?? country.constitutions[0];
-  const versions = orderVersions(constitution?.versions ?? []);
+  const versions = orderVersions(publicVersions(constitution?.versions ?? []));
   const fromId = searchParams.from ?? versions[0]?.id;
   const toId = searchParams.to ?? versions[versions.length - 1]?.id;
   const showAll = searchParams.all === '1';
@@ -136,33 +137,26 @@ export default async function ComparePage(props: ComparePageProps) {
 
   let fromArticles: ArticleSummary[] = [];
   let toArticles: ArticleSummary[] = [];
-  let hops: Hop[] = [];
+  let lawHops: LawHop[] = [];
   let loadError: string | null = selectedError;
 
-  if (path && path.length >= 2 && !selectedError) {
+  if (path && path.length >= 2 && !selectedError && constitution) {
     try {
-      const hopPairs = path.slice(0, -1).map((source, index) => ({
-        source,
-        target: path[index + 1],
-      }));
-      const [fromList, toList] = await Promise.all([
+      const [fromList, toList, constitutionAmendments] = await Promise.all([
         listAllArticles(path[0].id, true),
         listAllArticles(path[path.length - 1].id, true),
+        listConstitutionAmendments(constitution.id),
       ]);
-      hops = await Promise.all(
-        hopPairs.map(async (pair) => {
-          const [amendments, articles] = await Promise.all([
-            listAmendments(pair.target.id, pair.source.id),
-            listAllArticles(pair.target.id, true),
-          ]);
-          return {
-            source: pair.source,
-            target: pair.target,
-            amendments: amendments ?? [],
-            articles,
-          };
-        }),
-      );
+      const between = amendmentsBetween(constitutionAmendments ?? [], fromId!, toId!, versions);
+      lawHops = between.map((amendment) => ({
+        amendment,
+        source: amendment.sourceVersionId
+          ? versions.find((version) => version.id === amendment.sourceVersionId)
+          : undefined,
+        target: amendment.targetVersionId
+          ? versions.find((version) => version.id === amendment.targetVersionId)
+          : undefined,
+      }));
       fromArticles = fromList;
       toArticles = toList;
       loadError = null;
@@ -175,14 +169,12 @@ export default async function ComparePage(props: ComparePageProps) {
   const toMap = new Map(toArticles.map((article) => [article.articleNumber, article]));
   const numbers = [...new Set([...fromMap.keys(), ...toMap.keys()])].sort(compareArticleNumbers);
   const recorded = new Map<string, string[]>();
-  for (const hop of hops) {
-    for (const amendment of hop.amendments) {
-      for (const change of amendment.changes) {
-        if (change.articleNumber) {
-          const types = recorded.get(change.articleNumber) ?? [];
-          types.push(change.changeType);
-          recorded.set(change.articleNumber, types);
-        }
+  for (const hop of lawHops) {
+    for (const change of hop.amendment.changes) {
+      if (change.articleNumber) {
+        const types = recorded.get(change.articleNumber) ?? [];
+        types.push(change.changeType);
+        recorded.set(change.articleNumber, types);
       }
     }
   }
@@ -238,7 +230,7 @@ export default async function ComparePage(props: ComparePageProps) {
             <Badge tone="added">{addedCount} added</Badge>
             <Badge tone="removed">{removedCount} removed</Badge>
             <Badge>
-              {hops.length} amendment hop{hops.length === 1 ? '' : 's'}
+              {lawHops.length} amending law{lawHops.length === 1 ? '' : 's'}
             </Badge>
             <span className="muted">
               {showAll ? (
@@ -255,76 +247,62 @@ export default async function ComparePage(props: ComparePageProps) {
           </div>
 
           <CompareView fromLabel={fromVersion.versionLabel} toLabel={toVersion.versionLabel}>
-            {hops.every((hop) => hop.amendments.length === 0) ? (
+            {lawHops.length === 0 ? (
               <p>
-                No amendment records are stored for these hops. The side-by-side text below still compares the snapshots.
+                No amending laws are recorded between these versions. The side-by-side text below still compares the snapshots.
               </p>
             ) : null}
-            {hops.map((hop, hopIndex) => {
-              const intermediate = hop.target.id !== toVersion.id;
-              const lawCount = hop.amendments.length;
-              const lastLaw = hop.amendments[hop.amendments.length - 1];
+            {lawHops.map((hop, hopIndex) => {
+              const amendment = hop.amendment;
+              const isErrata = amendment.kind === 'official_errata';
               return (
-                <details key={`${hop.source.id}-${hop.target.id}`} className="hop">
+                <details key={amendment.id} className="hop">
                   <summary>
-                    <Badge tone="accent">Hop {hopIndex + 1}</Badge>
-                    <span>
-                      {hop.source.versionLabel} → {hop.target.versionLabel}
-                    </span>
+                    <Badge tone="accent">Law {hopIndex + 1}</Badge>
+                    {isErrata ? <Badge tone="info">Official errata</Badge> : null}
+                    <span>{amendment.title}</span>
                     <span className="muted">
-                      · {lawCount} amending law{lawCount === 1 ? '' : 's'}
-                      {lastLaw?.sourceReference ? (
+                      {hop.source && hop.target ? (
                         <>
-                          {' · last: '}
-                          {lastLaw.sourceReference}
-                          {lastLaw.enactedOn ? (
-                            <>
-                              {' ('}
-                              <FormattedDate value={lastLaw.enactedOn} />
-                              {')'}
-                            </>
-                          ) : null}
+                          {' · '}
+                          {hop.source.versionLabel} → {hop.target.versionLabel}
+                        </>
+                      ) : null}
+                      {amendment.sourceReference ? (
+                        <>
+                          {' · '}
+                          {amendment.sourceReference}
+                        </>
+                      ) : null}
+                      {amendment.enactedOn ? (
+                        <>
+                          {' ('}
+                          <FormattedDate value={amendment.enactedOn} />
+                          {')'}
                         </>
                       ) : null}
                     </span>
                   </summary>
                   <div className="stack">
-                    {hop.amendments.map((amendment) =>
-                      amendment.changes.map((change) => (
-                          <div key={change.id} className="change-row">
-                            <Badge tone={hopChangeTone(change.changeType)}>{change.changeType}</Badge>
-                            {change.articleNumber ? (
-                              <a href={`/countries/${country.isoCode}/articles/${encodeURIComponent(change.articleNumber)}`}>
-                                Art. {change.articleNumber}
-                              </a>
-                            ) : null}
-                            <span className="muted">
-                              {amendment.title}
-                              {change.note ? ` · ${change.note}` : ''}
-                              {change.changedOn ? (
-                                <>
-                                  {' · '}
-                                  <FormattedDate value={change.changedOn} />
-                                </>
-                              ) : null}
-                            </span>
-                          </div>
-                      )),
-                    )}
-                    {intermediate && hop.articles.length > 0 ? (
-                      <details>
-                        <summary>
-                          Intermediate snapshot {hop.target.versionLabel} ({hop.articles.length} articles)
-                        </summary>
-                        <ol>
-                          {hop.articles.map((article) => (
-                            <li key={article.id}>
-                              Article {article.articleNumber} — {article.title}
-                            </li>
-                          ))}
-                        </ol>
-                      </details>
-                    ) : null}
+                    {amendment.changes.map((change) => (
+                      <div key={change.id} className="change-row">
+                        <Badge tone={hopChangeTone(change.changeType)}>{change.changeType}</Badge>
+                        {change.articleNumber ? (
+                          <a href={`/countries/${country.isoCode}/articles/${encodeURIComponent(change.articleNumber)}`}>
+                            Art. {change.articleNumber}
+                          </a>
+                        ) : null}
+                        <span className="muted">
+                          {change.note ? change.note : null}
+                          {change.changedOn ? (
+                            <>
+                              {change.note ? ' · ' : ''}
+                              <FormattedDate value={change.changedOn} />
+                            </>
+                          ) : null}
+                        </span>
+                      </div>
+                    ))}
                   </div>
                 </details>
               );

@@ -1,8 +1,8 @@
 import {
   ApiUnavailableError,
   getCountry,
-  listAmendments,
   listArticlePage,
+  listConstitutionAmendments,
   listCountries,
   type CountryDetail,
   type CountrySummary,
@@ -14,7 +14,9 @@ import { SiteSearchForm } from './components/SiteSearchForm';
 import { ServiceUnavailable } from './components/StatusMessage';
 import { Badge } from './components/ui';
 import {
+  chainTipId,
   newestChanges,
+  publicVersions,
   recentChangesFromAmendments,
   type RecentChange,
 } from '../lib/reading';
@@ -46,13 +48,13 @@ export default async function Page() {
   const recent: RecentChange[] = [];
   for (const country of details) {
     for (const constitution of country.constitutions) {
-      versionCount += constitution.versions.length;
-      const latest = latestVersion(constitution.versions);
-      if (!latest) {
+      versionCount += publicVersions(constitution.versions).length;
+      const tipId = chainTipId(constitution);
+      if (!tipId) {
         continue;
       }
       try {
-        const page = await listArticlePage(latest.id, 0, 1);
+        const page = await listArticlePage(tipId, 0, 1);
         const total = page?.total ?? 0;
         articleCount += total;
         articlesByCountry.set(country.isoCode, (articlesByCountry.get(country.isoCode) ?? 0) + total);
@@ -60,9 +62,9 @@ export default async function Page() {
         /* content is optional on the home stats */
       }
       try {
-        const amendments = (await listAmendments(latest.id)) ?? [];
+        const amendments = (await listConstitutionAmendments(constitution.id)) ?? [];
         amendmentCount += amendments.length;
-        recent.push(...recentChangesFromAmendments(country, latest, amendments));
+        recent.push(...recentChangesFromAmendments(country, constitution, amendments));
       } catch {
         /* amendment service down: skip recently changed */
       }
@@ -108,11 +110,13 @@ export default async function Page() {
         <div className="card-grid">
           {countries.map((summary) => {
             const country = details.find((item) => item.isoCode === summary.isoCode);
-            const versions = country
-              ? orderVersions(country.constitutions.flatMap((item) => item.versions))
+            const constitution = country?.constitutions[0];
+            const publicLine = constitution
+              ? orderVersions(publicVersions(constitution.versions))
               : [];
-            const latest = versions[versions.length - 1];
-            const previous = versions.length >= 2 ? versions[versions.length - 2] : undefined;
+            const tipId = constitution ? chainTipId(constitution) : summary.latestVersionId;
+            const tipVersion = constitution?.versions.find((version) => version.id === tipId);
+            const previous = publicLine.length >= 2 ? publicLine[publicLine.length - 2] : undefined;
             const countryArticles = country ? articlesByCountry.get(country.isoCode) : undefined;
             return (
               <article key={summary.id} className="card country-card">
@@ -127,10 +131,10 @@ export default async function Page() {
                     <p className="muted">{country.constitutions.map((item) => item.title).join(' · ')}</p>
                   ) : null}
                   <div className="card-meta">
-                    {summary.latestVersionLabel ? (
+                    {tipVersion ? (
+                      <Badge tone="accent">Latest: {tipVersion.versionLabel}</Badge>
+                    ) : summary.latestVersionLabel ? (
                       <Badge tone="accent">Latest: {summary.latestVersionLabel}</Badge>
-                    ) : latest ? (
-                      <Badge tone="accent">Latest: {latest.versionLabel}</Badge>
                     ) : null}
                     <span>
                       {summary.versionCount} version{summary.versionCount === 1 ? '' : 's'}
@@ -145,20 +149,20 @@ export default async function Page() {
                         {countryArticles} article{countryArticles === 1 ? '' : 's'}
                       </span>
                     ) : null}
-                    {latest ? <span>{latest.languageCode}</span> : null}
+                    {tipVersion ? <span>{tipVersion.languageCode}</span> : null}
                   </div>
                   <div className="card-actions">
-                    {latest ? (
-                      <a className="btn btn-sm" href={`/countries/${summary.isoCode}/versions/${latest.id}`}>
+                    {tipId ? (
+                      <a className="btn btn-sm" href={`/countries/${summary.isoCode}/versions/${tipId}`}>
                         Read latest
                       </a>
                     ) : null}
-                    {summary.versionCount >= 2 && latest && previous ? (
+                    {publicLine.length >= 2 && previous && tipId ? (
                       <a
                         className="btn btn-sm btn-ghost"
-                        href={`/countries/${summary.isoCode}/compare?from=${previous.id}&to=${latest.id}`}
+                        href={`/countries/${summary.isoCode}/compare?from=${previous.id}&to=${publicLine[publicLine.length - 1]?.id}`}
                       >
-                        Compare {previous.versionLabel} → {latest.versionLabel}
+                        Compare {previous.versionLabel} → {publicLine[publicLine.length - 1]?.versionLabel}
                       </a>
                     ) : null}
                   </div>

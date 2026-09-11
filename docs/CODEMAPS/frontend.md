@@ -22,13 +22,16 @@ Next.js 15 App Router, React 18, TypeScript. **No DB** — HTTP clients only. Pr
 | `/login`, `/login/mfa` | login + MFA |
 | `/reset`, `/invite` | password reset, invite accept |
 | `/account`, `/account/step-up` | self-service + MFA step-up |
-| `/editor` | drafts (`ArticleEditor.tsx`, `ArticleFilterList`, `WorkflowSteps`, `actions.ts`) |
+| `/editor` | drafts (`ArticleEditor.tsx`, `ArticleFilterList`, `WorkflowSteps`, `actions.ts`, `PublishForm.tsx`) |
+| `/editor/amendments` | staff amending-law list (`page.tsx`) |
+| `/editor/amendments/[id]` | create (`new`) or edit form with revision panel (`AmendmentEditorLayout.tsx`, `AmendmentRevisionPanel.tsx`, `AmendmentForm.tsx`, `AmendmentChangesTable.tsx`, `actions.ts`) |
+| `/editor/history` | staff snapshot history (`page.tsx`; `listing=all` version chain) |
 | `/admin` | admin index (Users, Outlines, Import) |
 | `/admin/users` | identity admin |
 | `/admin/constitutions`, `/admin/constitutions/[id]` | outlines |
 | `/admin/import`, `/admin/import/[jobId]` | ingestion |
 
-Shell: `layout.tsx` → skip link + `SiteHeader` + `SiteFooter`. Shared UI: `app/components/` (`ConstitutionText`, `DiffConstitutionText`, `VersionReader`, `ui.tsx`, `MenuDisclosure`, `Segmented`, `Tabs`, `Toc`, `FiltersPanel`, `ArticleFilterList`). Nav: `lib/nav.ts` (`primaryNavLinks`, `menuSections`). Home/country helpers: `lib/reading.ts`.
+Shell: `layout.tsx` → skip link + `SiteHeader` + `SiteFooter`. Shared UI: `app/components/` (`ConstitutionText`, `DiffConstitutionText`, `VersionReader`, `ui.tsx`, `MenuDisclosure`, `Segmented`, `Tabs`, `Toc`, `FiltersPanel`, `ArticleFilterList`). Nav: `lib/nav.ts` (`primaryNavLinks`, `menuSections`, `editorialLinks` includes Amending laws and Snapshot history). Amendment detail: revision panel (read-only browse, restore as new draft); **Fill from two versions** calls `POST /amendments/suggest`. Home/country helpers: `lib/reading.ts` (`publicVersions`, `chainTipId`). Timeline lists constitution-level published laws via `listConstitutionAmendments`. Editor publish uses `PublishForm` (hop kind + linked law; links to `/editor/amendments` when no law exists).
 
 Admin gates: `lib/admin.ts` (`requireAdminPage`). Editor/admin links: `lib/nav.ts` (UI only).
 
@@ -39,6 +42,7 @@ Admin gates: `lib/admin.ts` (`requireAdminPage`). Editor/admin links: `lib/nav.t
 | `api.ts` | catalog, content, amendment, search (`CATALOG_API_URL` …) |
 | `identity-client.ts` + `session.ts` | identity; cookies `ca_session`, `ca_mfa_challenge` |
 | `editor-api.ts` | editor-service (`searchIndexStatus` on preview after publish) |
+| `amendment-editor-api.ts` | amendment-service staff writes (create/revisions/publish/withdraw), `listRevisions`, `suggestChanges` |
 | `ingestion-api.ts` | ingestion |
 | `outline.ts` | render groups from catalog outline + content nodes |
 | `compare.ts`, `text-diff.ts` | compare page |

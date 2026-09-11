@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestHeader
+import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
 import java.util.UUID
@@ -28,8 +29,21 @@ class CatalogController(
         catalogQueryService.getCountry(isoCode)
 
     @GetMapping("/constitutions/{constitutionId}/versions")
-    fun listVersions(@PathVariable constitutionId: UUID): List<VersionSummary> =
-        catalogQueryService.listVersions(constitutionId)
+    fun listVersions(
+        @PathVariable constitutionId: UUID,
+        @RequestParam(required = false) listing: String?,
+        @RequestHeader(value = "Authorization", required = false) authorization: String?,
+    ): List<VersionSummary> {
+        val effectiveListing = listing ?: "public"
+        return when (effectiveListing) {
+            "public" -> catalogQueryService.listVersions(constitutionId)
+            "all" -> {
+                writeAccess.requireStaffCatalog(authorization)
+                catalogQueryService.listAllPublishedVersions(constitutionId)
+            }
+            else -> throw IllegalArgumentException("listing must be public or all")
+        }
+    }
 
     @GetMapping("/versions/{versionId}")
     fun getVersion(@PathVariable versionId: UUID): VersionDetail =

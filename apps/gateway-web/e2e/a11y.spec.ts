@@ -44,6 +44,10 @@ test('axe passes on public and editor routes', async ({ page }) => {
   await signInEditor(page);
   await expectNoAxeViolations(page);
 
+  await page.goto('/editor/amendments');
+  await expect(page.getByRole('heading', { name: 'Amending laws' })).toBeVisible();
+  await expectNoAxeViolations(page);
+
   await page.getByRole('button', { name: 'Account menu' }).click();
   await page.getByRole('button', { name: 'Sign out' }).click();
   await signInAdmin(page);

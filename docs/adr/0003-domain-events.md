@@ -26,13 +26,15 @@ Emitted after catalog `POST /versions/{id}/publish` succeeds for an editorial su
 
 ### `amendment.recorded`
 
-Emitted when amendment-service `POST /transitions` returns a transition id.
+Emitted for `legal_amendment` and `official_errata` publish hops after the editor links and publishes the named amendment. Not emitted for `editorial_correction`.
 
 | Field | Type |
 | --- | --- |
-| `transitionId` | UUID |
+| `amendmentId` | UUID |
 | `sourceVersionId` | UUID |
 | `targetVersionId` | UUID |
+
+Extra JSON fields are allowed.
 
 ### `search.reindex-requested`
 

@@ -66,6 +66,10 @@ export function editorialLinks(roles: string[]): NavLink[] {
   if (isPublisher) {
     links.push({ href: '/editor?status=approved', label: 'Ready to publish' });
   }
+  if (isEditor || isReviewer || isPublisher) {
+    links.push({ href: '/editor/amendments', label: 'Amending laws' });
+    links.push({ href: '/editor/history', label: 'Snapshot history' });
+  }
   return links;
 }
 

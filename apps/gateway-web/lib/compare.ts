@@ -1,4 +1,4 @@
-import type { ArticleSummary, ConstitutionSummary, VersionSummary } from './api';
+import type { Amendment, ArticleSummary, ConstitutionSummary, VersionSummary } from './api';
 
 export type CompareKind = 'added' | 'removed' | 'changed' | 'same';
 
@@ -17,6 +17,45 @@ export function orderVersions(versions: VersionSummary[]): VersionSummary[] {
     }
     return a.versionLabel.localeCompare(b.versionLabel, undefined, { numeric: true });
   });
+}
+
+export function amendmentsBetween(
+  amendments: Amendment[],
+  fromId: string,
+  toId: string,
+  versions: VersionSummary[],
+): Amendment[] {
+  const ordered = orderVersions(versions);
+  const fromIndex = ordered.findIndex((version) => version.id === fromId);
+  const toIndex = ordered.findIndex((version) => version.id === toId);
+  if (fromIndex < 0 || toIndex < 0 || fromIndex >= toIndex) {
+    return [];
+  }
+  return amendments
+    .filter((amendment) => {
+      if (!amendment.sourceVersionId || !amendment.targetVersionId) {
+        return false;
+      }
+      if (amendment.status && amendment.status !== 'published') {
+        return false;
+      }
+      const sourceIndex = ordered.findIndex((version) => version.id === amendment.sourceVersionId);
+      const targetIndex = ordered.findIndex((version) => version.id === amendment.targetVersionId);
+      if (sourceIndex < 0 || targetIndex < 0) {
+        return false;
+      }
+      return sourceIndex < targetIndex && fromIndex <= sourceIndex && targetIndex <= toIndex;
+    })
+    .sort((left, right) => {
+      const leftSource = ordered.findIndex((version) => version.id === left.sourceVersionId);
+      const rightSource = ordered.findIndex((version) => version.id === right.sourceVersionId);
+      if (leftSource !== rightSource) {
+        return leftSource - rightSource;
+      }
+      const leftTarget = ordered.findIndex((version) => version.id === left.targetVersionId);
+      const rightTarget = ordered.findIndex((version) => version.id === right.targetVersionId);
+      return leftTarget - rightTarget;
+    });
 }
 
 export function versionPath(
@@ -56,7 +95,10 @@ export function compareRequestError(
   if (fromConstitution.id !== toConstitution.id) {
     return 'Choose two versions of the same constitution.';
   }
-  if (!versionPath(fromConstitution.versions, fromId, toId)) {
+  const publicLine = fromConstitution.versions.filter(
+    (version) => version.listing !== 'staff' && version.hopKind !== 'editorial_correction',
+  );
+  if (!versionPath(publicLine, fromId, toId)) {
     return 'Those versions are not a forward path on this constitution’s published line.';
   }
   return null;

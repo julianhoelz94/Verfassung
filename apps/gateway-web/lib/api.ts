@@ -11,6 +11,9 @@ export type VersionSummary = {
   verificationState: string;
   verifiedBy: string | null;
   verifiedAt: string | null;
+  predecessorVersionId?: string | null;
+  hopKind?: string;
+  listing?: string;
   latestPublished: boolean;
 };
 
@@ -55,6 +58,7 @@ export type ConstitutionSummary = {
   id: string;
   slug: string;
   title: string;
+  latestVersionId?: string | null;
   versions: VersionSummary[];
   contentOutline?: ContentOutline;
 };
@@ -65,6 +69,7 @@ export type CountrySummary = {
   name: string;
   latestVersionLabel: string | null;
   latestEffectiveDate: string | null;
+  latestVersionId?: string | null;
   versionCount: number;
 };
 
@@ -105,8 +110,13 @@ export type Amendment = {
   summary: string;
   enactedOn: string | null;
   sourceReference: string | null;
-  sourceVersionId: string;
-  targetVersionId: string;
+  sourceVersionId?: string | null;
+  targetVersionId?: string | null;
+  constitutionId?: string;
+  kind?: string;
+  status?: string;
+  publishedRevisionId?: string | null;
+  effectiveOn?: string | null;
   changes: AmendmentChange[];
 };
 
@@ -484,4 +494,36 @@ export function listAmendmentsByArticle(
     articleNumber,
   });
   return readJson<Amendment[]>(`${amendmentBaseUrl()}/amendments?${params.toString()}`, 'amendment');
+}
+
+export function listConstitutionAmendments(
+  constitutionId: string,
+  options?: { status?: 'all'; authorization?: string },
+): Promise<Amendment[] | null> {
+  const params = new URLSearchParams();
+  if (options?.status) {
+    params.set('status', options.status);
+  }
+  const query = params.toString();
+  return readJson<Amendment[]>(
+    `${amendmentBaseUrl()}/constitutions/${encodeURIComponent(constitutionId)}/amendments${query ? `?${query}` : ''}`,
+    'amendment',
+    options?.authorization,
+  );
+}
+
+export function listConstitutionVersions(
+  constitutionId: string,
+  options?: { listing?: 'all'; authorization?: string },
+): Promise<VersionSummary[] | null> {
+  const params = new URLSearchParams();
+  if (options?.listing) {
+    params.set('listing', options.listing);
+  }
+  const query = params.toString();
+  return readJson<VersionSummary[]>(
+    `${catalogBaseUrl()}/constitutions/${encodeURIComponent(constitutionId)}/versions${query ? `?${query}` : ''}`,
+    'catalog',
+    options?.authorization,
+  );
 }

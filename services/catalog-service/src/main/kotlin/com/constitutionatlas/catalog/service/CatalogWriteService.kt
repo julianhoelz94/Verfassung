@@ -11,6 +11,7 @@ import com.constitutionatlas.catalog.api.OutlineKindWrite
 import com.constitutionatlas.catalog.api.OutlineUpdateResult
 import com.constitutionatlas.catalog.api.VersionCreated
 import com.constitutionatlas.catalog.repo.CatalogRepository
+import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.util.UUID
@@ -45,6 +46,7 @@ class CatalogWriteService(private val catalogRepository: CatalogRepository) {
             id,
             slug,
             request.title.trim(),
+            null,
             emptyList(),
             catalogRepository.findOutline(id),
         )
@@ -59,15 +61,60 @@ class CatalogWriteService(private val catalogRepository: CatalogRepository) {
         if (catalogRepository.versionLabelExists(constitutionId, label)) {
             throw ConflictException("Version '$label' already exists")
         }
-        val id = catalogRepository.insertDraftVersion(
-            constitutionId,
-            label,
-            request.effectiveDate,
-            request.languageCode,
-            request.sourceUrl,
-            request.gazetteReference,
-        )
-        return VersionCreated(id, constitutionId, label, "draft")
+
+        val predecessorId = request.predecessorVersionId
+        val hopKind: String
+        val listing: String
+
+        if (predecessorId == null) {
+            if (catalogRepository.listAllVersionIds(constitutionId).isNotEmpty()) {
+                throw ConflictException(
+                    "predecessorVersionId is required to append to an existing chain",
+                    "not_tip",
+                )
+            }
+            hopKind = "initial"
+            listing = "public"
+        } else {
+            val hop = request.hopKind?.trim()
+            if (hop.isNullOrBlank()) {
+                throw IllegalArgumentException("hopKind is required when predecessorVersionId is set")
+            }
+            if (hop !in VALID_HOP_KINDS) {
+                throw IllegalArgumentException("hopKind must be one of: ${VALID_HOP_KINDS.joinToString()}")
+            }
+            hopKind = hop
+            listing = if (hopKind == "editorial_correction") "staff" else "public"
+            val predecessorConstitution = catalogRepository.findVersionConstitutionId(predecessorId)
+            if (predecessorConstitution == null || predecessorConstitution != constitutionId) {
+                throw ConflictException("Unknown predecessor version", "unknown_predecessor")
+            }
+            if (catalogRepository.findSuccessorOf(predecessorId) != null) {
+                throw ConflictException("Predecessor already has a successor", "not_tip")
+            }
+        }
+
+        val id =
+            try {
+                catalogRepository.insertDraftVersion(
+                    constitutionId,
+                    label,
+                    request.effectiveDate,
+                    request.languageCode,
+                    request.sourceUrl,
+                    request.gazetteReference,
+                    predecessorId,
+                    hopKind,
+                    listing,
+                )
+            } catch (ex: DataIntegrityViolationException) {
+                if (predecessorId != null) {
+                    throw ConflictException("Predecessor already has a successor", "not_tip")
+                }
+                throw ex
+            }
+
+        return VersionCreated(id, constitutionId, label, "draft", predecessorId, hopKind, listing)
     }
 
     @Transactional
@@ -93,6 +140,12 @@ class CatalogWriteService(private val catalogRepository: CatalogRepository) {
 
     companion object {
         private val KIND_CODE = Regex("^[a-z][a-z0-9_-]{0,31}$")
+        private val VALID_HOP_KINDS = setOf(
+            "initial",
+            "legal_amendment",
+            "official_errata",
+            "editorial_correction",
+        )
 
         fun normalizeOutline(kinds: List<OutlineKindWrite>): List<OutlineKindWrite> {
             if (kinds.isEmpty()) {

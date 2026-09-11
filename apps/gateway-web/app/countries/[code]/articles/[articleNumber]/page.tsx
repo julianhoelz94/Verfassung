@@ -107,7 +107,9 @@ export default async function ArticleHistoryPage(props: HistoryPageProps) {
       <div className="stack">
         {snapshots.map((snapshot, index) => {
           const previous = snapshots[index - 1];
-          const incoming = amendments.filter((item) => item.targetVersionId === snapshot.version.id);
+          const incoming = amendments.filter(
+            (item) => item.targetVersionId != null && item.targetVersionId === snapshot.version.id,
+          );
           const articlesByNumber = Object.fromEntries(
             snapshot.articles.map((item) => [item.articleNumber, item.id]),
           );

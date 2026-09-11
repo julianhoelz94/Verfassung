@@ -3,11 +3,13 @@ import { ArticleFilterList } from '../components/ArticleFilterList';
 import { ConstitutionText } from '../components/ConstitutionText';
 import { PageMain } from '../components/PageMain';
 import { Alert, Badge, Button, Card, DataList, DataRow, Input, PageHeader, Select, WorkflowSteps } from '../components/ui';
-import { getArticle, getCountry, listAllArticles, listCountries, type ArticleSummary, type CountryDetail, type CountrySummary } from '../../lib/api';
+import { cookies } from 'next/headers';
+import { getArticle, getCountry, listAllArticles, listConstitutionAmendments, listCountries, type ArticleSummary, type CountryDetail, type CountrySummary } from '../../lib/api';
 import { editorErrorMessage, getDraftPreview, listSessions, type EditSessionSummary } from '../../lib/editor-api';
-import { currentUser } from '../../lib/session';
+import { SESSION_COOKIE, currentUser } from '../../lib/session';
 import { ArticleEditor } from './ArticleEditor';
-import { approveAction, loadSessionAction, openEditorAction, publishAction, reviewAction } from './actions';
+import { PublishForm } from './PublishForm';
+import { approveAction, loadSessionAction, openEditorAction, reviewAction } from './actions';
 
 type EditorPageProps = {
   searchParams: Promise<{
@@ -19,6 +21,7 @@ type EditorPageProps = {
     approved?: string;
     published?: string;
     newVersionLabel?: string;
+    amendmentTitle?: string;
     newVersionId?: string;
     error?: string;
     mine?: string;
@@ -151,7 +154,7 @@ export default async function EditorPage(props: EditorPageProps) {
       {searchParams.published ? (
         <Alert tone="success">
           {searchParams.newVersionLabel
-            ? `Published as version ${searchParams.newVersionLabel}.`
+            ? `Published as version ${searchParams.newVersionLabel}${searchParams.amendmentTitle ? ` · ${searchParams.amendmentTitle}` : ''}.`
             : 'Published as a new version.'}
         </Alert>
       ) : null}
@@ -219,6 +222,18 @@ export default async function EditorPage(props: EditorPageProps) {
   const title = `${selectedConstitution?.title ?? 'Constitution'} · ${selectedVersion?.versionLabel ?? ''}`.trim();
   const publicHref =
     country && versionId ? `/countries/${country.isoCode}/versions/${encodeURIComponent(versionId)}` : undefined;
+  const sessionToken = (await cookies()).get(SESSION_COOKIE)?.value;
+  const staffAmendments =
+    canPublish && session.status === 'approved' && selectedConstitution && sessionToken
+      ? (
+          (await listConstitutionAmendments(selectedConstitution.id, {
+            status: 'all',
+            authorization: `Bearer ${sessionToken}`,
+          })) ?? []
+        ).filter(
+          (amendment) => amendment.status === 'draft' || amendment.status === 'published',
+        )
+      : [];
   const canSave = Boolean(canEdit && session.status === 'open' && selected && versionId && searchParams.sessionId);
   const hiddenFields = (
     <>
@@ -318,11 +333,13 @@ export default async function EditorPage(props: EditorPageProps) {
                   <Button>Approve review</Button>
                 </form>
               ) : null}
-              {canPublish && session.status === 'approved' ? (
-                <form action={publishAction}>
-                  {hiddenFields}
-                  <Button variant="primary">Publish</Button>
-                </form>
+              {canPublish && session.status === 'approved' && searchParams.sessionId && versionId && selectedId ? (
+                <PublishForm
+                  sessionId={searchParams.sessionId}
+                  versionId={versionId}
+                  articleId={selectedId}
+                  amendments={staffAmendments}
+                />
               ) : null}
             </div>
           </section>

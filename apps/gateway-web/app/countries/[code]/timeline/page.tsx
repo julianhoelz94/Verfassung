@@ -6,14 +6,13 @@ import { Badge, PageHeader, type BadgeTone } from '../../../components/ui';
 import {
   ApiUnavailableError,
   getCountry,
-  listAmendments,
+  listConstitutionAmendments,
   type Amendment,
   type CountryDetail,
 } from '../../../../lib/api';
-import { orderVersions } from '../../../../lib/compare';
 import { FormattedDate } from '../../../../lib/format-date';
 import { atlasTitle, metaDescription, pageMetadata } from '../../../../lib/page-meta';
-import { latestVersion } from '../../../../lib/reading';
+import { chainTipId } from '../../../../lib/reading';
 import { sortAmendmentsByEnactment } from '../../../../lib/timeline';
 
 type TimelinePageProps = {
@@ -50,6 +49,10 @@ function changeTone(changeType: string): BadgeTone {
   return 'neutral';
 }
 
+function isPublicLaw(amendment: Amendment): boolean {
+  return amendment.kind === 'legal_amendment' || amendment.kind === 'official_errata' || !amendment.kind;
+}
+
 export default async function TimelinePage(props: TimelinePageProps) {
   const params = await props.params;
   let country: CountryDetail | null = null;
@@ -59,11 +62,11 @@ export default async function TimelinePage(props: TimelinePageProps) {
     country = await getCountry(params.code);
     if (country) {
       const groups = await Promise.all(
-        country.constitutions.flatMap((constitution) =>
-          constitution.versions.map((version) => listAmendments(version.id)),
-        ),
+        country.constitutions.map((constitution) => listConstitutionAmendments(constitution.id)),
       );
-      amendments = sortAmendmentsByEnactment(groups.flatMap((group) => group ?? []));
+      amendments = sortAmendmentsByEnactment(
+        groups.flatMap((group) => group ?? []).filter(isPublicLaw),
+      );
     }
   } catch (e) {
     error = e instanceof ApiUnavailableError ? e.message : 'Services are unavailable';
@@ -83,10 +86,11 @@ export default async function TimelinePage(props: TimelinePageProps) {
 
   const versionsById = new Map(
     country.constitutions.flatMap((constitution) =>
-      orderVersions(constitution.versions).map((version) => [version.id, version]),
+      constitution.versions.map((version) => [version.id, version]),
     ),
   );
-  const latest = country.constitutions[0] ? latestVersion(country.constitutions[0].versions) : undefined;
+  const primary = country.constitutions[0];
+  const tipId = primary ? chainTipId(primary) : undefined;
 
   return (
     <PageMain className="wide">
@@ -98,8 +102,8 @@ export default async function TimelinePage(props: TimelinePageProps) {
         ]}
         title="Amendment timeline"
         actions={
-          latest ? (
-            <a className="btn" href={`/countries/${country.isoCode}/versions/${latest.id}`}>
+          tipId ? (
+            <a className="btn" href={`/countries/${country.isoCode}/versions/${tipId}`}>
               Read latest
             </a>
           ) : (
@@ -109,16 +113,24 @@ export default async function TimelinePage(props: TimelinePageProps) {
           )
         }
       />
-      {amendments.length === 0 ? <p>No recorded amendments for published versions.</p> : null}
+      {amendments.length === 0 ? (
+        <p>No amending laws are recorded for this constitution.</p>
+      ) : null}
       <ol className="timeline">
         {amendments.map((amendment) => {
-          const source = versionsById.get(amendment.sourceVersionId);
-          const target = versionsById.get(amendment.targetVersionId);
+          const isErrata = amendment.kind === 'official_errata';
+          const source = amendment.sourceVersionId
+            ? versionsById.get(amendment.sourceVersionId)
+            : undefined;
+          const target = amendment.targetVersionId
+            ? versionsById.get(amendment.targetVersionId)
+            : undefined;
           return (
             <li key={amendment.id} className="timeline-item">
               <FormattedDate className="timeline-date" value={amendment.enactedOn} fallback="Date unknown" />
               <article className="card">
-                <h2 className="card-title">{amendment.title}</h2>
+                {isErrata ? <Badge tone="info">Official errata</Badge> : null}
+                <h2 className="card-title">{isErrata ? `Errata: ${amendment.title}` : amendment.title}</h2>
                 <p className="muted">
                   {target ? `Version ${target.versionLabel}` : 'Version'}
                   {amendment.sourceReference ? ` · ${amendment.sourceReference}` : ''}
@@ -132,20 +144,22 @@ export default async function TimelinePage(props: TimelinePageProps) {
                     </Badge>
                   ))}
                 </div>
-                <div className="card-actions">
-                  <a
-                    className="btn btn-sm"
-                    href={`/countries/${country.isoCode}/compare?from=${encodeURIComponent(amendment.sourceVersionId)}&to=${encodeURIComponent(amendment.targetVersionId)}`}
-                  >
-                    Compare with previous
-                    {source && target ? ` (${source.versionLabel} → ${target.versionLabel})` : ''}
-                  </a>
-                  {target ? (
-                    <a className="btn btn-sm btn-ghost" href={`/countries/${country.isoCode}/versions/${target.id}`}>
-                      Read
+                {amendment.sourceVersionId && amendment.targetVersionId ? (
+                  <div className="card-actions">
+                    <a
+                      className="btn btn-sm"
+                      href={`/countries/${country.isoCode}/compare?from=${encodeURIComponent(amendment.sourceVersionId)}&to=${encodeURIComponent(amendment.targetVersionId)}`}
+                    >
+                      Compare with previous
+                      {source && target ? ` (${source.versionLabel} → ${target.versionLabel})` : ''}
                     </a>
-                  ) : null}
-                </div>
+                    {target ? (
+                      <a className="btn btn-sm btn-ghost" href={`/countries/${country.isoCode}/versions/${target.id}`}>
+                        Read
+                      </a>
+                    ) : null}
+                  </div>
+                ) : null}
               </article>
             </li>
           );

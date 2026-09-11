@@ -4,9 +4,11 @@ import { PageMain } from '../../components/PageMain';
 import { ServiceUnavailable } from '../../components/StatusMessage';
 import { Badge, Chip, PageHeader } from '../../components/ui';
 import { ApiUnavailableError, getCountry, type CountryDetail } from '../../../lib/api';
+import { canVisitEditor } from '../../../lib/nav';
+import { currentUser } from '../../../lib/session';
 import { orderVersions } from '../../../lib/compare';
 import { atlasTitle, metaDescription, pageMetadata } from '../../../lib/page-meta';
-import { latestVersion, previousVersion } from '../../../lib/reading';
+import { chainTipId, publicVersions } from '../../../lib/reading';
 import { CompareForm } from './CompareForm';
 
 type CountryPageProps = {
@@ -55,7 +57,13 @@ export default async function CountryPage(props: CountryPageProps) {
     notFound();
   }
 
-  const versionTotal = country.constitutions.reduce((sum, item) => sum + item.versions.length, 0);
+  const user = await currentUser();
+  const showEditorialLinks = user ? canVisitEditor(user.roles) : false;
+
+  const versionTotal = country.constitutions.reduce(
+    (sum, item) => sum + publicVersions(item.versions).length,
+    0,
+  );
 
   return (
     <PageMain className="wide">
@@ -83,9 +91,11 @@ export default async function CountryPage(props: CountryPageProps) {
         }
       />
       {country.constitutions.map((constitution) => {
-        const versions = orderVersions(constitution.versions);
-        const latest = latestVersion(versions);
-        const previous = previousVersion(versions);
+        const publicLine = orderVersions(publicVersions(constitution.versions));
+        const tipId = chainTipId(constitution);
+        const tipVersion = constitution.versions.find((version) => version.id === tipId);
+        const newestPublic = publicLine[publicLine.length - 1];
+        const previousPublic = publicLine.length >= 2 ? publicLine[publicLine.length - 2] : undefined;
         return (
           <section key={constitution.id} className="card">
             <h2 className="card-title">{constitution.title}</h2>
@@ -96,14 +106,13 @@ export default async function CountryPage(props: CountryPageProps) {
               </p>
             ) : null}
             <div className="chip-row">
-              {versions.map((version) => (
+              {publicLine.map((version) => (
                 <Chip
                   key={version.id}
                   href={`/countries/${country.isoCode}/versions/${version.id}`}
-                  active={version.id === latest?.id}
+                  active={version.id === newestPublic?.id}
                 >
                   {version.versionLabel}
-                  {version.latestPublished ? ' · latest' : ''}
                 </Chip>
               ))}
             </div>
@@ -111,18 +120,31 @@ export default async function CountryPage(props: CountryPageProps) {
               <a className="btn btn-sm" href={`/countries/${country.isoCode}/timeline`}>
                 Timeline
               </a>
-              {latest && previous ? (
+              {showEditorialLinks ? (
                 <a
                   className="btn btn-sm btn-ghost"
-                  href={`/countries/${country.isoCode}/compare?from=${previous.id}&to=${latest.id}`}
+                  href={`/editor/history?constitutionId=${encodeURIComponent(constitution.id)}`}
+                >
+                  Version history
+                </a>
+              ) : null}
+              {tipId ? (
+                <a className="btn btn-sm btn-ghost" href={`/countries/${country.isoCode}/versions/${tipId}`}>
+                  Read latest
+                </a>
+              ) : null}
+              {previousPublic && newestPublic ? (
+                <a
+                  className="btn btn-sm btn-ghost"
+                  href={`/countries/${country.isoCode}/compare?from=${previousPublic.id}&to=${newestPublic.id}`}
                 >
                   Compare
                 </a>
               ) : null}
             </div>
-            {latest ? <Badge tone="accent">Latest: {latest.versionLabel}</Badge> : null}
+            {tipVersion ? <Badge tone="accent">Latest: {tipVersion.versionLabel}</Badge> : null}
             <h3>Compare versions</h3>
-            <CompareForm code={country.isoCode} versions={versions} variant="inline" />
+            <CompareForm code={country.isoCode} versions={publicLine} variant="inline" />
           </section>
         );
       })}

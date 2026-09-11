@@ -26,3 +26,9 @@ export async function signInEditor(page: Page): Promise<void> {
 export async function signInAdmin(page: Page): Promise<void> {
   await signIn(page, ADMIN_EMAIL);
 }
+
+export async function signOut(page: Page): Promise<void> {
+  await page.getByRole('button', { name: 'Account menu' }).click();
+  await page.getByRole('button', { name: 'Sign out' }).click();
+  await expect(page.getByRole('link', { name: 'Log in' })).toBeVisible();
+}

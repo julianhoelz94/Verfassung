@@ -25,14 +25,21 @@ class CatalogRepository(private val jdbc: JdbcTemplate) {
               c.name,
               latest.version_label AS latest_version_label,
               latest.effective_date AS latest_effective_date,
+              latest.id AS latest_version_id,
               COALESCE(counts.version_count, 0) AS version_count
             FROM countries c
             LEFT JOIN LATERAL (
-              SELECT cv.version_label, cv.effective_date
+              SELECT cv.id, cv.version_label, cv.effective_date
               FROM constitutions cons
               JOIN constitution_versions cv ON cv.constitution_id = cons.id
               WHERE cons.country_id = c.id
                 AND cv.publication_status = 'published'
+                AND NOT EXISTS (
+                  SELECT 1
+                  FROM constitution_versions successor
+                  WHERE successor.predecessor_version_id = cv.id
+                    AND successor.publication_status = 'published'
+                )
               ORDER BY cv.effective_date DESC NULLS LAST, cv.version_label DESC
               LIMIT 1
             ) latest ON TRUE
@@ -41,6 +48,7 @@ class CatalogRepository(private val jdbc: JdbcTemplate) {
               FROM constitutions cons
               JOIN constitution_versions cv ON cv.constitution_id = cons.id
               WHERE cv.publication_status = 'published'
+                AND cv.listing = 'public'
               GROUP BY cons.country_id
             ) counts ON counts.country_id = c.id
             ORDER BY c.name
@@ -75,18 +83,49 @@ class CatalogRepository(private val jdbc: JdbcTemplate) {
             },
             country.id,
         ).map { (id, slug, title) ->
-            ConstitutionSummary(id, slug, title, listPublishedVersions(id), findOutline(id))
+            ConstitutionSummary(
+                id,
+                slug,
+                title,
+                findChainTipId(id),
+                listPublishedPublicVersions(id),
+                findOutline(id),
+            )
         }
 
         return CountryDetail(country.id, country.isoCode, country.name, constitutions)
     }
 
-    fun listPublishedVersions(constitutionId: UUID): List<VersionSummary> {
+    fun listPublishedPublicVersions(constitutionId: UUID): List<VersionSummary> {
+        val tipId = findChainTipId(constitutionId)
         val versions =
             jdbc.query(
                 """
                 SELECT id, version_label, effective_date, language_code, source_url, gazette_reference,
-                       provenance, verification_state, verified_by, verified_at
+                       provenance, verification_state, verified_by, verified_at,
+                       predecessor_version_id, hop_kind, listing
+                FROM constitution_versions
+                WHERE constitution_id = ?
+                  AND publication_status = 'published'
+                  AND listing = 'public'
+                ORDER BY effective_date NULLS LAST, version_label
+                """.trimIndent(),
+                versionMapper,
+                constitutionId,
+            )
+        return versions.map { version ->
+            version.copy(latestPublished = tipId != null && version.id == tipId)
+        }
+    }
+
+    fun listAllPublishedVersions(constitutionId: UUID): List<VersionSummary> {
+        val tipId = findChainTipId(constitutionId)
+        val versions =
+            jdbc.query(
+                """
+                SELECT id, version_label, effective_date, language_code, source_url, gazette_reference,
+                       provenance, verification_state, verified_by, verified_at,
+                       predecessor_version_id, hop_kind, listing
                 FROM constitution_versions
                 WHERE constitution_id = ?
                   AND publication_status = 'published'
@@ -95,14 +134,44 @@ class CatalogRepository(private val jdbc: JdbcTemplate) {
                 versionMapper,
                 constitutionId,
             )
-        val latestId =
-            versions.maxWithOrNull(
-                compareBy<VersionSummary> { it.effectiveDate }.thenBy { it.versionLabel },
-            )?.id
         return versions.map { version ->
-            if (version.id == latestId) version.copy(latestPublished = true) else version
+            version.copy(latestPublished = tipId != null && version.id == tipId)
         }
     }
+
+    fun findChainTipId(constitutionId: UUID): UUID? =
+        jdbc.query(
+            """
+            SELECT cv.id
+            FROM constitution_versions cv
+            WHERE cv.constitution_id = ?
+              AND cv.publication_status = 'published'
+              AND NOT EXISTS (
+                SELECT 1
+                FROM constitution_versions successor
+                WHERE successor.predecessor_version_id = cv.id
+                  AND successor.publication_status = 'published'
+              )
+            ORDER BY cv.effective_date DESC NULLS LAST, cv.version_label DESC
+            LIMIT 1
+            """.trimIndent(),
+            { rs, _ -> rs.getObject("id", UUID::class.java) },
+            constitutionId,
+        ).firstOrNull()
+
+    fun findVersionConstitutionId(versionId: UUID): UUID? =
+        jdbc.query(
+            "SELECT constitution_id FROM constitution_versions WHERE id = ?",
+            { rs, _ -> rs.getObject("constitution_id", UUID::class.java) },
+            versionId,
+        ).firstOrNull()
+
+    fun findSuccessorOf(predecessorVersionId: UUID): UUID? =
+        jdbc.query(
+            "SELECT id FROM constitution_versions WHERE predecessor_version_id = ? LIMIT 1",
+            { rs, _ -> rs.getObject("id", UUID::class.java) },
+            predecessorVersionId,
+        ).firstOrNull()
 
     fun constitutionExists(constitutionId: UUID): Boolean {
         val count = jdbc.queryForObject(
@@ -264,14 +333,18 @@ class CatalogRepository(private val jdbc: JdbcTemplate) {
         languageCode: String,
         sourceUrl: String?,
         gazetteReference: String?,
+        predecessorVersionId: UUID?,
+        hopKind: String,
+        listing: String,
     ): UUID {
         val id = UUID.randomUUID()
         jdbc.update(
             """
             INSERT INTO constitution_versions (
               id, constitution_id, version_label, effective_date, publication_status,
-              language_code, source_url, gazette_reference, provenance, verification_state
-            ) VALUES (?, ?, ?, ?, 'draft', ?, ?, ?, 'imported', 'unverified')
+              language_code, source_url, gazette_reference, provenance, verification_state,
+              predecessor_version_id, hop_kind, listing
+            ) VALUES (?, ?, ?, ?, 'draft', ?, ?, ?, 'imported', 'unverified', ?, ?, ?)
             """.trimIndent(),
             id,
             constitutionId,
@@ -280,6 +353,9 @@ class CatalogRepository(private val jdbc: JdbcTemplate) {
             languageCode,
             sourceUrl,
             gazetteReference,
+            predecessorVersionId,
+            hopKind,
+            listing,
         )
         if (!sourceUrl.isNullOrBlank() || !gazetteReference.isNullOrBlank()) {
             jdbc.update(
@@ -305,26 +381,26 @@ class CatalogRepository(private val jdbc: JdbcTemplate) {
 
     fun findVersionCreated(versionId: UUID): VersionCreated? =
         findVersion(versionId)?.let {
-            VersionCreated(it.id, it.constitutionId, it.versionLabel, it.publicationStatus)
+            VersionCreated(
+                it.id,
+                it.constitutionId,
+                it.versionLabel,
+                it.publicationStatus,
+                it.predecessorVersionId,
+                it.hopKind,
+                it.listing,
+            )
         }
 
     fun findVersion(versionId: UUID): VersionDetail? =
         jdbc.query(
             """
-            SELECT id, constitution_id, version_label, publication_status, effective_date, language_code
+            SELECT id, constitution_id, version_label, publication_status, effective_date, language_code,
+                   predecessor_version_id, hop_kind, listing
             FROM constitution_versions
             WHERE id = ?
             """.trimIndent(),
-            { rs, _ ->
-                VersionDetail(
-                    id = rs.getObject("id", UUID::class.java),
-                    constitutionId = rs.getObject("constitution_id", UUID::class.java),
-                    versionLabel = rs.getString("version_label"),
-                    publicationStatus = rs.getString("publication_status"),
-                    effectiveDate = rs.getDate("effective_date")?.toLocalDate(),
-                    languageCode = rs.getString("language_code"),
-                )
-            },
+            versionDetailMapper,
             versionId,
         ).firstOrNull()
 
@@ -343,6 +419,7 @@ class CatalogRepository(private val jdbc: JdbcTemplate) {
             name = rs.getString("name"),
             latestVersionLabel = rs.getString("latest_version_label"),
             latestEffectiveDate = rs.getDate("latest_effective_date")?.toLocalDate(),
+            latestVersionId = rs.getObject("latest_version_id", UUID::class.java),
             versionCount = rs.getInt("version_count"),
         )
     }
@@ -359,6 +436,23 @@ class CatalogRepository(private val jdbc: JdbcTemplate) {
             verificationState = rs.getString("verification_state"),
             verifiedBy = rs.getString("verified_by"),
             verifiedAt = rs.getTimestamp("verified_at")?.toInstant()?.atOffset(java.time.ZoneOffset.UTC),
+            predecessorVersionId = rs.getObject("predecessor_version_id", UUID::class.java),
+            hopKind = rs.getString("hop_kind"),
+            listing = rs.getString("listing"),
+        )
+    }
+
+    private val versionDetailMapper = RowMapper { rs, _ ->
+        VersionDetail(
+            id = rs.getObject("id", UUID::class.java),
+            constitutionId = rs.getObject("constitution_id", UUID::class.java),
+            versionLabel = rs.getString("version_label"),
+            publicationStatus = rs.getString("publication_status"),
+            effectiveDate = rs.getDate("effective_date")?.toLocalDate(),
+            languageCode = rs.getString("language_code"),
+            predecessorVersionId = rs.getObject("predecessor_version_id", UUID::class.java),
+            hopKind = rs.getString("hop_kind"),
+            listing = rs.getString("listing"),
         )
     }
 }

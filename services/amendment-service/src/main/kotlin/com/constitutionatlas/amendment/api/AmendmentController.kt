@@ -14,6 +14,8 @@ import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
 import java.util.UUID
 
+// Callers: HTTP via Caddy /api/amendment. Unique REST controller for amendment-service.
+// API: GET ?reviewStatus=needs_review; POST .../refresh-review-status. User: "Work on Sprint 36"
 @RestController
 class AmendmentController(
     private val amendmentService: AmendmentService,
@@ -23,13 +25,27 @@ class AmendmentController(
     fun listForConstitution(
         @PathVariable constitutionId: UUID,
         @RequestParam(required = false) status: String?,
+        @RequestParam(required = false) reviewStatus: String?,
         @RequestHeader(value = "Authorization", required = false) authorization: String?,
     ): List<AmendmentDto> {
-        val filter = status?.trim()?.ifBlank { null }
-        if (filter == null || filter == "published") {
+        val statusFilter = status?.trim()?.ifBlank { null }
+        val reviewFilter = reviewStatus?.trim()?.ifBlank { null }
+        if (reviewFilter != null) {
+            if (reviewFilter != "ok" && reviewFilter != "needs_review") {
+                throw IllegalArgumentException("reviewStatus must be ok or needs_review")
+            }
+            val staffStatus = when (statusFilter) {
+                null, "all" -> null
+                "published" -> "published"
+                else -> throw IllegalArgumentException("status must be published or all")
+            }
+            writeAccess.requireStaffAmendment(authorization)
+            return amendmentService.listStaffForConstitution(constitutionId, staffStatus, reviewFilter)
+        }
+        if (statusFilter == null || statusFilter == "published") {
             return amendmentService.listForConstitution(constitutionId)
         }
-        if (filter != "all") {
+        if (statusFilter != "all") {
             throw IllegalArgumentException("status must be published or all")
         }
         writeAccess.requireStaffAmendment(authorization)
@@ -77,6 +93,16 @@ class AmendmentController(
     ): AmendmentDto {
         val actor = writeAccess.requireAmendmentDraftWriter(authorization)
         return amendmentService.createAmendment(constitutionId, request, actor)
+    }
+
+    @PostMapping("/constitutions/{constitutionId}/amendments/refresh-review-status")
+    fun refreshReviewStatus(
+        @PathVariable constitutionId: UUID,
+        @RequestHeader(value = "Authorization", required = false) authorization: String?,
+        @RequestBody request: RefreshReviewStatusRequest,
+    ): RefreshReviewStatusResponse {
+        writeAccess.requireAmendmentReviewRefresh(authorization)
+        return amendmentService.refreshReviewStatus(constitutionId, request.legalVersionId)
     }
 
     @PostMapping("/amendments/{id}/revisions")

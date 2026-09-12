@@ -5,6 +5,10 @@ import java.time.Instant
 import java.time.LocalDate
 import java.util.UUID
 
+// Callers: AmendmentController, AmendmentService, AmendmentRepository, AmendmentApiTest.
+// Unique DTO set for amendment-service. Public JSON drops kind; adds comment, documents, reviewStatus.
+// User instruction: "Work on Sprint 36"
+
 data class AmendmentChangeDto(
     val id: UUID,
     val articleId: UUID?,
@@ -21,22 +25,33 @@ data class AmendmentChangeDto(
     val amendingLawCitation: String? = null,
 )
 
+data class AmendmentDocumentDto(
+    val url: String? = null,
+    val fileId: String? = null,
+    val label: String? = null,
+)
+
 data class AmendmentDto(
     val id: UUID,
     val constitutionId: UUID,
-    val kind: String,
     val status: String,
     @get:JsonInclude(JsonInclude.Include.NON_NULL)
     val transitionId: UUID? = null,
     val title: String,
-    val summary: String,
+    val comment: String,
+    val documents: List<AmendmentDocumentDto> = emptyList(),
     val enactedOn: LocalDate?,
     val effectiveOn: LocalDate?,
-    val sourceReference: String?,
     val sourceVersionId: UUID?,
     val targetVersionId: UUID?,
     val publishedRevisionId: UUID? = null,
     val changes: List<AmendmentChangeDto>,
+    @get:JsonInclude(JsonInclude.Include.NON_NULL)
+    val reviewStatus: String? = null,
+    @get:JsonInclude(JsonInclude.Include.NON_NULL)
+    val reviewedSourceTipId: UUID? = null,
+    @get:JsonInclude(JsonInclude.Include.NON_NULL)
+    val reviewedTargetTipId: UUID? = null,
 )
 
 data class AmendmentChangeWriteRequest(
@@ -54,10 +69,10 @@ data class AmendmentChangeWriteRequest(
 data class AmendmentWriteRequest(
     val kind: String? = null,
     val title: String,
-    val summary: String? = null,
+    val comment: String? = null,
+    val documents: List<AmendmentDocumentDto> = emptyList(),
     val enactedOn: LocalDate? = null,
     val effectiveOn: LocalDate? = null,
-    val sourceReference: String? = null,
     val sourceVersionId: UUID? = null,
     val targetVersionId: UUID? = null,
     val changes: List<AmendmentChangeWriteRequest> = emptyList(),
@@ -91,13 +106,15 @@ data class AmendmentRevisionDto(
     val createdBy: UUID?,
     val createdAt: Instant,
     val title: String,
-    val summary: String,
+    val comment: String,
+    val documents: List<AmendmentDocumentDto> = emptyList(),
     val enactedOn: LocalDate?,
     val effectiveOn: LocalDate?,
-    val sourceReference: String?,
     val sourceVersionId: UUID?,
     val targetVersionId: UUID?,
     val changes: List<AmendmentChangeDto>,
+    val reviewedSourceTipId: UUID? = null,
+    val reviewedTargetTipId: UUID? = null,
 )
 
 data class TransitionRequest(
@@ -107,4 +124,12 @@ data class TransitionRequest(
     val effectiveOn: LocalDate? = null,
     val amendingLawTitle: String? = null,
     val amendingLawCitation: String? = null,
+)
+
+data class RefreshReviewStatusRequest(
+    val legalVersionId: UUID,
+)
+
+data class RefreshReviewStatusResponse(
+    val flaggedAmendmentIds: List<UUID>,
 )

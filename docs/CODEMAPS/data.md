@@ -29,7 +29,7 @@ Seed: `V3__seed_germany_articles.sql`, `V5__seed_article1_tree.sql`.
 
 ## amendment_db
 
-`version_transitions` (source→target UUIDs, `constitution_id`), `amendments` (`constitution_id`, `kind` until AMD-11, `status`, nullable `version_transition_id`, `published_revision_id`), `amendment_revisions` (linear chain), `amendment_changes` (hang off `revision_id`; V6 amending-law text). Seed: `V3__seed_basic_law_transition.sql`. Latest: V7. **ADR 0005 / AMD-11** (next Flyway, do not edit V7): drop `kind`; revision `comment` + `documents` JSONB; published pins; `review_status`.
+`version_transitions` (source→target UUIDs, `constitution_id`), `amendments` (`constitution_id`, `status`, `review_status` `ok`/`needs_review`, nullable `version_transition_id`, `published_revision_id`; `kind` dropped in V8), `amendment_revisions` (linear chain; `comment`, `documents` JSONB, published pins `reviewed_source_tip_id`/`reviewed_target_tip_id`, `is_published_tip`), `amendment_changes` (hang off `revision_id`; V6 amending-law text). Seed: `V3__seed_basic_law_transition.sql` (V8 migrates summary→comment and `source_reference`→a document URL). Latest: V8.
 
 ## identity_db
 

@@ -21,6 +21,11 @@ fun Actor.canViewStaffAmendments(): Boolean =
 
 fun Actor.canLinkAmendmentTargets(): Boolean = canWriteAmendmentDrafts() || canPublishAmendments()
 
+fun Actor.canRefreshAmendmentReview(): Boolean =
+    canWriteAmendmentDrafts() ||
+        "content:write" in scopes ||
+        "amendment:write" in scopes
+
 @Component
 class WriteAccess(private val identityClient: IdentityClient) {
     fun requireAmendmentWriter(authorization: String?): Actor {
@@ -67,6 +72,14 @@ class WriteAccess(private val identityClient: IdentityClient) {
         val actor = identityClient.authenticate(authorization)
         if (!actor.canLinkAmendmentTargets()) {
             throw ForbiddenException("amendment link-target requires editor, publisher, or admin")
+        }
+        return actor
+    }
+
+    fun requireAmendmentReviewRefresh(authorization: String?): Actor {
+        val actor = identityClient.authenticate(authorization)
+        if (!actor.canRefreshAmendmentReview()) {
+            throw ForbiddenException("refresh-review-status requires editor, admin, or an internal write token")
         }
         return actor
     }

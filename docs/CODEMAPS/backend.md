@@ -36,16 +36,17 @@ Tree in `content_nodes` is the only write model; `articles` is a view of roots. 
 ## amendment — `services/amendment-service`
 
 `AmendmentController` → `AmendmentService` → `AmendmentRepository`  
-Clients: identity (mutating Bearer), content (`includeBody=true` trees). Public reads use the published revision (AMD-7). `POST /transitions` returns 410; write via create/revision/publish/link-target. `POST /amendments/suggest` diffs two content trees and returns change rows without inserting. **ADR 0005 / AMD-11:** change records (no `kind`); `comment` + `documents`; pins + `needs_review`; `POST /constitutions/{id}/amendments/refresh-review-status`.
+Clients: identity (mutating Bearer), content (`includeBody=true` trees), catalog (`GET /versions/{id}` for live editorial tips). Public reads use the published revision (AMD-7). `POST /transitions` returns 410; write via create/revision/publish/link-target. `POST /amendments/suggest` diffs two content trees and returns change rows without inserting. **ADR 0005 / AMD-11:** change records (no `kind`); `comment` + `documents`; pins + `needs_review`; `POST /constitutions/{id}/amendments/refresh-review-status`.
 
 | Method | Path |
 | --- | --- |
-| GET | `/constitutions/{id}/amendments` (published; `?status=all` staff) |
-| GET | `/amendments/{id}` (published; staff see draft/withdrawn tip; `publishedRevisionId`) |
+| GET | `/constitutions/{id}/amendments` (published; `?status=all` staff; `?reviewStatus=needs_review` staff) |
+| GET | `/amendments/{id}` (published; staff see draft/withdrawn tip, `reviewStatus`, pins; `publishedRevisionId`) |
 | GET | `/amendments/{id}/revisions` (editorial staff) |
 | GET | `/versions/{id}/amendments?sourceVersionId` |
 | GET | `/amendments?constitutionId&articleNumber` |
-| POST | `/constitutions/{id}/amendments` (editor/admin draft create) |
+| POST | `/constitutions/{id}/amendments` (editor/admin draft create; no `kind`) |
+| POST | `/constitutions/{id}/amendments/refresh-review-status` (editor/admin or internal; body `legalVersionId`) |
 | POST | `/amendments/{id}/revisions` (editor/admin append) |
 | POST | `/amendments/{id}/publish` (publisher/admin) |
 | POST | `/amendments/{id}/withdraw` (publisher/admin) |

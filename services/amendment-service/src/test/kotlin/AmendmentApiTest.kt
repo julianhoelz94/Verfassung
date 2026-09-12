@@ -1,4 +1,6 @@
 import com.constitutionatlas.amendment.AmendmentServiceApplication
+import com.constitutionatlas.amendment.client.CatalogClient
+import com.constitutionatlas.amendment.client.CatalogVersionRef
 import com.constitutionatlas.amendment.client.ContentClient
 import com.constitutionatlas.amendment.client.ContentTreeArticle
 import com.constitutionatlas.amendment.client.ContentTreeNode
@@ -39,20 +41,31 @@ class AmendmentApiTest {
     @MockBean
     lateinit var contentClient: ContentClient
 
+    @MockBean
+    lateinit var catalogClient: CatalogClient
+
     private val editor =
         Actor(UUID.fromString("01900000-0000-4000-8000-000000000410"), "local-editor@example.local", listOf("editor"))
     private val publisher =
         Actor(UUID.fromString("01900000-0000-4000-8000-000000000412"), "local-publisher@example.local", listOf("publisher"))
     private val viewer =
         Actor(UUID.fromString("01900000-0000-4000-8000-000000000411"), "local-viewer@example.local", listOf("viewer"))
+    private val internal =
+        Actor(
+            UUID.fromString("01900000-0000-4000-8000-000000000413"),
+            "internal@example.local",
+            emptyList(),
+            listOf("amendment:write"),
+        )
 
     @BeforeEach
     fun stubIdentity() {
-        Mockito.reset(identityClient, contentClient)
+        Mockito.reset(identityClient, contentClient, catalogClient)
         Mockito.`when`(identityClient.authenticate(null)).thenThrow(UnauthorizedException("Missing session"))
         Mockito.`when`(identityClient.authenticate(TOKEN)).thenReturn(editor)
         Mockito.`when`(identityClient.authenticate(PUBLISHER_TOKEN)).thenReturn(publisher)
         Mockito.`when`(identityClient.authenticate(VIEWER_TOKEN)).thenReturn(viewer)
+        Mockito.`when`(identityClient.authenticate(INTERNAL_TOKEN)).thenReturn(internal)
     }
 
     @Test
@@ -273,7 +286,7 @@ class AmendmentApiTest {
                 contentType = MediaType.APPLICATION_JSON
                 content = createAmendmentJson("First title")
             }.andExpect { status { isCreated() } }
-            .andReturn()
+                .andReturn()
         val amendmentId = objectMapper.readTree(createResponse.response.contentAsString).get("id").asText()
 
         mockMvc.post("/amendments/$amendmentId/publish") {
@@ -337,7 +350,7 @@ class AmendmentApiTest {
                 contentType = MediaType.APPLICATION_JSON
                 content = createAmendmentJson("To withdraw")
             }.andExpect { status { isCreated() } }
-            .andReturn()
+                .andReturn()
         val amendmentId = objectMapper.readTree(createResponse.response.contentAsString).get("id").asText()
 
         mockMvc.post("/amendments/$amendmentId/publish") {
@@ -378,7 +391,7 @@ class AmendmentApiTest {
                 contentType = MediaType.APPLICATION_JSON
                 content = createAmendmentJson("Role gate")
             }.andExpect { status { isCreated() } }
-            .andReturn()
+                .andReturn()
         val amendmentId = objectMapper.readTree(createResponse.response.contentAsString).get("id").asText()
 
         mockMvc.post("/amendments/$amendmentId/publish") {
@@ -406,7 +419,7 @@ class AmendmentApiTest {
                 contentType = MediaType.APPLICATION_JSON
                 content = createAmendmentJson("Already public")
             }.andExpect { status { isCreated() } }
-            .andReturn()
+                .andReturn()
         val amendmentId = objectMapper.readTree(createResponse.response.contentAsString).get("id").asText()
 
         mockMvc.post("/amendments/$amendmentId/publish") {
@@ -424,6 +437,14 @@ class AmendmentApiTest {
             status { isOk() }
             jsonPath("$.status") { value("published") }
             jsonPath("$.title") { value("Post-1949 Basic Law revisions (seed)") }
+            jsonPath("$.comment") {
+                value(
+                    "Demo change set between the 1949 snapshot and the 2022 snapshot: expanded Article 1, added asylum and EU provisions, and tightened the eternity clause.",
+                )
+            }
+            jsonPath("$.documents[0].url") { value("BGBl. I 2022") }
+            jsonPath("$.kind") { doesNotExist() }
+            jsonPath("$.reviewStatus") { doesNotExist() }
         }
     }
 
@@ -435,7 +456,7 @@ class AmendmentApiTest {
                 contentType = MediaType.APPLICATION_JSON
                 content = createAmendmentJson("Hidden draft")
             }.andExpect { status { isCreated() } }
-            .andReturn()
+                .andReturn()
         val amendmentId = objectMapper.readTree(createResponse.response.contentAsString).get("id").asText()
 
         mockMvc.get("/amendments/$amendmentId").andExpect {
@@ -463,6 +484,7 @@ class AmendmentApiTest {
             status { isOk() }
             jsonPath("$.length()") { value(1) }
             jsonPath("$[0].title") { value("Post-1949 Basic Law revisions (seed)") }
+            jsonPath("$[0].comment") { exists() }
         }
     }
 
@@ -474,7 +496,7 @@ class AmendmentApiTest {
                 contentType = MediaType.APPLICATION_JSON
                 content = createAmendmentJson("Staff draft")
             }.andExpect { status { isCreated() } }
-            .andReturn()
+                .andReturn()
         val amendmentId = objectMapper.readTree(createResponse.response.contentAsString).get("id").asText()
 
         mockMvc.get("/amendments/$amendmentId") {
@@ -511,7 +533,7 @@ class AmendmentApiTest {
                 contentType = MediaType.APPLICATION_JSON
                 content = createAmendmentJson("Linked law")
             }.andExpect { status { isCreated() } }
-            .andReturn()
+                .andReturn()
         val amendmentId = objectMapper.readTree(createResponse.response.contentAsString).get("id").asText()
         val targetVersionId = UUID.fromString("01900000-0000-4000-8000-000000000904")
         val sourceVersionId = UUID.fromString("01900000-0000-4000-8000-000000000903")
@@ -533,10 +555,375 @@ class AmendmentApiTest {
         }
     }
 
+    @Test
+    fun createAmendmentRejectsKind() {
+        mockMvc.post("/constitutions/$CONSTITUTION_ID/amendments") {
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = createAmendmentJson("With kind", includeKind = true)
+        }.andExpect {
+            status { isBadRequest() }
+            jsonPath("$.error") { value("kind is not accepted") }
+        }
+    }
+
+    @Test
+    fun appendRevisionRejectsKind() {
+        val createResponse =
+            mockMvc.post("/constitutions/$CONSTITUTION_ID/amendments") {
+                header("Authorization", TOKEN)
+                contentType = MediaType.APPLICATION_JSON
+                content = createAmendmentJson("Kind on revision")
+            }.andExpect { status { isCreated() } }
+                .andReturn()
+        val amendmentId = objectMapper.readTree(createResponse.response.contentAsString).get("id").asText()
+
+        mockMvc.post("/amendments/$amendmentId/revisions") {
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = createAmendmentJson("Kind on revision", includeKind = true)
+        }.andExpect {
+            status { isBadRequest() }
+            jsonPath("$.error") { value("kind is not accepted") }
+        }
+    }
+
+    @Test
+    fun twoPublishedRecordsCannotShareASourcePin() {
+        val sourceVersionId = UUID.fromString("01900000-0000-4000-8000-000000000940")
+        val firstTarget = UUID.fromString("01900000-0000-4000-8000-000000000941")
+        val secondTarget = UUID.fromString("01900000-0000-4000-8000-000000000942")
+
+        val firstId =
+            objectMapper.readTree(
+                mockMvc.post("/constitutions/$CONSTITUTION_ID/amendments") {
+                    header("Authorization", TOKEN)
+                    contentType = MediaType.APPLICATION_JSON
+                    content =
+                        createAmendmentJson(
+                            "First pin owner",
+                            sourceVersionId = sourceVersionId,
+                            targetVersionId = firstTarget,
+                        )
+                }.andExpect { status { isCreated() } }
+                    .andReturn()
+                    .response
+                    .contentAsString,
+            ).get("id").asText()
+
+        mockMvc.post("/amendments/$firstId/publish") {
+            header("Authorization", PUBLISHER_TOKEN)
+        }.andExpect { status { isOk() } }
+
+        val secondId =
+            objectMapper.readTree(
+                mockMvc.post("/constitutions/$CONSTITUTION_ID/amendments") {
+                    header("Authorization", TOKEN)
+                    contentType = MediaType.APPLICATION_JSON
+                    content =
+                        createAmendmentJson(
+                            "Second pin owner",
+                            sourceVersionId = sourceVersionId,
+                            targetVersionId = secondTarget,
+                        )
+                }.andExpect { status { isCreated() } }
+                    .andReturn()
+                    .response
+                    .contentAsString,
+            ).get("id").asText()
+
+        mockMvc.post("/amendments/$secondId/publish") {
+            header("Authorization", PUBLISHER_TOKEN)
+        }.andExpect {
+            status { isConflict() }
+            jsonPath("$.code") { value("source_pin_taken") }
+        }
+    }
+
+    @Test
+    fun refreshReviewStatusFlagsMismatchWithoutChangingPublicGet() {
+        val legalVersionId = UUID.fromString("01900000-0000-4000-8000-000000000003")
+        val pinnedSource = legalVersionId
+        val liveTip = UUID.fromString("01900000-0000-4000-8000-000000000993")
+        val seedId = "01900000-0000-4000-8000-000000000302"
+
+        Mockito.`when`(catalogClient.getVersion(legalVersionId)).thenReturn(
+            CatalogVersionRef(
+                id = legalVersionId,
+                constitutionId = CONSTITUTION_ID,
+                legalVersionId = legalVersionId,
+                currentVersionId = liveTip,
+            ),
+        )
+        Mockito.`when`(catalogClient.getVersion(pinnedSource)).thenReturn(
+            CatalogVersionRef(
+                id = pinnedSource,
+                constitutionId = CONSTITUTION_ID,
+                legalVersionId = legalVersionId,
+                currentVersionId = liveTip,
+            ),
+        )
+
+        val before =
+            mockMvc.get("/amendments/$seedId")
+                .andExpect { status { isOk() } }
+                .andReturn()
+                .response
+                .contentAsString
+
+        mockMvc.post("/constitutions/$CONSTITUTION_ID/amendments/refresh-review-status") {
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"legalVersionId":"$legalVersionId"}"""
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.flaggedAmendmentIds") { isNotEmpty() }
+        }
+
+        val afterRefresh =
+            mockMvc.get("/amendments/$seedId")
+                .andExpect {
+                    status { isOk() }
+                    jsonPath("$.reviewStatus") { doesNotExist() }
+                }
+                .andReturn()
+                .response
+                .contentAsString
+        check(before == afterRefresh)
+
+        mockMvc.get("/amendments/$seedId") {
+            header("Authorization", TOKEN)
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.reviewStatus") { value("needs_review") }
+            jsonPath("$.title") { value("Post-1949 Basic Law revisions (seed)") }
+        }
+
+        mockMvc.get("/constitutions/$CONSTITUTION_ID/amendments") {
+            header("Authorization", TOKEN)
+            param("reviewStatus", "needs_review")
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$[?(@.id == '$seedId')]") { isNotEmpty() }
+        }
+    }
+
+    @Test
+    fun publicGetUnchangedUntilNewRevisionIsPublished() {
+        val sourceVersionId = UUID.fromString("01900000-0000-4000-8000-000000000950")
+        val targetVersionId = UUID.fromString("01900000-0000-4000-8000-000000000951")
+        val liveTip = UUID.fromString("01900000-0000-4000-8000-000000000952")
+
+        val amendmentId =
+            objectMapper.readTree(
+                mockMvc.post("/constitutions/$CONSTITUTION_ID/amendments") {
+                    header("Authorization", TOKEN)
+                    contentType = MediaType.APPLICATION_JSON
+                    content =
+                        createAmendmentJson(
+                            "Pinned record",
+                            comment = "Original comment",
+                            sourceVersionId = sourceVersionId,
+                            targetVersionId = targetVersionId,
+                        )
+                }.andExpect { status { isCreated() } }
+                    .andReturn()
+                    .response
+                    .contentAsString,
+            ).get("id").asText()
+
+        mockMvc.post("/amendments/$amendmentId/publish") {
+            header("Authorization", PUBLISHER_TOKEN)
+        }.andExpect { status { isOk() } }
+
+        Mockito.`when`(catalogClient.getVersion(sourceVersionId)).thenReturn(
+            CatalogVersionRef(
+                id = sourceVersionId,
+                constitutionId = CONSTITUTION_ID,
+                legalVersionId = sourceVersionId,
+                currentVersionId = liveTip,
+            ),
+        )
+
+        val published =
+            mockMvc.get("/amendments/$amendmentId")
+                .andExpect {
+                    status { isOk() }
+                    jsonPath("$.comment") { value("Original comment") }
+                }
+                .andReturn()
+                .response
+                .contentAsString
+
+        mockMvc.post("/constitutions/$CONSTITUTION_ID/amendments/refresh-review-status") {
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"legalVersionId":"$sourceVersionId"}"""
+        }.andExpect { status { isOk() } }
+
+        val afterRefresh =
+            mockMvc.get("/amendments/$amendmentId")
+                .andExpect { status { isOk() } }
+                .andReturn()
+                .response
+                .contentAsString
+        check(published == afterRefresh)
+
+        mockMvc.post("/amendments/$amendmentId/revisions") {
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content =
+                createAmendmentJson(
+                    "Pinned record revised",
+                    comment = "New comment",
+                    sourceVersionId = sourceVersionId,
+                    targetVersionId = targetVersionId,
+                )
+        }.andExpect { status { isOk() } }
+
+        val afterDraft =
+            mockMvc.get("/amendments/$amendmentId")
+                .andExpect { status { isOk() } }
+                .andReturn()
+                .response
+                .contentAsString
+        check(published == afterDraft)
+
+        mockMvc.post("/amendments/$amendmentId/publish") {
+            header("Authorization", PUBLISHER_TOKEN)
+        }.andExpect { status { isOk() } }
+
+        mockMvc.get("/amendments/$amendmentId").andExpect {
+            status { isOk() }
+            jsonPath("$.title") { value("Pinned record revised") }
+            jsonPath("$.comment") { value("New comment") }
+        }
+    }
+
+    @Test
+    fun refreshReviewStatusAllowsInternalToken() {
+        val legalVersionId = UUID.fromString("01900000-0000-4000-8000-000000000004")
+        Mockito.`when`(catalogClient.getVersion(legalVersionId)).thenReturn(
+            CatalogVersionRef(
+                id = legalVersionId,
+                constitutionId = CONSTITUTION_ID,
+                legalVersionId = legalVersionId,
+                currentVersionId = legalVersionId,
+            ),
+        )
+
+        mockMvc.post("/constitutions/$CONSTITUTION_ID/amendments/refresh-review-status") {
+            header("Authorization", INTERNAL_TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"legalVersionId":"$legalVersionId"}"""
+        }.andExpect { status { isOk() } }
+    }
+
+    @Test
+    fun refreshReviewStatusRejectsViewer() {
+        mockMvc.post("/constitutions/$CONSTITUTION_ID/amendments/refresh-review-status") {
+            header("Authorization", VIEWER_TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"legalVersionId":"01900000-0000-4000-8000-000000000003"}"""
+        }.andExpect { status { isForbidden() } }
+    }
+
+    @Test
+    fun publishWithSamePinsKeepsNeedsReview() {
+        val sourceVersionId = UUID.fromString("01900000-0000-4000-8000-000000000960")
+        val targetVersionId = UUID.fromString("01900000-0000-4000-8000-000000000961")
+        val liveTip = UUID.fromString("01900000-0000-4000-8000-000000000962")
+
+        val amendmentId =
+            objectMapper.readTree(
+                mockMvc.post("/constitutions/$CONSTITUTION_ID/amendments") {
+                    header("Authorization", TOKEN)
+                    contentType = MediaType.APPLICATION_JSON
+                    content =
+                        createAmendmentJson(
+                            "Stale pins",
+                            comment = "Original",
+                            sourceVersionId = sourceVersionId,
+                            targetVersionId = targetVersionId,
+                        )
+                }.andExpect { status { isCreated() } }
+                    .andReturn()
+                    .response
+                    .contentAsString,
+            ).get("id").asText()
+
+        mockMvc.post("/amendments/$amendmentId/publish") {
+            header("Authorization", PUBLISHER_TOKEN)
+        }.andExpect { status { isOk() } }
+
+        Mockito.`when`(catalogClient.getVersion(sourceVersionId)).thenReturn(
+            CatalogVersionRef(
+                id = sourceVersionId,
+                constitutionId = CONSTITUTION_ID,
+                legalVersionId = sourceVersionId,
+                currentVersionId = liveTip,
+            ),
+        )
+
+        mockMvc.post("/constitutions/$CONSTITUTION_ID/amendments/refresh-review-status") {
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"legalVersionId":"$sourceVersionId"}"""
+        }.andExpect { status { isOk() } }
+
+        mockMvc.post("/amendments/$amendmentId/revisions") {
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content =
+                createAmendmentJson(
+                    "Stale pins",
+                    comment = "Comment-only edit",
+                    sourceVersionId = sourceVersionId,
+                    targetVersionId = targetVersionId,
+                )
+        }.andExpect { status { isOk() } }
+
+        mockMvc.post("/amendments/$amendmentId/publish") {
+            header("Authorization", PUBLISHER_TOKEN)
+        }.andExpect { status { isOk() } }
+
+        mockMvc.get("/amendments/$amendmentId") {
+            header("Authorization", TOKEN)
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.comment") { value("Comment-only edit") }
+            jsonPath("$.reviewStatus") { value("needs_review") }
+        }
+
+        mockMvc.post("/amendments/$amendmentId/revisions") {
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content =
+                createAmendmentJson(
+                    "Stale pins",
+                    comment = "Re-pinned",
+                    sourceVersionId = liveTip,
+                    targetVersionId = targetVersionId,
+                )
+        }.andExpect { status { isOk() } }
+
+        mockMvc.post("/amendments/$amendmentId/publish") {
+            header("Authorization", PUBLISHER_TOKEN)
+        }.andExpect { status { isOk() } }
+
+        mockMvc.get("/amendments/$amendmentId") {
+            header("Authorization", TOKEN)
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.reviewStatus") { value("ok") }
+        }
+    }
+
     companion object {
         private const val TOKEN = "Bearer test-token"
         private const val PUBLISHER_TOKEN = "Bearer publisher-token"
         private const val VIEWER_TOKEN = "Bearer viewer-token"
+        private const val INTERNAL_TOKEN = "Bearer internal-token"
         private val CONSTITUTION_ID = UUID.fromString("01900000-0000-4000-8000-000000000002")
         private val SOURCE_ID = UUID.fromString("01900000-0000-4000-8000-000000000901")
         private val TARGET_ID = UUID.fromString("01900000-0000-4000-8000-000000000902")
@@ -644,14 +1031,30 @@ class AmendmentApiTest {
             }
             """.trimIndent()
 
-        private fun createAmendmentJson(title: String): String =
-            """
+        // Callers: AmendmentApiTest write helpers. Unique test fixture. User: "Work on Sprint 36"
+        private fun createAmendmentJson(
+            title: String,
+            comment: String = "Test comment",
+            sourceVersionId: UUID? = null,
+            targetVersionId: UUID? = null,
+            includeKind: Boolean = false,
+        ): String {
+            val kindLine = if (includeKind) """"kind": "legal_amendment",""" else ""
+            val sourceLine =
+                if (sourceVersionId != null) """"sourceVersionId": "$sourceVersionId",""" else ""
+            val targetLine =
+                if (targetVersionId != null) """"targetVersionId": "$targetVersionId",""" else ""
+            return """
             {
-              "kind": "legal_amendment",
+              $kindLine
               "title": "$title",
-              "summary": "Test summary",
+              "comment": "$comment",
+              $sourceLine
+              $targetLine
               "enactedOn": "2025-01-01",
-              "sourceReference": "BGBl. I 2025",
+              "documents": [
+                { "url": "https://example.local/bgbl" }
+              ],
               "changes": [
                 {
                   "articleNumber": "99",
@@ -661,5 +1064,6 @@ class AmendmentApiTest {
               ]
             }
             """.trimIndent()
+        }
     }
 }

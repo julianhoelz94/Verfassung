@@ -30,16 +30,16 @@ class AmendmentRevisionTest {
         val firstRevisionId = UUID.fromString("01900000-0000-4000-8000-000000000332")
         val secondRevisionId = UUID.randomUUID()
 
+        // Callers: AmendmentRevisionTest. Unique revision-chain fixture. User: "Work on Sprint 36"
         amendmentRepository.insertRevision(
             RevisionInsert(
                 id = secondRevisionId,
                 amendmentId = amendmentId,
                 predecessorRevisionId = firstRevisionId,
                 title = "Updated title",
-                summary = "Second revision in chain",
+                comment = "Second revision in chain",
                 enactedOn = LocalDate.parse("2023-07-01"),
                 effectiveOn = null,
-                sourceReference = "BGBl. I 2023",
             ),
         )
 
@@ -66,9 +66,9 @@ class AmendmentRevisionTest {
             """
             INSERT INTO amendments (
               id, constitution_id, version_transition_id, title, summary, enacted_on, source_reference,
-              kind, status
+              status
             )
-            VALUES (?, ?, NULL, ?, ?, ?, ?, 'legal_amendment', 'published')
+            VALUES (?, ?, NULL, ?, ?, ?, ?, 'published')
             """.trimIndent(),
             amendmentId,
             UUID.fromString("01900000-0000-4000-8000-000000000002"),
@@ -83,10 +83,9 @@ class AmendmentRevisionTest {
                 amendmentId = amendmentId,
                 predecessorRevisionId = null,
                 title = "First revision",
-                summary = "Root",
+                comment = "Root",
                 enactedOn = LocalDate.parse("2020-01-01"),
                 effectiveOn = null,
-                sourceReference = null,
             ),
         )
         jdbcTemplate.update(
@@ -102,10 +101,9 @@ class AmendmentRevisionTest {
                 amendmentId = amendmentId,
                 predecessorRevisionId = firstRevisionId,
                 title = "First child",
-                summary = "Linear append",
+                comment = "Linear append",
                 enactedOn = LocalDate.parse("2021-01-01"),
                 effectiveOn = null,
-                sourceReference = null,
             ),
         )
 
@@ -116,10 +114,9 @@ class AmendmentRevisionTest {
                     amendmentId = amendmentId,
                     predecessorRevisionId = firstRevisionId,
                     title = "Branch attempt",
-                    summary = "Should fail uniqueness on predecessor",
+                    comment = "Should fail uniqueness on predecessor",
                     enactedOn = LocalDate.parse("2024-01-01"),
                     effectiveOn = null,
-                    sourceReference = null,
                 ),
             )
         }

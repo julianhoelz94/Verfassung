@@ -2,40 +2,24 @@ package com.constitutionatlas.amendment.repo
 
 import com.constitutionatlas.amendment.api.AmendmentChangeDto
 import com.constitutionatlas.amendment.api.AmendmentChangeWriteRequest
+import com.constitutionatlas.amendment.api.AmendmentDocumentDto
 import com.constitutionatlas.amendment.api.AmendmentDto
 import com.constitutionatlas.amendment.api.AmendmentRevisionDto
+import com.fasterxml.jackson.core.type.TypeReference
+import com.fasterxml.jackson.databind.ObjectMapper
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Repository
-import java.time.Instant
 import java.time.LocalDate
 import java.util.UUID
 
-data class TransitionInsert(
-    val id: UUID,
-    val sourceVersionId: UUID,
-    val targetVersionId: UUID,
-    val constitutionId: UUID?,
-)
-
-data class AmendmentInsert(
-    val id: UUID,
-    val constitutionId: UUID?,
-    val versionTransitionId: UUID,
-    val title: String,
-    val summary: String,
-    val enactedOn: LocalDate?,
-    val effectiveOn: LocalDate?,
-    val sourceReference: String?,
-    val sourceVersionId: UUID,
-    val targetVersionId: UUID,
-)
+// Callers: AmendmentService, AmendmentRevisionTest. Unique JDBC repo for amendment_db.
+// Schema: V8 comment/documents/pins/review_status; no amendments.kind. User: "Work on Sprint 36"
 
 data class DraftAmendmentInsert(
     val id: UUID,
     val constitutionId: UUID,
-    val kind: String,
     val title: String,
-    val summary: String,
+    val comment: String,
 )
 
 data class RevisionInsert(
@@ -43,10 +27,10 @@ data class RevisionInsert(
     val amendmentId: UUID,
     val predecessorRevisionId: UUID?,
     val title: String,
-    val summary: String,
+    val comment: String,
+    val documents: List<AmendmentDocumentDto> = emptyList(),
     val enactedOn: LocalDate?,
     val effectiveOn: LocalDate?,
-    val sourceReference: String?,
     val sourceVersionId: UUID? = null,
     val targetVersionId: UUID? = null,
     val createdBy: UUID? = null,
@@ -66,20 +50,26 @@ data class AmendmentChangeInsert(
     val amendingLawCitation: String?,
 )
 
+data class PublishedPinRow(
+    val amendmentId: UUID,
+    val reviewedSourceTipId: UUID?,
+    val reviewedTargetTipId: UUID?,
+)
+
 private data class AmendmentRow(
     val dto: AmendmentDto,
     val revisionId: UUID,
 )
 
 @Repository
-class AmendmentRepository(private val jdbc: JdbcTemplate) {
+class AmendmentRepository(
+    private val jdbc: JdbcTemplate,
+    private val objectMapper: ObjectMapper,
+) {
     fun listForTargetVersion(targetVersionId: UUID, sourceVersionId: UUID? = null): List<AmendmentDto> {
         val sql = StringBuilder(
             """
-            SELECT a.id, a.constitution_id, a.kind, a.status, a.published_revision_id AS published_revision_id, t.id AS transition_id,
-                   r.title, r.summary, r.enacted_on, r.effective_on, r.source_reference,
-                   COALESCE(r.source_version_id, t.source_version_id) AS source_version_id,
-                   COALESCE(r.target_version_id, t.target_version_id) AS target_version_id,
+            SELECT $AMENDMENT_COLUMNS,
                    a.published_revision_id AS revision_id
             FROM amendments a
             JOIN amendment_revisions r ON r.id = a.published_revision_id
@@ -93,9 +83,9 @@ class AmendmentRepository(private val jdbc: JdbcTemplate) {
         }
         sql.append(" ORDER BY r.enacted_on NULLS LAST, r.created_at")
         val amendments = if (sourceVersionId != null) {
-            jdbc.query(sql.toString(), amendmentRowMapper, targetVersionId, sourceVersionId)
+            jdbc.query(sql.toString(), publicRowMapper, targetVersionId, sourceVersionId)
         } else {
-            jdbc.query(sql.toString(), amendmentRowMapper, targetVersionId)
+            jdbc.query(sql.toString(), publicRowMapper, targetVersionId)
         }
         return amendments.map { it.dto.copy(changes = listChanges(it.revisionId)) }
     }
@@ -104,10 +94,7 @@ class AmendmentRepository(private val jdbc: JdbcTemplate) {
         val amendments =
             jdbc.query(
                 """
-                SELECT a.id, a.constitution_id, a.kind, a.status, a.published_revision_id AS published_revision_id, t.id AS transition_id,
-                       r.title, r.summary, r.enacted_on, r.effective_on, r.source_reference,
-                       COALESCE(r.source_version_id, t.source_version_id) AS source_version_id,
-                       COALESCE(r.target_version_id, t.target_version_id) AS target_version_id,
+                SELECT $AMENDMENT_COLUMNS,
                        a.published_revision_id AS revision_id
                 FROM amendments a
                 JOIN amendment_revisions r ON r.id = a.published_revision_id
@@ -116,35 +103,43 @@ class AmendmentRepository(private val jdbc: JdbcTemplate) {
                   AND a.status = 'published'
                 ORDER BY r.enacted_on NULLS LAST, r.created_at
                 """.trimIndent(),
-                amendmentRowMapper,
+                publicRowMapper,
                 constitutionId,
             )
         return amendments.map { it.dto.copy(changes = listChanges(it.revisionId)) }
     }
 
-    fun listStaffForConstitution(constitutionId: UUID): List<AmendmentDto> {
-        val amendments =
-            jdbc.query(
-                """
-                SELECT a.id, a.constitution_id, a.kind, a.status, a.published_revision_id AS published_revision_id, t.id AS transition_id,
-                       r.title, r.summary, r.enacted_on, r.effective_on, r.source_reference,
-                       COALESCE(r.source_version_id, t.source_version_id) AS source_version_id,
-                       COALESCE(r.target_version_id, t.target_version_id) AS target_version_id,
-                       r.id AS revision_id
-                FROM amendments a
-                JOIN amendment_revisions r ON r.amendment_id = a.id
-                  AND NOT EXISTS (
-                    SELECT 1 FROM amendment_revisions child
-                    WHERE child.predecessor_revision_id = r.id
-                  )
-                LEFT JOIN version_transitions t ON t.id = a.version_transition_id
-                WHERE a.constitution_id = ?
-                  AND a.status IN ('draft', 'published', 'withdrawn')
-                ORDER BY r.enacted_on NULLS LAST, r.created_at
-                """.trimIndent(),
-                amendmentRowMapper,
-                constitutionId,
-            )
+    fun listStaffForConstitution(
+        constitutionId: UUID,
+        status: String? = null,
+        reviewStatus: String? = null,
+    ): List<AmendmentDto> {
+        val sql = StringBuilder(
+            """
+            SELECT $AMENDMENT_COLUMNS,
+                   r.id AS revision_id
+            FROM amendments a
+            JOIN amendment_revisions r ON r.amendment_id = a.id
+              AND NOT EXISTS (
+                SELECT 1 FROM amendment_revisions child
+                WHERE child.predecessor_revision_id = r.id
+              )
+            LEFT JOIN version_transitions t ON t.id = a.version_transition_id
+            WHERE a.constitution_id = ?
+              AND a.status IN ('draft', 'published', 'withdrawn')
+            """.trimIndent(),
+        )
+        val args = mutableListOf<Any>(constitutionId)
+        if (status != null) {
+            sql.append(" AND a.status = ?")
+            args.add(status)
+        }
+        if (reviewStatus != null) {
+            sql.append(" AND a.review_status = ?")
+            args.add(reviewStatus)
+        }
+        sql.append(" ORDER BY r.enacted_on NULLS LAST, r.created_at")
+        val amendments = jdbc.query(sql.toString(), staffRowMapper, *args.toTypedArray())
         return amendments.map { it.dto.copy(changes = listChanges(it.revisionId)) }
     }
 
@@ -152,10 +147,7 @@ class AmendmentRepository(private val jdbc: JdbcTemplate) {
         val row =
             jdbc.query(
                 """
-                SELECT a.id, a.constitution_id, a.kind, a.status, a.published_revision_id AS published_revision_id, t.id AS transition_id,
-                       r.title, r.summary, r.enacted_on, r.effective_on, r.source_reference,
-                       COALESCE(r.source_version_id, t.source_version_id) AS source_version_id,
-                       COALESCE(r.target_version_id, t.target_version_id) AS target_version_id,
+                SELECT $AMENDMENT_COLUMNS,
                        a.published_revision_id AS revision_id
                 FROM amendments a
                 JOIN amendment_revisions r ON r.id = a.published_revision_id
@@ -163,7 +155,7 @@ class AmendmentRepository(private val jdbc: JdbcTemplate) {
                 WHERE a.id = ?
                   AND a.status = 'published'
                 """.trimIndent(),
-                amendmentRowMapper,
+                publicRowMapper,
                 id,
             ).firstOrNull() ?: return null
         return row.dto.copy(changes = listChanges(row.revisionId))
@@ -177,10 +169,7 @@ class AmendmentRepository(private val jdbc: JdbcTemplate) {
         val amendments =
             jdbc.query(
                 """
-                SELECT DISTINCT a.id, a.constitution_id, a.kind, a.status, a.published_revision_id AS published_revision_id, t.id AS transition_id,
-                       r.title, r.summary, r.enacted_on, r.effective_on, r.source_reference,
-                       COALESCE(r.source_version_id, t.source_version_id) AS source_version_id,
-                       COALESCE(r.target_version_id, t.target_version_id) AS target_version_id,
+                SELECT DISTINCT $AMENDMENT_COLUMNS,
                        a.published_revision_id AS revision_id
                 FROM amendments a
                 JOIN amendment_revisions r ON r.id = a.published_revision_id
@@ -190,7 +179,7 @@ class AmendmentRepository(private val jdbc: JdbcTemplate) {
                   AND a.status = 'published'
                   AND lower(c.article_number) = lower(?)
                 """.trimIndent(),
-                amendmentRowMapper,
+                publicRowMapper,
                 constitutionId,
                 number,
             )
@@ -214,8 +203,9 @@ class AmendmentRepository(private val jdbc: JdbcTemplate) {
         val revisions =
             jdbc.query(
                 """
-                SELECT id, predecessor_revision_id, created_by, created_at, title, summary,
-                       enacted_on, effective_on, source_reference, source_version_id, target_version_id
+                SELECT id, predecessor_revision_id, created_by, created_at, title, comment, documents,
+                       enacted_on, effective_on, source_version_id, target_version_id,
+                       reviewed_source_tip_id, reviewed_target_tip_id
                 FROM amendment_revisions
                 WHERE amendment_id = ?
                 ORDER BY created_at ASC
@@ -227,18 +217,50 @@ class AmendmentRepository(private val jdbc: JdbcTemplate) {
                         createdBy = rs.getObject("created_by", UUID::class.java),
                         createdAt = rs.getTimestamp("created_at").toInstant(),
                         title = rs.getString("title"),
-                        summary = rs.getString("summary"),
+                        comment = rs.getString("comment"),
+                        documents = parseDocuments(rs.getString("documents")),
                         enactedOn = rs.getDate("enacted_on")?.toLocalDate(),
                         effectiveOn = rs.getDate("effective_on")?.toLocalDate(),
-                        sourceReference = rs.getString("source_reference"),
                         sourceVersionId = rs.getObject("source_version_id", UUID::class.java),
                         targetVersionId = rs.getObject("target_version_id", UUID::class.java),
                         changes = emptyList(),
+                        reviewedSourceTipId = rs.getObject("reviewed_source_tip_id", UUID::class.java),
+                        reviewedTargetTipId = rs.getObject("reviewed_target_tip_id", UUID::class.java),
                     )
                 },
                 amendmentId,
             )
         return revisions.map { revision -> revision.copy(changes = listChanges(revision.id)) }
+    }
+
+    fun listPublishedPins(constitutionId: UUID): List<PublishedPinRow> =
+        jdbc.query(
+            """
+            SELECT a.id, r.reviewed_source_tip_id, r.reviewed_target_tip_id
+            FROM amendments a
+            JOIN amendment_revisions r ON r.id = a.published_revision_id
+            WHERE a.constitution_id = ?
+              AND a.status = 'published'
+            """.trimIndent(),
+            { rs, _ ->
+                PublishedPinRow(
+                    amendmentId = rs.getObject("id", UUID::class.java),
+                    reviewedSourceTipId = rs.getObject("reviewed_source_tip_id", UUID::class.java),
+                    reviewedTargetTipId = rs.getObject("reviewed_target_tip_id", UUID::class.java),
+                )
+            },
+            constitutionId,
+        )
+
+    fun markNeedsReview(amendmentIds: Collection<UUID>) {
+        if (amendmentIds.isEmpty()) {
+            return
+        }
+        val placeholders = amendmentIds.joinToString(",") { "?" }
+        jdbc.update(
+            "UPDATE amendments SET review_status = 'needs_review' WHERE id IN ($placeholders)",
+            *amendmentIds.toTypedArray(),
+        )
     }
 
     fun amendmentExists(id: UUID): Boolean =
@@ -249,13 +271,6 @@ class AmendmentRepository(private val jdbc: JdbcTemplate) {
                 id,
             ) ?: 0
             ) > 0
-
-    fun getAmendmentKind(id: UUID): String? =
-        jdbc.queryForObject(
-            "SELECT kind FROM amendments WHERE id = ?",
-            String::class.java,
-            id,
-        )
 
     fun getAmendmentStatus(id: UUID): String? =
         jdbc.queryForObject(
@@ -288,131 +303,62 @@ class AmendmentRepository(private val jdbc: JdbcTemplate) {
             amendmentId,
         )
 
-    fun getAmendmentDtoForRevision(amendmentId: UUID, revisionId: UUID): AmendmentDto? {
+    fun getAmendmentDtoForRevision(amendmentId: UUID, revisionId: UUID, includeStaff: Boolean = true): AmendmentDto? {
         val row =
             jdbc.query(
                 """
-                SELECT a.id, a.constitution_id, a.kind, a.status, a.published_revision_id AS published_revision_id, t.id AS transition_id,
-                       r.title, r.summary, r.enacted_on, r.effective_on, r.source_reference,
-                       COALESCE(r.source_version_id, t.source_version_id) AS source_version_id,
-                       COALESCE(r.target_version_id, t.target_version_id) AS target_version_id,
+                SELECT $AMENDMENT_COLUMNS,
                        r.id AS revision_id
                 FROM amendments a
                 JOIN amendment_revisions r ON r.id = ?
                 LEFT JOIN version_transitions t ON t.id = a.version_transition_id
                 WHERE a.id = ?
                 """.trimIndent(),
-                amendmentRowMapper,
+                if (includeStaff) staffRowMapper else publicRowMapper,
                 revisionId,
                 amendmentId,
             ).firstOrNull() ?: return null
         return row.dto.copy(changes = listChanges(revisionId))
     }
 
-    fun transitionExists(sourceVersionId: UUID, targetVersionId: UUID): Boolean =
-        (
-            jdbc.queryForObject(
-                """
-                SELECT COUNT(*) FROM version_transitions
-                WHERE source_version_id = ? AND target_version_id = ?
-                """.trimIndent(),
-                Int::class.java,
-                sourceVersionId,
-                targetVersionId,
-            ) ?: 0
-            ) > 0
-
-    fun insertTransition(row: TransitionInsert) {
-        jdbc.update(
-            """
-            INSERT INTO version_transitions (id, source_version_id, target_version_id, constitution_id)
-            VALUES (?, ?, ?, ?)
-            """.trimIndent(),
-            row.id,
-            row.sourceVersionId,
-            row.targetVersionId,
-            row.constitutionId,
-        )
-    }
-
     fun insertDraftAmendment(row: DraftAmendmentInsert) {
         jdbc.update(
             """
             INSERT INTO amendments (
-              id, constitution_id, version_transition_id, title, summary, kind, status
+              id, constitution_id, version_transition_id, title, summary, status, review_status
             )
-            VALUES (?, ?, NULL, ?, ?, ?, 'draft')
+            VALUES (?, ?, NULL, ?, ?, 'draft', 'ok')
             """.trimIndent(),
             row.id,
             row.constitutionId,
             row.title,
-            row.summary,
-            row.kind,
+            row.comment,
         )
-    }
-
-    fun insertAmendment(row: AmendmentInsert): UUID {
-        val revisionId = UUID.randomUUID()
-        jdbc.update(
-            """
-            INSERT INTO amendments (
-              id, constitution_id, version_transition_id, title, summary, enacted_on, source_reference,
-              kind, status
-            )
-            VALUES (?, ?, ?, ?, ?, ?, ?, 'legal_amendment', 'published')
-            """.trimIndent(),
-            row.id,
-            row.constitutionId,
-            row.versionTransitionId,
-            row.title,
-            row.summary,
-            row.enactedOn,
-            row.sourceReference,
-        )
-        insertRevision(
-            RevisionInsert(
-                id = revisionId,
-                amendmentId = row.id,
-                predecessorRevisionId = null,
-                title = row.title,
-                summary = row.summary,
-                enactedOn = row.enactedOn,
-                effectiveOn = row.effectiveOn,
-                sourceReference = row.sourceReference,
-                sourceVersionId = row.sourceVersionId,
-                targetVersionId = row.targetVersionId,
-            ),
-        )
-        jdbc.update(
-            """
-            UPDATE amendments SET published_revision_id = ? WHERE id = ?
-            """.trimIndent(),
-            revisionId,
-            row.id,
-        )
-        return revisionId
     }
 
     fun insertRevision(row: RevisionInsert) {
         jdbc.update(
             """
             INSERT INTO amendment_revisions (
-              id, amendment_id, predecessor_revision_id, title, summary, enacted_on, effective_on,
-              source_reference, source_version_id, target_version_id, created_by
+              id, amendment_id, predecessor_revision_id, title, comment, documents, enacted_on, effective_on,
+              source_version_id, target_version_id, created_by,
+              reviewed_source_tip_id, reviewed_target_tip_id
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?::jsonb, ?, ?, ?, ?, ?, ?, ?)
             """.trimIndent(),
             row.id,
             row.amendmentId,
             row.predecessorRevisionId,
             row.title,
-            row.summary,
+            row.comment,
+            objectMapper.writeValueAsString(row.documents),
             row.enactedOn,
             row.effectiveOn,
-            row.sourceReference,
             row.sourceVersionId,
             row.targetVersionId,
             row.createdBy,
+            row.sourceVersionId,
+            row.targetVersionId,
         )
     }
 
@@ -460,12 +406,42 @@ class AmendmentRepository(private val jdbc: JdbcTemplate) {
     }
 
     fun publishAmendment(amendmentId: UUID, revisionId: UUID) {
+        val previousPublishedId = getPublishedRevisionId(amendmentId)
+        markRevisionPublished(amendmentId, revisionId)
+        if (previousPublishedId == null) {
+            jdbc.update(
+                """
+                UPDATE amendments
+                SET status = 'published', published_revision_id = ?, review_status = 'ok'
+                WHERE id = ?
+                """.trimIndent(),
+                revisionId,
+                amendmentId,
+            )
+            return
+        }
         jdbc.update(
             """
             UPDATE amendments
-            SET status = 'published', published_revision_id = ?
+            SET status = 'published',
+                published_revision_id = ?,
+                review_status = CASE
+                  WHEN EXISTS (
+                    SELECT 1
+                    FROM amendment_revisions neu
+                    JOIN amendment_revisions old ON old.id = ?
+                    WHERE neu.id = ?
+                      AND (
+                        old.reviewed_source_tip_id IS DISTINCT FROM neu.reviewed_source_tip_id
+                        OR old.reviewed_target_tip_id IS DISTINCT FROM neu.reviewed_target_tip_id
+                      )
+                  ) THEN 'ok'
+                  ELSE review_status
+                END
             WHERE id = ?
             """.trimIndent(),
+            revisionId,
+            previousPublishedId,
             revisionId,
             amendmentId,
         )
@@ -474,33 +450,78 @@ class AmendmentRepository(private val jdbc: JdbcTemplate) {
     fun withdrawAmendment(amendmentId: UUID) {
         jdbc.update(
             """
+            UPDATE amendment_revisions SET is_published_tip = false WHERE amendment_id = ?
+            """.trimIndent(),
+            amendmentId,
+        )
+        jdbc.update(
+            """
             UPDATE amendments SET status = 'withdrawn' WHERE id = ?
             """.trimIndent(),
             amendmentId,
         )
     }
 
-    private val amendmentRowMapper = org.springframework.jdbc.core.RowMapper { rs, _ ->
-        AmendmentRow(
+    private fun markRevisionPublished(amendmentId: UUID, revisionId: UUID) {
+        jdbc.update(
+            """
+            UPDATE amendment_revisions SET is_published_tip = false WHERE amendment_id = ?
+            """.trimIndent(),
+            amendmentId,
+        )
+        jdbc.update(
+            """
+            UPDATE amendment_revisions
+            SET is_published_tip = true,
+                reviewed_source_tip_id = source_version_id,
+                reviewed_target_tip_id = target_version_id
+            WHERE id = ?
+            """.trimIndent(),
+            revisionId,
+        )
+    }
+
+    private val publicRowMapper = org.springframework.jdbc.core.RowMapper { rs, _ ->
+        mapAmendmentRow(rs, includeStaff = false)
+    }
+
+    private val staffRowMapper = org.springframework.jdbc.core.RowMapper { rs, _ ->
+        mapAmendmentRow(rs, includeStaff = true)
+    }
+
+    private fun mapAmendmentRow(rs: java.sql.ResultSet, includeStaff: Boolean): AmendmentRow {
+        val documents = parseDocuments(rs.getString("documents"))
+        return AmendmentRow(
             dto =
             AmendmentDto(
                 id = rs.getObject("id", UUID::class.java),
                 constitutionId = rs.getObject("constitution_id", UUID::class.java),
-                kind = rs.getString("kind"),
                 status = rs.getString("status"),
                 transitionId = rs.getObject("transition_id", UUID::class.java),
                 title = rs.getString("title"),
-                summary = rs.getString("summary"),
+                comment = rs.getString("comment"),
+                documents = documents,
                 enactedOn = rs.getDate("enacted_on")?.toLocalDate(),
                 effectiveOn = rs.getDate("effective_on")?.toLocalDate(),
-                sourceReference = rs.getString("source_reference"),
                 sourceVersionId = rs.getObject("source_version_id", UUID::class.java),
                 targetVersionId = rs.getObject("target_version_id", UUID::class.java),
                 publishedRevisionId = rs.getObject("published_revision_id", UUID::class.java),
                 changes = emptyList(),
+                reviewStatus = if (includeStaff) rs.getString("review_status") else null,
+                reviewedSourceTipId =
+                if (includeStaff) rs.getObject("reviewed_source_tip_id", UUID::class.java) else null,
+                reviewedTargetTipId =
+                if (includeStaff) rs.getObject("reviewed_target_tip_id", UUID::class.java) else null,
             ),
             revisionId = rs.getObject("revision_id", UUID::class.java),
         )
+    }
+
+    private fun parseDocuments(raw: String?): List<AmendmentDocumentDto> {
+        if (raw.isNullOrBlank() || raw == "[]") {
+            return emptyList()
+        }
+        return objectMapper.readValue(raw, DOCUMENT_LIST)
     }
 
     private fun listChanges(revisionId: UUID): List<AmendmentChangeDto> =
@@ -530,4 +551,16 @@ class AmendmentRepository(private val jdbc: JdbcTemplate) {
             },
             revisionId,
         )
+
+    companion object {
+        private val DOCUMENT_LIST = object : TypeReference<List<AmendmentDocumentDto>>() {}
+
+        private const val AMENDMENT_COLUMNS = """
+            a.id, a.constitution_id, a.status, a.review_status, a.published_revision_id AS published_revision_id,
+            t.id AS transition_id, r.title, r.comment, r.documents, r.enacted_on, r.effective_on,
+            COALESCE(r.source_version_id, t.source_version_id) AS source_version_id,
+            COALESCE(r.target_version_id, t.target_version_id) AS target_version_id,
+            r.reviewed_source_tip_id, r.reviewed_target_tip_id
+        """
+    }
 }

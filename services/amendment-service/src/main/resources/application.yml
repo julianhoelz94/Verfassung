@@ -24,3 +24,7 @@ identity:
 content:
   api:
     url: ${CONTENT_API_URL:http://localhost/api/content}
+# Callers: CatalogClientConfig. Unique catalog.api.url for amendment-service. User: "Work on Sprint 36"
+catalog:
+  api:
+    url: ${CATALOG_API_URL:http://localhost/api/catalog}

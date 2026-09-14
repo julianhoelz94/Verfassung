@@ -8,6 +8,9 @@ import com.constitutionatlas.editor.api.EditSessionDto
 import com.constitutionatlas.editor.api.EditSessionStatus
 import com.constitutionatlas.editor.api.EditSessionSummaryDto
 import com.constitutionatlas.editor.api.PublishRequest
+import com.constitutionatlas.editor.api.PublishDetailsRequest
+import com.constitutionatlas.editor.api.ChangeRecordRequest
+import com.constitutionatlas.editor.api.ChangeRecordChange
 import com.constitutionatlas.editor.api.SaveDraftRequest
 import com.constitutionatlas.editor.api.canEdit
 import com.constitutionatlas.editor.api.canPublish
@@ -42,6 +45,7 @@ class EditorService(
     private val contentClient: ContentClient,
     private val catalogClient: CatalogClient,
     private val amendmentClient: AmendmentClient,
+    private val amendmentActions: AmendmentActions,
     private val editorRepository: EditorRepository,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
@@ -58,8 +62,9 @@ class EditorService(
     fun createSession(authorization: String?, request: CreateSessionRequest): EditSessionDto {
         val actor = actor(authorization)
         requireEdit(actor)
-        val existing = editorRepository.findOpenSession(actor.id, request.versionId)
-        val id = existing ?: editorRepository.insertSession(actor.id, request.versionId)
+        val hopKind = normalizeHopKind(request.hopKind)
+        val existing = editorRepository.findOpenSession(actor.id, request.versionId, hopKind)
+        val id = existing ?: editorRepository.insertSession(actor.id, request.versionId, hopKind)
         val session = editorRepository.findSession(id) ?: throw NotFoundException("Session missing after insert")
         if (existing == null) {
             auditClient.record(actor, "session_opened", "edit_session", id, mapOf("versionId" to request.versionId))
@@ -120,6 +125,12 @@ class EditorService(
         requireEdit(actor)
         val session = requireOwned(actor, sessionId)
         requireStatus(session, EditSessionStatus.OPEN)
+        if (session.hopKind == "legal" && editorRepository.changeRecord(session.id) == null) {
+            throw IllegalArgumentException("Save the change record before review")
+        }
+        if (session.hopKind == "editorial_correction" && editorRepository.publishComment(session.id).isNullOrBlank()) {
+            throw IllegalArgumentException("Save the transcription comment before review")
+        }
         editorRepository.updateStatus(session.id, EditSessionStatus.REVIEWING)
         auditClient.record(actor, "review_submitted", "edit_session", session.id)
         return previewDto(session.id)
@@ -140,6 +151,28 @@ class EditorService(
     }
 
     @Transactional
+    fun savePublishDetails(authorization: String?, sessionId: UUID, request: PublishDetailsRequest): DraftPreviewDto {
+        val actor = actor(authorization)
+        requireEdit(actor)
+        val session = requireOwned(actor, sessionId)
+        requireStatus(session, EditSessionStatus.OPEN)
+        when (session.hopKind) {
+            "legal" -> {
+                val record = request.changeRecord ?: throw IllegalArgumentException("changeRecord is required")
+                validateChangeRecord(record)
+                editorRepository.recordChangeRecord(sessionId, record)
+            }
+            "editorial_correction" -> {
+                val comment = request.comment?.trim()?.takeIf { it.isNotEmpty() }
+                    ?: throw IllegalArgumentException("comment is required")
+                editorRepository.recordPublishComment(sessionId, comment)
+            }
+            else -> throw IllegalArgumentException("session has no publish job")
+        }
+        return previewDto(sessionId)
+    }
+
+    @Transactional
     fun publish(authorization: String?, sessionId: UUID, request: PublishRequest): DraftPreviewDto {
         val actor = actor(authorization)
         requirePublish(actor)
@@ -150,64 +183,102 @@ class EditorService(
             throw IllegalArgumentException("No draft article changes to publish")
         }
         val hopKind = normalizeHopKind(request.hopKind)
-        if (hopKind == "editorial_correction" && request.amendmentId != null) {
-            throw IllegalArgumentException("editorial_correction must not include amendmentId")
+        if (session.hopKind != hopKind) {
+            throw IllegalArgumentException("publish hopKind must match the session job")
         }
-        if (hopKind != "editorial_correction" && request.amendmentId == null) {
-            throw IllegalArgumentException("hopKind '$hopKind' requires amendmentId")
+        val comment = request.comment ?: editorRepository.publishComment(session.id)
+        val changeRecord = if (request.amendmentId != null) request.changeRecord else request.changeRecord ?: editorRepository.changeRecord(session.id)
+        if (hopKind == "editorial_correction") {
+            if (request.amendmentId != null || request.changeRecord != null) {
+                throw IllegalArgumentException("editorial_correction must not include a change record")
+            }
+            if (comment.isNullOrBlank()) {
+                throw IllegalArgumentException("editorial_correction requires comment")
+            }
+        } else if ((request.amendmentId == null) == (changeRecord == null)) {
+            throw IllegalArgumentException("legal publish requires one change record payload or amendmentId")
         }
+        changeRecord?.let(::validateChangeRecord)
         val source = catalogClient.getVersion(session.versionId)
         val versions = catalogClient.listVersions(source.constitutionId, "all")
-        if (versions.any { it.predecessorVersionId == session.versionId }) {
-            throw ConflictException("session version is not the chain tip", "not_tip")
+        val legalId = source.legalVersionId ?: source.id
+        if (versions.any { it.editorialPredecessorVersionId == session.versionId } ||
+            (source.currentVersionId != null && source.currentVersionId != session.versionId)
+        ) {
+            throw ConflictException("session version is not this law's editorial tip", "not_editorial_tip")
         }
-        val amendment = if (hopKind != "editorial_correction") {
-            requireAmendmentForHop(request.amendmentId!!, hopKind, source.constitutionId, authorization)
-        } else {
-            null
+        if (hopKind == "legal") {
+            val legalPredecessors = versions.mapNotNull { it.legalPredecessorVersionId }
+                .map { predecessor -> versions.find { it.id == predecessor }?.legalVersionId ?: predecessor }.toSet()
+            val legalTipIds = versions.filter { it.hopKind == "initial" || it.hopKind == "legal" }
+                .map { it.legalVersionId ?: it.id }.toSet() - legalPredecessors
+            if (legalTipIds.isNotEmpty() && legalId !in legalTipIds) {
+                throw ConflictException("session version is not the current legal tip", "not_legal_tip")
+            }
         }
         val sourceTree = contentClient.listArticles(session.versionId)
         if (sourceTree.isEmpty()) {
             throw ConflictException("Source version ${session.versionId} has no articles to copy")
         }
+        val changedArticles = drafts.map { draft ->
+            sourceTree.find { it.id == draft.articleId }
+                ?: throw ConflictException("Article ${draft.articleId} is not on this version")
+        }
+        val amendment = if (hopKind == "legal") {
+            request.amendmentId?.let { requireAmendmentForHop(it, source.constitutionId, session.versionId, authorization) }
+                ?: amendmentClient.createAmendment(
+                    source.constitutionId,
+                    changeRecord!!.copy(changes = changedArticles.map {
+                        ChangeRecordChange(it.id, it.articleNumber)
+                    }),
+                    authorization,
+                )
+        } else {
+            null
+        }
         val successor = createSuccessor(source, hopKind, session.versionId)
         contentClient.replaceArticles(successor.id, sourceTree.map { toWrite(it) })
         val copies = contentClient.listArticles(successor.id).associateBy { it.articleNumber }
-        drafts.forEach { draft ->
-            val sourceArticle = sourceTree.find { it.id == draft.articleId }
-                ?: throw ConflictException("Article ${draft.articleId} is not on this version")
+        drafts.forEachIndexed { index, draft ->
+            val sourceArticle = changedArticles[index]
             val copy = copies[sourceArticle.articleNumber]
                 ?: throw ConflictException("Copied article ${sourceArticle.articleNumber} is missing")
             contentClient.updateArticle(copy.id, draft.title, draft.body)
         }
         val published = catalogClient.publishVersion(successor.id)
         if (amendment != null) {
+            val payload = mapOf(
+                "amendmentId" to amendment.id,
+                "sourceVersionId" to session.versionId,
+                "targetVersionId" to published.id,
+            )
+            val eventId = editorRepository.insertOutboxEvent(session.id, DomainEvents.AMENDMENT_LINK_REQUESTED, payload)
             try {
-                amendmentClient.linkTarget(
-                    amendment.id,
-                    session.versionId,
-                    published.id,
-                    authorization,
-                )
-                amendmentClient.publishAmendment(amendment.id, authorization)
+                amendmentActions.completeLink(amendment.id, session.versionId, published.id, authorization)
+                editorRepository.markOutboxPublished(eventId)
                 editorRepository.insertOutboxEvent(
-                    session.id,
-                    DomainEvents.AMENDMENT_RECORDED,
-                    mapOf(
-                        "amendmentId" to amendment.id,
-                        "sourceVersionId" to session.versionId,
-                        "targetVersionId" to published.id,
-                    ),
-                    publishedAt = Instant.now(),
+                    session.id, DomainEvents.AMENDMENT_RECORDED, payload, publishedAt = Instant.now(),
                 )
             } catch (ex: RuntimeException) {
-                log.warn(
-                    "amendment {} not linked after successor {} was published: {}",
-                    amendment.id,
-                    published.id,
-                    ex.message,
-                )
+                log.warn("change record {} linkage queued for retry: {}", amendment.id, ex.message)
+                editorRepository.markOutboxFailed(eventId, ex.message ?: ex.javaClass.simpleName)
             }
+        } else {
+            val eventId = editorRepository.insertOutboxEvent(
+                session.id,
+                DomainEvents.REVIEW_STATUS_REFRESH_REQUESTED,
+                mapOf("constitutionId" to source.constitutionId, "legalVersionId" to legalId),
+            )
+            try {
+                amendmentActions.refresh(source.constitutionId, legalId, authorization)
+                editorRepository.markOutboxPublished(eventId)
+            } catch (ex: RuntimeException) {
+                log.warn("review status refresh queued for retry: {}", ex.message)
+                editorRepository.markOutboxFailed(eventId, ex.message ?: ex.javaClass.simpleName)
+            }
+        }
+        if (hopKind == "editorial_correction") {
+            editorRepository.recordPublishComment(session.id, comment!!)
         }
         editorRepository.updateStatus(session.id, EditSessionStatus.PUBLISHED)
         editorRepository.insertOutboxEvent(
@@ -305,23 +376,34 @@ class EditorService(
             newVersionId = published?.newVersionId,
             newVersionLabel = published?.versionLabel,
             searchIndexStatus = editorRepository.searchIndexStatus(sessionId),
+            publishComment = editorRepository.publishComment(sessionId),
+            changeRecord = editorRepository.changeRecord(sessionId),
+            amendmentStatus = editorRepository.amendmentActionStatus(sessionId),
         )
     }
 
     private fun normalizeHopKind(raw: String?): String {
         val normalized = raw?.trim()?.lowercase()
         return when (normalized) {
-            "legal_amendment", "official_errata", "editorial_correction" -> normalized
+            "legal", "editorial_correction" -> normalized
             else -> throw IllegalArgumentException(
-                "hopKind must be legal_amendment, official_errata, or editorial_correction",
+                "hopKind must be legal or editorial_correction",
             )
+        }
+    }
+
+    private fun validateChangeRecord(record: ChangeRecordRequest) {
+        if (record.title.isBlank() || record.comment.isBlank() || record.documents.isEmpty() ||
+            record.documents.any { it.url.isNullOrBlank() && it.fileId.isNullOrBlank() }
+        ) {
+            throw IllegalArgumentException("Legal change record requires title, comment, and documents")
         }
     }
 
     private fun requireAmendmentForHop(
         amendmentId: UUID,
-        hopKind: String,
         constitutionId: UUID,
+        sourceVersionId: UUID,
         authorization: String?,
     ): LinkedAmendment {
         val amendment = amendmentClient.getAmendment(amendmentId, authorization)
@@ -332,8 +414,13 @@ class EditorService(
         if (amendment.status !in setOf("draft", "published")) {
             throw IllegalArgumentException("Amendment status must be draft or published")
         }
-        if (amendment.kind != hopKind) {
-            throw IllegalArgumentException("Amendment kind must match hopKind")
+        if (amendment.status != "draft" || amendment.targetVersionId != null ||
+            (amendment.sourceVersionId != null && amendment.sourceVersionId != sourceVersionId)
+        ) {
+            throw IllegalArgumentException("Change record must be an unlinked draft for this source version")
+        }
+        if (amendment.title.isBlank() || amendment.comment.isBlank() || amendment.documents.isEmpty()) {
+            throw IllegalArgumentException("Legal change record requires title, comment, and documents")
         }
         return amendment
     }
@@ -355,7 +442,7 @@ class EditorService(
                     hopKind,
                 )
             } catch (ex: ConflictException) {
-                if (ex.code == "not_tip") {
+                if (ex.code == "not_legal_tip" || ex.code == "not_editorial_tip") {
                     throw ex
                 }
                 continue

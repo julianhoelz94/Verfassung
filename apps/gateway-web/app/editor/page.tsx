@@ -3,10 +3,9 @@ import { ArticleFilterList } from '../components/ArticleFilterList';
 import { ConstitutionText } from '../components/ConstitutionText';
 import { PageMain } from '../components/PageMain';
 import { Alert, Badge, Button, Card, DataList, DataRow, Input, PageHeader, Select, WorkflowSteps } from '../components/ui';
-import { cookies } from 'next/headers';
-import { getArticle, getCountry, listAllArticles, listConstitutionAmendments, listCountries, type ArticleSummary, type CountryDetail, type CountrySummary } from '../../lib/api';
+import { getArticle, getCountry, listAllArticles, listCountries, type ArticleSummary, type CountryDetail, type CountrySummary } from '../../lib/api';
 import { editorErrorMessage, getDraftPreview, listSessions, type EditSessionSummary } from '../../lib/editor-api';
-import { SESSION_COOKIE, currentUser } from '../../lib/session';
+import { currentUser } from '../../lib/session';
 import { ArticleEditor } from './ArticleEditor';
 import { PublishForm } from './PublishForm';
 import { approveAction, loadSessionAction, openEditorAction, reviewAction } from './actions';
@@ -17,9 +16,11 @@ type EditorPageProps = {
     sessionId?: string;
     articleId?: string;
     saved?: string;
+    detailsSaved?: string;
     reviewed?: string;
     approved?: string;
     published?: string;
+    amendmentPending?: string;
     newVersionLabel?: string;
     amendmentTitle?: string;
     newVersionId?: string;
@@ -118,14 +119,16 @@ export default async function EditorPage(props: EditorPageProps) {
   const versions = country?.constitutions.flatMap((constitution) =>
     constitution.versions.map((version) => ({
       ...version,
+      snapshotId: version.currentVersionId ?? version.id,
       constitutionTitle: constitution.title,
     })),
   ) ?? [];
-  const versionId = searchParams.versionId ?? session?.versionId ?? versions[0]?.id;
+  const legalTips = versions.filter((version) => version.latestPublished);
+  const versionId = session?.versionId ?? searchParams.versionId ?? versions[0]?.snapshotId;
   const selectedConstitution = country?.constitutions.find((constitution) =>
-    constitution.versions.some((version) => version.id === versionId),
+    constitution.versions.some((version) => version.id === versionId || version.currentVersionId === versionId),
   );
-  const selectedVersion = selectedConstitution?.versions.find((version) => version.id === versionId);
+  const selectedVersion = selectedConstitution?.versions.find((version) => version.id === versionId || version.currentVersionId === versionId);
   const articles: ArticleSummary[] = versionId ? await listAllArticles(versionId) : [];
   const selectedId = searchParams.articleId ?? articles[0]?.id;
   const selected = selectedId ? await getArticle(selectedId) : null;
@@ -149,6 +152,7 @@ export default async function EditorPage(props: EditorPageProps) {
     <>
       {errorMessage ? <Alert tone="error">{errorMessage}</Alert> : null}
       {searchParams.saved ? <Alert tone="success">Draft saved.</Alert> : null}
+      {searchParams.detailsSaved ? <Alert tone="success">Publish details saved.</Alert> : null}
       {searchParams.reviewed ? <Alert tone="success">Submitted for review.</Alert> : null}
       {searchParams.approved ? <Alert tone="success">Review approved. A publisher can now publish.</Alert> : null}
       {searchParams.published ? (
@@ -158,6 +162,7 @@ export default async function EditorPage(props: EditorPageProps) {
             : 'Published as a new version.'}
         </Alert>
       ) : null}
+      {searchParams.amendmentPending ? <Alert tone="error">The snapshot was published, but the change record or review status is pending retry.</Alert> : null}
     </>
   );
 
@@ -183,16 +188,28 @@ export default async function EditorPage(props: EditorPageProps) {
         <div className="card-grid">
           {canEdit && versions.length > 0 ? (
             <Card>
-              <h2 className="card-title">Open a session</h2>
-              <form action={openEditorAction}>
-                <Select id="versionId" name="versionId" label="Version" defaultValue={versionId}>
-                  {versions.map((version) => (
-                    <option key={version.id} value={version.id}>
+              <h2 className="card-title">Record the next legal change</h2>
+              {legalTips.length > 0 ? <form action={openEditorAction}>
+                <input type="hidden" name="hopKind" value="legal" />
+                <Select id="legalVersionId" name="versionId" label="Current law" defaultValue={legalTips[0].snapshotId}>
+                  {legalTips.map((version) => (
+                    <option key={version.id} value={version.snapshotId}>
                       {version.constitutionTitle} {version.versionLabel}
                     </option>
                   ))}
                 </Select>
-                <Button variant="primary">Open session</Button>
+                <Button variant="primary">Record the next legal change</Button>
+              </form> : null}
+              <form action={openEditorAction}>
+                <input type="hidden" name="hopKind" value="editorial_correction" />
+                <Select id="correctionVersionId" name="versionId" label="Correct this text" defaultValue={versionId}>
+                  {versions.map((version) => (
+                    <option key={version.id} value={version.snapshotId}>
+                      {version.constitutionTitle} {version.versionLabel}
+                    </option>
+                  ))}
+                </Select>
+                <Button>Correct this text</Button>
               </form>
             </Card>
           ) : null}
@@ -222,18 +239,6 @@ export default async function EditorPage(props: EditorPageProps) {
   const title = `${selectedConstitution?.title ?? 'Constitution'} · ${selectedVersion?.versionLabel ?? ''}`.trim();
   const publicHref =
     country && versionId ? `/countries/${country.isoCode}/versions/${encodeURIComponent(versionId)}` : undefined;
-  const sessionToken = (await cookies()).get(SESSION_COOKIE)?.value;
-  const staffAmendments =
-    canPublish && session.status === 'approved' && selectedConstitution && sessionToken
-      ? (
-          (await listConstitutionAmendments(selectedConstitution.id, {
-            status: 'all',
-            authorization: `Bearer ${sessionToken}`,
-          })) ?? []
-        ).filter(
-          (amendment) => amendment.status === 'draft' || amendment.status === 'published',
-        )
-      : [];
   const canSave = Boolean(canEdit && session.status === 'open' && selected && versionId && searchParams.sessionId);
   const hiddenFields = (
     <>
@@ -247,7 +252,7 @@ export default async function EditorPage(props: EditorPageProps) {
     <PageMain className="wide">
       <PageHeader
         breadcrumbs={[{ href: '/editor', label: 'Editor' }, { label: `Session ${session.id.slice(0, 8)}` }]}
-        eyebrow={`Edit session · ${session.status}`}
+        eyebrow={`${session.hopKind === 'legal' ? 'Next legal change' : 'Transcription correction'} · ${session.status}`}
         title={title || 'Editor'}
         meta={<WorkflowSteps status={session.status} />}
         actions={
@@ -324,7 +329,7 @@ export default async function EditorPage(props: EditorPageProps) {
               {canEdit && session.status === 'open' ? (
                 <form action={reviewAction}>
                   {hiddenFields}
-                  <Button>Submit for review</Button>
+                  <Button disabled={session.hopKind === 'legal' ? !preview.changeRecord : session.hopKind === 'editorial_correction' ? !preview.publishComment : false}>Submit for review</Button>
                 </form>
               ) : null}
               {canReview && session.status === 'reviewing' ? (
@@ -332,14 +337,6 @@ export default async function EditorPage(props: EditorPageProps) {
                   {hiddenFields}
                   <Button>Approve review</Button>
                 </form>
-              ) : null}
-              {canPublish && session.status === 'approved' && searchParams.sessionId && versionId && selectedId ? (
-                <PublishForm
-                  sessionId={searchParams.sessionId}
-                  versionId={versionId}
-                  articleId={selectedId}
-                  amendments={staffAmendments}
-                />
               ) : null}
             </div>
           </section>
@@ -383,6 +380,19 @@ export default async function EditorPage(props: EditorPageProps) {
                 </div>
               ) : null}
             </dl>
+            {session.hopKind && searchParams.sessionId && versionId && selectedId ? (
+              <PublishForm
+                sessionId={searchParams.sessionId}
+                versionId={versionId}
+                articleId={selectedId}
+                hopKind={session.hopKind}
+                status={session.status}
+                canEdit={canEdit}
+                canPublish={canPublish}
+                record={preview.changeRecord}
+                comment={preview.publishComment}
+              />
+            ) : null}
             {selected ? (
               <>
                 <p className="panel-title">Preview</p>

@@ -29,6 +29,10 @@ data class CatalogVersion(
     val predecessorVersionId: UUID? = null,
     val hopKind: String = "initial",
     val listing: String = "public",
+    val legalVersionId: UUID? = null,
+    val currentVersionId: UUID? = null,
+    val legalPredecessorVersionId: UUID? = null,
+    val editorialPredecessorVersionId: UUID? = null,
 )
 
 interface CatalogClient {
@@ -100,8 +104,8 @@ class RestCatalogClient(
         } catch (ex: RestClientResponseException) {
             if (ex.statusCode == HttpStatus.CONFLICT) {
                 val code = parseConflictCode(ex.responseBodyAsString)
-                if (code == "not_tip") {
-                    throw ConflictException("Predecessor is not the chain tip", "not_tip")
+                if (code == "not_editorial_tip" || code == "not_legal_tip") {
+                    throw ConflictException("Predecessor is no longer the required tip", code)
                 }
                 throw ConflictException("Version '$versionLabel' already exists")
             }

@@ -10,4 +10,4 @@ Next.js 15 App Router, TypeScript. Public reading experience and later editor ro
 - Reuse the same article renderer for public and preview once the editor exists.
 - After UI changes: `npm run lint` and `npm run build` in this directory only.
 - Journey, axe, and visual tests: `npx playwright install --with-deps chromium && npm run build && npm run test:e2e`. Visual snapshots under `e2e/snapshots/` are Linux Chromium; regenerate them with `mcr.microsoft.com/playwright:v1.51.1-jammy`.
-- When the work completes a backlog ID, set that ID to `Done` in `backlog.md`.
+- When the work completes a tracked issue, update its status in Linear after verification. The root `AGENTS.md` defines progress tracking.

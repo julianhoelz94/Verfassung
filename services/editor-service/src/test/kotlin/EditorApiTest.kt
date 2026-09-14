@@ -314,6 +314,11 @@ class EditorApiTest {
             Mockito.any(UUID::class.java) ?: UUID(0, 0),
             Mockito.anyString(),
         )
+        Mockito.verify(amendmentClient).refreshReviewStatus(
+            eqNonNull(UUID.fromString("01900000-0000-4000-8000-000000000002")),
+            eqNonNull(versionId),
+            eqNonNull(TOKEN),
+        )
     }
 
     @Test
@@ -477,9 +482,11 @@ class EditorApiTest {
                 kind = "legal_amendment",
                 status = "draft",
                 title = "Test amendment",
+                comment = "The legal change",
+                documents = listOf(com.constitutionatlas.editor.client.ChangeRecordDocumentDto(url = "https://example.org/law")),
             ),
         )
-        val sessionId = openSession(versionId)
+        val sessionId = openSession(versionId, "legal")
         saveDraft(sessionId, articleId)
         postCommand(sessionId, "review", "reviewing")
         stub(reviewer)
@@ -488,7 +495,7 @@ class EditorApiTest {
         mockMvc.post("/edit-sessions/$sessionId/publish") {
             header("Authorization", TOKEN)
             contentType = MediaType.APPLICATION_JSON
-            content = """{"hopKind":"legal_amendment","amendmentId":"$amendmentId"}"""
+            content = """{"hopKind":"legal","amendmentId":"$amendmentId"}"""
         }.andExpect {
             status { isOk() }
             jsonPath("$.session.status") { value("published") }
@@ -546,8 +553,33 @@ class EditorApiTest {
     @Test
     fun legalPublishRequiresAmendmentId() {
         val versionId = UUID.randomUUID()
-        val sessionId = openSession(versionId)
+        val sessionId = openSession(versionId, "legal")
         saveDraft(sessionId, UUID.randomUUID())
+        postCommand(sessionId, "review", "reviewing")
+        stub(reviewer)
+        postCommand(sessionId, "approval", "approved")
+        stub(publisher)
+        jdbcTemplate.update("UPDATE edit_sessions SET change_record = NULL WHERE id = ?::uuid", sessionId)
+        mockMvc.post("/edit-sessions/$sessionId/publish") {
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"hopKind":"legal"}"""
+        }.andExpect { status { isBadRequest() } }
+    }
+
+    @Test
+    fun editorialCorrectionOfOldLawSucceedsAfterLaterLegalVersion() {
+        val versionId = UUID.randomUUID()
+        val articleId = UUID.randomUUID()
+        val constitutionId = UUID.fromString("01900000-0000-4000-8000-000000000002")
+        stubSuccessorPublish(versionId, articleId)
+        val source = CatalogVersion(versionId, constitutionId, "1949", "published", hopKind = "initial", legalVersionId = versionId)
+        val later = CatalogVersion(UUID.randomUUID(), constitutionId, "1956", "published", hopKind = "legal", legalPredecessorVersionId = versionId)
+        Mockito.`when`(catalogClient.getVersion(versionId)).thenReturn(source)
+        Mockito.`when`(catalogClient.listVersions(eqNonNull(constitutionId), Mockito.anyString() ?: "all"))
+            .thenReturn(listOf(source, later))
+        val sessionId = openSession(versionId)
+        saveDraft(sessionId, articleId)
         postCommand(sessionId, "review", "reviewing")
         stub(reviewer)
         postCommand(sessionId, "approval", "approved")
@@ -555,8 +587,36 @@ class EditorApiTest {
         mockMvc.post("/edit-sessions/$sessionId/publish") {
             header("Authorization", TOKEN)
             contentType = MediaType.APPLICATION_JSON
-            content = """{"hopKind":"legal_amendment"}"""
-        }.andExpect { status { isBadRequest() } }
+            content = EDITORIAL_PUBLISH_BODY
+        }.andExpect { status { isOk() } }
+        Mockito.verify(amendmentClient).refreshReviewStatus(eqNonNull(constitutionId), eqNonNull(versionId), eqNonNull(TOKEN))
+    }
+
+    @Test
+    fun legalPublishOfOldLawRejectsNonLegalTip() {
+        val versionId = UUID.randomUUID()
+        val articleId = UUID.randomUUID()
+        val constitutionId = UUID.fromString("01900000-0000-4000-8000-000000000002")
+        stubSuccessorPublish(versionId, articleId)
+        val source = CatalogVersion(versionId, constitutionId, "1949", "published", hopKind = "initial", legalVersionId = versionId)
+        val later = CatalogVersion(UUID.randomUUID(), constitutionId, "1956", "published", hopKind = "legal", legalPredecessorVersionId = versionId)
+        Mockito.`when`(catalogClient.getVersion(versionId)).thenReturn(source)
+        Mockito.`when`(catalogClient.listVersions(eqNonNull(constitutionId), Mockito.anyString() ?: "all"))
+            .thenReturn(listOf(source, later))
+        val sessionId = openSession(versionId, "legal")
+        saveDraft(sessionId, articleId)
+        postCommand(sessionId, "review", "reviewing")
+        stub(reviewer)
+        postCommand(sessionId, "approval", "approved")
+        stub(publisher)
+        mockMvc.post("/edit-sessions/$sessionId/publish") {
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"hopKind":"legal","amendmentId":"${UUID.randomUUID()}"}"""
+        }.andExpect {
+            status { isConflict() }
+            jsonPath("$.code") { value("not_legal_tip") }
+        }
     }
 
     @Test
@@ -565,7 +625,7 @@ class EditorApiTest {
         val articleId = UUID.randomUUID()
         val constitutionId = UUID.fromString("01900000-0000-4000-8000-000000000002")
         val source = CatalogVersion(versionId, constitutionId, "2022", "published", LocalDate.parse("2022-12-19"), "en")
-        val successor = CatalogVersion(NEW_VERSION_ID, constitutionId, "2022-1", "published", null, "en", versionId, "editorial_correction", "public")
+        val successor = CatalogVersion(NEW_VERSION_ID, constitutionId, "2022-1", "published", null, "en", versionId, "editorial_correction", "staff", legalVersionId = versionId, editorialPredecessorVersionId = versionId)
         Mockito.`when`(catalogClient.getVersion(versionId)).thenReturn(source)
         Mockito.`when`(catalogClient.listVersions(eqNonNull(constitutionId), Mockito.anyString() ?: "all"))
             .thenReturn(listOf(source, successor))
@@ -584,7 +644,7 @@ class EditorApiTest {
             content = EDITORIAL_PUBLISH_BODY
         }.andExpect {
             status { isConflict() }
-            jsonPath("$.code") { value("not_tip") }
+            jsonPath("$.code") { value("not_editorial_tip") }
         }
         Mockito.verify(catalogClient, Mockito.never()).createDraftVersion(
             eqNonNull(constitutionId),
@@ -612,7 +672,7 @@ class EditorApiTest {
                 title = "Wrong constitution",
             ),
         )
-        val sessionId = openSession(versionId)
+        val sessionId = openSession(versionId, "legal")
         saveDraft(sessionId, articleId)
         postCommand(sessionId, "review", "reviewing")
         stub(reviewer)
@@ -621,7 +681,7 @@ class EditorApiTest {
         mockMvc.post("/edit-sessions/$sessionId/publish") {
             header("Authorization", TOKEN)
             contentType = MediaType.APPLICATION_JSON
-            content = """{"hopKind":"legal_amendment","amendmentId":"$amendmentId"}"""
+            content = """{"hopKind":"legal","amendmentId":"$amendmentId"}"""
         }.andExpect { status { isBadRequest() } }
         Mockito.verify(catalogClient, Mockito.never()).createDraftVersion(
             eqNonNull(constitutionId),
@@ -690,11 +750,11 @@ class EditorApiTest {
         Mockito.`when`(identityClient.authenticate(TOKEN)).thenReturn(actor)
     }
 
-    private fun openSession(versionId: UUID): String {
+    private fun openSession(versionId: UUID, hopKind: String = "editorial_correction"): String {
         val sessionJson = mockMvc.post("/edit-sessions") {
             header("Authorization", TOKEN)
             contentType = MediaType.APPLICATION_JSON
-            content = """{"versionId":"$versionId"}"""
+            content = """{"versionId":"$versionId","hopKind":"$hopKind"}"""
         }.andExpect {
             status { isCreated() }
             jsonPath("$.status") { value("open") }
@@ -728,6 +788,20 @@ class EditorApiTest {
     }
 
     private fun postCommand(sessionId: String, command: String, expectedStatus: String) {
+        if (command == "review") {
+            val hopKind = jdbcTemplate.queryForObject(
+                "SELECT hop_kind FROM edit_sessions WHERE id = ?::uuid", String::class.java, sessionId,
+            )
+            mockMvc.post("/edit-sessions/$sessionId/publish-details") {
+                header("Authorization", TOKEN)
+                contentType = MediaType.APPLICATION_JSON
+                content = if (hopKind == "legal") {
+                    """{"changeRecord":{"title":"A law","comment":"Changed the law","documents":[{"url":"https://example.org/law"}]}}"""
+                } else {
+                    """{"comment":"Correct transcription"}"""
+                }
+            }.andExpect { status { isOk() } }
+        }
         mockMvc.post("/edit-sessions/$sessionId/$command") {
             header("Authorization", TOKEN)
         }.andExpect {
@@ -737,7 +811,7 @@ class EditorApiTest {
     }
 
     companion object {
-        private const val EDITORIAL_PUBLISH_BODY = """{"hopKind":"editorial_correction"}"""
+        private const val EDITORIAL_PUBLISH_BODY = """{"hopKind":"editorial_correction","comment":"Correct transcription"}"""
         private const val TOKEN = "Bearer test-token"
         private val NEW_VERSION_ID = UUID.fromString("01900000-0000-4000-8000-000000000501")
         private fun nestedJson(depth: Int): String = (1..depth).fold("1") { acc, _ -> """{"x":$acc}""" }

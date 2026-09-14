@@ -54,6 +54,13 @@ class EditorController(private val editorService: EditorService) {
         @PathVariable sessionId: UUID,
     ): DraftPreviewDto = editorService.approve(authorization, sessionId)
 
+    @PostMapping("/edit-sessions/{sessionId}/publish-details")
+    fun savePublishDetails(
+        @RequestHeader(value = "Authorization", required = false) authorization: String?,
+        @PathVariable sessionId: UUID,
+        @RequestBody request: PublishDetailsRequest,
+    ): DraftPreviewDto = editorService.savePublishDetails(authorization, sessionId, request)
+
     @PostMapping("/edit-sessions/{sessionId}/publish")
     fun publish(
         @RequestHeader(value = "Authorization", required = false) authorization: String?,

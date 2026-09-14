@@ -39,7 +39,7 @@ Navigation only. Rules stay in `AGENTS.md`. If a path here disagrees with code, 
 | Implement two-axis staff UI (Sprints 37–39) | frontend | [ADR 0005](../adr/0005-two-axis-versions.md), [`docs/design/two-axis-versions.md`](../design/two-axis-versions.md) § Sprint UI reference, then `docs/design/prototype/editor-constitution.html` (`#timeline`, `#legal`, `#correct-1949`, `#hop-1956`, `#hop-2022`) |
 | Version pins | — | `docs/dependencies.md` |
 | UI concept / tokens | frontend | `docs/design/`, `app/globals.css` |
-| Sprint / story status | — | grep `backlog.md` for `CAT-` `CNT-` `UI-` `IDN-` `OPS-` |
+| Sprint / story status | — | Linear is the source of truth; grep `backlog.md` by ID only for historical context |
 
 ## Package layout (every Kotlin service)
 

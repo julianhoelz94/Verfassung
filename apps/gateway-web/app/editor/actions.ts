@@ -7,6 +7,7 @@ import {
   openSession,
   publishSession,
   saveDraft,
+  savePublishDetails,
   submitReview,
 } from '../../lib/editor-api';
 
@@ -46,7 +47,11 @@ async function runCommand(formData: FormData, command: () => Promise<unknown>, s
 export async function openEditorAction(formData: FormData): Promise<void> {
   const versionId = String(formData.get('versionId') ?? '');
   try {
-    const session = await openSession(versionId);
+    const hopKind = String(formData.get('hopKind') ?? '');
+    if (hopKind !== 'legal' && hopKind !== 'editorial_correction') {
+      redirect(`/editor?error=invalid`);
+    }
+    const session = await openSession(versionId, hopKind);
     redirect(`/editor?versionId=${encodeURIComponent(versionId)}&sessionId=${encodeURIComponent(session.id)}`);
   } catch (error) {
     if (error instanceof EditorApiError) {
@@ -85,15 +90,29 @@ export async function reviewAction(formData: FormData): Promise<void> {
   await runCommand(formData, () => submitReview(String(formData.get('sessionId') ?? '')), { reviewed: '1' });
 }
 
+export async function savePublishDetailsAction(formData: FormData): Promise<void> {
+  const hopKind = String(formData.get('hopKind') ?? '');
+  const details = hopKind === 'legal' ? {
+    changeRecord: {
+      title: String(formData.get('recordTitle') ?? '').trim(),
+      comment: String(formData.get('recordComment') ?? '').trim(),
+      documents: [{
+        url: String(formData.get('documentUrl') ?? '').trim(),
+        label: String(formData.get('documentLabel') ?? '').trim() || undefined,
+      }],
+    },
+  } : { comment: String(formData.get('comment') ?? '').trim() };
+  await runCommand(formData, () => savePublishDetails(String(formData.get('sessionId') ?? ''), details), { detailsSaved: '1' });
+}
+
 export async function approveAction(formData: FormData): Promise<void> {
   await runCommand(formData, () => approveReview(String(formData.get('sessionId') ?? '')), { approved: '1' });
 }
 
 export async function publishAction(formData: FormData): Promise<void> {
   try {
-    const hopKind = String(formData.get('hopKind') ?? '');
+    const hopKind = String(formData.get('hopKind') ?? '') as 'legal' | 'editorial_correction';
     const amendmentId = String(formData.get('amendmentId') ?? '').trim();
-    const amendmentTitle = String(formData.get('amendmentTitle') ?? '').trim();
     const preview = await publishSession(String(formData.get('sessionId') ?? ''), {
       hopKind,
       amendmentId: amendmentId || undefined,
@@ -105,11 +124,11 @@ export async function publishAction(formData: FormData): Promise<void> {
     if (preview.newVersionId) {
       extra.newVersionId = preview.newVersionId;
     }
-    if (
-      amendmentTitle &&
-      (hopKind === 'legal_amendment' || hopKind === 'official_errata')
-    ) {
-      extra.amendmentTitle = amendmentTitle;
+    if (hopKind === 'legal' && preview.changeRecord?.title) {
+      extra.amendmentTitle = preview.changeRecord.title;
+    }
+    if (preview.amendmentStatus === 'failed' || preview.amendmentStatus === 'pending') {
+      extra.amendmentPending = '1';
     }
     redirectEditor(formData, extra);
   } catch (error) {

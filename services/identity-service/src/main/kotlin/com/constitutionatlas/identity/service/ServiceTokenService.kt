@@ -104,6 +104,8 @@ class ServiceTokenService(
                 "catalog:write",
                 "catalog:publish",
                 "content:write",
+                "amendment:write",
+                "amendment:publish",
                 "search:reindex",
                 "audit:append",
                 "audit:read",

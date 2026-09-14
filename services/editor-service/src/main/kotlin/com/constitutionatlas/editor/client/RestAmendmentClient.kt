@@ -1,6 +1,7 @@
 package com.constitutionatlas.editor.client
 
 import com.constitutionatlas.editor.DownstreamException
+import com.constitutionatlas.editor.api.ChangeRecordRequest
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
@@ -17,15 +18,24 @@ import java.util.UUID
 data class LinkedAmendment(
     val id: UUID,
     val constitutionId: UUID,
-    val kind: String,
     val status: String,
     val title: String,
+    val kind: String? = null,
+    val comment: String = "",
+    val documents: List<ChangeRecordDocumentDto> = emptyList(),
     val sourceVersionId: UUID? = null,
     val targetVersionId: UUID? = null,
 )
 
+@JsonIgnoreProperties(ignoreUnknown = true)
+data class ChangeRecordDocumentDto(val url: String? = null, val fileId: String? = null, val label: String? = null)
+
 interface AmendmentClient {
     fun getAmendment(id: UUID, authorization: String?): LinkedAmendment?
+
+    fun createAmendment(constitutionId: UUID, record: ChangeRecordRequest, authorization: String?): LinkedAmendment
+
+    fun refreshReviewStatus(constitutionId: UUID, legalVersionId: UUID, authorization: String?)
 
     fun linkTarget(
         amendmentId: UUID,
@@ -56,6 +66,28 @@ class RestAmendmentClient(
         } catch (ex: RestClientException) {
             throw DownstreamException("amendment lookup failed", ex)
         }
+
+    override fun createAmendment(constitutionId: UUID, record: ChangeRecordRequest, authorization: String?): LinkedAmendment =
+        try {
+            val request = client.post().uri("/constitutions/{id}/amendments", constitutionId)
+                .contentType(MediaType.APPLICATION_JSON)
+            authorize(request, authorization)
+            request.body(record).retrieve().body(LinkedAmendment::class.java)
+                ?: throw DownstreamException("amendment create returned no body")
+        } catch (ex: RestClientException) {
+            throw DownstreamException("amendment create failed", ex)
+        }
+
+    override fun refreshReviewStatus(constitutionId: UUID, legalVersionId: UUID, authorization: String?) {
+        try {
+            val request = client.post().uri("/constitutions/{id}/amendments/refresh-review-status", constitutionId)
+                .contentType(MediaType.APPLICATION_JSON)
+            authorize(request, authorization)
+            request.body(mapOf("legalVersionId" to legalVersionId)).retrieve().toBodilessEntity()
+        } catch (ex: RestClientException) {
+            throw DownstreamException("amendment refresh-review-status failed", ex)
+        }
+    }
 
     override fun linkTarget(
         amendmentId: UUID,

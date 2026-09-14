@@ -19,7 +19,8 @@ Public site for versioned constitutions: countries → constitution versions →
 | `infra/` | Caddy, backup script |
 | `env/` | Profile templates (`local-stack`, `ci`, `testing`, `production`) |
 | `docs/CODEMAPS/` | Agent navigation maps. Start at [`docs/CODEMAPS/INDEX.md`](docs/CODEMAPS/INDEX.md). |
-| `backlog.md` | Product + sprint backlog (large). **Grep for IDs** (`ARCH-`, `CAT-`, `CNT-`, `AMD-`, `ING-`, `UI-`, `OPS-`); do not read the whole file. |
+| Linear | Source of truth for issue status, priorities, and sprint/cycle progress. Find the relevant issue before starting tracked work. |
+| `backlog.md` | Historical product and sprint planning context. **Grep for IDs** if needed; do not use it as the status board or read the whole file. |
 
 ## Repo map
 
@@ -47,11 +48,11 @@ cd apps/gateway-web && npm ci && npm run lint && npm run build
 Swagger (via Caddy): `http://localhost/api/docs/<service>/swagger-ui/index.html`  
 Service names: `catalog`, `content`, `amendment`, `identity`, `editor`, `search`, `ingestion`, `audit`.
 
-## Current sprint
+## Progress tracking
 
-See `backlog.md` **Suggested Sprint Breakdown**. Sprint 0–36 are closed. Next is **Sprint 37 (ED-7 + UI-52)** — publish from a legal version’s editorial tip. Decision: `docs/adr/0005-two-axis-versions.md`; design at `docs/design/two-axis-versions.md`. Pull from **Later / Ideas** only if the user asks. Do not start SRV-7 (MCP) until asked.
+Use Linear for the current cycle, issue scope, priority, and status. Match a repository story ID to its Linear issue when one exists; use the Linear issue identifier when reporting progress. `backlog.md` and its suggested sprint breakdown are historical context, not the current work queue. Decision for two-axis versions: `docs/adr/0005-two-axis-versions.md`; design: `docs/design/two-axis-versions.md`. Do not start SRV-7 (MCP) until asked.
 
-**When a story/task is finished, update `backlog.md` in the same change:** set Status to `Done`, add the ID to that sprint’s Done list, and keep the board snapshot accurate. Do not leave completed work as `Ready`.
+When tracked work is finished and verified, update its Linear issue to the appropriate completed status. If Linear is unavailable, report the status and issue ID to the user; do not silently substitute a `backlog.md` edit. Do not create or change Linear issues merely to document untracked maintenance work unless the user asks.
 
 **Closing a sprint requires the Sprint close-out gate below.** Do not mark the sprint closed, or start the next sprint, until that gate has run and its fixes are in.
 
@@ -64,7 +65,7 @@ Do not declare the sprint done until every step below has been completed and rem
 1. **Review the sprint diff.** Launch `/reviewer` on the changes for that sprint (commits and uncommitted work since the sprint started). Treat findings as work: fix bugs, regressions, broken contracts, missing tests, and incorrect behavior. Skip nitpicks that do not affect correctness or maintainability.
 2. **Remove duplicate and dead code.** Scan packages this sprint touched for unused exports, unreachable branches, copy-pasted helpers, and files superseded by the new work. Delete or consolidate them. Do not remove public API, applied Flyway migrations, or contract fixtures unless they are unused and owned by this sprint.
 3. **Verify.** Run tests for every service or app the sprint changed (`cd services/<name> && ./gradlew test`; `npm run lint` / `npm run build` in `apps/gateway-web` when UI changed). For a multi-file sprint, also launch `/verifier` and fix anything it fails.
-4. **Then update the backlog.** Only after the fixes land: set remaining stories to `Done`, add IDs to that sprint’s Done list, and record the sprint as closed.
+4. **Then update Linear.** Only after the fixes land: complete the remaining issues and record sprint completion in Linear where applicable.
 
 Keep cost rules: one `/reviewer` and one cleanup pass over the combined sprint diff — not one subagent per microservice.
 
@@ -73,5 +74,5 @@ Keep cost rules: one `/reviewer` and one cleanup pass over the combined sprint d
 - Touch **one service** (or gateway + Caddy) per task unless the user asks for a cross-cut.
 - Do **not** spawn parallel subagents for a one-file or one-service change.
 - Prefer built-in `explore` for search. Use project subagents only when the description matches.
-- Read this file, then `docs/CODEMAPS/INDEX.md` and one area map. Open `backlog.md` only for the relevant epic/story IDs.
+- Read this file, then `docs/CODEMAPS/INDEX.md` and one area map. Use Linear for current work; open `backlog.md` only for relevant historical epic/story context.
 - Run tests only for the service you changed: `cd services/<name> && ./gradlew test`.

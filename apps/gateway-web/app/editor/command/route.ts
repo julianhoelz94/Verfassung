@@ -24,12 +24,28 @@ function editorPath(form: FormData, extra: Record<string, string> = {}): string 
 }
 
 function redirectTo(request: NextRequest, path: string): NextResponse {
-  return NextResponse.redirect(new URL(path, request.url), 303);
+  const origin = request.headers.get('origin');
+  if (origin) return NextResponse.redirect(new URL(path, origin), 303);
+  const host = request.headers.get('x-forwarded-host')?.split(',')[0]?.trim() ?? request.headers.get('host');
+  const protocol = request.headers.get('x-forwarded-proto')?.split(',')[0]?.trim() ?? request.nextUrl.protocol.replace(':', '');
+  return NextResponse.redirect(new URL(path, host ? `${protocol}://${host}` : request.url), 303);
+}
+
+function hasTrustedOrigin(request: NextRequest): boolean {
+  const origin = request.headers.get('origin');
+  if (!origin) return true;
+  try {
+    const originUrl = new URL(origin);
+    const host = request.headers.get('x-forwarded-host')?.split(',')[0]?.trim() ?? request.headers.get('host');
+    const protocol = request.headers.get('x-forwarded-proto')?.split(',')[0]?.trim() ?? request.nextUrl.protocol.replace(':', '');
+    return Boolean(host) && originUrl.host === host && originUrl.protocol === `${protocol}:`;
+  } catch {
+    return false;
+  }
 }
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
-  const origin = request.headers.get('origin');
-  if (origin && origin !== request.nextUrl.origin) {
+  if (!hasTrustedOrigin(request)) {
     return new NextResponse('Forbidden', { status: 403 });
   }
   const form = await request.formData();

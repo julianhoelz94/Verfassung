@@ -8,7 +8,7 @@ import { editorErrorMessage, getDraftPreview, listSessions, type EditSessionSumm
 import { currentUser } from '../../lib/session';
 import { ArticleEditor } from './ArticleEditor';
 import { PublishForm } from './PublishForm';
-import { approveAction, loadSessionAction, openEditorAction, reviewAction } from './actions';
+import { LegacyPublishForm } from './LegacyPublishForm';
 
 type EditorPageProps = {
   searchParams: Promise<{
@@ -189,7 +189,8 @@ export default async function EditorPage(props: EditorPageProps) {
           {canEdit && versions.length > 0 ? (
             <Card>
               <h2 className="card-title">Record the next legal change</h2>
-              {legalTips.length > 0 ? <form action={openEditorAction}>
+              {legalTips.length > 0 ? <form action="/editor/command" method="post">
+                <input type="hidden" name="command" value="open" />
                 <input type="hidden" name="hopKind" value="legal" />
                 <Select id="legalVersionId" name="versionId" label="Current law" defaultValue={legalTips[0].snapshotId}>
                   {legalTips.map((version) => (
@@ -200,7 +201,8 @@ export default async function EditorPage(props: EditorPageProps) {
                 </Select>
                 <Button variant="primary">Record the next legal change</Button>
               </form> : null}
-              <form action={openEditorAction}>
+              <form action="/editor/command" method="post">
+                <input type="hidden" name="command" value="open" />
                 <input type="hidden" name="hopKind" value="editorial_correction" />
                 <Select id="correctionVersionId" name="versionId" label="Correct this text" defaultValue={versionId}>
                   {versions.map((version) => (
@@ -215,7 +217,8 @@ export default async function EditorPage(props: EditorPageProps) {
           ) : null}
           <Card>
             <h2 className="card-title">Load a session</h2>
-            <form action={loadSessionAction} className="form-row">
+            <form action="/editor/command" method="post" className="form-row">
+              <input type="hidden" name="command" value="load" />
               <input type="hidden" name="versionId" value={versionId ?? ''} />
               <Input id="loadSessionId" name="sessionId" label="Session id" defaultValue={searchParams.sessionId ?? ''} />
               <Button>Load session</Button>
@@ -321,19 +324,16 @@ export default async function EditorPage(props: EditorPageProps) {
                   Discard changes
                 </a>
               ) : null}
-              {canSave ? (
-                <Button form="draft-form" variant="primary">
-                  Save draft
-                </Button>
-              ) : null}
               {canEdit && session.status === 'open' ? (
-                <form action={reviewAction}>
+                <form action="/editor/command" method="post">
+                  <input type="hidden" name="command" value="review" />
                   {hiddenFields}
                   <Button disabled={session.hopKind === 'legal' ? !preview.changeRecord : session.hopKind === 'editorial_correction' ? !preview.publishComment : false}>Submit for review</Button>
                 </form>
               ) : null}
               {canReview && session.status === 'reviewing' ? (
-                <form action={approveAction}>
+                <form action="/editor/command" method="post">
+                  <input type="hidden" name="command" value="approve" />
                   {hiddenFields}
                   <Button>Approve review</Button>
                 </form>
@@ -392,6 +392,9 @@ export default async function EditorPage(props: EditorPageProps) {
                 record={preview.changeRecord}
                 comment={preview.publishComment}
               />
+            ) : null}
+            {!session.hopKind && session.status === 'approved' && canPublish && searchParams.sessionId && versionId && selectedId ? (
+              <LegacyPublishForm sessionId={searchParams.sessionId} versionId={versionId} articleId={selectedId} />
             ) : null}
             {selected ? (
               <>

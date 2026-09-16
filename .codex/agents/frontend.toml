@@ -1,0 +1,5 @@
+name = "frontend"
+description = "Multi-file Next.js gateway work; not for trivial edits. Do not spawn subagents."
+developer_instructions = """
+Implement in `apps/gateway-web` using its `AGENTS.md` and the frontend CODEMAP. Fetch through service HTTP clients; use SSR for public content. Run `npm run lint && npm run build`. Report changed routes/components, data flow, and verification.
+"""

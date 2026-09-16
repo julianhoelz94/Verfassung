@@ -2,15 +2,15 @@ package com.constitutionatlas.editor.service
 
 import com.constitutionatlas.editor.ConflictException
 import com.constitutionatlas.editor.StepUpRequiredException
+import com.constitutionatlas.editor.api.ChangeRecordChange
+import com.constitutionatlas.editor.api.ChangeRecordRequest
 import com.constitutionatlas.editor.api.CreateSessionRequest
 import com.constitutionatlas.editor.api.DraftPreviewDto
 import com.constitutionatlas.editor.api.EditSessionDto
 import com.constitutionatlas.editor.api.EditSessionStatus
 import com.constitutionatlas.editor.api.EditSessionSummaryDto
-import com.constitutionatlas.editor.api.PublishRequest
 import com.constitutionatlas.editor.api.PublishDetailsRequest
-import com.constitutionatlas.editor.api.ChangeRecordRequest
-import com.constitutionatlas.editor.api.ChangeRecordChange
+import com.constitutionatlas.editor.api.PublishRequest
 import com.constitutionatlas.editor.api.SaveDraftRequest
 import com.constitutionatlas.editor.api.canEdit
 import com.constitutionatlas.editor.api.canPublish
@@ -18,7 +18,6 @@ import com.constitutionatlas.editor.api.canReview
 import com.constitutionatlas.editor.api.isAdmin
 import com.constitutionatlas.editor.api.isEditorial
 import com.constitutionatlas.editor.client.AmendmentClient
-import com.constitutionatlas.editor.client.LinkedAmendment
 import com.constitutionatlas.editor.client.ArticleWritePayload
 import com.constitutionatlas.editor.client.AuditClient
 import com.constitutionatlas.editor.client.CatalogClient
@@ -26,6 +25,7 @@ import com.constitutionatlas.editor.client.CatalogVersion
 import com.constitutionatlas.editor.client.ContentClient
 import com.constitutionatlas.editor.client.ContentTreeArticle
 import com.constitutionatlas.editor.client.ContentTreeNode
+import com.constitutionatlas.editor.client.LinkedAmendment
 import com.constitutionatlas.editor.client.NodeWritePayload
 import com.constitutionatlas.editor.repo.EditorRepository
 import com.constitutionatlas.platform.Actor
@@ -183,7 +183,7 @@ class EditorService(
             throw IllegalArgumentException("No draft article changes to publish")
         }
         val hopKind = normalizeHopKind(request.hopKind)
-        if (session.hopKind != hopKind) {
+        if (session.hopKind != null && session.hopKind != hopKind) {
             throw IllegalArgumentException("publish hopKind must match the session job")
         }
         val comment = request.comment ?: editorRepository.publishComment(session.id)
@@ -228,9 +228,11 @@ class EditorService(
             request.amendmentId?.let { requireAmendmentForHop(it, source.constitutionId, session.versionId, authorization) }
                 ?: amendmentClient.createAmendment(
                     source.constitutionId,
-                    changeRecord!!.copy(changes = changedArticles.map {
-                        ChangeRecordChange(it.id, it.articleNumber)
-                    }),
+                    changeRecord!!.copy(
+                        changes = changedArticles.map {
+                            ChangeRecordChange(it.id, it.articleNumber)
+                        },
+                    ),
                     authorization,
                 )
         } else {
@@ -257,7 +259,10 @@ class EditorService(
                 amendmentActions.completeLink(amendment.id, session.versionId, published.id, authorization)
                 editorRepository.markOutboxPublished(eventId)
                 editorRepository.insertOutboxEvent(
-                    session.id, DomainEvents.AMENDMENT_RECORDED, payload, publishedAt = Instant.now(),
+                    session.id,
+                    DomainEvents.AMENDMENT_RECORDED,
+                    payload,
+                    publishedAt = Instant.now(),
                 )
             } catch (ex: RuntimeException) {
                 log.warn("change record {} linkage queued for retry: {}", amendment.id, ex.message)
@@ -393,7 +398,9 @@ class EditorService(
     }
 
     private fun validateChangeRecord(record: ChangeRecordRequest) {
-        if (record.title.isBlank() || record.comment.isBlank() || record.documents.isEmpty() ||
+        if (record.title.isBlank() ||
+            record.comment.isBlank() ||
+            record.documents.isEmpty() ||
             record.documents.any { it.url.isNullOrBlank() && it.fileId.isNullOrBlank() }
         ) {
             throw IllegalArgumentException("Legal change record requires title, comment, and documents")
@@ -414,12 +421,17 @@ class EditorService(
         if (amendment.status !in setOf("draft", "published")) {
             throw IllegalArgumentException("Amendment status must be draft or published")
         }
-        if (amendment.status != "draft" || amendment.targetVersionId != null ||
+        if (amendment.status != "draft" ||
+            amendment.targetVersionId != null ||
             (amendment.sourceVersionId != null && amendment.sourceVersionId != sourceVersionId)
         ) {
             throw IllegalArgumentException("Change record must be an unlinked draft for this source version")
         }
-        if (amendment.title.isBlank() || amendment.comment.isBlank() || amendment.documents.isEmpty()) {
+        if (amendment.title.isBlank() ||
+            amendment.comment.isBlank() ||
+            amendment.documents.isEmpty() ||
+            amendment.documents.any { it.url.isNullOrBlank() && it.fileId.isNullOrBlank() }
+        ) {
             throw IllegalArgumentException("Legal change record requires title, comment, and documents")
         }
         return amendment

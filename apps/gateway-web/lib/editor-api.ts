@@ -46,7 +46,7 @@ export type DraftPreview = {
 };
 
 /**
- * Fixed editor error copy keyed by a short identifier. Server actions redirect with
+ * Fixed editor error copy keyed by a short identifier. Editor commands redirect with
  * `?error=<key>` and the editor page renders only these strings, so a crafted URL cannot
  * put arbitrary text into the trusted error banner.
  */

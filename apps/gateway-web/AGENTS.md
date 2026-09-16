@@ -1,13 +1,8 @@
 # gateway-web
 
-Next.js 15 App Router, TypeScript. Public reading experience and later editor routes.
+Next.js 15 App Router + TypeScript. See the [`frontend map`](../../docs/CODEMAPS/frontend.md).
 
-**Repo map:** [`docs/CODEMAPS/INDEX.md`](../../docs/CODEMAPS/INDEX.md) (jump table for the whole repo). Gateway pages and clients: [`docs/CODEMAPS/frontend.md`](../../docs/CODEMAPS/frontend.md).
-
-- Keep this app a composition layer: fetch via service HTTP clients, no direct DB.
-- SSR for public content pages when adding real routes.
-- Fail optional backend data gracefully; do not block the whole page on a down search index.
-- Reuse the same article renderer for public and preview once the editor exists.
-- After UI changes: `npm run lint` and `npm run build` in this directory only.
-- Journey, axe, and visual tests: `npx playwright install --with-deps chromium && npm run build && npm run test:e2e`. Visual snapshots under `e2e/snapshots/` are Linux Chromium; regenerate them with `mcr.microsoft.com/playwright:v1.51.1-jammy`.
-- When the work completes a tracked issue, update its status in Linear after verification. The root `AGENTS.md` defines progress tracking.
+- Compose service data through HTTP clients; no direct database access. Use SSR for public content and let optional services fail gracefully.
+- Reuse the article renderer for public and preview views.
+- Verify UI changes with `npm run lint && npm run build` here. For journey, axe, or visual changes, run `npm run test:e2e`; Linux Chromium snapshots are in `e2e/snapshots/`.
+- Prefer server components for public pages and client components for interactive editor UI. Follow existing TypeScript conventions; add UI libraries only when needed.

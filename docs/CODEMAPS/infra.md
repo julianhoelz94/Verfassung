@@ -1,7 +1,7 @@
 <!-- Generated: 2026-09-06 | Files scanned: ~250 | Token estimate: ~700 -->
 # Infra
 
-**Rules:** `.cursor/rules/docker-infra.mdc`, `.cursor/skills/local-stack`  
+**Rules:** `infra/AGENTS.md`, `.agents/skills/local-stack`
 **Pins:** `docs/dependencies.md`
 
 ## Local stack
@@ -40,7 +40,7 @@ cd services/<name> && ./gradlew test
 ./gradlew -p services/<name> check    # tests + Spotless
 ```
 
-Shared: `gradle/service-conventions.gradle`. New service: copy sibling (`.cursor/skills/new-kotlin-service`) and add Compose DB, Caddy route, `BUILD_ORDER` in `manageLocalStack.sh`.
+Shared: `gradle/service-conventions.gradle`. New service: copy sibling (`.agents/skills/new-kotlin-service`) and add Compose DB, Caddy route, `BUILD_ORDER` in `manageLocalStack.sh`.
 
 ## CI (`.github/workflows/ci.yml`)
 

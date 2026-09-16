@@ -1,7 +1,6 @@
 'use client';
 
 import { Button, Input, TextArea } from '../components/ui';
-import { publishAction, savePublishDetailsAction } from './actions';
 
 type PublishFormProps = {
   sessionId: string;
@@ -27,7 +26,8 @@ export function PublishForm({ sessionId, versionId, articleId, hopKind, status, 
     <section className="stack" aria-label={hopKind === 'legal' ? 'Change record' : 'Transcription comment'}>
       <h3>{hopKind === 'legal' ? 'Change record' : 'Transcription comment'}</h3>
       {status === 'open' && canEdit ? (
-        <form action={savePublishDetailsAction} className="stack">
+        <form action="/editor/command" method="post" className="stack">
+          <input type="hidden" name="command" value="details" />
           {fields}
           {hopKind === 'legal' ? <>
             <Input id="recordTitle" name="recordTitle" label="Title" defaultValue={record?.title ?? ''} required />
@@ -40,10 +40,33 @@ export function PublishForm({ sessionId, versionId, articleId, hopKind, status, 
           <Button>Save {hopKind === 'legal' ? 'change record' : 'comment'}</Button>
         </form>
       ) : (
-        <p className="muted">{hopKind === 'legal' ? record?.title ?? 'No change record saved.' : comment ?? 'No comment saved.'}</p>
+        hopKind === 'legal' && record ? (
+          <div className="stack">
+            <p><strong>{record.title}</strong></p>
+            <p>{record.comment}</p>
+            {record.documents.length > 0 ? (
+              <ul>
+                {record.documents.map((document, index) => (
+                  <li key={`${document.url ?? document.label ?? 'document'}-${index}`}>
+                    {document.url ? (
+                      <a href={document.url} rel="noreferrer">
+                        {document.label ?? document.url}
+                      </a>
+                    ) : (
+                      document.label ?? 'Archived document'
+                    )}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
+        ) : (
+          <p className="muted">{comment ?? 'No comment saved.'}</p>
+        )
       )}
       {status === 'approved' && canPublish ? (
-        <form action={publishAction} className="stack">
+        <form action="/editor/command" method="post" className="stack">
+          <input type="hidden" name="command" value="publish" />
           {fields}
           <Button variant="primary" disabled={!ready}>
             {hopKind === 'legal' ? 'Publish new legal version' : 'Publish transcription'}

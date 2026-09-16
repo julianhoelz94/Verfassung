@@ -1,14 +1,14 @@
 package com.constitutionatlas.editor.repo
 
-import com.constitutionatlas.editor.api.DraftArticleDto
 import com.constitutionatlas.editor.api.ChangeRecordRequest
+import com.constitutionatlas.editor.api.DraftArticleDto
 import com.constitutionatlas.editor.api.EditSessionDto
 import com.constitutionatlas.editor.api.EditSessionStatus
 import com.constitutionatlas.editor.api.EditSessionSummaryDto
 import com.constitutionatlas.editor.api.SearchIndexStatus
 import com.constitutionatlas.editor.service.DomainEvents
-import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.JsonNode
+import com.fasterxml.jackson.databind.ObjectMapper
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Repository
 import java.sql.Timestamp
@@ -335,12 +335,14 @@ class EditorRepository(
             LIMIT ?
             FOR UPDATE SKIP LOCKED
             """.trimIndent(),
-            { rs, _ -> PendingAmendmentAction(
-                id = rs.getObject("id", UUID::class.java),
-                sessionId = rs.getObject("session_id", UUID::class.java),
-                eventName = rs.getString("event_name"),
-                payload = objectMapper.readTree(rs.getString("payload")),
-            ) },
+            { rs, _ ->
+                PendingAmendmentAction(
+                    id = rs.getObject("id", UUID::class.java),
+                    sessionId = rs.getObject("session_id", UUID::class.java),
+                    eventName = rs.getString("event_name"),
+                    payload = objectMapper.readTree(rs.getString("payload")),
+                )
+            },
             DomainEvents.AMENDMENT_LINK_REQUESTED,
             DomainEvents.REVIEW_STATUS_REFRESH_REQUESTED,
             limit,

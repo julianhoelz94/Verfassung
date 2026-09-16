@@ -1,13 +1,14 @@
 import com.constitutionatlas.editor.DownstreamException
 import com.constitutionatlas.editor.EditorServiceApplication
+import com.constitutionatlas.editor.api.ChangeRecordRequest
 import com.constitutionatlas.editor.client.AmendmentClient
-import com.constitutionatlas.editor.client.LinkedAmendment
 import com.constitutionatlas.editor.client.ArticleWritePayload
 import com.constitutionatlas.editor.client.AuditClient
 import com.constitutionatlas.editor.client.CatalogClient
 import com.constitutionatlas.editor.client.CatalogVersion
 import com.constitutionatlas.editor.client.ContentClient
 import com.constitutionatlas.editor.client.ContentTreeArticle
+import com.constitutionatlas.editor.client.LinkedAmendment
 import com.constitutionatlas.editor.client.SearchIndexClient
 import com.constitutionatlas.editor.service.OutboxPublisher
 import com.constitutionatlas.platform.Actor
@@ -39,7 +40,7 @@ import java.util.UUID
 
 @Testcontainers
 @AutoConfigureMockMvc
-@SpringBootTest(classes = [EditorServiceApplication::class])
+@SpringBootTest(classes = [EditorServiceApplication::class], properties = ["editor.downstream.bearer=test-service-token"])
 class EditorApiTest {
     @Autowired
     lateinit var mockMvc: MockMvc
@@ -154,7 +155,7 @@ class EditorApiTest {
             sessionId,
         )
         assertEquals(
-            listOf("search.reindex-requested", "version.published"),
+            listOf("amendment.review-refresh-requested", "search.reindex-requested", "version.published"),
             eventNames,
         )
         outboxPublisher.processDue()
@@ -322,6 +323,36 @@ class EditorApiTest {
     }
 
     @Test
+    fun refreshFailureAfterCatalogPublishIsRetriedFromOutbox() {
+        val versionId = UUID.randomUUID()
+        val articleId = UUID.randomUUID()
+        val constitutionId = UUID.fromString("01900000-0000-4000-8000-000000000002")
+        stubSuccessorPublish(versionId, articleId)
+        val sessionId = openSession(versionId)
+        saveDraft(sessionId, articleId)
+        postCommand(sessionId, "review", "reviewing")
+        stub(reviewer)
+        postCommand(sessionId, "approval", "approved")
+        stub(publisher)
+        Mockito.doThrow(DownstreamException("refresh unavailable")).`when`(amendmentClient)
+            .refreshReviewStatus(eqNonNull(constitutionId), eqNonNull(versionId), eqNonNull(TOKEN))
+        mockMvc.post("/edit-sessions/$sessionId/publish") {
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = EDITORIAL_PUBLISH_BODY
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.session.status") { value("published") }
+            jsonPath("$.amendmentStatus") { value("failed") }
+        }
+        outboxPublisher.processDue()
+        mockMvc.get("/edit-sessions/$sessionId") { header("Authorization", TOKEN) }.andExpect {
+            status { isOk() }
+            jsonPath("$.amendmentStatus") { value("ready") }
+        }
+    }
+
+    @Test
     fun publishKeepsSessionPublishedWhenAuditAppendFails() {
         val versionId = UUID.randomUUID()
         val articleId = UUID.fromString("01900000-0000-4000-8000-000000000201")
@@ -467,7 +498,6 @@ class EditorApiTest {
         }.andExpect { status { isForbidden() } }
     }
 
-
     @Test
     fun legalPublishLinksAndPublishesAmendment() {
         val versionId = UUID.randomUUID()
@@ -479,7 +509,6 @@ class EditorApiTest {
             LinkedAmendment(
                 id = amendmentId,
                 constitutionId = constitutionId,
-                kind = "legal_amendment",
                 status = "draft",
                 title = "Test amendment",
                 comment = "The legal change",
@@ -513,9 +542,65 @@ class EditorApiTest {
             sessionId,
         )
         assertEquals(
-            listOf("amendment.recorded", "search.reindex-requested", "version.published"),
+            listOf("amendment.link-requested", "amendment.recorded", "search.reindex-requested", "version.published"),
             eventNames,
         )
+    }
+
+    @Test
+    fun legalPublishCreatesRecordWithChangedArticleRows() {
+        val versionId = UUID.randomUUID()
+        val articleId = UUID.randomUUID()
+        val amendmentId = UUID.randomUUID()
+        val constitutionId = UUID.fromString("01900000-0000-4000-8000-000000000002")
+        stubSuccessorPublish(versionId, articleId)
+        Mockito.`when`(
+            amendmentClient.createAmendment(
+                eqNonNull(constitutionId),
+                Mockito.any(ChangeRecordRequest::class.java) ?: ChangeRecordRequest("", ""),
+                eqNonNull(TOKEN),
+            ),
+        ).thenReturn(
+            LinkedAmendment(
+                id = amendmentId,
+                constitutionId = constitutionId,
+                status = "draft",
+                title = "A law",
+                comment = "Changed the law",
+                documents = listOf(com.constitutionatlas.editor.client.ChangeRecordDocumentDto(url = "https://example.org/law")),
+            ),
+        )
+        Mockito.`when`(amendmentClient.getAmendment(eqNonNull(amendmentId), eqNonNull(TOKEN)))
+            .thenReturn(
+                LinkedAmendment(
+                    id = amendmentId,
+                    constitutionId = constitutionId,
+                    status = "draft",
+                    title = "A law",
+                    comment = "Changed the law",
+                    documents = listOf(com.constitutionatlas.editor.client.ChangeRecordDocumentDto(url = "https://example.org/law")),
+                ),
+            )
+        val sessionId = openSession(versionId, "legal")
+        saveDraft(sessionId, articleId)
+        postCommand(sessionId, "review", "reviewing")
+        stub(reviewer)
+        postCommand(sessionId, "approval", "approved")
+        stub(publisher)
+        mockMvc.post("/edit-sessions/$sessionId/publish") {
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"hopKind":"legal"}"""
+        }.andExpect { status { isOk() } }
+        val record = ArgumentCaptor.forClass(ChangeRecordRequest::class.java)
+        Mockito.verify(amendmentClient).createAmendment(
+            eqNonNull(constitutionId),
+            record.capture() ?: ChangeRecordRequest("", ""),
+            eqNonNull(TOKEN),
+        )
+        assertEquals(articleId, record.value.changes.single().articleId)
+        assertEquals("1", record.value.changes.single().articleNumber)
+        assertEquals("changed", record.value.changes.single().changeType)
     }
 
     @Test
@@ -667,7 +752,6 @@ class EditorApiTest {
             LinkedAmendment(
                 id = amendmentId,
                 constitutionId = UUID.randomUUID(),
-                kind = "legal_amendment",
                 status = "draft",
                 title = "Wrong constitution",
             ),
@@ -790,7 +874,9 @@ class EditorApiTest {
     private fun postCommand(sessionId: String, command: String, expectedStatus: String) {
         if (command == "review") {
             val hopKind = jdbcTemplate.queryForObject(
-                "SELECT hop_kind FROM edit_sessions WHERE id = ?::uuid", String::class.java, sessionId,
+                "SELECT hop_kind FROM edit_sessions WHERE id = ?::uuid",
+                String::class.java,
+                sessionId,
             )
             mockMvc.post("/edit-sessions/$sessionId/publish-details") {
                 header("Authorization", TOKEN)

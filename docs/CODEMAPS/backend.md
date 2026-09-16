@@ -103,7 +103,7 @@ PUT/PATCH/DELETE → 405; DB rules block update/delete.
 ## Shared conventions
 
 - Shared Kotlin module: `services/platform` (`com.constitutionatlas:platform:0.1.0`). Each service `includeBuild("../platform")`. It owns `CorrelationIdFilter` (SEC-9 allow-list), `NotFoundException` / `UnauthorizedException` / `ForbiddenException` + `ProblemAdvice`, and the identity Bearer `IdentityClient`. Do not copy those into a service.
-- New service: copy a sibling for Gradle/Docker layout (`.cursor/skills/new-kotlin-service`), then depend on platform.
+- New service: copy a sibling for Gradle/Docker layout (`.agents/skills/new-kotlin-service`), then depend on platform.
 - Gradle: `gradle/service-conventions.gradle` (Spotless/ktlint, `bootJar` → `app.jar`).
 - Tests: Testcontainers `postgres:16-alpine`; extend `SmokeTest` unless isolation is required.
 - Run: `cd services/<name> && ./gradlew test` (wrapper **9.7.1**).

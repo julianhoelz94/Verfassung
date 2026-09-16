@@ -20,7 +20,6 @@ data class LinkedAmendment(
     val constitutionId: UUID,
     val status: String,
     val title: String,
-    val kind: String? = null,
     val comment: String = "",
     val documents: List<ChangeRecordDocumentDto> = emptyList(),
     val sourceVersionId: UUID? = null,

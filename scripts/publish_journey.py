@@ -114,7 +114,7 @@ def wait_for_ping(base: str, name: str, attempts: int = 90) -> None:
             if status == 200:
                 return
             last = f"HTTP {status} {payload}"
-        except urllib.error.URLError as error:
+        except (urllib.error.URLError, OSError) as error:
             last = str(error.reason if hasattr(error, "reason") else error)
         time.sleep(2)
     raise SystemExit(f"{name} did not become ready at {url}: {last}")

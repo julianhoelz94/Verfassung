@@ -7,6 +7,7 @@ const TABLET = { width: 820, height: 1180 };
 const DESKTOP = { width: 1440, height: 900 };
 
 async function snapshot(page: Page, name: string): Promise<void> {
+  await expect(page.locator('h1').first()).toBeVisible();
   await expect(page).toHaveScreenshot(name, { fullPage: true });
 }
 
@@ -23,7 +24,10 @@ test('public and editor layouts at 390, 820 and 1440', async ({ page }) => {
   ]) {
     await page.setViewportSize(viewport.size);
 
-    await page.goto('/');
+    await expect(async () => {
+      await page.goto('/');
+      await expect(page.locator('h1').first()).toBeVisible();
+    }).toPass({ timeout: 10_000 });
     await snapshot(page, `home-${viewport.suffix}.png`);
 
     await page.goto(

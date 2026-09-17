@@ -1,7 +1,6 @@
 package com.constitutionatlas.catalog.service
 
 import com.constitutionatlas.catalog.ConflictException
-import com.constitutionatlas.platform.NotFoundException
 import com.constitutionatlas.catalog.api.ConstitutionSummary
 import com.constitutionatlas.catalog.api.CountrySummary
 import com.constitutionatlas.catalog.api.CreateConstitutionRequest
@@ -11,6 +10,7 @@ import com.constitutionatlas.catalog.api.OutlineKindWrite
 import com.constitutionatlas.catalog.api.OutlineUpdateResult
 import com.constitutionatlas.catalog.api.VersionCreated
 import com.constitutionatlas.catalog.repo.CatalogRepository
+import com.constitutionatlas.platform.NotFoundException
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional

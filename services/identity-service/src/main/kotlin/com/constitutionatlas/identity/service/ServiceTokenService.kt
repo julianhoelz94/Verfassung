@@ -2,7 +2,6 @@ package com.constitutionatlas.identity.service
 
 import com.constitutionatlas.identity.BadRequestException
 import com.constitutionatlas.identity.ConflictException
-import com.constitutionatlas.platform.ForbiddenException
 import com.constitutionatlas.identity.api.CreateServiceTokenRequest
 import com.constitutionatlas.identity.api.RotateServiceTokenRequest
 import com.constitutionatlas.identity.api.ServiceTokenCreatedDto
@@ -11,6 +10,7 @@ import com.constitutionatlas.identity.crypto.Tokens
 import com.constitutionatlas.identity.repo.IdentityRepository
 import com.constitutionatlas.identity.repo.StoredUser
 import com.constitutionatlas.identity.repo.toDto
+import com.constitutionatlas.platform.ForbiddenException
 import org.springframework.stereotype.Service
 import java.security.SecureRandom
 import java.time.OffsetDateTime

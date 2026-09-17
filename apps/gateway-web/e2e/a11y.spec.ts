@@ -1,11 +1,12 @@
 /* eslint-disable */
 import { test, expect, type Page } from '@playwright/test';
 import path from 'node:path';
-import { signInAdmin, signInEditor } from './helpers';
+import { signInAdmin, signInEditor, signOut } from './helpers';
 
 const axePath = path.join(process.cwd(), 'node_modules/axe-core/axe.min.js');
 
 async function expectNoAxeViolations(page: Page): Promise<void> {
+  await expect(page.locator('h1').first()).toBeVisible();
   await page.addScriptTag({ path: axePath });
   const results = await page.evaluate(async () => {
     // @ts-expect-error axe is injected onto window
@@ -15,7 +16,10 @@ async function expectNoAxeViolations(page: Page): Promise<void> {
 }
 
 test('axe passes on public and editor routes', async ({ page }) => {
-  await page.goto('/');
+  await expect(async () => {
+    await page.goto('/');
+    await expect(page.locator('h1').first()).toBeVisible();
+  }).toPass({ timeout: 10_000 });
   await expectNoAxeViolations(page);
 
   await page.goto('/search');
@@ -48,8 +52,7 @@ test('axe passes on public and editor routes', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Amending laws' })).toBeVisible();
   await expectNoAxeViolations(page);
 
-  await page.getByRole('button', { name: 'Account menu' }).click();
-  await page.getByRole('button', { name: 'Sign out' }).click();
+  await signOut(page);
   await signInAdmin(page);
   await page.goto('/admin/users');
   await expectNoAxeViolations(page);

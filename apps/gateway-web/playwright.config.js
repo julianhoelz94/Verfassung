@@ -50,7 +50,7 @@ module.exports = defineConfig({
         },
         {
           command: built ? `npx next start -p ${webPort}` : `npx next dev -p ${webPort}`,
-          url: `http://127.0.0.1:${webPort}`,
+          url: `http://127.0.0.1:${webPort}/about`,
           reuseExistingServer: !process.env.CI,
           env: { ...process.env, ...apiEnv },
         },

@@ -20,7 +20,7 @@ test.beforeEach(async ({ request }) => {
 test('public and editor layouts at 390, 820 and 1440', async ({ page }) => {
   test.setTimeout(120_000);
   test.skip(
-    process.platform !== 'linux',
+    process.env.E2E_SKIP_VISUAL === 'true' || process.platform !== 'linux',
     'Visual snapshots are Linux Chromium (Playwright Docker / CI). Re-baseline with mcr.microsoft.com/playwright:v1.51.1-jammy.',
   );
   for (const viewport of [

@@ -167,6 +167,16 @@ const editorState = {
 let pendingMfaEmail = identityMe.email;
 let currentUser = { ...identityMe };
 
+function resetMockState() {
+  mockAmendments.clear();
+  mockAmendments.set(amendment.id, amendment);
+  mockAmendments.set(amendmentDraft.id, amendmentDraft);
+  extraVersions.splice(0);
+  editorState.session = null;
+  pendingMfaEmail = identityMe.email;
+  currentUser = { ...identityMe };
+}
+
 function userForEmail(email) {
   if (email === 'local-admin@example.local') {
     return { ...identityMe, email, roles: ['admin'] };
@@ -237,6 +247,12 @@ const server = createServer(async (req, res) => {
 
   if (pathname === '/health') {
     json(res, 200, { ok: true });
+    return;
+  }
+
+  if (method === 'POST' && pathname === '/__reset') {
+    resetMockState();
+    empty(res, 204);
     return;
   }
 

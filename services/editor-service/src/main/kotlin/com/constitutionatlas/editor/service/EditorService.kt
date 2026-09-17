@@ -200,11 +200,12 @@ class EditorService(
         }
         changeRecord?.let(::validateChangeRecord)
         val source = catalogClient.getVersion(session.versionId)
-        val versions = catalogClient.listVersions(source.constitutionId, "all")
+        val versions = catalogClient.listVersions(
+            source.constitutionId,
+            if (hopKind == "editorial_correction") "public" else "all",
+        )
         val legalId = source.legalVersionId ?: source.id
-        if (versions.any { it.editorialPredecessorVersionId == session.versionId } ||
-            (source.currentVersionId != null && source.currentVersionId != session.versionId)
-        ) {
+        if (source.currentVersionId != null && source.currentVersionId != session.versionId) {
             throw ConflictException("session version is not this law's editorial tip", "not_editorial_tip")
         }
         if (hopKind == "legal") {

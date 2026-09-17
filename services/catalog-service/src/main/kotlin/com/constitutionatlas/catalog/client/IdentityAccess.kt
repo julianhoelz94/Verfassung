@@ -12,7 +12,7 @@ fun Actor.canPublishCatalog(): Boolean =
     "admin" in roles || "publisher" in roles || "catalog:publish" in scopes
 
 fun Actor.canViewStaffCatalog(): Boolean =
-    "admin" in roles || "editor" in roles || "reviewer" in roles || "publisher" in roles
+    "admin" in roles || "editor" in roles || "reviewer" in roles || "publisher" in roles || "catalog:write" in scopes
 
 @Component
 class WriteAccess(private val identityClient: IdentityClient) {

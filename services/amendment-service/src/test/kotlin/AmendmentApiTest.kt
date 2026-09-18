@@ -753,6 +753,10 @@ class AmendmentApiTest {
             contentType = MediaType.APPLICATION_JSON
             content = createAmendmentJson("Unpublished edit", sourceVersionId = SOURCE_ID, targetVersionId = TARGET_ID)
         }.andExpect { status { isOk() } }
+        Mockito.`when`(catalogClient.getVersion(SOURCE_ID))
+            .thenReturn(CatalogVersionRef(SOURCE_ID, CONSTITUTION_ID, SOURCE_ID, SOURCE_ID))
+        Mockito.`when`(catalogClient.getVersion(TARGET_ID))
+            .thenReturn(CatalogVersionRef(TARGET_ID, CONSTITUTION_ID, TARGET_ID, TARGET_ID))
 
         mockMvc.post("/amendments/$amendmentId/confirm-quotes") { header("Authorization", PUBLISHER_TOKEN) }
             .andExpect {

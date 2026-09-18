@@ -1,8 +1,8 @@
 package com.constitutionatlas.catalog.api
 
+import com.fasterxml.jackson.annotation.JsonInclude
 import java.time.LocalDate
 import java.util.UUID
-import com.fasterxml.jackson.annotation.JsonInclude
 
 data class CountrySummary(
     val id: UUID,

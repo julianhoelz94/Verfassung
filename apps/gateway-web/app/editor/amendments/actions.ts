@@ -59,9 +59,10 @@ function readWriteBody(formData: FormData): AmendmentWriteBody {
     throw new AmendmentApiError('title');
   }
   return {
-    kind: String(formData.get('kind') ?? 'legal_amendment'),
     title,
     summary: optionalField(formData, 'summary'),
+    comment: optionalField(formData, 'comment'),
+    documents: [{ url: optionalField(formData, 'documentUrl'), label: optionalField(formData, 'documentLabel') }],
     enactedOn: optionalField(formData, 'enactedOn'),
     effectiveOn: optionalField(formData, 'effectiveOn'),
     sourceReference: optionalField(formData, 'sourceReference'),

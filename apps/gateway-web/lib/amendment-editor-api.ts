@@ -10,7 +10,6 @@ export type AmendmentChangeWrite = {
 };
 
 export type AmendmentWriteBody = {
-  kind?: string;
   title: string;
   summary?: string | null;
   enactedOn?: string | null;
@@ -19,6 +18,8 @@ export type AmendmentWriteBody = {
   sourceVersionId?: string | null;
   targetVersionId?: string | null;
   changes: AmendmentChangeWrite[];
+  comment?: string | null;
+  documents?: { url?: string | null; label?: string | null }[];
 };
 
 export type AmendmentRevision = AmendmentWriteBody & {

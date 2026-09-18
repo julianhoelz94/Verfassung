@@ -22,17 +22,6 @@ function hasRole(roles: string[], role: string): boolean {
   return roles.includes(role) || roles.includes('admin');
 }
 
-function kindLabel(kind: string | undefined): string {
-  switch (kind) {
-    case 'legal_amendment':
-      return 'Legal amendment';
-    case 'official_errata':
-      return 'Official errata';
-    default:
-      return kind ?? 'Unknown';
-  }
-}
-
 function statusTone(status: string | undefined): 'added' | 'removed' | 'changed' {
   if (status === 'published') {
     return 'added';
@@ -93,13 +82,13 @@ export default async function AmendmentsPage(props: AmendmentsPageProps) {
   return (
     <PageMain className="wide">
       <PageHeader
-        title="Amending laws"
+        title="Legal changes"
         eyebrow="Editorial workspace"
         meta={`Signed in as ${user.email}. Roles: ${user.roles.join(', ')}.`}
         actions={
           canEdit && selectedConstitution ? (
             <a className="btn btn-primary" href={newHref}>
-              Add amending law
+              Add legal change
             </a>
           ) : null
         }
@@ -137,7 +126,7 @@ export default async function AmendmentsPage(props: AmendmentsPageProps) {
                       label: 'Title',
                       value: <a href={`/editor/amendments/${encodeURIComponent(amendment.id)}`}>{amendment.title}</a>,
                     },
-                    { label: 'Kind', value: kindLabel(amendment.kind) },
+                    { label: 'Comment', value: amendment.comment ?? amendment.summary },
                     {
                       label: 'Enacted',
                       value: <FormattedDate value={amendment.enactedOn} />,

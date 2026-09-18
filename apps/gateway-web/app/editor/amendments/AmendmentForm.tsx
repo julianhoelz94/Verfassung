@@ -6,11 +6,6 @@ import { Alert, Badge, Button, Input, Select, TextArea } from '../../components/
 import { AmendmentChangesTable, type ChangeRow } from './AmendmentChangesTable';
 import { publishAmendmentAction, saveAmendmentAction, suggestChangesAction, withdrawAmendmentAction } from './actions';
 
-const KIND_OPTIONS = [
-  { value: 'legal_amendment', label: 'Legal amendment' },
-  { value: 'official_errata', label: 'Official errata' },
-] as const;
-
 type AmendmentFormProps = {
   amendmentId: string;
   constitutionId: string;
@@ -129,13 +124,6 @@ export function AmendmentForm({
         required
         disabled={readOnly}
       />
-      <Select id="amendment-kind" name="kind" label="Kind" defaultValue={amendment?.kind ?? 'legal_amendment'} disabled={readOnly}>
-        {KIND_OPTIONS.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </Select>
       <Input
         id="amendment-citation"
         name="sourceReference"
@@ -168,6 +156,11 @@ export function AmendmentForm({
         defaultValue={amendment?.summary ?? ''}
         disabled={readOnly}
       />
+      <TextArea id="amendment-comment" name="comment" label="Comment" defaultValue={amendment?.comment ?? ''} required disabled={readOnly} rows={4} />
+      <div className="form-row">
+        <Input id="amendment-document-url" name="documentUrl" label="Document URL" defaultValue={amendment?.documents?.[0]?.url ?? ''} type="url" disabled={readOnly} />
+        <Input id="amendment-document-label" name="documentLabel" label="Document label" defaultValue={amendment?.documents?.[0]?.label ?? ''} disabled={readOnly} />
+      </div>
       <div className="form-row">
         <Select
           id="amendment-source-version"

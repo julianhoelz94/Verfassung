@@ -226,7 +226,7 @@ export function AmendmentForm({
           </Button>
         ) : null}
         {canPublish && amendmentId !== 'new' ? (
-          <Button formAction={publishAmendmentAction}>Publish law</Button>
+          <Button formAction={publishAmendmentAction} formNoValidate>Publish law</Button>
         ) : null}
         {canWithdraw && amendmentId !== 'new' ? (
           <Button formAction={withdrawAmendmentAction}>Withdraw</Button>

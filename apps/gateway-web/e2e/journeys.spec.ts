@@ -75,6 +75,7 @@ test('recorded amending law appears on the public timeline', async ({ page }) =>
   await page.getByRole('button', { name: 'Save draft' }).click();
   await expect(page.getByText('Draft saved.')).toBeVisible();
   await page.getByRole('button', { name: 'Publish law' }).click();
+  await expect(page).toHaveURL(/published=1/);
   await expect(page.getByText('Amending law published.')).toBeVisible();
   await signOut(page);
   await page.goto('/countries/DE/timeline');
@@ -114,7 +115,7 @@ test('editorial correction hop stays off the public timeline', async ({ page }) 
   await signInEditor(page);
   await page.goto('/editor/history');
   await expect(page.getByRole('heading', { name: 'Snapshot history' })).toBeVisible();
-  await expect(page.getByText('2022-1')).toBeVisible();
-  await expect(page.getByText('editorial correction')).toBeVisible();
+  await expect(page.getByRole('link', { name: '2022-1' })).toBeVisible();
+  await expect(page.getByText('Editorial correction', { exact: true })).toBeVisible();
   await expect(page.getByText('staff')).toBeVisible();
 });

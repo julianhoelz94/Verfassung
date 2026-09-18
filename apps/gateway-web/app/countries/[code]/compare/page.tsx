@@ -32,7 +32,7 @@ import {
 } from '../../../../lib/compare';
 import { FormattedDate } from '../../../../lib/format-date';
 import { atlasTitle, metaDescription, pageMetadata } from '../../../../lib/page-meta';
-import { publicVersions } from '../../../../lib/reading';
+import { publicVersions, snapshotVersionId } from '../../../../lib/reading';
 import { CompareForm } from '../CompareForm';
 
 type ComparePageProps = {
@@ -143,8 +143,8 @@ export default async function ComparePage(props: ComparePageProps) {
   if (path && path.length >= 2 && !selectedError && constitution) {
     try {
       const [fromList, toList, constitutionAmendments] = await Promise.all([
-        listAllArticles(path[0].id, true),
-        listAllArticles(path[path.length - 1].id, true),
+        listAllArticles(snapshotVersionId(path[0]), true),
+        listAllArticles(snapshotVersionId(path[path.length - 1]), true),
         listConstitutionAmendments(constitution.id),
       ]);
       const between = amendmentsBetween(constitutionAmendments ?? [], fromId!, toId!, versions);
@@ -249,17 +249,15 @@ export default async function ComparePage(props: ComparePageProps) {
           <CompareView fromLabel={fromVersion.versionLabel} toLabel={toVersion.versionLabel}>
             {lawHops.length === 0 ? (
               <p>
-                No amending laws are recorded between these versions. The side-by-side text below still compares the snapshots.
+                No legal changes are recorded between these versions. The side-by-side text below still compares the snapshots.
               </p>
             ) : null}
             {lawHops.map((hop, hopIndex) => {
               const amendment = hop.amendment;
-              const isErrata = amendment.kind === 'official_errata';
               return (
                 <details key={amendment.id} className="hop">
                   <summary>
-                    <Badge tone="accent">Law {hopIndex + 1}</Badge>
-                    {isErrata ? <Badge tone="info">Official errata</Badge> : null}
+                    <Badge tone="accent">Legal change {hopIndex + 1}</Badge>
                     <span>{amendment.title}</span>
                     <span className="muted">
                       {hop.source && hop.target ? (

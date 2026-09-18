@@ -110,6 +110,8 @@ export type Amendment = {
   id: string;
   title: string;
   summary: string;
+  comment?: string | null;
+  documents?: AmendmentDocument[];
   enactedOn: string | null;
   sourceReference: string | null;
   sourceVersionId?: string | null;
@@ -120,6 +122,12 @@ export type Amendment = {
   publishedRevisionId?: string | null;
   effectiveOn?: string | null;
   changes: AmendmentChange[];
+};
+
+export type AmendmentDocument = {
+  url?: string | null;
+  fileId?: string | null;
+  label?: string | null;
 };
 
 export class ApiUnavailableError extends Error {

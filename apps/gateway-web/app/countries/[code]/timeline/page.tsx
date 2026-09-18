@@ -49,10 +49,6 @@ function changeTone(changeType: string): BadgeTone {
   return 'neutral';
 }
 
-function isPublicLaw(amendment: Amendment): boolean {
-  return amendment.kind === 'legal_amendment' || amendment.kind === 'official_errata' || !amendment.kind;
-}
-
 export default async function TimelinePage(props: TimelinePageProps) {
   const params = await props.params;
   let country: CountryDetail | null = null;
@@ -65,7 +61,7 @@ export default async function TimelinePage(props: TimelinePageProps) {
         country.constitutions.map((constitution) => listConstitutionAmendments(constitution.id)),
       );
       amendments = sortAmendmentsByEnactment(
-        groups.flatMap((group) => group ?? []).filter(isPublicLaw),
+        groups.flatMap((group) => group ?? []),
       );
     }
   } catch (e) {
@@ -114,11 +110,10 @@ export default async function TimelinePage(props: TimelinePageProps) {
         }
       />
       {amendments.length === 0 ? (
-        <p>No amending laws are recorded for this constitution.</p>
+        <p>No legal changes are recorded for this constitution.</p>
       ) : null}
       <ol className="timeline">
         {amendments.map((amendment) => {
-          const isErrata = amendment.kind === 'official_errata';
           const source = amendment.sourceVersionId
             ? versionsById.get(amendment.sourceVersionId)
             : undefined;
@@ -129,13 +124,21 @@ export default async function TimelinePage(props: TimelinePageProps) {
             <li key={amendment.id} className="timeline-item">
               <FormattedDate className="timeline-date" value={amendment.enactedOn} fallback="Date unknown" />
               <article className="card">
-                {isErrata ? <Badge tone="info">Official errata</Badge> : null}
-                <h2 className="card-title">{isErrata ? `Errata: ${amendment.title}` : amendment.title}</h2>
+                <h2 className="card-title">{amendment.title}</h2>
                 <p className="muted">
                   {target ? `Version ${target.versionLabel}` : 'Version'}
                   {amendment.sourceReference ? ` · ${amendment.sourceReference}` : ''}
                 </p>
-                {amendment.summary ? <p>{amendment.summary}</p> : null}
+                {amendment.comment || amendment.summary ? <p>{amendment.comment ?? amendment.summary}</p> : null}
+                {amendment.documents?.length ? (
+                  <ul className="link-list">
+                    {amendment.documents.map((document, index) => (
+                      <li key={`${document.url ?? document.fileId ?? document.label ?? 'document'}-${index}`}>
+                        {document.url ? <a href={document.url} rel="noreferrer">{document.label ?? document.url}</a> : document.label ?? 'Archived document'}
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
                 <div className="chip-row">
                   {amendment.changes.map((change) => (
                     <Badge key={change.id} tone={changeTone(change.changeType)}>

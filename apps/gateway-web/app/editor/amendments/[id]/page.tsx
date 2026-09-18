@@ -113,7 +113,7 @@ export default async function AmendmentDetailPage(props: AmendmentDetailPageProp
     : [];
   const reviewVersionIds = [...new Set(quotedVersionIds.flatMap((versionId) => [versionId, versions.find((version) => version.id === versionId)?.currentVersionId].filter((id): id is string => Boolean(id))))];
   const reviewContentEntries = await Promise.all(reviewVersionIds.map(async (versionId) => {
-    const articles = await listAllArticles(versionId).catch(() => []);
+    const articles = await listAllArticles(versionId, true).catch(() => []);
     return [versionId, articles.map((article) => `Article ${article.articleNumber}: ${article.body ?? article.title}`)] as const;
   }));
   const reviewContentByVersion = Object.fromEntries(reviewContentEntries);

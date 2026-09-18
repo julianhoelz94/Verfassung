@@ -69,8 +69,9 @@ test('edit, review, and publish a draft', async ({ page }) => {
 test('recorded amending law appears on the public timeline', async ({ page }) => {
   await signInEditor(page);
   await page.goto('/editor/amendments');
-  await page.getByRole('link', { name: 'Add amending law' }).click();
+  await page.getByRole('link', { name: 'Add legal change' }).click();
   await page.getByLabel('Title', { exact: true }).fill('E2E amending law');
+  await page.getByLabel('Comment').fill('Recorded for the timeline journey.');
   await page.getByRole('button', { name: 'Save draft' }).click();
   await expect(page.getByText('Draft saved.')).toBeVisible();
   await page.getByRole('button', { name: 'Publish law' }).click();

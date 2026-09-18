@@ -52,6 +52,10 @@ test('axe passes on public and editor routes', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Legal changes' })).toBeVisible();
   await expectNoAxeViolations(page);
 
+  await page.goto('/editor/history');
+  await expect(page.getByRole('heading', { name: 'Snapshot history' })).toBeVisible();
+  await expectNoAxeViolations(page);
+
   await signOut(page);
   await signInAdmin(page);
   await page.goto('/admin/users');

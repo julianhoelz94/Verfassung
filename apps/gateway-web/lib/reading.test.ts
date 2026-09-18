@@ -52,6 +52,20 @@ describe('publicVersions', () => {
     });
     expect(publicVersions([publicVersion, staff, editorial]).map((item) => item.id)).toEqual(['a']);
   });
+
+  it('keeps one legal identity and prefers its editorial tip', () => {
+    const legal = version({ id: 'legal-2022', versionLabel: '2022', legalVersionId: 'legal-2022', listing: 'public' });
+    const tip = version({
+      id: 'tip-2022',
+      versionLabel: '2022',
+      legalVersionId: 'legal-2022',
+      currentVersionId: 'tip-2022',
+      latestPublished: true,
+      listing: 'public',
+    });
+    expect(publicVersions([legal, tip]).map((item) => item.id)).toEqual(['tip-2022']);
+    expect(chainTipId({ id: 'c', slug: 'c', title: 'C', versions: [legal, tip] })).toBe('tip-2022');
+  });
 });
 
 describe('chainTipId', () => {

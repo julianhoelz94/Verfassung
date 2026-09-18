@@ -33,6 +33,8 @@ import {
 import { FormattedDate } from '../../../../lib/format-date';
 import { atlasTitle, metaDescription, pageMetadata } from '../../../../lib/page-meta';
 import { publicVersions, snapshotVersionId } from '../../../../lib/reading';
+import { currentUser } from '../../../../lib/session';
+import { canVisitEditor } from '../../../../lib/nav';
 import { CompareForm } from '../CompareForm';
 
 type ComparePageProps = {
@@ -132,6 +134,8 @@ export default async function ComparePage(props: ComparePageProps) {
   const fromId = searchParams.from ?? versions[0]?.id;
   const toId = searchParams.to ?? versions[versions.length - 1]?.id;
   const showAll = searchParams.all === '1';
+  const user = await currentUser();
+  const showReviewWarnings = Boolean(user && canVisitEditor(user.roles));
   const selectedError = compareRequestError(country.constitutions, fromId, toId);
   const path = fromId && toId && constitution && !selectedError ? versionPath(versions, fromId, toId) : null;
 
@@ -254,10 +258,12 @@ export default async function ComparePage(props: ComparePageProps) {
             ) : null}
             {lawHops.map((hop, hopIndex) => {
               const amendment = hop.amendment;
+              const needsReview = amendment.reviewStatus === 'needs_review';
               return (
                 <details key={amendment.id} className="hop">
                   <summary>
                     <Badge tone="accent">Legal change {hopIndex + 1}</Badge>
+                    {showReviewWarnings && needsReview ? <Badge tone="changed">Needs review</Badge> : null}
                     <span>{amendment.title}</span>
                     <span className="muted">
                       {hop.source && hop.target ? (

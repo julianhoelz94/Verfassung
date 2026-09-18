@@ -119,6 +119,7 @@ export type Amendment = {
   constitutionId?: string;
   kind?: string;
   status?: string;
+  reviewStatus?: string | null;
   publishedRevisionId?: string | null;
   effectiveOn?: string | null;
   changes: AmendmentChange[];

@@ -19,7 +19,7 @@ export type AmendmentWriteBody = {
   targetVersionId?: string | null;
   changes: AmendmentChangeWrite[];
   comment?: string | null;
-  documents?: { url?: string | null; label?: string | null }[];
+  documents?: { url?: string | null; fileId?: string | null; label?: string | null }[];
 };
 
 export type AmendmentRevision = AmendmentWriteBody & {
@@ -149,6 +149,14 @@ export async function appendRevision(amendmentId: string, body: AmendmentWriteBo
 
 export async function publishAmendment(amendmentId: string): Promise<Amendment> {
   const response = await amendmentFetch(`/amendments/${encodeURIComponent(amendmentId)}/publish`, {
+    method: 'POST',
+  });
+  await throwIfNotOk(response, 'publish_failed');
+  return (await response.json()) as Amendment;
+}
+
+export async function confirmAmendmentQuotes(amendmentId: string): Promise<Amendment> {
+  const response = await amendmentFetch(`/amendments/${encodeURIComponent(amendmentId)}/confirm-quotes`, {
     method: 'POST',
   });
   await throwIfNotOk(response, 'publish_failed');

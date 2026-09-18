@@ -3,7 +3,7 @@ import { cookies } from 'next/headers';
 import { PageMain } from '../../components/PageMain';
 import { Alert, Badge, Button, DataList, DataRow, PageHeader, Select } from '../../components/ui';
 import { FormattedDate } from '../../../lib/format-date';
-import { getCountry, listConstitutionVersions, listCountries, type ConstitutionSummary, type VersionSummary } from '../../../lib/api';
+import { getCountry, listConstitutionAmendments, listConstitutionVersions, listCountries, type Amendment, type ConstitutionSummary, type VersionSummary } from '../../../lib/api';
 import { orderVersions } from '../../../lib/compare';
 import { canVisitEditor } from '../../../lib/nav';
 import { SESSION_COOKIE, currentUser } from '../../../lib/session';
@@ -79,7 +79,26 @@ export default async function SnapshotHistoryPage(props: HistoryPageProps) {
     }
   }
   const orderedVersions = orderVersions(versions);
-  const legalGroups = [...new Map(orderedVersions.map((version) => [legalIdentity(version), version])).values()];
+  const snapshotGroups = new Map<string, VersionSummary[]>();
+  for (const version of orderedVersions) {
+    const key = legalIdentity(version);
+    snapshotGroups.set(key, [...(snapshotGroups.get(key) ?? []), version]);
+  }
+  const legalGroups = [...snapshotGroups.entries()].map(([legalId, snapshots]) => ({
+    legalId,
+    legal: snapshots.find((version) => version.hopKind !== 'editorial_correction') ?? snapshots[0]!,
+    editorial: snapshots.filter((version) => version.hopKind === 'editorial_correction').reverse(),
+  }));
+  let amendments: Amendment[] = [];
+  if (selectedConstitution && sessionToken) {
+    amendments = (await listConstitutionAmendments(selectedConstitution.id, { status: 'all', authorization: `Bearer ${sessionToken}` }).catch(() => null)) ?? [];
+  }
+  const legalIdBySnapshotId = new Map(versions.map((version) => [version.id, legalIdentity(version)]));
+  const recordsForLegal = (legalId: string) =>
+    amendments.filter((amendment) =>
+      legalIdBySnapshotId.get(amendment.sourceVersionId ?? '') === legalId ||
+      legalIdBySnapshotId.get(amendment.targetVersionId ?? '') === legalId,
+    );
   const countryCode = selectedConstitution ? isoByConstitutionId[selectedConstitution.id] : undefined;
 
   return (
@@ -110,38 +129,56 @@ export default async function SnapshotHistoryPage(props: HistoryPageProps) {
             <p className="muted">No version snapshots recorded for this constitution yet.</p>
           ) : (
             <DataList columns={5}>
-              {legalGroups.map((version) => (
+              {legalGroups.map(({ legalId, legal, editorial }) => (
                 <DataRow
-                  key={version.id}
+                  key={legalId}
                   cells={[
                     {
                       label: 'Label',
                       value: countryCode ? (
-                        <a href={`/countries/${countryCode}/versions/${version.id}`}>{version.versionLabel}</a>
+                        <a href={`/countries/${countryCode}/versions/${legal.currentVersionId ?? legal.id}`}>{legal.versionLabel}</a>
                       ) : (
-                        version.versionLabel
+                        legal.versionLabel
                       ),
                     },
                     {
                       label: 'Hop kind',
                       value: (
                         <span className="chip-row">
-                          <Badge tone="info">{hopKindLabel(version.hopKind)}</Badge>
-                          {isStaffOnly(version) ? <Badge tone="changed">Staff only</Badge> : null}
+                          <Badge tone="info">{hopKindLabel(legal.hopKind)}</Badge>
+                          {editorial.length ? <Badge tone="changed">{editorial.length} editorial revision{editorial.length === 1 ? '' : 's'}</Badge> : null}
                         </span>
                       ),
                     },
                     {
-                      label: 'Listing',
-                      value: version.listing ?? 'public',
+                      label: 'Editorial revisions',
+                      value: editorial.length ? (
+                        <ol>
+                          {editorial.map((version) => (
+                            <li key={version.id}>
+                              {version.versionLabel} · editorial correction · {version.listing ?? 'staff'}
+                            </li>
+                          ))}
+                        </ol>
+                      ) : 'No editorial revisions',
                     },
                     {
                       label: 'Effective',
-                      value: <FormattedDate value={version.effectiveDate} />,
+                      value: <FormattedDate value={legal.effectiveDate} />,
                     },
                     {
-                      label: 'Latest published',
-                      value: version.latestPublished ? 'Yes' : 'No',
+                      label: 'Change-record edges',
+                      value: recordsForLegal(legalId).length ? (
+                        <ul>
+                          {recordsForLegal(legalId).map((amendment) => (
+                            <li key={amendment.id}>
+                              <a href={`/editor/amendments/${amendment.id}`}>{amendment.title}</a>
+                              {amendment.comment ? ` — ${amendment.comment}` : ''}
+                              {amendment.reviewStatus === 'needs_review' ? <Badge tone="changed">Needs review</Badge> : null}
+                            </li>
+                          ))}
+                        </ul>
+                      ) : <span className="chip-row">No change record <Badge tone={legal.latestPublished ? 'added' : 'changed'}>{legal.latestPublished ? 'Latest published' : 'Historical'}</Badge></span>,
                     },
                   ]}
                 />

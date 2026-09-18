@@ -166,6 +166,55 @@ class AmendmentService(
             ?: throw IllegalStateException("published amendment not readable")
     }
 
+    /**
+     * Republishes the currently published record with pins resolved against the live catalog tips.
+     * A staff draft is deliberately left untouched: callers must merge or discard it before review.
+     */
+    @Transactional
+    fun confirmQuotes(amendmentId: UUID, actor: Actor): AmendmentDto {
+        if (!amendmentRepository.amendmentExists(amendmentId)) {
+            throw NotFoundException("amendment not found")
+        }
+        val publishedRevisionId = amendmentRepository.getPublishedRevisionId(amendmentId)
+            ?: throw ConflictException("only a published amendment can confirm quotes")
+        val tipRevisionId = amendmentRepository.findTipRevisionId(amendmentId)
+            ?: throw IllegalStateException("amendment has no revisions")
+        if (tipRevisionId != publishedRevisionId) {
+            throw ConflictException("save or discard the staff draft before confirming quotes", "draft_pending")
+        }
+        val published = amendmentRepository.getAmendmentDtoForRevision(amendmentId, publishedRevisionId, includeStaff = true)
+            ?: throw IllegalStateException("published amendment not readable")
+        val sourceVersionId = published.sourceVersionId?.let(::liveTip)
+        val targetVersionId = published.targetVersionId?.let(::liveTip)
+        appendRevision(
+            amendmentId,
+            AmendmentWriteRequest(
+                title = published.title,
+                comment = published.comment,
+                documents = published.documents,
+                enactedOn = published.enactedOn,
+                effectiveOn = published.effectiveOn,
+                sourceVersionId = sourceVersionId,
+                targetVersionId = targetVersionId,
+                changes = published.changes.map { change ->
+                    AmendmentChangeWriteRequest(
+                        articleNumber = change.articleNumber,
+                        changeType = change.changeType,
+                        note = change.note,
+                        articleId = change.articleId,
+                        nodeId = change.nodeId,
+                        changedOn = change.changedOn,
+                        effectiveOn = change.effectiveOn,
+                        amendingLawTitle = change.amendingLawTitle,
+                        amendingLawCitation = change.amendingLawCitation,
+                    )
+                },
+            ),
+            actor,
+        )
+        return publishAmendment(amendmentId)
+    }
+
     @Transactional
     fun withdrawAmendment(amendmentId: UUID): AmendmentDto {
         if (!amendmentRepository.amendmentExists(amendmentId)) {
@@ -277,6 +326,12 @@ class AmendmentService(
     ): Boolean =
         pinStale(row.reviewedSourceTipId, legalId, liveTip, version) ||
             pinStale(row.reviewedTargetTipId, legalId, liveTip, version)
+
+    private fun liveTip(versionId: UUID): UUID {
+        val version = catalogClient.getVersion(versionId)
+            ?: throw IllegalArgumentException("unknown quoted version")
+        return version.currentVersionId ?: version.id
+    }
 
     private fun pinStale(
         pin: UUID?,

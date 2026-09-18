@@ -124,6 +124,15 @@ class AmendmentController(
         return amendmentService.publishAmendment(id)
     }
 
+    @PostMapping("/amendments/{id}/confirm-quotes")
+    fun confirmQuotes(
+        @PathVariable id: UUID,
+        @RequestHeader(value = "Authorization", required = false) authorization: String?,
+    ): AmendmentDto {
+        val actor = writeAccess.requireAmendmentPublisher(authorization)
+        return amendmentService.confirmQuotes(id, actor)
+    }
+
     @PostMapping("/amendments/{id}/withdraw")
     fun withdrawAmendment(
         @PathVariable id: UUID,

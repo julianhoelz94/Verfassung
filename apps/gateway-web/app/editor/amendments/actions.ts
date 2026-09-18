@@ -5,6 +5,7 @@ import {
   AmendmentApiError,
   amendmentErrorMessage,
   appendRevision,
+  confirmAmendmentQuotes,
   createAmendment,
   publishAmendment,
   suggestChanges,
@@ -53,6 +54,13 @@ function parseChanges(formData: FormData): AmendmentChangeWrite[] {
   }
 }
 
+function parseDocuments(formData: FormData): { url?: string | null; fileId?: string | null; label?: string | null }[] {
+  try {
+    const rows = JSON.parse(String(formData.get('documentsJson') ?? '[]')) as { url?: string; fileId?: string; label?: string }[];
+    return rows.map((row) => ({ url: row.url?.trim() || null, fileId: row.fileId?.trim() || null, label: row.label?.trim() || null })).filter((row) => row.url || row.fileId || row.label);
+  } catch { return []; }
+}
+
 function readWriteBody(formData: FormData): AmendmentWriteBody {
   const title = String(formData.get('title') ?? '').trim();
   if (!title) {
@@ -62,7 +70,7 @@ function readWriteBody(formData: FormData): AmendmentWriteBody {
     title,
     summary: optionalField(formData, 'summary'),
     comment: optionalField(formData, 'comment'),
-    documents: [{ url: optionalField(formData, 'documentUrl'), label: optionalField(formData, 'documentLabel') }],
+    documents: parseDocuments(formData),
     enactedOn: optionalField(formData, 'enactedOn'),
     effectiveOn: optionalField(formData, 'effectiveOn'),
     sourceReference: optionalField(formData, 'sourceReference'),
@@ -134,10 +142,7 @@ export async function confirmQuotesAction(formData: FormData): Promise<void> {
   await runDetailCommand(
     formData,
     amendmentId,
-    async () => {
-      await appendRevision(amendmentId, readWriteBody(formData));
-      await publishAmendment(amendmentId);
-    },
+    () => confirmAmendmentQuotes(amendmentId),
     { confirmed: '1' },
   );
 }

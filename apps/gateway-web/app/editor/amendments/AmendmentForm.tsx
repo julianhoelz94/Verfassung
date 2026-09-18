@@ -1,10 +1,10 @@
 'use client';
 
 import { useMemo, useRef, useState, useTransition } from 'react';
-import type { Amendment, VersionSummary } from '../../../lib/api';
+import type { Amendment, AmendmentDocument, VersionSummary } from '../../../lib/api';
 import { Alert, Badge, Button, Input, Select, TextArea } from '../../components/ui';
 import { AmendmentChangesTable, type ChangeRow } from './AmendmentChangesTable';
-import { confirmQuotesAction, publishAmendmentAction, saveAmendmentAction, suggestChangesAction, withdrawAmendmentAction } from './actions';
+import { publishAmendmentAction, saveAmendmentAction, suggestChangesAction, withdrawAmendmentAction } from './actions';
 
 type AmendmentFormProps = {
   amendmentId: string;
@@ -59,6 +59,7 @@ export function AmendmentForm({
 }: AmendmentFormProps) {
   const [targetVersionId, setTargetVersionId] = useState(amendment?.targetVersionId ?? latestVersionId ?? '');
   const [changeRows, setChangeRows] = useState<ChangeRow[]>(() => initialRows(amendment));
+  const [documents, setDocuments] = useState<AmendmentDocument[]>(() => amendment?.documents?.length ? amendment.documents : [{ url: '', fileId: '', label: '' }]);
   const [suggestSourceId, setSuggestSourceId] = useState(versions[0]?.id ?? '');
   const [suggestTargetId, setSuggestTargetId] = useState(versions[1]?.id ?? versions[0]?.id ?? '');
   const [suggestError, setSuggestError] = useState<string | null>(null);
@@ -157,10 +158,19 @@ export function AmendmentForm({
         disabled={readOnly}
       />
       <TextArea id="amendment-comment" name="comment" label="Comment" defaultValue={amendment?.comment ?? ''} required disabled={readOnly} rows={4} />
-      <div className="form-row">
-        <Input id="amendment-document-url" name="documentUrl" label="Document URL" defaultValue={amendment?.documents?.[0]?.url ?? ''} type="url" disabled={readOnly} />
-        <Input id="amendment-document-label" name="documentLabel" label="Document label" defaultValue={amendment?.documents?.[0]?.label ?? ''} disabled={readOnly} />
-      </div>
+      <input type="hidden" name="documentsJson" value={JSON.stringify(documents)} />
+      <fieldset className="stack">
+        <legend>Documents</legend>
+        {documents.map((document, index) => (
+          <div className="form-row" key={index}>
+            <Input id={`amendment-document-url-${index}`} label="Document URL" value={document.url ?? ''} type="url" disabled={readOnly} onChange={(event) => setDocuments((rows) => rows.map((row, rowIndex) => rowIndex === index ? { ...row, url: event.target.value } : row))} />
+            <Input id={`amendment-document-file-${index}`} label="Archived file ID" value={document.fileId ?? ''} disabled={readOnly} onChange={(event) => setDocuments((rows) => rows.map((row, rowIndex) => rowIndex === index ? { ...row, fileId: event.target.value } : row))} />
+            <Input id={`amendment-document-label-${index}`} label="Label" value={document.label ?? ''} disabled={readOnly} onChange={(event) => setDocuments((rows) => rows.map((row, rowIndex) => rowIndex === index ? { ...row, label: event.target.value } : row))} />
+            {!readOnly && documents.length > 1 ? <Button type="button" onClick={() => setDocuments((rows) => rows.filter((_, rowIndex) => rowIndex !== index))}>Remove</Button> : null}
+          </div>
+        ))}
+        {!readOnly ? <Button type="button" onClick={() => setDocuments((rows) => [...rows, { url: '', fileId: '', label: '' }])}>Add document</Button> : null}
+      </fieldset>
       <div className="form-row">
         <Select
           id="amendment-source-version"
@@ -217,9 +227,6 @@ export function AmendmentForm({
         ) : null}
         {canPublish && amendmentId !== 'new' ? (
           <Button formAction={publishAmendmentAction}>Publish law</Button>
-        ) : null}
-        {canPublish && amendment?.reviewStatus === 'needs_review' ? (
-          <Button formAction={confirmQuotesAction}>Confirm quotes</Button>
         ) : null}
         {canWithdraw && amendmentId !== 'new' ? (
           <Button formAction={withdrawAmendmentAction}>Withdraw</Button>

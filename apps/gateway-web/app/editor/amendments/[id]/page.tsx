@@ -8,6 +8,7 @@ import { canVisitEditor } from '../../../../lib/nav';
 import { SESSION_COOKIE, currentUser } from '../../../../lib/session';
 import { AmendmentEditorLayout } from '../AmendmentEditorLayout';
 import { AmendmentForm } from '../AmendmentForm';
+import { QuoteReviewPanel } from '../QuoteReviewPanel';
 
 type AmendmentDetailPageProps = {
   params: Promise<{ id: string }>;
@@ -131,6 +132,14 @@ export default async function AmendmentDetailPage(props: AmendmentDetailPageProp
       {searchParams.published ? <Alert tone="success">Amending law published.</Alert> : null}
       {searchParams.confirmed ? <Alert tone="success">Quotes confirmed and the legal change republished.</Alert> : null}
       {searchParams.withdrawn ? <Alert tone="success">Amending law withdrawn.</Alert> : null}
+      {amendment?.reviewStatus === 'needs_review' ? (
+        <QuoteReviewPanel
+          amendment={amendment}
+          publishedRevision={revisions?.find((revision) => revision.id === amendment.publishedRevisionId) ?? null}
+          versions={versions}
+          canConfirm={canPublishLaw}
+        />
+      ) : null}
       {isNew || !amendment ? (
         <AmendmentForm
           amendmentId="new"

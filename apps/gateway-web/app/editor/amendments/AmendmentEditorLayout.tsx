@@ -3,9 +3,10 @@
 import { useMemo, useState } from 'react';
 import type { Amendment, VersionSummary } from '../../../lib/api';
 import type { AmendmentRevision } from '../../../lib/amendment-editor-api';
-import { Alert } from '../../components/ui';
+import { Alert, Button } from '../../components/ui';
 import { AmendmentForm } from './AmendmentForm';
 import { AmendmentRevisionPanel } from './AmendmentRevisionPanel';
+import { publishAmendmentAction } from './actions';
 
 type AmendmentEditorLayoutProps = {
   amendmentId: string;
@@ -104,6 +105,12 @@ export function AmendmentEditorLayout({
           readOnly={readOnly || viewingPast}
           contentAvailable={contentAvailable}
         />
+        {canPublish && !viewingPast ? (
+          <form action={publishAmendmentAction} className="action-bar">
+            <input type="hidden" name="amendmentId" value={amendmentId} />
+            <Button>Publish law</Button>
+          </form>
+        ) : null}
       </section>
       {revisions && revisions.length > 0 ? (
         <AmendmentRevisionPanel

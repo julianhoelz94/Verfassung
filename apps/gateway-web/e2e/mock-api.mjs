@@ -331,6 +331,8 @@ const server = createServer(async (req, res) => {
       id: '01900000-0000-4000-8000-000000000303',
       title: body.title ?? amendmentDraft.title,
       summary: body.summary ?? amendmentDraft.summary,
+      comment: body.comment ?? amendmentDraft.comment,
+      documents: body.documents ?? amendmentDraft.documents ?? [],
       kind: body.kind ?? amendmentDraft.kind,
       status: 'draft',
       constitutionId: constitutionAmendmentsMatch[1],

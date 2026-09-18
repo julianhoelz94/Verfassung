@@ -2,6 +2,13 @@
 import { test, expect } from '@playwright/test';
 import { ARTICLE_1, VERSION_2022, signInEditor, signOut } from './helpers';
 
+const MOCK_ORIGIN = `http://127.0.0.1:${process.env.E2E_MOCK_PORT ?? 4010}`;
+
+test.beforeEach(async ({ request }) => {
+  const response = await request.post(`${MOCK_ORIGIN}/__reset`);
+  expect(response.ok()).toBeTruthy();
+});
+
 test('browse from countries to an article', async ({ page }) => {
   await page.goto('/');
   await expect(page.getByRole('heading', { name: 'Countries' })).toBeVisible();
@@ -72,6 +79,8 @@ test('recorded amending law appears on the public timeline', async ({ page }) =>
   await page.getByRole('link', { name: 'Add legal change' }).click();
   await page.getByLabel('Title', { exact: true }).fill('E2E amending law');
   await page.getByLabel('Comment').fill('Recorded for the timeline journey.');
+  await expect(page.locator('form.stack').first()).toHaveJSProperty('noValidate', false);
+  expect(await page.locator('form.stack').first().evaluate((form) => form.checkValidity())).toBeTruthy();
   await page.getByRole('button', { name: 'Save draft' }).click();
   await expect(page.getByText('Draft saved.')).toBeVisible();
   await page.getByRole('button', { name: 'Publish law' }).click();

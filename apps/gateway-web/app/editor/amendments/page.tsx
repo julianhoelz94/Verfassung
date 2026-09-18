@@ -15,6 +15,7 @@ type AmendmentsPageProps = {
     published?: string;
     withdrawn?: string;
     error?: string;
+    review?: string;
   }>;
 };
 
@@ -51,7 +52,7 @@ export default async function AmendmentsPage(props: AmendmentsPageProps) {
   if (!canVisitEditor(user.roles)) {
     return (
       <PageMain className="wide">
-        <PageHeader title="Amending laws" meta={`Signed in as ${user.email}, but this account has no editorial role.`} />
+        <PageHeader title="Legal changes" meta={`Signed in as ${user.email}, but this account has no editorial role.`} />
       </PageMain>
     );
   }
@@ -75,6 +76,9 @@ export default async function AmendmentsPage(props: AmendmentsPageProps) {
   }
 
   const errorMessage = amendmentErrorMessage(searchParams.error);
+  const visibleAmendments = searchParams.review === 'needs_review'
+    ? amendments.filter((amendment) => amendment.reviewStatus === 'needs_review')
+    : amendments;
   const newHref = selectedConstitution
     ? `/editor/amendments/new?constitutionId=${encodeURIComponent(selectedConstitution.id)}`
     : '/editor/amendments/new';
@@ -106,6 +110,10 @@ export default async function AmendmentsPage(props: AmendmentsPageProps) {
               </option>
             ))}
           </Select>
+          <Select id="review" name="review" label="Review status" defaultValue={searchParams.review ?? ''}>
+            <option value="">All legal changes</option>
+            <option value="needs_review">Needs review</option>
+          </Select>
           <Button type="submit">Show laws</Button>
         </form>
       ) : (
@@ -114,11 +122,11 @@ export default async function AmendmentsPage(props: AmendmentsPageProps) {
       {selectedConstitution ? (
         <section>
           <h2 className="section-title">{selectedConstitution.title}</h2>
-          {amendments.length === 0 ? (
-            <p className="muted">No amending laws recorded for this constitution yet.</p>
+          {visibleAmendments.length === 0 ? (
+            <p className="muted">No legal changes match this view.</p>
           ) : (
             <DataList columns={4}>
-              {amendments.map((amendment) => (
+              {visibleAmendments.map((amendment) => (
                 <DataRow
                   key={amendment.id}
                   cells={[
@@ -133,7 +141,7 @@ export default async function AmendmentsPage(props: AmendmentsPageProps) {
                     },
                     {
                       label: 'Status',
-                      value: <Badge tone={statusTone(amendment.status)}>{amendment.status ?? 'draft'}</Badge>,
+                      value: <span className="chip-row"><Badge tone={statusTone(amendment.status)}>{amendment.status ?? 'draft'}</Badge>{amendment.reviewStatus === 'needs_review' ? <Badge tone="changed">Needs review</Badge> : null}</span>,
                     },
                   ]}
                 />

@@ -160,14 +160,14 @@ export default async function ComparePage(props: ComparePageProps) {
     try {
       const [fromList, toList, constitutionAmendments] = await Promise.all([
         listAllArticles(
-          searchParams.from && constitution.versions.some((version) => version.id === searchParams.from)
-            ? searchParams.from
+          fromDetail?.constitutionId === constitution.id
+            ? fromDetail.id
             : snapshotVersionId(path[0]),
           true,
         ),
         listAllArticles(
-          searchParams.to && constitution.versions.some((version) => version.id === searchParams.to)
-            ? searchParams.to
+          toDetail?.constitutionId === constitution.id
+            ? toDetail.id
             : snapshotVersionId(path[path.length - 1]),
           true,
         ),
@@ -178,7 +178,14 @@ export default async function ComparePage(props: ComparePageProps) {
       ]);
       const pins = [...new Set((constitutionAmendments ?? []).flatMap((amendment) => [amendment.sourceVersionId, amendment.targetVersionId]).filter((id): id is string => Boolean(id)))];
       const pinDetails = await Promise.all(pins.map((id) => getVersion(id)));
-      const legalPinIds = new Map(pinDetails.filter((version): version is NonNullable<typeof version> => version != null).map((version) => [version.id, version.legalVersionId ?? version.id]));
+      const legalPinIds = new Map(
+        pinDetails
+          .filter((version): version is NonNullable<typeof version> => version != null)
+          .map((version) => [
+            version.id,
+            versions.find((publicVersion) => publicVersion.legalVersionId === (version.legalVersionId ?? version.id))?.id ?? version.id,
+          ]),
+      );
       const between = amendmentsBetween(
         (constitutionAmendments ?? []).map((amendment) => ({
           ...amendment,

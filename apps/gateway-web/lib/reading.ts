@@ -37,7 +37,10 @@ export function publicVersionForSnapshot(
   snapshotId: string,
 ): VersionSummary | undefined {
   return publicVersions(versions).find(
-    (version) => version.id === snapshotId || snapshotVersionId(version) === snapshotId,
+    (version) =>
+      version.id === snapshotId ||
+      legalVersionId(version) === snapshotId ||
+      snapshotVersionId(version) === snapshotId,
   );
 }
 

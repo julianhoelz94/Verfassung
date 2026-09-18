@@ -1,6 +1,6 @@
 /* eslint-disable */
 import { test, expect } from '@playwright/test';
-import { ARTICLE_1, VERSION_2022, signInEditor, signOut } from './helpers';
+import { ARTICLE_1, VERSION_2022, signInEditor, signInPublisher, signOut } from './helpers';
 
 const MOCK_ORIGIN = `http://127.0.0.1:${process.env.E2E_MOCK_PORT ?? 4010}`;
 
@@ -92,6 +92,21 @@ test('recorded amending law appears on the public timeline', async ({ page }) =>
   await expect(page.getByText('E2E amending law')).toBeVisible();
 });
 
+test('publisher confirms stale old-law quotes without changing the public comment', async ({ page }) => {
+  await signInPublisher(page);
+  await page.goto('/editor/amendments');
+  await expect(page.locator('.badge', { hasText: 'Needs review' }).first()).toBeVisible();
+  await page.getByRole('link', { name: 'Update to Article 1' }).click();
+  await expect(page.getByRole('heading', { name: 'Flagged record review' })).toBeVisible();
+  await expect(page.getByRole('textbox', { name: 'Comment' })).toHaveValue('The published legal-change comment.');
+  await page.getByRole('button', { name: 'Confirm live quotes and republish' }).click();
+  await expect(page.getByText('Quotes confirmed and the legal change republished.')).toBeVisible();
+  await expect(page.getByRole('textbox', { name: 'Comment' })).toHaveValue('The published legal-change comment.');
+  await page.reload();
+  await page.goto('/editor/amendments');
+  await expect(page.locator('.badge', { hasText: 'Needs review' })).toHaveCount(0);
+});
+
 test('editorial correction hop stays off the public timeline', async ({ page }) => {
   await page.goto('/countries/DE/timeline');
   const timelineCount = await page.locator('.timeline-item').count();
@@ -126,5 +141,5 @@ test('editorial correction hop stays off the public timeline', async ({ page }) 
   await expect(page.getByRole('heading', { name: 'Snapshot history' })).toBeVisible();
   await expect(page.getByRole('link', { name: '2022-1' })).toBeVisible();
   await expect(page.getByText('Editorial correction', { exact: true })).toBeVisible();
-  await expect(page.getByText('staff')).toBeVisible();
+  await expect(page.getByText('No publication comment')).toBeVisible();
 });

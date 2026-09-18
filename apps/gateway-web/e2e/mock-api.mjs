@@ -101,11 +101,13 @@ const amendment = {
   id: '01900000-0000-4000-8000-000000000301',
   title: 'Update to Article 1',
   summary: 'Expanded the dignity clause.',
+  comment: 'The published legal-change comment.',
   enactedOn: '2022-12-19',
   sourceReference: 'BGBl. I 2022',
   constitutionId: CONSTITUTION_ID,
   kind: 'legal_amendment',
   status: 'published',
+  reviewStatus: 'needs_review',
   publishedRevisionId: '01900000-0000-4000-8000-000000000321',
   sourceVersionId: VERSION_1949,
   targetVersionId: VERSION_2022,
@@ -128,6 +130,7 @@ const amendmentDraft = {
   id: '01900000-0000-4000-8000-000000000302',
   title: 'Draft amending law',
   status: 'draft',
+  reviewStatus: 'ok',
   publishedRevisionId: null,
 };
 
@@ -144,6 +147,7 @@ const amendmentRevision = {
   sourceReference: amendment.sourceReference,
   sourceVersionId: amendment.sourceVersionId,
   targetVersionId: amendment.targetVersionId,
+  comment: amendment.comment,
   kind: amendment.kind,
   changes: amendment.changes.map(({ articleNumber, changeType, note }) => ({
     articleNumber,
@@ -309,7 +313,8 @@ const server = createServer(async (req, res) => {
     }
     const items = [...mockAmendments.values()];
     const staff = searchParams.get('status') === 'all';
-    json(res, 200, staff ? items : items.filter((item) => item.status === 'published'));
+    const reviewStatus = searchParams.get('reviewStatus');
+    json(res, 200, (staff ? items : items.filter((item) => item.status === 'published')).filter((item) => !reviewStatus || item.reviewStatus === reviewStatus));
     return;
   }
 
@@ -405,6 +410,19 @@ const server = createServer(async (req, res) => {
       return;
     }
     const updated = { ...existing, status: 'published', publishedRevisionId: existing.publishedRevisionId ?? amendmentRevision.id };
+    mockAmendments.set(updated.id, updated);
+    json(res, 200, updated);
+    return;
+  }
+
+  const confirmQuotesMatch = pathname.match(/^\/api\/amendment\/amendments\/([^/]+)\/confirm-quotes$/);
+  if (method === 'POST' && confirmQuotesMatch) {
+    const existing = mockAmendments.get(confirmQuotesMatch[1]);
+    if (!existing) {
+      json(res, 404, { error: 'Not found' });
+      return;
+    }
+    const updated = { ...existing, reviewStatus: 'ok', status: 'published' };
     mockAmendments.set(updated.id, updated);
     json(res, 200, updated);
     return;

@@ -139,12 +139,7 @@ export async function confirmQuotesAction(formData: FormData): Promise<void> {
   if (!amendmentId || amendmentId === 'new') {
     redirect(amendmentListPath({ error: 'invalid' }));
   }
-  await runDetailCommand(
-    formData,
-    amendmentId,
-    () => confirmAmendmentQuotes(amendmentId),
-    { confirmed: '1' },
-  );
+  await runDetailCommand(formData, amendmentId, () => confirmAmendmentQuotes(amendmentId), { confirmed: '1' });
 }
 
 export async function withdrawAmendmentAction(formData: FormData): Promise<void> {

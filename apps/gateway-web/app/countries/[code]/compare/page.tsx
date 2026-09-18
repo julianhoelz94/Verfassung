@@ -149,8 +149,18 @@ export default async function ComparePage(props: ComparePageProps) {
   if (path && path.length >= 2 && !selectedError && constitution) {
     try {
       const [fromList, toList, constitutionAmendments] = await Promise.all([
-        listAllArticles(snapshotVersionId(path[0]), true),
-        listAllArticles(snapshotVersionId(path[path.length - 1]), true),
+        listAllArticles(
+          searchParams.from && constitution.versions.some((version) => version.id === searchParams.from)
+            ? searchParams.from
+            : snapshotVersionId(path[0]),
+          true,
+        ),
+        listAllArticles(
+          searchParams.to && constitution.versions.some((version) => version.id === searchParams.to)
+            ? searchParams.to
+            : snapshotVersionId(path[path.length - 1]),
+          true,
+        ),
         listConstitutionAmendments(
           constitution.id,
           showReviewWarnings ? { status: 'all', authorization: await requireSessionBearer() } : undefined,

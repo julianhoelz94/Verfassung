@@ -13,8 +13,6 @@ import {
 import { FormattedDate } from '../../../../lib/format-date';
 import { atlasTitle, metaDescription, pageMetadata } from '../../../../lib/page-meta';
 import { chainTipId } from '../../../../lib/reading';
-import { canVisitEditor } from '../../../../lib/nav';
-import { currentUser, requireSessionBearer } from '../../../../lib/session';
 import { sortAmendmentsByEnactment } from '../../../../lib/timeline';
 
 type TimelinePageProps = {
@@ -58,13 +56,9 @@ export default async function TimelinePage(props: TimelinePageProps) {
   let error: string | null = null;
   try {
     country = await getCountry(params.code);
-    const user = await currentUser();
-    const authorization = user && canVisitEditor(user.roles) ? await requireSessionBearer() : undefined;
     if (country) {
       const groups = await Promise.all(
-        country.constitutions.map((constitution) =>
-          listConstitutionAmendments(constitution.id, authorization ? { status: 'all', authorization } : undefined),
-        ),
+        country.constitutions.map((constitution) => listConstitutionAmendments(constitution.id)),
       );
       amendments = sortAmendmentsByEnactment(
         groups.flatMap((group) => group ?? []),

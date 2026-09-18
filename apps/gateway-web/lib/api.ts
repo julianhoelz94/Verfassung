@@ -538,3 +538,11 @@ export function listConstitutionVersions(
     options?.authorization,
   );
 }
+
+export function getVersion(versionId: string, authorization?: string): Promise<VersionSummary | null> {
+  return readJson<VersionSummary>(
+    `${catalogBaseUrl()}/versions/${encodeURIComponent(versionId)}`,
+    'catalog',
+    authorization,
+  );
+}

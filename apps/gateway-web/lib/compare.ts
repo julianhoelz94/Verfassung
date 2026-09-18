@@ -1,7 +1,4 @@
 import type { Amendment, ArticleSummary, ConstitutionSummary, VersionSummary } from './api';
-function identityId(version: VersionSummary): string {
-  return version.legalVersionId ?? version.id;
-}
 
 export type CompareKind = 'added' | 'removed' | 'changed' | 'same';
 
@@ -42,8 +39,8 @@ export function amendmentsBetween(
       if (amendment.status && amendment.status !== 'published') {
         return false;
       }
-      const sourceIndex = ordered.findIndex((version) => identityId(version) === amendment.sourceVersionId);
-      const targetIndex = ordered.findIndex((version) => identityId(version) === amendment.targetVersionId);
+      const sourceIndex = ordered.findIndex((version) => version.id === amendment.sourceVersionId);
+      const targetIndex = ordered.findIndex((version) => version.id === amendment.targetVersionId);
       if (sourceIndex < 0 || targetIndex < 0) {
         return false;
       }

@@ -13,7 +13,7 @@ import {
 } from '../../../../lib/api';
 import { FormattedDate } from '../../../../lib/format-date';
 import { atlasTitle, metaDescription, pageMetadata } from '../../../../lib/page-meta';
-import { chainTipId } from '../../../../lib/reading';
+import { chainTipId, publicVersions, snapshotVersionId } from '../../../../lib/reading';
 import { sortAmendmentsByEnactment } from '../../../../lib/timeline';
 
 type TimelinePageProps = {
@@ -89,13 +89,18 @@ export default async function TimelinePage(props: TimelinePageProps) {
   const pinnedIds = [...new Set(amendments.flatMap((amendment) => [amendment.sourceVersionId, amendment.targetVersionId]).filter((id): id is string => Boolean(id)))];
   const pinnedVersions = await Promise.all(pinnedIds.map((id) => getVersion(id)));
   const pinnedById = new Map(pinnedVersions.filter((version) => version != null).map((version) => [version!.id, version!]));
+  const publicByLegalId = new Map(
+    country.constitutions.flatMap((constitution) =>
+      publicVersions(constitution.versions).map((version) => [version.legalVersionId ?? version.id, version]),
+    ),
+  );
   const versionForPin = (id: string | null | undefined) =>
-    id
-      ? versionsById.get(id) ?? pinnedById.get(id) ??
-        [...versionsById.values()].find(
-          (version) => version.legalVersionId === id || version.currentVersionId === id,
-        )
-      : undefined;
+    id ? (
+      versionsById.get(id) ??
+      publicByLegalId.get(pinnedById.get(id)?.legalVersionId ?? '') ??
+      publicByLegalId.get(id) ??
+      [...versionsById.values()].find((version) => version.currentVersionId === id)
+    ) : undefined;
   const primary = country.constitutions[0];
   const tipId = primary ? chainTipId(primary) : undefined;
 
@@ -158,13 +163,13 @@ export default async function TimelinePage(props: TimelinePageProps) {
                   <div className="card-actions">
                     <a
                       className="btn btn-sm"
-                      href={`/countries/${country.isoCode}/compare?from=${encodeURIComponent(amendment.sourceVersionId)}&to=${encodeURIComponent(amendment.targetVersionId)}`}
+                      href={`/countries/${country.isoCode}/compare?from=${encodeURIComponent(source?.id ?? amendment.sourceVersionId)}&to=${encodeURIComponent(target?.id ?? amendment.targetVersionId)}`}
                     >
                       Compare with previous
                       {source && target ? ` (${source.versionLabel} → ${target.versionLabel})` : ''}
                     </a>
                     {target ? (
-                      <a className="btn btn-sm btn-ghost" href={`/countries/${country.isoCode}/versions/${target.id}`}>
+                      <a className="btn btn-sm btn-ghost" href={`/countries/${country.isoCode}/versions/${snapshotVersionId(target)}`}>
                         Read
                       </a>
                     ) : null}

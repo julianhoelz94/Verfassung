@@ -19,6 +19,11 @@ export type VersionSummary = {
   latestPublished: boolean;
 };
 
+export type VersionDetail = Pick<VersionSummary, 'id' | 'versionLabel' | 'effectiveDate' | 'languageCode' | 'predecessorVersionId' | 'legalVersionId' | 'currentVersionId' | 'hopKind' | 'listing'> & {
+  constitutionId: string;
+  publicationStatus: string;
+};
+
 export type ContentNode = {
   id: string;
   kind: string;
@@ -539,8 +544,8 @@ export function listConstitutionVersions(
   );
 }
 
-export function getVersion(versionId: string, authorization?: string): Promise<VersionSummary | null> {
-  return readJson<VersionSummary>(
+export function getVersion(versionId: string, authorization?: string): Promise<VersionDetail | null> {
+  return readJson<VersionDetail>(
     `${catalogBaseUrl()}/versions/${encodeURIComponent(versionId)}`,
     'catalog',
     authorization,

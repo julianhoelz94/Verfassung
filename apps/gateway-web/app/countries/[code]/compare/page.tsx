@@ -10,6 +10,7 @@ import { ServiceUnavailable } from '../../../components/StatusMessage';
 import { Badge, PageHeader } from '../../../components/ui';
 import {
   ApiUnavailableError,
+  getVersion,
   listAllArticles,
   listConstitutionAmendments,
   getCountry,
@@ -126,13 +127,22 @@ export default async function ComparePage(props: ComparePageProps) {
     notFound();
   }
 
+  const explicitSnapshots = await Promise.all(
+    [searchParams.from, searchParams.to]
+      .filter((id): id is string => Boolean(id))
+      .map((id) => getVersion(id)),
+  );
+  const explicitConstitutionId = explicitSnapshots.find((version) => version)?.constitutionId;
   const constitution =
+    country.constitutions.find((item) => item.id === explicitConstitutionId) ??
     country.constitutions.find((item) =>
       item.versions.some((version) => version.id === searchParams.from || version.id === searchParams.to),
     ) ?? country.constitutions[0];
   const versions = orderVersions(publicVersions(constitution?.versions ?? []));
-  const fromPublic = searchParams.from ? publicVersionForSnapshot(constitution?.versions ?? [], searchParams.from) : undefined;
-  const toPublic = searchParams.to ? publicVersionForSnapshot(constitution?.versions ?? [], searchParams.to) : undefined;
+  const fromDetail = explicitSnapshots.find((version) => version?.id === searchParams.from);
+  const toDetail = explicitSnapshots.find((version) => version?.id === searchParams.to);
+  const fromPublic = searchParams.from ? publicVersionForSnapshot(constitution?.versions ?? [], fromDetail?.legalVersionId ?? searchParams.from) : undefined;
+  const toPublic = searchParams.to ? publicVersionForSnapshot(constitution?.versions ?? [], toDetail?.legalVersionId ?? searchParams.to) : undefined;
   const fromId = fromPublic?.id ?? searchParams.from ?? versions[0]?.id;
   const toId = toPublic?.id ?? searchParams.to ?? versions[versions.length - 1]?.id;
   const showAll = searchParams.all === '1';
@@ -166,7 +176,17 @@ export default async function ComparePage(props: ComparePageProps) {
           showReviewWarnings ? { status: 'all', authorization: await requireSessionBearer() } : undefined,
         ),
       ]);
-      const between = amendmentsBetween(constitutionAmendments ?? [], fromId!, toId!, versions);
+      const pins = [...new Set((constitutionAmendments ?? []).flatMap((amendment) => [amendment.sourceVersionId, amendment.targetVersionId]).filter((id): id is string => Boolean(id)))];
+      const pinDetails = await Promise.all(pins.map((id) => getVersion(id)));
+      const legalPinIds = new Map(pinDetails.filter((version): version is NonNullable<typeof version> => version != null).map((version) => [version.id, version.legalVersionId ?? version.id]));
+      const between = amendmentsBetween(
+        (constitutionAmendments ?? []).map((amendment) => ({
+          ...amendment,
+          sourceVersionId: amendment.sourceVersionId ? legalPinIds.get(amendment.sourceVersionId) ?? amendment.sourceVersionId : null,
+          targetVersionId: amendment.targetVersionId ? legalPinIds.get(amendment.targetVersionId) ?? amendment.targetVersionId : null,
+        })),
+        fromId!, toId!, versions,
+      );
       lawHops = between.map((amendment) => ({
         amendment,
         source: amendment.sourceVersionId

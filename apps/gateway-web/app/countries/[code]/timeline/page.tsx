@@ -5,6 +5,7 @@ import { ServiceUnavailable } from '../../../components/StatusMessage';
 import { Badge, PageHeader, type BadgeTone } from '../../../components/ui';
 import {
   ApiUnavailableError,
+  getVersion,
   getCountry,
   listConstitutionAmendments,
   type Amendment,
@@ -85,9 +86,12 @@ export default async function TimelinePage(props: TimelinePageProps) {
       constitution.versions.map((version) => [version.id, version]),
     ),
   );
+  const pinnedIds = [...new Set(amendments.flatMap((amendment) => [amendment.sourceVersionId, amendment.targetVersionId]).filter((id): id is string => Boolean(id)))];
+  const pinnedVersions = await Promise.all(pinnedIds.map((id) => getVersion(id)));
+  const pinnedById = new Map(pinnedVersions.filter((version) => version != null).map((version) => [version!.id, version!]));
   const versionForPin = (id: string | null | undefined) =>
     id
-      ? versionsById.get(id) ??
+      ? versionsById.get(id) ?? pinnedById.get(id) ??
         [...versionsById.values()].find(
           (version) => version.legalVersionId === id || version.currentVersionId === id,
         )

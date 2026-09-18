@@ -33,7 +33,6 @@ function revisionToAmendment(revision: AmendmentRevision, base: Amendment): Amen
     sourceReference: revision.sourceReference ?? null,
     sourceVersionId: revision.sourceVersionId ?? null,
     targetVersionId: revision.targetVersionId ?? null,
-    kind: revision.kind ?? base.kind,
     changes: revision.changes.map((change, index) => ({
       id: `revision-${index}`,
       articleId: null,

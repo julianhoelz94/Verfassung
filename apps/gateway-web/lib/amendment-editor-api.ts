@@ -23,6 +23,7 @@ export type AmendmentWriteBody = {
 };
 
 export type AmendmentRevision = AmendmentWriteBody & {
+  kind?: string;
   id: string;
   predecessorRevisionId?: string | null;
   createdBy?: string | null;

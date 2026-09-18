@@ -161,7 +161,6 @@ export async function restoreRevisionAction(formData: FormData): Promise<void> {
     redirectDetail(amendmentId, { error: 'invalid' });
   }
   const body: AmendmentWriteBody = {
-    kind: revision.kind ?? 'legal_amendment',
     title: revision.title,
     summary: revision.summary ?? null,
     enactedOn: revision.enactedOn ?? null,

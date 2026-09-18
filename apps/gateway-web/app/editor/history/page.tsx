@@ -14,8 +14,7 @@ type HistoryPageProps = {
 
 const HOP_KIND_LABELS: Record<string, string> = {
   initial: 'Initial',
-  legal_amendment: 'Amending law',
-  official_errata: 'Official errata',
+  legal: 'Legal change',
   editorial_correction: 'Editorial correction',
 };
 
@@ -28,6 +27,10 @@ function hopKindLabel(hopKind: string | undefined): string {
 
 function isStaffOnly(version: VersionSummary): boolean {
   return version.hopKind === 'editorial_correction' || version.listing === 'staff';
+}
+
+function legalIdentity(version: VersionSummary): string {
+  return version.legalVersionId ?? version.id;
 }
 
 async function loadConstitutions(): Promise<{ constitutions: ConstitutionSummary[]; isoByConstitutionId: Record<string, string> }> {
@@ -76,6 +79,7 @@ export default async function SnapshotHistoryPage(props: HistoryPageProps) {
     }
   }
   const orderedVersions = orderVersions(versions);
+  const legalGroups = [...new Map(orderedVersions.map((version) => [legalIdentity(version), version])).values()];
   const countryCode = selectedConstitution ? isoByConstitutionId[selectedConstitution.id] : undefined;
 
   return (
@@ -106,7 +110,7 @@ export default async function SnapshotHistoryPage(props: HistoryPageProps) {
             <p className="muted">No version snapshots recorded for this constitution yet.</p>
           ) : (
             <DataList columns={5}>
-              {orderedVersions.map((version) => (
+              {legalGroups.map((version) => (
                 <DataRow
                   key={version.id}
                   cells={[

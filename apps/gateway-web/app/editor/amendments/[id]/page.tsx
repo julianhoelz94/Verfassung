@@ -87,7 +87,7 @@ export default async function AmendmentDetailPage(props: AmendmentDetailPageProp
   if (!constitutionId) {
     return (
       <PageMain className="wide">
-        <PageHeader title="Amending law" />
+        <PageHeader title="Legal change" />
         <Alert tone="error">No constitution is available for this form.</Alert>
       </PageMain>
     );
@@ -117,13 +117,14 @@ export default async function AmendmentDetailPage(props: AmendmentDetailPageProp
   return (
     <PageMain className="wide">
       <PageHeader
-        breadcrumbs={[
-          { href: '/editor/amendments', label: 'Amending laws' },
+          breadcrumbs={[
+          { href: '/editor/amendments', label: 'Legal changes' },
           { label: isNew ? 'New' : amendment?.title ?? id.slice(0, 8) },
         ]}
         title={title}
         meta={`Signed in as ${user.email}. Roles: ${user.roles.join(', ')}.`}
       />
+      {amendment?.reviewStatus === 'needs_review' ? <Alert tone="info">Needs review: quotes or document pins are stale.</Alert> : null}
       {errorMessage ? <Alert tone="error">{errorMessage}</Alert> : null}
       {searchParams.saved ? <Alert tone="success">Draft saved.</Alert> : null}
       {searchParams.published ? <Alert tone="success">Amending law published.</Alert> : null}

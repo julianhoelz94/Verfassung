@@ -168,6 +168,8 @@ export async function restoreRevisionAction(formData: FormData): Promise<void> {
     sourceReference: revision.sourceReference ?? null,
     sourceVersionId: revision.sourceVersionId ?? null,
     targetVersionId: revision.targetVersionId ?? null,
+    comment: revision.comment ?? null,
+    documents: revision.documents ?? [],
     changes: revision.changes.map((change) => ({
       articleNumber: change.articleNumber?.trim() || null,
       changeType: change.changeType,

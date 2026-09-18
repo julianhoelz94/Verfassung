@@ -5,6 +5,7 @@ import { ServiceUnavailable } from '../../../components/StatusMessage';
 import { Badge, PageHeader, type BadgeTone } from '../../../components/ui';
 import {
   ApiUnavailableError,
+  getVersion,
   getCountry,
   listConstitutionAmendments,
   type Amendment,
@@ -12,7 +13,7 @@ import {
 } from '../../../../lib/api';
 import { FormattedDate } from '../../../../lib/format-date';
 import { atlasTitle, metaDescription, pageMetadata } from '../../../../lib/page-meta';
-import { chainTipId } from '../../../../lib/reading';
+import { chainTipId, publicVersions, snapshotVersionId } from '../../../../lib/reading';
 import { sortAmendmentsByEnactment } from '../../../../lib/timeline';
 
 type TimelinePageProps = {
@@ -49,10 +50,6 @@ function changeTone(changeType: string): BadgeTone {
   return 'neutral';
 }
 
-function isPublicLaw(amendment: Amendment): boolean {
-  return amendment.kind === 'legal_amendment' || amendment.kind === 'official_errata' || !amendment.kind;
-}
-
 export default async function TimelinePage(props: TimelinePageProps) {
   const params = await props.params;
   let country: CountryDetail | null = null;
@@ -65,7 +62,7 @@ export default async function TimelinePage(props: TimelinePageProps) {
         country.constitutions.map((constitution) => listConstitutionAmendments(constitution.id)),
       );
       amendments = sortAmendmentsByEnactment(
-        groups.flatMap((group) => group ?? []).filter(isPublicLaw),
+        groups.flatMap((group) => group ?? []),
       );
     }
   } catch (e) {
@@ -89,6 +86,21 @@ export default async function TimelinePage(props: TimelinePageProps) {
       constitution.versions.map((version) => [version.id, version]),
     ),
   );
+  const pinnedIds = [...new Set(amendments.flatMap((amendment) => [amendment.sourceVersionId, amendment.targetVersionId]).filter((id): id is string => Boolean(id)))];
+  const pinnedVersions = await Promise.all(pinnedIds.map((id) => getVersion(id)));
+  const pinnedById = new Map(pinnedVersions.filter((version) => version != null).map((version) => [version!.id, version!]));
+  const publicByLegalId = new Map(
+    country.constitutions.flatMap((constitution) =>
+      publicVersions(constitution.versions).map((version) => [version.legalVersionId ?? version.id, version]),
+    ),
+  );
+  const versionForPin = (id: string | null | undefined) =>
+    id ? (
+      versionsById.get(id) ??
+      publicByLegalId.get(pinnedById.get(id)?.legalVersionId ?? '') ??
+      publicByLegalId.get(id) ??
+      [...versionsById.values()].find((version) => version.currentVersionId === id)
+    ) : undefined;
   const primary = country.constitutions[0];
   const tipId = primary ? chainTipId(primary) : undefined;
 
@@ -114,28 +126,31 @@ export default async function TimelinePage(props: TimelinePageProps) {
         }
       />
       {amendments.length === 0 ? (
-        <p>No amending laws are recorded for this constitution.</p>
+        <p>No legal changes are recorded for this constitution.</p>
       ) : null}
       <ol className="timeline">
         {amendments.map((amendment) => {
-          const isErrata = amendment.kind === 'official_errata';
-          const source = amendment.sourceVersionId
-            ? versionsById.get(amendment.sourceVersionId)
-            : undefined;
-          const target = amendment.targetVersionId
-            ? versionsById.get(amendment.targetVersionId)
-            : undefined;
+          const source = versionForPin(amendment.sourceVersionId);
+          const target = versionForPin(amendment.targetVersionId);
           return (
             <li key={amendment.id} className="timeline-item">
               <FormattedDate className="timeline-date" value={amendment.enactedOn} fallback="Date unknown" />
               <article className="card">
-                {isErrata ? <Badge tone="info">Official errata</Badge> : null}
-                <h2 className="card-title">{isErrata ? `Errata: ${amendment.title}` : amendment.title}</h2>
+                <h2 className="card-title">{amendment.title}</h2>
                 <p className="muted">
                   {target ? `Version ${target.versionLabel}` : 'Version'}
                   {amendment.sourceReference ? ` · ${amendment.sourceReference}` : ''}
                 </p>
-                {amendment.summary ? <p>{amendment.summary}</p> : null}
+                {amendment.comment || amendment.summary ? <p>{amendment.comment ?? amendment.summary}</p> : null}
+                {amendment.documents?.length ? (
+                  <ul className="link-list">
+                    {amendment.documents.map((document, index) => (
+                      <li key={`${document.url ?? document.fileId ?? document.label ?? 'document'}-${index}`}>
+                        {document.url ? <a href={document.url} rel="noreferrer">{document.label ?? document.url}</a> : document.label ?? 'Archived document'}
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
                 <div className="chip-row">
                   {amendment.changes.map((change) => (
                     <Badge key={change.id} tone={changeTone(change.changeType)}>
@@ -148,13 +163,13 @@ export default async function TimelinePage(props: TimelinePageProps) {
                   <div className="card-actions">
                     <a
                       className="btn btn-sm"
-                      href={`/countries/${country.isoCode}/compare?from=${encodeURIComponent(amendment.sourceVersionId)}&to=${encodeURIComponent(amendment.targetVersionId)}`}
+                      href={`/countries/${country.isoCode}/compare?from=${encodeURIComponent(source?.id ?? amendment.sourceVersionId)}&to=${encodeURIComponent(target?.id ?? amendment.targetVersionId)}`}
                     >
                       Compare with previous
                       {source && target ? ` (${source.versionLabel} → ${target.versionLabel})` : ''}
                     </a>
                     {target ? (
-                      <a className="btn btn-sm btn-ghost" href={`/countries/${country.isoCode}/versions/${target.id}`}>
+                      <a className="btn btn-sm btn-ghost" href={`/countries/${country.isoCode}/versions/${snapshotVersionId(target)}`}>
                         Read
                       </a>
                     ) : null}

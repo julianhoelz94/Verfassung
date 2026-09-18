@@ -10,6 +10,7 @@ import { ServiceUnavailable } from '../../../components/StatusMessage';
 import { Badge, PageHeader } from '../../../components/ui';
 import {
   ApiUnavailableError,
+  getVersion,
   listAllArticles,
   listConstitutionAmendments,
   getCountry,
@@ -32,7 +33,9 @@ import {
 } from '../../../../lib/compare';
 import { FormattedDate } from '../../../../lib/format-date';
 import { atlasTitle, metaDescription, pageMetadata } from '../../../../lib/page-meta';
-import { publicVersions } from '../../../../lib/reading';
+import { publicVersions, publicVersionForSnapshot, snapshotVersionId } from '../../../../lib/reading';
+import { currentUser, requireSessionBearer } from '../../../../lib/session';
+import { canVisitEditor } from '../../../../lib/nav';
 import { CompareForm } from '../CompareForm';
 
 type ComparePageProps = {
@@ -124,14 +127,27 @@ export default async function ComparePage(props: ComparePageProps) {
     notFound();
   }
 
+  const explicitSnapshots = await Promise.all(
+    [searchParams.from, searchParams.to]
+      .filter((id): id is string => Boolean(id))
+      .map((id) => getVersion(id)),
+  );
+  const explicitConstitutionId = explicitSnapshots.find((version) => version)?.constitutionId;
   const constitution =
+    country.constitutions.find((item) => item.id === explicitConstitutionId) ??
     country.constitutions.find((item) =>
       item.versions.some((version) => version.id === searchParams.from || version.id === searchParams.to),
     ) ?? country.constitutions[0];
   const versions = orderVersions(publicVersions(constitution?.versions ?? []));
-  const fromId = searchParams.from ?? versions[0]?.id;
-  const toId = searchParams.to ?? versions[versions.length - 1]?.id;
+  const fromDetail = explicitSnapshots.find((version) => version?.id === searchParams.from);
+  const toDetail = explicitSnapshots.find((version) => version?.id === searchParams.to);
+  const fromPublic = searchParams.from ? publicVersionForSnapshot(constitution?.versions ?? [], fromDetail?.legalVersionId ?? searchParams.from) : undefined;
+  const toPublic = searchParams.to ? publicVersionForSnapshot(constitution?.versions ?? [], toDetail?.legalVersionId ?? searchParams.to) : undefined;
+  const fromId = fromPublic?.id ?? searchParams.from ?? versions[0]?.id;
+  const toId = toPublic?.id ?? searchParams.to ?? versions[versions.length - 1]?.id;
   const showAll = searchParams.all === '1';
+  const user = await currentUser();
+  const showReviewWarnings = Boolean(user && canVisitEditor(user.roles));
   const selectedError = compareRequestError(country.constitutions, fromId, toId);
   const path = fromId && toId && constitution && !selectedError ? versionPath(versions, fromId, toId) : null;
 
@@ -143,11 +159,41 @@ export default async function ComparePage(props: ComparePageProps) {
   if (path && path.length >= 2 && !selectedError && constitution) {
     try {
       const [fromList, toList, constitutionAmendments] = await Promise.all([
-        listAllArticles(path[0].id, true),
-        listAllArticles(path[path.length - 1].id, true),
-        listConstitutionAmendments(constitution.id),
+        listAllArticles(
+          fromDetail?.constitutionId === constitution.id
+            ? fromDetail.id
+            : snapshotVersionId(path[0]),
+          true,
+        ),
+        listAllArticles(
+          toDetail?.constitutionId === constitution.id
+            ? toDetail.id
+            : snapshotVersionId(path[path.length - 1]),
+          true,
+        ),
+        listConstitutionAmendments(
+          constitution.id,
+          showReviewWarnings ? { status: 'all', authorization: await requireSessionBearer() } : undefined,
+        ),
       ]);
-      const between = amendmentsBetween(constitutionAmendments ?? [], fromId!, toId!, versions);
+      const pins = [...new Set((constitutionAmendments ?? []).flatMap((amendment) => [amendment.sourceVersionId, amendment.targetVersionId]).filter((id): id is string => Boolean(id)))];
+      const pinDetails = await Promise.all(pins.map((id) => getVersion(id)));
+      const legalPinIds = new Map(
+        pinDetails
+          .filter((version): version is NonNullable<typeof version> => version != null)
+          .map((version) => [
+            version.id,
+            versions.find((publicVersion) => publicVersion.legalVersionId === (version.legalVersionId ?? version.id))?.id ?? version.id,
+          ]),
+      );
+      const between = amendmentsBetween(
+        (constitutionAmendments ?? []).map((amendment) => ({
+          ...amendment,
+          sourceVersionId: amendment.sourceVersionId ? legalPinIds.get(amendment.sourceVersionId) ?? amendment.sourceVersionId : null,
+          targetVersionId: amendment.targetVersionId ? legalPinIds.get(amendment.targetVersionId) ?? amendment.targetVersionId : null,
+        })),
+        fromId!, toId!, versions,
+      );
       lawHops = between.map((amendment) => ({
         amendment,
         source: amendment.sourceVersionId
@@ -249,17 +295,17 @@ export default async function ComparePage(props: ComparePageProps) {
           <CompareView fromLabel={fromVersion.versionLabel} toLabel={toVersion.versionLabel}>
             {lawHops.length === 0 ? (
               <p>
-                No amending laws are recorded between these versions. The side-by-side text below still compares the snapshots.
+                No legal changes are recorded between these versions. The side-by-side text below still compares the snapshots.
               </p>
             ) : null}
             {lawHops.map((hop, hopIndex) => {
               const amendment = hop.amendment;
-              const isErrata = amendment.kind === 'official_errata';
+              const needsReview = amendment.reviewStatus === 'needs_review';
               return (
                 <details key={amendment.id} className="hop">
                   <summary>
-                    <Badge tone="accent">Law {hopIndex + 1}</Badge>
-                    {isErrata ? <Badge tone="info">Official errata</Badge> : null}
+                    <Badge tone="accent">Legal change {hopIndex + 1}</Badge>
+                    {showReviewWarnings && needsReview ? <Badge tone="changed">Needs review</Badge> : null}
                     <span>{amendment.title}</span>
                     <span className="muted">
                       {hop.source && hop.target ? (

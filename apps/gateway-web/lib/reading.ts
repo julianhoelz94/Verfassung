@@ -2,16 +2,46 @@ import type { Amendment, ConstitutionSummary, CountryDetail, VersionSummary } fr
 import { orderVersions } from './compare';
 
 export function publicVersions(versions: VersionSummary[]): VersionSummary[] {
-  return versions.filter(
+  const visible = versions.filter(
     (version) => version.listing !== 'staff' && version.hopKind !== 'editorial_correction',
   );
+  const byLegalIdentity = new Map<string, VersionSummary>();
+  for (const version of visible) {
+    const identity = version.legalVersionId ?? version.id;
+    const current = byLegalIdentity.get(identity);
+    if (!current || version.id === version.currentVersionId || version.latestPublished) {
+      byLegalIdentity.set(identity, version);
+    }
+  }
+  return [...byLegalIdentity.values()];
 }
 
 export function chainTipId(constitution: ConstitutionSummary): string | undefined {
   if (constitution.latestVersionId) {
     return constitution.latestVersionId;
   }
-  return latestVersion(publicVersions(constitution.versions))?.id;
+  const latest = latestVersion(publicVersions(constitution.versions));
+  return latest?.currentVersionId ?? latest?.id;
+}
+
+export function snapshotVersionId(version: VersionSummary): string {
+  return version.currentVersionId ?? version.id;
+}
+
+export function legalVersionId(version: VersionSummary): string {
+  return version.legalVersionId ?? version.id;
+}
+
+export function publicVersionForSnapshot(
+  versions: VersionSummary[],
+  snapshotId: string,
+): VersionSummary | undefined {
+  return publicVersions(versions).find(
+    (version) =>
+      version.id === snapshotId ||
+      legalVersionId(version) === snapshotId ||
+      snapshotVersionId(version) === snapshotId,
+  );
 }
 
 export function latestVersion(versions: VersionSummary[]): VersionSummary | undefined {

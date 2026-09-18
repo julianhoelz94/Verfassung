@@ -19,6 +19,11 @@ export type VersionSummary = {
   latestPublished: boolean;
 };
 
+export type VersionDetail = Pick<VersionSummary, 'id' | 'versionLabel' | 'effectiveDate' | 'languageCode' | 'predecessorVersionId' | 'legalVersionId' | 'currentVersionId' | 'hopKind' | 'listing'> & {
+  constitutionId: string;
+  publicationStatus: string;
+};
+
 export type ContentNode = {
   id: string;
   kind: string;
@@ -110,6 +115,8 @@ export type Amendment = {
   id: string;
   title: string;
   summary: string;
+  comment?: string | null;
+  documents?: AmendmentDocument[];
   enactedOn: string | null;
   sourceReference: string | null;
   sourceVersionId?: string | null;
@@ -117,9 +124,16 @@ export type Amendment = {
   constitutionId?: string;
   kind?: string;
   status?: string;
+  reviewStatus?: string | null;
   publishedRevisionId?: string | null;
   effectiveOn?: string | null;
   changes: AmendmentChange[];
+};
+
+export type AmendmentDocument = {
+  url?: string | null;
+  fileId?: string | null;
+  label?: string | null;
 };
 
 export class ApiUnavailableError extends Error {
@@ -527,5 +541,13 @@ export function listConstitutionVersions(
     `${catalogBaseUrl()}/constitutions/${encodeURIComponent(constitutionId)}/versions${query ? `?${query}` : ''}`,
     'catalog',
     options?.authorization,
+  );
+}
+
+export function getVersion(versionId: string, authorization?: string): Promise<VersionDetail | null> {
+  return readJson<VersionDetail>(
+    `${catalogBaseUrl()}/versions/${encodeURIComponent(versionId)}`,
+    'catalog',
+    authorization,
   );
 }

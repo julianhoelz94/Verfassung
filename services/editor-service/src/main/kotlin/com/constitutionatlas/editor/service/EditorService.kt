@@ -200,10 +200,13 @@ class EditorService(
         }
         changeRecord?.let(::validateChangeRecord)
         val source = catalogClient.getVersion(session.versionId)
-        val versions = if (hopKind == "editorial_correction") {
+        val versions = if (hopKind == "editorial_correction" && source.currentVersionId != null) {
             emptyList()
         } else {
-            catalogClient.listVersions(source.constitutionId, "all")
+            catalogClient.listVersions(
+                source.constitutionId,
+                if (hopKind == "editorial_correction") "public" else "all",
+            )
         }
         val legalId = source.legalVersionId ?: source.id
         if (versions.any { it.editorialPredecessorVersionId == session.versionId } ||

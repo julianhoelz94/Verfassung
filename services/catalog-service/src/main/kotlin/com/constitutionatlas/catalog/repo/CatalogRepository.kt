@@ -128,7 +128,8 @@ class CatalogRepository(private val jdbc: JdbcTemplate) {
                        legal.id AS legal_version_id,
                        tip.id AS current_version_id,
                        legal.legal_predecessor_version_id,
-                       NULL::uuid AS editorial_predecessor_version_id
+                       NULL::uuid AS editorial_predecessor_version_id,
+                       NULL::text AS publication_comment
                 FROM constitution_versions legal
                 JOIN LATERAL (
                   SELECT cv.id
@@ -165,7 +166,7 @@ class CatalogRepository(private val jdbc: JdbcTemplate) {
                 """
                 SELECT cv.id, cv.version_label, cv.effective_date, cv.language_code, cv.source_url,
                        cv.gazette_reference, cv.provenance, cv.verification_state, cv.verified_by,
-                       cv.verified_at, cv.predecessor_version_id, cv.hop_kind, cv.listing,
+                       cv.verified_at, cv.predecessor_version_id, cv.hop_kind, cv.listing, cv.publication_comment,
                        cv.legal_version_id,
                        tip.id AS current_version_id,
                        cv.legal_predecessor_version_id,
@@ -424,6 +425,7 @@ class CatalogRepository(private val jdbc: JdbcTemplate) {
         languageCode: String,
         sourceUrl: String?,
         gazetteReference: String?,
+        publicationComment: String?,
         predecessorVersionId: UUID?,
         hopKind: String,
         listing: String,
@@ -436,9 +438,9 @@ class CatalogRepository(private val jdbc: JdbcTemplate) {
             INSERT INTO constitution_versions (
               id, constitution_id, version_label, effective_date, publication_status,
               language_code, source_url, gazette_reference, provenance, verification_state,
-              predecessor_version_id, hop_kind, listing,
+              predecessor_version_id, hop_kind, listing, publication_comment,
               legal_version_id, legal_predecessor_version_id, editorial_predecessor_version_id
-            ) VALUES (?, ?, ?, ?, 'draft', ?, ?, ?, 'imported', 'unverified', ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, 'draft', ?, ?, ?, 'imported', 'unverified', ?, ?, ?, ?, ?, ?, ?)
             """.trimIndent(),
             id,
             constitutionId,
@@ -450,6 +452,7 @@ class CatalogRepository(private val jdbc: JdbcTemplate) {
             predecessorVersionId,
             hopKind,
             listing,
+            publicationComment,
             legalVersionId,
             legalPredecessorVersionId,
             editorialPredecessorVersionId,
@@ -563,6 +566,7 @@ class CatalogRepository(private val jdbc: JdbcTemplate) {
             currentVersionId = rs.getObject("current_version_id", UUID::class.java),
             legalPredecessorVersionId = rs.getObject("legal_predecessor_version_id", UUID::class.java),
             editorialPredecessorVersionId = rs.getObject("editorial_predecessor_version_id", UUID::class.java),
+            publicationComment = rs.getString("publication_comment"),
         )
     }
 

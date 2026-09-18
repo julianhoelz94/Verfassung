@@ -17,6 +17,7 @@ export type VersionSummary = {
   hopKind?: string;
   listing?: string;
   latestPublished: boolean;
+  publicationComment?: string | null;
 };
 
 export type VersionDetail = Pick<VersionSummary, 'id' | 'versionLabel' | 'effectiveDate' | 'languageCode' | 'predecessorVersionId' | 'legalVersionId' | 'currentVersionId' | 'hopKind' | 'listing'> & {

@@ -130,6 +130,7 @@ class CatalogWriteService(private val catalogRepository: CatalogRepository) {
                 request.languageCode,
                 request.sourceUrl,
                 request.gazetteReference,
+                request.publicationComment?.trim()?.ifBlank { null },
                 predecessorId,
                 hopKind,
                 listing,

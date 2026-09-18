@@ -32,6 +32,7 @@ data class VersionSummary(
     val currentVersionId: UUID? = null,
     val legalPredecessorVersionId: UUID? = null,
     val editorialPredecessorVersionId: UUID? = null,
+    val publicationComment: String? = null,
 )
 
 data class NodeKindDto(
@@ -104,6 +105,7 @@ data class CreateVersionRequest(
     val gazetteReference: String? = null,
     val predecessorVersionId: UUID? = null,
     val hopKind: String? = null,
+    val publicationComment: String? = null,
 )
 
 data class VersionCreated(

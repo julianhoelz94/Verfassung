@@ -155,7 +155,7 @@ export default async function SnapshotHistoryPage(props: HistoryPageProps) {
                         <ol>
                           {editorial.map((version) => (
                             <li key={version.id}>
-                              {version.versionLabel} · Editorial correction · {version.listing ?? 'staff'}
+                              {version.versionLabel} · Editorial correction · {version.publicationComment ?? 'No publication comment'}
                             </li>
                           ))}
                         </ol>

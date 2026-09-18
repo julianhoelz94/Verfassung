@@ -28,6 +28,19 @@ export function snapshotVersionId(version: VersionSummary): string {
   return version.currentVersionId ?? version.id;
 }
 
+export function legalVersionId(version: VersionSummary): string {
+  return version.legalVersionId ?? version.id;
+}
+
+export function publicVersionForSnapshot(
+  versions: VersionSummary[],
+  snapshotId: string,
+): VersionSummary | undefined {
+  return publicVersions(versions).find(
+    (version) => version.id === snapshotId || snapshotVersionId(version) === snapshotId,
+  );
+}
+
 export function latestVersion(versions: VersionSummary[]): VersionSummary | undefined {
   const ordered = orderVersions(versions);
   return ordered.find((version) => version.latestPublished) ?? ordered[ordered.length - 1];

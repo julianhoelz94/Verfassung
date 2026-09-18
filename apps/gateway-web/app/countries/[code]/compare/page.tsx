@@ -32,8 +32,8 @@ import {
 } from '../../../../lib/compare';
 import { FormattedDate } from '../../../../lib/format-date';
 import { atlasTitle, metaDescription, pageMetadata } from '../../../../lib/page-meta';
-import { publicVersions, snapshotVersionId } from '../../../../lib/reading';
-import { currentUser } from '../../../../lib/session';
+import { publicVersions, publicVersionForSnapshot, snapshotVersionId } from '../../../../lib/reading';
+import { currentUser, requireSessionBearer } from '../../../../lib/session';
 import { canVisitEditor } from '../../../../lib/nav';
 import { CompareForm } from '../CompareForm';
 
@@ -131,8 +131,10 @@ export default async function ComparePage(props: ComparePageProps) {
       item.versions.some((version) => version.id === searchParams.from || version.id === searchParams.to),
     ) ?? country.constitutions[0];
   const versions = orderVersions(publicVersions(constitution?.versions ?? []));
-  const fromId = searchParams.from ?? versions[0]?.id;
-  const toId = searchParams.to ?? versions[versions.length - 1]?.id;
+  const fromPublic = searchParams.from ? publicVersionForSnapshot(constitution?.versions ?? [], searchParams.from) : undefined;
+  const toPublic = searchParams.to ? publicVersionForSnapshot(constitution?.versions ?? [], searchParams.to) : undefined;
+  const fromId = fromPublic?.id ?? searchParams.from ?? versions[0]?.id;
+  const toId = toPublic?.id ?? searchParams.to ?? versions[versions.length - 1]?.id;
   const showAll = searchParams.all === '1';
   const user = await currentUser();
   const showReviewWarnings = Boolean(user && canVisitEditor(user.roles));
@@ -149,7 +151,10 @@ export default async function ComparePage(props: ComparePageProps) {
       const [fromList, toList, constitutionAmendments] = await Promise.all([
         listAllArticles(snapshotVersionId(path[0]), true),
         listAllArticles(snapshotVersionId(path[path.length - 1]), true),
-        listConstitutionAmendments(constitution.id),
+        listConstitutionAmendments(
+          constitution.id,
+          showReviewWarnings ? { status: 'all', authorization: await requireSessionBearer() } : undefined,
+        ),
       ]);
       const between = amendmentsBetween(constitutionAmendments ?? [], fromId!, toId!, versions);
       lawHops = between.map((amendment) => ({

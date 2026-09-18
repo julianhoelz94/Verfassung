@@ -13,6 +13,8 @@ import {
 import { FormattedDate } from '../../../../lib/format-date';
 import { atlasTitle, metaDescription, pageMetadata } from '../../../../lib/page-meta';
 import { chainTipId } from '../../../../lib/reading';
+import { canVisitEditor } from '../../../../lib/nav';
+import { currentUser, requireSessionBearer } from '../../../../lib/session';
 import { sortAmendmentsByEnactment } from '../../../../lib/timeline';
 
 type TimelinePageProps = {
@@ -56,9 +58,13 @@ export default async function TimelinePage(props: TimelinePageProps) {
   let error: string | null = null;
   try {
     country = await getCountry(params.code);
+    const user = await currentUser();
+    const authorization = user && canVisitEditor(user.roles) ? await requireSessionBearer() : undefined;
     if (country) {
       const groups = await Promise.all(
-        country.constitutions.map((constitution) => listConstitutionAmendments(constitution.id)),
+        country.constitutions.map((constitution) =>
+          listConstitutionAmendments(constitution.id, authorization ? { status: 'all', authorization } : undefined),
+        ),
       );
       amendments = sortAmendmentsByEnactment(
         groups.flatMap((group) => group ?? []),
@@ -85,6 +91,13 @@ export default async function TimelinePage(props: TimelinePageProps) {
       constitution.versions.map((version) => [version.id, version]),
     ),
   );
+  const versionForPin = (id: string | null | undefined) =>
+    id
+      ? versionsById.get(id) ??
+        [...versionsById.values()].find(
+          (version) => version.legalVersionId === id || version.currentVersionId === id,
+        )
+      : undefined;
   const primary = country.constitutions[0];
   const tipId = primary ? chainTipId(primary) : undefined;
 
@@ -114,12 +127,8 @@ export default async function TimelinePage(props: TimelinePageProps) {
       ) : null}
       <ol className="timeline">
         {amendments.map((amendment) => {
-          const source = amendment.sourceVersionId
-            ? versionsById.get(amendment.sourceVersionId)
-            : undefined;
-          const target = amendment.targetVersionId
-            ? versionsById.get(amendment.targetVersionId)
-            : undefined;
+          const source = versionForPin(amendment.sourceVersionId);
+          const target = versionForPin(amendment.targetVersionId);
           return (
             <li key={amendment.id} className="timeline-item">
               <FormattedDate className="timeline-date" value={amendment.enactedOn} fallback="Date unknown" />

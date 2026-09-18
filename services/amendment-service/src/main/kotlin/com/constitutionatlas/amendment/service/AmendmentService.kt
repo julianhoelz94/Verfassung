@@ -168,7 +168,8 @@ class AmendmentService(
 
     /**
      * Republishes the currently published record with pins resolved against the live catalog tips.
-     * A staff draft is deliberately left untouched: callers must merge or discard it before review.
+     * A later staff draft is kept in history but never becomes public: the new revision copies only
+     * the published record and is appended after the current tip before publication.
      */
     @Transactional
     fun confirmQuotes(amendmentId: UUID, actor: Actor): AmendmentDto {
@@ -179,9 +180,6 @@ class AmendmentService(
             ?: throw ConflictException("only a published amendment can confirm quotes")
         val tipRevisionId = amendmentRepository.findTipRevisionId(amendmentId)
             ?: throw IllegalStateException("amendment has no revisions")
-        if (tipRevisionId != publishedRevisionId) {
-            throw ConflictException("save or discard the staff draft before confirming quotes", "draft_pending")
-        }
         val published = amendmentRepository.getAmendmentDtoForRevision(amendmentId, publishedRevisionId, includeStaff = true)
             ?: throw IllegalStateException("published amendment not readable")
         val sourceVersionId = published.sourceVersionId?.let(::liveTip)

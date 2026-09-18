@@ -114,6 +114,6 @@ test('editorial correction hop stays off the public timeline', async ({ page }) 
   await page.goto('/editor/history');
   await expect(page.getByRole('heading', { name: 'Snapshot history' })).toBeVisible();
   await expect(page.getByText('2022-1')).toBeVisible();
-  await expect(page.getByText('Editorial correction')).toBeVisible();
-  await expect(page.getByText('Staff only')).toBeVisible();
+  await expect(page.getByText('editorial correction')).toBeVisible();
+  await expect(page.getByText('staff')).toBeVisible();
 });

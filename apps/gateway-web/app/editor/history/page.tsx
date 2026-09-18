@@ -96,8 +96,7 @@ export default async function SnapshotHistoryPage(props: HistoryPageProps) {
   const legalIdBySnapshotId = new Map(versions.map((version) => [version.id, legalIdentity(version)]));
   const recordsForLegal = (legalId: string) =>
     amendments.filter((amendment) =>
-      legalIdBySnapshotId.get(amendment.sourceVersionId ?? '') === legalId ||
-      legalIdBySnapshotId.get(amendment.targetVersionId ?? '') === legalId,
+      legalIdBySnapshotId.get(amendment.sourceVersionId ?? '') === legalId,
     );
   const countryCode = selectedConstitution ? isoByConstitutionId[selectedConstitution.id] : undefined;
 
@@ -167,7 +166,7 @@ export default async function SnapshotHistoryPage(props: HistoryPageProps) {
                       value: <FormattedDate value={legal.effectiveDate} />,
                     },
                     {
-                      label: 'Change-record edges',
+                      label: 'Outgoing change-record edges',
                       value: recordsForLegal(legalId).length ? (
                         <ul>
                           {recordsForLegal(legalId).map((amendment) => (

@@ -8,6 +8,7 @@ type QuoteReviewPanelProps = {
   publishedRevision: AmendmentRevision | null;
   versions: VersionSummary[];
   canConfirm: boolean;
+  contentByVersion: Record<string, string[]>;
 };
 
 function versionFor(id: string | null | undefined, versions: VersionSummary[]): VersionSummary | null {
@@ -20,18 +21,20 @@ function liveVersionFor(version: VersionSummary | null, versions: VersionSummary
   return versionFor(liveId, versions) ?? version;
 }
 
-function QuoteSide({ label, reviewed, live }: { label: string; reviewed: VersionSummary | null; live: VersionSummary | null }) {
+function QuoteSide({ label, reviewed, live, contentByVersion }: { label: string; reviewed: VersionSummary | null; live: VersionSummary | null; contentByVersion: Record<string, string[]> }) {
   return (
     <section className="panel quote-review-side">
       <h2 className="panel-title">{label}</h2>
       <p><strong>Last reviewed</strong><br />{reviewed?.versionLabel ?? 'No quoted snapshot'}</p>
       <p><strong>Live tip</strong><br />{live?.versionLabel ?? 'No quoted snapshot'}</p>
       {reviewed && live && reviewed.id !== live.id ? <Badge tone="changed">Updated since review</Badge> : <Badge tone="added">Current</Badge>}
+      {reviewed ? <details><summary>Last-reviewed constitutional text</summary><ul>{(contentByVersion[reviewed.id] ?? []).map((text) => <li key={text}>{text}</li>)}</ul></details> : null}
+      {live && live.id !== reviewed?.id ? <details><summary>Live constitutional text</summary><ul>{(contentByVersion[live.id] ?? []).map((text) => <li key={text}>{text}</li>)}</ul></details> : null}
     </section>
   );
 }
 
-export function QuoteReviewPanel({ amendment, publishedRevision, versions, canConfirm }: QuoteReviewPanelProps) {
+export function QuoteReviewPanel({ amendment, publishedRevision, versions, canConfirm, contentByVersion }: QuoteReviewPanelProps) {
   const source = versionFor(publishedRevision?.sourceVersionId, versions);
   const target = versionFor(publishedRevision?.targetVersionId, versions);
   const sourceLive = liveVersionFor(source, versions);
@@ -40,7 +43,7 @@ export function QuoteReviewPanel({ amendment, publishedRevision, versions, canCo
     <section aria-labelledby="quote-review-title">
       <h2 id="quote-review-title" className="section-title">Flagged record review</h2>
       <div className="quote-review-grid">
-        <QuoteSide label="Source" reviewed={source} live={sourceLive} />
+        <QuoteSide label="Source" reviewed={source} live={sourceLive} contentByVersion={contentByVersion} />
         <section className="panel quote-review-instrument">
           <h2 className="panel-title">Instrument</h2>
           <p><strong>{publishedRevision?.title ?? amendment.title}</strong></p>
@@ -59,7 +62,7 @@ export function QuoteReviewPanel({ amendment, publishedRevision, versions, canCo
             </form>
           ) : null}
         </section>
-        <QuoteSide label="Target" reviewed={target} live={targetLive} />
+        <QuoteSide label="Target" reviewed={target} live={targetLive} contentByVersion={contentByVersion} />
       </div>
     </section>
   );

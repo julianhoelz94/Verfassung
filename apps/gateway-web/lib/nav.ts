@@ -6,6 +6,7 @@ export type NavUser = {
 export type NavLink = {
   href: string;
   label: string;
+  badgeCount?: number;
 };
 
 export type MenuSection = {
@@ -51,7 +52,7 @@ export function primaryNavLinks(user: NavUser | null, apiDocsAvailable = false):
   return links;
 }
 
-export function editorialLinks(roles: string[]): NavLink[] {
+export function editorialLinks(roles: string[], needsReviewCount = 0): NavLink[] {
   const links: NavLink[] = [];
   const isAdmin = roles.includes('admin');
   const isEditor = isAdmin || roles.includes('editor');
@@ -67,7 +68,7 @@ export function editorialLinks(roles: string[]): NavLink[] {
     links.push({ href: '/editor?status=approved', label: 'Ready to publish' });
   }
   if (isEditor || isReviewer || isPublisher) {
-    links.push({ href: '/editor/amendments', label: 'Legal changes' });
+    links.push({ href: '/editor/amendments', label: 'Legal changes', badgeCount: needsReviewCount || undefined });
     links.push({ href: '/editor/history', label: 'Snapshot history' });
   }
   return links;
@@ -81,7 +82,7 @@ export function adminLinks(): NavLink[] {
   ];
 }
 
-export function menuSections(user: NavUser | null, apiDocsAvailable = false): MenuSection[] {
+export function menuSections(user: NavUser | null, apiDocsAvailable = false, needsReviewCount = 0): MenuSection[] {
   const sections: MenuSection[] = [];
   if (user) {
     sections.push({
@@ -101,7 +102,7 @@ export function menuSections(user: NavUser | null, apiDocsAvailable = false): Me
     sections.push({
       id: 'editorial',
       heading: 'Editorial',
-      links: editorialLinks(user.roles),
+      links: editorialLinks(user.roles, needsReviewCount),
     });
   }
   if (user && canVisitAdmin(user.roles)) {

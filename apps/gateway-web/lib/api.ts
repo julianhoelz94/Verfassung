@@ -514,11 +514,14 @@ export function listAmendmentsByArticle(
 
 export function listConstitutionAmendments(
   constitutionId: string,
-  options?: { status?: 'all'; authorization?: string },
+  options?: { status?: 'all'; reviewStatus?: 'needs_review' | 'ok'; authorization?: string },
 ): Promise<Amendment[] | null> {
   const params = new URLSearchParams();
   if (options?.status) {
     params.set('status', options.status);
+  }
+  if (options?.reviewStatus) {
+    params.set('reviewStatus', options.reviewStatus);
   }
   const query = params.toString();
   return readJson<Amendment[]>(

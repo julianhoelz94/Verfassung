@@ -756,8 +756,8 @@ class AmendmentApiTest {
 
         mockMvc.post("/amendments/$amendmentId/confirm-quotes") { header("Authorization", PUBLISHER_TOKEN) }
             .andExpect {
-                status { isConflict() }
-                jsonPath("$.code") { value("draft_pending") }
+                status { isOk() }
+                jsonPath("$.title") { value("Published record") }
             }
         mockMvc.get("/amendments/$amendmentId").andExpect { jsonPath("$.title") { value("Published record") } }
     }

@@ -107,6 +107,16 @@ export default async function AmendmentDetailPage(props: AmendmentDetailPageProp
   const latestVersionId = versions.find((version) => version.latestPublished)?.id ?? versions.at(-1)?.id ?? null;
 
   const revisions = !isNew && sessionToken ? await listRevisions(id) : null;
+  const publishedRevision = revisions?.find((revision) => revision.id === amendment?.publishedRevisionId) ?? null;
+  const quotedVersionIds = publishedRevision
+    ? [publishedRevision.sourceVersionId, publishedRevision.targetVersionId].filter((versionId): versionId is string => Boolean(versionId))
+    : [];
+  const reviewVersionIds = [...new Set(quotedVersionIds.flatMap((versionId) => [versionId, versions.find((version) => version.id === versionId)?.currentVersionId].filter((id): id is string => Boolean(id))))];
+  const reviewContentEntries = await Promise.all(reviewVersionIds.map(async (versionId) => {
+    const articles = await listAllArticles(versionId).catch(() => []);
+    return [versionId, articles.map((article) => `Article ${article.articleNumber}: ${article.body ?? article.title}`)] as const;
+  }));
+  const reviewContentByVersion = Object.fromEntries(reviewContentEntries);
 
   const canSave = canEdit;
   const canPublishLaw = canPublish && amendment?.status !== 'withdrawn' && !isNew;
@@ -135,9 +145,10 @@ export default async function AmendmentDetailPage(props: AmendmentDetailPageProp
       {amendment?.reviewStatus === 'needs_review' ? (
         <QuoteReviewPanel
           amendment={amendment}
-          publishedRevision={revisions?.find((revision) => revision.id === amendment.publishedRevisionId) ?? null}
+          publishedRevision={publishedRevision}
           versions={versions}
           canConfirm={canPublishLaw}
+          contentByVersion={reviewContentByVersion}
         />
       ) : null}
       {isNew || !amendment ? (

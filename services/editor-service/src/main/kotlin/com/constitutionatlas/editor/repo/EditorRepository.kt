@@ -1,11 +1,13 @@
 package com.constitutionatlas.editor.repo
 
+import com.constitutionatlas.editor.api.ChangeRecordRequest
 import com.constitutionatlas.editor.api.DraftArticleDto
 import com.constitutionatlas.editor.api.EditSessionDto
 import com.constitutionatlas.editor.api.EditSessionStatus
 import com.constitutionatlas.editor.api.EditSessionSummaryDto
 import com.constitutionatlas.editor.api.SearchIndexStatus
 import com.constitutionatlas.editor.service.DomainEvents
+import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Repository
@@ -18,14 +20,15 @@ class EditorRepository(
     private val jdbc: JdbcTemplate,
     private val objectMapper: ObjectMapper,
 ) {
-    fun insertSession(actorId: UUID, versionId: UUID): UUID {
+    fun insertSession(actorId: UUID, versionId: UUID, hopKind: String?): UUID {
         val id = UUID.randomUUID()
         jdbc.update(
-            "INSERT INTO edit_sessions (id, actor_id, version_id, status) VALUES (?, ?, ?, ?)",
+            "INSERT INTO edit_sessions (id, actor_id, version_id, status, hop_kind) VALUES (?, ?, ?, ?, ?)",
             id,
             actorId,
             versionId,
             EditSessionStatus.OPEN.toJson(),
+            hopKind,
         )
         return id
     }
@@ -33,7 +36,7 @@ class EditorRepository(
     fun findSession(sessionId: UUID): EditSessionDto? {
         val session = jdbc.query(
             """
-            SELECT id, actor_id, version_id, status
+            SELECT id, actor_id, version_id, status, hop_kind
             FROM edit_sessions
             WHERE id = ?
             """.trimIndent(),
@@ -44,6 +47,7 @@ class EditorRepository(
                     versionId = rs.getObject("version_id", UUID::class.java),
                     status = EditSessionStatus.fromDb(rs.getString("status")),
                     revisionCount = 0,
+                    hopKind = rs.getString("hop_kind"),
                 )
             },
             sessionId,
@@ -59,7 +63,7 @@ class EditorRepository(
     fun listSessions(status: EditSessionStatus?, openedBy: UUID?, versionId: UUID?): List<EditSessionSummaryDto> {
         val sql = StringBuilder(
             """
-            SELECT s.id, s.actor_id, s.version_id, s.status, s.created_at, s.updated_at,
+            SELECT s.id, s.actor_id, s.version_id, s.status, s.hop_kind, s.created_at, s.updated_at,
               (
                 SELECT COUNT(DISTINCT c.article_id)
                 FROM draft_changes c
@@ -92,6 +96,7 @@ class EditorRepository(
                 openedAt = toInstant(rs.getTimestamp("created_at")),
                 updatedAt = toInstant(rs.getTimestamp("updated_at")),
                 changedArticleCount = rs.getInt("changed_article_count"),
+                hopKind = rs.getString("hop_kind"),
             )
         }, *args.toTypedArray())
     }
@@ -133,18 +138,18 @@ class EditorRepository(
         )
     }
 
-    fun findOpenSession(actorId: UUID, versionId: UUID): UUID? {
+    fun findOpenSession(actorId: UUID, versionId: UUID, hopKind: String?): UUID? {
         val statuses = EditSessionStatus.inProgress
         val placeholders = statuses.joinToString(",") { "?" }
         return jdbc.query(
             """
             SELECT id FROM edit_sessions
-            WHERE actor_id = ? AND version_id = ? AND status IN ($placeholders)
+            WHERE actor_id = ? AND version_id = ? AND hop_kind IS NOT DISTINCT FROM ? AND status IN ($placeholders)
             ORDER BY updated_at DESC
             LIMIT 1
             """.trimIndent(),
             { rs, _ -> rs.getObject("id", UUID::class.java) },
-            *listOf(actorId, versionId).plus(statuses.map { it.toJson() }).toTypedArray(),
+            *listOf(actorId, versionId, hopKind).plus(statuses.map { it.toJson() }).toTypedArray(),
         ).firstOrNull()
     }
 
@@ -155,6 +160,30 @@ class EditorRepository(
             sessionId,
         )
     }
+
+    fun recordPublishComment(sessionId: UUID, comment: String) {
+        jdbc.update("UPDATE edit_sessions SET publish_comment = ? WHERE id = ?", comment.trim(), sessionId)
+    }
+
+    fun publishComment(sessionId: UUID): String? = jdbc.query(
+        "SELECT publish_comment FROM edit_sessions WHERE id = ?",
+        { rs, _ -> rs.getString("publish_comment") },
+        sessionId,
+    ).firstOrNull()
+
+    fun recordChangeRecord(sessionId: UUID, record: ChangeRecordRequest) {
+        jdbc.update(
+            "UPDATE edit_sessions SET change_record = ?::jsonb WHERE id = ?",
+            objectMapper.writeValueAsString(record),
+            sessionId,
+        )
+    }
+
+    fun changeRecord(sessionId: UUID): ChangeRecordRequest? = jdbc.query(
+        "SELECT change_record::text FROM edit_sessions WHERE id = ?",
+        { rs, _ -> rs.getString(1)?.let { objectMapper.readValue(it, ChangeRecordRequest::class.java) } },
+        sessionId,
+    ).firstOrNull()
 
     fun latestSnapshot(sessionId: UUID): String? =
         jdbc.query(
@@ -194,18 +223,20 @@ class EditorRepository(
         eventName: String,
         payload: Map<String, Any?>,
         publishedAt: Instant? = null,
-    ) {
+    ): UUID {
+        val id = UUID.randomUUID()
         jdbc.update(
             """
             INSERT INTO outbox_events (id, session_id, event_name, payload, published_at)
             VALUES (?, ?, ?, ?::jsonb, ?)
             """.trimIndent(),
-            UUID.randomUUID(),
+            id,
             sessionId,
             eventName,
             objectMapper.writeValueAsString(payload),
             publishedAt?.let { Timestamp.from(it) },
         )
+        return id
     }
 
     fun findPublishedPreview(sessionId: UUID): PublishedPreview? =
@@ -260,6 +291,25 @@ class EditorRepository(
         return SearchIndexStatus.PENDING
     }
 
+    fun amendmentActionStatus(sessionId: UUID): SearchIndexStatus? {
+        val row = jdbc.query(
+            """
+            SELECT published_at, last_error FROM outbox_events
+            WHERE session_id = ? AND event_name IN (?, ?)
+            ORDER BY created_at DESC LIMIT 1
+            """.trimIndent(),
+            { rs, _ -> Pair(rs.getTimestamp("published_at"), rs.getString("last_error")) },
+            sessionId,
+            DomainEvents.AMENDMENT_LINK_REQUESTED,
+            DomainEvents.REVIEW_STATUS_REFRESH_REQUESTED,
+        ).firstOrNull() ?: return null
+        return when {
+            row.first != null -> SearchIndexStatus.READY
+            !row.second.isNullOrBlank() -> SearchIndexStatus.FAILED
+            else -> SearchIndexStatus.PENDING
+        }
+    }
+
     fun claimUnpublishedSearchReindex(limit: Int): List<UUID> =
         jdbc.query(
             """
@@ -272,6 +322,29 @@ class EditorRepository(
             """.trimIndent(),
             { rs, _ -> rs.getObject("id", UUID::class.java) },
             DomainEvents.SEARCH_REINDEX_REQUESTED,
+            limit,
+        )
+
+    fun claimUnpublishedAmendmentActions(limit: Int): List<PendingAmendmentAction> =
+        jdbc.query(
+            """
+            SELECT id, session_id, event_name, payload
+            FROM outbox_events
+            WHERE event_name IN (?, ?) AND published_at IS NULL
+            ORDER BY created_at
+            LIMIT ?
+            FOR UPDATE SKIP LOCKED
+            """.trimIndent(),
+            { rs, _ ->
+                PendingAmendmentAction(
+                    id = rs.getObject("id", UUID::class.java),
+                    sessionId = rs.getObject("session_id", UUID::class.java),
+                    eventName = rs.getString("event_name"),
+                    payload = objectMapper.readTree(rs.getString("payload")),
+                )
+            },
+            DomainEvents.AMENDMENT_LINK_REQUESTED,
+            DomainEvents.REVIEW_STATUS_REFRESH_REQUESTED,
             limit,
         )
 
@@ -303,6 +376,13 @@ data class PublishedPreview(
     val sourceVersionId: UUID,
     val newVersionId: UUID,
     val versionLabel: String?,
+)
+
+data class PendingAmendmentAction(
+    val id: UUID,
+    val sessionId: UUID,
+    val eventName: String,
+    val payload: JsonNode,
 )
 
 private fun toInstant(value: Timestamp?): Instant = value?.toInstant() ?: Instant.EPOCH

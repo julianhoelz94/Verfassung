@@ -12,12 +12,12 @@ fun Actor.canWriteAmendments(): Boolean =
         "content:write" in scopes ||
         "amendment:write" in scopes
 
-fun Actor.canWriteAmendmentDrafts(): Boolean = "admin" in roles || "editor" in roles
+fun Actor.canWriteAmendmentDrafts(): Boolean = "admin" in roles || "editor" in roles || "publisher" in roles || "amendment:write" in scopes
 
-fun Actor.canPublishAmendments(): Boolean = "admin" in roles || "publisher" in roles
+fun Actor.canPublishAmendments(): Boolean = "admin" in roles || "publisher" in roles || "amendment:publish" in scopes
 
 fun Actor.canViewStaffAmendments(): Boolean =
-    "admin" in roles || "editor" in roles || "reviewer" in roles || "publisher" in roles
+    "admin" in roles || "editor" in roles || "reviewer" in roles || "publisher" in roles || "amendment:write" in scopes
 
 fun Actor.canLinkAmendmentTargets(): Boolean = canWriteAmendmentDrafts() || canPublishAmendments()
 
@@ -39,7 +39,7 @@ class WriteAccess(private val identityClient: IdentityClient) {
     fun requireAmendmentDraftWriter(authorization: String?): Actor {
         val actor = identityClient.authenticate(authorization)
         if (!actor.canWriteAmendmentDrafts()) {
-            throw ForbiddenException("amendment draft write requires editor or admin")
+            throw ForbiddenException("amendment draft write requires editor, publisher, or admin")
         }
         return actor
     }

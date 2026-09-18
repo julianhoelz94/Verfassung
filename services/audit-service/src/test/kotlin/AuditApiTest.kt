@@ -173,6 +173,7 @@ class AuditApiTest {
         private const val ADMIN = "Bearer admin-token"
         private const val MACHINE = "Bearer machine-token"
         private const val READER = "Bearer reader-token"
+
         @Container
         @JvmStatic
         val postgres: PostgreSQLContainer<*> = PostgreSQLContainer("postgres:16-alpine")

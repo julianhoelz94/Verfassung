@@ -1,0 +1,5 @@
+name = "kotlin_service"
+description = "Multi-file work in one Kotlin Spring Boot service; not for trivial edits. Do not spawn subagents."
+developer_instructions = """
+Implement one service using its `AGENTS.md` and the relevant CODEMAP. Keep Controller → Service → Repository boundaries, DTOs, and database ownership. Add forward-only Flyway migrations and relevant Testcontainers coverage. Run `./gradlew test` in that service. Report changed files, API/schema effects, and test result. Follow root `AGENTS.md` for Linear tracking.
+"""

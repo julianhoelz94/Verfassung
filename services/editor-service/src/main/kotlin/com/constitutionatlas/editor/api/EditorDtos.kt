@@ -41,6 +41,7 @@ enum class EditSessionStatus {
 
 data class CreateSessionRequest(
     val versionId: UUID,
+    val hopKind: String? = null,
 )
 
 data class SaveDraftRequest(
@@ -52,6 +53,32 @@ data class SaveDraftRequest(
 data class PublishRequest(
     val hopKind: String,
     val amendmentId: UUID? = null,
+    val comment: String? = null,
+    val changeRecord: ChangeRecordRequest? = null,
+)
+
+data class ChangeRecordRequest(
+    val title: String,
+    val comment: String,
+    val documents: List<ChangeRecordDocument> = emptyList(),
+    val changes: List<ChangeRecordChange> = emptyList(),
+)
+
+data class ChangeRecordChange(
+    val articleId: UUID,
+    val articleNumber: String,
+    val changeType: String = "changed",
+)
+
+data class ChangeRecordDocument(
+    val url: String? = null,
+    val fileId: String? = null,
+    val label: String? = null,
+)
+
+data class PublishDetailsRequest(
+    val comment: String? = null,
+    val changeRecord: ChangeRecordRequest? = null,
 )
 
 data class EditSessionDto(
@@ -60,6 +87,7 @@ data class EditSessionDto(
     val versionId: UUID,
     val status: EditSessionStatus,
     val revisionCount: Int,
+    val hopKind: String? = null,
 )
 
 data class EditSessionSummaryDto(
@@ -70,6 +98,7 @@ data class EditSessionSummaryDto(
     val openedAt: Instant,
     val updatedAt: Instant,
     val changedArticleCount: Int,
+    val hopKind: String? = null,
 )
 
 data class DraftArticleDto(
@@ -97,4 +126,7 @@ data class DraftPreviewDto(
     val newVersionId: UUID? = null,
     val newVersionLabel: String? = null,
     val searchIndexStatus: SearchIndexStatus? = null,
+    val publishComment: String? = null,
+    val changeRecord: ChangeRecordRequest? = null,
+    val amendmentStatus: SearchIndexStatus? = null,
 )

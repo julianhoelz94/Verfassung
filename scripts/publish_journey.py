@@ -114,7 +114,7 @@ def wait_for_ping(base: str, name: str, attempts: int = 90) -> None:
             if status == 200:
                 return
             last = f"HTTP {status} {payload}"
-        except urllib.error.URLError as error:
+        except (urllib.error.URLError, OSError) as error:
             last = str(error.reason if hasattr(error, "reason") else error)
         time.sleep(2)
     raise SystemExit(f"{name} did not become ready at {url}: {last}")
@@ -190,13 +190,24 @@ def main() -> None:
     source_before = article_body(SOURCE_VERSION_ID, article_id=SOURCE_ARTICLE_ID)
 
     editor_token = login(editor_email, editor_password, secret)
-    session = editor("POST", "/edit-sessions", editor_token, {"versionId": SOURCE_VERSION_ID})
+    session = editor(
+        "POST",
+        "/edit-sessions",
+        editor_token,
+        {"versionId": SOURCE_VERSION_ID, "hopKind": "editorial_correction"},
+    )
     session_id = session["id"]
     editor(
         "POST",
         f"/edit-sessions/{session_id}/saves",
         editor_token,
         {"articleId": SOURCE_ARTICLE_ID, "title": DRAFT_TITLE, "body": DRAFT_BODY},
+    )
+    editor(
+        "POST",
+        f"/edit-sessions/{session_id}/publish-details",
+        editor_token,
+        {"comment": "Corrected an editorial transcription error."},
     )
     editor("POST", f"/edit-sessions/{session_id}/review", editor_token)
 
@@ -209,7 +220,12 @@ def main() -> None:
         raise SystemExit(f"publisher /me failed: HTTP {status} {principal}")
     if not principal.get("stepUpFresh"):
         step_up(publisher_token, secret)
-    preview = editor("POST", f"/edit-sessions/{session_id}/publish", publisher_token)
+    preview = editor(
+        "POST",
+        f"/edit-sessions/{session_id}/publish",
+        publisher_token,
+        {"hopKind": "editorial_correction"},
+    )
     new_version_id = preview.get("newVersionId")
     if not new_version_id:
         raise SystemExit(f"publish returned no newVersionId: {preview}")

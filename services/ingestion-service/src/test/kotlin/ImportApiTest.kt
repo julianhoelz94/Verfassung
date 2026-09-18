@@ -1,6 +1,6 @@
+import com.constitutionatlas.ingestion.IngestionServiceApplication
 import com.constitutionatlas.ingestion.api.ImportArticle
 import com.constitutionatlas.ingestion.api.ImportOutlineKind
-import com.constitutionatlas.ingestion.IngestionServiceApplication
 import com.constitutionatlas.ingestion.client.CatalogClient
 import com.constitutionatlas.ingestion.client.ContentClient
 import com.constitutionatlas.ingestion.client.DownstreamConstitution

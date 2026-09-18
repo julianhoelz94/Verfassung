@@ -2,7 +2,6 @@ package com.constitutionatlas.identity.service
 
 import com.constitutionatlas.identity.BadRequestException
 import com.constitutionatlas.identity.ConflictException
-import com.constitutionatlas.platform.UnauthorizedException
 import com.constitutionatlas.identity.client.AuthAudit
 import com.constitutionatlas.identity.config.IdentityMfaProperties
 import com.constitutionatlas.identity.crypto.Base32
@@ -11,6 +10,7 @@ import com.constitutionatlas.identity.crypto.Tokens
 import com.constitutionatlas.identity.crypto.Totp
 import com.constitutionatlas.identity.repo.IdentityRepository
 import com.constitutionatlas.identity.repo.StoredMfaChallenge
+import com.constitutionatlas.platform.UnauthorizedException
 import org.springframework.stereotype.Service
 import java.security.SecureRandom
 import java.time.Instant

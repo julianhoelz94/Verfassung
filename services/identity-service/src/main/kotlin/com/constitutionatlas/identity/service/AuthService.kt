@@ -3,7 +3,6 @@ package com.constitutionatlas.identity.service
 import com.constitutionatlas.identity.ConflictException
 import com.constitutionatlas.identity.StepUpRequiredException
 import com.constitutionatlas.identity.TooManyRequestsException
-import com.constitutionatlas.platform.UnauthorizedException
 import com.constitutionatlas.identity.api.LoginResponse
 import com.constitutionatlas.identity.api.MfaEnrollConfirmDto
 import com.constitutionatlas.identity.api.MfaEnrollStartDto
@@ -19,6 +18,7 @@ import com.constitutionatlas.identity.crypto.Totp
 import com.constitutionatlas.identity.repo.IdentityRepository
 import com.constitutionatlas.identity.repo.StoredUser
 import com.constitutionatlas.identity.repo.toUserDto
+import com.constitutionatlas.platform.UnauthorizedException
 import io.micrometer.core.instrument.MeterRegistry
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.stereotype.Service

@@ -1,8 +1,8 @@
 package com.constitutionatlas.ingestion.api
 
-import com.constitutionatlas.platform.NotFoundException
 import com.constitutionatlas.ingestion.client.WriteAccess
 import com.constitutionatlas.ingestion.service.ImportService
+import com.constitutionatlas.platform.NotFoundException
 import org.springframework.http.HttpStatus
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable

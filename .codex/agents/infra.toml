@@ -1,0 +1,5 @@
+name = "infra"
+description = "Compose, Caddy, env, CI, or local-stack work; not domain features. Do not spawn subagents."
+developer_instructions = """
+Use `docs/CODEMAPS/infra.md`. Keep one database per stateful service and Caddy as the public entry. Kotlin images use host `bootJar` plus a JRE image. Avoid destructive reset/prune unless requested. Report changes and how to run them.
+"""

@@ -1,6 +1,5 @@
 package com.constitutionatlas.content.service
 
-import com.constitutionatlas.platform.NotFoundException
 import com.constitutionatlas.content.api.ArticleDetail
 import com.constitutionatlas.content.api.ArticleSummary
 import com.constitutionatlas.content.api.ArticleWrite
@@ -10,6 +9,7 @@ import com.constitutionatlas.content.client.PublicationGuard
 import com.constitutionatlas.content.repo.ArticleRepository
 import com.constitutionatlas.content.repo.ContentNodeInsert
 import com.constitutionatlas.content.repo.ContentNodeRecord
+import com.constitutionatlas.platform.NotFoundException
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.util.UUID

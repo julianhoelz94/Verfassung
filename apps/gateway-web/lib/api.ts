@@ -12,6 +12,8 @@ export type VersionSummary = {
   verifiedBy: string | null;
   verifiedAt: string | null;
   predecessorVersionId?: string | null;
+  legalVersionId?: string | null;
+  currentVersionId?: string | null;
   hopKind?: string;
   listing?: string;
   latestPublished: boolean;

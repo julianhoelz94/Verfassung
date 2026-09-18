@@ -167,6 +167,16 @@ const editorState = {
 let pendingMfaEmail = identityMe.email;
 let currentUser = { ...identityMe };
 
+function resetMockState() {
+  mockAmendments.clear();
+  mockAmendments.set(amendment.id, amendment);
+  mockAmendments.set(amendmentDraft.id, amendmentDraft);
+  extraVersions.splice(0);
+  editorState.session = null;
+  pendingMfaEmail = identityMe.email;
+  currentUser = { ...identityMe };
+}
+
 function userForEmail(email) {
   if (email === 'local-admin@example.local') {
     return { ...identityMe, email, roles: ['admin'] };
@@ -221,6 +231,9 @@ function preview() {
     session: editorState.session,
     latestSnapshot: editorState.session ? 'snapshot' : null,
     drafts: editorState.session?.drafts ?? [],
+    publishComment: editorState.session?.publishComment ?? null,
+    changeRecord: editorState.session?.changeRecord ?? null,
+    amendmentStatus: editorState.session?.status === 'published' ? 'ready' : null,
     publicContentUpdated: editorState.session?.status === 'published' ? true : null,
     newVersionId: editorState.session?.status === 'published' ? '01900000-0000-4000-8000-000000000501' : null,
     newVersionLabel: editorState.session?.status === 'published' ? '2022-1' : null,
@@ -234,6 +247,12 @@ const server = createServer(async (req, res) => {
 
   if (pathname === '/health') {
     json(res, 200, { ok: true });
+    return;
+  }
+
+  if (method === 'POST' && pathname === '/__reset') {
+    resetMockState();
+    empty(res, 204);
     return;
   }
 
@@ -535,6 +554,7 @@ const server = createServer(async (req, res) => {
       id: SESSION_ID,
       actorId: identityMe.id,
       versionId: body.versionId ?? VERSION_2022,
+      hopKind: body.hopKind ?? null,
       status: 'open',
       revisionCount: 0,
       drafts: [],
@@ -552,6 +572,14 @@ const server = createServer(async (req, res) => {
     return;
   }
   const editorCommand = pathname.match(/^\/api\/editor\/edit-sessions\/([^/]+)\/(saves|review|approval|publish)$/);
+  const publishDetailsMatch = pathname.match(/^\/api\/editor\/edit-sessions\/([^/]+)\/publish-details$/);
+  if (method === 'POST' && publishDetailsMatch && editorState.session?.id === publishDetailsMatch[1]) {
+    const body = await readBody(req);
+    editorState.session.publishComment = body.comment ?? null;
+    editorState.session.changeRecord = body.changeRecord ?? null;
+    json(res, 200, preview());
+    return;
+  }
   if (method === 'POST' && editorCommand && editorState.session?.id === editorCommand[1]) {
     const command = editorCommand[2];
     if (command === 'saves') {

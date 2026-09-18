@@ -1,103 +1,78 @@
 'use client';
 
-import { useState } from 'react';
-import Link from 'next/link';
-import type { Amendment } from '../../lib/api';
-import { Button, Select } from '../components/ui';
-import { publishAction } from './actions';
+import { Button, Input, TextArea } from '../components/ui';
 
 type PublishFormProps = {
   sessionId: string;
   versionId: string;
   articleId: string;
-  amendments: Amendment[];
+  hopKind: 'legal' | 'editorial_correction';
+  status: string;
+  canEdit: boolean;
+  canPublish: boolean;
+  record?: { title: string; comment: string; documents: { url?: string; label?: string }[] } | null;
+  comment?: string | null;
 };
 
-const HOP_KINDS = [
-  { value: 'legal_amendment', label: 'Amending law' },
-  { value: 'official_errata', label: 'Official errata' },
-  { value: 'editorial_correction', label: 'Fix transcription (not a law)' },
-] as const;
-
-export function PublishForm({ sessionId, versionId, articleId, amendments }: PublishFormProps) {
-  const [hopKind, setHopKind] = useState<string>('legal_amendment');
-  const matchingAmendments = amendments.filter((item) => !item.kind || item.kind === hopKind);
-  const [amendmentId, setAmendmentId] = useState(matchingAmendments[0]?.id ?? '');
-  const [amendmentTitle, setAmendmentTitle] = useState(matchingAmendments[0]?.title ?? '');
-  const showAmendmentSelect = hopKind === 'legal_amendment' || hopKind === 'official_errata';
-
-  function onHopKindChange(nextKind: string) {
-    setHopKind(nextKind);
-    const nextList = amendments.filter((item) => !item.kind || item.kind === nextKind);
-    const next = nextList[0];
-    setAmendmentId(next?.id ?? '');
-    setAmendmentTitle(next?.title ?? '');
-  }
-
-  function onAmendmentChange(nextId: string) {
-    setAmendmentId(nextId);
-    const selected = amendments.find((item) => item.id === nextId);
-    setAmendmentTitle(selected?.title ?? '');
-  }
-
+export function PublishForm({ sessionId, versionId, articleId, hopKind, status, canEdit, canPublish, record, comment }: PublishFormProps) {
+  const fields = <>
+    <input type="hidden" name="sessionId" value={sessionId} />
+    <input type="hidden" name="versionId" value={versionId} />
+    <input type="hidden" name="articleId" value={articleId} />
+    <input type="hidden" name="hopKind" value={hopKind} />
+  </>;
+  const ready = hopKind === 'legal' ? Boolean(record) : Boolean(comment);
   return (
-    <form action={publishAction} className="stack">
-      <input type="hidden" name="sessionId" value={sessionId} />
-      <input type="hidden" name="versionId" value={versionId} />
-      <input type="hidden" name="articleId" value={articleId} />
-      <input type="hidden" name="hopKind" value={hopKind} />
-      {showAmendmentSelect ? (
-        <>
-          <input type="hidden" name="amendmentId" value={amendmentId} />
-          <input type="hidden" name="amendmentTitle" value={amendmentTitle} />
-        </>
-      ) : null}
-      <Select
-        id="publish-hop-kind"
-        name="publishHopKind"
-        label="What kind of change is this?"
-        value={hopKind}
-        onChange={(event) => onHopKindChange(event.target.value)}
-      >
-        {HOP_KINDS.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </Select>
-      {showAmendmentSelect ? (
-        <>
-          <Select
-            id="publish-amendment"
-            name="publishAmendment"
-            label="Amending law"
-            value={amendmentId}
-            required={matchingAmendments.length > 0}
-            onChange={(event) => onAmendmentChange(event.target.value)}
-          >
-            {matchingAmendments.length === 0 ? (
-              <option value="">No laws available</option>
-            ) : (
-              matchingAmendments.map((amendment) => (
-                <option key={amendment.id} value={amendment.id}>
-                  {amendment.title}
-                  {amendment.status === 'draft' ? ' (draft)' : ''}
-                </option>
-              ))
-            )}
-          </Select>
-          {matchingAmendments.length === 0 ? (
-            <p className="muted">
-              <Link href="/editor/amendments">Record a law first</Link> before publishing this hop.
-            </p>
-          ) : null}
-        </>
+    <section className="stack" aria-label={hopKind === 'legal' ? 'Change record' : 'Transcription comment'}>
+      <h3>{hopKind === 'legal' ? 'Change record' : 'Transcription comment'}</h3>
+      {status === 'open' && canEdit ? (
+        <form action="/editor/command" method="post" className="stack">
+          <input type="hidden" name="command" value="details" />
+          {fields}
+          {hopKind === 'legal' ? <>
+            <Input id="recordTitle" name="recordTitle" label="Title" defaultValue={record?.title ?? ''} required />
+            <TextArea id="recordComment" name="recordComment" label="Comment" defaultValue={record?.comment ?? ''} required rows={3} />
+            <Input id="documentUrl" name="documentUrl" label="Document URL" defaultValue={record?.documents[0]?.url ?? ''} required type="url" />
+            <Input id="documentLabel" name="documentLabel" label="Document label" defaultValue={record?.documents[0]?.label ?? ''} />
+          </> : (
+            <TextArea id="comment" name="comment" label="What was corrected in this transcription?" defaultValue={comment ?? ''} required rows={3} />
+          )}
+          <Button>Save {hopKind === 'legal' ? 'change record' : 'comment'}</Button>
+        </form>
       ) : (
-        <p className="muted">This hop will not appear on the public amendment timeline.</p>
+        hopKind === 'legal' && record ? (
+          <div className="stack">
+            <p><strong>{record.title}</strong></p>
+            <p>{record.comment}</p>
+            {record.documents.length > 0 ? (
+              <ul>
+                {record.documents.map((document, index) => (
+                  <li key={`${document.url ?? document.label ?? 'document'}-${index}`}>
+                    {document.url ? (
+                      <a href={document.url} rel="noreferrer">
+                        {document.label ?? document.url}
+                      </a>
+                    ) : (
+                      document.label ?? 'Archived document'
+                    )}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
+        ) : (
+          <p className="muted">{comment ?? 'No comment saved.'}</p>
+        )
       )}
-      <Button variant="primary" disabled={showAmendmentSelect && !amendmentId}>
-        Publish
-      </Button>
-    </form>
+      {status === 'approved' && canPublish ? (
+        <form action="/editor/command" method="post" className="stack">
+          <input type="hidden" name="command" value="publish" />
+          {fields}
+          <Button variant="primary" disabled={!ready}>
+            {hopKind === 'legal' ? 'Publish new legal version' : 'Publish transcription'}
+          </Button>
+        </form>
+      ) : null}
+    </section>
   );
 }

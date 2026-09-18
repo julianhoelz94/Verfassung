@@ -11,6 +11,7 @@ export type EditSession = {
   versionId: string;
   status: string;
   revisionCount: number;
+  hopKind?: 'legal' | 'editorial_correction' | null;
 };
 
 export type EditSessionSummary = {
@@ -21,6 +22,7 @@ export type EditSessionSummary = {
   openedAt: string;
   updatedAt: string;
   changedArticleCount: number;
+  hopKind?: 'legal' | 'editorial_correction' | null;
 };
 
 export type DraftArticle = {
@@ -38,10 +40,13 @@ export type DraftPreview = {
   newVersionId?: string | null;
   newVersionLabel?: string | null;
   searchIndexStatus?: 'pending' | 'ready' | 'failed' | null;
+  amendmentStatus?: 'pending' | 'ready' | 'failed' | null;
+  publishComment?: string | null;
+  changeRecord?: { title: string; comment: string; documents: { url?: string; fileId?: string; label?: string }[] } | null;
 };
 
 /**
- * Fixed editor error copy keyed by a short identifier. Server actions redirect with
+ * Fixed editor error copy keyed by a short identifier. Editor commands redirect with
  * `?error=<key>` and the editor page renders only these strings, so a crafted URL cannot
  * put arbitrary text into the trusted error banner.
  */
@@ -51,6 +56,8 @@ export const EDITOR_ERROR_MESSAGES = {
   forbidden: 'You do not have permission for that action.',
   not_ready: 'This draft is not ready for that action.',
   not_tip: 'Publish only from the latest snapshot in the chain.',
+  not_editorial_tip: 'This text has a newer transcription. Open a session on its current snapshot.',
+  not_legal_tip: 'A newer law exists. Record the next legal change from the current law.',
   invalid: 'The draft could not be published.',
   open_failed: 'Could not open an edit session.',
   list_failed: 'Could not list edit sessions.',
@@ -123,7 +130,7 @@ async function throwIfNotOk(response: Response, fallback: EditorErrorKey): Promi
     throw new EditorApiError('forbidden', code);
   }
   if (response.status === 409) {
-    throw new EditorApiError(code === 'not_tip' ? 'not_tip' : 'not_ready', code);
+    throw new EditorApiError(code === 'not_tip' || code === 'not_editorial_tip' || code === 'not_legal_tip' ? code : 'not_ready', code);
   }
   if (response.status === 400) {
     throw new EditorApiError('invalid', code);
@@ -131,10 +138,10 @@ async function throwIfNotOk(response: Response, fallback: EditorErrorKey): Promi
   throw new EditorApiError(fallback, code);
 }
 
-export async function openSession(versionId: string): Promise<EditSession> {
+export async function openSession(versionId: string, hopKind: 'legal' | 'editorial_correction'): Promise<EditSession> {
   const response = await editorFetch('/edit-sessions', {
     method: 'POST',
-    body: JSON.stringify({ versionId }),
+    body: JSON.stringify({ versionId, hopKind }),
   });
   await throwIfNotOk(response, 'open_failed');
   return (await response.json()) as EditSession;
@@ -199,14 +206,23 @@ export async function approveReview(sessionId: string): Promise<DraftPreview> {
   return (await response.json()) as DraftPreview;
 }
 
+export async function savePublishDetails(
+  sessionId: string,
+  details: { comment?: string; changeRecord?: { title: string; comment: string; documents: { url: string; label?: string }[] } },
+): Promise<DraftPreview> {
+  const response = await editorFetch(`/edit-sessions/${encodeURIComponent(sessionId)}/publish-details`, {
+    method: 'POST',
+    body: JSON.stringify(details),
+  });
+  await throwIfNotOk(response, 'save_failed');
+  return (await response.json()) as DraftPreview;
+}
+
 export async function publishSession(
   sessionId: string,
-  options: { hopKind: string; amendmentId?: string },
+  options: { hopKind: 'legal' | 'editorial_correction'; amendmentId?: string; comment?: string; changeRecord?: { title: string; comment: string; documents: { url: string; label?: string }[] } },
 ): Promise<DraftPreview> {
-  const body: { hopKind: string; amendmentId?: string } = { hopKind: options.hopKind };
-  if (options.amendmentId) {
-    body.amendmentId = options.amendmentId;
-  }
+  const body = options;
   const response = await editorFetch(`/edit-sessions/${encodeURIComponent(sessionId)}/publish`, {
     method: 'POST',
     body: JSON.stringify(body),

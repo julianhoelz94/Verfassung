@@ -2,6 +2,7 @@ package com.constitutionatlas.catalog.api
 
 import java.time.LocalDate
 import java.util.UUID
+import com.fasterxml.jackson.annotation.JsonInclude
 
 data class CountrySummary(
     val id: UUID,
@@ -32,6 +33,7 @@ data class VersionSummary(
     val currentVersionId: UUID? = null,
     val legalPredecessorVersionId: UUID? = null,
     val editorialPredecessorVersionId: UUID? = null,
+    @get:JsonInclude(JsonInclude.Include.NON_NULL)
     val publicationComment: String? = null,
 )
 

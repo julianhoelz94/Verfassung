@@ -238,7 +238,11 @@ class EditorApiTest {
         Mockito.verify(contentClient, Mockito.never()).updateArticle(
             eqNonNull(articleId),
             Mockito.anyString() ?: "",
+            Mockito.nullable(String::class.java),
+            Mockito.nullable(String::class.java),
             Mockito.anyString() ?: "",
+            Mockito.nullable(String::class.java),
+            Mockito.nullable(String::class.java),
         )
     }
 

@@ -178,7 +178,7 @@ class AmendmentService(
         }
         val publishedRevisionId = amendmentRepository.getPublishedRevisionId(amendmentId)
             ?: throw ConflictException("only a published amendment can confirm quotes")
-        val tipRevisionId = amendmentRepository.findTipRevisionId(amendmentId)
+        amendmentRepository.findTipRevisionId(amendmentId)
             ?: throw IllegalStateException("amendment has no revisions")
         val published = amendmentRepository.getAmendmentDtoForRevision(amendmentId, publishedRevisionId, includeStaff = true)
             ?: throw IllegalStateException("published amendment not readable")

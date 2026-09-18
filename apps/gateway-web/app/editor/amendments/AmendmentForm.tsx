@@ -4,7 +4,7 @@ import { useMemo, useRef, useState, useTransition } from 'react';
 import type { Amendment, VersionSummary } from '../../../lib/api';
 import { Alert, Badge, Button, Input, Select, TextArea } from '../../components/ui';
 import { AmendmentChangesTable, type ChangeRow } from './AmendmentChangesTable';
-import { publishAmendmentAction, saveAmendmentAction, suggestChangesAction, withdrawAmendmentAction } from './actions';
+import { confirmQuotesAction, publishAmendmentAction, saveAmendmentAction, suggestChangesAction, withdrawAmendmentAction } from './actions';
 
 type AmendmentFormProps = {
   amendmentId: string;
@@ -217,6 +217,9 @@ export function AmendmentForm({
         ) : null}
         {canPublish && amendmentId !== 'new' ? (
           <Button formAction={publishAmendmentAction}>Publish law</Button>
+        ) : null}
+        {canPublish && amendment?.reviewStatus === 'needs_review' ? (
+          <Button formAction={confirmQuotesAction}>Confirm quotes</Button>
         ) : null}
         {canWithdraw && amendmentId !== 'new' ? (
           <Button formAction={withdrawAmendmentAction}>Withdraw</Button>

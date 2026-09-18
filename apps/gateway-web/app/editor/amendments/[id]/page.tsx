@@ -17,6 +17,7 @@ type AmendmentDetailPageProps = {
     published?: string;
     withdrawn?: string;
     error?: string;
+    confirmed?: string;
   }>;
 };
 
@@ -128,6 +129,7 @@ export default async function AmendmentDetailPage(props: AmendmentDetailPageProp
       {errorMessage ? <Alert tone="error">{errorMessage}</Alert> : null}
       {searchParams.saved ? <Alert tone="success">Draft saved.</Alert> : null}
       {searchParams.published ? <Alert tone="success">Amending law published.</Alert> : null}
+      {searchParams.confirmed ? <Alert tone="success">Quotes confirmed and the legal change republished.</Alert> : null}
       {searchParams.withdrawn ? <Alert tone="success">Amending law withdrawn.</Alert> : null}
       {isNew || !amendment ? (
         <AmendmentForm

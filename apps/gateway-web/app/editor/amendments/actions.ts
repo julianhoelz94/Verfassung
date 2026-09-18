@@ -126,6 +126,22 @@ export async function publishAmendmentAction(formData: FormData): Promise<void> 
   await runDetailCommand(formData, amendmentId, () => publishAmendment(amendmentId), { published: '1' });
 }
 
+export async function confirmQuotesAction(formData: FormData): Promise<void> {
+  const amendmentId = String(formData.get('amendmentId') ?? '').trim();
+  if (!amendmentId || amendmentId === 'new') {
+    redirect(amendmentListPath({ error: 'invalid' }));
+  }
+  await runDetailCommand(
+    formData,
+    amendmentId,
+    async () => {
+      await appendRevision(amendmentId, readWriteBody(formData));
+      await publishAmendment(amendmentId);
+    },
+    { confirmed: '1' },
+  );
+}
+
 export async function withdrawAmendmentAction(formData: FormData): Promise<void> {
   const amendmentId = String(formData.get('amendmentId') ?? '').trim();
   if (!amendmentId || amendmentId === 'new') {

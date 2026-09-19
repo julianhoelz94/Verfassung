@@ -3,8 +3,10 @@ import { type Page, expect } from '@playwright/test';
 
 export const EDITOR_EMAIL = 'local-editor@example.local';
 export const ADMIN_EMAIL = 'local-admin@example.local';
+export const PUBLISHER_EMAIL = 'local-publisher@example.local';
 export const EDITOR_PASSWORD = 'change-me';
 export const MFA_CODE = '123456';
+export const VERSION_1949 = '01900000-0000-4000-8000-000000000003';
 export const VERSION_2022 = '01900000-0000-4000-8000-000000000004';
 export const ARTICLE_1 = '01900000-0000-4000-8000-000000000201';
 
@@ -25,6 +27,10 @@ export async function signInEditor(page: Page): Promise<void> {
 
 export async function signInAdmin(page: Page): Promise<void> {
   await signIn(page, ADMIN_EMAIL);
+}
+
+export async function signInPublisher(page: Page): Promise<void> {
+  await signIn(page, PUBLISHER_EMAIL);
 }
 
 export async function signOut(page: Page): Promise<void> {

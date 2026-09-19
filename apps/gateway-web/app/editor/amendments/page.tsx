@@ -15,22 +15,12 @@ type AmendmentsPageProps = {
     published?: string;
     withdrawn?: string;
     error?: string;
+    review?: string;
   }>;
 };
 
 function hasRole(roles: string[], role: string): boolean {
   return roles.includes(role) || roles.includes('admin');
-}
-
-function kindLabel(kind: string | undefined): string {
-  switch (kind) {
-    case 'legal_amendment':
-      return 'Legal amendment';
-    case 'official_errata':
-      return 'Official errata';
-    default:
-      return kind ?? 'Unknown';
-  }
 }
 
 function statusTone(status: string | undefined): 'added' | 'removed' | 'changed' {
@@ -62,7 +52,7 @@ export default async function AmendmentsPage(props: AmendmentsPageProps) {
   if (!canVisitEditor(user.roles)) {
     return (
       <PageMain className="wide">
-        <PageHeader title="Amending laws" meta={`Signed in as ${user.email}, but this account has no editorial role.`} />
+        <PageHeader title="Legal changes" meta={`Signed in as ${user.email}, but this account has no editorial role.`} />
       </PageMain>
     );
   }
@@ -86,6 +76,9 @@ export default async function AmendmentsPage(props: AmendmentsPageProps) {
   }
 
   const errorMessage = amendmentErrorMessage(searchParams.error);
+  const visibleAmendments = searchParams.review === 'needs_review'
+    ? amendments.filter((amendment) => amendment.reviewStatus === 'needs_review')
+    : amendments;
   const newHref = selectedConstitution
     ? `/editor/amendments/new?constitutionId=${encodeURIComponent(selectedConstitution.id)}`
     : '/editor/amendments/new';
@@ -93,13 +86,13 @@ export default async function AmendmentsPage(props: AmendmentsPageProps) {
   return (
     <PageMain className="wide">
       <PageHeader
-        title="Amending laws"
+        title="Legal changes"
         eyebrow="Editorial workspace"
         meta={`Signed in as ${user.email}. Roles: ${user.roles.join(', ')}.`}
         actions={
           canEdit && selectedConstitution ? (
             <a className="btn btn-primary" href={newHref}>
-              Add amending law
+              Add legal change
             </a>
           ) : null
         }
@@ -117,6 +110,10 @@ export default async function AmendmentsPage(props: AmendmentsPageProps) {
               </option>
             ))}
           </Select>
+          <Select id="review" name="review" label="Review status" defaultValue={searchParams.review ?? ''}>
+            <option value="">All legal changes</option>
+            <option value="needs_review">Needs review</option>
+          </Select>
           <Button type="submit">Show laws</Button>
         </form>
       ) : (
@@ -125,11 +122,11 @@ export default async function AmendmentsPage(props: AmendmentsPageProps) {
       {selectedConstitution ? (
         <section>
           <h2 className="section-title">{selectedConstitution.title}</h2>
-          {amendments.length === 0 ? (
-            <p className="muted">No amending laws recorded for this constitution yet.</p>
+          {visibleAmendments.length === 0 ? (
+            <p className="muted">No legal changes match this view.</p>
           ) : (
             <DataList columns={4}>
-              {amendments.map((amendment) => (
+              {visibleAmendments.map((amendment) => (
                 <DataRow
                   key={amendment.id}
                   cells={[
@@ -137,14 +134,14 @@ export default async function AmendmentsPage(props: AmendmentsPageProps) {
                       label: 'Title',
                       value: <a href={`/editor/amendments/${encodeURIComponent(amendment.id)}`}>{amendment.title}</a>,
                     },
-                    { label: 'Kind', value: kindLabel(amendment.kind) },
+                    { label: 'Comment', value: amendment.comment ?? amendment.summary },
                     {
                       label: 'Enacted',
                       value: <FormattedDate value={amendment.enactedOn} />,
                     },
                     {
                       label: 'Status',
-                      value: <Badge tone={statusTone(amendment.status)}>{amendment.status ?? 'draft'}</Badge>,
+                      value: <span className="chip-row"><Badge tone={statusTone(amendment.status)}>{amendment.status ?? 'draft'}</Badge>{amendment.reviewStatus === 'needs_review' ? <Badge tone="changed">Needs review</Badge> : null}</span>,
                     },
                   ]}
                 />

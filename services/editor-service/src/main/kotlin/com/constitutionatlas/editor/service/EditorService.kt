@@ -245,7 +245,7 @@ class EditorService(
         } else {
             null
         }
-        val successor = createSuccessor(source, hopKind, session.versionId)
+        val successor = createSuccessor(source, hopKind, session.versionId, comment)
         contentClient.replaceArticles(successor.id, sourceTree.map { toWrite(it) })
         val copies = contentClient.listArticles(successor.id).associateBy { it.articleNumber }
         drafts.forEachIndexed { index, draft ->
@@ -448,6 +448,7 @@ class EditorService(
         source: CatalogVersion,
         hopKind: String,
         predecessorVersionId: UUID,
+        publicationComment: String?,
     ): CatalogVersion {
         for (n in 1..50) {
             val label = "${source.versionLabel}-$n"
@@ -459,6 +460,7 @@ class EditorService(
                     source.languageCode,
                     predecessorVersionId,
                     hopKind,
+                    publicationComment,
                 )
             } catch (ex: ConflictException) {
                 if (ex.code == "not_legal_tip" || ex.code == "not_editorial_tip") {

@@ -8,6 +8,7 @@ import { canVisitEditor } from '../../../../lib/nav';
 import { SESSION_COOKIE, currentUser } from '../../../../lib/session';
 import { AmendmentEditorLayout } from '../AmendmentEditorLayout';
 import { AmendmentForm } from '../AmendmentForm';
+import { QuoteReviewPanel } from '../QuoteReviewPanel';
 
 type AmendmentDetailPageProps = {
   params: Promise<{ id: string }>;
@@ -17,6 +18,7 @@ type AmendmentDetailPageProps = {
     published?: string;
     withdrawn?: string;
     error?: string;
+    confirmed?: string;
   }>;
 };
 
@@ -87,7 +89,7 @@ export default async function AmendmentDetailPage(props: AmendmentDetailPageProp
   if (!constitutionId) {
     return (
       <PageMain className="wide">
-        <PageHeader title="Amending law" />
+        <PageHeader title="Legal change" />
         <Alert tone="error">No constitution is available for this form.</Alert>
       </PageMain>
     );
@@ -105,6 +107,16 @@ export default async function AmendmentDetailPage(props: AmendmentDetailPageProp
   const latestVersionId = versions.find((version) => version.latestPublished)?.id ?? versions.at(-1)?.id ?? null;
 
   const revisions = !isNew && sessionToken ? await listRevisions(id) : null;
+  const publishedRevision = revisions?.find((revision) => revision.id === amendment?.publishedRevisionId) ?? null;
+  const quotedVersionIds = publishedRevision
+    ? [publishedRevision.sourceVersionId, publishedRevision.targetVersionId].filter((versionId): versionId is string => Boolean(versionId))
+    : [];
+  const reviewVersionIds = [...new Set(quotedVersionIds.flatMap((versionId) => [versionId, versions.find((version) => version.id === versionId)?.currentVersionId].filter((id): id is string => Boolean(id))))];
+  const reviewContentEntries = await Promise.all(reviewVersionIds.map(async (versionId) => {
+    const articles = await listAllArticles(versionId, true).catch(() => []);
+    return [versionId, articles.map((article) => `Article ${article.articleNumber}: ${article.body ?? article.title}`)] as const;
+  }));
+  const reviewContentByVersion = Object.fromEntries(reviewContentEntries);
 
   const canSave = canEdit;
   const canPublishLaw = canPublish && amendment?.status !== 'withdrawn' && !isNew;
@@ -117,17 +129,28 @@ export default async function AmendmentDetailPage(props: AmendmentDetailPageProp
   return (
     <PageMain className="wide">
       <PageHeader
-        breadcrumbs={[
-          { href: '/editor/amendments', label: 'Amending laws' },
+          breadcrumbs={[
+          { href: '/editor/amendments', label: 'Legal changes' },
           { label: isNew ? 'New' : amendment?.title ?? id.slice(0, 8) },
         ]}
         title={title}
         meta={`Signed in as ${user.email}. Roles: ${user.roles.join(', ')}.`}
       />
+      {amendment?.reviewStatus === 'needs_review' ? <Alert tone="info">Needs review: quotes or document pins are stale.</Alert> : null}
       {errorMessage ? <Alert tone="error">{errorMessage}</Alert> : null}
       {searchParams.saved ? <Alert tone="success">Draft saved.</Alert> : null}
       {searchParams.published ? <Alert tone="success">Amending law published.</Alert> : null}
+      {searchParams.confirmed ? <Alert tone="success">Quotes confirmed and the legal change republished.</Alert> : null}
       {searchParams.withdrawn ? <Alert tone="success">Amending law withdrawn.</Alert> : null}
+      {amendment?.reviewStatus === 'needs_review' ? (
+        <QuoteReviewPanel
+          amendment={amendment}
+          publishedRevision={publishedRevision}
+          versions={versions}
+          canConfirm={canPublishLaw}
+          contentByVersion={reviewContentByVersion}
+        />
+      ) : null}
       {isNew || !amendment ? (
         <AmendmentForm
           amendmentId="new"

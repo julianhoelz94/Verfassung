@@ -148,6 +148,7 @@ class EditorApiTest {
             Mockito.anyString() ?: "en",
             eqNonNull(versionId),
             eqNonNull("editorial_correction"),
+            eqNonNull("Correct transcription"),
         )
         val eventNames = jdbcTemplate.queryForList(
             "SELECT event_name FROM outbox_events WHERE session_id = ?::uuid ORDER BY event_name",
@@ -738,6 +739,7 @@ class EditorApiTest {
             Mockito.anyString() ?: "",
             Mockito.any(UUID::class.java) ?: UUID(0, 0),
             Mockito.anyString() ?: "",
+            Mockito.nullable(String::class.java),
         )
     }
 
@@ -774,6 +776,7 @@ class EditorApiTest {
             Mockito.anyString() ?: "",
             Mockito.any(UUID::class.java) ?: UUID(0, 0),
             Mockito.anyString() ?: "",
+            Mockito.nullable(String::class.java),
         )
     }
 
@@ -800,6 +803,7 @@ class EditorApiTest {
                 Mockito.anyString() ?: "en",
                 eqNonNull(sourceVersionId),
                 Mockito.anyString() ?: "editorial_correction",
+                Mockito.nullable(String::class.java),
             ),
         ).thenReturn(draft)
         Mockito.`when`(catalogClient.listVersions(eqNonNull(constitutionId), Mockito.anyString() ?: "all"))

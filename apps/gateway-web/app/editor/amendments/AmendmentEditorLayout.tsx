@@ -3,9 +3,10 @@
 import { useMemo, useState } from 'react';
 import type { Amendment, VersionSummary } from '../../../lib/api';
 import type { AmendmentRevision } from '../../../lib/amendment-editor-api';
-import { Alert } from '../../components/ui';
+import { Alert, Button } from '../../components/ui';
 import { AmendmentForm } from './AmendmentForm';
 import { AmendmentRevisionPanel } from './AmendmentRevisionPanel';
+import { publishAmendmentAction } from './actions';
 
 type AmendmentEditorLayoutProps = {
   amendmentId: string;
@@ -33,7 +34,8 @@ function revisionToAmendment(revision: AmendmentRevision, base: Amendment): Amen
     sourceReference: revision.sourceReference ?? null,
     sourceVersionId: revision.sourceVersionId ?? null,
     targetVersionId: revision.targetVersionId ?? null,
-    kind: revision.kind ?? base.kind,
+    comment: revision.comment ?? base.comment ?? null,
+    documents: revision.documents ?? base.documents ?? [],
     changes: revision.changes.map((change, index) => ({
       id: `revision-${index}`,
       articleId: null,
@@ -103,6 +105,12 @@ export function AmendmentEditorLayout({
           readOnly={readOnly || viewingPast}
           contentAvailable={contentAvailable}
         />
+        {canPublish && !viewingPast ? (
+          <form action={publishAmendmentAction} className="action-bar">
+            <input type="hidden" name="amendmentId" value={amendmentId} />
+            <Button>Publish law</Button>
+          </form>
+        ) : null}
       </section>
       {revisions && revisions.length > 0 ? (
         <AmendmentRevisionPanel

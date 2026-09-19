@@ -1769,6 +1769,24 @@ button.article-toggle[aria-expanded='false']::after {
   grid-template-columns: 1fr;
 }
 
+.quote-review-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-4);
+  margin-bottom: var(--space-5);
+}
+
+.quote-review-side p,
+.quote-review-instrument p {
+  margin: 0 0 var(--space-3);
+}
+
+@media (min-width: 1024px) {
+  .quote-review-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr) minmax(0, 1fr);
+  }
+}
+
 @media (min-width: 1024px) {
   .amendment-workspace {
     grid-template-columns: minmax(0, 1fr) 300px;

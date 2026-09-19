@@ -1,5 +1,6 @@
 package com.constitutionatlas.catalog.api
 
+import com.fasterxml.jackson.annotation.JsonInclude
 import java.time.LocalDate
 import java.util.UUID
 
@@ -32,6 +33,8 @@ data class VersionSummary(
     val currentVersionId: UUID? = null,
     val legalPredecessorVersionId: UUID? = null,
     val editorialPredecessorVersionId: UUID? = null,
+    @get:JsonInclude(JsonInclude.Include.NON_NULL)
+    val publicationComment: String? = null,
 )
 
 data class NodeKindDto(
@@ -104,6 +107,7 @@ data class CreateVersionRequest(
     val gazetteReference: String? = null,
     val predecessorVersionId: UUID? = null,
     val hopKind: String? = null,
+    val publicationComment: String? = null,
 )
 
 data class VersionCreated(

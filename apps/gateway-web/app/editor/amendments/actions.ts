@@ -5,6 +5,7 @@ import {
   AmendmentApiError,
   amendmentErrorMessage,
   appendRevision,
+  confirmAmendmentQuotes,
   createAmendment,
   publishAmendment,
   suggestChanges,
@@ -53,15 +54,23 @@ function parseChanges(formData: FormData): AmendmentChangeWrite[] {
   }
 }
 
+function parseDocuments(formData: FormData): { url?: string | null; fileId?: string | null; label?: string | null }[] {
+  try {
+    const rows = JSON.parse(String(formData.get('documentsJson') ?? '[]')) as { url?: string; fileId?: string; label?: string }[];
+    return rows.map((row) => ({ url: row.url?.trim() || null, fileId: row.fileId?.trim() || null, label: row.label?.trim() || null })).filter((row) => row.url || row.fileId || row.label);
+  } catch { return []; }
+}
+
 function readWriteBody(formData: FormData): AmendmentWriteBody {
   const title = String(formData.get('title') ?? '').trim();
   if (!title) {
     throw new AmendmentApiError('title');
   }
   return {
-    kind: String(formData.get('kind') ?? 'legal_amendment'),
     title,
     summary: optionalField(formData, 'summary'),
+    comment: optionalField(formData, 'comment'),
+    documents: parseDocuments(formData),
     enactedOn: optionalField(formData, 'enactedOn'),
     effectiveOn: optionalField(formData, 'effectiveOn'),
     sourceReference: optionalField(formData, 'sourceReference'),
@@ -125,6 +134,14 @@ export async function publishAmendmentAction(formData: FormData): Promise<void> 
   await runDetailCommand(formData, amendmentId, () => publishAmendment(amendmentId), { published: '1' });
 }
 
+export async function confirmQuotesAction(formData: FormData): Promise<void> {
+  const amendmentId = String(formData.get('amendmentId') ?? '').trim();
+  if (!amendmentId || amendmentId === 'new') {
+    redirect(amendmentListPath({ error: 'invalid' }));
+  }
+  await runDetailCommand(formData, amendmentId, () => confirmAmendmentQuotes(amendmentId), { confirmed: '1' });
+}
+
 export async function withdrawAmendmentAction(formData: FormData): Promise<void> {
   const amendmentId = String(formData.get('amendmentId') ?? '').trim();
   if (!amendmentId || amendmentId === 'new') {
@@ -160,7 +177,6 @@ export async function restoreRevisionAction(formData: FormData): Promise<void> {
     redirectDetail(amendmentId, { error: 'invalid' });
   }
   const body: AmendmentWriteBody = {
-    kind: revision.kind ?? 'legal_amendment',
     title: revision.title,
     summary: revision.summary ?? null,
     enactedOn: revision.enactedOn ?? null,
@@ -168,6 +184,8 @@ export async function restoreRevisionAction(formData: FormData): Promise<void> {
     sourceReference: revision.sourceReference ?? null,
     sourceVersionId: revision.sourceVersionId ?? null,
     targetVersionId: revision.targetVersionId ?? null,
+    comment: revision.comment ?? null,
+    documents: revision.documents ?? [],
     changes: revision.changes.map((change) => ({
       articleNumber: change.articleNumber?.trim() || null,
       changeType: change.changeType,

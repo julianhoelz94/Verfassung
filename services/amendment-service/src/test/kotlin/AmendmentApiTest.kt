@@ -709,6 +709,64 @@ class AmendmentApiTest {
     }
 
     @Test
+    fun confirmQuotesRepublishesThePublishedRevisionAtLiveTips() {
+        val source = UUID.fromString("01900000-0000-4000-8000-000000000941")
+        val target = UUID.fromString("01900000-0000-4000-8000-000000000942")
+        val sourceTip = UUID.fromString("01900000-0000-4000-8000-000000000943")
+        val targetTip = UUID.fromString("01900000-0000-4000-8000-000000000944")
+        val amendmentId =
+            objectMapper.readTree(
+                mockMvc.post("/constitutions/$CONSTITUTION_ID/amendments") {
+                    header("Authorization", TOKEN)
+                    contentType = MediaType.APPLICATION_JSON
+                    content = createAmendmentJson("Quoted record", comment = "Checked", sourceVersionId = source, targetVersionId = target)
+                }.andExpect { status { isCreated() } }.andReturn().response.contentAsString,
+            ).get("id").asText()
+        mockMvc.post("/amendments/$amendmentId/publish") { header("Authorization", PUBLISHER_TOKEN) }
+            .andExpect { status { isOk() } }
+        Mockito.`when`(catalogClient.getVersion(source)).thenReturn(CatalogVersionRef(source, CONSTITUTION_ID, source, sourceTip))
+        Mockito.`when`(catalogClient.getVersion(target)).thenReturn(CatalogVersionRef(target, CONSTITUTION_ID, target, targetTip))
+
+        mockMvc.post("/amendments/$amendmentId/confirm-quotes") { header("Authorization", PUBLISHER_TOKEN) }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.sourceVersionId") { value(sourceTip.toString()) }
+                jsonPath("$.targetVersionId") { value(targetTip.toString()) }
+                jsonPath("$.comment") { value("Checked") }
+            }
+    }
+
+    @Test
+    fun confirmQuotesDoesNotPublishAnUnrelatedStaffDraft() {
+        val amendmentId =
+            objectMapper.readTree(
+                mockMvc.post("/constitutions/$CONSTITUTION_ID/amendments") {
+                    header("Authorization", TOKEN)
+                    contentType = MediaType.APPLICATION_JSON
+                    content = createAmendmentJson("Published record", sourceVersionId = SOURCE_ID, targetVersionId = TARGET_ID)
+                }.andExpect { status { isCreated() } }.andReturn().response.contentAsString,
+            ).get("id").asText()
+        mockMvc.post("/amendments/$amendmentId/publish") { header("Authorization", PUBLISHER_TOKEN) }
+            .andExpect { status { isOk() } }
+        mockMvc.post("/amendments/$amendmentId/revisions") {
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = createAmendmentJson("Unpublished edit", sourceVersionId = SOURCE_ID, targetVersionId = TARGET_ID)
+        }.andExpect { status { isOk() } }
+        Mockito.`when`(catalogClient.getVersion(SOURCE_ID))
+            .thenReturn(CatalogVersionRef(SOURCE_ID, CONSTITUTION_ID, SOURCE_ID, SOURCE_ID))
+        Mockito.`when`(catalogClient.getVersion(TARGET_ID))
+            .thenReturn(CatalogVersionRef(TARGET_ID, CONSTITUTION_ID, TARGET_ID, TARGET_ID))
+
+        mockMvc.post("/amendments/$amendmentId/confirm-quotes") { header("Authorization", PUBLISHER_TOKEN) }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.title") { value("Published record") }
+            }
+        mockMvc.get("/amendments/$amendmentId").andExpect { jsonPath("$.title") { value("Published record") } }
+    }
+
+    @Test
     fun publicGetUnchangedUntilNewRevisionIsPublished() {
         val sourceVersionId = UUID.fromString("01900000-0000-4000-8000-000000000950")
         val targetVersionId = UUID.fromString("01900000-0000-4000-8000-000000000951")

@@ -1,15 +1,10 @@
 'use client';
 
 import { useMemo, useRef, useState, useTransition } from 'react';
-import type { Amendment, VersionSummary } from '../../../lib/api';
+import type { Amendment, AmendmentDocument, VersionSummary } from '../../../lib/api';
 import { Alert, Badge, Button, Input, Select, TextArea } from '../../components/ui';
 import { AmendmentChangesTable, type ChangeRow } from './AmendmentChangesTable';
-import { publishAmendmentAction, saveAmendmentAction, suggestChangesAction, withdrawAmendmentAction } from './actions';
-
-const KIND_OPTIONS = [
-  { value: 'legal_amendment', label: 'Legal amendment' },
-  { value: 'official_errata', label: 'Official errata' },
-] as const;
+import { saveAmendmentAction, suggestChangesAction, withdrawAmendmentAction } from './actions';
 
 type AmendmentFormProps = {
   amendmentId: string;
@@ -64,6 +59,7 @@ export function AmendmentForm({
 }: AmendmentFormProps) {
   const [targetVersionId, setTargetVersionId] = useState(amendment?.targetVersionId ?? latestVersionId ?? '');
   const [changeRows, setChangeRows] = useState<ChangeRow[]>(() => initialRows(amendment));
+  const [documents, setDocuments] = useState<AmendmentDocument[]>(() => amendment?.documents?.length ? amendment.documents : [{ url: '', fileId: '', label: '' }]);
   const [suggestSourceId, setSuggestSourceId] = useState(versions[0]?.id ?? '');
   const [suggestTargetId, setSuggestTargetId] = useState(versions[1]?.id ?? versions[0]?.id ?? '');
   const [suggestError, setSuggestError] = useState<string | null>(null);
@@ -129,13 +125,6 @@ export function AmendmentForm({
         required
         disabled={readOnly}
       />
-      <Select id="amendment-kind" name="kind" label="Kind" defaultValue={amendment?.kind ?? 'legal_amendment'} disabled={readOnly}>
-        {KIND_OPTIONS.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </Select>
       <Input
         id="amendment-citation"
         name="sourceReference"
@@ -168,6 +157,20 @@ export function AmendmentForm({
         defaultValue={amendment?.summary ?? ''}
         disabled={readOnly}
       />
+      <TextArea id="amendment-comment" name="comment" label="Comment" defaultValue={amendment?.comment ?? ''} required disabled={readOnly} rows={4} />
+      <input type="hidden" name="documentsJson" value={JSON.stringify(documents)} />
+      <fieldset className="stack">
+        <legend>Documents</legend>
+        {documents.map((document, index) => (
+          <div className="form-row" key={index}>
+            <Input id={`amendment-document-url-${index}`} label="Document URL" value={document.url ?? ''} type="url" disabled={readOnly} onChange={(event) => setDocuments((rows) => rows.map((row, rowIndex) => rowIndex === index ? { ...row, url: event.target.value } : row))} />
+            <Input id={`amendment-document-file-${index}`} label="Archived file ID" value={document.fileId ?? ''} disabled={readOnly} onChange={(event) => setDocuments((rows) => rows.map((row, rowIndex) => rowIndex === index ? { ...row, fileId: event.target.value } : row))} />
+            <Input id={`amendment-document-label-${index}`} label="Label" value={document.label ?? ''} disabled={readOnly} onChange={(event) => setDocuments((rows) => rows.map((row, rowIndex) => rowIndex === index ? { ...row, label: event.target.value } : row))} />
+            {!readOnly && documents.length > 1 ? <Button type="button" onClick={() => setDocuments((rows) => rows.filter((_, rowIndex) => rowIndex !== index))}>Remove</Button> : null}
+          </div>
+        ))}
+        {!readOnly ? <Button type="button" onClick={() => setDocuments((rows) => [...rows, { url: '', fileId: '', label: '' }])}>Add document</Button> : null}
+      </fieldset>
       <div className="form-row">
         <Select
           id="amendment-source-version"
@@ -221,9 +224,6 @@ export function AmendmentForm({
           <Button variant="primary" formAction={saveAmendmentAction}>
             Save draft
           </Button>
-        ) : null}
-        {canPublish && amendmentId !== 'new' ? (
-          <Button formAction={publishAmendmentAction}>Publish law</Button>
         ) : null}
         {canWithdraw && amendmentId !== 'new' ? (
           <Button formAction={withdrawAmendmentAction}>Withdraw</Button>

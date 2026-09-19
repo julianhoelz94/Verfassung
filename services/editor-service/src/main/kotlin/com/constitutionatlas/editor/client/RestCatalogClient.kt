@@ -45,6 +45,7 @@ interface CatalogClient {
         languageCode: String,
         predecessorVersionId: UUID,
         hopKind: String,
+        publicationComment: String? = null,
     ): CatalogVersion
 
     fun listVersions(constitutionId: UUID, listing: String = "all"): List<CatalogVersion>
@@ -82,6 +83,7 @@ class RestCatalogClient(
         languageCode: String,
         predecessorVersionId: UUID,
         hopKind: String,
+        publicationComment: String?,
     ): CatalogVersion {
         try {
             val request = client.post()
@@ -96,6 +98,7 @@ class RestCatalogClient(
                         "languageCode" to languageCode,
                         "predecessorVersionId" to predecessorVersionId,
                         "hopKind" to hopKind,
+                        "publicationComment" to publicationComment,
                     ),
                 )
                 .retrieve()

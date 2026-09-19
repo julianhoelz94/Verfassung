@@ -20,6 +20,7 @@ import { SiteSearchForm } from './SiteSearchForm';
 type SiteHeaderProps = {
   user: NavUser | null;
   identityUnavailable?: boolean;
+  needsReviewCount?: number;
 };
 
 function MenuSectionList({
@@ -54,7 +55,7 @@ function MenuSectionList({
               href={link.href}
               aria-current={isCurrentNavHref(pathname, link.href) ? 'page' : undefined}
             >
-              {link.label}
+              {link.label}{link.badgeCount ? <Badge tone="changed">{link.badgeCount}</Badge> : null}
             </a>
           ))}
           {section.id === 'account' && user ? (
@@ -68,10 +69,10 @@ function MenuSectionList({
   );
 }
 
-export function SiteHeader({ user, identityUnavailable = false }: SiteHeaderProps) {
+export function SiteHeader({ user, identityUnavailable = false, needsReviewCount = 0 }: SiteHeaderProps) {
   const pathname = usePathname();
   const links = primaryNavLinks(user);
-  const sections = menuSections(user);
+  const sections = menuSections(user, false, needsReviewCount);
   const versionId = versionIdFromPath(pathname);
   const country = versionId ? countryFromPath(pathname) : undefined;
   return (

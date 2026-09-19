@@ -101,11 +101,13 @@ const amendment = {
   id: '01900000-0000-4000-8000-000000000301',
   title: 'Update to Article 1',
   summary: 'Expanded the dignity clause.',
+  comment: 'The published legal-change comment.',
   enactedOn: '2022-12-19',
   sourceReference: 'BGBl. I 2022',
   constitutionId: CONSTITUTION_ID,
   kind: 'legal_amendment',
   status: 'published',
+  reviewStatus: 'ok',
   publishedRevisionId: '01900000-0000-4000-8000-000000000321',
   sourceVersionId: VERSION_1949,
   targetVersionId: VERSION_2022,
@@ -128,6 +130,7 @@ const amendmentDraft = {
   id: '01900000-0000-4000-8000-000000000302',
   title: 'Draft amending law',
   status: 'draft',
+  reviewStatus: 'ok',
   publishedRevisionId: null,
 };
 
@@ -144,6 +147,7 @@ const amendmentRevision = {
   sourceReference: amendment.sourceReference,
   sourceVersionId: amendment.sourceVersionId,
   targetVersionId: amendment.targetVersionId,
+  comment: amendment.comment,
   kind: amendment.kind,
   changes: amendment.changes.map(({ articleNumber, changeType, note }) => ({
     articleNumber,
@@ -236,7 +240,7 @@ function preview() {
     amendmentStatus: editorState.session?.status === 'published' ? 'ready' : null,
     publicContentUpdated: editorState.session?.status === 'published' ? true : null,
     newVersionId: editorState.session?.status === 'published' ? '01900000-0000-4000-8000-000000000501' : null,
-    newVersionLabel: editorState.session?.status === 'published' ? '2022-1' : null,
+    newVersionLabel: editorState.session?.status === 'published' ? (editorState.session.newVersionLabel ?? '2022-1') : null,
   };
 }
 
@@ -309,7 +313,8 @@ const server = createServer(async (req, res) => {
     }
     const items = [...mockAmendments.values()];
     const staff = searchParams.get('status') === 'all';
-    json(res, 200, staff ? items : items.filter((item) => item.status === 'published'));
+    const reviewStatus = searchParams.get('reviewStatus');
+    json(res, 200, (staff ? items : items.filter((item) => item.status === 'published')).filter((item) => !reviewStatus || item.reviewStatus === reviewStatus));
     return;
   }
 
@@ -331,6 +336,8 @@ const server = createServer(async (req, res) => {
       id: '01900000-0000-4000-8000-000000000303',
       title: body.title ?? amendmentDraft.title,
       summary: body.summary ?? amendmentDraft.summary,
+      comment: body.comment ?? amendmentDraft.comment,
+      documents: body.documents ?? amendmentDraft.documents ?? [],
       kind: body.kind ?? amendmentDraft.kind,
       status: 'draft',
       constitutionId: constitutionAmendmentsMatch[1],
@@ -403,6 +410,19 @@ const server = createServer(async (req, res) => {
       return;
     }
     const updated = { ...existing, status: 'published', publishedRevisionId: existing.publishedRevisionId ?? amendmentRevision.id };
+    mockAmendments.set(updated.id, updated);
+    json(res, 200, updated);
+    return;
+  }
+
+  const confirmQuotesMatch = pathname.match(/^\/api\/amendment\/amendments\/([^/]+)\/confirm-quotes$/);
+  if (method === 'POST' && confirmQuotesMatch) {
+    const existing = mockAmendments.get(confirmQuotesMatch[1]);
+    if (!existing) {
+      json(res, 404, { error: 'Not found' });
+      return;
+    }
+    const updated = { ...existing, reviewStatus: 'ok', status: 'published' };
     mockAmendments.set(updated.id, updated);
     json(res, 200, updated);
     return;
@@ -596,9 +616,11 @@ const server = createServer(async (req, res) => {
       const body = await readBody(req);
       editorState.session.status = 'published';
       if (body.hopKind === 'editorial_correction' && !extraVersions.some((version) => version.id === EDITORIAL_VERSION_ID)) {
+        const correctedVersionId = editorState.session.versionId;
+        const correctedVersionLabel = correctedVersionId === VERSION_1949 ? '1949-1' : '2022-1';
         extraVersions.push({
           id: EDITORIAL_VERSION_ID,
-          versionLabel: '2022-1',
+          versionLabel: correctedVersionLabel,
           effectiveDate: '2022-12-20',
           languageCode: 'en',
           sourceUrl: null,
@@ -607,11 +629,17 @@ const server = createServer(async (req, res) => {
           verificationState: 'unverified',
           verifiedBy: null,
           verifiedAt: null,
-          predecessorVersionId: VERSION_2022,
+          predecessorVersionId: correctedVersionId,
           hopKind: 'editorial_correction',
           listing: 'staff',
           latestPublished: true,
         });
+        editorState.session.newVersionLabel = correctedVersionLabel;
+        for (const [id, record] of mockAmendments) {
+          if (record.status === 'published' && (record.sourceVersionId === correctedVersionId || record.targetVersionId === correctedVersionId)) {
+            mockAmendments.set(id, { ...record, reviewStatus: 'needs_review' });
+          }
+        }
       }
     }
     json(res, 200, preview());

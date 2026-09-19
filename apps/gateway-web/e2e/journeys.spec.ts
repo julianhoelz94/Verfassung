@@ -1,6 +1,6 @@
 /* eslint-disable */
 import { test, expect } from '@playwright/test';
-import { ARTICLE_1, VERSION_2022, signInEditor, signInPublisher, signOut } from './helpers';
+import { ARTICLE_1, VERSION_1949, VERSION_2022, signInEditor, signInPublisher, signOut } from './helpers';
 
 const MOCK_ORIGIN = `http://127.0.0.1:${process.env.E2E_MOCK_PORT ?? 4010}`;
 
@@ -51,6 +51,7 @@ test('login with MFA then logout', async ({ page }) => {
 test('edit, review, and publish a draft', async ({ page }) => {
   await signInEditor(page);
   await page.goto('/editor');
+  await page.getByLabel('Correct this text').selectOption(VERSION_2022);
   await page.getByRole('button', { name: 'Correct this text' }).click();
   await expect(page).toHaveURL(/sessionId=/);
   await expect(page.getByRole('heading', { name: 'Articles' })).toBeVisible();
@@ -93,6 +94,23 @@ test('recorded amending law appears on the public timeline', async ({ page }) =>
 });
 
 test('publisher confirms stale old-law quotes without changing the public comment', async ({ page }) => {
+  await signInEditor(page);
+  await page.goto('/editor');
+  await page.getByLabel('Correct this text').selectOption(VERSION_1949);
+  await page.getByRole('button', { name: 'Correct this text' }).click();
+  await expect(page).toHaveURL(/sessionId=/);
+  await page.getByLabel('Article text').fill('Corrected 1949 transcription.');
+  await page.getByRole('button', { name: 'Save draft' }).click();
+  await page.getByLabel('What was corrected in this transcription?').fill('Corrected the historical transcription.');
+  await page.getByRole('button', { name: 'Save comment' }).click();
+  await page.getByRole('button', { name: 'Submit for review' }).click();
+  await page.getByRole('button', { name: 'Approve review' }).click();
+  await page.getByRole('button', { name: 'Publish transcription' }).click();
+  await expect(page.getByText('Published as version 1949-1.')).toBeVisible();
+  await page.getByRole('button', { name: 'Account menu' }).click();
+  await expect(page.getByRole('link', { name: /Legal changes/ })).toContainText('1');
+  await page.getByRole('button', { name: 'Sign out' }).click();
+  await expect(page.getByRole('link', { name: 'Log in' })).toBeVisible();
   await signInPublisher(page);
   await page.goto('/editor/amendments');
   await expect(page.locator('.badge', { hasText: 'Needs review' }).first()).toBeVisible();
@@ -105,6 +123,10 @@ test('publisher confirms stale old-law quotes without changing the public commen
   await page.reload();
   await page.goto('/editor/amendments');
   await expect(page.locator('.badge', { hasText: 'Needs review' })).toHaveCount(0);
+  await signOut(page);
+  await page.goto('/countries/DE/timeline');
+  await expect(page.getByText('Update to Article 1')).toBeVisible();
+  await expect(page.getByText('The published legal-change comment.')).toBeVisible();
 });
 
 test('editorial correction hop stays off the public timeline', async ({ page }) => {
@@ -112,6 +134,7 @@ test('editorial correction hop stays off the public timeline', async ({ page }) 
   const timelineCount = await page.locator('.timeline-item').count();
   await signInEditor(page);
   await page.goto('/editor');
+  await page.getByLabel('Correct this text').selectOption(VERSION_2022);
   await page.getByRole('button', { name: 'Correct this text' }).click();
   await expect(page).toHaveURL(/sessionId=/);
   await expect(page.getByRole('heading', { name: 'Articles' })).toBeVisible();

@@ -86,7 +86,8 @@ jobs:
       - run: npm ci
       - run: npx playwright install --with-deps chromium
       - run: npm run build
-      - run: npm run test:e2e
+      - name: Playwright journeys including all login roles
+        run: npm run test:e2e
         env:
           CI: true
           E2E_SKIP_VISUAL: true

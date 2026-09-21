@@ -2,6 +2,7 @@
 
 import { redirect } from 'next/navigation';
 import { canVisitEditor } from '../../lib/nav';
+import { IdentityApiError } from '../../lib/identity-client';
 import { completeMfaLogin, confirmMfaEnrollment, login, logout } from '../../lib/session';
 
 export async function loginAction(formData: FormData): Promise<void> {
@@ -10,8 +11,14 @@ export async function loginAction(formData: FormData): Promise<void> {
   let result: Awaited<ReturnType<typeof login>>;
   try {
     result = await login(email, password);
-  } catch {
-    redirect('/login?error=1');
+  } catch (error) {
+    if (error instanceof IdentityApiError && error.status === 401) {
+      redirect('/login?error=credentials');
+    }
+    if (error instanceof IdentityApiError && error.status === 429) {
+      redirect('/login?error=rate-limit');
+    }
+    redirect('/login?error=unavailable');
   }
   if ('mfa' in result) {
     redirect(result.mfa === 'enroll' ? '/login/mfa?enroll=1' : '/login/mfa');

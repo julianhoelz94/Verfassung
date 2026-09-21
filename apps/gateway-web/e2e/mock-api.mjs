@@ -188,6 +188,12 @@ function userForEmail(email) {
   if (email === 'local-publisher@example.local') {
     return { ...identityMe, email, roles: ['publisher'] };
   }
+  if (email === 'local-reviewer@example.local') {
+    return { ...identityMe, email, roles: ['reviewer'], mfaEnabled: false, mfaRequired: false };
+  }
+  if (email === 'local-viewer@example.local') {
+    return { ...identityMe, email, roles: ['viewer'], mfaEnabled: false, mfaRequired: false };
+  }
   return { ...identityMe, email };
 }
 
@@ -474,7 +480,10 @@ const server = createServer(async (req, res) => {
 
   if (method === 'POST' && pathname === '/api/identity/login') {
     const body = await readBody(req);
-    if (body.password !== 'change-me' || typeof body.email !== 'string') {
+    if (body.password !== 'change-me' || ![
+      'local-editor@example.local', 'local-reviewer@example.local', 'local-publisher@example.local',
+      'local-admin@example.local', 'local-viewer@example.local',
+    ].includes(body.email)) {
       json(res, 401, { error: 'Invalid credentials' });
       return;
     }
@@ -487,10 +496,11 @@ const server = createServer(async (req, res) => {
       });
       return;
     }
+    currentUser = userForEmail(body.email);
     json(res, 200, {
       token: SESSION_TOKEN,
       expiresInSeconds: 86400,
-      user: { ...identityMe, email: body.email, roles: ['viewer'], mfaEnabled: false, mfaRequired: false },
+      user: currentUser,
     });
     return;
   }

@@ -29,8 +29,10 @@ export default async function LoginPage(props: LoginPageProps) {
           seedHintEnabled() ? (
             <>
               Use a seeded local account. local-editor@example.local can edit, review, and publish. Dedicated
-              reviewer and publisher accounts exist for separated duties. Seeded admin and publisher accounts use the
-              authenticator secret from <code>IDENTITY_SEED_TOTP_SECRET</code> in your <code>env/</code> profile.
+              reviewer and publisher accounts exist for separated duties. Editor, admin, and publisher accounts need
+              a current six-digit code from an authenticator app configured with <code>IDENTITY_SEED_TOTP_SECRET</code>.
+              If that setting is absent, use <code>CAATLASMFASEED22</code> as the authenticator secret.
+              Seeding creates missing users only; changing a password in the env file does not update an existing user.
             </>
           ) : (
             'Sign in with your editorial account.'
@@ -39,7 +41,13 @@ export default async function LoginPage(props: LoginPageProps) {
       />
       {searchParams.error ? (
         <Alert tone="error">
-          <span id="login-error">Invalid email or password.</span>
+          <span id="login-error">
+            {searchParams.error === 'unavailable'
+              ? 'Sign-in is temporarily unavailable. Check that the local stack is running.'
+              : searchParams.error === 'rate-limit'
+                ? 'Too many sign-in attempts. Wait a moment and try again.'
+                : 'Invalid email or password.'}
+          </span>
         </Alert>
       ) : null}
       <Card>

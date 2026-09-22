@@ -6,7 +6,7 @@ const { join } = require('node:path');
 const mockPort = Number(process.env.E2E_MOCK_PORT ?? 4010);
 const webPort = Number(process.env.E2E_WEB_PORT ?? 3100);
 const mockOrigin = `http://127.0.0.1:${mockPort}`;
-const built = existsSync(join(__dirname, '.next'));
+const built = existsSync(join(__dirname, '.next', 'BUILD_ID'));
 
 const apiEnv = {
   CATALOG_API_URL: `${mockOrigin}/api/catalog`,

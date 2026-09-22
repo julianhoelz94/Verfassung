@@ -65,6 +65,7 @@ test('viewer cannot use editorial or administrative pages by direct URL', async 
   await page.getByLabel('Email').fill('local-viewer@example.local');
   await page.getByLabel('Password').fill('change-me');
   await page.getByRole('button', { name: 'Sign in' }).click();
+  await expect(page).toHaveURL(/\/$/);
   await page.goto('/editor');
   await expect(page.getByText('this account has no editorial role.')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Open session' })).toHaveCount(0);
@@ -78,6 +79,7 @@ test('reviewer cannot open editing controls or administer constitutions', async 
   await page.getByLabel('Email').fill('local-reviewer@example.local');
   await page.getByLabel('Password').fill('change-me');
   await page.getByRole('button', { name: 'Sign in' }).click();
+  await expect(page).toHaveURL(/\/editor$/);
   await page.goto('/editor');
   await expect(page.getByRole('heading', { name: 'Editor' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Correct this text' })).toHaveCount(0);

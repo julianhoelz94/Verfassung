@@ -80,6 +80,7 @@ test('recorded amending law appears on the public timeline', async ({ page }) =>
   await page.getByRole('link', { name: 'Add legal change' }).click();
   await page.getByLabel('Title', { exact: true }).fill('E2E amending law');
   await page.getByLabel('Comment').fill('Recorded for the timeline journey.');
+  await page.getByLabel('Document URL').fill('https://example.gov/e2e-amending-law.pdf');
   await expect(page.locator('form.stack').first()).toHaveJSProperty('noValidate', false);
   expect(await page.locator('form.stack').first().evaluate((form) => form.checkValidity())).toBeTruthy();
   await page.getByRole('button', { name: 'Save draft' }).click();

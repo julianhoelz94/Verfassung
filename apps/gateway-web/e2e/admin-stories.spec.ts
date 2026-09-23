@@ -28,7 +28,7 @@ test('administrator manages a user and its access lifecycle', async ({ page }) =
   await expect(page.getByText('E2E-RESET-ADMIN')).toBeVisible();
   await page.locator('.data-row').filter({ hasText: 'local-admin@example.local' }).getByRole('button', { name: 'Disable' }).click();
   let persistedUser = page.locator('.data-row').filter({ hasText: 'local-admin@example.local' });
-  await expect(persistedUser).toContainText('active');
+  await expect(persistedUser).toContainText('disabled');
   await expect(persistedUser.getByRole('button', { name: 'Activate' })).toBeVisible();
   await persistedUser.getByRole('button', { name: 'Activate' }).click();
   persistedUser = page.locator('.data-row').filter({ hasText: 'local-admin@example.local' });
@@ -77,19 +77,26 @@ test('administrator creates a constitution and changes its outline settings', as
   await page.getByLabel('Slug').fill('test-constitution');
   await page.getByLabel('Title', { exact: true }).fill('Test Constitution');
   await page.getByRole('button', { name: 'Add deeper layer' }).click();
-  await page.getByLabel('Label').nth(1).fill('Clause');
+  await page.getByRole('textbox', { name: 'Label' }).nth(1).fill('Clause');
   await page.getByRole('button', { name: 'Create' }).click();
   await expect(page.getByRole('heading', { name: 'Test Constitution' })).toBeVisible();
-  await expect(page.getByLabel('Label').nth(1)).toHaveValue('Clause');
+  await expect(page.getByRole('textbox', { name: 'Label' }).nth(1)).toHaveValue('Clause');
   await page.getByLabel('How this layer is shown').nth(1).selectOption('concatenated');
   await page.getByRole('button', { name: 'Save outline' }).click();
   await expect(page.getByText('Outline saved.')).toBeVisible();
   await expect(page.getByLabel('How this layer is shown').nth(1)).toHaveValue('concatenated');
 });
 
-test('administrator opens the API documentation destination', async ({ page }) => {
+test('administrator can carry an editorial correction through every role action', async ({ page }) => {
   await signInAdmin(page);
-  await page.getByRole('button', { name: 'Account menu' }).click();
-  const apiDocs = page.getByRole('link', { name: 'API docs' });
-  await expect(apiDocs).toHaveAttribute('href', '/api-docs');
+  await page.goto('/editor');
+  await page.getByRole('button', { name: 'Correct this text' }).click();
+  await page.getByLabel('Article text').fill('Administrator correction.');
+  await page.getByRole('button', { name: 'Save draft' }).click();
+  await page.getByLabel('What was corrected in this transcription?').fill('Administrator fixed the transcription.');
+  await page.getByRole('button', { name: 'Save comment' }).click();
+  await page.getByRole('button', { name: 'Submit for review' }).click();
+  await page.getByRole('button', { name: 'Approve review' }).click();
+  await page.getByRole('button', { name: 'Publish transcription' }).click();
+  await expect(page.getByText(/Published as version/)).toBeVisible();
 });

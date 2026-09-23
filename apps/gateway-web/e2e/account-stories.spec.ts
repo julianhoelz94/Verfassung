@@ -63,5 +63,8 @@ test('viewer changes password, enrolls MFA and receives recovery codes', async (
   await page.getByLabel('Email').fill('local-viewer@example.local');
   await page.getByLabel('Password').fill('replacement-password');
   await page.getByRole('button', { name: 'Sign in' }).click();
+  await expect(page.getByRole('heading', { name: 'Authenticator code' })).toBeVisible();
+  await page.getByLabel('Authenticator code').fill('123456');
+  await page.getByRole('button', { name: 'Continue' }).click();
   await expect(page).toHaveURL(/\/$/);
 });

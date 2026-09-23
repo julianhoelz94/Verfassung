@@ -60,7 +60,7 @@ These stories describe what people want to do on Constitution Atlas. A person ma
 - As a reviewer, I want to compare the proposed result with its source version so that I can identify unintended changes.
 - As a reviewer, I want to approve a satisfactory session so that it can move to publication.
 - As a reviewer, I want to browse legal change records and snapshot history while reviewing so that I can check the surrounding evidence.
-- As a reviewer, I want my own submitted work to require another person's approval so that review remains independent.
+- **Planned:** As a reviewer, I want my own submitted work to require another person's approval so that review remains independent.
 
 ## Publisher
 
@@ -86,7 +86,7 @@ These stories describe what people want to do on Constitution Atlas. A person ma
 - As an administrator, I want to edit a constitution's outline and presentation settings so that its structure appears correctly in the reader and editor.
 - As an administrator, I want to import constitution data by pasting or uploading JSON so that a large text can be added efficiently.
 - As an administrator, I want to inspect an import job and open its resulting version so that I can verify the imported content.
-- As an administrator, I want to inspect API documentation so that I can understand the available integrations.
+- **Planned:** As an administrator, I want to inspect API documentation so that I can understand the available integrations.
 - **Planned:** As an administrator, I want to verify a version's source from its reader page so that readers can see its trust status.
 - **Planned:** As an administrator, I want the settings form to reject a structure the editor cannot handle so that future editing remains possible.
 

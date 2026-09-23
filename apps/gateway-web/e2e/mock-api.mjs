@@ -176,6 +176,8 @@ let serviceTokens = [];
 let credentials = new Map();
 let createdConstitutions = [];
 let nodeTitleOverrides = new Map();
+let enrolledMfaEmails = new Set();
+let stepUpFresh = true;
 
 function resetMockState() {
   mockAmendments.clear();
@@ -189,6 +191,8 @@ function resetMockState() {
   serviceTokens = [];
   createdConstitutions = [];
   nodeTitleOverrides = new Map();
+  enrolledMfaEmails = new Set();
+  stepUpFresh = true;
   credentials = new Map([
     ['local-editor@example.local', 'change-me'], ['local-reviewer@example.local', 'change-me'],
     ['local-publisher@example.local', 'change-me'], ['local-admin@example.local', 'change-me'],
@@ -210,6 +214,9 @@ function userForEmail(email) {
     return { ...identityMe, email, roles: ['reviewer'], mfaEnabled: false, mfaRequired: false };
   }
   if (email === 'local-viewer@example.local') {
+    return { ...identityMe, email, roles: ['viewer'], mfaEnabled: enrolledMfaEmails.has(email), mfaRequired: false };
+  }
+  if (email === 'invited@example.local') {
     return { ...identityMe, email, roles: ['viewer'], mfaEnabled: false, mfaRequired: false };
   }
   return { ...identityMe, email };
@@ -264,7 +271,7 @@ function preview() {
     amendmentStatus: editorState.session?.status === 'published' ? 'ready' : null,
     searchIndexStatus: editorState.session?.status === 'published' ? 'ready' : null,
     publicContentUpdated: editorState.session?.status === 'published' ? true : null,
-    newVersionId: editorState.session?.status === 'published' ? '01900000-0000-4000-8000-000000000501' : null,
+    newVersionId: editorState.session?.status === 'published' ? (editorState.session.newVersionId ?? '01900000-0000-4000-8000-000000000501') : null,
     newVersionLabel: editorState.session?.status === 'published' ? (editorState.session.newVersionLabel ?? '2022-1') : null,
   };
 }
@@ -284,13 +291,22 @@ const server = createServer(async (req, res) => {
     empty(res, 204);
     return;
   }
+  if (method === 'POST' && pathname === '/__step_up_stale') {
+    stepUpFresh = false;
+    currentUser = { ...currentUser, stepUpFresh: false };
+    empty(res, 204);
+    return;
+  }
 
   if (method === 'GET' && pathname === '/api/catalog/countries') {
     json(res, 200, countries);
     return;
   }
   if (method === 'GET' && pathname === '/api/catalog/countries/DE') {
-    json(res, 200, { ...germany, constitutions: [...germany.constitutions, ...createdConstitutions] });
+    const baseConstitutions = germany.constitutions.map((item) => item.id === CONSTITUTION_ID
+      ? { ...item, versions: [...item.versions, ...extraVersions] }
+      : item);
+    json(res, 200, { ...germany, constitutions: [...baseConstitutions, ...createdConstitutions] });
     return;
   }
   if (method === 'POST' && pathname === '/api/catalog/countries/DE/constitutions') {
@@ -535,7 +551,7 @@ const server = createServer(async (req, res) => {
       json(res, 401, { error: 'Invalid credentials' });
       return;
     }
-    if (MFA_EMAILS.has(body.email)) {
+    if (MFA_EMAILS.has(body.email) || enrolledMfaEmails.has(body.email)) {
       pendingMfaEmail = body.email;
       json(res, 200, {
         user: userForEmail(body.email),
@@ -610,6 +626,7 @@ const server = createServer(async (req, res) => {
       json(res, 400, { error: 'Invalid code' });
       return;
     }
+    enrolledMfaEmails.add(currentUser.email);
     currentUser = { ...currentUser, mfaEnabled: true };
     json(res, 200, { recoveryCodes: ['RECOVERY-ONE', 'RECOVERY-TWO'] });
     return;
@@ -637,7 +654,7 @@ const server = createServer(async (req, res) => {
         email: currentUser.email,
         roles: currentUser.roles,
         enabled: currentUser.enabled !== false,
-        status: 'active',
+        status: currentUser.status ?? (currentUser.enabled === false ? 'disabled' : 'active'),
         createdAt: '2026-01-01T00:00:00Z',
       },
       ...managedUsers,
@@ -666,15 +683,14 @@ const server = createServer(async (req, res) => {
       status: 'active', createdAt: '2026-01-02T00:00:00Z',
     };
     if (!isCurrentUser && !managedUsers.includes(user)) managedUsers.push(user);
-    if (managedUserMatch[2] === 'disable') user.enabled = false;
-    if (managedUserMatch[2] === 'enable') user.enabled = true;
+    if (managedUserMatch[2] === 'disable') { user.enabled = false; user.status = 'disabled'; }
+    if (managedUserMatch[2] === 'enable') { user.enabled = true; user.status = 'active'; }
     if (managedUserMatch[2] === 'roles') user.roles = (await readBody(req)).roles;
     if (isCurrentUser) currentUser = { ...currentUser, roles: user.roles };
     if (managedUserMatch[2] === 'password-resets') {
       json(res, 201, { resetToken: 'E2E-RESET-ADMIN' });
       return;
     }
-    user.status = 'active';
     json(res, 200, user);
     return;
   }
@@ -714,6 +730,8 @@ const server = createServer(async (req, res) => {
       json(res, 401, { error: 'Unable to confirm step-up authentication' });
       return;
     }
+    stepUpFresh = true;
+    currentUser = { ...currentUser, stepUpFresh: true };
     empty(res, 204);
     return;
   }
@@ -784,6 +802,10 @@ const server = createServer(async (req, res) => {
     } else if (command === 'approval') {
       editorState.session.status = 'approved';
     } else if (command === 'publish') {
+      if (!stepUpFresh) {
+        json(res, 403, { error: 'Fresh authentication required', code: 'step_up_required' });
+        return;
+      }
       const body = await readBody(req);
       editorState.session.status = 'published';
       if (body.hopKind === 'editorial_correction' && !extraVersions.some((version) => version.id === EDITORIAL_VERSION_ID)) {
@@ -811,6 +833,18 @@ const server = createServer(async (req, res) => {
             mockAmendments.set(id, { ...record, reviewStatus: 'needs_review' });
           }
         }
+      } else if (body.hopKind === 'legal') {
+        const legalVersionId = '01900000-0000-4000-8000-000000000502';
+        if (!extraVersions.some((version) => version.id === legalVersionId)) {
+          extraVersions.push({
+            id: legalVersionId, versionLabel: '2027', effectiveDate: '2027-01-01', languageCode: 'en',
+            sourceUrl: null, gazetteReference: null, provenance: 'editorial', verificationState: 'unverified',
+            verifiedBy: null, verifiedAt: null, predecessorVersionId: editorState.session.versionId,
+            hopKind: 'legal', listing: 'public', latestPublished: true,
+          });
+        }
+        editorState.session.newVersionId = legalVersionId;
+        editorState.session.newVersionLabel = '2027';
       }
     }
     json(res, 200, preview());

@@ -24,7 +24,7 @@ import {
 } from '../../lib/identity-client';
 import { requireAdminUser } from '../../lib/admin';
 import { safeReturnTo } from '../../lib/return-to';
-import { SESSION_COOKIE, clearChallengeCookie, setChallengeCookie } from '../../lib/session';
+import { SESSION_COOKIE, setChallengeCookie } from '../../lib/session';
 
 async function tokenOrRedirect(): Promise<string> {
   const token = (await cookies()).get(SESSION_COOKIE)?.value;
@@ -170,7 +170,6 @@ export async function confirmAccountMfaAction(
       String(formData.get('challengeToken') ?? ''),
       token,
     );
-    await clearChallengeCookie();
     return { recoveryCodes: confirmed.recoveryCodes };
   } catch {
     return { error: true };

@@ -171,6 +171,8 @@ const editorState = {
 
 let pendingMfaEmail = identityMe.email;
 let currentUser = { ...identityMe };
+let managedUsers = [];
+let serviceTokens = [];
 
 function resetMockState() {
   mockAmendments.clear();
@@ -180,6 +182,8 @@ function resetMockState() {
   editorState.session = null;
   pendingMfaEmail = identityMe.email;
   currentUser = { ...identityMe };
+  managedUsers = [];
+  serviceTokens = [];
 }
 
 function userForEmail(email) {
@@ -585,7 +589,68 @@ const server = createServer(async (req, res) => {
         status: 'active',
         createdAt: '2026-01-01T00:00:00Z',
       },
+      ...managedUsers,
     ]);
+    return;
+  }
+  if (method === 'POST' && pathname === '/api/identity/users/invites') {
+    const body = await readBody(req);
+    const user = {
+      id: `managed-${managedUsers.length + 1}`,
+      email: body.email,
+      roles: body.roles,
+      enabled: true,
+      status: 'invited',
+      createdAt: '2026-01-02T00:00:00Z',
+    };
+    managedUsers.push(user);
+    json(res, 201, { user, inviteToken: 'E2E-INVITE-ADMIN' });
+    return;
+  }
+  const managedUserMatch = pathname.match(/^\/api\/identity\/users\/([^/]+)\/(disable|enable|roles|password-resets)$/);
+  if (managedUserMatch && (method === 'POST' || method === 'PUT')) {
+    const isCurrentUser = managedUserMatch[1] === currentUser.id;
+    const user = (isCurrentUser ? currentUser : managedUsers.find((item) => item.id === managedUserMatch[1])) ?? {
+      id: managedUserMatch[1], email: 'managed@example.local', roles: ['viewer'], enabled: true,
+      status: 'active', createdAt: '2026-01-02T00:00:00Z',
+    };
+    if (!isCurrentUser && !managedUsers.includes(user)) managedUsers.push(user);
+    if (managedUserMatch[2] === 'disable') user.enabled = false;
+    if (managedUserMatch[2] === 'enable') user.enabled = true;
+    if (managedUserMatch[2] === 'roles') user.roles = (await readBody(req)).roles;
+    if (isCurrentUser) currentUser = { ...currentUser, roles: user.roles };
+    if (managedUserMatch[2] === 'password-resets') {
+      json(res, 201, { resetToken: 'E2E-RESET-ADMIN' });
+      return;
+    }
+    user.status = 'active';
+    json(res, 200, user);
+    return;
+  }
+  if (method === 'GET' && pathname === '/api/identity/service-tokens') {
+    json(res, 200, serviceTokens);
+    return;
+  }
+  if (method === 'POST' && pathname === '/api/identity/service-tokens') {
+    const body = await readBody(req);
+    const created = {
+      id: `service-token-${serviceTokens.length + 1}`, name: body.name, scopes: body.scopes,
+      createdAt: '2026-01-02T00:00:00Z', expiresAt: '2026-04-02T00:00:00Z', revokedAt: null,
+    };
+    serviceTokens.push(created);
+    json(res, 201, { ...created, token: 'E2E-SERVICE-TOKEN' });
+    return;
+  }
+  const serviceTokenMatch = pathname.match(/^\/api\/identity\/service-tokens\/([^/]+)(\/rotate)?$/);
+  if (serviceTokenMatch && method === 'POST' && serviceTokenMatch[2]) {
+    const token = serviceTokens.find((item) => item.id === serviceTokenMatch[1]);
+    json(res, 200, { ...token, token: 'E2E-ROTATED-TOKEN' });
+    return;
+  }
+  if (serviceTokenMatch && method === 'DELETE') {
+    const token = serviceTokens.find((item) => item.id === serviceTokenMatch[1]);
+    if (token) token.revokedAt = '2026-01-03T00:00:00Z';
+    empty(res, 204);
     return;
   }
   if (method === 'POST' && pathname === '/api/identity/logout') {

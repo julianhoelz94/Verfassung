@@ -21,7 +21,7 @@ test('visitor follows the country, legal version, article and history', async ({
   await expect(page).toHaveURL(new RegExp(`/articles/${ARTICLE_1}#article-1$`));
   await expect(page.getByRole('heading', { name: /Human dignity/ })).toBeVisible();
   await page.getByRole('link', { name: /Article 2/ }).click();
-  await expect(page.getByRole('heading', { name: /Article 2/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /Personal freedoms/ })).toBeVisible();
   await page.getByRole('link', { name: /Article 1/ }).click();
   await page.getByRole('link', { name: 'History of Article 1' }).click();
   await expect(page.getByRole('link', { name: 'Compare with previous' })).toBeVisible();
@@ -37,7 +37,7 @@ test('visitor reads the site scope, sources and accessibility statement', async 
 test('visitor filters search and result retains its version', async ({ page }) => {
   await page.goto('/search');
   await page.getByLabel('Keyword').fill('dignity');
-  await page.getByLabel(/Germany/).check();
+  await page.getByRole('radio', { name: 'Germany (1)' }).check();
   await page.getByLabel(/Basic Law · 2022/).check();
   await page.getByLabel(/2022-12-19/).check();
   await page.getByRole('button', { name: 'Apply filters' }).click();

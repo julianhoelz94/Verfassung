@@ -11,14 +11,27 @@ test('visitor follows the country, legal version, article and history', async ({
   await page.goto('/');
   await page.getByRole('link', { name: 'Germany' }).click();
   await expect(page.getByRole('heading', { name: 'Basic Law' })).toBeVisible();
-  await expect(page.getByRole('link', { name: '1949' })).toHaveAttribute('href', `/countries/DE/versions/${VERSION_1949}`);
+  await page.getByRole('link', { name: '1949' }).click();
+  await expect(page).toHaveURL(new RegExp(`/versions/${VERSION_1949}$`));
+  await expect(page.getByRole('heading', { name: /Version in force since/ })).toBeVisible();
+  await page.getByRole('link', { name: 'Germany' }).click();
   await page.getByRole('link', { name: 'Read latest' }).click();
   await expect(page).toHaveURL(new RegExp(`/versions/${VERSION_2022}$`));
   await page.getByRole('link', { name: 'Permalink' }).first().click();
   await expect(page).toHaveURL(new RegExp(`/articles/${ARTICLE_1}#article-1$`));
   await expect(page.getByRole('heading', { name: /Human dignity/ })).toBeVisible();
+  await page.getByRole('link', { name: /Article 2/ }).click();
+  await expect(page.getByRole('heading', { name: /Article 2/ })).toBeVisible();
+  await page.getByRole('link', { name: /Article 1/ }).click();
   await page.getByRole('link', { name: 'History of Article 1' }).click();
   await expect(page.getByRole('link', { name: 'Compare with previous' })).toBeVisible();
+});
+
+test('visitor reads the site scope, sources and accessibility statement', async ({ page }) => {
+  await page.goto('/about');
+  await expect(page.getByRole('heading', { name: 'Sources' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Verification labels' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Accessibility' })).toBeVisible();
 });
 
 test('visitor filters search and result retains its version', async ({ page }) => {

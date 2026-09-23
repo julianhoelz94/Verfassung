@@ -519,6 +519,50 @@ const server = createServer(async (req, res) => {
     });
     return;
   }
+  if (method === 'POST' && pathname === '/api/identity/password/reset') {
+    empty(res, 204);
+    return;
+  }
+  if (method === 'POST' && pathname === '/api/identity/password/reset/confirm') {
+    const body = await readBody(req);
+    if (body.token !== 'e2e-reset-token') {
+      json(res, 400, { error: 'Invalid reset token' });
+      return;
+    }
+    empty(res, 204);
+    return;
+  }
+  if (method === 'POST' && pathname === '/api/identity/invites/accept') {
+    const body = await readBody(req);
+    if (body.token !== 'e2e-invite-token') {
+      json(res, 400, { error: 'Invalid invite token' });
+      return;
+    }
+    json(res, 200, { ...userForEmail('invited@example.local'), roles: ['viewer'] });
+    return;
+  }
+  if (method === 'POST' && pathname === '/api/identity/password/change') {
+    empty(res, 204);
+    return;
+  }
+  if (method === 'POST' && pathname === '/api/identity/mfa/enroll/start') {
+    json(res, 200, { secret: 'E2ESECRET', otpauthUrl: 'otpauth://totp/e2e', challengeToken: 'e2e-enroll-challenge' });
+    return;
+  }
+  if (method === 'POST' && pathname === '/api/identity/mfa/enroll/confirm') {
+    const body = await readBody(req);
+    if (body.code !== MFA_CODE) {
+      json(res, 400, { error: 'Invalid code' });
+      return;
+    }
+    currentUser = { ...currentUser, mfaEnabled: true };
+    json(res, 200, { recoveryCodes: ['RECOVERY-ONE', 'RECOVERY-TWO'] });
+    return;
+  }
+  if (method === 'POST' && pathname === '/api/identity/mfa/recovery/regenerate') {
+    json(res, 200, { recoveryCodes: ['RECOVERY-NEW'] });
+    return;
+  }
   if (method === 'GET' && pathname === '/api/identity/me') {
     if (bearer(req) !== SESSION_TOKEN) {
       json(res, 401, { error: 'Unauthorized' });

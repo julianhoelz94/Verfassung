@@ -4,6 +4,7 @@ import { type Page, expect } from '@playwright/test';
 export const EDITOR_EMAIL = 'local-editor@example.local';
 export const ADMIN_EMAIL = 'local-admin@example.local';
 export const PUBLISHER_EMAIL = 'local-publisher@example.local';
+export const REVIEWER_EMAIL = 'local-reviewer@example.local';
 export const EDITOR_PASSWORD = 'change-me';
 export const MFA_CODE = '123456';
 export const VERSION_1949 = '01900000-0000-4000-8000-000000000003';
@@ -31,6 +32,14 @@ export async function signInAdmin(page: Page): Promise<void> {
 
 export async function signInPublisher(page: Page): Promise<void> {
   await signIn(page, PUBLISHER_EMAIL);
+}
+
+export async function signInReviewer(page: Page): Promise<void> {
+  await page.goto('/login');
+  await page.getByLabel('Email').fill(REVIEWER_EMAIL);
+  await page.getByLabel('Password').fill(EDITOR_PASSWORD);
+  await page.getByRole('button', { name: 'Sign in' }).click();
+  await expect(page.getByRole('heading', { name: 'Editor' })).toBeVisible();
 }
 
 export async function signOut(page: Page): Promise<void> {

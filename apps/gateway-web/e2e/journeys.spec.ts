@@ -1,6 +1,6 @@
 /* eslint-disable */
 import { test, expect } from '@playwright/test';
-import { ARTICLE_1, VERSION_1949, VERSION_2022, signInEditor, signInPublisher, signOut } from './helpers';
+import { ARTICLE_1, VERSION_1949, VERSION_2022, signInEditor, signInPublisher, signInReviewer, signOut } from './helpers';
 
 const MOCK_ORIGIN = `http://127.0.0.1:${process.env.E2E_MOCK_PORT ?? 4010}`;
 
@@ -67,9 +67,17 @@ test('edit, review, and publish a draft', async ({ page }) => {
   await page.getByRole('button', { name: 'Submit for review' }).click();
   await expect(page).toHaveURL(/reviewed=1/);
   await expect(page.getByText('Submitted for review.')).toBeVisible();
+  const sessionUrl = page.url();
+  await signOut(page);
+  await signInReviewer(page);
+  await page.goto(sessionUrl);
   await page.getByRole('button', { name: 'Approve review' }).click();
   await expect(page).toHaveURL(/approved=1/);
   await expect(page.getByText('Review approved.')).toBeVisible();
+  const approvedUrl = page.url();
+  await signOut(page);
+  await signInPublisher(page);
+  await page.goto(approvedUrl);
   await page.getByRole('button', { name: 'Publish transcription' }).click();
   await expect(page.getByText('Published as version 2022-1.')).toBeVisible();
 });

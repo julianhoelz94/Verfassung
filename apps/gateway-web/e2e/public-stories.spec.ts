@@ -24,7 +24,11 @@ test('visitor follows the country, legal version, article and history', async ({
 test('visitor filters search and result retains its version', async ({ page }) => {
   await page.goto('/search');
   await page.getByLabel('Keyword').fill('dignity');
-  await page.locator('main').getByRole('button', { name: 'Search', exact: true }).click();
+  await page.getByLabel(/Germany/).check();
+  await page.getByLabel(/Basic Law · 2022/).check();
+  await page.getByLabel(/2022-12-19/).check();
+  await page.getByRole('button', { name: 'Apply filters' }).click();
+  await expect(page).toHaveURL(new RegExp(`country=DE.*versionId=${VERSION_2022}.*effectiveDate=2022-12-19`));
   const result = page.getByRole('link', { name: /Article 1 — Human dignity/ });
   await expect(result).toHaveAttribute('href', `/countries/DE/versions/${VERSION_2022}/articles/${ARTICLE_1}`);
   await result.click();
@@ -45,6 +49,8 @@ test('visitor reads the legal timeline and its source context', async ({ page })
   await page.goto('/countries/DE/timeline');
   const change = page.locator('.timeline-item').filter({ hasText: 'Update to Article 1' });
   await expect(change).toContainText('The published legal-change comment.');
+  const sourceDocument = change.getByRole('link', { name: 'Official change document' });
+  await expect(sourceDocument).toHaveAttribute('href', 'https://example.gov/update-article-1.pdf');
   await expect(change.getByRole('link', { name: /Compare with previous/ })).toHaveAttribute('href', new RegExp(`from=${VERSION_1949}&to=${VERSION_2022}`));
   await change.getByRole('link', { name: /Compare with previous/ }).click();
   await expect(page.getByText('Update to Article 1')).toBeVisible();
@@ -54,5 +60,10 @@ test('visitor can reach provenance and a print action on narrow screens', async 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(`/countries/DE/versions/${VERSION_2022}/articles/${ARTICLE_1}`);
   await expect(page.getByRole('complementary', { name: 'Source and trust' }).getByText('Verification')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Print' })).toBeVisible();
+  await page.evaluate(() => {
+    (window as Window & { printCalled?: boolean }).printCalled = false;
+    window.print = () => { (window as Window & { printCalled?: boolean }).printCalled = true; };
+  });
+  await page.getByRole('button', { name: 'Print' }).click();
+  await expect.poll(() => page.evaluate(() => (window as Window & { printCalled?: boolean }).printCalled)).toBe(true);
 });

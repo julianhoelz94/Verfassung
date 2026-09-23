@@ -102,6 +102,7 @@ const amendment = {
   title: 'Update to Article 1',
   summary: 'Expanded the dignity clause.',
   comment: 'The published legal-change comment.',
+  documents: [{ url: 'https://example.gov/update-article-1.pdf', label: 'Official change document' }],
   enactedOn: '2022-12-19',
   sourceReference: 'BGBl. I 2022',
   constitutionId: CONSTITUTION_ID,

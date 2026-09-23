@@ -40,7 +40,7 @@ These stories describe what people want to do on Constitution Atlas. A person ma
 - As an editor, I want to see my sessions and their statuses so that I can resume unfinished work.
 - As an editor, I want to filter the article list and see which articles are changed so that I can navigate a large session.
 - As an editor, I want to edit an article's title and text and save a draft so that my changes can be reviewed.
-- As an editor, I want to discard an unwanted draft so that it does not appear in the proposed version.
+- **Planned:** As an editor, I want to discard an unwanted draft so that it does not appear in the proposed version.
 - As an editor, I want to edit section titles where the constitution's outline permits them so that the reader's structure stays accurate.
 - As an editor, I want to preview my changes against the published text so that I can check their effect before submission.
 - As an editor, I want to submit a completed session for review so that another person can approve it.
@@ -68,7 +68,7 @@ These stories describe what people want to do on Constitution Atlas. A person ma
 - As a publisher, I want to inspect an approved session and its preview so that I can confirm what will become public.
 - As a publisher, I want to publish a legal successor with its change-record details and source document so that readers can trace the legal change.
 - As a publisher, I want to publish a transcription correction with an explanation so that the corrected text is available without presenting it as a new law.
-- As a publisher, I want to publish a reviewed change record so that it appears on the public timeline.
+- **Planned:** As a publisher, I want to publish a reviewed change record so that it appears on the public timeline.
 - As a publisher, I want to withdraw an incorrect change record so that readers do not rely on it.
 - As a publisher, I want to confirm my authenticator before sensitive publication actions so that those actions require fresh authentication.
 - As a publisher, I want to see whether publication and search indexing succeeded so that I know when readers can find the new text.

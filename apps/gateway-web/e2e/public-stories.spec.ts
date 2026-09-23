@@ -38,8 +38,8 @@ test('visitor filters search and result retains its version', async ({ page }) =
   await page.goto('/search');
   await page.getByLabel('Keyword').fill('dignity');
   await page.getByRole('radio', { name: 'Germany (1)' }).check();
-  await page.getByLabel(/Basic Law · 2022/).check();
-  await page.getByLabel(/2022-12-19/).check();
+  await page.getByRole('radio', { name: /Basic Law.*2022/ }).check();
+  await page.getByRole('radio', { name: /2022-12-19/ }).check();
   await page.getByRole('button', { name: 'Apply filters' }).click();
   await expect(page).toHaveURL(new RegExp(`country=DE.*versionId=${VERSION_2022}.*effectiveDate=2022-12-19`));
   const result = page.getByRole('link', { name: /Article 1 — Human dignity/ });

@@ -173,6 +173,9 @@ let pendingMfaEmail = identityMe.email;
 let currentUser = { ...identityMe };
 let managedUsers = [];
 let serviceTokens = [];
+let credentials = new Map();
+let createdConstitutions = [];
+let nodeTitleOverrides = new Map();
 
 function resetMockState() {
   mockAmendments.clear();
@@ -184,9 +187,19 @@ function resetMockState() {
   currentUser = { ...identityMe };
   managedUsers = [];
   serviceTokens = [];
+  createdConstitutions = [];
+  nodeTitleOverrides = new Map();
+  credentials = new Map([
+    ['local-editor@example.local', 'change-me'], ['local-reviewer@example.local', 'change-me'],
+    ['local-publisher@example.local', 'change-me'], ['local-admin@example.local', 'change-me'],
+    ['local-viewer@example.local', 'change-me'],
+  ]);
 }
 
 function userForEmail(email) {
+  if (email === 'local-editor@example.local') {
+    return { ...identityMe, email, roles: ['editor'] };
+  }
   if (email === 'local-admin@example.local') {
     return { ...identityMe, email, roles: ['admin'] };
   }
@@ -249,6 +262,7 @@ function preview() {
     publishComment: editorState.session?.publishComment ?? null,
     changeRecord: editorState.session?.changeRecord ?? null,
     amendmentStatus: editorState.session?.status === 'published' ? 'ready' : null,
+    searchIndexStatus: editorState.session?.status === 'published' ? 'ready' : null,
     publicContentUpdated: editorState.session?.status === 'published' ? true : null,
     newVersionId: editorState.session?.status === 'published' ? '01900000-0000-4000-8000-000000000501' : null,
     newVersionLabel: editorState.session?.status === 'published' ? (editorState.session.newVersionLabel ?? '2022-1') : null,
@@ -276,7 +290,25 @@ const server = createServer(async (req, res) => {
     return;
   }
   if (method === 'GET' && pathname === '/api/catalog/countries/DE') {
-    json(res, 200, germany);
+    json(res, 200, { ...germany, constitutions: [...germany.constitutions, ...createdConstitutions] });
+    return;
+  }
+  if (method === 'POST' && pathname === '/api/catalog/countries/DE/constitutions') {
+    const body = await readBody(req);
+    const created = {
+      id: '01900000-0000-4000-8000-000000000099', slug: body.slug, title: body.title,
+      latestVersionId: null, versions: [], contentOutline: { kinds: body.outline },
+    };
+    createdConstitutions.push(created);
+    json(res, 201, created);
+    return;
+  }
+  const outlineMatch = pathname.match(/^\/api\/catalog\/constitutions\/([^/]+)\/content-outline$/);
+  if (method === 'PUT' && outlineMatch) {
+    const body = await readBody(req);
+    const created = createdConstitutions.find((item) => item.id === outlineMatch[1]);
+    if (created) created.contentOutline = { kinds: body.kinds };
+    json(res, 200, { versionIds: [] });
     return;
   }
 
@@ -301,12 +333,25 @@ const server = createServer(async (req, res) => {
   }
   const articleMatch = pathname.match(/^\/api\/content\/articles\/([^/]+)$/);
   if (method === 'GET' && articleMatch) {
-    const article = articlesById.get(articleMatch[1]);
+    const summary = articles2022.find((item) => item.id === articleMatch[1]);
+    const article = articlesById.get(articleMatch[1]) ?? (summary ? { ...summary, body: `${summary.title}.`, children: [] } : null);
     if (!article) {
       json(res, 404, { error: 'Not found' });
       return;
     }
-    json(res, 200, article);
+    const applyTitles = (node) => ({
+      ...node,
+      title: nodeTitleOverrides.has(node.id) ? nodeTitleOverrides.get(node.id) : node.title,
+      children: (node.children ?? []).map(applyTitles),
+    });
+    json(res, 200, applyTitles(article));
+    return;
+  }
+  const contentNodeMatch = pathname.match(/^\/api\/content\/nodes\/([^/]+)$/);
+  if (method === 'PATCH' && contentNodeMatch) {
+    const body = await readBody(req);
+    nodeTitleOverrides.set(contentNodeMatch[1], body.title);
+    json(res, 200, { id: contentNodeMatch[1], title: body.title, children: [] });
     return;
   }
 
@@ -372,7 +417,8 @@ const server = createServer(async (req, res) => {
       json(res, 404, { error: 'Not found' });
       return;
     }
-    json(res, 200, [{ ...amendmentRevision, title: existing.title, summary: existing.summary, changes: existing.changes.map(({ articleNumber, changeType, note }) => ({ articleNumber, changeType, note })) }]);
+    const currentRevision = { ...amendmentRevision, id: '01900000-0000-4000-8000-000000000322', predecessorRevisionId: amendmentRevision.id, createdAt: '2022-12-20T12:00:00Z', title: existing.title, summary: existing.summary, changes: existing.changes.map(({ articleNumber, changeType, note }) => ({ articleNumber, changeType, note })) };
+    json(res, 200, [amendmentRevision, currentRevision]);
     return;
   }
 
@@ -485,10 +531,7 @@ const server = createServer(async (req, res) => {
 
   if (method === 'POST' && pathname === '/api/identity/login') {
     const body = await readBody(req);
-    if (body.password !== 'change-me' || ![
-      'local-editor@example.local', 'local-reviewer@example.local', 'local-publisher@example.local',
-      'local-admin@example.local', 'local-viewer@example.local',
-    ].includes(body.email)) {
+    if (credentials.get(body.email) !== body.password) {
       json(res, 401, { error: 'Invalid credentials' });
       return;
     }
@@ -533,6 +576,7 @@ const server = createServer(async (req, res) => {
       json(res, 400, { error: 'Invalid reset token' });
       return;
     }
+    credentials.set('local-viewer@example.local', body.newPassword);
     empty(res, 204);
     return;
   }
@@ -542,10 +586,17 @@ const server = createServer(async (req, res) => {
       json(res, 400, { error: 'Invalid invite token' });
       return;
     }
+    credentials.set('invited@example.local', body.password);
     json(res, 200, { ...userForEmail('invited@example.local'), roles: ['viewer'] });
     return;
   }
   if (method === 'POST' && pathname === '/api/identity/password/change') {
+    const body = await readBody(req);
+    if (credentials.get(currentUser.email) !== body.currentPassword) {
+      json(res, 400, { error: 'Invalid current password' });
+      return;
+    }
+    credentials.set(currentUser.email, body.newPassword);
     empty(res, 204);
     return;
   }
@@ -585,7 +636,7 @@ const server = createServer(async (req, res) => {
         id: currentUser.id,
         email: currentUser.email,
         roles: currentUser.roles,
-        enabled: true,
+        enabled: currentUser.enabled !== false,
         status: 'active',
         createdAt: '2026-01-01T00:00:00Z',
       },

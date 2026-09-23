@@ -15,6 +15,10 @@ test('visitor requests and completes a password reset', async ({ page }) => {
   await page.getByLabel('New password').fill('replacement-password');
   await page.getByRole('button', { name: 'Set new password' }).click();
   await expect(page).toHaveURL(/\/login$/);
+  await page.getByLabel('Email').fill('local-viewer@example.local');
+  await page.getByLabel('Password').fill('replacement-password');
+  await page.getByRole('button', { name: 'Sign in' }).click();
+  await expect(page).toHaveURL(/\/$/);
 });
 
 test('invited visitor activates the assigned account', async ({ page }) => {
@@ -23,6 +27,12 @@ test('invited visitor activates the assigned account', async ({ page }) => {
   await page.getByLabel('Password').fill('invited-password');
   await page.getByRole('button', { name: 'Activate account' }).click();
   await expect(page).toHaveURL(/\/login$/);
+  await page.getByLabel('Email').fill('invited@example.local');
+  await page.getByLabel('Password').fill('invited-password');
+  await page.getByRole('button', { name: 'Sign in' }).click();
+  await expect(page).toHaveURL(/\/$/);
+  await page.getByRole('button', { name: 'Account menu' }).click();
+  await expect(page.getByText('invited@example.local', { exact: true })).toBeVisible();
 });
 
 test('viewer changes password, enrolls MFA and receives recovery codes', async ({ page }) => {
@@ -47,4 +57,11 @@ test('viewer changes password, enrolls MFA and receives recovery codes', async (
   await page.getByLabel('Authenticator code').fill('123456');
   await page.getByRole('button', { name: 'Replace recovery codes' }).click();
   await expect(page.getByText('RECOVERY-NEW')).toBeVisible();
+  await page.getByRole('button', { name: 'Account menu' }).click();
+  await page.getByRole('button', { name: 'Sign out' }).click();
+  await page.goto('/login');
+  await page.getByLabel('Email').fill('local-viewer@example.local');
+  await page.getByLabel('Password').fill('replacement-password');
+  await page.getByRole('button', { name: 'Sign in' }).click();
+  await expect(page).toHaveURL(/\/$/);
 });

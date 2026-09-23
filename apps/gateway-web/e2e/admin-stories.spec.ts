@@ -26,6 +26,13 @@ test('administrator manages a user and its access lifecycle', async ({ page }) =
   await expect(page.locator('.data-row').filter({ hasText: 'local-admin@example.local' })).toContainText('admin, publisher');
   await page.locator('.data-row').filter({ hasText: 'local-admin@example.local' }).getByRole('button', { name: 'Issue reset token' }).click();
   await expect(page.getByText('E2E-RESET-ADMIN')).toBeVisible();
+  await page.locator('.data-row').filter({ hasText: 'local-admin@example.local' }).getByRole('button', { name: 'Disable' }).click();
+  let persistedUser = page.locator('.data-row').filter({ hasText: 'local-admin@example.local' });
+  await expect(persistedUser).toContainText('active');
+  await expect(persistedUser.getByRole('button', { name: 'Activate' })).toBeVisible();
+  await persistedUser.getByRole('button', { name: 'Activate' }).click();
+  persistedUser = page.locator('.data-row').filter({ hasText: 'local-admin@example.local' });
+  await expect(persistedUser.getByRole('button', { name: 'Disable' })).toBeVisible();
 });
 
 test('administrator creates, rotates and revokes a service token', async ({ page }) => {
@@ -61,4 +68,28 @@ test('administrator imports constitution JSON and opens the resulting version li
   await expect(page.getByRole('heading', { name: 'Import job' })).toBeVisible();
   await expect(page.getByText('Status: completed')).toBeVisible();
   await expect(page.getByRole('link', { name: 'Open the published version' })).toHaveAttribute('href', /\/countries\/US\/versions\//);
+});
+
+test('administrator creates a constitution and changes its outline settings', async ({ page }) => {
+  await signInAdmin(page);
+  await page.goto('/admin/constitutions');
+  await page.getByLabel('Country').selectOption('DE');
+  await page.getByLabel('Slug').fill('test-constitution');
+  await page.getByLabel('Title', { exact: true }).fill('Test Constitution');
+  await page.getByRole('button', { name: 'Add deeper layer' }).click();
+  await page.getByLabel('Label').nth(1).fill('Clause');
+  await page.getByRole('button', { name: 'Create' }).click();
+  await expect(page.getByRole('heading', { name: 'Test Constitution' })).toBeVisible();
+  await expect(page.getByLabel('Label').nth(1)).toHaveValue('Clause');
+  await page.getByLabel('How this layer is shown').nth(1).selectOption('concatenated');
+  await page.getByRole('button', { name: 'Save outline' }).click();
+  await expect(page.getByText('Outline saved.')).toBeVisible();
+  await expect(page.getByLabel('How this layer is shown').nth(1)).toHaveValue('concatenated');
+});
+
+test('administrator opens the API documentation destination', async ({ page }) => {
+  await signInAdmin(page);
+  await page.getByRole('button', { name: 'Account menu' }).click();
+  const apiDocs = page.getByRole('link', { name: 'API docs' });
+  await expect(apiDocs).toHaveAttribute('href', '/api-docs');
 });

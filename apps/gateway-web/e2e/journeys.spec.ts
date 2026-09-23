@@ -55,11 +55,20 @@ test('edit, review, and publish a draft', async ({ page }) => {
   await page.getByRole('button', { name: 'Correct this text' }).click();
   await expect(page).toHaveURL(/sessionId=/);
   await expect(page.getByRole('heading', { name: 'Articles' })).toBeVisible();
+  await page.getByLabel('Filter articles').fill('dignity');
+  await expect(page.getByRole('link', { name: /Art\. 1 Human dignity/ })).toBeVisible();
+  await expect(page.getByRole('link', { name: /Art\. 2/ })).toHaveCount(0);
+  await page.getByLabel('Filter articles').fill('');
+  await expect(page.getByRole('link', { name: 'Discard changes' })).toBeVisible();
+  await expect(page.getByText('Preview', { exact: true })).toBeVisible();
+  await expect(page.getByText('Section titles', { exact: true })).toBeVisible();
   await page.getByLabel('Title', { exact: true }).fill('Human dignity (draft)');
   await page.getByLabel('Article text').fill('Draft body for the e2e journey.');
   await page.getByRole('button', { name: 'Save draft' }).click();
   await expect(page).toHaveURL(/saved=1/);
   await expect(page.getByText('Draft saved.')).toBeVisible();
+  await expect(page.getByText('Draft body for the e2e journey.')).toBeVisible();
+  await expect(page.locator('.badge', { hasText: 'draft' })).toBeVisible();
   await page.getByLabel('What was corrected in this transcription?').fill('Corrected text.');
   await page.getByRole('button', { name: 'Save comment' }).click();
   await expect(page).toHaveURL(/detailsSaved=1/);
@@ -67,10 +76,14 @@ test('edit, review, and publish a draft', async ({ page }) => {
   await page.getByRole('button', { name: 'Submit for review' }).click();
   await expect(page).toHaveURL(/reviewed=1/);
   await expect(page.getByText('Submitted for review.')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Approve review' })).toHaveCount(0);
   const sessionUrl = page.url();
   await signOut(page);
   await signInReviewer(page);
   await page.goto(sessionUrl);
+  await expect(page.getByText('Preview', { exact: true })).toBeVisible();
+  await expect(page.getByText('Draft body for the e2e journey.')).toBeVisible();
+  await expect(page.getByRole('link', { name: 'View public source' })).toBeVisible();
   await page.getByRole('button', { name: 'Approve review' }).click();
   await expect(page).toHaveURL(/approved=1/);
   await expect(page.getByText('Review approved.')).toBeVisible();
@@ -80,6 +93,7 @@ test('edit, review, and publish a draft', async ({ page }) => {
   await page.goto(approvedUrl);
   await page.getByRole('button', { name: 'Publish transcription' }).click();
   await expect(page.getByText('Published as version 2022-1.')).toBeVisible();
+  await expect(page.getByText('ready', { exact: true })).toBeVisible();
 });
 
 test('recorded amending law appears on the public timeline', async ({ page }) => {
@@ -87,12 +101,25 @@ test('recorded amending law appears on the public timeline', async ({ page }) =>
   await page.goto('/editor/amendments');
   await page.getByRole('link', { name: 'Add legal change' }).click();
   await page.getByLabel('Title', { exact: true }).fill('E2E amending law');
+  await page.getByLabel('Citation').fill('Federal Gazette 2026 I No. 1');
+  await page.getByLabel('Enacted date').fill('2026-01-02');
+  await page.getByLabel('Effective date').fill('2026-02-01');
+  await page.getByLabel('Summary').fill('Updates the dignity provision.');
   await page.getByLabel('Comment').fill('Recorded for the timeline journey.');
   await page.getByLabel('Document URL').fill('https://example.gov/e2e-amending-law.pdf');
+  await page.getByLabel('Source version (optional)').selectOption(VERSION_1949);
+  await page.getByLabel('Target version (optional)').selectOption(VERSION_2022);
+  await page.getByRole('button', { name: 'Fill from two versions' }).click();
+  await page.getByRole('button', { name: 'Suggest changes' }).click();
+  await expect(page.getByLabel('Article').first()).not.toHaveValue('');
   await expect(page.locator('form.stack').first()).toHaveJSProperty('noValidate', false);
   expect(await page.locator('form.stack').first().evaluate((form) => form.checkValidity())).toBeTruthy();
   await page.getByRole('button', { name: 'Save draft' }).click();
   await expect(page.getByText('Draft saved.')).toBeVisible();
+  const amendmentUrl = page.url();
+  await signOut(page);
+  await signInPublisher(page);
+  await page.goto(amendmentUrl);
   await page.getByRole('button', { name: 'Publish law' }).click();
   await expect(page).toHaveURL(/published=1/);
   await expect(page.getByText('Amending law published.')).toBeVisible();
@@ -113,7 +140,15 @@ test('publisher confirms stale old-law quotes without changing the public commen
   await page.getByLabel('What was corrected in this transcription?').fill('Corrected the historical transcription.');
   await page.getByRole('button', { name: 'Save comment' }).click();
   await page.getByRole('button', { name: 'Submit for review' }).click();
+  const historicalCorrectionUrl = page.url();
+  await signOut(page);
+  await signInReviewer(page);
+  await page.goto(historicalCorrectionUrl);
   await page.getByRole('button', { name: 'Approve review' }).click();
+  const approvedHistoricalCorrectionUrl = page.url();
+  await signOut(page);
+  await signInPublisher(page);
+  await page.goto(approvedHistoricalCorrectionUrl);
   await page.getByRole('button', { name: 'Publish transcription' }).click();
   await expect(page.getByText('Published as version 1949-1.')).toBeVisible();
   await page.getByRole('button', { name: 'Account menu' }).click();
@@ -159,9 +194,17 @@ test('editorial correction hop stays off the public timeline', async ({ page }) 
   await page.getByRole('button', { name: 'Submit for review' }).click();
   await expect(page).toHaveURL(/reviewed=1/);
   await expect(page.getByText('Submitted for review.')).toBeVisible();
+  const correctionUrl = page.url();
+  await signOut(page);
+  await signInReviewer(page);
+  await page.goto(correctionUrl);
   await page.getByRole('button', { name: 'Approve review' }).click();
   await expect(page).toHaveURL(/approved=1/);
   await expect(page.getByText('Review approved.')).toBeVisible();
+  const approvedCorrectionUrl = page.url();
+  await signOut(page);
+  await signInPublisher(page);
+  await page.goto(approvedCorrectionUrl);
   await page.getByRole('button', { name: 'Publish transcription' }).click();
   await expect(page.getByText('Published as version 2022-1.')).toBeVisible();
   await signOut(page);
@@ -174,4 +217,39 @@ test('editorial correction hop stays off the public timeline', async ({ page }) 
   await expect(page.getByRole('link', { name: '2022-1' })).toBeVisible();
   await expect(page.getByText('Editorial correction', { exact: true })).toBeVisible();
   await expect(page.getByText('No publication comment')).toBeVisible();
+});
+
+test('editor reaches title controls from the public article reader', async ({ page }) => {
+  await signInEditor(page);
+  await page.goto(`/countries/DE/versions/${VERSION_2022}/articles/${ARTICLE_1}`);
+  const title = page.getByLabel(/Title for/).first();
+  await title.fill('Rights paragraph');
+  await page.getByRole('button', { name: 'Save title' }).first().click();
+  await expect(page.getByLabel(/Title for/).first()).toHaveValue('Rights paragraph');
+});
+
+test('editor inspects and restores a legal-change revision as a new draft', async ({ page }) => {
+  await signInEditor(page);
+  await page.goto('/editor/amendments/01900000-0000-4000-8000-000000000302');
+  const history = page.getByRole('complementary', { name: 'Revision history' });
+  await history.locator('button.revision-item').first().click();
+  await expect(page.getByText('Viewing a past revision read-only.')).toBeVisible();
+  await history.getByRole('button', { name: 'Restore as new draft' }).click();
+  await expect(page.getByText('Draft saved.')).toBeVisible();
+});
+
+test('publisher withdraws an incorrect published legal-change record', async ({ page }) => {
+  await signInPublisher(page);
+  await page.goto('/editor/amendments/01900000-0000-4000-8000-000000000301');
+  await page.getByRole('button', { name: 'Withdraw' }).click();
+  await expect(page.getByText('Amending law withdrawn.')).toBeVisible();
+  await expect(page.getByText('withdrawn', { exact: true })).toBeVisible();
+});
+
+test('publisher completes a fresh authenticator check before returning to publication', async ({ page }) => {
+  await signInPublisher(page);
+  await page.goto('/account/step-up?returnTo=%2Feditor%2Famendments');
+  await page.getByLabel('Authenticator code').fill('123456');
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await expect(page).toHaveURL(/\/editor\/amendments$/);
 });

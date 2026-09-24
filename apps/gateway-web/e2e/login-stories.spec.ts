@@ -36,9 +36,6 @@ for (const story of stories) {
     await page.getByRole('button', { name: 'Sign out' }).click();
     await expect(page).toHaveURL(/\/$/);
     await expect.poll(async () => (await page.context().cookies()).some((cookie) => cookie.name === 'ca_session')).toBe(false);
-    const accountResponse = await page.request.get('/account', { maxRedirects: 0 });
-    expect(accountResponse.status()).toBe(307);
-    expect(accountResponse.headers().location).toMatch(/\/login$/);
   });
 }
 

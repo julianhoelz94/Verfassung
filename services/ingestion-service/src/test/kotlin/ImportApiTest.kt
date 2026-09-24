@@ -116,6 +116,56 @@ class ImportApiTest {
     }
 
     @Test
+    fun successorImportForwardsLegalPredecessor() {
+        val constitutionId = UUID.fromString("01900000-0000-4000-8000-000000000501")
+        val predecessorId = UUID.fromString("01900000-0000-4000-8000-000000000502")
+        val versionId = UUID.fromString("01900000-0000-4000-8000-000000000503")
+        Mockito.`when`(catalogClient.getCountry("FR"))
+            .thenReturn(DownstreamCountry(UUID.randomUUID(), "FR", "France"))
+        Mockito.`when`(catalogClient.findConstitution("FR", "1958"))
+            .thenReturn(DownstreamConstitution(constitutionId, "1958", "Constitution of 1958"))
+        Mockito.`when`(
+            catalogClient.createDraftVersion(constitutionId, "1962", LocalDate.parse("1962-11-06"), "en", null, null, predecessorId, "legal"),
+        ).thenReturn(DownstreamVersion(versionId, constitutionId, "draft"))
+        Mockito.`when`(catalogClient.publishVersion(versionId))
+            .thenReturn(DownstreamVersion(versionId, constitutionId, "published"))
+
+        mockMvc.post("/import-jobs") {
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = """
+                {
+                  "isoCode": "FR",
+                  "countryName": "France",
+                  "constitutionSlug": "1958",
+                  "constitutionTitle": "Constitution of 1958",
+                  "versionLabel": "1962",
+                  "effectiveDate": "1962-11-06",
+                  "predecessorVersionId": "$predecessorId",
+                  "hopKind": "legal",
+                  "articles": [
+                    {"articleNumber": "1", "title": "Sovereignty", "body": "Sovereignty belongs to the people.", "sortOrder": 1}
+                  ]
+                }
+            """.trimIndent()
+        }.andExpect {
+            status { isCreated() }
+            jsonPath("$.status") { value("completed") }
+            jsonPath("$.versionId") { value(versionId.toString()) }
+        }
+        Mockito.verify(catalogClient).createDraftVersion(
+            constitutionId,
+            "1962",
+            LocalDate.parse("1962-11-06"),
+            "en",
+            null,
+            null,
+            predecessorId,
+            "legal",
+        )
+    }
+
+    @Test
     fun treeFixtureImportAppliesOutlineAndSources() {
         val constitutionId = UUID.fromString("01900000-0000-4000-8000-000000000601")
         val versionId = UUID.fromString("01900000-0000-4000-8000-000000000602")

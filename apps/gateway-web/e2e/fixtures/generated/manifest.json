@@ -1,0 +1,82 @@
+{
+  "schemaVersion": 1,
+  "namespace": "atlas-e2e",
+  "expected": {
+    "countries": 2,
+    "constitutions": 2,
+    "versions": 5,
+    "articles": 60,
+    "amendments": 3
+  },
+  "countries": [
+    {
+      "isoCode": "XA",
+      "constitutionSlug": "atlas-charter",
+      "versions": [
+        {
+          "key": "xa-2020",
+          "file": "xa-2020.json",
+          "predecessor": null
+        },
+        {
+          "key": "xa-2022",
+          "file": "xa-2022.json",
+          "predecessor": "xa-2020"
+        },
+        {
+          "key": "xa-2024",
+          "file": "xa-2024.json",
+          "predecessor": "xa-2022"
+        }
+      ]
+    },
+    {
+      "isoCode": "XB",
+      "constitutionSlug": "civic-charter",
+      "versions": [
+        {
+          "key": "xb-2018",
+          "file": "xb-2018.json",
+          "predecessor": null
+        },
+        {
+          "key": "xb-2023",
+          "file": "xb-2023.json",
+          "predecessor": "xb-2018"
+        }
+      ]
+    }
+  ],
+  "amendments": [
+    {
+      "key": "xa-2022-law",
+      "constitution": "XA",
+      "source": "xa-2020",
+      "target": "xa-2022",
+      "title": "Atlas Testland Civic Revision 2022",
+      "enactedOn": "2022-01-02",
+      "effectiveOn": "2022-02-02",
+      "articleNumber": "1"
+    },
+    {
+      "key": "xa-2024-law",
+      "constitution": "XA",
+      "source": "xa-2022",
+      "target": "xa-2024",
+      "title": "Atlas Testland Civic Revision 2024",
+      "enactedOn": "2024-02-03",
+      "effectiveOn": "2024-03-03",
+      "articleNumber": "13"
+    },
+    {
+      "key": "xb-2023-law",
+      "constitution": "XB",
+      "source": "xb-2018",
+      "target": "xb-2023",
+      "title": "Atlas Sample Civic Revision 2023",
+      "enactedOn": "2023-04-05",
+      "effectiveOn": "2023-05-05",
+      "articleNumber": "1"
+    }
+  ]
+}

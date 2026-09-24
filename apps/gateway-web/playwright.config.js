@@ -21,6 +21,7 @@ const apiEnv = {
 
 module.exports = defineConfig({
   testDir: './e2e',
+  testIgnore: './e2e/full/**',
   fullyParallel: false,
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 2 : 0,

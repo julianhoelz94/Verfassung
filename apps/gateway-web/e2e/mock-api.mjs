@@ -178,6 +178,7 @@ let createdConstitutions = [];
 let nodeTitleOverrides = new Map();
 let enrolledMfaEmails = new Set();
 let stepUpFresh = true;
+let visualRoles = false;
 
 function resetMockState() {
   mockAmendments.clear();
@@ -193,6 +194,7 @@ function resetMockState() {
   nodeTitleOverrides = new Map();
   enrolledMfaEmails = new Set();
   stepUpFresh = true;
+  visualRoles = false;
   credentials = new Map([
     ['local-editor@example.local', 'change-me'], ['local-reviewer@example.local', 'change-me'],
     ['local-publisher@example.local', 'change-me'], ['local-admin@example.local', 'change-me'],
@@ -202,7 +204,7 @@ function resetMockState() {
 
 function userForEmail(email) {
   if (email === 'local-editor@example.local') {
-    return { ...identityMe, email, roles: ['editor'] };
+    return { ...identityMe, email, roles: visualRoles ? identityMe.roles : ['editor'] };
   }
   if (email === 'local-admin@example.local') {
     return { ...identityMe, email, roles: ['admin'] };
@@ -276,6 +278,8 @@ function preview() {
   };
 }
 
+resetMockState();
+
 const server = createServer(async (req, res) => {
   const url = new URL(req.url ?? '/', `http://127.0.0.1:${port}`);
   const { pathname, searchParams } = url;
@@ -294,6 +298,11 @@ const server = createServer(async (req, res) => {
   if (method === 'POST' && pathname === '/__step_up_stale') {
     stepUpFresh = false;
     currentUser = { ...currentUser, stepUpFresh: false };
+    empty(res, 204);
+    return;
+  }
+  if (method === 'POST' && pathname === '/__visual_roles') {
+    visualRoles = true;
     empty(res, 204);
     return;
   }

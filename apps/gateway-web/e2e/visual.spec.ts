@@ -15,6 +15,7 @@ async function snapshot(page: Page, name: string, maxDiffPixelRatio = 0.02): Pro
 test.beforeEach(async ({ request }) => {
   const response = await request.post(`${MOCK_ORIGIN}/__reset`);
   expect(response.ok()).toBeTruthy();
+  expect((await request.post(`${MOCK_ORIGIN}/__visual_roles`)).ok()).toBeTruthy();
 });
 
 test('public and editor layouts at 390, 820 and 1440', async ({ page }) => {

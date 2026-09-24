@@ -50,11 +50,11 @@ test('viewer changes password, enrolls MFA and receives recovery codes', async (
   await page.getByRole('button', { name: 'Enroll authenticator' }).click();
   await expect(page).toHaveURL(/\/account\?enroll=1$/);
   await expect(page.getByText(/Authenticator secret:/)).toContainText('E2ESECRET');
-  await page.getByLabel('Authenticator code').fill('123456');
+  await page.locator('#enrollCode').fill('123456');
   await page.getByRole('button', { name: 'Confirm enrollment' }).click();
   await expect(page.getByText('RECOVERY-ONE')).toBeVisible();
   await page.getByRole('link', { name: 'Back to account' }).click();
-  await page.getByLabel('Authenticator code').fill('123456');
+  await page.locator('#recoveryRotateCode').fill('123456');
   await page.getByRole('button', { name: 'Replace recovery codes' }).click();
   await expect(page.getByText('RECOVERY-NEW')).toBeVisible();
   await page.getByRole('button', { name: 'Account menu' }).click();

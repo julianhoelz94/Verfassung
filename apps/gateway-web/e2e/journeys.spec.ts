@@ -84,7 +84,7 @@ test('edit, review, and publish a draft', async ({ page }) => {
   await page.locator('.data-row').getByRole('link').first().click();
   await expect(page).toHaveURL(/sessionId=/);
   await expect(page.getByText('Preview', { exact: true })).toBeVisible();
-  await expect(page.getByText('Draft body for the e2e journey.')).toBeVisible();
+  await expect(page.getByLabel('Article 1').getByText('Draft body for the e2e journey.')).toBeVisible();
   await expect(page.getByRole('link', { name: 'View public source' })).toBeVisible();
   const reviewerSessionUrl = page.url();
   await page.goto('/editor/amendments');
@@ -263,7 +263,7 @@ test('legal successor passes queues and requires fresh authentication before pub
   await signInEditor(page);
   await page.goto('/editor');
   await page.getByRole('button', { name: 'Record the next legal change' }).click();
-  await page.getByLabel('Title', { exact: true }).fill('Human dignity in 2027');
+  await page.getByRole('region', { name: 'Article' }).getByLabel('Title', { exact: true }).fill('Human dignity in 2027');
   await page.getByLabel('Article text').fill('The 2027 legally amended text.');
   await page.getByRole('button', { name: 'Save draft' }).click();
   await page.getByLabel('Title', { exact: true }).last().fill('2027 dignity amendment');

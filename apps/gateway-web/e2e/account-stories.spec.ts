@@ -47,7 +47,7 @@ test('viewer changes password, enrolls MFA and receives recovery codes', async (
   await page.getByLabel('New password').fill('replacement-password');
   await page.getByRole('button', { name: 'Update password' }).click();
   await expect(page.getByText('Password updated.')).toBeVisible();
-  await page.getByRole('button', { name: 'Enroll authenticator' }).click();
+  await Promise.all([page.waitForURL(/\/account\?enroll=1$/), page.getByRole('button', { name: 'Enroll authenticator' }).click()]);
   await expect(page).toHaveURL(/\/account\?enroll=1$/);
   await expect(page.getByText(/Authenticator secret:/)).toContainText('E2ESECRET');
   await page.locator('#enrollCode').fill('123456');
@@ -58,7 +58,7 @@ test('viewer changes password, enrolls MFA and receives recovery codes', async (
   await page.getByRole('button', { name: 'Replace recovery codes' }).click();
   await expect(page.getByText('RECOVERY-NEW')).toBeVisible();
   await page.getByRole('button', { name: 'Account menu' }).click();
-  await page.getByRole('button', { name: 'Sign out' }).click();
+  await Promise.all([page.waitForURL(/\/$/), page.getByRole('button', { name: 'Sign out' }).click()]);
   await page.goto('/login');
   await page.getByLabel('Email').fill('local-viewer@example.local');
   await page.getByLabel('Password').fill('replacement-password');

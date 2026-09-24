@@ -16,7 +16,7 @@ Flyway: `services/<name>/src/main/resources/db/migration/`. Forward-only `V{n}__
 | `constitution_node_kinds` | outline: kind_code, flags, presentation `section\|concatenated` (V6) |
 | `constitution_node_kind_edges` | allowed parent→child kinds |
 
-Latest: V10 two-axis chains. Seed: `V3__seed_germany.sql` (demo provenance, not official); V9 sets 1949 `initial` and 2022 `legal_amendment`; V10 migrates that hop to `legal` and fills `legal_version_id`.
+Latest: V10 two-axis chains. Historical seed migration numbers are retained as no-ops; fresh databases start without constitutions or versions. Test data is to be uploaded through APIs.
 
 ## content_db
 
@@ -25,11 +25,11 @@ Latest: V10 two-axis chains. Seed: `V3__seed_germany.sql` (demo provenance, not 
 | `articles` | View over root `content_nodes` (`parent_id IS NULL`); V7 dropped the table |
 | `content_nodes` | Tree (`parent_id`, kind, body, `predecessor_id` V7). Display and write SoT |
 
-Seed: `V3__seed_germany_articles.sql`, `V5__seed_article1_tree.sql`.
+Historical seed migration numbers V3 and V5 are no-ops on fresh databases.
 
 ## amendment_db
 
-`version_transitions` (source→target UUIDs, `constitution_id`), `amendments` (`constitution_id`, `status`, `review_status` `ok`/`needs_review`, nullable `version_transition_id`, `published_revision_id`; `kind` dropped in V8), `amendment_revisions` (linear chain; `comment`, `documents` JSONB, published pins `reviewed_source_tip_id`/`reviewed_target_tip_id`, `is_published_tip`), `amendment_changes` (hang off `revision_id`; V6 amending-law text). Seed: `V3__seed_basic_law_transition.sql` (V8 migrates summary→comment and `source_reference`→a document URL). Latest: V8.
+`version_transitions` (source→target UUIDs, `constitution_id`), `amendments` (`constitution_id`, `status`, `review_status` `ok`/`needs_review`, nullable `version_transition_id`, `published_revision_id`; `kind` dropped in V8), `amendment_revisions` (linear chain; `comment`, `documents` JSONB, published pins `reviewed_source_tip_id`/`reviewed_target_tip_id`, `is_published_tip`), `amendment_changes` (hang off `revision_id`; V6 amending-law text). Historical seed migration V3 is a no-op. Latest: V8.
 
 ## identity_db
 

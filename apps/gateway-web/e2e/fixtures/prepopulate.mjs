@@ -174,7 +174,7 @@ const ids = { constitutions: {}, versions: {}, amendments: {} };
 await ensureVersions(ids);
 await ensureAmendments(ids);
 await verifyTotals(ids);
-const resultPath = join(dirname(fileURLToPath(import.meta.url)), '..', 'test-results', 'prepopulate-ids.json');
+const resultPath = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'test-results', 'prepopulate-ids.json');
 mkdirSync(dirname(resultPath), { recursive: true });
 writeFileSync(resultPath, `${JSON.stringify(ids, null, 2)}\n`);
 console.log(`Prepopulation ${verifyOnly ? 'verified' : 'uploaded and verified'}: ${JSON.stringify(manifest.expected)}`);

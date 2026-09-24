@@ -230,7 +230,7 @@ export function AmendmentForm({
         ) : null}
       </div>
       <dialog ref={suggestDialogRef} className="dialog">
-        <form method="dialog" className="stack">
+        <div className="stack">
           <h2 className="section-title">Fill from two versions</h2>
           <p className="muted">Compare two snapshots and merge suggested changes into the table below. Nothing is saved until you save the draft.</p>
           <Select
@@ -268,7 +268,7 @@ export function AmendmentForm({
               {pending ? 'Suggesting…' : 'Suggest changes'}
             </Button>
           </div>
-        </form>
+        </div>
       </dialog>
     </form>
   );

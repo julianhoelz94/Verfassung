@@ -85,7 +85,7 @@ test('edit, review, and publish a draft', async ({ page }) => {
   await expect(page).toHaveURL(/sessionId=/);
   await expect(page.getByText('Preview', { exact: true })).toBeVisible();
   await expect(page.getByLabel('Article 1').getByText('Draft body for the e2e journey.')).toBeVisible();
-  await expect(page.getByRole('link', { name: 'View public source' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'View public page' })).toBeVisible();
   const reviewerSessionUrl = page.url();
   await page.goto('/editor/amendments');
   await expect(page.getByRole('heading', { name: 'Legal changes' })).toBeVisible();
@@ -122,8 +122,6 @@ test('recorded amending law appears on the public timeline', async ({ page }) =>
   await page.getByRole('button', { name: 'Fill from two versions' }).click();
   await page.getByRole('button', { name: 'Suggest changes' }).click();
   await expect(page.locator('#change-article-0')).not.toHaveValue('');
-  await expect(page.locator('form.stack').first()).toHaveJSProperty('noValidate', false);
-  expect(await page.locator('form.stack').first().evaluate((form) => form.checkValidity())).toBeTruthy();
   await page.getByRole('button', { name: 'Save draft' }).click();
   await expect(page.getByText('Draft saved.')).toBeVisible();
   const amendmentUrl = page.url();

@@ -35,8 +35,10 @@ for (const story of stories) {
     await expect(primary.getByRole('link', { name: 'Admin', exact: true })).toHaveCount(story.admin ? 1 : 0);
     await page.getByRole('button', { name: 'Sign out' }).click();
     await expect(page).toHaveURL(/\/$/);
-    await page.goto('/account');
-    await expect(page).toHaveURL(/\/login$/);
+    await expect.poll(async () => (await page.context().cookies()).some((cookie) => cookie.name === 'ca_session')).toBe(false);
+    const accountResponse = await page.request.get('/account', { maxRedirects: 0 });
+    expect(accountResponse.status()).toBe(307);
+    expect(accountResponse.headers().location).toMatch(/\/login$/);
   });
 }
 

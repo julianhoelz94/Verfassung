@@ -2,6 +2,20 @@
 
 This matrix maps the implemented stories in `docs/user-stories.md` to browser journeys. Story numbers are the bullet order within each user type. Stories marked **Planned** in the catalog are excluded because the corresponding product behavior does not exist yet.
 
+The journeys in the table below use `mock-api.mjs` and verify UI behavior against mutable mock state. They do not prove backend persistence. The separate `e2e/full` project runs against built gateway, Caddy, and all required services, with records uploaded and checked by `npm run prepopulate`.
+
+| Real-stack action | Full-stack Playwright test |
+| --- | --- |
+| Browse a country, version, and article | `full/real-journeys.spec.ts`: visitor reads a published constitution |
+| Compare legal versions and read timeline documents | `full/real-journeys.spec.ts`: visitor compares legal versions |
+| Search imported article text | `full/real-journeys.spec.ts`: visitor finds imported text |
+| Viewer signs in, sees account, and signs out | `full/real-journeys.spec.ts`: viewer signs in |
+| Editor, reviewer, publisher, and admin access with real MFA | `full/roles.spec.ts`: four role permission tests |
+| Draft, review, publish, and read an editorial correction | `full/roles.spec.ts`: real transcription correction |
+| Admin imports JSON and opens the published version | `full/roles.spec.ts`: administrator imports a new constitution |
+
+The fixture verifier checks 2 countries, 2 constitutions, 5 published versions, 60 article snapshots, 3 amendments, nested content, predecessor links, revision history, source documents, and indexed search hits. A second upload and `--verify-only` pass prove idempotence. Account recovery, legal successor publication, change-record revision and withdrawal, and user/token administration currently have mock-only browser coverage.
+
 | Stories | Playwright journey | Durable outcome or permission assertion |
 | --- | --- | --- |
 | Anonymous 1–8, 13 | `public-stories.spec.ts` — `visitor follows the country, legal version, article and history`; `visitor can reach provenance and a print action on narrow screens` | Opens a country, historical and current versions, permanent article URL, adjacent articles and article history; invokes the browser print action. |
@@ -24,4 +38,4 @@ This matrix maps the implemented stories in `docs/user-stories.md` to browser jo
 | Shared 2 | `login-stories.spec.ts` viewer and reviewer direct-URL tests | Shows explicit access messages and omits forbidden controls. |
 | Shared 3 | `login-stories.spec.ts` invalid and valid MFA journeys | Rejects an invalid authenticator code without a session and accepts a valid challenge for sensitive roles. |
 
-The mock API is reset before each test and holds mutable workflow state during a journey. This ensures mutation tests assert later reads or public outcomes instead of only checking a success message.
+The mock API is reset before each test and holds mutable workflow state during a journey. Mutation tests assert later mock reads or mock public outcomes instead of only checking a success message.

@@ -33,7 +33,7 @@ Add a separate Playwright project or command, `npm run test:e2e:full`, against t
 
 Map every automated story to a test ID in a coverage table. Mark stories that are still **Planned** as unavailable rather than counting them as passing journeys. Include negative role checks, but avoid asserting implementation details such as internal service calls when the user-visible result is sufficient.
 
-The current mapping is in [sprint-47-story-coverage.md](sprint-47-story-coverage.md).
+The current mapping is in [USER_STORY_COVERAGE.md](../../apps/gateway-web/e2e/USER_STORY_COVERAGE.md).
 
 ## CI sequence and acceptance
 

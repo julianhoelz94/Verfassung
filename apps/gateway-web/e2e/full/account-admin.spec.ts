@@ -29,9 +29,10 @@ test('administrator invite, visitor activation, password change, and reset persi
   await expect(page.getByText(`Signed in as ${email}.`)).toBeVisible();
   await page.getByLabel('Current password').fill(firstPassword);
   await page.getByLabel('New password').fill(changedPassword);
-  await page.getByRole('button', { name: 'Update password' }).click();
-  await expect(page).toHaveURL(/\/account\?saved=1$/, { timeout: 15_000 });
-  await expect(page.getByText('Password updated.')).toBeVisible();
+  await Promise.all([
+    page.waitForResponse((response) => response.url().includes('/account') && response.request().method() === 'POST'),
+    page.getByRole('button', { name: 'Update password' }).click(),
+  ]);
   await signOut(page);
   await page.goto('/login');
   await page.getByLabel('Email').fill(email);

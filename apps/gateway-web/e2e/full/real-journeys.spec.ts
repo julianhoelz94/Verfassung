@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-const ids = JSON.parse(readFileSync(join(__dirname, '..', '..', 'test-results', 'prepopulate-ids.json'), 'utf8')) as {
+const ids = JSON.parse(readFileSync(join(__dirname, '..', 'fixtures', 'generated', '.runtime', 'prepopulate-ids.json'), 'utf8')) as {
   constitutions: Record<string, string>;
   versions: Record<string, string>;
   amendments: Record<string, string>;

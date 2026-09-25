@@ -17,8 +17,9 @@ The journeys in the table below use `mock-api.mjs` and verify UI behavior agains
 | Admin creates, rotates and revokes a service token | `full/account-admin.spec.ts`: real token lifecycle |
 | Editor restores a change-record revision and publisher republishes it | `full/amendments.spec.ts`: real amendment revision history |
 | Publisher withdraws a change record from the public timeline | `full/amendments.spec.ts`: real withdrawal |
+| Editor, reviewer, and publisher release a legal successor with a source document | `full/zz-legal-successor.spec.ts`: real legal successor publication |
 
-The fixture verifier checks 2 countries, 2 constitutions, 5 published versions, 60 article snapshots, 3 amendments, nested content, predecessor links, revision history, source documents, and indexed search hits. A second upload and `--verify-only` pass prove idempotence. Legal successor publication currently has mock-only browser coverage.
+The fixture verifier checks 2 countries, 2 constitutions, 5 published versions, 60 article snapshots, 3 amendments, nested content, predecessor links, revision history, source documents, and indexed search hits. A second upload and `--verify-only` pass prove idempotence. Detailed account MFA enrollment, stale-quote review, and administrator outline editing remain mock-only browser journeys.
 
 | Stories | Playwright journey | Durable outcome or permission assertion |
 | --- | --- | --- |

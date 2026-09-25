@@ -106,3 +106,23 @@ test('editor, reviewer, and publisher carry a real transcription correction to t
   await page.goto(`/countries/XA/versions/${latest.id}`);
   await expect(page.getByText('Dignity and civic equality protect every person. Verified transcription.').first()).toBeVisible();
 });
+
+test('administrator imports a new constitution through the website', async ({ page }) => {
+  const slug = `admin-journey-${Date.now()}`;
+  await signIn(page, 'admin');
+  await page.goto('/admin/import');
+  await page.getByLabel('Import JSON').fill(JSON.stringify({
+    isoCode: 'XC',
+    countryName: 'Atlas Admin Testland',
+    constitutionSlug: slug,
+    constitutionTitle: 'Admin Imported Charter',
+    versionLabel: '2025',
+    effectiveDate: '2025-01-01',
+    articles: [{ articleNumber: '1', title: 'Public trust', body: 'Public trust protects every person.', sortOrder: 1 }],
+  }));
+  await page.getByRole('button', { name: 'Start import' }).click();
+  await expect(page.getByRole('heading', { name: 'Import job' })).toBeVisible();
+  await expect(page.getByText('Status: completed')).toBeVisible();
+  await page.getByRole('link', { name: 'Open the published version' }).click();
+  await expect(page.getByText('Public trust')).toBeVisible();
+});

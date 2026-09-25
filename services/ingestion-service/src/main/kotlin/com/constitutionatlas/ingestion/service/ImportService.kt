@@ -58,6 +58,8 @@ class ImportService(
             request.languageCode,
             request.sourceUrl,
             request.gazetteReference,
+            request.predecessorVersionId,
+            request.hopKind,
         )
         try {
             contentClient.replaceArticles(version.id, request.articles)

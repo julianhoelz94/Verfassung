@@ -42,6 +42,8 @@ data class ImportRequest(
     val languageCode: String = "en",
     val sourceUrl: String? = null,
     val gazetteReference: String? = null,
+    val predecessorVersionId: UUID? = null,
+    val hopKind: String? = null,
     val outline: ImportOutline? = null,
     val articles: List<ImportArticle>,
 )

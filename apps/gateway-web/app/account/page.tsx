@@ -52,7 +52,14 @@ export default async function AccountPage(props: AccountPageProps) {
         {user.mfaRequired && !user.mfaEnabled ? (
           <p>Admin and publisher accounts must enroll an authenticator.</p>
         ) : null}
-        {user.mfaEnabled ? (
+        {enrollRequested && enrollChallenge && enrollSecret ? (
+          <>
+            <p>
+              Authenticator secret: <code>{enrollSecret}</code>
+            </p>
+            <ConfirmEnrollForm challengeToken={enrollChallenge} />
+          </>
+        ) : user.mfaEnabled ? (
           <>
             <p>Authenticator app is enrolled{user.stepUpFresh ? ' and recently confirmed.' : '.'}</p>
             {user.mfaRequired ? (
@@ -64,13 +71,6 @@ export default async function AccountPage(props: AccountPageProps) {
               </form>
             )}
             <RegenerateRecoveryForm />
-          </>
-        ) : enrollSecret && enrollChallenge ? (
-          <>
-            <p>
-              Authenticator secret: <code>{enrollSecret}</code>
-            </p>
-            <ConfirmEnrollForm challengeToken={enrollChallenge} />
           </>
         ) : (
           <>

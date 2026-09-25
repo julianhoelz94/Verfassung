@@ -19,6 +19,7 @@ import org.springframework.boot.test.mock.mockito.MockBean
 import org.springframework.http.MediaType
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
+import org.springframework.test.context.jdbc.Sql
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.patch
@@ -31,6 +32,7 @@ import java.io.File
 import java.util.UUID
 
 @Testcontainers
+@Sql(scripts = ["/fixtures/demo_content.sql"], executionPhase = Sql.ExecutionPhase.BEFORE_TEST_CLASS)
 @AutoConfigureMockMvc
 @SpringBootTest(classes = [ContentServiceApplication::class])
 class ContentApiTest {

@@ -35,6 +35,37 @@ data class CatalogVersion(
     val editorialPredecessorVersionId: UUID? = null,
 )
 
+@JsonIgnoreProperties(ignoreUnknown = true)
+private data class CatalogVersionListItem(
+    val id: UUID,
+    val versionLabel: String,
+    val effectiveDate: LocalDate? = null,
+    val languageCode: String = "en",
+    val predecessorVersionId: UUID? = null,
+    val hopKind: String = "initial",
+    val listing: String = "public",
+    val legalVersionId: UUID? = null,
+    val currentVersionId: UUID? = null,
+    val legalPredecessorVersionId: UUID? = null,
+    val editorialPredecessorVersionId: UUID? = null,
+) {
+    fun toVersion(constitutionId: UUID) = CatalogVersion(
+        id = id,
+        constitutionId = constitutionId,
+        versionLabel = versionLabel,
+        publicationStatus = "published",
+        effectiveDate = effectiveDate,
+        languageCode = languageCode,
+        predecessorVersionId = predecessorVersionId,
+        hopKind = hopKind,
+        listing = listing,
+        legalVersionId = legalVersionId,
+        currentVersionId = currentVersionId,
+        legalPredecessorVersionId = legalPredecessorVersionId,
+        editorialPredecessorVersionId = editorialPredecessorVersionId,
+    )
+}
+
 interface CatalogClient {
     fun getVersion(versionId: UUID): CatalogVersion
 
@@ -126,6 +157,7 @@ class RestCatalogClient(
             request
                 .retrieve()
                 .body(VERSION_LIST)
+                ?.map { it.toVersion(constitutionId) }
                 ?: emptyList()
         } catch (ex: RestClientException) {
             throw DownstreamException("catalog list versions failed", ex)
@@ -151,7 +183,7 @@ class RestCatalogClient(
     }
 
     companion object {
-        private val VERSION_LIST = object : ParameterizedTypeReference<List<CatalogVersion>>() {}
+        private val VERSION_LIST = object : ParameterizedTypeReference<List<CatalogVersionListItem>>() {}
         private val objectMapper = ObjectMapper()
 
         private fun parseConflictCode(body: String): String? =

@@ -1,0 +1,119 @@
+import { expect, test } from '@playwright/test';
+import { authenticatorCode, signIn, signOut } from './auth';
+
+test('administrator invite, visitor activation, password change, and reset persist across logins', async ({ page }) => {
+  test.setTimeout(120_000);
+  const email = `journey-${Date.now()}@example.local`;
+  const firstPassword = 'Journey-first-password-47';
+  const changedPassword = 'Journey-changed-password-47';
+  const resetPassword = 'Journey-reset-password-47';
+
+  await signIn(page, 'admin');
+  await page.goto('/admin/users');
+  await page.getByLabel('Email').fill(email);
+  await page.getByLabel('Roles (comma-separated)').first().fill('viewer');
+  await page.getByRole('button', { name: 'Send invite' }).click();
+  const inviteToken = await page.getByText('Invite created.', { exact: false }).locator('code').textContent();
+  expect(inviteToken).toBeTruthy();
+  await signOut(page);
+
+  await page.goto(`/invite?token=${encodeURIComponent(inviteToken!)}`);
+  await page.getByLabel('Password').fill(firstPassword);
+  await page.getByRole('button', { name: 'Activate account' }).click();
+  await expect(page).toHaveURL(/\/login$/);
+  await page.getByLabel('Email').fill(email);
+  await page.getByLabel('Password').fill(firstPassword);
+  await page.getByRole('button', { name: 'Sign in' }).click();
+  await expect(page).toHaveURL(/\/$/);
+  await page.goto('/account');
+  await expect(page.getByText(`Signed in as ${email}.`)).toBeVisible();
+  await page.getByLabel('Current password').fill(firstPassword);
+  await page.getByLabel('New password').fill(changedPassword);
+  await Promise.all([
+    page.waitForResponse((response) => response.url().includes('/account') && response.request().method() === 'POST'),
+    page.getByRole('button', { name: 'Update password' }).click(),
+  ]);
+  await signOut(page);
+  await page.goto('/login');
+  await page.getByLabel('Email').fill(email);
+  await page.getByLabel('Password').fill(changedPassword);
+  await page.getByRole('button', { name: 'Sign in' }).click();
+  await expect(page).toHaveURL(/\/$/);
+  await signOut(page);
+
+  await signIn(page, 'admin');
+  await page.goto('/admin/users');
+  const user = page.locator('.data-row').filter({ hasText: email });
+  await expect(user).toContainText('viewer');
+  await user.getByRole('button', { name: 'Issue reset token' }).click();
+  const resetToken = await user.getByText('Reset token issued.', { exact: false }).locator('code').textContent();
+  expect(resetToken).toBeTruthy();
+  await signOut(page);
+
+  await page.goto('/reset');
+  await page.getByLabel('Reset token').fill(resetToken!);
+  await page.getByLabel('New password').fill(resetPassword);
+  await page.getByRole('button', { name: 'Set new password' }).click();
+  await expect(page).toHaveURL(/\/login$/);
+  await page.getByLabel('Email').fill(email);
+  await page.getByLabel('Password').fill(resetPassword);
+  await page.getByRole('button', { name: 'Sign in' }).click();
+  await expect(page).toHaveURL(/\/$/);
+  await page.goto('/account');
+  await page.getByRole('button', { name: 'Enroll authenticator' }).click();
+  const secret = await page.getByText('Authenticator secret:', { exact: false }).locator('code').textContent();
+  expect(secret).toBeTruthy();
+  await page.getByLabel('Authenticator code').fill(authenticatorCode(secret!));
+  await page.getByRole('button', { name: 'Confirm enrollment' }).click();
+  await expect(page.getByText(/recovery codes now/)).toBeVisible();
+  await page.getByRole('link', { name: 'Back to account' }).click();
+  await page.locator('#recoveryRotateCode').fill(authenticatorCode(secret!));
+  await page.getByRole('button', { name: 'Replace recovery codes' }).click();
+  await expect(page.getByText(/recovery codes now/)).toBeVisible();
+  await signOut(page);
+  await page.goto('/login');
+  await page.getByLabel('Email').fill(email);
+  await page.getByLabel('Password').fill(resetPassword);
+  await page.getByRole('button', { name: 'Sign in' }).click();
+  await expect(page.getByRole('heading', { name: 'Authenticator code' })).toBeVisible();
+  await page.getByLabel('Authenticator code').fill(authenticatorCode(secret!));
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await expect(page).toHaveURL(/\/$/);
+});
+
+test('administrator creates, rotates, and revokes a real service token', async ({ page }) => {
+  const name = `journey-token-${Date.now()}`;
+  await signIn(page, 'admin');
+  await page.goto('/admin/users');
+  await page.getByLabel('Name').fill(name);
+  await page.getByLabel('Scopes (comma-separated)').fill('catalog:write');
+  await page.getByRole('button', { name: 'Issue token' }).click();
+  await expect(page.getByText('Token created.', { exact: false }).locator('code')).not.toBeEmpty();
+  await page.reload();
+  const token = page.locator('.data-row').filter({ hasText: name });
+  await expect(token).toContainText('catalog:write');
+  await token.getByRole('button', { name: 'Rotate' }).click();
+  await expect(token.getByText('Token rotated.', { exact: false }).locator('code')).not.toBeEmpty();
+  await page.reload();
+  await page.locator('.data-row').filter({ hasText: name }).getByRole('button', { name: 'Revoke' }).click();
+  await expect(page.locator('.data-row').filter({ hasText: name })).toContainText('Revoked');
+});
+
+test('administrator creates a constitution and updates its outline presentation', async ({ page }) => {
+  const title = `Journey Outline ${Date.now()}`;
+  await signIn(page, 'admin');
+  await page.goto('/admin/constitutions');
+  await page.getByLabel('Country').selectOption('XA');
+  await page.getByLabel('Slug').fill(`journey-outline-${Date.now()}`);
+  await page.getByLabel('Title', { exact: true }).fill(title);
+  await page.getByRole('button', { name: 'Add deeper layer' }).click();
+  await page.getByRole('textbox', { name: 'Label' }).nth(1).fill('Clause');
+  await page.getByRole('button', { name: 'Create' }).click();
+  await expect(page.getByRole('heading', { name: title })).toBeVisible();
+  await expect(page.getByRole('textbox', { name: 'Label' }).nth(1)).toHaveValue('Clause');
+  await page.getByLabel('How this layer is shown').nth(1).selectOption('concatenated');
+  await page.getByRole('button', { name: 'Save outline' }).click();
+  await expect(page.getByText('Outline saved.')).toBeVisible();
+  await page.reload();
+  await expect(page.getByLabel('How this layer is shown').nth(1)).toHaveValue('concatenated');
+});

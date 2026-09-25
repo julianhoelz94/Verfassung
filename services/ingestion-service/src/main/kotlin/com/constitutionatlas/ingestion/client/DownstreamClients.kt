@@ -27,6 +27,8 @@ interface CatalogClient {
         languageCode: String,
         sourceUrl: String?,
         gazetteReference: String?,
+        predecessorVersionId: UUID? = null,
+        hopKind: String? = null,
     ): DownstreamVersion
     fun publishVersion(versionId: UUID): DownstreamVersion
     fun replaceOutline(constitutionId: UUID, kinds: List<ImportOutlineKind>)

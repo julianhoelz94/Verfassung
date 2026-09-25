@@ -193,3 +193,102 @@ jobs:
           docker compose --env-file env/ci.env.example \
             -f docker-compose.yml -f docker-compose.publish-journey.yml \
             down -v
+
+  full-stack-service-artifacts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4
+      - name: Build service artifacts on one runner
+        run: |
+          set -euo pipefail
+          for service in identity-service catalog-service content-service editor-service \
+            audit-service amendment-service search-service ingestion-service; do
+            ./gradlew -p "services/${service}" bootJar -x test
+            test -f "services/${service}/build/libs/app.jar"
+          done
+          tar -cf full-stack-service-jars.tar services/*/build/libs/app.jar
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: full-stack-service-jars
+          path: full-stack-service-jars.tar
+          if-no-files-found: error
+          compression-level: 0
+
+  full-stack-e2e:
+    needs: full-stack-service-artifacts
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    env:
+      COMPOSE_PROJECT_NAME: full-stack-e2e
+      CADDY_PORT: '18080'
+      GATEWAY_PORT: '13000'
+      SESSION_COOKIE_SECURE: 'false'
+      PUBLIC_BASE_URL: http://127.0.0.1:18080
+      PREPOPULATE_TEST_STACK: 'true'
+      PREPOPULATE_BASE_URL: http://127.0.0.1:18080
+      E2E_BASE_URL: http://127.0.0.1:18080
+      CI_ADMIN_EMAIL: ci-admin@example.local
+      CI_ADMIN_PASSWORD: change-me
+      CI_VIEWER_EMAIL: ci-viewer@example.local
+      CI_VIEWER_PASSWORD: change-me
+      IDENTITY_SEED_TOTP_SECRET: CAATLASMFASEED22
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: full-stack-service-jars
+          path: .
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '20'
+      - name: Install browser dependencies
+        working-directory: apps/gateway-web
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+      - name: Verify transferred service artifacts
+        run: |
+          set -euo pipefail
+          tar -xf full-stack-service-jars.tar
+          for service in identity-service catalog-service content-service editor-service \
+            audit-service amendment-service search-service ingestion-service; do
+            test -s "services/${service}/build/libs/app.jar"
+          done
+      - name: Start production stack
+        run: |
+          docker compose --env-file env/ci.env.example up -d --build edge-proxy
+          for attempt in $(seq 1 90); do
+            ready=true
+            for service in catalog content amendment identity ingestion search; do
+              status=$(curl --silent --output /dev/null --write-out '%{http_code}' "http://127.0.0.1:18080/api/${service}/actuator/health" || true)
+              if [ "$status" != 200 ]; then ready=false; break; fi
+            done
+            if [ "$ready" = true ] && curl --fail --silent http://127.0.0.1:18080/about >/dev/null; then exit 0; fi
+            sleep 2
+          done
+          docker compose --env-file env/ci.env.example ps
+          exit 1
+      - name: Generate, upload, and verify API fixtures
+        working-directory: apps/gateway-web
+        run: |
+          npm run fixtures:generate
+          git diff --exit-code -- e2e/fixtures/generated
+          npm run prepopulate
+          cp e2e/fixtures/generated/.runtime/prepopulate-ids.json /tmp/prepopulate-first-ids.json
+          npm run prepopulate
+          cmp /tmp/prepopulate-first-ids.json e2e/fixtures/generated/.runtime/prepopulate-ids.json
+          npm run prepopulate -- --verify-only
+      - name: Full-stack browser journeys
+        working-directory: apps/gateway-web
+        run: npm run test:e2e:full
+      - name: Stack logs
+        if: failure()
+        run: docker compose --env-file env/ci.env.example logs --no-color --tail=200
+      - name: Stop stack
+        if: always()
+        run: docker compose --env-file env/ci.env.example down -v

@@ -1,0 +1,119 @@
+{
+  "isoCode": "XB",
+  "countryName": "Atlas Sample Republic",
+  "constitutionSlug": "civic-charter",
+  "constitutionTitle": "Civic Test Charter",
+  "versionLabel": "2018",
+  "effectiveDate": "2018-04-04",
+  "languageCode": "en",
+  "sourceUrl": "https://example.org/atlas-e2e/xb-2018",
+  "gazetteReference": "Atlas fixture 2018",
+  "outline": {
+    "kinds": [
+      {
+        "kindCode": "article",
+        "displayLabel": "Article",
+        "showTitle": true,
+        "showKind": true
+      },
+      {
+        "kindCode": "paragraph",
+        "displayLabel": "Paragraph",
+        "showLabel": true
+      },
+      {
+        "kindCode": "sentence",
+        "displayLabel": "Sentence",
+        "presentation": "concatenated",
+        "showLabel": false
+      }
+    ]
+  },
+  "articles": [
+    {
+      "articleNumber": "1",
+      "title": "Human dignity",
+      "body": "Atlas Sample Republic article 1 in 2018. Dignity and civic equality protect every person.",
+      "sortOrder": 1,
+      "nodes": [
+        {
+          "kind": "paragraph",
+          "label": "(1)",
+          "children": [
+            {
+              "kind": "sentence",
+              "label": "1",
+              "body": "Atlas Sample Republic article 1 in 2018. Dignity and civic equality protect every person."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "articleNumber": "2",
+      "title": "Civic provision 2",
+      "body": "Atlas Sample Republic article 2 in 2018. Public institutions serve the people.",
+      "sortOrder": 2
+    },
+    {
+      "articleNumber": "3",
+      "title": "Civic provision 3",
+      "body": "Atlas Sample Republic article 3 in 2018. Public institutions serve the people.",
+      "sortOrder": 3
+    },
+    {
+      "articleNumber": "4",
+      "title": "Civic provision 4",
+      "body": "Atlas Sample Republic article 4 in 2018. Public institutions serve the people.",
+      "sortOrder": 4
+    },
+    {
+      "articleNumber": "5",
+      "title": "Civic provision 5",
+      "body": "Atlas Sample Republic article 5 in 2018. Public institutions serve the people.",
+      "sortOrder": 5
+    },
+    {
+      "articleNumber": "6",
+      "title": "Civic provision 6",
+      "body": "Atlas Sample Republic article 6 in 2018. Public institutions serve the people.",
+      "sortOrder": 6
+    },
+    {
+      "articleNumber": "7",
+      "title": "Civic provision 7",
+      "body": "Atlas Sample Republic article 7 in 2018. Public institutions serve the people.",
+      "sortOrder": 7
+    },
+    {
+      "articleNumber": "8",
+      "title": "Civic provision 8",
+      "body": "Atlas Sample Republic article 8 in 2018. Public institutions serve the people.",
+      "sortOrder": 8
+    },
+    {
+      "articleNumber": "9",
+      "title": "Civic provision 9",
+      "body": "Atlas Sample Republic article 9 in 2018. Public institutions serve the people.",
+      "sortOrder": 9
+    },
+    {
+      "articleNumber": "10",
+      "title": "Civic provision 10",
+      "body": "Atlas Sample Republic article 10 in 2018. Public institutions serve the people.",
+      "sortOrder": 10
+    },
+    {
+      "articleNumber": "11",
+      "title": "Civic provision 11",
+      "body": "Atlas Sample Republic article 11 in 2018. Public institutions serve the people.",
+      "sortOrder": 11
+    },
+    {
+      "articleNumber": "12",
+      "title": "Civic provision 12",
+      "body": "Atlas Sample Republic article 12 in 2018. Public institutions serve the people.",
+      "sortOrder": 12
+    }
+  ]
+}

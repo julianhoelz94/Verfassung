@@ -13,8 +13,6 @@ import urllib.error
 import urllib.request
 from typing import Any
 
-SOURCE_VERSION_ID = "01900000-0000-4000-8000-000000000004"
-SOURCE_ARTICLE_ID = "01900000-0000-4000-8000-000000000201"
 DRAFT_TITLE = "Human dignity"
 DRAFT_BODY = "CI-6 publish journey draft body."
 TOTP_PERIOD = 30
@@ -169,6 +167,42 @@ def editor(method: str, path: str, token: str, body: Any | None = None) -> Any:
     return payload
 
 
+def bootstrap_source(secret: str) -> tuple[str, str]:
+    """Create the journey source through the owning APIs on an empty CI stack."""
+    admin_token = login(
+        env("CI_ADMIN_EMAIL", "ci-admin@example.local"),
+        env("CI_ADMIN_PASSWORD", "change-me"),
+        secret,
+    )
+
+    def write(method: str, url: str, body: Any | None = None) -> Any:
+        status, payload = http(method, url, body, admin_token)
+        if status >= 400:
+            raise SystemExit(f"source bootstrap {method} {url} failed: HTTP {status} {payload}")
+        return payload
+
+    write("POST", f"{catalog_url()}/countries", {"isoCode": "XA", "name": "Journey Testland"})
+    constitution = write(
+        "POST",
+        f"{catalog_url()}/countries/XA/constitutions",
+        {"slug": "publish-journey", "title": "Publish Journey Constitution"},
+    )
+    constitution_id = constitution["id"]
+    version = write(
+        "POST",
+        f"{catalog_url()}/constitutions/{constitution_id}/versions",
+        {"versionLabel": "initial", "effectiveDate": "2020-01-01"},
+    )
+    version_id = version["id"]
+    articles = write(
+        "PUT",
+        f"{content_url()}/versions/{version_id}/articles",
+        [{"articleNumber": "1", "title": DRAFT_TITLE, "body": "Original CI text.", "sortOrder": 1}],
+    )
+    write("POST", f"{catalog_url()}/versions/{version_id}/publish")
+    return version_id, articles[0]["id"]
+
+
 def main() -> None:
     secret = env("IDENTITY_SEED_TOTP_SECRET", "CAATLASMFASEED22")
     editor_email = env("CI_EDITOR_EMAIL", "ci-editor@example.local")
@@ -183,25 +217,26 @@ def main() -> None:
     wait_for_ping(content_url(), "content")
     wait_for_ping(editor_url(), "editor")
 
-    status, version = http("GET", f"{catalog_url()}/versions/{SOURCE_VERSION_ID}")
+    source_version_id, source_article_id = bootstrap_source(secret)
+    status, version = http("GET", f"{catalog_url()}/versions/{source_version_id}")
     if status != 200:
         raise SystemExit(f"source catalog version missing: HTTP {status} {version}")
 
-    source_before = article_body(SOURCE_VERSION_ID, article_id=SOURCE_ARTICLE_ID)
+    source_before = article_body(source_version_id, article_id=source_article_id)
 
     editor_token = login(editor_email, editor_password, secret)
     session = editor(
         "POST",
         "/edit-sessions",
         editor_token,
-        {"versionId": SOURCE_VERSION_ID, "hopKind": "editorial_correction"},
+        {"versionId": source_version_id, "hopKind": "editorial_correction"},
     )
     session_id = session["id"]
     editor(
         "POST",
         f"/edit-sessions/{session_id}/saves",
         editor_token,
-        {"articleId": SOURCE_ARTICLE_ID, "title": DRAFT_TITLE, "body": DRAFT_BODY},
+        {"articleId": source_article_id, "title": DRAFT_TITLE, "body": DRAFT_BODY},
     )
     editor(
         "POST",
@@ -232,7 +267,7 @@ def main() -> None:
     if preview.get("session", {}).get("status") != "published":
         raise SystemExit(f"session was not published: {preview}")
 
-    source_after = article_body(SOURCE_VERSION_ID, article_id=SOURCE_ARTICLE_ID)
+    source_after = article_body(source_version_id, article_id=source_article_id)
     if source_after != source_before:
         raise SystemExit("source version body changed after publish")
 
@@ -240,7 +275,7 @@ def main() -> None:
     if new_body != DRAFT_BODY:
         raise SystemExit(f"successor article 1 body mismatch: {new_body!r}")
 
-    print(f"ok: source {SOURCE_VERSION_ID} unchanged; successor {new_version_id} has draft text")
+    print(f"ok: source {source_version_id} unchanged; successor {new_version_id} has draft text")
 
 
 if __name__ == "__main__":

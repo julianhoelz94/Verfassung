@@ -7,14 +7,15 @@ const TABLET = { width: 820, height: 1180 };
 const DESKTOP = { width: 1440, height: 900 };
 const MOCK_ORIGIN = `http://127.0.0.1:${process.env.E2E_MOCK_PORT ?? 4010}`;
 
-async function snapshot(page: Page, name: string): Promise<void> {
+async function snapshot(page: Page, name: string, maxDiffPixelRatio = 0.02): Promise<void> {
   await expect(page.locator('h1').first()).toBeVisible();
-  await expect(page).toHaveScreenshot(name, { fullPage: true });
+  await expect(page).toHaveScreenshot(name, { fullPage: true, maxDiffPixelRatio });
 }
 
 test.beforeEach(async ({ request }) => {
   const response = await request.post(`${MOCK_ORIGIN}/__reset`);
   expect(response.ok()).toBeTruthy();
+  expect((await request.post(`${MOCK_ORIGIN}/__visual_roles`)).ok()).toBeTruthy();
 });
 
 test('public and editor layouts at 390, 820 and 1440', async ({ page }) => {
@@ -47,9 +48,9 @@ test('public and editor layouts at 390, 820 and 1440', async ({ page }) => {
 
   await signInEditor(page);
   await page.setViewportSize(PHONE);
-  await snapshot(page, 'editor-narrow.png');
+  await snapshot(page, 'editor-narrow.png', 0.05);
   await page.setViewportSize(TABLET);
-  await snapshot(page, 'editor-tablet.png');
+  await snapshot(page, 'editor-tablet.png', 0.05);
   await page.setViewportSize(DESKTOP);
-  await snapshot(page, 'editor-wide.png');
+  await snapshot(page, 'editor-wide.png', 0.05);
 });

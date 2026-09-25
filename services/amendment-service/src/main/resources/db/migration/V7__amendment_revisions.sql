@@ -20,10 +20,6 @@ SET constitution_id = t.constitution_id
 FROM version_transitions t
 WHERE t.id = a.version_transition_id;
 
-UPDATE amendments
-SET constitution_id = '01900000-0000-4000-8000-000000000002'
-WHERE constitution_id IS NULL;
-
 ALTER TABLE amendments
   ALTER COLUMN constitution_id SET NOT NULL;
 
@@ -51,59 +47,6 @@ CREATE UNIQUE INDEX amendment_revisions_first_revision_idx
   WHERE predecessor_revision_id IS NULL;
 
 CREATE INDEX amendment_revisions_amendment_idx ON amendment_revisions (amendment_id);
-
--- (3) Seed revisions for existing DE amendments (stable UUIDs).
-INSERT INTO amendment_revisions (
-  id, amendment_id, predecessor_revision_id, title, summary, enacted_on, effective_on,
-  source_reference, source_version_id, target_version_id
-)
-SELECT
-  '01900000-0000-4000-8000-000000000331',
-  a.id,
-  NULL,
-  a.title,
-  a.summary,
-  a.enacted_on,
-  NULL,
-  a.source_reference,
-  t.source_version_id,
-  t.target_version_id
-FROM amendments a
-JOIN version_transitions t ON t.id = a.version_transition_id
-WHERE a.id = '01900000-0000-4000-8000-000000000302';
-
-INSERT INTO amendment_revisions (
-  id, amendment_id, predecessor_revision_id, title, summary, enacted_on, effective_on,
-  source_reference, source_version_id, target_version_id
-)
-SELECT
-  '01900000-0000-4000-8000-000000000332',
-  a.id,
-  NULL,
-  a.title,
-  a.summary,
-  a.enacted_on,
-  DATE '2023-06-01',
-  a.source_reference,
-  t.source_version_id,
-  t.target_version_id
-FROM amendments a
-JOIN version_transitions t ON t.id = a.version_transition_id
-WHERE a.id = '01900000-0000-4000-8000-000000000322';
-
-UPDATE amendments
-SET
-  kind = 'legal_amendment',
-  status = 'published',
-  published_revision_id = '01900000-0000-4000-8000-000000000331'
-WHERE id = '01900000-0000-4000-8000-000000000302';
-
-UPDATE amendments
-SET
-  kind = 'legal_amendment',
-  status = 'published',
-  published_revision_id = '01900000-0000-4000-8000-000000000332'
-WHERE id = '01900000-0000-4000-8000-000000000322';
 
 -- (4) Point change rows at the published revision, then drop amendment_id.
 ALTER TABLE amendment_changes

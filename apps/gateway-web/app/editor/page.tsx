@@ -113,19 +113,21 @@ export default async function EditorPage(props: EditorPageProps) {
   } catch {
     countries = [];
   }
-  const country: CountryDetail | null = countries[0]
-    ? await getCountry(countries[0].isoCode)
-    : null;
-  const versions = country?.constitutions.flatMap((constitution) =>
+  const countryDetails: CountryDetail[] = (await Promise.all(countries.map((item) => getCountry(item.isoCode))))
+    .filter((item): item is CountryDetail => item !== null);
+  const versions = countryDetails.flatMap((country) => country.constitutions.flatMap((constitution) =>
     constitution.versions.map((version) => ({
       ...version,
       snapshotId: version.currentVersionId ?? version.id,
       constitutionTitle: constitution.title,
     })),
-  ) ?? [];
+  ));
   const legalTips = versions.filter((version) => version.latestPublished);
   const versionId = session?.versionId ?? searchParams.versionId ?? versions[0]?.snapshotId;
-  const selectedConstitution = country?.constitutions.find((constitution) =>
+  const selectedCountry = countryDetails.find((country) => country.constitutions.some((constitution) =>
+    constitution.versions.some((version) => version.id === versionId || version.currentVersionId === versionId),
+  ));
+  const selectedConstitution = selectedCountry?.constitutions.find((constitution) =>
     constitution.versions.some((version) => version.id === versionId || version.currentVersionId === versionId),
   );
   const selectedVersion = selectedConstitution?.versions.find((version) => version.id === versionId || version.currentVersionId === versionId);
@@ -241,7 +243,7 @@ export default async function EditorPage(props: EditorPageProps) {
 
   const title = `${selectedConstitution?.title ?? 'Constitution'} · ${selectedVersion?.versionLabel ?? ''}`.trim();
   const publicHref =
-    country && versionId ? `/countries/${country.isoCode}/versions/${encodeURIComponent(versionId)}` : undefined;
+    selectedCountry && versionId ? `/countries/${selectedCountry.isoCode}/versions/${encodeURIComponent(versionId)}` : undefined;
   const canSave = Boolean(canEdit && session.status === 'open' && selected && versionId && searchParams.sessionId);
   const hiddenFields = (
     <>

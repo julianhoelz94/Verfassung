@@ -25,6 +25,7 @@ services:
       - IDENTITY_API_URL=http://identity-service:8080
       - EDITOR_API_URL=http://editor-service:8080
       - SEARCH_API_URL=http://search-service:8080
+      - INGESTION_API_URL=http://ingestion-service:8080
       - "PUBLIC_BASE_URL=${PUBLIC_BASE_URL:-http://localhost}"
       - "NEXT_PUBLIC_BASE_URL=${PUBLIC_BASE_URL:-http://localhost}"
     container_name: gateway-web

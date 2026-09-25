@@ -75,6 +75,8 @@ class RestCatalogClient(
         languageCode: String,
         sourceUrl: String?,
         gazetteReference: String?,
+        predecessorVersionId: UUID?,
+        hopKind: String?,
     ): DownstreamVersion =
         client.postJson(
             "/constitutions/{id}/versions",
@@ -84,6 +86,8 @@ class RestCatalogClient(
                 "languageCode" to languageCode,
                 "sourceUrl" to sourceUrl,
                 "gazetteReference" to gazetteReference,
+                "predecessorVersionId" to predecessorVersionId,
+                "hopKind" to hopKind,
             ),
             DownstreamVersion::class.java,
             constitutionId,

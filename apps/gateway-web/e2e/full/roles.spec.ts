@@ -1,5 +1,11 @@
 import { createHmac } from 'node:crypto';
-import { expect, test } from '@playwright/test';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { expect, test, type Page } from '@playwright/test';
+
+const ids = JSON.parse(readFileSync(join(__dirname, '..', 'fixtures', 'generated', '.runtime', 'prepopulate-ids.json'), 'utf8')) as {
+  versions: Record<string, string>;
+};
 
 function authenticatorCode(secret: string): string {
   const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
@@ -20,26 +26,37 @@ function authenticatorCode(secret: string): string {
 }
 
 const roles = [
-  { role: 'editor', mfa: true, admin: false, canEdit: true },
-  { role: 'reviewer', mfa: false, admin: false, canEdit: false },
-  { role: 'publisher', mfa: true, admin: false, canEdit: false },
-  { role: 'admin', mfa: true, admin: true, canEdit: true },
+  { role: 'editor', admin: false, canEdit: true },
+  { role: 'reviewer', admin: false, canEdit: false },
+  { role: 'publisher', admin: false, canEdit: false },
+  { role: 'admin', admin: true, canEdit: true },
 ] as const;
+
+async function signIn(page: Page, role: 'editor' | 'reviewer' | 'publisher' | 'admin') {
+  const email = process.env[`CI_${role.toUpperCase()}_EMAIL`] ?? `ci-${role}@example.local`;
+  const password = process.env[`CI_${role.toUpperCase()}_PASSWORD`] ?? 'change-me';
+  await page.goto('/login');
+  await page.getByLabel('Email').fill(email);
+  await page.getByLabel('Password').fill(password);
+  await page.getByRole('button', { name: 'Sign in' }).click();
+  if (role !== 'reviewer') {
+    await expect(page.getByRole('heading', { name: 'Authenticator code' })).toBeVisible();
+    await page.getByLabel('Authenticator code').fill(authenticatorCode(process.env.IDENTITY_SEED_TOTP_SECRET ?? 'CAATLASMFASEED22'));
+    await page.getByRole('button', { name: 'Continue' }).click();
+  }
+  await expect(page).toHaveURL(/\/editor$/);
+  return email;
+}
+
+async function signOut(page: Page) {
+  await page.getByRole('button', { name: 'Account menu' }).click();
+  await page.getByRole('button', { name: 'Sign out' }).click();
+  await expect(page.getByRole('link', { name: 'Log in' })).toBeVisible();
+}
 
 for (const story of roles) {
   test(`${story.role} signs in and sees real role permissions`, async ({ page }) => {
-    const email = process.env[`CI_${story.role.toUpperCase()}_EMAIL`] ?? `ci-${story.role}@example.local`;
-    const password = process.env[`CI_${story.role.toUpperCase()}_PASSWORD`] ?? 'change-me';
-    await page.goto('/login');
-    await page.getByLabel('Email').fill(email);
-    await page.getByLabel('Password').fill(password);
-    await page.getByRole('button', { name: 'Sign in' }).click();
-    if (story.mfa) {
-      await expect(page.getByRole('heading', { name: 'Authenticator code' })).toBeVisible();
-      await page.getByLabel('Authenticator code').fill(authenticatorCode(process.env.IDENTITY_SEED_TOTP_SECRET ?? 'CAATLASMFASEED22'));
-      await page.getByRole('button', { name: 'Continue' }).click();
-    }
-    await expect(page).toHaveURL(/\/editor$/);
+    const email = await signIn(page, story.role);
     await page.getByRole('button', { name: 'Account menu' }).click();
     await expect(page.getByText(email, { exact: true })).toBeVisible();
     await expect(page.getByRole('navigation', { name: 'Primary' }).getByRole('link', { name: 'Admin', exact: true })).toHaveCount(story.admin ? 1 : 0);
@@ -55,3 +72,37 @@ for (const story of roles) {
     }
   });
 }
+
+test('editor, reviewer, and publisher carry a real transcription correction to the public reader', async ({ page, request }) => {
+  await signIn(page, 'editor');
+  await page.getByLabel('Correct this text').selectOption(ids.versions['xa-2024']);
+  await page.getByRole('button', { name: 'Correct this text' }).click();
+  await expect(page).toHaveURL(/sessionId=/);
+  await page.getByLabel('Article text').fill('Dignity and civic equality protect every person. Verified transcription.');
+  await page.getByRole('button', { name: 'Save draft' }).click();
+  await expect(page.getByText('Draft saved.')).toBeVisible();
+  await page.getByLabel('What was corrected in this transcription?').fill('Verified Article 1 transcription.');
+  await page.getByRole('button', { name: 'Save comment' }).click();
+  await page.getByRole('button', { name: 'Submit for review' }).click();
+  await expect(page.getByText('Submitted for review.')).toBeVisible();
+  const sessionUrl = page.url();
+  await signOut(page);
+
+  await signIn(page, 'reviewer');
+  await page.goto(sessionUrl);
+  await expect(page.getByText('Dignity and civic equality protect every person. Verified transcription.').first()).toBeVisible();
+  await page.getByRole('button', { name: 'Approve review' }).click();
+  await expect(page.getByText('Review approved. A publisher can now publish.')).toBeVisible();
+  await signOut(page);
+
+  await signIn(page, 'publisher');
+  await page.goto(sessionUrl);
+  await page.getByRole('button', { name: 'Publish transcription' }).click();
+  await expect(page.getByText(/Published as version/)).toBeVisible();
+  await signOut(page);
+  const country = await (await request.get('/api/catalog/countries/XA')).json();
+  const latest = country.constitutions[0].versions.find((version: { predecessorVersionId: string }) => version.predecessorVersionId === ids.versions['xa-2024']);
+  expect(latest).toBeTruthy();
+  await page.goto(`/countries/XA/versions/${latest.id}`);
+  await expect(page.getByText('Dignity and civic equality protect every person. Verified transcription.').first()).toBeVisible();
+});

@@ -110,8 +110,14 @@ jobs:
       - name: Reject generated fixture drift
         working-directory: apps/gateway-web
         run: |
+          find e2e/fixtures/generated -maxdepth 1 -type f -name '*.json' -delete
           npm run fixtures:generate
           git diff --exit-code -- e2e/fixtures/generated
+          untracked_generated="$(git ls-files --others --exclude-standard -- e2e/fixtures/generated)"
+          if [ -n "$untracked_generated" ]; then
+            echo "$untracked_generated"
+            exit 1
+          fi
       - name: Test, lint, and build gateway
         working-directory: apps/gateway-web
         run: |
@@ -357,10 +363,7 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: full-stack-e2e-diagnostics
-          path: |
-            apps/gateway-web/playwright-report
-            apps/gateway-web/test-results
-            full-stack-logs.txt
+          path: full-stack-logs.txt
           if-no-files-found: ignore
           retention-days: 7
       - name: Stop stack

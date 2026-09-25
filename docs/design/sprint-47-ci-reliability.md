@@ -5,12 +5,12 @@ The `CI` workflow cancels superseded runs for the same pull request or branch. E
 ## Failure evidence
 
 - Failed Kotlin service and platform checks upload their check output, test results, and reports, including formatting failures that produce no test report.
-- Failed mock, visual, and full-stack Playwright jobs upload their HTML reports and traces from `test-results`.
+- Failed mock and visual Playwright jobs upload HTML reports and traces from their synthetic-data suites. Full-stack browser failures stay in the Actions log; their authenticated traces are not uploaded because they can contain session data.
 - Failed Compose journeys upload the last 200 lines of stack logs. The publish journey also captures build, Compose startup, and test output. Artifacts are retained for seven days. They contain test fixtures and diagnostics, not database dumps or environment files.
 
 ## Generated fixture drift
 
-The tracked `apps/gateway-web/e2e/fixtures/generated` JSON files come from `cd apps/gateway-web && npm run fixtures:generate`. The frontend job regenerates them and runs `git diff --exit-code -- e2e/fixtures/generated`. A generator change that does not commit its new output therefore fails before the gateway tests. Runtime fixture IDs under `.runtime` are ignored and are not part of this check.
+The tracked `apps/gateway-web/e2e/fixtures/generated` JSON files come from `cd apps/gateway-web && npm run fixtures:generate`. The frontend job removes only the root-level generated JSON files, regenerates them, checks tracked differences, and rejects untracked generated files. Added, removed, renamed, or changed output therefore fails before the gateway tests. Runtime fixture IDs under `.runtime` are ignored and are not part of this check.
 
 ## Required status
 

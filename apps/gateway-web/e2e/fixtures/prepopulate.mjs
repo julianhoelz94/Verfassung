@@ -148,7 +148,10 @@ function amendmentPayload(record, ids) {
     documents: [{ url: `https://example.org/atlas-e2e/${record.key}.pdf`, label: 'Synthetic source document' }],
     enactedOn: record.enactedOn, effectiveOn: record.effectiveOn,
     sourceVersionId: ids.versions[record.source], targetVersionId: ids.versions[record.target],
-    changes: [{ articleNumber: record.articleNumber, changeType: 'changed', note: 'Synthetic legal revision.' }],
+    changes: [{
+      articleNumber: record.articleNumber, changeType: 'changed', note: 'Synthetic legal revision.',
+      amendingLawTitle: record.title, amendingLawCitation: record.citation,
+    }],
   };
 }
 
@@ -171,14 +174,16 @@ async function ensureAmendments(ids) {
     assertFields(item, { ...expected, status: 'published' },
       ['status', 'title', 'comment', 'enactedOn', 'effectiveOn', 'sourceVersionId', 'targetVersionId'], record.key);
     assertEqual(JSON.stringify(item.documents.map(({ url, label }) => ({ url, label }))), JSON.stringify(expected.documents), `${record.key} documents`);
-    assertEqual(JSON.stringify(item.changes.map(({ articleNumber, changeType, note }) => ({ articleNumber, changeType, note }))),
+    assertEqual(JSON.stringify(item.changes.map(({ articleNumber, changeType, note, amendingLawTitle, amendingLawCitation }) =>
+      ({ articleNumber, changeType, note, amendingLawTitle, amendingLawCitation }))),
       JSON.stringify(expected.changes), `${record.key} changes`);
     const revisions = await api('GET', `amendment/amendments/${item.id}/revisions`, undefined, true);
     assertEqual(revisions.length, record.key === 'xa-2022-law' ? 2 : 1, `${record.key} revision count`);
     for (const [index, revision] of revisions.entries()) {
       assertFields(revision, expected, ['title', 'comment', 'enactedOn', 'effectiveOn', 'sourceVersionId', 'targetVersionId'], `${record.key} revision ${index + 1}`);
       assertEqual(JSON.stringify(revision.documents.map(({ url, label }) => ({ url, label }))), JSON.stringify(expected.documents), `${record.key} revision ${index + 1} documents`);
-      assertEqual(JSON.stringify(revision.changes.map(({ articleNumber, changeType, note }) => ({ articleNumber, changeType, note }))),
+      assertEqual(JSON.stringify(revision.changes.map(({ articleNumber, changeType, note, amendingLawTitle, amendingLawCitation }) =>
+        ({ articleNumber, changeType, note, amendingLawTitle, amendingLawCitation }))),
         JSON.stringify(expected.changes), `${record.key} revision ${index + 1} changes`);
     }
     ids.amendments[record.key] = item.id;

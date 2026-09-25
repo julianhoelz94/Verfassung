@@ -211,10 +211,11 @@ jobs:
             ./gradlew -p "services/${service}" bootJar -x test
             test -f "services/${service}/build/libs/app.jar"
           done
+          tar -cf full-stack-service-jars.tar services/*/build/libs/app.jar
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: full-stack-service-jars
-          path: services/*/build/libs/app.jar
+          path: full-stack-service-jars.tar
           if-no-files-found: error
           compression-level: 0
 
@@ -241,7 +242,7 @@ jobs:
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: full-stack-service-jars
-          path: services
+          path: .
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '20'
@@ -253,6 +254,7 @@ jobs:
       - name: Verify transferred service artifacts
         run: |
           set -euo pipefail
+          tar -xf full-stack-service-jars.tar
           for service in identity-service catalog-service content-service editor-service \
             audit-service amendment-service search-service ingestion-service; do
             test -s "services/${service}/build/libs/app.jar"

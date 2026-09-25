@@ -56,9 +56,9 @@ for (const country of definitions) {
   manifest.countries.push(entry);
 }
 manifest.amendments = [
-  { key: 'xa-2022-law', constitution: 'XA', source: 'xa-2020', target: 'xa-2022', title: 'Atlas Testland Civic Revision 2022', enactedOn: '2022-01-02', effectiveOn: '2022-02-02', articleNumber: '1' },
-  { key: 'xa-2024-law', constitution: 'XA', source: 'xa-2022', target: 'xa-2024', title: 'Atlas Testland Civic Revision 2024', enactedOn: '2024-02-03', effectiveOn: '2024-03-03', articleNumber: '13' },
-  { key: 'xb-2023-law', constitution: 'XB', source: 'xb-2018', target: 'xb-2023', title: 'Atlas Sample Civic Revision 2023', enactedOn: '2023-04-05', effectiveOn: '2023-05-05', articleNumber: '1' },
+  { key: 'xa-2022-law', constitution: 'XA', source: 'xa-2020', target: 'xa-2022', title: 'Atlas Testland Civic Revision 2022', citation: 'Atlas Gazette 2022 No. 1', enactedOn: '2022-01-02', effectiveOn: '2022-02-02', articleNumber: '1' },
+  { key: 'xa-2024-law', constitution: 'XA', source: 'xa-2022', target: 'xa-2024', title: 'Atlas Testland Civic Revision 2024', citation: 'Atlas Gazette 2024 No. 2', enactedOn: '2024-02-03', effectiveOn: '2024-03-03', articleNumber: '13' },
+  { key: 'xb-2023-law', constitution: 'XB', source: 'xb-2018', target: 'xb-2023', title: 'Atlas Sample Civic Revision 2023', citation: 'Atlas Gazette 2023 No. 3', enactedOn: '2023-04-05', effectiveOn: '2023-05-05', articleNumber: '1' },
 ];
 const versionEntries = manifest.countries.flatMap((country) => country.versions);
 const keys = versionEntries.map((version) => version.key);

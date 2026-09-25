@@ -1,16 +1,49 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { expect, test } from '@playwright/test';
-import { signIn, signOut } from './auth';
+import { expect, test, type APIRequestContext } from '@playwright/test';
+import { authenticatorCode, signIn, signOut } from './auth';
 
 const ids = JSON.parse(readFileSync(join(__dirname, '..', 'fixtures', 'generated', '.runtime', 'prepopulate-ids.json'), 'utf8')) as {
+  constitutions: Record<string, string>;
   amendments: Record<string, string>;
   versions: Record<string, string>;
 };
 
-test('editor restores a real change-record revision and publisher republishes it', async ({ page }) => {
+async function createPublishedRecord(request: APIRequestContext, title: string, country: 'XA' | 'XB', sourceVersionId: string, targetVersionId: string, twoRevisions = false) {
+  const login = await request.post('/api/identity/login', { data: {
+    email: process.env.CI_ADMIN_EMAIL ?? 'ci-admin@example.local',
+    password: process.env.CI_ADMIN_PASSWORD ?? 'change-me',
+  } });
+  expect(login.ok()).toBeTruthy();
+  const challenge = await login.json();
+  const mfa = await request.post('/api/identity/login/mfa', { data: {
+    challengeToken: challenge.challengeToken,
+    code: authenticatorCode(process.env.IDENTITY_SEED_TOTP_SECRET ?? 'CAATLASMFASEED22'),
+  } });
+  expect(mfa.ok()).toBeTruthy();
+  const { token } = await mfa.json();
+  const headers = { Authorization: `Bearer ${token}` };
+  const payload = {
+    title, comment: `Journey source for ${title}.`,
+    documents: [{ url: `https://example.org/atlas-e2e/${country.toLowerCase()}-journey.pdf`, label: 'Journey source document' }],
+    enactedOn: '2023-01-01', effectiveOn: '2023-02-01', sourceVersionId, targetVersionId,
+    changes: [{ articleNumber: '1', changeType: 'changed', note: 'Journey legal revision.' }],
+  };
+  const created = await request.post(`/api/amendment/constitutions/${ids.constitutions[country]}/amendments`, { data: payload, headers });
+  expect(created.ok()).toBeTruthy();
+  const { id } = await created.json();
+  if (twoRevisions) {
+    const revision = await request.post(`/api/amendment/amendments/${id}/revisions`, { data: payload, headers });
+    expect(revision.ok()).toBeTruthy();
+  }
+  const published = await request.post(`/api/amendment/amendments/${id}/publish`, { headers });
+  expect(published.ok()).toBeTruthy();
+  return id as string;
+}
+
+test('editor restores a real change-record revision and publisher republishes it', async ({ page, request }) => {
   test.setTimeout(120_000);
-  const amendmentId = ids.amendments['xa-2022-law'];
+  const amendmentId = await createPublishedRecord(request, `Journey restoration ${Date.now()}`, 'XA', ids.versions['xa-2020'], ids.versions['xa-2022'], true);
   await signIn(page, 'editor');
   await page.goto(`/editor/amendments/${amendmentId}`);
   const history = page.getByRole('complementary', { name: 'Revision history' });
@@ -20,7 +53,7 @@ test('editor restores a real change-record revision and publisher republishes it
   await history.getByRole('button', { name: 'Restore as new draft' }).click();
   await expect(page.getByText('Draft saved.')).toBeVisible();
   await page.reload();
-  await expect(page.getByLabel('Title', { exact: true })).toHaveValue('Atlas Testland Civic Revision 2022');
+  await expect(page.getByLabel('Title', { exact: true })).toHaveValue(/Journey restoration/);
   await signOut(page);
 
   await signIn(page, 'publisher');
@@ -31,10 +64,15 @@ test('editor restores a real change-record revision and publisher republishes it
   await expect(page.getByRole('complementary', { name: 'Revision history' }).locator('button.revision-item')).toHaveCount(3);
 });
 
-test('publisher reviews stale quotes after a historical transcription correction', async ({ page }) => {
+test('publisher reviews stale quotes after a historical transcription correction', async ({ page, request }) => {
   test.setTimeout(120_000);
+  const country = await (await request.get('/api/catalog/countries/XB')).json();
+  const constitution = country.constitutions.find((item: { id: string }) => item.id === ids.constitutions.XB);
+  const historical = constitution.versions.find((item: { id: string }) => item.id === ids.versions['xb-2018']);
+  const sourceVersionId = historical.currentVersionId ?? historical.id;
+  const amendmentId = await createPublishedRecord(request, `Journey quote review ${Date.now()}`, 'XB', sourceVersionId, ids.versions['xb-2023']);
   await signIn(page, 'editor');
-  await page.getByLabel('Correct this text').selectOption(ids.versions['xb-2018']);
+  await page.getByLabel('Correct this text').selectOption(sourceVersionId);
   await page.getByRole('button', { name: 'Correct this text' }).click();
   await page.getByLabel('Article text').fill('The historical dignity text was checked and corrected.');
   await page.getByRole('button', { name: 'Save draft' }).click();
@@ -53,7 +91,7 @@ test('publisher reviews stale quotes after a historical transcription correction
   await page.goto(sessionUrl);
   await page.getByRole('button', { name: 'Publish transcription' }).click();
   await expect(page.getByText(/Published as version/)).toBeVisible();
-  await page.goto(`/editor/amendments/${ids.amendments['xb-2023-law']}`);
+  await page.goto(`/editor/amendments/${amendmentId}`);
   await expect(page.getByRole('heading', { name: 'Flagged record review' })).toBeVisible();
   await page.getByRole('button', { name: 'Confirm live quotes and republish' }).click();
   await expect(page.getByText('Quotes confirmed and the legal change republished.')).toBeVisible();
@@ -61,13 +99,14 @@ test('publisher reviews stale quotes after a historical transcription correction
   await expect(page.getByRole('heading', { name: 'Flagged record review' })).toHaveCount(0);
 });
 
-test('publisher withdraws an incorrect real legal-change record', async ({ page }) => {
-  const amendmentId = ids.amendments['xb-2023-law'];
+test('publisher withdraws an incorrect real legal-change record', async ({ page, request }) => {
+  const title = `Journey withdrawn law ${Date.now()}`;
+  const amendmentId = await createPublishedRecord(request, title, 'XB', ids.versions['xb-2018'], ids.versions['xb-2023']);
   await signIn(page, 'publisher');
   await page.goto(`/editor/amendments/${amendmentId}`);
   await page.getByRole('button', { name: 'Withdraw' }).click();
   await expect(page.getByText('Amending law withdrawn.')).toBeVisible();
   await signOut(page);
   await page.goto('/countries/XB/timeline');
-  await expect(page.getByText('Atlas Sample Civic Revision 2023')).toHaveCount(0);
+  await expect(page.getByText(title)).toHaveCount(0);
 });

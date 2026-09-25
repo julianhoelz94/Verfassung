@@ -114,11 +114,16 @@ async function throwIfNotOk(response: Response, fallback: EditorErrorKey): Promi
     return;
   }
   let code: string | undefined;
+  let detail: string | undefined;
   try {
     const body = (await response.json()) as { error?: string; code?: string };
     code = body.code;
+    detail = body.error;
   } catch {
     // Keep status-based messages when the body is not JSON.
+  }
+  if (fallback === 'publish_failed') {
+    console.error('Editor publish API failed', { status: response.status, code, detail });
   }
   if (response.status === 401) {
     throw new EditorApiError('sign_in', code);

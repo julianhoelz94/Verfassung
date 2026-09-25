@@ -46,7 +46,7 @@ test('visitor reads historical article context, provenance, and site guidance', 
   await expect(page.getByRole('complementary', { name: 'Source and trust' })).toBeVisible();
   await page.getByRole('link', { name: 'History of Article 1' }).click();
   await expect(page.getByRole('heading', { name: 'History of Article 1' })).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Compare with previous' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Compare with previous' }).first()).toBeVisible();
   await page.goto('/about');
   await expect(page.getByRole('heading', { name: 'Sources' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Accessibility' })).toBeVisible();

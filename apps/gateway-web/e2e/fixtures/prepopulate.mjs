@@ -77,6 +77,15 @@ function fixture(file) { return JSON.parse(readFileSync(join(fixtureDir, file), 
 function assertEqual(actual, expected, label) {
   if (actual !== expected) throw new Error(`${label}: expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`);
 }
+function assertFields(actual, expected, fields, label) {
+  for (const field of fields) assertEqual(actual[field] ?? null, expected[field] ?? null, `${label} ${field}`);
+}
+function comparableNodes(nodes) {
+  return (nodes ?? []).map((node) => ({
+    kind: node.kind, label: node.label ?? null, title: node.title ?? null, body: node.body ?? null,
+    children: comparableNodes(node.children),
+  }));
+}
 
 async function verifyArticles(versionId, payload) {
   const articles = await api('GET', `content/versions/${versionId}/articles?includeBody=true&limit=200`);
@@ -87,8 +96,12 @@ async function verifyArticles(versionId, payload) {
       assertEqual(actual[field], expected[field], `${payload.isoCode}/${payload.versionLabel} article ${index + 1} ${field}`);
     }
   });
-  const first = await api('GET', `content/articles/${articles[0].id}`);
-  if (!first.children?.length) throw new Error(`${payload.isoCode}/${payload.versionLabel} article 1 has no nested paragraph`);
+  for (let index = 0; index < articles.length; index++) {
+    if (!payload.articles[index].nodes?.length) continue;
+    const detail = await api('GET', `content/articles/${articles[index].id}`);
+    assertEqual(JSON.stringify(comparableNodes(detail.children)), JSON.stringify(comparableNodes(payload.articles[index].nodes)),
+      `${payload.isoCode}/${payload.versionLabel} article ${index + 1} nested content`);
+  }
 }
 
 async function ensureVersions(ids) {
@@ -108,8 +121,20 @@ async function ensureVersions(ids) {
         existing = constitution?.versions.find((item) => item.id === result.versionId);
       }
       if (!existing || !constitution) throw new Error(`Missing ${version.key} after import`);
-      assertEqual(existing.versionLabel, payload.versionLabel, `${version.key} label`);
+      assertEqual(detail.name, payload.countryName, `${version.key} country name`);
+      assertFields(constitution, { slug: payload.constitutionSlug, title: payload.constitutionTitle }, ['slug', 'title'], `${version.key} constitution`);
+      assertFields(existing, payload, ['versionLabel', 'effectiveDate', 'languageCode', 'sourceUrl', 'gazetteReference'], `${version.key} version`);
       assertEqual(existing.predecessorVersionId ?? null, version.predecessor ? ids.versions[version.predecessor] : null, `${version.key} predecessor`);
+      assertEqual(existing.hopKind, version.predecessor ? 'legal' : 'initial', `${version.key} hop kind`);
+      const actualOutline = constitution.contentOutline.kinds.map((kind) => ({
+        kindCode: kind.kindCode, displayLabel: kind.displayLabel, presentation: kind.presentation,
+        showLabel: kind.showLabel, showTitle: kind.showTitle, showKind: kind.showKind,
+      }));
+      const expectedOutline = payload.outline.kinds.map((kind) => ({
+        kindCode: kind.kindCode, displayLabel: kind.displayLabel, presentation: kind.presentation ?? 'section',
+        showLabel: kind.showLabel ?? true, showTitle: kind.showTitle ?? false, showKind: kind.showKind ?? false,
+      }));
+      assertEqual(JSON.stringify(actualOutline), JSON.stringify(expectedOutline), `${version.key} outline`);
       ids.constitutions[country.isoCode] = constitution.id;
       ids.versions[version.key] = existing.id;
       await verifyArticles(existing.id, payload);
@@ -142,12 +167,20 @@ async function ensureAmendments(ids) {
       item = list.find((amendment) => amendment.id === item.id);
     }
     if (!item) throw new Error(`Missing amendment ${record.key}`);
-    assertEqual(item.status, 'published', `${record.key} status`);
-    assertEqual(item.sourceVersionId, ids.versions[record.source], `${record.key} source`);
-    assertEqual(item.targetVersionId, ids.versions[record.target], `${record.key} target`);
-    assertEqual(item.documents.length, 1, `${record.key} document count`);
+    const expected = amendmentPayload(record, ids);
+    assertFields(item, { ...expected, status: 'published' },
+      ['status', 'title', 'comment', 'enactedOn', 'effectiveOn', 'sourceVersionId', 'targetVersionId'], record.key);
+    assertEqual(JSON.stringify(item.documents.map(({ url, label }) => ({ url, label }))), JSON.stringify(expected.documents), `${record.key} documents`);
+    assertEqual(JSON.stringify(item.changes.map(({ articleNumber, changeType, note }) => ({ articleNumber, changeType, note }))),
+      JSON.stringify(expected.changes), `${record.key} changes`);
     const revisions = await api('GET', `amendment/amendments/${item.id}/revisions`, undefined, true);
     assertEqual(revisions.length, record.key === 'xa-2022-law' ? 2 : 1, `${record.key} revision count`);
+    for (const [index, revision] of revisions.entries()) {
+      assertFields(revision, expected, ['title', 'comment', 'enactedOn', 'effectiveOn', 'sourceVersionId', 'targetVersionId'], `${record.key} revision ${index + 1}`);
+      assertEqual(JSON.stringify(revision.documents.map(({ url, label }) => ({ url, label }))), JSON.stringify(expected.documents), `${record.key} revision ${index + 1} documents`);
+      assertEqual(JSON.stringify(revision.changes.map(({ articleNumber, changeType, note }) => ({ articleNumber, changeType, note }))),
+        JSON.stringify(expected.changes), `${record.key} revision ${index + 1} changes`);
+    }
     ids.amendments[record.key] = item.id;
   }
 }
@@ -165,6 +198,14 @@ async function verifyTotals(ids) {
   for (const country of manifest.countries) {
     const search = await api('GET', `search/search?q=dignity&country=${country.isoCode}&limit=50`);
     assertEqual(search.total, country.versions.length, `${country.isoCode} indexed dignity hits`);
+    for (const version of country.versions) {
+      const payload = fixture(version.file);
+      const query = `search/search?q=dignity&country=${country.isoCode}&versionId=${ids.versions[version.key]}&effectiveDate=${payload.effectiveDate}&limit=50`;
+      const filtered = await api('GET', query);
+      assertEqual(filtered.total, 1, `${version.key} indexed version/date hit`);
+      assertFields(filtered.hits[0], { versionId: ids.versions[version.key], countryCode: country.isoCode, effectiveDate: payload.effectiveDate },
+        ['versionId', 'countryCode', 'effectiveDate'], `${version.key} search hit`);
+    }
   }
 }
 

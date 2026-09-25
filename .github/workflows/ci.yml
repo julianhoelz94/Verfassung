@@ -194,7 +194,32 @@ jobs:
             -f docker-compose.yml -f docker-compose.publish-journey.yml \
             down -v
 
+  full-stack-service-artifacts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4
+      - name: Build service artifacts on one runner
+        run: |
+          set -euo pipefail
+          for service in identity-service catalog-service content-service editor-service \
+            audit-service amendment-service search-service ingestion-service; do
+            ./gradlew -p "services/${service}" bootJar -x test
+            test -f "services/${service}/build/libs/app.jar"
+          done
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: full-stack-service-jars
+          path: services/*/build/libs/app.jar
+          if-no-files-found: error
+          compression-level: 0
+
   full-stack-e2e:
+    needs: full-stack-service-artifacts
     runs-on: ubuntu-latest
     timeout-minutes: 50
     env:
@@ -213,11 +238,10 @@ jobs:
       IDENTITY_SEED_TOTP_SECRET: CAATLASMFASEED22
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
-          distribution: temurin
-          java-version: '21'
-      - uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4
+          name: full-stack-service-jars
+          path: services
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '20'
@@ -226,12 +250,12 @@ jobs:
         run: |
           npm ci
           npx playwright install --with-deps chromium
-      - name: Build service artifacts
+      - name: Verify transferred service artifacts
         run: |
           set -euo pipefail
           for service in identity-service catalog-service content-service editor-service \
             audit-service amendment-service search-service ingestion-service; do
-            ./gradlew -p "services/${service}" bootJar -x test
+            test -s "services/${service}/build/libs/app.jar"
           done
       - name: Start production stack
         run: |
@@ -253,7 +277,9 @@ jobs:
           npm run fixtures:generate
           git diff --exit-code -- e2e/fixtures/generated
           npm run prepopulate
+          cp e2e/fixtures/generated/.runtime/prepopulate-ids.json /tmp/prepopulate-first-ids.json
           npm run prepopulate
+          cmp /tmp/prepopulate-first-ids.json e2e/fixtures/generated/.runtime/prepopulate-ids.json
           npm run prepopulate -- --verify-only
       - name: Full-stack browser journeys
         working-directory: apps/gateway-web

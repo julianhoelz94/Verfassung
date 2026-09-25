@@ -33,6 +33,12 @@ test('administrator invite, visitor activation, password change, and reset persi
   await expect(page).toHaveURL(/\/account\?saved=1$/, { timeout: 15_000 });
   await expect(page.getByText('Password updated.')).toBeVisible();
   await signOut(page);
+  await page.goto('/login');
+  await page.getByLabel('Email').fill(email);
+  await page.getByLabel('Password').fill(changedPassword);
+  await page.getByRole('button', { name: 'Sign in' }).click();
+  await expect(page).toHaveURL(/\/$/);
+  await signOut(page);
 
   await signIn(page, 'admin');
   await page.goto('/admin/users');

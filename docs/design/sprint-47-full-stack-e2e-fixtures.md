@@ -18,7 +18,7 @@ These are synthetic test records, not historical claims. Document links may poin
 
 1. Extend the ingestion request and catalog client to accept a predecessor version ID and legal hop kind. The current ingestion API can import the first version but cannot append a version to an existing chain. Keep initial imports backward compatible. Test first import, successor import, invalid predecessor, and repeat behavior in the ingestion service.
 2. The uploader reads the manifest in dependency order, imports each constitution version with `POST /api/ingestion/import-jobs`, polls the job to completion, and resolves each returned version ID for the next import. It then creates amendment records and revisions through the amendment API, using those IDs. Use the identity API for any additional fixture accounts. The existing create-only CI identity seed supplies the bootstrap administrator and service token; credentials come from environment variables, never fixture JSON.
-3. Trigger search reindex through `POST /api/search/reindex` after imports and poll for the expected indexed results. Store the resolved ID map only in ignored test output, for Playwright setup to consume.
+3. Trigger search reindex through `POST /api/search/reindex` after imports and poll for the expected indexed results. Store the resolved ID map in an ignored fixture runtime directory outside Playwright's cleaned output, for the browser tests to consume.
 4. Make upload idempotent. Find records by fixture namespace and stable slug or label. Skip an exact match; fail with a field-level mismatch if a published record differs. Do not overwrite immutable published versions. A second run must preserve IDs and counts.
 
 ## `prepopulate` is an assertion-bearing test
@@ -32,6 +32,8 @@ Read-back assertions must check the namespaced fixture totals (2 countries, 2 co
 Add a separate Playwright project or command, `npm run test:e2e:full`, against the running Caddy/gateway stack. Use the fixture ID map and normal login through the website. Browser requests must reach real service APIs; route interception is limited to deliberately simulated external failures in tests whose purpose is failure handling. Cover the implemented stories in `docs/user-stories.md`: country and version reading, article navigation, search/filter, comparison and history, amendment timeline/documents, account and role visibility, editor draft/review/publish, and administrator import/access flows. Use fresh, namespaced records for mutating journeys so test order and retries do not change the baseline. Keep existing component-style mock tests as a separate fast suite and label them accurately.
 
 Map every automated story to a test ID in a coverage table. Mark stories that are still **Planned** as unavailable rather than counting them as passing journeys. Include negative role checks, but avoid asserting implementation details such as internal service calls when the user-visible result is sufficient.
+
+The current mapping is in [sprint-47-story-coverage.md](sprint-47-story-coverage.md).
 
 ## CI sequence and acceptance
 

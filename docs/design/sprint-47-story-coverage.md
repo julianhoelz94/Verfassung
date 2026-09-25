@@ -15,7 +15,8 @@ The source catalog is [user-stories.md](../user-stories.md). The `e2e/full` Play
 | Editor drafts and revises legal change records and a legal successor | — | `journeys.spec.ts`: amending law, revision restoration, legal successor and source document |
 | Publisher withdraws a change record and confirms stale quotes | — | `journeys.spec.ts`: withdraw and quote confirmation |
 | Administrator views constitutions and their outlines | `roles.spec.ts`: admin permission test | `admin-stories.spec.ts`: create/update outline |
-| Administrator manages users, service tokens and JSON imports | — | `admin-stories.spec.ts`: access lifecycle, token lifecycle, import |
+| Administrator imports constitution JSON and opens the published result | `roles.spec.ts`: administrator imports a new constitution | `admin-stories.spec.ts`: import |
+| Administrator manages users and service tokens | — | `admin-stories.spec.ts`: access lifecycle and token lifecycle |
 
 The full-stack fixture verification separately checks exact counts, nested content, legal predecessor links, amendment revision history, documents, and search indexing. `prepopulate` is idempotent and its `--verify-only` mode checks the same records without creating them.
 

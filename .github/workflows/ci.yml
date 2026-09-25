@@ -237,9 +237,15 @@ jobs:
         run: |
           docker compose --env-file env/ci.env.example up -d --build edge-proxy
           for attempt in $(seq 1 90); do
-            if curl --fail --silent http://127.0.0.1:18080/api/catalog/countries >/dev/null; then exit 0; fi
+            ready=true
+            for service in catalog content amendment identity ingestion search; do
+              status=$(curl --silent --output /dev/null --write-out '%{http_code}' "http://127.0.0.1:18080/api/${service}/actuator/health" || true)
+              if [ "$status" != 200 ]; then ready=false; break; fi
+            done
+            if [ "$ready" = true ] && curl --fail --silent http://127.0.0.1:18080/about >/dev/null; then exit 0; fi
             sleep 2
           done
+          docker compose --env-file env/ci.env.example ps
           exit 1
       - name: Generate, upload, and verify API fixtures
         working-directory: apps/gateway-web

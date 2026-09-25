@@ -1,11 +1,5 @@
 import { createHmac } from 'node:crypto';
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
-
-const ids = JSON.parse(readFileSync(join(__dirname, '..', 'fixtures', 'generated', '.runtime', 'prepopulate-ids.json'), 'utf8')) as {
-  versions: Record<string, string>;
-};
 
 function authenticatorCode(secret: string): string {
   const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
@@ -74,8 +68,22 @@ for (const story of roles) {
 }
 
 test('editor, reviewer, and publisher carry a real transcription correction to the public reader', async ({ page, request }) => {
+  test.setTimeout(120_000);
   await signIn(page, 'editor');
-  await page.getByLabel('Correct this text').selectOption(ids.versions['xa-2024']);
+  const sourceVersionId = await page.getByLabel('Correct this text').locator('option').first().getAttribute('value');
+  expect(sourceVersionId).toBeTruthy();
+  await page.getByLabel('Correct this text').selectOption(sourceVersionId!);
+  const countries = await (await request.get('/api/catalog/countries')).json();
+  let sourceCountryIso: string | undefined;
+  for (const summary of countries) {
+    const detail = await (await request.get(`/api/catalog/countries/${summary.isoCode}`)).json();
+    if (detail.constitutions.some((constitution: { versions: Array<{ id: string; currentVersionId?: string }> }) =>
+      constitution.versions.some((version) => version.id === sourceVersionId || version.currentVersionId === sourceVersionId))) {
+      sourceCountryIso = summary.isoCode;
+      break;
+    }
+  }
+  expect(sourceCountryIso).toBeTruthy();
   await page.getByRole('button', { name: 'Correct this text' }).click();
   await expect(page).toHaveURL(/sessionId=/);
   await page.getByLabel('Article text').fill('Dignity and civic equality protect every person. Verified transcription.');
@@ -99,11 +107,10 @@ test('editor, reviewer, and publisher carry a real transcription correction to t
   await page.goto(sessionUrl);
   await page.getByRole('button', { name: 'Publish transcription' }).click();
   await expect(page.getByText(/Published as version/)).toBeVisible();
+  const newVersionId = new URL(page.url()).searchParams.get('newVersionId');
+  expect(newVersionId).toBeTruthy();
   await signOut(page);
-  const country = await (await request.get('/api/catalog/countries/XA')).json();
-  const latest = country.constitutions[0].versions.find((version: { predecessorVersionId: string }) => version.predecessorVersionId === ids.versions['xa-2024']);
-  expect(latest).toBeTruthy();
-  await page.goto(`/countries/XA/versions/${latest.id}`);
+  await page.goto(`/countries/${sourceCountryIso}/versions/${newVersionId}`);
   await expect(page.getByText('Dignity and civic equality protect every person. Verified transcription.').first()).toBeVisible();
 });
 

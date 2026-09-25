@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { signIn, signOut } from './auth';
+import { authenticatorCode, signIn, signOut } from './auth';
 
 test('editor, reviewer, and publisher release a real legal successor with its source document', async ({ page, request }) => {
   test.setTimeout(120_000);
@@ -43,6 +43,13 @@ test('editor, reviewer, and publisher release a real legal successor with its so
   await signIn(page, 'publisher');
   await page.goto(sessionUrl);
   await page.getByRole('button', { name: 'Publish new legal version' }).click();
+  await expect(page).toHaveURL(/(?:published=1|\/account\/step-up\?)/, { timeout: 15_000 });
+  if (page.url().includes('/account/step-up')) {
+    const secret = process.env.IDENTITY_SEED_TOTP_SECRET ?? 'CAATLASMFASEED22';
+    await page.getByLabel('Authenticator code').fill(authenticatorCode(secret));
+    await page.getByRole('button', { name: 'Continue' }).click();
+    await expect(page).toHaveURL(/published=1/, { timeout: 15_000 });
+  }
   await expect(page.getByText(/Published as version/)).toBeVisible();
   const newVersionId = new URL(page.url()).searchParams.get('newVersionId');
   expect(newVersionId).toBeTruthy();

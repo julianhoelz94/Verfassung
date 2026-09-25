@@ -13,8 +13,10 @@ The journeys in the table below use `mock-api.mjs` and verify UI behavior agains
 | Editor, reviewer, publisher, and admin access with real MFA | `full/roles.spec.ts`: four role permission tests |
 | Draft, review, publish, and read an editorial correction | `full/roles.spec.ts`: real transcription correction |
 | Admin imports JSON and opens the published version | `full/roles.spec.ts`: administrator imports a new constitution |
+| Admin invite, visitor activation, password change and reset | `full/account-admin.spec.ts`: real account lifecycle |
+| Admin creates, rotates and revokes a service token | `full/account-admin.spec.ts`: real token lifecycle |
 
-The fixture verifier checks 2 countries, 2 constitutions, 5 published versions, 60 article snapshots, 3 amendments, nested content, predecessor links, revision history, source documents, and indexed search hits. A second upload and `--verify-only` pass prove idempotence. Account recovery, legal successor publication, change-record revision and withdrawal, and user/token administration currently have mock-only browser coverage.
+The fixture verifier checks 2 countries, 2 constitutions, 5 published versions, 60 article snapshots, 3 amendments, nested content, predecessor links, revision history, source documents, and indexed search hits. A second upload and `--verify-only` pass prove idempotence. Legal successor publication and change-record revision and withdrawal currently have mock-only browser coverage.
 
 | Stories | Playwright journey | Durable outcome or permission assertion |
 | --- | --- | --- |

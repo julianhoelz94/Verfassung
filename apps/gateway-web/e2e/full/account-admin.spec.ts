@@ -1,0 +1,72 @@
+import { expect, test } from '@playwright/test';
+import { signIn, signOut } from './auth';
+
+test('administrator invite, visitor activation, password change, and reset persist across logins', async ({ page }) => {
+  test.setTimeout(120_000);
+  const email = `journey-${Date.now()}@example.local`;
+  const firstPassword = 'Journey-first-password-47';
+  const changedPassword = 'Journey-changed-password-47';
+  const resetPassword = 'Journey-reset-password-47';
+
+  await signIn(page, 'admin');
+  await page.goto('/admin/users');
+  await page.getByLabel('Email').fill(email);
+  await page.getByLabel('Roles (comma-separated)').first().fill('viewer');
+  await page.getByRole('button', { name: 'Send invite' }).click();
+  const inviteToken = await page.getByText('Invite created.', { exact: false }).locator('code').textContent();
+  expect(inviteToken).toBeTruthy();
+  await signOut(page);
+
+  await page.goto(`/invite?token=${encodeURIComponent(inviteToken!)}`);
+  await page.getByLabel('Password').fill(firstPassword);
+  await page.getByRole('button', { name: 'Activate account' }).click();
+  await expect(page).toHaveURL(/\/login$/);
+  await page.getByLabel('Email').fill(email);
+  await page.getByLabel('Password').fill(firstPassword);
+  await page.getByRole('button', { name: 'Sign in' }).click();
+  await expect(page).toHaveURL(/\/$/);
+  await page.goto('/account');
+  await expect(page.getByText(`Signed in as ${email}.`)).toBeVisible();
+  await page.getByLabel('Current password').fill(firstPassword);
+  await page.getByLabel('New password').fill(changedPassword);
+  await page.getByRole('button', { name: 'Update password' }).click();
+  await expect(page.getByText('Password updated.')).toBeVisible();
+  await signOut(page);
+
+  await signIn(page, 'admin');
+  await page.goto('/admin/users');
+  const user = page.locator('.data-row').filter({ hasText: email });
+  await expect(user).toContainText('viewer');
+  await user.getByRole('button', { name: 'Issue reset token' }).click();
+  const resetToken = await user.getByText('Reset token issued.', { exact: false }).locator('code').textContent();
+  expect(resetToken).toBeTruthy();
+  await signOut(page);
+
+  await page.goto('/reset');
+  await page.getByLabel('Reset token').fill(resetToken!);
+  await page.getByLabel('New password').fill(resetPassword);
+  await page.getByRole('button', { name: 'Set new password' }).click();
+  await expect(page).toHaveURL(/\/login$/);
+  await page.getByLabel('Email').fill(email);
+  await page.getByLabel('Password').fill(resetPassword);
+  await page.getByRole('button', { name: 'Sign in' }).click();
+  await expect(page).toHaveURL(/\/$/);
+});
+
+test('administrator creates, rotates, and revokes a real service token', async ({ page }) => {
+  const name = `journey-token-${Date.now()}`;
+  await signIn(page, 'admin');
+  await page.goto('/admin/users');
+  await page.getByLabel('Name').fill(name);
+  await page.getByLabel('Scopes (comma-separated)').fill('catalog:write');
+  await page.getByRole('button', { name: 'Issue token' }).click();
+  await expect(page.getByText('Token created.', { exact: false }).locator('code')).not.toBeEmpty();
+  await page.reload();
+  const token = page.locator('.data-row').filter({ hasText: name });
+  await expect(token).toContainText('catalog:write');
+  await token.getByRole('button', { name: 'Rotate' }).click();
+  await expect(token.getByText('Token rotated.', { exact: false }).locator('code')).not.toBeEmpty();
+  await page.reload();
+  await page.locator('.data-row').filter({ hasText: name }).getByRole('button', { name: 'Revoke' }).click();
+  await expect(page.locator('.data-row').filter({ hasText: name })).toContainText('Revoked');
+});

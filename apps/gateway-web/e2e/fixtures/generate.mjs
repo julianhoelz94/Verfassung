@@ -47,7 +47,7 @@ for (const country of definitions) {
       constitutionTitle: country.constitutionTitle, versionLabel: version.versionLabel,
       effectiveDate: version.effectiveDate, languageCode: 'en',
       sourceUrl: `https://example.org/atlas-e2e/${version.key}`, gazetteReference: `Atlas fixture ${version.versionLabel}`,
-      ...(version.predecessor ? {} : { outline }), articles,
+      outline, articles,
     };
     const file = `${version.key}.json`;
     writeFileSync(join(output, file), `${JSON.stringify(payload, null, 2)}\n`);

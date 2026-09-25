@@ -8,6 +8,27 @@
   "languageCode": "en",
   "sourceUrl": "https://example.org/atlas-e2e/xa-2022",
   "gazetteReference": "Atlas fixture 2022",
+  "outline": {
+    "kinds": [
+      {
+        "kindCode": "article",
+        "displayLabel": "Article",
+        "showTitle": true,
+        "showKind": true
+      },
+      {
+        "kindCode": "paragraph",
+        "displayLabel": "Paragraph",
+        "showLabel": true
+      },
+      {
+        "kindCode": "sentence",
+        "displayLabel": "Sentence",
+        "presentation": "concatenated",
+        "showLabel": false
+      }
+    ]
+  },
   "articles": [
     {
       "articleNumber": "1",

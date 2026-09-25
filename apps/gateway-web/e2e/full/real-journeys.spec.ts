@@ -27,7 +27,7 @@ test('visitor compares legal versions and reads the source document timeline', a
   await expect(page.locator('ins.diff-add, del.diff-remove').first()).toBeVisible();
   await page.goto('/countries/XA/timeline');
   await expect(page.getByRole('heading', { name: 'Amendment timeline' })).toBeVisible();
-  await expect(page.getByText('Atlas Testland Civic Revision 2024')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Atlas Testland Civic Revision 2024' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Synthetic source document' }).first()).toBeVisible();
 });
 

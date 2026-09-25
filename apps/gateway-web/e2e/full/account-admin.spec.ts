@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { signIn, signOut } from './auth';
+import { authenticatorCode, signIn, signOut } from './auth';
 
 test('administrator invite, visitor activation, password change, and reset persist across logins', async ({ page }) => {
   test.setTimeout(120_000);
@@ -51,6 +51,26 @@ test('administrator invite, visitor activation, password change, and reset persi
   await page.getByLabel('Password').fill(resetPassword);
   await page.getByRole('button', { name: 'Sign in' }).click();
   await expect(page).toHaveURL(/\/$/);
+  await page.goto('/account');
+  await page.getByRole('button', { name: 'Enroll authenticator' }).click();
+  const secret = await page.getByText('Authenticator secret:', { exact: false }).locator('code').textContent();
+  expect(secret).toBeTruthy();
+  await page.getByLabel('Authenticator code').fill(authenticatorCode(secret!));
+  await page.getByRole('button', { name: 'Confirm enrollment' }).click();
+  await expect(page.getByText(/recovery codes now/)).toBeVisible();
+  await page.getByRole('link', { name: 'Back to account' }).click();
+  await page.locator('#recoveryRotateCode').fill(authenticatorCode(secret!));
+  await page.getByRole('button', { name: 'Replace recovery codes' }).click();
+  await expect(page.getByText(/recovery codes now/)).toBeVisible();
+  await signOut(page);
+  await page.goto('/login');
+  await page.getByLabel('Email').fill(email);
+  await page.getByLabel('Password').fill(resetPassword);
+  await page.getByRole('button', { name: 'Sign in' }).click();
+  await expect(page.getByRole('heading', { name: 'Authenticator code' })).toBeVisible();
+  await page.getByLabel('Authenticator code').fill(authenticatorCode(secret!));
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await expect(page).toHaveURL(/\/$/);
 });
 
 test('administrator creates, rotates, and revokes a real service token', async ({ page }) => {
@@ -69,4 +89,23 @@ test('administrator creates, rotates, and revokes a real service token', async (
   await page.reload();
   await page.locator('.data-row').filter({ hasText: name }).getByRole('button', { name: 'Revoke' }).click();
   await expect(page.locator('.data-row').filter({ hasText: name })).toContainText('Revoked');
+});
+
+test('administrator creates a constitution and updates its outline presentation', async ({ page }) => {
+  const title = `Journey Outline ${Date.now()}`;
+  await signIn(page, 'admin');
+  await page.goto('/admin/constitutions');
+  await page.getByLabel('Country').selectOption('XA');
+  await page.getByLabel('Slug').fill(`journey-outline-${Date.now()}`);
+  await page.getByLabel('Title', { exact: true }).fill(title);
+  await page.getByRole('button', { name: 'Add deeper layer' }).click();
+  await page.getByRole('textbox', { name: 'Label' }).nth(1).fill('Clause');
+  await page.getByRole('button', { name: 'Create' }).click();
+  await expect(page.getByRole('heading', { name: title })).toBeVisible();
+  await expect(page.getByRole('textbox', { name: 'Label' }).nth(1)).toHaveValue('Clause');
+  await page.getByLabel('How this layer is shown').nth(1).selectOption('concatenated');
+  await page.getByRole('button', { name: 'Save outline' }).click();
+  await expect(page.getByText('Outline saved.')).toBeVisible();
+  await page.reload();
+  await expect(page.getByLabel('How this layer is shown').nth(1)).toHaveValue('concatenated');
 });

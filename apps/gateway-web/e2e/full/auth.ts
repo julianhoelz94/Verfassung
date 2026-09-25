@@ -1,7 +1,7 @@
 import { createHmac } from 'node:crypto';
 import { expect, type Page } from '@playwright/test';
 
-function authenticatorCode(secret: string): string {
+export function authenticatorCode(secret: string): string {
   const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
   let bits = 0;
   let value = 0;

@@ -38,6 +38,33 @@ test('visitor finds imported text through the real search index', async ({ page 
   await expect(page.getByRole('link', { name: /Article 1 — Human dignity/ }).first()).toBeVisible();
 });
 
+test('visitor reads historical article context, provenance, and site guidance', async ({ page, request }) => {
+  const articles = await (await request.get(`/api/content/versions/${ids.versions['xa-2020']}/articles`)).json();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(`/countries/XA/versions/${ids.versions['xa-2020']}/articles/${articles[0].id}`);
+  await expect(page.getByRole('heading', { name: /Human dignity/ })).toBeVisible();
+  await expect(page.getByRole('complementary', { name: 'Source and trust' })).toBeVisible();
+  await page.getByRole('link', { name: 'History of Article 1' }).click();
+  await expect(page.getByRole('heading', { name: 'History of Article 1' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Compare with previous' })).toBeVisible();
+  await page.goto('/about');
+  await expect(page.getByRole('heading', { name: 'Sources' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Accessibility' })).toBeVisible();
+});
+
+test('visitor filters real search results and opens their original version', async ({ page }) => {
+  await page.goto('/search');
+  await page.getByLabel('Keyword').fill('dignity');
+  await page.locator('main').getByRole('button', { name: 'Search' }).click();
+  await page.getByRole('radio', { name: /Atlas Testland/ }).check();
+  await page.getByRole('radio', { name: /Atlas Test Charter.*2020/ }).check();
+  await page.getByRole('button', { name: 'Apply filters' }).click();
+  const result = page.getByRole('link', { name: /Article 1 — Human dignity/ });
+  await expect(result).toHaveAttribute('href', new RegExp(`/versions/${ids.versions['xa-2020']}/articles/`));
+  await result.click();
+  await expect(page).toHaveURL(new RegExp(`/versions/${ids.versions['xa-2020']}/articles/`));
+});
+
 test('viewer signs in, sees the public site, and signs out', async ({ page }) => {
   await page.goto('/login');
   await page.getByLabel('Email').fill(process.env.CI_VIEWER_EMAIL ?? 'ci-viewer@example.local');

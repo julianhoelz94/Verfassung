@@ -9,6 +9,8 @@ The journeys in the table below use `mock-api.mjs` and verify UI behavior agains
 | Browse a country, version, and article | `full/real-journeys.spec.ts`: visitor reads a published constitution |
 | Compare legal versions and read timeline documents | `full/real-journeys.spec.ts`: visitor compares legal versions |
 | Search imported article text | `full/real-journeys.spec.ts`: visitor finds imported text |
+| Filter search to a historical version and open its result | `full/real-journeys.spec.ts`: visitor filters real search results |
+| Read article history, provenance and site guidance | `full/real-journeys.spec.ts`: visitor reads historical article context |
 | Viewer signs in, sees account, and signs out | `full/real-journeys.spec.ts`: viewer signs in |
 | Editor, reviewer, publisher, and admin access with real MFA | `full/roles.spec.ts`: four role permission tests |
 | Draft, review, publish, and read an editorial correction | `full/roles.spec.ts`: real transcription correction |
@@ -18,9 +20,10 @@ The journeys in the table below use `mock-api.mjs` and verify UI behavior agains
 | Admin creates a constitution and changes its outline | `full/account-admin.spec.ts`: real outline lifecycle |
 | Editor restores a change-record revision and publisher republishes it | `full/amendments.spec.ts`: real amendment revision history |
 | Publisher withdraws a change record from the public timeline | `full/amendments.spec.ts`: real withdrawal |
+| Publisher confirms stale quotes after a historical correction | `full/amendments.spec.ts`: real stale quote review |
 | Editor, reviewer, and publisher release a legal successor with a source document | `full/zz-legal-successor.spec.ts`: real legal successor publication |
 
-The fixture verifier checks 2 countries, 2 constitutions, 5 published versions, 60 article snapshots, 3 amendments, nested content, predecessor links, revision history, source documents, and indexed search hits. A second upload and `--verify-only` pass prove idempotence. Stale-quote review remains mock-only browser coverage.
+The fixture verifier checks 2 countries, 2 constitutions, 5 published versions, 60 article snapshots, 3 amendments, nested content, predecessor links, revision history, source documents, and indexed search hits. A second upload and `--verify-only` pass prove idempotence. Detailed UI states beyond these journeys remain in the faster mock suite.
 
 | Stories | Playwright journey | Durable outcome or permission assertion |
 | --- | --- | --- |

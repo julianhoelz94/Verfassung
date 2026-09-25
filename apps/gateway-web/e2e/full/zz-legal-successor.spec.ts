@@ -48,6 +48,8 @@ test('editor, reviewer, and publisher release a real legal successor with its so
     const secret = process.env.IDENTITY_SEED_TOTP_SECRET ?? 'CAATLASMFASEED22';
     await page.getByLabel('Authenticator code').fill(authenticatorCode(secret));
     await page.getByRole('button', { name: 'Continue' }).click();
+    await expect(page).toHaveURL(/\/editor\?/);
+    await page.getByRole('button', { name: 'Publish new legal version' }).click();
     await expect(page).toHaveURL(/published=1/, { timeout: 15_000 });
   }
   await expect(page.getByText(/Published as version/)).toBeVisible();

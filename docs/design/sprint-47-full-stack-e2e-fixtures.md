@@ -37,6 +37,6 @@ The current mapping is in [sprint-47-story-coverage.md](sprint-47-story-coverage
 
 ## CI sequence and acceptance
 
-Create a full-stack CI job with identity, catalog, content, ingestion, amendment, editor, audit, search, gateway, and Caddy. After health checks: install dependencies, regenerate and diff fixtures, run `prepopulate`, run it again to prove idempotence, run `prepopulate -- --verify-only`, then run the full-stack Playwright suite. Preserve service logs, import-job responses, uploader diagnostics, and Playwright traces on failure. Keep the existing fast mocked suite distinct.
+Create a full-stack CI job with identity, catalog, content, ingestion, amendment, editor, audit, search, gateway, and Caddy. After health checks: install dependencies, regenerate and diff fixtures, run `prepopulate`, run it again to prove idempotence, run `prepopulate -- --verify-only`, then run the full-stack Playwright suite. Emit service logs and uploader diagnostics on failure. Keep browser traces local to the runner because they may contain session data. Keep the existing fast mocked suite distinct.
 
 Sprint 47 acceptance requires the real-stack job to pass in CI, with no Playwright API mocks in the full-stack project; exact fixture assertions passing after upload and on rerun; all implemented user-journey stories mapped to passing tests; and the sprint's required review, verification, PR checks, merge, and Linear updates completed. This plan belongs to Sprint 47 and does not start Sprint 48.

@@ -110,7 +110,9 @@ test('editor, reviewer, and publisher carry a real transcription correction to t
   const newVersionId = new URL(page.url()).searchParams.get('newVersionId');
   expect(newVersionId).toBeTruthy();
   await signOut(page);
-  await page.goto(`/countries/${sourceCountryIso}/versions/${newVersionId}`);
+  const publishedArticles = await (await request.get(`/api/content/versions/${newVersionId}/articles?includeBody=true`)).json();
+  expect(publishedArticles[0].body).toContain('Verified transcription.');
+  await page.goto(`/countries/${sourceCountryIso}/versions/${newVersionId}/articles/${publishedArticles[0].id}`);
   await expect(page.getByText('Dignity and civic equality protect every person. Verified transcription.').first()).toBeVisible();
 });
 

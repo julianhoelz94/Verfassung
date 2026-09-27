@@ -97,6 +97,10 @@ for (const hop of ['editorial_correction', 'legal'] as const) {
     await expect(page.getByText('Before.', { exact: true })).toBeVisible();
     await expect(page.getByText('Between.', { exact: true })).toBeVisible();
     await expect(page.getByText('After.', { exact: true })).toBeVisible();
+    const rendered = await page.locator('main').innerText();
+    const positions = ['Before.', 'Changed wording.', 'Between.', 'Untouched branch.', 'After.'].map(text => rendered.indexOf(text));
+    expect(positions.every(position => position >= 0)).toBeTruthy();
+    expect(positions).toEqual([...positions].sort((a, b) => a - b));
     await expect.poll(async () => {
       const found = await json(await request.get(`/api/search?q=Changed%20wording&versionId=${targetId}`));
       return found.total;
@@ -135,4 +139,34 @@ test('custom one-level root supports literal labels, plain text and new root nav
   await canvas.getByRole('button', { name: 'Save draft', exact: true }).click();
   await page.reload();
   await expect(canvas.getByLabel('Clause text')).toHaveValue('New root text.');
+});
+
+
+test('pasted boundaries, inline titles and keyboard edits persist with explicit lineage', async ({ page, request }) => {
+  const { version, headers } = await fixture(request);
+  await signIn(page, 'editor');
+  await page.getByLabel('Correct this text').selectOption(version.id);
+  await page.getByRole('button', { name: 'Correct this text', exact: true }).click();
+  const canvas = page.locator('#draft-form');
+  const pasted = 'Art.12 applies. Next! ';
+  const sentence = canvas.getByLabel('Sentence text').first();
+  await sentence.fill(pasted);
+  await sentence.press('Tab');
+  await expect(canvas.getByRole('button', { name: 'Split at cursor', exact: true }).nth(1)).toBeFocused();
+  await canvas.getByRole('button', { name: 'Suggest sentence boundaries' }).first().click();
+  await expect(canvas.getByLabel('Sentence text')).toHaveCount(3);
+  await expect(canvas.getByLabel('Sentence text').nth(0)).toHaveValue('Art.12 applies. ');
+  await expect(canvas.getByLabel('Sentence text').nth(1)).toHaveValue('Next! ');
+  await canvas.getByLabel('Sentence title').first().fill('Inline title');
+  await canvas.getByRole('button', { name: 'Merge with next sentence' }).first().click();
+  await expect(canvas.getByLabel('Sentence text').first()).toHaveValue(pasted);
+  await canvas.getByRole('button', { name: 'Save draft', exact: true }).click();
+  await expect(page.getByText('Draft saved.', { exact: true })).toBeVisible();
+  await page.reload();
+  await expect(canvas.getByLabel('Sentence text').first()).toHaveValue(pasted);
+  await expect(canvas.getByLabel('Sentence title').first()).toHaveValue('Inline title');
+  const sessionId = new URL(page.url()).searchParams.get('sessionId');
+  const draft = await json(await request.get(`/api/editor/edit-sessions/${sessionId}/structured-draft`, { headers }));
+  expect(draft.operations.map((operation: { type: string }) => operation.type)).toEqual(expect.arrayContaining(['split_text', 'merge_text', 'insert_child', 'move']));
+  expect(draft.roots[0].content.map((entry: { type: string }) => entry.type)).toEqual(['text', 'child', 'text', 'child', 'text']);
 });

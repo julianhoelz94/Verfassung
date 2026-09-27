@@ -8,7 +8,7 @@ import { editorErrorMessage, getDraftPreview, getStructuredDraft, listSessions, 
 import { currentUser } from '../../lib/session';
 import { ArticleEditor } from './ArticleEditor';
 import { EditorDraftState, SubmitReviewButton } from './EditorDraftState';
-import { draftDifferences, readerNode } from '../../lib/structured-editor';
+import { draftDifferences, nodes, readerNode } from '../../lib/structured-editor';
 import { OrderedContentTree } from '../components/ConstitutionText';
 import { StructuredEditor } from './StructuredEditor';
 import { PublishForm } from './PublishForm';
@@ -150,7 +150,8 @@ export default async function EditorPage(props: EditorPageProps) {
     versionId: versionId!, articleNumber: root.label ?? '', title: root.title ?? '', sortOrder: index + 1,
     kind: root.kind, logicalId: root.logicalId,
   })) : sourceArticles;
-  const selectedId = articles.some(article => article.id === searchParams.articleId) ? searchParams.articleId : articles[0]?.id;
+  const selectionRoot = searchParams.selectedNode ? structured?.roots.find(root => nodes([root]).some(node => node.logicalId === searchParams.selectedNode || node.content.some(entry => entry.logicalId === searchParams.selectedNode))) : undefined;
+  const selectedId = articles.find(article => article.logicalId === selectionRoot?.logicalId)?.id ?? (articles.some(article => article.id === searchParams.articleId) ? searchParams.articleId : articles[0]?.id);
   const selectedSummary = articles.find(article => article.id === selectedId);
   const selectedRoot = structured?.roots.find(root => root.logicalId === selectedSummary?.logicalId);
   const selected = selectedRoot && selectedSummary ? { ...selectedSummary, body: '', content: selectedRoot.content as import('../../lib/api').OrderedEntry[] } : selectedId && versionId ? await getUnit(versionId, selectedId) : null;
@@ -163,11 +164,16 @@ export default async function EditorPage(props: EditorPageProps) {
     versionId && searchParams.sessionId
       ? `/editor?versionId=${encodeURIComponent(versionId)}&sessionId=${encodeURIComponent(searchParams.sessionId)}${searchParams.scope ? `&scope=${encodeURIComponent(searchParams.scope)}` : ''}`
       : '/editor';
-  const changedRootIds = structured?.roots.filter(root => draftDifferences(structured.sourceRoots.filter(source => source.logicalId === root.logicalId), [root]).length > 0).map(root => root.logicalId) ?? [];
+  const differences = structured ? draftDifferences(structured.sourceRoots, structured.roots) : [];
+  const changedRootIds = structured ? [...structured.sourceRoots, ...structured.roots].filter(root => {
+    const identities = nodes([root]).flatMap(node => [node.logicalId, ...node.content.map(entry => entry.logicalId)]);
+    return differences.some(change => identities.includes(change.logicalId));
+  }).map(root => root.logicalId) : [];
   const draftIds = [...(preview?.drafts ?? []).map((item) => item.articleId), ...articles.filter(article => article.logicalId && changedRootIds.includes(article.logicalId)).map(article => article.id)];
   const changedLabels = articles
     .filter((article) => draftIds.includes(article.id))
     .map((article) => `${article.kind ?? 'Unit'} ${article.articleNumber}`);
+  if (structured) sourceArticles.filter(article => article.logicalId && changedRootIds.includes(article.logicalId) && !articles.some(target => target.logicalId === article.logicalId)).forEach(article => changedLabels.push(`Removed ${article.kind ?? 'Unit'} ${article.articleNumber}`));
   const errorMessage = editorErrorMessage(searchParams.error);
   const alerts = (
     <>
@@ -312,7 +318,7 @@ export default async function EditorPage(props: EditorPageProps) {
             </p>
             {structured && selectedRoot && settings && versionId && selected && selectedConstitution ? <StructuredEditor
               key={`${session.id}:${structured.generation}:${selectedRoot.logicalId}`}
-              preview={structured} outline={settings.outline} rootId={selectedRoot.logicalId} versionId={versionId} articleId={selected.id} constitutionId={selectedConstitution.id} publishedVersionId={preview.newVersionId} unitMapping={preview.unitMapping} editable={canSave && session.actorId === user.id} scope={searchParams.scope} selectedNode={searchParams.selectedNode}
+              review={differences.map(difference => { const sourceRoot = structured.sourceRoots.find(root => nodes([root]).some(node => node.logicalId === difference.logicalId || node.content.some(entry => entry.logicalId === difference.logicalId))); const targetRoot = structured.roots.find(root => nodes([root]).some(node => node.logicalId === difference.logicalId || node.content.some(entry => entry.logicalId === difference.logicalId))); const targetOccurrence = targetRoot && preview.unitMapping?.[targetRoot.logicalId]; return { ...difference, sourceLink: sourceRoot?.occurrenceId ? `/versions/${structured.sourceVersionId}/units/${sourceRoot.occurrenceId}` : undefined, targetLink: preview.newVersionId && targetOccurrence ? `/versions/${preview.newVersionId}/units/${targetOccurrence}` : undefined }; })} preview={{ ...structured, roots: structured.roots.map(root => root.logicalId === selectedRoot.logicalId ? root : { ...root, content: [] }), sourceRoots: structured.sourceRoots.map(root => root.logicalId === selectedRoot.logicalId ? root : { ...root, content: [] }) }} outline={settings.outline} rootId={selectedRoot.logicalId} versionId={versionId} articleId={selected.id} constitutionId={selectedConstitution.id} publishedVersionId={preview.newVersionId} unitMapping={preview.unitMapping} editable={canSave && session.actorId === user.id} scope={searchParams.scope} selectedNode={searchParams.selectedNode}
             /> : canSave && selected && versionId && searchParams.sessionId ? (
               <ArticleEditor
                 sessionId={searchParams.sessionId}

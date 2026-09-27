@@ -1,12 +1,17 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import type { ContentOutline } from '../../lib/api';
-import { applyOperation, draftDifferences, findNode, nodes, scopedNodes, sentenceParts, token, validateDraft, type DraftEntry, type DraftNode, type DraftOperation, type StructuredPreview } from '../../lib/structured-editor';
+import { applyOperation, draftDifferences, findNode, nodes, scopedNodes, sentenceParts, token, validateDraft, type DraftDifference, type DraftEntry, type DraftNode, type DraftOperation, type StructuredPreview } from '../../lib/structured-editor';
 import { useDraftState } from './EditorDraftState';
 import { Button } from '../components/ui';
 
-type Props = { preview: StructuredPreview; outline: ContentOutline; rootId: string; versionId: string; articleId: string; constitutionId: string; editable: boolean; scope?: string; selectedNode?: string; publishedVersionId?: string | null; unitMapping?: Record<string, string> | null };
-export function StructuredEditor({ preview, outline, rootId, versionId, articleId, constitutionId, editable, scope: initialScope, selectedNode, publishedVersionId, unitMapping }: Props) {
+type ReviewDifference = DraftDifference & { sourceLink?: string; targetLink?: string };
+type Props = { review?: ReviewDifference[]; preview: StructuredPreview; outline: ContentOutline; rootId: string; versionId: string; articleId: string; constitutionId: string; editable: boolean; scope?: string; selectedNode?: string; publishedVersionId?: string | null; unitMapping?: Record<string, string> | null };
+export function StructuredEditor({ review = [], preview, outline, rootId, versionId, articleId, constitutionId, editable, scope: initialScope, selectedNode, publishedVersionId, unitMapping }: Props) {
+  const [sourceRoots, setSourceRoots] = useState(preview.sourceRoots);
+  const [overviewRoots, setOverviewRoots] = useState<DraftNode[]>([]);
+  const [loadedRootIds, setLoadedRootIds] = useState([rootId]);
+  const [loading, setLoading] = useState(false);
   const [roots, setRoots] = useState(preview.roots);
   const [operations, setOperations] = useState<DraftOperation[]>([]);
   const [history, setHistory] = useState<{ roots: DraftNode[]; operations: DraftOperation[] }[]>([]);
@@ -24,10 +29,45 @@ export function StructuredEditor({ preview, outline, rootId, versionId, articleI
   const allNodes = nodes(roots);
   const root = roots.find(root => nodes([root]).some(node => node.logicalId === selection || node.content.some(entry => entry.logicalId === selection))) ?? findNode(roots, rootId) ?? roots[0];
   const errors = validateDraft(roots, outline);
-  const differences = draftDifferences(preview.sourceRoots, roots);
+  const loadedIds = new Set(nodes([...sourceRoots, ...roots]).flatMap(node => [node.logicalId, ...node.content.map(entry => entry.logicalId).filter((id): id is string => Boolean(id))]));
+  const differences: ReviewDifference[] = [...review.filter(item => !loadedIds.has(item.logicalId)), ...draftDifferences(sourceRoots, roots)];
   function remember(view: string, selected: string) {
     const url = new URL(window.location.href); url.searchParams.set('scope', view); url.searchParams.set('selectedNode', selected); window.history.replaceState(null, '', url);
   }
+  async function loadView(view: string, selected = selection, fullRootId?: string) {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams({ sessionId: preview.sessionId, scope: view });
+      if (fullRootId) params.set('rootId', fullRootId);
+      const response = await fetch(`/editor/view?${params}`, { cache: 'no-store' });
+      if (!response.ok) throw new Error('Could not load this editor view. Try again.');
+      const loaded: StructuredPreview = await response.json();
+      if (loaded.generation !== preview.generation || loaded.settingsRevisionId !== preview.settingsRevisionId) throw new Error('This session changed. Save or reload before navigating.');
+      if (fullRootId) {
+        const newRoot = loaded.roots.find(root => root.logicalId === fullRootId);
+        const original = loaded.sourceRoots.find(root => root.logicalId === fullRootId);
+        if (newRoot) {
+          setRoots(current => current.map(root => root.logicalId === fullRootId ? newRoot : root));
+          setHistory(current => current.map(snapshot => ({ ...snapshot, roots: snapshot.roots.map(root => root.logicalId === fullRootId ? newRoot : root) })));
+          setLoadedRootIds(current => [...current, fullRootId]);
+        }
+        if (original) setSourceRoots(current => current.map(root => root.logicalId === fullRootId ? original : root));
+      } else setOverviewRoots(loaded.roots);
+      setScope(view); setSelection(selected); remember(view, selected);
+    } catch (error) { setMessage(error instanceof Error ? error.message : 'Could not load view.'); }
+    finally { setLoading(false); }
+  }
+  function changeScope(view: string) {
+    const index = outline.kinds.findIndex(kind => kind.kindCode === view);
+    const article = outline.kinds.findIndex(kind => kind.kindCode === 'article');
+    if (view === 'constitution' || (article >= 0 && index < article)) void loadView(view);
+    else { setScope(view); remember(view, selection); }
+  }
+  useEffect(() => {
+    if (initialScope === 'constitution' || (initialScope && outline.kinds.findIndex(kind => kind.kindCode === initialScope) < outline.kinds.findIndex(kind => kind.kindCode === 'article'))) void loadView(initialScope);
+    // Only initial navigation; subsequent changes explicitly call loadView.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   function select(id: string) { setSelection(id); remember(scope, id); }
   function transaction(build: (emit: (operation: Omit<DraftOperation, 'id'>) => DraftOperation, current: () => DraftNode[]) => void) {
     let nextRoots = roots; let nextOperations = operations;
@@ -104,7 +144,7 @@ export function StructuredEditor({ preview, outline, rootId, versionId, articleI
     }
     const container = allNodes.find(node => node.content.some(item => item.node?.logicalId === parent.logicalId));
     const siblingPosition = container?.content.findIndex(item => item.node?.logicalId === parent.logicalId) ?? -1;
-    const nextSentence = container?.content[siblingPosition + 1]?.node;
+    const nextSentence = container ? container.content[siblingPosition + 1]?.node : roots[roots.findIndex(node => node.logicalId === parent.logicalId) + 1];
     const canMergeSentence = level.segmentation === 'sentence' && parent.content.length === 1 && nextSentence?.kind === parent.kind && nextSentence.content.length === 1 && nextSentence.content[0].type === 'text' && !nextSentence.label && !nextSentence.title;
     function mergeSentence() {
       if (!canMergeSentence || !nextSentence) return;
@@ -133,9 +173,10 @@ export function StructuredEditor({ preview, outline, rootId, versionId, articleI
   const articleIndex = outline.kinds.findIndex(kind => kind.kindCode === 'article');
   const broad = scope === 'constitution' || (articleIndex >= 0 && scopeIndex < articleIndex);
   const selectedUnit = findNode(roots, selection) ?? allNodes.find(node => node.content.some(entry => entry.logicalId === selection)) ?? root;
+  const navigationRoots = overviewRoots.length ? [...overviewRoots.filter(root => roots.some(current => current.logicalId === root.logicalId)).map(root => loadedRootIds.includes(root.logicalId) ? roots.find(current => current.logicalId === root.logicalId)! : root), ...roots.filter(root => !overviewRoots.some(item => item.logicalId === root.logicalId))] : roots;
   const focusedNodes = scopedNodes(roots, root?.logicalId ?? rootId, selection, scope);
   function reference(id: string, target: boolean) {
-    const sourceRoot = preview.sourceRoots.find(root => nodes([root]).some(node => node.logicalId === id || node.content.some(entry => entry.logicalId === id)));
+    const sourceRoot = sourceRoots.find(root => nodes([root]).some(node => node.logicalId === id || node.content.some(entry => entry.logicalId === id)));
     const targetRoot = roots.find(root => nodes([root]).some(node => node.logicalId === id || node.content.some(entry => entry.logicalId === id)));
     const sourceUnit = sourceRoot && (findNode([sourceRoot], id) ?? nodes([sourceRoot]).flatMap(node => node.content).find(entry => entry.logicalId === id));
     const version = target ? publishedVersionId : preview.sourceVersionId;
@@ -146,17 +187,17 @@ export function StructuredEditor({ preview, outline, rootId, versionId, articleI
   return <form action="/editor/command" method="post" id="draft-form">
     <input type="hidden" name="command" value="structured-save" /><input type="hidden" name="sessionId" value={preview.sessionId} /><input type="hidden" name="versionId" value={versionId} /><input type="hidden" name="articleId" value={articleId} />
     <input type="hidden" name="scope" value={scope} /><input type="hidden" name="selectedNode" value={selection} /><input type="hidden" name="structuredDraft" value={JSON.stringify({ expectedGeneration: preview.generation, operations })} />
-    <div className="action-bar"><label>Editor view<select value={scope} onChange={event => { setScope(event.target.value); remember(event.target.value, selection); }}><option value="constitution">Constitution</option>{outline.kinds.map(kind => <option key={kind.kindCode} value={kind.kindCode}>{kind.displayLabel}</option>)}</select></label><a href={`/admin/constitutions/${constitutionId}`}>Constitution structure settings</a></div>
-    <p role="status">{message || (preview.operations.length ? 'Saved draft' : 'Source snapshot')}</p>
+    <div className="action-bar"><label>Editor view<select value={scope} disabled={loading} onChange={event => changeScope(event.target.value)}><option value="constitution">Constitution</option>{outline.kinds.map(kind => <option key={kind.kindCode} value={kind.kindCode}>{kind.displayLabel}</option>)}</select></label><a href={`/admin/constitutions/${constitutionId}`}>Constitution structure settings</a></div>
+    <p role="status">{loading ? 'Loading editor view…' : message || (preview.operations.length ? 'Saved draft' : 'Source snapshot')}</p>
     {errors.length ? <div role="alert"><p>Resolve these issues before saving or review:</p><ul>{errors.map(error => <li key={error}>{error}</li>)}</ul></div> : null}
     <aside aria-label="Selection inspector"><p>Selected: {selectedUnit?.kind} {selectedUnit?.label} {selection !== selectedUnit?.logicalId ? '· Unnumbered parent text' : ''}</p></aside>
-    {broad ? <ul>{allNodes.filter(node => scope === 'constitution' ? roots.some(root => root.logicalId === node.logicalId) : node.kind === scope).map(node => <li key={node.logicalId}><button type="button" onClick={() => { select(node.logicalId); const nextScope = outline.kinds[Math.min(outline.kinds.findIndex(kind => kind.kindCode === node.kind) + 1, outline.kinds.length - 1)].kindCode; setScope(nextScope); remember(nextScope, node.logicalId); }}>{node.kind} {node.label} {node.title}</button></li>)}</ul> : focusedNodes.length ? focusedNodes.map(node => renderNode(node)) : <p>No {outline.kinds[scopeIndex]?.displayLabel} units in this selection. Add a child in the broader view.</p>}
+    {broad ? <ul>{nodes(navigationRoots).filter(node => scope === 'constitution' ? roots.some(root => root.logicalId === node.logicalId) : node.kind === scope).map(node => <li key={node.logicalId}><button type="button" disabled={loading} onClick={() => { const nextScope = outline.kinds[Math.min(outline.kinds.findIndex(kind => kind.kindCode === node.kind) + 1, outline.kinds.length - 1)].kindCode; const selectedRoot = navigationRoots.find(root => nodes([root]).some(child => child.logicalId === node.logicalId)); if (selectedRoot && !loadedRootIds.includes(selectedRoot.logicalId) && sourceRoots.some(root => root.logicalId === selectedRoot.logicalId)) void loadView(nextScope, node.logicalId, selectedRoot.logicalId); else { select(node.logicalId); setScope(nextScope); remember(nextScope, node.logicalId); } }}>{node.kind} {node.label} {node.title}</button></li>)}</ul> : focusedNodes.length ? focusedNodes.map(node => renderNode(node)) : <p>No {outline.kinds[scopeIndex]?.displayLabel} units in this selection. Add a child in the broader view.</p>}
     {editable && root ? <div className="action-bar" aria-label="Top-level unit actions">
       <button type="button" onClick={() => change({ type: 'insert_root', targetId: root.logicalId, expectedRevisionId: token(root), position: roots.indexOf(root) + 1, node: createNode(0) })}>Add top-level unit</button>
       <button type="button" disabled={roots.indexOf(root) === 0} onClick={() => change({ type: 'move_root', targetId: root.logicalId, expectedRevisionId: token(root), position: roots.indexOf(root) - 1 })}>Move top-level unit earlier</button>
       <button type="button" disabled={roots.length < 2} onClick={() => change({ type: 'remove', targetId: root.logicalId, expectedRevisionId: token(root) })}>Remove top-level unit</button>
     </div> : null}
-    {editable ? <div className="action-bar"><Button variant="primary" disabled={!operations.length || errors.length > 0}>Save draft</Button><button type="button" disabled={!history.length} onClick={undo}>Undo</button></div> : null}
-    <details open={!editable}><summary>Entry-level review ({differences.length} changes)</summary>{differences.length ? <ol>{differences.map((difference, index) => <li key={index}><strong>{difference.field}</strong><div><del>{difference.before}</del> → <ins>{difference.after}</ins></div><div>{reference(difference.logicalId, false) ? <a href={reference(difference.logicalId, false)}>Source snapshot</a> : null} {reference(difference.logicalId, true) ? <a href={reference(difference.logicalId, true)}>Published successor</a> : null}</div><details><summary>Revision details</summary><small>Unit: {difference.logicalId} · Source revision: {difference.sourceRevisionId ?? 'new'} · Target: {difference.targetRevisionId ?? 'removed'}</small></details></li>)}</ol> : <p>No changes.</p>}</details>
+    {editable ? <div className="action-bar"><Button variant="primary" disabled={loading || !operations.length || errors.length > 0}>Save draft</Button><button type="button" disabled={!history.length} onClick={undo}>Undo</button></div> : null}
+    <details open={!editable}><summary>Entry-level review ({differences.length} changes)</summary>{differences.length ? <ol>{differences.map((difference, index) => <li key={index}><strong>{difference.field}</strong><div><del>{difference.before}</del> → <ins>{difference.after}</ins></div><div>{(difference.sourceLink ?? reference(difference.logicalId, false)) ? <a href={difference.sourceLink ?? reference(difference.logicalId, false)}>Source snapshot</a> : null} {(difference.targetLink ?? reference(difference.logicalId, true)) ? <a href={difference.targetLink ?? reference(difference.logicalId, true)}>Published successor</a> : null}</div><details><summary>Revision details</summary><small>Unit: {difference.logicalId} · Source revision: {difference.sourceRevisionId ?? 'new'} · Target: {difference.targetRevisionId ?? 'removed'}</small></details></li>)}</ol> : <p>No changes.</p>}</details>
   </form>;
 }

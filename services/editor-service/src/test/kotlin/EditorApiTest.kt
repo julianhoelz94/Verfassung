@@ -171,6 +171,25 @@ class EditorApiTest {
     }
 
     @Test
+    fun legacyBodySaveCannotDiscardStructuredChildren() {
+        val version = UUID.randomUUID()
+        val article = UUID.randomUUID()
+        val child = com.constitutionatlas.editor.client.ContentTreeNode(UUID.randomUUID(), "sentence", body = "Original text.")
+        Mockito.`when`(contentClient.listArticles(version)).thenReturn(listOf(ContentTreeArticle(article, version, "46a", "Rights", 1, "Original text.", listOf(child))))
+        val session = openSession(version)
+        mockMvc.post("/edit-sessions/$session/saves") {
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"articleId":"$article","title":"Rights","body":"Flattened replacement."}"""
+        }.andExpect {
+            status { isConflict() }
+            jsonPath("$.code") { value("structured_draft_required") }
+        }
+        assertEquals(0, jdbcTemplate.queryForObject("SELECT COUNT(*) FROM draft_changes WHERE session_id = ?::uuid", Int::class.java, session))
+        saveDraft(session, article, "Edited title", "Original text.")
+    }
+
+    @Test
     fun roleMatrixRejectsCommandsTheActorCannotPerform() {
         val versionId = UUID.randomUUID()
         stub(reviewer)

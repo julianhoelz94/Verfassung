@@ -77,8 +77,10 @@ test('administrator creates a constitution and changes its outline settings', as
   await page.getByLabel('Slug').fill('test-constitution');
   await page.getByLabel('Title', { exact: true }).fill('Test Constitution');
   await page.getByRole('button', { name: 'Add deeper layer' }).click();
+  await expect(page.getByRole('textbox', { name: 'Kind code' }).last()).toHaveValue('sentence');
   await page.getByRole('textbox', { name: 'Label' }).nth(1).fill('Clause');
   await page.getByRole('button', { name: 'Create' }).click();
+  await expect(page).toHaveURL(/\/admin\/constitutions\/[^/?]+$/, { timeout: 30000 });
   await expect(page.getByRole('heading', { name: 'Test Constitution' })).toBeVisible();
   await expect(page.getByRole('textbox', { name: 'Label' }).nth(1)).toHaveValue('Clause');
   await page.getByLabel('How this layer is shown').nth(1).selectOption('concatenated');

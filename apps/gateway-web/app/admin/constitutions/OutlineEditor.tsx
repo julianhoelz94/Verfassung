@@ -66,9 +66,8 @@ export function OutlineEditor({
 
   function addLayer() {
     setImpact(null);
-    setLayers((current) => [
-      ...current.map((layer) => ({ ...layer, segmentation: 'plain' as const })),
-      {
+    setLayers((current) => {
+      const added: Layer = {
         kindCode: `layer-${current.length + 1}`,
         displayLabel: 'New layer',
         presentation: 'section',
@@ -76,8 +75,12 @@ export function OutlineEditor({
         showTitle: true,
         showKind: false,
         existing: false,
-      },
-    ]);
+      };
+      const leaf = current[current.length - 1];
+      // Sentence units stay terminal; add a structural level above them.
+      if (leaf?.kindCode === 'sentence') return [...current.slice(0, -1), added, leaf];
+      return [...current.map((layer) => ({ ...layer, segmentation: 'plain' as const })), added];
+    });
   }
 
   function removeLayer(index: number) {
@@ -237,6 +240,7 @@ export function OutlineEditor({
         <Button type="button" onClick={addLayer}>
           Add deeper layer
         </Button>
+        {layers[layers.length - 1]?.kindCode === 'sentence' ? <p className="muted">New levels are added before the final sentence level.</p> : null}
         {constitutionId ? <Button type="button" onClick={checkImpact} disabled={checking}>{checking ? 'Checking impact…' : 'Preview change impact'}</Button> : null}
         <Button variant="primary" disabled={Boolean(constitutionId) && (!impact || impact.classification === 'migration_required' || impact.currentRevisionId !== settingsRevisionId)}>{submitLabel}</Button>
       </div>

@@ -46,10 +46,16 @@ test('editor, reviewer, and publisher carry a real transcription correction to t
   expect(sourceCountryIso).toBeTruthy();
   await page.getByRole('button', { name: 'Correct this text' }).click();
   await expect(page).toHaveURL(/sessionId=/);
+  const sourceArticles = await (await request.get(`/api/content/versions/${sourceVersionId}/articles?includeBody=true`)).json();
+  const plainArticle = sourceArticles.find((article: { children?: unknown[] }) => !article.children?.length);
+  expect(plainArticle).toBeTruthy();
+  const sessionPage = new URL(page.url());
+  sessionPage.searchParams.set('articleId', plainArticle.id);
+  await page.goto(sessionPage.toString());
   await page.getByLabel('Article text').fill('Dignity and civic equality protect every person. Verified transcription.');
   await page.getByRole('button', { name: 'Save draft' }).click();
   await expect(page.getByText('Draft saved.')).toBeVisible();
-  await page.getByLabel('What was corrected in this transcription?').fill('Verified Article 1 transcription.');
+  await page.getByLabel('What was corrected in this transcription?').fill(`Verified Article ${plainArticle.articleNumber} transcription.`);
   await page.getByRole('button', { name: 'Save comment' }).click();
   await page.getByRole('button', { name: 'Submit for review' }).click();
   await expect(page.getByText('Submitted for review.')).toBeVisible();
@@ -71,8 +77,10 @@ test('editor, reviewer, and publisher carry a real transcription correction to t
   expect(newVersionId).toBeTruthy();
   await signOut(page);
   const publishedArticles = await (await request.get(`/api/content/versions/${newVersionId}/articles?includeBody=true`)).json();
-  expect(publishedArticles[0].body).toContain('Verified transcription.');
-  await page.goto(`/countries/${sourceCountryIso}/versions/${newVersionId}/articles/${publishedArticles[0].id}`);
+  const corrected = publishedArticles.find((article: { articleNumber: string }) => article.articleNumber === plainArticle.articleNumber);
+  expect(corrected.body).toContain('Verified transcription.');
+  expect(publishedArticles.find((article: { articleNumber: string }) => article.articleNumber === sourceArticles[0].articleNumber).children.length).toBe(sourceArticles[0].children.length);
+  await page.goto(`/countries/${sourceCountryIso}/versions/${newVersionId}/articles/${corrected.id}`);
   await expect(page.getByText('Dignity and civic equality protect every person. Verified transcription.').first()).toBeVisible();
 });
 

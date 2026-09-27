@@ -109,11 +109,14 @@ test('administrator creates a constitution and updates its outline presentation'
   await page.getByRole('button', { name: 'Add deeper layer' }).click();
   await page.getByRole('textbox', { name: 'Label' }).nth(1).fill('Clause');
   await page.getByRole('button', { name: 'Create' }).click();
+  await expect(page).toHaveURL(/\/admin\/constitutions\/[^/?]+$/, { timeout: 30000 });
   await expect(page.getByRole('heading', { name: title })).toBeVisible();
   await expect(page.getByRole('textbox', { name: 'Label' }).nth(1)).toHaveValue('Clause');
   await page.getByLabel('How this layer is shown').nth(1).selectOption('concatenated');
+  await page.getByRole('button', { name: 'Preview change impact' }).click();
+  await expect(page.getByRole('heading', { name: 'Safe to save' })).toBeVisible();
   await page.getByRole('button', { name: 'Save outline' }).click();
-  await expect(page.getByText('Outline saved.')).toBeVisible();
+  await expect(page.getByText('Settings saved. Historical versions retain their structural settings.')).toBeVisible();
   await page.reload();
   await expect(page.getByLabel('How this layer is shown').nth(1)).toHaveValue('concatenated');
 });

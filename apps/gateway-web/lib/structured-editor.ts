@@ -120,5 +120,5 @@ export function draftDifferences(source: DraftNode[], target: DraftNode[]): Draf
 
 /** Draft preview IDs are local anchors; historical public IDs remain version scoped. */
 export function readerNode(node: DraftNode): import('./api').OrderedNode {
-  return { ...node, label: node.label ?? null, title: node.title ?? null, revisionId: token(node), occurrenceId: `draft-${node.logicalId}`, content: node.content.map(entry => entry.node ? { type: 'child', node: readerNode(entry.node) } : { ...entry, occurrenceId: `draft-${entry.logicalId}` }) };
+  return { ...node, label: node.label ?? null, title: node.title ?? null, revisionId: token(node), occurrenceId: `draft-${node.logicalId}`, content: node.content.map(entry => entry.node ? { type: 'child', node: readerNode(entry.node) } : { type: 'text', logicalId: entry.logicalId, revisionId: token(entry), text: entry.text, occurrenceId: `draft-${entry.logicalId}` }) };
 }

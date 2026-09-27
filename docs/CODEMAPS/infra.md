@@ -49,6 +49,8 @@ Shared: `gradle/service-conventions.gradle`. New service: copy sibling (`.agents
 3. Playwright e2e (mock API)
 4. Image builds (host bootJar + `docker build`)
 5. `publish-journey`: Compose identity+catalog+content+editor (CI-6) and `scripts/publish_journey.py`
+6. `full-stack-service-artifacts` builds the service jars; `full-stack-e2e` downloads them, starts Compose, uploads API fixtures, and runs real browser journeys
+7. `ci-status` requires every job to succeed; failed jobs upload short-lived diagnostics where available
 
 Dependabot: `.github/dependabot.yml`.
 

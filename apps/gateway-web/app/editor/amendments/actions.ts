@@ -1,6 +1,7 @@
 'use server';
 
 import { redirect } from 'next/navigation';
+import { revalidatePath } from 'next/cache';
 import {
   AmendmentApiError,
   amendmentErrorMessage,
@@ -94,6 +95,8 @@ async function runDetailCommand(
     }
     throw error;
   }
+  // Refresh the current detail before a query-only redirect after a mutation.
+  revalidatePath(amendmentDetailPath(amendmentId));
   redirectDetail(amendmentId, success);
 }
 
@@ -107,6 +110,7 @@ export async function saveAmendmentAction(formData: FormData): Promise<void> {
         redirect(amendmentListPath({ error: 'invalid' }));
       }
       const created = await createAmendment(constitutionId, body);
+      revalidatePath(amendmentDetailPath(created.id));
       redirectDetail(created.id, { saved: '1' });
     }
     await runDetailCommand(formData, amendmentId, () => appendRevision(amendmentId, body), { saved: '1' });

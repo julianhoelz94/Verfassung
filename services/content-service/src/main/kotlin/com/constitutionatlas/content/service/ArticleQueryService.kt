@@ -55,13 +55,14 @@ class ArticleQueryService(
 
     fun listUnits(version: UUID, offset: Int, limit: Int, includeBody: Boolean): Pair<List<ArticleSummary>, Int> {
         val roots = ordered.get(version).roots
+        val legacyIdentity = !orderedRepository.canonical(version)
         return roots.drop(offset).take(limit).mapIndexed { index, root ->
             ArticleSummary(
                 root.occurrenceId, version, root.label.orEmpty(), root.title.orEmpty(), offset + index + 1,
                 body = if (includeBody) ordered.plainText(root) else null,
                 children = if (includeBody) root.content.mapNotNull { it.node?.let(::compatibilityNode) } else null,
                 predecessorId = orderedRepository.occurrencePredecessor(root.occurrenceId),
-                content = if (includeBody) root.content else null, logicalId = root.logicalId, revisionId = root.revisionId, kind = root.kind, legacyIdentity = !orderedRepository.canonical(version),
+                content = if (includeBody) root.content else null, logicalId = root.logicalId, revisionId = root.revisionId, kind = root.kind, legacyIdentity = legacyIdentity,
             )
         } to roots.size
     }

@@ -202,6 +202,19 @@ class CatalogApiTest {
             contentType = MediaType.APPLICATION_JSON
             content = request
         }.andExpect { status { isConflict() } }
+        val current = objectMapper.readTree(mockMvc.get("/constitutions/$constitutionId/settings").andReturn().response.contentAsString).get("id").asText()
+        val restored = mockMvc.post("/constitutions/$constitutionId/settings/$revisionId/restore") {
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"expectedRevisionId":"$current"}"""
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.predecessorId") { value(current) }
+            jsonPath("$.outline.kinds[0].displayLabel") { value("Article") }
+        }.andReturn()
+        assertThat(objectMapper.readTree(restored.response.contentAsString).get("id").asText()).isNotEqualTo(revisionId)
+        mockMvc.get("/versions/$versionId/reader-settings").andExpect { jsonPath("$.kinds[0].displayLabel") { value("Article") } }
+        mockMvc.get("/versions/$versionId/settings").andExpect { jsonPath("$.id") { value(revisionId) } }
     }
 
     @Test

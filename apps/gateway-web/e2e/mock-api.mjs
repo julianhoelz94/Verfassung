@@ -342,7 +342,7 @@ const server = createServer(async (req, res) => {
     if (method === 'GET') { json(res, 200, current); return; }
     const body = await readBody(req);
     if (settingsMatch[2]) {
-      json(res, 200, { currentRevisionId: current.id, classification: 'safe', affectedVersionIds: (constitution.versions ?? []).map((version) => version.id), affectedDraftSessionIds: [], violations: [], reasons: [] });
+      json(res, 200, { currentRevisionId: current.id, classification: 'safely_reversible', affectedVersionIds: (constitution.versions ?? []).map((version) => version.id), affectedDraftSessionIds: [], violations: [], reasons: [] });
       return;
     }
     if (body.expectedRevisionId !== current.id) { json(res, 409, { error: 'stale_settings' }); return; }

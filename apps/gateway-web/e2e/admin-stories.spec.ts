@@ -120,7 +120,6 @@ test('outline mixed-content preview follows permissions on desktop and mobile', 
   await expect(preview.getByText('The following rights are protected.', { exact: true })).toHaveCount(2);
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(preview).toBeVisible();
-  await page.screenshot({ path: testInfo.outputPath('outline-mobile.png'), fullPage: true });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBeTruthy();
   await page.screenshot({ path: testInfo.outputPath('outline-mobile.png'), fullPage: true });
 });

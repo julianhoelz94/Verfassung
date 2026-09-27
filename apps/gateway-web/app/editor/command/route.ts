@@ -5,6 +5,7 @@ import {
   openSession,
   publishSession,
   saveDraft,
+  saveStructuredDraft,
   savePublishDetails,
   submitReview,
 } from '../../../lib/editor-api';
@@ -15,7 +16,7 @@ function value(form: FormData, key: string): string {
 
 function editorPath(form: FormData, extra: Record<string, string> = {}): string {
   const params = new URLSearchParams();
-  for (const key of ['versionId', 'sessionId', 'articleId']) {
+  for (const key of ['versionId', 'sessionId', 'articleId', 'scope', 'selectedNode']) {
     const entry = value(form, key);
     if (entry) params.set(key, entry);
   }
@@ -64,6 +65,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     if (command === 'load') {
       if (!sessionId) return redirectTo(request, '/editor?error=session_id');
       return redirectTo(request, editorPath(form));
+    }
+    if (command === 'structured-save') {
+      let payload;
+      try { payload = JSON.parse(String(form.get('structuredDraft') ?? '')); } catch { return redirectTo(request, editorPath(form, { error: 'invalid' })); }
+      if (!payload || !Number.isSafeInteger(payload.expectedGeneration) || !Array.isArray(payload.operations)) return redirectTo(request, editorPath(form, { error: 'invalid' }));
+      await saveStructuredDraft(sessionId, payload);
+      return redirectTo(request, editorPath(form, { saved: '1' }));
     }
     if (command === 'save') {
       await saveDraft(sessionId, value(form, 'articleId'), value(form, 'title'), value(form, 'body'));

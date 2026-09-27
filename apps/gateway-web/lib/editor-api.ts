@@ -238,3 +238,15 @@ export async function publishSession(
   await throwIfNotOk(response, 'publish_failed');
   return (await response.json()) as DraftPreview;
 }
+
+export async function getStructuredDraft(sessionId: string): Promise<import('./structured-editor').StructuredPreview | null> {
+  const response = await editorFetch(`/edit-sessions/${encodeURIComponent(sessionId)}/structured-draft`);
+  if (response.status === 404) return null;
+  await throwIfNotOk(response, 'save_failed');
+  return response.json();
+}
+export async function saveStructuredDraft(sessionId: string, request: { expectedGeneration: number; operations: import('./structured-editor').DraftOperation[] }): Promise<import('./structured-editor').StructuredPreview> {
+  const response = await editorFetch(`/edit-sessions/${encodeURIComponent(sessionId)}/structured-saves`, { method: 'POST', body: JSON.stringify(request) });
+  await throwIfNotOk(response, 'save_failed');
+  return response.json();
+}

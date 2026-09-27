@@ -56,4 +56,5 @@ data class StructuredDraftPreview(
     val sourceRootRevisionIds: List<UUID>,
     val operations: List<DraftOperation>,
     val roots: List<DraftNode>,
+    val sourceRoots: List<DraftNode> = emptyList(),
 )

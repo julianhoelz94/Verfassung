@@ -614,3 +614,7 @@ export function restoreSettings(id: string, revisionId: string, expectedRevision
 
 export type OrderedNode = { logicalId: string; revisionId: string; occurrenceId: string; kind: string; label: string | null; title: string | null; content: OrderedEntry[] };
 export type OrderedEntry = { type: 'text' | 'child'; node?: OrderedNode | null; logicalId?: string | null; revisionId?: string | null; occurrenceId?: string | null; text?: string | null };
+
+export function getVersionSettings(versionId: string): Promise<SettingsRevision | null> {
+  return readJson<SettingsRevision>(`${catalogBaseUrl()}/versions/${encodeURIComponent(versionId)}/settings`, 'catalog');
+}

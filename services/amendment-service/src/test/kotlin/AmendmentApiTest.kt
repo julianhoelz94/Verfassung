@@ -71,6 +71,24 @@ class AmendmentApiTest {
     }
 
     @Test
+    fun publishAttemptRetriesReturnSameChangeRecordAndRejectPayloadChanges() {
+        val attempt = UUID.randomUUID()
+        fun request(title: String): String = objectMapper.readTree(createAmendmentJson(title)).also { (it as com.fasterxml.jackson.databind.node.ObjectNode).put("publishAttemptId", attempt.toString()) }.toString()
+        fun create(title: String) = mockMvc.post("/constitutions/$CONSTITUTION_ID/amendments") {
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = request(title)
+        }
+        val first = create("Reserved publication").andExpect { status { isCreated() } }.andReturn()
+        val retried = create("Reserved publication").andExpect { status { isCreated() } }.andReturn()
+        val original = objectMapper.readTree(first.response.contentAsString)
+        val repeated = objectMapper.readTree(retried.response.contentAsString)
+        org.junit.jupiter.api.Assertions.assertEquals(original.get("id"), repeated.get("id"))
+        org.junit.jupiter.api.Assertions.assertEquals(original.get("revisionId"), repeated.get("revisionId"))
+        create("Changed publication").andExpect { status { isConflict() } }
+    }
+
+    @Test
     fun listAmendmentsFor2022Version() {
         mockMvc.get("/versions/01900000-0000-4000-8000-000000000004/amendments")
             .andExpect {

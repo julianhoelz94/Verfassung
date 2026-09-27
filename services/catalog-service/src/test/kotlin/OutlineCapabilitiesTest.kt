@@ -6,6 +6,14 @@ import org.junit.jupiter.api.Test
 
 class OutlineCapabilitiesTest {
     @Test
+    fun superscriptLabelsAreLeafDisplayAndDoNotRevokeTitlePermission() {
+        val outline = CatalogWriteService.normalizeOutline(listOf(OutlineKindWrite("clause", "Clause", titlePolicy = "optional", showTitle = false, labelPlacement = "superscript")))
+        assertEquals("optional", outline.single().titlePolicy)
+        assertEquals("superscript", outline.single().labelPlacement)
+        assertThrows(IllegalArgumentException::class.java) { CatalogWriteService.normalizeOutline(listOf(OutlineKindWrite("part", "Part", labelPlacement = "superscript"), OutlineKindWrite("clause", "Clause"))) }
+    }
+
+    @Test
     fun parentTextAndLiteralLabelPoliciesAreExplicit() {
         val outline = CatalogWriteService.normalizeOutline(
             listOf(

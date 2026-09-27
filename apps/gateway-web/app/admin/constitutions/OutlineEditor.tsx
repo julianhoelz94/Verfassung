@@ -170,7 +170,7 @@ export function OutlineEditor({
               <option value="section">Block with optional heading</option>
               <option value="concatenated">Running text (no title, joined with siblings)</option>
             </Select>
-            {layer.presentation === 'section' ? (
+            {(
               <>
                 <label className="field">
                   <span className="field-label">
@@ -205,11 +205,9 @@ export function OutlineEditor({
                   </span>
                 </label>
               </>
-            ) : (
-              <p className="muted">Sibling nodes of this kind are concatenated in the public text.</p>
             )}
               <Select label="Label placement" name={`label-placement-${index}`} value={layer.labelPlacement ?? 'before_title'} onChange={(event) => update(index, { labelPlacement: event.target.value as Layer['labelPlacement'] })}>
-                <option value="before_title">Before title</option><option value="after_title">After title</option><option value="inline">Inline with text</option>
+                <option value="before_title">Before title</option><option value="after_title">After title</option><option value="inline">Inline with text</option>{index === layers.length - 1 ? <option value="superscript">Superscript in text</option> : null}
               </Select>
             </fieldset>
             {index > 0 ? (

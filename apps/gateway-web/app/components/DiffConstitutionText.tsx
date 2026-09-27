@@ -1,8 +1,9 @@
-import type { ArticleSummary, ContentNode, ContentOutline } from '../../lib/api';
+import type { ArticleSummary, ContentNode, ContentOutline, OrderedEntry, OrderedNode } from '../../lib/api';
 import { articleHeading, asOutlinePresentation, concatenatedText, kindByCode, nodeHeading } from '../../lib/outline';
+import { OrderedContentTree } from './ConstitutionText';
 import { alignNodes, diffText, segsForSide, type DiffSeg } from '../../lib/text-diff';
 
-type ArticleLike = Pick<ArticleSummary, 'articleNumber' | 'title' | 'body' | 'children'>;
+type ArticleLike = Pick<ArticleSummary, 'articleNumber' | 'title' | 'body' | 'children' | 'content' | 'kind'>;
 
 type DiffConstitutionTextProps = {
   left?: ArticleLike;
@@ -11,6 +12,7 @@ type DiffConstitutionTextProps = {
   headingLevel?: 'h1' | 'h2' | 'h3';
   showHeading?: boolean;
   outline?: ContentOutline;
+  oppositeOutline?: ContentOutline;
   lang?: string;
 };
 
@@ -21,30 +23,58 @@ export function DiffConstitutionText({
   headingLevel = 'h3',
   showHeading = true,
   outline,
+  oppositeOutline,
   lang,
 }: DiffConstitutionTextProps) {
   const Heading = headingLevel;
   const article = side === 'from' ? left : right;
+  const rootKind = kindByCode(outline, article?.kind ?? outline?.kinds[0]?.kindCode ?? 'article');
+  const other = side === 'from' ? right : left;
+  const rootLabel = article ? segsForSide(diffText(left?.articleNumber ?? '', right?.articleNumber ?? ''), side).map((seg, index) => <DiffMark key={index} seg={seg} />) : null;
+  const heading = article ? articleHeading(outline, article) : '';
+  const oppositeHeading = other ? articleHeading(oppositeOutline ?? outline, other) : '';
+  const rootHeading = segsForSide(side === 'from' ? diffText(heading, oppositeHeading) : diffText(oppositeHeading, heading), side);
   const leftChildren = left?.children ?? [];
   const rightChildren = right?.children ?? [];
   const hasTree = leftChildren.length > 0 || rightChildren.length > 0;
   return (
     <div className="constitution-text text-column" lang={lang}>
-      {showHeading && article ? (
-        <Heading id={`article-${side}-${article.articleNumber}`}>
-          {articleHeading(outline, {
-            articleNumber: article.articleNumber,
-            title: article.title,
-          })}
-        </Heading>
-      ) : null}
-      {hasTree ? (
+      {showHeading && heading ? <Heading>{rootHeading.map((seg, index) => <DiffMark key={index} seg={seg} />)}</Heading> : null}
+      {article && rootKind?.showLabel && rootKind.labelPlacement === 'inline' ? <span className="num">{rootLabel}</span> : null}
+      {article && rootKind?.showLabel && rootKind.labelPlacement === 'superscript' ? <sup className="num">{rootLabel}</sup> : null}
+      {left?.content != null || right?.content != null ? (
+        <OrderedDiff entries={article?.content ?? []} opposite={(side === 'from' ? right : left)?.content ?? []} side={side} outline={outline} oppositeOutline={oppositeOutline ?? outline} />
+      ) : hasTree ? (
         <DiffNodeTree left={leftChildren} right={rightChildren} side={side} outline={outline} />
       ) : (
         <DiffBody left={left?.body ?? ''} right={right?.body ?? ''} side={side} />
       )}
     </div>
   );
+}
+
+function OrderedDiff({ entries, opposite, side, outline, oppositeOutline }: { entries: OrderedEntry[]; opposite: OrderedEntry[]; side: 'from' | 'to'; outline?: ContentOutline; oppositeOutline?: ContentOutline }) {
+  const texts = new Map<string, OrderedEntry>();
+  const nodes = new Map<string, OrderedNode>();
+  function collect(content: OrderedEntry[]) {
+    for (const entry of content) {
+      if (entry.node) { nodes.set(entry.node.logicalId, entry.node); collect(entry.node.content); }
+      else if (entry.logicalId) texts.set(entry.logicalId, entry);
+    }
+  }
+  collect(opposite);
+  function marks(value: string, other: string) {
+    const segments = segsForSide(side === 'from' ? diffText(value, other) : diffText(other, value), side);
+    return segments.map((segment, index) => <DiffMark key={index} seg={segment} />);
+  }
+  return <OrderedContentTree entries={entries} outline={outline} idPrefix={`diff-${side}-`}
+    renderText={(entry) => marks(entry.text ?? '', entry.logicalId ? texts.get(entry.logicalId)?.text ?? '' : '')}
+    renderHeading={(node, heading) => {
+      const other = nodes.get(node.logicalId);
+      return marks(heading, other ? nodeHeading(kindByCode(oppositeOutline, other.kind), { kind: other.kind, label: other.label, number: other.label, title: other.title }) ?? '' : '');
+    }}
+    renderLabel={(node, label) => marks(label, nodes.get(node.logicalId)?.label ?? '')}
+  />;
 }
 
 function DiffNodeTree({

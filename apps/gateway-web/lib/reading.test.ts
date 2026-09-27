@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ConstitutionSummary, VersionSummary } from './api';
-import { chainTipId, latestVersion, newestChanges, previousVersion, publicVersions } from './reading';
+import { chainTipId, publicSnapshotContext, latestVersion, newestChanges, previousVersion, publicVersions } from './reading';
 
 function version(partial: Partial<VersionSummary> & Pick<VersionSummary, 'id' | 'versionLabel'>): VersionSummary {
   return {
@@ -118,5 +118,18 @@ describe('newestChanges', () => {
     );
     expect(rows).toHaveLength(1);
     expect(rows[0]?.articleNumber).toBe('2');
+  });
+});
+
+
+describe('historical editorial snapshot context', () => {
+  it('accepts a published former editorial tip through its legal identity', () => {
+    const legal = version({ id: 'legal', versionLabel: '1949', currentVersionId: 'new-tip' });
+    const constitution = { id: 'constitution', slug: 'gg', title: 'GG', versions: [legal] };
+    const country = { isoCode: 'DE', name: 'Germany', constitutions: [constitution] };
+    const snapshot = { id: 'old-tip', constitutionId: 'constitution', legalVersionId: 'legal', versionLabel: 'old correction', effectiveDate: null, languageCode: 'de', publicationStatus: 'published' };
+    expect(publicSnapshotContext(country, snapshot)?.version).toBe(legal);
+    expect(publicSnapshotContext(country, { ...snapshot, publicationStatus: 'draft' })).toBeUndefined();
+    expect(publicSnapshotContext(country, { ...snapshot, constitutionId: 'foreign' })).toBeUndefined();
   });
 });

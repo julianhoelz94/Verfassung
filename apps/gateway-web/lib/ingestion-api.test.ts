@@ -16,6 +16,11 @@ describe('isImportRequest', () => {
     expect(isImportRequest(parseImportJson(JSON.stringify(valid)))).toBe(true);
   });
 
+  it('accepts ordered roots and rejects ambiguous formats', () => {
+    expect(isImportRequest({ ...valid, articles: [], roots: [{ kind: 'part', content: [] }] })).toBe(true);
+    expect(isImportRequest({ ...valid, roots: [{ kind: 'part', content: [] }] })).toBe(false);
+  });
+
   it('rejects missing articles or blank required strings', () => {
     expect(isImportRequest({ ...valid, articles: [] })).toBe(false);
     expect(isImportRequest({ ...valid, isoCode: ' ' })).toBe(false);

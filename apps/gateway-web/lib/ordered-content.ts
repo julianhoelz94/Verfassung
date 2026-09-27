@@ -1,13 +1,16 @@
 import type { OrderedEntry } from './api';
 
-/** Preserve stored bytes; insert a space only where neither boundary supplies whitespace. */
+/** Adjacent text concatenates exactly; child boundaries supply only missing whitespace. */
 export function orderedText(entries: OrderedEntry[]): string {
-  return entries.map((entry) => {
-    if (entry.type === 'text' && entry.text != null) return entry.text;
-    if (entry.type === 'child' && entry.node) return orderedText(entry.node.content);
-    throw new Error('Invalid ordered content entry');
-  }).reduce((text, part) => {
-    if (!part) return text;
-    return text + (text && !/\s$/u.test(text) && !/^\s/u.test(part) ? ' ' : '') + part;
-  }, '');
+  let text = '';
+  let previousChild = false;
+  for (const entry of entries) {
+    const child = entry.type === 'child';
+    const part = entry.type === 'text' && entry.text != null ? entry.text : child && entry.node ? orderedText(entry.node.content) : null;
+    if (part == null) throw new Error('Invalid ordered content entry');
+    if (!part) continue;
+    text += (text && (child || previousChild) && !/\s$/u.test(text) && !/^\s/u.test(part) ? ' ' : '') + part;
+    previousChild = child;
+  }
+  return text;
 }

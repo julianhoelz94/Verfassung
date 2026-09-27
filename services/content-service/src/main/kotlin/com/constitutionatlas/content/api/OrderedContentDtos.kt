@@ -8,32 +8,9 @@ typealias OrderedNode = com.constitutionatlas.platform.OrderedNode
 typealias OrderedEntry = com.constitutionatlas.platform.OrderedEntry
 typealias OrderedSnapshot = com.constitutionatlas.platform.OrderedSnapshot
 
-data class OrderedNodeWrite(
-    val revisionId: UUID? = null,
-    val logicalId: UUID? = null,
-    val predecessorRevisionId: UUID? = null,
-    val kind: String? = null,
-    val label: String? = null,
-    val title: String? = null,
-    val content: List<OrderedEntryWrite>? = null,
-) : StrictContentWrite()
-
-data class OrderedEntryWrite(
-    val type: String,
-    val node: OrderedNodeWrite? = null,
-    val revisionId: UUID? = null,
-    val logicalId: UUID? = null,
-    val predecessorRevisionId: UUID? = null,
-    val text: String? = null,
-    val lineage: List<UUID> = emptyList(),
-) : StrictContentWrite()
-
-data class OrderedSnapshotWrite(
-    val expectedGeneration: Long,
-    val sourceVersionId: UUID? = null,
-    val sourceGeneration: Long? = null,
-    val roots: List<OrderedNodeWrite>,
-) : StrictContentWrite()
+typealias OrderedNodeWrite = com.constitutionatlas.platform.OrderedNodeWrite
+typealias OrderedEntryWrite = com.constitutionatlas.platform.OrderedEntryWrite
+typealias OrderedSnapshotWrite = com.constitutionatlas.platform.OrderedSnapshotWrite
 
 data class ResolvedContent(
     val versionId: UUID,
@@ -51,3 +28,5 @@ open class StrictContentWrite {
     @JsonAnySetter
     fun rejectUnknown(name: String, value: JsonNode): Unit = throw IllegalArgumentException("Unexpected content field '$name'")
 }
+
+data class OrderedContentExport(val versionId: UUID, val settingsRevisionId: UUID?, val roots: List<OrderedNodeWrite>)

@@ -33,6 +33,12 @@ class ArticleController(
         return ResponseEntity.ok().header("X-Total-Count", total.toString()).body(items)
     }
 
+    @GetMapping("/versions/{versionId}/units")
+    fun listUnits(@PathVariable versionId: UUID, @RequestParam(required = false) offset: Int?, @RequestParam(required = false) limit: Int?, @RequestParam(defaultValue = "false") includeBody: Boolean): ResponseEntity<List<ArticleSummary>> {
+        val (items, total) = articleQueryService.listUnits(versionId, (offset ?: 0).coerceAtLeast(0), (limit ?: 200).coerceIn(1, 200), includeBody)
+        return ResponseEntity.ok().header("X-Total-Count", total.toString()).body(items)
+    }
+
     @PutMapping("/versions/{versionId}/articles")
     fun replaceArticles(
         @RequestHeader(value = "Authorization", required = false) authorization: String?,
@@ -46,6 +52,9 @@ class ArticleController(
     @GetMapping("/articles/{articleId}")
     fun getArticle(@PathVariable articleId: UUID): ArticleDetail =
         articleQueryService.getById(articleId)
+
+    @GetMapping("/versions/{versionId}/units/{unitId}")
+    fun getUnit(@PathVariable versionId: UUID, @PathVariable unitId: UUID): ArticleDetail = articleQueryService.getUnit(versionId, unitId)
 
     @PatchMapping("/articles/{articleId}")
     fun patchArticle(

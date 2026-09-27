@@ -36,6 +36,64 @@ class OrderedContentApiTest {
 
     @MockBean lateinit var catalog: CatalogClient
 
+    @Test
+    fun partChapterArticleRootsPreserveKindOrderAndExportIdentity() {
+        val version = UUID.randomUUID()
+        val constitution = UUID.randomUUID()
+        Mockito.`when`(catalog.getVersion(version)).thenReturn(CatalogVersion(version, "draft", constitution))
+        Mockito.`when`(catalog.getSettings(version)).thenReturn(
+            StructuralSettings(
+                UUID.randomUUID(),
+                StructuralOutline(
+                    listOf(
+                        StructuralLevel("part", true, true, listOf("chapter")),
+                        StructuralLevel("chapter", false, true, listOf("article")),
+                        StructuralLevel("article", true, false, emptyList()),
+                    ),
+                ),
+            ),
+        )
+        val article = OrderedNodeWrite(kind = "article", label = "46a", title = "Rights", content = listOf(OrderedEntryWrite("text", text = "Exact  bytes.")))
+        val chapter = OrderedNodeWrite(kind = "chapter", label = "bis", content = listOf(OrderedEntryWrite("child", node = article)))
+        val part = OrderedNodeWrite(kind = "part", label = "I", content = listOf(OrderedEntryWrite("text", text = "Before."), OrderedEntryWrite("child", node = chapter), OrderedEntryWrite("text", text = "After.")))
+        val snapshot = content.save(version, OrderedSnapshotWrite(0, roots = listOf(part)))
+        val root = snapshot.roots.single()
+        val summary = articles.listByVersion(version, includeBody = true).single()
+        assertThat(summary.kind).isEqualTo("part")
+        assertThat(summary.logicalId).isEqualTo(root.logicalId)
+        assertThat(articles.getById(root.occurrenceId).kind).isEqualTo("part")
+        assertThat(content.plainText(root)).isEqualTo("Before. Exact  bytes. After.")
+        val exported = content.export(version).roots.single()
+        assertThat(exported.logicalId).isEqualTo(root.logicalId)
+        assertThat(exported.revisionId).isNull()
+        assertThat(exported.content!![1].node!!.label).isEqualTo("bis")
+        assertThat(exported.content!![1].node!!.content!!.single().node!!.label).isEqualTo("46a")
+        val copy = UUID.randomUUID()
+        Mockito.`when`(catalog.getVersion(copy)).thenReturn(CatalogVersion(copy, "draft", constitution))
+        val pinnedSettings = catalog.getSettings(version)
+        Mockito.`when`(catalog.getSettings(copy)).thenReturn(pinnedSettings)
+        val reopened = content.save(copy, OrderedSnapshotWrite(0, roots = listOf(exported))).roots.single()
+        assertThat(reopened.logicalId).isEqualTo(root.logicalId)
+        assertThat(content.plainText(reopened)).isEqualTo(content.plainText(root))
+    }
+
+    @Test
+    fun publishReceiptMakesBindingRetryableAndSealsRoots() {
+        val version = UUID.randomUUID()
+        val constitution = UUID.randomUUID()
+        version(version, constitution)
+        val attempt = UUID.randomUUID()
+        val request = OrderedSnapshotWrite(0, roots = listOf(OrderedNodeWrite(kind = "article", label = "46a", content = listOf(OrderedEntryWrite("text", text = "Exact  bytes.\n")))), publishAttemptId = attempt)
+        val first = content.save(version, request)
+        assertThat(content.save(version, request)).isEqualTo(first)
+        assertThat(content.publishReceipt(version, attempt)).isEqualTo(first)
+        assertThrows(org.springframework.web.server.ResponseStatusException::class.java) { content.save(version, request.copy(expectedGeneration = first.generation, publishAttemptId = null)) }
+        assertThrows(org.springframework.web.server.ResponseStatusException::class.java) { content.save(version, request.copy(roots = emptyList())) }
+        Mockito.`when`(catalog.getVersion(version)).thenReturn(CatalogVersion(version, "published", constitution))
+        assertThat(content.save(version, request)).isEqualTo(first)
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM ordered_publish_receipts WHERE version_id = ?", Int::class.java, version)).isEqualTo(1)
+    }
+
     private fun version(id: UUID, constitution: UUID, parentText: Boolean = true) {
         Mockito.`when`(catalog.getVersion(id)).thenReturn(CatalogVersion(id, "draft", constitution))
         Mockito.`when`(catalog.getSettings(id)).thenReturn(

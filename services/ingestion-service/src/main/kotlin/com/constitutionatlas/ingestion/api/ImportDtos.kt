@@ -1,5 +1,6 @@
 package com.constitutionatlas.ingestion.api
 
+import com.constitutionatlas.platform.OrderedNodeWrite
 import java.time.LocalDate
 import java.util.UUID
 
@@ -26,6 +27,11 @@ data class ImportOutlineKind(
     val showLabel: Boolean = true,
     val showTitle: Boolean = false,
     val showKind: Boolean = false,
+    val allowTextAlongsideChildren: Boolean = false,
+    val titlePolicy: String = "optional",
+    val labelPolicy: String = "optional",
+    val labelPlacement: String = "before_title",
+    val segmentation: String = "plain",
 )
 
 data class ImportOutline(
@@ -45,7 +51,8 @@ data class ImportRequest(
     val predecessorVersionId: UUID? = null,
     val hopKind: String? = null,
     val outline: ImportOutline? = null,
-    val articles: List<ImportArticle>,
+    val articles: List<ImportArticle> = emptyList(),
+    val roots: List<OrderedNodeWrite> = emptyList(),
 )
 
 data class ImportErrorDto(

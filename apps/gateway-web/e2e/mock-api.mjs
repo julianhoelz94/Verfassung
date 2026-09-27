@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { createServer } from 'node:http';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -76,6 +77,21 @@ function articlesFor(versionId, includeBody) {
     }
     return { ...article, body: `${article.title}.`, children: [] };
   });
+}
+
+function mockUnit(article) {
+  function uuid(value) {
+    const hex = createHash('sha256').update(value).digest('hex').slice(0, 32);
+    return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+  }
+  function node(source, identity, rootNode = false) {
+    const children = source.children ?? [];
+    const content = children.length ? children.map((child, index) => ({ type: 'child', node: node(child, `${identity}/${child.kind}/${child.label ?? child.number ?? index}`) })) : [{ type: 'text', logicalId: uuid(`${identity}:text`), revisionId: uuid(`text:${source.body ?? ''}`), occurrenceId: uuid(`${article.versionId}:${identity}:text`), text: source.body ?? '' }];
+    const title = nodeTitleOverrides.get(source.id) ?? source.title;
+    return { logicalId: uuid(identity), revisionId: uuid(JSON.stringify([source.kind ?? 'article', source.label ?? source.articleNumber, title, content.map((entry) => entry.node?.revisionId ?? entry.revisionId)])), occurrenceId: source.id, kind: source.kind ?? 'article', label: source.label ?? source.number ?? source.articleNumber ?? null, title: title ?? null, content };
+  }
+  const ordered = node(article, `article:${article.articleNumber}`, true);
+  return { ...article, kind: ordered.kind, logicalId: ordered.logicalId, revisionId: ordered.revisionId, content: ordered.content };
 }
 
 function to1949(article) {
@@ -378,6 +394,15 @@ const server = createServer(async (req, res) => {
     return;
   }
 
+  const units = pathname.match(/^\/api\/content\/versions\/([^/]+)\/units(?:\/([^/]+))?$/);
+  if (method === 'GET' && units) {
+    const items = articlesFor(units[1], true).map(mockUnit);
+    if (units[2]) {
+      const item = items.find((unit) => unit.id === units[2]);
+      json(res, item ? 200 : 404, item ?? { error: 'Not found' });
+    } else json(res, 200, items, { 'X-Total-Count': String(items.length) });
+    return;
+  }
   const versionArticles = pathname.match(/^\/api\/content\/versions\/([^/]+)\/articles$/);
   if (method === 'GET' && versionArticles) {
     const items = articlesFor(versionArticles[1], searchParams.get('includeBody') === 'true');

@@ -1,5 +1,7 @@
 import type { Amendment, ArticleSummary, ConstitutionSummary, VersionSummary } from './api';
 
+import { orderedText } from './ordered-content';
+
 export type CompareKind = 'added' | 'removed' | 'changed' | 'same';
 
 export const COMPARE_KIND_LABEL: Record<CompareKind, string> = {
@@ -146,7 +148,9 @@ export function netArticleKind(
   if (!left && !right) {
     return 'same';
   }
-  if ((left?.body ?? '') !== (right?.body ?? '')) {
+  if (left?.logicalId && left.logicalId === right?.logicalId && left.revisionId && left.revisionId === right.revisionId) return 'same';
+  if (left?.logicalId && left.logicalId === right?.logicalId && left.revisionId && right.revisionId && left.revisionId !== right.revisionId) return 'changed';
+  if ((left?.content ? orderedText(left.content) : left?.body ?? '') !== (right?.content ? orderedText(right.content) : right?.body ?? '') || left?.title !== right?.title) {
     return 'changed';
   }
   if (recordedTypes.some((type) => type === 'added' || type === 'changed' || type === 'removed')) {
@@ -183,4 +187,18 @@ export function canonicalCompareQuery(
     from: ordered[earlierIndex].id,
     to: ordered[laterIndex].id,
   };
+}
+
+/** Pair stable logical units; labels remain display text and need not be unique. */
+export function alignArticles(left: ArticleSummary[], right: ArticleSummary[]) {
+  const unmatched = new Set(left);
+  const pairs = right.map((target) => {
+    const source = left.find((candidate) => unmatched.has(candidate) && (
+      target.logicalId ? target.logicalId === (candidate.logicalId ?? candidate.id) : candidate.logicalId ? candidate.logicalId === target.id : candidate.articleNumber === target.articleNumber
+    ));
+    if (source) unmatched.delete(source);
+    return { key: target.logicalId ?? target.id, left: source, right: target as ArticleSummary | undefined };
+  });
+  for (const source of unmatched) pairs.push({ key: source.logicalId ?? source.id, left: source, right: undefined });
+  return pairs;
 }

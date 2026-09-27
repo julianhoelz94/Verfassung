@@ -23,7 +23,7 @@ export function toOutlineKindWrite(kind: {
     kindCode: kind.kindCode,
     displayLabel: kind.displayLabel,
     presentation,
-    showLabel: concatenated ? false : Boolean(kind.showLabel),
+    showLabel: concatenated && kind.labelPlacement !== 'inline' && kind.labelPlacement !== 'superscript' ? false : Boolean(kind.showLabel),
     showTitle: concatenated ? false : Boolean(kind.showTitle),
     showKind: concatenated ? false : Boolean(kind.showKind),
     allowTextAlongsideChildren: Boolean(kind.allowTextAlongsideChildren),
@@ -80,7 +80,7 @@ export function nodeHeading(
   if (kind.showKind) {
     parts.push(kind.displayLabel);
   }
-  if (kind.showLabel && kind.labelPlacement !== 'inline') {
+  if (kind.showLabel && kind.labelPlacement !== 'inline' && kind.labelPlacement !== 'superscript') {
     const label = node.label ?? node.number;
     if (label) {
       parts.push(label);

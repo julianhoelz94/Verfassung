@@ -41,6 +41,10 @@ class OrderedContentRepository(private val jdbc: JdbcTemplate) {
             { rs, _ -> LegacyNode(rs.getObject("id", UUID::class.java), rs.getObject("parent_id", UUID::class.java), rs.getString("kind"), rs.getString("label"), rs.getString("title"), rs.getString("body"), rs.getObject("predecessor_id", UUID::class.java)) },
             versionId,
         )
+        if (nodes.isEmpty() && snapshot(versionId).generation == 0L) {
+            jdbc.update("UPDATE content_snapshots SET legacy_dirty = FALSE WHERE version_id = ?", versionId)
+            return
+        }
         val revisions = nodes.associate { it.id to UUID.randomUUID() }
         val logicalIds = nodes.associate { node ->
             node.id to (

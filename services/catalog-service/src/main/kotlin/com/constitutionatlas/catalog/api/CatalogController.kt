@@ -149,6 +149,12 @@ class CatalogController(
         return catalogWriteService.createDraftVersion(constitutionId, request)
     }
 
+    @GetMapping("/publish-attempts/{attemptId}")
+    fun publishAttempt(@RequestHeader(value = "Authorization", required = false) authorization: String?, @PathVariable attemptId: UUID): VersionCreated {
+        writeAccess.requireCatalogWriter(authorization)
+        return catalogWriteService.publishAttempt(attemptId)
+    }
+
     @PostMapping("/versions/{versionId}/publish")
     fun publishVersion(
         @RequestHeader(value = "Authorization", required = false) authorization: String?,

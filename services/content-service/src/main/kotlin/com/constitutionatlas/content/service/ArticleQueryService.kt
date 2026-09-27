@@ -38,6 +38,7 @@ class ArticleQueryService(
                     root.label.orEmpty(),
                     root.title.orEmpty(),
                     offset + index + 1,
+                    kind = root.kind, logicalId = root.logicalId, revisionId = root.revisionId,
                     predecessorId = orderedRepository.occurrencePredecessor(root.occurrenceId),
                     body = if (includeBody) ordered.plainText(root) else null,
                     children = if (includeBody) root.content.mapNotNull { it.node?.let(::compatibilityNode) } else null,
@@ -52,6 +53,30 @@ class ArticleQueryService(
         return items.map { attachChildren(it) }
     }
 
+    fun listUnits(version: UUID, offset: Int, limit: Int, includeBody: Boolean): Pair<List<ArticleSummary>, Int> {
+        val roots = ordered.get(version).roots
+        return roots.drop(offset).take(limit).mapIndexed { index, root ->
+            ArticleSummary(
+                root.occurrenceId, version, root.label.orEmpty(), root.title.orEmpty(), offset + index + 1,
+                body = if (includeBody) ordered.plainText(root) else null,
+                children = if (includeBody) root.content.mapNotNull { it.node?.let(::compatibilityNode) } else null,
+                predecessorId = orderedRepository.occurrencePredecessor(root.occurrenceId),
+                content = if (includeBody) root.content else null, logicalId = root.logicalId, revisionId = root.revisionId, kind = root.kind,
+            )
+        } to roots.size
+    }
+
+    fun getUnit(version: UUID, id: UUID): ArticleDetail {
+        val roots = ordered.get(version).roots
+        val index = roots.indexOfFirst { it.occurrenceId == id }
+        if (index < 0) throw NotFoundException("Unit is not on this version")
+        val root = roots[index]
+        return ArticleDetail(
+            root.occurrenceId, version, root.label.orEmpty(), root.title.orEmpty(), ordered.plainText(root), index + 1, root.kind,
+            children = root.content.mapNotNull { it.node?.let(::compatibilityNode) }, predecessorId = orderedRepository.occurrencePredecessor(id), content = root.content, logicalId = root.logicalId, revisionId = root.revisionId,
+        )
+    }
+
     fun countByVersion(versionId: UUID): Int = if (orderedRepository.canonical(versionId)) ordered.get(versionId).roots.size else articleRepository.countByVersion(versionId)
 
     fun getById(id: UUID): ArticleDetail {
@@ -61,7 +86,7 @@ class ArticleQueryService(
                 return ArticleDetail(
                     id, version, root.label.orEmpty(), root.title.orEmpty(), ordered.plainText(root), 1,
                     predecessorId = orderedRepository.occurrencePredecessor(id),
-                    kind = root.kind, children = root.content.mapNotNull { it.node?.let(::compatibilityNode) }, content = root.content,
+                    kind = root.kind, children = root.content.mapNotNull { it.node?.let(::compatibilityNode) }, content = root.content, logicalId = root.logicalId, revisionId = root.revisionId,
                 )
             }
         }
@@ -185,8 +210,8 @@ class ArticleQueryService(
     private fun compatibilityNode(node: com.constitutionatlas.content.api.OrderedNode): ContentNodeDto =
         ContentNodeDto(
             node.occurrenceId, node.kind, node.label, node.label, node.title,
-            node.content.filter { it.type == "text" }.joinToString(" ") { it.text.orEmpty() }, 1,
-            node.content.mapNotNull { it.node?.let(::compatibilityNode) }, predecessorId = orderedRepository.occurrencePredecessor(node.occurrenceId), content = node.content,
+            com.constitutionatlas.platform.OrderedContentText.entries(node.content.filter { it.type == "text" }), 1,
+            node.content.mapNotNull { it.node?.let(::compatibilityNode) }, predecessorId = orderedRepository.occurrencePredecessor(node.occurrenceId), content = node.content, logicalId = node.logicalId, revisionId = node.revisionId,
         )
 
     private fun insertWriteNode(versionId: UUID, parentId: UUID, node: NodeWrite, sortOrder: Int) {

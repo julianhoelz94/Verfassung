@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Amendment, ConstitutionSummary, VersionSummary } from './api';
 import {
+  alignArticles,
   amendmentsBetween,
   canonicalCompareQuery,
   compareRequestError,
@@ -159,5 +160,18 @@ describe('amendmentsBetween', () => {
       amendment('kept', 'a', 'b'),
     ];
     expect(amendmentsBetween(laws, 'a', 'b', versions).map((item) => item.id)).toEqual(['kept']);
+  });
+});
+
+
+describe('stable ordered root alignment', () => {
+  it('pairs renumbered and unlabeled roots by logical identity in target order', () => {
+    const root = (id: string, logicalId: string, articleNumber: string) => ({ id, logicalId, versionId: id, articleNumber, title: '', sortOrder: 1 });
+    const left = [root('old-a', 'a', '46a'), root('old-b', 'b', ''), root('old-c', 'c', '')];
+    const right = [root('new-c', 'c', ''), root('new-a', 'a', 'bis'), root('new-b', 'b', '')];
+    const aligned = alignArticles(left, right);
+    expect(aligned.map((pair) => [pair.key, pair.left?.id, pair.right?.id])).toEqual([
+      ['c', 'old-c', 'new-c'], ['a', 'old-a', 'new-a'], ['b', 'old-b', 'new-b'],
+    ]);
   });
 });

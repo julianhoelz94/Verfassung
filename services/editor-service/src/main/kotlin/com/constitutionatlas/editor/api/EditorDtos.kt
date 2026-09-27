@@ -62,6 +62,7 @@ data class ChangeRecordRequest(
     val comment: String,
     val documents: List<ChangeRecordDocument> = emptyList(),
     val changes: List<ChangeRecordChange> = emptyList(),
+    val publishAttemptId: UUID? = null,
 )
 
 data class ChangeRecordChange(
@@ -129,4 +130,7 @@ data class DraftPreviewDto(
     val publishComment: String? = null,
     val changeRecord: ChangeRecordRequest? = null,
     val amendmentStatus: SearchIndexStatus? = null,
+    val unitMapping: Map<String, String>? = null,
+    val sourceGeneration: Long? = null,
+    val settingsRevisionId: UUID? = null,
 )

@@ -519,8 +519,10 @@ class CatalogRepository(private val jdbc: JdbcTemplate) {
                    cv.legal_version_id,
                    tip.id AS current_version_id,
                    cv.legal_predecessor_version_id,
-                   cv.editorial_predecessor_version_id
+                   cv.editorial_predecessor_version_id, country.iso_code AS country_code
             FROM constitution_versions cv
+            JOIN constitutions constitution ON constitution.id = cv.constitution_id
+            JOIN countries country ON country.id = constitution.country_id
             LEFT JOIN LATERAL (
               SELECT t.id
               FROM constitution_versions t
@@ -587,6 +589,7 @@ class CatalogRepository(private val jdbc: JdbcTemplate) {
 
     private val versionDetailMapper = RowMapper { rs, _ ->
         VersionDetail(
+            countryCode = rs.getString("country_code"),
             id = rs.getObject("id", UUID::class.java),
             constitutionId = rs.getObject("constitution_id", UUID::class.java),
             versionLabel = rs.getString("version_label"),

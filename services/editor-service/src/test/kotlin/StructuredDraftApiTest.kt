@@ -41,6 +41,20 @@ class StructuredDraftApiTest {
 
     @MockBean lateinit var identity: IdentityClient
 
+    @Autowired lateinit var editorService: com.constitutionatlas.editor.service.EditorService
+
+    @MockBean lateinit var publishClient: com.constitutionatlas.editor.client.OrderedPublishClient
+
+    @MockBean lateinit var catalogClient: com.constitutionatlas.editor.client.CatalogClient
+
+    @MockBean lateinit var contentClient: com.constitutionatlas.editor.client.ContentClient
+
+    @MockBean lateinit var amendmentClient: com.constitutionatlas.editor.client.AmendmentClient
+
+    @MockBean lateinit var auditClient: com.constitutionatlas.editor.client.AuditClient
+
+    @MockBean lateinit var searchClient: com.constitutionatlas.editor.client.SearchIndexClient
+
     @MockBean lateinit var sources: StructuredSourceClient
 
     private val settings = DraftSettings(
@@ -76,6 +90,59 @@ class StructuredDraftApiTest {
             DraftEntry("text", logicalId = UUID.randomUUID(), revisionId = UUID.randomUUID(), text = "After."),
         ),
     )
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = ["editorial_correction", "legal"])
+    fun orderedPublishRetriesReuseReservationAndPreserveMapping(hop: String) {
+        val auth = "Bearer ordered-$hop"
+        val actor = Actor(UUID.randomUUID(), "admin@test.local", listOf("admin"), stepUpFresh = true)
+        val version = UUID.randomUUID()
+        val constitution = UUID.randomUUID()
+        val target = UUID.randomUUID()
+        val root = fixture()
+        val entry = root.content[1].node!!.content.single()
+        val source = DraftSource(version, 7, settings.id, listOf(root))
+        Mockito.`when`(identity.authenticate(auth)).thenReturn(actor)
+        Mockito.`when`(sources.source(version)).thenReturn(source)
+        Mockito.`when`(sources.settings(version)).thenReturn(settings)
+        val catalogSource = com.constitutionatlas.editor.client.CatalogVersion(version, constitution, "1", "published", legalVersionId = version, currentVersionId = version)
+        val catalogTarget = catalogSource.copy(id = target, versionLabel = "2", publicationStatus = "draft", predecessorVersionId = version, hopKind = hop)
+        Mockito.`when`(catalogClient.getVersion(version)).thenReturn(catalogSource)
+        Mockito.`when`(catalogClient.listVersions(constitution, "all")).thenReturn(listOf(catalogSource))
+        Mockito.`when`(contentClient.listArticles(version)).thenReturn(listOf(com.constitutionatlas.editor.client.ContentTreeArticle(root.logicalId, version, "46a", "Rights", 1)))
+        val session = sessions.insertSession(actor.id, version, hop)
+        val operation = DraftOperation(UUID.randomUUID(), "replace_text", entry.logicalId!!, entry.revisionId!!, text = "Changed wording.")
+        val preview = drafts.save(auth, session, StructuredDraftSave(0, listOf(operation)))
+        val record = com.constitutionatlas.editor.api.ChangeRecordRequest("Law", "Legal update", listOf(com.constitutionatlas.editor.api.ChangeRecordDocument(url = "https://example.test/law")))
+        if (hop == "legal") sessions.recordChangeRecord(session, record) else sessions.recordPublishComment(session, "Transcription fix")
+        editorService.submitReview(auth, session)
+        editorService.approve(auth, session)
+        val amendment = com.constitutionatlas.editor.client.LinkedAmendment(UUID.randomUUID(), constitution, "draft", "Law", "Legal update", listOf(com.constitutionatlas.editor.client.ChangeRecordDocumentDto(url = "https://example.test/law")))
+        Mockito.`when`(amendmentClient.createAmendment(Mockito.eq(constitution) ?: constitution, Mockito.any(com.constitutionatlas.editor.api.ChangeRecordRequest::class.java) ?: record, Mockito.eq(auth) ?: auth)).thenReturn(amendment)
+        Mockito.`when`(amendmentClient.getAmendment(amendment.id, auth)).thenReturn(amendment)
+        val comment = if (hop == "legal") null else "Transcription fix"
+        Mockito.`when`(publishClient.reserve(session, catalogSource, hop, comment, settings.id, auth)).thenReturn(catalogTarget)
+        fun ordered(node: DraftNode): com.constitutionatlas.platform.OrderedNode = com.constitutionatlas.platform.OrderedNode(node.logicalId, UUID.randomUUID(), UUID.nameUUIDFromBytes("$target:${node.logicalId}".toByteArray()), node.kind, node.label, node.title, node.content.map { item -> item.node?.let { com.constitutionatlas.platform.OrderedEntry("child", node = ordered(it)) } ?: com.constitutionatlas.platform.OrderedEntry("text", logicalId = item.logicalId, revisionId = UUID.randomUUID(), occurrenceId = UUID.nameUUIDFromBytes("$target:${item.logicalId}".toByteArray()), text = item.text) })
+        val snapshot = com.constitutionatlas.platform.OrderedSnapshot(target, 1, settings.id, preview.roots.map(::ordered))
+        val write = com.constitutionatlas.platform.OrderedSnapshotWrite(0, version, 7, com.constitutionatlas.editor.service.OrderedSuccessorPlan.build(source.roots, preview.roots, preview.operations), session)
+        Mockito.`when`(publishClient.save(target, write, auth)).thenThrow(com.constitutionatlas.editor.DownstreamException("content unavailable")).thenReturn(snapshot)
+        val request = com.constitutionatlas.editor.api.PublishRequest(hop)
+        assertThrows(com.constitutionatlas.editor.DownstreamException::class.java) { editorService.publish(auth, session, request) }
+        assertThat(sessions.findSession(session)!!.status).isEqualTo(com.constitutionatlas.editor.api.EditSessionStatus.APPROVED)
+        Mockito.`when`(publishClient.reservation(session, auth)).thenReturn(catalogTarget)
+        Mockito.`when`(catalogClient.publishVersion(target)).thenThrow(com.constitutionatlas.editor.DownstreamException("publication response lost")).thenReturn(catalogTarget.copy(publicationStatus = "published"))
+        assertThrows(com.constitutionatlas.editor.DownstreamException::class.java) { editorService.publish(auth, session, request) }
+        val published = editorService.publish(auth, session, request)
+        assertThat(published.newVersionId).isEqualTo(target)
+        assertThat(published.unitMapping).containsEntry(entry.logicalId.toString(), UUID.nameUUIDFromBytes("$target:${entry.logicalId}".toByteArray()).toString())
+        assertThat(published.sourceGeneration).isEqualTo(7)
+        assertThat(editorService.publish(auth, session, request).newVersionId).isEqualTo(target)
+        Mockito.verify(publishClient, Mockito.times(3)).save(target, write, auth)
+        if (hop == "legal") Mockito.verify(amendmentClient, Mockito.times(1)).createAmendment(Mockito.eq(constitution) ?: constitution, Mockito.any(com.constitutionatlas.editor.api.ChangeRecordRequest::class.java) ?: record, Mockito.eq(auth) ?: auth)
+        val payload = jdbc.queryForObject("SELECT payload::text FROM outbox_events WHERE session_id = ? AND event_name = 'version.published'", String::class.java, session)
+        assertThat(payload).contains("unitMapping", entry.logicalId.toString(), "sourceGeneration", "settingsRevisionId")
+        assertThrows(ConflictException::class.java) { editorService.publish(auth, session, request.copy(comment = "changed retry payload")) }
+    }
 
     @Test
     fun targetedSaveReopensLosslesslyAndPersistsOnlyOperation() {

@@ -95,3 +95,11 @@ export function newestChanges(rows: RecentChange[], limit: number): RecentChange
     .sort((a, b) => (b.date ?? '').localeCompare(a.date ?? ''))
     .slice(0, limit);
 }
+
+/** A historical published snapshot belongs to its legal version, even when it is no longer the tip. */
+export function publicSnapshotContext(country: CountryDetail | null, snapshot: import('./api').VersionDetail | null) {
+  if (!country || !snapshot || snapshot.publicationStatus !== 'published') return undefined;
+  const constitution = country.constitutions.find((item) => item.id === snapshot.constitutionId);
+  const version = constitution?.versions.find((item) => item.id === (snapshot.legalVersionId ?? snapshot.id) || item.id === snapshot.id || item.currentVersionId === snapshot.id);
+  return constitution && version ? { constitution, version } : undefined;
+}

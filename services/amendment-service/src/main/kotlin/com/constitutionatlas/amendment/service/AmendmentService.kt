@@ -35,6 +35,7 @@ class AmendmentService(
     private val amendmentRepository: AmendmentRepository,
     private val contentClient: ContentClient,
     private val catalogClient: CatalogClient,
+    private val publishAttempts: com.constitutionatlas.amendment.repo.ChangeRecordPublishAttemptRepository,
 ) {
     fun listForVersion(versionId: UUID, sourceVersionId: UUID?): List<AmendmentDto> =
         amendmentRepository.listForTargetVersion(versionId, sourceVersionId)
@@ -73,6 +74,14 @@ class AmendmentService(
 
     @Transactional
     fun createAmendment(constitutionId: UUID, request: AmendmentWriteRequest, actor: Actor): AmendmentDto {
+        val requestHash = java.security.MessageDigest.getInstance("SHA-256").digest(request.toString().toByteArray()).joinToString("") { "%02x".format(it) }
+        request.publishAttemptId?.let { attempt ->
+            publishAttempts.lock(attempt)
+            publishAttempts.find(attempt)?.let { existing ->
+                if (existing.constitutionId != constitutionId || existing.requestHash != requestHash) throw ConflictException("Publish attempt payload changed")
+                return amendmentRepository.getAmendmentDtoForRevision(existing.amendmentId, existing.revisionId, includeStaff = true) ?: throw NotFoundException("Reserved change record missing")
+            }
+        }
         rejectKind(request.kind)
         val comment = normalizeComment(request.comment)
         val documents = normalizeDocuments(request.documents)
@@ -103,6 +112,7 @@ class AmendmentService(
             ),
         )
         amendmentRepository.insertChanges(revisionId, request.changes)
+        request.publishAttemptId?.let { publishAttempts.insert(it, constitutionId, amendmentId, revisionId, requestHash) }
         return amendmentRepository.getAmendmentDtoForRevision(amendmentId, revisionId, includeStaff = true)
             ?: throw IllegalStateException("created amendment not readable")
     }

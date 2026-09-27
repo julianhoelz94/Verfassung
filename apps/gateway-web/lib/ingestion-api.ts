@@ -25,7 +25,9 @@ export function isImportRequest(value: unknown): value is Record<string, unknown
       return false;
     }
   }
-  return Array.isArray(row.articles) && row.articles.length > 0;
+  const articles = Array.isArray(row.articles) && row.articles.length > 0;
+  const roots = Array.isArray(row.roots) && row.roots.length > 0;
+  return articles !== roots;
 }
 
 export function parseImportJson(raw: string): unknown {

@@ -1,6 +1,8 @@
 package com.constitutionatlas.platform
 
+import com.fasterxml.jackson.annotation.JsonAnySetter
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
+import com.fasterxml.jackson.databind.JsonNode
 import java.util.UUID
 
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -35,20 +37,52 @@ data class OrderedSnapshot(
 
 /** Traversal preserves stored order and exact text bytes. Headings are metadata, not body text. */
 object OrderedContentText {
-    fun entries(content: List<OrderedEntry>): String = join(content.map { entry ->
-        when (entry.type) {
-            "text" -> requireNotNull(entry.text) { "Ordered text entry has no text" }
-            "child" -> entries(requireNotNull(entry.node) { "Ordered child entry has no node" }.content)
-            else -> throw IllegalArgumentException("Unknown ordered entry type '${entry.type}'")
-        }
-    })
-
-    /** Add a boundary space only when both fragments lack whitespace at that boundary. */
-    fun join(parts: List<String>): String = buildString {
-        for (part in parts) {
+    fun entries(content: List<OrderedEntry>): String = buildString {
+        var previousChild = false
+        for (entry in content) {
+            val child = entry.type == "child"
+            val part = when (entry.type) {
+                "text" -> requireNotNull(entry.text) { "Ordered text entry has no text" }
+                "child" -> entries(requireNotNull(entry.node) { "Ordered child entry has no node" }.content)
+                else -> throw IllegalArgumentException("Unknown ordered entry type '${entry.type}'")
+            }
             if (part.isEmpty()) continue
-            if (isNotEmpty() && !last().isWhitespace() && !part.first().isWhitespace()) append(' ')
+            if (isNotEmpty() && (child || previousChild) && !last().isWhitespace() && !part.first().isWhitespace()) append(' ')
             append(part)
+            previousChild = child
         }
     }
+}
+
+data class OrderedNodeWrite(
+    val revisionId: UUID? = null,
+    val logicalId: UUID? = null,
+    val predecessorRevisionId: UUID? = null,
+    val kind: String? = null,
+    val label: String? = null,
+    val title: String? = null,
+    val content: List<OrderedEntryWrite>? = null,
+) : StrictOrderedWrite()
+
+data class OrderedEntryWrite(
+    val type: String,
+    val node: OrderedNodeWrite? = null,
+    val revisionId: UUID? = null,
+    val logicalId: UUID? = null,
+    val predecessorRevisionId: UUID? = null,
+    val text: String? = null,
+    val lineage: List<UUID> = emptyList(),
+) : StrictOrderedWrite()
+
+data class OrderedSnapshotWrite(
+    val expectedGeneration: Long,
+    val sourceVersionId: UUID? = null,
+    val sourceGeneration: Long? = null,
+    val roots: List<OrderedNodeWrite>,
+    val publishAttemptId: UUID? = null,
+) : StrictOrderedWrite()
+
+open class StrictOrderedWrite {
+    @JsonAnySetter
+    fun rejectUnknown(name: String, value: JsonNode): Unit = throw IllegalArgumentException("Unexpected content field '$name'")
 }

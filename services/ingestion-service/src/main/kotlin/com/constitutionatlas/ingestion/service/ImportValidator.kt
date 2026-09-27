@@ -20,8 +20,24 @@ object ImportValidator {
         if (request.versionLabel.isBlank()) {
             errors += "MISSING_VERSION" to "versionLabel is required"
         }
-        if (request.articles.isEmpty()) {
+        if (request.articles.isEmpty() && request.roots.isEmpty()) {
             errors += "NO_ARTICLES" to "at least one article is required"
+        }
+        if (request.articles.isNotEmpty() && request.roots.isNotEmpty()) errors += "MIXED_FORMATS" to "Use roots or articles, not both"
+        if (request.roots.isNotEmpty()) {
+            val rootKind = request.outline?.kinds?.firstOrNull()?.kindCode ?: "article"
+            if (request.roots.any { it.kind != rootKind }) errors += "ROOT_KIND" to "Roots must use the first outline kind '$rootKind'"
+            val logicalIds = mutableSetOf<java.util.UUID>()
+            fun visit(node: com.constitutionatlas.platform.OrderedNodeWrite) {
+                if (node.revisionId != null || node.predecessorRevisionId != null) errors += "REVISION_REFERENCE" to "Imports must contain complete units without foreign revision references"
+                if (node.logicalId != null && !logicalIds.add(requireNotNull(node.logicalId))) errors += "DUPLICATE_LOGICAL_ID" to "Logical identities must be unique"
+                node.content.orEmpty().forEach { entry ->
+                    entry.node?.let(::visit)
+                    if (entry.logicalId != null && !logicalIds.add(requireNotNull(entry.logicalId))) errors += "DUPLICATE_LOGICAL_ID" to "Logical identities must be unique"
+                    if (entry.revisionId != null || entry.predecessorRevisionId != null || entry.lineage.isNotEmpty()) errors += "REVISION_REFERENCE" to "Imports cannot refer to foreign revisions"
+                }
+            }
+            request.roots.forEach(::visit)
         }
         val numbers = request.articles.map { it.articleNumber.trim() }
         if (numbers.any { it.isBlank() }) {

@@ -15,6 +15,12 @@ data class ArticleSummary(
     val predecessorId: UUID? = null,
     @get:JsonInclude(JsonInclude.Include.NON_NULL)
     val content: List<OrderedEntry>? = null,
+    @get:JsonInclude(JsonInclude.Include.NON_NULL)
+    val logicalId: UUID? = null,
+    @get:JsonInclude(JsonInclude.Include.NON_NULL)
+    val revisionId: UUID? = null,
+    @get:JsonInclude(JsonInclude.Include.NON_NULL)
+    val kind: String? = null,
 )
 
 data class ContentNodeDto(
@@ -30,6 +36,10 @@ data class ContentNodeDto(
     val predecessorId: UUID? = null,
     @get:JsonInclude(JsonInclude.Include.NON_NULL)
     val content: List<OrderedEntry>? = null,
+    @get:JsonInclude(JsonInclude.Include.NON_NULL)
+    val logicalId: UUID? = null,
+    @get:JsonInclude(JsonInclude.Include.NON_NULL)
+    val revisionId: UUID? = null,
 )
 
 data class ArticleDetail(
@@ -45,6 +55,10 @@ data class ArticleDetail(
     val predecessorId: UUID? = null,
     @get:JsonInclude(JsonInclude.Include.NON_NULL)
     val content: List<OrderedEntry>? = null,
+    @get:JsonInclude(JsonInclude.Include.NON_NULL)
+    val logicalId: UUID? = null,
+    @get:JsonInclude(JsonInclude.Include.NON_NULL)
+    val revisionId: UUID? = null,
 )
 
 data class NodeWrite(

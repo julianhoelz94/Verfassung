@@ -19,7 +19,12 @@ import org.springframework.web.server.ResponseStatusException
 import java.util.UUID
 
 @Service
-class OrderedContentService(private val repository: OrderedContentRepository, private val catalog: CatalogClient, @Value("\${content.ordered-mixed-writes.enabled:false}") private val mixedWritesEnabled: Boolean) {
+class OrderedContentService(
+    private val receipts: com.constitutionatlas.content.repo.OrderedPublishReceiptRepository,
+    private val repository: OrderedContentRepository,
+    private val catalog: CatalogClient,
+    @Value("\${content.ordered-mixed-writes.enabled:true}") private val mixedWritesEnabled: Boolean,
+) {
     @Transactional
     fun get(version: UUID): OrderedSnapshot {
         if (!repository.exists(version) && catalog.getVersion(version) == null) throw NotFoundException("Unknown version '$version'")
@@ -35,14 +40,32 @@ class OrderedContentService(private val repository: OrderedContentRepository, pr
 
     @Transactional
     fun save(version: UUID, request: OrderedSnapshotWrite): OrderedSnapshot {
+        val requestHash = java.security.MessageDigest.getInstance("SHA-256").digest(request.toString().toByteArray()).joinToString("") { "%02x".format(it) }
+        request.publishAttemptId?.let { attempt ->
+            receipts.find(attempt)?.let { receipt ->
+                if (receipt.versionId != version || receipt.requestHash != requestHash) stale("Publish attempt payload changed")
+                val snapshot = get(version)
+                if (snapshot.generation != receipt.generation) stale("Reserved roots changed")
+                return snapshot
+            }
+        }
+        if (receipts.forVersion(version) != null) stale("Successor roots are sealed for publication")
         val metadata = catalog.getVersion(version) ?: throw NotFoundException("Unknown version '$version'")
         if (metadata.publicationStatus == "published") throw VersionPublishedException()
         val constitution = metadata.constitutionId ?: throw CatalogUnavailableException("Catalog did not supply constitution identity")
         val settings = catalog.getSettings(version) ?: throw CatalogUnavailableException("Version-pinned settings unavailable")
         val current = get(version)
+        request.publishAttemptId?.let { attempt ->
+            receipts.find(attempt)?.let { receipt ->
+                if (receipt.versionId != version || receipt.requestHash != requestHash || receipt.generation != current.generation) stale("Publish attempt payload or roots changed")
+                return current
+            }
+        }
+        if (receipts.forVersion(version) != null) stale("Successor roots are sealed for publication")
         if (repository.lock(version) != request.expectedGeneration) stale("Target roots changed")
         val source = request.sourceVersionId?.let { sourceVersion ->
             val sourceMetadata = catalog.getVersion(sourceVersion) ?: throw NotFoundException("Unknown source version")
+            if (request.publishAttemptId != null && sourceMetadata.publicationStatus != "published") stale("Successor source must be published")
             require(sourceMetadata.constitutionId == constitution) { "Cross-constitution source reference" }
             val resolved = get(sourceVersion)
             if (request.sourceGeneration != resolved.generation) stale("Source roots changed")
@@ -79,7 +102,7 @@ class OrderedContentService(private val repository: OrderedContentRepository, pr
                 when (entry.type) {
                     "child" -> {
                         require(entry.node != null && entry.text == null && entry.revisionId == null && entry.logicalId == null && entry.predecessorRevisionId == null && entry.lineage.isEmpty()) { "Invalid child entry at $logical/content/$position" }
-                        repository.insertEntry(revision, position, null, store(entry.node, depth + 1))
+                        repository.insertEntry(revision, position, null, store(requireNotNull(entry.node), depth + 1))
                     }
                     "text" -> {
                         require(entry.node == null) { "Text entry cannot contain a child" }
@@ -112,7 +135,34 @@ class OrderedContentService(private val repository: OrderedContentRepository, pr
         if (!mixedWritesEnabled && resolved.any(::mixed)) throw ResponseStatusException(HttpStatus.CONFLICT, "Mixed snapshot writes await ordered reader and consumer rollout")
         repository.bind(version, constitution, settings.id)
         repository.replaceRoots(version, roots, source = source)
-        return repository.snapshot(version)
+        val saved = repository.snapshot(version)
+        request.publishAttemptId?.let { receipts.insert(it, version, requestHash, saved.generation) }
+        return saved
+    }
+
+    @Transactional
+    fun export(version: UUID): com.constitutionatlas.content.api.OrderedContentExport {
+        val snapshot = get(version)
+        fun nodeWrite(node: OrderedNode): OrderedNodeWrite = OrderedNodeWrite(
+            logicalId = node.logicalId,
+            kind = node.kind,
+            label = node.label,
+            title = node.title,
+            content = node.content.map { entry ->
+                entry.node?.let { com.constitutionatlas.platform.OrderedEntryWrite("child", node = nodeWrite(it)) }
+                    ?: com.constitutionatlas.platform.OrderedEntryWrite("text", logicalId = entry.logicalId, text = entry.text)
+            },
+        )
+        return com.constitutionatlas.content.api.OrderedContentExport(version, snapshot.settingsRevisionId, snapshot.roots.map(::nodeWrite))
+    }
+
+    @Transactional
+    fun publishReceipt(version: UUID, attempt: UUID): OrderedSnapshot {
+        val receipt = receipts.find(attempt) ?: throw NotFoundException("No complete successor roots")
+        if (receipt.versionId != version) throw NotFoundException("Receipt belongs to another version")
+        val snapshot = get(version)
+        if (snapshot.generation != receipt.generation) stale("Reserved roots changed")
+        return snapshot
     }
 
     fun validate(roots: List<OrderedNode>, settings: StructuralSettings) {
@@ -143,15 +193,15 @@ class OrderedContentService(private val repository: OrderedContentRepository, pr
     @Transactional
     fun resolve(version: UUID, logical: UUID): ResolvedContent {
         val snapshot = get(version)
-        fun walk(node: OrderedNode, path: List<UUID>): ResolvedContent? {
-            if (node.logicalId == logical) return ResolvedContent(version, logical, node.revisionId, node.occurrenceId, path.lastOrNull(), path, node.kind, plainText(node), "/api/content/versions/$version/resolve?logicalId=$logical")
+        fun walk(node: OrderedNode, path: List<UUID>, root: UUID): ResolvedContent? {
+            if (node.logicalId == logical) return ResolvedContent(version, logical, node.revisionId, node.occurrenceId, path.lastOrNull(), path, node.kind, plainText(node), "/versions/$version/units/$root?occurrenceId=${node.occurrenceId}")
             node.content.forEach { entry ->
-                if (entry.logicalId == logical) return ResolvedContent(version, logical, entry.revisionId!!, entry.occurrenceId!!, node.logicalId, path + node.logicalId, "parent_text", entry.text!!, "/api/content/versions/$version/resolve?logicalId=$logical")
-                entry.node?.let { walk(it, path + node.logicalId)?.let { found -> return found } }
+                if (entry.logicalId == logical) return ResolvedContent(version, logical, entry.revisionId!!, entry.occurrenceId!!, node.logicalId, path + node.logicalId, "parent_text", entry.text!!, "/versions/$version/units/$root?occurrenceId=${entry.occurrenceId}")
+                entry.node?.let { walk(it, path + node.logicalId, root)?.let { found -> return found } }
             }
             return null
         }
-        return snapshot.roots.firstNotNullOfOrNull { walk(it, emptyList()) } ?: throw NotFoundException("Unit '$logical' is not in version '$version'")
+        return snapshot.roots.firstNotNullOfOrNull { walk(it, emptyList(), it.occurrenceId) } ?: throw NotFoundException("Unit '$logical' is not in version '$version'")
     }
 
     fun plainText(node: OrderedNode): String = com.constitutionatlas.platform.OrderedContentText.entries(node.content)

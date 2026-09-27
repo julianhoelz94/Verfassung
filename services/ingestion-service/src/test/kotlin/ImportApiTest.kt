@@ -116,6 +116,32 @@ class ImportApiTest {
     }
 
     @Test
+    fun customRootsForwardOrderedTextAndLiteralIdentities() {
+        val constitution = UUID.randomUUID()
+        val version = UUID.randomUUID()
+        val logical = UUID.randomUUID()
+        Mockito.`when`(catalogClient.getCountry("FR")).thenReturn(DownstreamCountry(UUID.randomUUID(), "FR", "France"))
+        Mockito.`when`(catalogClient.findConstitution("FR", "ordered")).thenReturn(DownstreamConstitution(constitution, "ordered", "Ordered constitution"))
+        Mockito.`when`(catalogClient.createDraftVersion(constitution, "1", null, "en", null, null, null, null)).thenReturn(DownstreamVersion(version, constitution, "draft"))
+        Mockito.`when`(catalogClient.publishVersion(version)).thenReturn(DownstreamVersion(version, constitution, "published"))
+        mockMvc.post("/import-jobs") {
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"isoCode":"FR","countryName":"France","constitutionSlug":"ordered","constitutionTitle":"Ordered constitution","versionLabel":"1","outline":{"kinds":[{"kindCode":"clause","displayLabel":"Clause"}]},"roots":[{"logicalId":"$logical","kind":"clause","label":"(2a)","title":"Literal","content":[{"type":"text","text":"Before  "},{"type":"text","text":"after."}]}]}"""
+        }.andExpect {
+            status { isCreated() }
+            jsonPath("$.status") { value("completed") }
+        }
+        Mockito.verify(contentClient).replaceRoots(
+            eqNonNull(version),
+            Mockito.argThat<List<com.constitutionatlas.platform.OrderedNodeWrite>> { roots ->
+                roots.single().logicalId == logical && roots.single().label == "(2a)" && roots.single().content!!.map { it.text } == listOf("Before  ", "after.")
+            } ?: emptyList(),
+        )
+        Mockito.verify(contentClient, Mockito.never()).replaceArticles(eqNonNull(version), Mockito.anyList())
+    }
+
+    @Test
     fun successorImportForwardsLegalPredecessor() {
         val constitutionId = UUID.fromString("01900000-0000-4000-8000-000000000501")
         val predecessorId = UUID.fromString("01900000-0000-4000-8000-000000000502")

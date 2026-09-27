@@ -6,7 +6,7 @@ describe('ordered text contract', () => {
   it('preserves text before and after children and stored whitespace', () => {
     expect(orderedText([{ type: 'text', text: 'before  ' }, child, { type: 'text', text: 'after' }])).toBe('before  inside.\nafter');
   });
-  it('adds only missing boundary spaces and ignores empty fragments', () => {
-    expect(orderedText([{ type: 'text', text: 'one.' }, { type: 'text', text: '' }, { type: 'text', text: 'Two.' }])).toBe('one. Two.');
+  it('concatenates adjacent text exactly so split and merge preserve text', () => {
+    expect(orderedText([{ type: 'text', text: 'one.' }, { type: 'text', text: '' }, { type: 'text', text: 'Two.' }])).toBe('one.Two.');
   });
 });

@@ -338,7 +338,8 @@ class CatalogRepository(private val jdbc: JdbcTemplate) {
         val kinds = jdbc.query(
             """
             SELECT kind_code, display_label, sort_order, may_hold_text, may_hold_children,
-                   presentation, show_label, show_title, show_kind
+                   presentation, show_label, show_title, show_kind, allow_text_alongside_children,
+                   title_policy, label_policy, label_placement, segmentation
             FROM constitution_node_kinds
             WHERE constitution_id = ?
             ORDER BY sort_order
@@ -356,6 +357,11 @@ class CatalogRepository(private val jdbc: JdbcTemplate) {
                     showLabel = rs.getBoolean("show_label"),
                     showTitle = rs.getBoolean("show_title"),
                     showKind = rs.getBoolean("show_kind"),
+                    allowTextAlongsideChildren = rs.getBoolean("allow_text_alongside_children"),
+                    titlePolicy = rs.getString("title_policy"),
+                    labelPolicy = rs.getString("label_policy"),
+                    labelPlacement = rs.getString("label_placement"),
+                    segmentation = rs.getString("segmentation"),
                 )
             },
             constitutionId,
@@ -379,19 +385,26 @@ class CatalogRepository(private val jdbc: JdbcTemplate) {
                 """
                 INSERT INTO constitution_node_kinds (
                   id, constitution_id, kind_code, display_label, sort_order, may_hold_text, may_hold_children,
-                  presentation, show_label, show_title, show_kind
-                ) VALUES (?, ?, ?, ?, ?, TRUE, ?, ?, ?, ?, ?)
+                  presentation, show_label, show_title, show_kind, allow_text_alongside_children,
+                  title_policy, label_policy, label_placement, segmentation
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """.trimIndent(),
                 UUID.randomUUID(),
                 constitutionId,
                 kind.kindCode,
                 kind.displayLabel,
                 index + 1,
+                last || kind.allowTextAlongsideChildren,
                 !last,
                 kind.presentation,
                 kind.showLabel,
                 kind.showTitle,
                 kind.showKind,
+                kind.allowTextAlongsideChildren,
+                kind.titlePolicy,
+                kind.labelPolicy,
+                kind.labelPlacement,
+                kind.segmentation,
             )
         }
         kinds.zipWithNext().forEach { (parent, child) ->

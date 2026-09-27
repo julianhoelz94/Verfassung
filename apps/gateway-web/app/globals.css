@@ -1854,3 +1854,9 @@ button.article-toggle[aria-expanded='false']::after {
 .dialog::backdrop {
   background: rgb(0 0 0 / 0.35);
 }
+
+.outline-config-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(18rem, 1fr); gap: 1.5rem; align-items: start; }
+.outline-live-preview { position: sticky; top: 1rem; }
+.outline-example-level { padding: .75rem; margin-block: .5rem; border-left: 2px solid var(--border); }
+.outline-example-level small { color: var(--muted); }
+@media (max-width: 800px) { .outline-config-layout { grid-template-columns: 1fr; } .outline-live-preview { position: static; } }

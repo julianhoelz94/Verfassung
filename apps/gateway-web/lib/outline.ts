@@ -11,6 +11,11 @@ export function toOutlineKindWrite(kind: {
   showLabel?: boolean;
   showTitle?: boolean;
   showKind?: boolean;
+  allowTextAlongsideChildren?: boolean;
+  titlePolicy?: string;
+  labelPolicy?: string;
+  labelPlacement?: string;
+  segmentation?: string;
 }): OutlineKindWrite {
   const presentation = asOutlinePresentation(kind.presentation);
   const concatenated = presentation === 'concatenated';
@@ -21,6 +26,11 @@ export function toOutlineKindWrite(kind: {
     showLabel: concatenated ? false : Boolean(kind.showLabel),
     showTitle: concatenated ? false : Boolean(kind.showTitle),
     showKind: concatenated ? false : Boolean(kind.showKind),
+    allowTextAlongsideChildren: Boolean(kind.allowTextAlongsideChildren),
+    titlePolicy: (kind.titlePolicy ?? 'optional') as OutlineKindWrite['titlePolicy'],
+    labelPolicy: (kind.labelPolicy ?? 'optional') as OutlineKindWrite['labelPolicy'],
+    labelPlacement: (kind.labelPlacement ?? 'before_title') as OutlineKindWrite['labelPlacement'],
+    segmentation: (kind.segmentation ?? (kind.kindCode === 'sentence' ? 'sentence' : 'plain')) as OutlineKindWrite['segmentation'],
   };
 }
 

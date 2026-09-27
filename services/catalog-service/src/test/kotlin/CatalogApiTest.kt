@@ -39,6 +39,12 @@ class CatalogApiTest {
     @Autowired
     lateinit var jdbcTemplate: JdbcTemplate
 
+    @Autowired
+    lateinit var settingsRepository: com.constitutionatlas.catalog.repo.SettingsRepository
+
+    @Autowired
+    lateinit var catalogRepository: com.constitutionatlas.catalog.repo.CatalogRepository
+
     @MockBean
     lateinit var identityClient: IdentityClient
 
@@ -51,6 +57,13 @@ class CatalogApiTest {
 
     @BeforeEach
     fun stubIdentity() {
+        val constitutionId = UUID.fromString("01900000-0000-4000-8000-000000000002")
+        if (settingsRepository.currentId(constitutionId) == null) {
+            settingsRepository.append(constitutionId, catalogRepository.findOutline(constitutionId))
+            catalogRepository.listAllVersionIds(constitutionId).forEach {
+                settingsRepository.pin(it, constitutionId, null)
+            }
+        }
         Mockito.reset(identityClient)
         Mockito.`when`(identityClient.authenticate(null)).thenThrow(UnauthorizedException("Missing session"))
         Mockito.`when`(identityClient.authenticate(TOKEN)).thenReturn(editor)
@@ -108,33 +121,72 @@ class CatalogApiTest {
     }
 
     @Test
-    fun putOutlineReplacesLayers() {
+    fun occupiedHierarchyChangesRequireMigration() {
         mockMvc.put("/constitutions/01900000-0000-4000-8000-000000000002/content-outline") {
             header("Authorization", TOKEN)
             contentType = MediaType.APPLICATION_JSON
             content = """
                 {"kinds":[
-                  {"kindCode":"article","displayLabel":"Article","presentation":"section","showLabel":true,"showTitle":true,"showKind":true},
+                  {"kindCode":"article","displayLabel":"Article","presentation":"section","showLabel":true,"showTitle":true,"showKind":true,"allowTextAlongsideChildren":true},
                   {"kindCode":"paragraph","displayLabel":"Paragraph","presentation":"section","showLabel":true,"showTitle":false,"showKind":false}
                 ]}
             """.trimIndent()
         }.andExpect {
-            status { isOk() }
-            jsonPath("$.outline.kinds.length()") { value(2) }
-            jsonPath("$.outline.kinds[1].kindCode") { value("paragraph") }
-            jsonPath("$.versionIds.length()") { value(3) }
+            status { isConflict() }
         }
         mockMvc.put("/constitutions/01900000-0000-4000-8000-000000000002/content-outline") {
             header("Authorization", TOKEN)
             contentType = MediaType.APPLICATION_JSON
             content = """
                 {"kinds":[
-                  {"kindCode":"article","displayLabel":"Article","presentation":"section","showLabel":true,"showTitle":true,"showKind":true},
-                  {"kindCode":"paragraph","displayLabel":"Paragraph","presentation":"section","showLabel":true,"showTitle":true,"showKind":false},
-                  {"kindCode":"sentence","displayLabel":"Sentence","presentation":"concatenated","showLabel":false,"showTitle":false,"showKind":false}
+                  {"kindCode":"article","displayLabel":"Article","presentation":"section","showLabel":true,"showTitle":true,"showKind":true,"allowTextAlongsideChildren":true},
+                  {"kindCode":"paragraph","displayLabel":"Paragraph","presentation":"section","showLabel":true,"showTitle":false,"showKind":false,"allowTextAlongsideChildren":true},
+                  {"kindCode":"sentence","displayLabel":"Sentence","presentation":"concatenated","showLabel":false,"showTitle":false,"showKind":false,"segmentation":"sentence"}
                 ]}
             """.trimIndent()
         }.andExpect { status { isOk() } }
+    }
+
+    @Test
+    fun settingsPinsSurvivePresentationChangesAndRejectStaleSaves() {
+        mockMvc.post("/countries") {
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"isoCode":"XY","name":"Settings test"}"""
+        }.andExpect { status { isCreated() } }
+        val created = mockMvc.post("/countries/XY/constitutions") {
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"slug":"settings-test","title":"Settings test"}"""
+        }.andExpect { status { isCreated() } }.andReturn()
+        val constitutionId = objectMapper.readTree(created.response.contentAsString).get("id").asText()
+        val initial = mockMvc.get("/constitutions/$constitutionId/settings").andReturn()
+        val revisionId = objectMapper.readTree(initial.response.contentAsString).get("id").asText()
+        val version = mockMvc.post("/constitutions/$constitutionId/versions") {
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"versionLabel":"Initial"}"""
+        }.andExpect { status { isCreated() } }.andReturn()
+        val versionId = objectMapper.readTree(version.response.contentAsString).get("id").asText()
+        val request = """{"expectedRevisionId":"$revisionId","kinds":[{"kindCode":"article","displayLabel":"Provision","showTitle":true}]}"""
+        mockMvc.put("/constitutions/$constitutionId/settings") {
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = request
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.predecessorId") { value(revisionId) }
+        }
+        mockMvc.get("/versions/$versionId/settings").andExpect {
+            status { isOk() }
+            jsonPath("$.id") { value(revisionId) }
+            jsonPath("$.outline.kinds[0].displayLabel") { value("Article") }
+        }
+        mockMvc.put("/constitutions/$constitutionId/settings") {
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = request
+        }.andExpect { status { isConflict() } }
     }
 
     @Test

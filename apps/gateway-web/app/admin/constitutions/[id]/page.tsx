@@ -2,14 +2,14 @@ import { notFound } from 'next/navigation';
 import { AdminForbidden } from '../../../components/AdminForbidden';
 import { Alert, PageHeader } from '../../../components/ui';
 import { PageMain } from '../../../components/PageMain';
-import { loadCountriesWithDetails } from '../../../../lib/api';
+import { loadCountriesWithDetails, getConstitutionSettings } from '../../../../lib/api';
 import { requireAdminPage } from '../../../../lib/admin';
 import { toOutlineKindWrite } from '../../../../lib/outline';
 import { OutlineEditor } from '../OutlineEditor';
 
 type AdminOutlinePageProps = {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ saved?: string; error?: string }>;
+  searchParams: Promise<{ saved?: string; error?: string; migration?: string }>;
 };
 
 export default async function AdminOutlinePage(props: AdminOutlinePageProps) {
@@ -27,6 +27,7 @@ export default async function AdminOutlinePage(props: AdminOutlinePageProps) {
   if (!match) {
     notFound();
   }
+  const settings = await getConstitutionSettings(params.id);
   const kinds = (match.constitution.contentOutline?.kinds ?? []).map(toOutlineKindWrite);
   return (
     <PageMain className="wide">
@@ -40,14 +41,15 @@ export default async function AdminOutlinePage(props: AdminOutlinePageProps) {
         meta={match.country?.name}
       />
       {searchParams.saved ? (
-        <Alert tone="success">Outline saved. Existing versions were restructured if layers were removed.</Alert>
+        <Alert tone="success">Settings saved. Historical versions retain their structural settings.</Alert>
       ) : null}
+      {searchParams.migration ? <Alert tone="error">This change requires a reviewed successor migration. Existing versions have been preserved.</Alert> : null}
       {searchParams.error ? <Alert tone="error">The outline could not be saved.</Alert> : null}
       <p>
         Depth is the number of layers. The top layer is the provision the public table of contents lists. A concatenated
         layer (typical for sentences) has no heading and is joined with its siblings.
       </p>
-      <OutlineEditor constitutionId={params.id} initial={kinds} />
+      <OutlineEditor constitutionId={params.id} initial={kinds} settingsRevisionId={settings.id} />
     </PageMain>
   );
 }

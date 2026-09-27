@@ -153,7 +153,7 @@ export default async function EditorPage(props: EditorPageProps) {
     kind: root.kind, logicalId: root.logicalId,
   })) : sourceArticles;
   const selectionRoot = searchParams.selectedNode ? structured?.roots.find(root => nodes([root]).some(node => node.logicalId === searchParams.selectedNode || node.content.some(entry => entry.logicalId === searchParams.selectedNode))) : undefined;
-  const selectedId = articles.find(article => article.logicalId === selectionRoot?.logicalId)?.id ?? (articles.some(article => article.id === searchParams.articleId) ? searchParams.articleId : articles[0]?.id);
+  const selectedId = (selectionRoot ? articles.find(article => article.logicalId === selectionRoot.logicalId)?.id : undefined) ?? (articles.some(article => article.id === searchParams.articleId) ? searchParams.articleId : articles[0]?.id);
   const selectedSummary = articles.find(article => article.id === selectedId);
   const selectedRoot = structured?.roots.find(root => root.logicalId === selectedSummary?.logicalId);
   const selected = selectedRoot && selectedSummary ? { ...selectedSummary, body: '', content: selectedRoot.content as import('../../lib/api').OrderedEntry[] } : selectedId && versionId ? legacySource ? await getArticle(selectedId) : await getUnit(versionId, selectedId) : null;

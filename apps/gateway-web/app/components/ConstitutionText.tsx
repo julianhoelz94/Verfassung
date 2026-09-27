@@ -2,15 +2,17 @@ import type { ReactNode } from 'react';
 import type { ArticleDetail, ArticleSummary, ContentNode, ContentOutline, OrderedEntry } from '../../lib/api';
 import { linkifyReferences, type CrossRefContext } from '../../lib/crossrefs';
 import { articleHeading, concatenatedText, groupNodes, kindByCode, nodeHeading } from '../../lib/outline';
+import { orderedText } from '../../lib/ordered-content';
 import { NodeTitleForm } from './NodeTitleForm';
 
 export type ConstitutionCrossRefs = Omit<CrossRefContext, 'kindLabel'>;
 
 type ConstitutionTextProps = {
   article?:
-    | Pick<ArticleDetail, 'articleNumber' | 'title' | 'body' | 'children' | 'kind'>
-    | Pick<ArticleSummary, 'articleNumber' | 'title' | 'body' | 'children'>;
+    | Pick<ArticleDetail, 'articleNumber' | 'title' | 'body' | 'children' | 'kind' | 'content'>
+    | Pick<ArticleSummary, 'articleNumber' | 'title' | 'body' | 'children' | 'content'>;
   nodes?: ContentNode[];
+  entries?: OrderedEntry[];
   body?: string | null;
   headingLevel?: 'h1' | 'h2' | 'h3';
   showHeading?: boolean;
@@ -25,6 +27,7 @@ type ConstitutionTextProps = {
 export function ConstitutionText({
   article,
   nodes,
+  entries,
   body,
   headingLevel = 'h1',
   showHeading = true,
@@ -56,7 +59,9 @@ export function ConstitutionText({
         </Heading>
       ) : null}
       {article && rootKind?.showLabel && rootKind.labelPlacement === 'inline' ? <span className="num">{article.articleNumber}</span> : null}
-      {children && children.length > 0 ? (
+      {entries !== undefined || article?.content != null ? (
+        <OrderedContentTree entries={entries ?? article?.content ?? []} outline={outline} withRefs={withRefs} />
+      ) : children && children.length > 0 ? (
         <NodeTree
           nodes={children}
           outline={outline}
@@ -150,7 +155,7 @@ function SectionNode({
 }
 
 /** Ordered reader rendering shares heading and sibling presentation rules with NodeTree. */
-export function OrderedContentTree({ entries, outline, withRefs = (text) => text }: { entries: OrderedEntry[]; outline: ContentOutline; withRefs?: (text: string) => ReactNode }) {
+export function OrderedContentTree({ entries, outline, withRefs = (text) => text }: { entries: OrderedEntry[]; outline?: ContentOutline; withRefs?: (text: string) => ReactNode }) {
   const groups: Array<{ entries: OrderedEntry[]; concatenated: boolean }> = [];
   for (const entry of entries) {
     const concatenated = entry.type === 'child' && Boolean(entry.node) &&
@@ -161,7 +166,7 @@ export function OrderedContentTree({ entries, outline, withRefs = (text) => text
     else groups.push({ entries: [entry], concatenated });
   }
   return <div className="node-tree">{groups.map((group, index) => {
-    if (group.concatenated) return <p key={index} className="constitution-body constitution-concat">{withRefs(group.entries.map((entry) => entry.node!.content.map((part) => part.text?.trim() ?? '').filter(Boolean).join(' ')).filter(Boolean).join(' '))}</p>;
+    if (group.concatenated) return <p key={index} className="constitution-body constitution-concat">{withRefs(orderedText(group.entries))}</p>;
     const entry = group.entries[0]!;
     if (entry.type === 'text') return <p key={entry.occurrenceId ?? entry.logicalId ?? index} id={entry.occurrenceId ?? undefined} className="constitution-body">{withRefs(entry.text ?? '')}</p>;
     const node = entry.node;

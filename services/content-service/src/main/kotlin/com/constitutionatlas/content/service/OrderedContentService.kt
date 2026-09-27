@@ -154,7 +154,7 @@ class OrderedContentService(private val repository: OrderedContentRepository, pr
         return snapshot.roots.firstNotNullOfOrNull { walk(it, emptyList()) } ?: throw NotFoundException("Unit '$logical' is not in version '$version'")
     }
 
-    fun plainText(node: OrderedNode): String = node.content.joinToString(" ") { it.node?.let(::plainText) ?: it.text.orEmpty() }
+    fun plainText(node: OrderedNode): String = com.constitutionatlas.platform.OrderedContentText.entries(node.content)
 
     private fun stale(message: String): Nothing = throw ResponseStatusException(HttpStatus.CONFLICT, message)
 }

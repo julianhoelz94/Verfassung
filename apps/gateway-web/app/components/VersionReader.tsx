@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import type { ArticleSummary, ContentOutline } from '../../lib/api';
-import { clipNodes, depthStopCount, depthStopLabels } from '../../lib/outline';
+import { clipOrderedEntries, clipNodes, depthStopCount, depthStopLabels } from '../../lib/outline';
 import { neighborsOf } from '../../lib/article-nav';
 import { Badge, type BadgeTone, Toolbar } from './ui';
 import { ArticleNav } from './ArticleNav';
@@ -140,6 +140,7 @@ export function VersionReader({
                 {open ? (
                   <div id={regionId}>
                     <ConstitutionText
+                      entries={article.content == null ? undefined : clipOrderedEntries(article.content, outline, shown)}
                       nodes={nodes}
                       body={body}
                       showHeading={false}

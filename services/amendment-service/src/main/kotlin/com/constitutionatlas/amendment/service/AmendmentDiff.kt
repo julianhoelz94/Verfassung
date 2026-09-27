@@ -17,6 +17,8 @@ internal data class FlatNode(
     val articleNumber: String,
     val logicalId: UUID? = null,
     val revisionId: UUID? = null,
+    val legacyIdentity: Boolean = false,
+    val legacyPath: String? = null,
 )
 
 internal data class NodeChange(
@@ -35,12 +37,12 @@ internal object AmendmentDiff {
                     number = article.articleNumber,
                     title = article.title,
                     body = article.content?.let(OrderedContentText::entries) ?: article.body,
-                    logicalId = article.logicalId, revisionId = article.revisionId,
+                    logicalId = article.logicalId, revisionId = article.revisionId, legacyIdentity = article.legacyIdentity,
                     predecessorId = article.predecessorId,
                     articleId = article.id,
                     articleNumber = article.articleNumber,
                 )
-            listOf(root) + (article.content?.let { flattenOrdered(it, article.id, article.articleNumber) } ?: flattenChildren(article.children, article.id, article.articleNumber))
+            listOf(root) + (article.content?.let { flattenOrdered(it, article.id, article.articleNumber, article.legacyIdentity, article.articleNumber) } ?: flattenChildren(article.children, article.id, article.articleNumber))
         }
 
     fun diff(source: List<FlatNode>, target: List<FlatNode>): List<NodeChange> {
@@ -62,10 +64,9 @@ internal object AmendmentDiff {
         val stillUnmatched = mutableListOf<FlatNode>()
         for (node in unmatchedTarget) {
             val key = identityKey(node)
-            val match =
-                source.firstOrNull { candidate ->
-                    candidate.id in unmatchedSource && (if (node.logicalId != null) candidate.logicalId == node.logicalId else candidate.logicalId == null && identityKey(candidate) == key)
-                }
+            val match = source.firstOrNull { candidate ->
+                candidate.id in unmatchedSource && (if (node.logicalId != null) candidate.logicalId == node.logicalId else candidate.logicalId == null && identityKey(candidate) == key)
+            }
             if (match != null) {
                 pairs += match to node
                 unmatchedSource.remove(match.id)
@@ -74,7 +75,19 @@ internal object AmendmentDiff {
             }
         }
 
-        val added = stillUnmatched.map { NodeChange("added", it) }
+        val addedTargets = mutableListOf<FlatNode>()
+        for (node in stillUnmatched) {
+            val match = source.firstOrNull { candidate ->
+                candidate.id in unmatchedSource && node.legacyIdentity && candidate.legacyIdentity && legacyKey(candidate) == legacyKey(node)
+            }
+            if (match != null) {
+                pairs += match to node
+                unmatchedSource.remove(match.id)
+            } else {
+                addedTargets += node
+            }
+        }
+        val added = addedTargets.map { NodeChange("added", it) }
         val removed = source.filter { it.id in unmatchedSource }.map { NodeChange("removed", it) }
         val changed =
             pairs
@@ -91,12 +104,12 @@ internal object AmendmentDiff {
         return added + changed + removed
     }
 
-    private fun flattenOrdered(entries: List<com.constitutionatlas.platform.OrderedEntry>, articleId: UUID, articleNumber: String): List<FlatNode> = entries.flatMap { entry ->
+    private fun flattenOrdered(entries: List<com.constitutionatlas.platform.OrderedEntry>, articleId: UUID, articleNumber: String, legacyIdentity: Boolean, path: String): List<FlatNode> = entries.flatMapIndexed { index, entry ->
         val node = entry.node
         if (node != null) {
-            listOf(FlatNode(node.occurrenceId, node.kind, node.label, node.label, node.title, OrderedContentText.entries(node.content), null, articleId, articleNumber, node.logicalId, node.revisionId)) + flattenOrdered(node.content, articleId, articleNumber)
+            listOf(FlatNode(node.occurrenceId, node.kind, node.label, node.label, node.title, OrderedContentText.entries(node.content), null, articleId, articleNumber, node.logicalId, node.revisionId, legacyIdentity, "$path/${node.kind}:${node.label.orEmpty()}:$index")) + flattenOrdered(node.content, articleId, articleNumber, legacyIdentity, "$path/${node.kind}:${node.label.orEmpty()}:$index")
         } else {
-            listOf(FlatNode(requireNotNull(entry.occurrenceId), "parent_text", null, null, null, requireNotNull(entry.text), null, articleId, articleNumber, entry.logicalId, entry.revisionId))
+            listOf(FlatNode(requireNotNull(entry.occurrenceId), "parent_text", null, null, null, requireNotNull(entry.text), null, articleId, articleNumber, entry.logicalId, entry.revisionId, legacyIdentity, "$path/text:$index"))
         }
     }
 
@@ -121,6 +134,8 @@ internal object AmendmentDiff {
                 )
             listOf(flat) + flattenChildren(node.children, articleId, articleNumber)
         }
+
+    private fun legacyKey(node: FlatNode): String = "${node.articleNumber}\u0000${node.legacyPath ?: identityKey(node)}"
 
     private fun identityKey(node: FlatNode): String =
         "${node.kind}\u0000${(node.number ?: node.label ?: "").lowercase()}"

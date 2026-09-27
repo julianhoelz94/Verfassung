@@ -61,7 +61,7 @@ class ArticleQueryService(
                 body = if (includeBody) ordered.plainText(root) else null,
                 children = if (includeBody) root.content.mapNotNull { it.node?.let(::compatibilityNode) } else null,
                 predecessorId = orderedRepository.occurrencePredecessor(root.occurrenceId),
-                content = if (includeBody) root.content else null, logicalId = root.logicalId, revisionId = root.revisionId, kind = root.kind,
+                content = if (includeBody) root.content else null, logicalId = root.logicalId, revisionId = root.revisionId, kind = root.kind, legacyIdentity = !orderedRepository.canonical(version),
             )
         } to roots.size
     }
@@ -73,7 +73,7 @@ class ArticleQueryService(
         val root = roots[index]
         return ArticleDetail(
             root.occurrenceId, version, root.label.orEmpty(), root.title.orEmpty(), ordered.plainText(root), index + 1, root.kind,
-            children = root.content.mapNotNull { it.node?.let(::compatibilityNode) }, predecessorId = orderedRepository.occurrencePredecessor(id), content = root.content, logicalId = root.logicalId, revisionId = root.revisionId,
+            children = root.content.mapNotNull { it.node?.let(::compatibilityNode) }, predecessorId = orderedRepository.occurrencePredecessor(id), content = root.content, logicalId = root.logicalId, revisionId = root.revisionId, legacyIdentity = !orderedRepository.canonical(version),
         )
     }
 
@@ -86,7 +86,7 @@ class ArticleQueryService(
                 return ArticleDetail(
                     id, version, root.label.orEmpty(), root.title.orEmpty(), ordered.plainText(root), 1,
                     predecessorId = orderedRepository.occurrencePredecessor(id),
-                    kind = root.kind, children = root.content.mapNotNull { it.node?.let(::compatibilityNode) }, content = root.content, logicalId = root.logicalId, revisionId = root.revisionId,
+                    kind = root.kind, children = root.content.mapNotNull { it.node?.let(::compatibilityNode) }, content = root.content, logicalId = root.logicalId, revisionId = root.revisionId, legacyIdentity = !orderedRepository.canonical(version),
                 )
             }
         }

@@ -60,6 +60,8 @@ class OrderedContentApiTest {
         val root = snapshot.roots.single()
         val summary = articles.listByVersion(version, includeBody = true).single()
         assertThat(summary.kind).isEqualTo("part")
+        assertThat(articles.listUnits(version, 0, 200, true).first.single().legacyIdentity).isFalse()
+        assertThat(articles.getUnit(version, root.occurrenceId).legacyIdentity).isFalse()
         assertThat(summary.logicalId).isEqualTo(root.logicalId)
         assertThat(articles.getById(root.occurrenceId).kind).isEqualTo("part")
         assertThat(content.plainText(root)).isEqualTo("Before. Exact  bytes. After.")

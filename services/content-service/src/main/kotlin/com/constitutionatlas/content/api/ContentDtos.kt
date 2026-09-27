@@ -21,6 +21,8 @@ data class ArticleSummary(
     val revisionId: UUID? = null,
     @get:JsonInclude(JsonInclude.Include.NON_NULL)
     val kind: String? = null,
+    @get:JsonInclude(JsonInclude.Include.NON_NULL)
+    val legacyIdentity: Boolean? = null,
 )
 
 data class ContentNodeDto(
@@ -59,6 +61,8 @@ data class ArticleDetail(
     val logicalId: UUID? = null,
     @get:JsonInclude(JsonInclude.Include.NON_NULL)
     val revisionId: UUID? = null,
+    @get:JsonInclude(JsonInclude.Include.NON_NULL)
+    val legacyIdentity: Boolean? = null,
 )
 
 data class NodeWrite(

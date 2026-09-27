@@ -38,6 +38,7 @@ export type ContentNode = {
   content?: OrderedEntry[];
   logicalId?: string;
   revisionId?: string;
+  legacyIdentity?: boolean;
 };
 
 export type ArticleDetail = {
@@ -52,6 +53,7 @@ export type ArticleDetail = {
   content?: OrderedEntry[];
   logicalId?: string;
   revisionId?: string;
+  legacyIdentity?: boolean;
 };
 
 export type ContentOutline = {
@@ -112,6 +114,7 @@ export type ArticleSummary = {
   content?: OrderedEntry[];
   logicalId?: string;
   revisionId?: string;
+  legacyIdentity?: boolean;
 };
 
 export type AmendmentChange = {

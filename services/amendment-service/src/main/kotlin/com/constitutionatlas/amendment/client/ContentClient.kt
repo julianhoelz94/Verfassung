@@ -41,6 +41,7 @@ data class ContentTreeArticle(
     val content: List<OrderedEntry>? = null,
     val logicalId: UUID? = null,
     val revisionId: UUID? = null,
+    val legacyIdentity: Boolean = false,
 )
 
 interface ContentClient {

@@ -102,3 +102,14 @@ describe('ordered title authoring permissions', () => {
     expect(NodeTitleForm).not.toHaveBeenCalled();
   });
 });
+
+
+it('retains unchanged legacy descendant text within a changed root', () => {
+  const leaf = (prefix: string, text: string) => ({ type: 'child' as const, node: { logicalId: prefix, revisionId: prefix, occurrenceId: prefix, kind: 'sentence', label: '(2a)', title: null, content: [{ type: 'text' as const, logicalId: `${prefix}-text`, occurrenceId: `${prefix}-text`, text }] } });
+  const left = { articleNumber: '46a', title: 'Rights', legacyIdentity: true, content: [leaf('old', 'Unchanged clause. Old ending.')] };
+  const right = { ...left, content: [leaf('new', 'Unchanged clause. New ending.')] };
+  const html = renderToStaticMarkup(createElement(DiffConstitutionText, { left, right, side: 'from', outline }));
+  expect(html).toContain('<span>Unchanged clause. </span>');
+  expect(html).not.toContain('<del class="diff-remove">Unchanged clause.');
+  expect(html).toContain('diff-remove');
+});

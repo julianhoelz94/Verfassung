@@ -3,7 +3,7 @@ import { articleHeading, asOutlinePresentation, concatenatedText, kindByCode, no
 import { OrderedContentTree } from './ConstitutionText';
 import { alignNodes, diffText, segsForSide, type DiffSeg } from '../../lib/text-diff';
 
-type ArticleLike = Pick<ArticleSummary, 'articleNumber' | 'title' | 'body' | 'children' | 'content' | 'kind'>;
+type ArticleLike = Pick<ArticleSummary, 'articleNumber' | 'title' | 'body' | 'children' | 'content' | 'kind' | 'legacyIdentity'>;
 
 type DiffConstitutionTextProps = {
   left?: ArticleLike;
@@ -43,7 +43,7 @@ export function DiffConstitutionText({
       {article && rootKind?.showLabel && rootKind.labelPlacement === 'inline' ? <span className="num">{rootLabel}</span> : null}
       {article && rootKind?.showLabel && rootKind.labelPlacement === 'superscript' ? <sup className="num">{rootLabel}</sup> : null}
       {left?.content != null || right?.content != null ? (
-        <OrderedDiff entries={article?.content ?? []} opposite={(side === 'from' ? right : left)?.content ?? []} side={side} outline={outline} oppositeOutline={oppositeOutline ?? outline} />
+        <OrderedDiff entries={article?.content ?? []} opposite={(side === 'from' ? right : left)?.content ?? []} side={side} outline={outline} oppositeOutline={oppositeOutline ?? outline} legacyIdentity={Boolean(left?.legacyIdentity && right?.legacyIdentity)} />
       ) : hasTree ? (
         <DiffNodeTree left={leftChildren} right={rightChildren} side={side} outline={outline} />
       ) : (
@@ -53,27 +53,55 @@ export function DiffConstitutionText({
   );
 }
 
-function OrderedDiff({ entries, opposite, side, outline, oppositeOutline }: { entries: OrderedEntry[]; opposite: OrderedEntry[]; side: 'from' | 'to'; outline?: ContentOutline; oppositeOutline?: ContentOutline }) {
-  const texts = new Map<string, OrderedEntry>();
-  const nodes = new Map<string, OrderedNode>();
+function OrderedDiff({ entries, opposite, side, outline, oppositeOutline, legacyIdentity }: { entries: OrderedEntry[]; opposite: OrderedEntry[]; side: 'from' | 'to'; outline?: ContentOutline; oppositeOutline?: ContentOutline; legacyIdentity: boolean }) {
+  const textIdentities = new Map<string, OrderedEntry>();
+  const nodeIdentities = new Map<string, OrderedNode>();
+  const texts = new Map<OrderedEntry, OrderedEntry>();
+  const nodes = new Map<OrderedNode, OrderedNode>();
   function collect(content: OrderedEntry[]) {
     for (const entry of content) {
-      if (entry.node) { nodes.set(entry.node.logicalId, entry.node); collect(entry.node.content); }
-      else if (entry.logicalId) texts.set(entry.logicalId, entry);
+      if (entry.node) { nodeIdentities.set(entry.node.logicalId, entry.node); collect(entry.node.content); }
+      else if (entry.logicalId) textIdentities.set(entry.logicalId, entry);
     }
   }
   collect(opposite);
+  function pair(content: OrderedEntry[], other: OrderedEntry[]) {
+    const remaining = new Set(other);
+    const selected = new Map<OrderedEntry, OrderedEntry>();
+    // Reserve stable identities before considering any legacy display-label match.
+    for (const entry of content) {
+      const identity = entry.node ? nodeIdentities.get(entry.node.logicalId) : entry.logicalId ? textIdentities.get(entry.logicalId) : undefined;
+      const match = identity ? other.find((candidate) => entry.node ? candidate.node === identity : candidate === identity) : undefined;
+      if (match) { selected.set(entry, match); remaining.delete(match); }
+    }
+    for (const entry of content) {
+      let match = selected.get(entry);
+      if (!match && legacyIdentity) {
+        match = other.find((candidate) => remaining.has(candidate) && (entry.node ? candidate.node?.kind === entry.node.kind && candidate.node.label === entry.node.label : !candidate.node));
+        if (match) remaining.delete(match);
+      }
+      if (entry.node) {
+        const counterpart = nodeIdentities.get(entry.node.logicalId) ?? match?.node;
+        if (counterpart) nodes.set(entry.node, counterpart);
+        pair(entry.node.content, counterpart?.content ?? []);
+      } else {
+        const counterpart = (entry.logicalId ? textIdentities.get(entry.logicalId) : undefined) ?? match;
+        if (counterpart) texts.set(entry, counterpart);
+      }
+    }
+  }
+  pair(entries, opposite);
   function marks(value: string, other: string) {
     const segments = segsForSide(side === 'from' ? diffText(value, other) : diffText(other, value), side);
     return segments.map((segment, index) => <DiffMark key={index} seg={segment} />);
   }
   return <OrderedContentTree entries={entries} outline={outline} idPrefix={`diff-${side}-`}
-    renderText={(entry) => marks(entry.text ?? '', entry.logicalId ? texts.get(entry.logicalId)?.text ?? '' : '')}
+    renderText={(entry) => marks(entry.text ?? '', texts.get(entry)?.text ?? '')}
     renderHeading={(node, heading) => {
-      const other = nodes.get(node.logicalId);
+      const other = nodes.get(node);
       return marks(heading, other ? nodeHeading(kindByCode(oppositeOutline, other.kind), { kind: other.kind, label: other.label, number: other.label, title: other.title }) ?? '' : '');
     }}
-    renderLabel={(node, label) => marks(label, nodes.get(node.logicalId)?.label ?? '')}
+    renderLabel={(node, label) => marks(label, nodes.get(node)?.label ?? '')}
   />;
 }
 

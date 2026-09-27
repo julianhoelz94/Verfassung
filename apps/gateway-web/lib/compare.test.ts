@@ -175,3 +175,31 @@ describe('stable ordered root alignment', () => {
     ]);
   });
 });
+
+
+describe('legacy ordered identity compatibility', () => {
+  const root = (id: string, body: string, legacyIdentity: boolean) => ({ id, logicalId: `logical-${id}`, revisionId: `revision-${id}`, legacyIdentity, versionId: id, articleNumber: '46a', title: 'Rights', sortOrder: 1, content: [{ type: 'text' as const, text: body }] });
+  it('pairs independently imported legacy roots by literal label and compares ordered text', () => {
+    const left = root('source', 'Old wording.', true);
+    const right = root('target', 'New wording.', true);
+    const [pair] = alignArticles([left], [right]);
+    expect(pair?.left).toBe(left);
+    expect(pair?.right).toBe(right);
+    expect(netArticleKind(pair?.left, pair?.right, [])).toBe('changed');
+    expect(netArticleKind(left, root('same', 'Old wording.', true), [])).toBe('same');
+  });
+  it('keeps distinct canonical roots added and removed despite matching labels and text', () => {
+    const pairs = alignArticles([root('source', 'Same wording.', false)], [root('target', 'Same wording.', false)]);
+    expect(pairs.map((pair) => netArticleKind(pair.left, pair.right, []))).toEqual(['added', 'removed']);
+  });
+});
+
+
+it('reserves stable identities before a renumbered legacy label collision', () => {
+  const source = { id: 'source', logicalId: 'stable', legacyIdentity: true, versionId: 'old', articleNumber: '1', title: '', sortOrder: 1 };
+  const newcomer = { ...source, id: 'newcomer', logicalId: 'new' };
+  const successor = { ...source, id: 'successor', articleNumber: '2' };
+  const pairs = alignArticles([source], [newcomer, successor]);
+  expect(pairs[0]?.left).toBeUndefined();
+  expect(pairs[1]?.left).toBe(source);
+});

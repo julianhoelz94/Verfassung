@@ -56,6 +56,21 @@ class ContentApiTest {
     }
 
     @Test
+    fun genericUnitsMarkLegacyIdentityWithoutChangingLegacyArticleContract() {
+        val version = UUID.fromString("01900000-0000-4000-8000-000000000004")
+        Mockito.`when`(catalogClient.getVersion(version)).thenReturn(CatalogVersion(version, "published"))
+        mockMvc.get("/versions/01900000-0000-4000-8000-000000000004/units")
+            .andExpect {
+                status { isOk() }
+                jsonPath("$[0].legacyIdentity") { value(true) }
+                jsonPath("$[0].logicalId") { isNotEmpty() }
+                jsonPath("$[0].revisionId") { isNotEmpty() }
+            }
+        mockMvc.get("/versions/01900000-0000-4000-8000-000000000004/articles")
+            .andExpect { jsonPath("$[0].legacyIdentity") { doesNotExist() } }
+    }
+
+    @Test
     fun listArticlesFor2022VersionIsOrdered() {
         mockMvc.get("/versions/01900000-0000-4000-8000-000000000004/articles")
             .andExpect {

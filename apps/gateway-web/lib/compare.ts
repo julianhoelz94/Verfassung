@@ -192,10 +192,15 @@ export function canonicalCompareQuery(
 /** Pair stable logical units; labels remain display text and need not be unique. */
 export function alignArticles(left: ArticleSummary[], right: ArticleSummary[]) {
   const unmatched = new Set(left);
-  const pairs = right.map((target) => {
+  const identities = new Map<ArticleSummary, ArticleSummary>();
+  for (const target of right) {
     const source = left.find((candidate) => unmatched.has(candidate) && (
       target.logicalId ? target.logicalId === (candidate.logicalId ?? candidate.id) : candidate.logicalId ? candidate.logicalId === target.id : candidate.articleNumber === target.articleNumber
     ));
+    if (source) { identities.set(target, source); unmatched.delete(source); }
+  }
+  const pairs = right.map((target) => {
+    const source = identities.get(target) ?? left.find((candidate) => unmatched.has(candidate) && target.legacyIdentity && candidate.legacyIdentity && candidate.articleNumber === target.articleNumber);
     if (source) unmatched.delete(source);
     return { key: target.logicalId ?? target.id, left: source, right: target as ArticleSummary | undefined };
   });

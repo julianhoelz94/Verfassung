@@ -84,13 +84,13 @@ function mockUnit(article) {
     const hex = createHash('sha256').update(value).digest('hex').slice(0, 32);
     return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
   }
-  function node(source, identity, rootNode = false) {
+  function node(source, identity) {
     const children = source.children ?? [];
     const content = children.length ? children.map((child, index) => ({ type: 'child', node: node(child, `${identity}/${child.kind}/${child.label ?? child.number ?? index}`) })) : [{ type: 'text', logicalId: uuid(`${identity}:text`), revisionId: uuid(`text:${source.body ?? ''}`), occurrenceId: uuid(`${article.versionId}:${identity}:text`), text: source.body ?? '' }];
     const title = nodeTitleOverrides.get(source.id) ?? source.title;
     return { logicalId: uuid(identity), revisionId: uuid(JSON.stringify([source.kind ?? 'article', source.label ?? source.articleNumber, title, content.map((entry) => entry.node?.revisionId ?? entry.revisionId)])), occurrenceId: source.id, kind: source.kind ?? 'article', label: source.label ?? source.number ?? source.articleNumber ?? null, title: title ?? null, content };
   }
-  const ordered = node(article, `article:${article.articleNumber}`, true);
+  const ordered = node(article, `article:${article.articleNumber}`);
   return { ...article, kind: ordered.kind, logicalId: ordered.logicalId, revisionId: ordered.revisionId, content: ordered.content };
 }
 
@@ -391,6 +391,14 @@ const server = createServer(async (req, res) => {
         ? versions
         : versions.filter((version) => version.listing !== 'staff' && version.hopKind !== 'editorial_correction');
     json(res, 200, filtered);
+    return;
+  }
+
+  const versionDetail = pathname.match(/^\/api\/catalog\/versions\/([^/]+)$/);
+  if (method === 'GET' && versionDetail) {
+    const version = [...germany.constitutions[0].versions, ...extraVersions].find((item) => item.id === versionDetail[1]);
+    if (!version) { json(res, 404, { error: 'Not found' }); return; }
+    json(res, 200, { ...version, constitutionId: CONSTITUTION_ID, countryCode: 'DE', publicationStatus: 'published', legalVersionId: version.legalVersionId ?? (version.hopKind === 'editorial_correction' ? version.predecessorVersionId : version.id) });
     return;
   }
 

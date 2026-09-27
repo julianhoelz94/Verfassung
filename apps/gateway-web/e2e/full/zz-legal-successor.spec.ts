@@ -10,7 +10,7 @@ test('editor, reviewer, and publisher release a real legal successor with its so
   await page.getByLabel('Current law').selectOption(pair.targetVersionId);
   await page.getByRole('button', { name: 'Record the next legal change' }).click();
   await expect(page).toHaveURL(/sessionId=/);
-  await page.getByLabel('Article text').fill('A new legal duty protects public dignity in this journey.');
+  await page.locator('#draft-form textarea').first().fill('A new legal duty protects public dignity in this journey.');
   await page.getByRole('button', { name: 'Save draft' }).click();
   await expect(page.getByText('Draft saved.')).toBeVisible();
   await page.getByLabel('Title', { exact: true }).last().fill(recordTitle);

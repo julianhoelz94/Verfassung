@@ -61,6 +61,7 @@ class StructuredDraftService(
         val pin = drafts.pin(sessionId)
         val source = sources.source(session.versionId)
         val settings = sources.settings(session.versionId)
+        if (source.settingsRevisionId != settings.id) throw ConflictException("Source and settings pins disagree", "stale_source")
         if (pin != null && (source.generation != pin.sourceGeneration || settings.id != pin.settingsRevisionId || source.roots.map { it.revisionId } != pin.rootRevisionIds)) throw ConflictException("Pinned source changed", "stale_source")
         val operations = drafts.operations(sessionId)
         return StructuredDraftPreview(sessionId, session.versionId, pin?.sourceGeneration ?: source.generation, pin?.settingsRevisionId ?: settings.id, pin?.generation ?: 0, pin?.rootRevisionIds ?: source.roots.map { requireNotNull(it.revisionId) }, operations, StructuredDraftEngine.replay(source.roots, operations, settings), source.roots)

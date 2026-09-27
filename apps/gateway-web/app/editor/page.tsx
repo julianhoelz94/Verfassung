@@ -7,6 +7,9 @@ import { getCountry, listAllUnits, getUnit, getVersionSettings, listCountries, t
 import { editorErrorMessage, getDraftPreview, getStructuredDraft, listSessions, type EditSessionSummary } from '../../lib/editor-api';
 import { currentUser } from '../../lib/session';
 import { ArticleEditor } from './ArticleEditor';
+import { EditorDraftState, SubmitReviewButton } from './EditorDraftState';
+import { draftDifferences, readerNode } from '../../lib/structured-editor';
+import { OrderedContentTree } from '../components/ConstitutionText';
 import { StructuredEditor } from './StructuredEditor';
 import { PublishForm } from './PublishForm';
 import { LegacyPublishForm } from './LegacyPublishForm';
@@ -139,24 +142,29 @@ export default async function EditorPage(props: EditorPageProps) {
     constitution.versions.some((version) => version.id === versionId || version.currentVersionId === versionId),
   );
   const selectedVersion = selectedConstitution?.versions.find((version) => version.id === versionId || version.currentVersionId === versionId);
-  const articles: ArticleSummary[] = versionId ? await listAllUnits(versionId) : [];
-  const selectedId = searchParams.articleId ?? articles[0]?.id;
-  const selected = selectedId && versionId ? await getUnit(versionId, selectedId) : null;
-  const draft = selected
-    ? preview?.drafts?.find((item) => item.articleId === selected.id)
-    : undefined;
   const settings = session && versionId ? await getVersionSettings(versionId) : null;
   const structured = session && !(preview?.drafts?.length) ? await getStructuredDraft(session.id) : null;
-  const selectedRoot = structured?.roots.find(root => root.logicalId === selected?.logicalId);
+  const sourceArticles: ArticleSummary[] = versionId ? await listAllUnits(versionId) : [];
+  const articles: ArticleSummary[] = structured ? structured.roots.map((root, index) => ({
+    id: sourceArticles.find(article => article.logicalId === root.logicalId)?.id ?? root.logicalId,
+    versionId: versionId!, articleNumber: root.label ?? '', title: root.title ?? '', sortOrder: index + 1,
+    kind: root.kind, logicalId: root.logicalId,
+  })) : sourceArticles;
+  const selectedId = articles.some(article => article.id === searchParams.articleId) ? searchParams.articleId : articles[0]?.id;
+  const selectedSummary = articles.find(article => article.id === selectedId);
+  const selectedRoot = structured?.roots.find(root => root.logicalId === selectedSummary?.logicalId);
+  const selected = selectedRoot && selectedSummary ? { ...selectedSummary, body: '', content: selectedRoot.content as import('../../lib/api').OrderedEntry[] } : selectedId && versionId ? await getUnit(versionId, selectedId) : null;
+  const draft = selected ? preview?.drafts?.find(item => item.articleId === selected.id) : undefined;
   const editorReturnTo =
     versionId && searchParams.sessionId && selected
       ? `/editor?versionId=${encodeURIComponent(versionId)}&sessionId=${encodeURIComponent(searchParams.sessionId)}&articleId=${encodeURIComponent(selected.id)}`
       : '/editor';
   const articleHrefBase =
     versionId && searchParams.sessionId
-      ? `/editor?versionId=${encodeURIComponent(versionId)}&sessionId=${encodeURIComponent(searchParams.sessionId)}`
+      ? `/editor?versionId=${encodeURIComponent(versionId)}&sessionId=${encodeURIComponent(searchParams.sessionId)}${searchParams.scope ? `&scope=${encodeURIComponent(searchParams.scope)}` : ''}`
       : '/editor';
-  const draftIds = (preview?.drafts ?? []).map((item) => item.articleId);
+  const changedRootIds = structured?.roots.filter(root => draftDifferences(structured.sourceRoots.filter(source => source.logicalId === root.logicalId), [root]).length > 0).map(root => root.logicalId) ?? [];
+  const draftIds = [...(preview?.drafts ?? []).map((item) => item.articleId), ...articles.filter(article => article.logicalId && changedRootIds.includes(article.logicalId)).map(article => article.id)];
   const changedLabels = articles
     .filter((article) => draftIds.includes(article.id))
     .map((article) => `${article.kind ?? 'Unit'} ${article.articleNumber}`);
@@ -286,15 +294,16 @@ export default async function EditorPage(props: EditorPageProps) {
       />
       {alerts}
       {searchParams.sessionId && articles.length > 0 ? (
-        <div className="workspace">
+        <EditorDraftState><div className="workspace">
           <aside className="panel" aria-label="Top-level units">
-            <h2 className="panel-title">Top-level units</h2>
+            <h2 className="panel-title">{(settings?.outline ?? selectedConstitution?.contentOutline)?.kinds[0]?.kindCode === 'article' ? 'Articles' : 'Top-level units'}</h2>
             <p className="muted">{draftIds.length} changed</p>
             <ArticleFilterList
               articles={articles}
               selectedId={selected?.id}
               hrefBase={articleHrefBase}
               draftIds={draftIds}
+              unitLabel={settings?.outline.kinds[0]?.kindCode === 'article' ? undefined : settings?.outline.kinds[0]?.displayLabel}
             />
           </aside>
           <section className="panel" aria-labelledby="edit-title">
@@ -349,7 +358,7 @@ export default async function EditorPage(props: EditorPageProps) {
                 <form action="/editor/command" method="post">
                   <input type="hidden" name="command" value="review" />
                   {hiddenFields}
-                  <Button disabled={session.hopKind === 'legal' ? !preview.changeRecord : session.hopKind === 'editorial_correction' ? !preview.publishComment : false}>Submit for review</Button>
+                  <SubmitReviewButton disabled={session.hopKind === 'legal' ? !preview.changeRecord : session.hopKind === 'editorial_correction' ? !preview.publishComment : false} />
                 </form>
               ) : null}
               {canReview && session.status === 'reviewing' ? (
@@ -420,7 +429,7 @@ export default async function EditorPage(props: EditorPageProps) {
             {selected ? (
               <>
                 <p className="panel-title">Preview</p>
-                <ConstitutionText
+                {structured && selectedRoot ? <OrderedContentTree entries={[{ type: 'child', node: readerNode(selectedRoot) }]} outline={settings?.outline} /> : <ConstitutionText
                   article={{
                     articleNumber: selected.articleNumber,
                     title: draft?.title ?? selected.title,
@@ -430,11 +439,11 @@ export default async function EditorPage(props: EditorPageProps) {
                   headingLevel="h3"
                   showHeading={false}
                   outline={settings?.outline ?? selectedConstitution?.contentOutline}
-                />
+                />}
               </>
             ) : null}
           </aside>
-        </div>
+        </div></EditorDraftState>
       ) : (
         <Alert tone="error">This session could not be loaded, or the version has no top-level units yet.</Alert>
       )}

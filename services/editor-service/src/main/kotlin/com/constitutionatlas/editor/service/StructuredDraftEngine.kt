@@ -34,6 +34,28 @@ object StructuredDraftEngine {
                 }
             }
             when (operation.type) {
+                "insert_root" -> {
+                    require(foundNode != null && roots.any { it.logicalId == operation.targetId }) { "Root insertion requires a source root" }
+                    val child = operation.node ?: throw IllegalArgumentException("New root is required")
+                    fun fresh(node: DraftNode) {
+                        require(node.revisionId == null && node.draftId == null) { "Inserted roots cannot claim revisions" }
+                        node.content.forEach { entry ->
+                            require(entry.revisionId == null && entry.draftId == null) { "Inserted entries cannot claim revisions" }
+                            entry.node?.let(::fresh)
+                        }
+                    }
+                    fresh(child)
+                    val position = operation.position ?: throw IllegalArgumentException("Root position is required")
+                    require(position in 0..roots.size) { "Invalid root position" }
+                    roots = roots.take(position) + markInserted(child, operation.id) + roots.drop(position)
+                }
+                "move_root" -> {
+                    val root = roots.find { it.logicalId == operation.targetId } ?: throw IllegalArgumentException("Root required")
+                    val retained = roots.filter { it.logicalId != root.logicalId }
+                    val position = operation.position ?: throw IllegalArgumentException("Root position is required")
+                    require(position in 0..retained.size) { "Invalid root position" }
+                    roots = retained.take(position) + root + retained.drop(position)
+                }
                 "replace_text" -> targetText { listOf(it.copy(text = operation.text ?: throw IllegalArgumentException("text is required"), draftId = operation.id)) }
                 "set_metadata" -> {
                     require(foundNode != null) { "Metadata belongs to nodes, not parent text" }
@@ -116,8 +138,8 @@ object StructuredDraftEngine {
                 }
                 else -> throw IllegalArgumentException("Unknown draft operation '${operation.type}'")
             }
-            validate(roots, settings)
         }
+        validate(roots, settings)
         return roots
     }
 

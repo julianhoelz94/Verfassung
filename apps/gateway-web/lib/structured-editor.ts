@@ -10,6 +10,23 @@ export function findNode(roots: DraftNode[], id: string): DraftNode | undefined 
 
 /** Local replay of the targeted command contract. Server replay remains authoritative. */
 export function applyOperation(roots: DraftNode[], op: DraftOperation): DraftNode[] {
+  if (op.type === 'insert_root') return [...roots.slice(0, op.position), markInserted(op.node!, op.id), ...roots.slice(op.position)];
+  if (op.type === 'move_root') {
+    const root = roots.find(node => node.logicalId === op.targetId)!;
+    const retained = roots.filter(node => node.logicalId !== op.targetId);
+    return [...retained.slice(0, op.position), root, ...retained.slice(op.position)];
+  }
+  if (op.type === 'move') {
+    const parent = nodes(roots).find(node => node.content.some(entry => entry.logicalId === op.targetId || entry.node?.logicalId === op.targetId));
+    const entry = parent?.content.find(entry => entry.logicalId === op.targetId || entry.node?.logicalId === op.targetId);
+    if (!entry) throw new Error('Move requires an entry under a parent.');
+    const retained = applyOperation(roots, { ...op, type: 'remove' });
+    function insert(node: DraftNode): DraftNode {
+      const content = node.content.map(item => item.node ? { ...item, node: insert(item.node) } : item);
+      return node.logicalId === op.destinationParentId ? { ...node, draftId: op.id, content: [...content.slice(0, op.position), entry!, ...content.slice(op.position)] } : { ...node, content };
+    }
+    return retained.map(insert);
+  }
   function walk(node: DraftNode): DraftNode {
     let content = node.content.map(entry => entry.node ? { ...entry, node: walk(entry.node) } : entry);
     let result = { ...node, content };
@@ -65,8 +82,21 @@ export function validateDraft(roots: DraftNode[], outline: ContentOutline): stri
   roots.forEach(node => walk(node, 0)); return errors;
 }
 export function sentenceParts(text: string): string[] {
-  // Propose boundaries only: retain every byte, including whitespace after punctuation.
-  return text.match(/[^.!?]*[.!?]+(?:\s+|$)|[^.!?]+$|[.!?]+/gu) ?? [text];
+  const parts: string[] = []; let start = 0;
+  for (const match of text.matchAll(/[.!?]+(?:\s+|$)/gu)) {
+    const end = match.index! + match[0].length;
+    parts.push(text.slice(start, end)); start = end;
+  }
+  if (start < text.length) parts.push(text.slice(start));
+  return parts.length ? parts : [text];
+}
+export function scopedNodes(roots: DraftNode[], rootId: string, selection: string, scope: string): DraftNode[] {
+  const root = findNode(roots, rootId); if (!root) return [];
+  const selected = findNode(roots, selection) ?? nodes(roots).find(node => node.content.some(entry => entry.logicalId === selection)) ?? root;
+  const candidates = nodes(roots).filter(node => node.kind === scope);
+  const ancestor = candidates.find(node => nodes([node]).some(child => child.logicalId === selected.logicalId));
+  if (ancestor) return [ancestor];
+  return nodes([selected]).filter(node => node.kind === scope);
 }
 export type DraftDifference = { logicalId: string; field: string; before: string; after: string; sourceRevisionId?: string | null; targetRevisionId?: string | null };
 export function draftDifferences(source: DraftNode[], target: DraftNode[]): DraftDifference[] {
@@ -86,4 +116,9 @@ export function draftDifferences(source: DraftNode[], target: DraftNode[]): Draf
     else for (const field of Object.keys(a.fields)) if (a.fields[field] !== b.fields[field]) changes.push({ logicalId: id, field, before: a.fields[field], after: b.fields[field], sourceRevisionId: a.revision, targetRevisionId: b.revision });
   }
   return changes;
+}
+
+/** Draft preview IDs are local anchors; historical public IDs remain version scoped. */
+export function readerNode(node: DraftNode): import('./api').OrderedNode {
+  return { ...node, label: node.label ?? null, title: node.title ?? null, revisionId: token(node), occurrenceId: `draft-${node.logicalId}`, content: node.content.map(entry => entry.node ? { type: 'child', node: readerNode(entry.node) } : { ...entry, occurrenceId: `draft-${entry.logicalId}` }) };
 }

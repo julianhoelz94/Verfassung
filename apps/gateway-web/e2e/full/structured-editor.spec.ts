@@ -112,6 +112,10 @@ for (const hop of ['editorial_correction', 'legal'] as const) {
       expect(laws).toHaveLength(1);
       expect(laws[0].sourceVersionId).toBe(version.id);
       expect(laws[0].targetVersionId).toBe(targetId);
+      await page.goto(`/countries/XA/compare?from=${version.id}&to=${targetId}&all=1`);
+      await expect(page.locator('main')).toContainText('Original wording.');
+      await expect(page.locator('main')).toContainText('Changed wording.');
+      await expect(page.locator('main')).toContainText('Between.');
     }
   });
 }

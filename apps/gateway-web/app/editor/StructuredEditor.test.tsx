@@ -1,4 +1,4 @@
-import { act } from 'react';
+import { act, type ComponentProps } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { Simulate } from 'react-dom/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -37,10 +37,11 @@ describe('structured editor acceptance', () => {
     host = document.createElement('main'); document.body.appendChild(host); root = createRoot(host);
   });
   afterEach(async () => { await act(async () => root.unmount()); host.remove(); vi.unstubAllGlobals(); });
-  async function mount(outline: ContentOutline, roots: DraftNode[], scope?: string) {
+  async function mount(outline: ContentOutline, roots: DraftNode[], scope?: string, extras: Partial<ComponentProps<typeof StructuredEditor>> = {}) {
     const preview: StructuredPreview = { sessionId: 'session', sourceVersionId: 'source', sourceGeneration: 1, settingsRevisionId: 'settings', generation: 0, sourceRoots: roots, roots, operations: [] };
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => preview }));
-    await act(async () => root.render(<EditorDraftState><StructuredEditor preview={preview} outline={outline} rootId={roots[0].logicalId} versionId="source" articleId="unit" constitutionId="constitution" editable scope={scope} /><SubmitReviewButton disabled={false} /></EditorDraftState>));
+    await act(async () => root.render(<EditorDraftState><StructuredEditor preview={preview} outline={outline} rootId={roots[0].logicalId} versionId="source" articleId="unit" constitutionId="constitution" editable scope={scope} {...extras} /><SubmitReviewButton disabled={false} /></EditorDraftState>));
+    return preview;
   }
   function button(name: string, index = 0): HTMLButtonElement {
     const found = [...host.querySelectorAll('button')].filter(item => item.textContent === name)[index];
@@ -141,5 +142,62 @@ describe('structured editor acceptance', () => {
     expect([...host.querySelectorAll('button')].some(item => item.textContent === 'Merge with next sentence')).toBe(false);
     expect(payload().operations).toEqual([]); expect(field('Sentence title').value).toBe('');
     expect(host.querySelectorAll('[aria-label="Sentence title"]')[1].getAttribute('value')).toBe('Keep this title');
+  });
+
+  it('retains saved review differences and historical links for an unloaded root', async () => {
+    const outline = { kinds: [level('Clause', 0)] };
+    const first = node('Clause', 'first', 'Selected source.'), second = { ...node('Clause', 'second'), content: [] };
+    await mount(outline, [first, second], undefined, { review: [{ logicalId: 'text-second', field: 'text', before: 'Historical wording.', after: 'Saved correction.', sourceRevisionId: 'old-text', targetRevisionId: 'saved-op', sourceLink: '/versions/historical/units/second', targetLink: '/versions/successor/units/second' }] });
+    expect(texts()).toHaveLength(1);
+    expect(host.querySelector('del')?.textContent).toBe('Historical wording.');
+    expect(host.querySelector('ins')?.textContent).toBe('Saved correction.');
+    expect(host.querySelector('a[href="/versions/historical/units/second"]')).not.toBeNull();
+    await change(texts()[0], 'Unsaved first correction.');
+    expect([...host.querySelectorAll('ins')].map(item => item.textContent)).toEqual(['Saved correction.', 'Unsaved first correction.']);
+  });
+
+  it('locks scope, navigation and saving while an overview request is pending', async () => {
+    const fixture = mixed(); const preview = await mount(fixture.outline, fixture.roots, 'constitution');
+    let release!: (response: { ok: boolean; json: () => Promise<StructuredPreview> }) => void;
+    vi.stubGlobal('fetch', vi.fn().mockReturnValue(new Promise(resolve => { release = resolve; })));
+    const scope = host.querySelector('select')!;
+    await change(scope, 'constitution');
+    expect(scope.disabled).toBe(true); expect(button('Save draft').disabled).toBe(true);
+    expect(button('article 46a Rights').disabled).toBe(true);
+    expect(host.textContent).toContain('Loading editor view');
+    await act(async () => release({ ok: true, json: async () => preview }));
+    expect(scope.disabled).toBe(false); expect(button('article 46a Rights').disabled).toBe(false);
+  });
+
+  it('loads another root without overwriting unsaved text, and preserves the loaded root through undo', async () => {
+    const outline = { kinds: [level('Article', 0)] };
+    const first = { ...node('Article', 'first', 'First source.'), label: '1' };
+    const second = { ...node('Article', 'second', 'Second saved wording.'), label: '2' };
+    const preview = await mount(outline, [first, { ...second, content: [] }]);
+    await change(texts()[0], 'Unsaved first wording.');
+    const fetchView = vi.fn(async (url: string) => ({ ok: true, json: async () => url.includes('rootId=second') ? { ...preview, roots: [{ ...first, content: [] }, second], sourceRoots: [{ ...first, content: [] }, second] } : { ...preview, roots: [{ ...first, content: [] }, { ...second, content: [] }] } }));
+    vi.stubGlobal('fetch', fetchView);
+    const scope = host.querySelector('select')!;
+    await change(scope, 'constitution'); await click('article 2 ');
+    expect(fetchView.mock.calls[1][0]).toContain('rootId=second');
+    expect(texts()[0].value).toBe('Second saved wording.');
+    expect(payload().operations).toEqual([expect.objectContaining({ targetId: 'text-first', text: 'Unsaved first wording.' })]);
+    await change(scope, 'constitution'); await click('article 1 ');
+    expect(texts()[0].value).toBe('Unsaved first wording.');
+    await click('Undo'); expect(texts()[0].value).toBe('First source.');
+    await change(scope, 'constitution'); await click('article 2 ');
+    expect(texts()[0].value).toBe('Second saved wording.');
+    expect(fetchView.mock.calls.filter(([url]) => url.includes('rootId=second'))).toHaveLength(1);
+  });
+
+  it.each(['generation', 'settingsRevisionId'] as const)('rejects a mismatched %s without losing unsaved work or changing scope', async pin => {
+    const fixture = mixed(); const preview = await mount(fixture.outline, fixture.roots);
+    await change(texts()[1], 'Keep unsaved wording.');
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ ...preview, [pin]: pin === 'generation' ? 2 : 'different-settings' }) }));
+    const scope = host.querySelector('select')!; await change(scope, 'constitution');
+    expect(scope.value).toBe('article'); expect(scope.disabled).toBe(false);
+    expect(texts()[1].value).toBe('Keep unsaved wording.');
+    expect(payload().operations[0].text).toBe('Keep unsaved wording.');
+    expect(host.textContent).toContain('This session changed. Save or reload before navigating.');
   });
 });

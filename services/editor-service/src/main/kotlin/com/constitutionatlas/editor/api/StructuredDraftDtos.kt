@@ -12,6 +12,7 @@ data class DraftNode(
     val label: String? = null,
     val title: String? = null,
     val content: List<DraftEntry>,
+    val occurrenceId: UUID? = null,
 )
 
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -22,6 +23,7 @@ data class DraftEntry(
     val revisionId: UUID? = null,
     val draftId: UUID? = null,
     val text: String? = null,
+    val occurrenceId: UUID? = null,
 )
 
 @JsonIgnoreProperties(ignoreUnknown = true)

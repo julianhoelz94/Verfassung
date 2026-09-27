@@ -5,8 +5,8 @@ import { applyOperation, draftDifferences, findNode, nodes, scopedNodes, sentenc
 import { useDraftState } from './EditorDraftState';
 import { Button } from '../components/ui';
 
-type Props = { preview: StructuredPreview; outline: ContentOutline; rootId: string; versionId: string; articleId: string; constitutionId: string; editable: boolean; scope?: string; selectedNode?: string };
-export function StructuredEditor({ preview, outline, rootId, versionId, articleId, constitutionId, editable, scope: initialScope, selectedNode }: Props) {
+type Props = { preview: StructuredPreview; outline: ContentOutline; rootId: string; versionId: string; articleId: string; constitutionId: string; editable: boolean; scope?: string; selectedNode?: string; publishedVersionId?: string | null; unitMapping?: Record<string, string> | null };
+export function StructuredEditor({ preview, outline, rootId, versionId, articleId, constitutionId, editable, scope: initialScope, selectedNode, publishedVersionId, unitMapping }: Props) {
   const [roots, setRoots] = useState(preview.roots);
   const [operations, setOperations] = useState<DraftOperation[]>([]);
   const [history, setHistory] = useState<{ roots: DraftNode[]; operations: DraftOperation[] }[]>([]);
@@ -22,7 +22,7 @@ export function StructuredEditor({ preview, outline, rootId, versionId, articleI
   }, [operations.length]);
   const caret = useRef<Record<string, number>>({});
   const allNodes = nodes(roots);
-  const root = findNode(roots, rootId);
+  const root = roots.find(root => nodes([root]).some(node => node.logicalId === selection || node.content.some(entry => entry.logicalId === selection))) ?? findNode(roots, rootId) ?? roots[0];
   const errors = validateDraft(roots, outline);
   const differences = draftDifferences(preview.sourceRoots, roots);
   function remember(view: string, selected: string) {
@@ -133,7 +133,16 @@ export function StructuredEditor({ preview, outline, rootId, versionId, articleI
   const articleIndex = outline.kinds.findIndex(kind => kind.kindCode === 'article');
   const broad = scope === 'constitution' || (articleIndex >= 0 && scopeIndex < articleIndex);
   const selectedUnit = findNode(roots, selection) ?? allNodes.find(node => node.content.some(entry => entry.logicalId === selection)) ?? root;
-  const focusedNodes = scopedNodes(roots, rootId, selection, scope);
+  const focusedNodes = scopedNodes(roots, root?.logicalId ?? rootId, selection, scope);
+  function reference(id: string, target: boolean) {
+    const sourceRoot = preview.sourceRoots.find(root => nodes([root]).some(node => node.logicalId === id || node.content.some(entry => entry.logicalId === id)));
+    const targetRoot = roots.find(root => nodes([root]).some(node => node.logicalId === id || node.content.some(entry => entry.logicalId === id)));
+    const sourceUnit = sourceRoot && (findNode([sourceRoot], id) ?? nodes([sourceRoot]).flatMap(node => node.content).find(entry => entry.logicalId === id));
+    const version = target ? publishedVersionId : preview.sourceVersionId;
+    const rootOccurrence = target ? targetRoot && unitMapping?.[targetRoot.logicalId] : sourceRoot?.occurrenceId;
+    const occurrence = target ? unitMapping?.[id] : sourceUnit?.occurrenceId;
+    return version && rootOccurrence ? `/versions/${encodeURIComponent(version)}/units/${encodeURIComponent(rootOccurrence)}${occurrence ? `?occurrenceId=${encodeURIComponent(occurrence)}` : ''}` : undefined;
+  }
   return <form action="/editor/command" method="post" id="draft-form">
     <input type="hidden" name="command" value="structured-save" /><input type="hidden" name="sessionId" value={preview.sessionId} /><input type="hidden" name="versionId" value={versionId} /><input type="hidden" name="articleId" value={articleId} />
     <input type="hidden" name="scope" value={scope} /><input type="hidden" name="selectedNode" value={selection} /><input type="hidden" name="structuredDraft" value={JSON.stringify({ expectedGeneration: preview.generation, operations })} />
@@ -148,6 +157,6 @@ export function StructuredEditor({ preview, outline, rootId, versionId, articleI
       <button type="button" disabled={roots.length < 2} onClick={() => change({ type: 'remove', targetId: root.logicalId, expectedRevisionId: token(root) })}>Remove top-level unit</button>
     </div> : null}
     {editable ? <div className="action-bar"><Button variant="primary" disabled={!operations.length || errors.length > 0}>Save draft</Button><button type="button" disabled={!history.length} onClick={undo}>Undo</button></div> : null}
-    <details open={!editable}><summary>Entry-level review ({differences.length} changes)</summary>{differences.length ? <ol>{differences.map((difference, index) => <li key={index}><strong>{difference.field}</strong> · <code>{difference.logicalId}</code><div><del>{difference.before}</del> → <ins>{difference.after}</ins></div><small>Source revision: {difference.sourceRevisionId ?? 'new'} · Target: {difference.targetRevisionId ?? 'removed'}</small></li>)}</ol> : <p>No changes.</p>}</details>
+    <details open={!editable}><summary>Entry-level review ({differences.length} changes)</summary>{differences.length ? <ol>{differences.map((difference, index) => <li key={index}><strong>{difference.field}</strong><div><del>{difference.before}</del> → <ins>{difference.after}</ins></div><div>{reference(difference.logicalId, false) ? <a href={reference(difference.logicalId, false)}>Source snapshot</a> : null} {reference(difference.logicalId, true) ? <a href={reference(difference.logicalId, true)}>Published successor</a> : null}</div><details><summary>Revision details</summary><small>Unit: {difference.logicalId} · Source revision: {difference.sourceRevisionId ?? 'new'} · Target: {difference.targetRevisionId ?? 'removed'}</small></details></li>)}</ol> : <p>No changes.</p>}</details>
   </form>;
 }

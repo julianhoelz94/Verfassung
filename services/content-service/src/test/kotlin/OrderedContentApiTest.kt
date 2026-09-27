@@ -24,6 +24,7 @@ import org.testcontainers.containers.PostgreSQLContainer
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
 import java.util.UUID
+import org.springframework.web.server.ResponseStatusException
 
 @Testcontainers
 @SpringBootTest(classes = [ContentServiceApplication::class], properties = ["content.ordered-mixed-writes.enabled=true"])
@@ -219,6 +220,32 @@ class OrderedContentApiTest {
         assertThrows(IllegalArgumentException::class.java) { content.save(targetId, OrderedSnapshotWrite(generation, roots = listOf(OrderedNodeWrite(kind = "article", content = listOf(OrderedEntryWrite("text", text = "Forbidden parent text")))))) }
         assertThat(count("content_node_revisions")).isEqualTo(before)
         assertThat(content.get(targetId).generation).isEqualTo(generation)
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(ints = [5, 250])
+    fun revisionGrowthDependsOnChangedPathRatherThanTreeSize(size: Int) {
+        val constitution = UUID.randomUUID()
+        val sourceId = UUID.randomUUID()
+        val targetId = UUID.randomUUID()
+        version(sourceId, constitution)
+        version(targetId, constitution)
+        val source = content.save(sourceId, OrderedSnapshotWrite(0, roots = listOf(OrderedNodeWrite(kind = "article", label = "46a", content = (0 until size).map { index -> OrderedEntryWrite("child", node = OrderedNodeWrite(kind = "sentence", label = "($index)", content = listOf(OrderedEntryWrite("text", text = "Sentence $index.")))) }))))
+        val root = source.roots.single()
+        val sentence = root.content.first().node!!
+        val text = sentence.content.single()
+        val nodeCount = count("content_node_revisions")
+        val textCount = count("content_text_revisions")
+        Mockito.`when`(catalog.getVersion(sourceId)).thenReturn(CatalogVersion(sourceId, "published", constitution))
+        val target = content.save(targetId, OrderedSnapshotWrite(0, sourceId, source.generation, listOf(OrderedNodeWrite(logicalId = root.logicalId, predecessorRevisionId = root.revisionId, kind = root.kind, label = root.label, content = root.content.mapIndexed { index, entry ->
+            if (index == 0) OrderedEntryWrite("child", node = OrderedNodeWrite(logicalId = sentence.logicalId, predecessorRevisionId = sentence.revisionId, kind = sentence.kind, label = sentence.label, content = listOf(OrderedEntryWrite("text", logicalId = text.logicalId, predecessorRevisionId = text.revisionId, text = "Changed wording.")))) else OrderedEntryWrite("child", node = OrderedNodeWrite(revisionId = entry.node!!.revisionId))
+        }))))
+        assertThat(count("content_node_revisions") - nodeCount).isEqualTo(2)
+        assertThat(count("content_text_revisions") - textCount).isEqualTo(1)
+        assertThat(target.roots.single().content.drop(1).map { it.node!!.revisionId }).isEqualTo(root.content.drop(1).map { it.node!!.revisionId })
+        assertThat(content.resolve(sourceId, text.logicalId!!).text).isEqualTo("Sentence 0.")
+        assertThat(content.resolve(targetId, text.logicalId!!).text).isEqualTo("Changed wording.")
+        assertThrows(ResponseStatusException::class.java) { content.save(targetId, OrderedSnapshotWrite(target.generation, sourceId, source.generation + 1, listOf(OrderedNodeWrite(revisionId = root.revisionId)))) }
     }
 
     private fun count(table: String): Int = jdbc.queryForObject("SELECT COUNT(*) FROM $table", Int::class.java)!!

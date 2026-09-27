@@ -218,6 +218,47 @@ class CatalogApiTest {
     }
 
     @Test
+    fun repeatedOutlineImportKeepsCurrentRevisionDespiteGrandfatheredContent() {
+        val id = "01900000-0000-4000-8000-000000000002"
+        val initial = objectMapper.readTree(mockMvc.get("/constitutions/$id/settings").andReturn().response.contentAsString)
+        val kinds = initial.path("outline").path("kinds")
+        Mockito.`when`(settingsUsage.inspect(Mockito.anyList(), Mockito.anyList(), Mockito.any())).thenReturn(
+            com.constitutionatlas.catalog.api.SettingsUsage(violations = listOf(com.constitutionatlas.catalog.api.SettingsViolation(UUID.randomUUID(), null, "content", "Grandfathered parent text"))),
+        )
+        mockMvc.post("/constitutions/$id/settings/preflight") {
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"kinds":$kinds}"""
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.classification") { value("safely_reversible") }
+            jsonPath("$.violations.length()") { value(0) }
+        }
+        mockMvc.put("/constitutions/$id/content-outline") {
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"kinds":$kinds}"""
+        }.andExpect { status { isOk() } }
+        mockMvc.get("/constitutions/$id/settings").andExpect { jsonPath("$.id") { value(initial.path("id").asText()) } }
+        val displayKinds = kinds.deepCopy<com.fasterxml.jackson.databind.node.ArrayNode>()
+        (displayKinds[0] as com.fasterxml.jackson.databind.node.ObjectNode).put("displayLabel", "Grandfathered provision")
+        mockMvc.put("/constitutions/$id/settings") {
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"expectedRevisionId":"${initial.path("id").asText()}","kinds":$displayKinds}"""
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.outline.kinds[0].displayLabel") { value("Grandfathered provision") }
+        }
+        val updated = objectMapper.readTree(mockMvc.get("/constitutions/$id/settings").andReturn().response.contentAsString)
+        mockMvc.post("/constitutions/$id/settings/${initial.path("id").asText()}/restore") {
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"expectedRevisionId":"${updated.path("id").asText()}"}"""
+        }.andExpect { status { isOk() } }
+    }
+
+    @Test
     fun metadataChangesRetainSlugAliasesAndRejectCreationOnlyFields() {
         mockMvc.post("/countries") {
             header("Authorization", TOKEN)

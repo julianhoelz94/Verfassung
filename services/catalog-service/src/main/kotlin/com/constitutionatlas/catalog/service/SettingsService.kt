@@ -29,17 +29,18 @@ class SettingsService(private val catalog: CatalogRepository, private val settin
     fun impact(constitutionId: UUID, kinds: List<OutlineKindWrite>, authorization: String? = null): SettingsImpact {
         if (!catalog.constitutionExists(constitutionId)) throw NotFoundException("Unknown constitution '$constitutionId'")
         val proposed = CatalogWriteService.normalizeOutline(kinds)
+        val unchangedStructure = structuralRules(proposed) == structuralRules(currentKinds(constitutionId))
         val versions = catalog.listAllVersionIds(constitutionId)
         val reasons = mutableListOf<String>()
         val inspected = usage.inspect(versions, proposed, authorization)
-        if (inspected.violations.isNotEmpty()) reasons.add("Stored content violates the proposed settings")
+        if (!unchangedStructure && inspected.violations.isNotEmpty()) reasons.add("Stored content violates the proposed settings")
         return SettingsImpact(
             settings.currentId(constitutionId),
             if (versions.isNotEmpty() && reasons.isNotEmpty()) "migration_required" else "safely_reversible",
             versions,
             if (versions.isNotEmpty()) reasons else emptyList(),
             inspected.draftSessionIds,
-            inspected.violations,
+            if (unchangedStructure) emptyList() else inspected.violations,
         )
     }
 
@@ -61,6 +62,19 @@ class SettingsService(private val catalog: CatalogRepository, private val settin
             },
         )
     }
+
+    private fun structuralRules(kinds: List<OutlineKindWrite>): List<List<Any?>> = kinds.map { kind ->
+        listOf(kind.kindCode, kind.allowTextAlongsideChildren, kind.titlePolicy, kind.labelPolicy, kind.segmentation)
+    }
+
+    private fun currentKinds(constitutionId: UUID): List<OutlineKindWrite> = CatalogWriteService.normalizeOutline(
+        current(constitutionId).outline.kinds.map { kind ->
+            OutlineKindWrite(
+                kind.kindCode, kind.displayLabel, kind.presentation, kind.showLabel, kind.showTitle, kind.showKind,
+                kind.allowTextAlongsideChildren, kind.titlePolicy, kind.labelPolicy, kind.labelPlacement, kind.segmentation,
+            )
+        },
+    )
 
     @Transactional
     fun restore(constitutionId: UUID, revisionId: UUID, expectedRevisionId: UUID, authorization: String?): SettingsRevision {
@@ -84,6 +98,8 @@ class SettingsService(private val catalog: CatalogRepository, private val settin
     fun save(constitutionId: UUID, request: SettingsWrite, authorization: String? = null): SettingsRevision {
         val current = settings.currentId(constitutionId, lock = true)
         if (current != request.expectedRevisionId) throw ConflictException("Settings changed; reload the impact preview", "stale_settings")
+        // Repeated imports must not reinterpret already pinned legacy content as a settings migration.
+        if (CatalogWriteService.normalizeOutline(request.kinds) == currentKinds(constitutionId)) return settings.find(constitutionId, current)
         val impact = impact(constitutionId, request.kinds, authorization)
         if (impact.classification == "migration_required") {
             throw ConflictException(impact.reasons.joinToString("; "), "settings_migration_required")

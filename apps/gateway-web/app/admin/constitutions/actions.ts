@@ -1,7 +1,7 @@
 'use server';
 
 import { redirect } from 'next/navigation';
-import { createConstitution, ensureCountry, preflightSettings, saveSettings, type OutlineKindWrite } from '../../../lib/api';
+import { createConstitution, ensureCountry, preflightSettings, saveSettings, restoreSettings, type OutlineKindWrite } from '../../../lib/api';
 import { requireAdminUser } from '../../../lib/admin';
 import { requireSessionBearer } from '../../../lib/session';
 import { constitutionIsoCode, countryToCreate } from '../../../lib/create-constitution';
@@ -50,9 +50,9 @@ export async function saveOutlineAction(formData: FormData): Promise<void> {
   } catch {
     redirect(`/admin/constitutions/${encodeURIComponent(constitutionId)}?error=1`);
   }
-    if (impact.classification === 'migration_required') {
-      redirect(`/admin/constitutions/${encodeURIComponent(constitutionId)}?migration=1`);
-    }
+  if (impact.classification === 'migration_required') {
+    redirect(`/admin/constitutions/${encodeURIComponent(constitutionId)}?migration=1`);
+  }
   try {
     await saveSettings(constitutionId, String(formData.get('settingsRevisionId') ?? ''), kinds, authorization);
   } catch {
@@ -87,4 +87,20 @@ export async function createConstitutionAction(formData: FormData): Promise<void
     redirect('/admin/constitutions?error=1');
   }
   redirect(`/admin/constitutions/${encodeURIComponent(createdId)}`);
+}
+
+export async function previewOutlineImpactAction(formData: FormData) {
+  await requireAdmin();
+  const authorization = await requireSessionBearer();
+  return preflightSettings(String(formData.get('constitutionId')), parseOutline(String(formData.get('outline'))), authorization);
+}
+
+export async function restoreOutlineAction(formData: FormData): Promise<void> {
+  await requireAdmin();
+  const authorization = await requireSessionBearer();
+  const id = String(formData.get('constitutionId'));
+  try {
+    await restoreSettings(id, String(formData.get('revisionId')), String(formData.get('settingsRevisionId')), authorization);
+  } catch { redirect(`/admin/constitutions/${encodeURIComponent(id)}?error=1`); }
+  redirect(`/admin/constitutions/${encodeURIComponent(id)}?saved=1`);
 }

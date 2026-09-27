@@ -82,8 +82,11 @@ test('administrator creates a constitution and changes its outline settings', as
   await expect(page.getByRole('heading', { name: 'Test Constitution' })).toBeVisible();
   await expect(page.getByRole('textbox', { name: 'Label' }).nth(1)).toHaveValue('Clause');
   await page.getByLabel('How this layer is shown').nth(1).selectOption('concatenated');
+  await page.getByRole('button', { name: 'Preview change impact' }).click();
+  await expect(page.getByRole('heading', { name: 'Safe to save' })).toBeVisible();
   await page.getByRole('button', { name: 'Save outline' }).click();
-  await expect(page.getByText('Outline saved.')).toBeVisible();
+  await expect(page).toHaveURL(/saved=1/, { timeout: 30000 });
+  await expect(page.getByText('Settings saved. Historical versions retain their structural settings.')).toBeVisible();
   await expect(page.getByLabel('How this layer is shown').nth(1)).toHaveValue('concatenated');
 });
 
@@ -99,4 +102,25 @@ test('administrator can carry an editorial correction through every role action'
   await page.getByRole('button', { name: 'Approve review' }).click();
   await page.getByRole('button', { name: 'Publish transcription' }).click();
   await expect(page.getByText(/Published as version/)).toBeVisible();
+});
+
+test('outline mixed-content preview follows permissions on desktop and mobile', async ({ page }, testInfo) => {
+  await signInAdmin(page);
+  await page.goto('/admin/constitutions/01900000-0000-4000-8000-000000000002');
+  const preview = page.getByRole('complementary', { name: 'Live order example' });
+  await expect(preview.getByRole('heading', { name: 'Structure map' })).toBeVisible();
+  await expect(preview.getByRole('heading', { name: 'Reader preview' })).toBeVisible();
+  const permission = page.getByLabel('Allow text alongside child units').first();
+  await permission.check();
+  await expect(preview.getByText('The following rights are protected.', { exact: true }).first()).toBeVisible();
+  await expect(preview.getByText('These rights apply to everyone.', { exact: true }).first()).toBeVisible();
+  await expect(preview.getByText('The law shall uphold these guarantees.', { exact: true }).first()).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath('outline-desktop.png'), fullPage: true });
+  await permission.uncheck();
+  await expect(preview.getByText('The following rights are protected.', { exact: true })).toHaveCount(2);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(preview).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath('outline-mobile.png'), fullPage: true });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBeTruthy();
+  await page.screenshot({ path: testInfo.outputPath('outline-mobile.png'), fullPage: true });
 });

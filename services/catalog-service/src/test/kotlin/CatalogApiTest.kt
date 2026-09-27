@@ -46,6 +46,9 @@ class CatalogApiTest {
     lateinit var catalogRepository: com.constitutionatlas.catalog.repo.CatalogRepository
 
     @MockBean
+    lateinit var settingsUsage: com.constitutionatlas.catalog.client.SettingsUsageClient
+
+    @MockBean
     lateinit var identityClient: IdentityClient
 
     private val editor =
@@ -65,6 +68,14 @@ class CatalogApiTest {
             }
         }
         Mockito.reset(identityClient)
+        Mockito.`when`(settingsUsage.inspect(Mockito.anyList(), Mockito.anyList(), Mockito.any())).thenAnswer { invocation ->
+            val kinds = invocation.getArgument<List<com.constitutionatlas.catalog.api.OutlineKindWrite>>(1)
+            if (kinds.size == 2) {
+                com.constitutionatlas.catalog.api.SettingsUsage(violations = listOf(com.constitutionatlas.catalog.api.SettingsViolation(UUID.fromString("01900000-0000-4000-8000-000000000003"), null, "kind", "Occupied sentence level")))
+            } else {
+                com.constitutionatlas.catalog.api.SettingsUsage()
+            }
+        }
         Mockito.`when`(identityClient.authenticate(null)).thenThrow(UnauthorizedException("Missing session"))
         Mockito.`when`(identityClient.authenticate(TOKEN)).thenReturn(editor)
         Mockito.`when`(identityClient.authenticate(PUBLISHER_TOKEN)).thenReturn(publisher)
@@ -182,11 +193,53 @@ class CatalogApiTest {
             jsonPath("$.id") { value(revisionId) }
             jsonPath("$.outline.kinds[0].displayLabel") { value("Article") }
         }
+        mockMvc.get("/versions/$versionId/reader-settings").andExpect {
+            status { isOk() }
+            jsonPath("$.kinds[0].displayLabel") { value("Provision") }
+        }
         mockMvc.put("/constitutions/$constitutionId/settings") {
             header("Authorization", TOKEN)
             contentType = MediaType.APPLICATION_JSON
             content = request
         }.andExpect { status { isConflict() } }
+    }
+
+    @Test
+    fun metadataChangesRetainSlugAliasesAndRejectCreationOnlyFields() {
+        mockMvc.post("/countries") {
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"isoCode":"XR","name":"Metadata test"}"""
+        }.andExpect { status { isCreated() } }
+        val created = mockMvc.post("/countries/XR/constitutions") {
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"slug":"original-name","title":"Original title"}"""
+        }.andExpect { status { isCreated() } }.andReturn()
+        val id = objectMapper.readTree(created.response.contentAsString).get("id").asText()
+        val metadata = mockMvc.get("/constitutions/$id/metadata").andReturn()
+        val revision = objectMapper.readTree(metadata.response.contentAsString).get("revisionId").asText()
+        mockMvc.put("/constitutions/$id/metadata") {
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"expectedRevisionId":"$revision","title":"Corrected title","slug":"corrected-name"}"""
+        }.andExpect { status { isConflict() } }
+        mockMvc.put("/constitutions/$id/metadata") {
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"expectedRevisionId":"$revision","title":"Corrected title","slug":"corrected-name","retainSlugAlias":true}"""
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.predecessorId") { value(revision) }
+        }
+        val countryId = catalogRepository.findCountrySummary("XR")!!.id
+        assertThat(catalogRepository.findConstitutionId(countryId, "original-name")).isEqualTo(UUID.fromString(id))
+        assertThat(catalogRepository.findConstitutionId(countryId, "corrected-name")).isEqualTo(UUID.fromString(id))
+        mockMvc.put("/constitutions/$id/metadata") {
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"expectedRevisionId":"$revision","title":"Relocated","slug":"relocated","countryId":"${UUID.randomUUID()}"}"""
+        }.andExpect { status { isBadRequest() } }
     }
 
     @Test

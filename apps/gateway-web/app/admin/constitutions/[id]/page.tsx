@@ -5,6 +5,7 @@ import { PageMain } from '../../../components/PageMain';
 import { loadCountriesWithDetails, getConstitutionSettings } from '../../../../lib/api';
 import { requireAdminPage } from '../../../../lib/admin';
 import { toOutlineKindWrite } from '../../../../lib/outline';
+import { restoreOutlineAction } from '../actions';
 import { OutlineEditor } from '../OutlineEditor';
 
 type AdminOutlinePageProps = {
@@ -50,6 +51,13 @@ export default async function AdminOutlinePage(props: AdminOutlinePageProps) {
         layer (typical for sentences) has no heading and is joined with its siblings.
       </p>
       <OutlineEditor constitutionId={params.id} initial={kinds} settingsRevisionId={settings.id} />
+      {settings.predecessorId ? <form action={restoreOutlineAction} className="card">
+        <h2>Settings history</h2><p>Restore the previous revision after checking its impact on stored content.</p>
+        <input type="hidden" name="constitutionId" value={params.id} />
+        <input type="hidden" name="settingsRevisionId" value={settings.id} />
+        <input type="hidden" name="revisionId" value={settings.predecessorId} />
+        <button type="submit">Restore previous settings</button>
+      </form> : null}
     </PageMain>
   );
 }

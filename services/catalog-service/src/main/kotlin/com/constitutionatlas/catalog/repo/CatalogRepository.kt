@@ -293,8 +293,10 @@ class CatalogRepository(private val jdbc: JdbcTemplate) {
 
     fun findConstitutionId(countryId: UUID, slug: String): UUID? =
         jdbc.query(
-            "SELECT id FROM constitutions WHERE country_id = ? AND slug = ?",
+            "SELECT constitution_id AS id FROM constitution_slug_aliases WHERE country_id = ? AND slug = ? UNION SELECT id FROM constitutions WHERE country_id = ? AND slug = ?",
             { rs, _ -> rs.getObject("id", UUID::class.java) },
+            countryId,
+            slug,
             countryId,
             slug,
         ).firstOrNull()

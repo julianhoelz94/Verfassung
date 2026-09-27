@@ -23,6 +23,7 @@ class CatalogWriteService(
     private val catalogRepository: CatalogRepository,
     private val settingsRepository: SettingsRepository,
     private val settingsService: SettingsService,
+    private val metadataService: ConstitutionMetadataService,
 ) {
     @Transactional
     fun createCountry(request: CreateCountryRequest): CountrySummary {
@@ -49,6 +50,7 @@ class CatalogWriteService(
             catalogRepository.replaceOutline(id, normalizeOutline(request.outline))
         }
         settingsRepository.append(id, catalogRepository.findOutline(id))
+        metadataService.initialize(id, country.id, request.title.trim(), slug)
         return ConstitutionSummary(
             id,
             slug,
@@ -161,7 +163,8 @@ class CatalogWriteService(
             throw ex
         }
 
-        settingsRepository.pin(id, constitutionId, predecessorId)
+        request.structuralSettingsRevisionId?.let { settingsRepository.find(constitutionId, it) }
+        settingsRepository.pin(id, constitutionId, predecessorId, request.structuralSettingsRevisionId)
         return catalogRepository.findVersionCreated(id)
             ?: VersionCreated(id, constitutionId, label, "draft", predecessorId, hopKind, listing, legalVersionId)
     }
@@ -176,13 +179,14 @@ class CatalogWriteService(
     }
 
     @Transactional
-    fun replaceOutline(constitutionId: UUID, kinds: List<OutlineKindWrite>): OutlineUpdateResult {
+    fun replaceOutline(constitutionId: UUID, kinds: List<OutlineKindWrite>, authorization: String? = null): OutlineUpdateResult {
         if (!catalogRepository.constitutionExists(constitutionId)) {
             throw NotFoundException("Unknown constitution '$constitutionId'")
         }
         settingsService.save(
             constitutionId,
             SettingsWrite(settingsService.current(constitutionId).id, kinds),
+            authorization,
         )
         return OutlineUpdateResult(
             catalogRepository.findOutline(constitutionId),

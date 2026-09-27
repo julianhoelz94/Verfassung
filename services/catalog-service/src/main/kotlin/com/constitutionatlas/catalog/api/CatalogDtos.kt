@@ -66,9 +66,17 @@ data class SettingsImpact(
     val classification: String,
     val affectedVersionIds: List<UUID>,
     val reasons: List<String>,
+    val affectedDraftSessionIds: List<UUID> = emptyList(),
+    val violations: List<SettingsViolation> = emptyList(),
 )
 
+data class SettingsViolation(val versionId: UUID, val logicalId: UUID?, val field: String, val message: String)
+
+data class SettingsUsage(val draftSessionIds: List<UUID> = emptyList(), val violations: List<SettingsViolation> = emptyList())
+
 data class SettingsWrite(val expectedRevisionId: UUID, val kinds: List<OutlineKindWrite>)
+
+data class SettingsRestore(val expectedRevisionId: UUID)
 
 data class ConstitutionSummary(
     val id: UUID,
@@ -129,6 +137,7 @@ data class CreateVersionRequest(
     val predecessorVersionId: UUID? = null,
     val hopKind: String? = null,
     val publicationComment: String? = null,
+    val structuralSettingsRevisionId: UUID? = null,
 )
 
 data class VersionCreated(

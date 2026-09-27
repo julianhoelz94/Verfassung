@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import type { ArticleDetail, ArticleSummary, ContentNode, ContentOutline } from '../../lib/api';
+import type { ArticleDetail, ArticleSummary, ContentNode, ContentOutline, OrderedEntry } from '../../lib/api';
 import { linkifyReferences, type CrossRefContext } from '../../lib/crossrefs';
 import { articleHeading, concatenatedText, groupNodes, kindByCode, nodeHeading } from '../../lib/outline';
 import { NodeTitleForm } from './NodeTitleForm';
@@ -46,17 +46,16 @@ export function ConstitutionText({
     }
     return linkifyReferences(value, { ...crossRefs, kindLabel });
   }
+  const rootKind = kindByCode(outline, article && 'kind' in article ? article.kind ?? 'article' : outline?.kinds[0]?.kindCode ?? 'article');
+  const rootHeading = article ? articleHeading(outline, { ...article, kind: article && 'kind' in article ? article.kind : undefined }) : '';
   return (
     <div className="constitution-text text-column" lang={lang}>
-      {showHeading && article ? (
+      {showHeading && article && rootHeading ? (
         <Heading id={`${headingIdPrefix}-${article.articleNumber}`}>
-          {articleHeading(outline, {
-            articleNumber: article.articleNumber,
-            title: article.title,
-            kind: 'kind' in article ? article.kind : undefined,
-          })}
+          {rootHeading}
         </Heading>
       ) : null}
+      {article && rootKind?.showLabel && rootKind.labelPlacement === 'inline' ? <span className="num">{article.articleNumber}</span> : null}
       {children && children.length > 0 ? (
         <NodeTree
           nodes={children}
@@ -131,9 +130,9 @@ function SectionNode({
       {canEditTitles && returnTo ? (
         <NodeTitleForm nodeId={node.id} title={node.title} label={label} returnTo={returnTo} />
       ) : null}
+      {kind?.showLabel && kind.labelPlacement === 'inline' ? <span className="num">{node.label ?? node.number}</span> : null}
       {node.body ? (
         <div className="para">
-          <span className="num">{node.label ?? node.number ?? ''}</span>
           <p className="constitution-body">{withRefs(node.body)}</p>
         </div>
       ) : null}
@@ -148,4 +147,32 @@ function SectionNode({
       ) : null}
     </section>
   );
+}
+
+/** Ordered reader rendering shares heading and sibling presentation rules with NodeTree. */
+export function OrderedContentTree({ entries, outline, withRefs = (text) => text }: { entries: OrderedEntry[]; outline: ContentOutline; withRefs?: (text: string) => ReactNode }) {
+  const groups: Array<{ entries: OrderedEntry[]; concatenated: boolean }> = [];
+  for (const entry of entries) {
+    const concatenated = entry.type === 'child' && Boolean(entry.node) &&
+      kindByCode(outline, entry.node!.kind)?.presentation === 'concatenated' &&
+      entry.node!.content.every((part) => part.type === 'text');
+    const last = groups[groups.length - 1];
+    if (concatenated && last?.concatenated) last.entries.push(entry);
+    else groups.push({ entries: [entry], concatenated });
+  }
+  return <div className="node-tree">{groups.map((group, index) => {
+    if (group.concatenated) return <p key={index} className="constitution-body constitution-concat">{withRefs(group.entries.map((entry) => entry.node!.content.map((part) => part.text?.trim() ?? '').filter(Boolean).join(' ')).filter(Boolean).join(' '))}</p>;
+    const entry = group.entries[0]!;
+    if (entry.type === 'text') return <p key={entry.occurrenceId ?? entry.logicalId ?? index} id={entry.occurrenceId ?? undefined} className="constitution-body">{withRefs(entry.text ?? '')}</p>;
+    const node = entry.node;
+    if (!node) return null;
+    const kind = kindByCode(outline, node.kind);
+    const heading = nodeHeading(kind, { kind: node.kind, label: node.label, number: null, title: node.title });
+    const inlineLabel = kind?.showLabel && kind.labelPlacement === 'inline' ? node.label : null;
+    return <section key={node.occurrenceId} id={node.occurrenceId} className={`node-block node-kind-${node.kind}`}>
+      {heading ? <p className="node-heading">{heading}</p> : null}
+      {inlineLabel ? <span className="num">{inlineLabel}</span> : null}
+      <OrderedContentTree entries={node.content} outline={outline} withRefs={withRefs} />
+    </section>;
+  })}</div>;
 }

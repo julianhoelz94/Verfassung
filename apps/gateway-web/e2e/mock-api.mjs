@@ -175,6 +175,7 @@ let managedUsers = [];
 let serviceTokens = [];
 let credentials = new Map();
 let createdConstitutions = [];
+const settingsRevisions = new Map();
 let nodeTitleOverrides = new Map();
 let enrolledMfaEmails = new Set();
 let stepUpFresh = true;
@@ -191,6 +192,7 @@ function resetMockState() {
   managedUsers = [];
   serviceTokens = [];
   createdConstitutions = [];
+  settingsRevisions.clear();
   nodeTitleOverrides = new Map();
   enrolledMfaEmails = new Set();
   stepUpFresh = true;
@@ -326,6 +328,32 @@ const server = createServer(async (req, res) => {
     };
     createdConstitutions.push(created);
     json(res, 201, created);
+    return;
+  }
+  const settingsMatch = pathname.match(/^\/api\/catalog\/constitutions\/([^/]+)\/settings(\/preflight)?$/);
+  if (settingsMatch) {
+    const constitution = [...createdConstitutions, ...germany.constitutions].find((item) => item.id === settingsMatch[1]);
+    if (!constitution) { json(res, 404, { error: 'Not found' }); return; }
+    let current = settingsRevisions.get(constitution.id);
+    if (!current) {
+      current = { id: '01900000-0000-4000-8000-000000000901', predecessorId: null, outline: constitution.contentOutline };
+      settingsRevisions.set(constitution.id, current);
+    }
+    if (method === 'GET') { json(res, 200, current); return; }
+    const body = await readBody(req);
+    if (settingsMatch[2]) {
+      json(res, 200, { currentRevisionId: current.id, classification: 'safe', affectedVersionIds: (constitution.versions ?? []).map((version) => version.id), affectedDraftSessionIds: [], violations: [], reasons: [] });
+      return;
+    }
+    if (body.expectedRevisionId !== current.id) { json(res, 409, { error: 'stale_settings' }); return; }
+    const next = { id: '01900000-0000-4000-8000-000000000902', predecessorId: current.id, outline: { kinds: body.kinds } };
+    constitution.contentOutline = next.outline;
+    settingsRevisions.set(constitution.id, next);
+    json(res, 200, next);
+    return;
+  }
+  if (method === 'GET' && /^\/api\/catalog\/versions\/[^/]+\/reader-settings$/.test(pathname)) {
+    json(res, 200, germany.constitutions[0].contentOutline);
     return;
   }
   const outlineMatch = pathname.match(/^\/api\/catalog\/constitutions\/([^/]+)\/content-outline$/);

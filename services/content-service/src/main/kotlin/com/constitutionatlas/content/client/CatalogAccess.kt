@@ -18,16 +18,39 @@ import java.util.UUID
 data class CatalogVersion(
     val id: UUID,
     val publicationStatus: String,
+    val constitutionId: UUID? = null,
 )
+
+data class StructuralLevel(
+    val kindCode: String,
+    val mayHoldText: Boolean,
+    val mayHoldChildren: Boolean,
+    val allowedChildKinds: List<String>,
+    val titlePolicy: String = "optional",
+    val labelPolicy: String = "optional",
+)
+
+data class StructuralOutline(val kinds: List<StructuralLevel>)
+
+data class StructuralSettings(val id: UUID, val outline: StructuralOutline)
 
 interface CatalogClient {
     fun getVersion(versionId: UUID): CatalogVersion?
+
+    fun getSettings(versionId: UUID): StructuralSettings? = null
 }
 
 class RestCatalogClient(
     catalogUrl: String,
 ) : CatalogClient {
     private val client: RestClient = timedRestClient(catalogUrl)
+
+    override fun getSettings(versionId: UUID): StructuralSettings? =
+        try {
+            client.get().uri("/versions/{id}/settings", versionId).retrieve().body(StructuralSettings::class.java)
+        } catch (ex: RestClientException) {
+            throw CatalogUnavailableException("catalog settings lookup failed", ex)
+        }
 
     override fun getVersion(versionId: UUID): CatalogVersion? =
         try {

@@ -45,7 +45,7 @@ class SettingsRepository(private val jdbc: JdbcTemplate, private val mapper: Obj
         return id
     }
 
-    fun pin(versionId: UUID, constitutionId: UUID, predecessorVersionId: UUID?) {
+    fun pin(versionId: UUID, constitutionId: UUID, predecessorVersionId: UUID?, explicitRevisionId: UUID? = null) {
         val inherited = predecessorVersionId?.let {
             jdbc.query(
                 "SELECT structural_settings_revision_id FROM constitution_versions WHERE id = ?",
@@ -55,7 +55,7 @@ class SettingsRepository(private val jdbc: JdbcTemplate, private val mapper: Obj
         }
         jdbc.update(
             "UPDATE constitution_versions SET structural_settings_revision_id = ? WHERE id = ?",
-            inherited ?: currentId(constitutionId),
+            explicitRevisionId ?: inherited ?: currentId(constitutionId),
             versionId,
         )
     }

@@ -11,6 +11,7 @@ import {
   listAllArticles,
   listAmendments,
   getCountry,
+  getReaderOutline,
   type ArticleSummary,
   type CountryDetail,
 } from '../../../../../lib/api';
@@ -108,6 +109,7 @@ export default async function VersionPage(props: VersionPageProps) {
     `Version ${version.version.versionLabel}`
   );
 
+  const readerOutline = await getReaderOutline(params.versionId);
   return (
     <PageMain className="wide">
       <PageHeader
@@ -168,7 +170,7 @@ export default async function VersionPage(props: VersionPageProps) {
           code={country.isoCode}
           versionId={params.versionId}
           articles={articles}
-          outline={version.constitution.contentOutline}
+          outline={readerOutline ?? version.constitution.contentOutline}
           canEditTitles={canEditTitles}
           language={version.version.languageCode}
           changeByArticle={changeByArticle}

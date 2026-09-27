@@ -2,10 +2,11 @@
 
 import type { ReactNode } from 'react';
 import { useState } from 'react';
-import { Button, Input, Select } from '../../components/ui';
-import type { OutlineKindWrite } from '../../../lib/api';
-import { asOutlinePresentation, nodeHeading } from '../../../lib/outline';
-import { saveOutlineAction } from './actions';
+import { Alert, Button, Input, Select } from '../../components/ui';
+import type { OutlineKindWrite, SettingsImpact, ContentOutline, OrderedNode, OrderedEntry } from '../../../lib/api';
+import { asOutlinePresentation } from '../../../lib/outline';
+import { OrderedContentTree } from '../../components/ConstitutionText';
+import { saveOutlineAction, previewOutlineImpactAction } from './actions';
 
 type Layer = OutlineKindWrite & { existing?: boolean };
 
@@ -43,11 +44,28 @@ export function OutlineEditor({
     initial.map((kind) => ({ ...kind, existing: Boolean(constitutionId) })),
   );
 
+  const [impact, setImpact] = useState<SettingsImpact | null>(null);
+  const [impactError, setImpactError] = useState(false);
+  const [checking, setChecking] = useState(false);
+
+  async function checkImpact() {
+    setChecking(true);
+    setImpactError(false);
+    try {
+      const data = new FormData();
+      data.set('constitutionId', constitutionId ?? '');
+      data.set('outline', JSON.stringify(withoutExisting(layers)));
+      setImpact(await previewOutlineImpactAction(data));
+    } catch { setImpactError(true); } finally { setChecking(false); }
+  }
+
   function update(index: number, patch: Partial<Layer>) {
+    setImpact(null);
     setLayers((current) => current.map((layer, i) => (i === index ? { ...layer, ...patch } : layer)));
   }
 
   function addLayer() {
+    setImpact(null);
     setLayers((current) => [
       ...current.map((layer) => ({ ...layer, segmentation: 'plain' as const })),
       {
@@ -66,9 +84,12 @@ export function OutlineEditor({
     if (index === 0) {
       return;
     }
+    setImpact(null);
     setLayers((current) => current.filter((_, i) => i !== index).map((layer, i, next) => ({ ...layer, allowTextAlongsideChildren: i === next.length - 1 ? false : layer.allowTextAlongsideChildren })));
   }
 
+  const exampleOutline: ContentOutline = { kinds: layers.map((layer, index) => ({ ...layer, sortOrder: index + 1, mayHoldText: index === layers.length - 1 || Boolean(layer.allowTextAlongsideChildren), mayHoldChildren: index < layers.length - 1, allowedChildKinds: layers[index + 1] ? [layers[index + 1]!.kindCode] : [] })) };
+  const example = exampleNode(layers, 0, 'sample', 0);
   return (
     <form action={action}>
       {constitutionId ? <input type="hidden" name="constitutionId" value={constitutionId} /> : null}
@@ -123,7 +144,7 @@ export function OutlineEditor({
                 <option value="none">Not allowed</option><option value="optional">Optional</option><option value="required">Required</option>
               </Select>
               <p className="muted">Labels such as 46a, bis, and (2a) are entered exactly as written in the source.</p>
-              {index === layers.length - 1 ? <Select label="Text editing tools" name={`segmentation-${index}`} value={layer.segmentation ?? (layer.kindCode === 'sentence' ? 'sentence' : 'plain')} onChange={(event) => update(index, { segmentation: event.target.value as Layer['segmentation'] })}>
+              {index === layers.length - 1 ? <Select label="Text editing tools" name={`segmentation-${index}`} value={layer.segmentation ?? 'plain'} onChange={(event) => update(index, { segmentation: event.target.value as Layer['segmentation'] })}>
                 <option value="plain">Plain text</option><option value="sentence">Sentence boundary assistance</option>
               </Select> : null}
             </fieldset>
@@ -199,33 +220,53 @@ export function OutlineEditor({
       <aside className="card outline-live-preview" aria-label="Live order example">
         <h2>Live order example</h2>
         <p className="muted">Parent text is unnumbered and belongs to its parent. Editor view scopes are selected separately in the editor.</p>
-        <OutlineOrderExample layers={layers} />
+        <h3>Structure map</h3>
+        {example ? <ExampleMap node={example} /> : null}
+        <h3>Reader preview</h3>
+        {example ? <OrderedContentTree entries={[{ type: 'child', node: example }]} outline={exampleOutline} /> : null}
         {constitutionId ? <p>Occupied structure and stricter permissions are checked before saving. Changes requiring migration need a reviewed successor.</p> : null}
       </aside>
       </div>
+      {impactError ? <Alert tone="error">Impact could not be checked. Retry when the content and draft services are available.</Alert> : null}
+      {impact ? <section aria-live="polite" className="card">
+        <h2>{impact.classification === 'migration_required' ? 'Reviewed migration required' : 'Safe to save'}</h2>
+        <p>{impact.affectedVersionIds.length} versions and {impact.affectedDraftSessionIds.length} drafts checked. Published structural settings remain pinned; public display changes apply live.</p>
+        <ul>{impact.reasons.map((reason) => <li key={reason}>{reason}</li>)}{impact.violations.map((violation, index) => <li key={index}>{violation.field}: {violation.message}</li>)}</ul>
+      </section> : null}
       <div className="form-row">
         <Button type="button" onClick={addLayer}>
           Add deeper layer
         </Button>
-        <Button variant="primary">{submitLabel}</Button>
+        {constitutionId ? <Button type="button" onClick={checkImpact} disabled={checking}>{checking ? 'Checking impact…' : 'Preview change impact'}</Button> : null}
+        <Button variant="primary" disabled={Boolean(constitutionId) && (!impact || impact.classification === 'migration_required' || impact.currentRevisionId !== settingsRevisionId)}>{submitLabel}</Button>
       </div>
     </form>
   );
 }
 
-function OutlineOrderExample({ layers, depth = 0 }: { layers: Layer[]; depth?: number }) {
+function exampleNode(layers: Layer[], depth: number, path: string, sibling: number): OrderedNode | null {
   const level = layers[depth];
   if (!level) return null;
   const leaf = depth === layers.length - 1;
-  const heading = nodeHeading({ ...level, sortOrder: depth + 1, mayHoldText: leaf || Boolean(level.allowTextAlongsideChildren), mayHoldChildren: !leaf, allowedChildKinds: [] }, { kind: level.kindCode, label: depth === 0 ? '46a' : '(2a)', number: null, title: level.titlePolicy === 'none' ? null : 'Example title' });
-  return <section className="outline-example-level">
-    {heading ? <h3>{heading}</h3> : <p className="muted">{level.displayLabel}</p>}
-    {leaf ? <p>Everyone has the right to equal protection.</p> : <>
-      {level.allowTextAlongsideChildren ? <p><small>Unnumbered parent text · before children</small><br />The following rights are protected.</p> : null}
-      <OutlineOrderExample layers={layers} depth={depth + 1} />
-      {level.allowTextAlongsideChildren ? <p><small>Unnumbered parent text · between children</small><br />These rights apply to everyone.</p> : null}
-      <OutlineOrderExample layers={layers} depth={depth + 1} />
-      {level.allowTextAlongsideChildren ? <p><small>Unnumbered parent text · after children</small><br />The law shall uphold these guarantees.</p> : null}
-    </>}
-  </section>;
+  const content: OrderedEntry[] = [];
+  function text(position: string, words: string) { content.push({ type: 'text', logicalId: `${path}-${position}`, occurrenceId: `${path}-${position}`, text: words }); }
+  if (leaf) text('text', sibling === 0 ? 'Everyone has the right to equal protection.' : 'The law shall protect these rights.');
+  else {
+    if (level.allowTextAlongsideChildren) text('before', 'The following rights are protected.');
+    const first = exampleNode(layers, depth + 1, `${path}-a`, 0);
+    if (first) content.push({ type: 'child', node: first });
+    if (depth < 2) {
+      if (level.allowTextAlongsideChildren) text('between', 'These rights apply to everyone.');
+      const second = exampleNode(layers, depth + 1, `${path}-b`, 1);
+      if (second) content.push({ type: 'child', node: second });
+    }
+    if (level.allowTextAlongsideChildren) text('after', 'The law shall uphold these guarantees.');
+  }
+  return { logicalId: path, revisionId: path, occurrenceId: path, kind: level.kindCode,
+    label: level.labelPolicy === 'none' ? null : depth === 0 ? '46a' : sibling === 0 ? '(1)' : '(2a)',
+    title: level.titlePolicy === 'none' ? null : `${level.displayLabel} example`, content };
+}
+
+function ExampleMap({ node }: { node: OrderedNode }) {
+  return <ol><li>{node.kind} {node.label}<ol>{node.content.map((entry, index) => <li key={index}>{entry.node ? <ExampleMap node={entry.node} /> : 'Unnumbered parent text'}</li>)}</ol></li></ol>;
 }

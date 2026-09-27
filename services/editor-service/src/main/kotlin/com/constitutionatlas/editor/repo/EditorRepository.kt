@@ -20,6 +20,8 @@ class EditorRepository(
     private val jdbc: JdbcTemplate,
     private val objectMapper: ObjectMapper,
 ) {
+    fun hasStructuredDraft(sessionId: UUID): Boolean = (jdbc.queryForObject("SELECT COUNT(*) FROM structured_draft_sources WHERE session_id = ?", Int::class.java, sessionId) ?: 0) > 0
+
     fun insertSession(actorId: UUID, versionId: UUID, hopKind: String?): UUID {
         val id = UUID.randomUUID()
         jdbc.update(

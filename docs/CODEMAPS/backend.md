@@ -107,3 +107,7 @@ PUT/PATCH/DELETE → 405; DB rules block update/delete.
 - Gradle: `gradle/service-conventions.gradle` (Spotless/ktlint, `bootJar` → `app.jar`).
 - Tests: Testcontainers `postgres:16-alpine`; extend `SmokeTest` unless isolation is required.
 - Run: `cd services/<name> && ./gradlew test` (wrapper **9.7.1**).
+
+## Sprint 40 ordered content and settings
+
+See [implementation notes](../design/sprint-40-implementation.md) and [ADR 0006](../adr/0006-shared-immutable-content.md). Catalog `SettingsService`/`SettingsRepository` own settings revisions, preflight, restore and version/reader settings; `ConstitutionMetadataService` owns metadata history and permanent slug aliases. Content `OrderedContentService`/`OrderedContentRepository` own revision sharing, ordered roots, resolver and compatibility projections. Editor `StructuredDraftService`/`StructuredDraftEngine` replay targeted deltas against pinned roots. Mixed writes remain gated for the Sprint 41 consumer rollout.

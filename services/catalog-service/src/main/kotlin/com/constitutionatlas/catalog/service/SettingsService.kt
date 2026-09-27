@@ -5,6 +5,7 @@ import com.constitutionatlas.catalog.api.OutlineKindWrite
 import com.constitutionatlas.catalog.api.SettingsImpact
 import com.constitutionatlas.catalog.api.SettingsRevision
 import com.constitutionatlas.catalog.api.SettingsWrite
+import com.constitutionatlas.catalog.client.SettingsUsageClient
 import com.constitutionatlas.catalog.repo.CatalogRepository
 import com.constitutionatlas.catalog.repo.SettingsRepository
 import com.constitutionatlas.platform.NotFoundException
@@ -13,7 +14,7 @@ import org.springframework.transaction.annotation.Transactional
 import java.util.UUID
 
 @Service
-class SettingsService(private val catalog: CatalogRepository, private val settings: SettingsRepository) {
+class SettingsService(private val catalog: CatalogRepository, private val settings: SettingsRepository, private val usage: SettingsUsageClient) {
     fun current(constitutionId: UUID): SettingsRevision =
         settings.find(
             constitutionId,
@@ -25,43 +26,65 @@ class SettingsService(private val catalog: CatalogRepository, private val settin
 
     fun forVersion(versionId: UUID): SettingsRevision = settings.forVersion(versionId)
 
-    fun impact(constitutionId: UUID, kinds: List<OutlineKindWrite>): SettingsImpact {
+    fun impact(constitutionId: UUID, kinds: List<OutlineKindWrite>, authorization: String? = null): SettingsImpact {
         if (!catalog.constitutionExists(constitutionId)) throw NotFoundException("Unknown constitution '$constitutionId'")
         val proposed = CatalogWriteService.normalizeOutline(kinds)
-        val existing = catalog.findOutline(constitutionId).kinds
         val versions = catalog.listAllVersionIds(constitutionId)
         val reasons = mutableListOf<String>()
-        if (existing.map { it.kindCode } != proposed.map { it.kindCode }) {
-            reasons.add("Changing occupied hierarchy requires a reviewed successor migration")
-        }
-        proposed.forEach { kind ->
-            val old = existing.find { it.kindCode == kind.kindCode } ?: return@forEach
-            if (old.allowTextAlongsideChildren && !kind.allowTextAlongsideChildren) {
-                reasons.add("${kind.kindCode}: removing parent-text permission requires content validation")
-            }
-            if (old.titlePolicy != kind.titlePolicy && kind.titlePolicy != "optional") {
-                reasons.add("${kind.kindCode}: stricter title policy requires content validation")
-            }
-            if (old.labelPolicy != kind.labelPolicy && kind.labelPolicy != "optional") {
-                reasons.add("${kind.kindCode}: stricter literal-label policy requires content validation")
-            }
-            if (old.segmentation != kind.segmentation) {
-                reasons.add("${kind.kindCode}: changing segmentation requires a reviewed successor")
-            }
-        }
+        val inspected = usage.inspect(versions, proposed, authorization)
+        if (inspected.violations.isNotEmpty()) reasons.add("Stored content violates the proposed settings")
         return SettingsImpact(
             settings.currentId(constitutionId),
             if (versions.isNotEmpty() && reasons.isNotEmpty()) "migration_required" else "safely_reversible",
             versions,
             if (versions.isNotEmpty()) reasons else emptyList(),
+            inspected.draftSessionIds,
+            inspected.violations,
+        )
+    }
+
+    fun reader(versionId: UUID): com.constitutionatlas.catalog.api.ContentOutlineDto {
+        val pinned = forVersion(versionId)
+        val version = catalog.findVersion(versionId) ?: throw NotFoundException("Unknown version")
+        val presentation = current(version.constitutionId).outline.kinds.associateBy { it.kindCode }
+        return pinned.outline.copy(
+            kinds = pinned.outline.kinds.map { kind ->
+                val live = presentation[kind.kindCode] ?: return@map kind
+                kind.copy(
+                    displayLabel = live.displayLabel,
+                    presentation = live.presentation,
+                    showLabel = live.showLabel,
+                    showTitle = live.showTitle,
+                    showKind = live.showKind,
+                    labelPlacement = live.labelPlacement,
+                )
+            },
         )
     }
 
     @Transactional
-    fun save(constitutionId: UUID, request: SettingsWrite): SettingsRevision {
+    fun restore(constitutionId: UUID, revisionId: UUID, expectedRevisionId: UUID, authorization: String?): SettingsRevision {
+        val old = revision(constitutionId, revisionId)
+        return save(
+            constitutionId,
+            SettingsWrite(
+                expectedRevisionId,
+                old.outline.kinds.map { kind ->
+                    OutlineKindWrite(
+                        kind.kindCode, kind.displayLabel, kind.presentation, kind.showLabel, kind.showTitle, kind.showKind,
+                        kind.allowTextAlongsideChildren, kind.titlePolicy, kind.labelPolicy, kind.labelPlacement, kind.segmentation,
+                    )
+                },
+            ),
+            authorization,
+        )
+    }
+
+    @Transactional
+    fun save(constitutionId: UUID, request: SettingsWrite, authorization: String? = null): SettingsRevision {
         val current = settings.currentId(constitutionId, lock = true)
         if (current != request.expectedRevisionId) throw ConflictException("Settings changed; reload the impact preview", "stale_settings")
-        val impact = impact(constitutionId, request.kinds)
+        val impact = impact(constitutionId, request.kinds, authorization)
         if (impact.classification == "migration_required") {
             throw ConflictException(impact.reasons.joinToString("; "), "settings_migration_required")
         }

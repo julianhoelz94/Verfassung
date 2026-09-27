@@ -34,3 +34,13 @@ test('global unit permalink redirects to the exact version and text occurrence',
   await expect(page.locator(`[id="${entry.occurrenceId}"]`)).toBeVisible();
   await expect(page.locator(`[id="${entry.occurrenceId}"]`)).toHaveText(entry.text);
 });
+
+test('version overview reveals body only after its root is expanded', async ({ page }) => {
+  await page.goto(`/countries/DE/versions/${VERSION_2022}`);
+  const root = page.getByRole('button', { name: /Article 1.*Human dignity/ }).first();
+  await expect(root).toHaveAttribute('aria-expanded', 'false');
+  await expect(page.getByText('Human dignity shall be inviolable.', { exact: true })).toHaveCount(0);
+  await root.click();
+  await expect(root).toHaveAttribute('aria-expanded', 'true');
+  await expect(page.getByText('Human dignity shall be inviolable.', { exact: true })).toBeVisible();
+});

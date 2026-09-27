@@ -3,7 +3,7 @@ import { ArticleFilterList } from '../components/ArticleFilterList';
 import { ConstitutionText } from '../components/ConstitutionText';
 import { PageMain } from '../components/PageMain';
 import { Alert, Badge, Button, Card, DataList, DataRow, Input, PageHeader, Select, WorkflowSteps } from '../components/ui';
-import { getCountry, listAllUnits, getUnit, getVersionSettings, listCountries, type ArticleSummary, type CountryDetail, type CountrySummary } from '../../lib/api';
+import { getCountry, listAllArticles, getArticle, listAllUnits, getUnit, getVersionSettings, listCountries, type ArticleSummary, type CountryDetail, type CountrySummary } from '../../lib/api';
 import { editorErrorMessage, getDraftPreview, getStructuredDraft, listSessions, type EditSessionSummary } from '../../lib/editor-api';
 import { currentUser } from '../../lib/session';
 import { ArticleEditor } from './ArticleEditor';
@@ -143,8 +143,10 @@ export default async function EditorPage(props: EditorPageProps) {
   );
   const selectedVersion = selectedConstitution?.versions.find((version) => version.id === versionId || version.currentVersionId === versionId);
   const settings = session && versionId ? await getVersionSettings(versionId) : null;
-  const structured = session && !(preview?.drafts?.length) ? await getStructuredDraft(session.id) : null;
-  const sourceArticles: ArticleSummary[] = versionId ? await listAllUnits(versionId) : [];
+  const units: ArticleSummary[] = versionId ? await listAllUnits(versionId) : [];
+  const legacySource = units.some(unit => unit.legacyIdentity);
+  const structured = session && !legacySource && !(preview?.drafts?.length) ? await getStructuredDraft(session.id) : null;
+  const sourceArticles: ArticleSummary[] = legacySource && versionId ? await listAllArticles(versionId) : units;
   const articles: ArticleSummary[] = structured ? structured.roots.map((root, index) => ({
     id: sourceArticles.find(article => article.logicalId === root.logicalId)?.id ?? root.logicalId,
     versionId: versionId!, articleNumber: root.label ?? '', title: root.title ?? '', sortOrder: index + 1,
@@ -154,7 +156,7 @@ export default async function EditorPage(props: EditorPageProps) {
   const selectedId = articles.find(article => article.logicalId === selectionRoot?.logicalId)?.id ?? (articles.some(article => article.id === searchParams.articleId) ? searchParams.articleId : articles[0]?.id);
   const selectedSummary = articles.find(article => article.id === selectedId);
   const selectedRoot = structured?.roots.find(root => root.logicalId === selectedSummary?.logicalId);
-  const selected = selectedRoot && selectedSummary ? { ...selectedSummary, body: '', content: selectedRoot.content as import('../../lib/api').OrderedEntry[] } : selectedId && versionId ? await getUnit(versionId, selectedId) : null;
+  const selected = selectedRoot && selectedSummary ? { ...selectedSummary, body: '', content: selectedRoot.content as import('../../lib/api').OrderedEntry[] } : selectedId && versionId ? legacySource ? await getArticle(selectedId) : await getUnit(versionId, selectedId) : null;
   const draft = selected ? preview?.drafts?.find(item => item.articleId === selected.id) : undefined;
   const editorReturnTo =
     versionId && searchParams.sessionId && selected

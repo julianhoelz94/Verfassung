@@ -107,6 +107,11 @@ class EditorService(
         requireEdit(actor)
         val session = requireOwned(actor, sessionId)
         requireStatus(session, EditSessionStatus.OPEN)
+        if (editorRepository.hasStructuredDraft(sessionId)) throw ConflictException("Use targeted structured saves for this session", "mixed_draft_formats")
+        val original = contentClient.listArticles(session.versionId).find { it.id == request.articleId }
+        if (original != null && (mixedContent(original.content) || (original.children.isNotEmpty() && request.body != null && request.body != original.body))) {
+            throw ConflictException("Use targeted structured changes to preserve child units and parent text", "structured_draft_required")
+        }
         val payload = mapOf(
             "articleId" to request.articleId,
             "title" to request.title,
@@ -178,6 +183,7 @@ class EditorService(
         requirePublish(actor)
         val session = requireVisible(actor, sessionId)
         requireStatus(session, EditSessionStatus.APPROVED)
+        if (editorRepository.hasStructuredDraft(sessionId)) throw ConflictException("Ordered successor publishing is required for this structured draft", "ordered_publish_required")
         val drafts = editorRepository.listLatestDrafts(session.id)
         if (drafts.isEmpty()) {
             throw IllegalArgumentException("No draft article changes to publish")
@@ -224,6 +230,7 @@ class EditorService(
             }
         }
         val sourceTree = contentClient.listArticles(session.versionId)
+        if (sourceTree.any { mixedContent(it.content) }) throw ConflictException("Ordered successor publishing is required for mixed content", "ordered_publish_required")
         if (sourceTree.isEmpty()) {
             throw ConflictException("Source version ${session.versionId} has no articles to copy")
         }
@@ -328,6 +335,13 @@ class EditorService(
             log.warn("audit append failed after successor {} was published: {}", published.id, ex.message)
         }
         return previewDto(session.id)
+    }
+
+    private fun mixedContent(content: com.fasterxml.jackson.databind.JsonNode?): Boolean {
+        if (content == null || !content.isArray) return false
+        val hasText = content.any { it.path("type").asText() == "text" }
+        val hasChild = content.any { it.path("type").asText() == "child" }
+        return (hasText && hasChild) || content.any { mixedContent(it.path("node").get("content")) }
     }
 
     private fun requireEdit(actor: Actor) {

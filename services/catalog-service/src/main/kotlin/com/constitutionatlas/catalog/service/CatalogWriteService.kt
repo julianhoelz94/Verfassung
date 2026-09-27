@@ -8,8 +8,10 @@ import com.constitutionatlas.catalog.api.CreateCountryRequest
 import com.constitutionatlas.catalog.api.CreateVersionRequest
 import com.constitutionatlas.catalog.api.OutlineKindWrite
 import com.constitutionatlas.catalog.api.OutlineUpdateResult
+import com.constitutionatlas.catalog.api.SettingsWrite
 import com.constitutionatlas.catalog.api.VersionCreated
 import com.constitutionatlas.catalog.repo.CatalogRepository
+import com.constitutionatlas.catalog.repo.SettingsRepository
 import com.constitutionatlas.platform.NotFoundException
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.stereotype.Service
@@ -17,7 +19,12 @@ import org.springframework.transaction.annotation.Transactional
 import java.util.UUID
 
 @Service
-class CatalogWriteService(private val catalogRepository: CatalogRepository) {
+class CatalogWriteService(
+    private val catalogRepository: CatalogRepository,
+    private val settingsRepository: SettingsRepository,
+    private val settingsService: SettingsService,
+    private val metadataService: ConstitutionMetadataService,
+) {
     @Transactional
     fun createCountry(request: CreateCountryRequest): CountrySummary {
         val iso = request.isoCode.trim().uppercase()
@@ -42,6 +49,8 @@ class CatalogWriteService(private val catalogRepository: CatalogRepository) {
         if (!request.outline.isNullOrEmpty()) {
             catalogRepository.replaceOutline(id, normalizeOutline(request.outline))
         }
+        settingsRepository.append(id, catalogRepository.findOutline(id))
+        metadataService.initialize(id, country.id, request.title.trim(), slug)
         return ConstitutionSummary(
             id,
             slug,
@@ -154,6 +163,8 @@ class CatalogWriteService(private val catalogRepository: CatalogRepository) {
             throw ex
         }
 
+        request.structuralSettingsRevisionId?.let { settingsRepository.find(constitutionId, it) }
+        settingsRepository.pin(id, constitutionId, predecessorId, request.structuralSettingsRevisionId)
         return catalogRepository.findVersionCreated(id)
             ?: VersionCreated(id, constitutionId, label, "draft", predecessorId, hopKind, listing, legalVersionId)
     }
@@ -168,14 +179,18 @@ class CatalogWriteService(private val catalogRepository: CatalogRepository) {
     }
 
     @Transactional
-    fun replaceOutline(constitutionId: UUID, kinds: List<OutlineKindWrite>): OutlineUpdateResult {
+    fun replaceOutline(constitutionId: UUID, kinds: List<OutlineKindWrite>, authorization: String? = null): OutlineUpdateResult {
         if (!catalogRepository.constitutionExists(constitutionId)) {
             throw NotFoundException("Unknown constitution '$constitutionId'")
         }
-        catalogRepository.replaceOutline(constitutionId, normalizeOutline(kinds))
+        settingsService.save(
+            constitutionId,
+            SettingsWrite(settingsService.current(constitutionId).id, kinds),
+            authorization,
+        )
         return OutlineUpdateResult(
             catalogRepository.findOutline(constitutionId),
-            catalogRepository.listAllVersionIds(constitutionId),
+            emptyList(),
         )
     }
 
@@ -210,6 +225,31 @@ class CatalogWriteService(private val catalogRepository: CatalogRepository) {
                 }
                 if (presentation != "section" && presentation != "concatenated") {
                     throw IllegalArgumentException("presentation must be section or concatenated")
+                }
+                if (code == "sentence" && index != kinds.lastIndex) {
+                    throw IllegalArgumentException("sentence must be the final layer")
+                }
+                if (index == kinds.lastIndex && kind.allowTextAlongsideChildren) {
+                    throw IllegalArgumentException("the final layer has no child units")
+                }
+                if (kind.titlePolicy !in setOf("none", "optional", "required") ||
+                    kind.labelPolicy !in setOf("none", "optional", "required")
+                ) {
+                    throw IllegalArgumentException("titlePolicy and labelPolicy must be none, optional or required")
+                }
+                if (kind.showTitle && kind.titlePolicy == "none") {
+                    throw IllegalArgumentException("public title display requires editor title permission")
+                }
+                if (kind.showLabel && kind.labelPolicy == "none") {
+                    throw IllegalArgumentException("public label display requires literal label permission")
+                }
+                if (kind.labelPlacement !in setOf("before_title", "after_title", "inline")) {
+                    throw IllegalArgumentException("labelPlacement must be before_title, after_title or inline")
+                }
+                if (kind.segmentation !in setOf("plain", "sentence") ||
+                    (kind.segmentation == "sentence" && index != kinds.lastIndex)
+                ) {
+                    throw IllegalArgumentException("sentence segmentation is only available on the final layer")
                 }
                 kind.copy(
                     kindCode = code,

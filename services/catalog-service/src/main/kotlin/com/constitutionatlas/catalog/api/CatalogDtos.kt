@@ -48,11 +48,35 @@ data class NodeKindDto(
     val showLabel: Boolean = true,
     val showTitle: Boolean = false,
     val showKind: Boolean = false,
+    val allowTextAlongsideChildren: Boolean = false,
+    val titlePolicy: String = "optional",
+    val labelPolicy: String = "optional",
+    val labelPlacement: String = "before_title",
+    val segmentation: String = "plain",
 )
 
 data class ContentOutlineDto(
     val kinds: List<NodeKindDto>,
 )
+
+data class SettingsRevision(val id: UUID, val predecessorId: UUID?, val outline: ContentOutlineDto)
+
+data class SettingsImpact(
+    val currentRevisionId: UUID?,
+    val classification: String,
+    val affectedVersionIds: List<UUID>,
+    val reasons: List<String>,
+    val affectedDraftSessionIds: List<UUID> = emptyList(),
+    val violations: List<SettingsViolation> = emptyList(),
+)
+
+data class SettingsViolation(val versionId: UUID, val logicalId: UUID?, val field: String, val message: String)
+
+data class SettingsUsage(val draftSessionIds: List<UUID> = emptyList(), val violations: List<SettingsViolation> = emptyList())
+
+data class SettingsWrite(val expectedRevisionId: UUID, val kinds: List<OutlineKindWrite>)
+
+data class SettingsRestore(val expectedRevisionId: UUID)
 
 data class ConstitutionSummary(
     val id: UUID,
@@ -88,6 +112,11 @@ data class OutlineKindWrite(
     val showLabel: Boolean = true,
     val showTitle: Boolean = false,
     val showKind: Boolean = false,
+    val allowTextAlongsideChildren: Boolean = false,
+    val titlePolicy: String = "optional",
+    val labelPolicy: String = "optional",
+    val labelPlacement: String = "before_title",
+    val segmentation: String = "plain",
 )
 
 data class ContentOutlineWrite(
@@ -108,6 +137,7 @@ data class CreateVersionRequest(
     val predecessorVersionId: UUID? = null,
     val hopKind: String? = null,
     val publicationComment: String? = null,
+    val structuralSettingsRevisionId: UUID? = null,
 )
 
 data class VersionCreated(

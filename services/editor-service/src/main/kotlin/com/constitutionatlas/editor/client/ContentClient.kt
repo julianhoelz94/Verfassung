@@ -1,6 +1,7 @@
 package com.constitutionatlas.editor.client
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
+import com.fasterxml.jackson.databind.JsonNode
 import java.util.UUID
 
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -13,6 +14,7 @@ data class ContentTreeNode(
     val body: String? = null,
     val children: List<ContentTreeNode> = emptyList(),
     val predecessorId: UUID? = null,
+    val content: JsonNode? = null,
 )
 
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -25,6 +27,7 @@ data class ContentTreeArticle(
     val body: String? = null,
     val children: List<ContentTreeNode> = emptyList(),
     val predecessorId: UUID? = null,
+    val content: JsonNode? = null,
 )
 
 data class ArticleWritePayload(

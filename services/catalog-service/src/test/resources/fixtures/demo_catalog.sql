@@ -14,3 +14,6 @@ INSERT INTO constitution_node_kind_edges (constitution_id, parent_kind_code, chi
 ('01900000-0000-4000-8000-000000000002', 'paragraph', 'sentence');
 UPDATE constitution_node_kinds SET show_title = TRUE, show_kind = TRUE WHERE constitution_id = '01900000-0000-4000-8000-000000000002' AND kind_code = 'article';
 UPDATE constitution_node_kinds SET presentation = 'concatenated', show_label = FALSE WHERE constitution_id = '01900000-0000-4000-8000-000000000002' AND kind_code = 'sentence';
+
+UPDATE constitution_node_kinds SET allow_text_alongside_children = may_hold_text AND may_hold_children;
+UPDATE constitution_node_kinds SET segmentation = 'sentence' WHERE kind_code = 'sentence';

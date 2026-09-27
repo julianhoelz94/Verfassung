@@ -21,3 +21,10 @@ logging:
 identity:
   api:
     url: ${IDENTITY_API_URL:http://localhost/api/identity}
+
+content:
+  api:
+    url: ${CONTENT_API_URL:http://localhost/api/content}
+editor:
+  api:
+    url: ${EDITOR_API_URL:http://localhost/api/editor}

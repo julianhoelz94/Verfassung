@@ -3,6 +3,10 @@ package com.constitutionatlas.catalog.api
 import com.constitutionatlas.catalog.client.WriteAccess
 import com.constitutionatlas.catalog.service.CatalogQueryService
 import com.constitutionatlas.catalog.service.CatalogWriteService
+import com.constitutionatlas.catalog.service.ConstitutionMetadata
+import com.constitutionatlas.catalog.service.ConstitutionMetadataService
+import com.constitutionatlas.catalog.service.ConstitutionMetadataWrite
+import com.constitutionatlas.catalog.service.SettingsService
 import org.springframework.http.HttpStatus
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
@@ -20,6 +24,8 @@ class CatalogController(
     private val catalogQueryService: CatalogQueryService,
     private val catalogWriteService: CatalogWriteService,
     private val writeAccess: WriteAccess,
+    private val settingsService: SettingsService,
+    private val metadataService: ConstitutionMetadataService,
 ) {
     @GetMapping("/countries")
     fun listCountries(): List<CountrySummary> = catalogQueryService.listCountries()
@@ -53,6 +59,54 @@ class CatalogController(
     fun getOutline(@PathVariable constitutionId: UUID): ContentOutlineDto =
         catalogQueryService.getOutline(constitutionId)
 
+    @GetMapping("/constitutions/{constitutionId}/metadata")
+    fun getMetadata(@PathVariable constitutionId: UUID): ConstitutionMetadata = metadataService.get(constitutionId)
+
+    @PutMapping("/constitutions/{constitutionId}/metadata")
+    fun saveMetadata(@PathVariable constitutionId: UUID, @RequestHeader(value = "Authorization", required = false) authorization: String?, @RequestBody request: ConstitutionMetadataWrite): ConstitutionMetadata {
+        writeAccess.requireCatalogWriter(authorization)
+        return metadataService.save(constitutionId, request)
+    }
+
+    @GetMapping("/constitutions/{constitutionId}/settings")
+    fun getSettings(@PathVariable constitutionId: UUID): SettingsRevision = settingsService.current(constitutionId)
+
+    @GetMapping("/constitutions/{constitutionId}/settings/{revisionId}")
+    fun getSettingsRevision(@PathVariable constitutionId: UUID, @PathVariable revisionId: UUID): SettingsRevision =
+        settingsService.revision(constitutionId, revisionId)
+
+    @PostMapping("/constitutions/{constitutionId}/settings/{revisionId}/restore")
+    fun restoreSettings(@PathVariable constitutionId: UUID, @PathVariable revisionId: UUID, @RequestHeader(value = "Authorization", required = false) authorization: String?, @RequestBody request: SettingsRestore): SettingsRevision {
+        writeAccess.requireCatalogWriter(authorization)
+        return settingsService.restore(constitutionId, revisionId, request.expectedRevisionId, authorization)
+    }
+
+    @GetMapping("/versions/{versionId}/reader-settings")
+    fun getReaderSettings(@PathVariable versionId: UUID): ContentOutlineDto = settingsService.reader(versionId)
+
+    @GetMapping("/versions/{versionId}/settings")
+    fun getVersionSettings(@PathVariable versionId: UUID): SettingsRevision = settingsService.forVersion(versionId)
+
+    @PostMapping("/constitutions/{constitutionId}/settings/preflight")
+    fun preflightSettings(
+        @PathVariable constitutionId: UUID,
+        @RequestHeader(value = "Authorization", required = false) authorization: String?,
+        @RequestBody request: ContentOutlineWrite,
+    ): SettingsImpact {
+        writeAccess.requireCatalogWriter(authorization)
+        return settingsService.impact(constitutionId, request.kinds, authorization)
+    }
+
+    @PutMapping("/constitutions/{constitutionId}/settings")
+    fun saveSettings(
+        @PathVariable constitutionId: UUID,
+        @RequestHeader(value = "Authorization", required = false) authorization: String?,
+        @RequestBody request: SettingsWrite,
+    ): SettingsRevision {
+        writeAccess.requireCatalogWriter(authorization)
+        return settingsService.save(constitutionId, request, authorization)
+    }
+
     @PutMapping("/constitutions/{constitutionId}/content-outline")
     fun putOutline(
         @RequestHeader(value = "Authorization", required = false) authorization: String?,
@@ -60,7 +114,7 @@ class CatalogController(
         @RequestBody request: ContentOutlineWrite,
     ): OutlineUpdateResult {
         writeAccess.requireCatalogWriter(authorization)
-        return catalogWriteService.replaceOutline(constitutionId, request.kinds)
+        return catalogWriteService.replaceOutline(constitutionId, request.kinds, authorization)
     }
 
     @PostMapping("/countries")

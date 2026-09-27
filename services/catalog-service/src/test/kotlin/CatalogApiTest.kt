@@ -39,6 +39,15 @@ class CatalogApiTest {
     @Autowired
     lateinit var jdbcTemplate: JdbcTemplate
 
+    @Autowired
+    lateinit var settingsRepository: com.constitutionatlas.catalog.repo.SettingsRepository
+
+    @Autowired
+    lateinit var catalogRepository: com.constitutionatlas.catalog.repo.CatalogRepository
+
+    @MockBean
+    lateinit var settingsUsage: com.constitutionatlas.catalog.client.SettingsUsageClient
+
     @MockBean
     lateinit var identityClient: IdentityClient
 
@@ -51,7 +60,22 @@ class CatalogApiTest {
 
     @BeforeEach
     fun stubIdentity() {
+        val constitutionId = UUID.fromString("01900000-0000-4000-8000-000000000002")
+        if (settingsRepository.currentId(constitutionId) == null) {
+            settingsRepository.append(constitutionId, catalogRepository.findOutline(constitutionId))
+            catalogRepository.listAllVersionIds(constitutionId).forEach {
+                settingsRepository.pin(it, constitutionId, null)
+            }
+        }
         Mockito.reset(identityClient)
+        Mockito.`when`(settingsUsage.inspect(Mockito.anyList(), Mockito.anyList(), Mockito.any())).thenAnswer { invocation ->
+            val kinds = invocation.getArgument<List<com.constitutionatlas.catalog.api.OutlineKindWrite>>(1)
+            if (kinds.size == 2) {
+                com.constitutionatlas.catalog.api.SettingsUsage(violations = listOf(com.constitutionatlas.catalog.api.SettingsViolation(UUID.fromString("01900000-0000-4000-8000-000000000003"), null, "kind", "Occupied sentence level")))
+            } else {
+                com.constitutionatlas.catalog.api.SettingsUsage()
+            }
+        }
         Mockito.`when`(identityClient.authenticate(null)).thenThrow(UnauthorizedException("Missing session"))
         Mockito.`when`(identityClient.authenticate(TOKEN)).thenReturn(editor)
         Mockito.`when`(identityClient.authenticate(PUBLISHER_TOKEN)).thenReturn(publisher)
@@ -108,33 +132,168 @@ class CatalogApiTest {
     }
 
     @Test
-    fun putOutlineReplacesLayers() {
+    fun occupiedHierarchyChangesRequireMigration() {
         mockMvc.put("/constitutions/01900000-0000-4000-8000-000000000002/content-outline") {
             header("Authorization", TOKEN)
             contentType = MediaType.APPLICATION_JSON
             content = """
                 {"kinds":[
-                  {"kindCode":"article","displayLabel":"Article","presentation":"section","showLabel":true,"showTitle":true,"showKind":true},
+                  {"kindCode":"article","displayLabel":"Article","presentation":"section","showLabel":true,"showTitle":true,"showKind":true,"allowTextAlongsideChildren":true},
                   {"kindCode":"paragraph","displayLabel":"Paragraph","presentation":"section","showLabel":true,"showTitle":false,"showKind":false}
                 ]}
             """.trimIndent()
         }.andExpect {
-            status { isOk() }
-            jsonPath("$.outline.kinds.length()") { value(2) }
-            jsonPath("$.outline.kinds[1].kindCode") { value("paragraph") }
-            jsonPath("$.versionIds.length()") { value(3) }
+            status { isConflict() }
         }
         mockMvc.put("/constitutions/01900000-0000-4000-8000-000000000002/content-outline") {
             header("Authorization", TOKEN)
             contentType = MediaType.APPLICATION_JSON
             content = """
                 {"kinds":[
-                  {"kindCode":"article","displayLabel":"Article","presentation":"section","showLabel":true,"showTitle":true,"showKind":true},
-                  {"kindCode":"paragraph","displayLabel":"Paragraph","presentation":"section","showLabel":true,"showTitle":true,"showKind":false},
-                  {"kindCode":"sentence","displayLabel":"Sentence","presentation":"concatenated","showLabel":false,"showTitle":false,"showKind":false}
+                  {"kindCode":"article","displayLabel":"Article","presentation":"section","showLabel":true,"showTitle":true,"showKind":true,"allowTextAlongsideChildren":true},
+                  {"kindCode":"paragraph","displayLabel":"Paragraph","presentation":"section","showLabel":true,"showTitle":false,"showKind":false,"allowTextAlongsideChildren":true},
+                  {"kindCode":"sentence","displayLabel":"Sentence","presentation":"concatenated","showLabel":false,"showTitle":false,"showKind":false,"segmentation":"sentence"}
                 ]}
             """.trimIndent()
         }.andExpect { status { isOk() } }
+    }
+
+    @Test
+    fun settingsPinsSurvivePresentationChangesAndRejectStaleSaves() {
+        mockMvc.post("/countries") {
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"isoCode":"XY","name":"Settings test"}"""
+        }.andExpect { status { isCreated() } }
+        val created = mockMvc.post("/countries/XY/constitutions") {
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"slug":"settings-test","title":"Settings test"}"""
+        }.andExpect { status { isCreated() } }.andReturn()
+        val constitutionId = objectMapper.readTree(created.response.contentAsString).get("id").asText()
+        val initial = mockMvc.get("/constitutions/$constitutionId/settings").andReturn()
+        val revisionId = objectMapper.readTree(initial.response.contentAsString).get("id").asText()
+        val version = mockMvc.post("/constitutions/$constitutionId/versions") {
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"versionLabel":"Initial"}"""
+        }.andExpect { status { isCreated() } }.andReturn()
+        val versionId = objectMapper.readTree(version.response.contentAsString).get("id").asText()
+        val request = """{"expectedRevisionId":"$revisionId","kinds":[{"kindCode":"article","displayLabel":"Provision","showTitle":true}]}"""
+        mockMvc.put("/constitutions/$constitutionId/settings") {
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = request
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.predecessorId") { value(revisionId) }
+        }
+        mockMvc.get("/versions/$versionId/settings").andExpect {
+            status { isOk() }
+            jsonPath("$.id") { value(revisionId) }
+            jsonPath("$.outline.kinds[0].displayLabel") { value("Article") }
+        }
+        mockMvc.get("/versions/$versionId/reader-settings").andExpect {
+            status { isOk() }
+            jsonPath("$.kinds[0].displayLabel") { value("Provision") }
+        }
+        mockMvc.put("/constitutions/$constitutionId/settings") {
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = request
+        }.andExpect { status { isConflict() } }
+        val current = objectMapper.readTree(mockMvc.get("/constitutions/$constitutionId/settings").andReturn().response.contentAsString).get("id").asText()
+        val restored = mockMvc.post("/constitutions/$constitutionId/settings/$revisionId/restore") {
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"expectedRevisionId":"$current"}"""
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.predecessorId") { value(current) }
+            jsonPath("$.outline.kinds[0].displayLabel") { value("Article") }
+        }.andReturn()
+        assertThat(objectMapper.readTree(restored.response.contentAsString).get("id").asText()).isNotEqualTo(revisionId)
+        mockMvc.get("/versions/$versionId/reader-settings").andExpect { jsonPath("$.kinds[0].displayLabel") { value("Article") } }
+        mockMvc.get("/versions/$versionId/settings").andExpect { jsonPath("$.id") { value(revisionId) } }
+    }
+
+    @Test
+    fun repeatedOutlineImportKeepsCurrentRevisionDespiteGrandfatheredContent() {
+        val id = "01900000-0000-4000-8000-000000000002"
+        val initial = objectMapper.readTree(mockMvc.get("/constitutions/$id/settings").andReturn().response.contentAsString)
+        val kinds = initial.path("outline").path("kinds")
+        Mockito.`when`(settingsUsage.inspect(Mockito.anyList(), Mockito.anyList(), Mockito.any())).thenReturn(
+            com.constitutionatlas.catalog.api.SettingsUsage(violations = listOf(com.constitutionatlas.catalog.api.SettingsViolation(UUID.randomUUID(), null, "content", "Grandfathered parent text"))),
+        )
+        mockMvc.post("/constitutions/$id/settings/preflight") {
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"kinds":$kinds}"""
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.classification") { value("safely_reversible") }
+            jsonPath("$.violations.length()") { value(0) }
+        }
+        mockMvc.put("/constitutions/$id/content-outline") {
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"kinds":$kinds}"""
+        }.andExpect { status { isOk() } }
+        mockMvc.get("/constitutions/$id/settings").andExpect { jsonPath("$.id") { value(initial.path("id").asText()) } }
+        val displayKinds = kinds.deepCopy<com.fasterxml.jackson.databind.node.ArrayNode>()
+        (displayKinds[0] as com.fasterxml.jackson.databind.node.ObjectNode).put("displayLabel", "Grandfathered provision")
+        mockMvc.put("/constitutions/$id/settings") {
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"expectedRevisionId":"${initial.path("id").asText()}","kinds":$displayKinds}"""
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.outline.kinds[0].displayLabel") { value("Grandfathered provision") }
+        }
+        val updated = objectMapper.readTree(mockMvc.get("/constitutions/$id/settings").andReturn().response.contentAsString)
+        mockMvc.post("/constitutions/$id/settings/${initial.path("id").asText()}/restore") {
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"expectedRevisionId":"${updated.path("id").asText()}"}"""
+        }.andExpect { status { isOk() } }
+    }
+
+    @Test
+    fun metadataChangesRetainSlugAliasesAndRejectCreationOnlyFields() {
+        mockMvc.post("/countries") {
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"isoCode":"XR","name":"Metadata test"}"""
+        }.andExpect { status { isCreated() } }
+        val created = mockMvc.post("/countries/XR/constitutions") {
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"slug":"original-name","title":"Original title"}"""
+        }.andExpect { status { isCreated() } }.andReturn()
+        val id = objectMapper.readTree(created.response.contentAsString).get("id").asText()
+        val metadata = mockMvc.get("/constitutions/$id/metadata").andReturn()
+        val revision = objectMapper.readTree(metadata.response.contentAsString).get("revisionId").asText()
+        mockMvc.put("/constitutions/$id/metadata") {
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"expectedRevisionId":"$revision","title":"Corrected title","slug":"corrected-name"}"""
+        }.andExpect { status { isConflict() } }
+        mockMvc.put("/constitutions/$id/metadata") {
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"expectedRevisionId":"$revision","title":"Corrected title","slug":"corrected-name","retainSlugAlias":true}"""
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.predecessorId") { value(revision) }
+        }
+        val countryId = catalogRepository.findCountrySummary("XR")!!.id
+        assertThat(catalogRepository.findConstitutionId(countryId, "original-name")).isEqualTo(UUID.fromString(id))
+        assertThat(catalogRepository.findConstitutionId(countryId, "corrected-name")).isEqualTo(UUID.fromString(id))
+        mockMvc.put("/constitutions/$id/metadata") {
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"expectedRevisionId":"$revision","title":"Relocated","slug":"relocated","countryId":"${UUID.randomUUID()}"}"""
+        }.andExpect { status { isBadRequest() } }
     }
 
     @Test

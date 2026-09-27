@@ -88,6 +88,11 @@ describe('toOutlineKindWrite', () => {
       showLabel: false,
       showTitle: false,
       showKind: false,
+      allowTextAlongsideChildren: false,
+      titlePolicy: 'optional',
+      labelPolicy: 'optional',
+      labelPlacement: 'before_title',
+      segmentation: 'plain',
     });
   });
 });

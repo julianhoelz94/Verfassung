@@ -11,6 +11,7 @@ import {
   ApiUnavailableError,
   getArticle,
   getCountry,
+  getReaderOutline,
   listAllArticles,
   type ArticleDetail,
   type ArticleSummary,
@@ -102,6 +103,7 @@ export default async function ArticlePage(props: ArticlePageProps) {
     label: `Article ${item.articleNumber}`,
   });
 
+  const readerOutline = await getReaderOutline(params.versionId);
   return (
     <PageMain>
       <PageHeader
@@ -133,7 +135,7 @@ export default async function ArticlePage(props: ArticlePageProps) {
         <ConstitutionText
           article={article}
           nodes={article.children}
-          outline={constitution?.contentOutline}
+          outline={readerOutline ?? constitution?.contentOutline}
           canEditTitles={canEditTitles}
           returnTo={returnTo}
           lang={version?.languageCode}

@@ -11,6 +11,11 @@ export function toOutlineKindWrite(kind: {
   showLabel?: boolean;
   showTitle?: boolean;
   showKind?: boolean;
+  allowTextAlongsideChildren?: boolean;
+  titlePolicy?: string;
+  labelPolicy?: string;
+  labelPlacement?: string;
+  segmentation?: string;
 }): OutlineKindWrite {
   const presentation = asOutlinePresentation(kind.presentation);
   const concatenated = presentation === 'concatenated';
@@ -21,6 +26,11 @@ export function toOutlineKindWrite(kind: {
     showLabel: concatenated ? false : Boolean(kind.showLabel),
     showTitle: concatenated ? false : Boolean(kind.showTitle),
     showKind: concatenated ? false : Boolean(kind.showKind),
+    allowTextAlongsideChildren: Boolean(kind.allowTextAlongsideChildren),
+    titlePolicy: (kind.titlePolicy ?? 'optional') as OutlineKindWrite['titlePolicy'],
+    labelPolicy: (kind.labelPolicy ?? 'optional') as OutlineKindWrite['labelPolicy'],
+    labelPlacement: (kind.labelPlacement ?? 'before_title') as OutlineKindWrite['labelPlacement'],
+    segmentation: (kind.segmentation ?? 'plain') as OutlineKindWrite['segmentation'],
   };
 }
 
@@ -44,6 +54,7 @@ export const DEFAULT_NEW_OUTLINE: OutlineKindWrite[] = [
   {
     kindCode: 'sentence',
     displayLabel: 'Sentence',
+    segmentation: 'sentence',
     presentation: 'concatenated',
     showLabel: false,
     showTitle: false,
@@ -69,7 +80,7 @@ export function nodeHeading(
   if (kind.showKind) {
     parts.push(kind.displayLabel);
   }
-  if (kind.showLabel) {
+  if (kind.showLabel && kind.labelPlacement !== 'inline') {
     const label = node.label ?? node.number;
     if (label) {
       parts.push(label);
@@ -77,6 +88,9 @@ export function nodeHeading(
   }
   if (kind.showTitle && node.title) {
     parts.push(node.title);
+  }
+  if (kind.labelPlacement === 'after_title' && kind.showLabel && kind.showTitle && node.title) {
+    return [kind.showKind ? kind.displayLabel : null, node.title, node.label ?? node.number].filter(Boolean).join(' ');
   }
   if (parts.length === 0) {
     return null;
@@ -99,7 +113,7 @@ export function articleHeading(
     number: article.articleNumber,
     title: article.title,
   });
-  return heading ?? `Article ${article.articleNumber} — ${article.title}`;
+  return heading ?? (kind ? '' : `Article ${article.articleNumber} — ${article.title}`);
 }
 
 export type RenderGroup =

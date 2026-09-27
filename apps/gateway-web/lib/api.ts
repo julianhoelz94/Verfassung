@@ -59,6 +59,11 @@ export type ContentOutline = {
     showLabel: boolean;
     showTitle: boolean;
     showKind: boolean;
+    allowTextAlongsideChildren?: boolean;
+    titlePolicy?: string;
+    labelPolicy?: string;
+    labelPlacement?: string;
+    segmentation?: string;
   }[];
 };
 
@@ -389,6 +394,11 @@ export type OutlineKindWrite = {
   showLabel: boolean;
   showTitle: boolean;
   showKind: boolean;
+  allowTextAlongsideChildren?: boolean;
+  titlePolicy?: 'none' | 'optional' | 'required';
+  labelPolicy?: 'none' | 'optional' | 'required';
+  labelPlacement?: 'before_title' | 'after_title' | 'inline';
+  segmentation?: 'plain' | 'sentence';
 };
 
 export type OutlineUpdateResult = {
@@ -555,3 +565,27 @@ export function getVersion(versionId: string, authorization?: string): Promise<V
     authorization,
   );
 }
+
+export type SettingsRevision = { id: string; predecessorId: string | null; outline: ContentOutline };
+export type SettingsImpact = { currentRevisionId: string; classification: string; affectedVersionIds: string[]; reasons: string[]; affectedDraftSessionIds: string[]; violations: { versionId: string; logicalId: string | null; field: string; message: string }[] };
+export async function getConstitutionSettings(id: string): Promise<SettingsRevision> {
+  const settings = await readJson<SettingsRevision>(`${catalogBaseUrl()}/constitutions/${encodeURIComponent(id)}/settings`, 'catalog');
+  if (!settings) throw new ApiUnavailableError('catalog');
+  return settings;
+}
+export function preflightSettings(id: string, kinds: OutlineKindWrite[], authorization: string): Promise<SettingsImpact> {
+  return sendJson<SettingsImpact>(`${catalogBaseUrl()}/constitutions/${encodeURIComponent(id)}/settings/preflight`, 'catalog', 'POST', { kinds }, authorization);
+}
+export function saveSettings(id: string, expectedRevisionId: string, kinds: OutlineKindWrite[], authorization: string): Promise<SettingsRevision> {
+  return sendJson<SettingsRevision>(`${catalogBaseUrl()}/constitutions/${encodeURIComponent(id)}/settings`, 'catalog', 'PUT', { expectedRevisionId, kinds }, authorization);
+}
+
+export function getReaderOutline(versionId: string): Promise<ContentOutline | null> {
+  return readJson<ContentOutline>(`${catalogBaseUrl()}/versions/${encodeURIComponent(versionId)}/reader-settings`, 'catalog');
+}
+export function restoreSettings(id: string, revisionId: string, expectedRevisionId: string, authorization: string): Promise<SettingsRevision> {
+  return sendJson<SettingsRevision>(`${catalogBaseUrl()}/constitutions/${encodeURIComponent(id)}/settings/${encodeURIComponent(revisionId)}/restore`, 'catalog', 'POST', { expectedRevisionId }, authorization);
+}
+
+export type OrderedNode = { logicalId: string; revisionId: string; occurrenceId: string; kind: string; label: string | null; title: string | null; content: OrderedEntry[] };
+export type OrderedEntry = { type: 'text' | 'child'; node?: OrderedNode | null; logicalId?: string | null; revisionId?: string | null; occurrenceId?: string | null; text?: string | null };

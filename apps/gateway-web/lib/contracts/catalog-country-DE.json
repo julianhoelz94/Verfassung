@@ -58,11 +58,18 @@
             "sortOrder": 1,
             "mayHoldText": true,
             "mayHoldChildren": true,
-            "allowedChildKinds": ["paragraph"],
+            "allowedChildKinds": [
+              "paragraph"
+            ],
             "presentation": "section",
             "showLabel": true,
             "showTitle": true,
-            "showKind": true
+            "showKind": true,
+            "allowTextAlongsideChildren": true,
+            "titlePolicy": "optional",
+            "labelPolicy": "optional",
+            "labelPlacement": "before_title",
+            "segmentation": "plain"
           },
           {
             "kindCode": "paragraph",
@@ -70,11 +77,18 @@
             "sortOrder": 2,
             "mayHoldText": true,
             "mayHoldChildren": true,
-            "allowedChildKinds": ["sentence"],
+            "allowedChildKinds": [
+              "sentence"
+            ],
             "presentation": "section",
             "showLabel": true,
             "showTitle": false,
-            "showKind": false
+            "showKind": false,
+            "allowTextAlongsideChildren": true,
+            "titlePolicy": "optional",
+            "labelPolicy": "optional",
+            "labelPlacement": "before_title",
+            "segmentation": "plain"
           },
           {
             "kindCode": "sentence",
@@ -86,7 +100,12 @@
             "presentation": "concatenated",
             "showLabel": false,
             "showTitle": false,
-            "showKind": false
+            "showKind": false,
+            "allowTextAlongsideChildren": false,
+            "titlePolicy": "optional",
+            "labelPolicy": "optional",
+            "labelPlacement": "before_title",
+            "segmentation": "sentence"
           }
         ]
       }

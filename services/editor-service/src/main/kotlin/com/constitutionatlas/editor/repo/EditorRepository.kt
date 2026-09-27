@@ -262,6 +262,9 @@ class EditorRepository(
                         sourceVersionId = UUID.fromString(source),
                         newVersionId = UUID.fromString(next),
                         versionLabel = if (labelNode == null || labelNode.isNull) null else labelNode.asText(),
+                        unitMapping = node.get("unitMapping")?.takeIf { it.isObject }?.fields()?.asSequence()?.associate { it.key to it.value.asText() },
+                        sourceGeneration = node.get("sourceGeneration")?.takeUnless { it.isNull }?.asLong(),
+                        settingsRevisionId = node.get("settingsRevisionId")?.takeUnless { it.isNull }?.asText()?.let(UUID::fromString),
                     )
                 }
             },
@@ -378,6 +381,9 @@ data class PublishedPreview(
     val sourceVersionId: UUID,
     val newVersionId: UUID,
     val versionLabel: String?,
+    val unitMapping: Map<String, String>? = null,
+    val sourceGeneration: Long? = null,
+    val settingsRevisionId: UUID? = null,
 )
 
 data class PendingAmendmentAction(

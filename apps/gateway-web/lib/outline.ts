@@ -1,4 +1,4 @@
-import type { ArticleDetail, ArticleSummary, ContentNode, ContentOutline, OutlineKindWrite } from './api';
+import type { ArticleDetail, ArticleSummary, ContentNode, ContentOutline, OrderedEntry, OutlineKindWrite } from './api';
 
 export function asOutlinePresentation(value: string | undefined): OutlineKindWrite['presentation'] {
   return value === 'concatenated' ? 'concatenated' : 'section';
@@ -23,7 +23,7 @@ export function toOutlineKindWrite(kind: {
     kindCode: kind.kindCode,
     displayLabel: kind.displayLabel,
     presentation,
-    showLabel: concatenated ? false : Boolean(kind.showLabel),
+    showLabel: concatenated && kind.labelPlacement !== 'inline' && kind.labelPlacement !== 'superscript' ? false : Boolean(kind.showLabel),
     showTitle: concatenated ? false : Boolean(kind.showTitle),
     showKind: concatenated ? false : Boolean(kind.showKind),
     allowTextAlongsideChildren: Boolean(kind.allowTextAlongsideChildren),
@@ -80,7 +80,7 @@ export function nodeHeading(
   if (kind.showKind) {
     parts.push(kind.displayLabel);
   }
-  if (kind.showLabel && kind.labelPlacement !== 'inline') {
+  if (kind.showLabel && kind.labelPlacement !== 'inline' && kind.labelPlacement !== 'superscript') {
     const label = node.label ?? node.number;
     if (label) {
       parts.push(label);
@@ -235,4 +235,19 @@ function clipNode(
     body: stop.includeText ? node.body : null,
     children: clipVisible(node.children, outline, stop),
   };
+}
+
+/** Clip the ordered sequence without converting it into body plus children. */
+export function clipOrderedEntries(entries: OrderedEntry[], outline: ContentOutline | undefined, depth: number): OrderedEntry[] {
+  const stop = stopAt(outline, depth);
+  function clip(content: OrderedEntry[]): OrderedEntry[] {
+    return content.flatMap((entry): OrderedEntry[] => {
+      if (entry.type === 'text') return stop.includeText ? [entry] : [];
+      const node = entry.node;
+      if (!node || (!stop.includeText && nodeKindIndex(outline, node.kind) > stop.throughKindIndex)) return [];
+      if (!stop.includeText && asOutlinePresentation(kindByCode(outline, node.kind)?.presentation) === 'concatenated') return [];
+      return [{ ...entry, node: { ...node, content: clip(node.content) } }];
+    });
+  }
+  return clip(entries);
 }

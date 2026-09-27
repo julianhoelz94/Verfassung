@@ -1,5 +1,7 @@
 package com.constitutionatlas.search.client
 
+import com.constitutionatlas.platform.OrderedContentText
+import com.constitutionatlas.platform.OrderedEntry
 import com.constitutionatlas.search.timedRestClient
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import org.springframework.beans.factory.annotation.Value
@@ -52,7 +54,7 @@ class RestIndexSource(
         val articles = mutableListOf<IndexableArticle>()
         while (true) {
             val summaries = content.get()
-                .uri("/versions/{id}/articles?offset={offset}&limit={limit}", version.id, offset, pageSize)
+                .uri("/versions/{id}/units?offset={offset}&limit={limit}", version.currentVersionId ?: version.id, offset, pageSize)
                 .retrieve()
                 .body(object : ParameterizedTypeReference<List<ArticleSummaryWire>>() {})
                 .orEmpty()
@@ -61,7 +63,7 @@ class RestIndexSource(
             }
             for (summary in summaries) {
                 val detail = content.get()
-                    .uri("/articles/{id}", summary.id)
+                    .uri("/versions/{version}/units/{id}", version.currentVersionId ?: version.id, summary.id)
                     .retrieve()
                     .body(ArticleDetailWire::class.java)
                     ?: continue
@@ -75,7 +77,7 @@ class RestIndexSource(
                     effectiveDate = version.effectiveDate,
                     articleNumber = detail.articleNumber,
                     title = detail.title,
-                    body = detail.body,
+                    body = detail.content?.let(OrderedContentText::entries) ?: detail.body,
                     languageCode = version.languageCode.ifBlank { "en" },
                 )
             }
@@ -108,6 +110,7 @@ class RestIndexSource(
     @JsonIgnoreProperties(ignoreUnknown = true)
     private data class VersionWire(
         val id: UUID,
+        val currentVersionId: UUID? = null,
         val versionLabel: String = "",
         val effectiveDate: LocalDate? = null,
         val languageCode: String = "en",
@@ -125,6 +128,7 @@ class RestIndexSource(
         val articleNumber: String,
         val title: String,
         val body: String,
+        val content: List<OrderedEntry>? = null,
     )
 }
 

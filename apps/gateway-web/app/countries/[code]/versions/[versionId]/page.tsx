@@ -8,19 +8,19 @@ import { Alert, Badge, PageHeader, Pager } from '../../../../components/ui';
 import { VersionReader } from '../../../../components/VersionReader';
 import {
   ApiUnavailableError,
-  listAllArticles,
+  listAllUnits,
   listAmendments,
   getCountry,
   getReaderOutline,
+  getVersion,
   type ArticleSummary,
   type CountryDetail,
 } from '../../../../../lib/api';
 import { neighborCompareLinks, orderVersions } from '../../../../../lib/compare';
 import { FormattedDate } from '../../../../../lib/format-date';
-import { canVisitEditor } from '../../../../../lib/nav';
 import { atlasTitle, metaDescription, pageMetadata } from '../../../../../lib/page-meta';
 import { httpUrl, provenanceLabel, verificationLabel } from '../../../../../lib/provenance';
-import { currentUser } from '../../../../../lib/session';
+import { publicSnapshotContext } from '../../../../../lib/reading';
 
 type VersionPageProps = {
   params: Promise<{ code: string; versionId: string }>;
@@ -30,10 +30,8 @@ type VersionPageProps = {
 export async function generateMetadata(props: VersionPageProps): Promise<Metadata> {
   const params = await props.params;
   try {
-    const country = await getCountry(params.code);
-    const version = country?.constitutions
-      .flatMap((c) => c.versions.map((v) => ({ constitution: c, version: v })))
-      .find((row) => row.version.id === params.versionId);
+    const [country, snapshot] = await Promise.all([getCountry(params.code), getVersion(params.versionId)]);
+    const version = publicSnapshotContext(country, snapshot);
     if (!country || !version) {
       return { title: atlasTitle('Version') };
     }
@@ -55,9 +53,10 @@ export default async function VersionPage(props: VersionPageProps) {
   let country: CountryDetail | null = null;
   let articles: ArticleSummary[] = [];
   let error: string | null = null;
+  let snapshot: Awaited<ReturnType<typeof getVersion>> = null;
   try {
-    country = await getCountry(params.code);
-    articles = await listAllArticles(params.versionId, true);
+    [country, snapshot] = await Promise.all([getCountry(params.code), getVersion(params.versionId)]);
+    articles = await listAllUnits(params.versionId, true);
   } catch (e) {
     error = e instanceof ApiUnavailableError ? e.message : 'A backend service is unavailable';
     country = null;
@@ -72,21 +71,17 @@ export default async function VersionPage(props: VersionPageProps) {
     );
   }
 
-  const version = country?.constitutions
-    .flatMap((c) => c.versions.map((v) => ({ constitution: c, version: v })))
-    .find((row) => row.version.id === params.versionId);
+  const version = publicSnapshotContext(country, snapshot);
 
   if (!country || !version) {
     notFound();
   }
 
   const line = orderVersions(version.constitution.versions);
-  const currentIndex = line.findIndex((item) => item.id === params.versionId);
+  const currentIndex = line.findIndex((item) => item.id === version.version.id);
   const previousPublished = currentIndex > 0 ? line[currentIndex - 1] : undefined;
   const nextPublished = currentIndex >= 0 ? line[currentIndex + 1] : undefined;
-  const neighbors = neighborCompareLinks(country.isoCode, line, params.versionId);
-  const user = await currentUser();
-  const canEditTitles = Boolean(user && canVisitEditor(user.roles));
+  const neighbors = neighborCompareLinks(country.isoCode, line, version.version.id);
   const changeByArticle: Record<string, string> = {};
   try {
     for (const amendment of (await listAmendments(params.versionId)) ?? []) {
@@ -171,7 +166,6 @@ export default async function VersionPage(props: VersionPageProps) {
           versionId={params.versionId}
           articles={articles}
           outline={readerOutline ?? version.constitution.contentOutline}
-          canEditTitles={canEditTitles}
           language={version.version.languageCode}
           changeByArticle={changeByArticle}
           unchangedSinceLabel={previousPublished?.versionLabel}

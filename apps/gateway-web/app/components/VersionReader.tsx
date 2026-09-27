@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import type { ArticleSummary, ContentOutline } from '../../lib/api';
-import { clipNodes, depthStopCount, depthStopLabels } from '../../lib/outline';
+import { articleHeading, clipOrderedEntries, clipNodes, depthStopCount, depthStopLabels } from '../../lib/outline';
 import { neighborsOf } from '../../lib/article-nav';
 import { Badge, type BadgeTone, Toolbar } from './ui';
 import { ArticleNav } from './ArticleNav';
@@ -51,11 +51,11 @@ export function VersionReader({
   const tocItems = useMemo(
     () =>
       articles.map((article) => ({
-        id: `article-${article.articleNumber}`,
-        href: `#article-${article.articleNumber}`,
-        label: `Art. ${article.articleNumber} ${article.title}`,
+        id: `unit-${article.id}`,
+        href: `#unit-${article.id}`,
+        label: articleHeading(outline, article) || 'Unit',
       })),
-    [articles],
+    [articles, outline],
   );
   const articlesByNumber = useMemo(
     () => Object.fromEntries(articles.map((article) => [article.articleNumber, article.id])),
@@ -105,7 +105,7 @@ export function VersionReader({
           />
           <span className="toolbar-spacer" />
           <span className="muted">
-            {articles.length} article{articles.length === 1 ? '' : 's'}
+            {articles.length} {outline?.kinds[0]?.kindCode && outline.kinds[0].kindCode !== 'article' ? 'unit' : 'article'}{articles.length === 1 ? '' : 's'}
           </span>
         </Toolbar>
         <ol className="version-articles text-column" lang={language}>
@@ -118,7 +118,7 @@ export function VersionReader({
             const fullyOpen = depth >= max || expanded.has(article.id);
             const regionId = `article-panel-${article.id}`;
             const changeType = changeByArticle[article.articleNumber];
-            const permalink = `/countries/${code}/versions/${versionId}/articles/${article.id}#article-${article.articleNumber}`;
+            const permalink = `/countries/${code}/versions/${versionId}/${article.kind && article.kind !== 'article' ? 'units' : 'articles'}/${article.id}#article-${article.articleNumber}`;
             const neighbors = neighborsOf(articles, article.id);
             const historyHref = `/countries/${code}/articles/${encodeURIComponent(article.articleNumber)}`;
             return (
@@ -127,19 +127,20 @@ export function VersionReader({
                   <button
                     type="button"
                     className="article-toggle"
-                    id={`article-${article.articleNumber}`}
+                    id={`unit-${article.id}`}
                     aria-expanded={fullyOpen}
                     aria-controls={regionId}
                     disabled={depth >= max}
                     onClick={() => toggleArticle(article.id)}
                   >
-                    <span className="num">Art. {article.articleNumber}</span>
-                    <span>{article.title}</span>
+                    <span>{articleHeading(outline, article) || 'Unit'}</span>
                   </button>
                 </h2>
                 {open ? (
                   <div id={regionId}>
                     <ConstitutionText
+                      article={article}
+                      entries={article.content == null ? undefined : clipOrderedEntries(article.content, outline, shown)}
                       nodes={nodes}
                       body={body}
                       showHeading={false}
@@ -156,7 +157,7 @@ export function VersionReader({
                 )}
                 <p className="article-foot print-hide">
                   <a href={permalink}>Permalink</a>
-                  <a href={historyHref}>History of Art. {article.articleNumber}</a>
+                  <a href={historyHref}>History of {article.kind && article.kind !== 'article' ? outline?.kinds.find((kind) => kind.kindCode === article.kind)?.displayLabel ?? article.kind : 'Art.'} {article.articleNumber}</a>
                   {changeType ? (
                     <Badge tone={changeTone(changeType)}>{changeType}</Badge>
                   ) : (
@@ -170,16 +171,16 @@ export function VersionReader({
                     previous={
                       neighbors.previous
                         ? {
-                            href: `#article-${neighbors.previous.articleNumber}`,
-                            label: `Article ${neighbors.previous.articleNumber}`,
+                            href: `#unit-${neighbors.previous.id}`,
+                            label: articleHeading(outline, neighbors.previous) || 'Unit',
                           }
                         : undefined
                     }
                     next={
                       neighbors.next
                         ? {
-                            href: `#article-${neighbors.next.articleNumber}`,
-                            label: `Article ${neighbors.next.articleNumber}`,
+                            href: `#unit-${neighbors.next.id}`,
+                            label: articleHeading(outline, neighbors.next) || 'Unit',
                           }
                         : undefined
                     }

@@ -62,7 +62,11 @@ class ImportService(
             request.hopKind,
         )
         try {
-            contentClient.replaceArticles(version.id, request.articles)
+            if (request.roots.isNotEmpty()) {
+                contentClient.replaceRoots(version.id, request.roots)
+            } else {
+                contentClient.replaceArticles(version.id, request.articles)
+            }
         } catch (ex: RuntimeException) {
             importJobRepository.fail(
                 jobId,

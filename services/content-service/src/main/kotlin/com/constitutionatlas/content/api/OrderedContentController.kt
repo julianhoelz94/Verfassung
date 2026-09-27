@@ -22,6 +22,12 @@ class OrderedContentController(private val content: OrderedContentService, priva
         return content.save(versionId, request)
     }
 
+    @GetMapping("/versions/{versionId}/export")
+    fun export(@PathVariable versionId: UUID): OrderedContentExport = content.export(versionId)
+
+    @GetMapping("/versions/{versionId}/publish-receipt")
+    fun receipt(@PathVariable versionId: UUID, @RequestParam attemptId: UUID): OrderedSnapshot = content.publishReceipt(versionId, attemptId)
+
     @GetMapping("/versions/{versionId}/resolve")
     fun resolve(@PathVariable versionId: UUID, @RequestParam logicalId: UUID): ResolvedContent = content.resolve(versionId, logicalId)
 }

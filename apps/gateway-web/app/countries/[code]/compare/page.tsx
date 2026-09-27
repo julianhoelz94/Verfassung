@@ -11,7 +11,9 @@ import { Badge, PageHeader } from '../../../components/ui';
 import {
   ApiUnavailableError,
   getVersion,
-  listAllArticles,
+  getReaderOutline,
+  type ContentOutline,
+  listAllUnits,
   listConstitutionAmendments,
   getCountry,
   type Amendment,
@@ -23,7 +25,7 @@ import {
   COMPARE_KIND_LABEL,
   amendmentsBetween,
   canonicalCompareQuery,
-  compareArticleNumbers,
+  alignArticles,
   compareRequestError,
   compareRowId,
   netArticleKind,
@@ -31,6 +33,7 @@ import {
   versionPath,
   type CompareKind,
 } from '../../../../lib/compare';
+import { articleHeading } from '../../../../lib/outline';
 import { FormattedDate } from '../../../../lib/format-date';
 import { atlasTitle, metaDescription, pageMetadata } from '../../../../lib/page-meta';
 import { publicVersions, publicVersionForSnapshot, snapshotVersionId } from '../../../../lib/reading';
@@ -154,18 +157,23 @@ export default async function ComparePage(props: ComparePageProps) {
   let fromArticles: ArticleSummary[] = [];
   let toArticles: ArticleSummary[] = [];
   let lawHops: LawHop[] = [];
+  let fromOutline: ContentOutline | undefined;
+  let toOutline: ContentOutline | undefined;
   let loadError: string | null = selectedError;
 
   if (path && path.length >= 2 && !selectedError && constitution) {
     try {
+      const fromSnapshot = fromDetail?.constitutionId === constitution.id ? fromDetail.id : snapshotVersionId(path[0]);
+      const toSnapshot = toDetail?.constitutionId === constitution.id ? toDetail.id : snapshotVersionId(path[path.length - 1]);
+      [fromOutline, toOutline] = await Promise.all([getReaderOutline(fromSnapshot), getReaderOutline(toSnapshot)]).then((outlines) => outlines.map((outline) => outline ?? undefined));
       const [fromList, toList, constitutionAmendments] = await Promise.all([
-        listAllArticles(
+        listAllUnits(
           fromDetail?.constitutionId === constitution.id
             ? fromDetail.id
             : snapshotVersionId(path[0]),
           true,
         ),
-        listAllArticles(
+        listAllUnits(
           toDetail?.constitutionId === constitution.id
             ? toDetail.id
             : snapshotVersionId(path[path.length - 1]),
@@ -211,9 +219,6 @@ export default async function ComparePage(props: ComparePageProps) {
     }
   }
 
-  const fromMap = new Map(fromArticles.map((article) => [article.articleNumber, article]));
-  const toMap = new Map(toArticles.map((article) => [article.articleNumber, article]));
-  const numbers = [...new Set([...fromMap.keys(), ...toMap.keys()])].sort(compareArticleNumbers);
   const recorded = new Map<string, string[]>();
   for (const hop of lawHops) {
     for (const change of hop.amendment.changes) {
@@ -227,11 +232,10 @@ export default async function ComparePage(props: ComparePageProps) {
 
   const fromVersion = path?.[0];
   const toVersion = path?.[path.length - 1];
-  const rows = numbers.map((number) => {
-    const left = fromMap.get(number);
-    const right = toMap.get(number);
+  const rows = alignArticles(fromArticles, toArticles).map(({ key, left, right }) => {
+    const number = right?.articleNumber ?? left?.articleNumber ?? '';
     const kind = netArticleKind(left, right, recorded.get(number) ?? []);
-    return { number, left, right, kind, rowId: compareRowId(number) };
+    return { key, number, left, right, kind, rowId: compareRowId(right?.logicalId ?? left?.logicalId ?? number) };
   });
   const visible = showAll ? rows : rows.filter((row) => row.kind !== 'same');
   const changedCount = rows.filter((row) => row.kind === 'changed').length;
@@ -358,14 +362,13 @@ export default async function ComparePage(props: ComparePageProps) {
               {fromVersion.versionLabel} and {toVersion.versionLabel} side by side
             </h2>
             {visible.map((row) => {
-              const title = row.right?.title ?? row.left?.title ?? '';
+              const heading = articleHeading(row.right ? toOutline : fromOutline, (row.right ?? row.left)!);
               const fromBadge = columnBadge(row.kind, 'from');
               const toBadge = columnBadge(row.kind, 'to');
               return (
-                <section key={row.number} className={`compare-article kind-${row.kind}`}>
+                <section key={row.key} className={`compare-article kind-${row.kind}`}>
                   <h2 className="section-title" id={row.rowId}>
-                    Art. {row.number}
-                    {title ? ` · ${title}` : ''}{' '}
+                    {heading}{' '}
                     <a href={`#${row.rowId}`}>{COMPARE_KIND_LABEL[row.kind]}</a>
                   </h2>
                   <div className="compare-grid">
@@ -379,8 +382,9 @@ export default async function ComparePage(props: ComparePageProps) {
                           left={row.left}
                           right={row.right}
                           side="from"
-                          showHeading={false}
-                          outline={constitution?.contentOutline}
+                          oppositeOutline={toOutline}
+                          showHeading={true}
+                          outline={fromOutline}
                           lang={fromVersion.languageCode}
                         />
                       ) : row.left ? (
@@ -389,7 +393,7 @@ export default async function ComparePage(props: ComparePageProps) {
                           headingLevel="h3"
                           showHeading={false}
                           headingIdPrefix="article-from"
-                          outline={constitution?.contentOutline}
+                          outline={fromOutline}
                           lang={fromVersion.languageCode}
                         />
                       ) : (
@@ -406,8 +410,9 @@ export default async function ComparePage(props: ComparePageProps) {
                           left={row.left}
                           right={row.right}
                           side="to"
-                          showHeading={false}
-                          outline={constitution?.contentOutline}
+                          oppositeOutline={fromOutline}
+                          showHeading={true}
+                          outline={toOutline}
                           lang={toVersion.languageCode}
                         />
                       ) : row.right ? (
@@ -416,7 +421,7 @@ export default async function ComparePage(props: ComparePageProps) {
                           headingLevel="h3"
                           showHeading={false}
                           headingIdPrefix="article-to"
-                          outline={constitution?.contentOutline}
+                          outline={toOutline}
                           lang={toVersion.languageCode}
                         />
                       ) : (

@@ -39,6 +39,9 @@ export type DraftPreview = {
   sourceVersionId?: string | null;
   newVersionId?: string | null;
   newVersionLabel?: string | null;
+  unitMapping?: Record<string, string> | null;
+  sourceGeneration?: number | null;
+  settingsRevisionId?: string | null;
   searchIndexStatus?: 'pending' | 'ready' | 'failed' | null;
   amendmentStatus?: 'pending' | 'ready' | 'failed' | null;
   publishComment?: string | null;

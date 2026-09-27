@@ -138,6 +138,7 @@ data class CreateVersionRequest(
     val hopKind: String? = null,
     val publicationComment: String? = null,
     val structuralSettingsRevisionId: UUID? = null,
+    val publishAttemptId: UUID? = null,
 )
 
 data class VersionCreated(
@@ -168,4 +169,5 @@ data class VersionDetail(
     val currentVersionId: UUID? = null,
     val legalPredecessorVersionId: UUID? = null,
     val editorialPredecessorVersionId: UUID? = null,
+    val countryCode: String? = null,
 )

@@ -23,6 +23,7 @@ export type VersionSummary = {
 export type VersionDetail = Pick<VersionSummary, 'id' | 'versionLabel' | 'effectiveDate' | 'languageCode' | 'predecessorVersionId' | 'legalVersionId' | 'currentVersionId' | 'hopKind' | 'listing'> & {
   constitutionId: string;
   publicationStatus: string;
+  countryCode?: string | null;
 };
 
 export type ContentNode = {
@@ -34,6 +35,10 @@ export type ContentNode = {
   body: string | null;
   sortOrder: number;
   children: ContentNode[];
+  content?: OrderedEntry[];
+  logicalId?: string;
+  revisionId?: string;
+  legacyIdentity?: boolean;
 };
 
 export type ArticleDetail = {
@@ -45,6 +50,10 @@ export type ArticleDetail = {
   sortOrder: number;
   kind?: string;
   children?: ContentNode[];
+  content?: OrderedEntry[];
+  logicalId?: string;
+  revisionId?: string;
+  legacyIdentity?: boolean;
 };
 
 export type ContentOutline = {
@@ -99,8 +108,13 @@ export type ArticleSummary = {
   articleNumber: string;
   title: string;
   sortOrder: number;
+  kind?: string;
   body?: string | null;
   children?: ContentNode[];
+  content?: OrderedEntry[];
+  logicalId?: string;
+  revisionId?: string;
+  legacyIdentity?: boolean;
 };
 
 export type AmendmentChange = {
@@ -310,12 +324,15 @@ export async function listArticles(
   return page?.items ?? null;
 }
 
-export async function listArticlePage(
-  versionId: string,
-  offset?: number,
-  limit?: number,
-  includeBody?: boolean,
-): Promise<ArticlePage | null> {
+export function listArticlePage(versionId: string, offset?: number, limit?: number, includeBody?: boolean): Promise<ArticlePage | null> {
+  return listContentPage('articles', versionId, offset, limit, includeBody);
+}
+
+export function listUnitPage(versionId: string, offset?: number, limit?: number, includeBody?: boolean): Promise<ArticlePage | null> {
+  return listContentPage('units', versionId, offset, limit, includeBody);
+}
+
+async function listContentPage(resource: 'articles' | 'units', versionId: string, offset?: number, limit?: number, includeBody?: boolean): Promise<ArticlePage | null> {
   const params = new URLSearchParams();
   if (offset !== undefined) {
     params.set('offset', String(offset));
@@ -327,7 +344,7 @@ export async function listArticlePage(
     params.set('includeBody', 'true');
   }
   const query = params.toString();
-  const url = `${contentBaseUrl()}/versions/${encodeURIComponent(versionId)}/articles${query ? `?${query}` : ''}`;
+  const url = `${contentBaseUrl()}/versions/${encodeURIComponent(versionId)}/${resource}${query ? `?${query}` : ''}`;
   let response: Response;
   try {
     response = await fetch(url, { cache: 'no-store' });
@@ -347,20 +364,24 @@ export async function listArticlePage(
 
 const ARTICLE_PAGE_SIZE = 200;
 
-export async function listAllArticles(versionId: string, includeBody?: boolean): Promise<ArticleSummary[]> {
+export function listAllArticles(versionId: string, includeBody?: boolean): Promise<ArticleSummary[]> {
+  return listAllContent('articles', versionId, includeBody);
+}
+
+export function listAllUnits(versionId: string, includeBody?: boolean): Promise<ArticleSummary[]> {
+  return listAllContent('units', versionId, includeBody);
+}
+
+async function listAllContent(resource: 'articles' | 'units', versionId: string, includeBody?: boolean): Promise<ArticleSummary[]> {
   const all: ArticleSummary[] = [];
   let offset = 0;
   let total = Number.POSITIVE_INFINITY;
   while (offset < total) {
-    const page = await listArticlePage(versionId, offset, ARTICLE_PAGE_SIZE, includeBody);
-    if (!page) {
-      return all;
-    }
+    const page = await listContentPage(resource, versionId, offset, ARTICLE_PAGE_SIZE, includeBody);
+    if (!page) return all;
     all.push(...page.items);
     total = page.total;
-    if (page.items.length === 0) {
-      break;
-    }
+    if (page.items.length === 0) break;
     offset += ARTICLE_PAGE_SIZE;
   }
   return all;
@@ -371,6 +392,10 @@ export function getArticle(articleId: string): Promise<ArticleDetail | null> {
     `${contentBaseUrl()}/articles/${encodeURIComponent(articleId)}`,
     'content',
   );
+}
+
+export function getUnit(versionId: string, unitId: string): Promise<ArticleDetail | null> {
+  return readJson<ArticleDetail>(`${contentBaseUrl()}/versions/${encodeURIComponent(versionId)}/units/${encodeURIComponent(unitId)}`, 'content');
 }
 
 export function patchContentNode(
@@ -397,7 +422,7 @@ export type OutlineKindWrite = {
   allowTextAlongsideChildren?: boolean;
   titlePolicy?: 'none' | 'optional' | 'required';
   labelPolicy?: 'none' | 'optional' | 'required';
-  labelPlacement?: 'before_title' | 'after_title' | 'inline';
+  labelPlacement?: 'before_title' | 'after_title' | 'inline' | 'superscript';
   segmentation?: 'plain' | 'sentence';
 };
 

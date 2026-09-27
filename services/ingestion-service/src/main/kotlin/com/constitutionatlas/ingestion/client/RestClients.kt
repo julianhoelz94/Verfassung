@@ -2,6 +2,8 @@ package com.constitutionatlas.ingestion.client
 
 import com.constitutionatlas.ingestion.api.ImportArticle
 import com.constitutionatlas.ingestion.api.ImportOutlineKind
+import com.constitutionatlas.platform.OrderedNodeWrite
+import com.constitutionatlas.platform.OrderedSnapshotWrite
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
@@ -113,6 +115,10 @@ class RestContentClient(
     contentUrl: String,
 ) : ContentClient {
     private val client: RestClient = restClient(contentUrl)
+
+    override fun replaceRoots(versionId: UUID, roots: List<OrderedNodeWrite>) {
+        client.putJson("/versions/{id}/content", OrderedSnapshotWrite(expectedGeneration = 0, roots = roots), versionId)
+    }
 
     override fun replaceArticles(versionId: UUID, articles: List<ImportArticle>) {
         client.putJson("/versions/{id}/articles", articles, versionId)

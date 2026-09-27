@@ -17,7 +17,7 @@ export default async function AdminImportPage(props: AdminImportPageProps) {
     <PageMain className="wide">
       <PageHeader
         title="Import a constitution"
-        meta="Paste or upload import JSON. The payload must include country, constitution, version, and at least one article."
+        meta="Paste or upload import JSON. The payload must include country, constitution, version, and at least one article or ordered root unit."
       />
       {searchParams.error === 'forbidden' ? (
         <Alert tone="error">Administrator role required.</Alert>

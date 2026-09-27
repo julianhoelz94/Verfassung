@@ -48,6 +48,10 @@ class CatalogApiTest {
     @MockBean
     lateinit var settingsUsage: com.constitutionatlas.catalog.client.SettingsUsageClient
 
+    @Autowired lateinit var writes: com.constitutionatlas.catalog.service.CatalogWriteService
+
+    @MockBean lateinit var readiness: com.constitutionatlas.catalog.client.SuccessorReadinessClient
+
     @MockBean
     lateinit var identityClient: IdentityClient
 
@@ -57,6 +61,28 @@ class CatalogApiTest {
         Actor(UUID.fromString("01900000-0000-4000-8000-000000000412"), "local-publisher@example.local", listOf("publisher"))
     private val viewer =
         Actor(UUID.fromString("01900000-0000-4000-8000-000000000414"), "local-viewer@example.local", listOf("viewer"))
+
+    @Test
+    fun successorReservationRetriesRequireCompleteContentAndRejectChangedPayload() {
+        writes.createCountry(com.constitutionatlas.catalog.api.CreateCountryRequest("QZ", "Reservation country"))
+        val constitution = writes.createConstitution("QZ", com.constitutionatlas.catalog.api.CreateConstitutionRequest("reservation-${UUID.randomUUID()}", "Reservation test"))
+        val initial = writes.createDraftVersion(constitution.id, com.constitutionatlas.catalog.api.CreateVersionRequest("0"))
+        writes.publishVersion(initial.id)
+        val attempt = UUID.randomUUID()
+        val request = com.constitutionatlas.catalog.api.CreateVersionRequest("1", predecessorVersionId = initial.id, hopKind = "editorial_correction", publicationComment = "Correction", publishAttemptId = attempt)
+        val reserved = writes.createDraftVersion(constitution.id, request)
+        assertThat(writes.createDraftVersion(constitution.id, request).id).isEqualTo(reserved.id)
+        assertThat(writes.publishAttempt(attempt).id).isEqualTo(reserved.id)
+        org.junit.jupiter.api.Assertions.assertThrows(com.constitutionatlas.catalog.ConflictException::class.java) { writes.createDraftVersion(constitution.id, request.copy(publicationComment = "Changed request")) }
+        val settings = settingsRepository.forVersion(reserved.id).id
+        Mockito.doThrow(com.constitutionatlas.catalog.ConflictException("Incomplete roots")).`when`(readiness).requireReady(reserved.id, attempt, settings)
+        org.junit.jupiter.api.Assertions.assertThrows(com.constitutionatlas.catalog.ConflictException::class.java) { writes.publishVersion(reserved.id) }
+        assertThat(catalogRepository.findVersion(reserved.id)!!.publicationStatus).isEqualTo("draft")
+        Mockito.doNothing().`when`(readiness).requireReady(reserved.id, attempt, settings)
+        assertThat(writes.publishVersion(reserved.id).publicationStatus).isEqualTo("published")
+        assertThat(writes.createDraftVersion(constitution.id, request).id).isEqualTo(reserved.id)
+        org.junit.jupiter.api.Assertions.assertThrows(com.constitutionatlas.catalog.ConflictException::class.java) { writes.createDraftVersion(constitution.id, request.copy(versionLabel = "concurrent", publishAttemptId = UUID.randomUUID())) }
+    }
 
     @BeforeEach
     fun stubIdentity() {

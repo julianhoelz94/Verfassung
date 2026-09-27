@@ -111,3 +111,9 @@ PUT/PATCH/DELETE → 405; DB rules block update/delete.
 ## Sprint 40 ordered content and settings
 
 See [implementation notes](../design/sprint-40-implementation.md) and [ADR 0006](../adr/0006-shared-immutable-content.md). Catalog `SettingsService`/`SettingsRepository` own settings revisions, preflight, restore and version/reader settings; `ConstitutionMetadataService` owns metadata history and permanent slug aliases. Content `OrderedContentService`/`OrderedContentRepository` own revision sharing, ordered roots, resolver and compatibility projections. Editor `StructuredDraftService`/`StructuredDraftEngine` replay targeted deltas against pinned roots. Mixed writes remain gated for the Sprint 41 consumer rollout.
+
+## Sprint 41 ordered consumers and publishing
+
+Shared HTTP DTOs and flattening rules: `services/platform/.../OrderedContent.kt`, [traversal contract](../design/ordered-content-traversal.md). Content serves version-scoped `/units`, ordered `/content`, and lossless `/export`; legacy article URLs remain aliases. Reader/setup use `OrderedContentTree`; comparison, search, and amendment quotations traverse canonical entries.
+
+Structured publication: `OrderedSuccessorPlan` reuses unchanged revisions and copies changed ancestor paths. `StructuredPublicationService` verifies draft/source/settings pins. Catalog successor reservations, content publish receipts, and amendment creation attempts make retries reuse their resources. Completed successor roots are sealed before catalog publication; publish responses retain logical-unit to occurrence mappings and source pins.

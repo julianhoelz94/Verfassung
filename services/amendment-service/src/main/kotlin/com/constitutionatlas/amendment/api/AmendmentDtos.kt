@@ -76,6 +76,7 @@ data class AmendmentWriteRequest(
     val sourceVersionId: UUID? = null,
     val targetVersionId: UUID? = null,
     val changes: List<AmendmentChangeWriteRequest> = emptyList(),
+    val publishAttemptId: UUID? = null,
 )
 
 data class LinkTargetRequest(

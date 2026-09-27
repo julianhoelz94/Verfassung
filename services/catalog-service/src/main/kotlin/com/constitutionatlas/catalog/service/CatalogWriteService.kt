@@ -24,6 +24,8 @@ class CatalogWriteService(
     private val settingsRepository: SettingsRepository,
     private val settingsService: SettingsService,
     private val metadataService: ConstitutionMetadataService,
+    private val successorReadiness: com.constitutionatlas.catalog.client.SuccessorReadinessClient,
+    private val publishAttempts: com.constitutionatlas.catalog.repo.PublishAttemptRepository,
 ) {
     @Transactional
     fun createCountry(request: CreateCountryRequest): CountrySummary {
@@ -65,6 +67,14 @@ class CatalogWriteService(
     fun createDraftVersion(constitutionId: UUID, request: CreateVersionRequest): VersionCreated {
         if (!catalogRepository.constitutionExists(constitutionId)) {
             throw NotFoundException("Unknown constitution '$constitutionId'")
+        }
+        publishAttempts.lock(constitutionId)
+        val requestHash = java.security.MessageDigest.getInstance("SHA-256").digest(request.toString().toByteArray()).joinToString("") { "%02x".format(it) }
+        request.publishAttemptId?.let { attempt ->
+            publishAttempts.find(attempt)?.let { reservation ->
+                if (reservation.constitutionId != constitutionId || reservation.requestHash != requestHash) throw ConflictException("Publish attempt payload changed", "publish_attempt_mismatch")
+                return catalogRepository.findVersionCreated(reservation.versionId) ?: throw NotFoundException("Reserved version missing")
+            }
         }
         val label = request.versionLabel.trim()
         if (catalogRepository.versionLabelExists(constitutionId, label)) {
@@ -165,12 +175,19 @@ class CatalogWriteService(
 
         request.structuralSettingsRevisionId?.let { settingsRepository.find(constitutionId, it) }
         settingsRepository.pin(id, constitutionId, predecessorId, request.structuralSettingsRevisionId)
+        request.publishAttemptId?.let { publishAttempts.insert(it, constitutionId, id, requestHash) }
         return catalogRepository.findVersionCreated(id)
             ?: VersionCreated(id, constitutionId, label, "draft", predecessorId, hopKind, listing, legalVersionId)
     }
 
+    fun publishAttempt(id: UUID): VersionCreated {
+        val reservation = publishAttempts.find(id) ?: throw NotFoundException("Unknown publish attempt")
+        return catalogRepository.findVersionCreated(reservation.versionId) ?: throw NotFoundException("Reserved version missing")
+    }
+
     @Transactional
     fun publishVersion(versionId: UUID): VersionCreated {
+        publishAttempts.forVersion(versionId)?.let { attempt -> successorReadiness.requireReady(versionId, attempt, settingsRepository.forVersion(versionId).id) }
         if (!catalogRepository.publishVersion(versionId)) {
             throw NotFoundException("Unknown version '$versionId'")
         }
@@ -243,9 +260,10 @@ class CatalogWriteService(
                 if (kind.showLabel && kind.labelPolicy == "none") {
                     throw IllegalArgumentException("public label display requires literal label permission")
                 }
-                if (kind.labelPlacement !in setOf("before_title", "after_title", "inline")) {
-                    throw IllegalArgumentException("labelPlacement must be before_title, after_title or inline")
+                if (kind.labelPlacement !in setOf("before_title", "after_title", "inline", "superscript")) {
+                    throw IllegalArgumentException("labelPlacement must be before_title, after_title, inline or superscript")
                 }
+                if (kind.labelPlacement == "superscript" && index != kinds.lastIndex) throw IllegalArgumentException("superscript labels are only available on the final layer")
                 if (kind.segmentation !in setOf("plain", "sentence") ||
                     (kind.segmentation == "sentence" && index != kinds.lastIndex)
                 ) {

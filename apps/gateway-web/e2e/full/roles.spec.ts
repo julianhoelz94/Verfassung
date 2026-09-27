@@ -101,5 +101,7 @@ test('administrator imports a new constitution through the website', async ({ pa
   await expect(page.getByRole('heading', { name: 'Import job' })).toBeVisible();
   await expect(page.getByText('Status: completed')).toBeVisible();
   await page.getByRole('link', { name: 'Open the published version' }).click();
-  await expect(page.getByRole('link', { name: 'Art. 1 Public trust' }).first()).toBeVisible();
+  await expect(page.getByRole('button', { name: /Article 1.*Public trust/ }).first()).toBeVisible();
+  await page.getByRole('button', { name: /Article 1.*Public trust/ }).first().click();
+  await expect(page.getByText('Public trust protects every person.')).toBeVisible();
 });

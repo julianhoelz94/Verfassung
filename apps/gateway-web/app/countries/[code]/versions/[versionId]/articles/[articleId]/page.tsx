@@ -9,18 +9,18 @@ import { ServiceUnavailable } from '../../../../../../components/StatusMessage';
 import { Alert, PageHeader } from '../../../../../../components/ui';
 import {
   ApiUnavailableError,
-  getArticle,
+  getUnit,
   getCountry,
   getReaderOutline,
-  listAllArticles,
+  getVersion,
+  listAllUnits,
   type ArticleDetail,
   type ArticleSummary,
   type CountryDetail,
 } from '../../../../../../../lib/api';
 import { neighborsOf } from '../../../../../../../lib/article-nav';
-import { canVisitEditor } from '../../../../../../../lib/nav';
 import { atlasTitle, metaDescription, pageMetadata } from '../../../../../../../lib/page-meta';
-import { currentUser } from '../../../../../../../lib/session';
+import { publicSnapshotContext } from '../../../../../../../lib/reading';
 
 type ArticlePageProps = {
   params: Promise<{ code: string; versionId: string; articleId: string }>;
@@ -30,11 +30,8 @@ type ArticlePageProps = {
 export async function generateMetadata(props: ArticlePageProps): Promise<Metadata> {
   const params = await props.params;
   try {
-    const [country, article] = await Promise.all([getCountry(params.code), getArticle(params.articleId)]);
-    const constitution = country?.constitutions.find((item) =>
-      item.versions.some((itemVersion) => itemVersion.id === params.versionId),
-    );
-    const version = constitution?.versions.find((item) => item.id === params.versionId);
+    const [country, article, snapshot] = await Promise.all([getCountry(params.code), getUnit(params.versionId, params.articleId), getVersion(params.versionId)]);
+    const version = publicSnapshotContext(country, snapshot)?.version;
     if (!country || !article || article.versionId !== params.versionId || !version) {
       return { title: atlasTitle('Article') };
     }
@@ -63,10 +60,11 @@ export default async function ArticlePage(props: ArticlePageProps) {
   let article: ArticleDetail | null = null;
   let siblings: ArticleSummary[] = [];
   let error: string | null = null;
+  let snapshot: Awaited<ReturnType<typeof getVersion>> = null;
   try {
-    country = await getCountry(params.code);
-    article = await getArticle(params.articleId);
-    siblings = await listAllArticles(params.versionId, false);
+    [country, snapshot] = await Promise.all([getCountry(params.code), getVersion(params.versionId)]);
+    article = await getUnit(params.versionId, params.articleId);
+    siblings = await listAllUnits(params.versionId, false);
   } catch (e) {
     error = e instanceof ApiUnavailableError ? e.message : 'A backend service is unavailable';
     country = null;
@@ -89,12 +87,9 @@ export default async function ArticlePage(props: ArticlePageProps) {
   }
 
   const permalink = `/countries/${country.isoCode}/versions/${params.versionId}/articles/${article.id}`;
-  const constitution = country.constitutions.find((item) =>
-    item.versions.some((itemVersion) => itemVersion.id === params.versionId),
-  );
-  const version = constitution?.versions.find((item) => item.id === params.versionId);
-  const user = await currentUser();
-  const canEditTitles = Boolean(user && canVisitEditor(user.roles));
+  const context = publicSnapshotContext(country, snapshot);
+  if (!context) notFound();
+  const { constitution, version } = context;
   const returnTo = permalink;
   const neighbors = neighborsOf(siblings, article.id);
   const articlesByNumber = Object.fromEntries(siblings.map((item) => [item.articleNumber, item.id]));
@@ -136,7 +131,6 @@ export default async function ArticlePage(props: ArticlePageProps) {
           article={article}
           nodes={article.children}
           outline={readerOutline ?? constitution?.contentOutline}
-          canEditTitles={canEditTitles}
           returnTo={returnTo}
           lang={version?.languageCode}
           showHeading={false}

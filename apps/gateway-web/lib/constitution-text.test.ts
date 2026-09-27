@@ -2,7 +2,8 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import type { ContentNode, ContentOutline, OrderedEntry } from './api';
-vi.mock('../app/components/NodeTitleForm', () => ({ NodeTitleForm: () => null }));
+vi.mock('../app/components/NodeTitleForm', () => ({ NodeTitleForm: vi.fn(() => null) }));
+import { NodeTitleForm } from '../app/components/NodeTitleForm';
 import { DiffConstitutionText } from '../app/components/DiffConstitutionText';
 import { ConstitutionText, NodeTree, OrderedContentTree } from '../app/components/ConstitutionText';
 const outline: ContentOutline = { kinds: [
@@ -82,5 +83,22 @@ describe('root literal label diffs', () => {
     expect(to).toContain(`<${tag} class="num"><ins class="diff-add">bis</ins></${tag}>`);
     expect(from.replace(/<[^>]*>/g, '')).toBe('46aUnchanged rights.');
     expect(to.replace(/<[^>]*>/g, '')).toBe('bisUnchanged rights.');
+  });
+});
+
+
+describe('ordered title authoring permissions', () => {
+  it('forwards title controls even when public titles are hidden and leaves concatenate', () => {
+    vi.mocked(NodeTitleForm).mockClear();
+    renderToStaticMarkup(createElement(ConstitutionText, { entries, outline, canEditTitles: true, returnTo: '/reader' }));
+    const calls = vi.mocked(NodeTitleForm).mock.calls;
+    expect(calls.map(([props]) => props.nodeId)).toEqual(['0', '1']);
+    expect(calls.every(([props]) => props.returnTo === '/reader')).toBe(true);
+  });
+  it('does not offer title authoring when the structural title policy forbids titles', () => {
+    vi.mocked(NodeTitleForm).mockClear();
+    const forbidden = { kinds: outline.kinds.map((kind) => ({ ...kind, titlePolicy: 'none' })) };
+    renderToStaticMarkup(createElement(ConstitutionText, { entries, outline: forbidden, canEditTitles: true, returnTo: '/reader' }));
+    expect(NodeTitleForm).not.toHaveBeenCalled();
   });
 });

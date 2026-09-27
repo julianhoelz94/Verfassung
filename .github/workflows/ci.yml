@@ -221,7 +221,7 @@ jobs:
           set -euo pipefail
           for service in identity-service catalog-service content-service editor-service \
             audit-service amendment-service search-service; do
-            ./gradlew -p "services/${service}" bootJar -x test 2>&1 | tee -a publish-journey-build.txt
+            ./gradlew --no-daemon -p "services/${service}" bootJar -x test 2>&1 | tee -a publish-journey-build.txt
           done
       - name: Compose identity catalog content editor
         run: |
@@ -278,7 +278,7 @@ jobs:
           set -euo pipefail
           for service in identity-service catalog-service content-service editor-service \
             audit-service amendment-service search-service ingestion-service; do
-            ./gradlew -p "services/${service}" bootJar -x test
+            ./gradlew --no-daemon -p "services/${service}" bootJar -x test
             test -f "services/${service}/build/libs/app.jar"
           done
           tar -cf full-stack-service-jars.tar services/*/build/libs/app.jar

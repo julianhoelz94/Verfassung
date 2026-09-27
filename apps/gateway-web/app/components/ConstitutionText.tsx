@@ -61,7 +61,7 @@ export function ConstitutionText({
       {article && rootKind?.showLabel && rootKind.labelPlacement === 'inline' ? <span className="num">{article.articleNumber}</span> : null}
       {article && rootKind?.showLabel && rootKind.labelPlacement === 'superscript' ? <sup className="num">{article.articleNumber}</sup> : null}
       {entries !== undefined || article?.content != null ? (
-        <OrderedContentTree entries={entries ?? article?.content ?? []} outline={outline} withRefs={withRefs} />
+        <OrderedContentTree entries={entries ?? article?.content ?? []} outline={outline} withRefs={withRefs} canEditTitles={canEditTitles} returnTo={returnTo} />
       ) : children && children.length > 0 ? (
         <NodeTree
           nodes={children}
@@ -156,16 +156,18 @@ function SectionNode({
 }
 
 /** Ordered reader rendering shares heading and sibling presentation rules with NodeTree. */
-export function OrderedContentTree({ entries, outline, withRefs = (text) => text, renderText, renderHeading, renderLabel, idPrefix = '' }: {
+export function OrderedContentTree({ entries, outline, withRefs = (text) => text, renderText, renderHeading, renderLabel, idPrefix = '', canEditTitles = false, returnTo }: {
   entries: OrderedEntry[]; outline?: ContentOutline; withRefs?: (text: string) => ReactNode;
   renderText?: (entry: OrderedEntry) => ReactNode;
   renderHeading?: (node: OrderedNode, heading: string) => ReactNode;
   renderLabel?: (node: OrderedNode, label: string) => ReactNode;
   idPrefix?: string;
+  canEditTitles?: boolean;
+  returnTo?: string;
 }) {
   const groups: Array<{ entries: OrderedEntry[]; concatenated: boolean }> = [];
   for (const entry of entries) {
-    const concatenated = entry.type === 'child' && Boolean(entry.node) &&
+    const concatenated = !(canEditTitles && returnTo && kindByCode(outline, entry.node?.kind ?? '')?.titlePolicy !== 'none') && entry.type === 'child' && Boolean(entry.node) &&
       kindByCode(outline, entry.node!.kind)?.presentation === 'concatenated' &&
       (!kindByCode(outline, entry.node!.kind)?.showLabel || ['inline', 'superscript'].includes(kindByCode(outline, entry.node!.kind)?.labelPlacement ?? '')) && !kindByCode(outline, entry.node!.kind)?.showTitle && !kindByCode(outline, entry.node!.kind)?.showKind &&
       entry.node!.content.every((part) => part.type === 'text');
@@ -192,9 +194,10 @@ export function OrderedContentTree({ entries, outline, withRefs = (text) => text
     const inlineLabel = kind?.showLabel && kind.labelPlacement === 'inline' ? node.label : null;
     return <section key={node.occurrenceId} id={`${idPrefix}${node.occurrenceId}`} className={`node-block node-kind-${node.kind}`}>
       {heading ? <p className="node-heading">{renderHeading ? renderHeading(node, heading) : heading}</p> : null}
+      {canEditTitles && returnTo && kind?.titlePolicy !== 'none' ? <NodeTitleForm nodeId={node.occurrenceId} title={node.title} label={node.label ?? kind?.displayLabel ?? node.kind} returnTo={returnTo} /> : null}
       {superscriptLabel ? <sup className="num">{renderLabel ? renderLabel(node, superscriptLabel) : superscriptLabel}</sup> : null}
       {inlineLabel ? <span className="num">{renderLabel ? renderLabel(node, inlineLabel) : inlineLabel}</span> : null}
-      <OrderedContentTree entries={node.content} outline={outline} withRefs={withRefs} renderText={renderText} renderHeading={renderHeading} renderLabel={renderLabel} idPrefix={idPrefix} />
+      <OrderedContentTree entries={node.content} outline={outline} withRefs={withRefs} renderText={renderText} renderHeading={renderHeading} renderLabel={renderLabel} idPrefix={idPrefix} canEditTitles={canEditTitles} returnTo={returnTo} />
     </section>;
   })}</div>;
 }

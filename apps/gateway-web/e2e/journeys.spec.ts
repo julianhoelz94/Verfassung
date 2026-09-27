@@ -227,13 +227,12 @@ test('editorial correction hop stays off the public timeline', async ({ page }) 
   await expect(page.getByText('No publication comment')).toBeVisible();
 });
 
-test('editor reaches title controls from the public article reader', async ({ page }) => {
+test('published article titles remain read-only for editors', async ({ page }) => {
   await signInEditor(page);
   await page.goto(`/countries/DE/versions/${VERSION_2022}/articles/${ARTICLE_1}`);
-  const title = page.getByLabel(/Title for/).first();
-  await title.fill('Rights paragraph');
-  await page.getByRole('button', { name: 'Save title' }).first().click();
-  await expect(page.getByLabel(/Title for/).first()).toHaveValue('Rights paragraph');
+  await expect(page.getByRole('heading', { name: /Human dignity/ })).toBeVisible();
+  await expect(page.getByLabel(/Title for/)).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Save title' })).toHaveCount(0);
 });
 
 test('editor inspects and restores a legal-change revision as a new draft', async ({ page }) => {

@@ -18,11 +18,9 @@ import {
 } from '../../../../../lib/api';
 import { neighborCompareLinks, orderVersions } from '../../../../../lib/compare';
 import { FormattedDate } from '../../../../../lib/format-date';
-import { canVisitEditor } from '../../../../../lib/nav';
 import { atlasTitle, metaDescription, pageMetadata } from '../../../../../lib/page-meta';
 import { httpUrl, provenanceLabel, verificationLabel } from '../../../../../lib/provenance';
 import { publicSnapshotContext } from '../../../../../lib/reading';
-import { currentUser } from '../../../../../lib/session';
 
 type VersionPageProps = {
   params: Promise<{ code: string; versionId: string }>;
@@ -84,8 +82,6 @@ export default async function VersionPage(props: VersionPageProps) {
   const previousPublished = currentIndex > 0 ? line[currentIndex - 1] : undefined;
   const nextPublished = currentIndex >= 0 ? line[currentIndex + 1] : undefined;
   const neighbors = neighborCompareLinks(country.isoCode, line, version.version.id);
-  const user = await currentUser();
-  const canEditTitles = Boolean(user && canVisitEditor(user.roles));
   const changeByArticle: Record<string, string> = {};
   try {
     for (const amendment of (await listAmendments(params.versionId)) ?? []) {
@@ -170,7 +166,6 @@ export default async function VersionPage(props: VersionPageProps) {
           versionId={params.versionId}
           articles={articles}
           outline={readerOutline ?? version.constitution.contentOutline}
-          canEditTitles={canEditTitles}
           language={version.version.languageCode}
           changeByArticle={changeByArticle}
           unchangedSinceLabel={previousPublished?.versionLabel}

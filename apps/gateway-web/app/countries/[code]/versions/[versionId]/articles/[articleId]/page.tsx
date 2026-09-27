@@ -19,10 +19,8 @@ import {
   type CountryDetail,
 } from '../../../../../../../lib/api';
 import { neighborsOf } from '../../../../../../../lib/article-nav';
-import { canVisitEditor } from '../../../../../../../lib/nav';
 import { atlasTitle, metaDescription, pageMetadata } from '../../../../../../../lib/page-meta';
 import { publicSnapshotContext } from '../../../../../../../lib/reading';
-import { currentUser } from '../../../../../../../lib/session';
 
 type ArticlePageProps = {
   params: Promise<{ code: string; versionId: string; articleId: string }>;
@@ -92,8 +90,6 @@ export default async function ArticlePage(props: ArticlePageProps) {
   const context = publicSnapshotContext(country, snapshot);
   if (!context) notFound();
   const { constitution, version } = context;
-  const user = await currentUser();
-  const canEditTitles = Boolean(user && canVisitEditor(user.roles));
   const returnTo = permalink;
   const neighbors = neighborsOf(siblings, article.id);
   const articlesByNumber = Object.fromEntries(siblings.map((item) => [item.articleNumber, item.id]));
@@ -135,7 +131,6 @@ export default async function ArticlePage(props: ArticlePageProps) {
           article={article}
           nodes={article.children}
           outline={readerOutline ?? constitution?.contentOutline}
-          canEditTitles={canEditTitles}
           returnTo={returnTo}
           lang={version?.languageCode}
           showHeading={false}

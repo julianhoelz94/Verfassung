@@ -31,6 +31,7 @@ BUILD_ORDER=(
 DOCKER_STARTUP_TIMEOUT_SECONDS="${DOCKER_STARTUP_TIMEOUT_SECONDS:-120}"
 HTTP_READY_TIMEOUT_SECONDS="${HTTP_READY_TIMEOUT_SECONDS:-90}"
 MIN_FREE_MB="${MIN_FREE_MB:-2048}"
+GRADLE_BUILD_JOBS="${GRADLE_BUILD_JOBS:-2}"
 
 compose() {
   "${COMPOSE_CMD[@]}" --env-file "${ENV_FILE}" "$@"
@@ -74,18 +75,25 @@ ensure_docker_running() {
     return
   fi
 
-  echo "Docker daemon is not reachable."
+  local context
+  context="$(docker context show 2>/dev/null || true)"
+  echo "Docker daemon is not reachable (context: ${context:-unknown})."
 
   if [ "$(uname -s)" = "Darwin" ]; then
-    echo "Attempting to start Docker Desktop..."
-    open -a Docker
+    if [ "${context}" = "orbstack" ] || [[ "${DOCKER_HOST:-}" == *orbstack* ]]; then
+      echo "Attempting to start OrbStack..."
+      open -a OrbStack
+    else
+      echo "Attempting to start Docker Desktop..."
+      open -a Docker
+    fi
   fi
 
   local waited=0
   until docker info >/dev/null 2>&1; do
     if [ "$waited" -ge "$DOCKER_STARTUP_TIMEOUT_SECONDS" ]; then
       echo "Docker did not become ready within ${DOCKER_STARTUP_TIMEOUT_SECONDS}s."
-      echo "Please start Docker manually and run the script again."
+      echo "Start the engine for context '${context:-unknown}' or select the intended context, then run the script again."
       exit 1
     fi
 
@@ -122,7 +130,7 @@ wait_for_http() {
   until curl -sf -o /dev/null --max-time 2 "${url}"; do
     if [ "${waited}" -ge "${HTTP_READY_TIMEOUT_SECONDS}" ]; then
       echo "Caddy did not serve ${url} within ${HTTP_READY_TIMEOUT_SECONDS}s. Check: ${COMPOSE_CMD[*]} --env-file ${ENV_FILE} ps"
-      return 0
+      return 1
     fi
     echo "Waiting for ${url}... (${waited}s/${HTTP_READY_TIMEOUT_SECONDS}s)"
     sleep 3
@@ -168,17 +176,46 @@ is_kotlin_service() {
 }
 
 build_services() {
-  local service
+  local service i failed=0
+  local -a pids=()
+  local -a running_services=()
+  case "${GRADLE_BUILD_JOBS}" in
+    ''|*[!0-9]*) echo "GRADLE_BUILD_JOBS must be a positive integer." >&2; return 1 ;;
+  esac
+  if [ "${GRADLE_BUILD_JOBS}" -lt 1 ]; then
+    echo "GRADLE_BUILD_JOBS must be a positive integer." >&2
+    return 1
+  fi
+
   for service in "$@"; do
     if is_kotlin_service "${service}"; then
       echo "======== bootJar ${service} (host) ========"
-      ./gradlew -p "services/${service}" bootJar -x test
+      ./gradlew -p "services/${service}" bootJar -x test &
+      pids+=("$!")
+      running_services+=("${service}")
+      if [ "${#pids[@]}" -ge "${GRADLE_BUILD_JOBS}" ]; then
+        for ((i=0; i<${#pids[@]}; i++)); do
+          if ! wait "${pids[i]}"; then
+            echo "bootJar failed: ${running_services[i]}" >&2
+            failed=1
+          fi
+        done
+        pids=()
+        running_services=()
+        if [ "${failed}" -ne 0 ]; then return 1; fi
+      fi
     fi
   done
-  for service in "$@"; do
-    echo "======== Building ${service} ========"
-    compose build "${service}"
+  for ((i=0; i<${#pids[@]}; i++)); do
+    if ! wait "${pids[i]}"; then
+      echo "bootJar failed: ${running_services[i]}" >&2
+      failed=1
+    fi
   done
+  if [ "${failed}" -ne 0 ]; then return 1; fi
+
+  echo "======== Building images: $* ========"
+  compose build "$@"
 }
 
 usage() {
@@ -198,7 +235,7 @@ Services (compose names, or short: catalog, content, …, gateway, caddy):
   ${BUILD_ORDER[*]}
 
 Rebuild catalog or content also recreates search-service (SEARCH_REINDEX_ON_STARTUP).
-Env: COMPOSE_VERBOSE=1  MIN_FREE_MB=${MIN_FREE_MB}  HTTP_READY_TIMEOUT_SECONDS=${HTTP_READY_TIMEOUT_SECONDS}
+Env: COMPOSE_VERBOSE=1  GRADLE_BUILD_JOBS=${GRADLE_BUILD_JOBS}  MIN_FREE_MB=${MIN_FREE_MB}  HTTP_READY_TIMEOUT_SECONDS=${HTTP_READY_TIMEOUT_SECONDS}
 EOF
   exit "${code}"
 }

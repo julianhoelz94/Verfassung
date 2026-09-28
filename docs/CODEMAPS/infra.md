@@ -58,4 +58,4 @@ Dependabot: `.github/dependabot.yml`.
 
 `npm run dev` (port 3000), `lint`, `build`, `test`, `test:e2e`.
 
-Host tools (not in Compose): Docker Desktop, JDK 21, Node 20. See `README.md`.
+Host tools (not in Compose): OrbStack or Docker Desktop, JDK 21, Node 20. See `README.md`.

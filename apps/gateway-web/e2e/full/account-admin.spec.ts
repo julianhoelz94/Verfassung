@@ -104,11 +104,12 @@ test('administrator creates a constitution and updates its outline presentation'
   await signIn(page, 'admin');
   await page.goto('/admin/constitutions');
   await page.getByLabel('Country').selectOption('XA');
-  await page.getByLabel('Slug').fill(`journey-outline-${Date.now()}`);
-  await page.getByLabel('Title', { exact: true }).fill(title);
+  await page.getByLabel('Constitution title').fill(title);
+  await page.getByRole('button', { name: 'Continue to structure' }).click();
   await page.getByRole('button', { name: 'Add deeper layer' }).click();
   await page.getByRole('textbox', { name: 'Label' }).nth(1).fill('Clause');
-  await page.getByRole('button', { name: 'Create' }).click();
+  await page.getByRole('button', { name: 'Continue to review' }).click();
+  await page.getByRole('button', { name: 'Create constitution' }).click();
   await expect(page).toHaveURL(/\/admin\/constitutions\/[^/?]+$/, { timeout: 30000 });
   await expect(page.getByRole('heading', { name: title })).toBeVisible();
   await expect(page.getByRole('textbox', { name: 'Label' }).nth(1)).toHaveValue('Clause');

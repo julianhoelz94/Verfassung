@@ -1,6 +1,6 @@
 # Structured constitutional text editor
 
-Status: Proposed implementation plan  
+Status: Superseded for content/configuration rules by [constitution settings and editor compatibility](constitution-settings-and-editor-compatibility.md) and the [mixed-content Linear plan](https://linear.app/verfassung/document/mixed-content-constitution-structure-creation-and-editor-394a359fa467). This file remains historical design context; its leaf-only and body/children examples are not implementation requirements.
 Scope: catalog-service, content-service, editor-service, ingestion-service, and gateway-web  
 Tracking: assign Linear issues before implementation; Linear remains the source of truth for delivery status
 

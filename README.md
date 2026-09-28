@@ -8,11 +8,11 @@ Product work and sprint status live in [`backlog.md`](backlog.md). This file is 
 
 ## Host prerequisites (install yourself)
 
-These are not provided by the repo. Compose images contain a JRE (Kotlin services), Node (gateway), Caddy, and Postgres; you still need Docker and JDK 21 on the host.
+These are not provided by the repo. Compose images contain a JRE (Kotlin services), Node (gateway), Caddy, and Postgres; you still need a Docker-compatible engine and JDK 21 on the host.
 
 | Tool | Version | Needed for | Install |
 | --- | --- | --- | --- |
-| Docker Desktop | current, with the engine running | Local stack (`./manageLocalStack.sh`) and Testcontainers | [Docker Desktop for Mac](https://www.docker.com/products/docker-desktop/) |
+| OrbStack or Docker Desktop | current, with the engine running | Local stack (`./manageLocalStack.sh`) and Testcontainers | [OrbStack](https://orbstack.dev/) or [Docker Desktop for Mac](https://www.docker.com/products/docker-desktop/) |
 | Temurin JDK | **21** (LTS) | Host `./gradlew test` / `bootJar` (local stack Kotlin images) | [Adoptium Temurin 21](https://adoptium.net/temurin/releases/?version=21) (macOS `.pkg` needs admin). Without sudo: unpack the macOS aarch64/x64 `.tar.gz` under `~/.local/java/temurin-21` (`Contents/Home`) and set `JAVA_HOME` + `PATH` in `~/.zshrc`. |
 | Gradle | **9.7.1** (matches CI and the repo wrapper) | Host `./gradlew test` / `bootJar` | Wrapper at repo root (`./gradlew`); each `services/<name>/gradlew` delegates to it. Prefer the wrapper over Homebrew’s `gradle` formula so the patch version stays pinned. |
 | Node.js + npm | **20** | `cd apps/gateway-web && npm ci && npm run lint && npm run build` | [Node 20](https://nodejs.org/) or `nvm install 20` |
@@ -44,7 +44,7 @@ Service names: `catalog`, `content`, `amendment`, `identity`, `editor`, `search`
 
 ```bash
 ./manageLocalStack.sh --start              # host bootJar + image build, then up
-./manageLocalStack.sh --start --no-build   # reuse existing images
+./manageLocalStack.sh --start --no-build   # fast restart using existing images
 ./manageLocalStack.sh --rebuild content-service amendment-service gateway-web
 ./manageLocalStack.sh --status
 ./manageLocalStack.sh --stop               # keeps named database volumes
@@ -53,6 +53,8 @@ Service names: `catalog`, `content`, `amendment`, `identity`, `editor`, `search`
 ```
 
 `--start` runs `./gradlew bootJar` on the host for each Kotlin service, then copies `app.jar` onto `eclipse-temurin:21-jre`. Gateway and Caddy still build in Docker. After Flyway or gateway changes, `--rebuild` those services (catalog/content also recreates search so the index rebuilds).
+
+The script uses the selected Docker context. If its engine is stopped on macOS, it opens OrbStack for the `orbstack` context or Docker Desktop for other contexts. Select OrbStack with `docker context use orbstack` if needed. Builds run two Kotlin services at a time (`GRADLE_BUILD_JOBS=1` for a memory-constrained machine) and batch the Docker image builds. A fresh checkout still needs one full build; subsequent restarts can use `--start --no-build`. Use `--rebuild <service>` to apply source changes to a running stack.
 
 ## Backup and restore
 

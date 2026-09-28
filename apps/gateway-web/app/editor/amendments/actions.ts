@@ -6,12 +6,7 @@ import {
   AmendmentApiError,
   amendmentErrorMessage,
   appendRevision,
-  confirmAmendmentQuotes,
-  createAmendment,
-  publishAmendment,
   suggestChanges,
-  withdrawAmendment,
-  type AmendmentChangeWrite,
   type AmendmentRevision,
   type AmendmentWriteBody,
   type SuggestedChange,
@@ -33,54 +28,6 @@ function redirectDetail(id: string, extra: Record<string, string> = {}): never {
   redirect(amendmentDetailPath(id, extra));
 }
 
-function optionalField(formData: FormData, name: string): string | null {
-  const value = String(formData.get(name) ?? '').trim();
-  return value || null;
-}
-
-function parseChanges(formData: FormData): AmendmentChangeWrite[] {
-  const raw = String(formData.get('changesJson') ?? '[]');
-  try {
-    const parsed = JSON.parse(raw) as AmendmentChangeWrite[];
-    if (!Array.isArray(parsed)) {
-      return [];
-    }
-    return parsed.map((change) => ({
-      articleNumber: change.articleNumber?.trim() || null,
-      changeType: change.changeType,
-      note: change.note?.trim() || null,
-    }));
-  } catch {
-    return [];
-  }
-}
-
-function parseDocuments(formData: FormData): { url?: string | null; fileId?: string | null; label?: string | null }[] {
-  try {
-    const rows = JSON.parse(String(formData.get('documentsJson') ?? '[]')) as { url?: string; fileId?: string; label?: string }[];
-    return rows.map((row) => ({ url: row.url?.trim() || null, fileId: row.fileId?.trim() || null, label: row.label?.trim() || null })).filter((row) => row.url || row.fileId || row.label);
-  } catch { return []; }
-}
-
-function readWriteBody(formData: FormData): AmendmentWriteBody {
-  const title = String(formData.get('title') ?? '').trim();
-  if (!title) {
-    throw new AmendmentApiError('title');
-  }
-  return {
-    title,
-    summary: optionalField(formData, 'summary'),
-    comment: optionalField(formData, 'comment'),
-    documents: parseDocuments(formData),
-    enactedOn: optionalField(formData, 'enactedOn'),
-    effectiveOn: optionalField(formData, 'effectiveOn'),
-    sourceReference: optionalField(formData, 'sourceReference'),
-    sourceVersionId: optionalField(formData, 'sourceVersionId'),
-    targetVersionId: optionalField(formData, 'targetVersionId'),
-    changes: parseChanges(formData),
-  };
-}
-
 async function runDetailCommand(
   formData: FormData,
   amendmentId: string,
@@ -98,60 +45,6 @@ async function runDetailCommand(
   // Refresh the current detail before a query-only redirect after a mutation.
   revalidatePath(amendmentDetailPath(amendmentId));
   redirectDetail(amendmentId, success);
-}
-
-export async function saveAmendmentAction(formData: FormData): Promise<void> {
-  const amendmentId = String(formData.get('amendmentId') ?? '').trim();
-  const constitutionId = String(formData.get('constitutionId') ?? '').trim();
-  try {
-    const body = readWriteBody(formData);
-    if (!amendmentId || amendmentId === 'new') {
-      if (!constitutionId) {
-        redirect(amendmentListPath({ error: 'invalid' }));
-      }
-      const created = await createAmendment(constitutionId, body);
-      revalidatePath(amendmentDetailPath(created.id));
-      redirectDetail(created.id, { saved: '1' });
-    }
-    await runDetailCommand(formData, amendmentId, () => appendRevision(amendmentId, body), { saved: '1' });
-  } catch (error) {
-    if (error instanceof AmendmentApiError) {
-      if (!amendmentId || amendmentId === 'new') {
-        redirect(
-          amendmentDetailPath('new', {
-            constitutionId,
-            error: error.key,
-          }),
-        );
-      }
-      redirectDetail(amendmentId, { error: error.key });
-    }
-    throw error;
-  }
-}
-
-export async function publishAmendmentAction(formData: FormData): Promise<void> {
-  const amendmentId = String(formData.get('amendmentId') ?? '').trim();
-  if (!amendmentId || amendmentId === 'new') {
-    redirect(amendmentListPath({ error: 'invalid' }));
-  }
-  await runDetailCommand(formData, amendmentId, () => publishAmendment(amendmentId), { published: '1' });
-}
-
-export async function confirmQuotesAction(formData: FormData): Promise<void> {
-  const amendmentId = String(formData.get('amendmentId') ?? '').trim();
-  if (!amendmentId || amendmentId === 'new') {
-    redirect(amendmentListPath({ error: 'invalid' }));
-  }
-  await runDetailCommand(formData, amendmentId, () => confirmAmendmentQuotes(amendmentId), { confirmed: '1' });
-}
-
-export async function withdrawAmendmentAction(formData: FormData): Promise<void> {
-  const amendmentId = String(formData.get('amendmentId') ?? '').trim();
-  if (!amendmentId || amendmentId === 'new') {
-    redirect(amendmentListPath({ error: 'invalid' }));
-  }
-  await runDetailCommand(formData, amendmentId, () => withdrawAmendment(amendmentId), { withdrawn: '1' });
 }
 
 export async function suggestChangesAction(

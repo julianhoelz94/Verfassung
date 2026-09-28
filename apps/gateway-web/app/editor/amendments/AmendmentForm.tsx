@@ -4,7 +4,7 @@ import { useMemo, useRef, useState, useTransition } from 'react';
 import type { Amendment, AmendmentDocument, VersionSummary } from '../../../lib/api';
 import { Alert, Badge, Button, Input, Select, TextArea } from '../../components/ui';
 import { AmendmentChangesTable, type ChangeRow } from './AmendmentChangesTable';
-import { saveAmendmentAction, suggestChangesAction, withdrawAmendmentAction } from './actions';
+import { suggestChangesAction } from './actions';
 
 type AmendmentFormProps = {
   amendmentId: string;
@@ -102,7 +102,8 @@ export function AmendmentForm({
   }
 
   return (
-    <form action={saveAmendmentAction} className="stack">
+    <form action="/editor/command" method="post" className="stack">
+      <input type="hidden" name="command" value="amendment-save" />
       <input type="hidden" name="amendmentId" value={amendmentId} />
       <input type="hidden" name="constitutionId" value={constitutionId} />
       {amendment?.status ? (
@@ -221,12 +222,12 @@ export function AmendmentForm({
       />
       <div className="action-bar">
         {canSave ? (
-          <Button variant="primary" formAction={saveAmendmentAction}>
+          <Button variant="primary" type="submit">
             Save draft
           </Button>
         ) : null}
         {canWithdraw && amendmentId !== 'new' ? (
-          <Button formAction={withdrawAmendmentAction}>Withdraw</Button>
+          <Button formAction="/editor/command?command=amendment-withdraw" formMethod="post">Withdraw</Button>
         ) : null}
       </div>
       <dialog ref={suggestDialogRef} className="dialog">

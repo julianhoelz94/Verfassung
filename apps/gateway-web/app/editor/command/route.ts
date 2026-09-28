@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { readWriteBody } from '../../../lib/amendment-form';
+import { AmendmentApiError, appendRevision, confirmAmendmentQuotes, createAmendment, publishAmendment, withdrawAmendment } from '../../../lib/amendment-editor-api';
 import {
   EditorApiError,
   approveReview,
   openSession,
   publishSession,
   saveDraft,
+  saveStructuredDraft,
   savePublishDetails,
   submitReview,
 } from '../../../lib/editor-api';
@@ -15,7 +18,7 @@ function value(form: FormData, key: string): string {
 
 function editorPath(form: FormData, extra: Record<string, string> = {}): string {
   const params = new URLSearchParams();
-  for (const key of ['versionId', 'sessionId', 'articleId']) {
+  for (const key of ['versionId', 'sessionId', 'articleId', 'scope', 'selectedNode']) {
     const entry = value(form, key);
     if (entry) params.set(key, entry);
   }
@@ -49,9 +52,34 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return new NextResponse('Forbidden', { status: 403 });
   }
   const form = await request.formData();
-  const command = value(form, 'command');
+  const command = request.nextUrl.searchParams.get('command') ?? value(form, 'command');
   const sessionId = value(form, 'sessionId');
   try {
+    if (command === 'amendment-save') {
+      const id = value(form, 'amendmentId');
+      const constitutionId = value(form, 'constitutionId');
+      const body = readWriteBody(form);
+      if (!id || id === 'new') {
+        if (!constitutionId) return redirectTo(request, '/editor/amendments?error=invalid');
+        const created = await createAmendment(constitutionId, body);
+        return redirectTo(request, `/editor/amendments/${encodeURIComponent(created.id)}?saved=1`);
+      }
+      await appendRevision(id, body);
+      return redirectTo(request, `/editor/amendments/${encodeURIComponent(id)}?saved=1`);
+    }
+    if (command === 'amendment-withdraw') {
+      const id = value(form, 'amendmentId');
+      if (!id || id === 'new') return redirectTo(request, '/editor/amendments?error=invalid');
+      await withdrawAmendment(id);
+      return redirectTo(request, `/editor/amendments/${encodeURIComponent(id)}?withdrawn=1`);
+    }
+    if (command === 'amendment-publish' || command === 'amendment-confirm') {
+      const id = value(form, 'amendmentId');
+      if (!id || id === 'new') return redirectTo(request, '/editor/amendments?error=invalid');
+      if (command === 'amendment-publish') await publishAmendment(id);
+      else await confirmAmendmentQuotes(id);
+      return redirectTo(request, `/editor/amendments/${encodeURIComponent(id)}?${command === 'amendment-publish' ? 'published' : 'confirmed'}=1`);
+    }
     if (command === 'open') {
       const hopKind = value(form, 'hopKind');
       if (hopKind !== 'legal' && hopKind !== 'editorial_correction') {
@@ -64,6 +92,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     if (command === 'load') {
       if (!sessionId) return redirectTo(request, '/editor?error=session_id');
       return redirectTo(request, editorPath(form));
+    }
+    if (command === 'structured-save') {
+      let payload;
+      try { payload = JSON.parse(String(form.get('structuredDraft') ?? '')); } catch { return redirectTo(request, editorPath(form, { error: 'invalid' })); }
+      if (!payload || !Number.isSafeInteger(payload.expectedGeneration) || !Array.isArray(payload.operations)) return redirectTo(request, editorPath(form, { error: 'invalid' }));
+      await saveStructuredDraft(sessionId, payload);
+      return redirectTo(request, editorPath(form, { saved: '1' }));
     }
     if (command === 'save') {
       await saveDraft(sessionId, value(form, 'articleId'), value(form, 'title'), value(form, 'body'));
@@ -115,6 +150,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
     return redirectTo(request, editorPath(form, { error: 'invalid' }));
   } catch (error) {
+    if (error instanceof AmendmentApiError) {
+      const id = value(form, 'amendmentId');
+      const detail = id && id !== 'new' ? id : 'new';
+      const params = new URLSearchParams({ error: error.key });
+      if (detail === 'new' && value(form, 'constitutionId')) params.set('constitutionId', value(form, 'constitutionId'));
+      return redirectTo(request, `/editor/amendments/${encodeURIComponent(detail)}?${params}`);
+    }
     if (error instanceof EditorApiError && error.code === 'step_up_required') {
       return redirectTo(request, `/account/step-up?returnTo=${encodeURIComponent(editorPath(form))}`);
     }

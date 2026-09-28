@@ -52,7 +52,7 @@ test('editor, reviewer, and publisher carry a real transcription correction to t
   const sessionPage = new URL(page.url());
   sessionPage.searchParams.set('articleId', plainArticle.id);
   await page.goto(sessionPage.toString());
-  await page.getByLabel('Article text').fill('Dignity and civic equality protect every person. Verified transcription.');
+  await page.locator('#draft-form textarea').first().fill('Dignity and civic equality protect every person. Verified transcription.');
   await page.getByRole('button', { name: 'Save draft' }).click();
   await expect(page.getByText('Draft saved.')).toBeVisible();
   await page.getByLabel('What was corrected in this transcription?').fill(`Verified Article ${plainArticle.articleNumber} transcription.`);

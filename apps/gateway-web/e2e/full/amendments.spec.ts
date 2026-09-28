@@ -54,7 +54,7 @@ test('publisher reviews stale quotes after a historical transcription correction
   await signIn(page, 'editor');
   await page.getByLabel('Correct this text').selectOption(sourceVersionId);
   await page.getByRole('button', { name: 'Correct this text' }).click();
-  await page.getByLabel('Article text').fill('The historical dignity text was checked and corrected.');
+  await page.locator('#draft-form textarea').first().fill('The historical dignity text was checked and corrected.');
   await page.getByRole('button', { name: 'Save draft' }).click();
   await page.getByLabel('What was corrected in this transcription?').fill('Corrected the historical transcription.');
   await page.getByRole('button', { name: 'Save comment' }).click();

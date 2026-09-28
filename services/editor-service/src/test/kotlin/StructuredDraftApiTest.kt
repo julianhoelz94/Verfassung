@@ -155,6 +155,11 @@ class StructuredDraftApiTest {
         Mockito.`when`(sources.source(version)).thenReturn(source)
         Mockito.`when`(sources.settings(version)).thenReturn(settings)
         val session = sessions.insertSession(actor.id, version, "editorial_correction")
+        val initial = drafts.preview("Bearer test", session)
+        assertThat(initial.generation).isZero()
+        assertThat(initial.roots).containsExactly(root)
+        assertThat(initial.sourceRoots).containsExactly(root)
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM structured_draft_sources WHERE session_id = ?", Int::class.java, session)).isZero()
         val operation = DraftOperation(UUID.randomUUID(), "replace_text", entry.logicalId!!, entry.revisionId!!, text = "Changed wording.")
         val saved = drafts.save("Bearer test", session, StructuredDraftSave(0, listOf(operation)))
         assertThat(saved.roots.single().content[1].node!!.content.single().text).isEqualTo("Changed wording.")
@@ -191,6 +196,30 @@ class StructuredDraftApiTest {
         assertThat(result.content.last().text).isEqualTo("Before.")
         val duplicate = DraftOperation(UUID.randomUUID(), "insert_text", root.logicalId, root.revisionId!!, position = 0, parts = listOf(TextPart(first.logicalId!!, "Duplicate")))
         assertThrows(IllegalArgumentException::class.java) { StructuredDraftEngine.replay(listOf(root), listOf(duplicate), settings) }
+    }
+
+    @Test
+    fun rootCommandsAndTemporaryMetadataCorrectionsReplayToValidFinalSnapshot() {
+        val first = fixture()
+        val second = fixture().copy(label = "bis")
+        val required = settings.copy(outline = DraftOutline(settings.outline.kinds.map { it.copy(labelPolicy = "required") }))
+        val clear = DraftOperation(UUID.randomUUID(), "set_metadata", first.logicalId, first.revisionId!!, label = "", title = first.title)
+        val other = DraftOperation(UUID.randomUUID(), "set_metadata", second.logicalId, second.revisionId!!, label = "(2a)", title = "Other")
+        val restore = DraftOperation(UUID.randomUUID(), "set_metadata", first.logicalId, clear.id, label = "46a", title = first.title)
+        assertThrows(IllegalArgumentException::class.java) { StructuredDraftEngine.replay(listOf(first, second), listOf(clear), required) }
+        val valid = StructuredDraftEngine.replay(listOf(first, second), listOf(clear, other, restore), required)
+        assertThat(valid.map { it.label }).containsExactly("46a", "(2a)")
+        val fresh = DraftNode(UUID.randomUUID(), kind = "article", label = "new", content = emptyList())
+        val add = DraftOperation(UUID.randomUUID(), "insert_root", first.logicalId, first.revisionId!!, position = 1, node = fresh)
+        val inserted = StructuredDraftEngine.replay(listOf(first, second), listOf(add), required)
+        assertThat(inserted.map { it.logicalId }).containsExactly(first.logicalId, fresh.logicalId, second.logicalId)
+        val move = DraftOperation(UUID.randomUUID(), "move_root", fresh.logicalId, add.id, position = 0)
+        val remove = DraftOperation(UUID.randomUUID(), "remove", second.logicalId, second.revisionId!!)
+        val target = StructuredDraftEngine.replay(inserted, listOf(move, remove), required)
+        assertThat(target.map { it.logicalId }).containsExactly(fresh.logicalId, first.logicalId)
+        val plan = com.constitutionatlas.editor.service.OrderedSuccessorPlan.build(listOf(first, second), target, listOf(add, move, remove))
+        assertThat(plan[1].revisionId).isEqualTo(first.revisionId)
+        assertThrows(IllegalArgumentException::class.java) { StructuredDraftEngine.replay(listOf(first), listOf(add.copy(node = fresh.copy(revisionId = first.revisionId))), required) }
     }
 
     companion object {

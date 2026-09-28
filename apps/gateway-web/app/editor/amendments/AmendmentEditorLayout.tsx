@@ -6,7 +6,6 @@ import type { AmendmentRevision } from '../../../lib/amendment-editor-api';
 import { Alert, Button } from '../../components/ui';
 import { AmendmentForm } from './AmendmentForm';
 import { AmendmentRevisionPanel } from './AmendmentRevisionPanel';
-import { publishAmendmentAction } from './actions';
 
 type AmendmentEditorLayoutProps = {
   amendmentId: string;
@@ -106,7 +105,7 @@ export function AmendmentEditorLayout({
           contentAvailable={contentAvailable}
         />
         {canPublish && !viewingPast ? (
-          <form action={publishAmendmentAction} className="action-bar">
+          <form action="/editor/command" method="post" className="action-bar"><input type="hidden" name="command" value="amendment-publish" />
             <input type="hidden" name="amendmentId" value={amendmentId} />
             <Button>Publish law</Button>
           </form>

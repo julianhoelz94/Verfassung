@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation';
+import Link from 'next/link';
 import { AdminForbidden } from '../../../components/AdminForbidden';
 import { Alert, PageHeader } from '../../../components/ui';
 import { PageMain } from '../../../components/PageMain';
@@ -44,6 +45,7 @@ export default async function AdminOutlinePage(props: AdminOutlinePageProps) {
       {searchParams.saved ? (
         <Alert tone="success">Settings saved. Historical versions retain their structural settings.</Alert>
       ) : null}
+      {(match.constitution.versions ?? []).length === 0 ? <Alert tone="info">The structure is ready. <Link href="/admin/import">Import the first version</Link> or <Link href="/editor">open the editor</Link> to continue.</Alert> : null}
       {searchParams.migration ? <Alert tone="error">This change requires a reviewed successor migration. Existing versions have been preserved.</Alert> : null}
       {searchParams.error ? <Alert tone="error">The outline could not be saved.</Alert> : null}
       <p>

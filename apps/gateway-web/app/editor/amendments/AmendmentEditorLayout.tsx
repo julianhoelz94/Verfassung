@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import type { Amendment, VersionSummary } from '../../../lib/api';
+import type { Amendment, ArticleSummary, VersionSummary } from '../../../lib/api';
 import type { AmendmentRevision } from '../../../lib/amendment-editor-api';
 import { Alert, Button } from '../../components/ui';
 import { AmendmentForm } from './AmendmentForm';
@@ -14,6 +14,7 @@ type AmendmentEditorLayoutProps = {
   revisions: AmendmentRevision[] | null;
   versions: VersionSummary[];
   articlesByVersion: Record<string, string[]>;
+  unitTreesByVersion: Record<string, ArticleSummary[]>;
   latestVersionId?: string | null;
   canSave: boolean;
   canPublish: boolean;
@@ -41,6 +42,10 @@ function revisionToAmendment(revision: AmendmentRevision, base: Amendment): Amen
       articleNumber: change.articleNumber ?? null,
       changeType: change.changeType,
       note: change.note ?? null,
+      beforeRef: change.beforeRef ?? null,
+      afterRef: change.afterRef ?? null,
+      linkReviewReason: change.linkReviewReason ?? null,
+      legacyLinkUnresolved: change.legacyLinkUnresolved ?? false,
     })),
   };
 }
@@ -52,6 +57,7 @@ export function AmendmentEditorLayout({
   revisions,
   versions,
   articlesByVersion,
+  unitTreesByVersion,
   latestVersionId,
   canSave,
   canPublish,
@@ -97,6 +103,7 @@ export function AmendmentEditorLayout({
           amendment={displayAmendment}
           versions={versions}
           articlesByVersion={articlesByVersion}
+          unitTreesByVersion={unitTreesByVersion}
           latestVersionId={latestVersionId}
           canSave={canSave && !viewingPast}
           canPublish={canPublish && !viewingPast}

@@ -87,6 +87,9 @@ export async function restoreRevisionAction(formData: FormData): Promise<void> {
       articleNumber: change.articleNumber?.trim() || null,
       changeType: change.changeType,
       note: change.note?.trim() || null,
+      beforeRef: change.beforeRef ?? null,
+      afterRef: change.afterRef ?? null,
+      linkReviewReason: change.linkReviewReason ?? null,
     })),
   };
   await runDetailCommand(formData, amendmentId, () => appendRevision(amendmentId, body), { saved: '1' });

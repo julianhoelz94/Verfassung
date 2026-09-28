@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import { PageMain } from '../../../components/PageMain';
+import { AmendmentUnitLinks } from '../../../components/AmendmentUnitLinks';
 import { ServiceUnavailable } from '../../../components/StatusMessage';
 import { Badge, PageHeader, type BadgeTone } from '../../../components/ui';
 import {
@@ -153,10 +154,13 @@ export default async function TimelinePage(props: TimelinePageProps) {
                 ) : null}
                 <div className="chip-row">
                   {amendment.changes.map((change) => (
-                    <Badge key={change.id} tone={changeTone(change.changeType)}>
-                      {change.changeType}
-                      {change.articleNumber ? ` Art. ${change.articleNumber}` : ''}
-                    </Badge>
+                    <div className="stack" key={change.id}>
+                      <Badge tone={changeTone(change.changeType)}>
+                        {change.changeType}
+                        {change.articleNumber ? ` Art. ${change.articleNumber}` : ''}
+                      </Badge>
+                      <AmendmentUnitLinks change={change} />
+                    </div>
                   ))}
                 </div>
                 {amendment.sourceVersionId && amendment.targetVersionId ? (

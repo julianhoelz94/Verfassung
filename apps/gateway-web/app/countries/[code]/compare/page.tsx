@@ -5,6 +5,7 @@ import { ConstitutionText } from '../../../components/ConstitutionText';
 import { CopyLink } from '../../../components/CopyLink';
 import { DiffConstitutionText } from '../../../components/DiffConstitutionText';
 import { PageMain } from '../../../components/PageMain';
+import { AmendmentUnitLinks } from '../../../components/AmendmentUnitLinks';
 import { PrintLink } from '../../../components/PrintLink';
 import { ServiceUnavailable } from '../../../components/StatusMessage';
 import { Badge, PageHeader } from '../../../components/ui';
@@ -351,6 +352,7 @@ export default async function ComparePage(props: ComparePageProps) {
                             </>
                           ) : null}
                         </span>
+                        <AmendmentUnitLinks change={change} />
                       </div>
                     ))}
                   </div>

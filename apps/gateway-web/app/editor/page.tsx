@@ -366,7 +366,7 @@ export default async function EditorPage(props: EditorPageProps) {
                 <form action="/editor/command" method="post">
                   <input type="hidden" name="command" value="review" />
                   {hiddenFields}
-                  <SubmitReviewButton disabled={session.hopKind === 'legal' ? !preview.changeRecord : session.hopKind === 'editorial_correction' ? !preview.publishComment : false} />
+                  <SubmitReviewButton disabled={session.hopKind === 'legal' ? !preview.changeRecord || Boolean(structured && !preview.changeRecord.changes?.length) : session.hopKind === 'editorial_correction' ? !preview.publishComment : false} />
                 </form>
               ) : null}
               {canReview && session.status === 'reviewing' ? (
@@ -429,6 +429,7 @@ export default async function EditorPage(props: EditorPageProps) {
                 canPublish={canPublish}
                 record={preview.changeRecord}
                 comment={preview.publishComment}
+                structuredDraft={structured}
               />
             ) : null}
             {!session.hopKind && session.status === 'approved' && canPublish && searchParams.sessionId && versionId && selectedId ? (

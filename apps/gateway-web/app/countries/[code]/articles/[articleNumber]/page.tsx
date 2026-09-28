@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation';
 import { ConstitutionText } from '../../../../components/ConstitutionText';
 import { PageMain } from '../../../../components/PageMain';
 import { Provenance } from '../../../../components/Provenance';
+import { AmendmentUnitLinks } from '../../../../components/AmendmentUnitLinks';
 import { ServiceUnavailable } from '../../../../components/StatusMessage';
 import { Badge, PageHeader } from '../../../../components/ui';
 import {
@@ -143,6 +144,7 @@ export default async function ArticleHistoryPage(props: HistoryPageProps) {
                             : ''}
                           {change.note ? ` · ${change.note}` : ''}
                         </span>
+                        <AmendmentUnitLinks change={change} />
                       </div>
                     )),
                   )}

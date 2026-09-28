@@ -9,6 +9,7 @@ import java.util.UUID
 // Unique DTO set for amendment-service. Public JSON drops kind; adds comment, documents, reviewStatus.
 // User instruction: "Work on Sprint 36"
 
+@JsonInclude(JsonInclude.Include.NON_NULL)
 data class AmendmentChangeDto(
     val id: UUID,
     val articleId: UUID?,
@@ -23,6 +24,28 @@ data class AmendmentChangeDto(
     val amendingLawTitle: String? = null,
     @get:JsonInclude(JsonInclude.Include.NON_NULL)
     val amendingLawCitation: String? = null,
+    val beforeRef: AmendmentUnitRefDto? = null,
+    val afterRef: AmendmentUnitRefDto? = null,
+    val linkReviewReason: String? = null,
+    val legacyLinkUnresolved: Boolean = false,
+    val pendingAfterLogicalId: UUID? = null,
+)
+
+@JsonInclude(JsonInclude.Include.NON_NULL)
+data class AmendmentUnitRefDto(
+    val versionId: UUID? = null,
+    val logicalId: UUID? = null,
+    val occurrenceId: UUID? = null,
+    val rootOccurrenceId: UUID? = null,
+    val revisionId: UUID? = null,
+    val unitKind: String? = null,
+    val articleNumber: String? = null,
+    val constitutionId: UUID? = null,
+    val kind: String? = null,
+    val label: String? = null,
+    val breadcrumbs: List<String> = emptyList(),
+    val text: String? = null,
+    val deepLink: String? = null,
 )
 
 data class AmendmentDocumentDto(
@@ -64,6 +87,10 @@ data class AmendmentChangeWriteRequest(
     val effectiveOn: LocalDate? = null,
     val amendingLawTitle: String? = null,
     val amendingLawCitation: String? = null,
+    val beforeRef: AmendmentUnitRefDto? = null,
+    val afterRef: AmendmentUnitRefDto? = null,
+    val linkReviewReason: String? = null,
+    val pendingAfterLogicalId: UUID? = null,
 )
 
 data class AmendmentWriteRequest(
@@ -95,6 +122,9 @@ data class SuggestedChangeDto(
     val note: String?,
     val nodeId: UUID?,
     val articleId: UUID?,
+    val beforeRef: AmendmentUnitRefDto? = null,
+    val afterRef: AmendmentUnitRefDto? = null,
+    val ambiguous: Boolean = false,
 )
 
 data class SuggestResponse(

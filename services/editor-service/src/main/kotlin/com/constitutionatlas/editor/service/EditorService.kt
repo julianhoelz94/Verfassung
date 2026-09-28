@@ -216,6 +216,23 @@ class EditorService(
             throw IllegalArgumentException("legal publish requires one change record payload or amendmentId")
         }
         changeRecord?.let(::validateChangeRecord)
+        if (structured && hopKind == "legal" && changeRecord?.changes.isNullOrEmpty()) {
+            throw IllegalArgumentException("Structured legal publish needs exact before/after unit selections")
+        }
+        if (structured && hopKind == "legal") {
+            val changes = requireNotNull(changeRecord).changes
+            changes.forEach { change ->
+                val validSides = when (change.changeType) {
+                    "added" -> change.beforeRef == null && (change.afterRef?.logicalId != null || change.pendingAfterLogicalId != null)
+                    "removed" -> change.beforeRef?.logicalId != null && change.afterRef == null && change.pendingAfterLogicalId == null
+                    "changed" -> change.beforeRef?.logicalId != null && (change.afterRef?.logicalId != null || change.pendingAfterLogicalId != null)
+                    else -> false
+                }
+                if (!validSides) {
+                    throw IllegalArgumentException("Structured legal publish needs exact unit selections for every change")
+                }
+            }
+        }
         if (structured) structuredPublishJobs.pin(session.id, request.toString())
         val source = catalogClient.getVersion(session.versionId)
         if (structured && source.publicationStatus != "published") throw ConflictException("Structured successors require a published source", "stale_source")
@@ -266,8 +283,9 @@ class EditorService(
                     source.constitutionId,
                     changeRecord!!.copy(
                         publishAttemptId = if (structured) session.id else null,
-                        changes = changedArticles.map {
-                            ChangeRecordChange(it.id, it.articleNumber)
+                        sourceVersionId = session.versionId,
+                        changes = if (structured) changeRecord.changes else changeRecord.changes.ifEmpty {
+                            changedArticles.map { ChangeRecordChange(it.id, it.articleNumber) }
                         },
                     ),
                     authorization,

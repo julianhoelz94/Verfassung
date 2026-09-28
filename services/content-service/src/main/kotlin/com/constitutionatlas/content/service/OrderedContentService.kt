@@ -192,16 +192,18 @@ class OrderedContentService(
 
     @Transactional
     fun resolve(version: UUID, logical: UUID): ResolvedContent {
+        val constitutionId = catalog.getVersion(version)?.constitutionId ?: throw NotFoundException("Version '$version' not found")
         val snapshot = get(version)
-        fun walk(node: OrderedNode, path: List<UUID>, root: UUID): ResolvedContent? {
-            if (node.logicalId == logical) return ResolvedContent(version, logical, node.revisionId, node.occurrenceId, path.lastOrNull(), path, node.kind, plainText(node), "/versions/$version/units/$root?occurrenceId=${node.occurrenceId}")
+        fun label(node: OrderedNode): String = listOfNotNull(node.kind, node.label, node.title).joinToString(" ")
+        fun walk(node: OrderedNode, path: List<UUID>, pathLabels: List<String>, root: UUID, rootLabel: String?): ResolvedContent? {
+            if (node.logicalId == logical) return ResolvedContent(version, constitutionId, logical, node.revisionId, node.occurrenceId, root, path.lastOrNull(), path, pathLabels + label(node), node.kind, rootLabel, plainText(node), "/versions/$version/units/$root?occurrenceId=${node.occurrenceId}")
             node.content.forEach { entry ->
-                if (entry.logicalId == logical) return ResolvedContent(version, logical, entry.revisionId!!, entry.occurrenceId!!, node.logicalId, path + node.logicalId, "parent_text", entry.text!!, "/versions/$version/units/$root?occurrenceId=${entry.occurrenceId}")
-                entry.node?.let { walk(it, path + node.logicalId, root)?.let { found -> return found } }
+                if (entry.logicalId == logical) return ResolvedContent(version, constitutionId, logical, entry.revisionId!!, entry.occurrenceId!!, root, node.logicalId, path + node.logicalId, pathLabels + label(node) + "Parent text", "parent_text", rootLabel, entry.text!!, "/versions/$version/units/$root?occurrenceId=${entry.occurrenceId}")
+                entry.node?.let { walk(it, path + node.logicalId, pathLabels + label(node), root, rootLabel)?.let { found -> return found } }
             }
             return null
         }
-        return snapshot.roots.firstNotNullOfOrNull { walk(it, emptyList(), it.occurrenceId) } ?: throw NotFoundException("Unit '$logical' is not in version '$version'")
+        return snapshot.roots.firstNotNullOfOrNull { walk(it, emptyList(), emptyList(), it.occurrenceId, it.label) } ?: throw NotFoundException("Unit '$logical' is not in version '$version'")
     }
 
     fun plainText(node: OrderedNode): String = com.constitutionatlas.platform.OrderedContentText.entries(node.content)

@@ -113,7 +113,19 @@ class StructuredDraftApiTest {
         val session = sessions.insertSession(actor.id, version, hop)
         val operation = DraftOperation(UUID.randomUUID(), "replace_text", entry.logicalId!!, entry.revisionId!!, text = "Changed wording.")
         val preview = drafts.save(auth, session, StructuredDraftSave(0, listOf(operation)))
-        val record = com.constitutionatlas.editor.api.ChangeRecordRequest("Law", "Legal update", listOf(com.constitutionatlas.editor.api.ChangeRecordDocument(url = "https://example.test/law")))
+        val record = com.constitutionatlas.editor.api.ChangeRecordRequest(
+            "Law",
+            "Legal update",
+            listOf(com.constitutionatlas.editor.api.ChangeRecordDocument(url = "https://example.test/law")),
+            changes = if (hop == "legal") listOf(
+                com.constitutionatlas.editor.api.ChangeRecordChange(
+                    articleId = root.logicalId,
+                    articleNumber = "46a",
+                    beforeRef = com.constitutionatlas.editor.api.ChangeRecordUnitRef(logicalId = entry.logicalId!!, versionId = version),
+                    pendingAfterLogicalId = entry.logicalId,
+                ),
+            ) else emptyList(),
+        )
         if (hop == "legal") sessions.recordChangeRecord(session, record) else sessions.recordPublishComment(session, "Transcription fix")
         editorService.submitReview(auth, session)
         editorService.approve(auth, session)
@@ -142,6 +154,72 @@ class StructuredDraftApiTest {
         val payload = jdbc.queryForObject("SELECT payload::text FROM outbox_events WHERE session_id = ? AND event_name = 'version.published'", String::class.java, session)
         assertThat(payload).contains("unitMapping", entry.logicalId.toString(), "sourceGeneration", "settingsRevisionId")
         assertThrows(ConflictException::class.java) { editorService.publish(auth, session, request.copy(comment = "changed retry payload")) }
+    }
+
+    @Test
+    fun structuredLegalPublishRejectsLegacyChangesWithoutExactUnits() {
+        val auth = "Bearer missing-unit-selection"
+        val actor = Actor(UUID.randomUUID(), "admin@test.local", listOf("admin"), stepUpFresh = true)
+        val version = UUID.randomUUID()
+        val root = fixture()
+        val source = DraftSource(version, 7, settings.id, listOf(root))
+        Mockito.`when`(identity.authenticate(auth)).thenReturn(actor)
+        Mockito.`when`(sources.source(version)).thenReturn(source)
+        Mockito.`when`(sources.settings(version)).thenReturn(settings)
+        val session = sessions.insertSession(actor.id, version, "legal")
+        val entry = root.content[1].node!!.content.single()
+        val operation = DraftOperation(UUID.randomUUID(), "replace_text", entry.logicalId!!, entry.revisionId!!, text = "Changed wording.")
+        drafts.save(auth, session, StructuredDraftSave(0, listOf(operation)))
+        val record = com.constitutionatlas.editor.api.ChangeRecordRequest(
+            "Law",
+            "Legal update",
+            listOf(com.constitutionatlas.editor.api.ChangeRecordDocument(url = "https://example.test/law")),
+            changes = listOf(
+                com.constitutionatlas.editor.api.ChangeRecordChange(
+                    articleId = root.logicalId,
+                    articleNumber = "46a",
+                    changeType = "changed",
+                ),
+            ),
+        )
+        sessions.recordChangeRecord(session, record)
+        editorService.submitReview(auth, session)
+        editorService.approve(auth, session)
+
+        val failure = assertThrows(IllegalArgumentException::class.java) {
+            editorService.publish(auth, session, com.constitutionatlas.editor.api.PublishRequest("legal"))
+        }
+        assertThat(failure.message).contains("exact unit selections")
+    }
+
+    @Test
+    fun structuredLegalPublishRequiresBothSidesForChangedUnits() {
+        val auth = "Bearer partial-unit-selection"
+        val actor = Actor(UUID.randomUUID(), "admin@test.local", listOf("admin"), stepUpFresh = true)
+        val version = UUID.randomUUID()
+        val root = fixture()
+        val source = DraftSource(version, 7, settings.id, listOf(root))
+        Mockito.`when`(identity.authenticate(auth)).thenReturn(actor)
+        Mockito.`when`(sources.source(version)).thenReturn(source)
+        Mockito.`when`(sources.settings(version)).thenReturn(settings)
+        val session = sessions.insertSession(actor.id, version, "legal")
+        val entry = root.content[1].node!!.content.single()
+        drafts.save(auth, session, StructuredDraftSave(0, listOf(DraftOperation(UUID.randomUUID(), "replace_text", entry.logicalId!!, entry.revisionId!!, text = "Changed wording."))))
+        val record = com.constitutionatlas.editor.api.ChangeRecordRequest(
+            "Law", "Legal update", listOf(com.constitutionatlas.editor.api.ChangeRecordDocument(url = "https://example.test/law")),
+            changes = listOf(com.constitutionatlas.editor.api.ChangeRecordChange(
+                articleId = root.logicalId, articleNumber = "46a", changeType = "changed",
+                beforeRef = com.constitutionatlas.editor.api.ChangeRecordUnitRef(logicalId = entry.logicalId!!, versionId = version),
+            )),
+        )
+        sessions.recordChangeRecord(session, record)
+        editorService.submitReview(auth, session)
+        editorService.approve(auth, session)
+
+        val failure = assertThrows(IllegalArgumentException::class.java) {
+            editorService.publish(auth, session, com.constitutionatlas.editor.api.PublishRequest("legal"))
+        }
+        assertThat(failure.message).contains("exact unit selections")
     }
 
     @Test

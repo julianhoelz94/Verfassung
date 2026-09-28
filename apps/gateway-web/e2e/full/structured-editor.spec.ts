@@ -91,13 +91,13 @@ for (const hop of ['editorial_correction', 'legal'] as const) {
     const immutable = await request.put(`/api/content/versions/${version.id}/content`, { headers, data: { expectedGeneration: source.generation, roots: [] } });
     expect(immutable.status()).toBe(409);
     await page.goto(`/countries/XA/versions/${version.id}/units/${sourceRoot.occurrenceId}`);
-    await expect(page.locator('main')).toContainText('Original wording.');
+    await expect(page.locator('main').last()).toContainText('Original wording.');
     await page.goto(`/countries/XA/versions/${targetId}/units/${targetRoot.occurrenceId}`);
-    await expect(page.locator('main')).toContainText('Changed wording.');
-    await expect(page.locator('main')).toContainText('Before.');
-    await expect(page.locator('main')).toContainText('Between.');
-    await expect(page.locator('main')).toContainText('After.');
-    const rendered = await page.locator('main').innerText();
+    await expect(page.locator('main').last()).toContainText('Changed wording.');
+    await expect(page.locator('main').last()).toContainText('Before.');
+    await expect(page.locator('main').last()).toContainText('Between.');
+    await expect(page.locator('main').last()).toContainText('After.');
+    const rendered = await page.locator('main').last().innerText();
     const positions = ['Before.', 'Changed wording.', 'Between.', 'Untouched branch.', 'After.'].map(text => rendered.indexOf(text));
     expect(positions.every(position => position >= 0)).toBeTruthy();
     expect(positions).toEqual([...positions].sort((a, b) => a - b));
@@ -113,9 +113,9 @@ for (const hop of ['editorial_correction', 'legal'] as const) {
       expect(laws[0].sourceVersionId).toBe(version.id);
       expect(laws[0].targetVersionId).toBe(targetId);
       await page.goto(`/countries/XA/compare?from=${version.id}&to=${targetId}&all=1`);
-      await expect(page.locator('main')).toContainText('Original wording.');
-      await expect(page.locator('main')).toContainText('Changed wording.');
-      await expect(page.locator('main')).toContainText('Between.');
+      await expect(page.locator('main').last()).toContainText('Original wording.');
+      await expect(page.locator('main').last()).toContainText('Changed wording.');
+      await expect(page.locator('main').last()).toContainText('Between.');
     }
   });
 }

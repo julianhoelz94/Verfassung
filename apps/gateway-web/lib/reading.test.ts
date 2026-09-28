@@ -124,7 +124,7 @@ describe('newestChanges', () => {
 
 describe('historical editorial snapshot context', () => {
   it('accepts a published former editorial tip through its legal identity', () => {
-    const legal = version({ id: 'legal', versionLabel: '1949', currentVersionId: 'new-tip' });
+    const legal = version({ id: 'new-tip', versionLabel: '1949', legalVersionId: 'legal', currentVersionId: 'new-tip' });
     const constitution = { id: 'constitution', slug: 'gg', title: 'GG', versions: [legal] };
     const country = { isoCode: 'DE', name: 'Germany', constitutions: [constitution] };
     const snapshot = { id: 'old-tip', constitutionId: 'constitution', legalVersionId: 'legal', versionLabel: 'old correction', effectiveDate: null, languageCode: 'de', publicationStatus: 'published' };

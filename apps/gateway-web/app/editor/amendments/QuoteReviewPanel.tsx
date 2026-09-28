@@ -1,7 +1,6 @@
 import type { Amendment, VersionSummary } from '../../../lib/api';
 import type { AmendmentRevision } from '../../../lib/amendment-editor-api';
 import { Badge, Button } from '../../components/ui';
-import { confirmQuotesAction } from './actions';
 
 type QuoteReviewPanelProps = {
   amendment: Amendment;
@@ -56,7 +55,7 @@ export function QuoteReviewPanel({ amendment, publishedRevision, versions, canCo
             ))}
           </ul>
           {canConfirm ? (
-            <form action={confirmQuotesAction}>
+            <form action="/editor/command" method="post"><input type="hidden" name="command" value="amendment-confirm" />
               <input type="hidden" name="amendmentId" value={amendment.id} />
               <Button type="submit">Confirm live quotes and republish</Button>
             </form>

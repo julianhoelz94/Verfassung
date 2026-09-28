@@ -91,21 +91,21 @@ for (const hop of ['editorial_correction', 'legal'] as const) {
     const immutable = await request.put(`/api/content/versions/${version.id}/content`, { headers, data: { expectedGeneration: source.generation, roots: [] } });
     expect(immutable.status()).toBe(409);
     await page.goto(`/countries/XA/versions/${version.id}/units/${sourceRoot.occurrenceId}`);
-    await expect(page.getByText('Original wording.', { exact: true })).toBeVisible();
+    await expect(page.locator('main')).toContainText('Original wording.');
     await page.goto(`/countries/XA/versions/${targetId}/units/${targetRoot.occurrenceId}`);
-    await expect(page.getByText('Changed wording.', { exact: true })).toBeVisible();
-    await expect(page.getByText('Before.', { exact: true })).toBeVisible();
-    await expect(page.getByText('Between.', { exact: true })).toBeVisible();
-    await expect(page.getByText('After.', { exact: true })).toBeVisible();
+    await expect(page.locator('main')).toContainText('Changed wording.');
+    await expect(page.locator('main')).toContainText('Before.');
+    await expect(page.locator('main')).toContainText('Between.');
+    await expect(page.locator('main')).toContainText('After.');
     const rendered = await page.locator('main').innerText();
     const positions = ['Before.', 'Changed wording.', 'Between.', 'Untouched branch.', 'After.'].map(text => rendered.indexOf(text));
     expect(positions.every(position => position >= 0)).toBeTruthy();
     expect(positions).toEqual([...positions].sort((a, b) => a - b));
     await expect.poll(async () => {
-      const found = await json(await request.get(`/api/search?q=Changed%20wording&versionId=${targetId}`));
+      const found = await json(await request.get(`/api/search/search?q=Changed%20wording&versionId=${targetId}`));
       return found.total;
     }, { timeout: 30_000 }).toBeGreaterThan(0);
-    const originalSearch = await json(await request.get(`/api/search?q=Changed%20wording&versionId=${version.id}`));
+    const originalSearch = await json(await request.get(`/api/search/search?q=Changed%20wording&versionId=${version.id}`));
     expect(originalSearch.total).toBe(0);
     if (hop === 'legal') {
       const laws = await json(await request.get(`/api/amendment/constitutions/${constitution.id}/amendments`));

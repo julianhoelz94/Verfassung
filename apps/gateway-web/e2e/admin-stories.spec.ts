@@ -74,14 +74,28 @@ test('administrator creates a constitution and changes its outline settings', as
   await signInAdmin(page);
   await page.goto('/admin/constitutions');
   await page.getByLabel('Country').selectOption('DE');
-  await page.getByLabel('Slug').fill('test-constitution');
-  await page.getByLabel('Title', { exact: true }).fill('Test Constitution');
-  await page.getByRole('button', { name: 'Add deeper layer' }).click();
-  await expect(page.getByRole('textbox', { name: 'Kind code' }).last()).toHaveValue('sentence');
+  await page.getByLabel('Constitution title').fill('Test Constitution');
+  await page.getByRole('button', { name: 'Continue to structure' }).click();
+  await page.getByRole('button', { name: /Articles only/ }).click();
+  await expect(page.getByRole('textbox', { name: 'Label' })).toHaveCount(1);
+  await page.getByRole('button', { name: /Articles and sections/ }).click();
+  await expect(page.getByRole('textbox', { name: 'Label' })).toHaveCount(2);
   await page.getByRole('textbox', { name: 'Label' }).nth(1).fill('Clause');
-  await page.getByRole('button', { name: 'Create' }).click();
+  await page.getByLabel('Allow text alongside child units').check();
+  const preview = page.getByRole('complementary', { name: 'Live order example' });
+  await expect(preview.getByText('The following rights are protected.', { exact: true }).first()).toBeVisible();
+  await expect(preview.getByText('These rights apply to everyone.', { exact: true }).first()).toBeVisible();
+  await page.getByRole('button', { name: 'Continue to review' }).click();
+  await expect(page.getByRole('heading', { name: 'Review before creating' })).toBeVisible();
+  await expect(page).toHaveURL(/\/admin\/constitutions$/);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(preview).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBeTruthy();
+  await expect(page).toHaveURL(/\/admin\/constitutions$/);
+  await page.getByRole('button', { name: 'Create constitution' }).click();
   await expect(page).toHaveURL(/\/admin\/constitutions\/[^/?]+$/, { timeout: 30000 });
   await expect(page.getByRole('heading', { name: 'Test Constitution' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Import the first version' })).toBeVisible();
   await expect(page.getByRole('textbox', { name: 'Label' }).nth(1)).toHaveValue('Clause');
   await page.getByLabel('How this layer is shown').nth(1).selectOption('concatenated');
   await page.getByRole('button', { name: 'Preview change impact' }).click();
@@ -90,6 +104,29 @@ test('administrator creates a constitution and changes its outline settings', as
   await expect(page).toHaveURL(/saved=1/, { timeout: 30000 });
   await expect(page.getByText('Settings saved. Historical versions retain their structural settings.')).toBeVisible();
   await expect(page.getByLabel('How this layer is shown').nth(1)).toHaveValue('concatenated');
+});
+
+test('guided creation exposes a manual address when a title cannot generate one', async ({ page }) => {
+  await signInAdmin(page);
+  await page.goto('/admin/constitutions');
+  await page.getByLabel('Constitution title').fill('日本国憲法');
+  await expect(page.getByText('Enter a web address using Latin letters and numbers to continue.')).toBeVisible();
+  await page.getByLabel('Slug').fill('japan-constitution');
+  await page.getByRole('button', { name: 'Continue to structure' }).click();
+  await page.getByRole('button', { name: /Articles only/ }).focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('textbox', { name: 'Label' })).toHaveCount(1);
+});
+
+test('guided creation sends an expired administrator session to login', async ({ page }) => {
+  await signInAdmin(page);
+  await page.goto('/admin/constitutions');
+  await page.getByLabel('Constitution title').fill('Expired Session Example');
+  await page.getByRole('button', { name: 'Continue to structure' }).click();
+  await page.getByRole('button', { name: 'Continue to review' }).click();
+  await page.context().clearCookies();
+  await page.getByRole('button', { name: 'Create constitution' }).click();
+  await expect(page).toHaveURL(/\/login$/);
 });
 
 test('administrator can carry an editorial correction through every role action', async ({ page }) => {

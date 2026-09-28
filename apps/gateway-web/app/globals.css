@@ -1856,12 +1856,25 @@ button.article-toggle[aria-expanded='false']::after {
 }
 
 .outline-config-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(18rem, 1fr); gap: 1.5rem; align-items: start; }
+.outline-config-layout[hidden], .form-row[hidden] { display: none; }
 .outline-config-layout > *, .outline-config-layout fieldset { min-width: 0; }
 .outline-config-layout input:not([type="checkbox"]), .outline-config-layout select { max-width: 100%; width: 100%; }
 .outline-live-preview { position: sticky; top: 1rem; }
 .outline-example-level { padding: .75rem; margin-block: .5rem; border-left: 2px solid var(--border); }
 .outline-example-level small { color: var(--muted); }
 @media (max-width: 800px) { .outline-config-layout { grid-template-columns: minmax(0, 1fr); } .outline-live-preview { position: static; } }
+
+.creation-steps { display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: 1.5rem; }
+.creation-steps span { border: 1px solid var(--color-line); border-radius: var(--radius-md); padding: .6rem 1rem; color: var(--color-ink-3); }
+.creation-steps [aria-current="step"] { border-color: var(--color-focus); color: var(--color-ink); font-weight: 700; }
+.creation-basics { max-width: 38rem; display: grid; gap: .75rem; }
+.creation-templates { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; margin: 1rem 0 1.5rem; }
+.creation-template { text-align: left; display: grid; align-content: start; gap: .5rem; min-height: 7rem; padding: 1rem; border: 1px solid var(--color-line); border-radius: var(--radius-md); background: var(--color-surface); color: var(--color-ink); cursor: pointer; }
+.creation-template span { color: var(--color-ink-3); }
+.creation-template[aria-pressed="true"] { border: 2px solid var(--color-focus); background: var(--color-surface-2); }
+.creation-advanced { margin: .75rem 0; }
+.creation-advanced summary { cursor: pointer; font-weight: 600; }
+@media (max-width: 800px) { .creation-templates { grid-template-columns: 1fr; } }
 
 /* Ordered editorial canvas: opaque boxes preserve text/child sequence. */
 .structured-unit { border-left: 3px solid var(--line, #ccc); padding: .75rem; margin: .5rem 0; }

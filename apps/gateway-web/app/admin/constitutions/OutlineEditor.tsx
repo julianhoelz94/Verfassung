@@ -1,11 +1,12 @@
 'use client';
 
-import type { ReactNode } from 'react';
-import { useState } from 'react';
+import type { FormEvent, ReactNode } from 'react';
+import { useRef, useState } from 'react';
 import { Alert, Button, Input, Select } from '../../components/ui';
 import type { OutlineKindWrite, SettingsImpact, ContentOutline, OrderedNode, OrderedEntry } from '../../../lib/api';
 import { asOutlinePresentation } from '../../../lib/outline';
 import { OrderedContentTree } from '../../components/ConstitutionText';
+import { outlineFromTemplate, type ConstitutionTemplate } from '../../../lib/constitution-templates';
 import { saveOutlineAction, previewOutlineImpactAction } from './actions';
 
 type Layer = OutlineKindWrite & { existing?: boolean };
@@ -14,9 +15,10 @@ type OutlineEditorProps = {
   constitutionId?: string;
   settingsRevisionId?: string;
   initial: OutlineKindWrite[];
-  action?: (formData: FormData) => Promise<void>;
+  action?: (formData: FormData) => Promise<string>;
   submitLabel?: string;
   children?: ReactNode;
+  guidedCreation?: boolean;
 };
 
 function slugify(label: string): string {
@@ -39,13 +41,21 @@ export function OutlineEditor({
   action = saveOutlineAction,
   submitLabel = 'Save outline',
   children,
+  guidedCreation = false,
 }: OutlineEditorProps) {
+  const formRef = useRef<HTMLFormElement>(null);
+  const [step, setStep] = useState(1);
+  const [template, setTemplate] = useState<ConstitutionTemplate>('sentences');
+  const [showErrors, setShowErrors] = useState(false);
+  const [basicsSummary, setBasicsSummary] = useState('');
+  const [submitting, setSubmitting] = useState(false);
   const [layers, setLayers] = useState<Layer[]>(
     initial.map((kind) => ({ ...kind, existing: Boolean(constitutionId) })),
   );
 
   const [impact, setImpact] = useState<SettingsImpact | null>(null);
   const [impactError, setImpactError] = useState(false);
+  const [submitError, setSubmitError] = useState(false);
   const [checking, setChecking] = useState(false);
 
   async function checkImpact() {
@@ -55,7 +65,9 @@ export function OutlineEditor({
       const data = new FormData();
       data.set('constitutionId', constitutionId ?? '');
       data.set('outline', JSON.stringify(withoutExisting(layers)));
-      setImpact(await previewOutlineImpactAction(data));
+      const result = await previewOutlineImpactAction(data);
+      if ('redirectTo' in result) { window.location.assign(result.redirectTo); return; }
+      setImpact(result);
     } catch { setImpactError(true); } finally { setChecking(false); }
   }
 
@@ -93,14 +105,71 @@ export function OutlineEditor({
 
   const exampleOutline: ContentOutline = { kinds: layers.map((layer, index) => ({ ...layer, sortOrder: index + 1, mayHoldText: index === layers.length - 1 || Boolean(layer.allowTextAlongsideChildren), mayHoldChildren: index < layers.length - 1, allowedChildKinds: layers[index + 1] ? [layers[index + 1]!.kindCode] : [] })) };
   const example = exampleNode(layers, 0, 'sample', 0);
+  const codes = layers.map((layer) => layer.kindCode.trim().toLowerCase());
+  const outlineError = layers.some((layer) => !layer.displayLabel.trim() || !layer.kindCode.trim())
+    ? 'Give every level a name and a generated code.'
+    : new Set(codes).size !== codes.length
+      ? 'Each level needs a different code. Change a level name or its code under Advanced.'
+      : null;
+
+  function advance() {
+    if (step === 1) {
+      if (!formRef.current?.reportValidity()) return;
+      const data = new FormData(formRef.current);
+      setBasicsSummary(`${data.get('title') || 'Untitled constitution'} · ${data.get('isoCode') || ''}`);
+      setStep(2);
+      return;
+    }
+    if (outlineError) { setShowErrors(true); return; }
+    setStep(3);
+  }
+
+  async function onSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const submitter = (event.nativeEvent as SubmitEvent).submitter;
+    if (guidedCreation && (step !== 3 || submitter?.getAttribute('data-create') !== 'true')) {
+      if (step !== 3) advance();
+      return;
+    }
+    if (guidedCreation && outlineError) { setShowErrors(true); return; }
+    if (submitting) return;
+    setSubmitting(true);
+    setSubmitError(false);
+    try {
+      const destination = await action(new FormData(event.currentTarget));
+      window.location.assign(destination);
+    } catch {
+      setSubmitting(false);
+      setSubmitError(true);
+    }
+  }
   return (
-    <form action={action}>
+    <form ref={formRef} onSubmit={onSubmit}>
       {constitutionId ? <input type="hidden" name="constitutionId" value={constitutionId} /> : null}
       {settingsRevisionId ? <input type="hidden" name="settingsRevisionId" value={settingsRevisionId} /> : null}
-      {children}
+      {guidedCreation ? <nav className="creation-steps" aria-label="Creation steps">
+        {['Basics', 'Structure', 'Review & create'].map((name, index) => <span key={name} aria-current={step === index + 1 ? 'step' : undefined}>{index + 1}. {name}</span>)}
+      </nav> : null}
+      <div hidden={guidedCreation && step !== 1}>{children}</div>
       <input type="hidden" name="outline" value={JSON.stringify(withoutExisting(layers))} />
-      <div className="outline-config-layout">
-      <ol className="stack">
+      {guidedCreation && step === 1 ? <div className="form-row"><Button type="button" variant="primary" onClick={advance}>Continue to structure</Button></div> : null}
+      {guidedCreation && step === 2 ? <section aria-label="Starting structure">
+        <h2>Starting structure</h2>
+        <p className="muted">Choose a starting point, then adjust every level below. Changing templates replaces the current level settings.</p>
+        <div className="creation-templates">
+          {([['articles', 'Articles only', 'A short constitution with text in each article'], ['sections', 'Articles and sections', 'Two levels with plain text in each section'], ['sentences', 'Articles, paragraphs, sentences', 'Three levels with sentence editing tools']] as const).map(([id, title, detail]) => <button key={id} type="button" className="creation-template" aria-pressed={template === id} onClick={() => { setTemplate(id); setLayers(outlineFromTemplate(id).map((kind) => ({ ...kind, existing: false }))); setShowErrors(false); }}><strong>{title}</strong><span>{detail}</span></button>)}
+        </div>
+      </section> : null}
+      {guidedCreation && step === 3 ? <section className="card" aria-label="Review constitution"><h2>Review before creating</h2><p>{basicsSummary}</p><p>{layers.map((layer) => layer.displayLabel).join(' → ')}</p><p>The new constitution can be edited after creation. Content and versions are added in the editor.</p></section> : null}
+      <div className="outline-config-layout" hidden={guidedCreation && step === 1}>
+      {guidedCreation && step === 3 ? <div className="stack" aria-label="Final structure settings">
+        {layers.map((layer, index) => <section className="card" key={`${layer.kindCode}-${index}`}>
+          <h3>{index + 1}. {layer.displayLabel}</h3>
+          <p>Editor titles: {layer.titlePolicy ?? 'optional'} · Literal labels: {layer.labelPolicy ?? 'optional'}</p>
+          <p>Public reader: {layer.presentation === 'concatenated' ? 'running text' : 'block'} · Kind {layer.showKind ? 'shown' : 'hidden'} · Label {layer.showLabel ? 'shown' : 'hidden'} ({(layer.labelPlacement ?? 'before_title').replaceAll('_', ' ')}) · Title {layer.showTitle ? 'shown' : 'hidden'}</p>
+          <p>{index < layers.length - 1 ? layer.allowTextAlongsideChildren ? 'Unnumbered parent text allowed alongside children' : 'Text stays in child units' : `Final text with ${layer.segmentation === 'sentence' ? 'sentence boundary assistance' : 'plain editing'}`}</p>
+        </section>)}
+      </div> : <ol className="stack">
         {layers.map((layer, index) => (
           <li key={`${layer.kindCode}-${index}`} className="card">
             <p>
@@ -120,6 +189,8 @@ export function OutlineEditor({
                 });
               }}
             />
+            <details className="creation-advanced">
+              <summary>Advanced · generated code</summary>
             <Input
               label="Kind code"
               name={`code-${index}`}
@@ -132,6 +203,7 @@ export function OutlineEditor({
                 }
               }}
             />
+            </details>
             <fieldset>
               <legend>Editor permissions</legend>
               {index < layers.length - 1 ? (
@@ -217,7 +289,7 @@ export function OutlineEditor({
             ) : null}
           </li>
         ))}
-      </ol>
+      </ol>}
       <aside className="card outline-live-preview" aria-label="Live order example">
         <h2>Live order example</h2>
         <p className="muted">Parent text is unnumbered and belongs to its parent. Editor view scopes are selected separately in the editor.</p>
@@ -228,19 +300,24 @@ export function OutlineEditor({
         {constitutionId ? <p>Occupied structure and stricter permissions are checked before saving. Changes requiring migration need a reviewed successor.</p> : null}
       </aside>
       </div>
+      {guidedCreation && showErrors && outlineError ? <Alert tone="error">{outlineError}</Alert> : null}
       {impactError ? <Alert tone="error">Impact could not be checked. Retry when the content and draft services are available.</Alert> : null}
+      {submitError ? <Alert tone="error">The constitution could not be saved. Try again.</Alert> : null}
       {impact ? <section aria-live="polite" className="card">
         <h2>{impact.classification === 'migration_required' ? 'Reviewed migration required' : 'Safe to save'}</h2>
         <p>{impact.affectedVersionIds.length} versions and {impact.affectedDraftSessionIds.length} drafts checked. Published structural settings remain pinned; public display changes apply live.</p>
         <ul>{impact.reasons.map((reason) => <li key={reason}>{reason}</li>)}{impact.violations.map((violation, index) => <li key={index}>{violation.field}: {violation.message}</li>)}</ul>
       </section> : null}
-      <div className="form-row">
-        <Button type="button" onClick={addLayer}>
+      <div className="form-row" hidden={guidedCreation && step === 1}>
+        {(!guidedCreation || step === 2) ? <Button type="button" onClick={addLayer}>
           Add deeper layer
-        </Button>
-        {layers[layers.length - 1]?.kindCode === 'sentence' ? <p className="muted">New levels are added before the final sentence level.</p> : null}
+        </Button> : null}
+        {(!guidedCreation || step === 2) && layers[layers.length - 1]?.kindCode === 'sentence' ? <p className="muted">New levels are added before the final sentence level.</p> : null}
         {constitutionId ? <Button type="button" onClick={checkImpact} disabled={checking}>{checking ? 'Checking impact…' : 'Preview change impact'}</Button> : null}
-        <Button variant="primary" disabled={Boolean(constitutionId) && (!impact || impact.classification === 'migration_required' || impact.currentRevisionId !== settingsRevisionId)}>{submitLabel}</Button>
+        {guidedCreation ? <>
+          <Button type="button" onClick={() => { setStep(step === 3 ? 2 : 1); setShowErrors(false); }}>Back</Button>
+          {step === 2 ? <Button type="button" variant="primary" onClick={(event) => { event.preventDefault(); advance(); }}>Continue to review</Button> : <Button variant="primary" data-create="true" disabled={submitting}>{submitting ? 'Creating…' : 'Create constitution'}</Button>}
+        </> : <Button variant="primary" disabled={submitting || checking || (Boolean(constitutionId) && (!impact || impact.classification === 'migration_required' || impact.currentRevisionId !== settingsRevisionId))}>{submitting ? 'Saving…' : submitLabel}</Button>}
       </div>
     </form>
   );
@@ -270,5 +347,10 @@ function exampleNode(layers: Layer[], depth: number, path: string, sibling: numb
 }
 
 function ExampleMap({ node }: { node: OrderedNode }) {
-  return <ol><li>{node.kind} {node.label}<ol>{node.content.map((entry, index) => <li key={index}>{entry.node ? <ExampleMap node={entry.node} /> : 'Unnumbered parent text'}</li>)}</ol></li></ol>;
+  return <div className="outline-example-level">
+    <strong>{node.kind} {node.label}</strong>
+    <ol>{node.content.map((entry, index) => <li key={entry.node?.occurrenceId ?? entry.occurrenceId ?? index}>
+      {entry.type === 'child' && entry.node ? <ExampleMap node={entry.node} /> : <><small>Unnumbered parent text</small> {entry.text}</>}
+    </li>)}</ol>
+  </div>;
 }

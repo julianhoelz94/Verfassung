@@ -1,11 +1,11 @@
 import { AdminForbidden } from '../../components/AdminForbidden';
-import { Alert, Card, DataList, DataRow, Input, PageHeader } from '../../components/ui';
+import { Alert, Card, DataList, DataRow, PageHeader } from '../../components/ui';
 import { PageMain } from '../../components/PageMain';
 import { loadCountriesWithDetails } from '../../../lib/api';
 import { requireAdminPage } from '../../../lib/admin';
 import { DEFAULT_NEW_OUTLINE } from '../../../lib/outline';
 import { createConstitutionAction } from './actions';
-import { ConstitutionCountryFields } from './ConstitutionCountryFields';
+import { ConstitutionBasicsFields } from './ConstitutionBasicsFields';
 import { OutlineEditor } from './OutlineEditor';
 
 type AdminConstitutionsPageProps = {
@@ -29,8 +29,8 @@ export default async function AdminConstitutionsPage(props: AdminConstitutionsPa
   return (
     <PageMain className="wide">
       <PageHeader
-        title="Constitution outlines"
-        meta="Each constitution has an ordered tree of layers. The public reader uses these labels and presentation rules."
+        title="Constitutions"
+        meta="Create a constitution with a guided structure and a live reader preview."
       />
       {searchParams.error === 'forbidden' ? (
         <Alert tone="error">Administrator role required.</Alert>
@@ -39,14 +39,8 @@ export default async function AdminConstitutionsPage(props: AdminConstitutionsPa
       ) : null}
       <Card>
         <h2 className="card-title">New constitution</h2>
-        <p>
-          Choose an existing country or add a new one in this form. Then set the tree: the constitution is the parent,
-          then each layer below it. Concatenated layers have no heading and are joined in the reader.
-        </p>
-        <OutlineEditor action={createConstitutionAction} initial={DEFAULT_NEW_OUTLINE} submitLabel="Create">
-          <ConstitutionCountryFields countries={countries} />
-          <Input label="Slug" name="slug" required placeholder="basic-law" />
-          <Input label="Title" name="title" required />
+        <OutlineEditor action={createConstitutionAction} initial={DEFAULT_NEW_OUTLINE} guidedCreation>
+          <ConstitutionBasicsFields countries={countries} />
         </OutlineEditor>
       </Card>
       <DataList columns={3}>

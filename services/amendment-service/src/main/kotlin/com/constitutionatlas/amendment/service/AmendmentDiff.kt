@@ -24,6 +24,8 @@ internal data class FlatNode(
 internal data class NodeChange(
     val type: String,
     val node: FlatNode,
+    val before: FlatNode? = null,
+    val ambiguous: Boolean = false,
 )
 
 internal object AmendmentDiff {
@@ -49,6 +51,7 @@ internal object AmendmentDiff {
         val sourceById = source.associateBy { it.id }
         val unmatchedSource = source.map { it.id }.toMutableSet()
         val unmatchedTarget = mutableListOf<FlatNode>()
+        val ambiguousTargetIds = mutableSetOf<UUID>()
         val pairs = mutableListOf<Pair<FlatNode, FlatNode>>()
 
         for (node in target) {
@@ -64,13 +67,15 @@ internal object AmendmentDiff {
         val stillUnmatched = mutableListOf<FlatNode>()
         for (node in unmatchedTarget) {
             val key = identityKey(node)
-            val match = source.firstOrNull { candidate ->
+            val matches = source.filter { candidate ->
                 candidate.id in unmatchedSource && (if (node.logicalId != null) candidate.logicalId == node.logicalId else candidate.logicalId == null && identityKey(candidate) == key)
             }
+            val match = matches.singleOrNull()
             if (match != null) {
                 pairs += match to node
                 unmatchedSource.remove(match.id)
             } else {
+                if (matches.size > 1) ambiguousTargetIds += node.id
                 stillUnmatched += node
             }
         }
@@ -87,7 +92,7 @@ internal object AmendmentDiff {
                 addedTargets += node
             }
         }
-        val added = addedTargets.map { NodeChange("added", it) }
+        val added = addedTargets.map { NodeChange("added", it, ambiguous = it.id in ambiguousTargetIds) }
         val removed = source.filter { it.id in unmatchedSource }.map { NodeChange("removed", it) }
         val changed =
             pairs
@@ -100,7 +105,7 @@ internal object AmendmentDiff {
                         textOf(from) != textOf(to)
                     }
                 }
-                .map { (_, to) -> NodeChange("changed", to) }
+                .map { (from, to) -> NodeChange("changed", to, before = from) }
         return added + changed + removed
     }
 

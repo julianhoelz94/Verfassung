@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useRef, useState, useTransition } from 'react';
-import type { Amendment, AmendmentDocument, VersionSummary } from '../../../lib/api';
+import type { Amendment, AmendmentDocument, ArticleSummary, VersionSummary } from '../../../lib/api';
 import { Alert, Badge, Button, Input, Select, TextArea } from '../../components/ui';
 import { AmendmentChangesTable, type ChangeRow } from './AmendmentChangesTable';
 import { suggestChangesAction } from './actions';
@@ -12,6 +12,7 @@ type AmendmentFormProps = {
   amendment: Amendment | null;
   versions: VersionSummary[];
   articlesByVersion: Record<string, string[]>;
+  unitTreesByVersion: Record<string, ArticleSummary[]>;
   latestVersionId?: string | null;
   canSave: boolean;
   canPublish: boolean;
@@ -28,6 +29,10 @@ function initialRows(amendment: Amendment | null): ChangeRow[] {
     articleNumber: change.articleNumber ?? '',
     changeType: change.changeType,
     note: change.note ?? '',
+    beforeRef: change.beforeRef ?? null,
+    afterRef: change.afterRef ?? null,
+    linkReviewReason: change.linkReviewReason ?? '',
+    legacyLinkUnresolved: change.legacyLinkUnresolved ?? false,
   }));
 }
 
@@ -50,6 +55,7 @@ export function AmendmentForm({
   amendment,
   versions,
   articlesByVersion,
+  unitTreesByVersion,
   latestVersionId,
   canSave,
   canPublish,
@@ -57,6 +63,7 @@ export function AmendmentForm({
   readOnly,
   contentAvailable = true,
 }: AmendmentFormProps) {
+  const [sourceVersionId, setSourceVersionId] = useState(amendment?.sourceVersionId ?? versions[0]?.id ?? '');
   const [targetVersionId, setTargetVersionId] = useState(amendment?.targetVersionId ?? latestVersionId ?? '');
   const [changeRows, setChangeRows] = useState<ChangeRow[]>(() => initialRows(amendment));
   const [documents, setDocuments] = useState<AmendmentDocument[]>(() => amendment?.documents?.length ? amendment.documents : [{ url: '', fileId: '', label: '' }]);
@@ -95,7 +102,12 @@ export function AmendmentForm({
         articleNumber: change.articleNumber ?? '',
         changeType: change.changeType,
         note: change.note ?? '',
+        beforeRef: change.beforeRef ?? null,
+        afterRef: change.afterRef ?? null,
+        linkReviewReason: '',
       }));
+      setSourceVersionId(suggestSourceId);
+      setTargetVersionId(suggestTargetId);
       setChangeRows((current) => mergeSuggestedRows(current, suggested));
       closeSuggestDialog();
     });
@@ -177,8 +189,9 @@ export function AmendmentForm({
           id="amendment-source-version"
           name="sourceVersionId"
           label="Source version (optional)"
-          defaultValue={amendment?.sourceVersionId ?? ''}
+          value={sourceVersionId}
           disabled={readOnly}
+          onChange={(event) => setSourceVersionId(event.target.value)}
         >
           <option value="">None</option>
           {versions.map((version) => (
@@ -217,6 +230,9 @@ export function AmendmentForm({
       <AmendmentChangesTable
         initialRows={changeRows}
         articleNumbers={articleNumbers}
+        unitTreesByVersion={unitTreesByVersion}
+        sourceVersionId={sourceVersionId}
+        targetVersionId={targetVersionId}
         readOnly={readOnly}
         onRowsChange={setChangeRows}
       />

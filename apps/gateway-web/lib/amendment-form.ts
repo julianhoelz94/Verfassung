@@ -16,6 +16,10 @@ function parseChanges(formData: FormData): AmendmentChangeWrite[] {
       articleNumber: change.articleNumber?.trim() || null,
       changeType: change.changeType,
       note: change.note?.trim() || null,
+      beforeRef: change.beforeRef ?? null,
+      afterRef: change.afterRef ?? null,
+      pendingAfterLogicalId: change.pendingAfterLogicalId ?? (change.afterRef?.versionId ? null : change.afterRef?.logicalId ?? null),
+      linkReviewReason: change.linkReviewReason?.trim() || null,
     }));
   } catch {
     return [];
@@ -47,4 +51,3 @@ export function readWriteBody(formData: FormData): AmendmentWriteBody {
     changes: parseChanges(formData),
   };
 }
-

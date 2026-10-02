@@ -45,7 +45,27 @@ export type DraftPreview = {
   searchIndexStatus?: 'pending' | 'ready' | 'failed' | null;
   amendmentStatus?: 'pending' | 'ready' | 'failed' | null;
   publishComment?: string | null;
-  changeRecord?: { title: string; comment: string; documents: { url?: string; fileId?: string; label?: string }[] } | null;
+  changeRecord?: { title: string; comment: string; documents: { url?: string; fileId?: string; label?: string }[]; changes?: ChangeRecordChange[] } | null;
+};
+
+export type ChangeRecordUnitRef = {
+  logicalId: string;
+  versionId?: string | null;
+  occurrenceId?: string | null;
+  rootOccurrenceId?: string | null;
+  revisionId?: string | null;
+  unitKind?: 'node' | 'text_entry' | null;
+};
+
+export type ChangeRecordChange = {
+  articleId: string;
+  articleNumber: string;
+  changeType: 'added' | 'changed' | 'removed';
+  note?: string | null;
+  beforeRef?: ChangeRecordUnitRef | null;
+  afterRef?: ChangeRecordUnitRef | null;
+  linkReviewReason?: string | null;
+  pendingAfterLogicalId?: string | null;
 };
 
 /**
@@ -216,7 +236,7 @@ export async function approveReview(sessionId: string): Promise<DraftPreview> {
 
 export async function savePublishDetails(
   sessionId: string,
-  details: { comment?: string; changeRecord?: { title: string; comment: string; documents: { url: string; label?: string }[] } },
+  details: { comment?: string; changeRecord?: { title: string; comment: string; documents: { url: string; label?: string }[]; changes?: ChangeRecordChange[] } },
 ): Promise<DraftPreview> {
   const response = await editorFetch(`/edit-sessions/${encodeURIComponent(sessionId)}/publish-details`, {
     method: 'POST',
@@ -228,7 +248,7 @@ export async function savePublishDetails(
 
 export async function publishSession(
   sessionId: string,
-  options: { hopKind: 'legal' | 'editorial_correction'; amendmentId?: string; comment?: string; changeRecord?: { title: string; comment: string; documents: { url: string; label?: string }[] } },
+  options: { hopKind: 'legal' | 'editorial_correction'; amendmentId?: string; comment?: string; changeRecord?: { title: string; comment: string; documents: { url: string; label?: string }[]; changes?: ChangeRecordChange[] } },
 ): Promise<DraftPreview> {
   const body = options;
   const response = await editorFetch(`/edit-sessions/${encodeURIComponent(sessionId)}/publish`, {

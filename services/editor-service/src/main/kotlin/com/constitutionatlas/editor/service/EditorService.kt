@@ -281,16 +281,16 @@ class EditorService(
                 ?: request.amendmentId?.let {
                     requireAmendmentForHop(it, source.constitutionId, session.versionId, authorization).also { existing ->
                         if (structured) {
-                            require(
-                                existing.changes.isNotEmpty() && existing.changes.all { change ->
-                                    when (change.changeType) {
-                                        "added" -> change.beforeRef == null && (change.afterRef != null || change.pendingAfterLogicalId != null)
-                                        "removed" -> change.beforeRef != null && change.afterRef == null && change.pendingAfterLogicalId == null
-                                        "changed" -> change.beforeRef != null && (change.afterRef != null || change.pendingAfterLogicalId != null)
-                                        else -> false
-                                    }
-                                },
-                            ) { "Structured legal publish needs exact unit selections on the linked change record" }
+                            require(existing.changes.isNotEmpty()) { "Structured legal publish needs exact unit selections on the linked change record" }
+                            existing.changes.forEach { change ->
+                                val validSides = when (change.changeType) {
+                                    "added" -> change.beforeRef == null && (change.afterRef != null || change.pendingAfterLogicalId != null)
+                                    "removed" -> change.beforeRef != null && change.afterRef == null && change.pendingAfterLogicalId == null
+                                    "changed" -> change.beforeRef != null && (change.afterRef != null || change.pendingAfterLogicalId != null)
+                                    else -> false
+                                }
+                                require(validSides) { "Structured legal publish needs exact unit selections on the linked change record" }
+                            }
                         }
                     }
                 }

@@ -69,7 +69,7 @@ export function PublishForm({ sessionId, versionId, articleId, hopKind, status, 
     <input type="hidden" name="articleId" value={articleId} />
     <input type="hidden" name="hopKind" value={hopKind} />
   </>;
-  const ready = hopKind === 'legal' ? Boolean(record) && (!structuredDraft || changes.length > 0 && changes.every((change) => change.changeType === 'added' ? Boolean(change.afterRef) : change.changeType === 'removed' ? Boolean(change.beforeRef) : Boolean(change.beforeRef && change.afterRef))) : Boolean(comment);
+  const ready = hopKind === 'legal' ? Boolean(record) && (!structuredDraft || changes.length > 0 && changes.every((change) => change.changeType === 'added' ? Boolean(change.afterRef || change.pendingAfterLogicalId) : change.changeType === 'removed' ? Boolean(change.beforeRef) : Boolean(change.beforeRef && (change.afterRef || change.pendingAfterLogicalId)))) : Boolean(comment);
   function updateChange(index: number, patch: Partial<ChangeRecordChange>) {
     setChanges((current) => current.map((row, rowIndex) => {
       if (rowIndex !== index) return row;

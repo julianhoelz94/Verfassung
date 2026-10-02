@@ -24,7 +24,19 @@ data class LinkedAmendment(
     val documents: List<ChangeRecordDocumentDto> = emptyList(),
     val sourceVersionId: UUID? = null,
     val targetVersionId: UUID? = null,
+    val changes: List<LinkedAmendmentChange> = emptyList(),
 )
+
+@JsonIgnoreProperties(ignoreUnknown = true)
+data class LinkedAmendmentChange(
+    val changeType: String,
+    val beforeRef: LinkedUnitRef? = null,
+    val afterRef: LinkedUnitRef? = null,
+    val pendingAfterLogicalId: UUID? = null,
+)
+
+@JsonIgnoreProperties(ignoreUnknown = true)
+data class LinkedUnitRef(val logicalId: UUID)
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 data class ChangeRecordDocumentDto(val url: String? = null, val fileId: String? = null, val label: String? = null)

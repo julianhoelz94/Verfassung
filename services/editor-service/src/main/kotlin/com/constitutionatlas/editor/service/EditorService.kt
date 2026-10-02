@@ -216,10 +216,10 @@ class EditorService(
             throw IllegalArgumentException("legal publish requires one change record payload or amendmentId")
         }
         changeRecord?.let(::validateChangeRecord)
-        if (structured && hopKind == "legal" && changeRecord?.changes.isNullOrEmpty()) {
+        if (structured && hopKind == "legal" && request.amendmentId == null && changeRecord?.changes.isNullOrEmpty()) {
             throw IllegalArgumentException("Structured legal publish needs exact before/after unit selections")
         }
-        if (structured && hopKind == "legal") {
+        if (structured && hopKind == "legal" && request.amendmentId == null) {
             val changes = requireNotNull(changeRecord).changes
             changes.forEach { change ->
                 val validSides = when (change.changeType) {
@@ -278,14 +278,33 @@ class EditorService(
         val recordedAmendment = if (structured) structuredPublishJobs.amendment(session.id) else null
         val amendment = if (hopKind == "legal") {
             recordedAmendment?.let { amendmentClient.getAmendment(it, authorization) ?: throw ConflictException("Reserved change record missing") }
-                ?: request.amendmentId?.let { requireAmendmentForHop(it, source.constitutionId, session.versionId, authorization) }
+                ?: request.amendmentId?.let {
+                    requireAmendmentForHop(it, source.constitutionId, session.versionId, authorization).also { existing ->
+                        if (structured) {
+                            require(
+                                existing.changes.isNotEmpty() && existing.changes.all { change ->
+                                    when (change.changeType) {
+                                        "added" -> change.beforeRef == null && (change.afterRef != null || change.pendingAfterLogicalId != null)
+                                        "removed" -> change.beforeRef != null && change.afterRef == null && change.pendingAfterLogicalId == null
+                                        "changed" -> change.beforeRef != null && (change.afterRef != null || change.pendingAfterLogicalId != null)
+                                        else -> false
+                                    }
+                                },
+                            ) { "Structured legal publish needs exact unit selections on the linked change record" }
+                        }
+                    }
+                }
                 ?: amendmentClient.createAmendment(
                     source.constitutionId,
                     changeRecord!!.copy(
                         publishAttemptId = if (structured) session.id else null,
                         sourceVersionId = session.versionId,
-                        changes = if (structured) changeRecord.changes else changeRecord.changes.ifEmpty {
-                            changedArticles.map { ChangeRecordChange(it.id, it.articleNumber) }
+                        changes = if (structured) {
+                            changeRecord.changes
+                        } else {
+                            changeRecord.changes.ifEmpty {
+                                changedArticles.map { ChangeRecordChange(it.id, it.articleNumber) }
+                            }
                         },
                     ),
                     authorization,

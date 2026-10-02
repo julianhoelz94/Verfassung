@@ -9,10 +9,10 @@ import com.constitutionatlas.platform.Actor
 import com.constitutionatlas.platform.IdentityClient
 import com.constitutionatlas.platform.UnauthorizedException
 import com.fasterxml.jackson.databind.ObjectMapper
-import org.junit.jupiter.api.BeforeEach
-import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Test
 import org.mockito.Mockito
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
@@ -395,6 +395,10 @@ class AmendmentApiTest {
         mockMvc.get("/amendments/$amendmentId").andExpect {
             status { isNotFound() }
         }
+        mockMvc.get("/amendments/$amendmentId") { header("Authorization", TOKEN) }.andExpect {
+            status { isOk() }
+            jsonPath("$.status") { value("withdrawn") }
+        }
     }
 
     @Test
@@ -640,6 +644,40 @@ class AmendmentApiTest {
         val removed = requireNotNull(changes["removed"])
         assertFalse(removed.has("afterRef"))
         assertEquals(removedRef.occurrenceId.toString(), removed.get("beforeRef").get("occurrenceId").asText())
+    }
+
+    @Test
+    fun publishRejectsMixedExactAndUnlinkedChanges() {
+        val targetVersion = UUID.randomUUID()
+        val logicalId = UUID.randomUUID()
+        val resolved = ResolvedContentUnit(
+            versionId = targetVersion,
+            constitutionId = CONSTITUTION_ID,
+            logicalId = logicalId,
+            revisionId = UUID.randomUUID(),
+            occurrenceId = UUID.randomUUID(),
+            rootOccurrenceId = UUID.randomUUID(),
+            kind = "sentence",
+            articleNumber = "1",
+            text = "Added wording",
+            deepLink = "/versions/$targetVersion/units/$logicalId",
+        )
+        Mockito.`when`(contentClient.resolve(targetVersion, logicalId)).thenReturn(resolved)
+        val body = """
+            {"title":"Mixed links","comment":"Review","targetVersionId":"$targetVersion","changes":[
+              {"changeType":"added","afterRef":{"versionId":"$targetVersion","logicalId":"$logicalId","occurrenceId":"${resolved.occurrenceId}","rootOccurrenceId":"${resolved.rootOccurrenceId}","revisionId":"${resolved.revisionId}","unitKind":"node"}},
+              {"changeType":"changed","articleNumber":"2"}
+            ]}
+        """.trimIndent()
+        val created = mockMvc.post("/constitutions/$CONSTITUTION_ID/amendments") {
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = body
+        }.andExpect { status { isCreated() } }.andReturn().response.contentAsString
+        val id = objectMapper.readTree(created).get("id").asText()
+        mockMvc.post("/amendments/$id/publish") { header("Authorization", PUBLISHER_TOKEN) }.andExpect {
+            status { isBadRequest() }
+        }
     }
 
     @Test

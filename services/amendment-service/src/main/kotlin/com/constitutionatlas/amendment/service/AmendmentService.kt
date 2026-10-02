@@ -5,8 +5,8 @@ import com.constitutionatlas.amendment.api.AmendmentChangeWriteRequest
 import com.constitutionatlas.amendment.api.AmendmentDocumentDto
 import com.constitutionatlas.amendment.api.AmendmentDto
 import com.constitutionatlas.amendment.api.AmendmentRevisionDto
-import com.constitutionatlas.amendment.api.AmendmentWriteRequest
 import com.constitutionatlas.amendment.api.AmendmentUnitRefDto
+import com.constitutionatlas.amendment.api.AmendmentWriteRequest
 import com.constitutionatlas.amendment.api.LinkTargetRequest
 import com.constitutionatlas.amendment.api.RefreshReviewStatusResponse
 import com.constitutionatlas.amendment.api.SuggestRequest
@@ -57,7 +57,6 @@ class AmendmentService(
             ?: throw NotFoundException("amendment not found")
 
     fun getStaffAmendment(id: UUID): AmendmentDto {
-        if (amendmentRepository.getAmendmentStatus(id) == "withdrawn") throw NotFoundException("amendment not found")
         val tipRevisionId =
             amendmentRepository.findTipRevisionId(id)
                 ?: throw NotFoundException("amendment not found")
@@ -178,6 +177,11 @@ class AmendmentService(
         }
         val tip = amendmentRepository.getAmendmentDtoForRevision(amendmentId, tipRevisionId, includeStaff = true)
             ?: throw IllegalStateException("amendment tip not readable")
+        if (tip.changes.any { it.beforeRef != null || it.afterRef != null || it.pendingAfterLogicalId != null }) {
+            require(tip.changes.all { it.beforeRef != null || it.afterRef != null || it.pendingAfterLogicalId != null }) {
+                "Every change needs an exact unit selection when this record uses exact links"
+            }
+        }
         validateChangeRefs(
             tip.constitutionId,
             tip.sourceVersionId,
@@ -300,6 +304,9 @@ class AmendmentService(
     private fun linkedChanges(tip: AmendmentDto, sourceVersionId: UUID?, targetVersionId: UUID): List<AmendmentChangeWriteRequest> {
         val explicitlySelected = tip.changes.any { it.beforeRef != null || it.afterRef != null || it.pendingAfterLogicalId != null }
         if (explicitlySelected) {
+            require(tip.changes.all { it.beforeRef != null || it.afterRef != null || it.pendingAfterLogicalId != null }) {
+                "Every change needs an exact unit selection when this record uses exact links"
+            }
             return tip.changes.map { change ->
                 fun reResolve(ref: AmendmentUnitRefDto?, versionId: UUID?): AmendmentUnitRefDto? {
                     if (ref == null || versionId == null) return null
@@ -329,18 +336,20 @@ class AmendmentService(
         val targetTree = contentClient.listArticles(targetVersionId)
         val diffs = AmendmentDiff.diff(AmendmentDiff.flatten(sourceTree), AmendmentDiff.flatten(targetTree))
         if (diffs.any { it.ambiguous }) throw ConflictException("Change selection is ambiguous; choose the exact constitutional units before publishing", "ambiguous_unit_pairing")
-        if (diffs.isEmpty()) return tip.changes.map { change ->
-            AmendmentChangeWriteRequest(
-                articleNumber = change.articleNumber,
-                changeType = change.changeType,
-                note = change.note,
-                articleId = change.articleId,
-                nodeId = change.nodeId,
-                changedOn = change.changedOn,
-                effectiveOn = change.effectiveOn,
-                amendingLawTitle = change.amendingLawTitle,
-                amendingLawCitation = change.amendingLawCitation,
-            )
+        if (diffs.isEmpty()) {
+            return tip.changes.map { change ->
+                AmendmentChangeWriteRequest(
+                    articleNumber = change.articleNumber,
+                    changeType = change.changeType,
+                    note = change.note,
+                    articleId = change.articleId,
+                    nodeId = change.nodeId,
+                    changedOn = change.changedOn,
+                    effectiveOn = change.effectiveOn,
+                    amendingLawTitle = change.amendingLawTitle,
+                    amendingLawCitation = change.amendingLawCitation,
+                )
+            }
         }
         return diffs.map { change ->
             val previous = tip.changes.firstOrNull { row -> row.articleNumber == change.node.articleNumber && row.changeType == change.type }
@@ -533,7 +542,9 @@ class AmendmentService(
                 val kind = ref.unitKind
                 if (kind != null && kind !in setOf("node", "text_entry")) throw IllegalArgumentException("$side draft reference has an invalid unit kind")
                 return AmendmentUnitRefDto(logicalId = logicalId, unitKind = kind)
-            } else throw IllegalArgumentException("$side reference needs a version")
+            } else {
+                throw IllegalArgumentException("$side reference needs a version")
+            }
             if (expectedVersion == null || versionId != expectedVersion) throw IllegalArgumentException("$side reference is not pinned to this change record's snapshot")
             val logicalId = ref.logicalId ?: throw IllegalArgumentException("$side reference needs a logical unit")
             val resolved = contentClient.resolve(versionId, logicalId) ?: throw IllegalArgumentException("$side reference is not in its pinned snapshot")
@@ -565,14 +576,14 @@ class AmendmentService(
                 "removed" -> require(before != null && after == null) { "Removed units need a before reference only" }
                 else -> throw IllegalArgumentException("Unsupported change type")
             }
-                before?.let { if (!usedBefore.add(it.versionId!! to it.occurrenceId!!)) throw IllegalArgumentException("Duplicate before reference") }
-                after?.let {
-                    if (it.versionId == null) {
-                        if (!usedDraftTargets.add(it.logicalId!!)) throw IllegalArgumentException("Duplicate draft after reference")
-                    } else if (!usedAfter.add(it.versionId to it.occurrenceId!!)) {
-                        throw IllegalArgumentException("Duplicate after reference")
-                    }
+            before?.let { if (!usedBefore.add(it.versionId!! to it.occurrenceId!!)) throw IllegalArgumentException("Duplicate before reference") }
+            after?.let {
+                if (it.versionId == null) {
+                    if (!usedDraftTargets.add(it.logicalId!!)) throw IllegalArgumentException("Duplicate draft after reference")
+                } else if (!usedAfter.add(it.versionId to it.occurrenceId!!)) {
+                    throw IllegalArgumentException("Duplicate after reference")
                 }
+            }
             if ((before?.articleNumber != null && after?.articleNumber != null) && before.articleNumber != after.articleNumber) {
                 throw IllegalArgumentException("Before and after units must belong to the same article")
             }

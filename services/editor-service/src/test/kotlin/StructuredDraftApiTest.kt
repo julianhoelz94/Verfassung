@@ -117,14 +117,18 @@ class StructuredDraftApiTest {
             "Law",
             "Legal update",
             listOf(com.constitutionatlas.editor.api.ChangeRecordDocument(url = "https://example.test/law")),
-            changes = if (hop == "legal") listOf(
-                com.constitutionatlas.editor.api.ChangeRecordChange(
-                    articleId = root.logicalId,
-                    articleNumber = "46a",
-                    beforeRef = com.constitutionatlas.editor.api.ChangeRecordUnitRef(logicalId = entry.logicalId!!, versionId = version),
-                    pendingAfterLogicalId = entry.logicalId,
-                ),
-            ) else emptyList(),
+            changes = if (hop == "legal") {
+                listOf(
+                    com.constitutionatlas.editor.api.ChangeRecordChange(
+                        articleId = root.logicalId,
+                        articleNumber = "46a",
+                        beforeRef = com.constitutionatlas.editor.api.ChangeRecordUnitRef(logicalId = entry.logicalId!!, versionId = version),
+                        pendingAfterLogicalId = entry.logicalId,
+                    ),
+                )
+            } else {
+                emptyList()
+            },
         )
         if (hop == "legal") sessions.recordChangeRecord(session, record) else sessions.recordPublishComment(session, "Transcription fix")
         editorService.submitReview(auth, session)
@@ -206,11 +210,17 @@ class StructuredDraftApiTest {
         val entry = root.content[1].node!!.content.single()
         drafts.save(auth, session, StructuredDraftSave(0, listOf(DraftOperation(UUID.randomUUID(), "replace_text", entry.logicalId!!, entry.revisionId!!, text = "Changed wording."))))
         val record = com.constitutionatlas.editor.api.ChangeRecordRequest(
-            "Law", "Legal update", listOf(com.constitutionatlas.editor.api.ChangeRecordDocument(url = "https://example.test/law")),
-            changes = listOf(com.constitutionatlas.editor.api.ChangeRecordChange(
-                articleId = root.logicalId, articleNumber = "46a", changeType = "changed",
-                beforeRef = com.constitutionatlas.editor.api.ChangeRecordUnitRef(logicalId = entry.logicalId!!, versionId = version),
-            )),
+            "Law",
+            "Legal update",
+            listOf(com.constitutionatlas.editor.api.ChangeRecordDocument(url = "https://example.test/law")),
+            changes = listOf(
+                com.constitutionatlas.editor.api.ChangeRecordChange(
+                    articleId = root.logicalId,
+                    articleNumber = "46a",
+                    changeType = "changed",
+                    beforeRef = com.constitutionatlas.editor.api.ChangeRecordUnitRef(logicalId = entry.logicalId!!, versionId = version),
+                ),
+            ),
         )
         sessions.recordChangeRecord(session, record)
         editorService.submitReview(auth, session)

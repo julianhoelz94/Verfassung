@@ -3,9 +3,7 @@
 import { useMemo, useState } from 'react';
 import type { ArticleSummary, ContentOutline } from '../../lib/api';
 import { articleHeading, clipOrderedEntries, clipNodes, depthStopCount, depthStopLabels } from '../../lib/outline';
-import { neighborsOf } from '../../lib/article-nav';
 import { Badge, type BadgeTone, Toolbar } from './ui';
-import { ArticleNav } from './ArticleNav';
 import { ConstitutionText } from './ConstitutionText';
 import { Segmented } from './Segmented';
 import { Toc } from './Toc';
@@ -119,7 +117,6 @@ export function VersionReader({
             const regionId = `article-panel-${article.id}`;
             const changeType = changeByArticle[article.articleNumber];
             const permalink = `/countries/${code}/versions/${versionId}/${article.kind && article.kind !== 'article' ? 'units' : 'articles'}/${article.id}#article-${article.articleNumber}`;
-            const neighbors = neighborsOf(articles, article.id);
             const historyHref = `/countries/${code}/articles/${encodeURIComponent(article.articleNumber)}`;
             return (
               <li key={article.id} className="version-article article">
@@ -166,27 +163,6 @@ export function VersionReader({
                     </span>
                   )}
                 </p>
-                {fullyOpen ? (
-                  <ArticleNav
-                    previous={
-                      neighbors.previous
-                        ? {
-                            href: `#unit-${neighbors.previous.id}`,
-                            label: articleHeading(outline, neighbors.previous) || 'Unit',
-                          }
-                        : undefined
-                    }
-                    next={
-                      neighbors.next
-                        ? {
-                            href: `#unit-${neighbors.next.id}`,
-                            label: articleHeading(outline, neighbors.next) || 'Unit',
-                          }
-                        : undefined
-                    }
-                    tocHref="#toc"
-                  />
-                ) : null}
               </li>
             );
           })}

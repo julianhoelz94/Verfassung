@@ -187,9 +187,17 @@ test('mixed parent text and nested sentence decisions reopen when one draft unit
   const queue = page.getByRole('region', { name: 'Review differences' });
   await expect(queue.getByText(`Reviewed 0 of ${initial.candidates.length}`)).toBeVisible();
   for (let index = 0; index < initial.candidates.length; index++) {
-    await queue.getByLabel('Reason for exclusion').fill('Covered by the separately checked change record.');
-    await queue.getByRole('button', { name: 'Exclude with reason and next' }).click();
-    await expect(queue.getByText('Decision saved.')).toBeVisible();
+    await expect(queue.getByText(`Difference ${index + 1} of ${initial.candidates.length}`)).toBeVisible();
+    const reason = queue.getByLabel('Reason for exclusion');
+    await expect(reason).toHaveValue('');
+    await reason.fill('Covered by the separately checked change record.');
+    const exclude = queue.getByRole('button', { name: 'Exclude with reason and next' });
+    await expect(exclude).toBeEnabled();
+    await exclude.click();
+    await expect.poll(async () => {
+      const saved = await json(await request.get(endpoint, { headers }));
+      return saved.decisions.filter((decision: { status: string }) => decision.status === 'excluded_with_reason').length;
+    }).toBe(index + 1);
   }
   const proposed = await json(await request.get(endpoint, { headers }));
   expect(proposed.decisions.filter((decision: { status: string }) => decision.status === 'excluded_with_reason')).toHaveLength(initial.candidates.length);

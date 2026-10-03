@@ -21,6 +21,7 @@ import { FormattedDate } from '../../../../../lib/format-date';
 import { atlasTitle, metaDescription, pageMetadata } from '../../../../../lib/page-meta';
 import { httpUrl, provenanceLabel, verificationLabel } from '../../../../../lib/provenance';
 import { publicSnapshotContext } from '../../../../../lib/reading';
+import { listDocumentLinks } from '../../../../../lib/document-api';
 
 type VersionPageProps = {
   params: Promise<{ code: string; versionId: string }>;
@@ -96,6 +97,7 @@ export default async function VersionPage(props: VersionPageProps) {
   }
 
   const sourceHref = httpUrl(version.version.sourceUrl);
+  const documentLinks = await listDocumentLinks('constitution', version.constitution.id).catch(() => []);
   const title = version.version.effectiveDate ? (
     <>
       Version in force since <FormattedDate value={version.version.effectiveDate} />
@@ -147,6 +149,13 @@ export default async function VersionPage(props: VersionPageProps) {
           </>
         }
       />
+      {documentLinks.length ? <section className="card">
+        <h2>Constitution documents</h2>
+        <ul className="link-list">{documentLinks.map((link) => <li key={link.documentId}>
+          <a href={`/documents/${link.documentId}${link.revisionId ? `?revision=${link.document.revision.revision}` : ''}`}>{link.document.revision.title}</a>
+          {link.revisionId ? ` · revision ${link.document.revision.revision}` : null}
+        </li>)}</ul>
+      </section> : null}
       <SiteSearchForm
         id="version-search"
         className="version-search"

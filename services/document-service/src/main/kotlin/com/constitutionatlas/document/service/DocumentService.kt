@@ -19,6 +19,7 @@ import java.util.UUID
 class DocumentService(
     private val repository: DocumentRepository,
     private val identityClient: IdentityClient,
+    private val targetClient: LinkTargetClient,
 ) {
     fun requireWriter(authorization: String?): Actor {
         val actor = identityClient.authenticate(authorization)
@@ -89,8 +90,9 @@ class DocumentService(
     }
 
     @Transactional
-    fun attach(targetType: String, targetId: UUID, request: LinkRequest, actor: Actor): List<DocumentLinkDto> {
+    fun attach(targetType: String, targetId: UUID, request: LinkRequest, actor: Actor, authorization: String?): List<DocumentLinkDto> {
         validateTarget(targetType)
+        targetClient.requireTarget(targetType, targetId, authorization)
         val document = get(request.documentId)
         require(document.status == "active") { "Cannot attach an archived document" }
         request.revisionId?.let { revisionId ->
@@ -104,8 +106,9 @@ class DocumentService(
     }
 
     @Transactional
-    fun detach(targetType: String, targetId: UUID, documentId: UUID, actor: Actor): List<DocumentLinkDto> {
+    fun detach(targetType: String, targetId: UUID, documentId: UUID, actor: Actor, authorization: String?): List<DocumentLinkDto> {
         validateTarget(targetType)
+        targetClient.requireTarget(targetType, targetId, authorization)
         if (currentLinks(targetType, targetId).none { it.documentId == documentId }) {
             throw NotFoundException("Document link not found")
         }

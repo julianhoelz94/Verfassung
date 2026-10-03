@@ -228,10 +228,16 @@ services:
       - SPRING_DATASOURCE_USERNAME=postgres
       - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD:-postgres}
       - IDENTITY_API_URL=http://identity-service:8080
+      - CATALOG_API_URL=http://catalog-service:8080
+      - AMENDMENT_API_URL=http://amendment-service:8080
     depends_on:
       document-db:
         condition: service_healthy
       identity-service:
+        condition: service_started
+      catalog-service:
+        condition: service_started
+      amendment-service:
         condition: service_started
 
   ingestion-service:

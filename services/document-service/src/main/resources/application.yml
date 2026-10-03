@@ -17,3 +17,9 @@ management:
 identity:
   api:
     url: ${IDENTITY_API_URL:http://localhost/api/identity}
+catalog:
+  api:
+    url: ${CATALOG_API_URL:http://localhost/api/catalog}
+amendment:
+  api:
+    url: ${AMENDMENT_API_URL:http://localhost/api/amendment}

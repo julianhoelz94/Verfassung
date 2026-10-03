@@ -80,8 +80,12 @@ class DocumentController(
         @RequestParam expectedRevision: Int,
         @RequestPart file: MultipartFile,
     ): DocumentDto = service.upload(
-        id, expectedRevision, file.originalFilename ?: "document", file.contentType ?: "application/octet-stream",
-        file.bytes, service.requireWriter(authorization),
+        id,
+        expectedRevision,
+        file.originalFilename ?: "document",
+        file.contentType ?: "application/octet-stream",
+        file.bytes,
+        service.requireWriter(authorization),
     )
 
     @PostMapping("/documents/{id}/archive")
@@ -110,7 +114,7 @@ class DocumentController(
         @PathVariable targetId: UUID,
         @RequestHeader(value = "Authorization", required = false) authorization: String?,
         @RequestBody request: LinkRequest,
-    ): List<DocumentLinkDto> = service.attach(targetType, targetId, request, service.requireWriter(authorization))
+    ): List<DocumentLinkDto> = service.attach(targetType, targetId, request, service.requireWriter(authorization), authorization)
 
     @DeleteMapping("/links/{targetType}/{targetId}/{documentId}")
     fun detach(
@@ -118,5 +122,5 @@ class DocumentController(
         @PathVariable targetId: UUID,
         @PathVariable documentId: UUID,
         @RequestHeader(value = "Authorization", required = false) authorization: String?,
-    ): List<DocumentLinkDto> = service.detach(targetType, targetId, documentId, service.requireWriter(authorization))
+    ): List<DocumentLinkDto> = service.detach(targetType, targetId, documentId, service.requireWriter(authorization), authorization)
 }

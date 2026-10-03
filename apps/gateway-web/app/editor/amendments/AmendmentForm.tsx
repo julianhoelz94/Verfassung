@@ -74,7 +74,7 @@ export function AmendmentForm({
   const [sourceVersionId, setSourceVersionId] = useState(amendment?.sourceVersionId ?? versions[0]?.id ?? '');
   const [targetVersionId, setTargetVersionId] = useState(amendment?.targetVersionId ?? latestVersionId ?? '');
   const [changeRows, setChangeRows] = useState<ChangeRow[]>(() => initialRows(amendment));
-  const [documents, setDocuments] = useState<AmendmentDocument[]>(() => amendment?.documents?.length ? amendment.documents : [{ url: '', fileId: '', label: '' }]);
+  const documents: AmendmentDocument[] = amendment?.documents ?? [];
   const [suggestSourceId, setSuggestSourceId] = useState(versions[0]?.id ?? '');
   const [suggestTargetId, setSuggestTargetId] = useState(versions[1]?.id ?? versions[0]?.id ?? '');
   const [suggestError, setSuggestError] = useState<string | null>(null);
@@ -196,15 +196,10 @@ export function AmendmentForm({
       <input type="hidden" name="documentsJson" value={JSON.stringify(documents)} />
       <fieldset className="stack">
         <legend>Documents</legend>
-        {documents.map((document, index) => (
-          <div className="form-row" key={index}>
-            <Input id={`amendment-document-url-${index}`} label="Document URL" value={document.url ?? ''} type="url" disabled={readOnly} onChange={(event) => setDocuments((rows) => rows.map((row, rowIndex) => rowIndex === index ? { ...row, url: event.target.value } : row))} />
-            <Input id={`amendment-document-file-${index}`} label="Archived file ID" value={document.fileId ?? ''} disabled={readOnly} onChange={(event) => setDocuments((rows) => rows.map((row, rowIndex) => rowIndex === index ? { ...row, fileId: event.target.value } : row))} />
-            <Input id={`amendment-document-label-${index}`} label="Label" value={document.label ?? ''} disabled={readOnly} onChange={(event) => setDocuments((rows) => rows.map((row, rowIndex) => rowIndex === index ? { ...row, label: event.target.value } : row))} />
-            {!readOnly && documents.length > 1 ? <Button type="button" onClick={() => setDocuments((rows) => rows.filter((_, rowIndex) => rowIndex !== index))}>Remove</Button> : null}
-          </div>
-        ))}
-        {!readOnly ? <Button type="button" onClick={() => setDocuments((rows) => [...rows, { url: '', fileId: '', label: '' }])}>Add document</Button> : null}
+        <p>Save the legal change, then attach a managed document below. Older references remain available here.</p>
+        {documents.length ? <ul className="link-list">{documents.map((document, index) => <li key={index}>
+          {document.url ? <a href={document.url} rel="noreferrer">{document.label || document.url}</a> : document.label || document.fileId || 'Archived document'}
+        </li>)}</ul> : null}
       </fieldset>
       <div className="form-row">
         <Select

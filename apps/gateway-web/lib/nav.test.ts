@@ -69,6 +69,7 @@ describe('menuSections', () => {
     expect(sectionHrefs(editor, 'editorial')).toEqual([
       '/editor?mine=1',
       '/editor?status=reviewing',
+      '/editor/documents',
       '/editor/amendments',
       '/editor/history',
     ]);
@@ -76,12 +77,12 @@ describe('menuSections', () => {
 
   it('shows Review queue and Amending laws for a reviewer', () => {
     const reviewer = { email: 'reviewer@example.local', roles: ['reviewer'] };
-    expect(sectionHrefs(reviewer, 'editorial')).toEqual(['/editor?status=reviewing', '/editor/amendments', '/editor/history']);
+    expect(sectionHrefs(reviewer, 'editorial')).toEqual(['/editor?status=reviewing', '/editor/documents', '/editor/amendments', '/editor/history']);
   });
 
   it('shows Ready to publish and Amending laws for a publisher', () => {
     const publisher = { email: 'publisher@example.local', roles: ['publisher'] };
-    expect(sectionHrefs(publisher, 'editorial')).toEqual(['/editor?status=approved', '/editor/amendments', '/editor/history']);
+    expect(sectionHrefs(publisher, 'editorial')).toEqual(['/editor?status=approved', '/editor/documents', '/editor/amendments', '/editor/history']);
   });
 
   it('unions editorial destinations for combined roles', () => {
@@ -93,6 +94,7 @@ describe('menuSections', () => {
       '/editor?mine=1',
       '/editor?status=reviewing',
       '/editor?status=approved',
+      '/editor/documents',
       '/editor/amendments',
       '/editor/history',
     ]);
@@ -105,6 +107,7 @@ describe('menuSections', () => {
       '/editor?mine=1',
       '/editor?status=reviewing',
       '/editor?status=approved',
+      '/editor/documents',
       '/editor/amendments',
       '/editor/history',
     ]);

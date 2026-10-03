@@ -94,7 +94,11 @@ class DocumentRepository(private val jdbc: JdbcTemplate) {
     fun event(documentId: UUID, eventType: String, actorId: UUID, revisionId: UUID?) {
         jdbc.update(
             "INSERT INTO document_events (id, document_id, event_type, actor_id, revision_id) VALUES (?, ?, ?, ?, ?)",
-            UUID.randomUUID(), documentId, eventType, actorId, revisionId,
+            UUID.randomUUID(),
+            documentId,
+            eventType,
+            actorId,
+            revisionId,
         )
     }
 
@@ -103,8 +107,11 @@ class DocumentRepository(private val jdbc: JdbcTemplate) {
             "SELECT id, document_id, event_type, actor_id, occurred_at, revision_id FROM document_events WHERE document_id = ? ORDER BY occurred_at DESC, id DESC",
             { rs, _ ->
                 DocumentEventDto(
-                    rs.getObject("id", UUID::class.java), id, rs.getString("event_type"),
-                    rs.getObject("actor_id", UUID::class.java), rs.getTimestamp("occurred_at").toInstant().atOffset(ZoneOffset.UTC),
+                    rs.getObject("id", UUID::class.java),
+                    id,
+                    rs.getString("event_type"),
+                    rs.getObject("actor_id", UUID::class.java),
+                    rs.getTimestamp("occurred_at").toInstant().atOffset(ZoneOffset.UTC),
                     rs.getObject("revision_id", UUID::class.java),
                 )
             },
@@ -115,7 +122,13 @@ class DocumentRepository(private val jdbc: JdbcTemplate) {
         jdbc.update(
             """INSERT INTO document_link_events (id, target_type, target_id, document_id, revision_id, action, actor_id)
                VALUES (?, ?, ?, ?, ?, ?, ?)""",
-            UUID.randomUUID(), targetType, targetId, documentId, revisionId, action, actorId,
+            UUID.randomUUID(),
+            targetType,
+            targetId,
+            documentId,
+            revisionId,
+            action,
+            actorId,
         )
     }
 
@@ -125,20 +138,28 @@ class DocumentRepository(private val jdbc: JdbcTemplate) {
                FROM document_link_events WHERE target_type = ? AND target_id = ? ORDER BY occurred_at DESC, id DESC""",
             { rs, _ ->
                 DocumentLinkEventDto(
-                    rs.getObject("id", UUID::class.java), rs.getString("target_type"),
-                    rs.getObject("target_id", UUID::class.java), rs.getObject("document_id", UUID::class.java),
-                    rs.getObject("revision_id", UUID::class.java), rs.getString("action"),
-                    rs.getObject("actor_id", UUID::class.java), rs.getTimestamp("occurred_at").toInstant().atOffset(ZoneOffset.UTC),
+                    rs.getObject("id", UUID::class.java),
+                    rs.getString("target_type"),
+                    rs.getObject("target_id", UUID::class.java),
+                    rs.getObject("document_id", UUID::class.java),
+                    rs.getObject("revision_id", UUID::class.java),
+                    rs.getString("action"),
+                    rs.getObject("actor_id", UUID::class.java),
+                    rs.getTimestamp("occurred_at").toInstant().atOffset(ZoneOffset.UTC),
                 )
             },
-            targetType, targetId,
+            targetType,
+            targetId,
         )
 
     private fun document(rs: ResultSet): DocumentDto {
         val id = rs.getObject("id", UUID::class.java)
         return DocumentDto(
-            id, rs.getInt("current_revision"), rs.getString("status"),
-            rs.getTimestamp("created_at").toInstant().atOffset(ZoneOffset.UTC), revision(rs, id),
+            id,
+            rs.getInt("current_revision"),
+            rs.getString("status"),
+            rs.getTimestamp("created_at").toInstant().atOffset(ZoneOffset.UTC),
+            revision(rs, id),
         )
     }
 

@@ -8,6 +8,7 @@ import { requireAdminPage } from '../../../../lib/admin';
 import { toOutlineKindWrite } from '../../../../lib/outline';
 import { restoreOutlineAction } from '../actions';
 import { OutlineEditor } from '../OutlineEditor';
+import { DocumentLinks } from '../../../editor/documents/DocumentLinks';
 
 type AdminOutlinePageProps = {
   params: Promise<{ id: string }>;
@@ -53,6 +54,7 @@ export default async function AdminOutlinePage(props: AdminOutlinePageProps) {
         layer (typical for sentences) has no heading and is joined with its siblings.
       </p>
       <OutlineEditor constitutionId={params.id} initial={kinds} settingsRevisionId={settings.id} />
+      <DocumentLinks targetType="constitution" targetId={params.id} returnTo={`/admin/constitutions/${params.id}`} canEdit />
       {settings.predecessorId ? <form action={restoreOutlineAction} className="card">
         <h2>Settings history</h2><p>Restore the previous revision after checking its impact on stored content.</p>
         <input type="hidden" name="constitutionId" value={params.id} />

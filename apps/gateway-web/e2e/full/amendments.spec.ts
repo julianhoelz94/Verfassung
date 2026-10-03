@@ -17,9 +17,23 @@ async function createPublishedRecord(request: APIRequestContext, title: string, 
     const revision = await request.post(`/api/amendment/amendments/${id}/revisions`, { data: payload, headers });
     expect(revision.ok()).toBeTruthy();
   }
+  await reviewSnapshotDiff(request, id, headers);
   const published = await request.post(`/api/amendment/amendments/${id}/publish`, { headers });
   expect(published.ok(), `publish: HTTP ${published.status()} ${await published.text()}`).toBeTruthy();
   return id as string;
+}
+
+async function reviewSnapshotDiff(request: APIRequestContext, id: string, headers: Record<string, string>) {
+  const response = await request.get(`/api/amendment/amendments/${id}/diff-review`, { headers });
+  expect(response.ok(), `review: HTTP ${response.status()} ${await response.text()}`).toBeTruthy();
+  const review = await response.json();
+  for (const candidate of review.candidates) {
+    const decision = await request.post(`/api/amendment/amendments/${id}/diff-review/decisions`, { headers, data: {
+      expectedRevisionId: review.revisionId, key: candidate.key, fingerprint: candidate.fingerprint,
+      status: 'excluded_with_reason', exclusionReason: 'Journey fixture does not link exact change rows.', reviewerAcknowledged: true,
+    } });
+    expect(decision.ok(), `decision: HTTP ${decision.status()} ${await decision.text()}`).toBeTruthy();
+  }
 }
 
 test('editor restores a real change-record revision and publisher republishes it', async ({ page, request }) => {
@@ -34,6 +48,7 @@ test('editor restores a real change-record revision and publisher republishes it
   await expect(page.getByText('Viewing a past revision read-only.')).toBeVisible();
   await history.getByRole('button', { name: 'Restore as new draft' }).click();
   await expect(page.getByText('Draft saved.')).toBeVisible();
+  await reviewSnapshotDiff(request, amendmentId, await adminHeaders(request));
   await page.reload();
   await expect(page.getByLabel('Title', { exact: true })).toHaveValue(/Journey restoration/);
   await signOut(page);

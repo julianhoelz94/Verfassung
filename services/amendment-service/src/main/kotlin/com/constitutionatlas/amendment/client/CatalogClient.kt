@@ -21,6 +21,7 @@ data class CatalogVersionRef(
     val constitutionId: UUID? = null,
     val legalVersionId: UUID? = null,
     val currentVersionId: UUID? = null,
+    val publicationStatus: String? = null,
 )
 
 interface CatalogClient {

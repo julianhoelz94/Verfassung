@@ -43,6 +43,7 @@ class ArticleQueryService(
                     body = if (includeBody) ordered.plainText(root) else null,
                     children = if (includeBody) root.content.mapNotNull { it.node?.let(::compatibilityNode) } else null,
                     content = if (includeBody) root.content else null,
+                    lineage = root.lineage,
                 )
             }
         }
@@ -62,7 +63,7 @@ class ArticleQueryService(
                 body = if (includeBody) ordered.plainText(root) else null,
                 children = if (includeBody) root.content.mapNotNull { it.node?.let(::compatibilityNode) } else null,
                 predecessorId = orderedRepository.occurrencePredecessor(root.occurrenceId),
-                content = if (includeBody) root.content else null, logicalId = root.logicalId, revisionId = root.revisionId, kind = root.kind, legacyIdentity = legacyIdentity,
+                content = if (includeBody) root.content else null, logicalId = root.logicalId, revisionId = root.revisionId, kind = root.kind, legacyIdentity = legacyIdentity, lineage = root.lineage,
             )
         } to roots.size
     }
@@ -74,7 +75,7 @@ class ArticleQueryService(
         val root = roots[index]
         return ArticleDetail(
             root.occurrenceId, version, root.label.orEmpty(), root.title.orEmpty(), ordered.plainText(root), index + 1, root.kind,
-            children = root.content.mapNotNull { it.node?.let(::compatibilityNode) }, predecessorId = orderedRepository.occurrencePredecessor(id), content = root.content, logicalId = root.logicalId, revisionId = root.revisionId, legacyIdentity = !orderedRepository.canonical(version),
+            children = root.content.mapNotNull { it.node?.let(::compatibilityNode) }, predecessorId = orderedRepository.occurrencePredecessor(id), content = root.content, logicalId = root.logicalId, revisionId = root.revisionId, legacyIdentity = !orderedRepository.canonical(version), lineage = root.lineage,
         )
     }
 
@@ -87,7 +88,7 @@ class ArticleQueryService(
                 return ArticleDetail(
                     id, version, root.label.orEmpty(), root.title.orEmpty(), ordered.plainText(root), 1,
                     predecessorId = orderedRepository.occurrencePredecessor(id),
-                    kind = root.kind, children = root.content.mapNotNull { it.node?.let(::compatibilityNode) }, content = root.content, logicalId = root.logicalId, revisionId = root.revisionId, legacyIdentity = !orderedRepository.canonical(version),
+                    kind = root.kind, children = root.content.mapNotNull { it.node?.let(::compatibilityNode) }, content = root.content, logicalId = root.logicalId, revisionId = root.revisionId, legacyIdentity = !orderedRepository.canonical(version), lineage = root.lineage,
                 )
             }
         }
@@ -212,7 +213,7 @@ class ArticleQueryService(
         ContentNodeDto(
             node.occurrenceId, node.kind, node.label, node.label, node.title,
             com.constitutionatlas.platform.OrderedContentText.entries(node.content.filter { it.type == "text" }), 1,
-            node.content.mapNotNull { it.node?.let(::compatibilityNode) }, predecessorId = orderedRepository.occurrencePredecessor(node.occurrenceId), content = node.content, logicalId = node.logicalId, revisionId = node.revisionId,
+            node.content.mapNotNull { it.node?.let(::compatibilityNode) }, predecessorId = orderedRepository.occurrencePredecessor(node.occurrenceId), content = node.content, logicalId = node.logicalId, revisionId = node.revisionId, lineage = node.lineage,
         )
 
     private fun insertWriteNode(versionId: UUID, parentId: UUID, node: NodeWrite, sortOrder: Int) {

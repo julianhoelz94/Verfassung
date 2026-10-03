@@ -1,6 +1,5 @@
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
-import { ArticleNav } from '../../../../../../components/ArticleNav';
 import { ConstitutionText } from '../../../../../../components/ConstitutionText';
 import { PageMain } from '../../../../../../components/PageMain';
 import { PrintLink } from '../../../../../../components/PrintLink';
@@ -18,7 +17,6 @@ import {
   type ArticleSummary,
   type CountryDetail,
 } from '../../../../../../../lib/api';
-import { neighborsOf } from '../../../../../../../lib/article-nav';
 import { atlasTitle, metaDescription, pageMetadata } from '../../../../../../../lib/page-meta';
 import { publicSnapshotContext } from '../../../../../../../lib/reading';
 
@@ -43,14 +41,6 @@ export async function generateMetadata(props: ArticlePageProps): Promise<Metadat
   } catch {
     return { title: atlasTitle('Article') };
   }
-}
-
-function articleHref(
-  code: string,
-  versionId: string,
-  articleId: string,
-): string {
-  return `/countries/${code}/versions/${versionId}/articles/${articleId}`;
 }
 
 export default async function ArticlePage(props: ArticlePageProps) {
@@ -91,12 +81,7 @@ export default async function ArticlePage(props: ArticlePageProps) {
   if (!context) notFound();
   const { constitution, version } = context;
   const returnTo = permalink;
-  const neighbors = neighborsOf(siblings, article.id);
   const articlesByNumber = Object.fromEntries(siblings.map((item) => [item.articleNumber, item.id]));
-  const toLink = (item: ArticleSummary) => ({
-    href: articleHref(country.isoCode, params.versionId, item.id),
-    label: `Article ${item.articleNumber}`,
-  });
 
   const readerOutline = await getReaderOutline(params.versionId);
   return (
@@ -139,11 +124,6 @@ export default async function ArticlePage(props: ArticlePageProps) {
             versionId: params.versionId,
             articlesByNumber,
           }}
-        />
-        <ArticleNav
-          previous={neighbors.previous ? toLink(neighbors.previous) : undefined}
-          next={neighbors.next ? toLink(neighbors.next) : undefined}
-          tocHref={`/countries/${country.isoCode}/versions/${params.versionId}#toc`}
         />
       </article>
     </PageMain>

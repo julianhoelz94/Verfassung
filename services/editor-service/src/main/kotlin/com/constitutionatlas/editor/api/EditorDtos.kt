@@ -75,6 +75,8 @@ data class ChangeRecordChange(
     val afterRef: ChangeRecordUnitRef? = null,
     val linkReviewReason: String? = null,
     val pendingAfterLogicalId: UUID? = null,
+    val id: UUID? = null,
+    val amendmentChangeId: UUID? = null,
 )
 
 data class ChangeRecordUnitRef(

@@ -19,7 +19,7 @@ test('browse from countries to an article', async ({ page }) => {
   await page.getByRole('link', { name: 'Permalink' }).first().click();
   await expect(page.getByRole('heading', { name: /Human dignity/ })).toBeVisible();
   await expect(page).toHaveURL(new RegExp(`/countries/DE/versions/${VERSION_2022}/articles/${ARTICLE_1}`));
-  await expect(page.getByRole('navigation', { name: 'Article navigation' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'History of Article 1' })).toBeVisible();
   await page.getByRole('link', { name: 'History of Article 1' }).click();
   await expect(page.getByRole('heading', { name: 'History of Article 1' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Compare with previous' })).toBeVisible();

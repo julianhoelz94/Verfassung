@@ -2,6 +2,9 @@ package com.constitutionatlas.amendment.api
 
 import com.constitutionatlas.amendment.GoneException
 import com.constitutionatlas.amendment.client.WriteAccess
+import com.constitutionatlas.amendment.service.AmendmentDiffDecisionWrite
+import com.constitutionatlas.amendment.service.AmendmentDiffReviewService
+import com.constitutionatlas.amendment.service.AmendmentDiffReviewState
 import com.constitutionatlas.amendment.service.AmendmentService
 import org.springframework.http.HttpStatus
 import org.springframework.web.bind.annotation.GetMapping
@@ -19,6 +22,7 @@ import java.util.UUID
 @RestController
 class AmendmentController(
     private val amendmentService: AmendmentService,
+    private val diffReview: AmendmentDiffReviewService,
     private val writeAccess: WriteAccess,
 ) {
     @GetMapping("/constitutions/{constitutionId}/amendments")
@@ -70,6 +74,18 @@ class AmendmentController(
     ): List<AmendmentRevisionDto> {
         writeAccess.requireStaffAmendment(authorization)
         return amendmentService.listRevisions(id)
+    }
+
+    @GetMapping("/amendments/{id}/diff-review")
+    fun diffReview(@PathVariable id: UUID, @RequestHeader(value = "Authorization", required = false) authorization: String?): AmendmentDiffReviewState {
+        writeAccess.requireStaffAmendment(authorization)
+        return diffReview.refresh(id)
+    }
+
+    @PostMapping("/amendments/{id}/diff-review/decisions")
+    fun decide(@PathVariable id: UUID, @RequestHeader(value = "Authorization", required = false) authorization: String?, @RequestBody request: AmendmentDiffDecisionWrite): AmendmentDiffReviewState {
+        val actor = writeAccess.requireStaffAmendment(authorization)
+        return diffReview.decide(id, request, "reviewer" in actor.roles || "publisher" in actor.roles || "admin" in actor.roles)
     }
 
     @GetMapping("/versions/{versionId}/amendments")

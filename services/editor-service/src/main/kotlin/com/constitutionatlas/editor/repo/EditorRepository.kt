@@ -174,9 +174,10 @@ class EditorRepository(
     ).firstOrNull()
 
     fun recordChangeRecord(sessionId: UUID, record: ChangeRecordRequest) {
+        val stable = record.copy(changes = record.changes.map { change -> change.copy(id = change.id ?: UUID.randomUUID()) })
         jdbc.update(
             "UPDATE edit_sessions SET change_record = ?::jsonb WHERE id = ?",
-            objectMapper.writeValueAsString(record),
+            objectMapper.writeValueAsString(stable),
             sessionId,
         )
     }

@@ -164,7 +164,23 @@ async function ensureAmendments(ids) {
     if (!item && !verifyOnly) {
       const payload = amendmentPayload(record, ids);
       item = await api('POST', path, payload, true);
-      if (record.key === 'xa-2022-law') item = await api('POST', `amendment/amendments/${item.id}/revisions`, payload, true);
+    }
+    if (item?.status === 'draft' && !verifyOnly) {
+      const revisions = await api('GET', `amendment/amendments/${item.id}/revisions`, undefined, true);
+      if (record.key === 'xa-2022-law' && revisions.length === 1) {
+        item = await api('POST', `amendment/amendments/${item.id}/revisions`, amendmentPayload(record, ids), true);
+      }
+      const review = await api('GET', `amendment/amendments/${item.id}/diff-review`, undefined, true);
+      for (const candidate of review.candidates) {
+        await api('POST', `amendment/amendments/${item.id}/diff-review/decisions`, {
+          expectedRevisionId: review.revisionId,
+          key: candidate.key,
+          fingerprint: candidate.fingerprint,
+          status: 'excluded_with_reason',
+          exclusionReason: 'Synthetic history fixture; no exact change-row selection is stored.',
+          reviewerAcknowledged: true,
+        }, true);
+      }
       item = await api('POST', `amendment/amendments/${item.id}/publish`, undefined, true);
       list = await api('GET', `${path}?status=all`, undefined, true);
       item = list.find((amendment) => amendment.id === item.id);

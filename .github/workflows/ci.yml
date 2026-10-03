@@ -220,7 +220,7 @@ jobs:
         run: |
           set -euo pipefail
           for service in identity-service catalog-service content-service editor-service \
-            audit-service amendment-service search-service; do
+            audit-service amendment-service search-service document-service; do
             ./gradlew --no-daemon -p "services/${service}" bootJar -x test 2>&1 | tee -a publish-journey-build.txt
           done
       - name: Compose identity catalog content editor
@@ -277,7 +277,7 @@ jobs:
         run: |
           set -euo pipefail
           for service in identity-service catalog-service content-service editor-service \
-            audit-service amendment-service search-service ingestion-service; do
+            audit-service amendment-service search-service ingestion-service document-service; do
             ./gradlew --no-daemon -p "services/${service}" bootJar -x test
             test -f "services/${service}/build/libs/app.jar"
           done
@@ -326,7 +326,7 @@ jobs:
           set -euo pipefail
           tar -xf full-stack-service-jars.tar
           for service in identity-service catalog-service content-service editor-service \
-            audit-service amendment-service search-service ingestion-service; do
+            audit-service amendment-service search-service ingestion-service document-service; do
             test -s "services/${service}/build/libs/app.jar"
           done
       - name: Start production stack
@@ -334,7 +334,7 @@ jobs:
           docker compose --env-file env/ci.env.example up -d --build edge-proxy
           for attempt in $(seq 1 90); do
             ready=true
-            for service in catalog content amendment identity ingestion search; do
+            for service in catalog content amendment identity ingestion search document; do
               status=$(curl --silent --output /dev/null --write-out '%{http_code}' "http://127.0.0.1:18080/api/${service}/actuator/health" || true)
               if [ "$status" != 200 ]; then ready=false; break; fi
             done

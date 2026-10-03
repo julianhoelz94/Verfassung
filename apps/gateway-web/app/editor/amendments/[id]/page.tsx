@@ -9,6 +9,7 @@ import { SESSION_COOKIE, currentUser } from '../../../../lib/session';
 import { AmendmentEditorLayout } from '../AmendmentEditorLayout';
 import { AmendmentForm } from '../AmendmentForm';
 import { QuoteReviewPanel } from '../QuoteReviewPanel';
+import { DocumentLinks } from '../../documents/DocumentLinks';
 
 type AmendmentDetailPageProps = {
   params: Promise<{ id: string }>;
@@ -205,6 +206,7 @@ export default async function AmendmentDetailPage(props: AmendmentDetailPageProp
           canAcknowledgeDiff={hasRole(user.roles, 'reviewer') || canPublish}
         />
       )}
+      {!isNew ? <DocumentLinks targetType="amendment" targetId={id} returnTo={`/editor/amendments/${id}`} canEdit={canEdit && amendment?.status !== 'withdrawn'} /> : null}
     </PageMain>
   );
 }

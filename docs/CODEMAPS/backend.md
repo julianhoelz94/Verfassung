@@ -33,6 +33,19 @@ Tests: `CatalogApiTest.kt`. Seed DE: `V3__seed_germany.sql`. Versions: two axes 
 
 Tree in `content_nodes` is the only write model; `articles` is a view of roots. Latest Flyway: V7.
 
+## document — `services/document-service`
+
+`DocumentController` → `DocumentService` → `DocumentRepository`. Writes require an identity role (`editor`, `publisher`, or `admin`); lifecycle and link events are append-only. `LinkTargetClient` verifies constitution and amendment IDs through the owning services. Public reads expose current or numbered historical revisions; file downloads are revision-specific.
+
+| Method | Path |
+| --- | --- |
+| GET | `/documents?q`, `/documents/{id}?revision`, `/documents/{id}/revisions`, `/documents/{id}/revisions/{number}/file` |
+| POST/PUT | `/documents`, `/documents/{id}` (expected revision), `/documents/{id}/file` (multipart) |
+| GET | `/links/{constitution\|amendment}/{id}` |
+| POST/DELETE | `/links/{constitution\|amendment}/{id}` and `/{documentId}` |
+
+Tests: `DocumentApiTest.kt`. Migration: `scripts/migrate_document_references.py`.
+
 ## amendment — `services/amendment-service`
 
 `AmendmentController` → `AmendmentService` → `AmendmentRepository`  

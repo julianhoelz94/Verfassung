@@ -1,0 +1,25 @@
+spring:
+  application:
+    name: document-service
+  servlet:
+    multipart:
+      max-file-size: 20MB
+      max-request-size: 21MB
+  http:
+    client:
+      connect-timeout: 2s
+      read-timeout: 5s
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+identity:
+  api:
+    url: ${IDENTITY_API_URL:http://localhost/api/identity}
+catalog:
+  api:
+    url: ${CATALOG_API_URL:http://localhost/api/catalog}
+amendment:
+  api:
+    url: ${AMENDMENT_API_URL:http://localhost/api/amendment}

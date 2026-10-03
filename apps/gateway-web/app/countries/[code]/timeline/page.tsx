@@ -16,6 +16,7 @@ import { FormattedDate } from '../../../../lib/format-date';
 import { atlasTitle, metaDescription, pageMetadata } from '../../../../lib/page-meta';
 import { chainTipId, publicVersions, snapshotVersionId } from '../../../../lib/reading';
 import { sortAmendmentsByEnactment } from '../../../../lib/timeline';
+import { listDocumentLinks } from '../../../../lib/document-api';
 
 type TimelinePageProps = {
   params: Promise<{ code: string }>;
@@ -104,6 +105,9 @@ export default async function TimelinePage(props: TimelinePageProps) {
     ) : undefined;
   const primary = country.constitutions[0];
   const tipId = primary ? chainTipId(primary) : undefined;
+  const managedDocuments = new Map(await Promise.all(amendments.map(async (amendment) =>
+    [amendment.id, await listDocumentLinks('amendment', amendment.id).catch(() => [])] as const,
+  )));
 
   return (
     <PageMain className="wide">
@@ -152,6 +156,12 @@ export default async function TimelinePage(props: TimelinePageProps) {
                     ))}
                   </ul>
                 ) : null}
+                {(managedDocuments.get(amendment.id) ?? []).length ? <ul className="link-list">
+                  {(managedDocuments.get(amendment.id) ?? []).map((link) => <li key={link.documentId}>
+                    <a href={`/documents/${link.documentId}${link.revisionId ? `?revision=${link.document.revision.revision}` : ''}`}>{link.document.revision.title}</a>
+                    {link.revisionId ? ` · revision ${link.document.revision.revision}` : null}
+                  </li>)}
+                </ul> : null}
                 <div className="chip-row">
                   {amendment.changes.map((change) => (
                     <div className="stack" key={change.id}>

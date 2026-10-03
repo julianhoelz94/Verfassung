@@ -65,6 +65,8 @@ for (const hop of ['editorial_correction', 'legal'] as const) {
       await page.getByLabel('Title', { exact: true }).last().fill('Structured law');
       await page.getByLabel('Comment', { exact: true }).fill('Changed one sentence.');
       await page.getByLabel('Document URL').fill('https://example.org/structured-law.pdf');
+      await page.getByLabel('Before unit').selectOption(sourceSentence.logicalId);
+      await page.getByLabel('Draft after unit').selectOption(sourceSentence.logicalId);
       await page.getByRole('button', { name: 'Save change record' }).click();
     } else {
       await page.getByLabel('What was corrected in this transcription?').fill('Corrected one sentence.');

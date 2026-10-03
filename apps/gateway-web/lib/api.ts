@@ -129,6 +129,27 @@ export type AmendmentChange = {
   amendingLawCitationId?: string | null;
   amendingLawTitle?: string | null;
   amendingLawCitation?: string | null;
+  beforeRef?: AmendmentUnitRef | null;
+  afterRef?: AmendmentUnitRef | null;
+  linkReviewReason?: string | null;
+  legacyLinkUnresolved?: boolean;
+  pendingAfterLogicalId?: string | null;
+};
+
+export type AmendmentUnitRef = {
+  versionId?: string | null;
+  logicalId?: string | null;
+  occurrenceId?: string | null;
+  rootOccurrenceId?: string | null;
+  revisionId?: string | null;
+  unitKind?: 'node' | 'text_entry' | null;
+  articleNumber?: string | null;
+  constitutionId?: string | null;
+  kind?: string | null;
+  label?: string | null;
+  breadcrumbs?: string[];
+  text?: string | null;
+  deepLink?: string | null;
 };
 
 export type Amendment = {

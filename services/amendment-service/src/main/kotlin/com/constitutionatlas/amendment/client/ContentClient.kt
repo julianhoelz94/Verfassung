@@ -1,6 +1,7 @@
 package com.constitutionatlas.amendment.client
 
 import com.constitutionatlas.amendment.ContentUnavailableException
+import com.constitutionatlas.amendment.api.AmendmentUnitRefDto
 import com.constitutionatlas.platform.OrderedEntry
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import org.springframework.beans.factory.annotation.Value
@@ -16,6 +17,7 @@ import java.util.UUID
 data class ContentTreeNode(
     val id: UUID,
     val kind: String,
+    val articleNumber: String? = null,
     val label: String? = null,
     val number: String? = null,
     val title: String? = null,
@@ -44,8 +46,41 @@ data class ContentTreeArticle(
     val legacyIdentity: Boolean = false,
 )
 
+@JsonIgnoreProperties(ignoreUnknown = true)
+data class ResolvedContentUnit(
+    val versionId: UUID,
+    val constitutionId: UUID? = null,
+    val logicalId: UUID,
+    val revisionId: UUID,
+    val occurrenceId: UUID,
+    val rootOccurrenceId: UUID,
+    val kind: String,
+    val articleNumber: String? = null,
+    val text: String,
+    val deepLink: String,
+    val pathLabels: List<String> = emptyList(),
+)
+
+fun ResolvedContentUnit.toAmendmentRef(unitKind: String = if (kind == "parent_text") "text_entry" else "node"): AmendmentUnitRefDto =
+    AmendmentUnitRefDto(
+        versionId = versionId,
+        logicalId = logicalId,
+        occurrenceId = occurrenceId,
+        rootOccurrenceId = rootOccurrenceId,
+        revisionId = revisionId,
+        unitKind = unitKind,
+        articleNumber = articleNumber,
+        constitutionId = constitutionId,
+        kind = kind,
+        breadcrumbs = pathLabels,
+        text = text,
+        deepLink = deepLink,
+    )
+
 interface ContentClient {
     fun listArticles(versionId: UUID): List<ContentTreeArticle>
+
+    fun resolve(versionId: UUID, logicalId: UUID): ResolvedContentUnit? = null
 }
 
 class RestContentClient(
@@ -81,6 +116,18 @@ class RestContentClient(
         }
         return collected
     }
+
+    override fun resolve(versionId: UUID, logicalId: UUID): ResolvedContentUnit? =
+        try {
+            client.get()
+                .uri("/versions/{versionId}/resolve?logicalId={logicalId}", versionId, logicalId)
+                .retrieve()
+                .body(ResolvedContentUnit::class.java)
+        } catch (ex: org.springframework.web.client.HttpClientErrorException.NotFound) {
+            null
+        } catch (ex: RestClientException) {
+            throw ContentUnavailableException("content unit resolution failed", ex)
+        }
 
     companion object {
         private const val PAGE_SIZE = 200

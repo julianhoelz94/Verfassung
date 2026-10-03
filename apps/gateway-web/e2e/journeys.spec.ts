@@ -115,13 +115,19 @@ test('recorded amending law appears on the public timeline', async ({ page }) =>
   await page.getByLabel('Enacted date').fill('2026-01-02');
   await page.getByLabel('Effective date').fill('2026-02-01');
   await page.getByLabel('Summary').fill('Updates the dignity provision.');
-  await page.getByLabel('Comment').fill('Recorded for the timeline journey.');
+  await page.getByLabel('Comment', { exact: true }).fill('Recorded for the timeline journey.');
   await page.getByLabel('Document URL').fill('https://example.gov/e2e-amending-law.pdf');
   await page.getByLabel('Source version (optional)').selectOption(VERSION_1949);
   await page.getByLabel('Target version (optional)').selectOption(VERSION_2022);
   await page.getByRole('button', { name: 'Fill from two versions' }).click();
   await page.getByRole('button', { name: 'Suggest changes' }).click();
   await expect(page.locator('#change-article-0')).not.toHaveValue('');
+  const beforeUnit = page.getByLabel('Before unit');
+  const afterUnit = page.getByLabel('After unit');
+  await expect(beforeUnit.locator('option')).not.toHaveCount(1);
+  await expect(afterUnit.locator('option')).not.toHaveCount(1);
+  await beforeUnit.selectOption({ index: 1 });
+  await afterUnit.selectOption({ index: 1 });
   await page.getByRole('button', { name: 'Save draft' }).click();
   await expect(page.getByText('Draft saved.')).toBeVisible();
   const amendmentUrl = page.url();
@@ -135,6 +141,8 @@ test('recorded amending law appears on the public timeline', async ({ page }) =>
   await page.goto('/countries/DE/timeline');
   await expect(page.getByRole('heading', { name: 'Amendment timeline' })).toBeVisible();
   await expect(page.getByText('E2E amending law')).toBeVisible();
+  await expect(page.getByRole('link', { name: /Before unit/ })).toHaveAttribute('href', new RegExp(`/versions/${VERSION_1949}/units/`));
+  await expect(page.getByRole('link', { name: /After unit/ })).toHaveAttribute('href', new RegExp(`/versions/${VERSION_2022}/units/`));
 });
 
 test('publisher confirms stale old-law quotes without changing the public comment', async ({ page }) => {
@@ -168,10 +176,10 @@ test('publisher confirms stale old-law quotes without changing the public commen
   await expect(page.locator('.badge', { hasText: 'Needs review' }).first()).toBeVisible();
   await page.getByRole('link', { name: 'Update to Article 1' }).click();
   await expect(page.getByRole('heading', { name: 'Flagged record review' })).toBeVisible();
-  await expect(page.getByRole('textbox', { name: 'Comment' })).toHaveValue('The published legal-change comment.');
+  await expect(page.getByRole('textbox', { name: 'Comment', exact: true })).toHaveValue('The published legal-change comment.');
   await page.getByRole('button', { name: 'Confirm live quotes and republish' }).click();
   await expect(page.getByText('Quotes confirmed and the legal change republished.')).toBeVisible();
-  await expect(page.getByRole('textbox', { name: 'Comment' })).toHaveValue('The published legal-change comment.');
+  await expect(page.getByRole('textbox', { name: 'Comment', exact: true })).toHaveValue('The published legal-change comment.');
   await page.reload();
   await page.goto('/editor/amendments');
   await expect(page.locator('.badge', { hasText: 'Needs review' })).toHaveCount(0);
@@ -264,7 +272,7 @@ test('legal successor passes queues and requires fresh authentication before pub
   await page.getByLabel('Article text').fill('The 2027 legally amended text.');
   await page.getByRole('button', { name: 'Save draft' }).click();
   await page.getByLabel('Title', { exact: true }).last().fill('2027 dignity amendment');
-  await page.getByLabel('Comment').fill('Parliament amended Article 1.');
+  await page.getByLabel('Comment', { exact: true }).fill('Parliament amended Article 1.');
   await page.getByLabel('Document URL').fill('https://example.gov/2027-dignity.pdf');
   await page.getByLabel('Document label').fill('Official 2027 act');
   await page.getByRole('button', { name: 'Save change record' }).click();

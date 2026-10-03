@@ -14,12 +14,16 @@ typealias OrderedSnapshotWrite = com.constitutionatlas.platform.OrderedSnapshotW
 
 data class ResolvedContent(
     val versionId: UUID,
+    val constitutionId: UUID?,
     val logicalId: UUID,
     val revisionId: UUID,
     val occurrenceId: UUID,
+    val rootOccurrenceId: UUID,
     val parentLogicalId: UUID?,
     val breadcrumbs: List<UUID>,
+    val pathLabels: List<String>,
     val kind: String,
+    val articleNumber: String?,
     val text: String,
     val deepLink: String,
 )

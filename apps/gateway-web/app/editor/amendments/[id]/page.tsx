@@ -2,7 +2,7 @@ import { notFound, redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { PageMain } from '../../../components/PageMain';
 import { Alert, PageHeader } from '../../../components/ui';
-import { getCountry, listAllArticles, listConstitutionVersions, listCountries, type VersionSummary } from '../../../../lib/api';
+import { getCountry, listAllArticles, listAllUnits, listConstitutionVersions, listCountries, type ArticleSummary, type VersionSummary } from '../../../../lib/api';
 import { amendmentErrorMessage, getAmendment, listRevisions } from '../../../../lib/amendment-editor-api';
 import { canVisitEditor } from '../../../../lib/nav';
 import { SESSION_COOKIE, currentUser } from '../../../../lib/session';
@@ -45,18 +45,22 @@ async function resolveConstitutionId(
   }
 }
 
-async function loadArticlesByVersion(versions: VersionSummary[]): Promise<Record<string, string[]>> {
+async function loadContentByVersion(versions: VersionSummary[]): Promise<{ articlesByVersion: Record<string, string[]>; unitTreesByVersion: Record<string, ArticleSummary[]> }> {
   const entries = await Promise.all(
     versions.map(async (version) => {
       try {
-        const articles = await listAllArticles(version.id);
-        return [version.id, articles.map((article) => article.articleNumber)] as const;
+        const articles = await listAllUnits(version.id, true);
+        return [version.id, articles] as const;
       } catch {
-        return [version.id, []] as const;
+        return [version.id, [] as ArticleSummary[]] as const;
       }
     }),
   );
-  return Object.fromEntries(entries);
+  const content = Object.fromEntries(entries);
+  return {
+    articlesByVersion: Object.fromEntries(Object.entries(content).map(([versionId, articles]) => [versionId, articles.map((article) => article.articleNumber)])),
+    unitTreesByVersion: content,
+  };
 }
 
 export default async function AmendmentDetailPage(props: AmendmentDetailPageProps) {
@@ -102,7 +106,7 @@ export default async function AmendmentDetailPage(props: AmendmentDetailPageProp
           authorization: `Bearer ${sessionToken}`,
         })) ?? []
       : [];
-  const articlesByVersion = await loadArticlesByVersion(versions);
+  const { articlesByVersion, unitTreesByVersion } = await loadContentByVersion(versions);
   const contentAvailable = Object.values(articlesByVersion).some((articles) => articles.length > 0);
   const latestVersionId = versions.find((version) => version.latestPublished)?.id ?? versions.at(-1)?.id ?? null;
 
@@ -158,6 +162,7 @@ export default async function AmendmentDetailPage(props: AmendmentDetailPageProp
           amendment={amendment}
           versions={versions}
           articlesByVersion={articlesByVersion}
+          unitTreesByVersion={unitTreesByVersion}
           latestVersionId={latestVersionId}
           canSave={canSave}
           canPublish={false}
@@ -173,6 +178,7 @@ export default async function AmendmentDetailPage(props: AmendmentDetailPageProp
           revisions={revisions}
           versions={versions}
           articlesByVersion={articlesByVersion}
+          unitTreesByVersion={unitTreesByVersion}
           latestVersionId={latestVersionId}
           canSave={canSave}
           canPublish={canPublishLaw}

@@ -1,5 +1,5 @@
 import { cookies } from 'next/headers';
-import type { Amendment } from './api';
+import type { Amendment, AmendmentUnitRef } from './api';
 import { amendmentBaseUrl } from './api';
 import { SESSION_COOKIE } from './session';
 
@@ -7,6 +7,11 @@ export type AmendmentChangeWrite = {
   articleNumber?: string | null;
   changeType: string;
   note?: string | null;
+  beforeRef?: AmendmentUnitRef | null;
+  afterRef?: AmendmentUnitRef | null;
+  pendingAfterLogicalId?: string | null;
+  linkReviewReason?: string | null;
+  legacyLinkUnresolved?: boolean;
 };
 
 export type AmendmentWriteBody = {
@@ -33,6 +38,7 @@ export type AmendmentRevision = AmendmentWriteBody & {
 export type SuggestedChange = AmendmentChangeWrite & {
   nodeId?: string | null;
   articleId?: string | null;
+  ambiguous?: boolean;
 };
 
 export type SuggestChangesBody = {

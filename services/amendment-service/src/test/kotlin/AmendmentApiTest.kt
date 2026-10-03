@@ -4,10 +4,13 @@ import com.constitutionatlas.amendment.client.CatalogVersionRef
 import com.constitutionatlas.amendment.client.ContentClient
 import com.constitutionatlas.amendment.client.ContentTreeArticle
 import com.constitutionatlas.amendment.client.ContentTreeNode
+import com.constitutionatlas.amendment.client.ResolvedContentUnit
 import com.constitutionatlas.platform.Actor
 import com.constitutionatlas.platform.IdentityClient
 import com.constitutionatlas.platform.UnauthorizedException
 import com.fasterxml.jackson.databind.ObjectMapper
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito
@@ -356,7 +359,7 @@ class AmendmentApiTest {
             header("Authorization", PUBLISHER_TOKEN)
         }.andExpect { status { isOk() } }
 
-        mockMvc.get("/amendments/$amendmentId").andExpect {
+        mockMvc.get("/amendments/$amendmentId") { header("Authorization", PUBLISHER_TOKEN) }.andExpect {
             status { isOk() }
             jsonPath("$.title") { value("Revised title") }
         }
@@ -391,6 +394,10 @@ class AmendmentApiTest {
 
         mockMvc.get("/amendments/$amendmentId").andExpect {
             status { isNotFound() }
+        }
+        mockMvc.get("/amendments/$amendmentId") { header("Authorization", TOKEN) }.andExpect {
+            status { isOk() }
+            jsonPath("$.status") { value("withdrawn") }
         }
     }
 
@@ -568,10 +575,164 @@ class AmendmentApiTest {
             header("Authorization", PUBLISHER_TOKEN)
         }.andExpect { status { isOk() } }
 
-        mockMvc.get("/amendments/$amendmentId").andExpect {
+        mockMvc.get("/amendments/$amendmentId") { header("Authorization", PUBLISHER_TOKEN) }.andExpect {
             status { isOk() }
             jsonPath("$.targetVersionId") { value(targetVersionId.toString()) }
             jsonPath("$.sourceVersionId") { value(sourceVersionId.toString()) }
+        }
+    }
+
+    @Test
+    fun exactBeforeAndAfterUnitReferencesSurviveSaveAndPublish() {
+        val sourceVersion = UUID.randomUUID()
+        val targetVersion = UUID.randomUUID()
+        fun ref(versionId: UUID, logicalId: UUID, occurrenceId: UUID, revisionId: UUID) =
+            ResolvedContentUnit(
+                versionId = versionId,
+                constitutionId = CONSTITUTION_ID,
+                logicalId = logicalId,
+                revisionId = revisionId,
+                occurrenceId = occurrenceId,
+                rootOccurrenceId = UUID.randomUUID(),
+                kind = "sentence",
+                articleNumber = "1",
+                text = "Exact wording",
+                deepLink = "/versions/$versionId/units/root?occurrenceId=$occurrenceId",
+                pathLabels = listOf("Article 1", "Sentence (1)"),
+            )
+
+        val sourceChanged = UUID.randomUUID()
+        val addedLogical = UUID.randomUUID()
+        val removedLogical = UUID.randomUUID()
+        val sourceChangedRef = ref(sourceVersion, sourceChanged, UUID.randomUUID(), UUID.randomUUID())
+        val targetChangedRef = ref(targetVersion, sourceChanged, UUID.randomUUID(), UUID.randomUUID())
+        val addedRef = ref(targetVersion, addedLogical, UUID.randomUUID(), UUID.randomUUID())
+        val removedRef = ref(sourceVersion, removedLogical, UUID.randomUUID(), UUID.randomUUID())
+        listOf(sourceChangedRef, targetChangedRef, addedRef, removedRef).forEach { resolved ->
+            Mockito.`when`(contentClient.resolve(resolved.versionId, resolved.logicalId)).thenReturn(resolved)
+        }
+
+        val json = """
+            {
+              "title":"Exact links", "comment":"Reviewed", "sourceVersionId":"$sourceVersion", "targetVersionId":"$targetVersion",
+              "changes":[
+                {"changeType":"changed","beforeRef":{"versionId":"$sourceVersion","logicalId":"$sourceChanged","occurrenceId":"${sourceChangedRef.occurrenceId}","revisionId":"${sourceChangedRef.revisionId}","rootOccurrenceId":"${sourceChangedRef.rootOccurrenceId}","unitKind":"node"},"afterRef":{"versionId":"$targetVersion","logicalId":"$sourceChanged","occurrenceId":"${targetChangedRef.occurrenceId}","revisionId":"${targetChangedRef.revisionId}","rootOccurrenceId":"${targetChangedRef.rootOccurrenceId}","unitKind":"node"}},
+                {"changeType":"added","afterRef":{"versionId":"$targetVersion","logicalId":"$addedLogical","occurrenceId":"${addedRef.occurrenceId}","revisionId":"${addedRef.revisionId}","rootOccurrenceId":"${addedRef.rootOccurrenceId}","unitKind":"node"}},
+                {"changeType":"removed","beforeRef":{"versionId":"$sourceVersion","logicalId":"$removedLogical","occurrenceId":"${removedRef.occurrenceId}","revisionId":"${removedRef.revisionId}","rootOccurrenceId":"${removedRef.rootOccurrenceId}","unitKind":"node"}}
+              ]
+            }
+        """.trimIndent()
+        val created = mockMvc.post("/constitutions/$CONSTITUTION_ID/amendments") {
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = json
+        }.andExpect { status { isCreated() } }.andReturn().response.contentAsString
+        val amendmentId = objectMapper.readTree(created).get("id").asText()
+        mockMvc.post("/amendments/$amendmentId/publish") { header("Authorization", PUBLISHER_TOKEN) }.andExpect {
+            status { isOk() }
+            jsonPath("$.changes.length()") { value(3) }
+        }
+        val published = mockMvc.get("/amendments/$amendmentId") { header("Authorization", PUBLISHER_TOKEN) }
+            .andExpect { status { isOk() } }.andReturn().response.contentAsString
+        val changes = objectMapper.readTree(published).get("changes").associateBy { it.get("changeType").asText() }
+        val changed = requireNotNull(changes["changed"])
+        assertEquals(sourceVersion.toString(), changed.get("beforeRef").get("versionId").asText())
+        assertEquals(targetVersion.toString(), changed.get("afterRef").get("versionId").asText())
+        val added = requireNotNull(changes["added"])
+        assertFalse(added.has("beforeRef"))
+        assertEquals(addedRef.occurrenceId.toString(), added.get("afterRef").get("occurrenceId").asText())
+        val removed = requireNotNull(changes["removed"])
+        assertFalse(removed.has("afterRef"))
+        assertEquals(removedRef.occurrenceId.toString(), removed.get("beforeRef").get("occurrenceId").asText())
+    }
+
+    @Test
+    fun publishRejectsMixedExactAndUnlinkedChanges() {
+        val targetVersion = UUID.randomUUID()
+        val logicalId = UUID.randomUUID()
+        val resolved = ResolvedContentUnit(
+            versionId = targetVersion,
+            constitutionId = CONSTITUTION_ID,
+            logicalId = logicalId,
+            revisionId = UUID.randomUUID(),
+            occurrenceId = UUID.randomUUID(),
+            rootOccurrenceId = UUID.randomUUID(),
+            kind = "sentence",
+            articleNumber = "1",
+            text = "Added wording",
+            deepLink = "/versions/$targetVersion/units/$logicalId",
+        )
+        Mockito.`when`(contentClient.resolve(targetVersion, logicalId)).thenReturn(resolved)
+        val body = """
+            {"title":"Mixed links","comment":"Review","targetVersionId":"$targetVersion","changes":[
+              {"changeType":"added","afterRef":{"versionId":"$targetVersion","logicalId":"$logicalId","occurrenceId":"${resolved.occurrenceId}","rootOccurrenceId":"${resolved.rootOccurrenceId}","revisionId":"${resolved.revisionId}","unitKind":"node"}},
+              {"changeType":"changed","articleNumber":"2"}
+            ]}
+        """.trimIndent()
+        val created = mockMvc.post("/constitutions/$CONSTITUTION_ID/amendments") {
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = body
+        }.andExpect { status { isCreated() } }.andReturn().response.contentAsString
+        val id = objectMapper.readTree(created).get("id").asText()
+        mockMvc.post("/amendments/$id/publish") { header("Authorization", PUBLISHER_TOKEN) }.andExpect {
+            status { isBadRequest() }
+        }
+    }
+
+    @Test
+    fun draftTargetLogicalUnitIsResolvedAfterLegalPublish() {
+        val sourceVersion = UUID.randomUUID()
+        val targetVersion = UUID.randomUUID()
+        val logicalId = UUID.randomUUID()
+        fun resolved(versionId: UUID, occurrenceId: UUID, revisionId: UUID) =
+            ResolvedContentUnit(
+                versionId = versionId,
+                constitutionId = CONSTITUTION_ID,
+                logicalId = logicalId,
+                revisionId = revisionId,
+                occurrenceId = occurrenceId,
+                rootOccurrenceId = UUID.randomUUID(),
+                kind = "sentence",
+                articleNumber = "1",
+                text = "Updated",
+                deepLink = "/versions/$versionId/units/root?occurrenceId=$occurrenceId",
+                pathLabels = listOf("Article 1", "Sentence (1)"),
+            )
+        val before = resolved(sourceVersion, UUID.randomUUID(), UUID.randomUUID())
+        val after = resolved(targetVersion, UUID.randomUUID(), UUID.randomUUID())
+        Mockito.`when`(contentClient.resolve(sourceVersion, logicalId)).thenReturn(before)
+        Mockito.`when`(contentClient.resolve(targetVersion, logicalId)).thenReturn(after)
+        val body = """
+            {"title":"Pending target","comment":"Review","sourceVersionId":"$sourceVersion","changes":[
+              {"changeType":"changed","beforeRef":{"versionId":"$sourceVersion","logicalId":"$logicalId","occurrenceId":"${before.occurrenceId}","revisionId":"${before.revisionId}","rootOccurrenceId":"${before.rootOccurrenceId}","unitKind":"node"},"pendingAfterLogicalId":"$logicalId"}
+            ]}
+        """.trimIndent()
+        val created = mockMvc.post("/constitutions/$CONSTITUTION_ID/amendments") {
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = body
+        }.andExpect { status { isCreated() } }.andReturn().response.contentAsString
+        val id = objectMapper.readTree(created).get("id").asText()
+
+        mockMvc.post("/amendments/$id/link-target") {
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"sourceVersionId":"$sourceVersion","targetVersionId":"$targetVersion"}"""
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.changes[0].beforeRef.occurrenceId") { value(before.occurrenceId.toString()) }
+            jsonPath("$.changes[0].afterRef.occurrenceId") { value(after.occurrenceId.toString()) }
+            jsonPath("$.changes[0].pendingAfterLogicalId") { doesNotExist() }
+        }
+        mockMvc.get("/amendments/$id") { header("Authorization", TOKEN) }.andExpect {
+            status { isOk() }
+            jsonPath("$.changes[0].afterRef.logicalId") { value(logicalId.toString()) }
+            jsonPath("$.changes[0].afterRef.versionId") { value(targetVersion.toString()) }
+        }
+        mockMvc.post("/amendments/$id/publish") { header("Authorization", PUBLISHER_TOKEN) }.andExpect {
+            status { isOk() }
+            jsonPath("$.changes[0].afterRef.revisionId") { value(after.revisionId.toString()) }
         }
     }
 

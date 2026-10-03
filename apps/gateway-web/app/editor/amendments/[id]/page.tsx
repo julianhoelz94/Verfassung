@@ -2,8 +2,8 @@ import { notFound, redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { PageMain } from '../../../components/PageMain';
 import { Alert, PageHeader } from '../../../components/ui';
-import { getCountry, listAllArticles, listAllUnits, listConstitutionVersions, listCountries, type ArticleSummary, type VersionSummary } from '../../../../lib/api';
-import { amendmentErrorMessage, getAmendment, listRevisions } from '../../../../lib/amendment-editor-api';
+import { getCountry, getVersion, listAllArticles, listAllUnits, listConstitutionVersions, listCountries, type ArticleSummary, type VersionSummary } from '../../../../lib/api';
+import { amendmentErrorMessage, getAmendment, getAmendmentDiffReview, listRevisions } from '../../../../lib/amendment-editor-api';
 import { canVisitEditor } from '../../../../lib/nav';
 import { SESSION_COOKIE, currentUser } from '../../../../lib/session';
 import { AmendmentEditorLayout } from '../AmendmentEditorLayout';
@@ -111,6 +111,16 @@ export default async function AmendmentDetailPage(props: AmendmentDetailPageProp
   const latestVersionId = versions.find((version) => version.latestPublished)?.id ?? versions.at(-1)?.id ?? null;
 
   const revisions = !isNew && sessionToken ? await listRevisions(id) : null;
+  const tipRevision = revisions?.at(-1);
+  const hasDraftTip = amendment?.status === 'draft' || Boolean(tipRevision && tipRevision.id !== amendment?.publishedRevisionId);
+  const pairToReview = !isNew && hasDraftTip && amendment?.sourceVersionId && amendment.targetVersionId;
+  const pairDetails = pairToReview ? await Promise.all([
+    getVersion(amendment.sourceVersionId!, `Bearer ${sessionToken}`),
+    getVersion(amendment.targetVersionId!, `Bearer ${sessionToken}`),
+  ]) : null;
+  const pairPublished = pairDetails?.every((version) => version?.publicationStatus === 'published') ?? false;
+  const diffReview = pairToReview && pairPublished ? await getAmendmentDiffReview(id) : null;
+  const diffReviewUnavailable = pairToReview && !pairPublished;
   const publishedRevision = revisions?.find((revision) => revision.id === amendment?.publishedRevisionId) ?? null;
   const quotedVersionIds = publishedRevision
     ? [publishedRevision.sourceVersionId, publishedRevision.targetVersionId].filter((versionId): versionId is string => Boolean(versionId))
@@ -146,6 +156,7 @@ export default async function AmendmentDetailPage(props: AmendmentDetailPageProp
       {searchParams.published ? <Alert tone="success">Amending law published.</Alert> : null}
       {searchParams.confirmed ? <Alert tone="success">Quotes confirmed and the legal change republished.</Alert> : null}
       {searchParams.withdrawn ? <Alert tone="success">Amending law withdrawn.</Alert> : null}
+      {diffReviewUnavailable ? <Alert tone="info">Difference review requires two published snapshots. Publish the selected versions before reviewing this draft.</Alert> : null}
       {amendment?.reviewStatus === 'needs_review' ? (
         <QuoteReviewPanel
           amendment={amendment}
@@ -169,6 +180,9 @@ export default async function AmendmentDetailPage(props: AmendmentDetailPageProp
           canWithdraw={false}
           readOnly={readOnly}
           contentAvailable={contentAvailable}
+          diffReview={diffReview}
+          canReviewDiff={canEdit || hasRole(user.roles, 'reviewer') || canPublish}
+          canAcknowledgeDiff={hasRole(user.roles, 'reviewer') || canPublish}
         />
       ) : (
         <AmendmentEditorLayout
@@ -186,6 +200,9 @@ export default async function AmendmentDetailPage(props: AmendmentDetailPageProp
           readOnly={readOnly}
           canRestore={canRestore}
           contentAvailable={contentAvailable}
+          diffReview={diffReview}
+          canReviewDiff={canEdit || hasRole(user.roles, 'reviewer') || canPublish}
+          canAcknowledgeDiff={hasRole(user.roles, 'reviewer') || canPublish}
         />
       )}
     </PageMain>

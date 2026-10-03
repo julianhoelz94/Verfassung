@@ -508,6 +508,19 @@ const server = createServer(async (req, res) => {
     return;
   }
 
+  const amendmentDiffReviewMatch = pathname.match(/^\/api\/amendment\/amendments\/([^/]+)\/diff-review$/);
+  if (method === 'GET' && amendmentDiffReviewMatch) {
+    const existing = mockAmendments.get(amendmentDiffReviewMatch[1]);
+    if (!existing) { json(res, 404, { error: 'Not found' }); return; }
+    json(res, 200, {
+      revisionId: amendmentRevision.id,
+      sourceVersionId: existing.sourceVersionId,
+      targetVersionId: existing.targetVersionId,
+      candidates: [], decisions: [], totals: { total: 0, resolved: 0 }, currentPosition: null,
+    });
+    return;
+  }
+
   if (method === 'POST' && pathname === '/api/amendment/amendments/suggest') {
     const body = await readBody(req);
     if (!body.sourceVersionId || !body.targetVersionId) {

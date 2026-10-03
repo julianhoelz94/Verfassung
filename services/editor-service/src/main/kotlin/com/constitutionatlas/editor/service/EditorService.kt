@@ -141,7 +141,7 @@ class EditorService(
         }
         if (editorRepository.hasStructuredDraft(sessionId)) {
             val prepared = structuredPublication.prepare(sessionId, session.versionId)
-            if (session.hopKind == "legal") structuredDiffReview.requireComplete(prepared)
+            if (session.hopKind == "legal") structuredDiffReview.requireReadyForReview(prepared)
         }
         editorRepository.updateStatus(session.id, EditSessionStatus.REVIEWING)
         auditClient.record(actor, "review_submitted", "edit_session", session.id)
@@ -178,6 +178,7 @@ class EditorService(
                 validateChangeRecord(record)
                 require(record.changes.mapNotNull { it.id }.distinct().size == record.changes.mapNotNull { it.id }.size) { "Change row IDs must be unique" }
                 editorRepository.recordChangeRecord(sessionId, record)
+                if (editorRepository.hasStructuredDraft(sessionId)) structuredDiffReview.recheckInvalidLinks(sessionId)
             }
             "editorial_correction" -> {
                 val comment = request.comment?.trim()?.takeIf { it.isNotEmpty() }

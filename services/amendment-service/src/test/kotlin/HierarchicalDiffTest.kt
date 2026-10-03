@@ -25,6 +25,24 @@ class HierarchicalDiffTest {
     }
 
     @Test
+    fun oneWordLeafEditDoesNotCreateCopyOnWriteAncestorFindings() {
+        val textId = UUID.randomUUID()
+        val oldText = DiffEntry.Text(textId, UUID.randomUUID(), UUID.randomUUID(), "Every person has equal dignity.")
+        val sentence = node(label = "Sentence 1", entries = listOf(oldText))
+        val paragraph = node(label = "Paragraph 2", entries = listOf(DiffEntry.Child(sentence)))
+        val article = node(label = "Article 8", entries = listOf(DiffEntry.Child(paragraph)))
+        val revisedSentence = sentence.copy(
+            revisionId = UUID.randomUUID(),
+            entries = listOf(oldText.copy(revisionId = UUID.randomUUID(), text = "Every person has inherent dignity.")),
+        )
+        val revisedParagraph = paragraph.copy(revisionId = UUID.randomUUID(), entries = listOf(DiffEntry.Child(revisedSentence)))
+        val revisedArticle = article.copy(revisionId = UUID.randomUUID(), entries = listOf(DiffEntry.Child(revisedParagraph)))
+        val run = HierarchicalDiff.compare(beforeVersion, listOf(article), afterVersion, listOf(revisedArticle))
+        assertThat(run.items.map { it.facet }).containsExactly("text_changed")
+        assertThat(run.items.single().afterRefs.single().path).contains("section:Article 8", "section:Paragraph 2", "section:Sentence 1")
+    }
+
+    @Test
     fun insertionDoesNotMoveLaterSiblingsButReorderDoes() {
         val a = node(label = "Same")
         val b = node(label = "Same")

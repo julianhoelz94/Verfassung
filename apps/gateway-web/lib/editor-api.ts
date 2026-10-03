@@ -1,5 +1,6 @@
 import { cookies } from 'next/headers';
 import { SESSION_COOKIE } from './session';
+import type { DiffReviewState, ReviewDecisionInput } from './diff-review';
 
 export function editorBaseUrl(): string {
   return process.env.EDITOR_API_URL ?? 'http://localhost/api/editor';
@@ -58,6 +59,8 @@ export type ChangeRecordUnitRef = {
 };
 
 export type ChangeRecordChange = {
+  id?: string | null;
+  amendmentChangeId?: string | null;
   articleId: string;
   articleNumber: string;
   changeType: 'added' | 'changed' | 'removed';
@@ -267,6 +270,29 @@ export async function getStructuredDraft(sessionId: string): Promise<import('./s
 }
 export async function saveStructuredDraft(sessionId: string, request: { expectedGeneration: number; operations: import('./structured-editor').DraftOperation[] }): Promise<import('./structured-editor').StructuredPreview> {
   const response = await editorFetch(`/edit-sessions/${encodeURIComponent(sessionId)}/structured-saves`, { method: 'POST', body: JSON.stringify(request) });
+  await throwIfNotOk(response, 'save_failed');
+  return response.json();
+}
+
+export async function getEditorDiffReview(sessionId: string): Promise<DiffReviewState> {
+  const response = await editorFetch(`/edit-sessions/${encodeURIComponent(sessionId)}/diff-review`);
+  await throwIfNotOk(response, 'review_failed');
+  return response.json();
+}
+
+export async function decideEditorDiff(sessionId: string, generation: number, decision: ReviewDecisionInput): Promise<DiffReviewState> {
+  const response = await editorFetch(`/edit-sessions/${encodeURIComponent(sessionId)}/diff-review/decisions`, {
+    method: 'POST',
+    body: JSON.stringify({
+      expectedGeneration: generation,
+      key: decision.key,
+      fingerprint: decision.fingerprint,
+      status: decision.status,
+      linkedRowIds: decision.linkedIds ?? [],
+      exclusionReason: decision.exclusionReason ?? null,
+      reviewerAcknowledged: decision.reviewerAcknowledged ?? false,
+    }),
+  });
   await throwIfNotOk(response, 'save_failed');
   return response.json();
 }

@@ -280,6 +280,69 @@ class StructuredDraftApiTest {
     }
 
     @Test
+    fun editorCanSubmitReasonedExclusionForSeparateReviewerAcknowledgement() {
+        val editorAuth = "Bearer guided-editor"
+        val reviewerAuth = "Bearer guided-reviewer"
+        val editor = Actor(UUID.randomUUID(), "editor@test.local", listOf("editor"))
+        val reviewer = Actor(UUID.randomUUID(), "reviewer@test.local", listOf("reviewer"))
+        val version = UUID.randomUUID()
+        val root = fixture()
+        val source = DraftSource(version, 7, settings.id, listOf(root))
+        Mockito.`when`(identity.authenticate(editorAuth)).thenReturn(editor)
+        Mockito.`when`(identity.authenticate(reviewerAuth)).thenReturn(reviewer)
+        Mockito.`when`(sources.source(version)).thenReturn(source)
+        Mockito.`when`(sources.settings(version)).thenReturn(settings)
+        val session = sessions.insertSession(editor.id, version, "legal")
+        val entry = root.content[1].node!!.content.single()
+        val preview = drafts.save(editorAuth, session, StructuredDraftSave(0, listOf(DraftOperation(UUID.randomUUID(), "replace_text", entry.logicalId!!, entry.revisionId!!, text = "Changed wording."))))
+        sessions.recordChangeRecord(session, com.constitutionatlas.editor.api.ChangeRecordRequest("Law", "Legal update", changes = listOf(com.constitutionatlas.editor.api.ChangeRecordChange(root.logicalId, "46a", "changed"))))
+        val review = diffReview.refresh(preview)
+        assertThat(review.candidates).isNotEmpty()
+        review.candidates.forEach { item ->
+            diffReview.decide(preview, DiffReviewDecisionWrite(preview.generation, item.key, item.fingerprint, "excluded_with_reason", exclusionReason = "Separate correction"), reviewer = false)
+        }
+        editorService.submitReview(editorAuth, session)
+        assertThrows(ConflictException::class.java) { editorService.approve(reviewerAuth, session) }
+        val reviewerPreview = drafts.preview(reviewerAuth, session)
+        diffReview.refresh(reviewerPreview).candidates.forEach { item ->
+            diffReview.decide(reviewerPreview, DiffReviewDecisionWrite(reviewerPreview.generation, item.key, item.fingerprint, "excluded_with_reason", exclusionReason = "Separate correction", reviewerAcknowledged = true), reviewer = true)
+        }
+        editorService.approve(reviewerAuth, session)
+    }
+
+    @Test
+    fun changingSavedRowPairingMarksItsLinkedDecisionForRecheck() {
+        val auth = "Bearer pairing-recheck"
+        val actor = Actor(UUID.randomUUID(), "editor@test.local", listOf("admin"))
+        val version = UUID.randomUUID()
+        val root = fixture()
+        val entry = root.content[1].node!!.content.single()
+        Mockito.`when`(identity.authenticate(auth)).thenReturn(actor)
+        Mockito.`when`(sources.source(version)).thenReturn(DraftSource(version, 7, settings.id, listOf(root)))
+        Mockito.`when`(sources.settings(version)).thenReturn(settings)
+        val session = sessions.insertSession(actor.id, version, "legal")
+        val preview = drafts.save(auth, session, StructuredDraftSave(0, listOf(DraftOperation(UUID.randomUUID(), "replace_text", entry.logicalId!!, entry.revisionId!!, text = "Changed wording."))))
+        val rowId = UUID.randomUUID()
+        val row = com.constitutionatlas.editor.api.ChangeRecordChange(
+            root.logicalId,
+            "46a",
+            beforeRef = com.constitutionatlas.editor.api.ChangeRecordUnitRef(entry.logicalId!!, versionId = version),
+            pendingAfterLogicalId = entry.logicalId,
+            id = rowId,
+        )
+        val record = com.constitutionatlas.editor.api.ChangeRecordRequest("Law", "Review", listOf(com.constitutionatlas.editor.api.ChangeRecordDocument(url = "https://example.test/law")), changes = listOf(row))
+        editorService.savePublishDetails(auth, session, com.constitutionatlas.editor.api.PublishDetailsRequest(changeRecord = record))
+        val candidate = diffReview.refresh(preview).candidates.single()
+        diffReview.decide(preview, DiffReviewDecisionWrite(preview.generation, candidate.key, candidate.fingerprint, "linked", listOf(rowId)), reviewer = true)
+        assertThat(diffReview.refresh(preview).decisions.single().status).isEqualTo("linked")
+
+        editorService.savePublishDetails(auth, session, com.constitutionatlas.editor.api.PublishDetailsRequest(changeRecord = record.copy(changes = listOf(row.copy(pendingAfterLogicalId = UUID.randomUUID())))))
+        val refreshed = diffReview.refresh(preview)
+        assertThat(refreshed.decisions.single().status).isEqualTo("needs_recheck")
+        assertThat(refreshed.totals["resolved"]).isZero()
+    }
+
+    @Test
     fun targetedSaveReopensLosslesslyAndPersistsOnlyOperation() {
         val actor = Actor(UUID.randomUUID(), "editor@test.local", listOf("editor"))
         val version = UUID.randomUUID()

@@ -36,6 +36,41 @@ async function reviewSnapshotDiff(request: APIRequestContext, id: string, header
   }
 }
 
+test('guided review saves progress and gates publication for a changed snapshot pair', async ({ page, request }) => {
+  test.setTimeout(120_000);
+  const pair = await createIsolatedConstitution(request, `Guided review ${Date.now()}`, 'A revised civic duty protects every person.');
+  const headers = await adminHeaders(request);
+  const created = await request.post(`/api/amendment/constitutions/${pair.constitutionId}/amendments`, { headers, data: {
+    title: `Guided law ${Date.now()}`, comment: 'Legal effect of the revised duty.',
+    documents: [{ url: 'https://example.org/guided-law.pdf' }],
+    sourceVersionId: pair.sourceVersionId, targetVersionId: pair.targetVersionId, changes: [],
+  } });
+  expect(created.ok(), await created.text()).toBeTruthy();
+  const { id } = await created.json();
+  const blocked = await request.post(`/api/amendment/amendments/${id}/publish`, { headers });
+  expect(blocked.status()).toBe(409);
+  const findingsResponse = await request.get(`/api/amendment/amendments/${id}/diff-review`, { headers });
+  expect(findingsResponse.ok()).toBeTruthy();
+  const findings = await findingsResponse.json();
+  expect(findings.candidates.length).toBeGreaterThan(0);
+  await signIn(page, 'admin');
+  await page.goto(`/editor/amendments/${id}`);
+  const review = page.getByRole('region', { name: 'Review differences' });
+  await expect(review.getByText(`Reviewed 0 of ${findings.candidates.length}`)).toBeVisible();
+  await expect(review.getByText(`Difference 1 of ${findings.candidates.length}`)).toBeVisible();
+  for (let index = 0; index < findings.candidates.length; index++) {
+    await review.getByLabel('Reason for exclusion').fill('This wording is handled by a separate legal record.');
+    await review.getByLabel('Acknowledge this exclusion for publication').check();
+    await review.getByRole('button', { name: 'Exclude with reason and next' }).click();
+    await expect(review.getByText('Decision saved.')).toBeVisible();
+  }
+  await expect(review.getByText(`Reviewed ${findings.candidates.length} of ${findings.candidates.length}`)).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole('region', { name: 'Review differences' }).getByText(`Reviewed ${findings.candidates.length} of ${findings.candidates.length}`)).toBeVisible();
+  await page.getByRole('button', { name: 'Publish law' }).click();
+  await expect(page.getByText('Amending law published.')).toBeVisible();
+});
+
 test('editor restores a real change-record revision and publisher republishes it', async ({ page, request }) => {
   test.setTimeout(120_000);
   const pair = await createIsolatedConstitution(request, `Journey restoration constitution ${Date.now()}`);

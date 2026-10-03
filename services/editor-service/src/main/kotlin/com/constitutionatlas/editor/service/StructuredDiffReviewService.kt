@@ -84,7 +84,7 @@ class StructuredDiffReviewService(private val sources: StructuredSourceClient, p
         if (write.status == "excluded_with_reason") require(!write.exclusionReason.isNullOrBlank()) { "Exclusion needs a reason" }
         if (write.reviewerAcknowledged && !reviewer) throw com.constitutionatlas.platform.ForbiddenException("Reviewer role required to acknowledge an exclusion")
         if (write.status == "linked") validateRows(preview.sessionId, item, write.linkedRowIds)
-        if (item.ambiguous && write.status == "linked") require(write.linkedRowIds.size > 1 && write.reviewerAcknowledged) { "Ambiguous group needs reviewed multiple rows" }
+        if (item.ambiguous && write.status == "linked") require(write.linkedRowIds.size > 1) { "Ambiguous group needs multiple linked rows" }
         repository.saveDecision(preview.sessionId, DiffDecisionRow(write.key, write.fingerprint, write.status, write.linkedRowIds.distinct(), write.exclusionReason?.trim(), write.reviewerAcknowledged))
         return state(DiffReviewPin(current.sourceVersionId, current.sourceGeneration, current.settingsRevisionId, current.draftGeneration, current.algorithmVersion), current.candidates, repository.decisions(preview.sessionId))
     }
@@ -101,6 +101,41 @@ class StructuredDiffReviewService(private val sources: StructuredSourceClient, p
             }
         ) {
             throw ConflictException("Diff review has open, ambiguous, or unacknowledged findings", "diff_review_incomplete")
+        }
+    }
+
+    /** An editor may submit reasoned exclusions so a separate reviewer can acknowledge them. */
+    @Transactional
+    fun requireReadyForReview(preview: StructuredDraftPreview) {
+        val current = refresh(preview)
+        val decisions = current.decisions.associateBy { it.key }
+        current.candidates.forEach { item ->
+            decisions[item.key]?.takeIf { it.status == "linked" }?.let { validateRows(preview.sessionId, item, it.linkedRowIds) }
+        }
+        if (current.candidates.any { item ->
+                val decision = decisions[item.key]
+                decision == null ||
+                    decision.status == "open" ||
+                    decision.status == "needs_recheck" ||
+                    (decision.status == "excluded_with_reason" && decision.reason.isNullOrBlank()) ||
+                    (item.ambiguous && decision.status == "linked" && decision.linkedRowIds.size < 2)
+            }
+        ) {
+            throw ConflictException("Diff review has open, ambiguous, or stale findings", "diff_review_incomplete")
+        }
+    }
+
+    /** A saved change row may retain its ID while its exact unit pairing changes. */
+    @Transactional
+    fun recheckInvalidLinks(sessionId: UUID) {
+        val candidates = repository.candidates(sessionId).associateBy { it.key }
+        repository.decisions(sessionId).filter { it.status == "linked" }.forEach { decision ->
+            val candidate = candidates[decision.key] ?: return@forEach
+            try {
+                validateRows(sessionId, candidate, decision.linkedRowIds)
+            } catch (_: IllegalArgumentException) {
+                repository.markRecheck(sessionId, decision.key, candidate.fingerprint)
+            }
         }
     }
 

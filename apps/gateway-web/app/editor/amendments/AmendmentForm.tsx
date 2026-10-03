@@ -5,6 +5,8 @@ import type { Amendment, AmendmentDocument, ArticleSummary, VersionSummary } fro
 import { Alert, Badge, Button, Input, Select, TextArea } from '../../components/ui';
 import { AmendmentChangesTable, type ChangeRow } from './AmendmentChangesTable';
 import { suggestChangesAction } from './actions';
+import type { DiffReviewState, ReviewCandidate } from '../../../lib/diff-review';
+import { DiffReviewQueue } from '../DiffReviewQueue';
 
 type AmendmentFormProps = {
   amendmentId: string;
@@ -19,6 +21,9 @@ type AmendmentFormProps = {
   canWithdraw: boolean;
   readOnly: boolean;
   contentAvailable?: boolean;
+  diffReview?: DiffReviewState | null;
+  canReviewDiff?: boolean;
+  canAcknowledgeDiff?: boolean;
 };
 
 function initialRows(amendment: Amendment | null): ChangeRow[] {
@@ -62,6 +67,9 @@ export function AmendmentForm({
   canWithdraw,
   readOnly,
   contentAvailable = true,
+  diffReview,
+  canReviewDiff = false,
+  canAcknowledgeDiff = false,
 }: AmendmentFormProps) {
   const [sourceVersionId, setSourceVersionId] = useState(amendment?.sourceVersionId ?? versions[0]?.id ?? '');
   const [targetVersionId, setTargetVersionId] = useState(amendment?.targetVersionId ?? latestVersionId ?? '');
@@ -111,6 +119,20 @@ export function AmendmentForm({
       setChangeRows((current) => mergeSuggestedRows(current, suggested));
       closeSuggestDialog();
     });
+  }
+
+  function addCandidateRow(candidate: ReviewCandidate) {
+    const before = candidate.beforeRefs[0];
+    const after = candidate.afterRefs[0];
+    const path = after?.path ?? before?.path ?? [];
+    const articleNumber = path[0]?.match(/\d+[a-zA-Z]?/)?.[0] ?? '';
+    setChangeRows((current) => [...current, {
+      articleNumber,
+      changeType: !before ? 'added' : !after ? 'removed' : 'changed',
+      note: '',
+      beforeRef: before ? { versionId: before.versionId, logicalId: before.logicalId, occurrenceId: before.occurrenceId, revisionId: before.revisionId, unitKind: before.kind === 'text_entry' ? 'text_entry' : 'node' } : null,
+      afterRef: after ? { versionId: after.versionId, logicalId: after.logicalId, occurrenceId: after.occurrenceId, revisionId: after.revisionId, unitKind: after.kind === 'text_entry' ? 'text_entry' : 'node' } : null,
+    }]);
   }
 
   return (
@@ -227,15 +249,21 @@ export function AmendmentForm({
           <Alert tone="error">Content service is unavailable. Fill from two versions is disabled.</Alert>
         )
       ) : null}
-      <AmendmentChangesTable
-        initialRows={changeRows}
-        articleNumbers={articleNumbers}
-        unitTreesByVersion={unitTreesByVersion}
-        sourceVersionId={sourceVersionId}
-        targetVersionId={targetVersionId}
-        readOnly={readOnly}
-        onRowsChange={setChangeRows}
-      />
+      <div className={diffReview ? 'amendment-review-layout' : undefined}>
+        <AmendmentChangesTable
+          initialRows={changeRows}
+          articleNumbers={articleNumbers}
+          unitTreesByVersion={unitTreesByVersion}
+          sourceVersionId={sourceVersionId}
+          targetVersionId={targetVersionId}
+          readOnly={readOnly}
+          onRowsChange={setChangeRows}
+        />
+        {diffReview ? <DiffReviewQueue key={diffReview.revisionId} target={{ kind: 'amendment', id: amendmentId }} initial={diffReview}
+          rows={(amendment?.changes ?? []).map((change, index) => ({ id: change.id, label: `${index + 1}. ${change.changeType} ${change.articleNumber ?? ''} ${change.note ?? ''}`.trim() }))}
+          canDecide={canReviewDiff && !readOnly || canAcknowledgeDiff} canAcknowledge={canAcknowledgeDiff}
+          onAddRow={!readOnly ? addCandidateRow : undefined} /> : null}
+      </div>
       <div className="action-bar">
         {canSave ? (
           <Button variant="primary" type="submit">

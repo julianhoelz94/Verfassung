@@ -50,7 +50,7 @@ for (const hop of ['editorial_correction', 'legal'] as const) {
     await expect(canvas.getByLabel('Sentence text').first()).toHaveValue('Changed wording.');
     await canvas.getByRole('button', { name: 'Save draft', exact: true }).click();
     await expect(page.getByText('Draft saved.', { exact: true })).toBeVisible();
-    await expect(page.getByLabel('Session').getByText('Changed wording.', { exact: true })).toBeVisible();
+    await expect(page.getByLabel('Session').getByText('Changed wording.', { exact: true }).first()).toBeVisible();
     await page.reload();
     await expect(canvas.getByLabel('Sentence text').first()).toHaveValue('Changed wording.');
     await canvas.getByText(/Entry-level review/).click();
@@ -70,11 +70,12 @@ for (const hop of ['editorial_correction', 'legal'] as const) {
       await page.getByRole('button', { name: 'Save change record' }).click();
       const sessionId = new URL(page.url()).searchParams.get('sessionId');
       const review = await json(await request.get(`/api/editor/edit-sessions/${sessionId}/diff-review`, { headers }));
-      for (const candidate of review.candidates) {
-        await json(await request.post(`/api/editor/edit-sessions/${sessionId}/diff-review/decisions`, { headers, data: {
-          expectedGeneration: review.draftGeneration, key: candidate.key, fingerprint: candidate.fingerprint,
-          status: 'excluded_with_reason', exclusionReason: 'Journey fixture tracks the sentence node as its change row.', reviewerAcknowledged: true,
-        } }));
+      const queue = page.getByRole('region', { name: 'Review differences' });
+      await expect(queue.getByText(`Reviewed 0 of ${review.candidates.length}`)).toBeVisible();
+      for (let index = 0; index < review.candidates.length; index++) {
+        await queue.getByLabel('Reason for exclusion').fill('Journey fixture tracks the sentence node as its change row.');
+        await queue.getByRole('button', { name: 'Exclude with reason and next' }).click();
+        await expect(queue.getByText('Decision saved.')).toBeVisible();
       }
     } else {
       await page.getByLabel('What was corrected in this transcription?').fill('Corrected one sentence.');
@@ -85,6 +86,17 @@ for (const hop of ['editorial_correction', 'legal'] as const) {
     await signOut(page); await signIn(page, 'reviewer'); await page.goto(sessionUrl);
     await expect(canvas.getByLabel('Sentence text').first()).toBeDisabled();
     await expect(canvas.locator('del')).toContainText(['Original wording.']);
+    if (hop === 'legal') {
+      const queue = page.getByRole('region', { name: 'Review differences' });
+      const sessionId = new URL(page.url()).searchParams.get('sessionId');
+      const review = await json(await request.get(`/api/editor/edit-sessions/${sessionId}/diff-review`, { headers }));
+      for (let index = 0; index < review.candidates.length; index++) {
+        await queue.getByLabel('Acknowledge this exclusion for publication').check();
+        await queue.getByRole('button', { name: 'Exclude with reason and next' }).click();
+        await expect(queue.getByText('Decision saved.')).toBeVisible();
+      }
+      await expect(queue.getByText(`Reviewed ${review.candidates.length} of ${review.candidates.length}`)).toBeVisible();
+    }
     await page.getByRole('button', { name: 'Approve review' }).click();
     await signOut(page); await signIn(page, 'publisher'); await page.goto(sessionUrl);
     await page.getByRole('button', { name: hop === 'legal' ? 'Publish new legal version' : 'Publish transcription' }).click();
@@ -153,6 +165,49 @@ test('custom one-level root supports literal labels, plain text and new root nav
   await canvas.getByRole('button', { name: 'Save draft', exact: true }).click();
   await page.reload();
   await expect(canvas.getByLabel('Clause text')).toHaveValue('New root text.');
+});
+
+test('mixed parent text and nested sentence decisions reopen when one draft unit changes', async ({ page, request }) => {
+  test.setTimeout(120_000);
+  const { version, headers } = await fixture(request);
+  await signIn(page, 'editor');
+  await page.getByLabel('Current law').selectOption(version.id);
+  await page.getByRole('button', { name: 'Record the next legal change' }).click();
+  const canvas = page.locator('#draft-form');
+  await canvas.getByLabel('Unnumbered parent text').first().fill('Before, revised.');
+  await canvas.getByLabel('Sentence text').first().fill('Nested right revised.');
+  await canvas.getByRole('button', { name: 'Move unit earlier' }).first().click();
+  await canvas.getByRole('button', { name: 'Save draft', exact: true }).click();
+  await expect(page.getByText('Draft saved.', { exact: true })).toBeVisible();
+  const sessionId = new URL(page.url()).searchParams.get('sessionId');
+  const endpoint = `/api/editor/edit-sessions/${sessionId}/diff-review`;
+  const initial = await json(await request.get(endpoint, { headers }));
+  expect(initial.candidates.length).toBeGreaterThanOrEqual(2);
+  expect(initial.candidates.map((candidate: { facet: string }) => candidate.facet)).toContain('move');
+  const queue = page.getByRole('region', { name: 'Review differences' });
+  await expect(queue.getByText(`Reviewed 0 of ${initial.candidates.length}`)).toBeVisible();
+  for (let index = 0; index < initial.candidates.length; index++) {
+    await expect(queue.getByText(`Difference ${index + 1} of ${initial.candidates.length}`)).toBeVisible();
+    const reason = queue.getByLabel('Reason for exclusion');
+    await expect(reason).toHaveValue('');
+    await reason.fill('Covered by the separately checked change record.');
+    const exclude = queue.getByRole('button', { name: 'Exclude with reason and next' });
+    await expect(exclude).toBeEnabled();
+    await exclude.click();
+    await expect.poll(async () => {
+      const saved = await json(await request.get(endpoint, { headers }));
+      return saved.decisions.filter((decision: { status: string }) => decision.status === 'excluded_with_reason').length;
+    }).toBe(index + 1);
+  }
+  const proposed = await json(await request.get(endpoint, { headers }));
+  expect(proposed.decisions.filter((decision: { status: string }) => decision.status === 'excluded_with_reason')).toHaveLength(initial.candidates.length);
+  await canvas.getByLabel('Unnumbered parent text').first().fill('Before, revised again.');
+  await canvas.getByRole('button', { name: 'Save draft', exact: true }).click();
+  await expect(page.getByText('Draft saved.', { exact: true })).toBeVisible();
+  const revised = await json(await request.get(endpoint, { headers }));
+  expect(revised.decisions.some((decision: { status: string }) => decision.status === 'needs_recheck')).toBeTruthy();
+  await page.reload();
+  await expect(page.getByRole('region', { name: 'Review differences' }).getByText(/\d+ need recheck/)).toBeVisible();
 });
 
 

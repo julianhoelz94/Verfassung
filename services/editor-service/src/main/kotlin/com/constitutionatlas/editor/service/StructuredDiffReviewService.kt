@@ -125,6 +125,20 @@ class StructuredDiffReviewService(private val sources: StructuredSourceClient, p
         }
     }
 
+    /** A saved change row may retain its ID while its exact unit pairing changes. */
+    @Transactional
+    fun recheckInvalidLinks(sessionId: UUID) {
+        val candidates = repository.candidates(sessionId).associateBy { it.key }
+        repository.decisions(sessionId).filter { it.status == "linked" }.forEach { decision ->
+            val candidate = candidates[decision.key] ?: return@forEach
+            try {
+                validateRows(sessionId, candidate, decision.linkedRowIds)
+            } catch (_: IllegalArgumentException) {
+                repository.markRecheck(sessionId, decision.key, candidate.fingerprint)
+            }
+        }
+    }
+
     private fun validateRows(sessionId: UUID, item: DiffItem, ids: List<UUID>) {
         val rows = sessions.changeRecord(sessionId)?.changes.orEmpty().mapNotNull { row -> row.id?.let { it to row } }.toMap()
         require(ids.isNotEmpty() && ids.all { it in rows }) { "Linked amendment rows must belong to the saved change record" }

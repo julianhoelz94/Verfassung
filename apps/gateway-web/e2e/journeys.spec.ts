@@ -176,10 +176,10 @@ test('publisher confirms stale old-law quotes without changing the public commen
   await expect(page.locator('.badge', { hasText: 'Needs review' }).first()).toBeVisible();
   await page.getByRole('link', { name: 'Update to Article 1' }).click();
   await expect(page.getByRole('heading', { name: 'Flagged record review' })).toBeVisible();
-  await expect(page.getByRole('textbox', { name: 'Comment', exact: true })).toHaveValue('The published legal-change comment.');
+  await expect(page.locator('#amendment-comment')).toHaveValue('The published legal-change comment.');
   await page.getByRole('button', { name: 'Confirm live quotes and republish' }).click();
   await expect(page.getByText('Quotes confirmed and the legal change republished.')).toBeVisible();
-  await expect(page.getByRole('textbox', { name: 'Comment', exact: true })).toHaveValue('The published legal-change comment.');
+  await expect(page.locator('#amendment-comment')).toHaveValue('The published legal-change comment.');
   await page.reload();
   await page.goto('/editor/amendments');
   await expect(page.locator('.badge', { hasText: 'Needs review' })).toHaveCount(0);

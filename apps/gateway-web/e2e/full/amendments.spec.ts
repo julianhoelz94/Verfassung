@@ -49,17 +49,24 @@ test('guided review saves progress and gates publication for a changed snapshot 
   const { id } = await created.json();
   const blocked = await request.post(`/api/amendment/amendments/${id}/publish`, { headers });
   expect(blocked.status()).toBe(409);
+  const findingsResponse = await request.get(`/api/amendment/amendments/${id}/diff-review`, { headers });
+  expect(findingsResponse.ok()).toBeTruthy();
+  const findings = await findingsResponse.json();
+  expect(findings.candidates.length).toBeGreaterThan(0);
   await signIn(page, 'admin');
   await page.goto(`/editor/amendments/${id}`);
   const review = page.getByRole('region', { name: 'Review differences' });
-  await expect(review.getByText('Reviewed 0 of 1')).toBeVisible();
-  await expect(review.getByText('Difference 1 of 1')).toBeVisible();
-  await review.getByLabel('Reason for exclusion').fill('This wording is handled by a separate legal record.');
-  await review.getByLabel('Acknowledge this exclusion for publication').check();
-  await review.getByRole('button', { name: 'Exclude with reason and next' }).click();
-  await expect(review.getByText('Reviewed 1 of 1')).toBeVisible();
+  await expect(review.getByText(`Reviewed 0 of ${findings.candidates.length}`)).toBeVisible();
+  await expect(review.getByText(`Difference 1 of ${findings.candidates.length}`)).toBeVisible();
+  for (let index = 0; index < findings.candidates.length; index++) {
+    await review.getByLabel('Reason for exclusion').fill('This wording is handled by a separate legal record.');
+    await review.getByLabel('Acknowledge this exclusion for publication').check();
+    await review.getByRole('button', { name: 'Exclude with reason and next' }).click();
+    await expect(review.getByText('Decision saved.')).toBeVisible();
+  }
+  await expect(review.getByText(`Reviewed ${findings.candidates.length} of ${findings.candidates.length}`)).toBeVisible();
   await page.reload();
-  await expect(page.getByRole('region', { name: 'Review differences' }).getByText('Reviewed 1 of 1')).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Review differences' }).getByText(`Reviewed ${findings.candidates.length} of ${findings.candidates.length}`)).toBeVisible();
   await page.getByRole('button', { name: 'Publish law' }).click();
   await expect(page.getByText('Amending law published.')).toBeVisible();
 });

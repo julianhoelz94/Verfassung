@@ -47,6 +47,10 @@ function newChange(): ChangeRecordChange {
   return { articleId: '', articleNumber: '', changeType: 'changed', note: '', beforeRef: null, afterRef: null };
 }
 
+function isEmptyChange(change: ChangeRecordChange): boolean {
+  return !change.articleId && !change.articleNumber && !change.note && !change.beforeRef && !change.afterRef && !change.pendingAfterLogicalId;
+}
+
 type PublishFormProps = {
   sessionId: string;
   versionId: string;
@@ -87,7 +91,7 @@ export function PublishForm({ sessionId, versionId, articleId, hopKind, status, 
     const before = candidate.beforeRefs[0];
     const after = candidate.afterRefs[0];
     const unit = afterUnits.find((item) => item.logicalId === after?.logicalId) ?? beforeUnits.find((item) => item.logicalId === before?.logicalId);
-    setChanges((current) => [...current, {
+    setChanges((current) => [...(current.length === 1 && isEmptyChange(current[0]) ? [] : current), {
       articleId: unit?.articleId ?? articleId,
       articleNumber: unit?.articleNumber ?? '',
       changeType: !before ? 'added' : !after ? 'removed' : 'changed',

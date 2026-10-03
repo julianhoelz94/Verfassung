@@ -178,6 +178,7 @@ class EditorService(
                 validateChangeRecord(record)
                 require(record.changes.mapNotNull { it.id }.distinct().size == record.changes.mapNotNull { it.id }.size) { "Change row IDs must be unique" }
                 editorRepository.recordChangeRecord(sessionId, record)
+                if (editorRepository.hasStructuredDraft(sessionId)) structuredDiffReview.recheckInvalidLinks(sessionId)
             }
             "editorial_correction" -> {
                 val comment = request.comment?.trim()?.takeIf { it.isNotEmpty() }

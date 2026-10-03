@@ -50,7 +50,7 @@ for (const hop of ['editorial_correction', 'legal'] as const) {
     await expect(canvas.getByLabel('Sentence text').first()).toHaveValue('Changed wording.');
     await canvas.getByRole('button', { name: 'Save draft', exact: true }).click();
     await expect(page.getByText('Draft saved.', { exact: true })).toBeVisible();
-    await expect(page.getByLabel('Session').getByText('Changed wording.', { exact: true })).toBeVisible();
+    await expect(page.getByLabel('Session').getByText('Changed wording.', { exact: true }).first()).toBeVisible();
     await page.reload();
     await expect(canvas.getByLabel('Sentence text').first()).toHaveValue('Changed wording.');
     await canvas.getByText(/Entry-level review/).click();
@@ -165,6 +165,41 @@ test('custom one-level root supports literal labels, plain text and new root nav
   await canvas.getByRole('button', { name: 'Save draft', exact: true }).click();
   await page.reload();
   await expect(canvas.getByLabel('Clause text')).toHaveValue('New root text.');
+});
+
+test('mixed parent text and nested sentence decisions reopen when one draft unit changes', async ({ page, request }) => {
+  test.setTimeout(120_000);
+  const { version, headers } = await fixture(request);
+  await signIn(page, 'editor');
+  await page.getByLabel('Current law').selectOption(version.id);
+  await page.getByRole('button', { name: 'Record the next legal change' }).click();
+  const canvas = page.locator('#draft-form');
+  await canvas.getByLabel('Unnumbered parent text').first().fill('Before, revised.');
+  await canvas.getByLabel('Sentence text').first().fill('Nested right revised.');
+  await canvas.getByRole('button', { name: 'Move unit earlier' }).first().click();
+  await canvas.getByRole('button', { name: 'Save draft', exact: true }).click();
+  await expect(page.getByText('Draft saved.', { exact: true })).toBeVisible();
+  const sessionId = new URL(page.url()).searchParams.get('sessionId');
+  const endpoint = `/api/editor/edit-sessions/${sessionId}/diff-review`;
+  const initial = await json(await request.get(endpoint, { headers }));
+  expect(initial.candidates.length).toBeGreaterThanOrEqual(2);
+  expect(initial.candidates.map((candidate: { facet: string }) => candidate.facet)).toContain('move');
+  const queue = page.getByRole('region', { name: 'Review differences' });
+  await expect(queue.getByText(`Reviewed 0 of ${initial.candidates.length}`)).toBeVisible();
+  for (let index = 0; index < initial.candidates.length; index++) {
+    await queue.getByLabel('Reason for exclusion').fill('Covered by the separately checked change record.');
+    await queue.getByRole('button', { name: 'Exclude with reason and next' }).click();
+    await expect(queue.getByText('Decision saved.')).toBeVisible();
+  }
+  const proposed = await json(await request.get(endpoint, { headers }));
+  expect(proposed.decisions.filter((decision: { status: string }) => decision.status === 'excluded_with_reason')).toHaveLength(initial.candidates.length);
+  await canvas.getByLabel('Unnumbered parent text').first().fill('Before, revised again.');
+  await canvas.getByRole('button', { name: 'Save draft', exact: true }).click();
+  await expect(page.getByText('Draft saved.', { exact: true })).toBeVisible();
+  const revised = await json(await request.get(endpoint, { headers }));
+  expect(revised.decisions.some((decision: { status: string }) => decision.status === 'needs_recheck')).toBeTruthy();
+  await page.reload();
+  await expect(page.getByRole('region', { name: 'Review differences' }).getByText(/\d+ need recheck/)).toBeVisible();
 });
 
 

@@ -100,7 +100,9 @@ class AmendmentDiffReviewService(
         val decisions = current.decisions.associateBy { it.key }
         if (current.candidates.any { item ->
                 val decision = decisions[item.key]
-                decision == null || decision.status == "open" || decision.status == "needs_recheck" ||
+                decision == null ||
+                    decision.status == "open" ||
+                    decision.status == "needs_recheck" ||
                     (decision.status == "excluded_with_reason" && !decision.reviewerAcknowledged) ||
                     (item.ambiguous && decision.status == "linked" && (decision.linkedChangeIds.size < 2 || !decision.reviewerAcknowledged))
             }

@@ -24,7 +24,7 @@ wait_for_postgres() {
   done
 }
 
-for name in catalog content amendment identity editor audit ingestion search; do
+for name in catalog content amendment identity editor audit ingestion search document; do
   host="${name}-db"
   db="${name}_db"
   wait_for_postgres "$host" "$db"

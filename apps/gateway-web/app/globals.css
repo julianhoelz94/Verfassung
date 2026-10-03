@@ -1774,6 +1774,18 @@ button.article-toggle[aria-expanded='false']::after {
   min-width: 0;
 }
 
+.amendment-review-layout {
+  display: grid;
+  gap: var(--space-4);
+  align-items: start;
+}
+
+@media (min-width: 1400px) {
+  .amendment-review-layout {
+    grid-template-columns: minmax(0, 1fr) minmax(20rem, .9fr);
+  }
+}
+
 .diff-review-progress {
   display: grid;
   gap: var(--space-2);
@@ -1803,7 +1815,8 @@ button.article-toggle[aria-expanded='false']::after {
   min-height: 6rem;
 }
 
-.diff-review-branches {
+.diff-review-branches,
+.diff-review-levels {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);
@@ -1811,7 +1824,8 @@ button.article-toggle[aria-expanded='false']::after {
   list-style: none;
 }
 
-.diff-review-branches button {
+.diff-review-branches button,
+.diff-review-levels button {
   border: 1px solid var(--color-border, #aeb9c2);
   border-radius: var(--radius-sm, .25rem);
   background: transparent;

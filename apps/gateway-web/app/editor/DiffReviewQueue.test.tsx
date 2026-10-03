@@ -31,8 +31,8 @@ describe('guided difference review', () => {
     actions.refresh.mockReset(); actions.save.mockReset();
   });
   afterEach(async () => { await act(async () => root.unmount()); host.remove(); });
-  async function mount(review: DiffReviewState) {
-    await act(async () => root.render(<DiffReviewQueue target={{ kind: 'amendment', id: 'amendment' }} initial={review} rows={[]} canDecide canAcknowledge />));
+  async function mount(review: DiffReviewState, canAcknowledge = true) {
+    await act(async () => root.render(<DiffReviewQueue target={{ kind: 'amendment', id: 'amendment' }} initial={review} rows={[]} canDecide canAcknowledge={canAcknowledge} />));
   }
   function button(name: string): HTMLButtonElement {
     const found = [...host.querySelectorAll('button')].find((item) => item.textContent === name);
@@ -44,6 +44,7 @@ describe('guided difference review', () => {
     expect(host.textContent).toContain('Reviewed 0 of 2');
     expect(host.textContent).toContain('Article 8: 1 open');
     expect(host.textContent).toContain('Article 12: 1 open');
+    expect(host.textContent).toContain('Level 2: 0 of 2 reviewed');
     expect(host.textContent).toContain('Difference 1 of 2');
     await act(async () => button('Next').click());
     expect(host.textContent).toContain('Difference 2 of 2');
@@ -56,6 +57,21 @@ describe('guided difference review', () => {
     expect(progress.getAttribute('aria-label')).toBe('Reviewed 0 of 2 differences');
     const result = await axeRun(host, { rules: { 'color-contrast': { enabled: false } } });
     expect(result.violations.map((violation) => violation.id)).toEqual([]);
+  });
+
+  it('advances the editor to the next open finding after an exclusion proposal', async () => {
+    const initial = state([candidate('eight', 'Article 8', 'Old right', 'New right'), candidate('twelve', 'Article 12', 'Old duty', 'New duty')]);
+    actions.save.mockResolvedValue({ review: { ...initial, decisions: [{ ...initial.decisions[0], status: 'excluded_with_reason', reason: 'Separate legal record' }, initial.decisions[1]] } });
+    await mount(initial, false);
+    await act(async () => {
+      const reason = host.querySelector('textarea')!;
+      reason.value = 'Separate legal record';
+      Simulate.change(reason);
+    });
+    await act(async () => button('Exclude with reason and next').click());
+    expect(host.textContent).toContain('Difference 2 of 2');
+    expect(host.textContent).toContain('1 of 2 ready for reviewer handoff');
+    expect(host.textContent).toContain('Reviewed 0 of 2');
   });
 
   it('saves an acknowledged exclusion and restores progress from the saved state', async () => {

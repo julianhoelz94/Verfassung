@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import type { DiffReviewState, ReviewCandidate, ReviewDecisionInput, ReviewRef } from '../../lib/diff-review';
-import { decisionResolved } from '../../lib/diff-review';
+import { decisionReadyForReview, decisionResolved } from '../../lib/diff-review';
 import { diffText, segsForSide } from '../../lib/text-diff';
 import { saveDiffDecisionAction, refreshDiffReviewAction, type ReviewTarget } from './diff-review-actions';
 import { Button } from '../components/ui';
@@ -68,6 +68,8 @@ export function DiffReviewQueue({ target, initial, rows, canDecide, canAcknowled
     }
   }, [selected?.key]);
   const resolved = review.candidates.filter((candidate) => decisionResolved(candidate, decisions.get(candidate.key))).length;
+  const readyForReview = review.candidates.filter((candidate) => decisionReadyForReview(candidate, decisions.get(candidate.key))).length;
+  const levels = [...new Set(review.candidates.map((candidate) => candidate.level))].sort((a, b) => a - b);
   const counts = review.candidates.reduce<Record<string, number>>((result, candidate) => {
     const value = decisions.get(candidate.key)?.status ?? 'open';
     result[value] = (result[value] ?? 0) + 1;
@@ -91,7 +93,9 @@ export function DiffReviewQueue({ target, initial, rows, canDecide, canAcknowled
       if ('error' in result) { setMessage(result.error); return; }
       setReview(result.review);
       const byKey = new Map(result.review.decisions.map((decision) => [decision.key, decision]));
-      const next = result.review.candidates.find((candidate) => !decisionResolved(candidate, byKey.get(candidate.key)));
+      const next = result.review.candidates.find((candidate) => canAcknowledge
+        ? !decisionResolved(candidate, byKey.get(candidate.key))
+        : !decisionReadyForReview(candidate, byKey.get(candidate.key)));
       choose(next?.key ?? input.key);
       setMessage('Decision saved.');
       router.refresh();
@@ -121,15 +125,21 @@ export function DiffReviewQueue({ target, initial, rows, canDecide, canAcknowled
       <strong>Reviewed {resolved} of {review.candidates.length}</strong>
       <progress value={resolved} max={Math.max(1, review.candidates.length)} aria-label={`Reviewed ${resolved} of ${review.candidates.length} differences`} />
       <p>{counts.linked ?? 0} linked · {counts.excluded_with_reason ?? 0} excluded · {counts.open ?? 0} open · {counts.needs_recheck ?? 0} need recheck</p>
+      {readyForReview !== resolved ? <p>{readyForReview} of {review.candidates.length} ready for reviewer handoff</p> : null}
     </div>
     {review.candidates.length === 0 ? <p role="status">No differences found for the pinned snapshots.</p> : <>
       <div className="form-row" aria-label="Difference filters">
-        <label>Level <select value={level} onChange={(event) => setLevel(event.target.value)}><option value="all">All</option>{[...new Set(review.candidates.map((candidate) => candidate.level))].sort((a, b) => a - b).map((value) => <option key={value} value={value}>Level {value}</option>)}</select></label>
+        <label>Level <select value={level} onChange={(event) => setLevel(event.target.value)}><option value="all">All</option>{levels.map((value) => <option key={value} value={value}>Level {value}</option>)}</select></label>
         <label>Type <select value={facet} onChange={(event) => setFacet(event.target.value)}><option value="all">All</option>{[...new Set(review.candidates.map((candidate) => candidate.facet))].sort().map((value) => <option key={value} value={value}>{statusText(value)}</option>)}</select></label>
         <label>Status <select value={status} onChange={(event) => setStatus(event.target.value)}><option value="all">All</option>{['open', 'linked', 'excluded_with_reason', 'needs_recheck'].map((value) => <option key={value} value={value}>{statusText(value)}</option>)}</select></label>
         <label>Scope <select value={scope} onChange={(event) => setScope(event.target.value)}><option value="all">All</option>{scopes.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
       </div>
       <p className="muted">Showing {visible.length} of {review.candidates.length} differences.</p>
+      <ul className="diff-review-levels" aria-label="Progress by level">{levels.map((value) => {
+        const atLevel = review.candidates.filter((candidate) => candidate.level === value);
+        const done = atLevel.filter((candidate) => decisionResolved(candidate, decisions.get(candidate.key))).length;
+        return <li key={value}><button type="button" onClick={() => setLevel(String(value))}>Level {value}: {done} of {atLevel.length} reviewed</button></li>;
+      })}</ul>
       {scopes.length > 1 ? <ul className="diff-review-branches">{scopes.map((branch) => {
         const branchCandidates = review.candidates.filter((candidate) => (candidate.afterRefs[0] ?? candidate.beforeRefs[0])?.path[0] === branch);
         const open = branchCandidates.filter((candidate) => !decisionResolved(candidate, decisions.get(candidate.key))).length;
@@ -143,13 +153,13 @@ export function DiffReviewQueue({ target, initial, rows, canDecide, canAcknowled
           <div><h4>Before</h4><p>{selected.beforeRefs.map(label).join('; ') || 'No source unit'}</p><p className="diff-review-text">{segsForSide(spans, 'from').map((seg, index) => seg.type === 'remove' ? <del key={index}>{seg.text}</del> : <span key={index}>{seg.text}</span>)}</p>{selected.beforeRefs.map((ref) => <code key={`${ref.logicalId}-${ref.occurrenceId}`}>{ref.versionId ?? 'draft'} · {ref.logicalId}</code>)}</div>
           <div><h4>After</h4><p>{selected.afterRefs.map(label).join('; ') || 'No target unit'}</p><p className="diff-review-text">{segsForSide(spans, 'to').map((seg, index) => seg.type === 'add' ? <ins key={index}>{seg.text}</ins> : <span key={index}>{seg.text}</span>)}</p>{selected.afterRefs.map((ref) => <code key={`${ref.logicalId}-${ref.occurrenceId}`}>{ref.versionId ?? 'draft'} · {ref.logicalId}</code>)}</div>
         </div>
-        <div className="action-bar"><Button type="button" disabled={selectedIndex <= 0} onClick={() => navigation(selectedIndex - 1)}>Previous</Button><Button type="button" disabled={selectedIndex >= visible.length - 1} onClick={() => navigation(selectedIndex + 1)}>Next</Button><Button type="button" onClick={() => { const next = visible.find((candidate) => !decisionResolved(candidate, decisions.get(candidate.key)) && candidate.key !== selected.key); if (next) choose(next.key); }}>Next unreviewed</Button></div>
+        <div className="action-bar"><Button type="button" disabled={selectedIndex <= 0} onClick={() => navigation(selectedIndex - 1)}>Previous</Button><Button type="button" disabled={selectedIndex >= visible.length - 1} onClick={() => navigation(selectedIndex + 1)}>Next</Button><Button type="button" onClick={() => { const next = visible.find((candidate) => (canAcknowledge ? !decisionResolved(candidate, decisions.get(candidate.key)) : !decisionReadyForReview(candidate, decisions.get(candidate.key))) && candidate.key !== selected.key); if (next) choose(next.key); }}>Next unreviewed</Button></div>
         {canDecide ? <div className="stack">
           {onAddRow ? <Button type="button" onClick={() => { onAddRow(selected); setMessage('A change row was added. Check the exact units and save the draft before linking this difference.'); }}>Create change row from this difference</Button> : null}
           <Button type="button" onClick={() => { document.querySelector<HTMLElement>('[aria-label="Change record"], #amendment-changes-title')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); setMessage('Correct the pairing in the exact unit selectors, save, then link the saved row.'); }}>Correct pairing in change record</Button>
           <label>Link to saved change rows <select multiple value={linkedIds} onChange={(event) => setLinkedIds([...event.target.selectedOptions].map((option) => option.value))}>{rows.map((row) => <option key={row.id} value={row.id}>{row.label}</option>)}</select></label>
           {selected.ambiguous && canAcknowledge ? <label><input type="checkbox" checked={acknowledge} onChange={(event) => setAcknowledge(event.target.checked)} /> Confirm the multi-row pairing as reviewer</label> : null}
-          <Button type="button" disabled={pending || linkedIds.length === 0 || selected.ambiguous && (linkedIds.length < 2 || !acknowledge)} onClick={() => save({ key: selected.key, fingerprint: selected.fingerprint, status: 'linked', linkedIds, reviewerAcknowledged: selected.ambiguous && acknowledge })}>Link selected rows and next</Button>
+          <Button type="button" disabled={pending || linkedIds.length === 0 || selected.ambiguous && linkedIds.length < 2} onClick={() => save({ key: selected.key, fingerprint: selected.fingerprint, status: 'linked', linkedIds, reviewerAcknowledged: selected.ambiguous && canAcknowledge && acknowledge })}>Link selected rows and next</Button>
           <label>Reason for exclusion <textarea value={reason} onChange={(event) => setReason(event.target.value)} rows={3} /></label>
           {canAcknowledge ? <label><input type="checkbox" checked={acknowledge} onChange={(event) => setAcknowledge(event.target.checked)} /> Acknowledge this exclusion for publication</label> : <p className="muted">A reviewer must acknowledge an exclusion before publication.</p>}
           <Button type="button" disabled={pending || !reason.trim()} onClick={() => save({ key: selected.key, fingerprint: selected.fingerprint, status: 'excluded_with_reason', exclusionReason: reason.trim(), reviewerAcknowledged: acknowledge })}>Exclude with reason and next</Button>

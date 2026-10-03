@@ -84,7 +84,7 @@ class StructuredDiffReviewService(private val sources: StructuredSourceClient, p
         if (write.status == "excluded_with_reason") require(!write.exclusionReason.isNullOrBlank()) { "Exclusion needs a reason" }
         if (write.reviewerAcknowledged && !reviewer) throw com.constitutionatlas.platform.ForbiddenException("Reviewer role required to acknowledge an exclusion")
         if (write.status == "linked") validateRows(preview.sessionId, item, write.linkedRowIds)
-        if (item.ambiguous && write.status == "linked") require(write.linkedRowIds.size > 1 && write.reviewerAcknowledged) { "Ambiguous group needs reviewed multiple rows" }
+        if (item.ambiguous && write.status == "linked") require(write.linkedRowIds.size > 1) { "Ambiguous group needs multiple linked rows" }
         repository.saveDecision(preview.sessionId, DiffDecisionRow(write.key, write.fingerprint, write.status, write.linkedRowIds.distinct(), write.exclusionReason?.trim(), write.reviewerAcknowledged))
         return state(DiffReviewPin(current.sourceVersionId, current.sourceGeneration, current.settingsRevisionId, current.draftGeneration, current.algorithmVersion), current.candidates, repository.decisions(preview.sessionId))
     }

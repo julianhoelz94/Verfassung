@@ -249,19 +249,21 @@ export function AmendmentForm({
           <Alert tone="error">Content service is unavailable. Fill from two versions is disabled.</Alert>
         )
       ) : null}
-      <AmendmentChangesTable
-        initialRows={changeRows}
-        articleNumbers={articleNumbers}
-        unitTreesByVersion={unitTreesByVersion}
-        sourceVersionId={sourceVersionId}
-        targetVersionId={targetVersionId}
-        readOnly={readOnly}
-        onRowsChange={setChangeRows}
-      />
-      {diffReview ? <DiffReviewQueue key={diffReview.revisionId} target={{ kind: 'amendment', id: amendmentId }} initial={diffReview}
-        rows={(amendment?.changes ?? []).map((change, index) => ({ id: change.id, label: `${index + 1}. ${change.changeType} ${change.articleNumber ?? ''} ${change.note ?? ''}`.trim() }))}
-        canDecide={canReviewDiff && !readOnly || canAcknowledgeDiff} canAcknowledge={canAcknowledgeDiff}
-        onAddRow={!readOnly ? addCandidateRow : undefined} /> : null}
+      <div className={diffReview ? 'amendment-review-layout' : undefined}>
+        <AmendmentChangesTable
+          initialRows={changeRows}
+          articleNumbers={articleNumbers}
+          unitTreesByVersion={unitTreesByVersion}
+          sourceVersionId={sourceVersionId}
+          targetVersionId={targetVersionId}
+          readOnly={readOnly}
+          onRowsChange={setChangeRows}
+        />
+        {diffReview ? <DiffReviewQueue key={diffReview.revisionId} target={{ kind: 'amendment', id: amendmentId }} initial={diffReview}
+          rows={(amendment?.changes ?? []).map((change, index) => ({ id: change.id, label: `${index + 1}. ${change.changeType} ${change.articleNumber ?? ''} ${change.note ?? ''}`.trim() }))}
+          canDecide={canReviewDiff && !readOnly || canAcknowledgeDiff} canAcknowledge={canAcknowledgeDiff}
+          onAddRow={!readOnly ? addCandidateRow : undefined} /> : null}
+      </div>
       <div className="action-bar">
         {canSave ? (
           <Button variant="primary" type="submit">

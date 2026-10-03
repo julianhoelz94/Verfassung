@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # manageLocalStack.sh — start/stop/rebuild/reset the local Compose stack (Caddy :80).
-# Usage: manageLocalStack.sh --start|--stop|--status|--rebuild [service...]|--reset [--prune]|--help
+# Usage: manageLocalStack.sh --start [--no-build] [--no-prepopulate]|--rebuild [--no-prepopulate] <service...>|--only-prepopulate|--stop|--status|--reset [--prune]|--help
 
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 cd "$ROOT"
@@ -139,6 +139,31 @@ wait_for_http() {
   echo "Ready at ${url}"
 }
 
+run_prepopulate() {
+  local port service url waited
+  port="$(caddy_port)"
+  for service in catalog content amendment identity editor search ingestion audit; do
+    url="http://127.0.0.1:${port}/api/${service}/ping"
+    waited=0
+    until curl -sf -o /dev/null --max-time 2 "${url}"; do
+      if [ "${waited}" -ge "${HTTP_READY_TIMEOUT_SECONDS}" ]; then
+        echo "${service} did not become ready at ${url} within ${HTTP_READY_TIMEOUT_SECONDS}s." >&2
+        return 1
+      fi
+      sleep 3
+      waited=$((waited + 3))
+    done
+  done
+  echo "======== Prepopulating local stack ========"
+  (
+    cd "${ROOT}/apps/gateway-web"
+    npm run fixtures:generate
+    PREPOPULATE_TEST_STACK=true \
+      PREPOPULATE_BASE_URL="http://127.0.0.1:${port}" \
+      node --env-file="${ROOT}/${ENV_FILE}" e2e/fixtures/prepopulate.mjs
+  )
+}
+
 is_known_service() {
   local name="$1"
   local s
@@ -176,9 +201,12 @@ is_kotlin_service() {
 }
 
 build_services() {
-  local service i failed=0
+  local service i failed=0 batch_failed
   local -a pids=()
   local -a running_services=()
+  local -a log_files=()
+  local -a statuses=()
+  local log_dir
   case "${GRADLE_BUILD_JOBS}" in
     ''|*[!0-9]*) echo "GRADLE_BUILD_JOBS must be a positive integer." >&2; return 1 ;;
   esac
@@ -187,31 +215,53 @@ build_services() {
     return 1
   fi
 
+  log_dir="$(mktemp -d "${TMPDIR:-/tmp}/atlas-gradle-build.XXXXXX")"
+  echo "======== Building Kotlin artifacts (up to ${GRADLE_BUILD_JOBS} in parallel) ========"
+
   for service in "$@"; do
     if is_kotlin_service "${service}"; then
-      echo "======== bootJar ${service} (host) ========"
-      ./gradlew -p "services/${service}" bootJar -x test &
+      local_log="${log_dir}/${service}.log"
+      log_files+=("${local_log}")
+      echo "Queued ${service}"
+      ./gradlew --console=plain -p "services/${service}" bootJar -x test >"${local_log}" 2>&1 &
       pids+=("$!")
       running_services+=("${service}")
       if [ "${#pids[@]}" -ge "${GRADLE_BUILD_JOBS}" ]; then
+        batch_failed=0
         for ((i=0; i<${#pids[@]}; i++)); do
-          if ! wait "${pids[i]}"; then
-            echo "bootJar failed: ${running_services[i]}" >&2
-            failed=1
+          if wait "${pids[i]}"; then statuses+=(0); else statuses+=(1); batch_failed=1; failed=1; fi
+        done
+        for ((i=0; i<${#pids[@]}; i++)); do
+          if [ "${statuses[i]}" -eq 0 ]; then
+            echo "  OK   ${running_services[i]}"
+          else
+            echo "  FAIL ${running_services[i]}" >&2
+            sed "s/^/[${running_services[i]}] /" "${log_files[i]}" >&2
           fi
         done
         pids=()
         running_services=()
-        if [ "${failed}" -ne 0 ]; then return 1; fi
+        log_files=()
+        statuses=()
+        if [ "${batch_failed}" -ne 0 ]; then
+          rm -rf "${log_dir}"
+          return 1
+        fi
       fi
     fi
   done
   for ((i=0; i<${#pids[@]}; i++)); do
-    if ! wait "${pids[i]}"; then
-      echo "bootJar failed: ${running_services[i]}" >&2
-      failed=1
+    if wait "${pids[i]}"; then statuses+=(0); else statuses+=(1); failed=1; fi
+  done
+  for ((i=0; i<${#pids[@]}; i++)); do
+    if [ "${statuses[i]}" -eq 0 ]; then
+      echo "  OK   ${running_services[i]}"
+    else
+      echo "  FAIL ${running_services[i]}" >&2
+      sed "s/^/[${running_services[i]}] /" "${log_files[i]}" >&2
     fi
   done
+  rm -rf "${log_dir}"
   if [ "${failed}" -ne 0 ]; then return 1; fi
 
   echo "======== Building images: $* ========"
@@ -224,8 +274,11 @@ usage() {
 Usage: $0 <command> [args]
 
 Commands:
-  --start [--no-build]     Host bootJar for Kotlin services, image build, then up -d
-  --rebuild <service...>   Host bootJar if Kotlin, rebuild images, recreate containers
+  --start [--no-build] [--no-prepopulate]
+                           Build and start the stack, then prepopulate it
+  --only-prepopulate       Prepopulate an already running local stack
+  --rebuild [--no-prepopulate] <service...>
+                           Rebuild services, recreate containers, then prepopulate
   --stop                   Stop containers; keep named Postgres volumes
   --status                 Show compose ps
   --reset [--prune]        down -v --remove-orphans. --prune also docker system prune -af
@@ -254,11 +307,14 @@ case "${COMMAND}" in
 
   --start)
     NO_BUILD=0
-    if [ "${1:-}" = "--no-build" ]; then
-      NO_BUILD=1
-    elif [ "$#" -gt 0 ]; then
-      usage 1
-    fi
+    NO_PREPOPULATE=0
+    for option in "$@"; do
+      case "${option}" in
+        --no-build) NO_BUILD=1 ;;
+        --no-prepopulate) NO_PREPOPULATE=1 ;;
+        *) usage 1 ;;
+      esac
+    done
     ensure_docker_running
     ensure_env_file
     echo "Starting local stack using ${ENV_FILE}..."
@@ -271,21 +327,41 @@ case "${COMMAND}" in
     echo "======== Container status ========"
     compose ps
     wait_for_http
+    if [ "${NO_PREPOPULATE}" -eq 0 ]; then
+      run_prepopulate
+    fi
     print_urls
     echo "Started."
     ;;
 
+  --only-prepopulate|-only-prepopulate)
+    if [ "$#" -gt 0 ]; then usage 1; fi
+    ensure_env_file
+    wait_for_http
+    run_prepopulate
+    ;;
+
   --rebuild)
-    if [ "$#" -lt 1 ]; then
+    NO_PREPOPULATE=0
+    SERVICES=()
+    for raw in "$@"; do
+      if [ "${raw}" = "--no-prepopulate" ]; then
+        NO_PREPOPULATE=1
+      else
+        SERVICES+=("${raw}")
+      fi
+    done
+    if [ "${#SERVICES[@]}" -lt 1 ]; then
       echo "Specify at least one service to rebuild."
       usage 1
     fi
     ensure_docker_running
     ensure_env_file
     ensure_disk_space
+    REQUESTED_SERVICES=("${SERVICES[@]}")
     SERVICES=()
     NEED_SEARCH=0
-    for raw in "$@"; do
+    for raw in "${REQUESTED_SERVICES[@]}"; do
       svc="$(normalize_service "${raw}")"
       if ! is_known_service "${svc}"; then
         echo "Unknown service '${raw}' (resolved '${svc}')."
@@ -313,6 +389,9 @@ case "${COMMAND}" in
     compose up -d --no-build --remove-orphans --force-recreate "${SERVICES[@]}"
     compose ps
     wait_for_http
+    if [ "${NO_PREPOPULATE}" -eq 0 ]; then
+      run_prepopulate
+    fi
     print_urls
     echo "Rebuilt."
     ;;

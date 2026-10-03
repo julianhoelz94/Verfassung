@@ -73,6 +73,15 @@ class AmendmentRepository(
     private val jdbc: JdbcTemplate,
     private val objectMapper: ObjectMapper,
 ) {
+    fun initialRevisionUsesSnapshotReview(amendmentId: UUID): Boolean = jdbc.query(
+        """SELECT r.target_version_id IS NOT NULL OR EXISTS (
+             SELECT 1 FROM amendment_changes c WHERE c.revision_id = r.id
+               AND (c.before_logical_id IS NOT NULL OR c.after_logical_id IS NOT NULL OR c.draft_after_logical_id IS NOT NULL)
+           ) FROM amendment_revisions r WHERE r.amendment_id = ? AND r.predecessor_revision_id IS NULL""",
+        { rs, _ -> rs.getBoolean(1) },
+        amendmentId,
+    ).firstOrNull() ?: false
+
     fun lockAmendment(id: UUID) {
         jdbc.query("SELECT id FROM amendments WHERE id = ? FOR UPDATE", { rs, _ -> rs.getObject(1, UUID::class.java) }, id)
     }

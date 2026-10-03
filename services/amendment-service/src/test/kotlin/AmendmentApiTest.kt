@@ -107,6 +107,7 @@ class AmendmentApiTest {
         val amendment = amendments.createAmendment(UUID.randomUUID(), AmendmentWriteRequest(title = "Law", sourceVersionId = sourceId, targetVersionId = targetId), editor)
         val review = diffReview.refresh(amendment.id)
         org.assertj.core.api.Assertions.assertThat(review.candidates.map { it.facet }).containsExactly("text_changed")
+        assertThrows<ConflictException> { amendments.publishAmendment(amendment.id) }
         assertThrows<ConflictException> { diffReview.requireComplete(amendment.id) }
         val item = review.candidates.single()
         diffReview.decide(amendment.id, AmendmentDiffDecisionWrite(review.revisionId, item.key, item.fingerprint, "excluded_with_reason", exclusionReason = "Separate correction"), reviewer = false)
@@ -114,6 +115,65 @@ class AmendmentApiTest {
         diffReview.decide(amendment.id, AmendmentDiffDecisionWrite(review.revisionId, item.key, item.fingerprint, "excluded_with_reason", exclusionReason = "Separate correction", reviewerAcknowledged = true), reviewer = true)
         diffReview.requireComplete(amendment.id)
         org.assertj.core.api.Assertions.assertThat(diffReview.refresh(amendment.id).decisions.single().reviewerAcknowledged).isTrue()
+        amendments.publishAmendment(amendment.id)
+    }
+
+    @Test
+    fun sourceOnlyTransitionCanPublishAfterTargetIsPinned() {
+        val sourceId = UUID.randomUUID()
+        val targetId = UUID.randomUUID()
+        val logical = UUID.randomUUID()
+        val textLogical = UUID.randomUUID()
+        fun article(version: UUID, wording: String) = ContentTreeArticle(
+            UUID.randomUUID(),
+            version,
+            "7",
+            "Rights",
+            1,
+            logicalId = logical,
+            revisionId = UUID.randomUUID(),
+            content = listOf(OrderedEntry("text", logicalId = textLogical, revisionId = UUID.randomUUID(), occurrenceId = UUID.randomUUID(), text = wording)),
+        )
+        Mockito.`when`(contentClient.listArticles(sourceId)).thenReturn(listOf(article(sourceId, "Before.")))
+        Mockito.`when`(contentClient.listArticles(targetId)).thenReturn(listOf(article(targetId, "After.")))
+        Mockito.`when`(catalogClient.getVersion(sourceId)).thenReturn(CatalogVersionRef(sourceId, currentVersionId = sourceId, publicationStatus = "published"))
+        Mockito.`when`(catalogClient.getVersion(targetId)).thenReturn(CatalogVersionRef(targetId, currentVersionId = targetId, publicationStatus = "published"))
+        val transition = amendments.createAmendment(UUID.randomUUID(), AmendmentWriteRequest(title = "Successor law", sourceVersionId = sourceId), editor)
+        amendments.appendRevision(transition.id, AmendmentWriteRequest(title = "Successor law", sourceVersionId = sourceId, targetVersionId = targetId), editor)
+        amendments.publishAmendment(transition.id)
+    }
+
+    @Test
+    fun publisherCanConfirmLiveQuotesAfterReviewedSnapshotDiff() {
+        val sourceId = UUID.randomUUID()
+        val targetId = UUID.randomUUID()
+        val sourceTip = UUID.randomUUID()
+        val logical = UUID.randomUUID()
+        val textLogical = UUID.randomUUID()
+        fun article(version: UUID, wording: String) = ContentTreeArticle(
+            UUID.randomUUID(),
+            version,
+            "7",
+            "Rights",
+            1,
+            logicalId = logical,
+            revisionId = UUID.randomUUID(),
+            content = listOf(OrderedEntry("text", logicalId = textLogical, revisionId = UUID.randomUUID(), occurrenceId = UUID.randomUUID(), text = wording)),
+        )
+        Mockito.`when`(contentClient.listArticles(sourceId)).thenReturn(listOf(article(sourceId, "Before.")))
+        Mockito.`when`(contentClient.listArticles(targetId)).thenReturn(listOf(article(targetId, "After.")))
+        Mockito.`when`(contentClient.listArticles(sourceTip)).thenReturn(listOf(article(sourceTip, "Corrected before.")))
+        Mockito.`when`(catalogClient.getVersion(sourceId)).thenReturn(CatalogVersionRef(sourceId, currentVersionId = sourceId, publicationStatus = "published"))
+        Mockito.`when`(catalogClient.getVersion(targetId)).thenReturn(CatalogVersionRef(targetId, currentVersionId = targetId, publicationStatus = "published"))
+        val amendment = amendments.createAmendment(UUID.randomUUID(), AmendmentWriteRequest(title = "Quoted law", sourceVersionId = sourceId, targetVersionId = targetId), editor)
+        val review = diffReview.refresh(amendment.id)
+        review.candidates.forEach { item ->
+            diffReview.decide(amendment.id, AmendmentDiffDecisionWrite(review.revisionId, item.key, item.fingerprint, "excluded_with_reason", exclusionReason = "Separate correction", reviewerAcknowledged = true), reviewer = true)
+        }
+        amendments.publishAmendment(amendment.id)
+        Mockito.`when`(catalogClient.getVersion(sourceId)).thenReturn(CatalogVersionRef(sourceId, currentVersionId = sourceTip, publicationStatus = "published"))
+        Mockito.`when`(catalogClient.getVersion(sourceTip)).thenReturn(CatalogVersionRef(sourceTip, currentVersionId = sourceTip, publicationStatus = "published"))
+        assertEquals(sourceTip, amendments.confirmQuotes(amendment.id, publisher).sourceVersionId)
     }
 
     @Test

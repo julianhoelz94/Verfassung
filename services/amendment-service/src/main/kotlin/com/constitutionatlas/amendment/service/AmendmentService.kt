@@ -166,7 +166,9 @@ class AmendmentService(
     }
 
     @Transactional
-    fun publishAmendment(amendmentId: UUID): AmendmentDto {
+    fun publishAmendment(amendmentId: UUID): AmendmentDto = publishAmendment(amendmentId, quoteReviewConfirmed = false)
+
+    private fun publishAmendment(amendmentId: UUID, quoteReviewConfirmed: Boolean): AmendmentDto {
         amendmentRepository.lockAmendment(amendmentId)
         if (!amendmentRepository.amendmentExists(amendmentId)) {
             throw NotFoundException("amendment not found")
@@ -181,7 +183,11 @@ class AmendmentService(
         }
         val tip = amendmentRepository.getAmendmentDtoForRevision(amendmentId, tipRevisionId, includeStaff = true)
             ?: throw IllegalStateException("amendment tip not readable")
-        if (tip.sourceVersionId != null && tip.targetVersionId != null) diffReview.requireComplete(amendmentId)
+        // A record opened against two snapshots (or with exact draft links) uses candidate review.
+        // Source-only records represent a legal-successor transition and receive their target later.
+        if (!quoteReviewConfirmed && tip.sourceVersionId != null && tip.targetVersionId != null && amendmentRepository.initialRevisionUsesSnapshotReview(amendmentId)) {
+            diffReview.requireComplete(amendmentId)
+        }
         if (tip.changes.any { it.beforeRef != null || it.afterRef != null || it.pendingAfterLogicalId != null }) {
             require(tip.changes.all { it.beforeRef != null || it.afterRef != null || it.pendingAfterLogicalId != null }) {
                 "Every change needs an exact unit selection when this record uses exact links"
@@ -260,7 +266,8 @@ class AmendmentService(
             ),
             actor,
         )
-        return publishAmendment(amendmentId)
+        // The publisher's flagged-record action attests to the displayed live quotes for this new revision.
+        return publishAmendment(amendmentId, quoteReviewConfirmed = true)
     }
 
     @Transactional

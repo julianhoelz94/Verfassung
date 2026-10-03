@@ -68,6 +68,14 @@ for (const hop of ['editorial_correction', 'legal'] as const) {
       await page.getByLabel('Before unit').selectOption(sourceSentence.logicalId);
       await page.getByLabel('Draft after unit').selectOption(sourceSentence.logicalId);
       await page.getByRole('button', { name: 'Save change record' }).click();
+      const sessionId = new URL(page.url()).searchParams.get('sessionId');
+      const review = await json(await request.get(`/api/editor/edit-sessions/${sessionId}/diff-review`, { headers }));
+      for (const candidate of review.candidates) {
+        await json(await request.post(`/api/editor/edit-sessions/${sessionId}/diff-review/decisions`, { headers, data: {
+          expectedGeneration: review.draftGeneration, key: candidate.key, fingerprint: candidate.fingerprint,
+          status: 'excluded_with_reason', exclusionReason: 'Journey fixture tracks the sentence node as its change row.', reviewerAcknowledged: true,
+        } }));
+      }
     } else {
       await page.getByLabel('What was corrected in this transcription?').fill('Corrected one sentence.');
       await page.getByRole('button', { name: 'Save comment' }).click();

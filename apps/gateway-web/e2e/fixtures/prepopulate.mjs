@@ -47,10 +47,10 @@ function totp(secret) {
 }
 
 async function authenticate() {
-  const email = process.env.PREPOPULATE_ADMIN_EMAIL ?? process.env.CI_ADMIN_EMAIL;
-  const password = process.env.PREPOPULATE_ADMIN_PASSWORD ?? process.env.CI_ADMIN_PASSWORD;
-  const secret = process.env.PREPOPULATE_TOTP_SECRET ?? process.env.IDENTITY_SEED_TOTP_SECRET;
-  if (!email || !password) throw new Error('Set PREPOPULATE_ADMIN_EMAIL/PASSWORD or CI_ADMIN_EMAIL/PASSWORD');
+  const email = process.env.PREPOPULATE_ADMIN_EMAIL ?? process.env.CI_ADMIN_EMAIL ?? process.env.LOCAL_ADMIN_EMAIL;
+  const password = process.env.PREPOPULATE_ADMIN_PASSWORD ?? process.env.CI_ADMIN_PASSWORD ?? process.env.LOCAL_ADMIN_PASSWORD;
+  const secret = process.env.PREPOPULATE_TOTP_SECRET ?? process.env.IDENTITY_SEED_TOTP_SECRET ?? (process.env.LOCAL_ADMIN_EMAIL ? 'CAATLASMFASEED22' : undefined);
+  if (!email || !password) throw new Error('Set PREPOPULATE_ADMIN_EMAIL/PASSWORD, CI_ADMIN_EMAIL/PASSWORD, or LOCAL_ADMIN_EMAIL/PASSWORD');
   let login = await api('POST', 'identity/login', { email, password });
   if (login.mfaRequired) {
     if (!secret) throw new Error('Set PREPOPULATE_TOTP_SECRET for MFA');

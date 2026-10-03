@@ -74,6 +74,20 @@ describe('guided difference review', () => {
     expect(host.textContent).toContain('Reviewed 0 of 2');
   });
 
+  it('continues through open findings before returning to reviewer acknowledgements for a combined role', async () => {
+    const initial = state([candidate('eight', 'Article 8', 'Old right', 'New right'), candidate('twelve', 'Article 12', 'Old duty', 'New duty')]);
+    actions.save.mockResolvedValue({ review: { ...initial, decisions: [{ ...initial.decisions[0], status: 'excluded_with_reason', reason: 'Separate legal record' }, initial.decisions[1]] } });
+    await mount(initial);
+    await act(async () => {
+      const reason = host.querySelector('textarea')!;
+      reason.value = 'Separate legal record';
+      Simulate.change(reason);
+    });
+    await act(async () => button('Exclude with reason and next').click());
+    expect(host.textContent).toContain('Difference 2 of 2');
+    expect(host.textContent).toContain('1 of 2 ready for reviewer handoff');
+  });
+
   it('saves an acknowledged exclusion and restores progress from the saved state', async () => {
     const initial = state([candidate('eight', 'Article 8', 'Old', 'New')]);
     actions.save.mockResolvedValue({ review: { ...initial, decisions: [{ ...initial.decisions[0], status: 'excluded_with_reason', reason: 'Editorial correction', reviewerAcknowledged: true }], totals: { total: 1, resolved: 1 }, currentPosition: null } });

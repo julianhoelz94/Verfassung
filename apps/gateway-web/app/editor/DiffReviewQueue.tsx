@@ -93,9 +93,8 @@ export function DiffReviewQueue({ target, initial, rows, canDecide, canAcknowled
       if ('error' in result) { setMessage(result.error); return; }
       setReview(result.review);
       const byKey = new Map(result.review.decisions.map((decision) => [decision.key, decision]));
-      const next = result.review.candidates.find((candidate) => canAcknowledge
-        ? !decisionResolved(candidate, byKey.get(candidate.key))
-        : !decisionReadyForReview(candidate, byKey.get(candidate.key)));
+      const next = result.review.candidates.find((candidate) => !decisionReadyForReview(candidate, byKey.get(candidate.key)))
+        ?? (canAcknowledge ? result.review.candidates.find((candidate) => !decisionResolved(candidate, byKey.get(candidate.key))) : undefined);
       choose(next?.key ?? input.key);
       setMessage('Decision saved.');
       router.refresh();
@@ -153,7 +152,7 @@ export function DiffReviewQueue({ target, initial, rows, canDecide, canAcknowled
           <div><h4>Before</h4><p>{selected.beforeRefs.map(label).join('; ') || 'No source unit'}</p><p className="diff-review-text">{segsForSide(spans, 'from').map((seg, index) => seg.type === 'remove' ? <del key={index}>{seg.text}</del> : <span key={index}>{seg.text}</span>)}</p>{selected.beforeRefs.map((ref) => <code key={`${ref.logicalId}-${ref.occurrenceId}`}>{ref.versionId ?? 'draft'} · {ref.logicalId}</code>)}</div>
           <div><h4>After</h4><p>{selected.afterRefs.map(label).join('; ') || 'No target unit'}</p><p className="diff-review-text">{segsForSide(spans, 'to').map((seg, index) => seg.type === 'add' ? <ins key={index}>{seg.text}</ins> : <span key={index}>{seg.text}</span>)}</p>{selected.afterRefs.map((ref) => <code key={`${ref.logicalId}-${ref.occurrenceId}`}>{ref.versionId ?? 'draft'} · {ref.logicalId}</code>)}</div>
         </div>
-        <div className="action-bar"><Button type="button" disabled={selectedIndex <= 0} onClick={() => navigation(selectedIndex - 1)}>Previous</Button><Button type="button" disabled={selectedIndex >= visible.length - 1} onClick={() => navigation(selectedIndex + 1)}>Next</Button><Button type="button" onClick={() => { const next = visible.find((candidate) => (canAcknowledge ? !decisionResolved(candidate, decisions.get(candidate.key)) : !decisionReadyForReview(candidate, decisions.get(candidate.key))) && candidate.key !== selected.key); if (next) choose(next.key); }}>Next unreviewed</Button></div>
+        <div className="action-bar"><Button type="button" disabled={selectedIndex <= 0} onClick={() => navigation(selectedIndex - 1)}>Previous</Button><Button type="button" disabled={selectedIndex >= visible.length - 1} onClick={() => navigation(selectedIndex + 1)}>Next</Button><Button type="button" onClick={() => { const next = visible.find((candidate) => !decisionReadyForReview(candidate, decisions.get(candidate.key)) && candidate.key !== selected.key) ?? (canAcknowledge ? visible.find((candidate) => !decisionResolved(candidate, decisions.get(candidate.key)) && candidate.key !== selected.key) : undefined); if (next) choose(next.key); }}>Next unreviewed</Button></div>
         {canDecide ? <div className="stack">
           {onAddRow ? <Button type="button" onClick={() => { onAddRow(selected); setMessage('A change row was added. Check the exact units and save the draft before linking this difference.'); }}>Create change row from this difference</Button> : null}
           <Button type="button" onClick={() => { document.querySelector<HTMLElement>('[aria-label="Change record"], #amendment-changes-title')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); setMessage('Correct the pairing in the exact unit selectors, save, then link the saved row.'); }}>Correct pairing in change record</Button>

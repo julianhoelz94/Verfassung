@@ -4,6 +4,8 @@ import { useMemo, useState } from 'react';
 import { Button, Input, TextArea } from '../components/ui';
 import type { ChangeRecordChange, ChangeRecordUnitRef } from '../../lib/editor-api';
 import type { DraftEntry, DraftNode, StructuredPreview } from '../../lib/structured-editor';
+import type { DiffReviewState, ReviewCandidate } from '../../lib/diff-review';
+import { DiffReviewQueue } from './DiffReviewQueue';
 
 type UnitOption = { logicalId: string; display: string; articleId: string; articleNumber: string; unitKind: 'node' | 'text_entry'; ref: ChangeRecordUnitRef };
 
@@ -56,9 +58,11 @@ type PublishFormProps = {
   record?: { title: string; comment: string; documents: { url?: string; label?: string }[]; changes?: ChangeRecordChange[] } | null;
   comment?: string | null;
   structuredDraft?: StructuredPreview | null;
+  diffReview?: DiffReviewState | null;
+  canReviewDiff?: boolean;
 };
 
-export function PublishForm({ sessionId, versionId, articleId, hopKind, status, canEdit, canPublish, record, comment, structuredDraft }: PublishFormProps) {
+export function PublishForm({ sessionId, versionId, articleId, hopKind, status, canEdit, canPublish, record, comment, structuredDraft, diffReview, canReviewDiff = false }: PublishFormProps) {
   const [changes, setChanges] = useState<ChangeRecordChange[]>(() => record?.changes?.length ? record.changes : [newChange()]);
   const [search, setSearch] = useState<Record<string, string>>({});
   const beforeUnits = useMemo(() => unitOptions(structuredDraft?.sourceRoots ?? [], versionId, true), [structuredDraft, versionId]);
@@ -78,6 +82,19 @@ export function PublishForm({ sessionId, versionId, articleId, hopKind, status, 
       if (patch.changeType === 'removed') next.afterRef = null;
       return next;
     }));
+  }
+  function addCandidateRow(candidate: ReviewCandidate) {
+    const before = candidate.beforeRefs[0];
+    const after = candidate.afterRefs[0];
+    const unit = afterUnits.find((item) => item.logicalId === after?.logicalId) ?? beforeUnits.find((item) => item.logicalId === before?.logicalId);
+    setChanges((current) => [...current, {
+      articleId: unit?.articleId ?? articleId,
+      articleNumber: unit?.articleNumber ?? '',
+      changeType: !before ? 'added' : !after ? 'removed' : 'changed',
+      note: '',
+      beforeRef: before ? beforeUnits.find((item) => item.logicalId === before.logicalId)?.ref ?? { versionId, logicalId: before.logicalId } : null,
+      afterRef: after ? afterUnits.find((item) => item.logicalId === after.logicalId)?.ref ?? { logicalId: after.logicalId } : null,
+    }]);
   }
   function picker(row: ChangeRecordChange, index: number, side: 'before' | 'after') {
     const required = row.changeType === 'changed' || (side === 'before' ? row.changeType === 'removed' : row.changeType === 'added');
@@ -171,6 +188,11 @@ export function PublishForm({ sessionId, versionId, articleId, hopKind, status, 
           </Button>
         </form>
       ) : null}
+      {diffReview ? <DiffReviewQueue key={diffReview.draftGeneration} target={{ kind: 'editor', id: sessionId }} initial={diffReview}
+        rows={(record?.changes ?? []).flatMap((change, index) => change.id ? [{ id: change.id, label: `${index + 1}. ${change.changeType} ${change.articleNumber} ${change.note ?? ''}`.trim() }] : [])}
+        canDecide={status === 'open' && canEdit || canReviewDiff}
+        canAcknowledge={canReviewDiff}
+        onAddRow={status === 'open' && canEdit ? addCandidateRow : undefined} /> : null}
     </section>
   );
 }

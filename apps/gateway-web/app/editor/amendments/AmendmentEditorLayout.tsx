@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import type { Amendment, ArticleSummary, VersionSummary } from '../../../lib/api';
 import type { AmendmentRevision } from '../../../lib/amendment-editor-api';
+import type { DiffReviewState } from '../../../lib/diff-review';
 import { Alert, Button } from '../../components/ui';
 import { AmendmentForm } from './AmendmentForm';
 import { AmendmentRevisionPanel } from './AmendmentRevisionPanel';
@@ -22,6 +23,9 @@ type AmendmentEditorLayoutProps = {
   readOnly: boolean;
   canRestore: boolean;
   contentAvailable: boolean;
+  diffReview?: DiffReviewState | null;
+  canReviewDiff?: boolean;
+  canAcknowledgeDiff?: boolean;
 };
 
 function revisionToAmendment(revision: AmendmentRevision, base: Amendment): Amendment {
@@ -65,6 +69,9 @@ export function AmendmentEditorLayout({
   readOnly,
   canRestore,
   contentAvailable,
+  diffReview,
+  canReviewDiff,
+  canAcknowledgeDiff,
 }: AmendmentEditorLayoutProps) {
   const [selectedRevisionId, setSelectedRevisionId] = useState<string | null>(null);
 
@@ -110,6 +117,9 @@ export function AmendmentEditorLayout({
           canWithdraw={canWithdraw && !viewingPast}
           readOnly={readOnly || viewingPast}
           contentAvailable={contentAvailable}
+          diffReview={!viewingPast ? diffReview : null}
+          canReviewDiff={canReviewDiff}
+          canAcknowledgeDiff={canAcknowledgeDiff}
         />
         {canPublish && !viewingPast ? (
           <form action="/editor/command" method="post" className="action-bar"><input type="hidden" name="command" value="amendment-publish" />

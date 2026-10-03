@@ -104,6 +104,27 @@ class StructuredDiffReviewService(private val sources: StructuredSourceClient, p
         }
     }
 
+    /** An editor may submit reasoned exclusions so a separate reviewer can acknowledge them. */
+    @Transactional
+    fun requireReadyForReview(preview: StructuredDraftPreview) {
+        val current = refresh(preview)
+        val decisions = current.decisions.associateBy { it.key }
+        current.candidates.forEach { item ->
+            decisions[item.key]?.takeIf { it.status == "linked" }?.let { validateRows(preview.sessionId, item, it.linkedRowIds) }
+        }
+        if (current.candidates.any { item ->
+                val decision = decisions[item.key]
+                decision == null ||
+                    decision.status == "open" ||
+                    decision.status == "needs_recheck" ||
+                    (decision.status == "excluded_with_reason" && decision.reason.isNullOrBlank()) ||
+                    (item.ambiguous && decision.status == "linked" && decision.linkedRowIds.size < 2)
+            }
+        ) {
+            throw ConflictException("Diff review has open, ambiguous, or stale findings", "diff_review_incomplete")
+        }
+    }
+
     private fun validateRows(sessionId: UUID, item: DiffItem, ids: List<UUID>) {
         val rows = sessions.changeRecord(sessionId)?.changes.orEmpty().mapNotNull { row -> row.id?.let { it to row } }.toMap()
         require(ids.isNotEmpty() && ids.all { it in rows }) { "Linked amendment rows must belong to the saved change record" }

@@ -280,6 +280,37 @@ class StructuredDraftApiTest {
     }
 
     @Test
+    fun editorCanSubmitReasonedExclusionForSeparateReviewerAcknowledgement() {
+        val editorAuth = "Bearer guided-editor"
+        val reviewerAuth = "Bearer guided-reviewer"
+        val editor = Actor(UUID.randomUUID(), "editor@test.local", listOf("editor"))
+        val reviewer = Actor(UUID.randomUUID(), "reviewer@test.local", listOf("reviewer"))
+        val version = UUID.randomUUID()
+        val root = fixture()
+        val source = DraftSource(version, 7, settings.id, listOf(root))
+        Mockito.`when`(identity.authenticate(editorAuth)).thenReturn(editor)
+        Mockito.`when`(identity.authenticate(reviewerAuth)).thenReturn(reviewer)
+        Mockito.`when`(sources.source(version)).thenReturn(source)
+        Mockito.`when`(sources.settings(version)).thenReturn(settings)
+        val session = sessions.insertSession(editor.id, version, "legal")
+        val entry = root.content[1].node!!.content.single()
+        val preview = drafts.save(editorAuth, session, StructuredDraftSave(0, listOf(DraftOperation(UUID.randomUUID(), "replace_text", entry.logicalId!!, entry.revisionId!!, text = "Changed wording."))))
+        sessions.recordChangeRecord(session, com.constitutionatlas.editor.api.ChangeRecordRequest("Law", "Legal update", changes = listOf(com.constitutionatlas.editor.api.ChangeRecordChange(root.logicalId, "46a", "changed"))))
+        val review = diffReview.refresh(preview)
+        assertThat(review.candidates).isNotEmpty()
+        review.candidates.forEach { item ->
+            diffReview.decide(preview, DiffReviewDecisionWrite(preview.generation, item.key, item.fingerprint, "excluded_with_reason", exclusionReason = "Separate correction"), reviewer = false)
+        }
+        editorService.submitReview(editorAuth, session)
+        assertThrows(ConflictException::class.java) { editorService.approve(reviewerAuth, session) }
+        val reviewerPreview = drafts.preview(reviewerAuth, session)
+        diffReview.refresh(reviewerPreview).candidates.forEach { item ->
+            diffReview.decide(reviewerPreview, DiffReviewDecisionWrite(reviewerPreview.generation, item.key, item.fingerprint, "excluded_with_reason", exclusionReason = "Separate correction", reviewerAcknowledged = true), reviewer = true)
+        }
+        editorService.approve(reviewerAuth, session)
+    }
+
+    @Test
     fun targetedSaveReopensLosslesslyAndPersistsOnlyOperation() {
         val actor = Actor(UUID.randomUUID(), "editor@test.local", listOf("editor"))
         val version = UUID.randomUUID()

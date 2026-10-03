@@ -4,7 +4,8 @@ import { ConstitutionText } from '../components/ConstitutionText';
 import { PageMain } from '../components/PageMain';
 import { Alert, Badge, Button, Card, DataList, DataRow, Input, PageHeader, Select, WorkflowSteps } from '../components/ui';
 import { getCountry, listAllArticles, getArticle, listAllUnits, getUnit, getVersionSettings, listCountries, type ArticleSummary, type CountryDetail, type CountrySummary } from '../../lib/api';
-import { editorErrorMessage, getDraftPreview, getStructuredDraft, listSessions, type EditSessionSummary } from '../../lib/editor-api';
+import { editorErrorMessage, getDraftPreview, getEditorDiffReview, getStructuredDraft, listSessions, type EditSessionSummary } from '../../lib/editor-api';
+import { decisionReadyForReview } from '../../lib/diff-review';
 import { currentUser } from '../../lib/session';
 import { ArticleEditor } from './ArticleEditor';
 import { EditorDraftState, SubmitReviewButton } from './EditorDraftState';
@@ -146,6 +147,11 @@ export default async function EditorPage(props: EditorPageProps) {
   const units: ArticleSummary[] = versionId ? await listAllUnits(versionId) : [];
   const legacySource = units.some(unit => unit.legacyIdentity);
   const structured = session && !legacySource && !(preview?.drafts?.length) ? await getStructuredDraft(session.id) : null;
+  const diffReview = structured && session?.hopKind === 'legal' && session.status !== 'published'
+    ? await getEditorDiffReview(session.id)
+    : null;
+  const reviewDecisions = new Map(diffReview?.decisions.map((decision) => [decision.key, decision]));
+  const reviewComplete = diffReview?.candidates.every((candidate) => decisionReadyForReview(candidate, reviewDecisions.get(candidate.key))) ?? true;
   const sourceArticles: ArticleSummary[] = legacySource && versionId ? await listAllArticles(versionId) : units;
   const articles: ArticleSummary[] = structured ? structured.roots.map((root, index) => ({
     id: sourceArticles.find(article => article.logicalId === root.logicalId)?.id ?? root.logicalId,
@@ -366,7 +372,7 @@ export default async function EditorPage(props: EditorPageProps) {
                 <form action="/editor/command" method="post">
                   <input type="hidden" name="command" value="review" />
                   {hiddenFields}
-                  <SubmitReviewButton disabled={session.hopKind === 'legal' ? !preview.changeRecord || Boolean(structured && !preview.changeRecord.changes?.length) : session.hopKind === 'editorial_correction' ? !preview.publishComment : false} />
+                  <SubmitReviewButton disabled={session.hopKind === 'legal' ? !preview.changeRecord || Boolean(structured && (!preview.changeRecord.changes?.length || !reviewComplete)) : session.hopKind === 'editorial_correction' ? !preview.publishComment : false} />
                 </form>
               ) : null}
               {canReview && session.status === 'reviewing' ? (
@@ -430,6 +436,8 @@ export default async function EditorPage(props: EditorPageProps) {
                 record={preview.changeRecord}
                 comment={preview.publishComment}
                 structuredDraft={structured}
+                diffReview={diffReview}
+                canReviewDiff={canReview}
               />
             ) : null}
             {!session.hopKind && session.status === 'approved' && canPublish && searchParams.sessionId && versionId && selectedId ? (

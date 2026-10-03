@@ -2,6 +2,7 @@ import { cookies } from 'next/headers';
 import type { Amendment, AmendmentUnitRef } from './api';
 import { amendmentBaseUrl } from './api';
 import { SESSION_COOKIE } from './session';
+import type { DiffReviewState, ReviewDecisionInput } from './diff-review';
 
 export type AmendmentChangeWrite = {
   articleNumber?: string | null;
@@ -201,4 +202,27 @@ export async function suggestChanges(body: SuggestChangesBody): Promise<{ change
   });
   await throwIfNotOk(response, 'failed');
   return (await response.json()) as { changes: SuggestedChange[] };
+}
+
+export async function getAmendmentDiffReview(amendmentId: string): Promise<DiffReviewState> {
+  const response = await amendmentFetch(`/amendments/${encodeURIComponent(amendmentId)}/diff-review`);
+  await throwIfNotOk(response, 'failed');
+  return response.json();
+}
+
+export async function decideAmendmentDiff(amendmentId: string, revisionId: string, decision: ReviewDecisionInput): Promise<DiffReviewState> {
+  const response = await amendmentFetch(`/amendments/${encodeURIComponent(amendmentId)}/diff-review/decisions`, {
+    method: 'POST',
+    body: JSON.stringify({
+      expectedRevisionId: revisionId,
+      key: decision.key,
+      fingerprint: decision.fingerprint,
+      status: decision.status,
+      linkedChangeIds: decision.linkedIds ?? [],
+      exclusionReason: decision.exclusionReason ?? null,
+      reviewerAcknowledged: decision.reviewerAcknowledged ?? false,
+    }),
+  });
+  await throwIfNotOk(response, 'save_failed');
+  return response.json();
 }

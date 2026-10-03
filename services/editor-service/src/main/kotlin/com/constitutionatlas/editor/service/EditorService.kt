@@ -141,7 +141,7 @@ class EditorService(
         }
         if (editorRepository.hasStructuredDraft(sessionId)) {
             val prepared = structuredPublication.prepare(sessionId, session.versionId)
-            if (session.hopKind == "legal") structuredDiffReview.requireComplete(prepared)
+            if (session.hopKind == "legal") structuredDiffReview.requireReadyForReview(prepared)
         }
         editorRepository.updateStatus(session.id, EditSessionStatus.REVIEWING)
         auditClient.record(actor, "review_submitted", "edit_session", session.id)

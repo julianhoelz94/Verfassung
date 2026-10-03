@@ -23,7 +23,7 @@ export async function adminHeaders(request: APIRequestContext) {
   return { Authorization: `Bearer ${authenticated.token}` };
 }
 
-export async function createIsolatedConstitution(request: APIRequestContext, title: string) {
+export async function createIsolatedConstitution(request: APIRequestContext, title: string, targetBody?: string) {
   const headers = await adminHeaders(request);
   const slug = `journey-${randomUUID()}`;
   const base = {
@@ -34,6 +34,7 @@ export async function createIsolatedConstitution(request: APIRequestContext, tit
   async function importVersion(versionLabel: string, predecessorVersionId?: string) {
     const job = await expectJson(await request.post('/api/ingestion/import-jobs', { headers, data: {
       ...base, versionLabel, effectiveDate: versionLabel === '2020' ? '2020-01-01' : '2022-01-01',
+      articles: versionLabel === '2022' && targetBody ? [{ ...base.articles[0], body: targetBody }] : base.articles,
       ...(predecessorVersionId ? { predecessorVersionId, hopKind: 'legal' } : {}),
     } }), `${title} import ${versionLabel}`);
     expect(job.status).toBe('completed');

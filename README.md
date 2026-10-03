@@ -43,9 +43,12 @@ cp env/local-stack.env.example env/local-stack.env   # once
 Service names: `catalog`, `content`, `amendment`, `identity`, `editor`, `search`, `ingestion`, `audit`.
 
 ```bash
-./manageLocalStack.sh --start              # host bootJar + image build, then up
-./manageLocalStack.sh --start --no-build   # fast restart using existing images
+./manageLocalStack.sh --start              # host bootJar + image build, then up and prepopulate
+./manageLocalStack.sh --start --no-build   # fast restart using existing images, then prepopulate
+./manageLocalStack.sh --start --no-prepopulate # start without fixture data
+./manageLocalStack.sh --only-prepopulate   # populate an already running stack
 ./manageLocalStack.sh --rebuild content-service amendment-service gateway-web
+./manageLocalStack.sh --rebuild --no-prepopulate catalog-service
 ./manageLocalStack.sh --status
 ./manageLocalStack.sh --stop               # keeps named database volumes
 ./manageLocalStack.sh --reset              # compose down -v only
@@ -53,6 +56,8 @@ Service names: `catalog`, `content`, `amendment`, `identity`, `editor`, `search`
 ```
 
 `--start` runs `./gradlew bootJar` on the host for each Kotlin service, then copies `app.jar` onto `eclipse-temurin:21-jre`. Gateway and Caddy still build in Docker. After Flyway or gateway changes, `--rebuild` those services (catalog/content also recreates search so the index rebuilds).
+
+`--start` and `--rebuild` prepopulate after the services become reachable. Prepopulation uses the seeded `LOCAL_ADMIN_EMAIL` and `LOCAL_ADMIN_PASSWORD` from `env/local-stack.env`, targets only localhost, and verifies existing fixture data on repeated runs. Use `--no-prepopulate` to leave the stack's data as it is.
 
 The script uses the selected Docker context. If its engine is stopped on macOS, it opens OrbStack for the `orbstack` context or Docker Desktop for other contexts. Select OrbStack with `docker context use orbstack` if needed. Builds run two Kotlin services at a time (`GRADLE_BUILD_JOBS=1` for a memory-constrained machine) and batch the Docker image builds. A fresh checkout still needs one full build; subsequent restarts can use `--start --no-build`. Use `--rebuild <service>` to apply source changes to a running stack.
 

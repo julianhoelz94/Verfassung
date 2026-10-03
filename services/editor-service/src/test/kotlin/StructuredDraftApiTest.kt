@@ -11,6 +11,8 @@ import com.constitutionatlas.editor.client.DraftOutline
 import com.constitutionatlas.editor.client.DraftSettings
 import com.constitutionatlas.editor.client.StructuredSourceClient
 import com.constitutionatlas.editor.repo.EditorRepository
+import com.constitutionatlas.editor.service.DiffReviewDecisionWrite
+import com.constitutionatlas.editor.service.StructuredDiffReviewService
 import com.constitutionatlas.editor.service.StructuredDraftEngine
 import com.constitutionatlas.editor.service.StructuredDraftService
 import com.constitutionatlas.platform.Actor
@@ -34,6 +36,10 @@ import java.util.UUID
 @SpringBootTest(classes = [EditorServiceApplication::class])
 class StructuredDraftApiTest {
     @Autowired lateinit var drafts: StructuredDraftService
+
+    @Autowired lateinit var diffReview: StructuredDiffReviewService
+
+    @Autowired lateinit var amendmentActions: com.constitutionatlas.editor.service.AmendmentActions
 
     @Autowired lateinit var sessions: EditorRepository
 
@@ -91,6 +97,49 @@ class StructuredDraftApiTest {
         ),
     )
 
+    @Test
+    fun reviewedDuplicateRowsTransferBySourceIdAndPublishedRetryIsIdempotent() {
+        val auth = "Bearer duplicate-review"
+        val actor = Actor(UUID.randomUUID(), "reviewer@test.local", listOf("admin"), stepUpFresh = true)
+        val version = UUID.randomUUID()
+        val target = UUID.randomUUID()
+        val constitution = UUID.randomUUID()
+        val root = fixture()
+        val text = root.content[1].node!!.content.single()
+        Mockito.`when`(identity.authenticate(auth)).thenReturn(actor)
+        Mockito.`when`(sources.source(version)).thenReturn(DraftSource(version, 7, settings.id, listOf(root)))
+        Mockito.`when`(sources.settings(version)).thenReturn(settings)
+        val session = sessions.insertSession(actor.id, version, "legal")
+        val preview = drafts.save(auth, session, StructuredDraftSave(0, listOf(DraftOperation(UUID.randomUUID(), "replace_text", text.logicalId!!, text.revisionId!!, text = "Revised wording."))))
+        val unit = com.constitutionatlas.editor.api.ChangeRecordUnitRef(logicalId = text.logicalId!!, versionId = version)
+        val record = com.constitutionatlas.editor.api.ChangeRecordRequest(
+            "Law",
+            "Review",
+            listOf(com.constitutionatlas.editor.api.ChangeRecordDocument(url = "https://example.test/law")),
+            changes = listOf(
+                com.constitutionatlas.editor.api.ChangeRecordChange(root.logicalId, "46a", beforeRef = unit, pendingAfterLogicalId = text.logicalId),
+                com.constitutionatlas.editor.api.ChangeRecordChange(root.logicalId, "46a", beforeRef = unit, pendingAfterLogicalId = text.logicalId),
+            ),
+        )
+        sessions.recordChangeRecord(session, record)
+        val ids = sessions.changeRecord(session)!!.changes.map { it.id!! }
+        val review = diffReview.refresh(preview)
+        review.candidates.forEach { item -> diffReview.decide(preview, DiffReviewDecisionWrite(preview.generation, item.key, item.fingerprint, "linked", listOf(ids[1])), reviewer = true) }
+        val amendmentId = UUID.randomUUID()
+        val linkedRows = ids.map { source -> com.constitutionatlas.editor.client.LinkedAmendmentChange(UUID.randomUUID(), sourceChangeId = source, changeType = "changed", beforeRef = com.constitutionatlas.editor.client.LinkedUnitRef(text.logicalId!!), afterRef = com.constitutionatlas.editor.client.LinkedUnitRef(text.logicalId!!)) }
+        val initial = com.constitutionatlas.editor.client.LinkedAmendment(amendmentId, constitution, "draft", "Law", "Review", sourceVersionId = version)
+        val linked = initial.copy(targetVersionId = target, changes = linkedRows)
+        Mockito.`when`(amendmentClient.getAmendment(amendmentId, auth)).thenReturn(initial, linked, linked.copy(status = "published"))
+        Mockito.`when`(amendmentClient.diffReview(amendmentId, auth)).thenReturn(com.constitutionatlas.editor.client.AmendmentDiffReviewSnapshot(UUID.randomUUID(), review.candidates))
+        amendmentActions.completeLink(amendmentId, version, target, auth, session)
+        amendmentActions.completeLink(amendmentId, version, target, auth, session)
+        val decision = org.mockito.ArgumentCaptor.forClass(com.constitutionatlas.editor.client.AmendmentDiffDecisionRequest::class.java)
+        Mockito.verify(amendmentClient, Mockito.atLeastOnce()).decideDiff(Mockito.eq(amendmentId) ?: amendmentId, decision.capture() ?: com.constitutionatlas.editor.client.AmendmentDiffDecisionRequest(UUID.randomUUID(), "", "", "linked"), Mockito.eq(auth) ?: auth)
+        assertThat(decision.allValues.flatMap { it.linkedChangeIds }).contains(linkedRows[1].id)
+        assertThat(decision.allValues.flatMap { it.linkedChangeIds }).doesNotContain(linkedRows[0].id)
+        Mockito.verify(amendmentClient, Mockito.times(1)).publishAmendment(amendmentId, auth)
+    }
+
     @org.junit.jupiter.params.ParameterizedTest
     @org.junit.jupiter.params.provider.ValueSource(strings = ["editorial_correction", "legal"])
     fun orderedPublishRetriesReuseReservationAndPreserveMapping(hop: String) {
@@ -131,6 +180,14 @@ class StructuredDraftApiTest {
             },
         )
         if (hop == "legal") sessions.recordChangeRecord(session, record) else sessions.recordPublishComment(session, "Transcription fix")
+        if (hop == "legal") {
+            val review = diffReview.refresh(preview)
+            assertThat(review.candidates).isNotEmpty()
+            val rowId = sessions.changeRecord(session)!!.changes.single().id!!
+            review.candidates.forEach { item ->
+                diffReview.decide(preview, DiffReviewDecisionWrite(preview.generation, item.key, item.fingerprint, "linked", listOf(rowId)), reviewer = true)
+            }
+        }
         editorService.submitReview(auth, session)
         editorService.approve(auth, session)
         val amendment = com.constitutionatlas.editor.client.LinkedAmendment(UUID.randomUUID(), constitution, "draft", "Law", "Legal update", listOf(com.constitutionatlas.editor.client.ChangeRecordDocumentDto(url = "https://example.test/law")))
@@ -187,13 +244,8 @@ class StructuredDraftApiTest {
             ),
         )
         sessions.recordChangeRecord(session, record)
-        editorService.submitReview(auth, session)
-        editorService.approve(auth, session)
-
-        val failure = assertThrows(IllegalArgumentException::class.java) {
-            editorService.publish(auth, session, com.constitutionatlas.editor.api.PublishRequest("legal"))
-        }
-        assertThat(failure.message).contains("exact unit selections")
+        val failure = assertThrows(ConflictException::class.java) { editorService.submitReview(auth, session) }
+        assertThat(failure.message).contains("Diff review")
     }
 
     @Test
@@ -223,13 +275,8 @@ class StructuredDraftApiTest {
             ),
         )
         sessions.recordChangeRecord(session, record)
-        editorService.submitReview(auth, session)
-        editorService.approve(auth, session)
-
-        val failure = assertThrows(IllegalArgumentException::class.java) {
-            editorService.publish(auth, session, com.constitutionatlas.editor.api.PublishRequest("legal"))
-        }
-        assertThat(failure.message).contains("exact unit selections")
+        val failure = assertThrows(ConflictException::class.java) { editorService.submitReview(auth, session) }
+        assertThat(failure.message).contains("Diff review")
     }
 
     @Test
@@ -251,14 +298,22 @@ class StructuredDraftApiTest {
         val operation = DraftOperation(UUID.randomUUID(), "replace_text", entry.logicalId!!, entry.revisionId!!, text = "Changed wording.")
         val saved = drafts.save("Bearer test", session, StructuredDraftSave(0, listOf(operation)))
         assertThat(saved.roots.single().content[1].node!!.content.single().text).isEqualTo("Changed wording.")
+        val initialReview = diffReview.refresh(saved)
+        assertThat(initialReview.candidates).isNotEmpty()
+        val candidate = initialReview.candidates.single()
+        val decided = diffReview.decide(saved, DiffReviewDecisionWrite(saved.generation, candidate.key, candidate.fingerprint, "excluded_with_reason", exclusionReason = "Editorial correction"), reviewer = false)
+        assertThat(decided.decisions.single().status).isEqualTo("excluded_with_reason")
+        assertThat(diffReview.refresh(drafts.preview("Bearer test", session)).decisions.single().status).isEqualTo("excluded_with_reason")
         assertThat(saved.roots.single().content.first()).isEqualTo(root.content.first())
         assertThat(drafts.preview("Bearer test", session)).isEqualTo(saved)
         val stored = jdbc.queryForObject("SELECT payload::text FROM structured_draft_operations WHERE id = ?", String::class.java, operation.id)!!
         assertThat(stored).contains("Changed wording.").doesNotContain("Before.", "After.", "Original wording.")
         assertThrows(ConflictException::class.java) { drafts.save("Bearer test", session, StructuredDraftSave(0, listOf(operation.copy(id = UUID.randomUUID())))) }
+        val revised = drafts.save("Bearer test", session, StructuredDraftSave(1, listOf(DraftOperation(UUID.randomUUID(), "replace_text", entry.logicalId!!, operation.id, text = "Revised wording."))))
+        assertThat(diffReview.refresh(revised).decisions.single().status).isEqualTo("needs_recheck")
         Mockito.`when`(sources.source(version)).thenReturn(source.copy(generation = 8))
         assertThrows(ConflictException::class.java) { drafts.preview("Bearer test", session) }
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM structured_draft_operations WHERE session_id = ?", Int::class.java, session)).isEqualTo(1)
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM structured_draft_operations WHERE session_id = ?", Int::class.java, session)).isEqualTo(2)
     }
 
     @Test

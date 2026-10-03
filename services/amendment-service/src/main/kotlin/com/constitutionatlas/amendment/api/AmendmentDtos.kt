@@ -1,5 +1,6 @@
 package com.constitutionatlas.amendment.api
 
+import com.constitutionatlas.platform.DiffItem
 import com.fasterxml.jackson.annotation.JsonInclude
 import java.time.Instant
 import java.time.LocalDate
@@ -12,6 +13,7 @@ import java.util.UUID
 @JsonInclude(JsonInclude.Include.NON_NULL)
 data class AmendmentChangeDto(
     val id: UUID,
+    val sourceChangeId: UUID? = null,
     val articleId: UUID?,
     val articleNumber: String?,
     val changeType: String,
@@ -91,6 +93,8 @@ data class AmendmentChangeWriteRequest(
     val afterRef: AmendmentUnitRefDto? = null,
     val linkReviewReason: String? = null,
     val pendingAfterLogicalId: UUID? = null,
+    val id: UUID? = null,
+    val sourceChangeId: UUID? = null,
 )
 
 data class AmendmentWriteRequest(
@@ -129,6 +133,9 @@ data class SuggestedChangeDto(
 
 data class SuggestResponse(
     val changes: List<SuggestedChangeDto>,
+    val diffItems: List<DiffItem> = emptyList(),
+    val algorithmVersion: String? = null,
+    val settingsImpact: Boolean = false,
 )
 
 data class AmendmentRevisionDto(

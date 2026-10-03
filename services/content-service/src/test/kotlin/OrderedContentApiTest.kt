@@ -97,6 +97,68 @@ class OrderedContentApiTest {
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM ordered_publish_receipts WHERE version_id = ?", Int::class.java, version)).isEqualTo(1)
     }
 
+    @Test
+    fun orderedSnapshotExposesPersistedSplitLineage() {
+        val constitution = UUID.randomUUID()
+        val sourceId = UUID.randomUUID()
+        val targetId = UUID.randomUUID()
+        version(sourceId, constitution)
+        version(targetId, constitution)
+        val source = content.save(sourceId, OrderedSnapshotWrite(0, roots = listOf(OrderedNodeWrite(kind = "article", label = "1", content = listOf(OrderedEntryWrite("text", text = "Before"))))))
+        val root = source.roots.single()
+        val original = root.content.single()
+        Mockito.`when`(catalog.getVersion(sourceId)).thenReturn(CatalogVersion(sourceId, "published", constitution))
+        val target = content.save(
+            targetId,
+            OrderedSnapshotWrite(
+                0,
+                sourceId,
+                source.generation,
+                listOf(
+                    OrderedNodeWrite(
+                        logicalId = root.logicalId,
+                        predecessorRevisionId = root.revisionId,
+                        kind = "article",
+                        label = "1",
+                        content = listOf(
+                            OrderedEntryWrite("text", logicalId = UUID.randomUUID(), text = "Be", lineage = listOf(original.revisionId!!)),
+                            OrderedEntryWrite("text", logicalId = UUID.randomUUID(), text = "fore", lineage = listOf(original.revisionId!!)),
+                        ),
+                    ),
+                ),
+            ),
+        )
+        assertThat(target.roots.single().content.map { it.lineage }).containsExactly(listOf(original.revisionId!!), listOf(original.revisionId!!))
+        assertThat(content.get(targetId).roots.single().content.map { it.lineage }).containsExactly(listOf(original.revisionId!!), listOf(original.revisionId!!))
+    }
+
+    @Test
+    fun orderedSnapshotAndArticleApiExposeNodeSplitLineage() {
+        val constitution = UUID.randomUUID()
+        val sourceId = UUID.randomUUID()
+        val targetId = UUID.randomUUID()
+        version(sourceId, constitution)
+        version(targetId, constitution)
+        val source = content.save(sourceId, OrderedSnapshotWrite(0, roots = listOf(OrderedNodeWrite(kind = "article", label = "1", content = emptyList()))))
+        val original = source.roots.single()
+        Mockito.`when`(catalog.getVersion(sourceId)).thenReturn(CatalogVersion(sourceId, "published", constitution))
+        val target = content.save(
+            targetId,
+            OrderedSnapshotWrite(
+                0,
+                sourceId,
+                source.generation,
+                listOf(
+                    OrderedNodeWrite(kind = "article", label = "1a", content = emptyList(), lineage = listOf(original.revisionId)),
+                    OrderedNodeWrite(kind = "article", label = "1b", content = emptyList(), lineage = listOf(original.revisionId)),
+                ),
+            ),
+        )
+        assertThat(target.roots.map { it.lineage }).containsExactly(listOf(original.revisionId), listOf(original.revisionId))
+        assertThat(articles.listUnits(targetId, 0, 10, true).first.map { it.lineage }).containsExactly(listOf(original.revisionId), listOf(original.revisionId))
+        assertThat(articles.getUnit(targetId, target.roots.first().occurrenceId).lineage).containsExactly(original.revisionId)
+    }
+
     private fun version(id: UUID, constitution: UUID, parentText: Boolean = true) {
         Mockito.`when`(catalog.getVersion(id)).thenReturn(CatalogVersion(id, "draft", constitution))
         Mockito.`when`(catalog.getSettings(id)).thenReturn(

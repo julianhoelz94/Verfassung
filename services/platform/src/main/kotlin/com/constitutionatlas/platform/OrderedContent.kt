@@ -2,6 +2,7 @@ package com.constitutionatlas.platform
 
 import com.fasterxml.jackson.annotation.JsonAnySetter
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
+import com.fasterxml.jackson.annotation.JsonInclude
 import com.fasterxml.jackson.databind.JsonNode
 import java.util.UUID
 
@@ -15,6 +16,8 @@ data class OrderedNode(
     val title: String?,
     val content: List<OrderedEntry>,
     val orderInferred: Boolean = false,
+    @get:JsonInclude(JsonInclude.Include.NON_EMPTY)
+    val lineage: List<UUID> = emptyList(),
 )
 
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -25,6 +28,8 @@ data class OrderedEntry(
     val revisionId: UUID? = null,
     val occurrenceId: UUID? = null,
     val text: String? = null,
+    @get:JsonInclude(JsonInclude.Include.NON_EMPTY)
+    val lineage: List<UUID> = emptyList(),
 )
 
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -62,6 +67,7 @@ data class OrderedNodeWrite(
     val label: String? = null,
     val title: String? = null,
     val content: List<OrderedEntryWrite>? = null,
+    val lineage: List<UUID> = emptyList(),
 ) : StrictOrderedWrite()
 
 data class OrderedEntryWrite(

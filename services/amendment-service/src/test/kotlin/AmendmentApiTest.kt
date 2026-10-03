@@ -1,18 +1,25 @@
 import com.constitutionatlas.amendment.AmendmentServiceApplication
+import com.constitutionatlas.amendment.ConflictException
+import com.constitutionatlas.amendment.api.AmendmentWriteRequest
 import com.constitutionatlas.amendment.client.CatalogClient
 import com.constitutionatlas.amendment.client.CatalogVersionRef
 import com.constitutionatlas.amendment.client.ContentClient
 import com.constitutionatlas.amendment.client.ContentTreeArticle
 import com.constitutionatlas.amendment.client.ContentTreeNode
 import com.constitutionatlas.amendment.client.ResolvedContentUnit
+import com.constitutionatlas.amendment.service.AmendmentDiffDecisionWrite
+import com.constitutionatlas.amendment.service.AmendmentDiffReviewService
+import com.constitutionatlas.amendment.service.AmendmentService
 import com.constitutionatlas.platform.Actor
 import com.constitutionatlas.platform.IdentityClient
+import com.constitutionatlas.platform.OrderedEntry
 import com.constitutionatlas.platform.UnauthorizedException
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertThrows
 import org.mockito.Mockito
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
@@ -35,6 +42,10 @@ import java.util.UUID
 @AutoConfigureMockMvc
 @SpringBootTest(classes = [AmendmentServiceApplication::class])
 class AmendmentApiTest {
+    @Autowired lateinit var amendments: AmendmentService
+
+    @Autowired lateinit var diffReview: AmendmentDiffReviewService
+
     @Autowired
     lateinit var mockMvc: MockMvc
 
@@ -71,6 +82,38 @@ class AmendmentApiTest {
         Mockito.`when`(identityClient.authenticate(PUBLISHER_TOKEN)).thenReturn(publisher)
         Mockito.`when`(identityClient.authenticate(VIEWER_TOKEN)).thenReturn(viewer)
         Mockito.`when`(identityClient.authenticate(INTERNAL_TOKEN)).thenReturn(internal)
+    }
+
+    @Test
+    fun snapshotReviewPersistsExclusionAndRequiresReviewerAcknowledgement() {
+        val sourceId = UUID.randomUUID()
+        val targetId = UUID.randomUUID()
+        val logical = UUID.randomUUID()
+        val textLogical = UUID.randomUUID()
+        fun article(version: UUID, wording: String) = ContentTreeArticle(
+            UUID.randomUUID(),
+            version,
+            "7",
+            "Rights",
+            1,
+            logicalId = logical,
+            revisionId = UUID.randomUUID(),
+            content = listOf(OrderedEntry("text", logicalId = textLogical, revisionId = UUID.randomUUID(), occurrenceId = UUID.randomUUID(), text = wording)),
+        )
+        Mockito.`when`(contentClient.listArticles(sourceId)).thenReturn(listOf(article(sourceId, "Before.")))
+        Mockito.`when`(contentClient.listArticles(targetId)).thenReturn(listOf(article(targetId, "After.")))
+        Mockito.`when`(catalogClient.getVersion(sourceId)).thenReturn(CatalogVersionRef(sourceId, currentVersionId = sourceId, publicationStatus = "published"))
+        Mockito.`when`(catalogClient.getVersion(targetId)).thenReturn(CatalogVersionRef(targetId, currentVersionId = targetId, publicationStatus = "published"))
+        val amendment = amendments.createAmendment(UUID.randomUUID(), AmendmentWriteRequest(title = "Law", sourceVersionId = sourceId, targetVersionId = targetId), editor)
+        val review = diffReview.refresh(amendment.id)
+        org.assertj.core.api.Assertions.assertThat(review.candidates.map { it.facet }).containsExactly("text_changed")
+        assertThrows<ConflictException> { diffReview.requireComplete(amendment.id) }
+        val item = review.candidates.single()
+        diffReview.decide(amendment.id, AmendmentDiffDecisionWrite(review.revisionId, item.key, item.fingerprint, "excluded_with_reason", exclusionReason = "Separate correction"), reviewer = false)
+        assertThrows<ConflictException> { diffReview.requireComplete(amendment.id) }
+        diffReview.decide(amendment.id, AmendmentDiffDecisionWrite(review.revisionId, item.key, item.fingerprint, "excluded_with_reason", exclusionReason = "Separate correction", reviewerAcknowledged = true), reviewer = true)
+        diffReview.requireComplete(amendment.id)
+        org.assertj.core.api.Assertions.assertThat(diffReview.refresh(amendment.id).decisions.single().reviewerAcknowledged).isTrue()
     }
 
     @Test
@@ -245,6 +288,10 @@ class AmendmentApiTest {
         }.andExpect {
             status { isOk() }
             jsonPath("$.changes.length()") { value(4) }
+            jsonPath("$.algorithmVersion") { value("hierarchical-1") }
+            jsonPath("$.diffItems.length()") { isNotEmpty() }
+            jsonPath("$.diffItems[0].key") { isNotEmpty() }
+            jsonPath("$.diffItems[0].fingerprint") { isNotEmpty() }
             jsonPath("$.changes[0].changeType") { value("added") }
             jsonPath("$.changes[0].nodeId") { value(PARAGRAPH_2_TARGET.toString()) }
             jsonPath("$.changes[0].articleNumber") { value("1") }
@@ -1030,12 +1077,12 @@ class AmendmentApiTest {
 
         mockMvc.post("/amendments/$amendmentId/publish") {
             header("Authorization", PUBLISHER_TOKEN)
-        }.andExpect { status { isOk() } }
+        }.andExpect { status { isConflict() } }
 
         mockMvc.get("/amendments/$amendmentId").andExpect {
             status { isOk() }
-            jsonPath("$.title") { value("Pinned record revised") }
-            jsonPath("$.comment") { value("New comment") }
+            jsonPath("$.title") { value("Pinned record") }
+            jsonPath("$.comment") { value("Original comment") }
         }
     }
 
@@ -1124,7 +1171,7 @@ class AmendmentApiTest {
 
         mockMvc.post("/amendments/$amendmentId/publish") {
             header("Authorization", PUBLISHER_TOKEN)
-        }.andExpect { status { isOk() } }
+        }.andExpect { status { isConflict() } }
 
         mockMvc.get("/amendments/$amendmentId") {
             header("Authorization", TOKEN)

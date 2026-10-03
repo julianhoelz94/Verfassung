@@ -21,6 +21,7 @@ import com.constitutionatlas.amendment.repo.DraftAmendmentInsert
 import com.constitutionatlas.amendment.repo.PublishedPinRow
 import com.constitutionatlas.amendment.repo.RevisionInsert
 import com.constitutionatlas.platform.Actor
+import com.constitutionatlas.platform.HierarchicalDiff
 import com.constitutionatlas.platform.NotFoundException
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.stereotype.Service
@@ -38,6 +39,7 @@ class AmendmentService(
     private val contentClient: ContentClient,
     private val catalogClient: CatalogClient,
     private val publishAttempts: com.constitutionatlas.amendment.repo.ChangeRecordPublishAttemptRepository,
+    private val diffReview: AmendmentDiffReviewService,
 ) {
     fun listForVersion(versionId: UUID, sourceVersionId: UUID?): List<AmendmentDto> =
         amendmentRepository.listForTargetVersion(versionId, sourceVersionId)
@@ -123,6 +125,7 @@ class AmendmentService(
     @Transactional
     fun appendRevision(amendmentId: UUID, request: AmendmentWriteRequest, actor: Actor): AmendmentDto {
         rejectKind(request.kind)
+        amendmentRepository.lockAmendment(amendmentId)
         if (!amendmentRepository.amendmentExists(amendmentId)) {
             throw NotFoundException("amendment not found")
         }
@@ -164,6 +167,7 @@ class AmendmentService(
 
     @Transactional
     fun publishAmendment(amendmentId: UUID): AmendmentDto {
+        amendmentRepository.lockAmendment(amendmentId)
         if (!amendmentRepository.amendmentExists(amendmentId)) {
             throw NotFoundException("amendment not found")
         }
@@ -177,6 +181,7 @@ class AmendmentService(
         }
         val tip = amendmentRepository.getAmendmentDtoForRevision(amendmentId, tipRevisionId, includeStaff = true)
             ?: throw IllegalStateException("amendment tip not readable")
+        if (tip.sourceVersionId != null && tip.targetVersionId != null) diffReview.requireComplete(amendmentId)
         if (tip.changes.any { it.beforeRef != null || it.afterRef != null || it.pendingAfterLogicalId != null }) {
             require(tip.changes.all { it.beforeRef != null || it.afterRef != null || it.pendingAfterLogicalId != null }) {
                 "Every change needs an exact unit selection when this record uses exact links"
@@ -315,6 +320,7 @@ class AmendmentService(
                         ?: throw IllegalArgumentException("Selected unit is missing from the published snapshot")
                 }
                 AmendmentChangeWriteRequest(
+                    sourceChangeId = change.id,
                     articleNumber = change.articleNumber,
                     changeType = change.changeType,
                     note = change.note,
@@ -339,6 +345,7 @@ class AmendmentService(
         if (diffs.isEmpty()) {
             return tip.changes.map { change ->
                 AmendmentChangeWriteRequest(
+                    sourceChangeId = change.id,
                     articleNumber = change.articleNumber,
                     changeType = change.changeType,
                     note = change.note,
@@ -375,6 +382,7 @@ class AmendmentService(
         }
         val sourceTree = contentClient.listArticles(request.sourceVersionId)
         val targetTree = contentClient.listArticles(request.targetVersionId)
+        val hierarchical = AmendmentDiff.hierarchical(request.sourceVersionId, sourceTree, request.targetVersionId, targetTree, contentClient.settingsRevisionId(request.sourceVersionId), contentClient.settingsRevisionId(request.targetVersionId))
         val changes = AmendmentDiff.diff(AmendmentDiff.flatten(sourceTree), AmendmentDiff.flatten(targetTree))
         return SuggestResponse(
             changes =
@@ -390,6 +398,9 @@ class AmendmentService(
                     ambiguous = change.ambiguous,
                 )
             },
+            diffItems = hierarchical.items,
+            algorithmVersion = HierarchicalDiff.ALGORITHM_VERSION,
+            settingsImpact = hierarchical.settingsImpact,
         )
     }
 

@@ -2,6 +2,7 @@ package com.constitutionatlas.editor.client
 
 import com.constitutionatlas.editor.DownstreamException
 import com.constitutionatlas.editor.api.ChangeRecordRequest
+import com.constitutionatlas.platform.DiffItem
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
@@ -29,6 +30,8 @@ data class LinkedAmendment(
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 data class LinkedAmendmentChange(
+    val id: UUID? = null,
+    val sourceChangeId: UUID? = null,
     val changeType: String,
     val beforeRef: LinkedUnitRef? = null,
     val afterRef: LinkedUnitRef? = null,
@@ -40,6 +43,19 @@ data class LinkedUnitRef(val logicalId: UUID)
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 data class ChangeRecordDocumentDto(val url: String? = null, val fileId: String? = null, val label: String? = null)
+
+@JsonIgnoreProperties(ignoreUnknown = true)
+data class AmendmentDiffReviewSnapshot(val revisionId: UUID, val candidates: List<DiffItem>)
+
+data class AmendmentDiffDecisionRequest(
+    val expectedRevisionId: UUID,
+    val key: String,
+    val fingerprint: String,
+    val status: String,
+    val linkedChangeIds: List<UUID> = emptyList(),
+    val exclusionReason: String? = null,
+    val reviewerAcknowledged: Boolean = false,
+)
 
 interface AmendmentClient {
     fun getAmendment(id: UUID, authorization: String?): LinkedAmendment?
@@ -56,6 +72,10 @@ interface AmendmentClient {
     )
 
     fun publishAmendment(amendmentId: UUID, authorization: String?)
+
+    fun diffReview(amendmentId: UUID, authorization: String?): AmendmentDiffReviewSnapshot? = null
+
+    fun decideDiff(amendmentId: UUID, decision: AmendmentDiffDecisionRequest, authorization: String?) {}
 }
 
 class RestAmendmentClient(
@@ -132,6 +152,24 @@ class RestAmendmentClient(
             request.retrieve().toBodilessEntity()
         } catch (ex: RestClientException) {
             throw DownstreamException("amendment publish failed", ex)
+        }
+    }
+
+    override fun diffReview(amendmentId: UUID, authorization: String?): AmendmentDiffReviewSnapshot? = try {
+        val request = client.get().uri("/amendments/{id}/diff-review", amendmentId)
+        authorize(request, authorization)
+        request.retrieve().body(AmendmentDiffReviewSnapshot::class.java)
+    } catch (ex: RestClientException) {
+        throw DownstreamException("amendment diff review failed", ex)
+    }
+
+    override fun decideDiff(amendmentId: UUID, decision: AmendmentDiffDecisionRequest, authorization: String?) {
+        try {
+            val request = client.post().uri("/amendments/{id}/diff-review/decisions", amendmentId).contentType(MediaType.APPLICATION_JSON)
+            authorize(request, authorization)
+            request.body(decision).retrieve().toBodilessEntity()
+        } catch (ex: RestClientException) {
+            throw DownstreamException("amendment diff decision failed", ex)
         }
     }
 

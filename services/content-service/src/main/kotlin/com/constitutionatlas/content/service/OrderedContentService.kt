@@ -85,7 +85,7 @@ class OrderedContentService(
         fun store(node: OrderedNodeWrite, depth: Int): UUID {
             require(depth < 128) { "Hierarchy exceeds 128 levels" }
             node.revisionId?.let { revision ->
-                require(node.content == null && node.kind == null && node.logicalId == null && node.predecessorRevisionId == null && node.label == null && node.title == null) { "A revision reference cannot also contain changed node fields" }
+                require(node.content == null && node.kind == null && node.logicalId == null && node.predecessorRevisionId == null && node.label == null && node.title == null && node.lineage.isEmpty()) { "A revision reference cannot also contain changed node fields" }
                 require(revision in allowedNodes) { "Node revision is not a member of source or target snapshot" }
                 return revision
             }
@@ -96,8 +96,9 @@ class OrderedContentService(
                 require(allowedNodes[predecessor]?.logicalId == logical) { "Node predecessor is not the pinned logical unit" }
             }
             if (allowedNodes.values.any { it.logicalId == logical }) require(node.predecessorRevisionId != null) { "Existing logical unit requires its predecessor revision" }
+            require(node.lineage.all { it in allowedNodes }) { "Unknown split/merge node lineage" }
             val revision = UUID.randomUUID()
-            repository.insertNode(revision, logical, version, node.predecessorRevisionId, kind, node.label, node.title)
+            repository.insertNode(revision, logical, version, node.predecessorRevisionId, kind, node.label, node.title, lineage = node.lineage)
             entries.forEachIndexed { position, entry ->
                 when (entry.type) {
                     "child" -> {

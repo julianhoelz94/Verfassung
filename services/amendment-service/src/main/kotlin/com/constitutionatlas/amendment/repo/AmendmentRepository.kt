@@ -39,6 +39,7 @@ data class RevisionInsert(
 
 data class AmendmentChangeInsert(
     val id: UUID,
+    val sourceChangeId: UUID? = null,
     val revisionId: UUID,
     val articleId: UUID?,
     val articleNumber: String?,
@@ -72,6 +73,10 @@ class AmendmentRepository(
     private val jdbc: JdbcTemplate,
     private val objectMapper: ObjectMapper,
 ) {
+    fun lockAmendment(id: UUID) {
+        jdbc.query("SELECT id FROM amendments WHERE id = ? FOR UPDATE", { rs, _ -> rs.getObject(1, UUID::class.java) }, id)
+    }
+
     fun listForTargetVersion(targetVersionId: UUID, sourceVersionId: UUID? = null): List<AmendmentDto> {
         val sql = StringBuilder(
             """
@@ -372,7 +377,8 @@ class AmendmentRepository(
         changes.forEach { change ->
             insertChange(
                 AmendmentChangeInsert(
-                    id = UUID.randomUUID(),
+                    id = change.id ?: UUID.randomUUID(),
+                    sourceChangeId = change.sourceChangeId,
                     revisionId = revisionId,
                     articleId = change.articleId,
                     articleNumber = change.articleNumber,
@@ -397,7 +403,7 @@ class AmendmentRepository(
         jdbc.update(
             """
             INSERT INTO amendment_changes (
-              id, revision_id, article_id, article_number, change_type, note,
+              id, source_change_id, revision_id, article_id, article_number, change_type, note,
               node_id, changed_on, effective_on, amending_law_title, amending_law_citation,
               link_review_reason,
               legacy_link_unresolved,
@@ -405,9 +411,10 @@ class AmendmentRepository(
               before_version_id, before_logical_id, before_occurrence_id, before_root_occurrence_id, before_revision_id, before_unit_kind,
               after_version_id, after_logical_id, after_occurrence_id, after_root_occurrence_id, after_revision_id, after_unit_kind
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """.trimIndent(),
             row.id,
+            row.sourceChangeId,
             row.revisionId,
             row.articleId,
             row.articleNumber,
@@ -558,7 +565,7 @@ class AmendmentRepository(
     private fun listChanges(revisionId: UUID): List<AmendmentChangeDto> =
         jdbc.query(
             """
-            SELECT id, article_id, article_number, change_type, note,
+            SELECT id, source_change_id, article_id, article_number, change_type, note,
                    node_id, changed_on, effective_on, amending_law_citation_id,
                    amending_law_title, amending_law_citation,
                    link_review_reason,
@@ -573,6 +580,7 @@ class AmendmentRepository(
             { rs, _ ->
                 AmendmentChangeDto(
                     id = rs.getObject("id", UUID::class.java),
+                    sourceChangeId = rs.getObject("source_change_id", UUID::class.java),
                     articleId = rs.getObject("article_id", UUID::class.java),
                     articleNumber = rs.getString("article_number"),
                     changeType = rs.getString("change_type"),

@@ -83,8 +83,20 @@ class OrderedContentRepository(private val jdbc: JdbcTemplate) {
         jdbc.update("UPDATE content_snapshots SET legacy_dirty = FALSE WHERE version_id = ?", versionId)
     }
 
-    fun insertNode(id: UUID, logical: UUID, version: UUID, predecessor: UUID?, kind: String, label: String?, title: String?, inferred: Boolean = false) {
-        jdbc.update("INSERT INTO content_node_revisions(id, logical_id, origin_version_id, predecessor_id, kind, label, title, order_inferred) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", id, logical, version, predecessor, kind, label, title, inferred)
+    fun insertNode(id: UUID, logical: UUID, version: UUID, predecessor: UUID?, kind: String, label: String?, title: String?, inferred: Boolean = false, lineage: List<UUID> = emptyList()) {
+        jdbc.update({ connection ->
+            connection.prepareStatement("INSERT INTO content_node_revisions(id, logical_id, origin_version_id, predecessor_id, kind, label, title, order_inferred, lineage) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)").apply {
+                setObject(1, id)
+                setObject(2, logical)
+                setObject(3, version)
+                setObject(4, predecessor)
+                setString(5, kind)
+                setString(6, label)
+                setString(7, title)
+                setBoolean(8, inferred)
+                setArray(9, connection.createArrayOf("uuid", lineage.toTypedArray()))
+            }
+        })
     }
 
     fun insertText(id: UUID, logical: UUID, version: UUID, predecessor: UUID?, text: String, lineage: List<UUID>) {
@@ -166,19 +178,19 @@ class OrderedContentRepository(private val jdbc: JdbcTemplate) {
                 OrderedEntry("child", node = resolveNode(version, child, path + revision))
             } else {
                 val record = textRecord(text!!)
-                OrderedEntry("text", logicalId = record.first, revisionId = text, occurrenceId = occurrenceId(version, record.first), text = record.second)
+                OrderedEntry("text", logicalId = record.first, revisionId = text, occurrenceId = occurrenceId(version, record.first), text = record.second, lineage = record.third)
             }
         }
-        return OrderedNode(row.logicalId, revision, occurrenceId(version, row.logicalId), row.kind, row.label, row.title, content, row.inferred)
+        return OrderedNode(row.logicalId, revision, occurrenceId(version, row.logicalId), row.kind, row.label, row.title, content, row.inferred, row.lineage)
     }
 
     fun nodeRecord(revision: UUID): NodeRecord = jdbc.query(
-        "SELECT logical_id, kind, label, title, order_inferred FROM content_node_revisions WHERE id = ?",
-        { rs, _ -> NodeRecord(rs.getObject(1, UUID::class.java), rs.getString(2), rs.getString(3), rs.getString(4), rs.getBoolean(5)) },
+        "SELECT logical_id, kind, label, title, order_inferred, lineage FROM content_node_revisions WHERE id = ?",
+        { rs, _ -> NodeRecord(rs.getObject(1, UUID::class.java), rs.getString(2), rs.getString(3), rs.getString(4), rs.getBoolean(5), (rs.getArray(6).array as Array<*>).map { UUID.fromString(it.toString()) }) },
         revision,
     ).firstOrNull() ?: throw NotFoundException("Unknown node revision '$revision'")
 
-    fun textRecord(revision: UUID): Pair<UUID, String> = jdbc.query("SELECT logical_id, text FROM content_text_revisions WHERE id = ?", { rs, _ -> rs.getObject(1, UUID::class.java) to rs.getString(2) }, revision).firstOrNull()
+    fun textRecord(revision: UUID): Triple<UUID, String, List<UUID>> = jdbc.query("SELECT logical_id, text, lineage FROM content_text_revisions WHERE id = ?", { rs, _ -> Triple(rs.getObject(1, UUID::class.java), rs.getString(2), (rs.getArray(3).array as Array<*>).map { UUID.fromString(it.toString()) }) }, revision).firstOrNull()
         ?: throw NotFoundException("Unknown text revision '$revision'")
 
     fun entryReferences(revision: UUID): List<Pair<UUID?, UUID?>> = jdbc.query("SELECT text_revision_id, child_revision_id FROM content_revision_entries WHERE parent_revision_id = ? ORDER BY position", { rs, _ -> rs.getObject(1, UUID::class.java) to rs.getObject(2, UUID::class.java) }, revision)
@@ -196,6 +208,6 @@ class OrderedContentRepository(private val jdbc: JdbcTemplate) {
     private fun occurrenceId(version: UUID, logical: UUID): UUID = jdbc.query("SELECT id FROM content_occurrences WHERE version_id = ? AND logical_id = ?", { rs, _ -> rs.getObject(1, UUID::class.java) }, version, logical).firstOrNull()
         ?: UUID.nameUUIDFromBytes("$version:$logical".toByteArray())
 
-    data class NodeRecord(val logicalId: UUID, val kind: String, val label: String?, val title: String?, val inferred: Boolean)
+    data class NodeRecord(val logicalId: UUID, val kind: String, val label: String?, val title: String?, val inferred: Boolean, val lineage: List<UUID>)
     private data class LegacyNode(val id: UUID, val parentId: UUID?, val kind: String, val label: String?, val title: String?, val body: String?, val predecessorId: UUID?)
 }

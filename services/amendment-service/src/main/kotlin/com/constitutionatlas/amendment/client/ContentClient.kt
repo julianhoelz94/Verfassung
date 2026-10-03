@@ -27,6 +27,7 @@ data class ContentTreeNode(
     val content: List<OrderedEntry>? = null,
     val logicalId: UUID? = null,
     val revisionId: UUID? = null,
+    val lineage: List<UUID> = emptyList(),
 )
 
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -44,6 +45,7 @@ data class ContentTreeArticle(
     val logicalId: UUID? = null,
     val revisionId: UUID? = null,
     val legacyIdentity: Boolean = false,
+    val lineage: List<UUID> = emptyList(),
 )
 
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -79,6 +81,8 @@ fun ResolvedContentUnit.toAmendmentRef(unitKind: String = if (kind == "parent_te
 
 interface ContentClient {
     fun listArticles(versionId: UUID): List<ContentTreeArticle>
+
+    fun settingsRevisionId(versionId: UUID): UUID? = null
 
     fun resolve(versionId: UUID, logicalId: UUID): ResolvedContentUnit? = null
 }
@@ -117,6 +121,12 @@ class RestContentClient(
         return collected
     }
 
+    override fun settingsRevisionId(versionId: UUID): UUID? = try {
+        client.get().uri("/versions/{id}/content", versionId).retrieve().body(ContentSettingsPin::class.java)?.settingsRevisionId
+    } catch (ex: RestClientException) {
+        throw ContentUnavailableException("content settings lookup failed", ex)
+    }
+
     override fun resolve(versionId: UUID, logicalId: UUID): ResolvedContentUnit? =
         try {
             client.get()
@@ -134,6 +144,9 @@ class RestContentClient(
         private val ARTICLE_LIST = object : ParameterizedTypeReference<List<ContentTreeArticle>>() {}
     }
 }
+
+@JsonIgnoreProperties(ignoreUnknown = true)
+data class ContentSettingsPin(val settingsRevisionId: UUID? = null)
 
 @Configuration
 class ContentClientConfig {

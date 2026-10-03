@@ -41,7 +41,7 @@ class OutboxPublisher(
                         val amendmentId = UUID.fromString(event.payload.path("amendmentId").asText())
                         val sourceId = UUID.fromString(event.payload.path("sourceVersionId").asText())
                         val targetId = UUID.fromString(event.payload.path("targetVersionId").asText())
-                        amendmentActions.completeLink(amendmentId, sourceId, targetId, authorization)
+                        amendmentActions.completeLink(amendmentId, sourceId, targetId, authorization, event.sessionId)
                         editorRepository.insertOutboxEvent(
                             event.sessionId,
                             DomainEvents.AMENDMENT_RECORDED,

@@ -116,7 +116,6 @@ test('recorded amending law appears on the public timeline', async ({ page }) =>
   await page.getByLabel('Effective date').fill('2026-02-01');
   await page.getByLabel('Summary').fill('Updates the dignity provision.');
   await page.getByLabel('Comment', { exact: true }).fill('Recorded for the timeline journey.');
-  await page.getByLabel('Document URL').fill('https://example.gov/e2e-amending-law.pdf');
   await page.getByLabel('Source version (optional)').selectOption(VERSION_1949);
   await page.getByLabel('Target version (optional)').selectOption(VERSION_2022);
   await page.getByRole('button', { name: 'Fill from two versions' }).click();

@@ -11,12 +11,12 @@ export async function DocumentLinks(props: {
   canEdit: boolean;
 }) {
   const [links, documents, events] = await Promise.all([
-    listDocumentLinks(props.targetType, props.targetId),
-    props.canEdit ? listDocuments() : Promise.resolve([]),
-    listDocumentLinkEvents(props.targetType, props.targetId, await requireSessionBearer()),
+    listDocumentLinks(props.targetType, props.targetId).catch(() => []),
+    props.canEdit ? listDocuments().catch(() => []) : Promise.resolve([]),
+    listDocumentLinkEvents(props.targetType, props.targetId, await requireSessionBearer()).catch(() => []),
   ]);
   const available = documents.filter((document) => document.status === 'active' && !links.some((link) => link.documentId === document.id));
-  const revisions = props.canEdit ? await Promise.all(available.map((document) => listDocumentRevisions(document.id))) : [];
+  const revisions = props.canEdit ? await Promise.all(available.map((document) => listDocumentRevisions(document.id).catch(() => []))) : [];
   return <section className="card stack">
     <h2>Linked documents</h2>
     {links.length ? <ul className="link-list">{links.map((link) => <li key={link.documentId}>

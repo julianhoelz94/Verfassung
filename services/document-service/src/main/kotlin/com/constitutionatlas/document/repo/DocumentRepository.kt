@@ -118,13 +118,14 @@ class DocumentRepository(private val jdbc: JdbcTemplate) {
             id,
         )
 
-    fun linkEvent(targetType: String, targetId: UUID, documentId: UUID, revisionId: UUID?, action: String, actorId: UUID) {
+    fun linkEvent(targetType: String, targetId: UUID, scopeRevisionId: UUID?, documentId: UUID, revisionId: UUID?, action: String, actorId: UUID) {
         jdbc.update(
-            """INSERT INTO document_link_events (id, target_type, target_id, document_id, revision_id, action, actor_id)
-               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            """INSERT INTO document_link_events (id, target_type, target_id, scope_revision_id, document_id, revision_id, action, actor_id)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
             UUID.randomUUID(),
             targetType,
             targetId,
+            scopeRevisionId,
             documentId,
             revisionId,
             action,
@@ -132,10 +133,11 @@ class DocumentRepository(private val jdbc: JdbcTemplate) {
         )
     }
 
-    fun linkEvents(targetType: String, targetId: UUID): List<DocumentLinkEventDto> =
+    fun linkEvents(targetType: String, targetId: UUID, scopeRevisionId: UUID?): List<DocumentLinkEventDto> =
         jdbc.query(
-            """SELECT id, target_type, target_id, document_id, revision_id, action, actor_id, occurred_at
-               FROM document_link_events WHERE target_type = ? AND target_id = ? ORDER BY occurred_at DESC, id DESC""",
+            """SELECT id, target_type, target_id, document_id, revision_id, scope_revision_id, action, actor_id, occurred_at
+               FROM document_link_events WHERE target_type = ? AND target_id = ? AND scope_revision_id IS NOT DISTINCT FROM ?
+               ORDER BY occurred_at DESC, id DESC""",
             { rs, _ ->
                 DocumentLinkEventDto(
                     rs.getObject("id", UUID::class.java),
@@ -143,6 +145,7 @@ class DocumentRepository(private val jdbc: JdbcTemplate) {
                     rs.getObject("target_id", UUID::class.java),
                     rs.getObject("document_id", UUID::class.java),
                     rs.getObject("revision_id", UUID::class.java),
+                    rs.getObject("scope_revision_id", UUID::class.java),
                     rs.getString("action"),
                     rs.getObject("actor_id", UUID::class.java),
                     rs.getTimestamp("occurred_at").toInstant().atOffset(ZoneOffset.UTC),
@@ -150,7 +153,26 @@ class DocumentRepository(private val jdbc: JdbcTemplate) {
             },
             targetType,
             targetId,
+            scopeRevisionId,
         )
+
+    fun activeLinksForDocument(documentId: UUID): List<DocumentLinkEventDto> =
+        jdbc.query(
+            """SELECT DISTINCT ON (target_type, target_id, scope_revision_id) id, target_type, target_id,
+                      document_id, revision_id, scope_revision_id, action, actor_id, occurred_at
+               FROM document_link_events WHERE document_id = ?
+               ORDER BY target_type, target_id, scope_revision_id, occurred_at DESC, id DESC""",
+            { rs, _ ->
+                DocumentLinkEventDto(
+                    rs.getObject("id", UUID::class.java), rs.getString("target_type"),
+                    rs.getObject("target_id", UUID::class.java), rs.getObject("document_id", UUID::class.java),
+                    rs.getObject("revision_id", UUID::class.java), rs.getObject("scope_revision_id", UUID::class.java),
+                    rs.getString("action"), rs.getObject("actor_id", UUID::class.java),
+                    rs.getTimestamp("occurred_at").toInstant().atOffset(ZoneOffset.UTC),
+                )
+            },
+            documentId,
+        ).filter { it.action == "attach" }
 
     private fun document(rs: ResultSet): DocumentDto {
         val id = rs.getObject("id", UUID::class.java)

@@ -20,6 +20,7 @@ type AmendmentDetailPageProps = {
     withdrawn?: string;
     error?: string;
     confirmed?: string;
+    documentError?: string;
   }>;
 };
 
@@ -153,6 +154,7 @@ export default async function AmendmentDetailPage(props: AmendmentDetailPageProp
       />
       {amendment?.reviewStatus === 'needs_review' ? <Alert tone="info">Needs review: quotes or document pins are stale.</Alert> : null}
       {errorMessage ? <Alert tone="error">{errorMessage}</Alert> : null}
+      {searchParams.documentError ? <Alert tone="error">The document link could not be changed. Reload and try again.</Alert> : null}
       {searchParams.saved ? <Alert tone="success">Draft saved.</Alert> : null}
       {searchParams.published ? <Alert tone="success">Amending law published.</Alert> : null}
       {searchParams.confirmed ? <Alert tone="success">Quotes confirmed and the legal change republished.</Alert> : null}
@@ -206,7 +208,7 @@ export default async function AmendmentDetailPage(props: AmendmentDetailPageProp
           canAcknowledgeDiff={hasRole(user.roles, 'reviewer') || canPublish}
         />
       )}
-      {!isNew ? <DocumentLinks targetType="amendment" targetId={id} returnTo={`/editor/amendments/${id}`} canEdit={canEdit && amendment?.status !== 'withdrawn'} /> : null}
+      {!isNew && tipRevision ? <DocumentLinks targetType="amendment" targetId={id} scopeRevisionId={tipRevision.id} returnTo={`/editor/amendments/${id}`} canEdit={canEdit && amendment?.status !== 'withdrawn' && tipRevision.id !== amendment?.publishedRevisionId} /> : null}
     </PageMain>
   );
 }

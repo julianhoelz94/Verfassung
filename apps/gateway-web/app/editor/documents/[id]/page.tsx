@@ -13,8 +13,9 @@ export default async function DocumentDetailPage(props: { params: Promise<{ id: 
   if (!canVisitEditor(user.roles)) redirect('/editor');
   const { id } = await props.params;
   const params = await props.searchParams;
+  const authorization = await requireSessionBearer();
   const [document, revisions, events] = await Promise.all([
-    getDocument(id), listDocumentRevisions(id), listDocumentEvents(id, await requireSessionBearer()),
+    getDocument(id, undefined, authorization), listDocumentRevisions(id, authorization), listDocumentEvents(id, authorization),
   ]);
   const writable = user.roles.some((role) => ['editor', 'publisher', 'admin'].includes(role)) && document.status === 'active';
   return <PageMain className="wide">
@@ -24,7 +25,7 @@ export default async function DocumentDetailPage(props: { params: Promise<{ id: 
     {params.error ? <Alert tone="error">The document could not be saved. Reload to check its latest revision and permissions.</Alert> : null}
     {params.returnTo ? <p><Link href={params.returnTo}>Return to editor</Link></p> : null}
     {document.revision.sourceUrl ? <p><a href={document.revision.sourceUrl} rel="noreferrer">Source</a></p> : null}
-    {document.revision.fileName ? <p><a href={`/api/document/documents/${id}/revisions/${document.currentRevision}/file`}>Download {document.revision.fileName}</a></p> : null}
+    {document.revision.fileName ? <p><a href={`/editor/documents/${id}/revisions/${document.currentRevision}/file`}>Download {document.revision.fileName}</a></p> : null}
     {writable ? <div className="form-row">
       <form action={reviseDocumentAction} className="stack card">
         <h2>New metadata revision</h2>

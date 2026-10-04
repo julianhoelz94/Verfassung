@@ -43,6 +43,7 @@ data class DocumentEventDto(
 data class LinkRequest(
     val documentId: UUID,
     val revisionId: UUID? = null,
+    val scopeRevisionId: UUID? = null,
 )
 
 data class DocumentLinkDto(
@@ -57,6 +58,7 @@ data class DocumentLinkEventDto(
     val targetId: UUID,
     val documentId: UUID,
     val revisionId: UUID?,
+    val scopeRevisionId: UUID?,
     val action: String,
     val actorId: UUID,
     val occurredAt: OffsetDateTime,

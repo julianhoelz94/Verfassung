@@ -12,7 +12,7 @@ import { DocumentLinks } from '../../../editor/documents/DocumentLinks';
 
 type AdminOutlinePageProps = {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ saved?: string; error?: string; migration?: string }>;
+  searchParams: Promise<{ saved?: string; error?: string; migration?: string; documentError?: string }>;
 };
 
 export default async function AdminOutlinePage(props: AdminOutlinePageProps) {
@@ -49,6 +49,7 @@ export default async function AdminOutlinePage(props: AdminOutlinePageProps) {
       {(match.constitution.versions ?? []).length === 0 ? <Alert tone="info">The structure is ready. <Link href="/admin/import">Import the first version</Link> or <Link href="/editor">open the editor</Link> to continue.</Alert> : null}
       {searchParams.migration ? <Alert tone="error">This change requires a reviewed successor migration. Existing versions have been preserved.</Alert> : null}
       {searchParams.error ? <Alert tone="error">The outline could not be saved.</Alert> : null}
+      {searchParams.documentError ? <Alert tone="error">The document link could not be changed. Reload and try again.</Alert> : null}
       <p>
         Depth is the number of layers. The top layer is the provision the public table of contents lists. A concatenated
         layer (typical for sentences) has no heading and is joined with its siblings.

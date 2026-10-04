@@ -77,12 +77,12 @@ class DocumentApiTest {
             contentType = MediaType.APPLICATION_JSON
             content = """{"title":"Stale","expectedRevision":1}"""
         }.andExpect { status { isConflict() } }
-        mvc.get("/documents/$id?revision=1").andExpect {
+        mvc.get("/documents/$id?revision=1") { header("Authorization", EDITOR) }.andExpect {
             status { isOk() }
             jsonPath("$.revision.id") { value(firstRevision) }
             jsonPath("$.revision.title") { value("Official gazette") }
         }
-        mvc.get("/documents/$id/revisions").andExpect {
+        mvc.get("/documents/$id/revisions") { header("Authorization", EDITOR) }.andExpect {
             status { isOk() }
             jsonPath("$.length()") { value(2) }
         }
@@ -103,17 +103,73 @@ class DocumentApiTest {
     }
 
     @Test
+    fun unpublishedDocumentsAndRevisionHistoryArePrivate() {
+        val (id, _) = create()
+        mvc.get("/documents/$id").andExpect { status { isNotFound() } }
+        mvc.get("/documents").andExpect { status { isUnauthorized() } }
+        mvc.get("/documents/$id/revisions").andExpect { status { isUnauthorized() } }
+        mvc.get("/documents/$id/revisions") { header("Authorization", VIEWER) }
+            .andExpect { status { isForbidden() } }
+    }
+
+    @Test
+    fun amendmentLinksAreIsolatedByRevision() {
+        val (id, revisionId) = create()
+        val target = UUID.randomUUID()
+        val draft = UUID.randomUUID()
+        val published = UUID.randomUUID()
+        Mockito.`when`(targets.amendmentAncestry(target, draft, EDITOR)).thenReturn(listOf(draft))
+        Mockito.`when`(targets.amendmentAncestry(target, published, EDITOR)).thenReturn(listOf(published))
+        mvc.post("/links/amendment/$target") {
+            header("Authorization", EDITOR)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"documentId":"$id","revisionId":"$revisionId","scopeRevisionId":"$draft"}"""
+        }.andExpect { status { isOk() } }
+        mvc.get("/links/amendment/$target?scopeRevisionId=$published") { header("Authorization", EDITOR) }
+            .andExpect { jsonPath("$.length()") { value(0) } }
+        mvc.get("/links/amendment/$target?scopeRevisionId=$draft") { header("Authorization", EDITOR) }
+            .andExpect { jsonPath("$.length()") { value(1) } }
+        mvc.post("/links/amendment/$target") {
+            header("Authorization", EDITOR)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"documentId":"$id","revisionId":"$revisionId"}"""
+        }.andExpect { status { isBadRequest() } }
+    }
+
+    @Test
+    fun amendmentSuccessorInheritsLinksAndCanDetachWithoutChangingPredecessor() {
+        val (id, revisionId) = create()
+        val target = UUID.randomUUID()
+        val draft = UUID.randomUUID()
+        val successor = UUID.randomUUID()
+        Mockito.`when`(targets.amendmentAncestry(target, draft, EDITOR)).thenReturn(listOf(draft))
+        Mockito.`when`(targets.amendmentAncestry(target, successor, EDITOR)).thenReturn(listOf(draft, successor))
+        mvc.post("/links/amendment/$target") {
+            header("Authorization", EDITOR)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"documentId":"$id","revisionId":"$revisionId","scopeRevisionId":"$draft"}"""
+        }.andExpect { status { isOk() } }
+        mvc.get("/links/amendment/$target?scopeRevisionId=$successor") { header("Authorization", EDITOR) }
+            .andExpect { jsonPath("$.length()") { value(1) } }
+        mvc.delete("/links/amendment/$target/$id?scopeRevisionId=$successor") { header("Authorization", EDITOR) }
+            .andExpect { jsonPath("$.length()") { value(0) } }
+        mvc.get("/links/amendment/$target?scopeRevisionId=$draft") { header("Authorization", EDITOR) }
+            .andExpect { jsonPath("$.length()") { value(1) } }
+    }
+
+    @Test
     fun fileUploadCreatesDownloadableHistoricalRevision() {
         val (id, _) = create()
         val file = MockMultipartFile("file", "source.txt", "text/plain", "Source bytes".toByteArray())
         mvc.perform(multipart("/documents/$id/file").file(file).param("expectedRevision", "1").header("Authorization", EDITOR))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.currentRevision").value(2))
-        mvc.get("/documents/$id/revisions/2/file").andExpect {
+        mvc.get("/documents/$id/revisions/2/file") { header("Authorization", EDITOR) }.andExpect {
             status { isOk() }
             content { bytes("Source bytes".toByteArray()) }
         }
-        mvc.get("/documents/$id/revisions/1/file").andExpect { status { isNotFound() } }
+        mvc.get("/documents/$id/revisions/2/file").andExpect { status { isNotFound() } }
+        mvc.get("/documents/$id/revisions/1/file") { header("Authorization", EDITOR) }.andExpect { status { isNotFound() } }
     }
 
     @Test
@@ -128,7 +184,7 @@ class DocumentApiTest {
             status { isOk() }
             jsonPath("$[0].revisionId") { value(revisionId) }
         }
-        mvc.get("/links/constitution/$target").andExpect {
+        mvc.get("/links/constitution/$target") { header("Authorization", EDITOR) }.andExpect {
             status { isOk() }
             jsonPath("$.length()") { value(1) }
         }

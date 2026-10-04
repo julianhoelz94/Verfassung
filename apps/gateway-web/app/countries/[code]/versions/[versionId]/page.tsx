@@ -97,7 +97,10 @@ export default async function VersionPage(props: VersionPageProps) {
   }
 
   const sourceHref = httpUrl(version.version.sourceUrl);
-  const documentLinks = await listDocumentLinks('constitution', version.constitution.id).catch(() => []);
+  const documentLinks = [
+    ...await listDocumentLinks('constitution', version.constitution.id).catch(() => []),
+    ...await listDocumentLinks('version', version.version.id).catch(() => []),
+  ];
   const title = version.version.effectiveDate ? (
     <>
       Version in force since <FormattedDate value={version.version.effectiveDate} />

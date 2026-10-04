@@ -34,13 +34,15 @@ def candidates(base, token):
             versions = request(base, f"/api/catalog/constitutions/{constitution_id}/versions?listing=all", token)
             for version in versions:
                 url = version.get("sourceUrl")
-                if url and (constitution_id, url) not in seen:
-                    seen.add((constitution_id, url))
-                    yield {"targetType": "constitution", "targetId": constitution_id,
+                if url and (version["id"], url) not in seen:
+                    seen.add((version["id"], url))
+                    yield {"targetType": "version", "targetId": version["id"],
                            "title": f"{constitution['title']} — {version['versionLabel']}",
                            "sourceUrl": url, "description": f"Legacy constitution source for version {version['id']}"}
             amendments = request(base, f"/api/amendment/constitutions/{constitution_id}/amendments?status=all", token)
             for amendment in amendments:
+                revisions = request(base, f"/api/amendment/amendments/{amendment['id']}/revisions", token)
+                tip_id = revisions[-1]["id"] if revisions else None
                 for index, legacy in enumerate(amendment.get("documents") or []):
                     raw_url = legacy.get("url") or None
                     parsed = urllib.parse.urlparse(raw_url) if raw_url else None
@@ -54,6 +56,8 @@ def candidates(base, token):
                         continue
                     seen.add(key)
                     yield {"targetType": "amendment", "targetId": amendment["id"],
+                           "scopeRevisionId": tip_id,
+                           "skipReason": "published_revision_is_immutable" if tip_id == amendment.get("publishedRevisionId") else None,
                            "title": label or f"{amendment['title']} document {index + 1}",
                            "sourceUrl": url, "description": "; ".join(filter(None, [
                                f"Legacy archived file ID: {file_id}" if file_id else None,
@@ -72,8 +76,14 @@ def main():
     base = args.base_url.rstrip("/")
     existing_docs = request(base, "/api/document/documents", token)
     changes = 0
+    skipped = 0
     for item in candidates(base, token):
-        links = request(base, f"/api/document/links/{item['targetType']}/{item['targetId']}", token)
+        if item.get("skipReason") or (item["targetType"] == "amendment" and not item.get("scopeRevisionId")):
+            skipped += 1
+            print(json.dumps({"action": "skip", **item}, ensure_ascii=False))
+            continue
+        scope_query = f"?scopeRevisionId={item['scopeRevisionId']}" if item.get("scopeRevisionId") else ""
+        links = request(base, f"/api/document/links/{item['targetType']}/{item['targetId']}{scope_query}", token)
         matching = next((document for document in existing_docs if
                          document["revision"]["title"] == item["title"] and
                          document["revision"].get("sourceUrl") == item["sourceUrl"] and
@@ -89,8 +99,9 @@ def main():
                                {key: item[key] for key in ("title", "description", "sourceUrl")})
             existing_docs.append(matching)
         request(base, f"/api/document/links/{item['targetType']}/{item['targetId']}", token, "POST",
-                {"documentId": matching["id"], "revisionId": matching["revision"]["id"]})
-    print(f"{changes} reference(s) {'migrated' if args.apply else 'would be migrated'}", file=sys.stderr)
+                {"documentId": matching["id"], "revisionId": matching["revision"]["id"],
+                 "scopeRevisionId": item.get("scopeRevisionId")})
+    print(f"{changes} reference(s) {'migrated' if args.apply else 'would be migrated'}; {skipped} published or unscoped amendment reference(s) retained as legacy", file=sys.stderr)
 
 
 if __name__ == "__main__":

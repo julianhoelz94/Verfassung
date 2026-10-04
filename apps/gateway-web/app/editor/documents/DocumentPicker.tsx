@@ -7,8 +7,9 @@ import { attachDocumentAction } from './actions';
 export function DocumentPicker(props: {
   documents: DocumentRecord[];
   revisions: DocumentRevision[][];
-  targetType: 'constitution' | 'amendment';
+  targetType: 'constitution' | 'version' | 'amendment';
   targetId: string;
+  scopeRevisionId?: string | null;
   returnTo: string;
 }) {
   const [query, setQuery] = useState('');
@@ -26,6 +27,7 @@ export function DocumentPicker(props: {
     </select>
     {selected ? <form action={attachDocumentAction} className="form-row">
       <input type="hidden" name="targetType" value={props.targetType} /><input type="hidden" name="targetId" value={props.targetId} />
+      <input type="hidden" name="scopeRevisionId" value={props.scopeRevisionId ?? ''} />
       <input type="hidden" name="documentId" value={selected.id} /><input type="hidden" name="returnTo" value={props.returnTo} />
       <label htmlFor="linked-document-revision">Revision to cite</label>
       <select id="linked-document-revision" name="revisionId" defaultValue={selected.revision.id} key={selected.id}>

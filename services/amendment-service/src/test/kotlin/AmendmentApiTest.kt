@@ -462,6 +462,20 @@ class AmendmentApiTest {
             jsonPath("$[1].title") { value("Revised title") }
         }
 
+        val successorRevisionId = objectMapper.readTree(
+            mockMvc.get("/amendments/$amendmentId/revisions") { header("Authorization", TOKEN) }
+                .andReturn().response.contentAsString,
+        )[1].get("id").asText()
+        mockMvc.get("/amendments/$amendmentId/revisions/$successorRevisionId/ancestry")
+            .andExpect { status { isNotFound() } }
+        mockMvc.get("/amendments/$amendmentId/revisions/$successorRevisionId/ancestry") {
+            header("Authorization", TOKEN)
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$[0]") { value(publishedRevisionId) }
+            jsonPath("$[1]") { value(successorRevisionId) }
+        }
+
         mockMvc.post("/amendments/$amendmentId/publish") {
             header("Authorization", PUBLISHER_TOKEN)
         }.andExpect { status { isOk() } }
@@ -469,6 +483,11 @@ class AmendmentApiTest {
         mockMvc.get("/amendments/$amendmentId") { header("Authorization", PUBLISHER_TOKEN) }.andExpect {
             status { isOk() }
             jsonPath("$.title") { value("Revised title") }
+        }
+        mockMvc.get("/amendments/$amendmentId/revisions/$successorRevisionId/ancestry").andExpect {
+            status { isOk() }
+            jsonPath("$[0]") { value(publishedRevisionId) }
+            jsonPath("$[1]") { value(successorRevisionId) }
         }
     }
 

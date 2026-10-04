@@ -29,10 +29,11 @@ export type DocumentLink = {
 
 export type DocumentLinkEvent = {
   id: string;
-  targetType: 'constitution' | 'amendment';
+  targetType: 'constitution' | 'version' | 'amendment';
   targetId: string;
   documentId: string;
   revisionId: string | null;
+  scopeRevisionId: string | null;
   action: 'attach' | 'detach';
   actorId: string;
   occurredAt: string;
@@ -63,16 +64,16 @@ function json(authorization: string, method: string, body: unknown): RequestInit
   };
 }
 
-export function listDocuments(q?: string): Promise<DocumentRecord[]> {
-  return request(`/documents${q ? `?q=${encodeURIComponent(q)}` : ''}`);
+export function listDocuments(q: string | undefined, authorization: string): Promise<DocumentRecord[]> {
+  return request(`/documents${q ? `?q=${encodeURIComponent(q)}` : ''}`, { headers: { Authorization: authorization } });
 }
 
-export function getDocument(id: string, revision?: number): Promise<DocumentRecord> {
-  return request(`/documents/${encodeURIComponent(id)}${revision ? `?revision=${revision}` : ''}`);
+export function getDocument(id: string, revision?: number, authorization?: string): Promise<DocumentRecord> {
+  return request(`/documents/${encodeURIComponent(id)}${revision ? `?revision=${revision}` : ''}`, authorization ? { headers: { Authorization: authorization } } : {});
 }
 
-export function listDocumentRevisions(id: string): Promise<DocumentRevision[]> {
-  return request(`/documents/${encodeURIComponent(id)}/revisions`);
+export function listDocumentRevisions(id: string, authorization: string): Promise<DocumentRevision[]> {
+  return request(`/documents/${encodeURIComponent(id)}/revisions`, { headers: { Authorization: authorization } });
 }
 
 export function listDocumentEvents(id: string, authorization: string): Promise<{ id: string; eventType: string; occurredAt: string }[]> {
@@ -95,20 +96,24 @@ export function uploadDocument(id: string, expectedRevision: number, file: File,
   });
 }
 
-export function listDocumentLinks(targetType: 'constitution' | 'amendment', targetId: string): Promise<DocumentLink[]> {
-  return request(`/links/${targetType}/${encodeURIComponent(targetId)}`);
+function scopeQuery(scopeRevisionId?: string | null): string {
+  return scopeRevisionId ? `?scopeRevisionId=${encodeURIComponent(scopeRevisionId)}` : '';
 }
 
-export function listDocumentLinkEvents(targetType: 'constitution' | 'amendment', targetId: string, authorization: string): Promise<DocumentLinkEvent[]> {
-  return request(`/links/${targetType}/${encodeURIComponent(targetId)}/events`, { headers: { Authorization: authorization } });
+export function listDocumentLinks(targetType: 'constitution' | 'version' | 'amendment', targetId: string, scopeRevisionId?: string | null, authorization?: string): Promise<DocumentLink[]> {
+  return request(`/links/${targetType}/${encodeURIComponent(targetId)}${scopeQuery(scopeRevisionId)}`, authorization ? { headers: { Authorization: authorization } } : {});
 }
 
-export function attachDocument(targetType: 'constitution' | 'amendment', targetId: string, documentId: string, revisionId: string | null, authorization: string): Promise<DocumentLink[]> {
-  return request(`/links/${targetType}/${encodeURIComponent(targetId)}`, json(authorization, 'POST', { documentId, revisionId }));
+export function listDocumentLinkEvents(targetType: 'constitution' | 'version' | 'amendment', targetId: string, authorization: string, scopeRevisionId?: string | null): Promise<DocumentLinkEvent[]> {
+  return request(`/links/${targetType}/${encodeURIComponent(targetId)}/events${scopeQuery(scopeRevisionId)}`, { headers: { Authorization: authorization } });
 }
 
-export function detachDocument(targetType: 'constitution' | 'amendment', targetId: string, documentId: string, authorization: string): Promise<DocumentLink[]> {
-  return request(`/links/${targetType}/${encodeURIComponent(targetId)}/${encodeURIComponent(documentId)}`, {
+export function attachDocument(targetType: 'constitution' | 'version' | 'amendment', targetId: string, documentId: string, revisionId: string | null, authorization: string, scopeRevisionId?: string | null): Promise<DocumentLink[]> {
+  return request(`/links/${targetType}/${encodeURIComponent(targetId)}`, json(authorization, 'POST', { documentId, revisionId, scopeRevisionId }));
+}
+
+export function detachDocument(targetType: 'constitution' | 'version' | 'amendment', targetId: string, documentId: string, authorization: string, scopeRevisionId?: string | null): Promise<DocumentLink[]> {
+  return request(`/links/${targetType}/${encodeURIComponent(targetId)}/${encodeURIComponent(documentId)}${scopeQuery(scopeRevisionId)}`, {
     method: 'DELETE', headers: { Authorization: authorization },
   });
 }

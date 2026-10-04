@@ -68,11 +68,11 @@ export async function uploadDocumentAction(form: FormData): Promise<void> {
 
 export async function attachDocumentAction(form: FormData): Promise<void> {
   const authorization = await writer();
-  const targetType = String(form.get('targetType')) as 'constitution' | 'amendment';
+  const targetType = String(form.get('targetType')) as 'constitution' | 'version' | 'amendment';
   const targetId = String(form.get('targetId'));
   const returnTo = safeReturnPath(form.get('returnTo'));
   try {
-    await attachDocument(targetType, targetId, String(form.get('documentId')), String(form.get('revisionId') || '') || null, authorization);
+    await attachDocument(targetType, targetId, String(form.get('documentId')), String(form.get('revisionId') || '') || null, authorization, String(form.get('scopeRevisionId') || '') || null);
   } catch {
     redirect(`${returnTo}${returnTo.includes('?') ? '&' : '?'}documentError=attach`);
   }
@@ -82,11 +82,11 @@ export async function attachDocumentAction(form: FormData): Promise<void> {
 
 export async function detachDocumentAction(form: FormData): Promise<void> {
   const authorization = await writer();
-  const targetType = String(form.get('targetType')) as 'constitution' | 'amendment';
+  const targetType = String(form.get('targetType')) as 'constitution' | 'version' | 'amendment';
   const targetId = String(form.get('targetId'));
   const returnTo = safeReturnPath(form.get('returnTo'));
   try {
-    await detachDocument(targetType, targetId, String(form.get('documentId')), authorization);
+    await detachDocument(targetType, targetId, String(form.get('documentId')), authorization, String(form.get('scopeRevisionId') || '') || null);
   } catch {
     redirect(`${returnTo}${returnTo.includes('?') ? '&' : '?'}documentError=detach`);
   }

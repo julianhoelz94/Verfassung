@@ -29,10 +29,45 @@ class DocumentService(
         return actor
     }
 
-    fun requireReader(authorization: String?): Actor = identityClient.authenticate(authorization)
+    fun requireReader(authorization: String?): Actor {
+        val actor = identityClient.authenticate(authorization)
+        if (actor.roles.none { it in setOf("editor", "reviewer", "publisher", "admin") }) {
+            throw ForbiddenException("Document history requires editorial access")
+        }
+        return actor
+    }
 
     fun get(id: UUID, revision: Int? = null): DocumentDto =
         repository.get(id, revision) ?: throw NotFoundException("Document not found")
+
+    fun getVisible(id: UUID, revision: Int?, authorization: String?): DocumentDto {
+        val document = get(id, revision)
+        if (authorization != null) {
+            requireReader(authorization)
+        } else if (!publiclyLinked(id, document.revision.id)) {
+            throw NotFoundException("Document not found")
+        }
+        return document
+    }
+
+    private fun publiclyLinked(documentId: UUID, revisionId: UUID): Boolean =
+        repository.activeLinksForDocument(documentId).any { link ->
+            if (link.targetType == "amendment") {
+                val publishedScope = targetClient.publishedAmendmentRevision(link.targetId)
+                publishedScope != null &&
+                    currentLinks("amendment", link.targetId, publishedScope).any { current ->
+                        current.documentId == documentId && current.document.revision.id == revisionId
+                    }
+            } else {
+                (link.revisionId == null && get(documentId).revision.id == revisionId || link.revisionId == revisionId) &&
+                    targetClient.isPublic(link.targetType, link.targetId, link.scopeRevisionId)
+            }
+        }
+
+    fun targetIsPublic(targetType: String, targetId: UUID, scopeRevisionId: UUID?): Boolean {
+        validateTarget(targetType)
+        return targetClient.isPublic(targetType, targetId, scopeRevisionId)
+    }
 
     @Transactional
     fun create(request: SaveDocumentRequest, actor: Actor): DocumentDto {
@@ -92,34 +127,45 @@ class DocumentService(
     @Transactional
     fun attach(targetType: String, targetId: UUID, request: LinkRequest, actor: Actor, authorization: String?): List<DocumentLinkDto> {
         validateTarget(targetType)
+        validateScope(targetType, targetId, request.scopeRevisionId, authorization)
         targetClient.requireTarget(targetType, targetId, authorization)
         val document = get(request.documentId)
         require(document.status == "active") { "Cannot attach an archived document" }
-        request.revisionId?.let { revisionId ->
-            require(repository.revisionById(revisionId)?.documentId == request.documentId) { "Revision does not belong to document" }
-        }
-        if (currentLinks(targetType, targetId).any { it.documentId == request.documentId }) {
+        require(request.revisionId != null) { "A pinned document revision is required" }
+        require(repository.revisionById(request.revisionId)?.documentId == request.documentId) { "Revision does not belong to document" }
+        if (currentLinks(targetType, targetId, request.scopeRevisionId, authorization).any { it.documentId == request.documentId }) {
             throw DocumentConflictException("Document is already linked")
         }
-        repository.linkEvent(targetType, targetId, request.documentId, request.revisionId, "attach", actor.id)
-        return currentLinks(targetType, targetId)
+        repository.linkEvent(targetType, targetId, request.scopeRevisionId, request.documentId, request.revisionId, "attach", actor.id)
+        return currentLinks(targetType, targetId, request.scopeRevisionId, authorization)
     }
 
     @Transactional
-    fun detach(targetType: String, targetId: UUID, documentId: UUID, actor: Actor, authorization: String?): List<DocumentLinkDto> {
+    fun detach(targetType: String, targetId: UUID, scopeRevisionId: UUID?, documentId: UUID, actor: Actor, authorization: String?): List<DocumentLinkDto> {
         validateTarget(targetType)
+        validateScope(targetType, targetId, scopeRevisionId, authorization)
         targetClient.requireTarget(targetType, targetId, authorization)
-        if (currentLinks(targetType, targetId).none { it.documentId == documentId }) {
+        if (currentLinks(targetType, targetId, scopeRevisionId, authorization).none { it.documentId == documentId }) {
             throw NotFoundException("Document link not found")
         }
-        repository.linkEvent(targetType, targetId, documentId, null, "detach", actor.id)
-        return currentLinks(targetType, targetId)
+        repository.linkEvent(targetType, targetId, scopeRevisionId, documentId, null, "detach", actor.id)
+        return currentLinks(targetType, targetId, scopeRevisionId, authorization)
     }
 
-    fun currentLinks(targetType: String, targetId: UUID): List<DocumentLinkDto> {
+    fun currentLinks(targetType: String, targetId: UUID, scopeRevisionId: UUID?, authorization: String? = null): List<DocumentLinkDto> {
         validateTarget(targetType)
-        return repository.linkEvents(targetType, targetId)
-            .distinctBy { it.documentId }
+        val scopes = if (targetType == "amendment" && scopeRevisionId != null) {
+            listOf<UUID?>(null) + targetClient.amendmentAncestry(targetId, scopeRevisionId, authorization)
+        } else {
+            listOf(scopeRevisionId)
+        }
+        val state = linkedMapOf<UUID, com.constitutionatlas.document.api.DocumentLinkEventDto>()
+        scopes.forEach { scope ->
+            repository.linkEvents(targetType, targetId, scope).asReversed().forEach { event ->
+                state[event.documentId] = event
+            }
+        }
+        return state.values
             .filter { it.action == "attach" }
             .map { event ->
                 val revision = event.revisionId?.let { repository.revisionById(it)?.revision }
@@ -136,6 +182,15 @@ class DocumentService(
     }
 
     private fun validateTarget(targetType: String) {
-        require(targetType == "constitution" || targetType == "amendment") { "Unsupported link target" }
+        require(targetType in setOf("constitution", "version", "amendment")) { "Unsupported link target" }
+    }
+
+    private fun validateScope(targetType: String, targetId: UUID, scopeRevisionId: UUID?, authorization: String?) {
+        if (targetType == "amendment") {
+            require(scopeRevisionId != null) { "Amendment revision is required" }
+            targetClient.requireAmendmentRevision(targetId, scopeRevisionId, authorization, false)
+        } else {
+            require(scopeRevisionId == null) { "Only amendment links have a revision scope" }
+        }
     }
 }

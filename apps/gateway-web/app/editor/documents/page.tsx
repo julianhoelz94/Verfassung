@@ -4,14 +4,14 @@ import { Alert, PageHeader } from '../../components/ui';
 import { PageMain } from '../../components/PageMain';
 import { listDocuments } from '../../../lib/document-api';
 import { canVisitEditor } from '../../../lib/nav';
-import { currentUser } from '../../../lib/session';
+import { currentUser, requireSessionBearer } from '../../../lib/session';
 
 export default async function DocumentsPage(props: { searchParams: Promise<{ q?: string; error?: string }> }) {
   const user = await currentUser();
   if (!user) redirect('/login');
   if (!canVisitEditor(user.roles)) redirect('/editor');
   const params = await props.searchParams;
-  const documents = await listDocuments(params.q);
+  const documents = await listDocuments(params.q, await requireSessionBearer());
   return <PageMain className="wide">
     <PageHeader title="Documents" meta="Sources, files, and revision history shared across constitutions and legal changes." actions={<Link className="btn" href="/editor/documents/new">New document</Link>} />
     {params.error ? <Alert tone="error">Document action was not allowed.</Alert> : null}

@@ -179,7 +179,7 @@ is_known_service() {
 normalize_service() {
   local raw="$1"
   case "${raw}" in
-    catalog|content|amendment|identity|editor|search|ingestion|audit)
+    catalog|content|amendment|identity|editor|search|ingestion|audit|document)
       echo "${raw}-service"
       ;;
     caddy|proxy)

@@ -106,7 +106,7 @@ export default async function TimelinePage(props: TimelinePageProps) {
   const primary = country.constitutions[0];
   const tipId = primary ? chainTipId(primary) : undefined;
   const managedDocuments = new Map(await Promise.all(amendments.map(async (amendment) =>
-    [amendment.id, await listDocumentLinks('amendment', amendment.id).catch(() => [])] as const,
+    [amendment.id, amendment.publishedRevisionId ? await listDocumentLinks('amendment', amendment.id, amendment.publishedRevisionId).catch(() => []) : []] as const,
   )));
 
   return (

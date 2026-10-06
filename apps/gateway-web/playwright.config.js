@@ -16,6 +16,7 @@ const apiEnv = {
   IDENTITY_API_URL: `${mockOrigin}/api/identity`,
   EDITOR_API_URL: `${mockOrigin}/api/editor`,
   INGESTION_API_URL: `${mockOrigin}/api/ingestion`,
+  DOCUMENT_API_URL: `${mockOrigin}/api/document`,
   SESSION_COOKIE_SECURE: 'false',
 };
 

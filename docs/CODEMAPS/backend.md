@@ -35,14 +35,14 @@ Tree in `content_nodes` is the only write model; `articles` is a view of roots. 
 
 ## document — `services/document-service`
 
-`DocumentController` → `DocumentService` → `DocumentRepository`. Writes require an identity role (`editor`, `publisher`, or `admin`); lifecycle and link events are append-only. `LinkTargetClient` verifies constitution and amendment IDs through the owning services. Public reads expose current or numbered historical revisions; file downloads are revision-specific.
+`DocumentController` → `DocumentService` → `DocumentRepository`. Writes require an identity role (`editor`, `publisher`, or `admin`); lifecycle and link events are append-only. `LinkTargetClient` verifies constitution, version, and amendment IDs through the owning services. Document lists and revision history require editorial access. Public metadata and file reads require an active link to a public target and expose only its pinned revision. Amendment links inherit through draft revision ancestry; the published revision determines the public link set and cannot be edited.
 
 | Method | Path |
 | --- | --- |
 | GET | `/documents?q`, `/documents/{id}?revision`, `/documents/{id}/revisions`, `/documents/{id}/revisions/{number}/file` |
 | POST/PUT | `/documents`, `/documents/{id}` (expected revision), `/documents/{id}/file` (multipart) |
-| GET | `/links/{constitution\|amendment}/{id}` |
-| POST/DELETE | `/links/{constitution\|amendment}/{id}` and `/{documentId}` |
+| GET | `/links/{constitution\|version\|amendment}/{id}` (amendment: `scopeRevisionId`) |
+| POST/DELETE | `/links/{constitution\|version\|amendment}/{id}` and `/{documentId}` |
 
 Tests: `DocumentApiTest.kt`. Migration: `scripts/migrate_document_references.py`.
 

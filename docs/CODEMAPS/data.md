@@ -33,7 +33,7 @@ Historical seed migration numbers V3 and V5 are no-ops on fresh databases.
 
 ## document_db
 
-`documents` stores identity, current revision number, and lifecycle state. `document_revisions` stores immutable metadata and optional file bytes. `document_events` and `document_link_events` are append-only; link targets are external UUIDs verified through owner APIs, without cross-database foreign keys. Latest Flyway: V1.
+`documents` stores identity, current revision number, and lifecycle state. `document_revisions` stores immutable metadata and optional file bytes. `document_events` and `document_link_events` are append-only; link targets are external constitution, version, or amendment UUIDs verified through owner APIs, without cross-database foreign keys. V2 adds `scope_revision_id` to amendment link events so published citations follow a specific amendment revision. Latest Flyway: V2.
 
 ## identity_db
 

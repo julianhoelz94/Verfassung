@@ -325,6 +325,11 @@ const server = createServer(async (req, res) => {
     return;
   }
 
+  if (method === 'GET' && (pathname === '/api/document/documents' || /^\/api\/document\/links\/(constitution|version|amendment)\/[^/]+(?:\/events)?$/.test(pathname))) {
+    json(res, 200, []);
+    return;
+  }
+
   if (method === 'GET' && pathname === '/api/catalog/countries') {
     json(res, 200, countries);
     return;

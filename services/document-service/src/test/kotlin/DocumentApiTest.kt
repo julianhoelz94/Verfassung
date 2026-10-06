@@ -113,6 +113,36 @@ class DocumentApiTest {
     }
 
     @Test
+    fun publicCitationExposesOnlyItsPinnedRevisionAndFile() {
+        val (id, _) = create()
+        val file = MockMultipartFile("file", "gazette.txt", "text/plain", "Public source".toByteArray())
+        val uploaded = mvc.perform(multipart("/documents/$id/file").file(file).param("expectedRevision", "1").header("Authorization", EDITOR))
+            .andExpect(status().isOk)
+            .andReturn()
+        val pinnedId = mapper.readTree(uploaded.response.contentAsString)["revision"]["id"].asText()
+        val target = UUID.randomUUID()
+        Mockito.`when`(targets.isPublic("constitution", target, null)).thenReturn(true)
+        mvc.post("/links/constitution/$target") {
+            header("Authorization", EDITOR)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"documentId":"$id","revisionId":"$pinnedId"}"""
+        }.andExpect { status { isOk() } }
+        mvc.get("/documents/$id?revision=2").andExpect { status { isOk() } }
+        mvc.get("/documents/$id/revisions/2/file").andExpect {
+            status { isOk() }
+            content { bytes("Public source".toByteArray()) }
+        }
+        mvc.put("/documents/$id") {
+            header("Authorization", EDITOR)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"title":"New internal notes","expectedRevision":2}"""
+        }.andExpect { status { isOk() } }
+        mvc.get("/documents/$id").andExpect { status { isNotFound() } }
+        mvc.get("/documents/$id/revisions/3/file").andExpect { status { isNotFound() } }
+        mvc.get("/documents/$id?revision=2").andExpect { status { isOk() } }
+    }
+
+    @Test
     fun amendmentLinksAreIsolatedByRevision() {
         val (id, revisionId) = create()
         val target = UUID.randomUUID()

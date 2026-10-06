@@ -208,7 +208,7 @@ export function OutlineEditor({
               <legend>Editor permissions</legend>
               {index < layers.length - 1 ? (
                 <label className="field">
-                  <span><input type="checkbox" checked={Boolean(layer.allowTextAlongsideChildren)} onChange={(event) => update(index, { allowTextAlongsideChildren: event.target.checked })} /> Allow text alongside child units</span>
+                  <span className="choice-row"><input type="checkbox" checked={Boolean(layer.allowTextAlongsideChildren)} onChange={(event) => update(index, { allowTextAlongsideChildren: event.target.checked })} /> Allow text alongside child units</span>
                   <span className="muted">Unnumbered parent text can appear before, between, or after child units.</span>
                 </label>
               ) : <p>This final level holds text and has no child units.</p>}
@@ -245,7 +245,7 @@ export function OutlineEditor({
             {(
               <>
                 <label className="field">
-                  <span className="field-label">
+                  <span className="field-label choice-row">
                     <input
                       type="checkbox"
                       checked={layer.showKind}
@@ -255,7 +255,7 @@ export function OutlineEditor({
                   </span>
                 </label>
                 <label className="field">
-                  <span className="field-label">
+                  <span className="field-label choice-row">
                     <input
                       type="checkbox"
                       checked={layer.showLabel}
@@ -266,7 +266,7 @@ export function OutlineEditor({
                   </span>
                 </label>
                 <label className="field">
-                  <span className="field-label">
+                  <span className="field-label choice-row">
                     <input
                       type="checkbox"
                       checked={layer.showTitle}

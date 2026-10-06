@@ -59,10 +59,10 @@ type PageHeaderProps = {
 export function PageHeader({ breadcrumbs, eyebrow, title, meta, actions }: PageHeaderProps) {
   return (
     <div className="page-header">
-      {breadcrumbs && breadcrumbs.length > 0 ? <Breadcrumbs items={breadcrumbs} /> : null}
-      <div>
+      <div className="page-heading">
         {eyebrow ? <p className="eyebrow">{eyebrow}</p> : null}
         <h1 className="page-title">{title}</h1>
+        {breadcrumbs && breadcrumbs.length > 0 ? <Breadcrumbs items={breadcrumbs} /> : null}
         {meta ? <div className="page-meta">{meta}</div> : null}
       </div>
       {actions ? <div className="page-actions">{actions}</div> : null}

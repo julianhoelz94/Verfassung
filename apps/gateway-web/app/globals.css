@@ -178,7 +178,7 @@ button {
 
 .header-search input,
 .compare-bar select,
-input,
+input:not([type='checkbox']):not([type='radio']),
 select,
 textarea {
   min-height: 44px;
@@ -186,6 +186,17 @@ textarea {
   border: 1px solid var(--color-line);
   border-radius: 4px;
   font: inherit;
+}
+
+input[type='checkbox'],
+input[type='radio'] {
+  flex: none;
+  width: 1.125rem;
+  height: 1.125rem;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  accent-color: var(--color-accent);
 }
 
 .header-spacer {
@@ -236,8 +247,9 @@ main:focus {
 }
 
 .crumbs {
-  margin-bottom: 16px;
+  margin-bottom: var(--space-4);
   color: var(--color-ink-2);
+  overflow-wrap: anywhere;
 }
 
 .crumbs-sep {
@@ -517,8 +529,8 @@ summary {
 .actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px 20px;
-  margin: 12px 0 24px;
+  gap: var(--space-3) var(--space-4);
+  margin: var(--space-3) 0 var(--space-5);
 }
 
 .status-panel {
@@ -1035,6 +1047,15 @@ button.article-toggle[aria-expanded='false']::after {
   margin-bottom: var(--space-5);
 }
 
+.page-heading {
+  flex: 1 1 30rem;
+  min-width: 0;
+}
+
+.page-header .crumbs {
+  margin: var(--space-2) 0 0;
+}
+
 .eyebrow {
   font-size: var(--text-sm);
   text-transform: uppercase;
@@ -1062,6 +1083,25 @@ button.article-toggle[aria-expanded='false']::after {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);
+}
+
+.choice-row {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  min-height: var(--control-min);
+  padding: var(--space-2) 0;
+  cursor: pointer;
+}
+
+.choice-row input[type='checkbox'],
+.choice-row input[type='radio'] {
+  margin-top: 0.2em;
+}
+
+.choice-row:has(input:disabled) {
+  cursor: not-allowed;
+  color: var(--color-ink-3);
 }
 
 .btn {
@@ -1530,6 +1570,10 @@ button.article-toggle[aria-expanded='false']::after {
   gap: var(--space-2);
   min-height: var(--control-min);
   margin: 0;
+}
+
+.search-filter-fields input[type='radio'] {
+  margin-top: 0.2em;
 }
 
 .search-snippet {

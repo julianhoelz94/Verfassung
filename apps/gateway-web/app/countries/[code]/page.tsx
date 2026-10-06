@@ -10,6 +10,7 @@ import { orderVersions } from '../../../lib/compare';
 import { atlasTitle, metaDescription, pageMetadata } from '../../../lib/page-meta';
 import { chainTipId, publicVersions } from '../../../lib/reading';
 import { CompareForm } from './CompareForm';
+import { listDocumentLinks } from '../../../lib/document-api';
 
 type CountryPageProps = {
   params: Promise<{ code: string }>;
@@ -64,6 +65,9 @@ export default async function CountryPage(props: CountryPageProps) {
     (sum, item) => sum + publicVersions(item.versions).length,
     0,
   );
+  const documentsByConstitution = new Map(await Promise.all(country.constitutions.map(async (constitution) =>
+    [constitution.id, await listDocumentLinks('constitution', constitution.id).catch(() => [])] as const,
+  )));
 
   return (
     <PageMain className="wide">
@@ -143,6 +147,12 @@ export default async function CountryPage(props: CountryPageProps) {
               ) : null}
             </div>
             {tipVersion ? <Badge tone="accent">Latest: {tipVersion.versionLabel}</Badge> : null}
+            {(documentsByConstitution.get(constitution.id) ?? []).length ? <div>
+              <h3>Documents</h3>
+              <ul className="link-list">{(documentsByConstitution.get(constitution.id) ?? []).map((link) => <li key={link.documentId}>
+                <a href={`/documents/${link.documentId}${link.revisionId ? `?revision=${link.document.revision.revision}` : ''}`}>{link.document.revision.title}</a>
+              </li>)}</ul>
+            </div> : null}
             <h3>Compare versions</h3>
             <CompareForm code={country.isoCode} versions={publicLine} variant="inline" />
           </section>

@@ -26,6 +26,7 @@ BUILD_ORDER=(
   search-service
   ingestion-service
   audit-service
+  document-service
 )
 
 DOCKER_STARTUP_TIMEOUT_SECONDS="${DOCKER_STARTUP_TIMEOUT_SECONDS:-120}"
@@ -66,7 +67,7 @@ Local stack (Caddy is the only host entry):
   Timeline (DE) ${host}/countries/DE/timeline
   Editor        ${host}/login
   API docs      ${host}/api/docs/<service>/swagger-ui/index.html
-                services: catalog content amendment identity editor search ingestion audit
+                services: catalog content amendment identity editor search ingestion audit document
 EOF
 }
 
@@ -178,7 +179,7 @@ is_known_service() {
 normalize_service() {
   local raw="$1"
   case "${raw}" in
-    catalog|content|amendment|identity|editor|search|ingestion|audit)
+    catalog|content|amendment|identity|editor|search|ingestion|audit|document)
       echo "${raw}-service"
       ;;
     caddy|proxy)

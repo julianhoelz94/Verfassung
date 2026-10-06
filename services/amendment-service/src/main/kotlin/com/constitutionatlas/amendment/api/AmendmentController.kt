@@ -76,6 +76,27 @@ class AmendmentController(
         return amendmentService.listRevisions(id)
     }
 
+    @GetMapping("/amendments/{id}/revisions/{revisionId}/ancestry")
+    fun revisionAncestry(
+        @PathVariable id: UUID,
+        @PathVariable revisionId: UUID,
+        @RequestHeader(value = "Authorization", required = false) authorization: String?,
+    ): List<UUID> {
+        if (writeAccess.staffActorOrNull(authorization) == null) {
+            val published = amendmentService.getPublishedAmendment(id)
+            if (published.publishedRevisionId != revisionId) throw com.constitutionatlas.platform.NotFoundException("Revision not found")
+        }
+        val byId = amendmentService.listRevisions(id).associateBy { it.id }
+        val ancestry = mutableListOf<UUID>()
+        var cursor: UUID? = revisionId
+        while (cursor != null) {
+            val revision = byId[cursor] ?: throw com.constitutionatlas.platform.NotFoundException("Revision not found")
+            ancestry.add(cursor)
+            cursor = revision.predecessorRevisionId
+        }
+        return ancestry.asReversed()
+    }
+
     @GetMapping("/amendments/{id}/diff-review")
     fun diffReview(@PathVariable id: UUID, @RequestHeader(value = "Authorization", required = false) authorization: String?): AmendmentDiffReviewState {
         writeAccess.requireStaffAmendment(authorization)

@@ -68,6 +68,7 @@ export function editorialLinks(roles: string[], needsReviewCount = 0): NavLink[]
     links.push({ href: '/editor?status=approved', label: 'Ready to publish' });
   }
   if (isEditor || isReviewer || isPublisher) {
+    links.push({ href: '/editor/documents', label: 'Documents' });
     links.push({ href: '/editor/amendments', label: 'Legal changes', badgeCount: needsReviewCount || undefined });
     links.push({ href: '/editor/history', label: 'Snapshot history' });
   }

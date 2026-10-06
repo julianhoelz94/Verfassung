@@ -28,7 +28,7 @@
 	@missing_write_auth {
 		method POST PUT PATCH DELETE
 		header !Authorization
-		path /api/catalog* /api/content* /api/amendment* /api/audit* /api/search* /api/ingestion*
+		path /api/catalog* /api/content* /api/amendment* /api/audit* /api/search* /api/ingestion* /api/document*
 	}
 	route @missing_write_auth {
 		respond 401
@@ -73,6 +73,10 @@
 		import docs_upstream audit audit-service
 	}
 
+	route /api/docs/document* {
+		import docs_upstream document document-service
+	}
+
 	route /api/catalog* {
 		uri strip_prefix /api/catalog
 		reverse_proxy catalog-service:8080
@@ -106,6 +110,11 @@
 	route /api/audit* {
 		uri strip_prefix /api/audit
 		reverse_proxy audit-service:8080
+	}
+
+	route /api/document* {
+		uri strip_prefix /api/document
+		reverse_proxy document-service:8080
 	}
 
 	route /api/search* {

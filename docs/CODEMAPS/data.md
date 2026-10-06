@@ -31,6 +31,10 @@ Historical seed migration numbers V3 and V5 are no-ops on fresh databases.
 
 `version_transitions` (source→target UUIDs, `constitution_id`), `amendments` (`constitution_id`, `status`, `review_status` `ok`/`needs_review`, nullable `version_transition_id`, `published_revision_id`; `kind` dropped in V8), `amendment_revisions` (linear chain; `comment`, `documents` JSONB, published pins `reviewed_source_tip_id`/`reviewed_target_tip_id`, `is_published_tip`), `amendment_changes` (hang off `revision_id`; V6 amending-law text). Historical seed migration V3 is a no-op. Latest: V8.
 
+## document_db
+
+`documents` stores identity, current revision number, and lifecycle state. `document_revisions` stores immutable metadata and optional file bytes. `document_events` and `document_link_events` are append-only; link targets are external constitution, version, or amendment UUIDs verified through owner APIs, without cross-database foreign keys. V2 adds `scope_revision_id` to amendment link events so published citations follow a specific amendment revision. Latest Flyway: V2.
+
 ## identity_db
 
 `roles`, `users` (+ `enabled` V5), `user_roles`, `sessions` (+ `last_seen_at` V4), `login_throttle`, `invites`, `password_resets`, `user_mfa`, `mfa_recovery_codes`, `mfa_challenges`, `service_tokens` (V8, `expires_at` V9).

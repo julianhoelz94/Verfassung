@@ -19,14 +19,14 @@ Env: copy `env/local-stack.env.example` → `env/local-stack.env` (gitignored). 
 
 Kotlin images: host `./gradlew bootJar` then `COPY app.jar` onto `eclipse-temurin:21-jre` (`services/*/Dockerfile`). Gateway (`node:20-alpine`) and Caddy still build in Docker.
 
-Compose services: `edge-proxy`, `gateway-web`, eight `*-service`, eight `*-db` (`postgres:16`), `backup-service`.
+Compose services: `edge-proxy`, `gateway-web`, nine `*-service`, nine `*-db` (`postgres:16`), `backup-service`.
 
 ## Caddy (`infra/caddy/Caddyfile`)
 
 | Path | Upstream |
 | --- | --- |
 | `/api/docs/<svc>*` | `<svc>:8080` + strip prefix + `X-Forwarded-Prefix` |
-| `/api/catalog\|content\|amendment\|identity\|editor\|search\|ingestion\|audit*` | matching service, strip `/api/<svc>` |
+| `/api/catalog\|content\|amendment\|identity\|editor\|search\|ingestion\|audit\|document*` | matching service, strip `/api/<svc>` |
 | everything else | `gateway-web:3000` |
 
 Docs: `http://localhost/api/docs/<svc>/swagger-ui/index.html` when `CADDY_EXPOSE_API_DOCS=true` (local-stack/ci). Other profiles 404 that path.

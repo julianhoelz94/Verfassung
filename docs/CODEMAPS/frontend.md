@@ -25,6 +25,8 @@ Next.js 15 App Router, React 18, TypeScript. **No DB** — HTTP clients only. Pr
 | `/editor` | drafts (`ArticleEditor.tsx`, `ArticleFilterList`, `WorkflowSteps`, `actions.ts`, `PublishForm.tsx`) |
 | `/editor/amendments` | staff Legal changes inbox (`page.tsx`; was “Amending laws”) |
 | `/editor/amendments/[id]` | create (`new`) or edit form with revision panel (`AmendmentEditorLayout.tsx`, `AmendmentRevisionPanel.tsx`, `AmendmentForm.tsx`, `AmendmentChangesTable.tsx`, `actions.ts`); quote review (UI-56) |
+| `/editor/documents`, `/editor/documents/new`, `/editor/documents/[id]` | staff document workspace, revisions, uploads, and shared link controls |
+| `/documents/[id]` | public current or pinned revision reader |
 | `/editor/history` | staff snapshot history (`page.tsx`; `listing=all` version chain) |
 | `/admin` | admin index (Users, Outlines, Import) |
 | `/admin/users` | identity admin |
@@ -43,6 +45,7 @@ Admin gates: `lib/admin.ts` (`requireAdminPage`). Editor/admin links: `lib/nav.t
 | `identity-client.ts` + `session.ts` | identity; cookies `ca_session`, `ca_mfa_challenge` |
 | `editor-api.ts` | editor-service (`searchIndexStatus` on preview after publish) |
 | `amendment-editor-api.ts` | amendment-service staff writes (create/revisions/publish/withdraw), `listRevisions`, `suggestChanges` |
+| `document-api.ts` | document-service reads, revisions, uploads, and links |
 | `ingestion-api.ts` | ingestion |
 | `outline.ts` | render groups from catalog outline + content nodes |
 | `compare.ts`, `text-diff.ts` | compare page |

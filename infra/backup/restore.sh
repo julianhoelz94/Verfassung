@@ -1,5 +1,5 @@
 #!/bin/sh
-# Restore all eight service databases from a backup directory produced by backup.sh.
+# Restore all service databases from a backup directory produced by backup.sh.
 # Usage: restore.sh /backups/YYYYMMDD-HHMMSS
 # Run from a host that can reach Compose Postgres hostnames (the backup-service container),
 # or: docker compose run --rm backup-service sh /backup/restore.sh /backups/<stamp>
@@ -26,7 +26,7 @@ wait_for_postgres() {
   done
 }
 
-for name in catalog content amendment identity editor audit ingestion search; do
+for name in catalog content amendment identity editor audit ingestion search document; do
   host="${name}-db"
   db="${name}_db"
   dump="${SRC_DIR}/${name}.sql"

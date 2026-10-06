@@ -22,6 +22,7 @@ services:
       - CATALOG_API_URL=http://catalog-service:8080
       - CONTENT_API_URL=http://content-service:8080
       - AMENDMENT_API_URL=http://amendment-service:8080
+      - DOCUMENT_API_URL=http://document-service:8080
       - IDENTITY_API_URL=http://identity-service:8080
       - EDITOR_API_URL=http://editor-service:8080
       - SEARCH_API_URL=http://search-service:8080
@@ -40,6 +41,8 @@ services:
       content-service:
         condition: service_started
       amendment-service:
+        condition: service_started
+      document-service:
         condition: service_started
       identity-service:
         condition: service_started
@@ -216,6 +219,27 @@ services:
       audit-db:
         condition: service_healthy
 
+  document-service:
+    build: ./services/document-service
+    environment:
+      - SPRING_PROFILES_ACTIVE=${PROFILE:-local-stack}
+      - SERVER_FORWARD_HEADERS_STRATEGY=framework
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://document-db:5432/document_db
+      - SPRING_DATASOURCE_USERNAME=postgres
+      - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - IDENTITY_API_URL=http://identity-service:8080
+      - CATALOG_API_URL=http://catalog-service:8080
+      - AMENDMENT_API_URL=http://amendment-service:8080
+    depends_on:
+      document-db:
+        condition: service_healthy
+      identity-service:
+        condition: service_started
+      catalog-service:
+        condition: service_started
+      amendment-service:
+        condition: service_started
+
   ingestion-service:
     build: ./services/ingestion-service
     environment:
@@ -278,6 +302,8 @@ services:
       editor-db:
         condition: service_healthy
       audit-db:
+        condition: service_healthy
+      document-db:
         condition: service_healthy
       ingestion-db:
         condition: service_healthy
@@ -344,6 +370,16 @@ services:
       timeout: 3s
       retries: 20
       start_period: 5s
+  document-db:
+    image: postgres:16
+    environment: { POSTGRES_DB: document_db, POSTGRES_USER: postgres, POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-postgres}" }
+    volumes: [document-db-data:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
   ingestion-db:
     image: postgres:16
     environment: { POSTGRES_DB: ingestion_db, POSTGRES_USER: postgres, POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-postgres}" }
@@ -372,5 +408,6 @@ volumes:
   identity-db-data:
   editor-db-data:
   audit-db-data:
+  document-db-data:
   ingestion-db-data:
   search-db-data:

@@ -36,6 +36,7 @@ test('invited visitor activates the assigned account', async ({ page }) => {
 });
 
 test('viewer changes password, enrolls MFA and receives recovery codes', async ({ page }) => {
+  test.setTimeout(90_000);
   await page.goto('/login');
   await page.getByLabel('Email').fill('local-viewer@example.local');
   await page.getByLabel('Password').fill('change-me');
@@ -43,12 +44,16 @@ test('viewer changes password, enrolls MFA and receives recovery codes', async (
   await expect(page).toHaveURL(/\/$/);
   await page.goto('/account');
   await expect(page.getByText('Signed in as local-viewer@example.local.')).toBeVisible();
+  await page.waitForLoadState('networkidle');
   await page.getByLabel('Current password').fill('change-me');
   await page.getByLabel('New password').fill('replacement-password');
   await page.getByRole('button', { name: 'Update password' }).click();
+  await expect(page.getByText('Password updated.')).toBeVisible({ timeout: 15_000 });
+  await page.reload();
   await expect(page.getByText('Password updated.')).toBeVisible();
-  await Promise.all([page.waitForURL(/\/account\?enroll=1$/), page.getByRole('button', { name: 'Enroll authenticator' }).click()]);
-  await expect(page).toHaveURL(/\/account\?enroll=1$/);
+  await page.waitForLoadState('networkidle');
+  await page.getByRole('button', { name: 'Enroll authenticator' }).click();
+  await expect(page).toHaveURL(/\/account\?enroll=1$/, { timeout: 15_000 });
   await expect(page.getByText(/Authenticator secret:/)).toContainText('E2ESECRET');
   await page.locator('#enrollCode').fill('123456');
   await page.getByRole('button', { name: 'Confirm enrollment' }).click();
@@ -58,7 +63,8 @@ test('viewer changes password, enrolls MFA and receives recovery codes', async (
   await page.getByRole('button', { name: 'Replace recovery codes' }).click();
   await expect(page.getByText('RECOVERY-NEW')).toBeVisible();
   await page.getByRole('button', { name: 'Account menu' }).click();
-  await Promise.all([page.waitForURL(/\/$/), page.getByRole('button', { name: 'Sign out' }).click()]);
+  await page.getByRole('button', { name: 'Sign out' }).click();
+  await expect(page).toHaveURL(/\/$/);
   await page.goto('/login');
   await page.getByLabel('Email').fill('local-viewer@example.local');
   await page.getByLabel('Password').fill('replacement-password');

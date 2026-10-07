@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { expect, test, type APIRequestContext } from '@playwright/test';
 import { adminHeaders } from './api-fixtures';
-import { signIn, signOut } from './auth';
+import { signIn, signOut, startFromViewer } from './auth';
 
 async function json(response: Awaited<ReturnType<APIRequestContext['post']>>) {
   const result = await response.json();
@@ -32,10 +32,7 @@ for (const hop of ['editorial_correction', 'legal'] as const) {
     const { version, source, headers, constitution } = await fixture(request);
     const sourceRoot = source.roots[0], sourceSentence = sourceRoot.content[1].node;
     await signIn(page, 'editor');
-    const control = hop === 'legal' ? 'Current law' : 'Correct this text';
-    const action = hop === 'legal' ? 'Record the next legal change' : 'Correct this text';
-    await page.getByLabel(control).selectOption(version.id);
-    await page.getByRole('button', { name: action, exact: true }).click();
+    await startFromViewer(page, 'XA', version.id, hop);
     await expect(page.getByLabel('Editor view')).toHaveValue('article');
     const canvas = page.locator('#draft-form');
     await expect(canvas.getByLabel('Unnumbered parent text').first()).toHaveValue('Before.');
@@ -145,8 +142,7 @@ for (const hop of ['editorial_correction', 'legal'] as const) {
 test('custom one-level root supports literal labels, plain text and new root navigation', async ({ page, request }) => {
   const { version } = await fixture(request, true);
   await signIn(page, 'editor');
-  await page.getByLabel('Correct this text').selectOption(version.id);
-  await page.getByRole('button', { name: 'Correct this text', exact: true }).click();
+  await startFromViewer(page, 'XA', version.id, 'editorial_correction');
   const canvas = page.locator('#draft-form');
   await expect(page.getByLabel('Editor view')).toHaveValue('clause');
   await expect(canvas.getByLabel('Clause title')).toHaveCount(0);
@@ -171,8 +167,7 @@ test('mixed parent text and nested sentence decisions reopen when one draft unit
   test.setTimeout(120_000);
   const { version, headers } = await fixture(request);
   await signIn(page, 'editor');
-  await page.getByLabel('Current law').selectOption(version.id);
-  await page.getByRole('button', { name: 'Record the next legal change' }).click();
+  await startFromViewer(page, 'XA', version.id, 'legal');
   const canvas = page.locator('#draft-form');
   await canvas.getByLabel('Unnumbered parent text').first().fill('Before, revised.');
   await canvas.getByLabel('Sentence text').first().fill('Nested right revised.');
@@ -214,8 +209,7 @@ test('mixed parent text and nested sentence decisions reopen when one draft unit
 test('pasted boundaries, inline titles and keyboard edits persist with explicit lineage', async ({ page, request }) => {
   const { version, headers } = await fixture(request);
   await signIn(page, 'editor');
-  await page.getByLabel('Correct this text').selectOption(version.id);
-  await page.getByRole('button', { name: 'Correct this text', exact: true }).click();
+  await startFromViewer(page, 'XA', version.id, 'editorial_correction');
   const canvas = page.locator('#draft-form');
   const pasted = 'Art.12 applies. Next! ';
   const sentence = canvas.getByLabel('Sentence text').first();

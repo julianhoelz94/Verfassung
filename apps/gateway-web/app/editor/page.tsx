@@ -2,9 +2,9 @@ import { redirect } from 'next/navigation';
 import { ArticleFilterList } from '../components/ArticleFilterList';
 import { ConstitutionText } from '../components/ConstitutionText';
 import { PageMain } from '../components/PageMain';
-import { Alert, Badge, Button, Card, DataList, DataRow, Input, PageHeader, Select, WorkflowSteps } from '../components/ui';
+import { Alert, Badge, Button, PageHeader, WorkflowSteps } from '../components/ui';
 import { getCountry, listAllArticles, getArticle, listAllUnits, getUnit, getVersionSettings, listCountries, type ArticleSummary, type CountryDetail, type CountrySummary } from '../../lib/api';
-import { editorErrorMessage, getDraftPreview, getEditorDiffReview, getStructuredDraft, listSessions, type EditSessionSummary } from '../../lib/editor-api';
+import { editorErrorMessage, getDraftPreview, getEditorDiffReview, getStructuredDraft } from '../../lib/editor-api';
 import { decisionReadyForReview } from '../../lib/diff-review';
 import { currentUser } from '../../lib/session';
 import { ArticleEditor } from './ArticleEditor';
@@ -14,6 +14,7 @@ import { OrderedContentTree } from '../components/ConstitutionText';
 import { StructuredEditor } from './StructuredEditor';
 import { PublishForm } from './PublishForm';
 import { LegacyPublishForm } from './LegacyPublishForm';
+import { EditorLanding } from './EditorLanding';
 
 type EditorPageProps = {
   searchParams: Promise<{
@@ -43,59 +44,6 @@ function hasRole(roles: string[], role: string): boolean {
   return roles.includes(role) || roles.includes('admin');
 }
 
-async function safeListSessions(filters: { status?: string; openedBy?: string }): Promise<EditSessionSummary[]> {
-  try {
-    return await listSessions(filters);
-  } catch {
-    return [];
-  }
-}
-
-function sessionHref(session: EditSessionSummary): string {
-  return `/editor?sessionId=${encodeURIComponent(session.id)}&versionId=${encodeURIComponent(session.versionId)}`;
-}
-
-function formatOpened(iso: string): string {
-  return iso.slice(0, 10);
-}
-
-function SessionTable({
-  title,
-  sessions,
-  empty,
-}: {
-  title: string;
-  sessions: EditSessionSummary[];
-  empty: string;
-}) {
-  return (
-    <section>
-      <h2 className="section-title">{title}</h2>
-      {sessions.length === 0 ? (
-        <p className="muted">{empty}</p>
-      ) : (
-        <DataList columns={5}>
-          {sessions.map((session) => (
-            <DataRow
-              key={session.id}
-              cells={[
-                { label: 'Session', value: <a href={sessionHref(session)}>{session.id.slice(0, 8)}</a> },
-                { label: 'Version', value: session.versionId.slice(0, 8) },
-                {
-                  label: 'Status',
-                  value: <Badge tone={session.status === 'approved' ? 'added' : 'changed'}>{session.status}</Badge>,
-                },
-                { label: 'Changed', value: String(session.changedArticleCount) },
-                { label: 'Opened', value: formatOpened(session.openedAt) },
-              ]}
-            />
-          ))}
-        </DataList>
-      )}
-    </section>
-  );
-}
-
 export default async function EditorPage(props: EditorPageProps) {
   const searchParams = await props.searchParams;
   const user = await currentUser();
@@ -115,6 +63,9 @@ export default async function EditorPage(props: EditorPageProps) {
 
   const preview = searchParams.sessionId ? await getDraftPreview(searchParams.sessionId) : null;
   const session = preview?.session;
+  if (!session) {
+    return <EditorLanding email={user.email} roles={user.roles} status={searchParams.status} error={searchParams.error} />;
+  }
 
   let countries: CountrySummary[] = [];
   try {
@@ -124,18 +75,7 @@ export default async function EditorPage(props: EditorPageProps) {
   }
   const countryDetails: CountryDetail[] = (await Promise.all(countries.map((item) => getCountry(item.isoCode))))
     .filter((item): item is CountryDetail => item !== null);
-  const versions = countryDetails.flatMap((country) => country.constitutions.flatMap((constitution) =>
-    constitution.versions.map((version) => ({
-      ...version,
-      snapshotId: version.currentVersionId ?? version.id,
-      constitutionTitle: constitution.title,
-      constitutionId: constitution.id,
-      countryCode: country.isoCode,
-    })),
-  ));
-  const availableVersions = versions.filter(version => (!searchParams.country || version.countryCode === searchParams.country) && (!searchParams.constitutionId || version.constitutionId === searchParams.constitutionId));
-  const legalTips = availableVersions.filter((version) => version.latestPublished);
-  const versionId = session?.versionId ?? searchParams.versionId ?? availableVersions[0]?.snapshotId;
+  const versionId = session.versionId;
   const selectedCountry = countryDetails.find((country) => country.constitutions.some((constitution) =>
     constitution.versions.some((version) => version.id === versionId || version.currentVersionId === versionId),
   ));
@@ -144,6 +84,8 @@ export default async function EditorPage(props: EditorPageProps) {
   );
   const selectedVersion = selectedConstitution?.versions.find((version) => version.id === versionId || version.currentVersionId === versionId);
   const settings = session && versionId ? await getVersionSettings(versionId) : null;
+  const displayOutline = settings?.outline ?? selectedConstitution?.contentOutline;
+  const kindLabel = (kind?: string) => kind ? displayOutline?.kinds.find((item) => item.kindCode === kind)?.displayLabel ?? kind : 'Unit';
   const units: ArticleSummary[] = versionId ? await listAllUnits(versionId) : [];
   const legacySource = units.some(unit => unit.legacyIdentity);
   const structured = session && !legacySource && !(preview?.drafts?.length) ? await getStructuredDraft(session.id) : null;
@@ -180,8 +122,8 @@ export default async function EditorPage(props: EditorPageProps) {
   const draftIds = [...(preview?.drafts ?? []).map((item) => item.articleId), ...articles.filter(article => article.logicalId && changedRootIds.includes(article.logicalId)).map(article => article.id)];
   const changedLabels = articles
     .filter((article) => draftIds.includes(article.id))
-    .map((article) => `${article.kind ?? 'Unit'} ${article.articleNumber}`);
-  if (structured) sourceArticles.filter(article => article.logicalId && changedRootIds.includes(article.logicalId) && !articles.some(target => target.logicalId === article.logicalId)).forEach(article => changedLabels.push(`Removed ${article.kind ?? 'Unit'} ${article.articleNumber}`));
+    .map((article) => `${kindLabel(article.kind)} ${article.articleNumber}`);
+  if (structured) sourceArticles.filter(article => article.logicalId && changedRootIds.includes(article.logicalId) && !articles.some(target => target.logicalId === article.logicalId)).forEach(article => changedLabels.push(`Removed ${kindLabel(article.kind)} ${article.articleNumber}`));
   const errorMessage = editorErrorMessage(searchParams.error);
   const alerts = (
     <>
@@ -200,84 +142,6 @@ export default async function EditorPage(props: EditorPageProps) {
       {searchParams.amendmentPending ? <Alert tone="error">The snapshot was published, but the change record or review status is pending retry.</Alert> : null}
     </>
   );
-
-  if (!session) {
-    const listMine = searchParams.mine === '1' || (!searchParams.status && canEdit);
-    const listReview = searchParams.status === 'reviewing' || (!searchParams.mine && !searchParams.status && (canEdit || canReview));
-    const listApproved = searchParams.status === 'approved' || (!searchParams.mine && !searchParams.status && canPublish);
-    const [mine, reviewing, approved] = await Promise.all([
-      listMine ? safeListSessions({ openedBy: 'me' }) : Promise.resolve([]),
-      listReview ? safeListSessions({ status: 'reviewing' }) : Promise.resolve([]),
-      listApproved ? safeListSessions({ status: 'approved' }) : Promise.resolve([]),
-    ]);
-    const focused =
-      searchParams.mine === '1' ? 'My sessions' : searchParams.status === 'reviewing' ? 'Review queue' : searchParams.status === 'approved' ? 'Ready to publish' : null;
-    return (
-      <PageMain className="wide">
-        <PageHeader
-          title="Editor"
-          eyebrow={focused ?? 'Editorial workspace'}
-          meta={`Signed in as ${user.email}. Roles: ${user.roles.join(', ')}.`}
-        />
-        {alerts}
-        <form action="/editor" method="get" className="form-row">
-          <Select id="country" name="country" label="Country" defaultValue={searchParams.country ?? ''}><option value="">All countries</option>{countries.map(country => <option key={country.isoCode} value={country.isoCode}>{country.isoCode}</option>)}</Select>
-          <Select id="constitutionId" name="constitutionId" label="Constitution" defaultValue={searchParams.constitutionId ?? ''}><option value="">All constitutions</option>{countryDetails.filter(country => !searchParams.country || country.isoCode === searchParams.country).flatMap(country => country.constitutions.map(constitution => <option key={constitution.id} value={constitution.id}>{country.isoCode} · {constitution.title}</option>))}</Select>
-          <Button>Choose constitution</Button>
-        </form>
-        <div className="card-grid">
-          {canEdit && versions.length > 0 ? (
-            <Card>
-              <h2 className="card-title">Record the next legal change</h2>
-              {legalTips.length > 0 ? <form action="/editor/command" method="post">
-                <input type="hidden" name="command" value="open" />
-                <input type="hidden" name="hopKind" value="legal" />
-                <Select id="legalVersionId" name="versionId" label="Current law" defaultValue={legalTips[0].snapshotId}>
-                  {legalTips.map((version) => (
-                    <option key={version.id} value={version.snapshotId}>
-                      {version.countryCode} · {version.constitutionTitle} {version.versionLabel}
-                    </option>
-                  ))}
-                </Select>
-                <Button variant="primary">Record the next legal change</Button>
-              </form> : null}
-              <form action="/editor/command" method="post">
-                <input type="hidden" name="command" value="open" />
-                <input type="hidden" name="hopKind" value="editorial_correction" />
-                <Select id="correctionVersionId" name="versionId" label="Correct this text" defaultValue={versionId}>
-                  {availableVersions.map((version) => (
-                    <option key={version.id} value={version.snapshotId}>
-                      {version.countryCode} · {version.constitutionTitle} {version.versionLabel}
-                    </option>
-                  ))}
-                </Select>
-                <Button>Correct this text</Button>
-              </form>
-            </Card>
-          ) : null}
-          <Card>
-            <h2 className="card-title">Load a session</h2>
-            <form action="/editor/command" method="post" className="form-row">
-              <input type="hidden" name="command" value="load" />
-              <input type="hidden" name="versionId" value={versionId ?? ''} />
-              <Input id="loadSessionId" name="sessionId" label="Session id" defaultValue={searchParams.sessionId ?? ''} />
-              <Button>Load session</Button>
-            </form>
-          </Card>
-        </div>
-        {canEdit && versions.length === 0 ? <p>No published versions available.</p> : null}
-        {listMine ? (
-          <SessionTable title="My sessions" sessions={mine} empty="You have not opened a session yet." />
-        ) : null}
-        {listReview ? (
-          <SessionTable title="Review queue" sessions={reviewing} empty="No sessions are waiting for review." />
-        ) : null}
-        {listApproved ? (
-          <SessionTable title="Ready to publish" sessions={approved} empty="No sessions are approved for publish." />
-        ) : null}
-      </PageMain>
-    );
-  }
 
   const title = `${selectedConstitution?.title ?? 'Constitution'} · ${selectedVersion?.versionLabel ?? ''}`.trim();
   const publicHref =
@@ -322,7 +186,7 @@ export default async function EditorPage(props: EditorPageProps) {
           </aside>
           <section className="panel" aria-labelledby="edit-title">
             <p className="panel-title" id="edit-title">
-              {selected ? `${selected.kind ?? 'Unit'} ${selected.articleNumber}` : 'Unit'}
+              {selected ? `${kindLabel(selected.kind)} ${selected.articleNumber}` : 'Unit'}
             </p>
             {structured && selectedRoot && settings && versionId && selected && selectedConstitution ? <StructuredEditor
               key={`${session.id}:${structured.generation}:${selectedRoot.logicalId}`}

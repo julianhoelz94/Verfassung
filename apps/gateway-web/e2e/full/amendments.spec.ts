@@ -1,5 +1,5 @@
 import { expect, test, type APIRequestContext } from '@playwright/test';
-import { signIn, signOut } from './auth';
+import { signIn, signOut, startFromViewer } from './auth';
 import { adminHeaders, createIsolatedConstitution } from './api-fixtures';
 
 async function createPublishedRecord(request: APIRequestContext, title: string, constitutionId: string, sourceVersionId: string, targetVersionId: string, twoRevisions = false) {
@@ -102,8 +102,7 @@ test('publisher reviews stale quotes after a historical transcription correction
   const sourceVersionId = pair.sourceVersionId;
   const amendmentId = await createPublishedRecord(request, `Journey quote review ${Date.now()}`, pair.constitutionId, sourceVersionId, pair.targetVersionId);
   await signIn(page, 'editor');
-  await page.getByLabel('Correct this text').selectOption(sourceVersionId);
-  await page.getByRole('button', { name: 'Correct this text' }).click();
+  await startFromViewer(page, pair.countryIso, sourceVersionId, 'editorial_correction');
   await page.locator('#draft-form textarea').first().fill('The historical dignity text was checked and corrected.');
   await page.getByRole('button', { name: 'Save draft' }).click();
   await page.getByLabel('What was corrected in this transcription?').fill('Corrected the historical transcription.');

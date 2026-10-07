@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import type { ArticleDetail, ArticleSummary, ContentNode, ContentOutline, OrderedEntry, OrderedNode } from '../../lib/api';
 import { linkifyReferences, type CrossRefContext } from '../../lib/crossrefs';
-import { articleHeading, concatenatedText, groupNodes, kindByCode, nodeHeading } from '../../lib/outline';
+import { articleHeading, effectiveDisplayKind, groupNodes, kindByCode, nodeHeading } from '../../lib/outline';
 import { orderedText } from '../../lib/ordered-content';
 import { NodeTitleForm } from './NodeTitleForm';
 
@@ -49,7 +49,7 @@ export function ConstitutionText({
     }
     return linkifyReferences(value, { ...crossRefs, kindLabel });
   }
-  const rootKind = kindByCode(outline, article && 'kind' in article ? article.kind ?? 'article' : outline?.kinds[0]?.kindCode ?? 'article');
+  const rootKind = effectiveDisplayKind(kindByCode(outline, article && 'kind' in article ? article.kind ?? 'article' : outline?.kinds[0]?.kindCode ?? 'article'));
   const rootHeading = article ? articleHeading(outline, { ...article, kind: article && 'kind' in article ? article.kind : undefined }) : '';
   return (
     <div className="constitution-text text-column" lang={lang} id={article && 'id' in article && typeof article.id === 'string' ? article.id : undefined}>
@@ -97,7 +97,15 @@ export function NodeTree({
       {groupNodes(nodes, outline).map((group, index) =>
         group.type === 'concatenated' ? (
           <p key={group.nodes.map((node) => node.id).join('-') || index} className="constitution-body constitution-concat">
-            {withRefs(concatenatedText(group.nodes))}
+            {group.nodes.map((node, nodeIndex) => {
+              const kind = effectiveDisplayKind(kindByCode(outline, node.kind));
+              const label = node.label ?? node.number;
+              return <span key={node.id}>{nodeIndex > 0 ? ' ' : null}
+                {kind?.showLabel && label && kind.labelPlacement === 'superscript' ? <sup className="num">{label}</sup> : null}
+                {kind?.showLabel && label && kind.labelPlacement === 'inline' ? <span className="num">{label}</span> : null}
+                {withRefs(node.body?.trim() ?? '')}
+              </span>;
+            })}
           </p>
         ) : (
           <SectionNode
@@ -127,7 +135,7 @@ function SectionNode({
   returnTo?: string;
   withRefs?: (text: string) => ReactNode;
 }) {
-  const kind = kindByCode(outline, node.kind);
+  const kind = effectiveDisplayKind(kindByCode(outline, node.kind));
   const heading = nodeHeading(kind, node);
   const label = node.label ?? node.number ?? kind?.displayLabel ?? node.kind;
   return (
@@ -137,6 +145,7 @@ function SectionNode({
         <NodeTitleForm nodeId={node.id} title={node.title} label={label} returnTo={returnTo} />
       ) : null}
       {kind?.showLabel && kind.labelPlacement === 'inline' ? <span className="num">{node.label ?? node.number}</span> : null}
+      {kind?.showLabel && kind.labelPlacement === 'superscript' ? <sup className="num">{node.label ?? node.number}</sup> : null}
       {node.body ? (
         <div className="para">
           <p className="constitution-body">{withRefs(node.body)}</p>
@@ -167,9 +176,10 @@ export function OrderedContentTree({ entries, outline, withRefs = (text) => text
 }) {
   const groups: Array<{ entries: OrderedEntry[]; concatenated: boolean }> = [];
   for (const entry of entries) {
+    const kind = effectiveDisplayKind(kindByCode(outline, entry.node?.kind ?? ''));
     const concatenated = !(canEditTitles && returnTo && kindByCode(outline, entry.node?.kind ?? '')?.titlePolicy !== 'none') && entry.type === 'child' && Boolean(entry.node) &&
-      kindByCode(outline, entry.node!.kind)?.presentation === 'concatenated' &&
-      (!kindByCode(outline, entry.node!.kind)?.showLabel || ['inline', 'superscript'].includes(kindByCode(outline, entry.node!.kind)?.labelPlacement ?? '')) && !kindByCode(outline, entry.node!.kind)?.showTitle && !kindByCode(outline, entry.node!.kind)?.showKind &&
+      kind?.presentation === 'concatenated' &&
+      (!kind.showLabel || ['inline', 'superscript'].includes(kind.labelPlacement ?? '')) && !kind.showTitle && !kind.showKind &&
       entry.node!.content.every((part) => part.type === 'text');
     const last = groups[groups.length - 1];
     if ((concatenated && last?.concatenated) || (entry.type === 'text' && last?.entries.every((part) => part.type === 'text'))) last!.entries.push(entry);
@@ -178,7 +188,7 @@ export function OrderedContentTree({ entries, outline, withRefs = (text) => text
   return <div className="node-tree">{groups.map((group, index) => {
     if (group.concatenated) return <p key={index} className="constitution-body constitution-concat">{group.entries.map((part, partIndex) => {
       const unit = part.node!;
-      const kind = kindByCode(outline, unit.kind);
+      const kind = effectiveDisplayKind(kindByCode(outline, unit.kind));
       const text = orderedText(unit.content);
       const previous = partIndex > 0 ? orderedText(group.entries[partIndex - 1]!.node!.content) : '';
       const space = previous && text && !/\s$/u.test(previous) && !/^\s/u.test(text) ? ' ' : '';
@@ -188,7 +198,7 @@ export function OrderedContentTree({ entries, outline, withRefs = (text) => text
     if (entry.type === 'text') return <p key={entry.occurrenceId ?? entry.logicalId ?? index} className="constitution-body">{group.entries.map((part, partIndex) => <span key={part.occurrenceId ?? part.logicalId ?? partIndex} id={part.occurrenceId ? `${idPrefix}${part.occurrenceId}` : undefined}>{renderText ? renderText(part) : withRefs(part.text ?? '')}</span>)}</p>;
     const node = entry.node;
     if (!node) return null;
-    const kind = kindByCode(outline, node.kind);
+    const kind = effectiveDisplayKind(kindByCode(outline, node.kind));
     const heading = nodeHeading(kind, { kind: node.kind, label: node.label, number: null, title: node.title });
     const superscriptLabel = kind?.showLabel && kind.labelPlacement === 'superscript' ? node.label : null;
     const inlineLabel = kind?.showLabel && kind.labelPlacement === 'inline' ? node.label : null;

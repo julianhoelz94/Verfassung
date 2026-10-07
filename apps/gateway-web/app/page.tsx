@@ -175,11 +175,11 @@ export default async function Page() {
       {recentTop.length > 0 ? (
         <>
           <h2 className="section-title">Recently changed</h2>
-          <ul className="stack">
+          <ul className="recent-list">
             {recentTop.map((row, index) => (
               <li key={`${row.versionId}-${row.articleNumber}-${index}`}>
-                <Badge>{row.changeType}</Badge>{' '}
-                {row.articleNumber ? `Article ${row.articleNumber}` : 'An article'}{' '}
+                <Badge>{row.changeType}</Badge>
+                <span>{row.articleNumber ? `Article ${row.articleNumber}` : 'An article'}</span>
                 <span className="muted">
                   {row.countryName}
                   {row.date ? ` · ${row.date}` : ''}

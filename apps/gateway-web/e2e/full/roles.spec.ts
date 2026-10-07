@@ -1,5 +1,24 @@
-import { expect, test } from '@playwright/test';
-import { signIn, signOut } from './auth';
+import { expect, test, type APIRequestContext } from '@playwright/test';
+import { signIn, signOut, startFromViewer } from './auth';
+
+async function publishedVersion(request: APIRequestContext, requirePlainArticle = false): Promise<{ countryIso: string; versionId: string }> {
+  const countries = await (await request.get('/api/catalog/countries')).json();
+  for (const summary of countries) {
+    const country = await (await request.get(`/api/catalog/countries/${summary.isoCode}`)).json();
+    for (const constitution of country.constitutions ?? []) {
+      for (const version of constitution.versions ?? []) {
+        const versionId = version.currentVersionId ?? version.id;
+        if (!versionId) continue;
+        if (requirePlainArticle) {
+          const response = await request.get(`/api/content/versions/${versionId}/articles?includeBody=true`);
+          if (!response.ok() || !(await response.json()).some((article: { children?: unknown[] }) => !article.children?.length)) continue;
+        }
+        return { countryIso: summary.isoCode, versionId };
+      }
+    }
+  }
+  throw new Error('No published constitution version available for role journey');
+}
 
 const roles = [
   { role: 'editor', admin: false, canEdit: true },
@@ -9,14 +28,16 @@ const roles = [
 ] as const;
 
 for (const story of roles) {
-  test(`${story.role} signs in and sees real role permissions`, async ({ page }) => {
+  test(`${story.role} signs in and sees real role permissions`, async ({ page, request }) => {
     const email = await signIn(page, story.role);
     await page.getByRole('button', { name: 'Account menu' }).click();
     await expect(page.getByText(email, { exact: true })).toBeVisible();
     await expect(page.getByRole('navigation', { name: 'Primary' }).getByRole('link', { name: 'Admin', exact: true })).toHaveCount(story.admin ? 1 : 0);
     await page.goto('/editor');
     await expect(page.getByRole('heading', { name: 'Editor' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Correct this text' })).toHaveCount(story.canEdit ? 1 : 0);
+    const source = await publishedVersion(request);
+    await page.goto(`/countries/${source.countryIso}/versions/${source.versionId}`);
+    await expect(page.getByRole('link', { name: 'Edit this constitution' })).toHaveCount(story.canEdit ? 1 : 0);
     await page.goto('/admin/constitutions');
     if (story.admin) {
       await expect(page.getByRole('heading', { name: 'Constitutions', exact: true })).toBeVisible();
@@ -29,23 +50,11 @@ for (const story of roles) {
 
 test('editor, reviewer, and publisher carry a real transcription correction to the public reader', async ({ page, request }) => {
   test.setTimeout(120_000);
+  const source = await publishedVersion(request, true);
+  const sourceCountryIso = source.countryIso;
+  const sourceVersionId = source.versionId;
   await signIn(page, 'editor');
-  const sourceVersionId = await page.getByLabel('Correct this text').locator('option').first().getAttribute('value');
-  expect(sourceVersionId).toBeTruthy();
-  await page.getByLabel('Correct this text').selectOption(sourceVersionId!);
-  const countries = await (await request.get('/api/catalog/countries')).json();
-  let sourceCountryIso: string | undefined;
-  for (const summary of countries) {
-    const detail = await (await request.get(`/api/catalog/countries/${summary.isoCode}`)).json();
-    if (detail.constitutions.some((constitution: { versions: Array<{ id: string; currentVersionId?: string }> }) =>
-      constitution.versions.some((version) => version.id === sourceVersionId || version.currentVersionId === sourceVersionId))) {
-      sourceCountryIso = summary.isoCode;
-      break;
-    }
-  }
-  expect(sourceCountryIso).toBeTruthy();
-  await page.getByRole('button', { name: 'Correct this text' }).click();
-  await expect(page).toHaveURL(/sessionId=/);
+  await startFromViewer(page, sourceCountryIso, sourceVersionId, 'editorial_correction');
   const sourceArticles = await (await request.get(`/api/content/versions/${sourceVersionId}/articles?includeBody=true`)).json();
   const plainArticle = sourceArticles.find((article: { children?: unknown[] }) => !article.children?.length);
   expect(plainArticle).toBeTruthy();

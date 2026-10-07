@@ -182,6 +182,8 @@ export async function listSessions(filters: {
   status?: string;
   openedBy?: string;
   versionId?: string;
+  limit?: number;
+  offset?: number;
 } = {}): Promise<EditSessionSummary[]> {
   const params = new URLSearchParams();
   if (filters.status) {
@@ -193,10 +195,22 @@ export async function listSessions(filters: {
   if (filters.versionId) {
     params.set('versionId', filters.versionId);
   }
+  if (filters.limit != null) params.set('limit', String(filters.limit));
+  if (filters.offset != null) params.set('offset', String(filters.offset));
   const query = params.toString();
   const response = await editorFetch(query ? `/edit-sessions?${query}` : '/edit-sessions');
   await throwIfNotOk(response, 'list_failed');
   return (await response.json()) as EditSessionSummary[];
+}
+
+export async function listAllSessions(filters: { status?: string; openedBy?: string; versionId?: string } = {}): Promise<EditSessionSummary[]> {
+  const sessions: EditSessionSummary[] = [];
+  const limit = 100;
+  for (let offset = 0; ; offset += limit) {
+    const page = await listSessions({ ...filters, limit, offset });
+    sessions.push(...page);
+    if (page.length < limit) return sessions;
+  }
 }
 
 export async function getDraftPreview(sessionId: string): Promise<DraftPreview | null> {

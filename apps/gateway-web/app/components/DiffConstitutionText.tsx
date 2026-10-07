@@ -1,5 +1,5 @@
 import type { ArticleSummary, ContentNode, ContentOutline, OrderedEntry, OrderedNode } from '../../lib/api';
-import { articleHeading, asOutlinePresentation, concatenatedText, kindByCode, nodeHeading } from '../../lib/outline';
+import { articleHeading, asOutlinePresentation, concatenatedText, effectiveDisplayKind, kindByCode, nodeHeading } from '../../lib/outline';
 import { OrderedContentTree } from './ConstitutionText';
 import { alignNodes, diffText, segsForSide, type DiffSeg } from '../../lib/text-diff';
 
@@ -28,7 +28,7 @@ export function DiffConstitutionText({
 }: DiffConstitutionTextProps) {
   const Heading = headingLevel;
   const article = side === 'from' ? left : right;
-  const rootKind = kindByCode(outline, article?.kind ?? outline?.kinds[0]?.kindCode ?? 'article');
+  const rootKind = effectiveDisplayKind(kindByCode(outline, article?.kind ?? outline?.kinds[0]?.kindCode ?? 'article'));
   const other = side === 'from' ? right : left;
   const rootLabel = article ? segsForSide(diffText(left?.articleNumber ?? '', right?.articleNumber ?? ''), side).map((seg, index) => <DiffMark key={index} seg={seg} />) : null;
   const heading = article ? articleHeading(outline, article) : '';
@@ -124,7 +124,7 @@ function DiffNodeTree({
         const presentation = asOutlinePresentation(
           kindByCode(outline, pair.left?.kind ?? pair.right?.kind ?? '')?.presentation,
         );
-        if (presentation === 'concatenated') {
+        if (presentation === 'concatenated' && !pair.left?.children.length && !pair.right?.children.length) {
           const leftText = concatenatedText(pair.left ? [pair.left] : []);
           const rightText = concatenatedText(pair.right ? [pair.right] : []);
           const key = `${pair.left?.id ?? 'l'}-${pair.right?.id ?? 'r'}-${index}`;
@@ -134,7 +134,10 @@ function DiffNodeTree({
           if (side === 'to' && !pair.right) {
             return null;
           }
-          return <DiffBody key={key} left={leftText} right={rightText} side={side} />;
+          const kind = effectiveDisplayKind(kindByCode(outline, node?.kind ?? ''));
+          return <DiffBody key={key} left={leftText} right={rightText} side={side}
+            leftLabel={pair.left?.label ?? pair.left?.number} rightLabel={pair.right?.label ?? pair.right?.number}
+            labelPlacement={kind?.showLabel ? kind.labelPlacement : undefined} />;
         }
         if (!node) {
           return null;
@@ -168,13 +171,15 @@ function DiffSectionNode({
   if (!node) {
     return null;
   }
-  const kind = kindByCode(outline, node.kind);
+  const kind = effectiveDisplayKind(kindByCode(outline, node.kind));
   const heading = nodeHeading(kind, node);
   return (
     <section className={`node-block node-kind-${node.kind}`}>
       {heading ? <p className="node-heading">{heading}</p> : null}
       {node.body || left?.body || right?.body ? (
-        <DiffBody left={left?.body ?? ''} right={right?.body ?? ''} side={side} />
+        <DiffBody left={left?.body ?? ''} right={right?.body ?? ''} side={side}
+          leftLabel={left?.label ?? left?.number} rightLabel={right?.label ?? right?.number}
+          labelPlacement={kind?.showLabel ? kind.labelPlacement : undefined} />
       ) : null}
       {left?.children.length || right?.children.length ? (
         <DiffNodeTree left={left?.children ?? []} right={right?.children ?? []} side={side} outline={outline} />
@@ -183,18 +188,27 @@ function DiffSectionNode({
   );
 }
 
-function DiffBody({ left, right, side }: { left: string; right: string; side: 'from' | 'to' }) {
+function DiffBody({ left, right, side, leftLabel, rightLabel, labelPlacement }: {
+  left: string; right: string; side: 'from' | 'to';
+  leftLabel?: string | null; rightLabel?: string | null; labelPlacement?: string;
+}) {
   const segs = segsForSide(diffText(left, right), side);
   if (segs.length === 0) {
     return <p className="constitution-body muted">No text in this version.</p>;
   }
   return (
     <p className="constitution-body">
+      {['inline', 'superscript'].includes(labelPlacement ?? '') ? <DiffLabel left={leftLabel ?? ''} right={rightLabel ?? ''} side={side} superscript={labelPlacement === 'superscript'} /> : null}
       {segs.map((seg, index) => (
         <DiffMark key={`${seg.type}-${index}`} seg={seg} />
       ))}
     </p>
   );
+}
+
+function DiffLabel({ left, right, side, superscript }: { left: string; right: string; side: 'from' | 'to'; superscript: boolean }) {
+  const marks = segsForSide(diffText(left, right), side).map((seg, index) => <DiffMark key={index} seg={seg} />);
+  return superscript ? <sup className="num">{marks}</sup> : <span className="num">{marks}</span>;
 }
 
 function DiffMark({ seg }: { seg: DiffSeg }) {

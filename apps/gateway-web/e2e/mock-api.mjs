@@ -183,6 +183,8 @@ const EDITORIAL_VERSION_ID = '01900000-0000-4000-8000-000000000501';
 
 const editorState = {
   session: null,
+  seededSessions: [],
+  sessionsUnavailable: false,
 };
 
 let pendingMfaEmail = identityMe.email;
@@ -203,6 +205,8 @@ function resetMockState() {
   mockAmendments.set(amendmentDraft.id, amendmentDraft);
   extraVersions.splice(0);
   editorState.session = null;
+  editorState.seededSessions = [];
+  editorState.sessionsUnavailable = false;
   pendingMfaEmail = identityMe.email;
   currentUser = { ...identityMe };
   managedUsers = [];
@@ -310,6 +314,13 @@ const server = createServer(async (req, res) => {
 
   if (method === 'POST' && pathname === '/__reset') {
     resetMockState();
+    empty(res, 204);
+    return;
+  }
+  if (method === 'POST' && pathname === '/__editor_sessions') {
+    const body = await readBody(req);
+    editorState.seededSessions = body.sessions ?? [];
+    editorState.sessionsUnavailable = body.unavailable ?? false;
     empty(res, 204);
     return;
   }
@@ -825,7 +836,11 @@ const server = createServer(async (req, res) => {
   }
 
   if (method === 'GET' && pathname === '/api/editor/edit-sessions') {
-    let sessions = editorState.session
+    if (editorState.sessionsUnavailable) {
+      json(res, 503, { error: 'Sessions unavailable' });
+      return;
+    }
+    let sessions = [...editorState.seededSessions, ...(editorState.session
       ? [
           {
             id: editorState.session.id,
@@ -833,16 +848,23 @@ const server = createServer(async (req, res) => {
             status: editorState.session.status,
             openedBy: editorState.session.actorId,
             openedAt: '2026-01-01T00:00:00Z',
-            updatedAt: '2026-01-01T00:00:00Z',
+            updatedAt: editorState.session.updatedAt ?? '2026-01-01T00:00:00Z',
             changedArticleCount: editorState.session.drafts.length,
+            hopKind: editorState.session.hopKind,
           },
         ]
-      : [];
+      : [])];
     const status = searchParams.get('status');
     if (status) {
       sessions = sessions.filter((session) => session.status === status);
     }
-    json(res, 200, sessions);
+    const openedBy = searchParams.get('openedBy');
+    if (openedBy) sessions = sessions.filter((session) => session.openedBy === (openedBy === 'me' ? currentUser?.id : openedBy));
+    const versionId = searchParams.get('versionId');
+    if (versionId) sessions = sessions.filter((session) => session.versionId === versionId);
+    const limit = Math.min(100, Math.max(1, Number(searchParams.get('limit') ?? 100)));
+    const offset = Math.max(0, Number(searchParams.get('offset') ?? 0));
+    json(res, 200, sessions.slice(offset, offset + limit));
     return;
   }
   if (method === 'POST' && pathname === '/api/editor/edit-sessions') {

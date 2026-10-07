@@ -80,7 +80,11 @@ class EditorService(
         status: String?,
         openedBy: String?,
         versionId: UUID?,
+        limit: Int,
+        offset: Int,
     ): List<EditSessionSummaryDto> {
+        require(limit in 1..100) { "limit must be between 1 and 100" }
+        require(offset >= 0) { "offset must be non-negative" }
         val actor = actor(authorization)
         val owner =
             when {
@@ -95,7 +99,7 @@ class EditorService(
             }
         val statusFilter =
             status?.ifBlank { null }?.let { EditSessionStatus.fromJson(it) }
-        return editorRepository.listSessions(statusFilter, owner, versionId)
+        return editorRepository.listSessions(statusFilter, owner, versionId, limit, offset)
     }
 
     fun preview(authorization: String?, sessionId: UUID): DraftPreviewDto {

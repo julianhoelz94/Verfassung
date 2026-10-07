@@ -580,14 +580,6 @@ summary {
   color: var(--color-danger);
 }
 
-.card {
-  border: 1px solid var(--color-line);
-  border-radius: 8px;
-  padding: var(--space-4) var(--space-5);
-  margin-bottom: var(--space-4);
-  background: var(--color-surface);
-}
-
 .stack {
   display: flex;
   flex-direction: column;
@@ -597,10 +589,13 @@ summary {
 .search-hits {
   list-style: none;
   padding: 0;
+  margin: 0;
+  display: grid;
+  gap: var(--space-4);
 }
 
 .search-hit {
-  margin-bottom: var(--space-4);
+  margin-bottom: 0;
 }
 
 .timeline-item {
@@ -1215,14 +1210,18 @@ button.article-toggle[aria-expanded='false']::after {
   border: 1px solid var(--color-line);
   border-radius: var(--radius-md);
   padding: var(--space-4) var(--space-5);
-  margin-bottom: var(--space-4);
+  margin-bottom: var(--space-5);
   box-shadow: var(--shadow-1);
 }
 
 .card-grid {
   display: grid;
-  gap: var(--space-4);
+  gap: var(--space-5);
   grid-template-columns: 1fr;
+}
+
+.card-grid > .card {
+  margin-bottom: 0;
 }
 
 .card-title {
@@ -1342,6 +1341,106 @@ button.article-toggle[aria-expanded='false']::after {
   font-size: var(--text-xl);
   font-weight: 600;
   margin: var(--space-6) 0 var(--space-4);
+}
+
+.recent-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-3);
+}
+
+.recent-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-2);
+}
+
+.account-section + .account-section {
+  border-top: 1px solid var(--color-line);
+  margin-top: var(--space-6);
+  padding-top: var(--space-5);
+}
+
+.account-section > h2:first-child {
+  margin-top: 0;
+}
+
+.editor-entry > h2 {
+  margin-top: 0;
+}
+
+.editor-entry > section + section {
+  border-top: 1px solid var(--color-line);
+  margin-top: var(--space-5);
+  padding-top: var(--space-5);
+}
+
+.editor-entry-list {
+  list-style: none;
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+}
+
+.editor-entry-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-4);
+  padding: var(--space-3);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-sm);
+}
+
+.editor-entry-waiting {
+  margin-top: var(--space-4);
+}
+
+.editor-entry form + form {
+  margin-top: var(--space-3);
+}
+
+.editor-session-country {
+  margin-top: var(--space-6);
+}
+
+.editor-session-country h2,
+.editor-session-constitution h3 {
+  margin: 0 0 var(--space-4);
+}
+
+.editor-session-constitution + .editor-session-constitution {
+  margin-top: var(--space-5);
+}
+
+.editor-session-list {
+  list-style: none;
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+}
+
+.editor-session-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3) var(--space-5);
+  padding: var(--space-4);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.editor-session-list li div {
+  display: grid;
+  gap: var(--space-1);
 }
 
 .chip-row {
@@ -1526,6 +1625,16 @@ button.article-toggle[aria-expanded='false']::after {
   margin-bottom: 0;
 }
 
+.timeline-item .card {
+  display: grid;
+  gap: var(--space-3);
+  margin-bottom: 0;
+}
+
+.timeline-item .card > :is(p, ul, .chip-row, .card-actions) {
+  margin-block: 0;
+}
+
 .timeline-date {
   font-size: var(--text-sm);
   color: var(--color-ink-2);
@@ -1545,7 +1654,7 @@ button.article-toggle[aria-expanded='false']::after {
 
 .search-layout {
   display: grid;
-  gap: var(--space-5);
+  gap: var(--space-4);
 }
 
 .search-filter-fields {
@@ -1587,6 +1696,10 @@ button.article-toggle[aria-expanded='false']::after {
 
 .filters-disclosure > summary {
   cursor: pointer;
+  margin-bottom: 0;
+}
+
+.filters-disclosure[open] > summary {
   margin-bottom: var(--space-3);
 }
 

@@ -4,7 +4,7 @@ import type { FormEvent, ReactNode } from 'react';
 import { useRef, useState } from 'react';
 import { Alert, Button, Input, Select } from '../../components/ui';
 import type { OutlineKindWrite, SettingsImpact, ContentOutline, OrderedNode, OrderedEntry } from '../../../lib/api';
-import { asOutlinePresentation } from '../../../lib/outline';
+import { asOutlinePresentation, effectiveDisplayKind, kindByCode } from '../../../lib/outline';
 import { OrderedContentTree } from '../../components/ConstitutionText';
 import { outlineFromTemplate, type ConstitutionTemplate } from '../../../lib/constitution-templates';
 import { saveOutlineAction, previewOutlineImpactAction } from './actions';
@@ -163,12 +163,15 @@ export function OutlineEditor({
       {guidedCreation && step === 3 ? <section className="card" aria-label="Review constitution"><h2>Review before creating</h2><p>{basicsSummary}</p><p>{layers.map((layer) => layer.displayLabel).join(' → ')}</p><p>The new constitution can be edited after creation. Content and versions are added in the editor.</p></section> : null}
       <div className="outline-config-layout" hidden={guidedCreation && step === 1}>
       {guidedCreation && step === 3 ? <div className="stack" aria-label="Final structure settings">
-        {layers.map((layer, index) => <section className="card" key={`${layer.kindCode}-${index}`}>
+        {layers.map((layer, index) => {
+          const effective = effectiveDisplayKind(exampleOutline.kinds[index])!;
+          return <section className="card" key={`${layer.kindCode}-${index}`}>
           <h3>{index + 1}. {layer.displayLabel}</h3>
           <p>Editor titles: {layer.titlePolicy ?? 'optional'} · Literal labels: {layer.labelPolicy ?? 'optional'}</p>
-          <p>Public reader: {layer.presentation === 'concatenated' ? 'running text' : 'block'} · Kind {layer.showKind ? 'shown' : 'hidden'} · Label {layer.showLabel ? 'shown' : 'hidden'} ({(layer.labelPlacement ?? 'before_title').replaceAll('_', ' ')}) · Title {layer.showTitle ? 'shown' : 'hidden'}</p>
+          <p>Public reader: {layer.presentation === 'concatenated' ? 'running text' : 'block'} · Kind {effective.showKind ? 'shown' : 'hidden'} · Label {effective.showLabel ? `shown (${(effective.labelPlacement ?? 'before_title').replaceAll('_', ' ')})` : 'hidden'} · Title {effective.showTitle ? 'shown' : 'hidden'}</p>
           <p>{index < layers.length - 1 ? layer.allowTextAlongsideChildren ? 'Unnumbered parent text allowed alongside children' : 'Text stays in child units' : `Final text with ${layer.segmentation === 'sentence' ? 'sentence boundary assistance' : 'plain editing'}`}</p>
-        </section>)}
+          </section>;
+        })}
       </div> : <ol className="stack">
         {layers.map((layer, index) => (
           <li key={`${layer.kindCode}-${index}`} className="card">
@@ -229,15 +232,7 @@ export function OutlineEditor({
               label="How this layer is shown"
               name={`presentation-${index}`}
               value={layer.presentation}
-              onChange={(event) => {
-                const presentation = asOutlinePresentation(event.target.value);
-                update(index, {
-                  presentation,
-                  showLabel: presentation === 'concatenated' ? false : layer.showLabel,
-                  showTitle: presentation === 'concatenated' ? false : layer.showTitle,
-                  showKind: presentation === 'concatenated' ? false : layer.showKind,
-                });
-              }}
+              onChange={(event) => update(index, { presentation: asOutlinePresentation(event.target.value) })}
             >
               <option value="section">Block with optional heading</option>
               <option value="concatenated">Running text (no title, joined with siblings)</option>
@@ -249,6 +244,7 @@ export function OutlineEditor({
                     <input
                       type="checkbox"
                       checked={layer.showKind}
+                      disabled={layer.presentation === 'concatenated'}
                       onChange={(event) => update(index, { showKind: event.target.checked })}
                     />{' '}
                     Show kind name ({layer.displayLabel})
@@ -259,7 +255,7 @@ export function OutlineEditor({
                     <input
                       type="checkbox"
                       checked={layer.showLabel}
-                      disabled={layer.labelPolicy === 'none'}
+                      disabled={layer.labelPolicy === 'none' || (layer.presentation === 'concatenated' && !['inline', 'superscript'].includes(layer.labelPlacement ?? 'before_title'))}
                       onChange={(event) => update(index, { showLabel: event.target.checked })}
                     />{' '}
                     Show literal legal label
@@ -270,7 +266,7 @@ export function OutlineEditor({
                     <input
                       type="checkbox"
                       checked={layer.showTitle}
-                      disabled={layer.titlePolicy === 'none'}
+                      disabled={layer.titlePolicy === 'none' || layer.presentation === 'concatenated'}
                       onChange={(event) => update(index, { showTitle: event.target.checked })}
                     />{' '}
                     Show editorial title
@@ -278,9 +274,13 @@ export function OutlineEditor({
                 </label>
               </>
             )}
-              <Select label="Label placement" name={`label-placement-${index}`} value={layer.labelPlacement ?? 'before_title'} onChange={(event) => update(index, { labelPlacement: event.target.value as Layer['labelPlacement'] })}>
-                <option value="before_title">Before title</option><option value="after_title">After title</option><option value="inline">Inline with text</option>{index === layers.length - 1 ? <option value="superscript">Superscript in text</option> : null}
+              {layer.presentation === 'concatenated' ? <p className="muted">Running text hides kind names and editorial titles. Literal labels appear only inline or as superscripts; saved heading preferences return when block display is selected.</p> : null}
+              {layer.titlePolicy === 'none' || layer.labelPolicy === 'none' ? <p className="muted">A name or label set to Not allowed cannot be shown in the public reader.</p> : null}
+              {layer.titlePolicy === 'optional' && layer.showTitle && layer.presentation !== 'concatenated' ? <p className="muted">Untitled units place a visible label before their text.</p> : null}
+              <Select label="Label placement" name={`label-placement-${index}`} value={layer.labelPlacement ?? 'before_title'} disabled={layer.labelPolicy === 'none' || (!layer.showLabel && layer.presentation !== 'concatenated')} onChange={(event) => update(index, { labelPlacement: event.target.value as Layer['labelPlacement'] })}>
+                <option value="before_title" disabled={layer.presentation === 'concatenated'}>Before title</option><option value="after_title" disabled={layer.presentation === 'concatenated' || !layer.showTitle || layer.titlePolicy === 'none'}>After title</option><option value="inline" disabled={index < layers.length - 1 && !layer.allowTextAlongsideChildren}>Inline with text</option>{index === layers.length - 1 ? <option value="superscript">Superscript in text</option> : null}
               </Select>
+              {!layer.showLabel && layer.presentation !== 'concatenated' ? <p className="muted">Show literal legal label to choose its placement.</p> : null}
             </fieldset>
             {index > 0 ? (
               <Button type="button" onClick={() => removeLayer(index)}>
@@ -294,7 +294,7 @@ export function OutlineEditor({
         <h2>Live order example</h2>
         <p className="muted">Parent text is unnumbered and belongs to its parent. Editor view scopes are selected separately in the editor.</p>
         <h3>Structure map</h3>
-        {example ? <ExampleMap node={example} /> : null}
+        {example ? <ExampleMap node={example} outline={exampleOutline} /> : null}
         <h3>Reader preview</h3>
         {example ? <OrderedContentTree entries={[{ type: 'child', node: example }]} outline={exampleOutline} /> : null}
         {constitutionId ? <p>Occupied structure and stricter permissions are checked before saving. Changes requiring migration need a reviewed successor.</p> : null}
@@ -343,14 +343,14 @@ function exampleNode(layers: Layer[], depth: number, path: string, sibling: numb
   }
   return { logicalId: path, revisionId: path, occurrenceId: path, kind: level.kindCode,
     label: level.labelPolicy === 'none' ? null : depth === 0 ? '46a' : sibling === 0 ? '(1)' : '(2a)',
-    title: level.titlePolicy === 'none' ? null : `${level.displayLabel} example`, content };
+    title: level.titlePolicy === 'none' || (level.titlePolicy === 'optional' && sibling > 0) ? null : `${level.displayLabel} example`, content };
 }
 
-function ExampleMap({ node }: { node: OrderedNode }) {
+function ExampleMap({ node, outline }: { node: OrderedNode; outline: ContentOutline }) {
   return <div className="outline-example-level">
-    <strong>{node.kind} {node.label}</strong>
+    <strong>{kindByCode(outline, node.kind)?.displayLabel ?? node.kind} {node.label}</strong>
     <ol>{node.content.map((entry, index) => <li key={entry.node?.occurrenceId ?? entry.occurrenceId ?? index}>
-      {entry.type === 'child' && entry.node ? <ExampleMap node={entry.node} /> : <><small>Unnumbered parent text</small> {entry.text}</>}
+      {entry.type === 'child' && entry.node ? <ExampleMap node={entry.node} outline={outline} /> : <><small>Unnumbered parent text</small> {entry.text}</>}
     </li>)}</ol>
   </div>;
 }

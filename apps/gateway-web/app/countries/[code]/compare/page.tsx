@@ -371,7 +371,7 @@ export default async function ComparePage(props: ComparePageProps) {
                 <section key={row.key} className={`compare-article kind-${row.kind}`}>
                   <h2 className="section-title" id={row.rowId}>
                     {heading}{' '}
-                    <a href={`#${row.rowId}`}>{COMPARE_KIND_LABEL[row.kind]}</a>
+                    <Badge tone={row.kind === 'same' ? 'neutral' : row.kind}>{COMPARE_KIND_LABEL[row.kind]}</Badge>
                   </h2>
                   <div className="compare-grid">
                     <section className="compare-col compare-col-from" aria-label={fromVersion.versionLabel}>

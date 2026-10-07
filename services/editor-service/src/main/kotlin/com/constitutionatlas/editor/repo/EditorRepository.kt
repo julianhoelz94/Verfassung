@@ -62,7 +62,7 @@ class EditorRepository(
         return session.copy(revisionCount = revisionCount)
     }
 
-    fun listSessions(status: EditSessionStatus?, openedBy: UUID?, versionId: UUID?): List<EditSessionSummaryDto> {
+    fun listSessions(status: EditSessionStatus?, openedBy: UUID?, versionId: UUID?, limit: Int, offset: Int): List<EditSessionSummaryDto> {
         val sql = StringBuilder(
             """
             SELECT s.id, s.actor_id, s.version_id, s.status, s.hop_kind, s.created_at, s.updated_at,
@@ -88,7 +88,9 @@ class EditorRepository(
             sql.append(" AND s.version_id = ?")
             args.add(versionId)
         }
-        sql.append(" ORDER BY s.updated_at DESC LIMIT 100")
+        sql.append(" ORDER BY s.updated_at DESC, s.id DESC LIMIT ? OFFSET ?")
+        args.add(limit)
+        args.add(offset)
         return jdbc.query(sql.toString(), { rs, _ ->
             EditSessionSummaryDto(
                 id = rs.getObject("id", UUID::class.java),
@@ -164,7 +166,7 @@ class EditorRepository(
     }
 
     fun recordPublishComment(sessionId: UUID, comment: String) {
-        jdbc.update("UPDATE edit_sessions SET publish_comment = ? WHERE id = ?", comment.trim(), sessionId)
+        jdbc.update("UPDATE edit_sessions SET publish_comment = ?, updated_at = NOW() WHERE id = ?", comment.trim(), sessionId)
     }
 
     fun publishComment(sessionId: UUID): String? = jdbc.query(
@@ -176,7 +178,7 @@ class EditorRepository(
     fun recordChangeRecord(sessionId: UUID, record: ChangeRecordRequest) {
         val stable = record.copy(changes = record.changes.map { change -> change.copy(id = change.id ?: UUID.randomUUID()) })
         jdbc.update(
-            "UPDATE edit_sessions SET change_record = ?::jsonb WHERE id = ?",
+            "UPDATE edit_sessions SET change_record = ?::jsonb, updated_at = NOW() WHERE id = ?",
             objectMapper.writeValueAsString(stable),
             sessionId,
         )

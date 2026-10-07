@@ -1,6 +1,6 @@
 /* eslint-disable */
 import { test, expect } from '@playwright/test';
-import { ARTICLE_1, VERSION_1949, VERSION_2022, signInEditor, signInPublisher, signInReviewer, signOut } from './helpers';
+import { ARTICLE_1, VERSION_1949, VERSION_2022, signInEditor, signInPublisher, signInReviewer, signOut, startEditorSession } from './helpers';
 
 const MOCK_ORIGIN = `http://127.0.0.1:${process.env.E2E_MOCK_PORT ?? 4010}`;
 
@@ -36,7 +36,7 @@ test('linear compare shows a structured change', async ({ page }) => {
   await page.goto('/countries/DE');
   await page.getByRole('button', { name: 'Compare' }).click();
   await expect(page.getByRole('heading', { name: /side by side/ })).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Changed' }).first()).toBeVisible();
+  await expect(page.locator('.compare-article h2 .badge').first()).toHaveText('Changed');
   await expect(page.locator('ins.diff-add, del.diff-remove').first()).toBeVisible();
 });
 
@@ -48,11 +48,61 @@ test('login with MFA then logout', async ({ page }) => {
   await expect(page.getByRole('link', { name: 'Log in' })).toBeVisible();
 });
 
+test('editor landing lists every owned open session and keeps creation on the viewer', async ({ page, request }) => {
+  const sessions = Array.from({ length: 101 }, (_, index) => ({
+    id: `01900000-0000-4000-8000-${String(index + 1000).padStart(12, '0')}`,
+    versionId: VERSION_1949,
+    status: 'open',
+    openedBy: '01900000-0000-4000-8000-000000000410',
+    openedAt: '2026-01-01T00:00:00Z',
+    updatedAt: '2026-01-02T00:00:00Z',
+    changedArticleCount: 0,
+    hopKind: 'editorial_correction',
+  }));
+  await request.post(`${MOCK_ORIGIN}/__editor_sessions`, { data: { sessions } });
+  await signInEditor(page);
+  await expect(page.getByRole('heading', { name: 'My open sessions' })).toBeVisible();
+  await expect(page.locator('.editor-session-list li')).toHaveCount(101);
+  await expect(page.getByRole('heading', { name: 'Germany', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Basic Law for the Federal Republic of Germany' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Correct this text' })).toHaveCount(0);
+  await page.goto(`/countries/DE/versions/${VERSION_1949}`);
+  await page.getByRole('link', { name: 'Edit this constitution' }).click();
+  await expect(page.locator('#editor-entry').getByRole('link', { name: 'Continue your open session' })).toBeVisible();
+  await expect(page.locator('#editor-entry').getByRole('button', { name: 'Correct this text' })).toHaveCount(0);
+});
+
+test('viewer explains when session lookup is unavailable', async ({ page, request }) => {
+  await request.post(`${MOCK_ORIGIN}/__editor_sessions`, { data: { unavailable: true } });
+  await signInEditor(page);
+  await page.goto(`/countries/DE/versions/${VERSION_2022}`);
+  await page.getByRole('link', { name: 'Edit this constitution' }).click();
+  await expect(page.getByText('Edit sessions are temporarily unavailable. Try again before starting a new session.')).toBeVisible();
+  await expect(page.locator('#editor-entry').getByRole('button', { name: 'Correct this text' })).toHaveCount(0);
+});
+
+test('viewer shows one matching session and ignores another constitution', async ({ page, request }) => {
+  const session = (id: string, versionId: string) => ({
+    id, versionId, status: 'open', openedBy: '01900000-0000-4000-8000-000000000410',
+    openedAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-02T00:00:00Z',
+    changedArticleCount: 0, hopKind: 'editorial_correction',
+  });
+  await request.post(`${MOCK_ORIGIN}/__editor_sessions`, { data: { sessions: [
+    session('01900000-0000-4000-8000-000000001001', VERSION_2022),
+    session('01900000-0000-4000-8000-000000001002', '01900000-0000-4000-8000-000000009999'),
+  ] } });
+  await signInEditor(page);
+  await page.goto(`/countries/DE/versions/${VERSION_2022}`);
+  await page.getByRole('link', { name: 'Edit this constitution' }).click();
+  await expect(page.locator('#editor-entry .editor-entry-list li')).toHaveCount(1);
+  await expect(page.locator('#editor-entry').getByRole('link', { name: 'Continue your open session' })).toHaveAttribute('href', /001001/);
+  await expect(page.locator('#editor-entry').getByRole('button', { name: 'Correct this text' })).toHaveCount(0);
+  await expect(page.locator('#editor-entry').getByText('Edit sessions are temporarily unavailable.')).toHaveCount(0);
+});
+
 test('edit, review, and publish a draft', async ({ page }) => {
   await signInEditor(page);
-  await page.goto('/editor');
-  await page.getByLabel('Correct this text').selectOption(VERSION_2022);
-  await page.getByRole('button', { name: 'Correct this text' }).click();
+  await startEditorSession(page, VERSION_2022, 'editorial_correction');
   await expect(page).toHaveURL(/sessionId=/);
   await expect(page.getByRole('heading', { name: 'Articles' })).toBeVisible();
   await page.getByLabel('Filter articles').fill('dignity');
@@ -81,7 +131,7 @@ test('edit, review, and publish a draft', async ({ page }) => {
   await signInReviewer(page);
   await page.goto('/editor?status=reviewing');
   await expect(page.getByRole('heading', { name: 'Review queue' })).toBeVisible();
-  await page.locator('.data-row').getByRole('link').first().click();
+  await page.locator('.editor-session-list').getByRole('link').first().click();
   await expect(page).toHaveURL(/sessionId=/);
   await expect(page.getByText('Preview', { exact: true })).toBeVisible();
   await expect(page.getByLabel('Article 1').getByText('Draft body for the e2e journey.')).toBeVisible();
@@ -99,7 +149,7 @@ test('edit, review, and publish a draft', async ({ page }) => {
   await signInPublisher(page);
   await page.goto('/editor?status=approved');
   await expect(page.getByRole('heading', { name: 'Ready to publish' })).toBeVisible();
-  await page.locator('.data-row').getByRole('link').first().click();
+  await page.locator('.editor-session-list').getByRole('link').first().click();
   await expect(page).toHaveURL(/sessionId=/);
   await page.getByRole('button', { name: 'Publish transcription' }).click();
   await expect(page.getByText('Published as version 2022-1.')).toBeVisible();
@@ -146,9 +196,7 @@ test('recorded amending law appears on the public timeline', async ({ page }) =>
 
 test('publisher confirms stale old-law quotes without changing the public comment', async ({ page }) => {
   await signInEditor(page);
-  await page.goto('/editor');
-  await page.getByLabel('Correct this text').selectOption(VERSION_1949);
-  await page.getByRole('button', { name: 'Correct this text' }).click();
+  await startEditorSession(page, VERSION_1949, 'editorial_correction');
   await expect(page).toHaveURL(/sessionId=/);
   await page.getByLabel('Article text').fill('Corrected 1949 transcription.');
   await page.getByRole('button', { name: 'Save draft' }).click();
@@ -192,9 +240,7 @@ test('editorial correction hop stays off the public timeline', async ({ page }) 
   await page.goto('/countries/DE/timeline');
   const timelineCount = await page.locator('.timeline-item').count();
   await signInEditor(page);
-  await page.goto('/editor');
-  await page.getByLabel('Correct this text').selectOption(VERSION_2022);
-  await page.getByRole('button', { name: 'Correct this text' }).click();
+  await startEditorSession(page, VERSION_2022, 'editorial_correction');
   await expect(page).toHaveURL(/sessionId=/);
   await expect(page.getByRole('heading', { name: 'Articles' })).toBeVisible();
   await page.getByLabel('Title', { exact: true }).fill('Human dignity (typo fix)');
@@ -265,8 +311,7 @@ test('publisher withdraws an incorrect published legal-change record', async ({ 
 
 test('legal successor passes queues and requires fresh authentication before publication', async ({ page, request }) => {
   await signInEditor(page);
-  await page.goto('/editor');
-  await page.getByRole('button', { name: 'Record the next legal change' }).click();
+  await startEditorSession(page, VERSION_2022, 'legal');
   await page.getByRole('region', { name: 'Article' }).getByLabel('Title', { exact: true }).fill('Human dignity in 2027');
   await page.getByLabel('Article text').fill('The 2027 legally amended text.');
   await page.getByRole('button', { name: 'Save draft' }).click();
@@ -280,7 +325,7 @@ test('legal successor passes queues and requires fresh authentication before pub
 
   await signInReviewer(page);
   await page.goto('/editor?status=reviewing');
-  await page.locator('.data-row').getByRole('link').first().click();
+  await page.locator('.editor-session-list').getByRole('link').first().click();
   await expect(page.getByText('2027 dignity amendment')).toBeVisible();
   await expect(page.getByRole('link', { name: 'Official 2027 act' })).toHaveAttribute('href', 'https://example.gov/2027-dignity.pdf');
   await page.getByRole('button', { name: 'Approve review' }).click();
@@ -288,7 +333,7 @@ test('legal successor passes queues and requires fresh authentication before pub
 
   await signInPublisher(page);
   await page.goto('/editor?status=approved');
-  await page.locator('.data-row').getByRole('link').first().click();
+  await page.locator('.editor-session-list').getByRole('link').first().click();
   expect((await request.post(`${MOCK_ORIGIN}/__step_up_stale`)).ok()).toBeTruthy();
   await page.getByRole('button', { name: 'Publish new legal version' }).click();
   await expect(page).toHaveURL(/\/account\/step-up/);

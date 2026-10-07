@@ -1,6 +1,6 @@
 /* eslint-disable */
 import { test, expect, type Page } from '@playwright/test';
-import { signInEditor } from './helpers';
+import { signInAdmin, signInEditor, signOut } from './helpers';
 
 const PHONE = { width: 390, height: 844 };
 const TABLET = { width: 820, height: 1180 };
@@ -19,7 +19,7 @@ test.beforeEach(async ({ request }) => {
 });
 
 test('public and editor layouts at 390, 820 and 1440', async ({ page }) => {
-  test.setTimeout(120_000);
+  test.setTimeout(180_000);
   test.skip(
     process.env.E2E_SKIP_VISUAL === 'true' || process.platform !== 'linux',
     'Visual snapshots are Linux Chromium (Playwright Docker / CI). Re-baseline with mcr.microsoft.com/playwright:v1.51.1-jammy.',
@@ -37,6 +37,21 @@ test('public and editor layouts at 390, 820 and 1440', async ({ page }) => {
     }).toPass({ timeout: 10_000 });
     await snapshot(page, `home-${viewport.suffix}.png`);
 
+    await page.goto('/countries/DE');
+    await snapshot(page, `country-${viewport.suffix}.png`);
+
+    await page.goto('/countries/DE/versions/01900000-0000-4000-8000-000000000004');
+    await snapshot(page, `reader-${viewport.suffix}.png`);
+
+    await page.goto('/search?q=dignity');
+    await snapshot(page, `search-${viewport.suffix}.png`);
+
+    await page.goto('/countries/DE/timeline');
+    await snapshot(page, `timeline-${viewport.suffix}.png`);
+
+    await page.goto('/login');
+    await snapshot(page, `login-${viewport.suffix}.png`);
+
     await page.goto(
       '/countries/DE/versions/01900000-0000-4000-8000-000000000004/articles/01900000-0000-4000-8000-000000000201',
     );
@@ -49,8 +64,27 @@ test('public and editor layouts at 390, 820 and 1440', async ({ page }) => {
   await signInEditor(page);
   await page.setViewportSize(PHONE);
   await snapshot(page, 'editor-narrow.png', 0.05);
+  await page.goto('/account');
+  await snapshot(page, 'account-narrow.png', 0.05);
   await page.setViewportSize(TABLET);
+  await page.goto('/editor');
   await snapshot(page, 'editor-tablet.png', 0.05);
+  await page.goto('/account');
+  await snapshot(page, 'account-tablet.png', 0.05);
   await page.setViewportSize(DESKTOP);
+  await page.goto('/editor');
   await snapshot(page, 'editor-wide.png', 0.05);
+  await page.goto('/account');
+  await snapshot(page, 'account-wide.png', 0.05);
+  await signOut(page);
+  await signInAdmin(page);
+  for (const viewport of [
+    { size: PHONE, suffix: 'narrow' },
+    { size: TABLET, suffix: 'tablet' },
+    { size: DESKTOP, suffix: 'wide' },
+  ]) {
+    await page.setViewportSize(viewport.size);
+    await page.goto('/admin/constitutions');
+    await snapshot(page, `outlines-${viewport.suffix}.png`);
+  }
 });

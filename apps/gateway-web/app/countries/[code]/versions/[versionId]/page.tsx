@@ -22,6 +22,8 @@ import { atlasTitle, metaDescription, pageMetadata } from '../../../../../lib/pa
 import { httpUrl, provenanceLabel, verificationLabel } from '../../../../../lib/provenance';
 import { publicSnapshotContext } from '../../../../../lib/reading';
 import { listDocumentLinks } from '../../../../../lib/document-api';
+import { currentUser } from '../../../../../lib/session';
+import { EditorEntry } from './EditorEntry';
 
 type VersionPageProps = {
   params: Promise<{ code: string; versionId: string }>;
@@ -110,6 +112,12 @@ export default async function VersionPage(props: VersionPageProps) {
   );
 
   const readerOutline = await getReaderOutline(params.versionId);
+  const user = await currentUser();
+  const canEdit = Boolean(user?.roles.some((role) => role === 'editor' || role === 'admin'));
+  const canReview = Boolean(user?.roles.some((role) => role === 'reviewer' || role === 'admin'));
+  const canPublish = Boolean(user?.roles.some((role) => role === 'publisher' || role === 'admin'));
+  const allowLegalStart = Boolean(version.version.latestPublished &&
+    (version.version.currentVersionId ?? version.version.id) === params.versionId);
   return (
     <PageMain className="wide">
       <PageHeader
@@ -140,6 +148,7 @@ export default async function VersionPage(props: VersionPageProps) {
         }
         actions={
           <>
+            {canEdit ? <a className="btn btn-primary" href="#editor-entry">Edit this constitution</a> : null}
             <a className="btn" href={`/countries/${country.isoCode}/timeline`}>
               Timeline
             </a>
@@ -152,6 +161,14 @@ export default async function VersionPage(props: VersionPageProps) {
           </>
         }
       />
+      {canEdit ? <EditorEntry
+        versions={version.constitution.versions}
+        viewedVersionId={params.versionId}
+        viewedVersionLabel={version.version.versionLabel}
+        allowLegalStart={allowLegalStart}
+        canReview={canReview}
+        canPublish={canPublish}
+      /> : null}
       {documentLinks.length ? <section className="card">
         <h2>Constitution documents</h2>
         <ul className="link-list">{documentLinks.map((link) => <li key={link.documentId}>

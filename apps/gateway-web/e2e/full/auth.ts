@@ -38,5 +38,14 @@ export async function signIn(page: Page, role: 'editor' | 'reviewer' | 'publishe
 export async function signOut(page: Page) {
   await page.getByRole('button', { name: 'Account menu' }).click();
   await page.getByRole('button', { name: 'Sign out' }).click();
+  await expect(page).toHaveURL(/\/$/);
+  await page.reload();
   await expect(page.getByRole('link', { name: 'Log in' })).toBeVisible();
+}
+
+export async function startFromViewer(page: Page, countryIso: string, versionId: string, kind: 'legal' | 'editorial_correction') {
+  await page.goto(`/countries/${countryIso}/versions/${versionId}`);
+  await page.getByRole('link', { name: 'Edit this constitution' }).click();
+  await page.locator('#editor-entry').getByRole('button', { name: kind === 'legal' ? 'Record the next legal change' : 'Correct this text' }).click();
+  await expect(page).toHaveURL(/sessionId=/);
 }

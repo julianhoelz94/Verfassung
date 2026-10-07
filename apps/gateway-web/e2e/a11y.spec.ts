@@ -48,6 +48,12 @@ test('axe passes on public and editor routes', async ({ page }) => {
   await signInEditor(page);
   await expectNoAxeViolations(page);
 
+  await page.goto('/countries/DE/versions/01900000-0000-4000-8000-000000000004');
+  await expectNoAxeViolations(page);
+
+  await page.goto('/account');
+  await expectNoAxeViolations(page);
+
   await page.goto('/editor/amendments');
   await expect(page.getByRole('heading', { name: 'Legal changes' })).toBeVisible();
   await expectNoAxeViolations(page);
@@ -59,5 +65,8 @@ test('axe passes on public and editor routes', async ({ page }) => {
   await signOut(page);
   await signInAdmin(page);
   await page.goto('/admin/users');
+  await expectNoAxeViolations(page);
+
+  await page.goto('/admin/constitutions');
   await expectNoAxeViolations(page);
 });

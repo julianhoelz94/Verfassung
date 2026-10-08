@@ -15,6 +15,7 @@ interface LinkTargetClient {
     fun amendmentAncestry(targetId: UUID, scopeRevisionId: UUID, authorization: String?): List<UUID>
     fun publishedAmendmentRevision(targetId: UUID): UUID?
     fun requireWikiRevision(targetType: String, targetId: UUID, scopeRevisionId: UUID, authorization: String?)
+    fun isWikiImagePublic(targetType: String, targetId: UUID, scopeRevisionId: UUID, documentId: UUID, revision: Int): Boolean
 }
 
 @Component
@@ -112,4 +113,15 @@ class RestLinkTargetClient(
         val published = catalog.get().uri("/wiki/$kind/$targetId").retrieve().body(JsonNode::class.java)
         require(published?.path("id")?.asText() != scopeRevisionId.toString()) { "Published wiki image links are immutable" }
     }
+
+    override fun isWikiImagePublic(targetType: String, targetId: UUID, scopeRevisionId: UUID, documentId: UUID, revision: Int): Boolean =
+        runCatching {
+            val kind = if (targetType == "country_wiki") "country" else "constitution"
+            val page = catalog.get().uri("/wiki/$kind/$targetId").retrieve().body(JsonNode::class.java)
+            page?.path("id")?.asText() == scopeRevisionId.toString() &&
+                page.path("images").any { image ->
+                    image.path("documentId").asText() == documentId.toString() &&
+                        image.path("revision").asInt() == revision
+                }
+        }.getOrDefault(false)
 }

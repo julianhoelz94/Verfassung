@@ -58,6 +58,10 @@ class DocumentService(
                     currentLinks("amendment", link.targetId, publishedScope).any { current ->
                         current.documentId == documentId && current.document.revision.id == revisionId
                     }
+            } else if (link.targetType in setOf("country_wiki", "constitution_wiki")) {
+                val revision = repository.revisionById(link.revisionId ?: return@any false)?.revision ?: return@any false
+                link.scopeRevisionId != null &&
+                    targetClient.isWikiImagePublic(link.targetType, link.targetId, link.scopeRevisionId, documentId, revision)
             } else {
                 (link.revisionId == null && get(documentId).revision.id == revisionId || link.revisionId == revisionId) &&
                     targetClient.isPublic(link.targetType, link.targetId, link.scopeRevisionId)
@@ -68,6 +72,16 @@ class DocumentService(
         validateTarget(targetType)
         return targetClient.isPublic(targetType, targetId, scopeRevisionId)
     }
+
+    fun publicLinks(targetType: String, targetId: UUID, scopeRevisionId: UUID?): List<DocumentLinkDto> =
+        currentLinks(targetType, targetId, scopeRevisionId).filter { link ->
+            if (targetType in setOf("country_wiki", "constitution_wiki")) {
+                scopeRevisionId != null &&
+                    targetClient.isWikiImagePublic(targetType, targetId, scopeRevisionId, link.documentId, link.document.revision.revision)
+            } else {
+                true
+            }
+        }
 
     @Transactional
     fun create(request: SaveDocumentRequest, actor: Actor): DocumentDto {

@@ -83,6 +83,7 @@ class DocumentApiTest {
         }.andExpect { status { isOk() } }
         mvc.get("/documents/$id/revisions/2/file").andExpect { status { isNotFound() } }
         Mockito.`when`(targets.isPublic("country_wiki", target, scope)).thenReturn(true)
+        Mockito.`when`(targets.isWikiImagePublic("country_wiki", target, scope, UUID.fromString(id), 2)).thenReturn(true)
         mvc.get("/documents/$id/revisions/2/file").andExpect {
             status { isOk() }
             header { string("Content-Disposition", org.hamcrest.Matchers.containsString("inline")) }

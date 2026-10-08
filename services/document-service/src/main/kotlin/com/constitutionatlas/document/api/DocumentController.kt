@@ -111,7 +111,7 @@ class DocumentController(
         } else if (!service.targetIsPublic(targetType, targetId, scopeRevisionId)) {
             throw NotFoundException("Links not found")
         }
-        return service.currentLinks(targetType, targetId, scopeRevisionId, authorization)
+        return if (authorization == null) service.publicLinks(targetType, targetId, scopeRevisionId) else service.currentLinks(targetType, targetId, scopeRevisionId, authorization)
     }
 
     @GetMapping("/links/{targetType}/{targetId}/events")

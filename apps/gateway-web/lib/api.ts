@@ -85,7 +85,7 @@ export type ConstitutionSummary = {
   contentOutline?: ContentOutline;
   predecessorConstitutionId?: string | null;
   interim?: boolean;
-  lifecycleStatus?: 'unknown' | 'awaiting_commencement' | 'in_force' | 'suspended' | 'repealed';
+  lifecycleStatus?: string;
 };
 
 export type ConstitutionLifecycleEvent = {

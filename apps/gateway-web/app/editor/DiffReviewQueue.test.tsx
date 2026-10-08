@@ -72,6 +72,7 @@ describe('guided difference review', () => {
     expect(host.textContent).toContain('Difference 2 of 2');
     expect(host.textContent).toContain('1 of 2 ready for reviewer handoff');
     expect(host.textContent).toContain('Reviewed 0 of 2');
+    expect(button('Refresh').disabled).toBe(false);
   });
 
   it('continues through open findings before returning to reviewer acknowledgements for a combined role', async () => {

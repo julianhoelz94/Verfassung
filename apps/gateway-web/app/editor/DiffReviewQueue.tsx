@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { DiffReviewState, ReviewCandidate, ReviewDecisionInput, ReviewRef } from '../../lib/diff-review';
 import { decisionReadyForReview, decisionResolved } from '../../lib/diff-review';
@@ -41,7 +41,7 @@ export function DiffReviewQueue({ target, initial, rows, canDecide, canAcknowled
   const [reason, setReason] = useState('');
   const [acknowledge, setAcknowledge] = useState(false);
   const [message, setMessage] = useState('');
-  const [pending, startTransition] = useTransition();
+  const [pending, setPending] = useState(false);
   const activeRef = useRef<HTMLDivElement>(null);
   const focusAfterNavigation = useRef(false);
   const decisions = useMemo(() => new Map(review.decisions.map((decision) => [decision.key, decision])), [review.decisions]);
@@ -87,8 +87,9 @@ export function DiffReviewQueue({ target, initial, rows, canDecide, canAcknowled
     setMessage('');
   }
 
-  function save(input: ReviewDecisionInput) {
-    startTransition(async () => {
+  async function save(input: ReviewDecisionInput) {
+    setPending(true);
+    try {
       const result = await saveDiffDecisionAction(target, review, input);
       if ('error' in result) { setMessage(result.error); return; }
       setReview(result.review);
@@ -98,11 +99,16 @@ export function DiffReviewQueue({ target, initial, rows, canDecide, canAcknowled
       choose(next?.key ?? input.key);
       setMessage('Decision saved.');
       router.refresh();
-    });
+    } catch {
+      setMessage('Could not update the review. Refresh and try again.');
+    } finally {
+      setPending(false);
+    }
   }
 
-  function refresh() {
-    startTransition(async () => {
+  async function refresh() {
+    setPending(true);
+    try {
       const result = await refreshDiffReviewAction(target);
       if ('error' in result) { setMessage(result.error); return; }
       const previousTotal = review.candidates.length;
@@ -111,7 +117,11 @@ export function DiffReviewQueue({ target, initial, rows, canDecide, canAcknowled
         ? `${result.review.candidates.length - previousTotal} deeper differences were added after the pairing changed.`
         : 'Review refreshed from the saved draft.');
       router.refresh();
-    });
+    } catch {
+      setMessage('Could not refresh the review. Try again.');
+    } finally {
+      setPending(false);
+    }
   }
 
   const navigation = (index: number) => index >= 0 && index < visible.length && choose(visible[index].key);

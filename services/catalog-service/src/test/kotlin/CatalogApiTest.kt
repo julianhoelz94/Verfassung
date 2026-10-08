@@ -58,6 +58,8 @@ class CatalogApiTest {
 
     @MockBean lateinit var provisionScope: com.constitutionatlas.catalog.client.ProvisionScope
 
+    @MockBean lateinit var wikiMedia: com.constitutionatlas.catalog.client.WikiMedia
+
     @MockBean lateinit var readiness: com.constitutionatlas.catalog.client.SuccessorReadinessClient
 
     @MockBean
@@ -150,6 +152,20 @@ class CatalogApiTest {
     }
 
     @Test
+    fun wikiPublicationRequiresPinnedImages() {
+        val countryCode = ('A'..'Z').shuffled().take(2).joinToString("")
+        val country = writes.createCountry(com.constitutionatlas.catalog.api.CreateCountryRequest(countryCode, "Image country"))
+        val image = com.constitutionatlas.catalog.api.WikiImage(UUID.randomUUID(), 1, "Map")
+        val draft = wiki.save("country", country.id, com.constitutionatlas.catalog.api.SaveWikiPage(summary = "Summary", body = "History", images = listOf(image)), editor.id)
+        Mockito.doThrow(com.constitutionatlas.catalog.ConflictException("Image not pinned")).`when`(wikiMedia)
+            .requirePinnedImages("country", country.id, draft.id, listOf(image), PUBLISHER_TOKEN)
+        org.junit.jupiter.api.Assertions.assertThrows(com.constitutionatlas.catalog.ConflictException::class.java) {
+            wiki.publish("country", country.id, draft.id, PUBLISHER_TOKEN)
+        }
+        assertThat(wiki.published("country", country.id)).isNull()
+    }
+
+    @Test
     fun provisionsCanCommenceLaterAndBeSuspendedIndependently() {
         val countryCode = ('A'..'Z').shuffled().take(2).joinToString("")
         writes.createCountry(com.constitutionatlas.catalog.api.CreateCountryRequest(countryCode, "Provision country"))
@@ -217,7 +233,7 @@ class CatalogApiTest {
                 settingsRepository.pin(it, constitutionId, null)
             }
         }
-        Mockito.reset(identityClient)
+        Mockito.reset(identityClient, wikiMedia, provisionScope)
         Mockito.`when`(settingsUsage.inspect(Mockito.anyList(), Mockito.anyList(), Mockito.any())).thenAnswer { invocation ->
             val kinds = invocation.getArgument<List<com.constitutionatlas.catalog.api.OutlineKindWrite>>(1)
             if (kinds.size == 2) {

@@ -113,7 +113,7 @@ class CatalogController(
         @RequestBody request: PublishWikiPage,
     ): WikiPageRevision {
         writeAccess.requireCatalogPublisher(authorization)
-        return wikiService.publish(targetType, targetId, request.revisionId)
+        return wikiService.publish(targetType, targetId, request.revisionId, authorization)
     }
 
     @GetMapping("/constitutions/{constitutionId}/versions")

@@ -3,6 +3,7 @@ package com.constitutionatlas.catalog.service
 import com.constitutionatlas.catalog.ConflictException
 import com.constitutionatlas.catalog.api.SaveWikiPage
 import com.constitutionatlas.catalog.api.WikiPageRevision
+import com.constitutionatlas.catalog.client.WikiMedia
 import com.constitutionatlas.catalog.repo.WikiRepository
 import com.constitutionatlas.platform.NotFoundException
 import org.springframework.stereotype.Service
@@ -10,7 +11,7 @@ import org.springframework.transaction.annotation.Transactional
 import java.util.UUID
 
 @Service
-class WikiService(private val repo: WikiRepository) {
+class WikiService(private val repo: WikiRepository, private val media: WikiMedia) {
     fun published(targetType: String, targetId: UUID): WikiPageRevision? {
         requireTarget(targetType, targetId)
         return repo.published(targetType, targetId)
@@ -46,12 +47,13 @@ class WikiService(private val repo: WikiRepository) {
     }
 
     @Transactional
-    fun publish(targetType: String, targetId: UUID, revisionId: UUID): WikiPageRevision {
+    fun publish(targetType: String, targetId: UUID, revisionId: UUID, authorization: String? = null): WikiPageRevision {
         requireTarget(targetType, targetId)
         val pageId = repo.pageId(targetType, targetId) ?: throw NotFoundException("Wiki page not found")
         repo.lockPage(pageId)
         val latest = repo.latest(targetType, targetId) ?: throw NotFoundException("Wiki draft not found")
         if (latest.id != revisionId) throw ConflictException("Only the latest wiki revision can be published", "wiki_revision_conflict")
+        media.requirePinnedImages(targetType, targetId, revisionId, latest.images, authorization)
         repo.publish(pageId, revisionId)
         return latest
     }

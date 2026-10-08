@@ -33,6 +33,8 @@ test('administrator invite, visitor activation, password change, and reset persi
     page.waitForResponse((response) => response.url().includes('/account') && response.request().method() === 'POST'),
     page.getByRole('button', { name: 'Update password' }).click(),
   ]);
+  await expect(page).toHaveURL(/\/account\?saved=1$/, { timeout: 15_000 });
+  await page.reload();
   await expect(page.getByText('Password updated.')).toBeVisible();
   await signOut(page);
   await page.goto('/login');

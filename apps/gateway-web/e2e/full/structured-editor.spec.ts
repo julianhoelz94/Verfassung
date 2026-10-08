@@ -65,6 +65,7 @@ for (const hop of ['editorial_correction', 'legal'] as const) {
       await page.getByLabel('Before unit').selectOption(sourceSentence.logicalId);
       await page.getByLabel('Draft after unit').selectOption(sourceSentence.logicalId);
       await page.getByRole('button', { name: 'Save change record' }).click();
+      await expect(page.getByText('Publish details saved.')).toBeVisible();
       const sessionId = new URL(page.url()).searchParams.get('sessionId');
       const review = await json(await request.get(`/api/editor/edit-sessions/${sessionId}/diff-review`, { headers }));
       const queue = page.getByRole('region', { name: 'Review differences' });
@@ -72,8 +73,12 @@ for (const hop of ['editorial_correction', 'legal'] as const) {
       for (let index = 0; index < review.candidates.length; index++) {
         await queue.getByLabel('Reason for exclusion').fill('Journey fixture tracks the sentence node as its change row.');
         await queue.getByRole('button', { name: 'Exclude with reason and next' }).click();
-        await expect(queue.getByText('Decision saved.')).toBeVisible();
+        await expect.poll(async () => {
+          const current = await json(await request.get(`/api/editor/edit-sessions/${sessionId}/diff-review`, { headers }));
+          return current.decisions.filter((decision: { status: string }) => decision.status === 'excluded_with_reason').length;
+        }).toBe(index + 1);
       }
+      await expect(page.getByRole('button', { name: 'Submit for review' })).toBeEnabled();
     } else {
       await page.getByLabel('What was corrected in this transcription?').fill('Corrected one sentence.');
       await page.getByRole('button', { name: 'Save comment' }).click();

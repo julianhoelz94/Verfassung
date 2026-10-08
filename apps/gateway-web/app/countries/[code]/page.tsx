@@ -3,7 +3,7 @@ import type { Metadata } from 'next';
 import { PageMain } from '../../components/PageMain';
 import { ServiceUnavailable } from '../../components/StatusMessage';
 import { WikiImages } from '../../components/WikiImages';
-import { Badge, Chip, PageHeader } from '../../components/ui';
+import { Chip, PageHeader } from '../../components/ui';
 import { ApiUnavailableError, getCountry, getWikiPage, type CountryDetail } from '../../../lib/api';
 import { canVisitEditor } from '../../../lib/nav';
 import { currentUser } from '../../../lib/session';
@@ -82,12 +82,9 @@ export default async function CountryPage(props: CountryPageProps) {
     <PageMain className="wide">
       <PageHeader
         breadcrumbs={[{ href: '/', label: 'Countries' }, { label: country.name }]}
-        title={country.name}
+        title={<>{country.name}<span className="country-title-code">{country.isoCode}</span></>}
         meta={
           <>
-            <span className="iso" aria-hidden="true">
-              {country.isoCode}
-            </span>
             <span>
               {country.constitutions.length} constitution
               {country.constitutions.length === 1 ? '' : 's'}
@@ -118,7 +115,6 @@ export default async function CountryPage(props: CountryPageProps) {
       {country.constitutions.map((constitution) => {
         const publicLine = orderVersions(publicVersions(constitution.versions));
         const tipId = chainTipId(constitution);
-        const tipVersion = constitution.versions.find((version) => version.id === tipId);
         const newestPublic = publicLine[publicLine.length - 1];
         const previousPublic = publicLine.length >= 2 ? publicLine[publicLine.length - 2] : undefined;
         return (
@@ -185,14 +181,13 @@ export default async function CountryPage(props: CountryPageProps) {
                 </a>
               ) : null}
             </div>
-            {tipVersion ? <Badge tone="accent">Latest: {tipVersion.versionLabel}</Badge> : null}
             {(documentsByConstitution.get(constitution.id) ?? []).length ? <div>
               <h3>Documents</h3>
               <ul className="link-list">{(documentsByConstitution.get(constitution.id) ?? []).map((link) => <li key={link.documentId}>
                 <a href={`/documents/${link.documentId}${link.revisionId ? `?revision=${link.document.revision.revision}` : ''}`}>{link.document.revision.title}</a>
               </li>)}</ul>
             </div> : null}
-            <h3>Compare versions</h3>
+            <h3 className="country-compare-heading">Compare versions</h3>
             <CompareForm code={country.isoCode} versions={publicLine} variant="inline" />
           </section>
         );

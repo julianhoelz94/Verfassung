@@ -295,6 +295,7 @@ test('editor inspects and restores a legal-change revision as a new draft', asyn
   await history.locator('button.revision-item').first().click();
   await expect(page.getByText('Viewing a past revision read-only.')).toBeVisible();
   await history.getByRole('button', { name: 'Restore as new draft' }).click();
+  await expect(page).toHaveURL(/saved=1/, { timeout: 20_000 });
   await expect(page.getByText('Draft saved.')).toBeVisible();
   await expect(page.getByLabel('Title', { exact: true })).toHaveValue('Update to Article 1');
   await page.reload();

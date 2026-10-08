@@ -29,7 +29,7 @@ class ProvisionLifecycleService(
 
     @Transactional
     fun append(constitutionId: UUID, request: CreateProvisionLifecycleEvent, actorId: UUID): ProvisionLifecycleEvent {
-        if (!catalog.constitutionExists(constitutionId)) throw NotFoundException("Unknown constitution '$constitutionId'")
+        if (!catalog.lockConstitution(constitutionId)) throw NotFoundException("Unknown constitution '$constitutionId'")
         val kind = request.eventType.trim().lowercase()
         require(kind in setOf("deferred", "commenced", "suspended", "restored")) { "Unsupported provision lifecycle event" }
         require(request.logicalUnitIds.isNotEmpty() && request.logicalUnitIds.size <= 100 && request.logicalUnitIds.distinct().size == request.logicalUnitIds.size) {

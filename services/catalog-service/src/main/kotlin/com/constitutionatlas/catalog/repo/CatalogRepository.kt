@@ -279,6 +279,13 @@ class CatalogRepository(private val jdbc: JdbcTemplate) {
         return (count ?: 0) > 0
     }
 
+    fun lockConstitution(constitutionId: UUID): Boolean =
+        jdbc.query(
+            "SELECT id FROM constitutions WHERE id = ? FOR UPDATE",
+            { rs, _ -> rs.getObject("id", UUID::class.java) },
+            constitutionId,
+        ).isNotEmpty()
+
     fun findCountrySummary(isoCode: String): CountrySummary? =
         jdbc.query(
             "SELECT id, iso_code, name FROM countries WHERE iso_code = ?",

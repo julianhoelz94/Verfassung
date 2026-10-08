@@ -60,7 +60,8 @@ class DocumentService(
                     }
             } else if (link.targetType in setOf("country_wiki", "constitution_wiki")) {
                 val revision = repository.revisionById(link.revisionId ?: return@any false)?.revision ?: return@any false
-                link.scopeRevisionId != null &&
+                link.revisionId == revisionId &&
+                    link.scopeRevisionId != null &&
                     targetClient.isWikiImagePublic(link.targetType, link.targetId, link.scopeRevisionId, documentId, revision)
             } else {
                 (link.revisionId == null && get(documentId).revision.id == revisionId || link.revisionId == revisionId) &&

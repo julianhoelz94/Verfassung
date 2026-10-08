@@ -33,7 +33,7 @@ class LifecycleService(
 
     @Transactional
     fun append(constitutionId: UUID, request: CreateLifecycleEvent, actorId: UUID): LifecycleEvent {
-        if (!catalog.constitutionExists(constitutionId)) throw NotFoundException("Unknown constitution '$constitutionId'")
+        if (!catalog.lockConstitution(constitutionId)) throw NotFoundException("Unknown constitution '$constitutionId'")
         val kind = request.eventType.trim().lowercase()
         val events = lifecycle.events(constitutionId)
         val previous = events.lastOrNull()

@@ -30,7 +30,10 @@ class WikiMediaClient(
         images.forEach { image ->
             if (!links.any { link ->
                     link.path("documentId").asText() == image.documentId.toString() &&
-                        link.path("document").path("revision").path("revision").asInt() == image.revision
+                        link.path("document").path("revision").path("revision").asInt() == image.revision &&
+                        link.path("document").path("revision").path("contentType").asText() in
+                        setOf("image/png", "image/jpeg", "image/gif", "image/webp", "image/avif") &&
+                        link.path("document").path("revision").path("fileName").asText().isNotBlank()
                 }
             ) {
                 throw ConflictException("Wiki image is not pinned to this draft revision", "wiki_image_missing")

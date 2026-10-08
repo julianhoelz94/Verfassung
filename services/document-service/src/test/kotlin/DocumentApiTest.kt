@@ -88,6 +88,14 @@ class DocumentApiTest {
             status { isOk() }
             header { string("Content-Disposition", org.hamcrest.Matchers.containsString("inline")) }
         }
+        mvc.perform(
+            multipart("/documents/$id/file")
+                .file(MockMultipartFile("file", "replacement.png", "image/png", png))
+                .param("expectedRevision", "2")
+                .header("Authorization", EDITOR),
+        ).andExpect(status().isOk)
+        mvc.get("/documents/$id/revisions/3/file").andExpect { status { isNotFound() } }
+        mvc.get("/documents/$id/revisions/2/file").andExpect { status { isOk() } }
     }
 
     @Test

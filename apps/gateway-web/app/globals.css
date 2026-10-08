@@ -2136,3 +2136,22 @@ button.article-toggle[aria-expanded='false']::after {
 .sentence-box { background: #e8edf8; color: #17243b; border: 1px solid #9badcf; border-radius: .4rem; padding: .6rem; margin: .4rem 0; }
 .sentence-box textarea { background: #fff; color: #17243b; width: 100%; min-height: 4rem; }
 .structured-unit.is-selected, .sentence-box.is-selected { outline: 2px solid #325bb3; outline-offset: 2px; }
+.wiki-body {
+  white-space: pre-line;
+}
+
+.wiki-images {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
+  gap: 1rem;
+}
+
+.wiki-images figure {
+  margin: 0;
+}
+
+.wiki-images img {
+  display: block;
+  width: 100%;
+  height: auto;
+}

@@ -6,7 +6,7 @@ import type { CountrySummary } from '../../../lib/api';
 
 const NEW_COUNTRY = '__new__';
 
-export function ConstitutionCountryFields({ countries }: { countries: CountrySummary[] }) {
+export function ConstitutionCountryFields({ countries, onCountryChange }: { countries: CountrySummary[]; onCountryChange?: (code: string) => void }) {
   const [choice, setChoice] = useState(countries[0]?.isoCode ?? NEW_COUNTRY);
   const [isoCode, setIsoCode] = useState('');
   const isNew = choice === NEW_COUNTRY;
@@ -17,7 +17,7 @@ export function ConstitutionCountryFields({ countries }: { countries: CountrySum
         label="Country"
         name="countryChoice"
         value={choice}
-        onChange={(event) => setChoice(event.target.value)}
+        onChange={(event) => { setChoice(event.target.value); onCountryChange?.(event.target.value); }}
       >
         {countries.map((country) => (
           <option key={country.id} value={country.isoCode}>

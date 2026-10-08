@@ -47,7 +47,11 @@ class CatalogWriteService(
         catalogRepository.findConstitutionId(country.id, slug)?.let {
             throw ConflictException("Constitution '$slug' already exists")
         }
-        val id = catalogRepository.insertConstitution(country.id, slug, request.title.trim())
+        val predecessor = request.predecessorConstitutionId
+        if (predecessor != null && catalogRepository.constitutionCountryId(predecessor) != country.id) {
+            throw ConflictException("Predecessor constitution must belong to the same country", "invalid_constitution_predecessor")
+        }
+        val id = catalogRepository.insertConstitution(country.id, slug, request.title.trim(), predecessor, request.interim)
         if (!request.outline.isNullOrEmpty()) {
             catalogRepository.replaceOutline(id, normalizeOutline(request.outline))
         }
@@ -60,6 +64,8 @@ class CatalogWriteService(
             null,
             emptyList(),
             catalogRepository.findOutline(id),
+            predecessor,
+            request.interim,
         )
     }
 

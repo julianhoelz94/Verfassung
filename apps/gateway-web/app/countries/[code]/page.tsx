@@ -2,8 +2,9 @@ import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import { PageMain } from '../../components/PageMain';
 import { ServiceUnavailable } from '../../components/StatusMessage';
+import { WikiImages } from '../../components/WikiImages';
 import { Badge, Chip, PageHeader } from '../../components/ui';
-import { ApiUnavailableError, getCountry, type CountryDetail } from '../../../lib/api';
+import { ApiUnavailableError, getCountry, getWikiPage, type CountryDetail } from '../../../lib/api';
 import { canVisitEditor } from '../../../lib/nav';
 import { currentUser } from '../../../lib/session';
 import { orderVersions } from '../../../lib/compare';
@@ -60,6 +61,14 @@ export default async function CountryPage(props: CountryPageProps) {
 
   const user = await currentUser();
   const showEditorialLinks = user ? canVisitEditor(user.roles) : false;
+  const canRecordLifecycle = user?.roles.some((role) => role === 'publisher' || role === 'admin') ?? false;
+  const countryWiki = await getWikiPage('country', country.id).catch(() => null);
+  const constitutionWikis = new Map(
+    await Promise.all(country.constitutions.map(async (constitution) => [
+      constitution.id,
+      await getWikiPage('constitution', constitution.id).catch(() => null),
+    ] as const)),
+  );
 
   const versionTotal = country.constitutions.reduce(
     (sum, item) => sum + publicVersions(item.versions).length,
@@ -89,11 +98,23 @@ export default async function CountryPage(props: CountryPageProps) {
           </>
         }
         actions={
-          <a className="btn btn-sm" href={`/countries/${country.isoCode}/timeline`}>
-            Timeline
-          </a>
+          <>
+            <a className="btn btn-sm" href={`/countries/${country.isoCode}/constitution-timeline`}>Constitution timeline</a>
+            <a className="btn btn-sm" href={`/countries/${country.isoCode}/timeline`}>Amendment timeline</a>
+          </>
         }
       />
+      {countryWiki ? (
+        <section className="card">
+          <h2>About {country.name}</h2>
+          <p>{countryWiki.summary}</p>
+          {countryWiki.body ? <p className="wiki-body">{countryWiki.body}</p> : null}
+          <WikiImages images={countryWiki.images} />
+        </section>
+      ) : null}
+      {showEditorialLinks ? (
+        <p><a href={`/editor/wiki/country/${country.id}?code=${country.isoCode}`}>Edit country page</a></p>
+      ) : null}
       {country.constitutions.map((constitution) => {
         const publicLine = orderVersions(publicVersions(constitution.versions));
         const tipId = chainTipId(constitution);
@@ -102,7 +123,25 @@ export default async function CountryPage(props: CountryPageProps) {
         const previousPublic = publicLine.length >= 2 ? publicLine[publicLine.length - 2] : undefined;
         return (
           <section key={constitution.id} className="card">
-            <h2 className="card-title">{constitution.title}</h2>
+            <h2 className="card-title">
+              <a href={`/countries/${country.isoCode}/constitutions/${constitution.id}`}>{constitution.title}</a>
+            </h2>
+            {constitutionWikis.get(constitution.id) ? (
+              <p>{constitutionWikis.get(constitution.id)?.summary}</p>
+            ) : null}
+            {showEditorialLinks ? (
+              <p><a href={`/editor/wiki/constitution/${constitution.id}?code=${country.isoCode}`}>Edit constitution page</a></p>
+            ) : null}
+            {canRecordLifecycle ? (
+              <p><a href={`/editor/lifecycle/${constitution.id}?code=${country.isoCode}`}>Record lifecycle event</a></p>
+            ) : null}
+            <p className="muted">
+              {constitution.interim ? 'Interim constitution · ' : ''}
+              {constitution.lifecycleStatus === 'in_force' ? 'In force' :
+                constitution.lifecycleStatus === 'awaiting_commencement' ? 'Adopted, not yet in force' :
+                constitution.lifecycleStatus === 'suspended' ? 'Suspended' :
+                constitution.lifecycleStatus === 'repealed' ? 'Repealed' : 'Status not recorded'}
+            </p>
             {constitution.contentOutline && constitution.contentOutline.kinds.length > 0 ? (
               <p className="muted">
                 Structure:{' '}

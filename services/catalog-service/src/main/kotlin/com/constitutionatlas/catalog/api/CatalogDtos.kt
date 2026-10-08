@@ -85,6 +85,9 @@ data class ConstitutionSummary(
     val latestVersionId: UUID? = null,
     val versions: List<VersionSummary>,
     val contentOutline: ContentOutlineDto,
+    val predecessorConstitutionId: UUID? = null,
+    val interim: Boolean = false,
+    val lifecycleStatus: String = "unknown",
 )
 
 data class CountryDetail(
@@ -103,6 +106,8 @@ data class CreateConstitutionRequest(
     val slug: String,
     val title: String,
     val outline: List<OutlineKindWrite>? = null,
+    val predecessorConstitutionId: UUID? = null,
+    val interim: Boolean = false,
 )
 
 data class OutlineKindWrite(

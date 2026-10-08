@@ -62,6 +62,34 @@ class DocumentApiTest {
     }
 
     @Test
+    fun wikiImageStaysPrivateUntilItsRevisionIsPublished() {
+        val (id, _) = create()
+        val png = java.util.Base64.getDecoder().decode(
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/GZkAAAAASUVORK5CYII=",
+        )
+        val uploaded = mvc.perform(
+            multipart("/documents/$id/file")
+                .file(MockMultipartFile("file", "flag.png", "image/png", png))
+                .param("expectedRevision", "1")
+                .header("Authorization", EDITOR),
+        ).andExpect(status().isOk).andReturn()
+        val pinnedId = mapper.readTree(uploaded.response.contentAsString)["revision"]["id"].asText()
+        val target = UUID.randomUUID()
+        val scope = UUID.randomUUID()
+        mvc.post("/links/country_wiki/$target") {
+            header("Authorization", EDITOR)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"documentId":"$id","revisionId":"$pinnedId","scopeRevisionId":"$scope"}"""
+        }.andExpect { status { isOk() } }
+        mvc.get("/documents/$id/revisions/2/file").andExpect { status { isNotFound() } }
+        Mockito.`when`(targets.isPublic("country_wiki", target, scope)).thenReturn(true)
+        mvc.get("/documents/$id/revisions/2/file").andExpect {
+            status { isOk() }
+            header { string("Content-Disposition", org.hamcrest.Matchers.containsString("inline")) }
+        }
+    }
+
+    @Test
     fun revisionsAreImmutableAndConflictsAreReported() {
         val (id, firstRevision) = create()
         mvc.put("/documents/$id") {

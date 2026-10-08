@@ -83,6 +83,63 @@ export type ConstitutionSummary = {
   latestVersionId?: string | null;
   versions: VersionSummary[];
   contentOutline?: ContentOutline;
+  predecessorConstitutionId?: string | null;
+  interim?: boolean;
+  lifecycleStatus?: 'unknown' | 'awaiting_commencement' | 'in_force' | 'suspended' | 'repealed';
+};
+
+export type ConstitutionLifecycleEvent = {
+  id: string;
+  constitutionId: string;
+  eventType: 'adopted' | 'commenced' | 'suspended' | 'restored' | 'repealed';
+  eventDate: string;
+  sourceUrl: string | null;
+  note: string | null;
+};
+
+export type ProvisionLifecycleEvent = {
+  id: string;
+  constitutionId: string;
+  sourceVersionId: string;
+  eventType: 'deferred' | 'commenced' | 'suspended' | 'restored';
+  eventDate: string;
+  logicalUnitIds: string[];
+  sourceUrl: string | null;
+  note: string | null;
+};
+
+export type ResolvedUnit = {
+  logicalId: string;
+  pathLabels: string[];
+  deepLink: string;
+};
+
+export type ExportedUnit = {
+  logicalId?: string | null;
+  kind?: string | null;
+  label?: string | null;
+  title?: string | null;
+  content?: Array<{ type: string; node?: ExportedUnit | null }>;
+};
+
+export type WikiImage = {
+  documentId: string;
+  revision: number;
+  alt: string;
+  caption?: string | null;
+  credit?: string | null;
+  sourceUrl?: string | null;
+  rights?: string | null;
+};
+
+export type WikiPageRevision = {
+  id: string;
+  targetType: 'country' | 'constitution';
+  targetId: string;
+  predecessorId: string | null;
+  summary: string;
+  body: string;
+  images: WikiImage[];
 };
 
 export type CountrySummary = {
@@ -313,6 +370,90 @@ export function getCountry(isoCode: string): Promise<CountryDetail | null> {
   );
 }
 
+export function getConstitutionLifecycle(isoCode: string): Promise<ConstitutionLifecycleEvent[] | null> {
+  return readJson<ConstitutionLifecycleEvent[]>(
+    `${catalogBaseUrl()}/countries/${encodeURIComponent(isoCode)}/constitution-lifecycle`,
+    'catalog',
+  );
+}
+
+export function appendConstitutionLifecycle(
+  constitutionId: string,
+  payload: { eventType: ConstitutionLifecycleEvent['eventType']; eventDate: string; sourceUrl?: string; note?: string },
+  authorization: string,
+): Promise<ConstitutionLifecycleEvent> {
+  return sendJson<ConstitutionLifecycleEvent>(
+    `${catalogBaseUrl()}/constitutions/${encodeURIComponent(constitutionId)}/lifecycle-events`,
+    'catalog',
+    'POST',
+    payload,
+    authorization,
+  );
+}
+
+export function getProvisionLifecycle(isoCode: string): Promise<ProvisionLifecycleEvent[] | null> {
+  return readJson<ProvisionLifecycleEvent[]>(
+    `${catalogBaseUrl()}/countries/${encodeURIComponent(isoCode)}/provision-lifecycle`,
+    'catalog',
+  );
+}
+
+export function resolveUnit(versionId: string, logicalId: string): Promise<ResolvedUnit | null> {
+  return readJson<ResolvedUnit>(
+    `${contentBaseUrl()}/versions/${encodeURIComponent(versionId)}/resolve?logicalId=${encodeURIComponent(logicalId)}`,
+    'content',
+  );
+}
+
+export function getExportedUnits(versionId: string): Promise<{ roots: ExportedUnit[] } | null> {
+  return readJson<{ roots: ExportedUnit[] }>(
+    `${contentBaseUrl()}/versions/${encodeURIComponent(versionId)}/export`,
+    'content',
+  );
+}
+
+export function appendProvisionLifecycle(
+  constitutionId: string,
+  payload: {
+    sourceVersionId: string;
+    eventType: ProvisionLifecycleEvent['eventType'];
+    eventDate: string;
+    logicalUnitIds: string[];
+    sourceUrl?: string;
+    note?: string;
+  },
+  authorization: string,
+): Promise<ProvisionLifecycleEvent> {
+  return sendJson<ProvisionLifecycleEvent>(
+    `${catalogBaseUrl()}/constitutions/${encodeURIComponent(constitutionId)}/provision-events`,
+    'catalog',
+    'POST',
+    payload,
+    authorization,
+  );
+}
+
+export function getWikiPage(targetType: 'country' | 'constitution', targetId: string): Promise<WikiPageRevision | null> {
+  return readJson<WikiPageRevision>(`${catalogBaseUrl()}/wiki/${targetType}/${encodeURIComponent(targetId)}`, 'catalog');
+}
+
+export function getWikiDraft(targetType: 'country' | 'constitution', targetId: string, authorization: string): Promise<WikiPageRevision | null> {
+  return readJson<WikiPageRevision>(`${catalogBaseUrl()}/wiki/${targetType}/${encodeURIComponent(targetId)}/draft`, 'catalog', authorization);
+}
+
+export function saveWikiDraft(targetType: 'country' | 'constitution', targetId: string, payload: {
+  expectedRevisionId: string | null;
+  summary: string;
+  body: string;
+  images: WikiImage[];
+}, authorization: string): Promise<WikiPageRevision> {
+  return sendJson<WikiPageRevision>(`${catalogBaseUrl()}/wiki/${targetType}/${encodeURIComponent(targetId)}/draft`, 'catalog', 'PUT', payload, authorization);
+}
+
+export function publishWikiPage(targetType: 'country' | 'constitution', targetId: string, revisionId: string, authorization: string): Promise<WikiPageRevision> {
+  return sendJson<WikiPageRevision>(`${catalogBaseUrl()}/wiki/${targetType}/${encodeURIComponent(targetId)}/publish`, 'catalog', 'POST', { revisionId }, authorization);
+}
+
 export async function loadCountriesWithDetails(): Promise<{
   countries: CountrySummary[];
   details: Array<CountryDetail | null>;
@@ -533,12 +674,14 @@ export async function createConstitution(
   title: string,
   outline?: OutlineKindWrite[],
   authorization?: string,
+  predecessorConstitutionId?: string | null,
+  interim = false,
 ): Promise<ConstitutionSummary> {
   return sendJson<ConstitutionSummary>(
     `${catalogBaseUrl()}/countries/${encodeURIComponent(isoCode)}/constitutions`,
     'catalog',
     'POST',
-    { slug, title, outline },
+    { slug, title, outline, predecessorConstitutionId, interim },
     authorization,
   );
 }

@@ -90,7 +90,15 @@ export async function createConstitutionAction(formData: FormData): Promise<stri
     if (newCountry) {
       await ensureCountry(newCountry.isoCode, newCountry.name, authorization);
     }
-    const created = await createConstitution(isoCode, slug, title, outline, authorization);
+    const created = await createConstitution(
+      isoCode,
+      slug,
+      title,
+      outline,
+      authorization,
+      String(formData.get('predecessorConstitutionId') ?? '') || null,
+      formData.get('interim') === 'on',
+    );
     createdId = created.id;
   } catch {
     return '/admin/constitutions?error=1';

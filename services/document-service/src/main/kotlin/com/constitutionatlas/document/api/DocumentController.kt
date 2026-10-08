@@ -59,7 +59,7 @@ class DocumentController(
         val metadata = service.getVisible(id, revision, authorization).revision
         val bytes = repository.file(metadata.id) ?: throw NotFoundException("File not found")
         return ResponseEntity.ok()
-            .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment().filename(metadata.fileName ?: "document").build().toString())
+            .header(HttpHeaders.CONTENT_DISPOSITION, (if (metadata.contentType?.startsWith("image/") == true) ContentDisposition.inline() else ContentDisposition.attachment()).filename(metadata.fileName ?: "document").build().toString())
             .contentType(MediaType.parseMediaType(metadata.contentType ?: "application/octet-stream"))
             .body(bytes)
     }

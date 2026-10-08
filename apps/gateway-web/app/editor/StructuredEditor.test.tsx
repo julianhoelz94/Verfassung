@@ -163,10 +163,10 @@ describe('structured editor acceptance', () => {
     const scope = host.querySelector('select')!;
     await change(scope, 'constitution');
     expect(scope.disabled).toBe(true); expect(button('Save draft').disabled).toBe(true);
-    expect(button('article 46a Rights').disabled).toBe(true);
+    expect(button('Article 46a Rights').disabled).toBe(true);
     expect(host.textContent).toContain('Loading editor view');
     await act(async () => release({ ok: true, json: async () => preview }));
-    expect(scope.disabled).toBe(false); expect(button('article 46a Rights').disabled).toBe(false);
+    expect(scope.disabled).toBe(false); expect(button('Article 46a Rights').disabled).toBe(false);
   });
 
   it('loads another root without overwriting unsaved text, and preserves the loaded root through undo', async () => {
@@ -178,14 +178,14 @@ describe('structured editor acceptance', () => {
     const fetchView = vi.fn(async (url: string) => ({ ok: true, json: async () => url.includes('rootId=second') ? { ...preview, roots: [{ ...first, content: [] }, second], sourceRoots: [{ ...first, content: [] }, second] } : { ...preview, roots: [{ ...first, content: [] }, { ...second, content: [] }] } }));
     vi.stubGlobal('fetch', fetchView);
     const scope = host.querySelector('select')!;
-    await change(scope, 'constitution'); await click('article 2 ');
+    await change(scope, 'constitution'); await click('Article 2 ');
     expect(fetchView.mock.calls[1][0]).toContain('rootId=second');
     expect(texts()[0].value).toBe('Second saved wording.');
     expect(payload().operations).toEqual([expect.objectContaining({ targetId: 'text-first', text: 'Unsaved first wording.' })]);
-    await change(scope, 'constitution'); await click('article 1 ');
+    await change(scope, 'constitution'); await click('Article 1 ');
     expect(texts()[0].value).toBe('Unsaved first wording.');
     await click('Undo'); expect(texts()[0].value).toBe('First source.');
-    await change(scope, 'constitution'); await click('article 2 ');
+    await change(scope, 'constitution'); await click('Article 2 ');
     expect(texts()[0].value).toBe('Second saved wording.');
     expect(fetchView.mock.calls.filter(([url]) => url.includes('rootId=second'))).toHaveLength(1);
   });

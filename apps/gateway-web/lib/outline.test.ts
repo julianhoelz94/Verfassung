@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { articleHeading, clipNodes, concatenatedText, depthStopCount, depthStopLabels, groupNodes, nodeHeading, toOutlineKindWrite } from './outline';
+import { articleHeading, clipNodes, concatenatedText, depthStopCount, depthStopLabels, effectiveDisplayKind, groupNodes, nodeHeading, toOutlineKindWrite } from './outline';
 import type { ContentNode, ContentOutline } from './api';
 
 const de: ContentOutline = {
@@ -71,7 +71,7 @@ describe('articleHeading', () => {
 });
 
 describe('toOutlineKindWrite', () => {
-  it('coerces concatenated presentation and clears heading flags', () => {
+  it('preserves saved heading preferences while running text is selected', () => {
     expect(
       toOutlineKindWrite({
         kindCode: 'sentence',
@@ -85,15 +85,33 @@ describe('toOutlineKindWrite', () => {
       kindCode: 'sentence',
       displayLabel: 'Sentence',
       presentation: 'concatenated',
-      showLabel: false,
-      showTitle: false,
-      showKind: false,
+      showLabel: true,
+      showTitle: true,
+      showKind: true,
       allowTextAlongsideChildren: false,
       titlePolicy: 'optional',
       labelPolicy: 'optional',
       labelPlacement: 'before_title',
       segmentation: 'plain',
     });
+  });
+});
+
+describe('effectiveDisplayKind', () => {
+  it('hides headings in running text while preserving an inline literal label', () => {
+    const kind = { ...de.kinds[0]!, presentation: 'concatenated', showKind: true, showTitle: true, showLabel: true, labelPlacement: 'inline' };
+    expect(effectiveDisplayKind(kind)).toMatchObject({ showKind: false, showTitle: false, showLabel: true, labelPlacement: 'inline' });
+    expect(kind).toMatchObject({ showKind: true, showTitle: true, showLabel: true });
+  });
+
+  it('places a label before text when an optional title is not displayed', () => {
+    expect(effectiveDisplayKind({ ...de.kinds[0]!, showTitle: false, showLabel: true, labelPlacement: 'after_title' }))
+      .toMatchObject({ labelPlacement: 'before_title' });
+  });
+
+  it('omits a title stop when the editor policy forbids titles', () => {
+    const invalid = { kinds: de.kinds.map((kind, index) => index === 1 ? { ...kind, showTitle: true, titlePolicy: 'none' } : kind) };
+    expect(depthStopLabels(invalid)).toEqual(['Overview', 'Full text']);
   });
 });
 

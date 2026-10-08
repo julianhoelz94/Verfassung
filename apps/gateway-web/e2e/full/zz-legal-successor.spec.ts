@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { authenticatorCode, signIn, signOut } from './auth';
+import { authenticatorCode, signIn, signOut, startFromViewer } from './auth';
 import { createIsolatedConstitution } from './api-fixtures';
 
 test('editor, reviewer, and publisher release a real legal successor with its source document', async ({ page, request }) => {
@@ -7,9 +7,7 @@ test('editor, reviewer, and publisher release a real legal successor with its so
   const pair = await createIsolatedConstitution(request, `Journey legal successor ${Date.now()}`);
   const recordTitle = `Journey dignity amendment ${Date.now()}`;
   await signIn(page, 'editor');
-  await page.getByLabel('Current law').selectOption(pair.targetVersionId);
-  await page.getByRole('button', { name: 'Record the next legal change' }).click();
-  await expect(page).toHaveURL(/sessionId=/);
+  await startFromViewer(page, pair.countryIso, pair.targetVersionId, 'legal');
   await page.locator('#draft-form textarea').first().fill('A new legal duty protects public dignity in this journey.');
   await page.getByRole('button', { name: 'Save draft' }).click();
   await expect(page.getByText('Draft saved.')).toBeVisible();

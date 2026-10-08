@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { signInAdmin } from './helpers';
+import { signInAdmin, startEditorSession, VERSION_2022 } from './helpers';
 
 const mockOrigin = `http://127.0.0.1:${process.env.E2E_MOCK_PORT ?? 4010}`;
 
@@ -23,6 +23,7 @@ test('administrator manages a user and its access lifecycle', async ({ page }) =
   const activeUser = page.locator('.data-row').filter({ hasText: 'local-admin@example.local' });
   await activeUser.getByLabel('Roles (comma-separated)').fill('admin, publisher');
   await activeUser.getByRole('button', { name: 'Update roles' }).click();
+  await page.reload();
   await expect(page.locator('.data-row').filter({ hasText: 'local-admin@example.local' })).toContainText('admin, publisher');
   await page.locator('.data-row').filter({ hasText: 'local-admin@example.local' }).getByRole('button', { name: 'Issue reset token' }).click();
   await expect(page.getByText('E2E-RESET-ADMIN')).toBeVisible();
@@ -50,6 +51,7 @@ test('administrator creates, rotates and revokes a service token', async ({ page
   await expect(page.getByText('E2E-ROTATED-TOKEN')).toBeVisible();
   await page.reload();
   await page.locator('.data-row').filter({ hasText: 'CI integration' }).getByRole('button', { name: 'Revoke' }).click();
+  await page.reload();
   await expect(page.locator('.data-row').filter({ hasText: 'CI integration' })).toContainText('Revoked');
 });
 
@@ -131,8 +133,7 @@ test('guided creation sends an expired administrator session to login', async ({
 
 test('administrator can carry an editorial correction through every role action', async ({ page }) => {
   await signInAdmin(page);
-  await page.goto('/editor');
-  await page.getByRole('button', { name: 'Correct this text' }).click();
+  await startEditorSession(page, VERSION_2022, 'editorial_correction');
   await page.getByLabel('Article text').fill('Administrator correction.');
   await page.getByRole('button', { name: 'Save draft' }).click();
   await page.getByLabel('What was corrected in this transcription?').fill('Administrator fixed the transcription.');

@@ -49,6 +49,27 @@ describe('reader presentation', () => {
     expect(html).toContain('constitution-concat');
   });
 
+  it('shows effective superscript labels in legacy reader and compare text', () => {
+    const labeled = { kinds: outline.kinds.map((kind) => ({ ...kind, showLabel: kind.kindCode === 'sentence', labelPlacement: 'superscript' })) };
+    const legacy = renderToStaticMarkup(createElement(NodeTree, { nodes, outline: labeled }));
+    expect(legacy).toContain('<sup class="num">(0)</sup>');
+    expect(legacy).toContain('<sup class="num">(1)</sup>');
+    const left = { articleNumber: '1', title: '', children: nodes, legacyIdentity: true };
+    const right = { ...left, children: [{ ...nodes[0]!, label: '(2a)' }, nodes[1]!] };
+    const compared = renderToStaticMarkup(createElement(DiffConstitutionText, { left, right, side: 'to', outline: labeled }));
+    expect(compared).toContain('<sup class="num">');
+    expect(compared).toContain('(2a)');
+  });
+
+  it('retains legacy children when a running-text parent has descendants', () => {
+    const parent = { ...nodes[0]!, children: [nodes[1]!] };
+    const reader = renderToStaticMarkup(createElement(NodeTree, { nodes: [parent], outline }));
+    const article = { articleNumber: '1', title: '', children: [parent], legacyIdentity: true };
+    const compared = renderToStaticMarkup(createElement(DiffConstitutionText, { left: article, right: article, side: 'to', outline }));
+    expect(reader).toContain('Second.');
+    expect(compared).toContain('Second.');
+  });
+
 });
 
 

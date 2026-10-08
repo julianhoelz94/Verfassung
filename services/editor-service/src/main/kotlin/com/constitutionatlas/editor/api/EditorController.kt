@@ -27,7 +27,9 @@ class EditorController(private val editorService: EditorService) {
         @RequestParam(required = false) status: String?,
         @RequestParam(required = false) openedBy: String?,
         @RequestParam(required = false) versionId: UUID?,
-    ): List<EditSessionSummaryDto> = editorService.listSessions(authorization, status, openedBy, versionId)
+        @RequestParam(defaultValue = "100") limit: Int,
+        @RequestParam(defaultValue = "0") offset: Int,
+    ): List<EditSessionSummaryDto> = editorService.listSessions(authorization, status, openedBy, versionId, limit, offset)
 
     @GetMapping("/edit-sessions/{sessionId}")
     fun preview(

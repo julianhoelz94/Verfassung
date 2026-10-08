@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { DiffReviewState, ReviewCandidate, ReviewDecisionInput, ReviewRef } from '../../lib/diff-review';
 import { decisionReadyForReview, decisionResolved } from '../../lib/diff-review';
@@ -41,7 +41,7 @@ export function DiffReviewQueue({ target, initial, rows, canDecide, canAcknowled
   const [reason, setReason] = useState('');
   const [acknowledge, setAcknowledge] = useState(false);
   const [message, setMessage] = useState('');
-  const [pending, startTransition] = useTransition();
+  const [pending, setPending] = useState(false);
   const activeRef = useRef<HTMLDivElement>(null);
   const focusAfterNavigation = useRef(false);
   const decisions = useMemo(() => new Map(review.decisions.map((decision) => [decision.key, decision])), [review.decisions]);
@@ -87,8 +87,9 @@ export function DiffReviewQueue({ target, initial, rows, canDecide, canAcknowled
     setMessage('');
   }
 
-  function save(input: ReviewDecisionInput) {
-    startTransition(async () => {
+  async function save(input: ReviewDecisionInput) {
+    setPending(true);
+    try {
       const result = await saveDiffDecisionAction(target, review, input);
       if ('error' in result) { setMessage(result.error); return; }
       setReview(result.review);
@@ -98,11 +99,16 @@ export function DiffReviewQueue({ target, initial, rows, canDecide, canAcknowled
       choose(next?.key ?? input.key);
       setMessage('Decision saved.');
       router.refresh();
-    });
+    } catch {
+      setMessage('Could not update the review. Refresh and try again.');
+    } finally {
+      setPending(false);
+    }
   }
 
-  function refresh() {
-    startTransition(async () => {
+  async function refresh() {
+    setPending(true);
+    try {
       const result = await refreshDiffReviewAction(target);
       if ('error' in result) { setMessage(result.error); return; }
       const previousTotal = review.candidates.length;
@@ -111,7 +117,11 @@ export function DiffReviewQueue({ target, initial, rows, canDecide, canAcknowled
         ? `${result.review.candidates.length - previousTotal} deeper differences were added after the pairing changed.`
         : 'Review refreshed from the saved draft.');
       router.refresh();
-    });
+    } catch {
+      setMessage('Could not refresh the review. Try again.');
+    } finally {
+      setPending(false);
+    }
   }
 
   const navigation = (index: number) => index >= 0 && index < visible.length && choose(visible[index].key);
@@ -157,10 +167,10 @@ export function DiffReviewQueue({ target, initial, rows, canDecide, canAcknowled
           {onAddRow ? <Button type="button" onClick={() => { onAddRow(selected); setMessage('A change row was added. Check the exact units and save the draft before linking this difference.'); }}>Create change row from this difference</Button> : null}
           <Button type="button" onClick={() => { document.querySelector<HTMLElement>('[aria-label="Change record"], #amendment-changes-title')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); setMessage('Correct the pairing in the exact unit selectors, save, then link the saved row.'); }}>Correct pairing in change record</Button>
           <label>Link to saved change rows <select multiple value={linkedIds} onChange={(event) => setLinkedIds([...event.target.selectedOptions].map((option) => option.value))}>{rows.map((row) => <option key={row.id} value={row.id}>{row.label}</option>)}</select></label>
-          {selected.ambiguous && canAcknowledge ? <label><input type="checkbox" checked={acknowledge} onChange={(event) => setAcknowledge(event.target.checked)} /> Confirm the multi-row pairing as reviewer</label> : null}
+          {selected.ambiguous && canAcknowledge ? <label className="choice-row"><input type="checkbox" checked={acknowledge} onChange={(event) => setAcknowledge(event.target.checked)} /> Confirm the multi-row pairing as reviewer</label> : null}
           <Button type="button" disabled={pending || linkedIds.length === 0 || selected.ambiguous && linkedIds.length < 2} onClick={() => save({ key: selected.key, fingerprint: selected.fingerprint, status: 'linked', linkedIds, reviewerAcknowledged: selected.ambiguous && canAcknowledge && acknowledge })}>Link selected rows and next</Button>
           <label>Reason for exclusion <textarea value={reason} onChange={(event) => setReason(event.target.value)} rows={3} /></label>
-          {canAcknowledge ? <label><input type="checkbox" checked={acknowledge} onChange={(event) => setAcknowledge(event.target.checked)} /> Acknowledge this exclusion for publication</label> : <p className="muted">A reviewer must acknowledge an exclusion before publication.</p>}
+          {canAcknowledge ? <label className="choice-row"><input type="checkbox" checked={acknowledge} onChange={(event) => setAcknowledge(event.target.checked)} /> Acknowledge this exclusion for publication</label> : <p className="muted">A reviewer must acknowledge an exclusion before publication.</p>}
           <Button type="button" disabled={pending || !reason.trim()} onClick={() => save({ key: selected.key, fingerprint: selected.fingerprint, status: 'excluded_with_reason', exclusionReason: reason.trim(), reviewerAcknowledged: acknowledge })}>Exclude with reason and next</Button>
         </div> : null}
       </div> : <p>No differences match these filters.</p>}

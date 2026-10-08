@@ -519,6 +519,43 @@ class EditorApiTest {
     }
 
     @Test
+    fun listSessionsPagesBeyondOneHundredOwnedOpenSessions() {
+        val owner = actor(UUID.randomUUID().toString(), "editor")
+        stub(owner)
+        repeat(101) {
+            jdbcTemplate.update(
+                "INSERT INTO edit_sessions (id, actor_id, version_id, status, hop_kind) VALUES (?, ?, ?, 'open', 'editorial_correction')",
+                UUID.randomUUID(),
+                owner.id,
+                UUID.randomUUID(),
+            )
+        }
+        mockMvc.get("/edit-sessions") {
+            header("Authorization", TOKEN)
+            param("openedBy", "me")
+            param("status", "open")
+            param("limit", "100")
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.length()") { value(100) }
+        }
+        mockMvc.get("/edit-sessions") {
+            header("Authorization", TOKEN)
+            param("openedBy", "me")
+            param("status", "open")
+            param("limit", "100")
+            param("offset", "100")
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.length()") { value(1) }
+        }
+        mockMvc.get("/edit-sessions") {
+            header("Authorization", TOKEN)
+            param("limit", "101")
+        }.andExpect { status { isBadRequest() } }
+    }
+
+    @Test
     fun legalPublishLinksAndPublishesAmendment() {
         val versionId = UUID.randomUUID()
         val articleId = UUID.fromString("01900000-0000-4000-8000-000000000201")

@@ -18,14 +18,13 @@ export function toOutlineKindWrite(kind: {
   segmentation?: string;
 }): OutlineKindWrite {
   const presentation = asOutlinePresentation(kind.presentation);
-  const concatenated = presentation === 'concatenated';
   return {
     kindCode: kind.kindCode,
     displayLabel: kind.displayLabel,
     presentation,
-    showLabel: concatenated && kind.labelPlacement !== 'inline' && kind.labelPlacement !== 'superscript' ? false : Boolean(kind.showLabel),
-    showTitle: concatenated ? false : Boolean(kind.showTitle),
-    showKind: concatenated ? false : Boolean(kind.showKind),
+    showLabel: Boolean(kind.showLabel),
+    showTitle: Boolean(kind.showTitle),
+    showKind: Boolean(kind.showKind),
     allowTextAlongsideChildren: Boolean(kind.allowTextAlongsideChildren),
     titlePolicy: (kind.titlePolicy ?? 'optional') as OutlineKindWrite['titlePolicy'],
     labelPolicy: (kind.labelPolicy ?? 'optional') as OutlineKindWrite['labelPolicy'],
@@ -68,6 +67,18 @@ export function kindByCode(outline: ContentOutline | undefined, kindCode: string
   return outline?.kinds.find((kind) => kind.kindCode === kindCode);
 }
 
+export function effectiveDisplayKind(kind: OutlineKind | undefined): OutlineKind | undefined {
+  if (!kind) return undefined;
+  const runningText = asOutlinePresentation(kind.presentation) === 'concatenated';
+  const placement = kind.labelPlacement ?? 'before_title';
+  const showTitle = !runningText && kind.titlePolicy !== 'none' && kind.showTitle;
+  const labelPlacement = placement === 'after_title' && !showTitle ||
+    placement === 'inline' && !kind.mayHoldText ? 'before_title' : placement;
+  const showLabel = kind.labelPolicy !== 'none' && kind.showLabel &&
+    (!runningText || labelPlacement === 'inline' || labelPlacement === 'superscript');
+  return { ...kind, showKind: !runningText && kind.showKind, showTitle, showLabel, labelPlacement };
+}
+
 export function nodeHeading(
   kind: OutlineKind | undefined,
   node: Pick<ContentNode, 'kind' | 'label' | 'number' | 'title'>,
@@ -76,6 +87,8 @@ export function nodeHeading(
     const fallback = [node.kind, node.label ?? node.number, node.title].filter(Boolean).join(' ');
     return fallback || null;
   }
+  kind = effectiveDisplayKind(kind);
+  if (!kind) return null;
   const parts: string[] = [];
   if (kind.showKind) {
     parts.push(kind.displayLabel);
@@ -123,9 +136,10 @@ export type RenderGroup =
 export function groupNodes(nodes: ContentNode[], outline?: ContentOutline): RenderGroup[] {
   const groups: RenderGroup[] = [];
   for (const node of nodes) {
-    const presentation = asOutlinePresentation(kindByCode(outline, node.kind)?.presentation);
+    const kind = effectiveDisplayKind(kindByCode(outline, node.kind));
+    const presentation = asOutlinePresentation(kind?.presentation);
     const last = groups[groups.length - 1];
-    if (presentation === 'concatenated') {
+    if (presentation === 'concatenated' && node.children.length === 0 && !kind?.showTitle && !kind?.showKind) {
       if (last && last.type === 'concatenated') {
         last.nodes.push(node);
       } else {
@@ -152,7 +166,7 @@ export type DepthStop = {
 };
 
 function isTitledSectionKind(kind: OutlineKind): boolean {
-  return asOutlinePresentation(kind.presentation) !== 'concatenated' && Boolean(kind.showTitle);
+  return Boolean(effectiveDisplayKind(kind)?.showTitle);
 }
 
 export function depthStops(outline?: ContentOutline): DepthStop[] {

@@ -48,7 +48,8 @@ export default async function AccountPage(props: AccountPageProps) {
       {searchParams.saved ? <Alert tone="success">Password updated.</Alert> : null}
       {searchParams.mfaRevoked ? <Alert tone="success">Authenticator enrollment was revoked.</Alert> : null}
       <Card>
-        <h2>Authenticator</h2>
+        <section className="account-section" aria-labelledby="authenticator-title">
+        <h2 id="authenticator-title">Authenticator</h2>
         {user.mfaRequired && !user.mfaEnabled ? (
           <p>Admin and publisher accounts must enroll an authenticator.</p>
         ) : null}
@@ -82,7 +83,9 @@ export default async function AccountPage(props: AccountPageProps) {
             </form>
           </>
         )}
-        <h2>Change password</h2>
+        </section>
+        <section className="account-section" aria-labelledby="password-title">
+        <h2 id="password-title">Change password</h2>
         <form action={changePasswordAction}>
           <Input
             label="Current password"
@@ -103,6 +106,7 @@ export default async function AccountPage(props: AccountPageProps) {
           />
           <Button variant="primary">Update password</Button>
         </form>
+        </section>
       </Card>
     </PageMain>
   );

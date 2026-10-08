@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import type { ArticleSummary, ContentOutline } from '../../lib/api';
-import { articleHeading, clipOrderedEntries, clipNodes, depthStopCount, depthStopLabels } from '../../lib/outline';
+import { articleHeading, clipOrderedEntries, clipNodes, depthStopCount, depthStopLabels, kindByCode } from '../../lib/outline';
 import { Badge, type BadgeTone, Toolbar } from './ui';
 import { ConstitutionText } from './ConstitutionText';
 import { Segmented } from './Segmented';
@@ -103,7 +103,7 @@ export function VersionReader({
           />
           <span className="toolbar-spacer" />
           <span className="muted">
-            {articles.length} {outline?.kinds[0]?.kindCode && outline.kinds[0].kindCode !== 'article' ? 'unit' : 'article'}{articles.length === 1 ? '' : 's'}
+            {articles.length} {articles.length === 1 ? 'unit' : 'units'}
           </span>
         </Toolbar>
         <ol className="version-articles text-column" lang={language}>
@@ -154,7 +154,7 @@ export function VersionReader({
                 )}
                 <p className="article-foot print-hide">
                   <a href={permalink}>Permalink</a>
-                  <a href={historyHref}>History of {article.kind && article.kind !== 'article' ? outline?.kinds.find((kind) => kind.kindCode === article.kind)?.displayLabel ?? article.kind : 'Art.'} {article.articleNumber}</a>
+                  <a href={historyHref}>History of {kindByCode(outline, article.kind ?? 'article')?.displayLabel ?? 'Article'} {article.articleNumber}</a>
                   {changeType ? (
                     <Badge tone={changeTone(changeType)}>{changeType}</Badge>
                   ) : (

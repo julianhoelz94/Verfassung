@@ -198,6 +198,7 @@ test('mixed parent text and nested sentence decisions reopen when one draft unit
       const saved = await json(await request.get(endpoint, { headers }));
       return saved.decisions.filter((decision: { status: string }) => decision.status === 'excluded_with_reason').length;
     }).toBe(index + 1);
+    await expect(queue.getByRole('button', { name: 'Refresh' })).toBeEnabled({ timeout: 20_000 });
   }
   const proposed = await json(await request.get(endpoint, { headers }));
   expect(proposed.decisions.filter((decision: { status: string }) => decision.status === 'excluded_with_reason')).toHaveLength(initial.candidates.length);

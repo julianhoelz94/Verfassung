@@ -50,6 +50,8 @@ class ImportApiTest {
         Actor(UUID.fromString("01900000-0000-4000-8000-000000000413"), "local-admin@example.local", listOf("admin"))
     private val reviewer = Actor(UUID.randomUUID(), "reviewer@example.local", listOf("reviewer"))
     private val publisher = Actor(UUID.randomUUID(), "publisher@example.local", listOf("publisher"), stepUpFresh = true)
+    private val otherEditor = Actor(UUID.randomUUID(), "other-editor@example.local", listOf("editor"))
+    private val scopedImporter = Actor(UUID.randomUUID(), "mcp@example.local", emptyList(), listOf("ingestion:import"))
     private val json = ObjectMapper()
 
     @BeforeEach
@@ -59,6 +61,8 @@ class ImportApiTest {
         Mockito.`when`(identityClient.authenticate(TOKEN)).thenReturn(admin)
         Mockito.`when`(identityClient.authenticate(REVIEWER_TOKEN)).thenReturn(reviewer)
         Mockito.`when`(identityClient.authenticate(PUBLISHER_TOKEN)).thenReturn(publisher)
+        Mockito.`when`(identityClient.authenticate(EDITOR_TOKEN)).thenReturn(otherEditor)
+        Mockito.`when`(identityClient.authenticate(MCP_TOKEN)).thenReturn(scopedImporter)
     }
 
     private fun jobId(response: String): String = json.readTree(response).path("id").asText()
@@ -80,6 +84,46 @@ class ImportApiTest {
 
     private fun anyUuid(): UUID = Mockito.any(UUID::class.java) ?: UUID(0, 0)
     private fun anyStr(): String = Mockito.anyString() ?: ""
+
+    @Test
+    fun setupProposalIsPrivateUntilAnEditorConfirmsItsOutline() {
+        val constitutionId = UUID.randomUUID()
+        val body = """{"isoCode":"FR","countryName":"France","constitutionSlug":"new-constitution","constitutionTitle":"New constitution","languageCode":"fr","sourceUrl":"https://example.org/source","outline":{"kinds":[{"kindCode":"article","displayLabel":"Article"}]},"sampleRoots":[{"kind":"article","label":"1","title":"Opening","content":[{"type":"text","text":"Sample text"}]}]}"""
+        Mockito.`when`(catalogClient.createConstitution("FR", "new-constitution", "New constitution"))
+            .thenReturn(DownstreamConstitution(constitutionId, "new-constitution", "New constitution"))
+        Mockito.`when`(catalogClient.currentSettingsRevisionId(constitutionId)).thenReturn(SETTINGS_REVISION)
+        val response = mockMvc.post("/import-setup-proposals") {
+            header("Authorization", TOKEN); contentType = MediaType.APPLICATION_JSON; content = body
+        }.andExpect { status { isCreated() }; jsonPath("$.status") { value("proposed") } }.andReturn()
+        val id = jobId(response.response.contentAsString)
+        mockMvc.get("/import-setup-proposals/$id") { header("Authorization", EDITOR_TOKEN) }
+            .andExpect { status { isForbidden() } }
+        mockMvc.post("/import-setup-proposals/$id/confirm") { header("Authorization", EDITOR_TOKEN) }
+            .andExpect { status { isForbidden() } }
+        mockMvc.post("/import-setup-proposals/$id/confirm") { header("Authorization", TOKEN) }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.status") { value("confirmed") }
+                jsonPath("$.constitutionId") { value(constitutionId.toString()) }
+                jsonPath("$.settingsRevisionId") { value(SETTINGS_REVISION.toString()) }
+            }
+        mockMvc.post("/import-setup-proposals/$id/confirm") { header("Authorization", TOKEN) }
+            .andExpect { status { isOk() }; jsonPath("$.status") { value("confirmed") } }
+        Mockito.verify(catalogClient, Mockito.times(1)).createConstitution("FR", "new-constitution", "New constitution")
+    }
+
+    @Test
+    fun scopedImportRequiresConfirmedConstitutionAndSettingsPin() {
+        val base = """{"isoCode":"FR","countryName":"France","constitutionSlug":"1958","constitutionTitle":"Constitution","versionLabel":"1","articles":[{"articleNumber":"1","title":"A","sortOrder":1}]}"""
+        mockMvc.post("/import-jobs") {
+            header("Authorization", MCP_TOKEN); contentType = MediaType.APPLICATION_JSON; content = base
+        }.andExpect { status { isConflict() } }
+        mockMvc.post("/import-jobs") {
+            header("Authorization", MCP_TOKEN); contentType = MediaType.APPLICATION_JSON
+            content = base.dropLast(1) + ",\"constitutionId\":\"${UUID.randomUUID()}\",\"settingsRevisionId\":\"$SETTINGS_REVISION\"}"
+        }.andExpect { status { isCreated() }; jsonPath("$.status") { value("pending_review") } }
+        Mockito.verifyNoInteractions(catalogClient, contentClient)
+    }
 
     private fun stubDraft(versionId: UUID, constitutionId: UUID) {
         Mockito.`when`(catalogClient.createDraftVersion(
@@ -445,6 +489,8 @@ class ImportApiTest {
         private const val TOKEN = "Bearer test-token"
         private const val REVIEWER_TOKEN = "Bearer reviewer-token"
         private const val PUBLISHER_TOKEN = "Bearer publisher-token"
+        private const val EDITOR_TOKEN = "Bearer other-editor-token"
+        private const val MCP_TOKEN = "Bearer scoped-mcp-key"
         private val SETTINGS_REVISION = UUID.fromString("01900000-0000-4000-8000-000000000504")
 
         private fun nestedJson(depth: Int): String = (1..depth).fold("1") { acc, _ -> """{"x":$acc}""" }

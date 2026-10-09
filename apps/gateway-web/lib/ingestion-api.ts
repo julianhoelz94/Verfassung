@@ -50,6 +50,28 @@ export function transitionImportJob(jobId: string, action: 'confirm-outline' | '
 
 export type ImportReviewDecision = { id: string; decision: string; reason: string; decidedBy: string; decidedAt: string };
 
+export type SetupProposal = {
+  id: string; ownerId: string; status: string; constitutionId: string | null; settingsRevisionId: string | null;
+  confirmedBy: string | null;
+  payload: Record<string, unknown> & { outline?: { kinds?: Record<string, unknown>[] }; sampleRoots?: unknown[] };
+};
+
+export function getSetupProposal(id: string, authorization: string): Promise<SetupProposal | null> {
+  return readJson<SetupProposal>(`${ingestionBaseUrl()}/import-setup-proposals/${encodeURIComponent(id)}`, 'ingestion', authorization);
+}
+
+export function createSetupProposal(payload: unknown, authorization: string): Promise<SetupProposal> {
+  return sendJson<SetupProposal>(`${ingestionBaseUrl()}/import-setup-proposals`, 'ingestion', 'POST', payload, authorization);
+}
+
+export function updateSetupProposal(id: string, payload: unknown, authorization: string): Promise<SetupProposal> {
+  return sendJson<SetupProposal>(`${ingestionBaseUrl()}/import-setup-proposals/${encodeURIComponent(id)}`, 'ingestion', 'PUT', payload, authorization);
+}
+
+export function transitionSetupProposal(id: string, action: 'confirm' | 'withdraw', authorization: string): Promise<SetupProposal> {
+  return sendJson<SetupProposal>(`${ingestionBaseUrl()}/import-setup-proposals/${encodeURIComponent(id)}/${action}`, 'ingestion', 'POST', {}, authorization);
+}
+
 export function getImportReviewDecisions(jobId: string, authorization: string): Promise<ImportReviewDecision[]> {
   return readJson<ImportReviewDecision[]>(`${ingestionBaseUrl()}/import-jobs/${encodeURIComponent(jobId)}/decisions`, 'ingestion', authorization).then(decisions => decisions ?? []);
 }

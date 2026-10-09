@@ -10,9 +10,18 @@ export type Version = {
 };
 
 export class UpstreamError extends Error {
-  constructor(readonly status: number, readonly upstream: string) {
-    super(status === 404 ? 'The requested record was not found.' : status === 401 || status === 403 ? 'This operation requires an authorized MCP key.' : `${upstream} is unavailable.`);
+  constructor(readonly status: number, readonly upstream: string, detail?: string) {
+    super(status === 404 ? 'The requested record was not found.' : status === 401 || status === 403 ? 'This operation requires an authorized MCP key.' : status === 400 || status === 409 || status === 413 ? detail || 'The submitted content needs correction.' : `${upstream} is unavailable.`);
   }
+}
+
+async function upstreamFailure(response: Response, upstream: string): Promise<UpstreamError> {
+  if (![400, 409, 413].includes(response.status)) return new UpstreamError(response.status, upstream);
+  const body = await response.text().catch(() => '');
+  let detail = '';
+  try { const data = JSON.parse(body) as { detail?: string; title?: string; message?: string }; detail = data.detail || data.message || data.title || ''; }
+  catch { detail = ''; }
+  return new UpstreamError(response.status, upstream, detail.slice(0, 1000));
 }
 
 const upstreams = {
@@ -28,7 +37,7 @@ export async function getJson<T>(upstream: keyof typeof upstreams, path: string,
     signal: AbortSignal.timeout(8_000),
     headers: { Accept: 'application/json', ...(authorization ? { Authorization: authorization } : {}) },
   });
-  if (!response.ok) throw new UpstreamError(response.status, upstream);
+  if (!response.ok) throw await upstreamFailure(response, upstream);
   return response.json() as Promise<T>;
 }
 
@@ -38,7 +47,17 @@ export async function postJson<T>(upstream: keyof typeof upstreams, path: string
     headers: { Accept: 'application/json', Authorization: authorization, 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
-  if (!response.ok) throw new UpstreamError(response.status, upstream);
+  if (!response.ok) throw await upstreamFailure(response, upstream);
+  return response.json() as Promise<T>;
+}
+
+export async function putJson<T>(upstream: keyof typeof upstreams, path: string, body: unknown, authorization: string): Promise<T> {
+  const response = await fetch(`${upstreams[upstream]}${path}`, {
+    method: 'PUT', signal: AbortSignal.timeout(30_000),
+    headers: { Accept: 'application/json', Authorization: authorization, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) throw await upstreamFailure(response, upstream);
   return response.json() as Promise<T>;
 }
 

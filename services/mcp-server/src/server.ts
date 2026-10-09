@@ -1,6 +1,6 @@
 import { McpServer } from '@modelcontextprotocol/server';
 import { z } from 'zod';
-import { getJson, postJson, publicVersionUrl, requirePublishedVersion, UpstreamError } from './catalog.js';
+import { getJson, postJson, putJson, publicVersionUrl, requirePublishedVersion, UpstreamError } from './catalog.js';
 
 const uuid = z.string().uuid();
 const page = { offset: z.number().int().min(0).default(0), limit: z.number().int().min(1).max(50).default(20) };
@@ -47,19 +47,66 @@ export function createServer(authorization?: string): McpServer {
     if (!actor.scopes.includes('ingestion:import')) throw new UpstreamError(403, 'identity');
   }
 
+  function requireConfirmedUpload(payload: Record<string, unknown>) {
+    if (!uuid.safeParse(payload.constitutionId).success || !uuid.safeParse(payload.settingsRevisionId).success || payload.outline != null) {
+      throw new UpstreamError(409, 'ingestion', 'Full upload requires the confirmed constitutionId and settingsRevisionId; omit outline.');
+    }
+  }
+
   server.registerTool('get_import_schema', {
     description: 'Learn the structured constitution import format, hierarchy rules, and review workflow before staging content.',
     inputSchema: {},
   }, () => run('get_import_schema', async () => ({
-    workflow: ['get_import_setup', 'stage_constitution_import', 'editor prepares a draft in the site', 'reviewer approves', 'publisher publishes'],
+    schemaVersion: '1.0',
+    workflow: ['find_constitution', 'propose_constitution_setup if missing', 'editor confirms outline in the site', 'get_import_setup for constitutionId and settingsRevisionId', 'stage_constitution_import', 'editor prepares a draft in the site', 'reviewer approves', 'publisher publishes'],
     required: ['isoCode', 'countryName', 'constitutionSlug', 'constitutionTitle', 'versionLabel', 'articles or roots', 'settingsRevisionId for an existing constitution'],
     structure: {
       outline: { kinds: [{ kindCode: 'article', displayLabel: 'Article', presentation: 'section', showLabel: true, showTitle: true, showKind: false, allowTextAlongsideChildren: false, titlePolicy: 'optional', labelPolicy: 'optional', labelPlacement: 'before_title', segmentation: 'plain' }] },
       articles: [{ articleNumber: '1', title: 'Example', body: 'Text', sortOrder: 1, nodes: [] }],
       roots: [{ logicalId: 'stable UUID', kind: 'article', label: '1', title: 'Example', content: [{ type: 'text', text: 'Text' }] }],
+      setupProposal: { isoCode: 'FR', countryName: 'France', constitutionSlug: 'constitution', constitutionTitle: 'Constitution', languageCode: 'fr', sourceUrl: 'https://example.org/source', outline: { kinds: [{ kindCode: 'article', displayLabel: 'Article' }] }, sampleRoots: [{ kind: 'article', label: '1', content: [{ type: 'text', text: 'Representative text' }] }] },
     },
     notes: ['Call get_import_setup first. For an existing constitution copy its settingsRevisionId and omit outline.', 'A new constitution needs an outline proposal and a site review before content preparation.', 'Preserve source spelling, numbering and text order.', 'No MCP tool can approve or publish.'],
   })));
+
+  server.registerTool('find_constitution', {
+    description: 'Find a constitution by country and slug before proposing an import. Does not create records.',
+    inputSchema: { countryCode: z.string().regex(/^[A-Za-z]{2}$/), constitutionSlug: z.string().trim().min(1).max(120) },
+  }, ({ countryCode, constitutionSlug }) => run('find_constitution', async () => {
+    await requireImportKey();
+    let country: CountryDetail;
+    try { country = await getJson<CountryDetail>('catalog', `/countries/${countryCode.toUpperCase()}`); }
+    catch (error) { if (error instanceof UpstreamError && error.status === 404) return { exists: false, countryCode: countryCode.toUpperCase() }; throw error; }
+    const constitution = country.constitutions.find(item => item.slug === constitutionSlug);
+    if (!constitution) return { exists: false, countryCode: country.isoCode, countryName: country.name };
+    const settings = await getJson<{ id: string; outline: Record<string, unknown> }>('catalog', `/constitutions/${constitution.id}/settings`);
+    return { exists: true, countryCode: country.isoCode, countryName: country.name, constitutionId: constitution.id, title: constitution.title, slug: constitution.slug, settingsRevisionId: settings.id, outline: settings.outline };
+  }));
+
+  server.registerTool('propose_constitution_setup', {
+    description: 'Submit private metadata, an outline, and a small representative source sample for editor inspection before full upload.',
+    inputSchema: { proposal: z.record(z.string(), z.unknown()) },
+  }, ({ proposal }) => run('propose_constitution_setup', async () => {
+    await requireImportKey();
+    const result = await postJson<{ id: string; status: string }>('ingestion', '/import-setup-proposals', proposal, authorization!);
+    return { proposalId: result.id, status: result.status, previewUrl: `${(process.env.PUBLIC_BASE_URL ?? 'http://localhost').replace(/\/$/, '')}/admin/import/setup/${result.id}` };
+  }));
+
+  server.registerTool('get_setup_proposal', {
+    description: 'Read the status of your private constitution setup proposal and the confirmed settings pin.',
+    inputSchema: { proposalId: uuid },
+  }, ({ proposalId }) => run('get_setup_proposal', async () => {
+    await requireImportKey();
+    return await getJson<Record<string, unknown>>('ingestion', `/import-setup-proposals/${proposalId}`, authorization);
+  }));
+
+  server.registerTool('revise_setup_proposal', {
+    description: 'Replace your unconfirmed structure proposal after inspecting validation feedback.',
+    inputSchema: { proposalId: uuid, proposal: z.record(z.string(), z.unknown()) },
+  }, ({ proposalId, proposal }) => run('revise_setup_proposal', async () => {
+    await requireImportKey();
+    return await putJson<Record<string, unknown>>('ingestion', `/import-setup-proposals/${proposalId}`, proposal, authorization!);
+  }));
 
   server.registerTool('get_import_setup', {
     description: 'For an editor import key, find an existing constitution and its configured content outline before uploading. A missing constitution has no outline yet.',
@@ -80,6 +127,7 @@ export function createServer(authorization?: string): McpServer {
     inputSchema: { payload: z.record(z.string(), z.unknown()) },
   }, ({ payload }) => run('stage_constitution_import', async () => {
     await requireImportKey();
+    requireConfirmedUpload(payload);
     const job = await postJson<{ id: string; status: string; errors: unknown[] }>('ingestion', '/import-jobs', payload, authorization!);
     return { jobId: job.id, status: job.status, errors: job.errors, reviewUrl: `${(process.env.PUBLIC_BASE_URL ?? 'http://localhost').replace(/\/$/, '')}/admin/import/${job.id}` };
   }));
@@ -98,6 +146,7 @@ export function createServer(authorization?: string): McpServer {
     inputSchema: { batchId: uuid, idempotencyKey: z.string().min(8).max(128), payload: z.record(z.string(), z.unknown()), checksumSha256: z.string().regex(/^[a-fA-F0-9]{64}$/).optional() },
   }, ({ batchId, idempotencyKey, payload, checksumSha256 }) => run('stage_batch_item', async () => {
     await requireImportKey();
+    requireConfirmedUpload(payload);
     const item = await postJson<{ id: string; status: string; errors: unknown[] }>('ingestion', `/import-batches/${batchId}/items`, { idempotencyKey, payload, checksumSha256 }, authorization!);
     return { batchId, itemId: item.id, status: item.status, errors: item.errors, reviewUrl: `${(process.env.PUBLIC_BASE_URL ?? 'http://localhost').replace(/\/$/, '')}/admin/import/${item.id}` };
   }));

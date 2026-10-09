@@ -2,7 +2,7 @@
 
 import { redirect } from 'next/navigation';
 import { currentUser, requireSessionBearer } from '../../../lib/session';
-import { createImportJob, isImportRequest, parseImportJson, transitionImportJob } from '../../../lib/ingestion-api';
+import { createImportJob, createSetupProposal, isImportRequest, parseImportJson, transitionImportJob } from '../../../lib/ingestion-api';
 
 function hasRole(roles: string[], role: string) { return roles.includes(role) || roles.includes('admin'); }
 
@@ -32,6 +32,22 @@ export async function createImportAction(formData: FormData): Promise<void> {
     redirect('/admin/import?error=1');
   }
   redirect(`/admin/import/${encodeURIComponent(jobId)}`);
+}
+
+export async function createSetupProposalAction(formData: FormData): Promise<void> {
+  const user = await currentUser();
+  if (!user || !hasRole(user.roles, 'editor')) redirect('/admin/import?error=forbidden');
+  let payload: unknown;
+  try { payload = parseImportJson(String(formData.get('proposal') ?? '')); }
+  catch { redirect('/admin/import?error=json'); }
+  let proposalId: string;
+  try {
+    const proposal = await createSetupProposal(payload, await requireSessionBearer());
+    proposalId = proposal.id;
+  } catch {
+    redirect('/admin/import?error=proposal');
+  }
+  redirect(`/admin/import/setup/${encodeURIComponent(proposalId)}`);
 }
 
 export async function transitionImportAction(formData: FormData): Promise<void> {

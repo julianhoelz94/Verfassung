@@ -21,7 +21,7 @@ function previewOutline(payload: Row): ContentOutline | undefined {
   })) };
 }
 
-function previewNode(source: Row, path: string, depth = 0): OrderedNode {
+export function previewNode(source: Row, path: string, depth = 0): OrderedNode {
   const content = depth < 12 ? children(source.content) : [];
   const entries: OrderedEntry[] = content.length ? content.map((part, index) => part.type === 'child' && part.node
     ? { type: 'child', node: previewNode(row(part.node), `${path}-${index}`, depth + 1) }
@@ -36,6 +36,10 @@ function previewNode(source: Row, path: string, depth = 0): OrderedNode {
   };
 }
 
+export function previewRoots(roots: unknown): OrderedNode[] {
+  return children(roots).slice(0, 100).map((root, index) => previewNode(root, `import-preview-${index}`));
+}
+
 export function ImportPreview({ payload }: { payload: Row }) {
   const roots = children(payload.roots).length ? children(payload.roots) : children(payload.articles);
   const outline = previewOutline(payload);
@@ -45,7 +49,7 @@ export function ImportPreview({ payload }: { payload: Row }) {
     {outline ? <table><thead><tr><th>Kind</th><th>Display</th><th>Presentation</th></tr></thead><tbody>{outline.kinds.map(kind => <tr key={kind.kindCode}>
       <td>{kind.kindCode}</td><td>{kind.displayLabel}</td><td>{kind.presentation}</td>
     </tr>)}</tbody></table> : <p>Uses the constitution’s existing layout revision {string(payload.settingsRevisionId)}.</p>}
-    <OrderedContentTree entries={roots.slice(0, 100).map((root, index) => ({ type: 'child', node: previewNode(root, `import-preview-${index}`) }))} outline={outline} />
+    <OrderedContentTree entries={previewRoots(roots).map(node => ({ type: 'child', node }))} outline={outline} />
     {roots.length > 100 ? <p>Showing the first 100 top-level units of {roots.length}.</p> : null}
   </>;
 }

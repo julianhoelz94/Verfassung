@@ -50,6 +50,7 @@ data class ImportRequest(
     val gazetteReference: String? = null,
     val predecessorVersionId: UUID? = null,
     val hopKind: String? = null,
+    val constitutionId: UUID? = null,
     val settingsRevisionId: UUID? = null,
     val outline: ImportOutline? = null,
     val articles: List<ImportArticle> = emptyList(),
@@ -81,3 +82,25 @@ data class StageBatchItemRequest(val idempotencyKey: String, val payload: Import
 data class ReviewDecisionRequest(val reason: String)
 
 data class ReviewDecisionDto(val id: UUID, val decision: String, val reason: String, val decidedBy: UUID, val decidedAt: java.time.OffsetDateTime)
+
+data class SetupProposalRequest(
+    val isoCode: String,
+    val countryName: String,
+    val constitutionSlug: String,
+    val constitutionTitle: String,
+    val languageCode: String = "en",
+    val sourceUrl: String? = null,
+    val gazetteReference: String? = null,
+    val outline: ImportOutline,
+    val sampleRoots: List<OrderedNodeWrite> = emptyList(),
+)
+
+data class SetupProposalDto(
+    val id: UUID,
+    val ownerId: UUID,
+    val status: String,
+    val payload: SetupProposalRequest,
+    val constitutionId: UUID?,
+    val settingsRevisionId: UUID?,
+    val confirmedBy: UUID?,
+)

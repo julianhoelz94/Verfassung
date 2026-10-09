@@ -2,9 +2,20 @@ package com.constitutionatlas.ingestion.service
 
 import com.constitutionatlas.ingestion.api.ImportNode
 import com.constitutionatlas.ingestion.api.ImportRequest
+import com.constitutionatlas.platform.Actor
+import org.springframework.http.HttpStatus
+import org.springframework.web.server.ResponseStatusException
 
 object ImportValidator {
     private val DEFAULT_KINDS = setOf("article")
+
+    fun requireConfirmedPinForScopedUpload(actor: Actor, request: ImportRequest) {
+        if ("ingestion:import" in actor.scopes && actor.roles.none { it == "editor" || it == "admin" }) {
+            if (request.constitutionId == null || request.settingsRevisionId == null || request.outline != null) {
+                throw ResponseStatusException(HttpStatus.CONFLICT, "Full upload requires a confirmed constitutionId and settingsRevisionId; omit outline")
+            }
+        }
+    }
 
     fun validate(request: ImportRequest): List<Pair<String, String>> {
         val errors = mutableListOf<Pair<String, String>>()

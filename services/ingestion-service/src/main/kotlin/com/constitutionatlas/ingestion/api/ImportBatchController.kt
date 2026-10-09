@@ -2,6 +2,7 @@ package com.constitutionatlas.ingestion.api
 
 import com.constitutionatlas.ingestion.client.WriteAccess
 import com.constitutionatlas.ingestion.service.ImportService
+import com.constitutionatlas.ingestion.service.ImportValidator
 import org.springframework.http.HttpStatus
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
@@ -29,5 +30,9 @@ class ImportBatchController(private val imports: ImportService, private val acce
         @RequestHeader(value = "Authorization", required = false) authorization: String?,
         @PathVariable id: UUID,
         @RequestBody request: StageBatchItemRequest,
-    ): ImportJobDto = imports.stageBatchItem(id, access.requireImporter(authorization).id, request)
+    ): ImportJobDto {
+        val actor = access.requireImporter(authorization)
+        ImportValidator.requireConfirmedPinForScopedUpload(actor, request.payload)
+        return imports.stageBatchItem(id, actor.id, request)
+    }
 }

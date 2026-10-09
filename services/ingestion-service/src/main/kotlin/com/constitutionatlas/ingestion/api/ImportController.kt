@@ -2,6 +2,7 @@ package com.constitutionatlas.ingestion.api
 
 import com.constitutionatlas.ingestion.client.WriteAccess
 import com.constitutionatlas.ingestion.service.ImportService
+import com.constitutionatlas.ingestion.service.ImportValidator
 import com.constitutionatlas.platform.NotFoundException
 import com.constitutionatlas.platform.ForbiddenException
 import org.springframework.http.HttpStatus
@@ -27,6 +28,7 @@ class ImportController(
         @RequestBody request: ImportRequest,
     ): ImportJobDto {
         val actor = writeAccess.requireImporter(authorization)
+        ImportValidator.requireConfirmedPinForScopedUpload(actor, request)
         return importService.importVersion(actor.id, request)
     }
 

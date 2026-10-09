@@ -15,13 +15,15 @@ Personal keys are rechecked against current roles on every request. An import
 key can stage content and read its own status; it cannot approve, reject, or
 publish.
 
-The import tools are `get_import_schema`, `get_import_setup`,
+The import tools are `get_import_schema`, `find_constitution`, `get_import_setup`,
+`propose_constitution_setup`, `get_setup_proposal`, `revise_setup_proposal`,
 `stage_constitution_import`, `create_import_batch`, `stage_batch_item`,
 `get_import_batch`, and `get_import_job`. The server accepts the personal key in
 `Authorization: Bearer ca_mcp_…`. For an existing constitution, call
 `get_import_setup` and include its `settingsRevisionId` in the payload; omit
-`outline`. For a new constitution, include an `outline` proposal. An editor
-checks its sample and confirms the outline in the site before preparing a draft.
+`outline`. For a new constitution, submit a private setup proposal with a small
+source sample. An editor checks its sample and confirms the outline in the site;
+the proposal then returns a constitution ID and settings revision for upload.
 Every staged item stays pending review. A separate reviewer records a reasoned
 decision in the site; a publisher with fresh MFA publishes the approved draft.
 The MCP server has no review or publish tool.

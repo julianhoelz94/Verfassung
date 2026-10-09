@@ -112,7 +112,7 @@ test('MCP import key stages a pending job and never publishes', async () => {
     return Response.json({ id: '01900000-0000-4000-8000-000000000001', status: 'pending_review', errors: [] });
   };
   try {
-    const result = await callTool('stage_constitution_import', { payload: { isoCode: 'FR' } }, 'Bearer ca_mcp_editor');
+    const result = await callTool('stage_constitution_import', { payload: { isoCode: 'FR', constitutionId: '01900000-0000-4000-8000-000000000002', settingsRevisionId: '01900000-0000-4000-8000-000000000003' } }, 'Bearer ca_mcp_editor');
     assert.equal(result.isError, undefined);
     assert.equal(result.structuredContent?.status, 'pending_review');
     assert.deepEqual(calls.map(call => call.method), ['GET', 'POST']);
@@ -120,4 +120,18 @@ test('MCP import key stages a pending job and never publishes', async () => {
   } finally {
     globalThis.fetch = originalFetch;
   }
+});
+
+test('MCP import key refuses an unpinned full upload before calling ingestion', async () => {
+  const originalFetch = globalThis.fetch;
+  const calls: string[] = [];
+  globalThis.fetch = async input => {
+    calls.push(String(input));
+    return Response.json({ scopes: ['ingestion:import'] });
+  };
+  try {
+    const result = await callTool('stage_constitution_import', { payload: { isoCode: 'FR', outline: { kinds: [] } } }, 'Bearer ca_mcp_editor');
+    assert.equal(result.isError, true);
+    assert.deepEqual(calls.map(url => new URL(url).pathname), ['/me']);
+  } finally { globalThis.fetch = originalFetch; }
 });

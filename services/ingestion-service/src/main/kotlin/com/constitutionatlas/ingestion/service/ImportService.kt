@@ -105,6 +105,9 @@ class ImportService(
             if (existing != null && request.settingsRevisionId != catalogClient.currentSettingsRevisionId(existing.id)) {
                 throw ResponseStatusException(HttpStatus.CONFLICT, "Settings revision changed; rediscover the constitution layout")
             }
+            if (existing != null && request.constitutionId != null && request.constitutionId != existing.id) {
+                throw ResponseStatusException(HttpStatus.CONFLICT, "Constitution ID does not match the selected country and slug")
+            }
         }
         if (!importJobRepository.claimPreparation(jobId, actorId)) throw ResponseStatusException(HttpStatus.CONFLICT, "Import is not awaiting preparation")
         try {
@@ -160,6 +163,9 @@ class ImportService(
             catalogClient.createCountry(iso, request.countryName.trim())
         }
         val existing = catalogClient.findConstitution(iso, request.constitutionSlug)
+        if (request.constitutionId != null && request.constitutionId != existing?.id) {
+            throw ResponseStatusException(HttpStatus.CONFLICT, "Constitution ID does not match the selected country and slug")
+        }
         if (existing != null) {
             if (request.outline != null) throw ResponseStatusException(HttpStatus.CONFLICT, "Existing constitution settings must be edited and confirmed in the site")
             val revision = catalogClient.currentSettingsRevisionId(existing.id)

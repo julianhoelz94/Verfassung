@@ -3,7 +3,7 @@ import { Alert, Button, Card, Input, PageHeader, TextArea } from '../../componen
 import { PageMain } from '../../components/PageMain';
 import { currentUser, requireSessionBearer } from '../../../lib/session';
 import { listImportJobs } from '../../../lib/ingestion-api';
-import { createImportAction } from './actions';
+import { createImportAction, createSetupProposalAction } from './actions';
 
 type AdminImportPageProps = {
   searchParams: Promise<{ error?: string }>;
@@ -33,6 +33,16 @@ export default async function AdminImportPage(props: AdminImportPageProps) {
         <Alert tone="error">The import could not be started.</Alert>
       ) : null}
       {canImport ? <Card>
+        <h2>New constitution setup</h2>
+        <p>Submit country, title, source, proposed levels, and up to five sample roots. Confirm the layout before uploading the full text.</p>
+        <form action={createSetupProposalAction}>
+          <TextArea label="Setup proposal JSON" id="proposal" name="proposal" rows={10} spellCheck={false} />
+          <Button>Create private setup proposal</Button>
+        </form>
+      </Card> : null}
+      {canImport ? <Card>
+        <h2>Upload a version</h2>
+        <p>Use the confirmed constitution ID and settings revision in the JSON. Each upload stays pending review.</p>
         <form action={createImportAction}>
           <TextArea label="Import JSON" id="payload" name="payload" rows={16} spellCheck={false} />
           <Input label="JSON file" id="file" name="file" type="file" accept="application/json,.json" />

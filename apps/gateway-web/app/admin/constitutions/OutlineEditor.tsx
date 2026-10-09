@@ -20,6 +20,7 @@ type OutlineEditorProps = {
   submitLabel?: string;
   children?: ReactNode;
   guidedCreation?: boolean;
+  sampleRoots?: OrderedNode[];
 };
 
 function slugify(label: string): string {
@@ -43,6 +44,7 @@ export function OutlineEditor({
   submitLabel = 'Save outline',
   children,
   guidedCreation = false,
+  sampleRoots = [],
 }: OutlineEditorProps) {
   const formRef = useRef<HTMLFormElement>(null);
   const [step, setStep] = useState(1);
@@ -295,12 +297,12 @@ export function OutlineEditor({
         ))}
       </ol>}
       <aside className="card outline-live-preview" aria-label="Live order example">
-        <h2>Live order example</h2>
+        <h2>{sampleRoots.length ? 'Proposed source sample' : 'Live order example'}</h2>
         <p className="muted">Parent text is unnumbered and belongs to its parent. Editor view scopes are selected separately in the editor.</p>
         <h3>Structure map</h3>
-        {example ? <ExampleMap node={example} outline={exampleOutline} /> : null}
+        {(sampleRoots.length ? sampleRoots : example ? [example] : []).map(node => <ExampleMap key={node.occurrenceId} node={node} outline={exampleOutline} />)}
         <h3>Reader preview</h3>
-        {example ? <OrderedContentTree entries={[{ type: 'child', node: example }]} outline={exampleOutline} /> : null}
+        <OrderedContentTree entries={(sampleRoots.length ? sampleRoots : example ? [example] : []).map(node => ({ type: 'child' as const, node }))} outline={exampleOutline} />
         {constitutionId ? <p>Occupied structure and stricter permissions are checked before saving. Changes requiring migration need a reviewed successor.</p> : null}
       </aside>
       </div>

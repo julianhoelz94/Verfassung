@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation';
 import { PageMain } from '../../../../components/PageMain';
 import { PageHeader } from '../../../../components/ui';
 import { WikiImages } from '../../../../components/WikiImages';
+import { WikiBody } from '../../../../components/WikiBody';
 import { WikiSources } from '../../../../components/WikiSources';
 import { getConstitutionLifecycle, getCountry, getWikiPage } from '../../../../../lib/api';
 import { publicVersions } from '../../../../../lib/reading';
@@ -50,8 +51,9 @@ export default async function ConstitutionOverview({ params }: Props) {
         <section className="card">
           <h2>About this constitution</h2>
           <p>{wiki.summary}</p>
-          {wiki.body ? <p className="wiki-body">{wiki.body}</p> : null}
-          <WikiImages images={wiki.images} />
+          <WikiImages images={wiki.images.filter((image) => image.placement === 'before_body')} />
+          <WikiBody body={wiki.body} />
+          <WikiImages images={wiki.images.filter((image) => image.placement !== 'before_body')} />
           <WikiSources sourceUrls={wiki.sourceUrls ?? []} />
         </section>
       ) : null}

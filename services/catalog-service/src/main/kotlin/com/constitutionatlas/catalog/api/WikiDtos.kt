@@ -1,5 +1,6 @@
 package com.constitutionatlas.catalog.api
 
+import java.time.OffsetDateTime
 import java.util.UUID
 
 data class WikiImage(
@@ -10,6 +11,7 @@ data class WikiImage(
     val credit: String? = null,
     val sourceUrl: String? = null,
     val rights: String? = null,
+    val placement: String = "after_body",
 )
 
 data class WikiPageRevision(
@@ -21,6 +23,9 @@ data class WikiPageRevision(
     val body: String,
     val images: List<WikiImage>,
     val sourceUrls: List<String> = emptyList(),
+    val createdAt: OffsetDateTime? = null,
+    val createdBy: UUID? = null,
+    val publishedAt: OffsetDateTime? = null,
 )
 
 data class SaveWikiPage(

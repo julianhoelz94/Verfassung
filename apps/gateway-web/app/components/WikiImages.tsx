@@ -1,6 +1,6 @@
 import type { WikiImage } from '../../lib/api';
 
-export function WikiImages({ images }: { images: WikiImage[] }) {
+export function WikiImages({ images, preview = false }: { images: WikiImage[]; preview?: boolean }) {
   if (images.length === 0) return null;
   return (
     <div className="wiki-images">
@@ -9,7 +9,7 @@ export function WikiImages({ images }: { images: WikiImage[] }) {
           {/* The document service verifies the published wiki link before returning image bytes. */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src={`/api/document/documents/${encodeURIComponent(image.documentId)}/revisions/${image.revision}/file`}
+            src={`${preview ? '/editor' : '/api/document'}/documents/${encodeURIComponent(image.documentId)}/revisions/${image.revision}/file`}
             alt={image.alt}
             loading="lazy"
           />

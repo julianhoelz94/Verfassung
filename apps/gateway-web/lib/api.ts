@@ -131,6 +131,7 @@ export type WikiImage = {
   credit?: string | null;
   sourceUrl?: string | null;
   rights?: string | null;
+  placement?: 'before_body' | 'after_body';
 };
 
 export type WikiPageRevision = {
@@ -142,6 +143,9 @@ export type WikiPageRevision = {
   body: string;
   images: WikiImage[];
   sourceUrls: string[];
+  createdAt?: string | null;
+  createdBy?: string | null;
+  publishedAt?: string | null;
 };
 
 export type CountrySummary = {
@@ -441,6 +445,10 @@ export function getWikiPage(targetType: 'country' | 'constitution', targetId: st
 
 export function getWikiDraft(targetType: 'country' | 'constitution', targetId: string, authorization: string): Promise<WikiPageRevision | null> {
   return readJson<WikiPageRevision>(`${catalogBaseUrl()}/wiki/${targetType}/${encodeURIComponent(targetId)}/draft`, 'catalog', authorization);
+}
+
+export async function getWikiHistory(targetType: 'country' | 'constitution', targetId: string, authorization: string, page = 0): Promise<WikiPageRevision[]> {
+  return (await readJson<WikiPageRevision[]>(`${catalogBaseUrl()}/wiki/${targetType}/${encodeURIComponent(targetId)}/history?limit=26&offset=${page * 25}`, 'catalog', authorization)) ?? [];
 }
 
 export function saveWikiDraft(targetType: 'country' | 'constitution', targetId: string, payload: {

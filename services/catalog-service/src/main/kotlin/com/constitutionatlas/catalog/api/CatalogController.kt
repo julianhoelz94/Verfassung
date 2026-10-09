@@ -86,6 +86,25 @@ class CatalogController(
     fun publicWiki(@PathVariable targetType: String, @PathVariable targetId: UUID): WikiPageRevision? =
         wikiService.published(targetType, targetId)
 
+    @GetMapping("/wiki/{targetType}/{targetId}/revisions/{revisionId}")
+    fun publicWikiRevision(
+        @PathVariable targetType: String,
+        @PathVariable targetId: UUID,
+        @PathVariable revisionId: UUID,
+    ): WikiPageRevision? = wikiService.publishedRevision(targetType, targetId, revisionId)
+
+    @GetMapping("/wiki/{targetType}/{targetId}/history")
+    fun wikiHistory(
+        @PathVariable targetType: String,
+        @PathVariable targetId: UUID,
+        @RequestParam(defaultValue = "25") limit: Int,
+        @RequestParam(defaultValue = "0") offset: Int,
+        @RequestHeader(value = "Authorization", required = false) authorization: String?,
+    ): List<WikiPageRevision> {
+        writeAccess.requireStaffCatalog(authorization)
+        return wikiService.history(targetType, targetId, limit, offset)
+    }
+
     @GetMapping("/wiki/{targetType}/{targetId}/draft")
     fun wikiDraft(
         @PathVariable targetType: String,

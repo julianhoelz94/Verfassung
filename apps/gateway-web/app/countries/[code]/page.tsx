@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import { PageMain } from '../../components/PageMain';
 import { ServiceUnavailable } from '../../components/StatusMessage';
 import { WikiImages } from '../../components/WikiImages';
+import { WikiBody } from '../../components/WikiBody';
 import { WikiSources } from '../../components/WikiSources';
 import { Chip, PageHeader } from '../../components/ui';
 import { ApiUnavailableError, getCountry, getWikiPage, type CountryDetail } from '../../../lib/api';
@@ -106,8 +107,9 @@ export default async function CountryPage(props: CountryPageProps) {
         <section className="card">
           <h2>About {country.name}</h2>
           <p>{countryWiki.summary}</p>
-          {countryWiki.body ? <p className="wiki-body">{countryWiki.body}</p> : null}
-          <WikiImages images={countryWiki.images} />
+          <WikiImages images={countryWiki.images.filter((image) => image.placement === 'before_body')} />
+          <WikiBody body={countryWiki.body} />
+          <WikiImages images={countryWiki.images.filter((image) => image.placement !== 'before_body')} />
           <WikiSources sourceUrls={countryWiki.sourceUrls ?? []} />
         </section>
       ) : null}

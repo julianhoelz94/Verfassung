@@ -117,7 +117,7 @@ class RestLinkTargetClient(
     override fun isWikiImagePublic(targetType: String, targetId: UUID, scopeRevisionId: UUID, documentId: UUID, revision: Int): Boolean =
         runCatching {
             val kind = if (targetType == "country_wiki") "country" else "constitution"
-            val page = catalog.get().uri("/wiki/$kind/$targetId").retrieve().body(JsonNode::class.java)
+            val page = catalog.get().uri("/wiki/$kind/$targetId/revisions/$scopeRevisionId").retrieve().body(JsonNode::class.java)
             page?.path("id")?.asText() == scopeRevisionId.toString() &&
                 page.path("images").any { image ->
                     image.path("documentId").asText() == documentId.toString() &&

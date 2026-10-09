@@ -199,6 +199,8 @@ let enrolledMfaEmails = new Set();
 let stepUpFresh = true;
 let visualRoles = false;
 let sprint50Content = false;
+const WIKI_IMAGE_ID = '01900000-0000-4000-8000-000000000736';
+const WIKI_IMAGE = { documentId: WIKI_IMAGE_ID, revision: 2, alt: 'A historic flag', caption: 'Historic flag', credit: 'Archive', sourceUrl: 'https://example.org/flag', rights: 'Public domain', placement: 'before_body' };
 
 function resetMockState() {
   mockAmendments.clear();
@@ -355,7 +357,24 @@ const server = createServer(async (req, res) => {
     return;
   }
   if (sprint50Content && method === 'GET' && pathname === `/api/catalog/wiki/country/${germany.id}`) {
-    json(res, 200, { id: '01900000-0000-4000-8000-000000000733', targetType: 'country', targetId: germany.id, predecessorId: null, summary: 'A federal republic', body: 'Historical context', images: [], sourceUrls: ['https://example.org/country-history'] });
+    json(res, 200, { id: '01900000-0000-4000-8000-000000000733', targetType: 'country', targetId: germany.id, predecessorId: null, summary: 'A federal republic', body: '# History\n\nHistorical context', images: [WIKI_IMAGE], sourceUrls: ['https://example.org/country-history'], createdAt: '2022-01-01T00:00:00Z', createdBy: identityMe.id, publishedAt: '2022-01-02T00:00:00Z' });
+    return;
+  }
+  if (sprint50Content && method === 'GET' && pathname === `/api/catalog/wiki/country/${germany.id}/draft`) {
+    json(res, 200, { id: '01900000-0000-4000-8000-000000000735', targetType: 'country', targetId: germany.id, predecessorId: '01900000-0000-4000-8000-000000000733', summary: 'Updated country context', body: '# History\n\n- First era\n- Second era', images: [WIKI_IMAGE], sourceUrls: ['https://example.org/country-history'], createdAt: '2022-02-01T00:00:00Z', createdBy: identityMe.id, publishedAt: null });
+    return;
+  }
+  if (sprint50Content && method === 'GET' && pathname === `/api/catalog/wiki/country/${germany.id}/history`) {
+    json(res, 200, [
+      { id: '01900000-0000-4000-8000-000000000735', targetType: 'country', targetId: germany.id, predecessorId: '01900000-0000-4000-8000-000000000733', summary: 'Updated country context', body: '# History\n\n- First era\n- Second era', images: [WIKI_IMAGE], sourceUrls: ['https://example.org/country-history'], createdAt: '2022-02-01T00:00:00Z', createdBy: identityMe.id, publishedAt: null },
+      { id: '01900000-0000-4000-8000-000000000733', targetType: 'country', targetId: germany.id, predecessorId: null, summary: 'A federal republic', body: '# History\n\nHistorical context', images: [WIKI_IMAGE], sourceUrls: ['https://example.org/country-history'], createdAt: '2022-01-01T00:00:00Z', createdBy: identityMe.id, publishedAt: '2022-01-02T00:00:00Z' },
+    ]);
+    return;
+  }
+  if (sprint50Content && method === 'GET' && pathname === `/api/document/documents/${WIKI_IMAGE_ID}/revisions/2/file`) {
+    const bytes = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/GZkAAAAASUVORK5CYII=', 'base64');
+    res.writeHead(200, { 'Content-Type': 'image/png', 'Content-Length': bytes.length });
+    res.end(bytes);
     return;
   }
   if (sprint50Content && method === 'GET' && pathname === `/api/catalog/wiki/constitution/${CONSTITUTION_ID}`) {

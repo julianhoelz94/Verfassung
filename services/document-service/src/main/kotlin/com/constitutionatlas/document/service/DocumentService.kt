@@ -121,7 +121,7 @@ class DocumentService(
         val supportedImages = setOf("image/jpeg", "image/png", "image/gif", "image/webp", "image/avif")
         require(contentType in supportedDocuments || contentType in supportedImages) { "Unsupported file type" }
         if (contentType in supportedImages) {
-            require(validImageSignature(contentType, bytes) && validImageDimensions(contentType, bytes)) {
+            require(validImageSignature(contentType, bytes) && runCatching { validImageDimensions(contentType, bytes) }.getOrDefault(false)) {
                 "Image content or dimensions are invalid"
             }
         }

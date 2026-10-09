@@ -34,18 +34,27 @@ export async function saveWikiAction(form: FormData) {
           credit: String(form.get(`credit-${image.documentId}`) ?? image.credit ?? '').trim() || null,
           rights: String(form.get(`rights-${image.documentId}`) ?? image.rights ?? '').trim() || null,
           sourceUrl: String(form.get(`source-${image.documentId}`) ?? image.sourceUrl ?? '').trim() || null,
+          placement: form.get(`placement-${image.documentId}`) === 'before_body' ? 'before_body' as const : 'after_body' as const,
         },
         order: Number(form.get(`order-${image.documentId}`) ?? index + 1),
       }))
       .sort((a, b) => a.order - b.order)
       .map((item) => item.image);
+    for (const image of images) {
+      const replacement = form.get(`replace-${image.documentId}`);
+      if (replacement instanceof File && replacement.size > 0) {
+        const document = await getDocument(image.documentId, undefined, authorization);
+        const uploaded = await uploadDocument(image.documentId, document.currentRevision, replacement, authorization);
+        image.revision = uploaded.currentRevision;
+      }
+    }
     const file = form.get('imageFile');
     if (file instanceof File && file.size > 0) {
       const alt = String(form.get('imageAlt') ?? '').trim();
       if (!alt) throw new Error('Image alt text is required');
       const doc = await createDocument({ title: file.name }, authorization);
       const uploaded = await uploadDocument(doc.id, doc.currentRevision, file, authorization);
-      images.push({
+      const addedImage = {
         documentId: uploaded.id,
         revision: uploaded.currentRevision,
         alt,
@@ -53,7 +62,10 @@ export async function saveWikiAction(form: FormData) {
         credit: String(form.get('imageCredit') ?? '').trim() || null,
         rights: String(form.get('imageRights') ?? '').trim() || null,
         sourceUrl: String(form.get('imageSource') ?? '').trim() || null,
-      });
+        placement: form.get('imagePlacement') === 'before_body' ? 'before_body' as const : 'after_body' as const,
+      };
+      const position = Number(form.get('imageOrder') ?? images.length + 1);
+      images.splice(Math.max(0, Math.min(images.length, Number.isFinite(position) ? position - 1 : images.length)), 0, addedImage);
     }
     const draft = await saveWikiDraft(targetType, targetId, {
       expectedRevisionId: String(form.get('expectedRevisionId') || '') || null,

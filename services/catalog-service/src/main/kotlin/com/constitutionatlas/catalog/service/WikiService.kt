@@ -22,6 +22,17 @@ class WikiService(private val repo: WikiRepository, private val media: WikiMedia
         return repo.latest(targetType, targetId)
     }
 
+    fun history(targetType: String, targetId: UUID, limit: Int = 25, offset: Int = 0): List<WikiPageRevision> {
+        requireTarget(targetType, targetId)
+        require(limit in 1..100 && offset >= 0) { "History page must have a limit of 1–100 and non-negative offset" }
+        return repo.history(targetType, targetId, limit, offset)
+    }
+
+    fun publishedRevision(targetType: String, targetId: UUID, revisionId: UUID): WikiPageRevision? {
+        requireTarget(targetType, targetId)
+        return repo.publishedRevision(targetType, targetId, revisionId)
+    }
+
     @Transactional
     fun save(targetType: String, targetId: UUID, request: SaveWikiPage, actorId: UUID): WikiPageRevision {
         requireTarget(targetType, targetId)
@@ -34,6 +45,7 @@ class WikiService(private val repo: WikiRepository, private val media: WikiMedia
         }
         request.images.forEach { image ->
             require(image.revision > 0) { "Image revision must be positive" }
+            require(image.placement in setOf("before_body", "after_body")) { "Image placement must be before or after the page text" }
             require(image.alt.isNotBlank() && image.alt.length <= 500) { "Image alt text is required and must be at most 500 characters" }
             require(image.caption == null || image.caption.length <= 1000) { "Image caption is too long" }
             require(image.credit == null || image.credit.length <= 500) { "Image credit is too long" }
@@ -59,7 +71,7 @@ class WikiService(private val repo: WikiRepository, private val media: WikiMedia
         if (latest.id != revisionId) throw ConflictException("Only the latest wiki revision can be published", "wiki_revision_conflict")
         media.requirePinnedImages(targetType, targetId, revisionId, latest.images, authorization)
         repo.publish(pageId, revisionId)
-        return latest
+        return repo.revision(targetType, targetId, revisionId)!!
     }
 
     private fun requireTarget(targetType: String, targetId: UUID) {

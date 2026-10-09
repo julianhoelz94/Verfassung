@@ -108,12 +108,12 @@ test('administrator creates a constitution and changes its outline settings', as
   await expect(page.getByLabel('How this layer is shown').nth(1)).toHaveValue('concatenated');
 });
 
-test('guided creation exposes a manual address when a title cannot generate one', async ({ page }) => {
+test('guided creation exposes a manual catalog slug when a title cannot generate one', async ({ page }) => {
   await signInAdmin(page);
   await page.goto('/admin/constitutions');
   await page.getByLabel('Constitution title').fill('日本国憲法');
-  await expect(page.getByText('Enter a web address using Latin letters and numbers to continue.')).toBeVisible();
-  await page.getByLabel('Slug').fill('japan-constitution');
+  await expect(page.getByText('Enter a catalog slug using Latin letters and numbers to continue.')).toBeVisible();
+  await page.getByRole('textbox', { name: 'Catalog slug' }).fill('japan-constitution');
   await page.getByRole('button', { name: 'Continue to structure' }).click();
   await page.getByRole('button', { name: /Articles only/ }).focus();
   await page.keyboard.press('Enter');

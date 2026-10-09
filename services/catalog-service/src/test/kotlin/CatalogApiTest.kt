@@ -136,7 +136,8 @@ class CatalogApiTest {
         val countryCode = ('A'..'Z').shuffled().take(2).joinToString("")
         val country = writes.createCountry(com.constitutionatlas.catalog.api.CreateCountryRequest(countryCode, "Wiki country"))
         val constitution = writes.createConstitution(countryCode, com.constitutionatlas.catalog.api.CreateConstitutionRequest("wiki", "Wiki constitution"))
-        val countryDraft = wiki.save("country", country.id, com.constitutionatlas.catalog.api.SaveWikiPage(summary = "A country summary", body = "History", sourceUrls = listOf("https://example.org/history")), editor.id)
+        val firstImage = com.constitutionatlas.catalog.api.WikiImage(UUID.randomUUID(), 2, "A historic flag", placement = "before_body")
+        val countryDraft = wiki.save("country", country.id, com.constitutionatlas.catalog.api.SaveWikiPage(summary = "A country summary", body = "History", images = listOf(firstImage), sourceUrls = listOf("https://example.org/history")), editor.id)
         val constitutionDraft = wiki.save("constitution", constitution.id, com.constitutionatlas.catalog.api.SaveWikiPage(summary = "A constitution summary", body = "Origins"), editor.id)
         assertThat(wiki.published("country", country.id)).isNull()
         wiki.publish("country", country.id, countryDraft.id)
@@ -147,6 +148,23 @@ class CatalogApiTest {
         val nextDraft = wiki.save("country", country.id, com.constitutionatlas.catalog.api.SaveWikiPage(countryDraft.id, "Updated summary", "Updated history"), editor.id)
         assertThat(nextDraft.predecessorId).isEqualTo(countryDraft.id)
         assertThat(wiki.published("country", country.id)?.summary).isEqualTo("A country summary")
+        assertThat(wiki.publishedRevision("country", country.id, nextDraft.id)).isNull()
+        assertThat(wiki.history("country", country.id).map { it.id }).containsExactly(nextDraft.id, countryDraft.id)
+        assertThat(wiki.history("country", country.id, limit = 1, offset = 1).single().id).isEqualTo(countryDraft.id)
+        assertThat(wiki.history("country", country.id).first().publishedAt).isNull()
+        wiki.publish("country", country.id, nextDraft.id)
+        assertThat(wiki.publishedRevision("country", country.id, countryDraft.id)?.summary).isEqualTo("A country summary")
+        assertThat(wiki.publishedRevision("country", country.id, countryDraft.id)?.images).containsExactly(firstImage)
+        assertThat(wiki.publishedRevision("country", country.id, nextDraft.id)?.publishedAt).isNotNull()
+        mockMvc.get("/wiki/country/${country.id}/revisions/${countryDraft.id}").andExpect {
+            status { isOk() }
+            jsonPath("$.summary") { value("A country summary") }
+        }
+        mockMvc.get("/wiki/country/${country.id}/history").andExpect { status { isUnauthorized() } }
+        mockMvc.get("/wiki/country/${country.id}/history") { header("Authorization", TOKEN) }.andExpect {
+            status { isOk() }
+            jsonPath("$[0].summary") { value("Updated summary") }
+        }
         org.junit.jupiter.api.Assertions.assertThrows(com.constitutionatlas.catalog.ConflictException::class.java) {
             wiki.publish("country", country.id, countryDraft.id)
         }

@@ -2214,7 +2214,12 @@ button.article-toggle[aria-expanded='false']::after {
 .sentence-box textarea { background: #fff; color: #17243b; width: 100%; min-height: 4rem; }
 .structured-unit.is-selected, .sentence-box.is-selected { outline: 2px solid #325bb3; outline-offset: 2px; }
 .wiki-body {
-  white-space: pre-line;
+  display: grid;
+  gap: var(--space-3);
+}
+
+.wiki-body > * {
+  margin: 0;
 }
 
 .wiki-images {

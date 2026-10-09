@@ -62,6 +62,48 @@ class DocumentApiTest {
     }
 
     @Test
+    fun wikiPictureFormatsValidateRealFilesAndRejectMismatches() {
+        val formats = listOf(
+            "sample.jpg" to "image/jpeg",
+            "sample.png" to "image/png",
+            "sample.gif" to "image/gif",
+            "sample.webp" to "image/webp",
+            "sample.avif" to "image/avif",
+        )
+        formats.forEach { (name, contentType) ->
+            val (id, _) = create()
+            val bytes = javaClass.getResourceAsStream("/wiki-images/$name")!!.use { it.readBytes() }
+            mvc.perform(
+                multipart("/documents/$id/file")
+                    .file(MockMultipartFile("file", name, contentType, bytes))
+                    .param("expectedRevision", "1")
+                    .header("Authorization", EDITOR),
+            ).andExpect(status().isOk)
+        }
+
+        val (mismatchedId, _) = create()
+        val png = javaClass.getResourceAsStream("/wiki-images/sample.png")!!.use { it.readBytes() }
+        mvc.perform(
+            multipart("/documents/$mismatchedId/file")
+                .file(MockMultipartFile("file", "fake.jpg", "image/jpeg", png))
+                .param("expectedRevision", "1")
+                .header("Authorization", EDITOR),
+        ).andExpect(status().isBadRequest)
+        mvc.perform(
+            multipart("/documents/$mismatchedId/file")
+                .file(MockMultipartFile("file", "unsafe.svg", "image/svg+xml", "<svg/>".toByteArray()))
+                .param("expectedRevision", "1")
+                .header("Authorization", EDITOR),
+        ).andExpect(status().isBadRequest)
+        mvc.perform(
+            multipart("/documents/$mismatchedId/file")
+                .file(MockMultipartFile("file", "broken.png", "image/png", png.copyOfRange(0, 16)))
+                .param("expectedRevision", "1")
+                .header("Authorization", EDITOR),
+        ).andExpect(status().isBadRequest)
+    }
+
+    @Test
     fun wikiImageStaysPrivateUntilItsRevisionIsPublished() {
         val (id, _) = create()
         val png = java.util.Base64.getDecoder().decode(

@@ -18,6 +18,7 @@ export async function appendLifecycleAction(form: FormData) {
     await appendConstitutionLifecycle(constitutionId, {
       eventType: String(form.get('eventType') ?? '') as ConstitutionLifecycleEvent['eventType'],
       eventDate: String(form.get('eventDate') ?? ''),
+      dateCertainty: form.get('dateCertainty') === 'approximate' ? 'approximate' : 'exact',
       sourceUrl: String(form.get('sourceUrl') ?? '').trim() || undefined,
       note: String(form.get('note') ?? '').trim() || undefined,
     }, await requireSessionBearer());

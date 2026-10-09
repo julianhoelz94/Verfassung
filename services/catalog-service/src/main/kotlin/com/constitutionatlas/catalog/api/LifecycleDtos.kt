@@ -10,6 +10,7 @@ data class LifecycleEvent(
     val eventDate: LocalDate,
     val sourceUrl: String?,
     val note: String?,
+    val dateCertainty: String = "exact",
 )
 
 data class CreateLifecycleEvent(
@@ -17,4 +18,5 @@ data class CreateLifecycleEvent(
     val eventDate: LocalDate,
     val sourceUrl: String? = null,
     val note: String? = null,
+    val dateCertainty: String = "exact",
 )

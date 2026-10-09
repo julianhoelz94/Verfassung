@@ -322,19 +322,26 @@ class CatalogRepository(private val jdbc: JdbcTemplate) {
         ).firstOrNull()
 
     fun lifecycleStatus(constitutionId: UUID, on: java.time.LocalDate = java.time.LocalDate.now()): String =
+        lifecycleState(constitutionId, on, showApproximateAsUncertain = true)
+
+    fun lifecycleLegalStatus(constitutionId: UUID, on: java.time.LocalDate): String =
+        lifecycleState(constitutionId, on, showApproximateAsUncertain = false)
+
+    private fun lifecycleState(constitutionId: UUID, on: java.time.LocalDate, showApproximateAsUncertain: Boolean): String =
         jdbc.query(
             """
-            SELECT event_type
+            SELECT event_type, date_certainty
             FROM constitution_lifecycle_events
             WHERE constitution_id = ? AND event_date <= ?
             ORDER BY event_date DESC, created_at DESC
             LIMIT 1
             """.trimIndent(),
-            { rs, _ -> rs.getString("event_type") },
+            { rs, _ -> rs.getString("event_type") to rs.getString("date_certainty") },
             constitutionId,
             java.sql.Date.valueOf(on),
-        ).firstOrNull()?.let {
-            when (it) {
+        ).firstOrNull()?.let { (eventType, certainty) ->
+            if (showApproximateAsUncertain && certainty == "approximate") return@let "uncertain"
+            when (eventType) {
                 "adopted" -> "awaiting_commencement"
                 "commenced", "restored" -> "in_force"
                 "suspended" -> "suspended"

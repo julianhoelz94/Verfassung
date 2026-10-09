@@ -60,6 +60,7 @@ export async function saveWikiAction(form: FormData) {
       summary: String(form.get('summary') ?? ''),
       body: String(form.get('body') ?? ''),
       images,
+      sourceUrls: String(form.get('sourceUrls') ?? '').split(/\r?\n/).map((url) => url.trim()).filter(Boolean),
     }, authorization);
     for (const image of images) {
       const doc = await getDocument(image.documentId, image.revision, authorization);

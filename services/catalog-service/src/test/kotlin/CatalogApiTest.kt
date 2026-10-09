@@ -136,12 +136,13 @@ class CatalogApiTest {
         val countryCode = ('A'..'Z').shuffled().take(2).joinToString("")
         val country = writes.createCountry(com.constitutionatlas.catalog.api.CreateCountryRequest(countryCode, "Wiki country"))
         val constitution = writes.createConstitution(countryCode, com.constitutionatlas.catalog.api.CreateConstitutionRequest("wiki", "Wiki constitution"))
-        val countryDraft = wiki.save("country", country.id, com.constitutionatlas.catalog.api.SaveWikiPage(summary = "A country summary", body = "History"), editor.id)
+        val countryDraft = wiki.save("country", country.id, com.constitutionatlas.catalog.api.SaveWikiPage(summary = "A country summary", body = "History", sourceUrls = listOf("https://example.org/history")), editor.id)
         val constitutionDraft = wiki.save("constitution", constitution.id, com.constitutionatlas.catalog.api.SaveWikiPage(summary = "A constitution summary", body = "Origins"), editor.id)
         assertThat(wiki.published("country", country.id)).isNull()
         wiki.publish("country", country.id, countryDraft.id)
         wiki.publish("constitution", constitution.id, constitutionDraft.id)
         assertThat(wiki.published("country", country.id)?.summary).isEqualTo("A country summary")
+        assertThat(wiki.published("country", country.id)?.sourceUrls).containsExactly("https://example.org/history")
         assertThat(wiki.published("constitution", constitution.id)?.summary).isEqualTo("A constitution summary")
         val nextDraft = wiki.save("country", country.id, com.constitutionatlas.catalog.api.SaveWikiPage(countryDraft.id, "Updated summary", "Updated history"), editor.id)
         assertThat(nextDraft.predecessorId).isEqualTo(countryDraft.id)
@@ -149,6 +150,22 @@ class CatalogApiTest {
         org.junit.jupiter.api.Assertions.assertThrows(com.constitutionatlas.catalog.ConflictException::class.java) {
             wiki.publish("country", country.id, countryDraft.id)
         }
+    }
+
+    @Test
+    fun approximateLifecycleDateDoesNotClaimCertainStatus() {
+        val countryCode = ('A'..'Z').shuffled().take(2).joinToString("")
+        writes.createCountry(com.constitutionatlas.catalog.api.CreateCountryRequest(countryCode, "Approximate date country"))
+        val constitution = writes.createConstitution(countryCode, com.constitutionatlas.catalog.api.CreateConstitutionRequest("approximate", "Approximate constitution"))
+        val adoption = lifecycle.append(
+            constitution.id,
+            com.constitutionatlas.catalog.api.CreateLifecycleEvent("adopted", java.time.LocalDate.parse("1900-01-01"), dateCertainty = "approximate"),
+            publisher.id,
+        )
+        assertThat(adoption.dateCertainty).isEqualTo("approximate")
+        assertThat(catalogRepository.lifecycleStatus(constitution.id, java.time.LocalDate.parse("1900-01-02"))).isEqualTo("uncertain")
+        lifecycle.append(constitution.id, com.constitutionatlas.catalog.api.CreateLifecycleEvent("commenced", java.time.LocalDate.parse("1901-01-01")), publisher.id)
+        assertThat(catalogRepository.lifecycleStatus(constitution.id, java.time.LocalDate.parse("1901-01-02"))).isEqualTo("in_force")
     }
 
     @Test
@@ -911,14 +928,16 @@ class CatalogApiTest {
 
     @Test
     fun editorialHopOnOlderLawAfterLaterLegalExists() {
+        val countryCode = generateSequence { ('A'..'Z').shuffled().take(2).joinToString("") }
+            .first { catalogRepository.findCountrySummary(it) == null }
         mockMvc.post("/countries") {
             header("Authorization", TOKEN)
             contentType = MediaType.APPLICATION_JSON
-            content = """{"isoCode":"be","name":"Belgium"}"""
+            content = """{"isoCode":"$countryCode","name":"Belgium"}"""
         }.andExpect { status { isCreated() } }
 
         val constitutionId =
-            mockMvc.post("/countries/BE/constitutions") {
+            mockMvc.post("/countries/$countryCode/constitutions") {
                 header("Authorization", TOKEN)
                 contentType = MediaType.APPLICATION_JSON
                 content = """{"slug":"constitution","title":"Belgian Constitution"}"""
@@ -1033,7 +1052,7 @@ class CatalogApiTest {
                 jsonPath("$.currentVersionId") { value(editorialId) }
             }
 
-        mockMvc.get("/countries/BE")
+        mockMvc.get("/countries/$countryCode")
             .andExpect {
                 status { isOk() }
                 jsonPath("$.constitutions[0].versions.length()") { value(2) }

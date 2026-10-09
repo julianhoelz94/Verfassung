@@ -1,6 +1,7 @@
 import { notFound, redirect } from 'next/navigation';
 import { PageMain } from '../../../../components/PageMain';
 import { PageHeader } from '../../../../components/ui';
+import { WikiSources } from '../../../../components/WikiSources';
 import { getWikiDraft, getWikiPage } from '../../../../../lib/api';
 import { currentUser, requireSessionBearer } from '../../../../../lib/session';
 import { publishWikiAction, saveWikiAction } from '../../actions';
@@ -47,6 +48,8 @@ export default async function WikiEditor({ params, searchParams }: Props) {
           <textarea id="wiki-summary" name="summary" maxLength={500} required defaultValue={current?.summary ?? ''} />
           <label htmlFor="wiki-body">Page text</label>
           <textarea id="wiki-body" name="body" maxLength={20000} rows={12} defaultValue={current?.body ?? ''} />
+          <label htmlFor="wiki-sources">Source links (one URL per line)</label>
+          <textarea id="wiki-sources" name="sourceUrls" rows={3} defaultValue={(current?.sourceUrls ?? []).join('\n')} />
           <h2>Pictures</h2>
           {current?.images.map((image, index) => (
             <fieldset key={image.documentId}>
@@ -90,6 +93,7 @@ export default async function WikiEditor({ params, searchParams }: Props) {
           <h2>Review draft</h2>
           <p>{draft.summary}</p>
           {draft.body ? <p className="wiki-body">{draft.body}</p> : null}
+          <WikiSources sourceUrls={draft.sourceUrls ?? []} />
           <button className="btn" type="submit">Publish page</button>
         </form>
       ) : null}

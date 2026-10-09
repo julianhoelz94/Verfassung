@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import { PageMain } from '../../components/PageMain';
 import { ServiceUnavailable } from '../../components/StatusMessage';
 import { WikiImages } from '../../components/WikiImages';
+import { WikiSources } from '../../components/WikiSources';
 import { Chip, PageHeader } from '../../components/ui';
 import { ApiUnavailableError, getCountry, getWikiPage, type CountryDetail } from '../../../lib/api';
 import { canVisitEditor } from '../../../lib/nav';
@@ -82,7 +83,7 @@ export default async function CountryPage(props: CountryPageProps) {
     <PageMain className="wide">
       <PageHeader
         breadcrumbs={[{ href: '/', label: 'Countries' }, { label: country.name }]}
-        title={<>{country.name}<span className="country-title-code">{country.isoCode}</span></>}
+        title={<>{country.name}<span className="country-title-code" aria-hidden="true">{country.isoCode}</span></>}
         meta={
           <>
             <span>
@@ -107,6 +108,7 @@ export default async function CountryPage(props: CountryPageProps) {
           <p>{countryWiki.summary}</p>
           {countryWiki.body ? <p className="wiki-body">{countryWiki.body}</p> : null}
           <WikiImages images={countryWiki.images} />
+          <WikiSources sourceUrls={countryWiki.sourceUrls ?? []} />
         </section>
       ) : null}
       {showEditorialLinks ? (
@@ -136,6 +138,7 @@ export default async function CountryPage(props: CountryPageProps) {
               {constitution.lifecycleStatus === 'in_force' ? 'In force' :
                 constitution.lifecycleStatus === 'awaiting_commencement' ? 'Adopted, not yet in force' :
                 constitution.lifecycleStatus === 'suspended' ? 'Suspended' :
+                constitution.lifecycleStatus === 'uncertain' ? 'Status uncertain' :
                 constitution.lifecycleStatus === 'repealed' ? 'Repealed' : 'Status not recorded'}
             </p>
             {constitution.contentOutline && constitution.contentOutline.kinds.length > 0 ? (

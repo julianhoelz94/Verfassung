@@ -20,6 +20,7 @@ data class WikiPageRevision(
     val summary: String,
     val body: String,
     val images: List<WikiImage>,
+    val sourceUrls: List<String> = emptyList(),
 )
 
 data class SaveWikiPage(
@@ -27,6 +28,7 @@ data class SaveWikiPage(
     val summary: String,
     val body: String,
     val images: List<WikiImage> = emptyList(),
+    val sourceUrls: List<String> = emptyList(),
 )
 
 data class PublishWikiPage(val revisionId: UUID)

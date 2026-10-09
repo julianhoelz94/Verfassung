@@ -41,7 +41,7 @@ class WikiRepository(private val jdbc: JdbcTemplate, private val mapper: ObjectM
     fun published(targetType: String, targetId: UUID): WikiPageRevision? =
         jdbc.query(
             """
-            SELECT r.id, p.target_type, p.target_id, r.predecessor_id, r.summary, r.body, r.images
+            SELECT r.id, p.target_type, p.target_id, r.predecessor_id, r.summary, r.body, r.images, r.source_urls
             FROM wiki_pages p
             JOIN wiki_page_revisions r ON r.id = p.published_revision_id
             WHERE p.target_type = ? AND p.target_id = ?
@@ -54,7 +54,7 @@ class WikiRepository(private val jdbc: JdbcTemplate, private val mapper: ObjectM
     fun latest(targetType: String, targetId: UUID): WikiPageRevision? =
         jdbc.query(
             """
-            SELECT r.id, p.target_type, p.target_id, r.predecessor_id, r.summary, r.body, r.images
+            SELECT r.id, p.target_type, p.target_id, r.predecessor_id, r.summary, r.body, r.images, r.source_urls
             FROM wiki_pages p
             JOIN wiki_page_revisions r ON r.page_id = p.id
             WHERE p.target_type = ? AND p.target_id = ?
@@ -69,7 +69,7 @@ class WikiRepository(private val jdbc: JdbcTemplate, private val mapper: ObjectM
     fun revision(targetType: String, targetId: UUID, revisionId: UUID): WikiPageRevision? =
         jdbc.query(
             """
-            SELECT r.id, p.target_type, p.target_id, r.predecessor_id, r.summary, r.body, r.images
+            SELECT r.id, p.target_type, p.target_id, r.predecessor_id, r.summary, r.body, r.images, r.source_urls
             FROM wiki_pages p
             JOIN wiki_page_revisions r ON r.page_id = p.id
             WHERE p.target_type = ? AND p.target_id = ? AND r.id = ?
@@ -80,16 +80,17 @@ class WikiRepository(private val jdbc: JdbcTemplate, private val mapper: ObjectM
             revisionId,
         ).firstOrNull()
 
-    fun append(pageId: UUID, predecessorId: UUID?, summary: String, body: String, images: List<WikiImage>, actorId: UUID): UUID {
+    fun append(pageId: UUID, predecessorId: UUID?, summary: String, body: String, images: List<WikiImage>, sourceUrls: List<String>, actorId: UUID): UUID {
         val id = UUID.randomUUID()
         jdbc.update(
-            "INSERT INTO wiki_page_revisions (id, page_id, predecessor_id, summary, body, images, created_by) VALUES (?, ?, ?, ?, ?, ?::jsonb, ?)",
+            "INSERT INTO wiki_page_revisions (id, page_id, predecessor_id, summary, body, images, source_urls, created_by) VALUES (?, ?, ?, ?, ?, ?::jsonb, ?::jsonb, ?)",
             id,
             pageId,
             predecessorId,
             summary,
             body,
             mapper.writeValueAsString(images),
+            mapper.writeValueAsString(sourceUrls),
             actorId,
         )
         return id
@@ -108,6 +109,7 @@ class WikiRepository(private val jdbc: JdbcTemplate, private val mapper: ObjectM
             rs.getString("summary"),
             rs.getString("body"),
             mapper.readValue(rs.getString("images"), object : TypeReference<List<WikiImage>>() {}),
+            mapper.readValue(rs.getString("source_urls"), object : TypeReference<List<String>>() {}),
         )
     }
 }

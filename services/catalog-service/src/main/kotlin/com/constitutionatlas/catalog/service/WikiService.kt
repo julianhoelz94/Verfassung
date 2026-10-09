@@ -28,6 +28,10 @@ class WikiService(private val repo: WikiRepository, private val media: WikiMedia
         require(request.summary.isNotBlank() && request.summary.length <= 500) { "Summary must be 1–500 characters" }
         require(request.body.length <= 20000) { "Body must be at most 20,000 characters" }
         require(request.images.size <= 30) { "Page may contain at most 30 images" }
+        require(request.sourceUrls.size <= 20) { "Page may contain at most 20 sources" }
+        request.sourceUrls.forEach { source ->
+            require(source.length <= 2048 && (source.startsWith("https://") || source.startsWith("http://"))) { "Source URLs must be HTTP(S) and at most 2,048 characters" }
+        }
         request.images.forEach { image ->
             require(image.revision > 0) { "Image revision must be positive" }
             require(image.alt.isNotBlank() && image.alt.length <= 500) { "Image alt text is required and must be at most 500 characters" }
@@ -42,7 +46,7 @@ class WikiService(private val repo: WikiRepository, private val media: WikiMedia
         if (current?.id != request.expectedRevisionId) {
             throw ConflictException("Wiki page changed; reload before saving", "wiki_revision_conflict")
         }
-        val id = repo.append(pageId, current?.id, request.summary.trim(), request.body.trim(), request.images, actorId)
+        val id = repo.append(pageId, current?.id, request.summary.trim(), request.body.trim(), request.images, request.sourceUrls.distinct(), actorId)
         return repo.revision(targetType, targetId, id)!!
     }
 

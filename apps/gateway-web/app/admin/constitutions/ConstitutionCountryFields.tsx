@@ -15,6 +15,7 @@ export function ConstitutionCountryFields({ countries, onCountryChange }: { coun
     <>
       <Select
         label="Country"
+        info={{ description: 'Choose the country that this constitution belongs to, or create a new country.', changeability: 'once' }}
         name="countryChoice"
         value={choice}
         onChange={(event) => { setChoice(event.target.value); onCountryChange?.(event.target.value); }}
@@ -30,6 +31,7 @@ export function ConstitutionCountryFields({ countries, onCountryChange }: { coun
         <>
           <Input
             label="Country code"
+            info={{ description: 'The two-letter country code used in public links and listings.', changeability: 'once' }}
             name="isoCode"
             required
             maxLength={2}
@@ -41,7 +43,7 @@ export function ConstitutionCountryFields({ countries, onCountryChange }: { coun
             value={isoCode}
             onChange={(event) => setIsoCode(event.target.value.toUpperCase())}
           />
-          <Input label="Country name" name="countryName" required autoComplete="off" placeholder="France" />
+          <Input label="Country name" info={{ description: 'The public name shown on the country page and in selectors.', changeability: 'once' }} name="countryName" required autoComplete="off" placeholder="France" />
         </>
       ) : (
         <input type="hidden" name="isoCode" value={choice} />

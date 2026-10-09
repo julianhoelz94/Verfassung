@@ -1,5 +1,8 @@
 import type { ButtonHTMLAttributes, CSSProperties, InputHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes } from 'react';
 import { Breadcrumbs } from './Breadcrumbs';
+import { SettingInfo, type SettingChangeability } from './SettingInfo';
+
+type FieldInfo = { description: string; changeability: SettingChangeability; changeNote?: string };
 
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: 'primary' | 'secondary' | 'ghost';
@@ -114,10 +117,16 @@ export function DataRow({ cells }: { cells: { label: string; value: ReactNode }[
   );
 }
 
-type InputProps = InputHTMLAttributes<HTMLInputElement> & { label: string };
+type InputProps = InputHTMLAttributes<HTMLInputElement> & { label: string; info?: FieldInfo };
 
-export function Input({ label, id, className, ...props }: InputProps) {
+export function Input({ label, id, className, info, ...props }: InputProps) {
   const inputId = id ?? props.name;
+  if (info) return (
+    <div className="field">
+      <div className="field-label-row"><label className="field-label" htmlFor={inputId}>{label}</label><SettingInfo label={label} {...info} /></div>
+      <input id={inputId} className={['field-control', className].filter(Boolean).join(' ')} {...props} />
+    </div>
+  );
   return (
     <label className="field" htmlFor={inputId}>
       <span className="field-label">{label}</span>
@@ -138,10 +147,16 @@ export function TextArea({ label, id, className, ...props }: TextAreaProps) {
   );
 }
 
-type SelectProps = SelectHTMLAttributes<HTMLSelectElement> & { label: string; children: ReactNode };
+type SelectProps = SelectHTMLAttributes<HTMLSelectElement> & { label: string; children: ReactNode; info?: FieldInfo };
 
-export function Select({ label, id, className, children, ...props }: SelectProps) {
+export function Select({ label, id, className, children, info, ...props }: SelectProps) {
   const inputId = id ?? props.name;
+  if (info) return (
+    <div className="field">
+      <div className="field-label-row"><label className="field-label" htmlFor={inputId}>{label}</label><SettingInfo label={label} {...info} /></div>
+      <select id={inputId} className={['field-control', className].filter(Boolean).join(' ')} {...props}>{children}</select>
+    </div>
+  );
   return (
     <label className="field" htmlFor={inputId}>
       <span className="field-label">{label}</span>

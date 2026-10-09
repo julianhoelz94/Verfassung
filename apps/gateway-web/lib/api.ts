@@ -95,6 +95,7 @@ export type ConstitutionLifecycleEvent = {
   eventDate: string;
   sourceUrl: string | null;
   note: string | null;
+  dateCertainty: 'exact' | 'approximate';
 };
 
 export type ProvisionLifecycleEvent = {
@@ -140,6 +141,7 @@ export type WikiPageRevision = {
   summary: string;
   body: string;
   images: WikiImage[];
+  sourceUrls: string[];
 };
 
 export type CountrySummary = {
@@ -379,7 +381,7 @@ export function getConstitutionLifecycle(isoCode: string): Promise<ConstitutionL
 
 export function appendConstitutionLifecycle(
   constitutionId: string,
-  payload: { eventType: ConstitutionLifecycleEvent['eventType']; eventDate: string; sourceUrl?: string; note?: string },
+  payload: { eventType: ConstitutionLifecycleEvent['eventType']; eventDate: string; dateCertainty?: ConstitutionLifecycleEvent['dateCertainty']; sourceUrl?: string; note?: string },
   authorization: string,
 ): Promise<ConstitutionLifecycleEvent> {
   return sendJson<ConstitutionLifecycleEvent>(
@@ -446,6 +448,7 @@ export function saveWikiDraft(targetType: 'country' | 'constitution', targetId: 
   summary: string;
   body: string;
   images: WikiImage[];
+  sourceUrls: string[];
 }, authorization: string): Promise<WikiPageRevision> {
   return sendJson<WikiPageRevision>(`${catalogBaseUrl()}/wiki/${targetType}/${encodeURIComponent(targetId)}/draft`, 'catalog', 'PUT', payload, authorization);
 }

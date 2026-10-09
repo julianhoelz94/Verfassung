@@ -74,7 +74,7 @@ export default async function LifecycleEditor({ params, searchParams }: Props) {
       <ol>
         {events.map((event) => (
           <li key={event.id}>
-            <time dateTime={event.eventDate}>{event.eventDate}</time> · {labels[event.eventType]}
+            <time dateTime={event.eventDate}>{event.dateCertainty === 'approximate' ? 'Circa ' : ''}{event.eventDate}</time> · {labels[event.eventType]}
             {event.note ? ` · ${event.note}` : ''}
           </li>
         ))}
@@ -99,6 +99,12 @@ export default async function LifecycleEditor({ params, searchParams }: Props) {
           </select>
           <label htmlFor="event-date">Effective date</label>
           <input id="event-date" type="date" name="eventDate" min={last?.eventDate} required />
+          <label htmlFor="event-certainty">Date certainty</label>
+          <select id="event-certainty" name="dateCertainty" defaultValue="exact">
+            <option value="exact">Exact date</option>
+            <option value="approximate">Approximate date</option>
+          </select>
+          <p>If the date is unknown, leave the lifecycle event unrecorded and describe the uncertainty on the constitution page.</p>
           <label htmlFor="event-source">Source URL</label>
           <input id="event-source" type="url" name="sourceUrl" />
           <label htmlFor="event-note">Note</label>

@@ -13,6 +13,7 @@ import {
   type ResolvedUnit,
 } from '../../../../lib/api';
 import { atlasTitle, metaDescription, pageMetadata } from '../../../../lib/page-meta';
+import { publicVersions } from '../../../../lib/reading';
 
 type Props = { params: Promise<{ code: string }>; searchParams: Promise<{ on?: string }> };
 
@@ -88,7 +89,9 @@ export default async function ConstitutionTimelinePage({ params, searchParams }:
     const last = (events ?? [])
       .filter((event) => event.constitutionId === constitution.id && event.eventDate <= on)
       .at(-1);
-    const status = last?.eventType === 'commenced' || last?.eventType === 'restored'
+    const status = last?.dateCertainty === 'approximate'
+      ? 'uncertain (last event date is approximate)'
+      : last?.eventType === 'commenced' || last?.eventType === 'restored'
       ? 'in force'
       : last?.eventType === 'adopted'
         ? 'adopted, awaiting commencement'
@@ -161,14 +164,26 @@ export default async function ConstitutionTimelinePage({ params, searchParams }:
         {dated.map((event) => {
           const constitution = constitutionsById.get(event.constitutionId);
           if (!constitution) return null;
+          const predecessor = constitution.predecessorConstitutionId
+            ? constitutionsById.get(constitution.predecessorConstitutionId)
+            : null;
+          const versions = publicVersions(constitution.versions);
           return (
             <li key={event.id} className="card">
-              <p><time dateTime={event.eventDate}>{event.eventDate}</time> · {event.scope === 'whole' ? labels[event.eventType] : provisionLabels[event.eventType]}</p>
+              <p><time dateTime={event.eventDate}>{event.scope === 'whole' && event.dateCertainty === 'approximate' ? 'Circa ' : ''}{event.eventDate}</time> · {event.scope === 'whole' ? labels[event.eventType] : provisionLabels[event.eventType]}</p>
               <h2 className="card-title">
                 <a href={`/countries/${country.isoCode}/constitutions/${constitution.id}`}>{constitution.title}</a>
                 {constitution.interim ? ' (interim)' : ''}
               </h2>
+              {event.scope === 'whole' && event.eventType === 'adopted' && predecessor ? (
+                <p>Replaces <a href={`/countries/${country.isoCode}/constitutions/${predecessor.id}`}>{predecessor.title}</a></p>
+              ) : null}
               {event.note ? <p>{event.note}</p> : null}
+              {versions.length > 0 ? (
+                <p>Published versions: {versions.map((version, index) => (
+                  <span key={version.id}>{index > 0 ? ' · ' : ''}<a href={`/countries/${country.isoCode}/versions/${version.currentVersionId ?? version.id}`}>{version.versionLabel}</a></span>
+                ))}</p>
+              ) : null}
               {event.scope === 'provisions' ? (
                 <ul>
                   {event.logicalUnitIds.map((logicalId) => {
@@ -192,7 +207,7 @@ export default async function ConstitutionTimelinePage({ params, searchParams }:
           <h2>Dates not recorded</h2>
           <ul>
             {undated.map((constitution) => (
-              <li key={constitution.id}>{constitution.title}</li>
+              <li key={constitution.id}><a href={`/countries/${country.isoCode}/constitutions/${constitution.id}`}>{constitution.title}</a></li>
             ))}
           </ul>
         </section>

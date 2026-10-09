@@ -548,6 +548,65 @@ summary {
   font-size: 0.95rem;
 }
 
+.field-label-row, .setting-inline {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  flex-wrap: wrap;
+}
+
+.setting-inline .choice-row { margin-top: 0; }
+
+.setting-info {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  vertical-align: middle;
+}
+
+.setting-info-trigger {
+  position: relative;
+  width: 0.9rem;
+  height: 0.9rem;
+  min-width: 0.9rem;
+  min-height: 0.9rem;
+  padding: 0;
+  border: 1px solid var(--color-accent-strong);
+  border-radius: 50%;
+  background: var(--color-surface);
+  color: var(--color-accent-strong);
+  font: 700 0.7rem/1 Georgia, serif;
+  cursor: pointer;
+}
+
+.setting-info-trigger::after {
+  content: '';
+  position: absolute;
+  inset: -15px;
+}
+
+.setting-info-box {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + var(--space-1));
+  left: 0;
+  display: grid;
+  gap: var(--space-2);
+  width: min(19rem, calc(100vw - 3rem));
+  padding: var(--space-3);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-1);
+  color: var(--color-ink);
+  font-size: var(--text-sm);
+  line-height: 1.45;
+}
+
+.setting-info-changeability {
+  font-weight: 700;
+}
+
 .field-control {
   width: 100%;
   min-height: var(--control-min);

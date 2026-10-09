@@ -35,6 +35,7 @@ class LifecycleService(
     fun append(constitutionId: UUID, request: CreateLifecycleEvent, actorId: UUID): LifecycleEvent {
         if (!catalog.lockConstitution(constitutionId)) throw NotFoundException("Unknown constitution '$constitutionId'")
         val kind = request.eventType.trim().lowercase()
+        require(request.dateCertainty in setOf("exact", "approximate")) { "Invalid lifecycle date certainty" }
         val events = lifecycle.events(constitutionId)
         val previous = events.lastOrNull()
         if (previous != null && !request.eventDate.isAfter(previous.eventDate)) {
@@ -52,6 +53,6 @@ class LifecycleService(
         if (sourceUrl != null && !(sourceUrl.startsWith("https://") || sourceUrl.startsWith("http://"))) {
             throw IllegalArgumentException("sourceUrl must be an HTTP(S) URL")
         }
-        return lifecycle.insert(constitutionId, kind, request.eventDate, sourceUrl, request.note?.trim(), actorId)
+        return lifecycle.insert(constitutionId, kind, request.eventDate, sourceUrl, request.note?.trim(), request.dateCertainty, actorId)
     }
 }

@@ -40,7 +40,7 @@ class ProvisionLifecycleService(
             throw ConflictException("Scope version must be a published version of this constitution", "invalid_scope_version")
         }
         scope.requireUnits(request.sourceVersionId, request.logicalUnitIds)
-        val wholeStatus = catalog.lifecycleStatus(constitutionId, request.eventDate)
+        val wholeStatus = catalog.lifecycleLegalStatus(constitutionId, request.eventDate)
         if (kind == "deferred" && wholeStatus != "awaiting_commencement") {
             throw ConflictException("A deferred provision must be recorded before constitution commencement", "invalid_provision_timing")
         }

@@ -14,10 +14,11 @@ if [ "${COMPOSE_VERBOSE:-}" = "1" ]; then
 fi
 
 # Compose service names — keep in sync with docker-compose.yml.
-# Kotlin images copy a host bootJar (app.jar); gateway-web and edge-proxy still build in Docker.
+# Kotlin images copy a host bootJar (app.jar); gateway-web, mcp-server, and edge-proxy build in Docker.
 BUILD_ORDER=(
   edge-proxy
   gateway-web
+  mcp-server
   catalog-service
   content-service
   amendment-service
@@ -66,6 +67,7 @@ Local stack (Caddy is the only host entry):
   Compare (DE)  ${host}/countries/DE/compare
   Timeline (DE) ${host}/countries/DE/timeline
   Editor        ${host}/login
+  MCP           ${host}/mcp
   API docs      ${host}/api/docs/<service>/swagger-ui/index.html
                 services: catalog content amendment identity editor search ingestion audit document
 EOF
@@ -182,6 +184,9 @@ normalize_service() {
     catalog|content|amendment|identity|editor|search|ingestion|audit|document)
       echo "${raw}-service"
       ;;
+    mcp)
+      echo "mcp-server"
+      ;;
     caddy|proxy)
       echo "edge-proxy"
       ;;
@@ -196,6 +201,7 @@ normalize_service() {
 
 is_kotlin_service() {
   case "$1" in
+    mcp-server) return 1 ;;
     *-service) return 0 ;;
     *) return 1 ;;
   esac

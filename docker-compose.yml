@@ -8,6 +8,23 @@ services:
       - CADDY_EXPOSE_API_DOCS=${CADDY_EXPOSE_API_DOCS:-false}
     depends_on:
       - gateway-web
+      - mcp-server
+
+  mcp-server:
+    build: ./services/mcp-server
+    environment:
+      - PORT=8080
+      - CATALOG_API_URL=http://catalog-service:8080
+      - CONTENT_API_URL=http://content-service:8080
+      - SEARCH_API_URL=http://search-service:8080
+      - PUBLIC_BASE_URL=${PUBLIC_BASE_URL:-http://localhost}
+    depends_on:
+      catalog-service:
+        condition: service_started
+      content-service:
+        condition: service_started
+      search-service:
+        condition: service_started
 
   gateway-web:
     build: ./apps/gateway-web

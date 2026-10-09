@@ -87,27 +87,33 @@ class CatalogRepository(private val jdbc: JdbcTemplate) {
 
         val constitutions = jdbc.query(
             """
-            SELECT id, slug, title
+            SELECT id, slug, title, predecessor_constitution_id, interim
             FROM constitutions
             WHERE country_id = ?
             ORDER BY title
             """.trimIndent(),
             { rs, _ ->
-                Triple(
+                arrayOf(
                     rs.getObject("id", UUID::class.java),
                     rs.getString("slug"),
                     rs.getString("title"),
+                    rs.getObject("predecessor_constitution_id", UUID::class.java),
+                    rs.getBoolean("interim"),
                 )
             },
             country.id,
-        ).map { (id, slug, title) ->
+        ).map { row ->
+            val id = row[0] as UUID
             ConstitutionSummary(
                 id,
-                slug,
-                title,
+                row[1] as String,
+                row[2] as String,
                 findLegalTipEditorialTipId(id, publishedOnly = true),
                 listPublishedPublicVersions(id),
                 findOutline(id),
+                row[3] as UUID?,
+                row[4] as Boolean,
+                lifecycleStatus(id),
             )
         }
 
@@ -273,6 +279,13 @@ class CatalogRepository(private val jdbc: JdbcTemplate) {
         return (count ?: 0) > 0
     }
 
+    fun lockConstitution(constitutionId: UUID): Boolean =
+        jdbc.query(
+            "SELECT id FROM constitutions WHERE id = ? FOR UPDATE",
+            { rs, _ -> rs.getObject("id", UUID::class.java) },
+            constitutionId,
+        ).isNotEmpty()
+
     fun findCountrySummary(isoCode: String): CountrySummary? =
         jdbc.query(
             "SELECT id, iso_code, name FROM countries WHERE iso_code = ?",
@@ -301,14 +314,52 @@ class CatalogRepository(private val jdbc: JdbcTemplate) {
             slug,
         ).firstOrNull()
 
-    fun insertConstitution(countryId: UUID, slug: String, title: String): UUID {
+    fun constitutionCountryId(constitutionId: UUID): UUID? =
+        jdbc.query(
+            "SELECT country_id FROM constitutions WHERE id = ?",
+            { rs, _ -> rs.getObject("country_id", UUID::class.java) },
+            constitutionId,
+        ).firstOrNull()
+
+    fun lifecycleStatus(constitutionId: UUID, on: java.time.LocalDate = java.time.LocalDate.now()): String =
+        lifecycleState(constitutionId, on, showApproximateAsUncertain = true)
+
+    fun lifecycleLegalStatus(constitutionId: UUID, on: java.time.LocalDate): String =
+        lifecycleState(constitutionId, on, showApproximateAsUncertain = false)
+
+    private fun lifecycleState(constitutionId: UUID, on: java.time.LocalDate, showApproximateAsUncertain: Boolean): String =
+        jdbc.query(
+            """
+            SELECT event_type, date_certainty
+            FROM constitution_lifecycle_events
+            WHERE constitution_id = ? AND event_date <= ?
+            ORDER BY event_date DESC, created_at DESC
+            LIMIT 1
+            """.trimIndent(),
+            { rs, _ -> rs.getString("event_type") to rs.getString("date_certainty") },
+            constitutionId,
+            java.sql.Date.valueOf(on),
+        ).firstOrNull()?.let { (eventType, certainty) ->
+            if (showApproximateAsUncertain && certainty == "approximate") return@let "uncertain"
+            when (eventType) {
+                "adopted" -> "awaiting_commencement"
+                "commenced", "restored" -> "in_force"
+                "suspended" -> "suspended"
+                "repealed" -> "repealed"
+                else -> "unknown"
+            }
+        } ?: "unknown"
+
+    fun insertConstitution(countryId: UUID, slug: String, title: String, predecessorId: UUID?, interim: Boolean): UUID {
         val id = UUID.randomUUID()
         jdbc.update(
-            "INSERT INTO constitutions (id, country_id, slug, title) VALUES (?, ?, ?, ?)",
+            "INSERT INTO constitutions (id, country_id, slug, title, predecessor_constitution_id, interim) VALUES (?, ?, ?, ?, ?, ?)",
             id,
             countryId,
             slug,
             title,
+            predecessorId,
+            interim,
         )
         insertDefaultOutline(id)
         return id

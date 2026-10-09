@@ -14,6 +14,8 @@ interface LinkTargetClient {
     fun requireAmendmentRevision(targetId: UUID, scopeRevisionId: UUID, authorization: String?, allowPublished: Boolean)
     fun amendmentAncestry(targetId: UUID, scopeRevisionId: UUID, authorization: String?): List<UUID>
     fun publishedAmendmentRevision(targetId: UUID): UUID?
+    fun requireWikiRevision(targetType: String, targetId: UUID, scopeRevisionId: UUID, authorization: String?)
+    fun isWikiImagePublic(targetType: String, targetId: UUID, scopeRevisionId: UUID, documentId: UUID, revision: Int): Boolean
 }
 
 @Component
@@ -29,6 +31,8 @@ class RestLinkTargetClient(
             "constitution" -> catalog to "/constitutions/$targetId/metadata"
             "version" -> catalog to "/versions/$targetId"
             "amendment" -> amendment to "/amendments/$targetId"
+            "country_wiki" -> catalog to "/wiki/country/$targetId/draft"
+            "constitution_wiki" -> catalog to "/wiki/constitution/$targetId/draft"
             else -> throw IllegalArgumentException("Unsupported link target")
         }
         try {
@@ -60,6 +64,11 @@ class RestLinkTargetClient(
                         val owner = amendment.get().uri("/amendments/$targetId").retrieve().body(JsonNode::class.java)
                         owner?.path("publishedRevisionId")?.asText() == scopeRevisionId.toString()
                     }
+                }
+                "country_wiki", "constitution_wiki" -> {
+                    val kind = if (targetType == "country_wiki") "country" else "constitution"
+                    val page = catalog.get().uri("/wiki/$kind/$targetId").retrieve().body(JsonNode::class.java)
+                    scopeRevisionId != null && page?.path("id")?.asText() == scopeRevisionId.toString()
                 }
                 else -> false
             }
@@ -93,4 +102,26 @@ class RestLinkTargetClient(
         val owner = amendment.get().uri("/amendments/$targetId").retrieve().body(JsonNode::class.java)
         owner?.path("publishedRevisionId")?.asText()?.takeIf { it.isNotBlank() }?.let(UUID::fromString)
     }.getOrNull()
+
+    override fun requireWikiRevision(targetType: String, targetId: UUID, scopeRevisionId: UUID, authorization: String?) {
+        require(authorization != null) { "Authorization is required" }
+        val kind = if (targetType == "country_wiki") "country" else "constitution"
+        val draft = catalog.get().uri("/wiki/$kind/$targetId/draft")
+            .header("Authorization", authorization).retrieve().body(JsonNode::class.java)
+            ?: throw NotFoundException("Wiki draft not found")
+        require(draft.path("id").asText() == scopeRevisionId.toString()) { "Only the current wiki draft can change image links" }
+        val published = catalog.get().uri("/wiki/$kind/$targetId").retrieve().body(JsonNode::class.java)
+        require(published?.path("id")?.asText() != scopeRevisionId.toString()) { "Published wiki image links are immutable" }
+    }
+
+    override fun isWikiImagePublic(targetType: String, targetId: UUID, scopeRevisionId: UUID, documentId: UUID, revision: Int): Boolean =
+        runCatching {
+            val kind = if (targetType == "country_wiki") "country" else "constitution"
+            val page = catalog.get().uri("/wiki/$kind/$targetId/revisions/$scopeRevisionId").retrieve().body(JsonNode::class.java)
+            page?.path("id")?.asText() == scopeRevisionId.toString() &&
+                page.path("images").any { image ->
+                    image.path("documentId").asText() == documentId.toString() &&
+                        image.path("revision").asInt() == revision
+                }
+        }.getOrDefault(false)
 }

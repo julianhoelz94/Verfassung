@@ -50,6 +50,16 @@ class CatalogApiTest {
 
     @Autowired lateinit var writes: com.constitutionatlas.catalog.service.CatalogWriteService
 
+    @Autowired lateinit var lifecycle: com.constitutionatlas.catalog.service.LifecycleService
+
+    @Autowired lateinit var wiki: com.constitutionatlas.catalog.service.WikiService
+
+    @Autowired lateinit var provisionLifecycle: com.constitutionatlas.catalog.service.ProvisionLifecycleService
+
+    @MockBean lateinit var provisionScope: com.constitutionatlas.catalog.client.ProvisionScope
+
+    @MockBean lateinit var wikiMedia: com.constitutionatlas.catalog.client.WikiMedia
+
     @MockBean lateinit var readiness: com.constitutionatlas.catalog.client.SuccessorReadinessClient
 
     @MockBean
@@ -61,6 +71,171 @@ class CatalogApiTest {
         Actor(UUID.fromString("01900000-0000-4000-8000-000000000412"), "local-publisher@example.local", listOf("publisher"))
     private val viewer =
         Actor(UUID.fromString("01900000-0000-4000-8000-000000000414"), "local-viewer@example.local", listOf("viewer"))
+
+    @Test
+    fun constitutionLifecycleTracksSuspensionRestorationAndRepeal() {
+        val countryCode = ('A'..'Z').shuffled().take(2).joinToString("")
+        writes.createCountry(com.constitutionatlas.catalog.api.CreateCountryRequest(countryCode, "Lifecycle country"))
+        val first = writes.createConstitution(countryCode, com.constitutionatlas.catalog.api.CreateConstitutionRequest("first", "First constitution"))
+        val second = writes.createConstitution(countryCode, com.constitutionatlas.catalog.api.CreateConstitutionRequest("interim", "Interim constitution", predecessorConstitutionId = first.id, interim = true))
+        assertThat(second.predecessorConstitutionId).isEqualTo(first.id)
+        assertThat(second.interim).isTrue()
+        val events = listOf(
+            "adopted" to "2000-01-01",
+            "commenced" to "2001-01-01",
+            "suspended" to "2002-01-01",
+            "restored" to "2003-01-01",
+            "repealed" to "2004-01-01",
+        )
+        events.forEach { (kind, date) ->
+            lifecycle.append(first.id, com.constitutionatlas.catalog.api.CreateLifecycleEvent(kind, java.time.LocalDate.parse(date)), publisher.id)
+        }
+        assertThat(lifecycle.events(first.id).map { it.eventType }).containsExactlyElementsOf(events.map { it.first })
+        assertThat(lifecycle.countryEvents(countryCode).map { it.constitutionId }).containsOnly(first.id)
+        assertThat(catalogRepository.lifecycleStatus(first.id)).isEqualTo("repealed")
+        org.junit.jupiter.api.Assertions.assertThrows(com.constitutionatlas.catalog.ConflictException::class.java) {
+            lifecycle.append(first.id, com.constitutionatlas.catalog.api.CreateLifecycleEvent("restored", java.time.LocalDate.parse("2005-01-01")), publisher.id)
+        }
+    }
+
+    @Test
+    fun lifecycleWritesRequirePublisherAndReadsArePublic() {
+        val countryCode = ('A'..'Z').shuffled().take(2).joinToString("")
+        writes.createCountry(com.constitutionatlas.catalog.api.CreateCountryRequest(countryCode, "Timeline country"))
+        val constitution = writes.createConstitution(countryCode, com.constitutionatlas.catalog.api.CreateConstitutionRequest("timeline", "Timeline constitution"))
+        val path = "/constitutions/${constitution.id}/lifecycle-events"
+        mockMvc.post(path) {
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"eventType":"adopted","eventDate":"2000-01-01"}"""
+        }.andExpect { status { isForbidden() } }
+        mockMvc.post(path) {
+            header("Authorization", PUBLISHER_TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"eventType":"adopted","eventDate":"2000-01-01"}"""
+        }.andExpect {
+            status { isCreated() }
+            jsonPath("$.eventType") { value("adopted") }
+        }
+        mockMvc.get("/countries/$countryCode/constitution-lifecycle").andExpect {
+            status { isOk() }
+            jsonPath("$[0].constitutionId") { value(constitution.id.toString()) }
+        }
+        mockMvc.get("/constitutions/${constitution.id}/lifecycle-status?on=1999-01-01").andExpect {
+            status { isOk() }
+            jsonPath("$.status") { value("unknown") }
+        }
+        mockMvc.get("/constitutions/${constitution.id}/lifecycle-status?on=2000-01-02").andExpect {
+            status { isOk() }
+            jsonPath("$.status") { value("awaiting_commencement") }
+        }
+    }
+
+    @Test
+    fun countryAndConstitutionWikiPagesPublishIndependentRevisions() {
+        val countryCode = ('A'..'Z').shuffled().take(2).joinToString("")
+        val country = writes.createCountry(com.constitutionatlas.catalog.api.CreateCountryRequest(countryCode, "Wiki country"))
+        val constitution = writes.createConstitution(countryCode, com.constitutionatlas.catalog.api.CreateConstitutionRequest("wiki", "Wiki constitution"))
+        val firstImage = com.constitutionatlas.catalog.api.WikiImage(UUID.randomUUID(), 2, "A historic flag", placement = "before_body")
+        val countryDraft = wiki.save("country", country.id, com.constitutionatlas.catalog.api.SaveWikiPage(summary = "A country summary", body = "History", images = listOf(firstImage), sourceUrls = listOf("https://example.org/history")), editor.id)
+        val constitutionDraft = wiki.save("constitution", constitution.id, com.constitutionatlas.catalog.api.SaveWikiPage(summary = "A constitution summary", body = "Origins"), editor.id)
+        assertThat(wiki.published("country", country.id)).isNull()
+        wiki.publish("country", country.id, countryDraft.id)
+        wiki.publish("constitution", constitution.id, constitutionDraft.id)
+        assertThat(wiki.published("country", country.id)?.summary).isEqualTo("A country summary")
+        assertThat(wiki.published("country", country.id)?.sourceUrls).containsExactly("https://example.org/history")
+        assertThat(wiki.published("constitution", constitution.id)?.summary).isEqualTo("A constitution summary")
+        val nextDraft = wiki.save("country", country.id, com.constitutionatlas.catalog.api.SaveWikiPage(countryDraft.id, "Updated summary", "Updated history"), editor.id)
+        assertThat(nextDraft.predecessorId).isEqualTo(countryDraft.id)
+        assertThat(wiki.published("country", country.id)?.summary).isEqualTo("A country summary")
+        assertThat(wiki.publishedRevision("country", country.id, nextDraft.id)).isNull()
+        assertThat(wiki.history("country", country.id).map { it.id }).containsExactly(nextDraft.id, countryDraft.id)
+        assertThat(wiki.history("country", country.id, limit = 1, offset = 1).single().id).isEqualTo(countryDraft.id)
+        assertThat(wiki.history("country", country.id).first().publishedAt).isNull()
+        wiki.publish("country", country.id, nextDraft.id)
+        assertThat(wiki.publishedRevision("country", country.id, countryDraft.id)?.summary).isEqualTo("A country summary")
+        assertThat(wiki.publishedRevision("country", country.id, countryDraft.id)?.images).containsExactly(firstImage)
+        assertThat(wiki.publishedRevision("country", country.id, nextDraft.id)?.publishedAt).isNotNull()
+        mockMvc.get("/wiki/country/${country.id}/revisions/${countryDraft.id}").andExpect {
+            status { isOk() }
+            jsonPath("$.summary") { value("A country summary") }
+        }
+        mockMvc.get("/wiki/country/${country.id}/history").andExpect { status { isUnauthorized() } }
+        mockMvc.get("/wiki/country/${country.id}/history") { header("Authorization", TOKEN) }.andExpect {
+            status { isOk() }
+            jsonPath("$[0].summary") { value("Updated summary") }
+        }
+        org.junit.jupiter.api.Assertions.assertThrows(com.constitutionatlas.catalog.ConflictException::class.java) {
+            wiki.publish("country", country.id, countryDraft.id)
+        }
+    }
+
+    @Test
+    fun approximateLifecycleDateDoesNotClaimCertainStatus() {
+        val countryCode = ('A'..'Z').shuffled().take(2).joinToString("")
+        writes.createCountry(com.constitutionatlas.catalog.api.CreateCountryRequest(countryCode, "Approximate date country"))
+        val constitution = writes.createConstitution(countryCode, com.constitutionatlas.catalog.api.CreateConstitutionRequest("approximate", "Approximate constitution"))
+        val adoption = lifecycle.append(
+            constitution.id,
+            com.constitutionatlas.catalog.api.CreateLifecycleEvent("adopted", java.time.LocalDate.parse("1900-01-01"), dateCertainty = "approximate"),
+            publisher.id,
+        )
+        assertThat(adoption.dateCertainty).isEqualTo("approximate")
+        assertThat(catalogRepository.lifecycleStatus(constitution.id, java.time.LocalDate.parse("1900-01-02"))).isEqualTo("uncertain")
+        lifecycle.append(constitution.id, com.constitutionatlas.catalog.api.CreateLifecycleEvent("commenced", java.time.LocalDate.parse("1901-01-01")), publisher.id)
+        assertThat(catalogRepository.lifecycleStatus(constitution.id, java.time.LocalDate.parse("1901-01-02"))).isEqualTo("in_force")
+    }
+
+    @Test
+    fun wikiPublicationRequiresPinnedImages() {
+        val countryCode = ('A'..'Z').shuffled().take(2).joinToString("")
+        val country = writes.createCountry(com.constitutionatlas.catalog.api.CreateCountryRequest(countryCode, "Image country"))
+        val image = com.constitutionatlas.catalog.api.WikiImage(UUID.randomUUID(), 1, "Map")
+        val draft = wiki.save("country", country.id, com.constitutionatlas.catalog.api.SaveWikiPage(summary = "Summary", body = "History", images = listOf(image)), editor.id)
+        Mockito.doThrow(com.constitutionatlas.catalog.ConflictException("Image not pinned")).`when`(wikiMedia)
+            .requirePinnedImages("country", country.id, draft.id, listOf(image), PUBLISHER_TOKEN)
+        org.junit.jupiter.api.Assertions.assertThrows(com.constitutionatlas.catalog.ConflictException::class.java) {
+            wiki.publish("country", country.id, draft.id, PUBLISHER_TOKEN)
+        }
+        assertThat(wiki.published("country", country.id)).isNull()
+    }
+
+    @Test
+    fun provisionsCanCommenceLaterAndBeSuspendedIndependently() {
+        val countryCode = ('A'..'Z').shuffled().take(2).joinToString("")
+        writes.createCountry(com.constitutionatlas.catalog.api.CreateCountryRequest(countryCode, "Provision country"))
+        val constitution = writes.createConstitution(countryCode, com.constitutionatlas.catalog.api.CreateConstitutionRequest("provisions", "Provision constitution"))
+        val version = writes.createDraftVersion(constitution.id, com.constitutionatlas.catalog.api.CreateVersionRequest("1"))
+        writes.publishVersion(version.id)
+        lifecycle.append(constitution.id, com.constitutionatlas.catalog.api.CreateLifecycleEvent("adopted", java.time.LocalDate.parse("2000-01-01")), publisher.id)
+        lifecycle.append(constitution.id, com.constitutionatlas.catalog.api.CreateLifecycleEvent("commenced", java.time.LocalDate.parse("2001-01-01")), publisher.id)
+        val unit = UUID.randomUUID()
+        val deferred = provisionLifecycle.append(
+            constitution.id,
+            com.constitutionatlas.catalog.api.CreateProvisionLifecycleEvent(version.id, "deferred", java.time.LocalDate.parse("2000-06-01"), listOf(unit)),
+            publisher.id,
+        )
+        assertThat(deferred.logicalUnitIds).containsExactly(unit)
+        provisionLifecycle.append(
+            constitution.id,
+            com.constitutionatlas.catalog.api.CreateProvisionLifecycleEvent(version.id, "commenced", java.time.LocalDate.parse("2002-01-01"), listOf(unit)),
+            publisher.id,
+        )
+        provisionLifecycle.append(
+            constitution.id,
+            com.constitutionatlas.catalog.api.CreateProvisionLifecycleEvent(version.id, "suspended", java.time.LocalDate.parse("2003-01-01"), listOf(unit)),
+            publisher.id,
+        )
+        assertThat(catalogRepository.lifecycleStatus(constitution.id, java.time.LocalDate.parse("2003-06-01"))).isEqualTo("in_force")
+        assertThat(provisionLifecycle.countryEvents(countryCode)).hasSize(3)
+        org.junit.jupiter.api.Assertions.assertThrows(com.constitutionatlas.catalog.ConflictException::class.java) {
+            provisionLifecycle.append(
+                constitution.id,
+                com.constitutionatlas.catalog.api.CreateProvisionLifecycleEvent(version.id, "commenced", java.time.LocalDate.parse("2004-01-01"), listOf(unit)),
+                publisher.id,
+            )
+        }
+    }
 
     @Test
     fun successorReservationRetriesRequireCompleteContentAndRejectChangedPayload() {
@@ -93,7 +268,7 @@ class CatalogApiTest {
                 settingsRepository.pin(it, constitutionId, null)
             }
         }
-        Mockito.reset(identityClient)
+        Mockito.reset(identityClient, wikiMedia, provisionScope)
         Mockito.`when`(settingsUsage.inspect(Mockito.anyList(), Mockito.anyList(), Mockito.any())).thenAnswer { invocation ->
             val kinds = invocation.getArgument<List<com.constitutionatlas.catalog.api.OutlineKindWrite>>(1)
             if (kinds.size == 2) {
@@ -771,14 +946,16 @@ class CatalogApiTest {
 
     @Test
     fun editorialHopOnOlderLawAfterLaterLegalExists() {
+        val countryCode = generateSequence { ('A'..'Z').shuffled().take(2).joinToString("") }
+            .first { catalogRepository.findCountrySummary(it) == null }
         mockMvc.post("/countries") {
             header("Authorization", TOKEN)
             contentType = MediaType.APPLICATION_JSON
-            content = """{"isoCode":"be","name":"Belgium"}"""
+            content = """{"isoCode":"$countryCode","name":"Belgium"}"""
         }.andExpect { status { isCreated() } }
 
         val constitutionId =
-            mockMvc.post("/countries/BE/constitutions") {
+            mockMvc.post("/countries/$countryCode/constitutions") {
                 header("Authorization", TOKEN)
                 contentType = MediaType.APPLICATION_JSON
                 content = """{"slug":"constitution","title":"Belgian Constitution"}"""
@@ -893,7 +1070,7 @@ class CatalogApiTest {
                 jsonPath("$.currentVersionId") { value(editorialId) }
             }
 
-        mockMvc.get("/countries/BE")
+        mockMvc.get("/countries/$countryCode")
             .andExpect {
                 status { isOk() }
                 jsonPath("$.constitutions[0].versions.length()") { value(2) }

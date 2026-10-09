@@ -548,6 +548,65 @@ summary {
   font-size: 0.95rem;
 }
 
+.field-label-row, .setting-inline {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  flex-wrap: wrap;
+}
+
+.setting-inline .choice-row { margin-top: 0; }
+
+.setting-info {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  vertical-align: middle;
+}
+
+.setting-info-trigger {
+  position: relative;
+  width: 0.9rem;
+  height: 0.9rem;
+  min-width: 0.9rem;
+  min-height: 0.9rem;
+  padding: 0;
+  border: 1px solid var(--color-accent-strong);
+  border-radius: 50%;
+  background: var(--color-surface);
+  color: var(--color-accent-strong);
+  font: 700 0.7rem/1 Georgia, serif;
+  cursor: pointer;
+}
+
+.setting-info-trigger::after {
+  content: '';
+  position: absolute;
+  inset: -15px;
+}
+
+.setting-info-box {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + var(--space-1));
+  left: 0;
+  display: grid;
+  gap: var(--space-2);
+  width: min(19rem, calc(100vw - 3rem));
+  padding: var(--space-3);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-1);
+  color: var(--color-ink);
+  font-size: var(--text-sm);
+  line-height: 1.45;
+}
+
+.setting-info-changeability {
+  font-weight: 700;
+}
+
 .field-control {
   width: 100%;
   min-height: var(--control-min);
@@ -1271,6 +1330,23 @@ button.article-toggle[aria-expanded='false']::after {
   place-items: center;
   font-weight: 700;
   letter-spacing: 0.04em;
+}
+
+.country-title-code {
+  display: inline-block;
+  margin-left: var(--space-2);
+  padding: 0.2em 0.5em;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent-soft);
+  color: var(--color-accent-strong);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  vertical-align: middle;
+}
+
+.country-compare-heading {
+  margin-top: var(--space-5);
 }
 
 .hero {
@@ -2117,7 +2193,8 @@ button.article-toggle[aria-expanded='false']::after {
 .creation-steps { display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: 1.5rem; }
 .creation-steps span { border: 1px solid var(--color-line); border-radius: var(--radius-md); padding: .6rem 1rem; color: var(--color-ink-3); }
 .creation-steps [aria-current="step"] { border-color: var(--color-focus); color: var(--color-ink); font-weight: 700; }
-.creation-basics { max-width: 38rem; display: grid; gap: .75rem; }
+.creation-basics { max-width: 38rem; min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: .75rem; }
+.creation-basics > *, .creation-basics select, .creation-basics input:not([type="checkbox"]) { min-width: 0; max-width: 100%; }
 .creation-templates { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; margin: 1rem 0 1.5rem; }
 .creation-template { text-align: left; display: grid; align-content: start; gap: .5rem; min-height: 7rem; padding: 1rem; border: 1px solid var(--color-line); border-radius: var(--radius-md); background: var(--color-surface); color: var(--color-ink); cursor: pointer; }
 .creation-template span { color: var(--color-ink-3); }
@@ -2136,3 +2213,27 @@ button.article-toggle[aria-expanded='false']::after {
 .sentence-box { background: #e8edf8; color: #17243b; border: 1px solid #9badcf; border-radius: .4rem; padding: .6rem; margin: .4rem 0; }
 .sentence-box textarea { background: #fff; color: #17243b; width: 100%; min-height: 4rem; }
 .structured-unit.is-selected, .sentence-box.is-selected { outline: 2px solid #325bb3; outline-offset: 2px; }
+.wiki-body {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.wiki-body > * {
+  margin: 0;
+}
+
+.wiki-images {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
+  gap: 1rem;
+}
+
+.wiki-images figure {
+  margin: 0;
+}
+
+.wiki-images img {
+  display: block;
+  width: 100%;
+  height: auto;
+}

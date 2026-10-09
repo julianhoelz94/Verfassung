@@ -6,7 +6,10 @@ import com.constitutionatlas.catalog.service.CatalogWriteService
 import com.constitutionatlas.catalog.service.ConstitutionMetadata
 import com.constitutionatlas.catalog.service.ConstitutionMetadataService
 import com.constitutionatlas.catalog.service.ConstitutionMetadataWrite
+import com.constitutionatlas.catalog.service.LifecycleService
+import com.constitutionatlas.catalog.service.ProvisionLifecycleService
 import com.constitutionatlas.catalog.service.SettingsService
+import com.constitutionatlas.catalog.service.WikiService
 import org.springframework.http.HttpStatus
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
@@ -17,6 +20,7 @@ import org.springframework.web.bind.annotation.RequestHeader
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
+import java.time.LocalDate
 import java.util.UUID
 
 @RestController
@@ -26,6 +30,9 @@ class CatalogController(
     private val writeAccess: WriteAccess,
     private val settingsService: SettingsService,
     private val metadataService: ConstitutionMetadataService,
+    private val lifecycleService: LifecycleService,
+    private val wikiService: WikiService,
+    private val provisionLifecycleService: ProvisionLifecycleService,
 ) {
     @GetMapping("/countries")
     fun listCountries(): List<CountrySummary> = catalogQueryService.listCountries()
@@ -33,6 +40,100 @@ class CatalogController(
     @GetMapping("/countries/{isoCode}")
     fun getCountry(@PathVariable isoCode: String): CountryDetail =
         catalogQueryService.getCountry(isoCode)
+
+    @GetMapping("/countries/{isoCode}/constitution-lifecycle")
+    fun countryLifecycle(@PathVariable isoCode: String): List<LifecycleEvent> =
+        lifecycleService.countryEvents(isoCode)
+
+    @GetMapping("/constitutions/{constitutionId}/lifecycle-events")
+    fun constitutionLifecycle(@PathVariable constitutionId: UUID): List<LifecycleEvent> =
+        lifecycleService.events(constitutionId)
+
+    @GetMapping("/constitutions/{constitutionId}/lifecycle-status")
+    fun constitutionLifecycleStatus(
+        @PathVariable constitutionId: UUID,
+        @RequestParam(required = false) on: LocalDate?,
+    ): Map<String, String> =
+        mapOf("status" to lifecycleService.status(constitutionId, on ?: LocalDate.now()))
+
+    @GetMapping("/countries/{isoCode}/provision-lifecycle")
+    fun countryProvisionLifecycle(@PathVariable isoCode: String): List<ProvisionLifecycleEvent> =
+        provisionLifecycleService.countryEvents(isoCode)
+
+    @GetMapping("/constitutions/{constitutionId}/provision-events")
+    fun constitutionProvisionLifecycle(@PathVariable constitutionId: UUID): List<ProvisionLifecycleEvent> =
+        provisionLifecycleService.events(constitutionId)
+
+    @PostMapping("/constitutions/{constitutionId}/provision-events")
+    @ResponseStatus(HttpStatus.CREATED)
+    fun appendProvisionLifecycle(
+        @PathVariable constitutionId: UUID,
+        @RequestHeader(value = "Authorization", required = false) authorization: String?,
+        @RequestBody request: CreateProvisionLifecycleEvent,
+    ): ProvisionLifecycleEvent =
+        provisionLifecycleService.append(constitutionId, request, writeAccess.requireCatalogPublisher(authorization).id)
+
+    @PostMapping("/constitutions/{constitutionId}/lifecycle-events")
+    @ResponseStatus(HttpStatus.CREATED)
+    fun appendConstitutionLifecycle(
+        @PathVariable constitutionId: UUID,
+        @RequestHeader(value = "Authorization", required = false) authorization: String?,
+        @RequestBody request: CreateLifecycleEvent,
+    ): LifecycleEvent =
+        lifecycleService.append(constitutionId, request, writeAccess.requireCatalogPublisher(authorization).id)
+
+    @GetMapping("/wiki/{targetType}/{targetId}")
+    fun publicWiki(@PathVariable targetType: String, @PathVariable targetId: UUID): WikiPageRevision? =
+        wikiService.published(targetType, targetId)
+
+    @GetMapping("/wiki/{targetType}/{targetId}/revisions/{revisionId}")
+    fun publicWikiRevision(
+        @PathVariable targetType: String,
+        @PathVariable targetId: UUID,
+        @PathVariable revisionId: UUID,
+    ): WikiPageRevision? = wikiService.publishedRevision(targetType, targetId, revisionId)
+
+    @GetMapping("/wiki/{targetType}/{targetId}/history")
+    fun wikiHistory(
+        @PathVariable targetType: String,
+        @PathVariable targetId: UUID,
+        @RequestParam(defaultValue = "25") limit: Int,
+        @RequestParam(defaultValue = "0") offset: Int,
+        @RequestHeader(value = "Authorization", required = false) authorization: String?,
+    ): List<WikiPageRevision> {
+        writeAccess.requireStaffCatalog(authorization)
+        return wikiService.history(targetType, targetId, limit, offset)
+    }
+
+    @GetMapping("/wiki/{targetType}/{targetId}/draft")
+    fun wikiDraft(
+        @PathVariable targetType: String,
+        @PathVariable targetId: UUID,
+        @RequestHeader(value = "Authorization", required = false) authorization: String?,
+    ): WikiPageRevision? {
+        writeAccess.requireStaffCatalog(authorization)
+        return wikiService.draft(targetType, targetId)
+    }
+
+    @PutMapping("/wiki/{targetType}/{targetId}/draft")
+    fun saveWiki(
+        @PathVariable targetType: String,
+        @PathVariable targetId: UUID,
+        @RequestHeader(value = "Authorization", required = false) authorization: String?,
+        @RequestBody request: SaveWikiPage,
+    ): WikiPageRevision =
+        wikiService.save(targetType, targetId, request, writeAccess.requireCatalogWriter(authorization).id)
+
+    @PostMapping("/wiki/{targetType}/{targetId}/publish")
+    fun publishWiki(
+        @PathVariable targetType: String,
+        @PathVariable targetId: UUID,
+        @RequestHeader(value = "Authorization", required = false) authorization: String?,
+        @RequestBody request: PublishWikiPage,
+    ): WikiPageRevision {
+        writeAccess.requireCatalogPublisher(authorization)
+        return wikiService.publish(targetType, targetId, request.revisionId, authorization)
+    }
 
     @GetMapping("/constitutions/{constitutionId}/versions")
     fun listVersions(

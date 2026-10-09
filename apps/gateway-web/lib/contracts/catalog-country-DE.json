@@ -108,7 +108,10 @@
             "segmentation": "sentence"
           }
         ]
-      }
+      },
+      "predecessorConstitutionId": null,
+      "interim": false,
+      "lifecycleStatus": "unknown"
     }
   ]
 }

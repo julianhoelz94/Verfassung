@@ -3,6 +3,7 @@
 import type { FormEvent, ReactNode } from 'react';
 import { useRef, useState } from 'react';
 import { Alert, Button, Input, Select } from '../../components/ui';
+import { SettingInfo } from '../../components/SettingInfo';
 import type { OutlineKindWrite, SettingsImpact, ContentOutline, OrderedNode, OrderedEntry } from '../../../lib/api';
 import { asOutlinePresentation, effectiveDisplayKind, kindByCode } from '../../../lib/outline';
 import { OrderedContentTree } from '../../components/ConstitutionText';
@@ -154,7 +155,7 @@ export function OutlineEditor({
       <input type="hidden" name="outline" value={JSON.stringify(withoutExisting(layers))} />
       {guidedCreation && step === 1 ? <div className="form-row"><Button type="button" variant="primary" onClick={advance}>Continue to structure</Button></div> : null}
       {guidedCreation && step === 2 ? <section aria-label="Starting structure">
-        <h2>Starting structure</h2>
+        <h2 className="setting-inline">Starting structure <SettingInfo label="Starting structure" description="Choose a template for the initial levels. You can adjust every level before creation and revise the structure later after an impact check." changeability="review" /></h2>
         <p className="muted">Choose a starting point, then adjust every level below. Changing templates replaces the current level settings.</p>
         <div className="creation-templates">
           {([['articles', 'Articles only', 'A short constitution with text in each article'], ['sections', 'Articles and sections', 'Two levels with plain text in each section'], ['sentences', 'Articles, paragraphs, sentences', 'Three levels with sentence editing tools']] as const).map(([id, title, detail]) => <button key={id} type="button" className="creation-template" aria-pressed={template === id} onClick={() => { setTemplate(id); setLayers(outlineFromTemplate(id).map((kind) => ({ ...kind, existing: false }))); setShowErrors(false); }}><strong>{title}</strong><span>{detail}</span></button>)}
@@ -182,6 +183,7 @@ export function OutlineEditor({
             </p>
             <Input
               label="Label"
+              info={{ description: 'The reader-facing name of this structural level, such as Article or Paragraph.', changeability: 'review' }}
               name={`label-${index}`}
               value={layer.displayLabel}
               onChange={(event) => {
@@ -196,6 +198,7 @@ export function OutlineEditor({
               <summary>Advanced · generated code</summary>
             <Input
               label="Kind code"
+              info={{ description: 'The internal identifier for this level. It is generated from the label.', changeability: 'once', changeNote: 'Set once when this level is first saved.' }}
               name={`code-${index}`}
               value={layer.kindCode}
               readOnly={layer.existing}
@@ -210,19 +213,19 @@ export function OutlineEditor({
             <fieldset>
               <legend>Editor permissions</legend>
               {index < layers.length - 1 ? (
-                <label className="field">
-                  <span className="choice-row"><input type="checkbox" checked={Boolean(layer.allowTextAlongsideChildren)} onChange={(event) => update(index, { allowTextAlongsideChildren: event.target.checked })} /> Allow text alongside child units</span>
+                <div className="field">
+                  <span className="setting-inline"><label className="choice-row"><input type="checkbox" checked={Boolean(layer.allowTextAlongsideChildren)} onChange={(event) => update(index, { allowTextAlongsideChildren: event.target.checked })} /> Allow text alongside child units</label><SettingInfo label="Allow text alongside child units" description="Allow unnumbered text before, between, or after the child units at this level." changeability="review" /></span>
                   <span className="muted">Unnumbered parent text can appear before, between, or after child units.</span>
-                </label>
+                </div>
               ) : <p>This final level holds text and has no child units.</p>}
-              <Select label="Editorial titles" name={`title-policy-${index}`} value={layer.titlePolicy ?? 'optional'} onChange={(event) => update(index, { titlePolicy: event.target.value as Layer['titlePolicy'], showTitle: event.target.value === 'none' ? false : layer.showTitle })}>
+              <Select label="Editorial titles" info={{ description: 'Choose whether units at this level can or must have an editorial title.', changeability: 'review' }} name={`title-policy-${index}`} value={layer.titlePolicy ?? 'optional'} onChange={(event) => update(index, { titlePolicy: event.target.value as Layer['titlePolicy'], showTitle: event.target.value === 'none' ? false : layer.showTitle })}>
                 <option value="none">Not allowed</option><option value="optional">Optional</option><option value="required">Required</option>
               </Select>
-              <Select label="Literal legal labels" name={`label-policy-${index}`} value={layer.labelPolicy ?? 'optional'} onChange={(event) => update(index, { labelPolicy: event.target.value as Layer['labelPolicy'], showLabel: event.target.value === 'none' ? false : layer.showLabel })}>
+              <Select label="Literal legal labels" info={{ description: 'Choose whether source labels, such as 46a or (2a), can or must be entered.', changeability: 'review' }} name={`label-policy-${index}`} value={layer.labelPolicy ?? 'optional'} onChange={(event) => update(index, { labelPolicy: event.target.value as Layer['labelPolicy'], showLabel: event.target.value === 'none' ? false : layer.showLabel })}>
                 <option value="none">Not allowed</option><option value="optional">Optional</option><option value="required">Required</option>
               </Select>
               <p className="muted">Labels such as 46a, bis, and (2a) are entered exactly as written in the source.</p>
-              {index === layers.length - 1 ? <Select label="Text editing tools" name={`segmentation-${index}`} value={layer.segmentation ?? 'plain'} onChange={(event) => update(index, { segmentation: event.target.value as Layer['segmentation'] })}>
+              {index === layers.length - 1 ? <Select label="Text editing tools" info={{ description: 'Choose plain text editing or guided sentence boundaries for the final text level.', changeability: 'review' }} name={`segmentation-${index}`} value={layer.segmentation ?? 'plain'} onChange={(event) => update(index, { segmentation: event.target.value as Layer['segmentation'] })}>
                 <option value="plain">Plain text</option><option value="sentence">Sentence boundary assistance</option>
               </Select> : null}
             </fieldset>
@@ -230,6 +233,7 @@ export function OutlineEditor({
               <legend>Public reader display</legend>
             <Select
               label="How this layer is shown"
+              info={{ description: 'Display units as separate blocks or join them as running text in the public reader.', changeability: 'review' }}
               name={`presentation-${index}`}
               value={layer.presentation}
               onChange={(event) => update(index, { presentation: asOutlinePresentation(event.target.value) })}
@@ -239,8 +243,8 @@ export function OutlineEditor({
             </Select>
             {(
               <>
-                <label className="field">
-                  <span className="field-label choice-row">
+                <div className="field">
+                  <span className="setting-inline"><label className="field-label choice-row">
                     <input
                       type="checkbox"
                       checked={layer.showKind}
@@ -248,10 +252,10 @@ export function OutlineEditor({
                       onChange={(event) => update(index, { showKind: event.target.checked })}
                     />{' '}
                     Show kind name ({layer.displayLabel})
-                  </span>
-                </label>
-                <label className="field">
-                  <span className="field-label choice-row">
+                  </label><SettingInfo label="Show kind name" description="Show the level name, such as Article, before each unit in the public reader." changeability="review" /></span>
+                </div>
+                <div className="field">
+                  <span className="setting-inline"><label className="field-label choice-row">
                     <input
                       type="checkbox"
                       checked={layer.showLabel}
@@ -259,10 +263,10 @@ export function OutlineEditor({
                       onChange={(event) => update(index, { showLabel: event.target.checked })}
                     />{' '}
                     Show literal legal label
-                  </span>
-                </label>
-                <label className="field">
-                  <span className="field-label choice-row">
+                  </label><SettingInfo label="Show literal legal label" description="Show the exact label entered from the source next to each unit in the public reader." changeability="review" /></span>
+                </div>
+                <div className="field">
+                  <span className="setting-inline"><label className="field-label choice-row">
                     <input
                       type="checkbox"
                       checked={layer.showTitle}
@@ -270,22 +274,22 @@ export function OutlineEditor({
                       onChange={(event) => update(index, { showTitle: event.target.checked })}
                     />{' '}
                     Show editorial title
-                  </span>
-                </label>
+                  </label><SettingInfo label="Show editorial title" description="Show editorial unit titles in the public reader when titles are allowed." changeability="review" /></span>
+                </div>
               </>
             )}
               {layer.presentation === 'concatenated' ? <p className="muted">Running text hides kind names and editorial titles. Literal labels appear only inline or as superscripts; saved heading preferences return when block display is selected.</p> : null}
               {layer.titlePolicy === 'none' || layer.labelPolicy === 'none' ? <p className="muted">A name or label set to Not allowed cannot be shown in the public reader.</p> : null}
               {layer.titlePolicy === 'optional' && layer.showTitle && layer.presentation !== 'concatenated' ? <p className="muted">Untitled units place a visible label before their text.</p> : null}
-              <Select label="Label placement" name={`label-placement-${index}`} value={layer.labelPlacement ?? 'before_title'} disabled={layer.labelPolicy === 'none' || (!layer.showLabel && layer.presentation !== 'concatenated')} onChange={(event) => update(index, { labelPlacement: event.target.value as Layer['labelPlacement'] })}>
+              <Select label="Label placement" info={{ description: 'Place literal legal labels before or after a title, inline with text, or as a superscript where supported.', changeability: 'review' }} name={`label-placement-${index}`} value={layer.labelPlacement ?? 'before_title'} disabled={layer.labelPolicy === 'none' || (!layer.showLabel && layer.presentation !== 'concatenated')} onChange={(event) => update(index, { labelPlacement: event.target.value as Layer['labelPlacement'] })}>
                 <option value="before_title" disabled={layer.presentation === 'concatenated'}>Before title</option><option value="after_title" disabled={layer.presentation === 'concatenated' || !layer.showTitle || layer.titlePolicy === 'none'}>After title</option><option value="inline" disabled={index < layers.length - 1 && !layer.allowTextAlongsideChildren}>Inline with text</option>{index === layers.length - 1 ? <option value="superscript">Superscript in text</option> : null}
               </Select>
               {!layer.showLabel && layer.presentation !== 'concatenated' ? <p className="muted">Show literal legal label to choose its placement.</p> : null}
             </fieldset>
             {index > 0 ? (
-              <Button type="button" onClick={() => removeLayer(index)}>
+              <span className="setting-inline"><Button type="button" onClick={() => removeLayer(index)}>
                 Remove level
-              </Button>
+              </Button><SettingInfo label="Remove level" description="Remove this structural level from the draft. Later structural changes require an impact check and may need a reviewed successor." changeability="review" /></span>
             ) : null}
           </li>
         ))}
@@ -312,6 +316,7 @@ export function OutlineEditor({
         {(!guidedCreation || step === 2) ? <Button type="button" onClick={addLayer}>
           Add deeper layer
         </Button> : null}
+        {(!guidedCreation || step === 2) ? <SettingInfo label="Add deeper layer" description="Add a nested unit level below the existing levels. Later structural changes require an impact check and may need a reviewed successor." changeability="review" /> : null}
         {(!guidedCreation || step === 2) && layers[layers.length - 1]?.kindCode === 'sentence' ? <p className="muted">New levels are added before the final sentence level.</p> : null}
         {constitutionId ? <Button type="button" onClick={checkImpact} disabled={checking}>{checking ? 'Checking impact…' : 'Preview change impact'}</Button> : null}
         {guidedCreation ? <>

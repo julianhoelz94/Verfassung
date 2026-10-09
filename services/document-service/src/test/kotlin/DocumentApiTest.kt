@@ -62,6 +62,85 @@ class DocumentApiTest {
     }
 
     @Test
+    fun wikiPictureFormatsValidateRealFilesAndRejectMismatches() {
+        val formats = listOf(
+            "sample.jpg" to "image/jpeg",
+            "sample.png" to "image/png",
+            "sample.gif" to "image/gif",
+            "sample.webp" to "image/webp",
+            "sample.avif" to "image/avif",
+        )
+        formats.forEach { (name, contentType) ->
+            val (id, _) = create()
+            val bytes = javaClass.getResourceAsStream("/wiki-images/$name")!!.use { it.readBytes() }
+            mvc.perform(
+                multipart("/documents/$id/file")
+                    .file(MockMultipartFile("file", name, contentType, bytes))
+                    .param("expectedRevision", "1")
+                    .header("Authorization", EDITOR),
+            ).andExpect(status().isOk)
+        }
+
+        val (mismatchedId, _) = create()
+        val png = javaClass.getResourceAsStream("/wiki-images/sample.png")!!.use { it.readBytes() }
+        mvc.perform(
+            multipart("/documents/$mismatchedId/file")
+                .file(MockMultipartFile("file", "fake.jpg", "image/jpeg", png))
+                .param("expectedRevision", "1")
+                .header("Authorization", EDITOR),
+        ).andExpect(status().isBadRequest)
+        mvc.perform(
+            multipart("/documents/$mismatchedId/file")
+                .file(MockMultipartFile("file", "unsafe.svg", "image/svg+xml", "<svg/>".toByteArray()))
+                .param("expectedRevision", "1")
+                .header("Authorization", EDITOR),
+        ).andExpect(status().isBadRequest)
+        mvc.perform(
+            multipart("/documents/$mismatchedId/file")
+                .file(MockMultipartFile("file", "broken.png", "image/png", png.copyOfRange(0, 16)))
+                .param("expectedRevision", "1")
+                .header("Authorization", EDITOR),
+        ).andExpect(status().isBadRequest)
+    }
+
+    @Test
+    fun wikiImageStaysPrivateUntilItsRevisionIsPublished() {
+        val (id, _) = create()
+        val png = java.util.Base64.getDecoder().decode(
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/GZkAAAAASUVORK5CYII=",
+        )
+        val uploaded = mvc.perform(
+            multipart("/documents/$id/file")
+                .file(MockMultipartFile("file", "flag.png", "image/png", png))
+                .param("expectedRevision", "1")
+                .header("Authorization", EDITOR),
+        ).andExpect(status().isOk).andReturn()
+        val pinnedId = mapper.readTree(uploaded.response.contentAsString)["revision"]["id"].asText()
+        val target = UUID.randomUUID()
+        val scope = UUID.randomUUID()
+        mvc.post("/links/country_wiki/$target") {
+            header("Authorization", EDITOR)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"documentId":"$id","revisionId":"$pinnedId","scopeRevisionId":"$scope"}"""
+        }.andExpect { status { isOk() } }
+        mvc.get("/documents/$id/revisions/2/file").andExpect { status { isNotFound() } }
+        Mockito.`when`(targets.isPublic("country_wiki", target, scope)).thenReturn(true)
+        Mockito.`when`(targets.isWikiImagePublic("country_wiki", target, scope, UUID.fromString(id), 2)).thenReturn(true)
+        mvc.get("/documents/$id/revisions/2/file").andExpect {
+            status { isOk() }
+            header { string("Content-Disposition", org.hamcrest.Matchers.containsString("inline")) }
+        }
+        mvc.perform(
+            multipart("/documents/$id/file")
+                .file(MockMultipartFile("file", "replacement.png", "image/png", png))
+                .param("expectedRevision", "2")
+                .header("Authorization", EDITOR),
+        ).andExpect(status().isOk)
+        mvc.get("/documents/$id/revisions/3/file").andExpect { status { isNotFound() } }
+        mvc.get("/documents/$id/revisions/2/file").andExpect { status { isOk() } }
+    }
+
+    @Test
     fun revisionsAreImmutableAndConflictsAreReported() {
         val (id, firstRevision) = create()
         mvc.put("/documents/$id") {

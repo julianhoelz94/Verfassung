@@ -6,7 +6,7 @@ import type { CountrySummary } from '../../../lib/api';
 
 const NEW_COUNTRY = '__new__';
 
-export function ConstitutionCountryFields({ countries }: { countries: CountrySummary[] }) {
+export function ConstitutionCountryFields({ countries, onCountryChange }: { countries: CountrySummary[]; onCountryChange?: (code: string) => void }) {
   const [choice, setChoice] = useState(countries[0]?.isoCode ?? NEW_COUNTRY);
   const [isoCode, setIsoCode] = useState('');
   const isNew = choice === NEW_COUNTRY;
@@ -15,9 +15,10 @@ export function ConstitutionCountryFields({ countries }: { countries: CountrySum
     <>
       <Select
         label="Country"
+        info={{ description: 'Choose the country that this constitution belongs to, or create a new country.', changeability: 'once' }}
         name="countryChoice"
         value={choice}
-        onChange={(event) => setChoice(event.target.value)}
+        onChange={(event) => { setChoice(event.target.value); onCountryChange?.(event.target.value); }}
       >
         {countries.map((country) => (
           <option key={country.id} value={country.isoCode}>
@@ -30,6 +31,7 @@ export function ConstitutionCountryFields({ countries }: { countries: CountrySum
         <>
           <Input
             label="Country code"
+            info={{ description: 'The two-letter country code used in public links and listings.', changeability: 'once' }}
             name="isoCode"
             required
             maxLength={2}
@@ -41,7 +43,7 @@ export function ConstitutionCountryFields({ countries }: { countries: CountrySum
             value={isoCode}
             onChange={(event) => setIsoCode(event.target.value.toUpperCase())}
           />
-          <Input label="Country name" name="countryName" required autoComplete="off" placeholder="France" />
+          <Input label="Country name" info={{ description: 'The public name shown on the country page and in selectors.', changeability: 'once' }} name="countryName" required autoComplete="off" placeholder="France" />
         </>
       ) : (
         <input type="hidden" name="isoCode" value={choice} />

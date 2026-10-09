@@ -1,7 +1,7 @@
 import { AdminForbidden } from '../../components/AdminForbidden';
 import { Alert, Card, DataList, DataRow, PageHeader } from '../../components/ui';
 import { PageMain } from '../../components/PageMain';
-import { loadCountriesWithDetails } from '../../../lib/api';
+import { loadCountriesWithDetails, type CountryDetail } from '../../../lib/api';
 import { requireAdminPage } from '../../../lib/admin';
 import { DEFAULT_NEW_OUTLINE } from '../../../lib/outline';
 import { createConstitutionAction } from './actions';
@@ -40,7 +40,7 @@ export default async function AdminConstitutionsPage(props: AdminConstitutionsPa
       <Card>
         <h2 className="card-title">New constitution</h2>
         <OutlineEditor action={createConstitutionAction} initial={DEFAULT_NEW_OUTLINE} guidedCreation>
-          <ConstitutionBasicsFields countries={countries} />
+          <ConstitutionBasicsFields countries={countries} details={details.filter((country): country is CountryDetail => country != null)} />
         </OutlineEditor>
       </Card>
       <DataList columns={3}>

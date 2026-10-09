@@ -66,4 +66,12 @@ data class ImportJobDto(
     val versionId: UUID?,
     val errors: List<ImportErrorDto>,
     val isoCode: String? = null,
+    val submittedBy: UUID? = null,
+    val preparedBy: UUID? = null,
+    val approvedBy: UUID? = null,
+    val publishedBy: UUID? = null,
 )
+
+data class ImportBatchDto(val id: UUID, val items: List<ImportJobDto>, val status: String)
+
+data class StageBatchItemRequest(val idempotencyKey: String, val payload: ImportRequest, val checksumSha256: String? = null)

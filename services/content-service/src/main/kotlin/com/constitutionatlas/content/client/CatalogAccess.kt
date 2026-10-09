@@ -2,6 +2,8 @@ package com.constitutionatlas.content.client
 
 import com.constitutionatlas.content.CatalogUnavailableException
 import com.constitutionatlas.content.VersionPublishedException
+import com.constitutionatlas.platform.IdentityClient
+import com.constitutionatlas.platform.NotFoundException
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
@@ -19,6 +21,7 @@ data class CatalogVersion(
     val id: UUID,
     val publicationStatus: String,
     val constitutionId: UUID? = null,
+    val listing: String = "public",
 )
 
 data class StructuralLevel(
@@ -75,6 +78,19 @@ class PublicationGuard(private val catalogClient: CatalogClient) {
         val version = catalogClient.getVersion(versionId) ?: return
         if (version.publicationStatus.equals("published", ignoreCase = true)) {
             throw VersionPublishedException()
+        }
+    }
+}
+
+@Component
+class ContentReadAccess(private val catalogClient: CatalogClient, private val identityClient: IdentityClient) {
+    fun requireVisible(versionId: UUID, authorization: String?) {
+        val version = catalogClient.getVersion(versionId) ?: throw NotFoundException("Unknown version")
+        if (version.publicationStatus == "published" && version.listing == "public") return
+        val actor = runCatching { identityClient.authenticate(authorization) }.getOrNull()
+        if (actor == null || actor.roles.none { it in setOf("editor", "reviewer", "publisher", "admin") } &&
+            actor.scopes.none { it in setOf("catalog:write", "content:write", "ingestion:publish") }) {
+            throw NotFoundException("Unknown version")
         }
     }
 }

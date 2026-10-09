@@ -2,10 +2,12 @@ import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { Alert, Button, Card, Input, PageHeader } from '../components/ui';
 import { PageMain } from '../components/PageMain';
-import { requestStartMfaEnroll } from '../../lib/identity-client';
+import { requestMcpKeys, requestStartMfaEnroll } from '../../lib/identity-client';
 import { SESSION_COOKIE, currentUser, mfaChallengeToken } from '../../lib/session';
 import { ConfirmEnrollForm, RegenerateRecoveryForm } from './MfaForms';
 import { changePasswordAction, revokeMfaAction, startMfaEnrollAction } from './actions';
+import { revokeMcpKeyAction } from './actions';
+import { CreateMcpKeyForm, RotateMcpKeyForm } from './McpKeyForms';
 
 type AccountPageProps = {
   searchParams: Promise<{
@@ -37,6 +39,9 @@ export default async function AccountPage(props: AccountPageProps) {
       enrollSecret = null;
     }
   }
+  const sessionToken = (await cookies()).get(SESSION_COOKIE)?.value;
+  const mcpKeys = sessionToken ? await requestMcpKeys(sessionToken).catch(() => []) : [];
+  const canImport = user.roles.includes('editor') || user.roles.includes('admin');
   return (
     <PageMain>
       <PageHeader title="Account" meta={`Signed in as ${user.email}.`} />
@@ -106,6 +111,21 @@ export default async function AccountPage(props: AccountPageProps) {
           />
           <Button variant="primary">Update password</Button>
         </form>
+        </section>
+      </Card>
+      <Card>
+        <section className="account-section" id="mcp-keys" aria-labelledby="mcp-keys-title">
+          <h2 id="mcp-keys-title">Connect a chat client</h2>
+          <p>Connect your client to this site’s <code>/mcp</code> endpoint. Public reading needs no key. Create a personal key to stage constitution imports. Every import remains pending review.</p>
+          <CreateMcpKeyForm canImport={canImport} />
+          <h3>Your MCP keys</h3>
+          {mcpKeys.length === 0 ? <p>No keys yet.</p> : mcpKeys.map((key) => <div key={key.id}>
+            <strong>{key.name}</strong> · {key.scopes.join(', ')} · expires {new Date(key.expiresAt).toLocaleDateString()}
+            {key.revokedAt ? <span> · revoked</span> : <>
+              <RotateMcpKeyForm keyId={key.id} />
+              <form action={revokeMcpKeyAction}><input type="hidden" name="keyId" value={key.id} /><Button>Revoke</Button></form>
+            </>}
+          </div>)}
         </section>
       </Card>
     </PageMain>

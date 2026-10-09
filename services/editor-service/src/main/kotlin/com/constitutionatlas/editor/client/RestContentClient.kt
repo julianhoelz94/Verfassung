@@ -22,11 +22,9 @@ class RestContentClient(
 
     override fun listArticles(versionId: UUID): List<ContentTreeArticle> =
         try {
-            client.get()
-                .uri("/versions/{id}/articles?includeBody=true", versionId)
-                .retrieve()
-                .body(ARTICLE_LIST)
-                ?: emptyList()
+            val request = client.get().uri("/versions/{id}/articles?includeBody=true", versionId)
+            authorize(request)
+            request.retrieve().body(ARTICLE_LIST) ?: emptyList()
         } catch (ex: RestClientException) {
             throw DownstreamException("content list failed", ex)
         }

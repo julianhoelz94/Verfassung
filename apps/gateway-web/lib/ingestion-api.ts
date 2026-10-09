@@ -1,4 +1,4 @@
-import { ingestionBaseUrl, readJson, sendJson } from './api';
+import { contentBaseUrl, ingestionBaseUrl, readJson, sendJson, type OrderedNode } from './api';
 
 export type ImportJobError = {
   code: string;
@@ -11,6 +11,10 @@ export type ImportJob = {
   versionId: string | null;
   errors: ImportJobError[];
   isoCode?: string | null;
+  submittedBy?: string | null;
+  preparedBy?: string | null;
+  approvedBy?: string | null;
+  publishedBy?: string | null;
 };
 
 const REQUIRED_STRINGS = ['isoCode', 'countryName', 'constitutionSlug', 'constitutionTitle', 'versionLabel'] as const;
@@ -28,6 +32,23 @@ export function isImportRequest(value: unknown): value is Record<string, unknown
   const articles = Array.isArray(row.articles) && row.articles.length > 0;
   const roots = Array.isArray(row.roots) && row.roots.length > 0;
   return articles !== roots;
+}
+
+export function listImportJobs(authorization: string, status?: string): Promise<ImportJob[]> {
+  const query = status ? `?status=${encodeURIComponent(status)}` : '';
+  return readJson<ImportJob[]>(`${ingestionBaseUrl()}/import-jobs${query}`, 'ingestion', authorization).then(jobs => jobs ?? []);
+}
+
+export function getImportPayload(jobId: string, authorization: string): Promise<Record<string, unknown> | null> {
+  return readJson<Record<string, unknown>>(`${ingestionBaseUrl()}/import-jobs/${encodeURIComponent(jobId)}/payload`, 'ingestion', authorization);
+}
+
+export function transitionImportJob(jobId: string, action: 'prepare' | 'approve' | 'reject' | 'publish', authorization: string): Promise<ImportJob> {
+  return sendJson<ImportJob>(`${ingestionBaseUrl()}/import-jobs/${encodeURIComponent(jobId)}/${action}`, 'ingestion', 'POST', {}, authorization);
+}
+
+export function getPreparedImportContent(versionId: string, authorization: string): Promise<{ roots: OrderedNode[]; generation: number; settingsRevisionId: string | null } | null> {
+  return readJson(`${contentBaseUrl()}/versions/${encodeURIComponent(versionId)}/content`, 'content', authorization);
 }
 
 export function parseImportJson(raw: string): unknown {

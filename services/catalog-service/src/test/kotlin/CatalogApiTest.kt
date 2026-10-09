@@ -72,9 +72,29 @@ class CatalogApiTest {
     private val viewer =
         Actor(UUID.fromString("01900000-0000-4000-8000-000000000414"), "local-viewer@example.local", listOf("viewer"))
 
+    private fun uniqueCountryCode(): String = generateSequence { ('A'..'Z').shuffled().take(2).joinToString("") }
+        .first { catalogRepository.findCountrySummary(it) == null }
+
+    @Test
+    fun importedDraftCannotBypassReviewWithOrdinaryPublisherCredential() {
+        val countryCode = uniqueCountryCode()
+        writes.createCountry(com.constitutionatlas.catalog.api.CreateCountryRequest(countryCode, "Import hold country"))
+        val constitution = writes.createConstitution(countryCode, com.constitutionatlas.catalog.api.CreateConstitutionRequest("import-hold", "Imported constitution"))
+        val jobId = UUID.randomUUID()
+        val version = writes.createDraftVersion(constitution.id, com.constitutionatlas.catalog.api.CreateVersionRequest("1", importJobId = jobId))
+        mockMvc.post("/versions/${version.id}/publish") { header("Authorization", PUBLISHER_TOKEN) }
+            .andExpect { status { isForbidden() } }
+        val importToken = "Bearer import-publisher-token"
+        Mockito.`when`(identityClient.authenticate(importToken)).thenReturn(Actor(UUID.randomUUID(), "ingestion", emptyList(), listOf("ingestion:publish")))
+        mockMvc.post("/versions/${version.id}/publish?importJobId=${UUID.randomUUID()}") { header("Authorization", importToken) }
+            .andExpect { status { isForbidden() } }
+        mockMvc.post("/versions/${version.id}/publish?importJobId=$jobId") { header("Authorization", importToken) }
+            .andExpect { status { isOk() } }
+    }
+
     @Test
     fun constitutionLifecycleTracksSuspensionRestorationAndRepeal() {
-        val countryCode = ('A'..'Z').shuffled().take(2).joinToString("")
+        val countryCode = uniqueCountryCode()
         writes.createCountry(com.constitutionatlas.catalog.api.CreateCountryRequest(countryCode, "Lifecycle country"))
         val first = writes.createConstitution(countryCode, com.constitutionatlas.catalog.api.CreateConstitutionRequest("first", "First constitution"))
         val second = writes.createConstitution(countryCode, com.constitutionatlas.catalog.api.CreateConstitutionRequest("interim", "Interim constitution", predecessorConstitutionId = first.id, interim = true))
@@ -100,7 +120,7 @@ class CatalogApiTest {
 
     @Test
     fun lifecycleWritesRequirePublisherAndReadsArePublic() {
-        val countryCode = ('A'..'Z').shuffled().take(2).joinToString("")
+        val countryCode = uniqueCountryCode()
         writes.createCountry(com.constitutionatlas.catalog.api.CreateCountryRequest(countryCode, "Timeline country"))
         val constitution = writes.createConstitution(countryCode, com.constitutionatlas.catalog.api.CreateConstitutionRequest("timeline", "Timeline constitution"))
         val path = "/constitutions/${constitution.id}/lifecycle-events"
@@ -133,7 +153,7 @@ class CatalogApiTest {
 
     @Test
     fun countryAndConstitutionWikiPagesPublishIndependentRevisions() {
-        val countryCode = ('A'..'Z').shuffled().take(2).joinToString("")
+        val countryCode = uniqueCountryCode()
         val country = writes.createCountry(com.constitutionatlas.catalog.api.CreateCountryRequest(countryCode, "Wiki country"))
         val constitution = writes.createConstitution(countryCode, com.constitutionatlas.catalog.api.CreateConstitutionRequest("wiki", "Wiki constitution"))
         val firstImage = com.constitutionatlas.catalog.api.WikiImage(UUID.randomUUID(), 2, "A historic flag", placement = "before_body")
@@ -172,7 +192,7 @@ class CatalogApiTest {
 
     @Test
     fun approximateLifecycleDateDoesNotClaimCertainStatus() {
-        val countryCode = ('A'..'Z').shuffled().take(2).joinToString("")
+        val countryCode = uniqueCountryCode()
         writes.createCountry(com.constitutionatlas.catalog.api.CreateCountryRequest(countryCode, "Approximate date country"))
         val constitution = writes.createConstitution(countryCode, com.constitutionatlas.catalog.api.CreateConstitutionRequest("approximate", "Approximate constitution"))
         val adoption = lifecycle.append(
@@ -188,7 +208,7 @@ class CatalogApiTest {
 
     @Test
     fun wikiPublicationRequiresPinnedImages() {
-        val countryCode = ('A'..'Z').shuffled().take(2).joinToString("")
+        val countryCode = uniqueCountryCode()
         val country = writes.createCountry(com.constitutionatlas.catalog.api.CreateCountryRequest(countryCode, "Image country"))
         val image = com.constitutionatlas.catalog.api.WikiImage(UUID.randomUUID(), 1, "Map")
         val draft = wiki.save("country", country.id, com.constitutionatlas.catalog.api.SaveWikiPage(summary = "Summary", body = "History", images = listOf(image)), editor.id)
@@ -202,7 +222,7 @@ class CatalogApiTest {
 
     @Test
     fun provisionsCanCommenceLaterAndBeSuspendedIndependently() {
-        val countryCode = ('A'..'Z').shuffled().take(2).joinToString("")
+        val countryCode = uniqueCountryCode()
         writes.createCountry(com.constitutionatlas.catalog.api.CreateCountryRequest(countryCode, "Provision country"))
         val constitution = writes.createConstitution(countryCode, com.constitutionatlas.catalog.api.CreateConstitutionRequest("provisions", "Provision constitution"))
         val version = writes.createDraftVersion(constitution.id, com.constitutionatlas.catalog.api.CreateVersionRequest("1"))

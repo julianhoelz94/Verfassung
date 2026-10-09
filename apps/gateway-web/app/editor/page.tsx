@@ -6,7 +6,7 @@ import { Alert, Badge, Button, PageHeader, WorkflowSteps } from '../components/u
 import { getCountry, listAllArticles, getArticle, listAllUnits, getUnit, getVersionSettings, listCountries, type ArticleSummary, type CountryDetail, type CountrySummary } from '../../lib/api';
 import { editorErrorMessage, getDraftPreview, getEditorDiffReview, getStructuredDraft } from '../../lib/editor-api';
 import { decisionReadyForReview } from '../../lib/diff-review';
-import { currentUser } from '../../lib/session';
+import { currentUser, requireSessionBearer } from '../../lib/session';
 import { ArticleEditor } from './ArticleEditor';
 import { EditorDraftState, SubmitReviewButton } from './EditorDraftState';
 import { draftDifferences, nodes, readerNode } from '../../lib/structured-editor';
@@ -76,6 +76,7 @@ export default async function EditorPage(props: EditorPageProps) {
   const countryDetails: CountryDetail[] = (await Promise.all(countries.map((item) => getCountry(item.isoCode))))
     .filter((item): item is CountryDetail => item !== null);
   const versionId = session.versionId;
+  const staffAuthorization = await requireSessionBearer();
   const selectedCountry = countryDetails.find((country) => country.constitutions.some((constitution) =>
     constitution.versions.some((version) => version.id === versionId || version.currentVersionId === versionId),
   ));
@@ -86,7 +87,7 @@ export default async function EditorPage(props: EditorPageProps) {
   const settings = session && versionId ? await getVersionSettings(versionId) : null;
   const displayOutline = settings?.outline ?? selectedConstitution?.contentOutline;
   const kindLabel = (kind?: string) => kind ? displayOutline?.kinds.find((item) => item.kindCode === kind)?.displayLabel ?? kind : 'Unit';
-  const units: ArticleSummary[] = versionId ? await listAllUnits(versionId) : [];
+  const units: ArticleSummary[] = versionId ? await listAllUnits(versionId, false, staffAuthorization) : [];
   const legacySource = units.some(unit => unit.legacyIdentity);
   const structured = session && !legacySource && !(preview?.drafts?.length) ? await getStructuredDraft(session.id) : null;
   const diffReview = structured && session?.hopKind === 'legal' && session.status !== 'published'
@@ -94,7 +95,7 @@ export default async function EditorPage(props: EditorPageProps) {
     : null;
   const reviewDecisions = new Map(diffReview?.decisions.map((decision) => [decision.key, decision]));
   const reviewComplete = diffReview?.candidates.every((candidate) => decisionReadyForReview(candidate, reviewDecisions.get(candidate.key))) ?? true;
-  const sourceArticles: ArticleSummary[] = legacySource && versionId ? await listAllArticles(versionId) : units;
+  const sourceArticles: ArticleSummary[] = legacySource && versionId ? await listAllArticles(versionId, false, staffAuthorization) : units;
   const articles: ArticleSummary[] = structured ? structured.roots.map((root, index) => ({
     id: sourceArticles.find(article => article.logicalId === root.logicalId)?.id ?? root.logicalId,
     versionId: versionId!, articleNumber: root.label ?? '', title: root.title ?? '', sortOrder: index + 1,
@@ -104,7 +105,7 @@ export default async function EditorPage(props: EditorPageProps) {
   const selectedId = (selectionRoot ? articles.find(article => article.logicalId === selectionRoot.logicalId)?.id : undefined) ?? (articles.some(article => article.id === searchParams.articleId) ? searchParams.articleId : articles[0]?.id);
   const selectedSummary = articles.find(article => article.id === selectedId);
   const selectedRoot = structured?.roots.find(root => root.logicalId === selectedSummary?.logicalId);
-  const selected = selectedRoot && selectedSummary ? { ...selectedSummary, body: '', content: selectedRoot.content as import('../../lib/api').OrderedEntry[] } : selectedId && versionId ? legacySource ? await getArticle(selectedId) : await getUnit(versionId, selectedId) : null;
+  const selected = selectedRoot && selectedSummary ? { ...selectedSummary, body: '', content: selectedRoot.content as import('../../lib/api').OrderedEntry[] } : selectedId && versionId ? legacySource ? await getArticle(selectedId, staffAuthorization) : await getUnit(versionId, selectedId, staffAuthorization) : null;
   const draft = selected ? preview?.drafts?.find(item => item.articleId === selected.id) : undefined;
   const editorReturnTo =
     versionId && searchParams.sessionId && selected

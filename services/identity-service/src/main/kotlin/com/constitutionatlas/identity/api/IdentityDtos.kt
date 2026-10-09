@@ -157,3 +157,21 @@ data class ServiceTokenDto(
     val lastUsedAt: OffsetDateTime? = null,
     val revokedAt: OffsetDateTime? = null,
 )
+
+data class CreateMcpKeyRequest(
+    val name: String,
+    val scopes: List<String> = listOf("mcp:read"),
+    val expiresAt: OffsetDateTime? = null,
+)
+
+data class McpKeyDto(
+    val id: UUID,
+    val name: String,
+    val scopes: List<String>,
+    val createdAt: OffsetDateTime,
+    val expiresAt: OffsetDateTime,
+    val lastUsedAt: OffsetDateTime?,
+    val revokedAt: OffsetDateTime?,
+)
+
+data class McpKeyCreatedDto(val key: McpKeyDto, val token: String)

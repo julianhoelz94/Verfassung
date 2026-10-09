@@ -260,8 +260,9 @@ class CatalogController(
     fun publishVersion(
         @RequestHeader(value = "Authorization", required = false) authorization: String?,
         @PathVariable versionId: UUID,
+        @RequestParam(required = false) importJobId: UUID?,
     ): VersionCreated {
-        writeAccess.requireCatalogPublisher(authorization)
-        return catalogWriteService.publishVersion(versionId)
+        val actor = writeAccess.requireVersionPublisher(authorization)
+        return catalogWriteService.publishVersion(versionId, actor, importJobId)
     }
 }

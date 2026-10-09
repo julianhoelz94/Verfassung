@@ -16,6 +16,15 @@ import java.util.UUID
 
 @Repository
 class CatalogRepository(private val jdbc: JdbcTemplate) {
+    fun holdImportedVersion(versionId: UUID, jobId: UUID) {
+        jdbc.update("INSERT INTO import_publication_holds (version_id, import_job_id) VALUES (?, ?)", versionId, jobId)
+    }
+
+    fun importHold(versionId: UUID): UUID? = jdbc.query(
+        "SELECT import_job_id FROM import_publication_holds WHERE version_id = ?",
+        { rs, _ -> rs.getObject("import_job_id", UUID::class.java) }, versionId,
+    ).firstOrNull()
+
     fun listCountries(): List<CountrySummary> =
         jdbc.query(
             """

@@ -17,4 +17,5 @@ data class IdentitySeedProperties(
     var viewerPassword: String = "",
     var totpSecret: String = "",
     var serviceToken: String = "",
+    var ingestionPublishToken: String = "",
 )

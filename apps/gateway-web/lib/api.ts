@@ -505,7 +505,7 @@ export function listUnitPage(versionId: string, offset?: number, limit?: number,
   return listContentPage('units', versionId, offset, limit, includeBody);
 }
 
-async function listContentPage(resource: 'articles' | 'units', versionId: string, offset?: number, limit?: number, includeBody?: boolean): Promise<ArticlePage | null> {
+async function listContentPage(resource: 'articles' | 'units', versionId: string, offset?: number, limit?: number, includeBody?: boolean, authorization?: string): Promise<ArticlePage | null> {
   const params = new URLSearchParams();
   if (offset !== undefined) {
     params.set('offset', String(offset));
@@ -520,7 +520,7 @@ async function listContentPage(resource: 'articles' | 'units', versionId: string
   const url = `${contentBaseUrl()}/versions/${encodeURIComponent(versionId)}/${resource}${query ? `?${query}` : ''}`;
   let response: Response;
   try {
-    response = await fetch(url, { cache: 'no-store' });
+    response = await fetch(url, { cache: 'no-store', headers: authorization ? { Authorization: authorization } : undefined });
   } catch {
     throw new ApiUnavailableError('content');
   }
@@ -537,20 +537,20 @@ async function listContentPage(resource: 'articles' | 'units', versionId: string
 
 const ARTICLE_PAGE_SIZE = 200;
 
-export function listAllArticles(versionId: string, includeBody?: boolean): Promise<ArticleSummary[]> {
-  return listAllContent('articles', versionId, includeBody);
+export function listAllArticles(versionId: string, includeBody?: boolean, authorization?: string): Promise<ArticleSummary[]> {
+  return listAllContent('articles', versionId, includeBody, authorization);
 }
 
-export function listAllUnits(versionId: string, includeBody?: boolean): Promise<ArticleSummary[]> {
-  return listAllContent('units', versionId, includeBody);
+export function listAllUnits(versionId: string, includeBody?: boolean, authorization?: string): Promise<ArticleSummary[]> {
+  return listAllContent('units', versionId, includeBody, authorization);
 }
 
-async function listAllContent(resource: 'articles' | 'units', versionId: string, includeBody?: boolean): Promise<ArticleSummary[]> {
+async function listAllContent(resource: 'articles' | 'units', versionId: string, includeBody?: boolean, authorization?: string): Promise<ArticleSummary[]> {
   const all: ArticleSummary[] = [];
   let offset = 0;
   let total = Number.POSITIVE_INFINITY;
   while (offset < total) {
-    const page = await listContentPage(resource, versionId, offset, ARTICLE_PAGE_SIZE, includeBody);
+    const page = await listContentPage(resource, versionId, offset, ARTICLE_PAGE_SIZE, includeBody, authorization);
     if (!page) return all;
     all.push(...page.items);
     total = page.total;
@@ -560,15 +560,16 @@ async function listAllContent(resource: 'articles' | 'units', versionId: string,
   return all;
 }
 
-export function getArticle(articleId: string): Promise<ArticleDetail | null> {
+export function getArticle(articleId: string, authorization?: string): Promise<ArticleDetail | null> {
   return readJson<ArticleDetail>(
     `${contentBaseUrl()}/articles/${encodeURIComponent(articleId)}`,
     'content',
+    authorization,
   );
 }
 
-export function getUnit(versionId: string, unitId: string): Promise<ArticleDetail | null> {
-  return readJson<ArticleDetail>(`${contentBaseUrl()}/versions/${encodeURIComponent(versionId)}/units/${encodeURIComponent(unitId)}`, 'content');
+export function getUnit(versionId: string, unitId: string, authorization?: string): Promise<ArticleDetail | null> {
+  return readJson<ArticleDetail>(`${contentBaseUrl()}/versions/${encodeURIComponent(versionId)}/units/${encodeURIComponent(unitId)}`, 'content', authorization);
 }
 
 export function patchContentNode(

@@ -4,7 +4,7 @@ import { createMcpHandler } from '@modelcontextprotocol/server';
 import { toNodeHandler } from '@modelcontextprotocol/node';
 import { createServer } from './server.js';
 
-const handler = toNodeHandler(createMcpHandler(createServer), { maxRequestBodySize: 128 * 1024 });
+const handler = toNodeHandler(createMcpHandler(ctx => createServer(ctx.requestInfo?.headers.get('authorization') ?? undefined), { maxRequestBodySize: 5 * 1024 * 1024 }), { maxRequestBodySize: 5 * 1024 * 1024 });
 const port = Number(process.env.PORT ?? '8080');
 const allowedOrigin = new URL(process.env.PUBLIC_BASE_URL ?? 'http://localhost').origin;
 const windows = new Map<string, { expiresAt: number; count: number }>();

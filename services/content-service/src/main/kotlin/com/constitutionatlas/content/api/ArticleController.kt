@@ -1,6 +1,7 @@
 package com.constitutionatlas.content.api
 
 import com.constitutionatlas.content.client.WriteAccess
+import com.constitutionatlas.content.client.ContentReadAccess
 import com.constitutionatlas.content.service.ArticleQueryService
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.GetMapping
@@ -18,6 +19,7 @@ import java.util.UUID
 class ArticleController(
     private val articleQueryService: ArticleQueryService,
     private val writeAccess: WriteAccess,
+    private val readAccess: ContentReadAccess,
 ) {
     @GetMapping("/versions/{versionId}/articles")
     fun listArticles(
@@ -25,7 +27,9 @@ class ArticleController(
         @RequestParam(required = false) offset: Int?,
         @RequestParam(required = false) limit: Int?,
         @RequestParam(required = false, defaultValue = "false") includeBody: Boolean,
+        @RequestHeader(value = "Authorization", required = false) authorization: String?,
     ): ResponseEntity<List<ArticleSummary>> {
+        readAccess.requireVisible(versionId, authorization)
         val off = (offset ?: 0).coerceAtLeast(0)
         val lim = (limit ?: 200).coerceIn(1, 200)
         val items = articleQueryService.listByVersion(versionId, off, lim, includeBody)
@@ -34,7 +38,8 @@ class ArticleController(
     }
 
     @GetMapping("/versions/{versionId}/units")
-    fun listUnits(@PathVariable versionId: UUID, @RequestParam(required = false) offset: Int?, @RequestParam(required = false) limit: Int?, @RequestParam(defaultValue = "false") includeBody: Boolean): ResponseEntity<List<ArticleSummary>> {
+    fun listUnits(@PathVariable versionId: UUID, @RequestParam(required = false) offset: Int?, @RequestParam(required = false) limit: Int?, @RequestParam(defaultValue = "false") includeBody: Boolean, @RequestHeader(value = "Authorization", required = false) authorization: String?): ResponseEntity<List<ArticleSummary>> {
+        readAccess.requireVisible(versionId, authorization)
         val (items, total) = articleQueryService.listUnits(versionId, (offset ?: 0).coerceAtLeast(0), (limit ?: 200).coerceIn(1, 200), includeBody)
         return ResponseEntity.ok().header("X-Total-Count", total.toString()).body(items)
     }
@@ -50,11 +55,17 @@ class ArticleController(
     }
 
     @GetMapping("/articles/{articleId}")
-    fun getArticle(@PathVariable articleId: UUID): ArticleDetail =
-        articleQueryService.getById(articleId)
+    fun getArticle(@PathVariable articleId: UUID, @RequestHeader(value = "Authorization", required = false) authorization: String?): ArticleDetail {
+        val article = articleQueryService.getById(articleId)
+        readAccess.requireVisible(article.versionId, authorization)
+        return article
+    }
 
     @GetMapping("/versions/{versionId}/units/{unitId}")
-    fun getUnit(@PathVariable versionId: UUID, @PathVariable unitId: UUID): ArticleDetail = articleQueryService.getUnit(versionId, unitId)
+    fun getUnit(@PathVariable versionId: UUID, @PathVariable unitId: UUID, @RequestHeader(value = "Authorization", required = false) authorization: String?): ArticleDetail {
+        readAccess.requireVisible(versionId, authorization)
+        return articleQueryService.getUnit(versionId, unitId)
+    }
 
     @PatchMapping("/articles/{articleId}")
     fun patchArticle(

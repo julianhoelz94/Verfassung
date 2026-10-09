@@ -20,6 +20,7 @@ identity:
     viewer-password: ${IDENTITY_VIEWER_PASSWORD:${LOCAL_VIEWER_PASSWORD:}}
     totp-secret: ${IDENTITY_SEED_TOTP_SECRET:}
     service-token: ${IDENTITY_SEED_SERVICE_TOKEN:}
+    ingestion-publish-token: ${IDENTITY_SEED_INGESTION_PUBLISH_TOKEN:}
   session:
     idle-timeout: ${IDENTITY_SESSION_IDLE:30m}
     absolute-timeout: ${IDENTITY_SESSION_ABSOLUTE:24h}

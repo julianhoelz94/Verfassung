@@ -11,7 +11,7 @@ export type Version = {
 
 export class UpstreamError extends Error {
   constructor(readonly status: number, readonly upstream: string) {
-    super(status === 404 ? 'The requested record was not found.' : `${upstream} is unavailable.`);
+    super(status === 404 ? 'The requested record was not found.' : status === 401 || status === 403 ? 'This operation requires an authorized MCP key.' : `${upstream} is unavailable.`);
   }
 }
 
@@ -19,12 +19,24 @@ const upstreams = {
   catalog: process.env.CATALOG_API_URL ?? 'http://catalog-service:8080',
   content: process.env.CONTENT_API_URL ?? 'http://content-service:8080',
   search: process.env.SEARCH_API_URL ?? 'http://search-service:8080',
+  identity: process.env.IDENTITY_API_URL ?? 'http://identity-service:8080',
+  ingestion: process.env.INGESTION_API_URL ?? 'http://ingestion-service:8080',
 };
 
-export async function getJson<T>(upstream: keyof typeof upstreams, path: string): Promise<T> {
+export async function getJson<T>(upstream: keyof typeof upstreams, path: string, authorization?: string): Promise<T> {
   const response = await fetch(`${upstreams[upstream]}${path}`, {
     signal: AbortSignal.timeout(8_000),
-    headers: { Accept: 'application/json' },
+    headers: { Accept: 'application/json', ...(authorization ? { Authorization: authorization } : {}) },
+  });
+  if (!response.ok) throw new UpstreamError(response.status, upstream);
+  return response.json() as Promise<T>;
+}
+
+export async function postJson<T>(upstream: keyof typeof upstreams, path: string, body: unknown, authorization: string): Promise<T> {
+  const response = await fetch(`${upstreams[upstream]}${path}`, {
+    method: 'POST', signal: AbortSignal.timeout(30_000),
+    headers: { Accept: 'application/json', Authorization: authorization, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
   });
   if (!response.ok) throw new UpstreamError(response.status, upstream);
   return response.json() as Promise<T>;

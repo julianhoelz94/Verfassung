@@ -16,6 +16,7 @@ import com.constitutionatlas.identity.config.IdentitySessionProperties
 import com.constitutionatlas.identity.crypto.Tokens
 import com.constitutionatlas.identity.crypto.Totp
 import com.constitutionatlas.identity.repo.IdentityRepository
+import com.constitutionatlas.identity.repo.McpKeyRepository
 import com.constitutionatlas.identity.repo.StoredUser
 import com.constitutionatlas.identity.repo.toUserDto
 import com.constitutionatlas.platform.UnauthorizedException
@@ -31,6 +32,7 @@ import java.util.UUID
 @Service
 class AuthService(
     private val identityRepository: IdentityRepository,
+    private val mcpKeyRepository: McpKeyRepository,
     private val passwordEncoder: PasswordEncoder,
     private val sessionProperties: IdentitySessionProperties,
     private val loginProperties: IdentityLoginProperties,
@@ -268,11 +270,20 @@ class AuthService(
             identityRepository.touchSession(hash)
             return identityRepository.toUserDto(user, hash, mfaProperties.stepUpTtl)
         }
-        val service =
-            identityRepository.findValidServiceTokenByHash(hash)
-                ?: throw UnauthorizedException("Invalid or expired session")
-        identityRepository.touchServiceToken(service.id)
-        return service.toUserDto()
+        val service = identityRepository.findValidServiceTokenByHash(hash)
+        if (service != null) {
+            identityRepository.touchServiceToken(service.id)
+            return service.toUserDto()
+        }
+        val key = mcpKeyRepository.findValidByHash(hash)
+            ?: throw UnauthorizedException("Invalid or expired session")
+        val owner = identityRepository.findUserById(key.ownerId)
+            ?.takeIf { it.enabled }
+            ?: throw UnauthorizedException("Invalid or expired session")
+        val roles = identityRepository.rolesForUser(owner.id)
+        val scopes = key.scopes.filter { it != "ingestion:import" || roles.any { role -> role == "editor" || role == "admin" } }
+        mcpKeyRepository.touch(key.id)
+        return UserDto(owner.id, owner.email, emptyList(), scopes = scopes)
     }
 
     fun logout(bearerToken: String?, clientIp: String, userAgent: String?) {

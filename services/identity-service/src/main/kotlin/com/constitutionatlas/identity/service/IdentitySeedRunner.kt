@@ -37,6 +37,7 @@ class IdentitySeedRunner(
         upsert(properties.adminEmail, properties.adminPassword, listOf("admin"), mode)
         upsert(properties.viewerEmail, properties.viewerPassword, listOf("viewer"), mode)
         seedServiceToken()
+        seedIngestionPublishToken()
     }
 
     private fun seedServiceToken() {
@@ -46,12 +47,12 @@ class IdentitySeedRunner(
         }
         val hash = Tokens.sha256Hex(plaintext)
         if (identityRepository.findValidServiceTokenByHash(hash) != null) {
-            identityRepository.replaceActiveServiceTokenScopes(SEED_TOKEN_NAME, ServiceTokenService.ALLOWED_SCOPES)
+            identityRepository.replaceActiveServiceTokenScopes(SEED_TOKEN_NAME, ServiceTokenService.ALLOWED_SCOPES.filterNot { it == "ingestion:publish" })
             identityRepository.renewActiveServiceTokenExpiry(SEED_TOKEN_NAME, seedTokenExpiry())
             return
         }
         if (identityRepository.findActiveServiceTokenByName(SEED_TOKEN_NAME) != null) {
-            identityRepository.replaceActiveServiceTokenScopes(SEED_TOKEN_NAME, ServiceTokenService.ALLOWED_SCOPES)
+            identityRepository.replaceActiveServiceTokenScopes(SEED_TOKEN_NAME, ServiceTokenService.ALLOWED_SCOPES.filterNot { it == "ingestion:publish" })
             identityRepository.renewActiveServiceTokenExpiry(SEED_TOKEN_NAME, seedTokenExpiry())
             return
         }
@@ -62,11 +63,30 @@ class IdentitySeedRunner(
         identityRepository.insertServiceToken(
             SEED_TOKEN_NAME,
             hash,
-            ServiceTokenService.ALLOWED_SCOPES,
+            ServiceTokenService.ALLOWED_SCOPES.filterNot { it == "ingestion:publish" },
             createdBy.id,
             seedTokenExpiry(),
         )
         log.info("Seeded automation service token '{}'", SEED_TOKEN_NAME)
+    }
+
+    private fun seedIngestionPublishToken() {
+        val plaintext = properties.ingestionPublishToken.trim()
+        if (plaintext.isEmpty()) return
+        val name = "local-ingestion-publisher"
+        val scopes = listOf("ingestion:publish")
+        val existing = identityRepository.findActiveServiceTokenByName(name)
+        if (existing != null) {
+            identityRepository.replaceActiveServiceTokenScopes(name, scopes)
+            identityRepository.renewActiveServiceTokenExpiry(name, seedTokenExpiry())
+            if (existing.tokenHash != Tokens.sha256Hex(plaintext)) {
+                identityRepository.rotateServiceToken(existing.id, Tokens.sha256Hex(plaintext), seedTokenExpiry())
+            }
+            return
+        }
+        val createdBy = identityRepository.findUserByEmail(properties.adminEmail) ?: return
+        identityRepository.insertServiceToken(name, Tokens.sha256Hex(plaintext), scopes, createdBy.id, seedTokenExpiry())
+        log.info("Seeded narrow ingestion publication token '{}'; plaintext is not logged", name)
     }
 
     private fun upsert(email: String, password: String, roleNames: List<String>, mode: String) {

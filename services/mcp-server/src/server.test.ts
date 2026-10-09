@@ -35,8 +35,8 @@ test('direct reads reject published staff-only versions', async () => {
   }
 });
 
-async function callTool(name: string, args: Record<string, unknown>): Promise<{ isError?: boolean; structuredContent?: Record<string, unknown> }> {
-  const handler = createMcpHandler(createServer);
+async function callTool(name: string, args: Record<string, unknown>, authorization?: string): Promise<{ isError?: boolean; structuredContent?: Record<string, unknown> }> {
+  const handler = createMcpHandler(ctx => createServer(ctx.requestInfo?.headers.get('authorization') ?? undefined));
   const request = new Request('http://localhost/mcp', {
     method: 'POST',
     headers: {
@@ -45,6 +45,7 @@ async function callTool(name: string, args: Record<string, unknown>): Promise<{ 
       'MCP-Protocol-Version': '2026-07-28',
       'Mcp-Method': 'tools/call',
       'Mcp-Name': name,
+      ...(authorization ? { Authorization: authorization } : {}),
     },
     body: JSON.stringify({
       jsonrpc: '2.0', id: 1, method: 'tools/call',
@@ -82,6 +83,40 @@ test('MCP direct outline read rejects a draft before fetching settings', async (
     const result = await callTool('get_constitution_outline', { versionId: '00000000-0000-4000-8000-000000000001' });
     assert.equal(result.isError, true);
     assert.equal(calls, 1);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('MCP staging requires an import-scoped personal key', async () => {
+  const originalFetch = globalThis.fetch;
+  let calls = 0;
+  globalThis.fetch = async () => { calls++; return Response.json({ scopes: ['mcp:read'] }); };
+  try {
+    const payload = { isoCode: 'FR', countryName: 'France', constitutionSlug: '1958', constitutionTitle: 'Constitution', versionLabel: '1', articles: [{ articleNumber: '1', title: 'First', sortOrder: 1 }] };
+    assert.equal((await callTool('stage_constitution_import', { payload })).isError, true);
+    assert.equal(calls, 0);
+    assert.equal((await callTool('stage_constitution_import', { payload }, 'Bearer ca_mcp_readonly')).isError, true);
+    assert.equal(calls, 1);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('MCP import key stages a pending job and never publishes', async () => {
+  const originalFetch = globalThis.fetch;
+  const calls: Array<{ url: string; method: string }> = [];
+  globalThis.fetch = async (input, init) => {
+    calls.push({ url: String(input), method: init?.method ?? 'GET' });
+    if (String(input).endsWith('/me')) return Response.json({ scopes: ['mcp:read', 'ingestion:import'] });
+    return Response.json({ id: '01900000-0000-4000-8000-000000000001', status: 'pending_review', errors: [] });
+  };
+  try {
+    const result = await callTool('stage_constitution_import', { payload: { isoCode: 'FR' } }, 'Bearer ca_mcp_editor');
+    assert.equal(result.isError, undefined);
+    assert.equal(result.structuredContent?.status, 'pending_review');
+    assert.deepEqual(calls.map(call => call.method), ['GET', 'POST']);
+    assert.equal(calls.some(call => call.url.includes('/publish')), false);
   } finally {
     globalThis.fetch = originalFetch;
   }

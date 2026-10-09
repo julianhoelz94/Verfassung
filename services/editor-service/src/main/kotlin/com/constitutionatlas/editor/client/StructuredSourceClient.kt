@@ -16,12 +16,14 @@ data class DraftOutline(val kinds: List<DraftLevel>)
 data class DraftSettings(val id: UUID, val outline: DraftOutline)
 
 @Component
-class StructuredSourceClient(@Value("\${content.api.url}") contentUrl: String, @Value("\${catalog.api.url}") catalogUrl: String) {
+class StructuredSourceClient(@Value("\${content.api.url}") contentUrl: String, @Value("\${catalog.api.url}") catalogUrl: String, @Value("\${editor.downstream.bearer:}") private val bearer: String) {
     private val content = timedRestClient(contentUrl)
     private val catalog = timedRestClient(catalogUrl)
 
     fun source(version: UUID): DraftSource = try {
-        content.get().uri("/versions/{id}/content", version).retrieve().body(DraftSource::class.java)
+        content.get().uri("/versions/{id}/content", version)
+            .apply { if (bearer.isNotBlank()) header("Authorization", bearerHeader(bearer)) }
+            .retrieve().body(DraftSource::class.java)
             ?: throw DownstreamException("Missing ordered source")
     } catch (ex: RestClientException) {
         throw DownstreamException("Ordered source unavailable", ex)

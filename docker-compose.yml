@@ -17,6 +17,8 @@ services:
       - CATALOG_API_URL=http://catalog-service:8080
       - CONTENT_API_URL=http://content-service:8080
       - SEARCH_API_URL=http://search-service:8080
+      - IDENTITY_API_URL=http://identity-service:8080
+      - INGESTION_API_URL=http://ingestion-service:8080
       - PUBLIC_BASE_URL=${PUBLIC_BASE_URL:-http://localhost}
     depends_on:
       catalog-service:
@@ -24,6 +26,10 @@ services:
       content-service:
         condition: service_started
       search-service:
+        condition: service_started
+      identity-service:
+        condition: service_started
+      ingestion-service:
         condition: service_started
 
   gateway-web:
@@ -145,6 +151,7 @@ services:
       - AUDIT_API_URL=http://audit-service:8080
       - AUDIT_API_BEARER=${AUDIT_API_BEARER:-}
       - IDENTITY_SEED_SERVICE_TOKEN=${IDENTITY_SEED_SERVICE_TOKEN:-}
+      - IDENTITY_SEED_INGESTION_PUBLISH_TOKEN=${IDENTITY_SEED_INGESTION_PUBLISH_TOKEN:-}
       - PUBLIC_BASE_URL=${PUBLIC_BASE_URL:-http://localhost}
       - IDENTITY_MAIL_ENABLED=${IDENTITY_MAIL_ENABLED:-true}
       - IDENTITY_MAIL_FROM=${IDENTITY_MAIL_FROM:-}
@@ -268,6 +275,7 @@ services:
       - CATALOG_API_URL=http://catalog-service:8080
       - CONTENT_API_URL=http://content-service:8080
       - IDENTITY_API_URL=http://identity-service:8080
+      - INGESTION_PUBLISH_TOKEN=${INGESTION_PUBLISH_TOKEN:-}
     depends_on:
       ingestion-db:
         condition: service_healthy

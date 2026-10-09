@@ -4,6 +4,7 @@ import com.constitutionatlas.ingestion.api.ImportArticle
 import com.constitutionatlas.ingestion.api.ImportOutlineKind
 import com.constitutionatlas.platform.OrderedNodeWrite
 import com.constitutionatlas.platform.OrderedSnapshotWrite
+import com.constitutionatlas.platform.OrderedSnapshot
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
@@ -79,6 +80,7 @@ class RestCatalogClient(
         gazetteReference: String?,
         predecessorVersionId: UUID?,
         hopKind: String?,
+        importJobId: UUID?,
     ): DownstreamVersion =
         client.postJson(
             "/constitutions/{id}/versions",
@@ -90,14 +92,15 @@ class RestCatalogClient(
                 "gazetteReference" to gazetteReference,
                 "predecessorVersionId" to predecessorVersionId,
                 "hopKind" to hopKind,
+                "importJobId" to importJobId,
             ),
             DownstreamVersion::class.java,
             constitutionId,
         )
 
-    override fun publishVersion(versionId: UUID): DownstreamVersion =
+    override fun publishVersion(versionId: UUID, importJobId: UUID?): DownstreamVersion =
         client.post()
-            .uri("/versions/{id}/publish", versionId)
+            .uri("/versions/{id}/publish?importJobId={jobId}", versionId, importJobId)
             .retrieve()
             .body(DownstreamVersion::class.java)!!
 
@@ -123,4 +126,7 @@ class RestContentClient(
     override fun replaceArticles(versionId: UUID, articles: List<ImportArticle>) {
         client.putJson("/versions/{id}/articles", articles, versionId)
     }
+
+    override fun snapshot(versionId: UUID): OrderedSnapshot =
+        client.get().uri("/versions/{id}/content", versionId).retrieve().body(OrderedSnapshot::class.java)!!
 }

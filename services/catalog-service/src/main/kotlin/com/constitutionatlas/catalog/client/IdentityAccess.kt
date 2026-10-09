@@ -32,6 +32,14 @@ class WriteAccess(private val identityClient: IdentityClient) {
         return actor
     }
 
+    fun requireVersionPublisher(authorization: String?): Actor {
+        val actor = identityClient.authenticate(authorization)
+        if (!actor.canPublishCatalog() && "ingestion:publish" !in actor.scopes) {
+            throw ForbiddenException("version publication requires publisher or ingestion:publish")
+        }
+        return actor
+    }
+
     fun requireStaffCatalog(authorization: String?): Actor {
         val actor = identityClient.authenticate(authorization)
         if (!actor.canViewStaffCatalog()) {

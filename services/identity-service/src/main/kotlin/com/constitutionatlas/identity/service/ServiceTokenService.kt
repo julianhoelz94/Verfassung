@@ -110,6 +110,7 @@ class ServiceTokenService(
                 "audit:append",
                 "audit:read",
                 "ingestion:import",
+                "ingestion:publish",
             )
 
         fun parseScopes(raw: List<String>): List<String> {

@@ -3,6 +3,7 @@ package com.constitutionatlas.ingestion.client
 import com.constitutionatlas.ingestion.api.ImportArticle
 import com.constitutionatlas.ingestion.api.ImportOutlineKind
 import com.constitutionatlas.platform.OrderedNodeWrite
+import com.constitutionatlas.platform.OrderedSnapshot
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import java.time.LocalDate
 import java.util.UUID
@@ -30,12 +31,14 @@ interface CatalogClient {
         gazetteReference: String?,
         predecessorVersionId: UUID? = null,
         hopKind: String? = null,
+        importJobId: UUID? = null,
     ): DownstreamVersion
-    fun publishVersion(versionId: UUID): DownstreamVersion
+    fun publishVersion(versionId: UUID, importJobId: UUID? = null): DownstreamVersion
     fun replaceOutline(constitutionId: UUID, kinds: List<ImportOutlineKind>)
 }
 
 interface ContentClient {
     fun replaceArticles(versionId: UUID, articles: List<ImportArticle>)
     fun replaceRoots(versionId: UUID, roots: List<OrderedNodeWrite>): Unit = throw UnsupportedOperationException("Ordered import is unavailable")
+    fun snapshot(versionId: UUID): OrderedSnapshot
 }

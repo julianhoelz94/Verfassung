@@ -1,6 +1,6 @@
 import { McpServer } from '@modelcontextprotocol/server';
 import { z } from 'zod';
-import { getJson, publicVersionUrl, requirePublishedVersion, UpstreamError } from './catalog.js';
+import { getJson, postJson, publicVersionUrl, requirePublishedVersion, UpstreamError } from './catalog.js';
 
 const uuid = z.string().uuid();
 const page = { offset: z.number().int().min(0).default(0), limit: z.number().int().min(1).max(50).default(20) };
@@ -38,8 +38,85 @@ async function run<T extends Record<string, unknown>>(tool: string, action: () =
   }
 }
 
-export function createServer(): McpServer {
+export function createServer(authorization?: string): McpServer {
   const server = new McpServer({ name: 'constitution-atlas', version: '0.1.0' }, { capabilities: { tools: {} } });
+
+  async function requireImportKey() {
+    if (!authorization?.startsWith('Bearer ca_mcp_')) throw new UpstreamError(403, 'identity');
+    const actor = await getJson<{ scopes: string[] }>('identity', '/me', authorization);
+    if (!actor.scopes.includes('ingestion:import')) throw new UpstreamError(403, 'identity');
+  }
+
+  server.registerTool('get_import_schema', {
+    description: 'Learn the structured constitution import format, hierarchy rules, and review workflow before staging content.',
+    inputSchema: {},
+  }, () => run('get_import_schema', async () => ({
+    workflow: ['get_import_setup', 'stage_constitution_import', 'editor prepares a draft in the site', 'reviewer approves', 'publisher publishes'],
+    required: ['isoCode', 'countryName', 'constitutionSlug', 'constitutionTitle', 'versionLabel', 'articles or roots'],
+    structure: {
+      outline: { kinds: [{ kindCode: 'article', displayLabel: 'Article', presentation: 'section', showLabel: true, showTitle: true, showKind: false, allowTextAlongsideChildren: false, titlePolicy: 'optional', labelPolicy: 'optional', labelPlacement: 'before_title', segmentation: 'plain' }] },
+      articles: [{ articleNumber: '1', title: 'Example', body: 'Text', sortOrder: 1, nodes: [] }],
+      roots: [{ logicalId: 'stable UUID', kind: 'article', label: '1', title: 'Example', content: [{ type: 'text', text: 'Text' }] }],
+    },
+    notes: ['For a new constitution provide outline.kinds, then inspect its preview in the site.', 'Preserve source spelling, numbering and text order.', 'No MCP tool can approve or publish.'],
+  })));
+
+  server.registerTool('get_import_setup', {
+    description: 'For an editor import key, find an existing constitution and its configured content outline before uploading. A missing constitution has no outline yet.',
+    inputSchema: { countryCode: z.string().regex(/^[A-Za-z]{2}$/), constitutionSlug: z.string().trim().min(1).max(120) },
+  }, ({ countryCode, constitutionSlug }) => run('get_import_setup', async () => {
+    await requireImportKey();
+    let country: CountryDetail;
+    try { country = await getJson<CountryDetail>('catalog', `/countries/${countryCode.toUpperCase()}`); }
+    catch (error) { if (error instanceof UpstreamError && error.status === 404) return { exists: false, countryCode: countryCode.toUpperCase(), outline: null }; throw error; }
+    const constitution = country.constitutions.find(item => item.slug === constitutionSlug);
+    if (!constitution) return { exists: false, countryCode: country.isoCode, outline: null };
+    const outline = await getJson<Record<string, unknown>>('catalog', `/constitutions/${constitution.id}/content-outline`);
+    return { exists: true, countryCode: country.isoCode, constitutionId: constitution.id, title: constitution.title, outline };
+  }));
+
+  server.registerTool('stage_constitution_import', {
+    description: 'Stage one constitution version for site review. This never publishes content.',
+    inputSchema: { payload: z.record(z.string(), z.unknown()) },
+  }, ({ payload }) => run('stage_constitution_import', async () => {
+    await requireImportKey();
+    const job = await postJson<{ id: string; status: string; errors: unknown[] }>('ingestion', '/import-jobs', payload, authorization!);
+    return { jobId: job.id, status: job.status, errors: job.errors, reviewUrl: `${(process.env.PUBLIC_BASE_URL ?? 'http://localhost').replace(/\/$/, '')}/admin/import/${job.id}` };
+  }));
+
+  server.registerTool('create_import_batch', {
+    description: 'Create a private batch handle for up to 100 constitution items. Each item has its own review status.',
+    inputSchema: {},
+  }, () => run('create_import_batch', async () => {
+    await requireImportKey();
+    const batch = await postJson<{ id: string; status: string }>('ingestion', '/import-batches', {}, authorization!);
+    return { batchId: batch.id, status: batch.status, reviewUrl: `${(process.env.PUBLIC_BASE_URL ?? 'http://localhost').replace(/\/$/, '')}/admin/import?batch=${batch.id}` };
+  }));
+
+  server.registerTool('stage_batch_item', {
+    description: 'Stage one item in a batch with a stable idempotency key. Retry the same key and payload safely.',
+    inputSchema: { batchId: uuid, idempotencyKey: z.string().min(8).max(128), payload: z.record(z.string(), z.unknown()), checksumSha256: z.string().regex(/^[a-fA-F0-9]{64}$/).optional() },
+  }, ({ batchId, idempotencyKey, payload, checksumSha256 }) => run('stage_batch_item', async () => {
+    await requireImportKey();
+    const item = await postJson<{ id: string; status: string; errors: unknown[] }>('ingestion', `/import-batches/${batchId}/items`, { idempotencyKey, payload, checksumSha256 }, authorization!);
+    return { batchId, itemId: item.id, status: item.status, errors: item.errors, reviewUrl: `${(process.env.PUBLIC_BASE_URL ?? 'http://localhost').replace(/\/$/, '')}/admin/import/${item.id}` };
+  }));
+
+  server.registerTool('get_import_batch', {
+    description: 'Read independent item statuses for a batch owned by this key principal.',
+    inputSchema: { batchId: uuid },
+  }, ({ batchId }) => run('get_import_batch', async () => {
+    await requireImportKey();
+    return await getJson<Record<string, unknown>>('ingestion', `/import-batches/${batchId}`, authorization);
+  }));
+
+  server.registerTool('get_import_job', {
+    description: 'Check the review status of an import you staged.',
+    inputSchema: { jobId: uuid },
+  }, ({ jobId }) => run('get_import_job', async () => {
+    await requireImportKey();
+    return await getJson<Record<string, unknown>>('ingestion', `/import-jobs/${jobId}`, authorization);
+  }));
 
   server.registerTool('list_countries', {
     description: 'List countries with published constitutions.',

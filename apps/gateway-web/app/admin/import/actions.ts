@@ -1,12 +1,14 @@
 'use server';
 
 import { redirect } from 'next/navigation';
-import { requireAdminUser } from '../../../lib/admin';
-import { requireSessionBearer } from '../../../lib/session';
-import { createImportJob, isImportRequest, parseImportJson } from '../../../lib/ingestion-api';
+import { currentUser, requireSessionBearer } from '../../../lib/session';
+import { createImportJob, isImportRequest, parseImportJson, transitionImportJob } from '../../../lib/ingestion-api';
+
+function hasRole(roles: string[], role: string) { return roles.includes(role) || roles.includes('admin'); }
 
 export async function createImportAction(formData: FormData): Promise<void> {
-  await requireAdminUser('/admin/import?error=forbidden');
+  const user = await currentUser();
+  if (!user || !hasRole(user.roles, 'editor')) redirect('/admin/import?error=forbidden');
   const uploaded = formData.get('file');
   const pasted = String(formData.get('payload') ?? '');
   let raw = pasted;
@@ -28,6 +30,21 @@ export async function createImportAction(formData: FormData): Promise<void> {
     jobId = job.id;
   } catch {
     redirect('/admin/import?error=1');
+  }
+  redirect(`/admin/import/${encodeURIComponent(jobId)}`);
+}
+
+export async function transitionImportAction(formData: FormData): Promise<void> {
+  const user = await currentUser();
+  const jobId = String(formData.get('jobId') ?? '');
+  const action = String(formData.get('action') ?? '');
+  const role = { prepare: 'editor', approve: 'reviewer', reject: 'reviewer', publish: 'publisher' }[action as 'prepare' | 'approve' | 'reject' | 'publish'];
+  if (!user || !role || !hasRole(user.roles, role)) redirect(`/admin/import/${encodeURIComponent(jobId)}?error=forbidden`);
+  if (action === 'publish' && !user.stepUpFresh) redirect(`/account/step-up?returnTo=${encodeURIComponent(`/admin/import/${jobId}`)}`);
+  try {
+    await transitionImportJob(jobId, action as 'prepare' | 'approve' | 'reject' | 'publish', await requireSessionBearer());
+  } catch {
+    redirect(`/admin/import/${encodeURIComponent(jobId)}?error=transition`);
   }
   redirect(`/admin/import/${encodeURIComponent(jobId)}`);
 }

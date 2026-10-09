@@ -63,6 +63,10 @@ class RestCatalogClient(
         return detail.constitutions.firstOrNull { it.slug == slug }
     }
 
+    override fun currentSettingsRevisionId(constitutionId: UUID): UUID =
+        client.get().uri("/constitutions/{id}/settings", constitutionId)
+            .retrieve().body(SettingsRevisionWire::class.java)!!.id
+
     override fun createConstitution(isoCode: String, slug: String, title: String): DownstreamConstitution =
         client.postJson(
             "/countries/{iso}/constitutions",
@@ -112,6 +116,9 @@ class RestCatalogClient(
     private data class CountryDetailWire(
         val constitutions: List<DownstreamConstitution> = emptyList(),
     )
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    private data class SettingsRevisionWire(val id: UUID)
 }
 
 class RestContentClient(

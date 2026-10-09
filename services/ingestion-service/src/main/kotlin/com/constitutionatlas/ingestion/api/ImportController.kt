@@ -65,13 +65,24 @@ class ImportController(
     fun prepare(@RequestHeader(value = "Authorization", required = false) authorization: String?, @PathVariable jobId: UUID): ImportJobDto =
         importService.prepare(authorization, jobId, writeAccess.requireEditor(authorization).id)
 
+    @PostMapping("/import-jobs/{jobId}/confirm-outline")
+    fun confirmOutline(@RequestHeader(value = "Authorization", required = false) authorization: String?, @PathVariable jobId: UUID): ImportJobDto =
+        importService.confirmOutline(authorization, jobId, writeAccess.requireEditor(authorization).id)
+
     @PostMapping("/import-jobs/{jobId}/approve")
-    fun approve(@RequestHeader(value = "Authorization", required = false) authorization: String?, @PathVariable jobId: UUID): ImportJobDto =
-        importService.approve(authorization, jobId, writeAccess.requireReviewer(authorization).id)
+    fun approve(@RequestHeader(value = "Authorization", required = false) authorization: String?, @PathVariable jobId: UUID, @RequestBody request: ReviewDecisionRequest): ImportJobDto =
+        importService.approve(authorization, jobId, writeAccess.requireReviewer(authorization).id, request.reason)
 
     @PostMapping("/import-jobs/{jobId}/reject")
-    fun reject(@RequestHeader(value = "Authorization", required = false) authorization: String?, @PathVariable jobId: UUID): ImportJobDto =
-        importService.reject(jobId, writeAccess.requireReviewer(authorization).id)
+    fun reject(@RequestHeader(value = "Authorization", required = false) authorization: String?, @PathVariable jobId: UUID, @RequestBody request: ReviewDecisionRequest): ImportJobDto =
+        importService.reject(jobId, writeAccess.requireReviewer(authorization).id, request.reason)
+
+    @GetMapping("/import-jobs/{jobId}/decisions")
+    fun reviewDecisions(@RequestHeader(value = "Authorization", required = false) authorization: String?, @PathVariable jobId: UUID): List<ReviewDecisionDto> {
+        writeAccess.requireStaff(authorization)
+        if (importService.getJob(jobId) == null) throw NotFoundException("Unknown import job '$jobId'")
+        return importService.reviewDecisions(jobId)
+    }
 
     @PostMapping("/import-jobs/{jobId}/publish")
     fun publish(@RequestHeader(value = "Authorization", required = false) authorization: String?, @PathVariable jobId: UUID): ImportJobDto =

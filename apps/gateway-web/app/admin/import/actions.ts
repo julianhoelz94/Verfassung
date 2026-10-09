@@ -38,11 +38,13 @@ export async function transitionImportAction(formData: FormData): Promise<void> 
   const user = await currentUser();
   const jobId = String(formData.get('jobId') ?? '');
   const action = String(formData.get('action') ?? '');
-  const role = { prepare: 'editor', approve: 'reviewer', reject: 'reviewer', publish: 'publisher' }[action as 'prepare' | 'approve' | 'reject' | 'publish'];
+  const reason = String(formData.get('reason') ?? '').trim();
+  const role = { 'confirm-outline': 'editor', prepare: 'editor', approve: 'reviewer', reject: 'reviewer', publish: 'publisher' }[action as 'confirm-outline' | 'prepare' | 'approve' | 'reject' | 'publish'];
   if (!user || !role || !hasRole(user.roles, role)) redirect(`/admin/import/${encodeURIComponent(jobId)}?error=forbidden`);
+  if (['approve', 'reject'].includes(action) && (reason.length < 10 || reason.length > 2000)) redirect(`/admin/import/${encodeURIComponent(jobId)}?error=reason`);
   if (action === 'publish' && !user.stepUpFresh) redirect(`/account/step-up?returnTo=${encodeURIComponent(`/admin/import/${jobId}`)}`);
   try {
-    await transitionImportJob(jobId, action as 'prepare' | 'approve' | 'reject' | 'publish', await requireSessionBearer());
+    await transitionImportJob(jobId, action as 'confirm-outline' | 'prepare' | 'approve' | 'reject' | 'publish', await requireSessionBearer(), reason);
   } catch {
     redirect(`/admin/import/${encodeURIComponent(jobId)}?error=transition`);
   }

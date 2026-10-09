@@ -83,8 +83,29 @@ class ImportService(
 
     fun stagedRequest(jobId: UUID): ImportRequest? = importJobRepository.request(jobId)
 
+    fun confirmOutline(authorization: String?, jobId: UUID, actorId: UUID): ImportJobDto {
+        val request = importJobRepository.request(jobId) ?: throw com.constitutionatlas.platform.NotFoundException("Unknown import job")
+        if (request.outline?.kinds.isNullOrEmpty()) throw ResponseStatusException(HttpStatus.CONFLICT, "Import has no proposed outline")
+        DownstreamAuth.withAuthorization(authorization) {
+            if (catalogClient.findConstitution(request.isoCode.trim().uppercase(), request.constitutionSlug) != null) {
+                throw ResponseStatusException(HttpStatus.CONFLICT, "Constitution already exists; discover and pin its settings revision")
+            }
+        }
+        if (!importJobRepository.confirmOutline(jobId, actorId)) throw ResponseStatusException(HttpStatus.CONFLICT, "Import is not awaiting outline confirmation")
+        return importJobRepository.find(jobId)!!
+    }
+
     fun prepare(authorization: String?, jobId: UUID, actorId: UUID): ImportJobDto {
         val request = importJobRepository.request(jobId) ?: throw com.constitutionatlas.platform.NotFoundException("Unknown import job")
+        DownstreamAuth.withAuthorization(authorization) {
+            val existing = catalogClient.findConstitution(request.isoCode.trim().uppercase(), request.constitutionSlug)
+            if (existing == null && !importJobRepository.isOutlineConfirmed(jobId)) {
+                throw ResponseStatusException(HttpStatus.CONFLICT, "An editor must confirm the new constitution outline before preparation")
+            }
+            if (existing != null && request.settingsRevisionId != catalogClient.currentSettingsRevisionId(existing.id)) {
+                throw ResponseStatusException(HttpStatus.CONFLICT, "Settings revision changed; rediscover the constitution layout")
+            }
+        }
         if (!importJobRepository.claimPreparation(jobId, actorId)) throw ResponseStatusException(HttpStatus.CONFLICT, "Import is not awaiting preparation")
         try {
             DownstreamAuth.withAuthorization(authorization) { persistDraft(jobId, request) }
@@ -94,18 +115,25 @@ class ImportService(
         return importJobRepository.find(jobId)!!
     }
 
-    fun approve(authorization: String?, jobId: UUID, actorId: UUID): ImportJobDto {
+    private fun reviewReason(reason: String): String = reason.trim().also {
+        if (it.length !in 10..2000) throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Review reason must contain 10 to 2000 characters")
+    }
+
+    fun approve(authorization: String?, jobId: UUID, actorId: UUID, reason: String): ImportJobDto {
+        val recordedReason = reviewReason(reason)
         val versionId = importJobRepository.find(jobId)?.versionId
             ?: throw ResponseStatusException(HttpStatus.CONFLICT, "Import has no prepared draft")
         val snapshot = DownstreamAuth.withAuthorization(authorization) { contentClient.snapshot(versionId) }
-        if (!importJobRepository.approve(jobId, actorId, snapshot)) throw ResponseStatusException(HttpStatus.CONFLICT, "Import is not prepared or cannot be self-approved")
+        if (!importJobRepository.approve(jobId, actorId, snapshot, recordedReason)) throw ResponseStatusException(HttpStatus.CONFLICT, "Import is not prepared or cannot be self-approved")
         return importJobRepository.find(jobId)!!
     }
 
-    fun reject(jobId: UUID, actorId: UUID): ImportJobDto {
-        if (!importJobRepository.reject(jobId, actorId)) throw ResponseStatusException(HttpStatus.CONFLICT, "Import is not pending or cannot be self-rejected")
+    fun reject(jobId: UUID, actorId: UUID, reason: String): ImportJobDto {
+        if (!importJobRepository.reject(jobId, actorId, reviewReason(reason))) throw ResponseStatusException(HttpStatus.CONFLICT, "Import is not pending or cannot be self-rejected")
         return importJobRepository.find(jobId)!!
     }
+
+    fun reviewDecisions(jobId: UUID): List<com.constitutionatlas.ingestion.api.ReviewDecisionDto> = importJobRepository.reviewDecisions(jobId)
 
     fun publish(authorization: String?, jobId: UUID, actorId: UUID): ImportJobDto {
         if (!importJobRepository.claimPublication(jobId, actorId)) throw ResponseStatusException(HttpStatus.CONFLICT, "Import is not approved or cannot be self-published")
@@ -131,11 +159,16 @@ class ImportService(
         if (catalogClient.getCountry(iso) == null) {
             catalogClient.createCountry(iso, request.countryName.trim())
         }
-        val constitution = catalogClient.findConstitution(iso, request.constitutionSlug)
-            ?: catalogClient.createConstitution(iso, request.constitutionSlug, request.constitutionTitle)
-        request.outline?.takeIf { it.kinds.isNotEmpty() }?.let { outline ->
-            catalogClient.replaceOutline(constitution.id, outline.kinds)
+        val existing = catalogClient.findConstitution(iso, request.constitutionSlug)
+        if (existing != null) {
+            if (request.outline != null) throw ResponseStatusException(HttpStatus.CONFLICT, "Existing constitution settings must be edited and confirmed in the site")
+            val revision = catalogClient.currentSettingsRevisionId(existing.id)
+            if (request.settingsRevisionId != revision) throw ResponseStatusException(HttpStatus.CONFLICT, "Settings revision changed; rediscover the constitution layout")
+        } else if (request.outline?.kinds.isNullOrEmpty()) {
+            throw ResponseStatusException(HttpStatus.CONFLICT, "New constitution requires a confirmed outline proposal")
         }
+        val constitution = existing ?: catalogClient.createConstitution(iso, request.constitutionSlug, request.constitutionTitle)
+        if (existing == null) request.outline?.let { catalogClient.replaceOutline(constitution.id, it.kinds) }
         val version = catalogClient.createDraftVersion(
             constitution.id,
             request.versionLabel.trim(),

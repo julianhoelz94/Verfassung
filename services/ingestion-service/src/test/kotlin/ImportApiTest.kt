@@ -66,7 +66,13 @@ class ImportApiTest {
     private fun prepare(id: String) = mockMvc.post("/import-jobs/$id/prepare") { header("Authorization", TOKEN) }
         .andExpect { status { isOk() }; jsonPath("$.status") { value("pending_review") } }
 
-    private fun approve(id: String) = mockMvc.post("/import-jobs/$id/approve") { header("Authorization", REVIEWER_TOKEN) }
+    private fun confirmOutline(id: String) = mockMvc.post("/import-jobs/$id/confirm-outline") { header("Authorization", TOKEN) }
+        .andExpect { status { isOk() }; jsonPath("$.outlineConfirmedBy") { value(admin.id.toString()) } }
+
+    private fun approve(id: String) = mockMvc.post("/import-jobs/$id/approve") {
+        header("Authorization", REVIEWER_TOKEN); contentType = MediaType.APPLICATION_JSON
+        content = """{"reason":"Reviewed source and structure against the submitted text."}"""
+    }
         .andExpect { status { isOk() }; jsonPath("$.status") { value("approved") } }
 
     private fun publish(id: String) = mockMvc.post("/import-jobs/$id/publish") { header("Authorization", PUBLISHER_TOKEN) }
@@ -97,6 +103,7 @@ class ImportApiTest {
                   "constitutionSlug": "1958",
                   "constitutionTitle": "Constitution of 1958",
                   "versionLabel": "1958",
+                  "outline": {"kinds": [{"kindCode": "article", "displayLabel": "Article"}]},
                   "articles": [
                     {"articleNumber": "1", "title": "A", "body": "a", "sortOrder": 1},
                     {"articleNumber": "1", "title": "B", "body": "b", "sortOrder": 2}
@@ -157,6 +164,7 @@ class ImportApiTest {
                   "constitutionSlug": "1958",
                   "constitutionTitle": "Constitution of 1958",
                   "versionLabel": "1958",
+                  "outline": {"kinds": [{"kindCode": "article", "displayLabel": "Article"}]},
                   "articles": [
                     {"articleNumber": "1", "title": "Sovereignty", "body": "France is a republic.", "sortOrder": 1}
                   ]
@@ -169,12 +177,24 @@ class ImportApiTest {
         }.andReturn()
         Mockito.verifyNoInteractions(catalogClient, contentClient)
         val id = jobId(staged.response.contentAsString)
+        confirmOutline(id)
         prepare(id).andExpect { jsonPath("$.versionId") { value(versionId.toString()) } }
         Mockito.verify(catalogClient, Mockito.never()).publishVersion(anyUuid(), anyUuid())
+        mockMvc.post("/import-jobs/$id/approve") {
+            header("Authorization", REVIEWER_TOKEN); contentType = MediaType.APPLICATION_JSON
+            content = """{"reason":"Too short"}"""
+        }.andExpect { status { isBadRequest() } }
         approve(id)
+        mockMvc.get("/import-jobs/$id/decisions") { header("Authorization", REVIEWER_TOKEN) }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$[0].decision") { value("approved") }
+                jsonPath("$[0].reason") { value("Reviewed source and structure against the submitted text.") }
+                jsonPath("$.length()") { value(1) }
+            }
         publish(id)
         Mockito.verify(catalogClient).publishVersion(versionId, UUID.fromString(id))
-        Mockito.verify(catalogClient, Mockito.never()).replaceOutline(anyUuid(), Mockito.anyList())
+        Mockito.verify(catalogClient).replaceOutline(anyUuid(), Mockito.anyList())
     }
 
     @Test
@@ -183,7 +203,9 @@ class ImportApiTest {
         val version = UUID.randomUUID()
         val logical = UUID.randomUUID()
         Mockito.`when`(catalogClient.getCountry("FR")).thenReturn(DownstreamCountry(UUID.randomUUID(), "FR", "France"))
-        Mockito.`when`(catalogClient.findConstitution("FR", "ordered")).thenReturn(DownstreamConstitution(constitution, "ordered", "Ordered constitution"))
+        Mockito.`when`(catalogClient.findConstitution("FR", "ordered")).thenReturn(null)
+        Mockito.`when`(catalogClient.createConstitution("FR", "ordered", "Ordered constitution"))
+            .thenReturn(DownstreamConstitution(constitution, "ordered", "Ordered constitution"))
         stubDraft(version, constitution)
         val staged = mockMvc.post("/import-jobs") {
             header("Authorization", TOKEN)
@@ -193,6 +215,7 @@ class ImportApiTest {
             status { isCreated() }
             jsonPath("$.status") { value("pending_review") }
         }.andReturn()
+        confirmOutline(jobId(staged.response.contentAsString))
         prepare(jobId(staged.response.contentAsString))
         Mockito.verify(contentClient).replaceRoots(
             eqNonNull(version),
@@ -212,6 +235,7 @@ class ImportApiTest {
             .thenReturn(DownstreamCountry(UUID.randomUUID(), "FR", "France"))
         Mockito.`when`(catalogClient.findConstitution("FR", "1958"))
             .thenReturn(DownstreamConstitution(constitutionId, "1958", "Constitution of 1958"))
+        Mockito.`when`(catalogClient.currentSettingsRevisionId(constitutionId)).thenReturn(SETTINGS_REVISION)
         stubDraft(versionId, constitutionId)
 
         val staged = mockMvc.post("/import-jobs") {
@@ -224,6 +248,7 @@ class ImportApiTest {
                   "constitutionSlug": "1958",
                   "constitutionTitle": "Constitution of 1958",
                   "versionLabel": "1962",
+                  "settingsRevisionId": "$SETTINGS_REVISION",
                   "effectiveDate": "1962-11-06",
                   "predecessorVersionId": "$predecessorId",
                   "hopKind": "legal",
@@ -248,6 +273,29 @@ class ImportApiTest {
             eqNonNull("legal"),
             anyUuid(),
         )
+    }
+
+    @Test
+    fun existingConstitutionRejectsAnUnpinnedOrStaleLayout() {
+        val constitutionId = UUID.randomUUID()
+        Mockito.`when`(catalogClient.getCountry("FR")).thenReturn(DownstreamCountry(UUID.randomUUID(), "FR", "France"))
+        Mockito.`when`(catalogClient.findConstitution("FR", "existing"))
+            .thenReturn(DownstreamConstitution(constitutionId, "existing", "Existing"))
+        Mockito.`when`(catalogClient.currentSettingsRevisionId(constitutionId)).thenReturn(SETTINGS_REVISION)
+        val staged = mockMvc.post("/import-jobs") {
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"isoCode":"FR","countryName":"France","constitutionSlug":"existing","constitutionTitle":"Existing","versionLabel":"1","settingsRevisionId":"${UUID.randomUUID()}","articles":[{"articleNumber":"1","title":"A","sortOrder":1}]}"""
+        }.andExpect { status { isCreated() } }.andReturn()
+        mockMvc.post("/import-jobs/${jobId(staged.response.contentAsString)}/prepare") {
+            header("Authorization", TOKEN)
+        }.andExpect { status { isConflict() } }
+        Mockito.verify(catalogClient, Mockito.never()).createDraftVersion(
+            anyUuid(), anyStr(), Mockito.nullable(LocalDate::class.java), anyStr(),
+            Mockito.nullable(String::class.java), Mockito.nullable(String::class.java),
+            Mockito.nullable(UUID::class.java), Mockito.nullable(String::class.java), anyUuid(),
+        )
+        Mockito.verify(catalogClient, Mockito.never()).replaceOutline(anyUuid(), Mockito.anyList())
     }
 
     @Test
@@ -277,6 +325,7 @@ class ImportApiTest {
             jsonPath("$.status") { value("pending_review") }
             jsonPath("$.isoCode") { value("US") }
         }.andReturn()
+        confirmOutline(jobId(staged.response.contentAsString))
         prepare(jobId(staged.response.contentAsString)).andExpect { jsonPath("$.versionId") { value(versionId.toString()) } }
         Mockito.verify(catalogClient).replaceOutline(
             eqNonNull(constitutionId),
@@ -396,6 +445,7 @@ class ImportApiTest {
         private const val TOKEN = "Bearer test-token"
         private const val REVIEWER_TOKEN = "Bearer reviewer-token"
         private const val PUBLISHER_TOKEN = "Bearer publisher-token"
+        private val SETTINGS_REVISION = UUID.fromString("01900000-0000-4000-8000-000000000504")
 
         private fun nestedJson(depth: Int): String = (1..depth).fold("1") { acc, _ -> """{"x":$acc}""" }
 

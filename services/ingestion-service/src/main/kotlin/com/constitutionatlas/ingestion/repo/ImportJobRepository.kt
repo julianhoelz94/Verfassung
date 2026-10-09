@@ -3,10 +3,12 @@ package com.constitutionatlas.ingestion.repo
 import com.constitutionatlas.ingestion.api.ImportErrorDto
 import com.constitutionatlas.ingestion.api.ImportJobDto
 import com.constitutionatlas.ingestion.api.ImportRequest
+import com.constitutionatlas.ingestion.api.ReviewDecisionDto
 import com.constitutionatlas.platform.OrderedSnapshot
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Repository
+import org.springframework.transaction.annotation.Transactional
 import java.util.UUID
 
 @Repository
@@ -62,19 +64,52 @@ class ImportJobRepository(
         actorId, jobId,
     ) == 1
 
+    fun confirmOutline(jobId: UUID, actorId: UUID): Boolean = jdbc.update(
+        "UPDATE import_jobs SET outline_confirmed_by = ?, outline_confirmed_at = NOW(), updated_at = NOW() WHERE id = ? AND status = 'pending_review' AND version_id IS NULL",
+        actorId, jobId,
+    ) == 1
+
+    fun isOutlineConfirmed(jobId: UUID): Boolean = jdbc.query(
+        "SELECT outline_confirmed_by IS NOT NULL FROM import_jobs WHERE id = ?",
+        { rs, _ -> rs.getBoolean(1) }, jobId,
+    ).firstOrNull() ?: false
+
     fun prepared(jobId: UUID, versionId: UUID) {
         jdbc.update("UPDATE import_jobs SET status = 'pending_review', version_id = ?, updated_at = NOW() WHERE id = ? AND status = 'preparing'", versionId, jobId)
     }
 
-    fun approve(jobId: UUID, actorId: UUID, snapshot: OrderedSnapshot): Boolean = jdbc.update(
-        "UPDATE import_jobs SET status = 'approved', approved_by = ?, approved_at = NOW(), approved_generation = ?, approved_settings_revision_id = ?, updated_at = NOW() WHERE id = ? AND status = 'pending_review' AND version_id = ? AND (submitted_by IS NULL OR submitted_by <> ?)",
-        actorId, snapshot.generation, snapshot.settingsRevisionId, jobId, snapshot.versionId, actorId,
-    ) == 1
+    @Transactional
+    fun approve(jobId: UUID, actorId: UUID, snapshot: OrderedSnapshot, reason: String): Boolean {
+        val changed = jdbc.update(
+            "UPDATE import_jobs SET status = 'approved', approved_by = ?, approved_at = NOW(), approved_generation = ?, approved_settings_revision_id = ?, updated_at = NOW() WHERE id = ? AND status = 'pending_review' AND version_id = ? AND (submitted_by IS NULL OR submitted_by <> ?)",
+            actorId, snapshot.generation, snapshot.settingsRevisionId, jobId, snapshot.versionId, actorId,
+        ) == 1
+        if (changed) recordDecision(jobId, actorId, "approved", reason)
+        return changed
+    }
 
-    fun reject(jobId: UUID, actorId: UUID): Boolean = jdbc.update(
-        "UPDATE import_jobs SET status = 'rejected', approved_by = ?, updated_at = NOW() WHERE id = ? AND status = 'pending_review' AND (submitted_by IS NULL OR submitted_by <> ?)",
-        actorId, jobId, actorId,
-    ) == 1
+    @Transactional
+    fun reject(jobId: UUID, actorId: UUID, reason: String): Boolean {
+        val changed = jdbc.update(
+            "UPDATE import_jobs SET status = 'rejected', approved_by = ?, updated_at = NOW() WHERE id = ? AND status = 'pending_review' AND (submitted_by IS NULL OR submitted_by <> ?)",
+            actorId, jobId, actorId,
+        ) == 1
+        if (changed) recordDecision(jobId, actorId, "rejected", reason)
+        return changed
+    }
+
+    private fun recordDecision(jobId: UUID, actorId: UUID, decision: String, reason: String) {
+        jdbc.update(
+            "INSERT INTO import_review_decisions (id, import_job_id, decision, reason, decided_by) VALUES (?, ?, ?, ?, ?)",
+            UUID.randomUUID(), jobId, decision, reason, actorId,
+        )
+    }
+
+    fun reviewDecisions(jobId: UUID): List<ReviewDecisionDto> = jdbc.query(
+        "SELECT id, decision, reason, decided_by, decided_at FROM import_review_decisions WHERE import_job_id = ? ORDER BY decided_at, id",
+        { rs, _ -> ReviewDecisionDto(rs.getObject("id", UUID::class.java), rs.getString("decision"), rs.getString("reason"), rs.getObject("decided_by", UUID::class.java), rs.getObject("decided_at", java.time.OffsetDateTime::class.java)) },
+        jobId,
+    )
 
     fun claimPublication(jobId: UUID, actorId: UUID): Boolean = jdbc.update(
         "UPDATE import_jobs SET status = 'publishing', published_by = ?, updated_at = NOW() WHERE id = ? AND status = 'approved' AND approved_by <> ?",
@@ -139,7 +174,7 @@ class ImportJobRepository(
 
     fun find(jobId: UUID): ImportJobDto? {
         val job = jdbc.query(
-            "SELECT id, status, version_id, payload, submitted_by, prepared_by, approved_by, published_by FROM import_jobs WHERE id = ?",
+            "SELECT id, status, version_id, payload, submitted_by, prepared_by, approved_by, published_by, outline_confirmed_by FROM import_jobs WHERE id = ?",
             { rs, _ ->
                 val payload = rs.getString("payload")
                 val iso =
@@ -153,6 +188,7 @@ class ImportJobRepository(
                     rs.getObject("prepared_by", UUID::class.java),
                     rs.getObject("approved_by", UUID::class.java),
                     rs.getObject("published_by", UUID::class.java),
+                    rs.getObject("outline_confirmed_by", UUID::class.java),
                 )
             },
             jobId,
@@ -162,7 +198,7 @@ class ImportJobRepository(
             { rs, _ -> ImportErrorDto(rs.getString("code"), rs.getString("message")) },
             jobId,
         )
-        return ImportJobDto(job.id, job.status, job.versionId, errors, job.isoCode, job.submittedBy, job.preparedBy, job.approvedBy, job.publishedBy)
+        return ImportJobDto(job.id, job.status, job.versionId, errors, job.isoCode, job.submittedBy, job.preparedBy, job.approvedBy, job.publishedBy, job.outlineConfirmedBy)
     }
 
     private data class JobRow(
@@ -174,5 +210,6 @@ class ImportJobRepository(
         val preparedBy: UUID?,
         val approvedBy: UUID?,
         val publishedBy: UUID?,
+        val outlineConfirmedBy: UUID?,
     )
 }

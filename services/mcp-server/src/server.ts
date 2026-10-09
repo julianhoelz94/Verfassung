@@ -52,13 +52,13 @@ export function createServer(authorization?: string): McpServer {
     inputSchema: {},
   }, () => run('get_import_schema', async () => ({
     workflow: ['get_import_setup', 'stage_constitution_import', 'editor prepares a draft in the site', 'reviewer approves', 'publisher publishes'],
-    required: ['isoCode', 'countryName', 'constitutionSlug', 'constitutionTitle', 'versionLabel', 'articles or roots'],
+    required: ['isoCode', 'countryName', 'constitutionSlug', 'constitutionTitle', 'versionLabel', 'articles or roots', 'settingsRevisionId for an existing constitution'],
     structure: {
       outline: { kinds: [{ kindCode: 'article', displayLabel: 'Article', presentation: 'section', showLabel: true, showTitle: true, showKind: false, allowTextAlongsideChildren: false, titlePolicy: 'optional', labelPolicy: 'optional', labelPlacement: 'before_title', segmentation: 'plain' }] },
       articles: [{ articleNumber: '1', title: 'Example', body: 'Text', sortOrder: 1, nodes: [] }],
       roots: [{ logicalId: 'stable UUID', kind: 'article', label: '1', title: 'Example', content: [{ type: 'text', text: 'Text' }] }],
     },
-    notes: ['For a new constitution provide outline.kinds, then inspect its preview in the site.', 'Preserve source spelling, numbering and text order.', 'No MCP tool can approve or publish.'],
+    notes: ['Call get_import_setup first. For an existing constitution copy its settingsRevisionId and omit outline.', 'A new constitution needs an outline proposal and a site review before content preparation.', 'Preserve source spelling, numbering and text order.', 'No MCP tool can approve or publish.'],
   })));
 
   server.registerTool('get_import_setup', {
@@ -71,8 +71,8 @@ export function createServer(authorization?: string): McpServer {
     catch (error) { if (error instanceof UpstreamError && error.status === 404) return { exists: false, countryCode: countryCode.toUpperCase(), outline: null }; throw error; }
     const constitution = country.constitutions.find(item => item.slug === constitutionSlug);
     if (!constitution) return { exists: false, countryCode: country.isoCode, outline: null };
-    const outline = await getJson<Record<string, unknown>>('catalog', `/constitutions/${constitution.id}/content-outline`);
-    return { exists: true, countryCode: country.isoCode, constitutionId: constitution.id, title: constitution.title, outline };
+    const settings = await getJson<{ id: string; outline: Record<string, unknown> }>('catalog', `/constitutions/${constitution.id}/settings`);
+    return { exists: true, countryCode: country.isoCode, constitutionId: constitution.id, title: constitution.title, settingsRevisionId: settings.id, outline: settings.outline };
   }));
 
   server.registerTool('stage_constitution_import', {

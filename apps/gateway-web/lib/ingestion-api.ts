@@ -15,6 +15,7 @@ export type ImportJob = {
   preparedBy?: string | null;
   approvedBy?: string | null;
   publishedBy?: string | null;
+  outlineConfirmedBy?: string | null;
 };
 
 const REQUIRED_STRINGS = ['isoCode', 'countryName', 'constitutionSlug', 'constitutionTitle', 'versionLabel'] as const;
@@ -43,8 +44,14 @@ export function getImportPayload(jobId: string, authorization: string): Promise<
   return readJson<Record<string, unknown>>(`${ingestionBaseUrl()}/import-jobs/${encodeURIComponent(jobId)}/payload`, 'ingestion', authorization);
 }
 
-export function transitionImportJob(jobId: string, action: 'prepare' | 'approve' | 'reject' | 'publish', authorization: string): Promise<ImportJob> {
-  return sendJson<ImportJob>(`${ingestionBaseUrl()}/import-jobs/${encodeURIComponent(jobId)}/${action}`, 'ingestion', 'POST', {}, authorization);
+export function transitionImportJob(jobId: string, action: 'confirm-outline' | 'prepare' | 'approve' | 'reject' | 'publish', authorization: string, reason?: string): Promise<ImportJob> {
+  return sendJson<ImportJob>(`${ingestionBaseUrl()}/import-jobs/${encodeURIComponent(jobId)}/${action}`, 'ingestion', 'POST', reason ? { reason } : {}, authorization);
+}
+
+export type ImportReviewDecision = { id: string; decision: string; reason: string; decidedBy: string; decidedAt: string };
+
+export function getImportReviewDecisions(jobId: string, authorization: string): Promise<ImportReviewDecision[]> {
+  return readJson<ImportReviewDecision[]>(`${ingestionBaseUrl()}/import-jobs/${encodeURIComponent(jobId)}/decisions`, 'ingestion', authorization).then(decisions => decisions ?? []);
 }
 
 export function getPreparedImportContent(versionId: string, authorization: string): Promise<{ roots: OrderedNode[]; generation: number; settingsRevisionId: string | null } | null> {

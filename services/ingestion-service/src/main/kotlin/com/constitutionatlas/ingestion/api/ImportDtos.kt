@@ -50,6 +50,7 @@ data class ImportRequest(
     val gazetteReference: String? = null,
     val predecessorVersionId: UUID? = null,
     val hopKind: String? = null,
+    val settingsRevisionId: UUID? = null,
     val outline: ImportOutline? = null,
     val articles: List<ImportArticle> = emptyList(),
     val roots: List<OrderedNodeWrite> = emptyList(),
@@ -70,8 +71,13 @@ data class ImportJobDto(
     val preparedBy: UUID? = null,
     val approvedBy: UUID? = null,
     val publishedBy: UUID? = null,
+    val outlineConfirmedBy: UUID? = null,
 )
 
 data class ImportBatchDto(val id: UUID, val items: List<ImportJobDto>, val status: String)
 
 data class StageBatchItemRequest(val idempotencyKey: String, val payload: ImportRequest, val checksumSha256: String? = null)
+
+data class ReviewDecisionRequest(val reason: String)
+
+data class ReviewDecisionDto(val id: UUID, val decision: String, val reason: String, val decidedBy: UUID, val decidedAt: java.time.OffsetDateTime)

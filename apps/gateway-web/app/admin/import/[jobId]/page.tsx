@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation';
 import { AdminForbidden } from '../../../components/AdminForbidden';
 import { Alert, Button, Card, PageHeader } from '../../../components/ui';
 import { PageMain } from '../../../components/PageMain';
-import { getImportJob, getImportPayload, getPreparedImportContent } from '../../../../lib/ingestion-api';
+import { getImportJob, getImportPayload, getPreparedImportContent, getImportReviewDecisions } from '../../../../lib/ingestion-api';
 import { getVersionSettings } from '../../../../lib/api';
 import { OrderedContentTree } from '../../../components/ConstitutionText';
 import { currentUser, requireSessionBearer } from '../../../../lib/session';
@@ -36,6 +36,7 @@ export default async function ImportJobPage(props: ImportJobPageProps) {
     notFound();
   }
   const payload = await getImportPayload(params.jobId, await requireSessionBearer()).catch(() => null);
+  const decisions = await getImportReviewDecisions(params.jobId, await requireSessionBearer()).catch(() => []);
   const prepared = job.versionId ? await getPreparedImportContent(job.versionId, await requireSessionBearer()).catch(() => null) : null;
   const settings = job.versionId ? await getVersionSettings(job.versionId).catch(() => null) : null;
   const editor = user.roles.includes('editor') || user.roles.includes('admin');
@@ -50,7 +51,7 @@ export default async function ImportJobPage(props: ImportJobPageProps) {
   return (
     <PageMain className="wide">
       <PageHeader title="Import job" meta={`Status: ${job.status}`} />
-      {searchParams.error ? <Alert tone="error">The action could not be completed. Check the job status and your rights.</Alert> : null}
+      {searchParams.error ? <Alert tone="error">{searchParams.error === 'reason' ? 'Enter a reason of 10 to 2000 characters.' : 'The action could not be completed. Check the job status and your rights.'}</Alert> : null}
       {job.status === 'pending_review' ? <Alert>This import is pending review. It is not public.</Alert> : null}
       {job.status === 'failed' ? <Alert tone="error">The import failed.</Alert> : null}
       {job.status === 'completed' && versionHref ? (
@@ -67,7 +68,8 @@ export default async function ImportJobPage(props: ImportJobPageProps) {
       </Card> : null}
       <Card>
         <h2>Review actions</h2>
-        {!job.versionId && job.status === 'pending_review' && editor ? <ActionForm action="prepare" jobId={job.id} label="Prepare unpublished draft" /> : null}
+        {!job.versionId && job.status === 'pending_review' && editor && payload?.outline && !job.outlineConfirmedBy ? <ActionForm action="confirm-outline" jobId={job.id} label="Confirm proposed outline" /> : null}
+        {!job.versionId && job.status === 'pending_review' && editor && (!payload?.outline || job.outlineConfirmedBy) ? <ActionForm action="prepare" jobId={job.id} label="Prepare unpublished draft" /> : null}
         {job.versionId && job.status === 'pending_review' && reviewer && !ownSubmission ? <>
           <ActionForm action="approve" jobId={job.id} label="Approve prepared draft" />
           <ActionForm action="reject" jobId={job.id} label="Reject import" />
@@ -75,6 +77,9 @@ export default async function ImportJobPage(props: ImportJobPageProps) {
         {job.status === 'approved' && publisher && !ownApproval ? <ActionForm action="publish" jobId={job.id} label="Publish approved version" /> : null}
         {job.versionId && job.status !== 'completed' ? <p>Draft version: <code>{job.versionId}</code></p> : null}
       </Card>
+      {decisions.length ? <Card><h2>Review decisions</h2><ol>{decisions.map(decision => <li key={decision.id}>
+        <strong>{decision.decision}</strong> · {new Date(decision.decidedAt).toLocaleString()}<p>{decision.reason}</p>
+      </li>)}</ol></Card> : null}
       {job.errors.length > 0 ? (
         <Card>
           <h2>Errors</h2>
@@ -91,10 +96,11 @@ export default async function ImportJobPage(props: ImportJobPageProps) {
   );
 }
 
-function ActionForm({ action, jobId, label }: { action: 'prepare' | 'approve' | 'reject' | 'publish'; jobId: string; label: string }) {
+function ActionForm({ action, jobId, label }: { action: 'confirm-outline' | 'prepare' | 'approve' | 'reject' | 'publish'; jobId: string; label: string }) {
   return <form action={transitionImportAction}>
     <input type="hidden" name="jobId" value={jobId} />
     <input type="hidden" name="action" value={action} />
+    {action === 'approve' || action === 'reject' ? <label>Review reason<textarea name="reason" minLength={10} maxLength={2000} required rows={3} /></label> : null}
     <Button variant={action === 'publish' ? 'primary' : undefined}>{label}</Button>
   </form>;
 }

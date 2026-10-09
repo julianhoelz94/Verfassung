@@ -18,4 +18,6 @@ data class IdentitySeedProperties(
     var totpSecret: String = "",
     var serviceToken: String = "",
     var ingestionPublishToken: String = "",
+    var ingestionAuditToken: String = "",
+    var ingestionSearchToken: String = "",
 )

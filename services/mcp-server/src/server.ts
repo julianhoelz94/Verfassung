@@ -159,6 +159,39 @@ export function createServer(authorization?: string): McpServer {
     return await getJson<Record<string, unknown>>('ingestion', `/import-batches/${batchId}`, authorization);
   }));
 
+  server.registerTool('begin_import_upload', {
+    description: 'Start or resume a bounded chunked item upload in a private batch. Compute SHA-256 over the complete UTF-8 JSON bytes.',
+    inputSchema: { batchId: uuid, idempotencyKey: z.string().min(8).max(128), checksumSha256: z.string().regex(/^[a-fA-F0-9]{64}$/), totalBytes: z.number().int().min(1).max(25 * 1024 * 1024) },
+  }, ({ batchId, idempotencyKey, checksumSha256, totalBytes }) => run('begin_import_upload', async () => {
+    await requireImportKey();
+    return await postJson<Record<string, unknown>>('ingestion', `/import-batches/${batchId}/uploads`, { idempotencyKey, checksumSha256, totalBytes }, authorization!);
+  }));
+
+  server.registerTool('put_import_chunk', {
+    description: 'Send one base64 chunk by index. Repeating the same index and checksum is safe; get_import_upload reports missing chunks.',
+    inputSchema: { uploadId: uuid, index: z.number().int().min(0).max(49), dataBase64: z.string().min(1).max(700_000), checksumSha256: z.string().regex(/^[a-fA-F0-9]{64}$/) },
+  }, ({ uploadId, index, dataBase64, checksumSha256 }) => run('put_import_chunk', async () => {
+    await requireImportKey();
+    return await putJson<Record<string, unknown>>('ingestion', `/import-uploads/${uploadId}/chunks/${index}`, { dataBase64, checksumSha256 }, authorization!);
+  }));
+
+  server.registerTool('get_import_upload', {
+    description: 'Inspect a private upload and find the chunk indices still missing.',
+    inputSchema: { uploadId: uuid },
+  }, ({ uploadId }) => run('get_import_upload', async () => {
+    await requireImportKey();
+    return await getJson<Record<string, unknown>>('ingestion', `/import-uploads/${uploadId}`, authorization);
+  }));
+
+  server.registerTool('complete_import_upload', {
+    description: 'Verify the assembled checksum and stage the completed item for site review. This never publishes.',
+    inputSchema: { uploadId: uuid },
+  }, ({ uploadId }) => run('complete_import_upload', async () => {
+    await requireImportKey();
+    const upload = await postJson<{ itemId?: string; status: string }>('ingestion', `/import-uploads/${uploadId}/complete`, {}, authorization!);
+    return { ...upload, reviewUrl: upload.itemId ? `${(process.env.PUBLIC_BASE_URL ?? 'http://localhost').replace(/\/$/, '')}/admin/import/${upload.itemId}` : null };
+  }));
+
   server.registerTool('get_import_job', {
     description: 'Check the review status of an import you staged.',
     inputSchema: { jobId: uuid },

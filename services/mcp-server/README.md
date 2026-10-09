@@ -18,7 +18,8 @@ publish.
 The import tools are `get_import_schema`, `find_constitution`, `get_import_setup`,
 `propose_constitution_setup`, `get_setup_proposal`, `revise_setup_proposal`,
 `stage_constitution_import`, `create_import_batch`, `stage_batch_item`,
-`get_import_batch`, and `get_import_job`. The server accepts the personal key in
+`get_import_batch`, `get_import_job`, `begin_import_upload`, `put_import_chunk`,
+`get_import_upload`, and `complete_import_upload`. The server accepts the personal key in
 `Authorization: Bearer ca_mcp_…`. For an existing constitution, call
 `get_import_setup` and include its `settingsRevisionId` in the payload; omit
 `outline`. For a new constitution, submit a private setup proposal with a small
@@ -39,5 +40,16 @@ Locally, `./manageLocalStack.sh --start` starts the service and exposes
 `npm ci && npm test` in this directory for its focused checks. The Docker image
 builds from the committed package lockfile.
 
-The import batch currently accepts at most 100 items. Each item has its own
-idempotency key, checksum, validation errors, and review status.
+An import batch accepts at most 100 items. Each item has its own idempotency
+key, checksum, validation errors, and review status. For a large JSON item,
+start a resumable upload with the complete UTF-8 byte count and SHA-256 digest.
+Send 512 KiB base64 chunks by zero-based index (the last chunk can be shorter),
+each with its own SHA-256 digest. Poll `get_import_upload` for missing indices,
+then complete it. Items are limited to 25 MiB, outstanding uploads to 100 MiB
+per batch, and incomplete upload handles expire after seven days. Completion
+stages an item for review and does not publish it.
+
+Ingestion uses separate service tokens for Catalog publication, Audit append,
+and Search reindex. The local stack seeds all three. Production operators must
+provision the three scopes separately. Published import events are queued in
+Ingestion's database and delivered with retries.

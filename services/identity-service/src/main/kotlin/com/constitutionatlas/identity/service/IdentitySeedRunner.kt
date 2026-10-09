@@ -38,6 +38,8 @@ class IdentitySeedRunner(
         upsert(properties.viewerEmail, properties.viewerPassword, listOf("viewer"), mode)
         seedServiceToken()
         seedIngestionPublishToken()
+        seedNarrowToken("local-ingestion-audit", properties.ingestionAuditToken, listOf("audit:append"))
+        seedNarrowToken("local-ingestion-search", properties.ingestionSearchToken, listOf("search:reindex"))
     }
 
     private fun seedServiceToken() {
@@ -71,10 +73,12 @@ class IdentitySeedRunner(
     }
 
     private fun seedIngestionPublishToken() {
-        val plaintext = properties.ingestionPublishToken.trim()
+        seedNarrowToken("local-ingestion-publisher", properties.ingestionPublishToken, listOf("ingestion:publish"))
+    }
+
+    private fun seedNarrowToken(name: String, supplied: String, scopes: List<String>) {
+        val plaintext = supplied.trim()
         if (plaintext.isEmpty()) return
-        val name = "local-ingestion-publisher"
-        val scopes = listOf("ingestion:publish")
         val existing = identityRepository.findActiveServiceTokenByName(name)
         if (existing != null) {
             identityRepository.replaceActiveServiceTokenScopes(name, scopes)
@@ -86,7 +90,7 @@ class IdentitySeedRunner(
         }
         val createdBy = identityRepository.findUserByEmail(properties.adminEmail) ?: return
         identityRepository.insertServiceToken(name, Tokens.sha256Hex(plaintext), scopes, createdBy.id, seedTokenExpiry())
-        log.info("Seeded narrow ingestion publication token '{}'; plaintext is not logged", name)
+        log.info("Seeded narrow ingestion service token '{}'; plaintext is not logged", name)
     }
 
     private fun upsert(email: String, password: String, roleNames: List<String>, mode: String) {

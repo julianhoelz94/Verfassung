@@ -9,6 +9,7 @@ import com.constitutionatlas.ingestion.client.ContentClient
 import com.constitutionatlas.ingestion.client.DownstreamAuth
 import com.constitutionatlas.ingestion.repo.ImportJobRepository
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
 import org.springframework.beans.factory.annotation.Value
 import java.util.UUID
 import java.security.MessageDigest
@@ -69,10 +70,12 @@ class ImportService(
         return ImportBatchDto(batchId, items, status)
     }
 
+    @Transactional
     fun stageBatchItem(batchId: UUID, actorId: UUID, item: StageBatchItemRequest): ImportJobDto {
         val key = item.idempotencyKey.trim()
         if (key.length !in 8..128) throw ResponseStatusException(HttpStatus.BAD_REQUEST, "idempotencyKey must contain 8 to 128 characters")
-        getBatch(batchId, actorId)
+        val owner = importJobRepository.batchOwnerForUpdate(batchId) ?: throw com.constitutionatlas.platform.NotFoundException("Unknown or expired import batch")
+        if (owner != actorId) throw com.constitutionatlas.platform.ForbiddenException("Import batch belongs to another principal")
         if (importJobRepository.findBatchItem(batchId, key) == null && importJobRepository.batchItems(batchId).size >= 100) {
             throw ResponseStatusException(HttpStatus.PAYLOAD_TOO_LARGE, "Batch item limit is 100")
         }
@@ -149,7 +152,7 @@ class ImportService(
             }
             if (publishToken.isBlank()) throw ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Import publication token is not configured")
             DownstreamAuth.withAuthorization("Bearer $publishToken") { catalogClient.publishVersion(versionId, jobId) }
-            importJobRepository.complete(jobId, versionId)
+            importJobRepository.complete(jobId, versionId, actorId)
         } catch (ex: RuntimeException) {
             importJobRepository.publishFailed(jobId)
             throw ex

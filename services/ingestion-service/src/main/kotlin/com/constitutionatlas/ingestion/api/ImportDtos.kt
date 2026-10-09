@@ -104,3 +104,7 @@ data class SetupProposalDto(
     val settingsRevisionId: UUID?,
     val confirmedBy: UUID?,
 )
+
+data class BeginUploadRequest(val idempotencyKey: String, val checksumSha256: String, val totalBytes: Int)
+data class UploadChunkRequest(val dataBase64: String, val checksumSha256: String)
+data class ImportUploadDto(val id: UUID, val batchId: UUID, val status: String, val totalBytes: Int, val chunkBytes: Int, val missingChunks: List<Int>, val itemId: UUID?)

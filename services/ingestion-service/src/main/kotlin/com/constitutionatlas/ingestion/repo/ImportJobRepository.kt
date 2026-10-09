@@ -15,6 +15,7 @@ import java.util.UUID
 class ImportJobRepository(
     private val jdbc: JdbcTemplate,
     private val objectMapper: ObjectMapper,
+    private val publicationOutbox: ImportPublicationOutbox,
 ) {
     fun insertPending(payload: Any, submittedBy: UUID, batchId: UUID? = null, idempotencyKey: String? = null, checksum: String? = null): UUID {
         val id = UUID.randomUUID()
@@ -41,6 +42,11 @@ class ImportJobRepository(
         { rs, _ -> rs.getObject("owner_id", UUID::class.java) }, batchId,
     ).firstOrNull()
 
+    fun batchOwnerForUpdate(batchId: UUID): UUID? = jdbc.query(
+        "SELECT owner_id FROM import_batches WHERE id = ? AND expires_at > NOW() FOR UPDATE",
+        { rs, _ -> rs.getObject("owner_id", UUID::class.java) }, batchId,
+    ).firstOrNull()
+
     fun batchItems(batchId: UUID): List<ImportJobDto> = jdbc.query(
         "SELECT id FROM import_jobs WHERE batch_id = ? ORDER BY created_at, id",
         { rs, _ -> rs.getObject("id", UUID::class.java) }, batchId,
@@ -51,12 +57,22 @@ class ImportJobRepository(
         { rs, _ -> rs.getObject("id", UUID::class.java) to rs.getString("payload_sha256") }, batchId, idempotencyKey,
     ).firstOrNull()?.let { (id, hash) -> find(id)?.let { it to hash } }
 
-    fun complete(jobId: UUID, versionId: UUID) {
-        jdbc.update(
-            "UPDATE import_jobs SET status = 'completed', version_id = ?, published_at = NOW(), updated_at = NOW() WHERE id = ?",
-            versionId,
-            jobId,
-        )
+    @Transactional
+    fun complete(jobId: UUID, versionId: UUID, actorId: UUID) {
+        val request = request(jobId) ?: error("Import payload missing")
+        val approvedBy = find(jobId)?.approvedBy ?: error("Approved reviewer missing")
+        check(jdbc.update(
+            "UPDATE import_jobs SET status = 'completed', version_id = ?, published_at = NOW(), updated_at = NOW() WHERE id = ? AND status = 'publishing'",
+            versionId, jobId,
+        ) == 1) { "Import was not publishing" }
+        publicationOutbox.enqueue(jobId, "audit_publish", mapOf(
+            "actorId" to actorId, "action" to "import.published", "entityType" to "import_job", "entityId" to jobId,
+            "payload" to mapOf(
+                "decision" to "approved", "approvedBy" to approvedBy, "sourceUrl" to request.sourceUrl,
+                "gazetteReference" to request.gazetteReference, "versionId" to versionId, "outcome" to "published",
+            ),
+        ))
+        publicationOutbox.enqueue(jobId, "search_reindex", mapOf("versionId" to versionId))
     }
 
     fun claimPreparation(jobId: UUID, actorId: UUID): Boolean = jdbc.update(

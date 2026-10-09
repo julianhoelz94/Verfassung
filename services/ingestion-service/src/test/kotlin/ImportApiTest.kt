@@ -12,23 +12,28 @@ import com.constitutionatlas.platform.UnauthorizedException
 import com.constitutionatlas.platform.OrderedSnapshot
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.Assertions.assertEquals
 import org.mockito.Mockito
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.test.mock.mockito.MockBean
 import org.springframework.http.MediaType
+import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.post
 import org.springframework.test.web.servlet.get
+import org.springframework.test.web.servlet.put
 import org.testcontainers.containers.PostgreSQLContainer
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
 import com.fasterxml.jackson.databind.ObjectMapper
 import java.time.LocalDate
 import java.util.UUID
+import java.security.MessageDigest
+import java.util.Base64
 
 @Testcontainers
 @AutoConfigureMockMvc
@@ -36,6 +41,9 @@ import java.util.UUID
 class ImportApiTest {
     @Autowired
     lateinit var mockMvc: MockMvc
+
+    @Autowired
+    lateinit var jdbc: JdbcTemplate
 
     @MockBean
     lateinit var catalogClient: CatalogClient
@@ -84,6 +92,40 @@ class ImportApiTest {
 
     private fun anyUuid(): UUID = Mockito.any(UUID::class.java) ?: UUID(0, 0)
     private fun anyStr(): String = Mockito.anyString() ?: ""
+
+    @Test
+    fun chunkedImportResumesAndCompletesAsPendingReview() {
+        val batch = json.readTree(mockMvc.post("/import-batches") { header("Authorization", MCP_TOKEN) }
+            .andExpect { status { isCreated() } }.andReturn().response.contentAsString).path("id").asText()
+        val payload = """{"isoCode":"FR","countryName":"France","constitutionSlug":"1958","constitutionTitle":"Constitution","versionLabel":"1","constitutionId":"${UUID.randomUUID()}","settingsRevisionId":"$SETTINGS_REVISION","articles":[{"articleNumber":"1","title":"A","sortOrder":1}]}"""
+        val bytes = payload.toByteArray()
+        val checksum = MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
+        val beginBody = """{"idempotencyKey":"chunked-item","checksumSha256":"$checksum","totalBytes":${bytes.size}}"""
+        val first = mockMvc.post("/import-batches/$batch/uploads") {
+            header("Authorization", MCP_TOKEN); contentType = MediaType.APPLICATION_JSON; content = beginBody
+        }.andExpect { status { isCreated() }; jsonPath("$.missingChunks[0]") { value(0) } }.andReturn()
+        val uploadId = jobId(first.response.contentAsString)
+        mockMvc.post("/import-batches/$batch/uploads") {
+            header("Authorization", MCP_TOKEN); contentType = MediaType.APPLICATION_JSON; content = beginBody
+        }.andExpect { status { isCreated() }; jsonPath("$.id") { value(uploadId) } }
+        mockMvc.get("/import-uploads/$uploadId") { header("Authorization", EDITOR_TOKEN) }
+            .andExpect { status { isForbidden() } }
+        val chunkBody = """{"dataBase64":"${Base64.getEncoder().encodeToString(bytes)}","checksumSha256":"$checksum"}"""
+        mockMvc.put("/import-uploads/$uploadId/chunks/0") {
+            header("Authorization", MCP_TOKEN); contentType = MediaType.APPLICATION_JSON; content = chunkBody
+        }.andExpect { status { isOk() }; jsonPath("$.missingChunks.length()") { value(0) } }
+        mockMvc.put("/import-uploads/$uploadId/chunks/0") {
+            header("Authorization", MCP_TOKEN); contentType = MediaType.APPLICATION_JSON; content = chunkBody
+        }.andExpect { status { isOk() } }
+        val completed = mockMvc.post("/import-uploads/$uploadId/complete") { header("Authorization", MCP_TOKEN) }
+            .andExpect { status { isOk() }; jsonPath("$.status") { value("completed") } }.andReturn()
+        val itemId = json.readTree(completed.response.contentAsString).path("itemId").asText()
+        mockMvc.get("/import-jobs/$itemId") { header("Authorization", MCP_TOKEN) }
+            .andExpect { status { isOk() }; jsonPath("$.status") { value("pending_review") } }
+        mockMvc.post("/import-uploads/$uploadId/complete") { header("Authorization", MCP_TOKEN) }
+            .andExpect { status { isOk() }; jsonPath("$.itemId") { value(itemId) } }
+        Mockito.verifyNoInteractions(catalogClient, contentClient)
+    }
 
     @Test
     fun setupProposalIsPrivateUntilAnEditorConfirmsItsOutline() {
@@ -237,6 +279,9 @@ class ImportApiTest {
                 jsonPath("$.length()") { value(1) }
             }
         publish(id)
+        assertEquals(setOf("audit_publish", "search_reindex"), jdbc.queryForList(
+            "SELECT event_type FROM import_publication_outbox WHERE import_job_id = ?", String::class.java, UUID.fromString(id),
+        ).toSet())
         Mockito.verify(catalogClient).publishVersion(versionId, UUID.fromString(id))
         Mockito.verify(catalogClient).replaceOutline(anyUuid(), Mockito.anyList())
     }

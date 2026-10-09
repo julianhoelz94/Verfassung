@@ -64,7 +64,7 @@ class ProductionIdentityGuard(
         if (demoPasswords.any { it.equals("change-me", ignoreCase = true) || it.equals("use-secret-store", ignoreCase = true) }) {
             throw IllegalStateException("Production rejects default/demo credentials")
         }
-        if (seedProperties.serviceToken.isNotBlank() || seedProperties.ingestionPublishToken.isNotBlank()) {
+        if (listOf(seedProperties.serviceToken, seedProperties.ingestionPublishToken, seedProperties.ingestionAuditToken, seedProperties.ingestionSearchToken).any { it.isNotBlank() }) {
             throw IllegalStateException("Production does not seed service tokens")
         }
     }

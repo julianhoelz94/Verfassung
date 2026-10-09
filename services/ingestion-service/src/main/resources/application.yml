@@ -14,9 +14,19 @@ content:
 identity:
   api:
     url: ${IDENTITY_API_URL:http://localhost/api/identity}
+audit:
+  api:
+    url: ${AUDIT_API_URL:http://localhost/api/audit}
+search:
+  api:
+    url: ${SEARCH_API_URL:http://localhost/api/search}
 ingestion:
   publish:
     token: ${INGESTION_PUBLISH_TOKEN:}
+  audit:
+    token: ${INGESTION_AUDIT_TOKEN:}
+  search:
+    token: ${INGESTION_SEARCH_TOKEN:}
 management:
   endpoints:
     web:

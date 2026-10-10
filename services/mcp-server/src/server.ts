@@ -84,7 +84,7 @@ export function createServer(authorization?: string): McpServer {
     schemaVersion: '1.0',
     settingsGuidance,
     workflow: ['find_constitution', 'propose_constitution_setup if missing', 'editor confirms outline in the site', 'get_import_setup for constitutionId and settingsRevisionId', 'stage_constitution_import', 'editor prepares a draft in the site', 'reviewer approves', 'publisher publishes'],
-    required: ['isoCode', 'countryName', 'constitutionSlug', 'constitutionTitle', 'constitutionId', 'settingsRevisionId', 'versionLabel', 'articles or roots'],
+    required: ['isoCode', 'countryName', 'constitutionSlug', 'constitutionTitle', 'constitutionId', 'settingsRevisionId', 'versionLabel', 'sourceUrl or gazetteReference', 'articles or roots'],
     uploadLimits: { directToolBytes: 2_097_152, chunkBytes: 524_288, chunkedItemBytes: 26_214_400, receivingBatchBytes: 104_857_600, maxItemsPerBatch: 100 },
     sourceFields: { languageCode: 'BCP 47 language tag', sourceUrl: 'HTTPS URL of the source', gazetteReference: 'Official citation or gazette reference', effectiveDate: 'YYYY-MM-DD or null' },
     structure: {
@@ -102,11 +102,11 @@ export function createServer(authorization?: string): McpServer {
   }, ({ countryCode, constitutionSlug }) => run('find_constitution', async () => {
     await requireImportKey();
     let country: CountryDetail;
-    try { country = await getJson<CountryDetail>('catalog', `/countries/${countryCode.toUpperCase()}`); }
+    try { country = await getJson<CountryDetail>('catalog', `/countries/${countryCode.toUpperCase()}`, authorization); }
     catch (error) { if (error instanceof UpstreamError && error.status === 404) return { exists: false, countryCode: countryCode.toUpperCase() }; throw error; }
     const constitution = country.constitutions.find(item => item.slug === constitutionSlug);
     if (!constitution) return { exists: false, countryCode: country.isoCode, countryName: country.name };
-    const settings = await getJson<{ id: string; outline: Record<string, unknown> }>('catalog', `/constitutions/${constitution.id}/settings`);
+    const settings = await getJson<{ id: string; outline: Record<string, unknown> }>('catalog', `/constitutions/${constitution.id}/settings`, authorization);
     return { exists: true, countryCode: country.isoCode, countryName: country.name, constitutionId: constitution.id, title: constitution.title, slug: constitution.slug, settingsRevisionId: settings.id, outline: settings.outline, settingsGuidance };
   }));
 
@@ -141,11 +141,11 @@ export function createServer(authorization?: string): McpServer {
   }, ({ countryCode, constitutionSlug }) => run('get_import_setup', async () => {
     await requireImportKey();
     let country: CountryDetail;
-    try { country = await getJson<CountryDetail>('catalog', `/countries/${countryCode.toUpperCase()}`); }
+    try { country = await getJson<CountryDetail>('catalog', `/countries/${countryCode.toUpperCase()}`, authorization); }
     catch (error) { if (error instanceof UpstreamError && error.status === 404) return { exists: false, countryCode: countryCode.toUpperCase(), outline: null }; throw error; }
     const constitution = country.constitutions.find(item => item.slug === constitutionSlug);
     if (!constitution) return { exists: false, countryCode: country.isoCode, outline: null };
-    const settings = await getJson<{ id: string; outline: Record<string, unknown> }>('catalog', `/constitutions/${constitution.id}/settings`);
+    const settings = await getJson<{ id: string; outline: Record<string, unknown> }>('catalog', `/constitutions/${constitution.id}/settings`, authorization);
     return { exists: true, countryCode: country.isoCode, constitutionId: constitution.id, title: constitution.title, settingsRevisionId: settings.id, outline: settings.outline, settingsGuidance };
   }));
 
@@ -302,8 +302,9 @@ export function createServer(authorization?: string): McpServer {
     const params = new URLSearchParams({ q: query, limit: String(limit), offset: String(offset) });
     if (countryCode) params.set('country', countryCode.toUpperCase());
     if (versionId) params.set('versionId', versionId);
-    const results = await getJson<Record<string, unknown>>('search', `/search?${params}`);
-    return { query, results };
+    const results = await getJson<{ hits: Array<{ articleId: string; versionId: string; countryCode: string; [key: string]: unknown }>; total: number; limit: number; offset: number }>('search', `/search?${params}`);
+    const base = (process.env.PUBLIC_BASE_URL ?? 'http://localhost').replace(/\/$/, '');
+    return { query, results: { ...results, hits: results.hits.map(hit => ({ ...hit, url: `${base}/countries/${encodeURIComponent(hit.countryCode)}/versions/${encodeURIComponent(hit.versionId)}/articles/${encodeURIComponent(hit.articleId)}` })) } };
   }));
 
   return server;

@@ -16,6 +16,7 @@ class ImportValidatorTest {
             constitutionSlug = "1958",
             constitutionTitle = "Constitution",
             versionLabel = "1",
+            sourceUrl = "https://example.org/source",
             roots = listOf(OrderedNodeWrite(kind = "section", label = "I")),
         )
         val outline = ImportOutline(listOf(ImportOutlineKind("section", "Section")))
@@ -30,6 +31,7 @@ class ImportValidatorTest {
             constitutionSlug = "1958",
             constitutionTitle = "Constitution",
             versionLabel = "1",
+            sourceUrl = "https://example.org/source",
             roots = listOf(
                 OrderedNodeWrite(
                     kind = "section",
@@ -41,5 +43,28 @@ class ImportValidatorTest {
         )
         val outline = ImportOutline(listOf(ImportOutlineKind("section", "Section")))
         assertTrue(ImportValidator.validate(request, outline).any { it.first == "UNKNOWN_KIND" })
+    }
+
+    @Test
+    fun `full upload needs a source and the expected hierarchy`() {
+        val request = ImportRequest(
+            isoCode = "FR",
+            countryName = "France",
+            constitutionSlug = "1958",
+            constitutionTitle = "Constitution",
+            versionLabel = "1",
+            roots = listOf(
+                OrderedNodeWrite(
+                    kind = "article",
+                    content = listOf(
+                        OrderedEntryWrite(type = "child", node = OrderedNodeWrite(kind = "sentence")),
+                    ),
+                ),
+            ),
+        )
+        val outline = ImportOutline(listOf(ImportOutlineKind("article", "Article"), ImportOutlineKind("paragraph", "Paragraph"), ImportOutlineKind("sentence", "Sentence")))
+        val errors = ImportValidator.validate(request, outline).map { it.first }
+        assertTrue("MISSING_SOURCE" in errors)
+        assertTrue("HIERARCHY_KIND" in errors)
     }
 }

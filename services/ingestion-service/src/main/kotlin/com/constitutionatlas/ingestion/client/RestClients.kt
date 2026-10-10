@@ -68,6 +68,12 @@ class RestCatalogClient(
         client.get().uri("/constitutions/{id}/settings", constitutionId)
             .retrieve().body(SettingsRevisionWire::class.java)!!.id
 
+    override fun version(versionId: UUID): DownstreamVersion? = try {
+        client.get().uri("/versions/{id}", versionId).retrieve().body(DownstreamVersion::class.java)
+    } catch (ex: RestClientResponseException) {
+        if (ex.statusCode == HttpStatus.NOT_FOUND) null else throw ex
+    }
+
     override fun settingsOutline(constitutionId: UUID, revisionId: UUID): ImportOutline =
         client.get().uri("/constitutions/{id}/settings/{revisionId}", constitutionId, revisionId)
             .retrieve().body(SettingsRevisionWire::class.java)!!.outline
@@ -90,6 +96,7 @@ class RestCatalogClient(
         predecessorVersionId: UUID?,
         hopKind: String?,
         importJobId: UUID?,
+        settingsRevisionId: UUID?,
     ): DownstreamVersion =
         client.postJson(
             "/constitutions/{id}/versions",
@@ -102,6 +109,7 @@ class RestCatalogClient(
                 "predecessorVersionId" to predecessorVersionId,
                 "hopKind" to hopKind,
                 "importJobId" to importJobId,
+                "structuralSettingsRevisionId" to settingsRevisionId,
             ),
             DownstreamVersion::class.java,
             constitutionId,

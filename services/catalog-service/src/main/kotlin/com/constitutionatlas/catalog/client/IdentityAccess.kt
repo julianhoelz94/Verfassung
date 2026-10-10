@@ -16,6 +16,15 @@ fun Actor.canViewStaffCatalog(): Boolean =
 
 @Component
 class WriteAccess(private val identityClient: IdentityClient) {
+    fun mayViewPrivateCatalog(authorization: String?): Boolean {
+        if (authorization.isNullOrBlank()) return false
+        return try {
+            val actor = identityClient.authenticate(authorization)
+            actor.canViewStaffCatalog() || "ingestion:import" in actor.scopes
+        } catch (_: RuntimeException) {
+            false
+        }
+    }
     fun requireCatalogWriter(authorization: String?): Actor {
         val actor = identityClient.authenticate(authorization)
         if (!actor.canWriteCatalog()) {

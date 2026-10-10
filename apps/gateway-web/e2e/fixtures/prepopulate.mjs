@@ -61,13 +61,13 @@ async function authenticate() {
   if (!login.token) throw new Error('Admin login returned no session token');
   token = login.token;
   const reviewer = await api('POST', 'identity/login', {
-    email: process.env.CI_REVIEWER_EMAIL ?? process.env.LOCAL_REVIEWER_EMAIL ?? 'local-reviewer@example.local',
+    email: process.env.CI_REVIEWER_EMAIL ?? process.env.LOCAL_REVIEWER_EMAIL ?? (process.env.CI_ADMIN_EMAIL ? 'ci-reviewer@example.local' : 'local-reviewer@example.local'),
     password: process.env.CI_REVIEWER_PASSWORD ?? process.env.LOCAL_REVIEWER_PASSWORD ?? password,
   });
   if (!reviewer.token) throw new Error('Reviewer login returned no session token');
   reviewerToken = reviewer.token;
   const publisher = await api('POST', 'identity/login', {
-    email: process.env.CI_PUBLISHER_EMAIL ?? process.env.LOCAL_PUBLISHER_EMAIL ?? 'local-publisher@example.local',
+    email: process.env.CI_PUBLISHER_EMAIL ?? process.env.LOCAL_PUBLISHER_EMAIL ?? (process.env.CI_ADMIN_EMAIL ? 'ci-publisher@example.local' : 'local-publisher@example.local'),
     password: process.env.CI_PUBLISHER_PASSWORD ?? process.env.LOCAL_PUBLISHER_PASSWORD ?? password,
   });
   const publisherSession = publisher.mfaRequired
@@ -87,7 +87,7 @@ async function waitForStack() {
 async function countryDetail(iso) {
   const countries = await api('GET', 'catalog/countries');
   if (!countries.some((country) => country.isoCode === iso)) return null;
-  return api('GET', `catalog/countries/${iso}`);
+  return api('GET', `catalog/countries/${iso}`, undefined, token);
 }
 
 function fixture(file) { return JSON.parse(readFileSync(join(fixtureDir, file), 'utf8')); }

@@ -369,10 +369,11 @@ export function listCountries(): Promise<CountrySummary[] | null> {
   return readJson<CountrySummary[]>(`${catalogBaseUrl()}/countries`, 'catalog');
 }
 
-export function getCountry(isoCode: string): Promise<CountryDetail | null> {
+export function getCountry(isoCode: string, authorization?: string): Promise<CountryDetail | null> {
   return readJson<CountryDetail>(
     `${catalogBaseUrl()}/countries/${encodeURIComponent(isoCode)}`,
     'catalog',
+    authorization,
   );
 }
 
@@ -465,7 +466,7 @@ export function publishWikiPage(targetType: 'country' | 'constitution', targetId
   return sendJson<WikiPageRevision>(`${catalogBaseUrl()}/wiki/${targetType}/${encodeURIComponent(targetId)}/publish`, 'catalog', 'POST', { revisionId }, authorization);
 }
 
-export async function loadCountriesWithDetails(): Promise<{
+export async function loadCountriesWithDetails(authorization?: string): Promise<{
   countries: CountrySummary[];
   details: Array<CountryDetail | null>;
 }> {
@@ -477,7 +478,7 @@ export async function loadCountriesWithDetails(): Promise<{
       throw error;
     }
   }
-  const details = await Promise.all(countries.map((country) => getCountry(country.isoCode).catch(() => null)));
+  const details = await Promise.all(countries.map((country) => getCountry(country.isoCode, authorization).catch(() => null)));
   return { countries, details };
 }
 
@@ -673,7 +674,7 @@ export async function createCountry(
 }
 
 export async function ensureCountry(isoCode: string, name: string, authorization?: string): Promise<void> {
-  const existing = await getCountry(isoCode);
+  const existing = await getCountry(isoCode, authorization);
   if (existing) {
     return;
   }
@@ -769,8 +770,8 @@ export function getVersion(versionId: string, authorization?: string): Promise<V
 
 export type SettingsRevision = { id: string; predecessorId: string | null; outline: ContentOutline };
 export type SettingsImpact = { currentRevisionId: string; classification: string; affectedVersionIds: string[]; reasons: string[]; affectedDraftSessionIds: string[]; violations: { versionId: string; logicalId: string | null; field: string; message: string }[] };
-export async function getConstitutionSettings(id: string): Promise<SettingsRevision> {
-  const settings = await readJson<SettingsRevision>(`${catalogBaseUrl()}/constitutions/${encodeURIComponent(id)}/settings`, 'catalog');
+export async function getConstitutionSettings(id: string, authorization?: string): Promise<SettingsRevision> {
+  const settings = await readJson<SettingsRevision>(`${catalogBaseUrl()}/constitutions/${encodeURIComponent(id)}/settings`, 'catalog', authorization);
   if (!settings) throw new ApiUnavailableError('catalog');
   return settings;
 }

@@ -6,6 +6,7 @@ import com.constitutionatlas.ingestion.client.ContentClient
 import com.constitutionatlas.ingestion.client.DownstreamConstitution
 import com.constitutionatlas.ingestion.client.DownstreamCountry
 import com.constitutionatlas.ingestion.client.DownstreamVersion
+import com.constitutionatlas.ingestion.service.ImportService
 import com.constitutionatlas.platform.Actor
 import com.constitutionatlas.platform.IdentityClient
 import com.constitutionatlas.platform.OrderedSnapshot
@@ -44,6 +45,9 @@ class ImportApiTest {
 
     @Autowired
     lateinit var jdbc: JdbcTemplate
+
+    @Autowired
+    lateinit var importService: ImportService
 
     @MockBean
     lateinit var catalogClient: CatalogClient
@@ -112,7 +116,7 @@ class ImportApiTest {
             mockMvc.post("/import-batches") { header("Authorization", MCP_TOKEN) }
                 .andExpect { status { isCreated() } }.andReturn().response.contentAsString,
         ).path("id").asText()
-        val payload = """{"isoCode":"FR","countryName":"France","constitutionSlug":"1958","constitutionTitle":"Constitution","versionLabel":"1","constitutionId":"${UUID.randomUUID()}","settingsRevisionId":"$SETTINGS_REVISION","articles":[{"articleNumber":"1","title":"A","sortOrder":1}]}"""
+        val payload = """{"isoCode":"FR","countryName":"France","constitutionSlug":"1958","constitutionTitle":"Constitution","versionLabel":"1","sourceUrl":"https://example.org/test-import","constitutionId":"${UUID.randomUUID()}","settingsRevisionId":"$SETTINGS_REVISION","articles":[{"articleNumber":"1","title":"A","sortOrder":1}]}"""
         val bytes = payload.toByteArray()
         val checksum = MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
         val beginBody = """{"idempotencyKey":"chunked-item","checksumSha256":"$checksum","totalBytes":${bytes.size}}"""
@@ -205,7 +209,7 @@ class ImportApiTest {
 
     @Test
     fun scopedImportRequiresConfirmedConstitutionAndSettingsPin() {
-        val base = """{"isoCode":"FR","countryName":"France","constitutionSlug":"1958","constitutionTitle":"Constitution","versionLabel":"1","articles":[{"articleNumber":"1","title":"A","sortOrder":1}]}"""
+        val base = """{"isoCode":"FR","countryName":"France","constitutionSlug":"1958","constitutionTitle":"Constitution","versionLabel":"1","sourceUrl":"https://example.org/test-import","articles":[{"articleNumber":"1","title":"A","sortOrder":1}]}"""
         mockMvc.post("/import-jobs") {
             header("Authorization", MCP_TOKEN)
             contentType = MediaType.APPLICATION_JSON
@@ -254,7 +258,7 @@ class ImportApiTest {
             catalogClient.createDraftVersion(
                 anyUuid(), anyStr(), Mockito.nullable(LocalDate::class.java), anyStr(),
                 Mockito.nullable(String::class.java), Mockito.nullable(String::class.java),
-                Mockito.nullable(UUID::class.java), Mockito.nullable(String::class.java), anyUuid(),
+                Mockito.nullable(UUID::class.java), Mockito.nullable(String::class.java), anyUuid(), Mockito.nullable(UUID::class.java),
             ),
         ).thenReturn(DownstreamVersion(versionId, constitutionId, "draft"))
     }
@@ -273,6 +277,7 @@ class ImportApiTest {
                   "constitutionSlug": "1958",
                   "constitutionTitle": "Constitution of 1958",
                   "versionLabel": "1958",
+                  "sourceUrl": "https://example.org/test-import",
                   "outline": {"kinds": [{"kindCode": "article", "displayLabel": "Article"}]},
                   "articles": [
                     {"articleNumber": "1", "title": "A", "body": "a", "sortOrder": 1},
@@ -295,7 +300,7 @@ class ImportApiTest {
             mockMvc.post("/import-batches") { header("Authorization", TOKEN) }
                 .andExpect { status { isCreated() } }.andReturn().response.contentAsString,
         ).path("id").asText()
-        val valid = """{"idempotencyKey":"first-item","payload":{"isoCode":"FR","countryName":"France","constitutionSlug":"batch","constitutionTitle":"Constitution","versionLabel":"1","articles":[{"articleNumber":"1","title":"First","sortOrder":1}]}}"""
+        val valid = """{"idempotencyKey":"first-item","payload":{"isoCode":"FR","countryName":"France","constitutionSlug":"batch","constitutionTitle":"Constitution","versionLabel":"1","sourceUrl":"https://example.org/test-import","articles":[{"articleNumber":"1","title":"First","sortOrder":1}]}}"""
         val first = json.readTree(
             mockMvc.post("/import-batches/$batch/items") {
                 header("Authorization", TOKEN)
@@ -322,7 +327,7 @@ class ImportApiTest {
         mockMvc.post("/import-batches/$batch/items") {
             header("Authorization", TOKEN)
             contentType = MediaType.APPLICATION_JSON
-            content = """{"idempotencyKey":"second-item","payload":{"isoCode":"FR","countryName":"France","constitutionSlug":"batch","constitutionTitle":"Constitution","versionLabel":"2","articles":[{"articleNumber":"1","title":"First","sortOrder":1},{"articleNumber":"1","title":"Duplicate","sortOrder":2}]}}"""
+            content = """{"idempotencyKey":"second-item","payload":{"isoCode":"FR","countryName":"France","constitutionSlug":"batch","constitutionTitle":"Constitution","versionLabel":"2","sourceUrl":"https://example.org/test-import","articles":[{"articleNumber":"1","title":"First","sortOrder":1},{"articleNumber":"1","title":"Duplicate","sortOrder":2}]}}"""
         }.andExpect {
             status { isCreated() }
             jsonPath("$.status") { value("failed") }
@@ -353,6 +358,7 @@ class ImportApiTest {
                   "constitutionSlug": "1958",
                   "constitutionTitle": "Constitution of 1958",
                   "versionLabel": "1958",
+                  "sourceUrl": "https://example.org/test-import",
                   "outline": {"kinds": [{"kindCode": "article", "displayLabel": "Article"}]},
                   "articles": [
                     {"articleNumber": "1", "title": "Sovereignty", "body": "France is a republic.", "sortOrder": 1}
@@ -396,6 +402,31 @@ class ImportApiTest {
     }
 
     @Test
+    fun publishedCatalogVersionIsReconciledAfterInterruptedCompletion() {
+        val constitutionId = UUID.randomUUID()
+        val versionId = UUID.randomUUID()
+        stubCatalog("FR", "France", "1958", "Constitution of 1958", "1958", constitutionId, versionId)
+        Mockito.`when`(contentClient.snapshot(versionId)).thenReturn(OrderedSnapshot(versionId, 1, null, emptyList()))
+        val staged = mockMvc.post("/import-jobs") {
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"isoCode":"FR","countryName":"France","constitutionSlug":"1958","constitutionTitle":"Constitution of 1958","versionLabel":"1958","sourceUrl":"https://example.org/source","outline":{"kinds":[{"kindCode":"article","displayLabel":"Article"}]},"articles":[{"articleNumber":"1","title":"Sovereignty","body":"France is a republic.","sortOrder":1}]}"""
+        }.andExpect { status { isCreated() } }.andReturn()
+        val id = jobId(staged.response.contentAsString)
+        confirmOutline(id)
+        prepare(id)
+        approve(id)
+        jdbc.update("UPDATE import_jobs SET status = 'publishing', published_by = ?, updated_at = NOW() - INTERVAL '3 minutes' WHERE id = ?", publisher.id, UUID.fromString(id))
+        Mockito.`when`(catalogClient.version(versionId)).thenReturn(DownstreamVersion(versionId, constitutionId, "published"))
+
+        importService.reconcilePublications()
+
+        mockMvc.get("/import-jobs/$id") { header("Authorization", TOKEN) }
+            .andExpect { jsonPath("$.status") { value("completed") } }
+        assertEquals(2, jdbc.queryForObject("SELECT COUNT(*) FROM import_publication_outbox WHERE import_job_id = ?", Int::class.java, UUID.fromString(id)))
+    }
+
+    @Test
     fun customRootsForwardOrderedTextAndLiteralIdentities() {
         val constitution = UUID.randomUUID()
         val version = UUID.randomUUID()
@@ -408,7 +439,7 @@ class ImportApiTest {
         val staged = mockMvc.post("/import-jobs") {
             header("Authorization", TOKEN)
             contentType = MediaType.APPLICATION_JSON
-            content = """{"isoCode":"FR","countryName":"France","constitutionSlug":"ordered","constitutionTitle":"Ordered constitution","versionLabel":"1","outline":{"kinds":[{"kindCode":"clause","displayLabel":"Clause"}]},"roots":[{"logicalId":"$logical","kind":"clause","label":"(2a)","title":"Literal","content":[{"type":"text","text":"Before  "},{"type":"text","text":"after."}]}]}"""
+            content = """{"isoCode":"FR","countryName":"France","constitutionSlug":"ordered","constitutionTitle":"Ordered constitution","versionLabel":"1","sourceUrl":"https://example.org/test-import","outline":{"kinds":[{"kindCode":"clause","displayLabel":"Clause"}]},"roots":[{"logicalId":"$logical","kind":"clause","label":"(2a)","title":"Literal","content":[{"type":"text","text":"Before  "},{"type":"text","text":"after."}]}]}"""
         }.andExpect {
             status { isCreated() }
             jsonPath("$.status") { value("pending_review") }
@@ -446,6 +477,7 @@ class ImportApiTest {
                   "constitutionSlug": "1958",
                   "constitutionTitle": "Constitution of 1958",
                   "versionLabel": "1962",
+                  "sourceUrl": "https://example.org/test-import",
                   "settingsRevisionId": "$SETTINGS_REVISION",
                   "effectiveDate": "1962-11-06",
                   "predecessorVersionId": "$predecessorId",
@@ -465,11 +497,12 @@ class ImportApiTest {
             eqNonNull("1962"),
             eqNonNull(LocalDate.parse("1962-11-06")),
             eqNonNull("en"),
-            Mockito.isNull(),
+            eqNonNull("https://example.org/test-import"),
             Mockito.isNull(),
             eqNonNull(predecessorId),
             eqNonNull("legal"),
             anyUuid(),
+            eqNonNull(SETTINGS_REVISION),
         )
     }
 
@@ -483,7 +516,7 @@ class ImportApiTest {
         val staged = mockMvc.post("/import-jobs") {
             header("Authorization", TOKEN)
             contentType = MediaType.APPLICATION_JSON
-            content = """{"isoCode":"FR","countryName":"France","constitutionSlug":"existing","constitutionTitle":"Existing","versionLabel":"1","settingsRevisionId":"${UUID.randomUUID()}","articles":[{"articleNumber":"1","title":"A","sortOrder":1}]}"""
+            content = """{"isoCode":"FR","countryName":"France","constitutionSlug":"existing","constitutionTitle":"Existing","versionLabel":"1","sourceUrl":"https://example.org/test-import","settingsRevisionId":"${UUID.randomUUID()}","articles":[{"articleNumber":"1","title":"A","sortOrder":1}]}"""
         }.andExpect { status { isCreated() } }.andReturn()
         mockMvc.post("/import-jobs/${jobId(staged.response.contentAsString)}/prepare") {
             header("Authorization", TOKEN)
@@ -491,7 +524,7 @@ class ImportApiTest {
         Mockito.verify(catalogClient, Mockito.never()).createDraftVersion(
             anyUuid(), anyStr(), Mockito.nullable(LocalDate::class.java), anyStr(),
             Mockito.nullable(String::class.java), Mockito.nullable(String::class.java),
-            Mockito.nullable(UUID::class.java), Mockito.nullable(String::class.java), anyUuid(),
+            Mockito.nullable(UUID::class.java), Mockito.nullable(String::class.java), anyUuid(), Mockito.nullable(UUID::class.java),
         )
         Mockito.verify(catalogClient, Mockito.never()).replaceOutline(anyUuid(), Mockito.anyList())
     }
@@ -540,6 +573,7 @@ class ImportApiTest {
             Mockito.isNull(),
             Mockito.isNull(),
             anyUuid(),
+            Mockito.isNull(),
         )
         Mockito.verify(contentClient).replaceArticles(
             eqNonNull(versionId),
@@ -562,6 +596,7 @@ class ImportApiTest {
                   "constitutionSlug": "constitution",
                   "constitutionTitle": "Constitution of the United States",
                   "versionLabel": "1789",
+                  "sourceUrl": "https://example.org/test-import",
                   "outline": {
                     "kinds": [
                       {"kindCode":"article","displayLabel":"Article","presentation":"section","showLabel":true,"showTitle":true,"showKind":true}
@@ -607,6 +642,7 @@ class ImportApiTest {
                   "constitutionSlug": "1958",
                   "constitutionTitle": "Constitution of 1958",
                   "versionLabel": "1958",
+                  "sourceUrl": "https://example.org/test-import",
                   "articles": [
                     {"articleNumber": "1", "title": "A", "body": "a", "sortOrder": 1}
                   ]

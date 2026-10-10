@@ -46,6 +46,7 @@ export async function createIsolatedConstitution(request: APIRequestContext, tit
   const base = {
     isoCode: 'XA', countryName: 'Atlas Testland', constitutionSlug: slug, constitutionTitle: title,
     languageCode: 'en',
+    sourceUrl: 'https://example.org/atlas-e2e/isolated',
     outline: { kinds: [{ kindCode: 'article', displayLabel: 'Article' }] },
     articles: [{ articleNumber: '1', title: 'Human dignity', body: 'A civic duty protects every person.', sortOrder: 1 }],
   };

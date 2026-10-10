@@ -9,9 +9,11 @@ import com.constitutionatlas.ingestion.client.ContentClient
 import com.constitutionatlas.ingestion.client.DownstreamAuth
 import com.constitutionatlas.ingestion.repo.ImportJobRepository
 import com.fasterxml.jackson.databind.ObjectMapper
+import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.dao.DuplicateKeyException
 import org.springframework.http.HttpStatus
+import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.server.ResponseStatusException
@@ -26,6 +28,7 @@ class ImportService(
     private val objectMapper: ObjectMapper,
     @Value("\${ingestion.publish.token:}") private val publishToken: String,
 ) {
+    private val log = LoggerFactory.getLogger(javaClass)
     fun importVersion(submittedBy: UUID, request: ImportRequest, batchId: UUID? = null, idempotencyKey: String? = null, expectedChecksum: String? = null): ImportJobDto {
         val checksum = MessageDigest.getInstance("SHA-256").digest(objectMapper.writeValueAsBytes(request)).joinToString("") { "%02x".format(it) }
         if (expectedChecksum != null && !checksum.equals(expectedChecksum, ignoreCase = true)) {
@@ -166,10 +169,30 @@ class ImportService(
             DownstreamAuth.withAuthorization("Bearer $publishToken") { catalogClient.publishVersion(versionId, jobId) }
             importJobRepository.complete(jobId, versionId, actorId)
         } catch (ex: RuntimeException) {
-            importJobRepository.publishFailed(jobId)
+            try {
+                if (catalogClient.version(versionId)?.publicationStatus != "published") importJobRepository.publishFailed(jobId)
+            } catch (lookupError: RuntimeException) {
+                log.warn("Publication state lookup failed for import {}; scheduled reconciliation will retry", jobId, lookupError)
+            }
             throw ex
         }
         return importJobRepository.find(jobId)!!
+    }
+
+    @Scheduled(initialDelay = 120_000, fixedDelay = 60_000)
+    fun reconcilePublications() {
+        for (job in importJobRepository.stalePublications()) {
+            try {
+                val versionId = job.versionId ?: error("Publishing import has no version")
+                if (catalogClient.version(versionId)?.publicationStatus == "published") {
+                    importJobRepository.complete(job.id, versionId, job.publishedBy ?: error("Publishing actor missing"))
+                } else {
+                    importJobRepository.publishFailed(job.id)
+                }
+            } catch (ex: RuntimeException) {
+                log.warn("Import publication reconciliation failed for {}", job.id, ex)
+            }
+        }
     }
 
     private fun persistDraft(jobId: UUID, request: ImportRequest) {
@@ -200,6 +223,7 @@ class ImportService(
             request.predecessorVersionId,
             request.hopKind,
             jobId,
+            request.settingsRevisionId,
         )
         try {
             if (request.roots.isNotEmpty()) {

@@ -84,6 +84,16 @@ test('MCP countries list omits countries with no published version', async () =>
   }
 });
 
+test('MCP search hits include public article citation links', async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => Response.json({ hits: [{ articleId: '01900000-0000-4000-8000-000000000001', versionId: '01900000-0000-4000-8000-000000000002', countryCode: 'FR', snippet: 'Text' }], total: 1, limit: 20, offset: 0 });
+  try {
+    const result = await callTool('search_constitutions', { query: 'Text' });
+    const results = result.structuredContent?.results as { hits: Array<{ url: string }> };
+    assert.match(results.hits[0].url, /\/countries\/FR\/versions\/01900000-0000-4000-8000-000000000002\/articles\/01900000-0000-4000-8000-000000000001$/);
+  } finally { globalThis.fetch = originalFetch; }
+});
+
 test('MCP direct outline read rejects a draft before fetching settings', async () => {
   const originalFetch = globalThis.fetch;
   let calls = 0;

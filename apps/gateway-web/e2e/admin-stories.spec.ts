@@ -64,6 +64,7 @@ test('administrator stages constitution JSON for review without publishing it', 
     constitutionSlug: 'constitution',
     constitutionTitle: 'Constitution',
     versionLabel: '1789',
+    sourceUrl: 'https://example.org/atlas-e2e/us-1789',
     articles: [{ articleNumber: '1', title: 'Legislative power', body: 'All legislative powers.' }],
   }));
   await page.getByRole('button', { name: 'Stage for review' }).click();

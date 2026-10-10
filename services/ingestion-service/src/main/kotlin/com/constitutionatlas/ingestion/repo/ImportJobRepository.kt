@@ -171,6 +171,11 @@ class ImportJobRepository(
         jdbc.update("UPDATE import_jobs SET status = 'approved', published_by = NULL, updated_at = NOW() WHERE id = ? AND status = 'publishing'", jobId)
     }
 
+    fun stalePublications(): List<ImportJobDto> = jdbc.query(
+        "SELECT id FROM import_jobs WHERE status = 'publishing' AND updated_at < NOW() - INTERVAL '2 minutes' ORDER BY updated_at LIMIT 50",
+        { rs, _ -> rs.getObject("id", UUID::class.java) },
+    ).mapNotNull(::find)
+
     fun approvedFingerprint(jobId: UUID): Pair<Long, UUID?>? = jdbc.query(
         "SELECT approved_generation, approved_settings_revision_id FROM import_jobs WHERE id = ? AND approved_generation IS NOT NULL",
         { rs, _ -> rs.getLong("approved_generation") to rs.getObject("approved_settings_revision_id", UUID::class.java) },

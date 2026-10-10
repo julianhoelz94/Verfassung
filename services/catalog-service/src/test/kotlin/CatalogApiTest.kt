@@ -392,7 +392,7 @@ class CatalogApiTest {
             content = """{"slug":"settings-test","title":"Settings test"}"""
         }.andExpect { status { isCreated() } }.andReturn()
         val constitutionId = objectMapper.readTree(created.response.contentAsString).get("id").asText()
-        val initial = mockMvc.get("/constitutions/$constitutionId/settings").andReturn()
+        val initial = mockMvc.get("/constitutions/$constitutionId/settings") { header("Authorization", TOKEN) }.andReturn()
         val revisionId = objectMapper.readTree(initial.response.contentAsString).get("id").asText()
         val version = mockMvc.post("/constitutions/$constitutionId/versions") {
             header("Authorization", TOKEN)
@@ -409,12 +409,12 @@ class CatalogApiTest {
             status { isOk() }
             jsonPath("$.predecessorId") { value(revisionId) }
         }
-        mockMvc.get("/versions/$versionId/settings").andExpect {
+        mockMvc.get("/versions/$versionId/settings") { header("Authorization", TOKEN) }.andExpect {
             status { isOk() }
             jsonPath("$.id") { value(revisionId) }
             jsonPath("$.outline.kinds[0].displayLabel") { value("Article") }
         }
-        mockMvc.get("/versions/$versionId/reader-settings").andExpect {
+        mockMvc.get("/versions/$versionId/reader-settings") { header("Authorization", TOKEN) }.andExpect {
             status { isOk() }
             jsonPath("$.kinds[0].displayLabel") { value("Provision") }
         }
@@ -423,7 +423,7 @@ class CatalogApiTest {
             contentType = MediaType.APPLICATION_JSON
             content = request
         }.andExpect { status { isConflict() } }
-        val current = objectMapper.readTree(mockMvc.get("/constitutions/$constitutionId/settings").andReturn().response.contentAsString).get("id").asText()
+        val current = objectMapper.readTree(mockMvc.get("/constitutions/$constitutionId/settings") { header("Authorization", TOKEN) }.andReturn().response.contentAsString).get("id").asText()
         val restored = mockMvc.post("/constitutions/$constitutionId/settings/$revisionId/restore") {
             header("Authorization", TOKEN)
             contentType = MediaType.APPLICATION_JSON
@@ -434,14 +434,14 @@ class CatalogApiTest {
             jsonPath("$.outline.kinds[0].displayLabel") { value("Article") }
         }.andReturn()
         assertThat(objectMapper.readTree(restored.response.contentAsString).get("id").asText()).isNotEqualTo(revisionId)
-        mockMvc.get("/versions/$versionId/reader-settings").andExpect { jsonPath("$.kinds[0].displayLabel") { value("Article") } }
-        mockMvc.get("/versions/$versionId/settings").andExpect { jsonPath("$.id") { value(revisionId) } }
+        mockMvc.get("/versions/$versionId/reader-settings") { header("Authorization", TOKEN) }.andExpect { jsonPath("$.kinds[0].displayLabel") { value("Article") } }
+        mockMvc.get("/versions/$versionId/settings") { header("Authorization", TOKEN) }.andExpect { jsonPath("$.id") { value(revisionId) } }
     }
 
     @Test
     fun repeatedOutlineImportKeepsCurrentRevisionDespiteGrandfatheredContent() {
         val id = "01900000-0000-4000-8000-000000000002"
-        val initial = objectMapper.readTree(mockMvc.get("/constitutions/$id/settings").andReturn().response.contentAsString)
+        val initial = objectMapper.readTree(mockMvc.get("/constitutions/$id/settings") { header("Authorization", TOKEN) }.andReturn().response.contentAsString)
         val kinds = initial.path("outline").path("kinds")
         Mockito.`when`(settingsUsage.inspect(Mockito.anyList(), Mockito.anyList(), Mockito.any())).thenReturn(
             com.constitutionatlas.catalog.api.SettingsUsage(violations = listOf(com.constitutionatlas.catalog.api.SettingsViolation(UUID.randomUUID(), null, "content", "Grandfathered parent text"))),
@@ -460,7 +460,7 @@ class CatalogApiTest {
             contentType = MediaType.APPLICATION_JSON
             content = """{"kinds":$kinds}"""
         }.andExpect { status { isOk() } }
-        mockMvc.get("/constitutions/$id/settings").andExpect { jsonPath("$.id") { value(initial.path("id").asText()) } }
+        mockMvc.get("/constitutions/$id/settings") { header("Authorization", TOKEN) }.andExpect { jsonPath("$.id") { value(initial.path("id").asText()) } }
         val displayKinds = kinds.deepCopy<com.fasterxml.jackson.databind.node.ArrayNode>()
         (displayKinds[0] as com.fasterxml.jackson.databind.node.ObjectNode).put("displayLabel", "Grandfathered provision")
         mockMvc.put("/constitutions/$id/settings") {
@@ -471,7 +471,7 @@ class CatalogApiTest {
             status { isOk() }
             jsonPath("$.outline.kinds[0].displayLabel") { value("Grandfathered provision") }
         }
-        val updated = objectMapper.readTree(mockMvc.get("/constitutions/$id/settings").andReturn().response.contentAsString)
+        val updated = objectMapper.readTree(mockMvc.get("/constitutions/$id/settings") { header("Authorization", TOKEN) }.andReturn().response.contentAsString)
         mockMvc.post("/constitutions/$id/settings/${initial.path("id").asText()}/restore") {
             header("Authorization", TOKEN)
             contentType = MediaType.APPLICATION_JSON
@@ -590,7 +590,7 @@ class CatalogApiTest {
             Regex("\"id\":\"([^\"]+)\"").find(it)!!.groupValues[1]
         }
 
-        mockMvc.get("/countries/FR").andExpect {
+        mockMvc.get("/countries/FR") { header("Authorization", TOKEN) }.andExpect {
             status { isOk() }
             jsonPath("$.constitutions[0].versions.length()") { value(0) }
         }
@@ -605,6 +605,11 @@ class CatalogApiTest {
         }.andReturn().response.contentAsString.let {
             Regex("\"id\":\"([^\"]+)\"").find(it)!!.groupValues[1]
         }
+
+        mockMvc.get("/countries/FR").andExpect { jsonPath("$.constitutions.length()") { value(0) } }
+        mockMvc.get("/constitutions/$constitutionId/settings").andExpect { status { isNotFound() } }
+        mockMvc.get("/constitutions/$constitutionId/content-outline").andExpect { status { isNotFound() } }
+        mockMvc.get("/versions/$versionId").andExpect { status { isNotFound() } }
 
         mockMvc.post("/versions/$versionId/publish") {
             header("Authorization", TOKEN)
@@ -946,7 +951,7 @@ class CatalogApiTest {
             jsonPath("$[2].latestPublished") { value(true) }
         }
 
-        mockMvc.get("/versions/$versionId")
+        mockMvc.get("/versions/$versionId") { header("Authorization", TOKEN) }
             .andExpect {
                 status { isOk() }
                 jsonPath("$.versionLabel") { value(editorialLabel) }

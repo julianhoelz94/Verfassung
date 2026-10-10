@@ -104,6 +104,7 @@ test('editorial roles stage, review, and publish a new constitution through the 
     constitutionTitle: 'Admin Imported Charter',
     outline: { kinds: [{ kindCode: 'article', displayLabel: 'Article' }] },
     versionLabel: '2025',
+    sourceUrl: 'https://example.org/atlas-e2e/admin-2025',
     effectiveDate: '2025-01-01',
     articles: [{ articleNumber: '1', title: 'Public trust', body: 'Public trust protects every person.', sortOrder: 1 }],
   }));

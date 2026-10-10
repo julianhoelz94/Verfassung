@@ -23,6 +23,7 @@ interface CatalogClient {
     fun createCountry(isoCode: String, name: String): DownstreamCountry
     fun findConstitution(isoCode: String, slug: String): DownstreamConstitution?
     fun currentSettingsRevisionId(constitutionId: UUID): UUID
+    fun version(versionId: UUID): DownstreamVersion? = null
     fun settingsOutline(constitutionId: UUID, revisionId: UUID): ImportOutline = ImportOutline()
     fun createConstitution(isoCode: String, slug: String, title: String, predecessorConstitutionId: UUID? = null, interim: Boolean = false): DownstreamConstitution
     fun createDraftVersion(
@@ -35,6 +36,7 @@ interface CatalogClient {
         predecessorVersionId: UUID? = null,
         hopKind: String? = null,
         importJobId: UUID? = null,
+        settingsRevisionId: UUID? = null,
     ): DownstreamVersion
     fun publishVersion(versionId: UUID, importJobId: UUID? = null): DownstreamVersion
     fun replaceOutline(constitutionId: UUID, kinds: List<ImportOutlineKind>)

@@ -145,13 +145,15 @@ def step_up(token: str, secret: str) -> None:
         raise SystemExit(f"step-up failed: HTTP {status} {payload}")
 
 
-def article_body(version_id: str, article_id: str | None = None, article_number: str | None = None) -> str:
+def article_body(version_id: str, article_id: str | None = None, article_number: str | None = None, token: str | None = None) -> str:
     status, payload = http(
         "GET",
         f"{content_url()}/versions/{version_id}/articles?includeBody=true&limit=200",
+        token=token,
     )
     if status != 200 or not isinstance(payload, list):
-        raise SystemExit(f"list articles failed for {version_id}: HTTP {status} {payload}")
+        version_status, version_payload = http("GET", f"{catalog_url()}/versions/{version_id}", token=token)
+        raise SystemExit(f"list articles failed for {version_id}: HTTP {status} {payload}; catalog HTTP {version_status} {version_payload}")
     for article in payload:
         if article_id and article.get("id") == article_id:
             return str(article.get("body") or "")
@@ -222,9 +224,8 @@ def main() -> None:
     if status != 200:
         raise SystemExit(f"source catalog version missing: HTTP {status} {version}")
 
-    source_before = article_body(source_version_id, article_id=source_article_id)
-
     editor_token = login(editor_email, editor_password, secret)
+    source_before = article_body(source_version_id, article_id=source_article_id, token=editor_token)
     session = editor(
         "POST",
         "/edit-sessions",
@@ -267,11 +268,11 @@ def main() -> None:
     if preview.get("session", {}).get("status") != "published":
         raise SystemExit(f"session was not published: {preview}")
 
-    source_after = article_body(source_version_id, article_id=source_article_id)
+    source_after = article_body(source_version_id, article_id=source_article_id, token=editor_token)
     if source_after != source_before:
         raise SystemExit("source version body changed after publish")
 
-    new_body = article_body(new_version_id, article_number="1")
+    new_body = article_body(new_version_id, article_number="1", token=publisher_token)
     if new_body != DRAFT_BODY:
         raise SystemExit(f"successor article 1 body mismatch: {new_body!r}")
 

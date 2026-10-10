@@ -11,12 +11,23 @@ import org.springframework.stereotype.Service
 import java.util.UUID
 
 @Service
-class CatalogQueryService(private val catalogRepository: CatalogRepository) {
+class CatalogQueryService(private val catalogRepository: CatalogRepository, private val settingsService: SettingsService) {
     fun listCountries(): List<CountrySummary> = catalogRepository.listCountries()
 
-    fun getCountry(isoCode: String): CountryDetail =
-        catalogRepository.findCountryDetail(isoCode)
+    fun getCountry(isoCode: String, includeUnpublished: Boolean = false): CountryDetail {
+        val detail = catalogRepository.findCountryDetail(isoCode)
             ?: throw NotFoundException("Unknown country '$isoCode'")
+        if (includeUnpublished) return detail
+        return detail.copy(
+            constitutions = detail.constitutions.filter { it.versions.isNotEmpty() }.map { constitution ->
+                constitution.copy(contentOutline = settingsService.forVersion(constitution.versions.firstOrNull { it.latestPublished }?.id ?: constitution.versions.last().id).outline)
+            },
+        )
+    }
+
+    fun publicVersionId(constitutionId: UUID): UUID? = catalogRepository.listPublishedPublicVersions(constitutionId).let { versions ->
+        versions.firstOrNull { it.latestPublished }?.id ?: versions.lastOrNull()?.id
+    }
 
     fun listVersions(constitutionId: UUID): List<VersionSummary> {
         if (!catalogRepository.constitutionExists(constitutionId)) {

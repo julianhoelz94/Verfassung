@@ -9,6 +9,7 @@ import { toOutlineKindWrite } from '../../../../lib/outline';
 import { restoreOutlineAction } from '../actions';
 import { OutlineEditor } from '../OutlineEditor';
 import { DocumentLinks } from '../../../editor/documents/DocumentLinks';
+import { requireSessionBearer } from '../../../../lib/session';
 
 type AdminOutlinePageProps = {
   params: Promise<{ id: string }>;
@@ -21,7 +22,8 @@ export default async function AdminOutlinePage(props: AdminOutlinePageProps) {
   if (!(await requireAdminPage())) {
     return <AdminForbidden title="Outline" />;
   }
-  const { details } = await loadCountriesWithDetails();
+  const authorization = await requireSessionBearer();
+  const { details } = await loadCountriesWithDetails(authorization);
   const match = details
     .flatMap((country) =>
       (country?.constitutions ?? []).map((constitution) => ({ country, constitution })),
@@ -30,7 +32,7 @@ export default async function AdminOutlinePage(props: AdminOutlinePageProps) {
   if (!match) {
     notFound();
   }
-  const settings = await getConstitutionSettings(params.id);
+  const settings = await getConstitutionSettings(params.id, authorization);
   const kinds = (match.constitution.contentOutline?.kinds ?? []).map(toOutlineKindWrite);
   return (
     <PageMain className="wide">

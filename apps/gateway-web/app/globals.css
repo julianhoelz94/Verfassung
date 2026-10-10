@@ -998,10 +998,13 @@ button.article-toggle[aria-expanded='false']::after {
 }
 
 .menu-panel {
-  position: absolute;
-  right: 0;
-  top: calc(100% + 6px);
+  position: fixed;
+  right: var(--gutter);
+  top: calc(var(--topbar-h) + 6px);
   z-index: var(--z-menu);
+  max-height: calc(100dvh - var(--topbar-h) - 12px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
   min-width: 260px;
   padding: var(--space-2);
   background: var(--color-surface);
@@ -1442,6 +1445,15 @@ button.article-toggle[aria-expanded='false']::after {
 
 .account-section > h2:first-child {
   margin-top: 0;
+}
+
+.account-section pre {
+  max-width: calc(100vw - 2 * var(--gutter) - 2 * var(--space-5));
+  overflow-x: auto;
+}
+
+.account-section p code {
+  overflow-wrap: anywhere;
 }
 
 .editor-entry > h2 {

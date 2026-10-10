@@ -39,8 +39,11 @@ object ImportValidator {
         if (request.roots.isNotEmpty()) {
             val rootKind = (pinnedOutline ?: request.outline)?.kinds?.firstOrNull()?.kindCode ?: "article"
             if (request.roots.any { it.kind != rootKind }) errors += "ROOT_KIND" to "Roots must use the first outline kind '$rootKind'"
+            val allowed = allowedKinds(request, pinnedOutline)
             val logicalIds = mutableSetOf<java.util.UUID>()
             fun visit(node: com.constitutionatlas.platform.OrderedNodeWrite) {
+                val kind = node.kind?.trim()?.lowercase().orEmpty()
+                if (kind !in allowed) errors += "UNKNOWN_KIND" to "kind '$kind' is not in the outline"
                 if (node.revisionId != null || node.predecessorRevisionId != null) errors += "REVISION_REFERENCE" to "Imports must contain complete units without foreign revision references"
                 if (node.logicalId != null && !logicalIds.add(requireNotNull(node.logicalId))) errors += "DUPLICATE_LOGICAL_ID" to "Logical identities must be unique"
                 node.content.orEmpty().forEach { entry ->

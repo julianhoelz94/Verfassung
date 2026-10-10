@@ -121,7 +121,7 @@ export function menuSections(user: NavUser | null, apiDocsAvailable = false, nee
     sections.push({
       id: 'account',
       heading: 'Account',
-      links: [{ href: '/account', label: 'Account' }],
+      links: [{ href: '/account', label: 'Account' }, { href: '/account#mcp-keys', label: 'MCP keys' }],
     });
   } else {
     sections.push({

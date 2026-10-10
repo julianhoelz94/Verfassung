@@ -122,6 +122,12 @@
 		reverse_proxy search-service:8080
 	}
 
+	route /mcp* {
+		reverse_proxy mcp-server:8080 {
+			header_up X-Atlas-Client-IP {remote_host}
+		}
+	}
+
 	route {
 		# Pin Host so Next.js server actions cannot follow a client-controlled Host (GHSA-89xv-2m56-2m9x).
 		reverse_proxy gateway-web:3000 {

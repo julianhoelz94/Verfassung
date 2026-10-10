@@ -1,8 +1,10 @@
 package com.constitutionatlas.ingestion.client
 
 import com.constitutionatlas.ingestion.api.ImportArticle
+import com.constitutionatlas.ingestion.api.ImportOutline
 import com.constitutionatlas.ingestion.api.ImportOutlineKind
 import com.constitutionatlas.platform.OrderedNodeWrite
+import com.constitutionatlas.platform.OrderedSnapshot
 import com.constitutionatlas.platform.OrderedSnapshotWrite
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import org.springframework.http.HttpHeaders
@@ -62,10 +64,24 @@ class RestCatalogClient(
         return detail.constitutions.firstOrNull { it.slug == slug }
     }
 
-    override fun createConstitution(isoCode: String, slug: String, title: String): DownstreamConstitution =
+    override fun currentSettingsRevisionId(constitutionId: UUID): UUID =
+        client.get().uri("/constitutions/{id}/settings", constitutionId)
+            .retrieve().body(SettingsRevisionWire::class.java)!!.id
+
+    override fun version(versionId: UUID): DownstreamVersion? = try {
+        client.get().uri("/versions/{id}", versionId).retrieve().body(DownstreamVersion::class.java)
+    } catch (ex: RestClientResponseException) {
+        if (ex.statusCode == HttpStatus.NOT_FOUND) null else throw ex
+    }
+
+    override fun settingsOutline(constitutionId: UUID, revisionId: UUID): ImportOutline =
+        client.get().uri("/constitutions/{id}/settings/{revisionId}", constitutionId, revisionId)
+            .retrieve().body(SettingsRevisionWire::class.java)!!.outline
+
+    override fun createConstitution(isoCode: String, slug: String, title: String, predecessorConstitutionId: UUID?, interim: Boolean): DownstreamConstitution =
         client.postJson(
             "/countries/{iso}/constitutions",
-            mapOf("slug" to slug, "title" to title),
+            mapOf("slug" to slug, "title" to title, "predecessorConstitutionId" to predecessorConstitutionId, "interim" to interim),
             DownstreamConstitution::class.java,
             isoCode,
         )
@@ -79,6 +95,8 @@ class RestCatalogClient(
         gazetteReference: String?,
         predecessorVersionId: UUID?,
         hopKind: String?,
+        importJobId: UUID?,
+        settingsRevisionId: UUID?,
     ): DownstreamVersion =
         client.postJson(
             "/constitutions/{id}/versions",
@@ -90,14 +108,16 @@ class RestCatalogClient(
                 "gazetteReference" to gazetteReference,
                 "predecessorVersionId" to predecessorVersionId,
                 "hopKind" to hopKind,
+                "importJobId" to importJobId,
+                "structuralSettingsRevisionId" to settingsRevisionId,
             ),
             DownstreamVersion::class.java,
             constitutionId,
         )
 
-    override fun publishVersion(versionId: UUID): DownstreamVersion =
+    override fun publishVersion(versionId: UUID, importJobId: UUID?): DownstreamVersion =
         client.post()
-            .uri("/versions/{id}/publish", versionId)
+            .uri("/versions/{id}/publish?importJobId={jobId}", versionId, importJobId)
             .retrieve()
             .body(DownstreamVersion::class.java)!!
 
@@ -109,6 +129,9 @@ class RestCatalogClient(
     private data class CountryDetailWire(
         val constitutions: List<DownstreamConstitution> = emptyList(),
     )
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    private data class SettingsRevisionWire(val id: UUID, val outline: ImportOutline = ImportOutline())
 }
 
 class RestContentClient(
@@ -123,4 +146,7 @@ class RestContentClient(
     override fun replaceArticles(versionId: UUID, articles: List<ImportArticle>) {
         client.putJson("/versions/{id}/articles", articles, versionId)
     }
+
+    override fun snapshot(versionId: UUID): OrderedSnapshot =
+        client.get().uri("/versions/{id}/content", versionId).retrieve().body(OrderedSnapshot::class.java)!!
 }

@@ -8,6 +8,29 @@ services:
       - CADDY_EXPOSE_API_DOCS=${CADDY_EXPOSE_API_DOCS:-false}
     depends_on:
       - gateway-web
+      - mcp-server
+
+  mcp-server:
+    build: ./services/mcp-server
+    environment:
+      - PORT=8080
+      - CATALOG_API_URL=http://catalog-service:8080
+      - CONTENT_API_URL=http://content-service:8080
+      - SEARCH_API_URL=http://search-service:8080
+      - IDENTITY_API_URL=http://identity-service:8080
+      - INGESTION_API_URL=http://ingestion-service:8080
+      - PUBLIC_BASE_URL=${PUBLIC_BASE_URL:-http://localhost}
+    depends_on:
+      catalog-service:
+        condition: service_started
+      content-service:
+        condition: service_started
+      search-service:
+        condition: service_started
+      identity-service:
+        condition: service_started
+      ingestion-service:
+        condition: service_started
 
   gateway-web:
     build: ./apps/gateway-web
@@ -128,6 +151,9 @@ services:
       - AUDIT_API_URL=http://audit-service:8080
       - AUDIT_API_BEARER=${AUDIT_API_BEARER:-}
       - IDENTITY_SEED_SERVICE_TOKEN=${IDENTITY_SEED_SERVICE_TOKEN:-}
+      - IDENTITY_SEED_INGESTION_PUBLISH_TOKEN=${IDENTITY_SEED_INGESTION_PUBLISH_TOKEN:-}
+      - IDENTITY_SEED_INGESTION_AUDIT_TOKEN=${IDENTITY_SEED_INGESTION_AUDIT_TOKEN:-}
+      - IDENTITY_SEED_INGESTION_SEARCH_TOKEN=${IDENTITY_SEED_INGESTION_SEARCH_TOKEN:-}
       - PUBLIC_BASE_URL=${PUBLIC_BASE_URL:-http://localhost}
       - IDENTITY_MAIL_ENABLED=${IDENTITY_MAIL_ENABLED:-true}
       - IDENTITY_MAIL_FROM=${IDENTITY_MAIL_FROM:-}
@@ -251,6 +277,11 @@ services:
       - CATALOG_API_URL=http://catalog-service:8080
       - CONTENT_API_URL=http://content-service:8080
       - IDENTITY_API_URL=http://identity-service:8080
+      - INGESTION_PUBLISH_TOKEN=${INGESTION_PUBLISH_TOKEN:-}
+      - INGESTION_AUDIT_TOKEN=${INGESTION_AUDIT_TOKEN:-}
+      - INGESTION_SEARCH_TOKEN=${INGESTION_SEARCH_TOKEN:-}
+      - AUDIT_API_URL=http://audit-service:8080
+      - SEARCH_API_URL=http://search-service:8080
     depends_on:
       ingestion-db:
         condition: service_healthy

@@ -55,7 +55,7 @@ test('administrator creates, rotates and revokes a service token', async ({ page
   await expect(page.locator('.data-row').filter({ hasText: 'CI integration' })).toContainText('Revoked');
 });
 
-test('administrator imports constitution JSON and opens the resulting version link', async ({ page }) => {
+test('administrator stages constitution JSON for review without publishing it', async ({ page }) => {
   await signInAdmin(page);
   await page.goto('/admin/import');
   await page.getByLabel('Import JSON').fill(JSON.stringify({
@@ -64,12 +64,13 @@ test('administrator imports constitution JSON and opens the resulting version li
     constitutionSlug: 'constitution',
     constitutionTitle: 'Constitution',
     versionLabel: '1789',
+    sourceUrl: 'https://example.org/atlas-e2e/us-1789',
     articles: [{ articleNumber: '1', title: 'Legislative power', body: 'All legislative powers.' }],
   }));
-  await page.getByRole('button', { name: 'Start import' }).click();
+  await page.getByRole('button', { name: 'Stage for review' }).click();
   await expect(page.getByRole('heading', { name: 'Import job' })).toBeVisible();
-  await expect(page.getByText('Status: completed')).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Open the published version' })).toHaveAttribute('href', /\/countries\/US\/versions\//);
+  await expect(page.getByText('Status: pending_review')).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Open the published version' })).toHaveCount(0);
 });
 
 test('administrator creates a constitution and changes its outline settings', async ({ page }) => {

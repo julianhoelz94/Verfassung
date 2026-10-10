@@ -1,18 +1,24 @@
 import { notFound } from 'next/navigation';
 import { AdminForbidden } from '../../../components/AdminForbidden';
-import { Alert, Card, PageHeader } from '../../../components/ui';
+import { Alert, Button, Card, PageHeader } from '../../../components/ui';
 import { PageMain } from '../../../components/PageMain';
-import { requireAdminPage } from '../../../../lib/admin';
-import { getImportJob } from '../../../../lib/ingestion-api';
-import { requireSessionBearer } from '../../../../lib/session';
+import { getImportJob, getImportPayload, getPreparedImportContent, getImportReviewDecisions } from '../../../../lib/ingestion-api';
+import { getVersionSettings } from '../../../../lib/api';
+import { OrderedContentTree } from '../../../components/ConstitutionText';
+import { currentUser, requireSessionBearer } from '../../../../lib/session';
+import { transitionImportAction } from '../actions';
+import { ImportPreview } from '../ImportPreview';
 
 type ImportJobPageProps = {
   params: Promise<{ jobId: string }>;
+  searchParams: Promise<{ error?: string }>;
 };
 
 export default async function ImportJobPage(props: ImportJobPageProps) {
   const params = await props.params;
-  if (!(await requireAdminPage())) {
+  const searchParams = await props.searchParams;
+  const user = await currentUser();
+  if (!user || !user.roles.some(role => ['editor', 'reviewer', 'publisher', 'admin'].includes(role))) {
     return <AdminForbidden title="Import" />;
   }
   let job;
@@ -29,15 +35,24 @@ export default async function ImportJobPage(props: ImportJobPageProps) {
   if (!job) {
     notFound();
   }
+  const payload = await getImportPayload(params.jobId, await requireSessionBearer()).catch(() => null);
+  const decisions = await getImportReviewDecisions(params.jobId, await requireSessionBearer()).catch(() => []);
+  const prepared = job.versionId ? await getPreparedImportContent(job.versionId, await requireSessionBearer()).catch(() => null) : null;
+  const settings = job.versionId ? await getVersionSettings(job.versionId).catch(() => null) : null;
+  const editor = user.roles.includes('editor') || user.roles.includes('admin');
+  const reviewer = user.roles.includes('reviewer') || user.roles.includes('admin');
+  const publisher = user.roles.includes('publisher') || user.roles.includes('admin');
+  const ownSubmission = job.submittedBy === user.id;
+  const ownApproval = job.approvedBy === user.id;
   const versionHref =
     job.status === 'completed' && job.versionId && job.isoCode
       ? `/countries/${encodeURIComponent(job.isoCode)}/versions/${encodeURIComponent(job.versionId)}`
       : null;
   return (
     <PageMain className="wide">
-      {job.status === 'running' ? <meta httpEquiv="refresh" content="2" /> : null}
       <PageHeader title="Import job" meta={`Status: ${job.status}`} />
-      {job.status === 'running' ? <Alert>The import is still running. This page refreshes automatically.</Alert> : null}
+      {searchParams.error ? <Alert tone="error">{searchParams.error === 'reason' ? 'Enter a reason of 10 to 2000 characters.' : 'The action could not be completed. Check the job status and your rights.'}</Alert> : null}
+      {job.status === 'pending_review' ? <Alert>This import is pending review. It is not public.</Alert> : null}
       {job.status === 'failed' ? <Alert tone="error">The import failed.</Alert> : null}
       {job.status === 'completed' && versionHref ? (
         <Alert tone="success">
@@ -45,6 +60,26 @@ export default async function ImportJobPage(props: ImportJobPageProps) {
           <a href={versionHref}>Open the published version</a>
         </Alert>
       ) : null}
+      {payload ? <Card><ImportPreview payload={payload} /></Card> : null}
+      {prepared ? <Card>
+        <h2>Prepared draft as readers will see it</h2>
+        <p>Content generation {prepared.generation}; settings revision {prepared.settingsRevisionId ?? 'unbound'}.</p>
+        <OrderedContentTree entries={prepared.roots.map(node => ({ type: 'child' as const, node }))} outline={settings?.outline} />
+      </Card> : null}
+      <Card>
+        <h2>Review actions</h2>
+        {!job.versionId && job.status === 'pending_review' && editor && payload?.outline && !job.outlineConfirmedBy ? <ActionForm action="confirm-outline" jobId={job.id} label="Confirm proposed outline" /> : null}
+        {!job.versionId && job.status === 'pending_review' && editor && (!payload?.outline || job.outlineConfirmedBy) ? <ActionForm action="prepare" jobId={job.id} label="Prepare unpublished draft" /> : null}
+        {job.versionId && job.status === 'pending_review' && reviewer && !ownSubmission ? <>
+          <ActionForm action="approve" jobId={job.id} label="Approve prepared draft" />
+          <ActionForm action="reject" jobId={job.id} label="Reject import" />
+        </> : null}
+        {job.status === 'approved' && publisher && !ownApproval ? <ActionForm action="publish" jobId={job.id} label="Publish approved version" /> : null}
+        {job.versionId && job.status !== 'completed' ? <p>Draft version: <code>{job.versionId}</code></p> : null}
+      </Card>
+      {decisions.length ? <Card><h2>Review decisions</h2><ol>{decisions.map(decision => <li key={decision.id}>
+        <strong>{decision.decision}</strong> · {new Date(decision.decidedAt).toLocaleString()}<p>{decision.reason}</p>
+      </li>)}</ol></Card> : null}
       {job.errors.length > 0 ? (
         <Card>
           <h2>Errors</h2>
@@ -59,4 +94,13 @@ export default async function ImportJobPage(props: ImportJobPageProps) {
       ) : null}
     </PageMain>
   );
+}
+
+function ActionForm({ action, jobId, label }: { action: 'confirm-outline' | 'prepare' | 'approve' | 'reject' | 'publish'; jobId: string; label: string }) {
+  return <form action={transitionImportAction}>
+    <input type="hidden" name="jobId" value={jobId} />
+    <input type="hidden" name="action" value={action} />
+    {action === 'approve' || action === 'reject' ? <label>Review reason<textarea name="reason" minLength={10} maxLength={2000} required rows={3} /></label> : null}
+    <Button variant={action === 'publish' ? 'primary' : undefined}>{label}</Button>
+  </form>;
 }

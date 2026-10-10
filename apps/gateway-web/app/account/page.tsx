@@ -2,10 +2,12 @@ import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { Alert, Button, Card, Input, PageHeader } from '../components/ui';
 import { PageMain } from '../components/PageMain';
-import { requestStartMfaEnroll } from '../../lib/identity-client';
+import { requestMcpKeys, requestStartMfaEnroll } from '../../lib/identity-client';
 import { SESSION_COOKIE, currentUser, mfaChallengeToken } from '../../lib/session';
 import { ConfirmEnrollForm, RegenerateRecoveryForm } from './MfaForms';
 import { changePasswordAction, revokeMfaAction, startMfaEnrollAction } from './actions';
+import { revokeMcpKeyAction } from './actions';
+import { CreateMcpKeyForm, RotateMcpKeyForm } from './McpKeyForms';
 
 type AccountPageProps = {
   searchParams: Promise<{
@@ -37,6 +39,10 @@ export default async function AccountPage(props: AccountPageProps) {
       enrollSecret = null;
     }
   }
+  const sessionToken = (await cookies()).get(SESSION_COOKIE)?.value;
+  const mcpKeys = sessionToken ? await requestMcpKeys(sessionToken).catch(() => []) : [];
+  const canImport = user.roles.includes('editor') || user.roles.includes('admin');
+  const mcpUrl = new URL('/mcp', process.env.PUBLIC_BASE_URL || 'http://localhost').toString();
   return (
     <PageMain>
       <PageHeader title="Account" meta={`Signed in as ${user.email}.`} />
@@ -106,6 +112,25 @@ export default async function AccountPage(props: AccountPageProps) {
           />
           <Button variant="primary">Update password</Button>
         </form>
+        </section>
+      </Card>
+      <Card>
+        <section className="account-section" id="mcp-keys" aria-labelledby="mcp-keys-title">
+          <h2 id="mcp-keys-title">Connect a chat client</h2>
+          <p>Connect your client to <code>{mcpUrl}</code> with a personal MCP key. A read key lets you browse published constitutions; editors can create an import key to stage content. Every import remains pending review.</p>
+          <h3>Claude Code example</h3>
+          <p>After copying a key, run this on your computer and replace the placeholder with the key:</p>
+          <pre tabIndex={0}><code>{`claude mcp add --transport http constitution-atlas ${mcpUrl} --header "Authorization: Bearer <your-MCP-key>"`}</code></pre>
+          <p><a href="https://code.claude.com/docs/en/mcp">Claude Code MCP setup instructions</a>. Use a client that supports a custom Authorization header for import keys.</p>
+          <CreateMcpKeyForm canImport={canImport} />
+          <h3>Your MCP keys</h3>
+          {mcpKeys.length === 0 ? <p>No keys yet.</p> : mcpKeys.map((key) => <div key={key.id}>
+            <strong>{key.name}</strong> · {key.scopes.join(', ')} · expires {new Date(key.expiresAt).toLocaleDateString()}
+            {key.revokedAt ? <span> · revoked</span> : <>
+              <RotateMcpKeyForm keyId={key.id} />
+              <form action={revokeMcpKeyAction}><input type="hidden" name="keyId" value={key.id} /><Button>Revoke</Button></form>
+            </>}
+          </div>)}
         </section>
       </Card>
     </PageMain>

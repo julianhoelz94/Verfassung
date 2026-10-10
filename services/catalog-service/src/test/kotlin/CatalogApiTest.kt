@@ -72,9 +72,29 @@ class CatalogApiTest {
     private val viewer =
         Actor(UUID.fromString("01900000-0000-4000-8000-000000000414"), "local-viewer@example.local", listOf("viewer"))
 
+    private fun uniqueCountryCode(): String = generateSequence { ('A'..'Z').shuffled().take(2).joinToString("") }
+        .first { catalogRepository.findCountrySummary(it) == null }
+
+    @Test
+    fun importedDraftCannotBypassReviewWithOrdinaryPublisherCredential() {
+        val countryCode = uniqueCountryCode()
+        writes.createCountry(com.constitutionatlas.catalog.api.CreateCountryRequest(countryCode, "Import hold country"))
+        val constitution = writes.createConstitution(countryCode, com.constitutionatlas.catalog.api.CreateConstitutionRequest("import-hold", "Imported constitution"))
+        val jobId = UUID.randomUUID()
+        val version = writes.createDraftVersion(constitution.id, com.constitutionatlas.catalog.api.CreateVersionRequest("1", importJobId = jobId))
+        mockMvc.post("/versions/${version.id}/publish") { header("Authorization", PUBLISHER_TOKEN) }
+            .andExpect { status { isForbidden() } }
+        val importToken = "Bearer import-publisher-token"
+        Mockito.`when`(identityClient.authenticate(importToken)).thenReturn(Actor(UUID.randomUUID(), "ingestion", emptyList(), listOf("ingestion:publish")))
+        mockMvc.post("/versions/${version.id}/publish?importJobId=${UUID.randomUUID()}") { header("Authorization", importToken) }
+            .andExpect { status { isForbidden() } }
+        mockMvc.post("/versions/${version.id}/publish?importJobId=$jobId") { header("Authorization", importToken) }
+            .andExpect { status { isOk() } }
+    }
+
     @Test
     fun constitutionLifecycleTracksSuspensionRestorationAndRepeal() {
-        val countryCode = ('A'..'Z').shuffled().take(2).joinToString("")
+        val countryCode = uniqueCountryCode()
         writes.createCountry(com.constitutionatlas.catalog.api.CreateCountryRequest(countryCode, "Lifecycle country"))
         val first = writes.createConstitution(countryCode, com.constitutionatlas.catalog.api.CreateConstitutionRequest("first", "First constitution"))
         val second = writes.createConstitution(countryCode, com.constitutionatlas.catalog.api.CreateConstitutionRequest("interim", "Interim constitution", predecessorConstitutionId = first.id, interim = true))
@@ -100,7 +120,7 @@ class CatalogApiTest {
 
     @Test
     fun lifecycleWritesRequirePublisherAndReadsArePublic() {
-        val countryCode = ('A'..'Z').shuffled().take(2).joinToString("")
+        val countryCode = uniqueCountryCode()
         writes.createCountry(com.constitutionatlas.catalog.api.CreateCountryRequest(countryCode, "Timeline country"))
         val constitution = writes.createConstitution(countryCode, com.constitutionatlas.catalog.api.CreateConstitutionRequest("timeline", "Timeline constitution"))
         val path = "/constitutions/${constitution.id}/lifecycle-events"
@@ -133,7 +153,7 @@ class CatalogApiTest {
 
     @Test
     fun countryAndConstitutionWikiPagesPublishIndependentRevisions() {
-        val countryCode = ('A'..'Z').shuffled().take(2).joinToString("")
+        val countryCode = uniqueCountryCode()
         val country = writes.createCountry(com.constitutionatlas.catalog.api.CreateCountryRequest(countryCode, "Wiki country"))
         val constitution = writes.createConstitution(countryCode, com.constitutionatlas.catalog.api.CreateConstitutionRequest("wiki", "Wiki constitution"))
         val firstImage = com.constitutionatlas.catalog.api.WikiImage(UUID.randomUUID(), 2, "A historic flag", placement = "before_body")
@@ -172,7 +192,7 @@ class CatalogApiTest {
 
     @Test
     fun approximateLifecycleDateDoesNotClaimCertainStatus() {
-        val countryCode = ('A'..'Z').shuffled().take(2).joinToString("")
+        val countryCode = uniqueCountryCode()
         writes.createCountry(com.constitutionatlas.catalog.api.CreateCountryRequest(countryCode, "Approximate date country"))
         val constitution = writes.createConstitution(countryCode, com.constitutionatlas.catalog.api.CreateConstitutionRequest("approximate", "Approximate constitution"))
         val adoption = lifecycle.append(
@@ -188,7 +208,7 @@ class CatalogApiTest {
 
     @Test
     fun wikiPublicationRequiresPinnedImages() {
-        val countryCode = ('A'..'Z').shuffled().take(2).joinToString("")
+        val countryCode = uniqueCountryCode()
         val country = writes.createCountry(com.constitutionatlas.catalog.api.CreateCountryRequest(countryCode, "Image country"))
         val image = com.constitutionatlas.catalog.api.WikiImage(UUID.randomUUID(), 1, "Map")
         val draft = wiki.save("country", country.id, com.constitutionatlas.catalog.api.SaveWikiPage(summary = "Summary", body = "History", images = listOf(image)), editor.id)
@@ -202,7 +222,7 @@ class CatalogApiTest {
 
     @Test
     fun provisionsCanCommenceLaterAndBeSuspendedIndependently() {
-        val countryCode = ('A'..'Z').shuffled().take(2).joinToString("")
+        val countryCode = uniqueCountryCode()
         writes.createCountry(com.constitutionatlas.catalog.api.CreateCountryRequest(countryCode, "Provision country"))
         val constitution = writes.createConstitution(countryCode, com.constitutionatlas.catalog.api.CreateConstitutionRequest("provisions", "Provision constitution"))
         val version = writes.createDraftVersion(constitution.id, com.constitutionatlas.catalog.api.CreateVersionRequest("1"))
@@ -372,7 +392,7 @@ class CatalogApiTest {
             content = """{"slug":"settings-test","title":"Settings test"}"""
         }.andExpect { status { isCreated() } }.andReturn()
         val constitutionId = objectMapper.readTree(created.response.contentAsString).get("id").asText()
-        val initial = mockMvc.get("/constitutions/$constitutionId/settings").andReturn()
+        val initial = mockMvc.get("/constitutions/$constitutionId/settings") { header("Authorization", TOKEN) }.andReturn()
         val revisionId = objectMapper.readTree(initial.response.contentAsString).get("id").asText()
         val version = mockMvc.post("/constitutions/$constitutionId/versions") {
             header("Authorization", TOKEN)
@@ -389,12 +409,12 @@ class CatalogApiTest {
             status { isOk() }
             jsonPath("$.predecessorId") { value(revisionId) }
         }
-        mockMvc.get("/versions/$versionId/settings").andExpect {
+        mockMvc.get("/versions/$versionId/settings") { header("Authorization", TOKEN) }.andExpect {
             status { isOk() }
             jsonPath("$.id") { value(revisionId) }
             jsonPath("$.outline.kinds[0].displayLabel") { value("Article") }
         }
-        mockMvc.get("/versions/$versionId/reader-settings").andExpect {
+        mockMvc.get("/versions/$versionId/reader-settings") { header("Authorization", TOKEN) }.andExpect {
             status { isOk() }
             jsonPath("$.kinds[0].displayLabel") { value("Provision") }
         }
@@ -403,7 +423,7 @@ class CatalogApiTest {
             contentType = MediaType.APPLICATION_JSON
             content = request
         }.andExpect { status { isConflict() } }
-        val current = objectMapper.readTree(mockMvc.get("/constitutions/$constitutionId/settings").andReturn().response.contentAsString).get("id").asText()
+        val current = objectMapper.readTree(mockMvc.get("/constitutions/$constitutionId/settings") { header("Authorization", TOKEN) }.andReturn().response.contentAsString).get("id").asText()
         val restored = mockMvc.post("/constitutions/$constitutionId/settings/$revisionId/restore") {
             header("Authorization", TOKEN)
             contentType = MediaType.APPLICATION_JSON
@@ -414,14 +434,14 @@ class CatalogApiTest {
             jsonPath("$.outline.kinds[0].displayLabel") { value("Article") }
         }.andReturn()
         assertThat(objectMapper.readTree(restored.response.contentAsString).get("id").asText()).isNotEqualTo(revisionId)
-        mockMvc.get("/versions/$versionId/reader-settings").andExpect { jsonPath("$.kinds[0].displayLabel") { value("Article") } }
-        mockMvc.get("/versions/$versionId/settings").andExpect { jsonPath("$.id") { value(revisionId) } }
+        mockMvc.get("/versions/$versionId/reader-settings") { header("Authorization", TOKEN) }.andExpect { jsonPath("$.kinds[0].displayLabel") { value("Article") } }
+        mockMvc.get("/versions/$versionId/settings") { header("Authorization", TOKEN) }.andExpect { jsonPath("$.id") { value(revisionId) } }
     }
 
     @Test
     fun repeatedOutlineImportKeepsCurrentRevisionDespiteGrandfatheredContent() {
         val id = "01900000-0000-4000-8000-000000000002"
-        val initial = objectMapper.readTree(mockMvc.get("/constitutions/$id/settings").andReturn().response.contentAsString)
+        val initial = objectMapper.readTree(mockMvc.get("/constitutions/$id/settings") { header("Authorization", TOKEN) }.andReturn().response.contentAsString)
         val kinds = initial.path("outline").path("kinds")
         Mockito.`when`(settingsUsage.inspect(Mockito.anyList(), Mockito.anyList(), Mockito.any())).thenReturn(
             com.constitutionatlas.catalog.api.SettingsUsage(violations = listOf(com.constitutionatlas.catalog.api.SettingsViolation(UUID.randomUUID(), null, "content", "Grandfathered parent text"))),
@@ -440,7 +460,7 @@ class CatalogApiTest {
             contentType = MediaType.APPLICATION_JSON
             content = """{"kinds":$kinds}"""
         }.andExpect { status { isOk() } }
-        mockMvc.get("/constitutions/$id/settings").andExpect { jsonPath("$.id") { value(initial.path("id").asText()) } }
+        mockMvc.get("/constitutions/$id/settings") { header("Authorization", TOKEN) }.andExpect { jsonPath("$.id") { value(initial.path("id").asText()) } }
         val displayKinds = kinds.deepCopy<com.fasterxml.jackson.databind.node.ArrayNode>()
         (displayKinds[0] as com.fasterxml.jackson.databind.node.ObjectNode).put("displayLabel", "Grandfathered provision")
         mockMvc.put("/constitutions/$id/settings") {
@@ -451,7 +471,7 @@ class CatalogApiTest {
             status { isOk() }
             jsonPath("$.outline.kinds[0].displayLabel") { value("Grandfathered provision") }
         }
-        val updated = objectMapper.readTree(mockMvc.get("/constitutions/$id/settings").andReturn().response.contentAsString)
+        val updated = objectMapper.readTree(mockMvc.get("/constitutions/$id/settings") { header("Authorization", TOKEN) }.andReturn().response.contentAsString)
         mockMvc.post("/constitutions/$id/settings/${initial.path("id").asText()}/restore") {
             header("Authorization", TOKEN)
             contentType = MediaType.APPLICATION_JSON
@@ -570,7 +590,7 @@ class CatalogApiTest {
             Regex("\"id\":\"([^\"]+)\"").find(it)!!.groupValues[1]
         }
 
-        mockMvc.get("/countries/FR").andExpect {
+        mockMvc.get("/countries/FR") { header("Authorization", TOKEN) }.andExpect {
             status { isOk() }
             jsonPath("$.constitutions[0].versions.length()") { value(0) }
         }
@@ -585,6 +605,11 @@ class CatalogApiTest {
         }.andReturn().response.contentAsString.let {
             Regex("\"id\":\"([^\"]+)\"").find(it)!!.groupValues[1]
         }
+
+        mockMvc.get("/countries/FR").andExpect { jsonPath("$.constitutions.length()") { value(0) } }
+        mockMvc.get("/constitutions/$constitutionId/settings").andExpect { status { isNotFound() } }
+        mockMvc.get("/constitutions/$constitutionId/content-outline").andExpect { status { isNotFound() } }
+        mockMvc.get("/versions/$versionId").andExpect { status { isNotFound() } }
 
         mockMvc.post("/versions/$versionId/publish") {
             header("Authorization", TOKEN)
@@ -899,6 +924,9 @@ class CatalogApiTest {
             header("Authorization", PUBLISHER_TOKEN)
         }.andExpect { status { isOk() } }
 
+        // The public version summary points at this published editorial tip.
+        mockMvc.get("/versions/$versionId").andExpect { status { isOk() } }
+
         mockMvc.get("/constitutions/$constitutionId/versions")
             .andExpect {
                 status { isOk() }
@@ -907,6 +935,7 @@ class CatalogApiTest {
                     value(org.hamcrest.Matchers.not(org.hamcrest.Matchers.hasItem(editorialLabel)))
                 }
                 jsonPath("$[?(@.versionLabel=='2020')].latestPublished") { value(true) }
+                jsonPath("$[?(@.versionLabel=='2020')].currentVersionId") { value(org.hamcrest.Matchers.hasItem(versionId)) }
             }
 
         mockMvc.get("/constitutions/$constitutionId/versions?listing=all")
@@ -926,7 +955,7 @@ class CatalogApiTest {
             jsonPath("$[2].latestPublished") { value(true) }
         }
 
-        mockMvc.get("/versions/$versionId")
+        mockMvc.get("/versions/$versionId") { header("Authorization", TOKEN) }
             .andExpect {
                 status { isOk() }
                 jsonPath("$.versionLabel") { value(editorialLabel) }

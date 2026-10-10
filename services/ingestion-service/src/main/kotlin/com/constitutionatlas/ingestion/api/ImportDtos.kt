@@ -50,6 +50,8 @@ data class ImportRequest(
     val gazetteReference: String? = null,
     val predecessorVersionId: UUID? = null,
     val hopKind: String? = null,
+    val constitutionId: UUID? = null,
+    val settingsRevisionId: UUID? = null,
     val outline: ImportOutline? = null,
     val articles: List<ImportArticle> = emptyList(),
     val roots: List<OrderedNodeWrite> = emptyList(),
@@ -66,4 +68,45 @@ data class ImportJobDto(
     val versionId: UUID?,
     val errors: List<ImportErrorDto>,
     val isoCode: String? = null,
+    val submittedBy: UUID? = null,
+    val preparedBy: UUID? = null,
+    val approvedBy: UUID? = null,
+    val publishedBy: UUID? = null,
+    val outlineConfirmedBy: UUID? = null,
 )
+
+data class ImportBatchDto(val id: UUID, val items: List<ImportJobDto>, val status: String)
+
+data class StageBatchItemRequest(val idempotencyKey: String, val payload: ImportRequest, val checksumSha256: String? = null)
+
+data class ReviewDecisionRequest(val reason: String)
+
+data class ReviewDecisionDto(val id: UUID, val decision: String, val reason: String, val decidedBy: UUID, val decidedAt: java.time.OffsetDateTime)
+
+data class SetupProposalRequest(
+    val isoCode: String,
+    val countryName: String,
+    val constitutionSlug: String,
+    val constitutionTitle: String,
+    val predecessorConstitutionId: UUID? = null,
+    val interim: Boolean = false,
+    val languageCode: String = "en",
+    val sourceUrl: String? = null,
+    val gazetteReference: String? = null,
+    val outline: ImportOutline,
+    val sampleRoots: List<OrderedNodeWrite> = emptyList(),
+)
+
+data class SetupProposalDto(
+    val id: UUID,
+    val ownerId: UUID,
+    val status: String,
+    val payload: SetupProposalRequest,
+    val constitutionId: UUID?,
+    val settingsRevisionId: UUID?,
+    val confirmedBy: UUID?,
+)
+
+data class BeginUploadRequest(val idempotencyKey: String, val checksumSha256: String, val totalBytes: Int)
+data class UploadChunkRequest(val dataBase64: String, val checksumSha256: String)
+data class ImportUploadDto(val id: UUID, val batchId: UUID, val status: String, val totalBytes: Int, val chunkBytes: Int, val missingChunks: List<Int>, val itemId: UUID?)

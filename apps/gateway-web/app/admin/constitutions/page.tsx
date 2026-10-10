@@ -7,6 +7,7 @@ import { DEFAULT_NEW_OUTLINE } from '../../../lib/outline';
 import { createConstitutionAction } from './actions';
 import { ConstitutionBasicsFields } from './ConstitutionBasicsFields';
 import { OutlineEditor } from './OutlineEditor';
+import { requireSessionBearer } from '../../../lib/session';
 
 type AdminConstitutionsPageProps = {
   searchParams: Promise<{ error?: string }>;
@@ -17,7 +18,7 @@ export default async function AdminConstitutionsPage(props: AdminConstitutionsPa
   if (!(await requireAdminPage())) {
     return <AdminForbidden title="Outlines" />;
   }
-  const { countries, details } = await loadCountriesWithDetails();
+  const { countries, details } = await loadCountriesWithDetails(await requireSessionBearer());
   const rows = details.flatMap((country) =>
     country
       ? country.constitutions.map((constitution) => ({

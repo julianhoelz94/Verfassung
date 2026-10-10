@@ -38,8 +38,8 @@ class CatalogController(
     fun listCountries(): List<CountrySummary> = catalogQueryService.listCountries()
 
     @GetMapping("/countries/{isoCode}")
-    fun getCountry(@PathVariable isoCode: String): CountryDetail =
-        catalogQueryService.getCountry(isoCode)
+    fun getCountry(@PathVariable isoCode: String, @RequestHeader(value = "Authorization", required = false) authorization: String?): CountryDetail =
+        catalogQueryService.getCountry(isoCode, writeAccess.mayViewPrivateCatalog(authorization))
 
     @GetMapping("/countries/{isoCode}/constitution-lifecycle")
     fun countryLifecycle(@PathVariable isoCode: String): List<LifecycleEvent> =
@@ -153,12 +153,22 @@ class CatalogController(
     }
 
     @GetMapping("/versions/{versionId}")
-    fun getVersion(@PathVariable versionId: UUID): VersionDetail =
-        catalogQueryService.getVersion(versionId)
+    fun getVersion(@PathVariable versionId: UUID, @RequestHeader(value = "Authorization", required = false) authorization: String?): VersionDetail =
+        catalogQueryService.getVersion(versionId).also { version ->
+            val publicSnapshot = version.publicationStatus == "published" &&
+                (version.listing == "public" || version.currentVersionId == version.id)
+            if (!writeAccess.mayViewPrivateCatalog(authorization) && !publicSnapshot) {
+                throw com.constitutionatlas.platform.NotFoundException("Unknown version '$versionId'")
+            }
+        }
 
     @GetMapping("/constitutions/{constitutionId}/content-outline")
-    fun getOutline(@PathVariable constitutionId: UUID): ContentOutlineDto =
-        catalogQueryService.getOutline(constitutionId)
+    fun getOutline(@PathVariable constitutionId: UUID, @RequestHeader(value = "Authorization", required = false) authorization: String?): ContentOutlineDto =
+        if (writeAccess.mayViewPrivateCatalog(authorization)) {
+            catalogQueryService.getOutline(constitutionId)
+        } else {
+            settingsService.forVersion(publicVersionOrNotFound(constitutionId)).outline
+        }
 
     @GetMapping("/constitutions/{constitutionId}/metadata")
     fun getMetadata(@PathVariable constitutionId: UUID): ConstitutionMetadata = metadataService.get(constitutionId)
@@ -170,11 +180,20 @@ class CatalogController(
     }
 
     @GetMapping("/constitutions/{constitutionId}/settings")
-    fun getSettings(@PathVariable constitutionId: UUID): SettingsRevision = settingsService.current(constitutionId)
+    fun getSettings(@PathVariable constitutionId: UUID, @RequestHeader(value = "Authorization", required = false) authorization: String?): SettingsRevision =
+        if (writeAccess.mayViewPrivateCatalog(authorization)) {
+            settingsService.current(constitutionId)
+        } else {
+            settingsService.forVersion(publicVersionOrNotFound(constitutionId))
+        }
 
     @GetMapping("/constitutions/{constitutionId}/settings/{revisionId}")
-    fun getSettingsRevision(@PathVariable constitutionId: UUID, @PathVariable revisionId: UUID): SettingsRevision =
-        settingsService.revision(constitutionId, revisionId)
+    fun getSettingsRevision(@PathVariable constitutionId: UUID, @PathVariable revisionId: UUID, @RequestHeader(value = "Authorization", required = false) authorization: String?): SettingsRevision {
+        if (!writeAccess.mayViewPrivateCatalog(authorization) && settingsService.forVersion(publicVersionOrNotFound(constitutionId)).id != revisionId) {
+            throw com.constitutionatlas.platform.NotFoundException("Unknown settings revision '$revisionId'")
+        }
+        return settingsService.revision(constitutionId, revisionId)
+    }
 
     @PostMapping("/constitutions/{constitutionId}/settings/{revisionId}/restore")
     fun restoreSettings(@PathVariable constitutionId: UUID, @PathVariable revisionId: UUID, @RequestHeader(value = "Authorization", required = false) authorization: String?, @RequestBody request: SettingsRestore): SettingsRevision {
@@ -183,10 +202,20 @@ class CatalogController(
     }
 
     @GetMapping("/versions/{versionId}/reader-settings")
-    fun getReaderSettings(@PathVariable versionId: UUID): ContentOutlineDto = settingsService.reader(versionId)
+    fun getReaderSettings(@PathVariable versionId: UUID, @RequestHeader(value = "Authorization", required = false) authorization: String?): ContentOutlineDto {
+        getVersion(versionId, authorization)
+        return settingsService.reader(versionId)
+    }
 
     @GetMapping("/versions/{versionId}/settings")
-    fun getVersionSettings(@PathVariable versionId: UUID): SettingsRevision = settingsService.forVersion(versionId)
+    fun getVersionSettings(@PathVariable versionId: UUID, @RequestHeader(value = "Authorization", required = false) authorization: String?): SettingsRevision {
+        getVersion(versionId, authorization)
+        return settingsService.forVersion(versionId)
+    }
+
+    private fun publicVersionOrNotFound(constitutionId: UUID): UUID =
+        catalogQueryService.publicVersionId(constitutionId)
+            ?: throw com.constitutionatlas.platform.NotFoundException("Unknown constitution '$constitutionId'")
 
     @PostMapping("/constitutions/{constitutionId}/settings/preflight")
     fun preflightSettings(
@@ -260,8 +289,9 @@ class CatalogController(
     fun publishVersion(
         @RequestHeader(value = "Authorization", required = false) authorization: String?,
         @PathVariable versionId: UUID,
+        @RequestParam(required = false) importJobId: UUID?,
     ): VersionCreated {
-        writeAccess.requireCatalogPublisher(authorization)
-        return catalogWriteService.publishVersion(versionId)
+        val actor = writeAccess.requireVersionPublisher(authorization)
+        return catalogWriteService.publishVersion(versionId, actor, importJobId, authorization)
     }
 }

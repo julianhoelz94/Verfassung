@@ -21,6 +21,9 @@ import {
   requestCreateServiceToken,
   requestRotateServiceToken,
   requestRevokeServiceToken,
+  requestCreateMcpKey,
+  requestRotateMcpKey,
+  requestRevokeMcpKey,
 } from '../../lib/identity-client';
 import { requireAdminUser } from '../../lib/admin';
 import { safeReturnTo } from '../../lib/return-to';
@@ -273,4 +276,40 @@ export async function revokeServiceTokenAction(formData: FormData): Promise<void
     redirect('/admin/users?error=1');
   }
   redirect('/admin/users');
+}
+
+export async function createMcpKeyAction(_prev: TokenRevealState, formData: FormData): Promise<TokenRevealState> {
+  const token = await tokenOrRedirect();
+  try {
+    const created = await requestCreateMcpKey(token, String(formData.get('name') ?? ''), formData.get('importEnabled') === 'on');
+    return { token: created.token };
+  } catch (error) {
+    if (error instanceof IdentityApiError && error.code === 'step_up_required') {
+      redirect('/account/step-up?returnTo=%2Faccount');
+    }
+    return { error: true };
+  }
+}
+
+export async function rotateMcpKeyAction(_prev: TokenRevealState, formData: FormData): Promise<TokenRevealState> {
+  const token = await tokenOrRedirect();
+  try {
+    const rotated = await requestRotateMcpKey(token, String(formData.get('keyId') ?? ''));
+    return { token: rotated.token };
+  } catch (error) {
+    if (error instanceof IdentityApiError && error.code === 'step_up_required') {
+      redirect('/account/step-up?returnTo=%2Faccount');
+    }
+    return { error: true };
+  }
+}
+
+export async function revokeMcpKeyAction(formData: FormData): Promise<void> {
+  const token = await tokenOrRedirect();
+  try {
+    await requestRevokeMcpKey(token, String(formData.get('keyId') ?? ''));
+  } catch {
+    redirect('/account?error=key');
+  }
+  redirect('/account');
 }

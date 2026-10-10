@@ -59,7 +59,7 @@ describe('menuSections', () => {
     const viewer = { email: 'viewer@example.local', roles: ['viewer'] };
     expect(sectionIds(viewer)).toEqual(['identity', 'primary', 'account']);
     expect(menuSections(viewer)[0]?.identity).toEqual({ email: viewer.email, roles: viewer.roles });
-    expect(sectionHrefs(viewer, 'account')).toEqual(['/account']);
+    expect(sectionHrefs(viewer, 'account')).toEqual(['/account', '/account#mcp-keys']);
     expect(sectionHrefs(viewer, 'editorial')).toEqual([]);
   });
 

@@ -12,6 +12,8 @@ import com.constitutionatlas.catalog.api.SettingsWrite
 import com.constitutionatlas.catalog.api.VersionCreated
 import com.constitutionatlas.catalog.repo.CatalogRepository
 import com.constitutionatlas.catalog.repo.SettingsRepository
+import com.constitutionatlas.platform.Actor
+import com.constitutionatlas.platform.ForbiddenException
 import com.constitutionatlas.platform.NotFoundException
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.stereotype.Service
@@ -179,6 +181,7 @@ class CatalogWriteService(
             throw ex
         }
 
+        request.importJobId?.let { catalogRepository.holdImportedVersion(id, it) }
         request.structuralSettingsRevisionId?.let { settingsRepository.find(constitutionId, it) }
         settingsRepository.pin(id, constitutionId, predecessorId, request.structuralSettingsRevisionId)
         request.publishAttemptId?.let { publishAttempts.insert(it, constitutionId, id, requestHash) }
@@ -192,8 +195,16 @@ class CatalogWriteService(
     }
 
     @Transactional
-    fun publishVersion(versionId: UUID): VersionCreated {
-        publishAttempts.forVersion(versionId)?.let { attempt -> successorReadiness.requireReady(versionId, attempt, settingsRepository.forVersion(versionId).id) }
+    fun publishVersion(versionId: UUID, actor: Actor? = null, importJobId: UUID? = null, authorization: String? = null): VersionCreated {
+        val hold = catalogRepository.importHold(versionId)
+        if (hold != null) {
+            if (hold != importJobId || actor == null || "ingestion:publish" !in actor.scopes) {
+                throw ForbiddenException("Imported version requires an approved ingestion publication")
+            }
+        } else if (actor != null && "ingestion:publish" in actor.scopes && actor.roles.none { it == "publisher" || it == "admin" } && "catalog:publish" !in actor.scopes) {
+            throw ForbiddenException("Import publication token cannot publish an ordinary version")
+        }
+        publishAttempts.forVersion(versionId)?.let { attempt -> successorReadiness.requireReady(versionId, attempt, settingsRepository.forVersion(versionId).id, authorization) }
         if (!catalogRepository.publishVersion(versionId)) {
             throw NotFoundException("Unknown version '$versionId'")
         }

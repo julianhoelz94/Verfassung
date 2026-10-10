@@ -144,6 +144,7 @@ data class CreateVersionRequest(
     val publicationComment: String? = null,
     val structuralSettingsRevisionId: UUID? = null,
     val publishAttemptId: UUID? = null,
+    val importJobId: UUID? = null,
 )
 
 data class VersionCreated(

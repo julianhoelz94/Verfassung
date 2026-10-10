@@ -427,3 +427,44 @@ export async function requestRevokeServiceToken(
   });
   await readOk(response, 'Unable to revoke service token');
 }
+
+export type McpKey = {
+  id: string;
+  name: string;
+  scopes: string[];
+  createdAt: string;
+  expiresAt: string;
+  lastUsedAt: string | null;
+  revokedAt: string | null;
+};
+
+export async function requestMcpKeys(token: string): Promise<McpKey[]> {
+  const response = await fetch(`${identityBaseUrl()}/mcp-keys`, {
+    headers: { Authorization: `Bearer ${token}` }, cache: 'no-store',
+  });
+  return readOk(response, 'Unable to list MCP keys');
+}
+
+export async function requestCreateMcpKey(token: string, name: string, importEnabled: boolean): Promise<{ key: McpKey; token: string }> {
+  const response = await fetch(`${identityBaseUrl()}/mcp-keys`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, scopes: importEnabled ? ['mcp:read', 'ingestion:import'] : ['mcp:read'] }),
+    cache: 'no-store',
+  });
+  return readOk(response, 'Unable to create MCP key');
+}
+
+export async function requestRotateMcpKey(token: string, id: string): Promise<{ key: McpKey; token: string }> {
+  const response = await fetch(`${identityBaseUrl()}/mcp-keys/${encodeURIComponent(id)}/rotate`, {
+    method: 'POST', headers: { Authorization: `Bearer ${token}` }, cache: 'no-store',
+  });
+  return readOk(response, 'Unable to rotate MCP key');
+}
+
+export async function requestRevokeMcpKey(token: string, id: string): Promise<void> {
+  const response = await fetch(`${identityBaseUrl()}/mcp-keys/${encodeURIComponent(id)}`, {
+    method: 'DELETE', headers: { Authorization: `Bearer ${token}` }, cache: 'no-store',
+  });
+  return readOk(response, 'Unable to revoke MCP key');
+}

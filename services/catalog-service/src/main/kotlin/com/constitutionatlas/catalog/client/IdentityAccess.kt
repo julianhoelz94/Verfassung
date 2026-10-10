@@ -16,6 +16,15 @@ fun Actor.canViewStaffCatalog(): Boolean =
 
 @Component
 class WriteAccess(private val identityClient: IdentityClient) {
+    fun mayViewPrivateCatalog(authorization: String?): Boolean {
+        if (authorization.isNullOrBlank()) return false
+        return try {
+            val actor = identityClient.authenticate(authorization)
+            actor.canViewStaffCatalog() || actor.scopes.any { it == "ingestion:import" || it == "ingestion:publish" || it == "content:write" }
+        } catch (_: RuntimeException) {
+            false
+        }
+    }
     fun requireCatalogWriter(authorization: String?): Actor {
         val actor = identityClient.authenticate(authorization)
         if (!actor.canWriteCatalog()) {
@@ -28,6 +37,14 @@ class WriteAccess(private val identityClient: IdentityClient) {
         val actor = identityClient.authenticate(authorization)
         if (!actor.canPublishCatalog()) {
             throw ForbiddenException("catalog publish requires publisher, admin, or catalog:publish")
+        }
+        return actor
+    }
+
+    fun requireVersionPublisher(authorization: String?): Actor {
+        val actor = identityClient.authenticate(authorization)
+        if (!actor.canPublishCatalog() && "ingestion:publish" !in actor.scopes) {
+            throw ForbiddenException("version publication requires publisher or ingestion:publish")
         }
         return actor
     }

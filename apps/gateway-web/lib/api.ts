@@ -369,10 +369,11 @@ export function listCountries(): Promise<CountrySummary[] | null> {
   return readJson<CountrySummary[]>(`${catalogBaseUrl()}/countries`, 'catalog');
 }
 
-export function getCountry(isoCode: string): Promise<CountryDetail | null> {
+export function getCountry(isoCode: string, authorization?: string): Promise<CountryDetail | null> {
   return readJson<CountryDetail>(
     `${catalogBaseUrl()}/countries/${encodeURIComponent(isoCode)}`,
     'catalog',
+    authorization,
   );
 }
 
@@ -465,7 +466,7 @@ export function publishWikiPage(targetType: 'country' | 'constitution', targetId
   return sendJson<WikiPageRevision>(`${catalogBaseUrl()}/wiki/${targetType}/${encodeURIComponent(targetId)}/publish`, 'catalog', 'POST', { revisionId }, authorization);
 }
 
-export async function loadCountriesWithDetails(): Promise<{
+export async function loadCountriesWithDetails(authorization?: string): Promise<{
   countries: CountrySummary[];
   details: Array<CountryDetail | null>;
 }> {
@@ -477,7 +478,7 @@ export async function loadCountriesWithDetails(): Promise<{
       throw error;
     }
   }
-  const details = await Promise.all(countries.map((country) => getCountry(country.isoCode).catch(() => null)));
+  const details = await Promise.all(countries.map((country) => getCountry(country.isoCode, authorization).catch(() => null)));
   return { countries, details };
 }
 
@@ -505,7 +506,7 @@ export function listUnitPage(versionId: string, offset?: number, limit?: number,
   return listContentPage('units', versionId, offset, limit, includeBody);
 }
 
-async function listContentPage(resource: 'articles' | 'units', versionId: string, offset?: number, limit?: number, includeBody?: boolean): Promise<ArticlePage | null> {
+async function listContentPage(resource: 'articles' | 'units', versionId: string, offset?: number, limit?: number, includeBody?: boolean, authorization?: string): Promise<ArticlePage | null> {
   const params = new URLSearchParams();
   if (offset !== undefined) {
     params.set('offset', String(offset));
@@ -520,7 +521,7 @@ async function listContentPage(resource: 'articles' | 'units', versionId: string
   const url = `${contentBaseUrl()}/versions/${encodeURIComponent(versionId)}/${resource}${query ? `?${query}` : ''}`;
   let response: Response;
   try {
-    response = await fetch(url, { cache: 'no-store' });
+    response = await fetch(url, { cache: 'no-store', headers: authorization ? { Authorization: authorization } : undefined });
   } catch {
     throw new ApiUnavailableError('content');
   }
@@ -537,20 +538,20 @@ async function listContentPage(resource: 'articles' | 'units', versionId: string
 
 const ARTICLE_PAGE_SIZE = 200;
 
-export function listAllArticles(versionId: string, includeBody?: boolean): Promise<ArticleSummary[]> {
-  return listAllContent('articles', versionId, includeBody);
+export function listAllArticles(versionId: string, includeBody?: boolean, authorization?: string): Promise<ArticleSummary[]> {
+  return listAllContent('articles', versionId, includeBody, authorization);
 }
 
-export function listAllUnits(versionId: string, includeBody?: boolean): Promise<ArticleSummary[]> {
-  return listAllContent('units', versionId, includeBody);
+export function listAllUnits(versionId: string, includeBody?: boolean, authorization?: string): Promise<ArticleSummary[]> {
+  return listAllContent('units', versionId, includeBody, authorization);
 }
 
-async function listAllContent(resource: 'articles' | 'units', versionId: string, includeBody?: boolean): Promise<ArticleSummary[]> {
+async function listAllContent(resource: 'articles' | 'units', versionId: string, includeBody?: boolean, authorization?: string): Promise<ArticleSummary[]> {
   const all: ArticleSummary[] = [];
   let offset = 0;
   let total = Number.POSITIVE_INFINITY;
   while (offset < total) {
-    const page = await listContentPage(resource, versionId, offset, ARTICLE_PAGE_SIZE, includeBody);
+    const page = await listContentPage(resource, versionId, offset, ARTICLE_PAGE_SIZE, includeBody, authorization);
     if (!page) return all;
     all.push(...page.items);
     total = page.total;
@@ -560,15 +561,16 @@ async function listAllContent(resource: 'articles' | 'units', versionId: string,
   return all;
 }
 
-export function getArticle(articleId: string): Promise<ArticleDetail | null> {
+export function getArticle(articleId: string, authorization?: string): Promise<ArticleDetail | null> {
   return readJson<ArticleDetail>(
     `${contentBaseUrl()}/articles/${encodeURIComponent(articleId)}`,
     'content',
+    authorization,
   );
 }
 
-export function getUnit(versionId: string, unitId: string): Promise<ArticleDetail | null> {
-  return readJson<ArticleDetail>(`${contentBaseUrl()}/versions/${encodeURIComponent(versionId)}/units/${encodeURIComponent(unitId)}`, 'content');
+export function getUnit(versionId: string, unitId: string, authorization?: string): Promise<ArticleDetail | null> {
+  return readJson<ArticleDetail>(`${contentBaseUrl()}/versions/${encodeURIComponent(versionId)}/units/${encodeURIComponent(unitId)}`, 'content', authorization);
 }
 
 export function patchContentNode(
@@ -672,7 +674,7 @@ export async function createCountry(
 }
 
 export async function ensureCountry(isoCode: string, name: string, authorization?: string): Promise<void> {
-  const existing = await getCountry(isoCode);
+  const existing = await getCountry(isoCode, authorization);
   if (existing) {
     return;
   }
@@ -768,8 +770,8 @@ export function getVersion(versionId: string, authorization?: string): Promise<V
 
 export type SettingsRevision = { id: string; predecessorId: string | null; outline: ContentOutline };
 export type SettingsImpact = { currentRevisionId: string; classification: string; affectedVersionIds: string[]; reasons: string[]; affectedDraftSessionIds: string[]; violations: { versionId: string; logicalId: string | null; field: string; message: string }[] };
-export async function getConstitutionSettings(id: string): Promise<SettingsRevision> {
-  const settings = await readJson<SettingsRevision>(`${catalogBaseUrl()}/constitutions/${encodeURIComponent(id)}/settings`, 'catalog');
+export async function getConstitutionSettings(id: string, authorization?: string): Promise<SettingsRevision> {
+  const settings = await readJson<SettingsRevision>(`${catalogBaseUrl()}/constitutions/${encodeURIComponent(id)}/settings`, 'catalog', authorization);
   if (!settings) throw new ApiUnavailableError('catalog');
   return settings;
 }

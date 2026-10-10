@@ -48,7 +48,7 @@ test('viewer changes password, enrolls MFA and receives recovery codes', async (
   await page.getByLabel('Current password').fill('change-me');
   await page.getByLabel('New password').fill('replacement-password');
   await page.getByRole('button', { name: 'Update password' }).click();
-  await expect(page.getByText('Password updated.')).toBeVisible({ timeout: 15_000 });
+  await expect(page).toHaveURL(/\/account\?saved=1$/, { timeout: 15_000 });
   await page.reload();
   await expect(page.getByText('Password updated.')).toBeVisible();
   await page.waitForLoadState('networkidle');

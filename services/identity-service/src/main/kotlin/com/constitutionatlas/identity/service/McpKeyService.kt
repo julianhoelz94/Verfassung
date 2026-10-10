@@ -78,7 +78,7 @@ class McpKeyService(
 
     private fun parseScopes(raw: List<String>): List<String> {
         val scopes = raw.map { it.trim() }.distinct()
-        if (scopes.isEmpty() || scopes.any { it !in setOf("mcp:read", "ingestion:import") }) {
+        if ("mcp:read" !in scopes || scopes.any { it !in setOf("mcp:read", "ingestion:import") }) {
             throw BadRequestException("MCP key scopes must be mcp:read and optionally ingestion:import")
         }
         return scopes

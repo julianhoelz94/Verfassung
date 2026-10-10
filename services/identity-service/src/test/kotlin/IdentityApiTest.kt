@@ -297,6 +297,11 @@ class IdentityApiTest {
         mockMvc.post("/mcp-keys") {
             header("Authorization", "Bearer $viewer")
             contentType = MediaType.APPLICATION_JSON
+            content = """{"name":"unusable-import-only","scopes":["ingestion:import"]}"""
+        }.andExpect { status { isBadRequest() } }
+        mockMvc.post("/mcp-keys") {
+            header("Authorization", "Bearer $viewer")
+            contentType = MediaType.APPLICATION_JSON
             content = """{"name":"viewer-import","scopes":["mcp:read","ingestion:import"]}"""
         }.andExpect { status { isForbidden() } }
         val created = objectMapper.readTree(

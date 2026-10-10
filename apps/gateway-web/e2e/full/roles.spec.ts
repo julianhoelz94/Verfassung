@@ -85,7 +85,9 @@ test('editor, reviewer, and publisher carry a real transcription correction to t
   const newVersionId = new URL(page.url()).searchParams.get('newVersionId');
   expect(newVersionId).toBeTruthy();
   await signOut(page);
-  const publishedArticles = await (await request.get(`/api/content/versions/${newVersionId}/articles?includeBody=true`)).json();
+  const publishedResponse = await request.get(`/api/content/versions/${newVersionId}/articles?includeBody=true`);
+  expect(publishedResponse.ok(), await publishedResponse.text()).toBeTruthy();
+  const publishedArticles = await publishedResponse.json();
   const corrected = publishedArticles.find((article: { articleNumber: string }) => article.articleNumber === plainArticle.articleNumber);
   expect(corrected.body).toContain('Verified transcription.');
   expect(publishedArticles.find((article: { articleNumber: string }) => article.articleNumber === sourceArticles[0].articleNumber).children.length).toBe(sourceArticles[0].children.length);
@@ -102,7 +104,7 @@ test('editorial roles stage, review, and publish a new constitution through the 
     countryName: 'Atlas Admin Testland',
     constitutionSlug: slug,
     constitutionTitle: 'Admin Imported Charter',
-    outline: { kinds: [{ kindCode: 'article', displayLabel: 'Article' }] },
+    outline: { kinds: [{ kindCode: 'article', displayLabel: 'Article', showKind: true, showLabel: true, showTitle: true }] },
     versionLabel: '2025',
     sourceUrl: 'https://example.org/atlas-e2e/admin-2025',
     effectiveDate: '2025-01-01',

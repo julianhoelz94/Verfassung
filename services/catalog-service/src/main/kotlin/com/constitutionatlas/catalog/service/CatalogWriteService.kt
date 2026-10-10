@@ -195,7 +195,7 @@ class CatalogWriteService(
     }
 
     @Transactional
-    fun publishVersion(versionId: UUID, actor: Actor? = null, importJobId: UUID? = null): VersionCreated {
+    fun publishVersion(versionId: UUID, actor: Actor? = null, importJobId: UUID? = null, authorization: String? = null): VersionCreated {
         val hold = catalogRepository.importHold(versionId)
         if (hold != null) {
             if (hold != importJobId || actor == null || "ingestion:publish" !in actor.scopes) {
@@ -204,7 +204,7 @@ class CatalogWriteService(
         } else if (actor != null && "ingestion:publish" in actor.scopes && actor.roles.none { it == "publisher" || it == "admin" } && "catalog:publish" !in actor.scopes) {
             throw ForbiddenException("Import publication token cannot publish an ordinary version")
         }
-        publishAttempts.forVersion(versionId)?.let { attempt -> successorReadiness.requireReady(versionId, attempt, settingsRepository.forVersion(versionId).id) }
+        publishAttempts.forVersion(versionId)?.let { attempt -> successorReadiness.requireReady(versionId, attempt, settingsRepository.forVersion(versionId).id, authorization) }
         if (!catalogRepository.publishVersion(versionId)) {
             throw NotFoundException("Unknown version '$versionId'")
         }

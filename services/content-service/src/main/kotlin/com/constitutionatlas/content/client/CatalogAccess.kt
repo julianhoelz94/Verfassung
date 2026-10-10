@@ -27,6 +27,7 @@ data class CatalogVersion(
     val publicationStatus: String,
     val constitutionId: UUID? = null,
     val listing: String = "public",
+    val currentVersionId: UUID? = null,
 )
 
 data class StructuralLevel(
@@ -118,7 +119,11 @@ class PublicationGuard(private val catalogClient: CatalogClient) {
 class ContentReadAccess(private val catalogClient: CatalogClient, private val identityClient: IdentityClient) {
     fun requireVisible(versionId: UUID, authorization: String?) {
         val version = catalogClient.getVersion(versionId) ?: throw NotFoundException("Unknown version")
-        if (version.publicationStatus == "published" && version.listing == "public") return
+        if (version.publicationStatus == "published" &&
+            (version.listing == "public" || version.currentVersionId == version.id)
+        ) {
+            return
+        }
         val actor = runCatching { identityClient.authenticate(authorization) }.getOrNull()
         if (actor == null ||
             actor.roles.none { it in setOf("editor", "reviewer", "publisher", "admin") } &&

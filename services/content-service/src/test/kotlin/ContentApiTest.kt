@@ -77,6 +77,15 @@ class ContentApiTest {
     }
 
     @Test
+    fun onlyThePublishedEditorialTipIsPubliclyReadable() {
+        val version = UUID.fromString("01900000-0000-4000-8000-000000000004")
+        Mockito.`when`(catalogClient.getVersion(version)).thenReturn(CatalogVersion(version, "published", listing = "staff"))
+        mockMvc.springGet("/versions/$version/units").andExpect { status { isNotFound() } }
+        Mockito.`when`(catalogClient.getVersion(version)).thenReturn(CatalogVersion(version, "published", listing = "staff", currentVersionId = version))
+        mockMvc.springGet("/versions/$version/units").andExpect { status { isOk() } }
+    }
+
+    @Test
     fun genericUnitsMarkLegacyIdentityWithoutChangingLegacyArticleContract() {
         val version = UUID.fromString("01900000-0000-4000-8000-000000000004")
         Mockito.`when`(catalogClient.getVersion(version)).thenReturn(CatalogVersion(version, "published"))

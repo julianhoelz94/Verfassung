@@ -924,6 +924,9 @@ class CatalogApiTest {
             header("Authorization", PUBLISHER_TOKEN)
         }.andExpect { status { isOk() } }
 
+        // The public version summary points at this published editorial tip.
+        mockMvc.get("/versions/$versionId").andExpect { status { isOk() } }
+
         mockMvc.get("/constitutions/$constitutionId/versions")
             .andExpect {
                 status { isOk() }
@@ -932,6 +935,7 @@ class CatalogApiTest {
                     value(org.hamcrest.Matchers.not(org.hamcrest.Matchers.hasItem(editorialLabel)))
                 }
                 jsonPath("$[?(@.versionLabel=='2020')].latestPublished") { value(true) }
+                jsonPath("$[?(@.versionLabel=='2020')].currentVersionId") { value(org.hamcrest.Matchers.hasItem(versionId)) }
             }
 
         mockMvc.get("/constitutions/$constitutionId/versions?listing=all")

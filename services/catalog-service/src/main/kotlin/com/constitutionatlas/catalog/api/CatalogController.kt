@@ -155,7 +155,9 @@ class CatalogController(
     @GetMapping("/versions/{versionId}")
     fun getVersion(@PathVariable versionId: UUID, @RequestHeader(value = "Authorization", required = false) authorization: String?): VersionDetail =
         catalogQueryService.getVersion(versionId).also { version ->
-            if (!writeAccess.mayViewPrivateCatalog(authorization) && (version.publicationStatus != "published" || version.listing != "public")) {
+            val publicSnapshot = version.publicationStatus == "published" &&
+                (version.listing == "public" || version.currentVersionId == version.id)
+            if (!writeAccess.mayViewPrivateCatalog(authorization) && !publicSnapshot) {
                 throw com.constitutionatlas.platform.NotFoundException("Unknown version '$versionId'")
             }
         }
@@ -290,6 +292,6 @@ class CatalogController(
         @RequestParam(required = false) importJobId: UUID?,
     ): VersionCreated {
         val actor = writeAccess.requireVersionPublisher(authorization)
-        return catalogWriteService.publishVersion(versionId, actor, importJobId)
+        return catalogWriteService.publishVersion(versionId, actor, importJobId, authorization)
     }
 }

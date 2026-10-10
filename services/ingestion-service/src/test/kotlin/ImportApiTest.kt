@@ -167,6 +167,31 @@ class ImportApiTest {
         Mockito.verifyNoInteractions(catalogClient, contentClient)
     }
 
+    @Test
+    fun roleBoundaryRejectsEditingReviewAndPublicationForWrongActors() {
+        val id = UUID.randomUUID()
+        for (token in listOf(MCP_TOKEN, REVIEWER_TOKEN, PUBLISHER_TOKEN)) {
+            mockMvc.post("/import-jobs/$id/prepare") { header("Authorization", token) }
+                .andExpect { status { isForbidden() } }
+            mockMvc.post("/import-jobs/$id/confirm-outline") { header("Authorization", token) }
+                .andExpect { status { isForbidden() } }
+        }
+        for (token in listOf(MCP_TOKEN, EDITOR_TOKEN, PUBLISHER_TOKEN)) {
+            mockMvc.post("/import-jobs/$id/approve") {
+                header("Authorization", token); contentType = MediaType.APPLICATION_JSON
+                content = """{"reason":"Checked the complete source against the draft."}"""
+            }.andExpect { status { isForbidden() } }
+            mockMvc.post("/import-jobs/$id/reject") {
+                header("Authorization", token); contentType = MediaType.APPLICATION_JSON
+                content = """{"reason":"The submitted source cannot be verified."}"""
+            }.andExpect { status { isForbidden() } }
+        }
+        for (token in listOf(MCP_TOKEN, EDITOR_TOKEN, REVIEWER_TOKEN)) {
+            mockMvc.post("/import-jobs/$id/publish") { header("Authorization", token) }
+                .andExpect { status { isForbidden() } }
+        }
+    }
+
     private fun stubDraft(versionId: UUID, constitutionId: UUID) {
         Mockito.`when`(catalogClient.createDraftVersion(
             anyUuid(), anyStr(), Mockito.nullable(LocalDate::class.java), anyStr(),

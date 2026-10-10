@@ -5,15 +5,20 @@ import com.constitutionatlas.content.VersionPublishedException
 import com.constitutionatlas.platform.IdentityClient
 import com.constitutionatlas.platform.NotFoundException
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
+import jakarta.servlet.FilterChain
+import jakarta.servlet.http.HttpServletRequest
+import jakarta.servlet.http.HttpServletResponse
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
+import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Component
 import org.springframework.web.client.RestClient
 import org.springframework.web.client.RestClientException
 import org.springframework.web.client.RestClientResponseException
+import org.springframework.web.filter.OncePerRequestFilter
 import java.util.UUID
 
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -43,10 +48,37 @@ interface CatalogClient {
     fun getSettings(versionId: UUID): StructuralSettings? = null
 }
 
+private object ContentDownstreamAuth {
+    private val holder = ThreadLocal<String?>()
+
+    fun header(): String? = holder.get()
+
+    fun withAuthorization(authorization: String?, block: () -> Unit) {
+        holder.set(authorization)
+        try {
+            block()
+        } finally {
+            holder.remove()
+        }
+    }
+}
+
+@Component
+class ContentCatalogAuthFilter : OncePerRequestFilter() {
+    override fun doFilterInternal(request: HttpServletRequest, response: HttpServletResponse, filterChain: FilterChain) {
+        ContentDownstreamAuth.withAuthorization(request.getHeader(HttpHeaders.AUTHORIZATION)) {
+            filterChain.doFilter(request, response)
+        }
+    }
+}
+
 class RestCatalogClient(
     catalogUrl: String,
 ) : CatalogClient {
-    private val client: RestClient = timedRestClient(catalogUrl)
+    private val client: RestClient = timedRestClient(catalogUrl).mutate().requestInterceptor { request, body, execution ->
+        ContentDownstreamAuth.header()?.let { request.headers.set(HttpHeaders.AUTHORIZATION, it) }
+        execution.execute(request, body)
+    }.build()
 
     override fun getSettings(versionId: UUID): StructuralSettings? =
         try {

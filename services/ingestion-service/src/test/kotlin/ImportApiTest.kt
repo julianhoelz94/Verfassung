@@ -450,6 +450,28 @@ class ImportApiTest {
     }
 
     @Test
+    fun failedPrivateOutlineLookupCannotLeaveAnUnvalidatedIdempotentJob() {
+        val constitutionId = UUID.randomUUID()
+        val revisionId = UUID.randomUUID()
+        Mockito.`when`(catalogClient.settingsOutline(constitutionId, revisionId))
+            .thenThrow(org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE))
+            .thenReturn(ImportOutline(listOf(ImportOutlineKind("article", "Article"))))
+        val body = """{"isoCode":"FR","countryName":"France","constitutionSlug":"new","constitutionTitle":"New constitution","constitutionId":"$constitutionId","settingsRevisionId":"$revisionId","versionLabel":"1","sourceUrl":"https://example.org/source","roots":[{"kind":"article","label":"1","content":[{"type":"text","text":"First article."}]}]}"""
+        fun stage() = mockMvc.post("/import-jobs") {
+            header("Authorization", MCP_TOKEN)
+            header("Idempotency-Key", "retry-after-catalog-failure")
+            contentType = MediaType.APPLICATION_JSON
+            content = body
+        }
+        stage().andExpect { status { isServiceUnavailable() } }
+        assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM import_jobs WHERE idempotency_key = ?", Int::class.java, "retry-after-catalog-failure"))
+        stage().andExpect {
+            status { isCreated() }
+            jsonPath("$.status") { value("pending_review") }
+        }
+    }
+
+    @Test
     fun directImportIdempotencyReplaysOnlyTheSamePayloadForTheSameSubmitter() {
         val body = """{"isoCode":"FR","countryName":"France","constitutionSlug":"retry-test","constitutionTitle":"Retry test","versionLabel":"1","sourceUrl":"https://example.org/source","outline":{"kinds":[{"kindCode":"article","displayLabel":"Article"}]},"articles":[{"articleNumber":"1","title":"First","sortOrder":1}]}"""
         fun stage(payload: String, token: String = TOKEN) = mockMvc.post("/import-jobs") {

@@ -17,10 +17,10 @@ class ImportJobRepository(
     private val objectMapper: ObjectMapper,
     private val publicationOutbox: ImportPublicationOutbox,
 ) {
-    fun insertPending(payload: Any, submittedBy: UUID, batchId: UUID? = null, idempotencyKey: String? = null, checksum: String? = null): UUID {
+    fun insertPending(payload: Any, submittedBy: UUID, batchId: UUID? = null, idempotencyKey: String? = null, checksum: String? = null): UUID? {
         val id = UUID.randomUUID()
-        jdbc.update(
-            "INSERT INTO import_jobs (id, status, payload, submitted_by, batch_id, idempotency_key, payload_sha256) VALUES (?, 'pending_review', ?::jsonb, ?, ?, ?, ?)",
+        val inserted = jdbc.update(
+            "INSERT INTO import_jobs (id, status, payload, submitted_by, batch_id, idempotency_key, payload_sha256) VALUES (?, 'pending_review', ?::jsonb, ?, ?, ?, ?) ON CONFLICT DO NOTHING",
             id,
             objectMapper.writeValueAsString(payload),
             submittedBy,
@@ -28,7 +28,7 @@ class ImportJobRepository(
             idempotencyKey,
             checksum,
         )
-        return id
+        return if (inserted == 1) id else null
     }
 
     fun createBatch(ownerId: UUID): UUID {

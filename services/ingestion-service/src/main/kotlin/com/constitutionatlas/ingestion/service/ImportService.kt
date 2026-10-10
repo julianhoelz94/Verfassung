@@ -11,7 +11,6 @@ import com.constitutionatlas.ingestion.repo.ImportJobRepository
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
-import org.springframework.dao.DuplicateKeyException
 import org.springframework.http.HttpStatus
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Service
@@ -29,6 +28,8 @@ class ImportService(
     @Value("\${ingestion.publish.token:}") private val publishToken: String,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
+
+    @Transactional
     fun importVersion(authorization: String?, submittedBy: UUID, request: ImportRequest, batchId: UUID? = null, idempotencyKey: String? = null, expectedChecksum: String? = null): ImportJobDto {
         if (idempotencyKey != null && idempotencyKey.length !in 8..128) throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Idempotency key must contain 8 to 128 characters")
         val checksum = MessageDigest.getInstance("SHA-256").digest(objectMapper.writeValueAsBytes(request)).joinToString("") { "%02x".format(it) }
@@ -42,9 +43,14 @@ class ImportService(
                 return existing
             }
         }
-        val jobId = try {
-            importJobRepository.insertPending(request, submittedBy, batchId, idempotencyKey, checksum)
-        } catch (ex: DuplicateKeyException) {
+        val needsOutline = request.roots.isNotEmpty() || request.articles.any { it.nodes.isNotEmpty() }
+        val pinnedOutline = if (needsOutline && request.constitutionId != null && request.settingsRevisionId != null) {
+            DownstreamAuth.withAuthorization(authorization) { catalogClient.settingsOutline(request.constitutionId, request.settingsRevisionId) }
+        } else {
+            null
+        }
+        val validation = ImportValidator.validate(request, pinnedOutline)
+        val jobId = importJobRepository.insertPending(request, submittedBy, batchId, idempotencyKey, checksum) ?: run {
             val existing = if (idempotencyKey == null) {
                 null
             } else if (batchId == null) {
@@ -56,14 +62,6 @@ class ImportService(
             throw ResponseStatusException(HttpStatus.CONFLICT, "Idempotency key was used for different content")
         }
         importJobRepository.stage(jobId, "request", request)
-
-        val needsOutline = request.roots.isNotEmpty() || request.articles.any { it.nodes.isNotEmpty() }
-        val pinnedOutline = if (needsOutline && request.constitutionId != null && request.settingsRevisionId != null) {
-            DownstreamAuth.withAuthorization(authorization) { catalogClient.settingsOutline(request.constitutionId, request.settingsRevisionId) }
-        } else {
-            null
-        }
-        val validation = ImportValidator.validate(request, pinnedOutline)
         if (validation.isNotEmpty()) {
             importJobRepository.fail(jobId, validation)
             return importJobRepository.find(jobId)!!

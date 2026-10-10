@@ -1,14 +1,15 @@
 # Constitution Atlas MCP server
 
 The remote MCP endpoint is `/mcp` through Caddy. This service has no database. It
-calls Catalog, Content, Search, Identity, and Ingestion over HTTP. Public read
-tools are:
+calls Catalog, Content, Search, Identity, and Ingestion over HTTP. Every MCP
+request requires a personal key from a signed-in account. Read tools are:
 
 - `list_countries`, `list_constitutions`, `list_versions`
 - `get_constitution_outline`, `list_units`, `read_unit`, `resolve_unit`
 - `search_constitutions`
 
-An editor or admin can create a personal import-scoped key in **Account → MCP
+Any signed-in user can create a read key in **Account → MCP keys**. An editor or
+admin can create a personal import-scoped key in **Account → MCP
 keys**. Import keys require enrolled MFA and a recent authenticator confirmation.
 The secret is displayed once and can be rotated or revoked from Account.
 Personal keys are rechecked against current roles on every request. An import

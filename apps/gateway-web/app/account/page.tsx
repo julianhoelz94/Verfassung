@@ -117,7 +117,7 @@ export default async function AccountPage(props: AccountPageProps) {
       <Card>
         <section className="account-section" id="mcp-keys" aria-labelledby="mcp-keys-title">
           <h2 id="mcp-keys-title">Connect a chat client</h2>
-          <p>Connect your client to <code>{mcpUrl}</code>. Public reading needs no key. Create a personal key to stage constitution imports. Every import remains pending review.</p>
+          <p>Connect your client to <code>{mcpUrl}</code> with a personal MCP key. A read key lets you browse published constitutions; editors can create an import key to stage content. Every import remains pending review.</p>
           <h3>Claude Code example</h3>
           <p>After copying a key, run this on your computer and replace the placeholder with the key:</p>
           <pre tabIndex={0}><code>{`claude mcp add --transport http constitution-atlas ${mcpUrl} --header "Authorization: Bearer <your-MCP-key>"`}</code></pre>

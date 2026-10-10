@@ -3,6 +3,7 @@ import { isIP } from 'node:net';
 import { createMcpHandler } from '@modelcontextprotocol/server';
 import { toNodeHandler } from '@modelcontextprotocol/node';
 import { createServer } from './server.js';
+import { authenticateMcpKey, UpstreamError } from './catalog.js';
 
 const handler = toNodeHandler(createMcpHandler(ctx => createServer(ctx.requestInfo?.headers.get('authorization') ?? undefined), { maxRequestBodySize: 5 * 1024 * 1024 }), { maxRequestBodySize: 5 * 1024 * 1024 });
 const port = Number(process.env.PORT ?? '8080');
@@ -44,5 +45,10 @@ createHttpServer((request, response) => {
     response.writeHead(429, { 'Retry-After': '60' }).end();
     return;
   }
-  void handler(request, response);
+  const authorization = request.headers.authorization;
+  void authenticateMcpKey(authorization).then(() => { void handler(request, response); }, (error: unknown) => {
+    const status = error instanceof UpstreamError && (error.status === 401 || error.status === 403) ? error.status : 503;
+    response.writeHead(status, { 'Content-Type': 'application/json', ...(status === 401 ? { 'WWW-Authenticate': 'Bearer' } : {}) });
+    response.end(JSON.stringify({ error: status === 503 ? 'Authentication service unavailable' : 'MCP key required' }));
+  });
 }).listen(port, '0.0.0.0');

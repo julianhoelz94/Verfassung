@@ -72,6 +72,14 @@ export async function requirePublishedVersion(versionId: string): Promise<Versio
   return version;
 }
 
+export async function authenticateMcpKey(authorization?: string): Promise<void> {
+  if (!authorization || !/^Bearer ca_mcp_[A-Za-z0-9_-]+$/.test(authorization)) {
+    throw new UpstreamError(401, 'identity');
+  }
+  const actor = await getJson<{ scopes?: string[] }>('identity', '/me', authorization);
+  if (!actor.scopes?.includes('mcp:read')) throw new UpstreamError(403, 'identity');
+}
+
 export function publicVersionUrl(version: Version): string | null {
   if (!version.countryCode) return null;
   const base = (process.env.PUBLIC_BASE_URL ?? 'http://localhost').replace(/\/$/, '');

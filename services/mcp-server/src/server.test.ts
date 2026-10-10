@@ -3,7 +3,36 @@ import test from 'node:test';
 import { createMcpHandler } from '@modelcontextprotocol/server';
 import { orderedText } from './server.js';
 import { createServer } from './server.js';
-import { requirePublishedVersion, UpstreamError } from './catalog.js';
+import { authenticateMcpKey, requirePublishedVersion, UpstreamError } from './catalog.js';
+
+test('MCP requests require a valid personal key with read scope', async () => {
+  const originalFetch = globalThis.fetch;
+  let calls = 0;
+  globalThis.fetch = async (_input, init) => {
+    calls += 1;
+    assert.equal(new Headers(init?.headers).get('Authorization'), 'Bearer ca_mcp_reader');
+    return Response.json({ scopes: ['mcp:read'] });
+  };
+  try {
+    await assert.rejects(authenticateMcpKey(), (error) => error instanceof UpstreamError && error.status === 401);
+    await assert.rejects(authenticateMcpKey('Bearer ordinary-session'), (error) => error instanceof UpstreamError && error.status === 401);
+    assert.equal(calls, 0);
+    await authenticateMcpKey('Bearer ca_mcp_reader');
+    assert.equal(calls, 1);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('MCP requests reject a valid key without read scope', async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => Response.json({ scopes: ['ingestion:import'] });
+  try {
+    await assert.rejects(authenticateMcpKey('Bearer ca_mcp_importer'), (error) => error instanceof UpstreamError && error.status === 403);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
 
 test('ordered content preserves text and child order', () => {
   const text = orderedText([

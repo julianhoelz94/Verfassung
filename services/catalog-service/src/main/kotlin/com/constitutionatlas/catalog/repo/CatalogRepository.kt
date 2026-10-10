@@ -22,7 +22,8 @@ class CatalogRepository(private val jdbc: JdbcTemplate) {
 
     fun importHold(versionId: UUID): UUID? = jdbc.query(
         "SELECT import_job_id FROM import_publication_holds WHERE version_id = ?",
-        { rs, _ -> rs.getObject("import_job_id", UUID::class.java) }, versionId,
+        { rs, _ -> rs.getObject("import_job_id", UUID::class.java) },
+        versionId,
     ).firstOrNull()
 
     fun listCountries(): List<CountrySummary> =

@@ -13,11 +13,13 @@ if (!['127.0.0.1', 'localhost', '::1'].includes(baseUrl.hostname) || process.env
 const endpoint = (path) => new URL(`/api/${path}`, baseUrl).toString();
 const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 let token;
+let reviewerToken;
+let publisherToken;
 
 async function api(method, path, body, authenticated = false) {
   const response = await fetch(endpoint(path), {
     method,
-    headers: { Accept: 'application/json', ...(body === undefined ? {} : { 'Content-Type': 'application/json' }), ...(authenticated ? { Authorization: `Bearer ${token}` } : {}) },
+    headers: { Accept: 'application/json', ...(body === undefined ? {} : { 'Content-Type': 'application/json' }), ...(authenticated ? { Authorization: `Bearer ${authenticated === true ? token : authenticated}` } : {}) },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     signal: AbortSignal.timeout(30000),
   });
@@ -58,6 +60,21 @@ async function authenticate() {
   }
   if (!login.token) throw new Error('Admin login returned no session token');
   token = login.token;
+  const reviewer = await api('POST', 'identity/login', {
+    email: process.env.CI_REVIEWER_EMAIL ?? process.env.LOCAL_REVIEWER_EMAIL ?? 'local-reviewer@example.local',
+    password: process.env.CI_REVIEWER_PASSWORD ?? process.env.LOCAL_REVIEWER_PASSWORD ?? password,
+  });
+  if (!reviewer.token) throw new Error('Reviewer login returned no session token');
+  reviewerToken = reviewer.token;
+  const publisher = await api('POST', 'identity/login', {
+    email: process.env.CI_PUBLISHER_EMAIL ?? process.env.LOCAL_PUBLISHER_EMAIL ?? 'local-publisher@example.local',
+    password: process.env.CI_PUBLISHER_PASSWORD ?? process.env.LOCAL_PUBLISHER_PASSWORD ?? password,
+  });
+  const publisherSession = publisher.mfaRequired
+    ? await api('POST', 'identity/login/mfa', { challengeToken: publisher.challengeToken, code: totp(secret) })
+    : publisher;
+  if (!publisherSession.token) throw new Error('Publisher login returned no session token');
+  publisherToken = publisherSession.token;
 }
 
 async function waitForStack() {
@@ -112,9 +129,15 @@ async function ensureVersions(ids) {
       let constitution = detail?.constitutions.find((item) => item.slug === country.constitutionSlug);
       let existing = constitution?.versions.find((item) => item.versionLabel === payload.versionLabel);
       if (!existing && !verifyOnly) {
-        const request = { ...payload, ...(version.predecessor ? { predecessorVersionId: ids.versions[version.predecessor], hopKind: 'legal' } : {}) };
+        const pin = constitution ? await api('GET', `catalog/constitutions/${constitution.id}/settings`) : null;
+        const request = { ...payload, ...(pin ? { outline: undefined, constitutionId: constitution.id, settingsRevisionId: pin.id } : {}),
+          ...(version.predecessor ? { predecessorVersionId: ids.versions[version.predecessor], hopKind: 'legal' } : {}) };
         const job = await api('POST', 'ingestion/import-jobs', request, true);
-        const result = job.status === 'completed' || job.status === 'failed' ? job : await api('GET', `ingestion/import-jobs/${job.id}`, undefined, true);
+        if (job.status === 'failed') throw new Error(`Import ${version.key} failed: ${JSON.stringify(job)}`);
+        if (!pin) await api('POST', `ingestion/import-jobs/${job.id}/confirm-outline`, {}, true);
+        await api('POST', `ingestion/import-jobs/${job.id}/prepare`, {}, true);
+        await api('POST', `ingestion/import-jobs/${job.id}/approve`, { reason: 'Fixture source and structure checked against the generated text.' }, reviewerToken);
+        const result = await api('POST', `ingestion/import-jobs/${job.id}/publish`, {}, publisherToken);
         if (result.status !== 'completed' || !result.versionId) throw new Error(`Import ${version.key} failed: ${JSON.stringify(result)}`);
         detail = await countryDetail(country.isoCode);
         constitution = detail?.constitutions.find((item) => item.slug === country.constitutionSlug);

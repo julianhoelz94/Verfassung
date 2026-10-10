@@ -1,11 +1,11 @@
 package com.constitutionatlas.ingestion.client
 
 import com.constitutionatlas.ingestion.api.ImportArticle
-import com.constitutionatlas.ingestion.api.ImportOutlineKind
 import com.constitutionatlas.ingestion.api.ImportOutline
+import com.constitutionatlas.ingestion.api.ImportOutlineKind
 import com.constitutionatlas.platform.OrderedNodeWrite
-import com.constitutionatlas.platform.OrderedSnapshotWrite
 import com.constitutionatlas.platform.OrderedSnapshot
+import com.constitutionatlas.platform.OrderedSnapshotWrite
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus

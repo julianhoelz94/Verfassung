@@ -88,8 +88,10 @@ class ContentReadAccess(private val catalogClient: CatalogClient, private val id
         val version = catalogClient.getVersion(versionId) ?: throw NotFoundException("Unknown version")
         if (version.publicationStatus == "published" && version.listing == "public") return
         val actor = runCatching { identityClient.authenticate(authorization) }.getOrNull()
-        if (actor == null || actor.roles.none { it in setOf("editor", "reviewer", "publisher", "admin") } &&
-            actor.scopes.none { it in setOf("catalog:write", "content:write", "ingestion:publish") }) {
+        if (actor == null ||
+            actor.roles.none { it in setOf("editor", "reviewer", "publisher", "admin") } &&
+            actor.scopes.none { it in setOf("catalog:write", "content:write", "ingestion:publish") }
+        ) {
             throw NotFoundException("Unknown version")
         }
     }

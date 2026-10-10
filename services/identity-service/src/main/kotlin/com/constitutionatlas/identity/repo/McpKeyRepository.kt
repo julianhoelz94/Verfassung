@@ -68,7 +68,10 @@ class McpKeyRepository(private val jdbc: JdbcTemplate) {
     fun rotate(ownerId: UUID, id: UUID, tokenHash: String, expiresAt: OffsetDateTime): Boolean =
         jdbc.update(
             "UPDATE mcp_keys SET token_hash = ?, expires_at = ?, last_used_at = NULL WHERE id = ? AND owner_id = ? AND revoked_at IS NULL",
-            tokenHash, Timestamp.from(expiresAt.toInstant()), id, ownerId,
+            tokenHash,
+            Timestamp.from(expiresAt.toInstant()),
+            id,
+            ownerId,
         ) > 0
 
     fun revoke(ownerId: UUID, id: UUID): Boolean =

@@ -8,11 +8,12 @@ import com.constitutionatlas.ingestion.client.DownstreamCountry
 import com.constitutionatlas.ingestion.client.DownstreamVersion
 import com.constitutionatlas.platform.Actor
 import com.constitutionatlas.platform.IdentityClient
-import com.constitutionatlas.platform.UnauthorizedException
 import com.constitutionatlas.platform.OrderedSnapshot
+import com.constitutionatlas.platform.UnauthorizedException
+import com.fasterxml.jackson.databind.ObjectMapper
+import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.Assertions.assertEquals
 import org.mockito.Mockito
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
@@ -23,17 +24,16 @@ import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.web.servlet.MockMvc
-import org.springframework.test.web.servlet.post
 import org.springframework.test.web.servlet.get
+import org.springframework.test.web.servlet.post
 import org.springframework.test.web.servlet.put
 import org.testcontainers.containers.PostgreSQLContainer
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
-import com.fasterxml.jackson.databind.ObjectMapper
-import java.time.LocalDate
-import java.util.UUID
 import java.security.MessageDigest
+import java.time.LocalDate
 import java.util.Base64
+import java.util.UUID
 
 @Testcontainers
 @AutoConfigureMockMvc
@@ -76,54 +76,95 @@ class ImportApiTest {
     private fun jobId(response: String): String = json.readTree(response).path("id").asText()
 
     private fun prepare(id: String) = mockMvc.post("/import-jobs/$id/prepare") { header("Authorization", TOKEN) }
-        .andExpect { status { isOk() }; jsonPath("$.status") { value("pending_review") } }
+        .andExpect {
+            status { isOk() }
+            jsonPath("$.status") { value("pending_review") }
+        }
 
     private fun confirmOutline(id: String) = mockMvc.post("/import-jobs/$id/confirm-outline") { header("Authorization", TOKEN) }
-        .andExpect { status { isOk() }; jsonPath("$.outlineConfirmedBy") { value(admin.id.toString()) } }
+        .andExpect {
+            status { isOk() }
+            jsonPath("$.outlineConfirmedBy") { value(admin.id.toString()) }
+        }
 
     private fun approve(id: String) = mockMvc.post("/import-jobs/$id/approve") {
-        header("Authorization", REVIEWER_TOKEN); contentType = MediaType.APPLICATION_JSON
+        header("Authorization", REVIEWER_TOKEN)
+        contentType = MediaType.APPLICATION_JSON
         content = """{"reason":"Reviewed source and structure against the submitted text."}"""
     }
-        .andExpect { status { isOk() }; jsonPath("$.status") { value("approved") } }
+        .andExpect {
+            status { isOk() }
+            jsonPath("$.status") { value("approved") }
+        }
 
     private fun publish(id: String) = mockMvc.post("/import-jobs/$id/publish") { header("Authorization", PUBLISHER_TOKEN) }
-        .andExpect { status { isOk() }; jsonPath("$.status") { value("completed") } }
+        .andExpect {
+            status { isOk() }
+            jsonPath("$.status") { value("completed") }
+        }
 
     private fun anyUuid(): UUID = Mockito.any(UUID::class.java) ?: UUID(0, 0)
     private fun anyStr(): String = Mockito.anyString() ?: ""
 
     @Test
     fun chunkedImportResumesAndCompletesAsPendingReview() {
-        val batch = json.readTree(mockMvc.post("/import-batches") { header("Authorization", MCP_TOKEN) }
-            .andExpect { status { isCreated() } }.andReturn().response.contentAsString).path("id").asText()
+        val batch = json.readTree(
+            mockMvc.post("/import-batches") { header("Authorization", MCP_TOKEN) }
+                .andExpect { status { isCreated() } }.andReturn().response.contentAsString,
+        ).path("id").asText()
         val payload = """{"isoCode":"FR","countryName":"France","constitutionSlug":"1958","constitutionTitle":"Constitution","versionLabel":"1","constitutionId":"${UUID.randomUUID()}","settingsRevisionId":"$SETTINGS_REVISION","articles":[{"articleNumber":"1","title":"A","sortOrder":1}]}"""
         val bytes = payload.toByteArray()
         val checksum = MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
         val beginBody = """{"idempotencyKey":"chunked-item","checksumSha256":"$checksum","totalBytes":${bytes.size}}"""
         val first = mockMvc.post("/import-batches/$batch/uploads") {
-            header("Authorization", MCP_TOKEN); contentType = MediaType.APPLICATION_JSON; content = beginBody
-        }.andExpect { status { isCreated() }; jsonPath("$.missingChunks[0]") { value(0) } }.andReturn()
+            header("Authorization", MCP_TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = beginBody
+        }.andExpect {
+            status { isCreated() }
+            jsonPath("$.missingChunks[0]") { value(0) }
+        }.andReturn()
         val uploadId = jobId(first.response.contentAsString)
         mockMvc.post("/import-batches/$batch/uploads") {
-            header("Authorization", MCP_TOKEN); contentType = MediaType.APPLICATION_JSON; content = beginBody
-        }.andExpect { status { isCreated() }; jsonPath("$.id") { value(uploadId) } }
+            header("Authorization", MCP_TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = beginBody
+        }.andExpect {
+            status { isCreated() }
+            jsonPath("$.id") { value(uploadId) }
+        }
         mockMvc.get("/import-uploads/$uploadId") { header("Authorization", EDITOR_TOKEN) }
             .andExpect { status { isForbidden() } }
         val chunkBody = """{"dataBase64":"${Base64.getEncoder().encodeToString(bytes)}","checksumSha256":"$checksum"}"""
         mockMvc.put("/import-uploads/$uploadId/chunks/0") {
-            header("Authorization", MCP_TOKEN); contentType = MediaType.APPLICATION_JSON; content = chunkBody
-        }.andExpect { status { isOk() }; jsonPath("$.missingChunks.length()") { value(0) } }
+            header("Authorization", MCP_TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = chunkBody
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.missingChunks.length()") { value(0) }
+        }
         mockMvc.put("/import-uploads/$uploadId/chunks/0") {
-            header("Authorization", MCP_TOKEN); contentType = MediaType.APPLICATION_JSON; content = chunkBody
+            header("Authorization", MCP_TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = chunkBody
         }.andExpect { status { isOk() } }
         val completed = mockMvc.post("/import-uploads/$uploadId/complete") { header("Authorization", MCP_TOKEN) }
-            .andExpect { status { isOk() }; jsonPath("$.status") { value("completed") } }.andReturn()
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.status") { value("completed") }
+            }.andReturn()
         val itemId = json.readTree(completed.response.contentAsString).path("itemId").asText()
         mockMvc.get("/import-jobs/$itemId") { header("Authorization", MCP_TOKEN) }
-            .andExpect { status { isOk() }; jsonPath("$.status") { value("pending_review") } }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.status") { value("pending_review") }
+            }
         mockMvc.post("/import-uploads/$uploadId/complete") { header("Authorization", MCP_TOKEN) }
-            .andExpect { status { isOk() }; jsonPath("$.itemId") { value(itemId) } }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.itemId") { value(itemId) }
+            }
         Mockito.verifyNoInteractions(catalogClient, contentClient)
     }
 
@@ -135,8 +176,13 @@ class ImportApiTest {
             .thenReturn(DownstreamConstitution(constitutionId, "new-constitution", "New constitution"))
         Mockito.`when`(catalogClient.currentSettingsRevisionId(constitutionId)).thenReturn(SETTINGS_REVISION)
         val response = mockMvc.post("/import-setup-proposals") {
-            header("Authorization", TOKEN); contentType = MediaType.APPLICATION_JSON; content = body
-        }.andExpect { status { isCreated() }; jsonPath("$.status") { value("proposed") } }.andReturn()
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = body
+        }.andExpect {
+            status { isCreated() }
+            jsonPath("$.status") { value("proposed") }
+        }.andReturn()
         val id = jobId(response.response.contentAsString)
         mockMvc.get("/import-setup-proposals/$id") { header("Authorization", EDITOR_TOKEN) }
             .andExpect { status { isForbidden() } }
@@ -150,7 +196,10 @@ class ImportApiTest {
                 jsonPath("$.settingsRevisionId") { value(SETTINGS_REVISION.toString()) }
             }
         mockMvc.post("/import-setup-proposals/$id/confirm") { header("Authorization", TOKEN) }
-            .andExpect { status { isOk() }; jsonPath("$.status") { value("confirmed") } }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.status") { value("confirmed") }
+            }
         Mockito.verify(catalogClient, Mockito.times(1)).createConstitution("FR", "new-constitution", "New constitution")
     }
 
@@ -158,12 +207,18 @@ class ImportApiTest {
     fun scopedImportRequiresConfirmedConstitutionAndSettingsPin() {
         val base = """{"isoCode":"FR","countryName":"France","constitutionSlug":"1958","constitutionTitle":"Constitution","versionLabel":"1","articles":[{"articleNumber":"1","title":"A","sortOrder":1}]}"""
         mockMvc.post("/import-jobs") {
-            header("Authorization", MCP_TOKEN); contentType = MediaType.APPLICATION_JSON; content = base
+            header("Authorization", MCP_TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = base
         }.andExpect { status { isConflict() } }
         mockMvc.post("/import-jobs") {
-            header("Authorization", MCP_TOKEN); contentType = MediaType.APPLICATION_JSON
+            header("Authorization", MCP_TOKEN)
+            contentType = MediaType.APPLICATION_JSON
             content = base.dropLast(1) + ",\"constitutionId\":\"${UUID.randomUUID()}\",\"settingsRevisionId\":\"$SETTINGS_REVISION\"}"
-        }.andExpect { status { isCreated() }; jsonPath("$.status") { value("pending_review") } }
+        }.andExpect {
+            status { isCreated() }
+            jsonPath("$.status") { value("pending_review") }
+        }
         Mockito.verifyNoInteractions(catalogClient, contentClient)
     }
 
@@ -178,11 +233,13 @@ class ImportApiTest {
         }
         for (token in listOf(MCP_TOKEN, EDITOR_TOKEN, PUBLISHER_TOKEN)) {
             mockMvc.post("/import-jobs/$id/approve") {
-                header("Authorization", token); contentType = MediaType.APPLICATION_JSON
+                header("Authorization", token)
+                contentType = MediaType.APPLICATION_JSON
                 content = """{"reason":"Checked the complete source against the draft."}"""
             }.andExpect { status { isForbidden() } }
             mockMvc.post("/import-jobs/$id/reject") {
-                header("Authorization", token); contentType = MediaType.APPLICATION_JSON
+                header("Authorization", token)
+                contentType = MediaType.APPLICATION_JSON
                 content = """{"reason":"The submitted source cannot be verified."}"""
             }.andExpect { status { isForbidden() } }
         }
@@ -193,11 +250,13 @@ class ImportApiTest {
     }
 
     private fun stubDraft(versionId: UUID, constitutionId: UUID) {
-        Mockito.`when`(catalogClient.createDraftVersion(
-            anyUuid(), anyStr(), Mockito.nullable(LocalDate::class.java), anyStr(),
-            Mockito.nullable(String::class.java), Mockito.nullable(String::class.java),
-            Mockito.nullable(UUID::class.java), Mockito.nullable(String::class.java), anyUuid(),
-        )).thenReturn(DownstreamVersion(versionId, constitutionId, "draft"))
+        Mockito.`when`(
+            catalogClient.createDraftVersion(
+                anyUuid(), anyStr(), Mockito.nullable(LocalDate::class.java), anyStr(),
+                Mockito.nullable(String::class.java), Mockito.nullable(String::class.java),
+                Mockito.nullable(UUID::class.java), Mockito.nullable(String::class.java), anyUuid(),
+            ),
+        ).thenReturn(DownstreamVersion(versionId, constitutionId, "draft"))
     }
 
     private fun <T : Any> eqNonNull(value: T): T = Mockito.eq(value) ?: value
@@ -232,23 +291,42 @@ class ImportApiTest {
 
     @Test
     fun batchItemsAreIndependentAndIdempotent() {
-        val batch = json.readTree(mockMvc.post("/import-batches") { header("Authorization", TOKEN) }
-            .andExpect { status { isCreated() } }.andReturn().response.contentAsString).path("id").asText()
+        val batch = json.readTree(
+            mockMvc.post("/import-batches") { header("Authorization", TOKEN) }
+                .andExpect { status { isCreated() } }.andReturn().response.contentAsString,
+        ).path("id").asText()
         val valid = """{"idempotencyKey":"first-item","payload":{"isoCode":"FR","countryName":"France","constitutionSlug":"batch","constitutionTitle":"Constitution","versionLabel":"1","articles":[{"articleNumber":"1","title":"First","sortOrder":1}]}}"""
-        val first = json.readTree(mockMvc.post("/import-batches/$batch/items") {
-            header("Authorization", TOKEN); contentType = MediaType.APPLICATION_JSON; content = valid
-        }.andExpect { status { isCreated() }; jsonPath("$.status") { value("pending_review") } }.andReturn().response.contentAsString).path("id").asText()
+        val first = json.readTree(
+            mockMvc.post("/import-batches/$batch/items") {
+                header("Authorization", TOKEN)
+                contentType = MediaType.APPLICATION_JSON
+                content = valid
+            }.andExpect {
+                status { isCreated() }
+                jsonPath("$.status") { value("pending_review") }
+            }.andReturn().response.contentAsString,
+        ).path("id").asText()
         mockMvc.post("/import-batches/$batch/items") {
-            header("Authorization", TOKEN); contentType = MediaType.APPLICATION_JSON; content = valid
-        }.andExpect { status { isCreated() }; jsonPath("$.id") { value(first) } }
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = valid
+        }.andExpect {
+            status { isCreated() }
+            jsonPath("$.id") { value(first) }
+        }
         mockMvc.post("/import-batches/$batch/items") {
-            header("Authorization", TOKEN); contentType = MediaType.APPLICATION_JSON
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
             content = valid.replace("\"versionLabel\":\"1\"", "\"versionLabel\":\"2\"")
         }.andExpect { status { isConflict() } }
         mockMvc.post("/import-batches/$batch/items") {
-            header("Authorization", TOKEN); contentType = MediaType.APPLICATION_JSON
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
             content = """{"idempotencyKey":"second-item","payload":{"isoCode":"FR","countryName":"France","constitutionSlug":"batch","constitutionTitle":"Constitution","versionLabel":"2","articles":[{"articleNumber":"1","title":"First","sortOrder":1},{"articleNumber":"1","title":"Duplicate","sortOrder":2}]}}"""
-        }.andExpect { status { isCreated() }; jsonPath("$.status") { value("failed") } }
+        }.andExpect {
+            status { isCreated() }
+            jsonPath("$.status") { value("failed") }
+        }
         mockMvc.get("/import-batches/$batch") { header("Authorization", TOKEN) }.andExpect {
             status { isOk() }
             jsonPath("$.items.length()") { value(2) }
@@ -292,7 +370,8 @@ class ImportApiTest {
         prepare(id).andExpect { jsonPath("$.versionId") { value(versionId.toString()) } }
         Mockito.verify(catalogClient, Mockito.never()).publishVersion(anyUuid(), anyUuid())
         mockMvc.post("/import-jobs/$id/approve") {
-            header("Authorization", REVIEWER_TOKEN); contentType = MediaType.APPLICATION_JSON
+            header("Authorization", REVIEWER_TOKEN)
+            contentType = MediaType.APPLICATION_JSON
             content = """{"reason":"Too short"}"""
         }.andExpect { status { isBadRequest() } }
         approve(id)
@@ -304,9 +383,14 @@ class ImportApiTest {
                 jsonPath("$.length()") { value(1) }
             }
         publish(id)
-        assertEquals(setOf("audit_publish", "search_reindex"), jdbc.queryForList(
-            "SELECT event_type FROM import_publication_outbox WHERE import_job_id = ?", String::class.java, UUID.fromString(id),
-        ).toSet())
+        assertEquals(
+            setOf("audit_publish", "search_reindex"),
+            jdbc.queryForList(
+                "SELECT event_type FROM import_publication_outbox WHERE import_job_id = ?",
+                String::class.java,
+                UUID.fromString(id),
+            ).toSet(),
+        )
         Mockito.verify(catalogClient).publishVersion(versionId, UUID.fromString(id))
         Mockito.verify(catalogClient).replaceOutline(anyUuid(), Mockito.anyList())
     }

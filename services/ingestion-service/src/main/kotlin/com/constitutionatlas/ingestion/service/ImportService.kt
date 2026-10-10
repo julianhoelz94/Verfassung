@@ -1,22 +1,22 @@
 package com.constitutionatlas.ingestion.service
 
+import com.constitutionatlas.ingestion.api.ImportBatchDto
 import com.constitutionatlas.ingestion.api.ImportJobDto
 import com.constitutionatlas.ingestion.api.ImportRequest
-import com.constitutionatlas.ingestion.api.ImportBatchDto
 import com.constitutionatlas.ingestion.api.StageBatchItemRequest
 import com.constitutionatlas.ingestion.client.CatalogClient
 import com.constitutionatlas.ingestion.client.ContentClient
 import com.constitutionatlas.ingestion.client.DownstreamAuth
 import com.constitutionatlas.ingestion.repo.ImportJobRepository
+import com.fasterxml.jackson.databind.ObjectMapper
+import org.springframework.beans.factory.annotation.Value
+import org.springframework.dao.DuplicateKeyException
+import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
-import org.springframework.beans.factory.annotation.Value
-import java.util.UUID
-import java.security.MessageDigest
-import com.fasterxml.jackson.databind.ObjectMapper
-import org.springframework.http.HttpStatus
-import org.springframework.dao.DuplicateKeyException
 import org.springframework.web.server.ResponseStatusException
+import java.security.MessageDigest
+import java.util.UUID
 
 @Service
 class ImportService(
@@ -49,7 +49,9 @@ class ImportService(
         val needsOutline = request.roots.isNotEmpty() || request.articles.any { it.nodes.isNotEmpty() }
         val pinnedOutline = if (needsOutline && request.constitutionId != null && request.settingsRevisionId != null) {
             catalogClient.settingsOutline(request.constitutionId, request.settingsRevisionId)
-        } else null
+        } else {
+            null
+        }
         val validation = ImportValidator.validate(request, pinnedOutline)
         if (validation.isNotEmpty()) {
             importJobRepository.fail(jobId, validation)
@@ -70,7 +72,13 @@ class ImportService(
         val owner = importJobRepository.batchOwner(batchId) ?: throw com.constitutionatlas.platform.NotFoundException("Unknown or expired import batch")
         if (owner != actorId) throw com.constitutionatlas.platform.ForbiddenException("Import batch belongs to another principal")
         val items = importJobRepository.batchItems(batchId)
-        val status = if (items.isEmpty()) "receiving" else if (items.all { it.status == "completed" }) "completed" else "in_progress"
+        val status = if (items.isEmpty()) {
+            "receiving"
+        } else if (items.all { it.status == "completed" }) {
+            "completed"
+        } else {
+            "in_progress"
+        }
         return ImportBatchDto(batchId, items, status)
     }
 

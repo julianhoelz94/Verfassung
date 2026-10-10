@@ -299,11 +299,13 @@ class IdentityApiTest {
             contentType = MediaType.APPLICATION_JSON
             content = """{"name":"viewer-import","scopes":["mcp:read","ingestion:import"]}"""
         }.andExpect { status { isForbidden() } }
-        val created = objectMapper.readTree(mockMvc.post("/mcp-keys") {
-            header("Authorization", "Bearer $viewer")
-            contentType = MediaType.APPLICATION_JSON
-            content = """{"name":"viewer-read","scopes":["mcp:read"]}"""
-        }.andExpect { status { isCreated() } }.andReturn().response.contentAsString)
+        val created = objectMapper.readTree(
+            mockMvc.post("/mcp-keys") {
+                header("Authorization", "Bearer $viewer")
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"name":"viewer-read","scopes":["mcp:read"]}"""
+            }.andExpect { status { isCreated() } }.andReturn().response.contentAsString,
+        )
         val id = created.path("key").path("id").asText()
         val first = created.path("token").asText()
         check(first.startsWith("ca_mcp_"))
@@ -312,9 +314,11 @@ class IdentityApiTest {
             jsonPath("$.roles.length()") { value(0) }
             jsonPath("$.scopes[0]") { value("mcp:read") }
         }
-        val second = objectMapper.readTree(mockMvc.post("/mcp-keys/$id/rotate") {
-            header("Authorization", "Bearer $viewer")
-        }.andExpect { status { isOk() } }.andReturn().response.contentAsString).path("token").asText()
+        val second = objectMapper.readTree(
+            mockMvc.post("/mcp-keys/$id/rotate") {
+                header("Authorization", "Bearer $viewer")
+            }.andExpect { status { isOk() } }.andReturn().response.contentAsString,
+        ).path("token").asText()
         mockMvc.get("/me") { header("Authorization", "Bearer $first") }.andExpect { status { isUnauthorized() } }
         mockMvc.delete("/mcp-keys/$id") { header("Authorization", "Bearer $viewer") }.andExpect { status { isNoContent() } }
         mockMvc.get("/me") { header("Authorization", "Bearer $second") }.andExpect { status { isUnauthorized() } }
@@ -323,11 +327,13 @@ class IdentityApiTest {
     @Test
     fun editorImportMcpKeyDoesNotInheritEditorRole() {
         val editor = login("local-editor@example.local", "change-me")
-        val created = objectMapper.readTree(mockMvc.post("/mcp-keys") {
-            header("Authorization", "Bearer $editor")
-            contentType = MediaType.APPLICATION_JSON
-            content = """{"name":"editor-import-${java.util.UUID.randomUUID()}","scopes":["mcp:read","ingestion:import"]}"""
-        }.andExpect { status { isCreated() } }.andReturn().response.contentAsString)
+        val created = objectMapper.readTree(
+            mockMvc.post("/mcp-keys") {
+                header("Authorization", "Bearer $editor")
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"name":"editor-import-${java.util.UUID.randomUUID()}","scopes":["mcp:read","ingestion:import"]}"""
+            }.andExpect { status { isCreated() } }.andReturn().response.contentAsString,
+        )
         val token = created.path("token").asText()
         mockMvc.get("/me") { header("Authorization", "Bearer $token") }.andExpect {
             status { isOk() }

@@ -1,8 +1,8 @@
 package com.constitutionatlas.ingestion.service
 
 import com.constitutionatlas.ingestion.api.ImportNode
-import com.constitutionatlas.ingestion.api.ImportRequest
 import com.constitutionatlas.ingestion.api.ImportOutline
+import com.constitutionatlas.ingestion.api.ImportRequest
 import com.constitutionatlas.platform.Actor
 import org.springframework.http.HttpStatus
 import org.springframework.web.server.ResponseStatusException

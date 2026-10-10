@@ -20,9 +20,8 @@ import org.springframework.http.MediaType
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.context.jdbc.Sql
-import org.springframework.test.web.servlet.MockMvc
-import org.springframework.test.web.servlet.get as springGet
 import org.springframework.test.web.servlet.MockHttpServletRequestDsl
+import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.patch
 import org.springframework.test.web.servlet.post
 import org.springframework.test.web.servlet.put
@@ -31,6 +30,7 @@ import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
 import java.io.File
 import java.util.UUID
+import org.springframework.test.web.servlet.get as springGet
 
 @Testcontainers
 @Sql(scripts = ["/fixtures/demo_content.sql"], executionPhase = Sql.ExecutionPhase.BEFORE_TEST_CLASS)
@@ -50,7 +50,10 @@ class ContentApiTest {
         Actor(UUID.fromString("01900000-0000-4000-8000-000000000410"), "local-editor@example.local", listOf("editor"))
 
     private fun MockMvc.get(path: String, dsl: MockHttpServletRequestDsl.() -> Unit = {}) =
-        this.springGet(path) { header("Authorization", TOKEN); dsl() }
+        this.springGet(path) {
+            header("Authorization", TOKEN)
+            dsl()
+        }
 
     private fun anyUuid(): UUID = Mockito.any(UUID::class.java) ?: UUID(0, 0)
 

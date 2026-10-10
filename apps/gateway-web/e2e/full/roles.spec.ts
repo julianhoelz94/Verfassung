@@ -93,7 +93,7 @@ test('editor, reviewer, and publisher carry a real transcription correction to t
   await expect(page.getByText('Dignity and civic equality protect every person. Verified transcription.').first()).toBeVisible();
 });
 
-test('administrator imports a new constitution through the website', async ({ page }) => {
+test('editorial roles stage, review, and publish a new constitution through the website', async ({ page }) => {
   const slug = `admin-journey-${Date.now()}`;
   await signIn(page, 'admin');
   await page.goto('/admin/import');
@@ -102,12 +102,27 @@ test('administrator imports a new constitution through the website', async ({ pa
     countryName: 'Atlas Admin Testland',
     constitutionSlug: slug,
     constitutionTitle: 'Admin Imported Charter',
+    outline: { kinds: [{ kindCode: 'article', displayLabel: 'Article' }] },
     versionLabel: '2025',
     effectiveDate: '2025-01-01',
     articles: [{ articleNumber: '1', title: 'Public trust', body: 'Public trust protects every person.', sortOrder: 1 }],
   }));
-  await page.getByRole('button', { name: 'Start import' }).click();
+  await page.getByRole('button', { name: 'Stage for review' }).click();
   await expect(page.getByRole('heading', { name: 'Import job' })).toBeVisible();
+  await expect(page.getByText('Status: pending_review')).toBeVisible();
+  const reviewUrl = page.url();
+  await page.getByRole('button', { name: 'Confirm proposed outline' }).click();
+  await page.getByRole('button', { name: 'Prepare unpublished draft' }).click();
+  await signOut(page);
+  await signIn(page, 'reviewer');
+  await page.goto(reviewUrl);
+  await page.getByLabel('Review reason').first().fill('Source wording and article structure match the submitted text.');
+  await page.getByRole('button', { name: 'Approve prepared draft' }).click();
+  await expect(page.getByText('Status: approved')).toBeVisible();
+  await signOut(page);
+  await signIn(page, 'publisher');
+  await page.goto(reviewUrl);
+  await page.getByRole('button', { name: 'Publish approved version' }).click();
   await expect(page.getByText('Status: completed')).toBeVisible();
   await page.getByRole('link', { name: 'Open the published version' }).click();
   await expect(page.getByRole('button', { name: /Article 1.*Public trust/ }).first()).toBeVisible();

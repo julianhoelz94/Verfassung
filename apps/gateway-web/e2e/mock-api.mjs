@@ -1010,8 +1010,8 @@ const server = createServer(async (req, res) => {
   if (method === 'POST' && pathname === '/api/ingestion/import-jobs') {
     json(res, 201, {
       id: '01900000-0000-4000-8000-000000000701',
-      status: 'completed',
-      versionId: VERSION_2022,
+      status: 'pending_review',
+      versionId: null,
       isoCode: 'US',
       errors: [],
     });
@@ -1020,8 +1020,8 @@ const server = createServer(async (req, res) => {
   if (method === 'GET' && pathname.startsWith('/api/ingestion/import-jobs/')) {
     json(res, 200, {
       id: pathname.split('/').pop(),
-      status: 'completed',
-      versionId: VERSION_2022,
+      status: 'pending_review',
+      versionId: null,
       isoCode: 'US',
       errors: [],
     });

@@ -39,55 +39,77 @@ class ImportJobRepository(
 
     fun batchOwner(batchId: UUID): UUID? = jdbc.query(
         "SELECT owner_id FROM import_batches WHERE id = ? AND expires_at > NOW()",
-        { rs, _ -> rs.getObject("owner_id", UUID::class.java) }, batchId,
+        { rs, _ -> rs.getObject("owner_id", UUID::class.java) },
+        batchId,
     ).firstOrNull()
 
     fun batchOwnerForUpdate(batchId: UUID): UUID? = jdbc.query(
         "SELECT owner_id FROM import_batches WHERE id = ? AND expires_at > NOW() FOR UPDATE",
-        { rs, _ -> rs.getObject("owner_id", UUID::class.java) }, batchId,
+        { rs, _ -> rs.getObject("owner_id", UUID::class.java) },
+        batchId,
     ).firstOrNull()
 
     fun batchItems(batchId: UUID): List<ImportJobDto> = jdbc.query(
         "SELECT id FROM import_jobs WHERE batch_id = ? ORDER BY created_at, id",
-        { rs, _ -> rs.getObject("id", UUID::class.java) }, batchId,
+        { rs, _ -> rs.getObject("id", UUID::class.java) },
+        batchId,
     ).mapNotNull(::find)
 
     fun findBatchItem(batchId: UUID, idempotencyKey: String): Pair<ImportJobDto, String?>? = jdbc.query(
         "SELECT id, payload_sha256 FROM import_jobs WHERE batch_id = ? AND idempotency_key = ?",
-        { rs, _ -> rs.getObject("id", UUID::class.java) to rs.getString("payload_sha256") }, batchId, idempotencyKey,
+        { rs, _ -> rs.getObject("id", UUID::class.java) to rs.getString("payload_sha256") },
+        batchId,
+        idempotencyKey,
     ).firstOrNull()?.let { (id, hash) -> find(id)?.let { it to hash } }
 
     @Transactional
     fun complete(jobId: UUID, versionId: UUID, actorId: UUID) {
         val request = request(jobId) ?: error("Import payload missing")
         val approvedBy = find(jobId)?.approvedBy ?: error("Approved reviewer missing")
-        check(jdbc.update(
-            "UPDATE import_jobs SET status = 'completed', version_id = ?, published_at = NOW(), updated_at = NOW() WHERE id = ? AND status = 'publishing'",
-            versionId, jobId,
-        ) == 1) { "Import was not publishing" }
-        publicationOutbox.enqueue(jobId, "audit_publish", mapOf(
-            "actorId" to actorId, "action" to "import.published", "entityType" to "import_job", "entityId" to jobId,
-            "payload" to mapOf(
-                "decision" to "approved", "approvedBy" to approvedBy, "sourceUrl" to request.sourceUrl,
-                "gazetteReference" to request.gazetteReference, "versionId" to versionId, "outcome" to "published",
+        check(
+            jdbc.update(
+                "UPDATE import_jobs SET status = 'completed', version_id = ?, published_at = NOW(), updated_at = NOW() WHERE id = ? AND status = 'publishing'",
+                versionId,
+                jobId,
+            ) == 1,
+        ) { "Import was not publishing" }
+        publicationOutbox.enqueue(
+            jobId,
+            "audit_publish",
+            mapOf(
+                "actorId" to actorId,
+                "action" to "import.published",
+                "entityType" to "import_job",
+                "entityId" to jobId,
+                "payload" to mapOf(
+                    "decision" to "approved",
+                    "approvedBy" to approvedBy,
+                    "sourceUrl" to request.sourceUrl,
+                    "gazetteReference" to request.gazetteReference,
+                    "versionId" to versionId,
+                    "outcome" to "published",
+                ),
             ),
-        ))
+        )
         publicationOutbox.enqueue(jobId, "search_reindex", mapOf("versionId" to versionId))
     }
 
     fun claimPreparation(jobId: UUID, actorId: UUID): Boolean = jdbc.update(
         "UPDATE import_jobs SET status = 'preparing', prepared_by = ?, updated_at = NOW() WHERE id = ? AND status = 'pending_review' AND version_id IS NULL",
-        actorId, jobId,
+        actorId,
+        jobId,
     ) == 1
 
     fun confirmOutline(jobId: UUID, actorId: UUID): Boolean = jdbc.update(
         "UPDATE import_jobs SET outline_confirmed_by = ?, outline_confirmed_at = NOW(), updated_at = NOW() WHERE id = ? AND status = 'pending_review' AND version_id IS NULL",
-        actorId, jobId,
+        actorId,
+        jobId,
     ) == 1
 
     fun isOutlineConfirmed(jobId: UUID): Boolean = jdbc.query(
         "SELECT outline_confirmed_by IS NOT NULL FROM import_jobs WHERE id = ?",
-        { rs, _ -> rs.getBoolean(1) }, jobId,
+        { rs, _ -> rs.getBoolean(1) },
+        jobId,
     ).firstOrNull() ?: false
 
     fun prepared(jobId: UUID, versionId: UUID) {
@@ -98,7 +120,12 @@ class ImportJobRepository(
     fun approve(jobId: UUID, actorId: UUID, snapshot: OrderedSnapshot, reason: String): Boolean {
         val changed = jdbc.update(
             "UPDATE import_jobs SET status = 'approved', approved_by = ?, approved_at = NOW(), approved_generation = ?, approved_settings_revision_id = ?, updated_at = NOW() WHERE id = ? AND status = 'pending_review' AND version_id = ? AND (submitted_by IS NULL OR submitted_by <> ?)",
-            actorId, snapshot.generation, snapshot.settingsRevisionId, jobId, snapshot.versionId, actorId,
+            actorId,
+            snapshot.generation,
+            snapshot.settingsRevisionId,
+            jobId,
+            snapshot.versionId,
+            actorId,
         ) == 1
         if (changed) recordDecision(jobId, actorId, "approved", reason)
         return changed
@@ -108,7 +135,9 @@ class ImportJobRepository(
     fun reject(jobId: UUID, actorId: UUID, reason: String): Boolean {
         val changed = jdbc.update(
             "UPDATE import_jobs SET status = 'rejected', approved_by = ?, updated_at = NOW() WHERE id = ? AND status = 'pending_review' AND (submitted_by IS NULL OR submitted_by <> ?)",
-            actorId, jobId, actorId,
+            actorId,
+            jobId,
+            actorId,
         ) == 1
         if (changed) recordDecision(jobId, actorId, "rejected", reason)
         return changed
@@ -117,7 +146,11 @@ class ImportJobRepository(
     private fun recordDecision(jobId: UUID, actorId: UUID, decision: String, reason: String) {
         jdbc.update(
             "INSERT INTO import_review_decisions (id, import_job_id, decision, reason, decided_by) VALUES (?, ?, ?, ?, ?)",
-            UUID.randomUUID(), jobId, decision, reason, actorId,
+            UUID.randomUUID(),
+            jobId,
+            decision,
+            reason,
+            actorId,
         )
     }
 
@@ -129,7 +162,9 @@ class ImportJobRepository(
 
     fun claimPublication(jobId: UUID, actorId: UUID): Boolean = jdbc.update(
         "UPDATE import_jobs SET status = 'publishing', published_by = ?, updated_at = NOW() WHERE id = ? AND status = 'approved' AND approved_by <> ?",
-        actorId, jobId, actorId,
+        actorId,
+        jobId,
+        actorId,
     ) == 1
 
     fun publishFailed(jobId: UUID) {
@@ -138,27 +173,37 @@ class ImportJobRepository(
 
     fun approvedFingerprint(jobId: UUID): Pair<Long, UUID?>? = jdbc.query(
         "SELECT approved_generation, approved_settings_revision_id FROM import_jobs WHERE id = ? AND approved_generation IS NOT NULL",
-        { rs, _ -> rs.getLong("approved_generation") to rs.getObject("approved_settings_revision_id", UUID::class.java) }, jobId,
+        { rs, _ -> rs.getLong("approved_generation") to rs.getObject("approved_settings_revision_id", UUID::class.java) },
+        jobId,
     ).firstOrNull()
 
     fun request(jobId: UUID): ImportRequest? = jdbc.query(
         "SELECT payload FROM import_jobs WHERE id = ?",
-        { rs, _ -> objectMapper.readValue(rs.getString("payload"), ImportRequest::class.java) }, jobId,
+        { rs, _ -> objectMapper.readValue(rs.getString("payload"), ImportRequest::class.java) },
+        jobId,
     ).firstOrNull()
 
     fun submitter(jobId: UUID): UUID? = jdbc.query(
         "SELECT submitted_by FROM import_jobs WHERE id = ?",
-        { rs, _ -> rs.getObject("submitted_by", UUID::class.java) }, jobId,
+        { rs, _ -> rs.getObject("submitted_by", UUID::class.java) },
+        jobId,
     ).firstOrNull()
 
     fun list(status: String?, limit: Int = 100): List<ImportJobDto> {
-        val ids = if (status == null) jdbc.query(
-            "SELECT id FROM import_jobs ORDER BY created_at DESC LIMIT ?",
-            { rs, _ -> rs.getObject("id", UUID::class.java) }, limit,
-        ) else jdbc.query(
-            "SELECT id FROM import_jobs WHERE status = ? ORDER BY created_at DESC LIMIT ?",
-            { rs, _ -> rs.getObject("id", UUID::class.java) }, status, limit,
-        )
+        val ids = if (status == null) {
+            jdbc.query(
+                "SELECT id FROM import_jobs ORDER BY created_at DESC LIMIT ?",
+                { rs, _ -> rs.getObject("id", UUID::class.java) },
+                limit,
+            )
+        } else {
+            jdbc.query(
+                "SELECT id FROM import_jobs WHERE status = ? ORDER BY created_at DESC LIMIT ?",
+                { rs, _ -> rs.getObject("id", UUID::class.java) },
+                status,
+                limit,
+            )
+        }
         return ids.mapNotNull(::find)
     }
 

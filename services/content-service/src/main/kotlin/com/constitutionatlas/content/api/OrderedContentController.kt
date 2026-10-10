@@ -1,7 +1,7 @@
 package com.constitutionatlas.content.api
 
-import com.constitutionatlas.content.client.WriteAccess
 import com.constitutionatlas.content.client.ContentReadAccess
+import com.constitutionatlas.content.client.WriteAccess
 import com.constitutionatlas.content.service.OrderedContentService
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable

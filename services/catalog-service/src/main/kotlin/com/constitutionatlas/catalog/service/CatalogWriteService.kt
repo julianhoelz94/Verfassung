@@ -12,9 +12,9 @@ import com.constitutionatlas.catalog.api.SettingsWrite
 import com.constitutionatlas.catalog.api.VersionCreated
 import com.constitutionatlas.catalog.repo.CatalogRepository
 import com.constitutionatlas.catalog.repo.SettingsRepository
-import com.constitutionatlas.platform.NotFoundException
 import com.constitutionatlas.platform.Actor
 import com.constitutionatlas.platform.ForbiddenException
+import com.constitutionatlas.platform.NotFoundException
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional

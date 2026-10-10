@@ -9,8 +9,8 @@ import com.constitutionatlas.ingestion.repo.UploadRow
 import com.constitutionatlas.platform.Actor
 import com.constitutionatlas.platform.ForbiddenException
 import com.constitutionatlas.platform.NotFoundException
-import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.core.StreamReadConstraints
+import com.fasterxml.jackson.databind.ObjectMapper
 import org.springframework.dao.DuplicateKeyException
 import org.springframework.http.HttpStatus
 import org.springframework.scheduling.annotation.Scheduled
@@ -53,8 +53,9 @@ class ImportUploadService(
             return status(existing)
         }
         if (uploads.reservedBytes(batchId) + request.totalBytes > MAX_BATCH_BYTES) tooLarge("Batch upload quota is 100 MiB")
-        val id = try { uploads.insert(batchId, actor.id, key, request.checksumSha256, request.totalBytes) }
-        catch (ex: DuplicateKeyException) {
+        val id = try {
+            uploads.insert(batchId, actor.id, key, request.checksumSha256, request.totalBytes)
+        } catch (ex: DuplicateKeyException) {
             val existing = uploads.byKey(batchId, key) ?: throw ex
             if (existing.checksumSha256 != request.checksumSha256.lowercase() || existing.totalBytes != request.totalBytes) conflict("Idempotency key was used for another upload")
             return status(existing)
@@ -71,8 +72,11 @@ class ImportUploadService(
         val count = chunkCount(upload)
         if (index !in 0 until count) bad("chunk index is out of range")
         if (request.dataBase64.length > 700_000) tooLarge("Chunk exceeds 512 KiB")
-        val bytes = try { Base64.getDecoder().decode(request.dataBase64) }
-        catch (ex: IllegalArgumentException) { bad("dataBase64 is not valid base64") }
+        val bytes = try {
+            Base64.getDecoder().decode(request.dataBase64)
+        } catch (ex: IllegalArgumentException) {
+            bad("dataBase64 is not valid base64")
+        }
         val expectedSize = if (index == count - 1) upload.totalBytes - index * CHUNK_BYTES else CHUNK_BYTES
         if (bytes.size != expectedSize) bad("chunk $index must contain exactly $expectedSize bytes")
         val checksum = sha256(bytes)
@@ -92,8 +96,11 @@ class ImportUploadService(
         uploads.chunks(id).forEach(payload::write)
         val bytes = payload.toByteArray()
         if (bytes.size != upload.totalBytes || sha256(bytes) != upload.checksumSha256) bad("Full upload checksum mismatch")
-        val request = try { uploadMapper.readValue(bytes, ImportRequest::class.java) }
-        catch (ex: Exception) { bad("Uploaded JSON is not a valid import payload") }
+        val request = try {
+            uploadMapper.readValue(bytes, ImportRequest::class.java)
+        } catch (ex: Exception) {
+            bad("Uploaded JSON is not a valid import payload")
+        }
         ImportValidator.requireConfirmedPinForScopedUpload(actor, request)
         val item = imports.stageBatchItem(upload.batchId, actor.id, com.constitutionatlas.ingestion.api.StageBatchItemRequest(upload.idempotencyKey, request))
         uploads.complete(id, item.id)
@@ -101,7 +108,9 @@ class ImportUploadService(
     }
 
     @Scheduled(fixedDelayString = "PT24H")
-    fun cleanExpired() { uploads.cleanExpired() }
+    fun cleanExpired() {
+        uploads.cleanExpired()
+    }
 
     private fun owned(id: UUID, actor: Actor, lock: Boolean = false): UploadRow {
         val upload = uploads.find(id, lock) ?: throw NotFoundException("Unknown or expired import upload")

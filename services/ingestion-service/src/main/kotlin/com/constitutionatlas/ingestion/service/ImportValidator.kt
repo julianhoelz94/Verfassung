@@ -2,6 +2,7 @@ package com.constitutionatlas.ingestion.service
 
 import com.constitutionatlas.ingestion.api.ImportNode
 import com.constitutionatlas.ingestion.api.ImportRequest
+import com.constitutionatlas.ingestion.api.ImportOutline
 import com.constitutionatlas.platform.Actor
 import org.springframework.http.HttpStatus
 import org.springframework.web.server.ResponseStatusException
@@ -17,7 +18,7 @@ object ImportValidator {
         }
     }
 
-    fun validate(request: ImportRequest): List<Pair<String, String>> {
+    fun validate(request: ImportRequest, pinnedOutline: ImportOutline? = null): List<Pair<String, String>> {
         val errors = mutableListOf<Pair<String, String>>()
         if (request.isoCode.trim().length != 2) {
             errors += "INVALID_ISO" to "isoCode must be two letters"
@@ -36,7 +37,7 @@ object ImportValidator {
         }
         if (request.articles.isNotEmpty() && request.roots.isNotEmpty()) errors += "MIXED_FORMATS" to "Use roots or articles, not both"
         if (request.roots.isNotEmpty()) {
-            val rootKind = request.outline?.kinds?.firstOrNull()?.kindCode ?: "article"
+            val rootKind = (pinnedOutline ?: request.outline)?.kinds?.firstOrNull()?.kindCode ?: "article"
             if (request.roots.any { it.kind != rootKind }) errors += "ROOT_KIND" to "Roots must use the first outline kind '$rootKind'"
             val logicalIds = mutableSetOf<java.util.UUID>()
             fun visit(node: com.constitutionatlas.platform.OrderedNodeWrite) {
@@ -68,15 +69,15 @@ object ImportValidator {
         if (request.articles.isNotEmpty() && orders.toSet() != expected) {
             errors += "ORDER_GAPS" to "sortOrder must be a contiguous sequence starting at 1"
         }
-        unknownKinds(request).distinct().forEach { kind ->
+        unknownKinds(request, pinnedOutline).distinct().forEach { kind ->
             errors += "UNKNOWN_KIND" to "kind '$kind' is not in the outline"
         }
         return errors
     }
 
-    fun allowedKinds(request: ImportRequest): Set<String> {
+    fun allowedKinds(request: ImportRequest, pinnedOutline: ImportOutline? = null): Set<String> {
         val fromOutline =
-            request.outline
+            (pinnedOutline ?: request.outline)
                 ?.kinds
                 .orEmpty()
                 .map { it.kindCode.trim().lowercase() }
@@ -84,8 +85,8 @@ object ImportValidator {
         return if (fromOutline.isEmpty()) DEFAULT_KINDS else fromOutline.toSet()
     }
 
-    private fun unknownKinds(request: ImportRequest): List<String> {
-        val allowed = allowedKinds(request)
+    private fun unknownKinds(request: ImportRequest, pinnedOutline: ImportOutline?): List<String> {
+        val allowed = allowedKinds(request, pinnedOutline)
         return request.articles.flatMap { article -> collectKinds(article.nodes) }.filter { it !in allowed }
     }
 

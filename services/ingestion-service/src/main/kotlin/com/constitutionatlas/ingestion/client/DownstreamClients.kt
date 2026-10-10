@@ -2,6 +2,7 @@ package com.constitutionatlas.ingestion.client
 
 import com.constitutionatlas.ingestion.api.ImportArticle
 import com.constitutionatlas.ingestion.api.ImportOutlineKind
+import com.constitutionatlas.ingestion.api.ImportOutline
 import com.constitutionatlas.platform.OrderedNodeWrite
 import com.constitutionatlas.platform.OrderedSnapshot
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
@@ -22,6 +23,7 @@ interface CatalogClient {
     fun createCountry(isoCode: String, name: String): DownstreamCountry
     fun findConstitution(isoCode: String, slug: String): DownstreamConstitution?
     fun currentSettingsRevisionId(constitutionId: UUID): UUID
+    fun settingsOutline(constitutionId: UUID, revisionId: UUID): ImportOutline = ImportOutline()
     fun createConstitution(isoCode: String, slug: String, title: String, predecessorConstitutionId: UUID? = null, interim: Boolean = false): DownstreamConstitution
     fun createDraftVersion(
         constitutionId: UUID,

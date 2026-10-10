@@ -46,7 +46,11 @@ class ImportService(
         }
         importJobRepository.stage(jobId, "request", request)
 
-        val validation = ImportValidator.validate(request)
+        val needsOutline = request.roots.isNotEmpty() || request.articles.any { it.nodes.isNotEmpty() }
+        val pinnedOutline = if (needsOutline && request.constitutionId != null && request.settingsRevisionId != null) {
+            catalogClient.settingsOutline(request.constitutionId, request.settingsRevisionId)
+        } else null
+        val validation = ImportValidator.validate(request, pinnedOutline)
         if (validation.isNotEmpty()) {
             importJobRepository.fail(jobId, validation)
             return importJobRepository.find(jobId)!!

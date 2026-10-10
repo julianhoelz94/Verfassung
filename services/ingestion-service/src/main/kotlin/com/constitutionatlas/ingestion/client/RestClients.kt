@@ -2,6 +2,7 @@ package com.constitutionatlas.ingestion.client
 
 import com.constitutionatlas.ingestion.api.ImportArticle
 import com.constitutionatlas.ingestion.api.ImportOutlineKind
+import com.constitutionatlas.ingestion.api.ImportOutline
 import com.constitutionatlas.platform.OrderedNodeWrite
 import com.constitutionatlas.platform.OrderedSnapshotWrite
 import com.constitutionatlas.platform.OrderedSnapshot
@@ -67,6 +68,10 @@ class RestCatalogClient(
         client.get().uri("/constitutions/{id}/settings", constitutionId)
             .retrieve().body(SettingsRevisionWire::class.java)!!.id
 
+    override fun settingsOutline(constitutionId: UUID, revisionId: UUID): ImportOutline =
+        client.get().uri("/constitutions/{id}/settings/{revisionId}", constitutionId, revisionId)
+            .retrieve().body(SettingsRevisionWire::class.java)!!.outline
+
     override fun createConstitution(isoCode: String, slug: String, title: String, predecessorConstitutionId: UUID?, interim: Boolean): DownstreamConstitution =
         client.postJson(
             "/countries/{iso}/constitutions",
@@ -118,7 +123,7 @@ class RestCatalogClient(
     )
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    private data class SettingsRevisionWire(val id: UUID)
+    private data class SettingsRevisionWire(val id: UUID, val outline: ImportOutline = ImportOutline())
 }
 
 class RestContentClient(

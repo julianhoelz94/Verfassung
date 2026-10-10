@@ -114,10 +114,13 @@ test('MCP staging requires an import-scoped personal key', async () => {
 
 test('MCP import key stages a pending job and never publishes', async () => {
   const originalFetch = globalThis.fetch;
+  const originalInfo = console.info;
+  const audit: string[] = [];
+  console.info = value => { audit.push(String(value)); };
   const calls: Array<{ url: string; method: string }> = [];
   globalThis.fetch = async (input, init) => {
     calls.push({ url: String(input), method: init?.method ?? 'GET' });
-    if (String(input).endsWith('/me')) return Response.json({ scopes: ['mcp:read', 'ingestion:import'] });
+    if (String(input).endsWith('/me')) return Response.json({ id: '01900000-0000-4000-8000-000000000099', scopes: ['mcp:read', 'ingestion:import'] });
     return Response.json({ id: '01900000-0000-4000-8000-000000000001', status: 'pending_review', errors: [] });
   };
   try {
@@ -126,8 +129,12 @@ test('MCP import key stages a pending job and never publishes', async () => {
     assert.equal(result.structuredContent?.status, 'pending_review');
     assert.deepEqual(calls.map(call => call.method), ['GET', 'POST']);
     assert.equal(calls.some(call => call.url.includes('/publish')), false);
+    assert.equal(JSON.parse(audit.at(-1) ?? '{}').actorId, '01900000-0000-4000-8000-000000000099');
+    assert.equal(JSON.parse(audit.at(-1) ?? '{}').resourceId, '01900000-0000-4000-8000-000000000001');
+    assert.equal(audit.some(line => line.includes('ca_mcp_editor')), false);
   } finally {
     globalThis.fetch = originalFetch;
+    console.info = originalInfo;
   }
 });
 

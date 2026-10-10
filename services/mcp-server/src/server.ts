@@ -45,14 +45,15 @@ export function orderedText(entries: OrderedEntry[]): string {
   return text;
 }
 
-async function run<T extends Record<string, unknown>>(tool: string, action: () => Promise<T>) {
+async function runLogged<T extends Record<string, unknown>>(tool: string, action: () => Promise<T>, actorId: () => string | undefined) {
   const started = Date.now();
   try {
-    const result = json(await action());
-    console.info(JSON.stringify({ event: "mcp_tool", tool, outcome: "ok", elapsedMs: Date.now() - started }));
-    return result;
+    const value = await action();
+    const resourceId = value.jobId ?? value.itemId ?? value.batchId ?? value.proposalId ?? value.constitutionId ?? value.uploadId;
+    console.info(JSON.stringify({ event: 'mcp_tool', tool, actorId: actorId(), resourceId, outcome: 'ok', elapsedMs: Date.now() - started }));
+    return json(value);
   } catch (error) {
-    console.warn(JSON.stringify({ event: 'mcp_tool', tool, outcome: 'error', status: error instanceof UpstreamError ? error.status : 503, elapsedMs: Date.now() - started }));
+    console.warn(JSON.stringify({ event: 'mcp_tool', tool, actorId: actorId(), outcome: 'error', status: error instanceof UpstreamError ? error.status : 503, elapsedMs: Date.now() - started }));
     const message = error instanceof UpstreamError ? error.message : 'The requested data could not be loaded.';
     return { content: [{ type: 'text' as const, text: message }], isError: true };
   }
@@ -60,11 +61,14 @@ async function run<T extends Record<string, unknown>>(tool: string, action: () =
 
 export function createServer(authorization?: string): McpServer {
   const server = new McpServer({ name: 'constitution-atlas', version: '0.1.0' }, { capabilities: { tools: {} } });
+  let auditActorId: string | undefined;
+  const run = <T extends Record<string, unknown>>(tool: string, action: () => Promise<T>) => runLogged(tool, action, () => auditActorId);
 
   async function requireImportKey() {
     if (!authorization?.startsWith('Bearer ca_mcp_')) throw new UpstreamError(403, 'identity');
-    const actor = await getJson<{ scopes: string[] }>('identity', '/me', authorization);
+    const actor = await getJson<{ id?: string; scopes: string[] }>('identity', '/me', authorization);
     if (!actor.scopes.includes('ingestion:import')) throw new UpstreamError(403, 'identity');
+    auditActorId = actor.id;
   }
 
   function requireConfirmedUpload(payload: Record<string, unknown>) {

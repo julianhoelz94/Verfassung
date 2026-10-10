@@ -88,7 +88,7 @@ class ImportUploadService(
     }
 
     @Transactional
-    fun complete(id: UUID, actor: Actor): ImportUploadDto {
+    fun complete(authorization: String?, id: UUID, actor: Actor): ImportUploadDto {
         val upload = owned(id, actor, lock = true)
         if (upload.status == "completed") return status(upload)
         if (status(upload).missingChunks.isNotEmpty()) conflict("Upload has missing chunks")
@@ -102,7 +102,7 @@ class ImportUploadService(
             bad("Uploaded JSON is not a valid import payload")
         }
         ImportValidator.requireConfirmedPinForScopedUpload(actor, request)
-        val item = imports.stageBatchItem(upload.batchId, actor.id, com.constitutionatlas.ingestion.api.StageBatchItemRequest(upload.idempotencyKey, request))
+        val item = imports.stageBatchItem(authorization, upload.batchId, actor.id, com.constitutionatlas.ingestion.api.StageBatchItemRequest(upload.idempotencyKey, request))
         uploads.complete(id, item.id)
         return status(uploads.find(id)!!)
     }

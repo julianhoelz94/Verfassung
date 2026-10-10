@@ -120,7 +120,7 @@ export default async function AccountPage(props: AccountPageProps) {
           <p>Connect your client to <code>{mcpUrl}</code>. Public reading needs no key. Create a personal key to stage constitution imports. Every import remains pending review.</p>
           <h3>Claude Code example</h3>
           <p>After copying a key, run this on your computer and replace the placeholder with the key:</p>
-          <pre><code>{`claude mcp add --transport http constitution-atlas ${mcpUrl} --header "Authorization: Bearer <your-MCP-key>"`}</code></pre>
+          <pre tabIndex={0}><code>{`claude mcp add --transport http constitution-atlas ${mcpUrl} --header "Authorization: Bearer <your-MCP-key>"`}</code></pre>
           <p><a href="https://code.claude.com/docs/en/mcp">Claude Code MCP setup instructions</a>. Use a client that supports a custom Authorization header for import keys.</p>
           <CreateMcpKeyForm canImport={canImport} />
           <h3>Your MCP keys</h3>

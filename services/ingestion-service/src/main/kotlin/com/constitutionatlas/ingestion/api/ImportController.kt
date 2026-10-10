@@ -25,11 +25,12 @@ class ImportController(
     @ResponseStatus(HttpStatus.CREATED)
     fun create(
         @RequestHeader(value = "Authorization", required = false) authorization: String?,
+        @RequestHeader(value = "Idempotency-Key", required = false) idempotencyKey: String?,
         @RequestBody request: ImportRequest,
     ): ImportJobDto {
         val actor = writeAccess.requireImporter(authorization)
         ImportValidator.requireConfirmedPinForScopedUpload(actor, request)
-        return importService.importVersion(actor.id, request)
+        return importService.importVersion(authorization, actor.id, request, idempotencyKey = idempotencyKey)
     }
 
     @GetMapping("/import-jobs/{jobId}")

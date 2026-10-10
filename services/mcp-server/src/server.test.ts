@@ -127,17 +127,21 @@ test('MCP import key stages a pending job and never publishes', async () => {
   const originalInfo = console.info;
   const audit: string[] = [];
   console.info = value => { audit.push(String(value)); };
-  const calls: Array<{ url: string; method: string }> = [];
+  const calls: Array<{ url: string; method: string; idempotencyKey?: string }> = [];
   globalThis.fetch = async (input, init) => {
-    calls.push({ url: String(input), method: init?.method ?? 'GET' });
+    calls.push({ url: String(input), method: init?.method ?? 'GET', idempotencyKey: new Headers(init?.headers).get('Idempotency-Key') ?? undefined });
     if (String(input).endsWith('/me')) return Response.json({ id: '01900000-0000-4000-8000-000000000099', scopes: ['mcp:read', 'ingestion:import'] });
     return Response.json({ id: '01900000-0000-4000-8000-000000000001', status: 'pending_review', errors: [] });
   };
   try {
-    const result = await callTool('stage_constitution_import', { payload: { isoCode: 'FR', constitutionId: '01900000-0000-4000-8000-000000000002', settingsRevisionId: '01900000-0000-4000-8000-000000000003' } }, 'Bearer ca_mcp_editor');
+    const payload = { isoCode: 'FR', constitutionId: '01900000-0000-4000-8000-000000000002', settingsRevisionId: '01900000-0000-4000-8000-000000000003' };
+    const result = await callTool('stage_constitution_import', { payload }, 'Bearer ca_mcp_editor');
     assert.equal(result.isError, undefined);
     assert.equal(result.structuredContent?.status, 'pending_review');
     assert.deepEqual(calls.map(call => call.method), ['GET', 'POST']);
+    assert.match(calls[1].idempotencyKey ?? '', /^ca-mcp-[a-f0-9]{64}$/);
+    await callTool('stage_constitution_import', { payload }, 'Bearer ca_mcp_editor');
+    assert.equal(calls[3].idempotencyKey, calls[1].idempotencyKey);
     assert.equal(calls.some(call => call.url.includes('/publish')), false);
     assert.equal(JSON.parse(audit.at(-1) ?? '{}').actorId, '01900000-0000-4000-8000-000000000099');
     assert.equal(JSON.parse(audit.at(-1) ?? '{}').resourceId, '01900000-0000-4000-8000-000000000001');

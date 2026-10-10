@@ -1,4 +1,5 @@
 import { McpServer } from '@modelcontextprotocol/server';
+import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import { getJson, postJson, putJson, publicVersionUrl, requirePublishedVersion, UpstreamError } from './catalog.js';
 
@@ -93,7 +94,7 @@ export function createServer(authorization?: string): McpServer {
       roots: [{ logicalId: 'stable UUID', kind: 'article', label: '1', title: 'Example', content: [{ type: 'text', text: 'Text' }] }],
       setupProposal: { isoCode: 'FR', countryName: 'France', constitutionSlug: 'constitution', constitutionTitle: 'Constitution', languageCode: 'fr', sourceUrl: 'https://example.org/source', outline: { kinds: [{ kindCode: 'article', displayLabel: 'Article' }] }, sampleRoots: [{ kind: 'article', label: '1', content: [{ type: 'text', text: 'Representative text' }] }] },
     },
-    notes: ['Call get_import_setup first. For an existing constitution copy its settingsRevisionId and omit outline.', 'A new constitution needs an outline proposal and a site review before content preparation.', 'Preserve source spelling, numbering and text order.', 'No MCP tool can approve or publish.'],
+    notes: ['Call get_import_setup first. For an existing constitution copy its settingsRevisionId and omit outline.', 'A new constitution needs an outline proposal and a site review before content preparation.', 'Reuse an idempotencyKey when retrying a direct upload; without one, identical payloads reuse a content-derived key.', 'Preserve source spelling, numbering and text order.', 'No MCP tool can approve or publish.'],
   })));
 
   server.registerTool('find_constitution', {
@@ -151,11 +152,12 @@ export function createServer(authorization?: string): McpServer {
 
   server.registerTool('stage_constitution_import', {
     description: 'Stage one constitution version for site review. This never publishes content.',
-    inputSchema: { payload: z.record(z.string(), z.unknown()) },
-  }, ({ payload }) => run('stage_constitution_import', async () => {
+    inputSchema: { payload: z.record(z.string(), z.unknown()), idempotencyKey: z.string().min(8).max(128).optional() },
+  }, ({ payload, idempotencyKey }) => run('stage_constitution_import', async () => {
     await requireImportKey();
     requireConfirmedUpload(payload);
-    const job = await postJson<{ id: string; status: string; errors: unknown[] }>('ingestion', '/import-jobs', payload, authorization!);
+    const retryKey = idempotencyKey ?? `ca-mcp-${createHash('sha256').update(JSON.stringify(payload)).digest('hex')}`;
+    const job = await postJson<{ id: string; status: string; errors: unknown[] }>('ingestion', '/import-jobs', payload, authorization!, retryKey);
     return { jobId: job.id, status: job.status, errors: job.errors, reviewUrl: `${(process.env.PUBLIC_BASE_URL ?? 'http://localhost').replace(/\/$/, '')}/admin/import/${job.id}` };
   }));
 

@@ -1,8 +1,10 @@
 import com.constitutionatlas.ingestion.IngestionServiceApplication
 import com.constitutionatlas.ingestion.api.ImportArticle
+import com.constitutionatlas.ingestion.api.ImportOutline
 import com.constitutionatlas.ingestion.api.ImportOutlineKind
 import com.constitutionatlas.ingestion.client.CatalogClient
 import com.constitutionatlas.ingestion.client.ContentClient
+import com.constitutionatlas.ingestion.client.DownstreamAuth
 import com.constitutionatlas.ingestion.client.DownstreamConstitution
 import com.constitutionatlas.ingestion.client.DownstreamCountry
 import com.constitutionatlas.ingestion.client.DownstreamVersion
@@ -417,13 +419,51 @@ class ImportApiTest {
         prepare(id)
         approve(id)
         jdbc.update("UPDATE import_jobs SET status = 'publishing', published_by = ?, updated_at = NOW() - INTERVAL '3 minutes' WHERE id = ?", publisher.id, UUID.fromString(id))
-        Mockito.`when`(catalogClient.version(versionId)).thenReturn(DownstreamVersion(versionId, constitutionId, "published"))
+        Mockito.`when`(catalogClient.version(versionId)).thenAnswer {
+            assertEquals("Bearer test-publish-token", DownstreamAuth.header())
+            DownstreamVersion(versionId, constitutionId, "published")
+        }
 
         importService.reconcilePublications()
 
         mockMvc.get("/import-jobs/$id") { header("Authorization", TOKEN) }
             .andExpect { jsonPath("$.status") { value("completed") } }
         assertEquals(2, jdbc.queryForObject("SELECT COUNT(*) FROM import_publication_outbox WHERE import_job_id = ?", Int::class.java, UUID.fromString(id)))
+    }
+
+    @Test
+    fun scopedImportReadsPinnedOutlineWithItsOwnCredential() {
+        val constitutionId = UUID.randomUUID()
+        val revisionId = UUID.randomUUID()
+        Mockito.`when`(catalogClient.settingsOutline(constitutionId, revisionId)).thenAnswer {
+            assertEquals(MCP_TOKEN, DownstreamAuth.header())
+            ImportOutline(listOf(ImportOutlineKind("article", "Article")))
+        }
+        mockMvc.post("/import-jobs") {
+            header("Authorization", MCP_TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"isoCode":"FR","countryName":"France","constitutionSlug":"new","constitutionTitle":"New constitution","constitutionId":"$constitutionId","settingsRevisionId":"$revisionId","versionLabel":"1","sourceUrl":"https://example.org/source","roots":[{"kind":"article","label":"1","content":[{"type":"text","text":"First article."}]}]}"""
+        }.andExpect {
+            status { isCreated() }
+            jsonPath("$.status") { value("pending_review") }
+        }
+    }
+
+    @Test
+    fun directImportIdempotencyReplaysOnlyTheSamePayloadForTheSameSubmitter() {
+        val body = """{"isoCode":"FR","countryName":"France","constitutionSlug":"retry-test","constitutionTitle":"Retry test","versionLabel":"1","sourceUrl":"https://example.org/source","outline":{"kinds":[{"kindCode":"article","displayLabel":"Article"}]},"articles":[{"articleNumber":"1","title":"First","sortOrder":1}]}"""
+        fun stage(payload: String, token: String = TOKEN) = mockMvc.post("/import-jobs") {
+            header("Authorization", token)
+            header("Idempotency-Key", "retry-same-request")
+            contentType = MediaType.APPLICATION_JSON
+            content = payload
+        }
+        val first = stage(body).andExpect { status { isCreated() } }.andReturn()
+        val again = stage(body).andExpect { status { isCreated() } }.andReturn()
+        assertEquals(jobId(first.response.contentAsString), jobId(again.response.contentAsString))
+        stage(body.replace("First", "Changed")).andExpect { status { isConflict() } }
+        val other = stage(body, EDITOR_TOKEN).andExpect { status { isCreated() } }.andReturn()
+        org.junit.jupiter.api.Assertions.assertNotEquals(jobId(first.response.contentAsString), jobId(other.response.contentAsString))
     }
 
     @Test

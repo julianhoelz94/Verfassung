@@ -20,7 +20,7 @@ class WriteAccess(private val identityClient: IdentityClient) {
         if (authorization.isNullOrBlank()) return false
         return try {
             val actor = identityClient.authenticate(authorization)
-            actor.canViewStaffCatalog() || "ingestion:import" in actor.scopes
+            actor.canViewStaffCatalog() || actor.scopes.any { it == "ingestion:import" || it == "ingestion:publish" }
         } catch (_: RuntimeException) {
             false
         }

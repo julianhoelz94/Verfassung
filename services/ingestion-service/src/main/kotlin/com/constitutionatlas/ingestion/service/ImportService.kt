@@ -29,13 +29,15 @@ class ImportService(
     @Value("\${ingestion.publish.token:}") private val publishToken: String,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
-    fun importVersion(submittedBy: UUID, request: ImportRequest, batchId: UUID? = null, idempotencyKey: String? = null, expectedChecksum: String? = null): ImportJobDto {
+    fun importVersion(authorization: String?, submittedBy: UUID, request: ImportRequest, batchId: UUID? = null, idempotencyKey: String? = null, expectedChecksum: String? = null): ImportJobDto {
+        if (idempotencyKey != null && idempotencyKey.length !in 8..128) throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Idempotency key must contain 8 to 128 characters")
         val checksum = MessageDigest.getInstance("SHA-256").digest(objectMapper.writeValueAsBytes(request)).joinToString("") { "%02x".format(it) }
         if (expectedChecksum != null && !checksum.equals(expectedChecksum, ignoreCase = true)) {
             throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Payload checksum mismatch")
         }
-        if (batchId != null && idempotencyKey != null) {
-            importJobRepository.findBatchItem(batchId, idempotencyKey)?.let { (existing, previousChecksum) ->
+        if (idempotencyKey != null) {
+            val previous = if (batchId == null) importJobRepository.findDirectItem(submittedBy, idempotencyKey) else importJobRepository.findBatchItem(batchId, idempotencyKey)
+            previous?.let { (existing, previousChecksum) ->
                 if (previousChecksum != checksum) throw ResponseStatusException(HttpStatus.CONFLICT, "Idempotency key was used for different content")
                 return existing
             }
@@ -43,7 +45,13 @@ class ImportService(
         val jobId = try {
             importJobRepository.insertPending(request, submittedBy, batchId, idempotencyKey, checksum)
         } catch (ex: DuplicateKeyException) {
-            val existing = if (batchId != null && idempotencyKey != null) importJobRepository.findBatchItem(batchId, idempotencyKey) else null
+            val existing = if (idempotencyKey == null) {
+                null
+            } else if (batchId == null) {
+                importJobRepository.findDirectItem(submittedBy, idempotencyKey)
+            } else {
+                importJobRepository.findBatchItem(batchId, idempotencyKey)
+            }
             if (existing?.second == checksum) return existing.first
             throw ResponseStatusException(HttpStatus.CONFLICT, "Idempotency key was used for different content")
         }
@@ -51,7 +59,7 @@ class ImportService(
 
         val needsOutline = request.roots.isNotEmpty() || request.articles.any { it.nodes.isNotEmpty() }
         val pinnedOutline = if (needsOutline && request.constitutionId != null && request.settingsRevisionId != null) {
-            catalogClient.settingsOutline(request.constitutionId, request.settingsRevisionId)
+            DownstreamAuth.withAuthorization(authorization) { catalogClient.settingsOutline(request.constitutionId, request.settingsRevisionId) }
         } else {
             null
         }
@@ -86,7 +94,7 @@ class ImportService(
     }
 
     @Transactional
-    fun stageBatchItem(batchId: UUID, actorId: UUID, item: StageBatchItemRequest): ImportJobDto {
+    fun stageBatchItem(authorization: String?, batchId: UUID, actorId: UUID, item: StageBatchItemRequest): ImportJobDto {
         val key = item.idempotencyKey.trim()
         if (key.length !in 8..128) throw ResponseStatusException(HttpStatus.BAD_REQUEST, "idempotencyKey must contain 8 to 128 characters")
         val owner = importJobRepository.batchOwnerForUpdate(batchId) ?: throw com.constitutionatlas.platform.NotFoundException("Unknown or expired import batch")
@@ -94,7 +102,7 @@ class ImportService(
         if (importJobRepository.findBatchItem(batchId, key) == null && importJobRepository.batchItems(batchId).size >= 100) {
             throw ResponseStatusException(HttpStatus.PAYLOAD_TOO_LARGE, "Batch item limit is 100")
         }
-        return importVersion(actorId, item.payload, batchId, key, item.checksumSha256)
+        return importVersion(authorization, actorId, item.payload, batchId, key, item.checksumSha256)
     }
 
     fun listJobs(status: String?): List<ImportJobDto> = importJobRepository.list(status)
@@ -170,7 +178,7 @@ class ImportService(
             importJobRepository.complete(jobId, versionId, actorId)
         } catch (ex: RuntimeException) {
             try {
-                if (catalogClient.version(versionId)?.publicationStatus != "published") importJobRepository.publishFailed(jobId)
+                if (publishedVersionStatus(versionId) != "published") importJobRepository.publishFailed(jobId)
             } catch (lookupError: RuntimeException) {
                 log.warn("Publication state lookup failed for import {}; scheduled reconciliation will retry", jobId, lookupError)
             }
@@ -184,7 +192,7 @@ class ImportService(
         for (job in importJobRepository.stalePublications()) {
             try {
                 val versionId = job.versionId ?: error("Publishing import has no version")
-                if (catalogClient.version(versionId)?.publicationStatus == "published") {
+                if (publishedVersionStatus(versionId) == "published") {
                     importJobRepository.complete(job.id, versionId, job.publishedBy ?: error("Publishing actor missing"))
                 } else {
                     importJobRepository.publishFailed(job.id)
@@ -194,6 +202,9 @@ class ImportService(
             }
         }
     }
+
+    private fun publishedVersionStatus(versionId: UUID): String? =
+        DownstreamAuth.withAuthorization("Bearer $publishToken") { catalogClient.version(versionId)?.publicationStatus }
 
     private fun persistDraft(jobId: UUID, request: ImportRequest) {
         val iso = request.isoCode.trim().uppercase()

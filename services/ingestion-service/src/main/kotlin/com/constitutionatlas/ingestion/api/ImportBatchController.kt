@@ -33,6 +33,6 @@ class ImportBatchController(private val imports: ImportService, private val acce
     ): ImportJobDto {
         val actor = access.requireImporter(authorization)
         ImportValidator.requireConfirmedPinForScopedUpload(actor, request.payload)
-        return imports.stageBatchItem(id, actor.id, request)
+        return imports.stageBatchItem(authorization, id, actor.id, request)
     }
 }

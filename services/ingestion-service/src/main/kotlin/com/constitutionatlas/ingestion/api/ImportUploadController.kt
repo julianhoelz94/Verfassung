@@ -30,5 +30,5 @@ class ImportUploadController(private val uploads: ImportUploadService, private v
 
     @PostMapping("/import-uploads/{id}/complete")
     fun complete(@RequestHeader(value = "Authorization", required = false) authorization: String?, @PathVariable id: UUID): ImportUploadDto =
-        uploads.complete(id, access.requireImporter(authorization))
+        uploads.complete(authorization, id, access.requireImporter(authorization))
 }

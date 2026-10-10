@@ -62,6 +62,13 @@ class ImportJobRepository(
         idempotencyKey,
     ).firstOrNull()?.let { (id, hash) -> find(id)?.let { it to hash } }
 
+    fun findDirectItem(submittedBy: UUID, idempotencyKey: String): Pair<ImportJobDto, String?>? = jdbc.query(
+        "SELECT id, payload_sha256 FROM import_jobs WHERE batch_id IS NULL AND submitted_by = ? AND idempotency_key = ?",
+        { rs, _ -> rs.getObject("id", UUID::class.java) to rs.getString("payload_sha256") },
+        submittedBy,
+        idempotencyKey,
+    ).firstOrNull()?.let { (id, hash) -> find(id)?.let { it to hash } }
+
     @Transactional
     fun complete(jobId: UUID, versionId: UUID, actorId: UUID) {
         val request = request(jobId) ?: error("Import payload missing")

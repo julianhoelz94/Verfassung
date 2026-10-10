@@ -41,10 +41,10 @@ export async function getJson<T>(upstream: keyof typeof upstreams, path: string,
   return response.json() as Promise<T>;
 }
 
-export async function postJson<T>(upstream: keyof typeof upstreams, path: string, body: unknown, authorization: string): Promise<T> {
+export async function postJson<T>(upstream: keyof typeof upstreams, path: string, body: unknown, authorization: string, idempotencyKey?: string): Promise<T> {
   const response = await fetch(`${upstreams[upstream]}${path}`, {
     method: 'POST', signal: AbortSignal.timeout(30_000),
-    headers: { Accept: 'application/json', Authorization: authorization, 'Content-Type': 'application/json' },
+    headers: { Accept: 'application/json', Authorization: authorization, 'Content-Type': 'application/json', ...(idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {}) },
     body: JSON.stringify(body),
   });
   if (!response.ok) throw await upstreamFailure(response, upstream);

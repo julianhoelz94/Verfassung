@@ -29,8 +29,9 @@ Every staged item stays pending review. A separate reviewer records a reasoned
 decision in the site; a publisher with fresh MFA publishes the approved draft.
 The MCP server has no review or publish tool.
 
-Direct version reads check Catalog's publication status and public listing before
-fetching Content. Countries and constitutions without a published version are
+Direct version reads check Catalog's publication status and public listing,
+including the current published editorial tip, before fetching Content.
+Countries and constitutions without a published version are
 omitted. The Search service indexes published content. Tool arguments and text
 responses are bounded. The endpoint serves MCP revision 2026-07-28 and the
 SDK's stateless legacy compatibility mode.

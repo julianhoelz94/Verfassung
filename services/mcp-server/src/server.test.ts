@@ -34,11 +34,21 @@ test('direct reads reject an unpublished version without disclosing its status',
   }
 });
 
-test('direct reads reject published staff-only versions', async () => {
+test('direct reads reject a superseded published staff version', async () => {
   const originalFetch = globalThis.fetch;
-  globalThis.fetch = async () => Response.json({ id: 'staff', publicationStatus: 'published', listing: 'staff' });
+  globalThis.fetch = async () => Response.json({ id: 'staff', publicationStatus: 'published', listing: 'staff', currentVersionId: 'newer-tip' });
   try {
     await assert.rejects(requirePublishedVersion('staff'), (error) => error instanceof UpstreamError && error.status === 404);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('direct reads accept the published editorial tip shown in public version listings', async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => Response.json({ id: 'tip', publicationStatus: 'published', listing: 'staff', currentVersionId: 'tip' });
+  try {
+    assert.equal((await requirePublishedVersion('tip')).id, 'tip');
   } finally {
     globalThis.fetch = originalFetch;
   }

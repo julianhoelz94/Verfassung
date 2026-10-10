@@ -88,6 +88,8 @@ data class SetupProposalRequest(
     val countryName: String,
     val constitutionSlug: String,
     val constitutionTitle: String,
+    val predecessorConstitutionId: UUID? = null,
+    val interim: Boolean = false,
     val languageCode: String = "en",
     val sourceUrl: String? = null,
     val gazetteReference: String? = null,

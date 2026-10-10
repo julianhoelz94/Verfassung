@@ -15,6 +15,15 @@ test('ordered content preserves text and child order', () => {
   assert.equal(text, 'Opening paragraph one, then paragraph two');
 });
 
+test('import schema explains settings and upload limits', async () => {
+  const result = await callTool('get_import_schema', {});
+  assert.equal(result.isError, undefined);
+  const guidance = result.structuredContent?.settingsGuidance as Array<{ id: string; changeability: string }>;
+  assert.ok(guidance.some(field => field.id === 'outline.kindCode' && field.changeability === 'set_once'));
+  assert.ok(guidance.some(field => field.id === 'outline.presentation' && field.changeability === 'impact_review'));
+  assert.equal((result.structuredContent?.uploadLimits as { chunkBytes: number }).chunkBytes, 524288);
+});
+
 test('direct reads reject an unpublished version without disclosing its status', async () => {
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async () => Response.json({ id: 'draft', publicationStatus: 'draft', listing: 'public' });

@@ -11,6 +11,26 @@ type CountryDetail = { isoCode: string; name: string; constitutions: Array<{ id:
 type OrderedEntry = { type: string; text?: string | null; node?: { logicalId?: string; content?: OrderedEntry[] } | null };
 type Unit = { id: string; versionId: string; articleNumber: string; title: string; body?: string; kind?: string; children?: Array<{ id: string }>; content?: OrderedEntry[] };
 
+const settingsGuidance = [
+  { id: 'country.isoCode', field: 'isoCode', description: 'Two-letter country code used in public links.', allowed: 'Two letters', changeability: 'set_once' },
+  { id: 'country.name', field: 'countryName', description: 'Public name shown on the country page and in selectors.', allowed: 'Non-empty text', changeability: 'set_once' },
+  { id: 'constitution.predecessor', field: 'predecessorConstitutionId', description: 'Earlier constitution replaced by this one; used in the timeline.', allowed: 'Existing constitution UUID in this country, or null', changeability: 'set_once' },
+  { id: 'constitution.interim', field: 'interim', description: 'Marks a transitional constitution; legal status and end date are separate lifecycle events.', allowed: [true, false], changeability: 'set_once' },
+  { id: 'constitution.title', field: 'constitutionTitle', description: 'Public name shown on country pages and timelines.', allowed: 'Non-empty text', changeability: 'later' },
+  { id: 'constitution.slug', field: 'constitutionSlug', description: 'Readable catalog identifier; an old slug remains an alias after change.', allowed: 'Lowercase letters, digits and hyphens', changeability: 'later' },
+  { id: 'outline.kindCode', field: 'outline.kinds[].kindCode', description: 'Stable internal identifier of a structural level.', allowed: 'Unique lowercase code up to 32 characters', changeability: 'set_once' },
+  { id: 'outline.displayLabel', field: 'outline.kinds[].displayLabel', description: 'Reader-facing name of a structural level.', allowed: 'Non-empty text', changeability: 'impact_review' },
+  { id: 'outline.allowTextAlongsideChildren', field: 'outline.kinds[].allowTextAlongsideChildren', description: 'Allows unnumbered parent text before, between or after child units.', allowed: [true, false], changeability: 'impact_review' },
+  { id: 'outline.titlePolicy', field: 'outline.kinds[].titlePolicy', description: 'Whether units may or must have an editorial title.', allowed: ['none', 'optional', 'required'], changeability: 'impact_review' },
+  { id: 'outline.labelPolicy', field: 'outline.kinds[].labelPolicy', description: 'Whether exact source labels such as 46a or (2a) may or must be entered.', allowed: ['none', 'optional', 'required'], changeability: 'impact_review' },
+  { id: 'outline.segmentation', field: 'outline.kinds[].segmentation', description: 'Plain editing or guided sentence boundaries on the final text level.', allowed: ['plain', 'sentence'], changeability: 'impact_review' },
+  { id: 'outline.presentation', field: 'outline.kinds[].presentation', description: 'Separate block or running text in the public reader.', allowed: ['section', 'concatenated'], changeability: 'impact_review' },
+  { id: 'outline.showKind', field: 'outline.kinds[].showKind', description: 'Displays the kind name before each unit.', allowed: [true, false], changeability: 'impact_review' },
+  { id: 'outline.showLabel', field: 'outline.kinds[].showLabel', description: 'Displays the exact source label beside each unit.', allowed: [true, false], changeability: 'impact_review' },
+  { id: 'outline.showTitle', field: 'outline.kinds[].showTitle', description: 'Displays editorial titles when titles are allowed.', allowed: [true, false], changeability: 'impact_review' },
+  { id: 'outline.labelPlacement', field: 'outline.kinds[].labelPlacement', description: 'Places labels before or after a title, inline, or as superscript.', allowed: ['before_title', 'after_title', 'inline', 'superscript'], changeability: 'impact_review' },
+] as const;
+
 export function orderedText(entries: OrderedEntry[]): string {
   let text = '';
   let previousChild = false;
@@ -58,8 +78,11 @@ export function createServer(authorization?: string): McpServer {
     inputSchema: {},
   }, () => run('get_import_schema', async () => ({
     schemaVersion: '1.0',
+    settingsGuidance,
     workflow: ['find_constitution', 'propose_constitution_setup if missing', 'editor confirms outline in the site', 'get_import_setup for constitutionId and settingsRevisionId', 'stage_constitution_import', 'editor prepares a draft in the site', 'reviewer approves', 'publisher publishes'],
-    required: ['isoCode', 'countryName', 'constitutionSlug', 'constitutionTitle', 'versionLabel', 'articles or roots', 'settingsRevisionId for an existing constitution'],
+    required: ['isoCode', 'countryName', 'constitutionSlug', 'constitutionTitle', 'constitutionId', 'settingsRevisionId', 'versionLabel', 'articles or roots'],
+    uploadLimits: { directToolBytes: 2_097_152, chunkBytes: 524_288, chunkedItemBytes: 26_214_400, receivingBatchBytes: 104_857_600, maxItemsPerBatch: 100 },
+    sourceFields: { languageCode: 'BCP 47 language tag', sourceUrl: 'HTTPS URL of the source', gazetteReference: 'Official citation or gazette reference', effectiveDate: 'YYYY-MM-DD or null' },
     structure: {
       outline: { kinds: [{ kindCode: 'article', displayLabel: 'Article', presentation: 'section', showLabel: true, showTitle: true, showKind: false, allowTextAlongsideChildren: false, titlePolicy: 'optional', labelPolicy: 'optional', labelPlacement: 'before_title', segmentation: 'plain' }] },
       articles: [{ articleNumber: '1', title: 'Example', body: 'Text', sortOrder: 1, nodes: [] }],
@@ -80,7 +103,7 @@ export function createServer(authorization?: string): McpServer {
     const constitution = country.constitutions.find(item => item.slug === constitutionSlug);
     if (!constitution) return { exists: false, countryCode: country.isoCode, countryName: country.name };
     const settings = await getJson<{ id: string; outline: Record<string, unknown> }>('catalog', `/constitutions/${constitution.id}/settings`);
-    return { exists: true, countryCode: country.isoCode, countryName: country.name, constitutionId: constitution.id, title: constitution.title, slug: constitution.slug, settingsRevisionId: settings.id, outline: settings.outline };
+    return { exists: true, countryCode: country.isoCode, countryName: country.name, constitutionId: constitution.id, title: constitution.title, slug: constitution.slug, settingsRevisionId: settings.id, outline: settings.outline, settingsGuidance };
   }));
 
   server.registerTool('propose_constitution_setup', {
@@ -89,7 +112,7 @@ export function createServer(authorization?: string): McpServer {
   }, ({ proposal }) => run('propose_constitution_setup', async () => {
     await requireImportKey();
     const result = await postJson<{ id: string; status: string }>('ingestion', '/import-setup-proposals', proposal, authorization!);
-    return { proposalId: result.id, status: result.status, previewUrl: `${(process.env.PUBLIC_BASE_URL ?? 'http://localhost').replace(/\/$/, '')}/admin/import/setup/${result.id}` };
+    return { proposalId: result.id, status: result.status, settingsGuidance, previewUrl: `${(process.env.PUBLIC_BASE_URL ?? 'http://localhost').replace(/\/$/, '')}/admin/import/setup/${result.id}` };
   }));
 
   server.registerTool('get_setup_proposal', {
@@ -119,7 +142,7 @@ export function createServer(authorization?: string): McpServer {
     const constitution = country.constitutions.find(item => item.slug === constitutionSlug);
     if (!constitution) return { exists: false, countryCode: country.isoCode, outline: null };
     const settings = await getJson<{ id: string; outline: Record<string, unknown> }>('catalog', `/constitutions/${constitution.id}/settings`);
-    return { exists: true, countryCode: country.isoCode, constitutionId: constitution.id, title: constitution.title, settingsRevisionId: settings.id, outline: settings.outline };
+    return { exists: true, countryCode: country.isoCode, constitutionId: constitution.id, title: constitution.title, settingsRevisionId: settings.id, outline: settings.outline, settingsGuidance };
   }));
 
   server.registerTool('stage_constitution_import', {

@@ -67,10 +67,10 @@ class RestCatalogClient(
         client.get().uri("/constitutions/{id}/settings", constitutionId)
             .retrieve().body(SettingsRevisionWire::class.java)!!.id
 
-    override fun createConstitution(isoCode: String, slug: String, title: String): DownstreamConstitution =
+    override fun createConstitution(isoCode: String, slug: String, title: String, predecessorConstitutionId: UUID?, interim: Boolean): DownstreamConstitution =
         client.postJson(
             "/countries/{iso}/constitutions",
-            mapOf("slug" to slug, "title" to title),
+            mapOf("slug" to slug, "title" to title, "predecessorConstitutionId" to predecessorConstitutionId, "interim" to interim),
             DownstreamConstitution::class.java,
             isoCode,
         )

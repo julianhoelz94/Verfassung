@@ -22,7 +22,7 @@ interface CatalogClient {
     fun createCountry(isoCode: String, name: String): DownstreamCountry
     fun findConstitution(isoCode: String, slug: String): DownstreamConstitution?
     fun currentSettingsRevisionId(constitutionId: UUID): UUID
-    fun createConstitution(isoCode: String, slug: String, title: String): DownstreamConstitution
+    fun createConstitution(isoCode: String, slug: String, title: String, predecessorConstitutionId: UUID? = null, interim: Boolean = false): DownstreamConstitution
     fun createDraftVersion(
         constitutionId: UUID,
         versionLabel: String,

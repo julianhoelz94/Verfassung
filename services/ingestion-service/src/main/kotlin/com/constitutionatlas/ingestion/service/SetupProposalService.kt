@@ -52,7 +52,7 @@ class SetupProposalService(
                     throw ResponseStatusException(HttpStatus.CONFLICT, "Constitution slug is already in use")
                 }
                 if (catalog.getCountry(iso) == null) catalog.createCountry(iso, request.countryName.trim())
-                val constitution = existing ?: catalog.createConstitution(iso, request.constitutionSlug.trim(), request.constitutionTitle.trim())
+                val constitution = existing ?: catalog.createConstitution(iso, request.constitutionSlug.trim(), request.constitutionTitle.trim(), request.predecessorConstitutionId, request.interim)
                 proposals.setConstitution(id, constitution.id)
                 catalog.replaceOutline(constitution.id, request.outline.kinds)
                 proposals.confirm(id, catalog.currentSettingsRevisionId(constitution.id), actorId)

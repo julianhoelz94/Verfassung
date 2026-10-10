@@ -42,6 +42,7 @@ export default async function AccountPage(props: AccountPageProps) {
   const sessionToken = (await cookies()).get(SESSION_COOKIE)?.value;
   const mcpKeys = sessionToken ? await requestMcpKeys(sessionToken).catch(() => []) : [];
   const canImport = user.roles.includes('editor') || user.roles.includes('admin');
+  const mcpUrl = new URL('/mcp', process.env.PUBLIC_BASE_URL || 'http://localhost').toString();
   return (
     <PageMain>
       <PageHeader title="Account" meta={`Signed in as ${user.email}.`} />
@@ -116,7 +117,11 @@ export default async function AccountPage(props: AccountPageProps) {
       <Card>
         <section className="account-section" id="mcp-keys" aria-labelledby="mcp-keys-title">
           <h2 id="mcp-keys-title">Connect a chat client</h2>
-          <p>Connect your client to this site’s <code>/mcp</code> endpoint. Public reading needs no key. Create a personal key to stage constitution imports. Every import remains pending review.</p>
+          <p>Connect your client to <code>{mcpUrl}</code>. Public reading needs no key. Create a personal key to stage constitution imports. Every import remains pending review.</p>
+          <h3>Claude Code example</h3>
+          <p>After copying a key, run this on your computer and replace the placeholder with the key:</p>
+          <pre><code>{`claude mcp add --transport http constitution-atlas ${mcpUrl} --header "Authorization: Bearer <your-MCP-key>"`}</code></pre>
+          <p><a href="https://code.claude.com/docs/en/mcp">Claude Code MCP setup instructions</a>. Use a client that supports a custom Authorization header for import keys.</p>
           <CreateMcpKeyForm canImport={canImport} />
           <h3>Your MCP keys</h3>
           {mcpKeys.length === 0 ? <p>No keys yet.</p> : mcpKeys.map((key) => <div key={key.id}>

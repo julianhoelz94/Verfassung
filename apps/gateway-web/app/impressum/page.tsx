@@ -15,7 +15,7 @@ export default async function ImpressumPage() {
   return (
     <PageMain>
       <PageHeader title="Impressum" />
-      <div className="legal-page-content">{page.content}</div>
+      <div className="legal-page-content" lang="de">{page.content}</div>
     </PageMain>
   );
 }

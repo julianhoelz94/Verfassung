@@ -29,7 +29,7 @@ export function CookieSettings() {
         Cookie-Einstellungen
       </button>
       {open ? (
-        <section className="cookie-notice" aria-label="Cookie-Einstellungen">
+        <section className="cookie-notice" aria-label="Cookie-Einstellungen" lang="de">
           <p><strong>Cookies auf dieser Website</strong></p>
           <p>Wir nutzen notwendige Cookies für Anmeldung und Sicherheit. Keine Analyse- oder Werbe-Cookies.</p>
           <p>Das Schließen dieses Hinweises merken wir uns lokal. Mehr in der <a href="/datenschutz">Datenschutzerklärung</a> und im <a href="/impressum">Impressum</a>.</p>

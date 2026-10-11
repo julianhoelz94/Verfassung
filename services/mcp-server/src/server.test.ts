@@ -4,6 +4,16 @@ import { createMcpHandler } from '@modelcontextprotocol/server';
 import { orderedText } from './server.js';
 import { createServer } from './server.js';
 import { authenticateMcpKey, requirePublishedVersion, UpstreamError } from './catalog.js';
+import { setupProposalSchema } from './import-schema.js';
+
+test('MCP outline choices match catalog authoring policies', () => {
+  const proposal = {
+    isoCode: 'FR', countryName: 'France', constitutionSlug: 'constitution', constitutionTitle: 'Constitution',
+    outline: { kinds: [{ kindCode: 'article', displayLabel: 'Article', titlePolicy: 'none', labelPolicy: 'required' }] },
+  };
+  assert.equal(setupProposalSchema.safeParse(proposal).success, true);
+  assert.equal(setupProposalSchema.safeParse({ ...proposal, outline: { kinds: [{ ...proposal.outline.kinds[0], kindCode: 'x'.repeat(33) }] } }).success, false);
+});
 
 test('MCP requests require a valid personal key with read scope', async () => {
   const originalFetch = globalThis.fetch;

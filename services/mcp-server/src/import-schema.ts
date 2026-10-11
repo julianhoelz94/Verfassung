@@ -5,15 +5,15 @@ const shortText = z.string().trim().min(1).max(512);
 const nullableText = z.string().max(1_048_576).nullable().optional();
 
 const outlineKind = z.object({
-  kindCode: z.string().regex(/^[a-z][a-z0-9_-]{0,63}$/),
+  kindCode: z.string().regex(/^[a-z][a-z0-9_-]{0,31}$/),
   displayLabel: shortText,
   presentation: z.enum(['section', 'concatenated']).optional(),
   showLabel: z.boolean().optional(),
   showTitle: z.boolean().optional(),
   showKind: z.boolean().optional(),
   allowTextAlongsideChildren: z.boolean().optional(),
-  titlePolicy: z.enum(['required', 'optional', 'forbidden']).optional(),
-  labelPolicy: z.enum(['required', 'optional', 'forbidden']).optional(),
+  titlePolicy: z.enum(['required', 'optional', 'none']).optional(),
+  labelPolicy: z.enum(['required', 'optional', 'none']).optional(),
   labelPlacement: z.enum(['before_title', 'after_title', 'inline', 'superscript']).optional(),
   segmentation: z.enum(['plain', 'sentence']).optional(),
 });

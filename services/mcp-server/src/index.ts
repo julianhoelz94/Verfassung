@@ -59,7 +59,13 @@ createHttpServer((request, response) => {
     response.end(JSON.stringify({ error: 'MCP key required' }));
     return;
   }
-  void authenticateMcpKey(authorization).then(() => { void handler(request, response); }, (error: unknown) => {
+  void authenticateMcpKey(authorization).then(actor => {
+    (request as typeof request & { auth?: { token: string; clientId: string; scopes: string[]; resource?: URL; resourceMetadataUrl: string } }).auth = {
+      token: authorization.slice('Bearer '.length), clientId: actor.id ?? 'unknown', scopes: actor.scopes,
+      ...(actor.resource ? { resource: new URL(actor.resource) } : {}), resourceMetadataUrl,
+    };
+    void handler(request, response);
+  }, (error: unknown) => {
     const status = error instanceof UpstreamError && (error.status === 401 || error.status === 403) ? error.status : 503;
     if (status !== 503 && rateLimited(ip)) {
       response.writeHead(429, { 'Retry-After': '60' }).end();

@@ -81,13 +81,14 @@ export async function requirePublishedVersion(versionId: string): Promise<Versio
   return version;
 }
 
-export async function authenticateMcpKey(authorization?: string): Promise<void> {
+export async function authenticateMcpKey(authorization?: string): Promise<{ id?: string; scopes: string[]; resource?: string }> {
   if (!authorization || !/^Bearer ca_(?:mcp|oauth)_[A-Za-z0-9_-]+$/.test(authorization)) {
     throw new UpstreamError(401, 'identity');
   }
-  const actor = await getJson<{ scopes?: string[]; resource?: string }>('identity', '/me', authorization);
+  const actor = await getJson<{ id?: string; scopes?: string[]; resource?: string }>('identity', '/me', authorization);
   if (authorization.startsWith('Bearer ca_oauth_') && actor.resource !== `${(process.env.PUBLIC_BASE_URL ?? 'http://localhost').replace(/\/$/, '')}/mcp`) throw new UpstreamError(401, 'identity');
   if (!actor.scopes?.includes('mcp:read')) throw new UpstreamError(403, 'identity');
+  return { id: actor.id, scopes: actor.scopes, resource: actor.resource };
 }
 
 export function publicVersionUrl(version: Version): string | null {

@@ -156,6 +156,18 @@ test('tool discovery describes read and staged-write retry behavior', async () =
   assert.equal(byName.get('cancel_import_upload')?.destructiveHint, true);
 });
 
+test('import tool returns an HTTP OAuth scope challenge before invocation', async () => {
+  const handler = createMcpHandler(() => createServer('Bearer ca_oauth_reader'));
+  const response = await handler.fetch(new Request('http://localhost/mcp', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json, text/event-stream', 'MCP-Protocol-Version': '2026-07-28', 'Mcp-Method': 'tools/call', 'Mcp-Name': 'get_import_setup' },
+    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'get_import_setup', arguments: { countryCode: 'FR', constitutionSlug: 'constitution' }, _meta: { 'io.modelcontextprotocol/protocolVersion': '2026-07-28', 'io.modelcontextprotocol/clientCapabilities': {} } } }),
+  }), { authInfo: { token: 'ca_oauth_reader', clientId: 'reader', scopes: ['mcp:read'], resource: new URL('http://localhost/mcp'), resourceMetadataUrl: 'http://localhost/.well-known/oauth-protected-resource/mcp' } });
+  assert.equal(response.status, 403);
+  assert.match(response.headers.get('WWW-Authenticate') ?? '', /insufficient_scope/);
+  assert.match(response.headers.get('WWW-Authenticate') ?? '', /ingestion:import/);
+});
+
 test('MCP countries list omits countries with no published version', async () => {
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async () => Response.json([

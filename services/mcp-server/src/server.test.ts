@@ -83,7 +83,7 @@ test('direct reads accept the published editorial tip shown in public version li
   }
 });
 
-async function callTool(name: string, args: Record<string, unknown>, authorization?: string): Promise<{ isError?: boolean; structuredContent?: Record<string, unknown> }> {
+async function callTool(name: string, args: Record<string, unknown>, authorization?: string): Promise<{ isError?: boolean; structuredContent?: Record<string, unknown>; content?: Array<{ text?: string }> }> {
   const handler = createMcpHandler(ctx => createServer(ctx.requestInfo?.headers.get('authorization') ?? undefined));
   const request = new Request('http://localhost/mcp', {
     method: 'POST',
@@ -105,7 +105,7 @@ async function callTool(name: string, args: Record<string, unknown>, authorizati
   });
   const response = await handler.fetch(request);
   assert.equal(response.status, 200);
-  const body = await response.json() as { result: { isError?: boolean; structuredContent?: Record<string, unknown> } };
+  const body = await response.json() as { result: { isError?: boolean; structuredContent?: Record<string, unknown>; content?: Array<{ text?: string }> } };
   return body.result;
 }
 
@@ -211,6 +211,34 @@ test('MCP staging requires an import-scoped personal key', async () => {
   }
 });
 
+test('MCP rejects malformed import payload before calling upstream services', async () => {
+  const originalFetch = globalThis.fetch;
+  let calls = 0;
+  globalThis.fetch = async () => { calls++; return Response.json({ scopes: ['mcp:read', 'ingestion:import'] }); };
+  try {
+    const result = await callTool('stage_constitution_import', { payload: { isoCode: 'FR', countryName: 'France', constitutionSlug: '1958', constitutionTitle: 'Constitution', versionLabel: '1', articles: [{ articleNumber: '1', title: 'First', sortOrder: -1 }] } }, 'Bearer ca_mcp_editor');
+    assert.equal(result.isError, true);
+    assert.equal(calls, 0);
+  } finally { globalThis.fetch = originalFetch; }
+});
+
+test('MCP directs oversized valid payloads to chunked upload', async () => {
+  const originalFetch = globalThis.fetch;
+  const calls: string[] = [];
+  globalThis.fetch = async input => { calls.push(new URL(String(input)).pathname); return Response.json({ scopes: ['mcp:read', 'ingestion:import'] }); };
+  try {
+    const payload = {
+      isoCode: 'FR', countryName: 'France', constitutionSlug: '1958', constitutionTitle: 'Constitution', versionLabel: '1',
+      constitutionId: '01900000-0000-4000-8000-000000000002', settingsRevisionId: '01900000-0000-4000-8000-000000000003',
+      articles: [1, 2, 3].map(number => ({ articleNumber: String(number), title: 'Article', body: 'x'.repeat(800_000), sortOrder: number })),
+    };
+    const result = await callTool('stage_constitution_import', { payload }, 'Bearer ca_mcp_editor');
+    assert.equal(result.isError, true);
+    assert.match(result.content?.[0]?.text ?? '', /chunked/);
+    assert.deepEqual(calls, ['/me']);
+  } finally { globalThis.fetch = originalFetch; }
+});
+
 test('MCP import key stages a pending job and never publishes', async () => {
   const originalFetch = globalThis.fetch;
   const originalInfo = console.info;
@@ -223,7 +251,7 @@ test('MCP import key stages a pending job and never publishes', async () => {
     return Response.json({ id: '01900000-0000-4000-8000-000000000001', status: 'pending_review', errors: [] });
   };
   try {
-    const payload = { isoCode: 'FR', constitutionId: '01900000-0000-4000-8000-000000000002', settingsRevisionId: '01900000-0000-4000-8000-000000000003' };
+    const payload = { isoCode: 'FR', countryName: 'France', constitutionSlug: '1958', constitutionTitle: 'Constitution', versionLabel: '1', constitutionId: '01900000-0000-4000-8000-000000000002', settingsRevisionId: '01900000-0000-4000-8000-000000000003' };
     const result = await callTool('stage_constitution_import', { payload }, 'Bearer ca_mcp_editor');
     assert.equal(result.isError, undefined);
     assert.equal(result.structuredContent?.status, 'pending_review');
@@ -249,7 +277,7 @@ test('MCP import key refuses an unpinned full upload before calling ingestion', 
     return Response.json({ scopes: ['ingestion:import'] });
   };
   try {
-    const result = await callTool('stage_constitution_import', { payload: { isoCode: 'FR', outline: { kinds: [] } } }, 'Bearer ca_mcp_editor');
+    const result = await callTool('stage_constitution_import', { payload: { isoCode: 'FR', countryName: 'France', constitutionSlug: '1958', constitutionTitle: 'Constitution', versionLabel: '1', outline: { kinds: [{ kindCode: 'article', displayLabel: 'Article' }] } } }, 'Bearer ca_mcp_editor');
     assert.equal(result.isError, true);
     assert.deepEqual(calls.map(url => new URL(url).pathname), ['/me']);
   } finally { globalThis.fetch = originalFetch; }

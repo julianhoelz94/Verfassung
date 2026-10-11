@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import { deleteJson, getJson, postJson, putJson, publicVersionUrl, requirePublishedVersion, UpstreamError } from './catalog.js';
 import { CursorError, decodeCursor, encodeCursor, fingerprint } from './cursor.js';
+import { importPayloadSchema, setupProposalSchema } from './import-schema.js';
 
 const uuid = z.string().uuid();
 const page = { offset: z.number().int().min(0).default(0), limit: z.number().int().min(1).max(50).default(20), cursor: z.string().max(1024).optional() };
@@ -85,6 +86,12 @@ export function createServer(authorization?: string): McpServer {
     }
   }
 
+  function requireDirectUploadSize(payload: Record<string, unknown>) {
+    if (Buffer.byteLength(JSON.stringify(payload), 'utf8') > 2_097_152) {
+      throw new UpstreamError(413, 'mcp', 'Direct upload exceeds 2 MiB; use a chunked batch upload.');
+    }
+  }
+
   server.registerTool('get_import_schema', {
     description: 'Learn the structured constitution import format, hierarchy rules, and review workflow before staging content.',
     inputSchema: {},
@@ -122,7 +129,7 @@ export function createServer(authorization?: string): McpServer {
 
   server.registerTool('propose_constitution_setup', {
     description: 'Submit private metadata, an outline, and a small representative source sample for editor inspection before full upload.',
-    inputSchema: { proposal: z.record(z.string(), z.unknown()) },
+    inputSchema: { proposal: setupProposalSchema },
     annotations: newStagedWrite,
   }, ({ proposal }) => run('propose_constitution_setup', async () => {
     await requireImportKey();
@@ -141,7 +148,7 @@ export function createServer(authorization?: string): McpServer {
 
   server.registerTool('revise_setup_proposal', {
     description: 'Replace your unconfirmed structure proposal after inspecting validation feedback.',
-    inputSchema: { proposalId: uuid, proposal: z.record(z.string(), z.unknown()) },
+    inputSchema: { proposalId: uuid, proposal: setupProposalSchema },
     annotations: stagedWrite,
   }, ({ proposalId, proposal }) => run('revise_setup_proposal', async () => {
     await requireImportKey();
@@ -165,10 +172,11 @@ export function createServer(authorization?: string): McpServer {
 
   server.registerTool('stage_constitution_import', {
     description: 'Stage one constitution version for site review. This never publishes content.',
-    inputSchema: { payload: z.record(z.string(), z.unknown()), idempotencyKey: z.string().min(8).max(128).optional() },
+    inputSchema: { payload: importPayloadSchema, idempotencyKey: z.string().min(8).max(128).optional() },
     annotations: stagedWrite,
   }, ({ payload, idempotencyKey }) => run('stage_constitution_import', async () => {
     await requireImportKey();
+    requireDirectUploadSize(payload);
     requireConfirmedUpload(payload);
     const retryKey = idempotencyKey ?? `ca-mcp-${createHash('sha256').update(JSON.stringify(payload)).digest('hex')}`;
     const job = await postJson<{ id: string; status: string; errors: unknown[] }>('ingestion', '/import-jobs', payload, authorization!, retryKey);
@@ -187,10 +195,11 @@ export function createServer(authorization?: string): McpServer {
 
   server.registerTool('stage_batch_item', {
     description: 'Stage one item in a batch with a stable idempotency key. Retry the same key and payload safely.',
-    inputSchema: { batchId: uuid, idempotencyKey: z.string().min(8).max(128), payload: z.record(z.string(), z.unknown()), checksumSha256: z.string().regex(/^[a-fA-F0-9]{64}$/).optional() },
+    inputSchema: { batchId: uuid, idempotencyKey: z.string().min(8).max(128), payload: importPayloadSchema, checksumSha256: z.string().regex(/^[a-fA-F0-9]{64}$/).optional() },
     annotations: stagedWrite,
   }, ({ batchId, idempotencyKey, payload, checksumSha256 }) => run('stage_batch_item', async () => {
     await requireImportKey();
+    requireDirectUploadSize(payload);
     requireConfirmedUpload(payload);
     const item = await postJson<{ id: string; status: string; errors: unknown[] }>('ingestion', `/import-batches/${batchId}/items`, { idempotencyKey, payload, checksumSha256 }, authorization!);
     return { batchId, itemId: item.id, status: item.status, errors: item.errors, reviewUrl: `${(process.env.PUBLIC_BASE_URL ?? 'http://localhost').replace(/\/$/, '')}/admin/import/${item.id}` };

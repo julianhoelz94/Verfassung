@@ -47,4 +47,15 @@ describe('edge API authorization', () => {
     expect(body).toContain('Public pages remain available');
     expect(body).toContain('href="/login"');
   });
+
+  it('ignores client-controlled forwarded IP headers', async () => {
+    vi.spyOn(Date, 'now').mockReturnValue(3_000);
+    const edgeIp = '198.51.100.99';
+    for (let i = 0; i < 600; i++) {
+      const response = await GET(request({ 'x-atlas-edge-check': '1', 'x-atlas-client-ip': edgeIp, 'x-forwarded-for': `203.0.113.${i % 255}` }));
+      expect(response.status).toBe(204);
+    }
+    const response = await GET(request({ 'x-atlas-edge-check': '1', 'x-atlas-client-ip': edgeIp, 'x-forwarded-for': '203.0.113.250' }));
+    expect(response.status).toBe(429);
+  });
 });

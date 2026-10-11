@@ -23,6 +23,19 @@
 		defer
 	}
 
+	# Anonymous API requests share one edge quota across services. Validated account
+	# sessions and bearer credentials are exempt. Public site pages stay available.
+	@api_request {
+		path /api/catalog* /api/content* /api/amendment* /api/audit* /api/search* /api/ingestion* /api/document* /api/identity* /api/editor*
+	}
+	route @api_request {
+		forward_auth gateway-web:3000 {
+			uri /api/edge-rate-limit
+			header_up X-Atlas-Client-IP {remote_host}
+			header_up X-Atlas-Edge-Check 1
+		}
+	}
+
 	# Mutating catalog/content/amendment/audit/search/ingestion routes need an
 	# Authorization header. Caddy does not validate the token; identity /me (GOV-6) does.
 	@missing_write_auth {
@@ -40,19 +53,6 @@
 		expression `{env.CADDY_EXPOSE_API_DOCS} != "true"`
 	}
 	respond @docs_closed 404
-
-	# Public reading stays anonymous. Caddy supplies the real peer address and asks
-	# the gateway to exempt only sessions validated by Identity. The gateway returns
-	# 429 with Retry-After after 600 anonymous requests per client IP per minute.
-	@public_api {
-		method GET HEAD
-		path /api/catalog* /api/content* /api/amendment* /api/search*
-	}
-	forward_auth @public_api gateway-web:3000 {
-		uri /api/edge-rate-limit
-		header_up X-Atlas-Client-IP {remote_host}
-		header_up X-Atlas-Edge-Check 1
-	}
 
 	route /api/docs/catalog* {
 		import docs_upstream catalog catalog-service

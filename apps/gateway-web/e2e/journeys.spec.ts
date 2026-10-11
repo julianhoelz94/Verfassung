@@ -1,5 +1,5 @@
 /* eslint-disable */
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures/consent';
 import { ARTICLE_1, VERSION_1949, VERSION_2022, signInEditor, signInPublisher, signInReviewer, signOut, startEditorSession } from './helpers';
 
 const MOCK_ORIGIN = `http://127.0.0.1:${process.env.E2E_MOCK_PORT ?? 4010}`;

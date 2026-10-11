@@ -1,4 +1,4 @@
-import { expect, test, type APIRequestContext } from '@playwright/test';
+import { expect, test, type APIRequestContext } from '../fixtures/consent';
 import { signIn, signOut, startFromViewer } from './auth';
 import { adminHeaders, createIsolatedConstitution } from './api-fixtures';
 

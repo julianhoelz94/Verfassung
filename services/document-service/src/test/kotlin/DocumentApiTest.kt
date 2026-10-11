@@ -42,6 +42,7 @@ class DocumentApiTest {
 
     private val editor = Actor(UUID.randomUUID(), "editor@example.local", listOf("editor"))
     private val viewer = Actor(UUID.randomUUID(), "viewer@example.local", listOf("viewer"))
+    private val admin = Actor(UUID.randomUUID(), "admin@example.local", listOf("admin"))
 
     @BeforeEach
     fun identity() {
@@ -49,6 +50,69 @@ class DocumentApiTest {
         Mockito.`when`(identity.authenticate(null)).thenThrow(UnauthorizedException("Missing session"))
         Mockito.`when`(identity.authenticate(EDITOR)).thenReturn(editor)
         Mockito.`when`(identity.authenticate(VIEWER)).thenReturn(viewer)
+        Mockito.`when`(identity.authenticate(ADMIN)).thenReturn(admin)
+    }
+
+    @Test
+    fun legalPagesKeepDraftPrivateAndRequireAdminForPublication() {
+        val key = "impressum"
+        mvc.get("/legal-pages/$key").andExpect { status { isNotFound() } }
+        mvc.get("/legal-pages/$key/editor").andExpect { status { isUnauthorized() } }
+        mvc.get("/legal-pages/$key/editor") { header("Authorization", VIEWER) }.andExpect { status { isForbidden() } }
+        mvc.put("/legal-pages/$key/draft") {
+            header("Authorization", VIEWER)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"content":"Operator and contact","expectedRevision":0}"""
+        }.andExpect { status { isForbidden() } }
+        mvc.put("/legal-pages/$key/draft") {
+            header("Authorization", ADMIN)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"content":"Operator and contact","expectedRevision":0}"""
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.draft.revision") { value(1) }
+            jsonPath("$.published") { doesNotExist() }
+        }
+        mvc.get("/legal-pages/$key").andExpect { status { isNotFound() } }
+        mvc.post("/legal-pages/$key/publish") {
+            header("Authorization", ADMIN)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"expectedRevision":1}"""
+        }.andExpect { status { isOk() } }
+        mvc.get("/legal-pages/$key").andExpect {
+            status { isOk() }
+            jsonPath("$.content") { value("Operator and contact") }
+        }
+        mvc.put("/legal-pages/$key/draft") {
+            header("Authorization", ADMIN)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"content":"Updated private draft","expectedRevision":1}"""
+        }.andExpect { status { isOk() } }
+        mvc.get("/legal-pages/$key").andExpect { jsonPath("$.content") { value("Operator and contact") } }
+        mvc.get("/legal-pages/$key/editor/revisions") { header("Authorization", ADMIN) }.andExpect {
+            status { isOk() }
+            jsonPath("$.length()") { value(2) }
+        }
+        mvc.post("/legal-pages/$key/publish") {
+            header("Authorization", ADMIN)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"expectedRevision":1}"""
+        }.andExpect { status { isConflict() } }
+    }
+
+    @Test
+    fun exampleLegalDetailsCannotBePublished() {
+        mvc.put("/legal-pages/datenschutz/draft") {
+            header("Authorization", ADMIN)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"content":"BEISPIEL — VOR VERÖFFENTLICHUNG ERSETZEN","expectedRevision":0}"""
+        }.andExpect { status { isOk() } }
+        mvc.post("/legal-pages/datenschutz/publish") {
+            header("Authorization", ADMIN)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"expectedRevision":1}"""
+        }.andExpect { status { isBadRequest() } }
+        mvc.get("/legal-pages/datenschutz").andExpect { status { isNotFound() } }
     }
 
     private fun create(): Pair<String, String> {
@@ -313,6 +377,7 @@ class DocumentApiTest {
     companion object {
         private const val EDITOR = "Bearer editor"
         private const val VIEWER = "Bearer viewer"
+        private const val ADMIN = "Bearer admin"
 
         @Container @JvmStatic
         val postgres: PostgreSQLContainer<*> = PostgreSQLContainer("postgres:16-alpine")

@@ -1,8 +1,9 @@
 package com.constitutionatlas.identity.api
 
+import com.constitutionatlas.identity.BadRequestException
 import com.constitutionatlas.identity.repo.OAuthGrant
 import com.constitutionatlas.identity.service.McpOAuthService
-import com.constitutionatlas.identity.service.McpOAuthToken
+import com.constitutionatlas.platform.UnauthorizedException
 import org.springframework.http.CacheControl
 import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
@@ -78,8 +79,14 @@ class McpOAuthController(private val oauth: McpOAuthService) {
         @RequestParam redirect_uri: String,
         @RequestParam code_verifier: String,
         @RequestParam resource: String,
-    ): ResponseEntity<McpOAuthToken> =
-        ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(oauth.redeem(grant_type, code, client_id, redirect_uri, code_verifier, resource))
+    ): ResponseEntity<Any> =
+        try {
+            ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(oauth.redeem(grant_type, code, client_id, redirect_uri, code_verifier, resource))
+        } catch (_: BadRequestException) {
+            ResponseEntity.badRequest().cacheControl(CacheControl.noStore()).body(mapOf("error" to "invalid_request"))
+        } catch (_: UnauthorizedException) {
+            ResponseEntity.badRequest().cacheControl(CacheControl.noStore()).body(mapOf("error" to "invalid_grant"))
+        }
 
     @PostMapping("/oauth/revoke", consumes = [MediaType.APPLICATION_FORM_URLENCODED_VALUE])
     fun revoke(@RequestParam token: String): ResponseEntity<Void> {

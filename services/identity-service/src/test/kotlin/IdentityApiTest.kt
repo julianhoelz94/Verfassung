@@ -84,7 +84,10 @@ class IdentityApiTest {
             param("redirect_uri", "http://127.0.0.1:45001/callback")
             param("resource", "http://localhost/mcp")
             param("code_verifier", "wrong-verifier-for-mcp-oauth-that-is-long-enough-0001")
-        }.andExpect { status { isUnauthorized() } }
+        }.andExpect {
+            status { isBadRequest() }
+            jsonPath("$.error") { value("invalid_grant") }
+        }
         val exchanged = mockMvc.post("/oauth/token") {
             contentType = MediaType.APPLICATION_FORM_URLENCODED
             param("grant_type", "authorization_code")
@@ -103,7 +106,10 @@ class IdentityApiTest {
             param("redirect_uri", "http://127.0.0.1:45001/callback")
             param("resource", "http://localhost/mcp")
             param("code_verifier", verifier)
-        }.andExpect { status { isUnauthorized() } }
+        }.andExpect {
+            status { isBadRequest() }
+            jsonPath("$.error") { value("invalid_grant") }
+        }
         mockMvc.get("/me") { header("Authorization", "Bearer $access") }.andExpect {
             status { isOk() }
             jsonPath("$.resource") { value("http://localhost/mcp") }

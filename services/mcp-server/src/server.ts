@@ -59,9 +59,11 @@ async function runLogged<T extends Record<string, unknown>>(tool: string, action
     console.info(JSON.stringify({ event: 'mcp_tool', tool, actorId: actorId(), resourceId, outcome: 'ok', elapsedMs: Date.now() - started }));
     return json(value);
   } catch (error) {
-    console.warn(JSON.stringify({ event: 'mcp_tool', tool, actorId: actorId(), outcome: 'error', status: error instanceof UpstreamError ? error.status : error instanceof CursorError ? 400 : 503, elapsedMs: Date.now() - started }));
+    const status = error instanceof UpstreamError ? error.status : error instanceof CursorError ? 400 : 503;
+    console.warn(JSON.stringify({ event: 'mcp_tool', tool, actorId: actorId(), outcome: 'error', status, elapsedMs: Date.now() - started }));
     const message = error instanceof UpstreamError || error instanceof CursorError ? error.message : 'The requested data could not be loaded.';
-    return { content: [{ type: 'text' as const, text: message }], isError: true };
+    const code = error instanceof CursorError ? 'invalid_cursor' : status === 401 ? 'unauthenticated' : status === 403 ? 'forbidden' : status === 404 ? 'not_found' : status === 409 ? 'conflict' : status === 413 ? 'payload_too_large' : status === 400 ? 'invalid_input' : 'upstream_unavailable';
+    return { content: [{ type: 'text' as const, text: message }], structuredContent: { code, status, message, retryable: status === 429 || status >= 500 }, isError: true };
   }
 }
 

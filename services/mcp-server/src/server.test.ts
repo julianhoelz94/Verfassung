@@ -178,6 +178,8 @@ test('country cursor traverses in stable order and detects a changed collection'
     countries.push({ isoCode: 'CH', name: 'Switzerland', versionCount: 1 });
     const stale = await callTool('list_countries', { limit: 2, cursor });
     assert.equal(stale.isError, true);
+    assert.equal(stale.structuredContent?.code, 'invalid_cursor');
+    assert.equal(stale.structuredContent?.retryable, false);
   } finally { globalThis.fetch = originalFetch; }
 });
 

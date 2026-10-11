@@ -25,6 +25,7 @@ data class OAuthAccessToken(
     val scopes: List<String>,
     val expiresAt: OffsetDateTime,
 )
+data class OAuthGrant(val clientId: UUID, val clientName: String, val expiresAt: OffsetDateTime)
 
 @Repository
 class OAuthRepository(private val jdbc: JdbcTemplate) {
@@ -88,5 +89,16 @@ class OAuthRepository(private val jdbc: JdbcTemplate) {
 
     fun revokeToken(hash: String) {
         jdbc.update("UPDATE oauth_access_tokens SET revoked_at = NOW() WHERE token_hash = ? AND revoked_at IS NULL", hash)
+    }
+
+    fun activeGrants(ownerId: UUID): List<OAuthGrant> =
+        jdbc.query(
+            "SELECT c.id, c.name, MAX(t.expires_at) AS expires_at FROM oauth_access_tokens t JOIN oauth_clients c ON c.id = t.client_id WHERE t.owner_id = ? AND t.revoked_at IS NULL AND t.expires_at > NOW() GROUP BY c.id, c.name ORDER BY c.name, c.id",
+            { rs, _ -> OAuthGrant(rs.getObject("id", UUID::class.java), rs.getString("name"), rs.getTimestamp("expires_at").toInstant().atOffset(java.time.ZoneOffset.UTC)) },
+            ownerId,
+        )
+
+    fun revokeGrant(ownerId: UUID, clientId: UUID) {
+        jdbc.update("UPDATE oauth_access_tokens SET revoked_at = NOW() WHERE owner_id = ? AND client_id = ? AND revoked_at IS NULL", ownerId, clientId)
     }
 }

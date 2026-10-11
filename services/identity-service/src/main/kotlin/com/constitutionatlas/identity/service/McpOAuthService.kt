@@ -5,6 +5,7 @@ import com.constitutionatlas.identity.crypto.Tokens
 import com.constitutionatlas.identity.repo.IdentityRepository
 import com.constitutionatlas.identity.repo.OAuthClient
 import com.constitutionatlas.identity.repo.OAuthCode
+import com.constitutionatlas.identity.repo.OAuthGrant
 import com.constitutionatlas.identity.repo.OAuthRepository
 import com.constitutionatlas.platform.ForbiddenException
 import com.constitutionatlas.platform.UnauthorizedException
@@ -99,6 +100,10 @@ class McpOAuthService(
     }
 
     fun revoke(token: String) = oauth.revokeToken(Tokens.sha256Hex(token))
+
+    fun grants(authorization: String?): List<OAuthGrant> = oauth.activeGrants(auth.requireSession(authorization).id)
+
+    fun revokeGrant(authorization: String?, clientId: UUID) = oauth.revokeGrant(auth.requireSession(authorization).id, clientId)
 
     private fun parseClientId(value: String): UUID = try {
         UUID.fromString(value)

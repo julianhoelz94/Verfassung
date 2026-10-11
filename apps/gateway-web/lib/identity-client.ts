@@ -468,3 +468,19 @@ export async function requestRevokeMcpKey(token: string, id: string): Promise<vo
   });
   return readOk(response, 'Unable to revoke MCP key');
 }
+
+export type OAuthGrant = { clientId: string; clientName: string; expiresAt: string };
+
+export async function requestOAuthGrants(token: string): Promise<OAuthGrant[]> {
+  const response = await fetch(`${identityBaseUrl()}/oauth/grants`, {
+    headers: { Authorization: `Bearer ${token}` }, cache: 'no-store',
+  });
+  return readOk(response, 'Unable to list chat client connections');
+}
+
+export async function requestRevokeOAuthGrant(token: string, clientId: string): Promise<void> {
+  const response = await fetch(`${identityBaseUrl()}/oauth/grants/${encodeURIComponent(clientId)}`, {
+    method: 'DELETE', headers: { Authorization: `Bearer ${token}` }, cache: 'no-store',
+  });
+  return readOk(response, 'Unable to revoke chat client connection');
+}

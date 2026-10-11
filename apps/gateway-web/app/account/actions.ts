@@ -24,6 +24,7 @@ import {
   requestCreateMcpKey,
   requestRotateMcpKey,
   requestRevokeMcpKey,
+  requestRevokeOAuthGrant,
 } from '../../lib/identity-client';
 import { requireAdminUser } from '../../lib/admin';
 import { safeReturnTo } from '../../lib/return-to';
@@ -310,6 +311,16 @@ export async function revokeMcpKeyAction(formData: FormData): Promise<void> {
     await requestRevokeMcpKey(token, String(formData.get('keyId') ?? ''));
   } catch {
     redirect('/account?error=key');
+  }
+  redirect('/account');
+}
+
+export async function revokeOAuthGrantAction(formData: FormData): Promise<void> {
+  const token = await tokenOrRedirect();
+  try {
+    await requestRevokeOAuthGrant(token, String(formData.get('clientId') ?? ''));
+  } catch {
+    redirect('/account?error=oauth');
   }
   redirect('/account');
 }

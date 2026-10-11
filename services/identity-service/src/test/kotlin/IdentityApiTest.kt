@@ -109,11 +109,16 @@ class IdentityApiTest {
             jsonPath("$.resource") { value("http://localhost/mcp") }
             jsonPath("$.scopes[0]") { value("mcp:read") }
         }
+        mockMvc.get("/oauth/grants") { header("Authorization", "Bearer $session") }.andExpect {
+            status { isOk() }
+            jsonPath("$[0].clientId") { value(clientId) }
+        }
+        mockMvc.delete("/oauth/grants/$clientId") { header("Authorization", "Bearer $session") }.andExpect { status { isNoContent() } }
+        mockMvc.get("/me") { header("Authorization", "Bearer $access") }.andExpect { status { isUnauthorized() } }
         mockMvc.post("/oauth/revoke") {
             contentType = MediaType.APPLICATION_FORM_URLENCODED
             param("token", access)
         }.andExpect { status { isOk() } }
-        mockMvc.get("/me") { header("Authorization", "Bearer $access") }.andExpect { status { isUnauthorized() } }
     }
 
     @Test

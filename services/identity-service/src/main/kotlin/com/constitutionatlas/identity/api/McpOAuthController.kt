@@ -1,5 +1,6 @@
 package com.constitutionatlas.identity.api
 
+import com.constitutionatlas.identity.repo.OAuthGrant
 import com.constitutionatlas.identity.service.McpOAuthService
 import com.constitutionatlas.identity.service.McpOAuthToken
 import org.springframework.http.CacheControl
@@ -7,6 +8,7 @@ import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
+import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
@@ -14,6 +16,7 @@ import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestHeader
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
+import java.util.UUID
 
 data class OAuthRegistrationRequest(val client_name: String, val redirect_uris: List<String>, val token_endpoint_auth_method: String = "none")
 data class OAuthApprovalRequest(
@@ -82,5 +85,14 @@ class McpOAuthController(private val oauth: McpOAuthService) {
     fun revoke(@RequestParam token: String): ResponseEntity<Void> {
         oauth.revoke(token)
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).build()
+    }
+
+    @GetMapping("/oauth/grants")
+    fun grants(@RequestHeader(HttpHeaders.AUTHORIZATION, required = false) authorization: String?): List<OAuthGrant> = oauth.grants(authorization)
+
+    @DeleteMapping("/oauth/grants/{clientId}")
+    fun revokeGrant(@RequestHeader(HttpHeaders.AUTHORIZATION, required = false) authorization: String?, @PathVariable clientId: UUID): ResponseEntity<Void> {
+        oauth.revokeGrant(authorization, clientId)
+        return ResponseEntity.noContent().build()
     }
 }

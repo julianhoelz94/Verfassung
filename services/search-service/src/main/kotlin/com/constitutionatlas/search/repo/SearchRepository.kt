@@ -97,7 +97,7 @@ class SearchRepository(private val jdbcTemplate: JdbcTemplate) {
                        ) AS snippet,
                        ts_rank(tsv, plainto_tsquery('simple', ?) || plainto_tsquery('german', ?)) AS rank
                 $filterSql
-                ORDER BY rank DESC, article_number
+                ORDER BY rank DESC, article_number, version_id, document_id
                 LIMIT ?
                 OFFSET ?
                 """.trimIndent(),

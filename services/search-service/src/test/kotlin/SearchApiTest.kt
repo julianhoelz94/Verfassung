@@ -141,6 +141,7 @@ class SearchApiTest {
             jsonPath("$.limit") { value(1) }
             jsonPath("$.offset") { value(0) }
             jsonPath("$.hits.length()") { value(1) }
+            jsonPath("$.hits[0].versionId") { value(DE_1949.toString()) }
         }
 
         mockMvc.get("/search") {
@@ -153,6 +154,7 @@ class SearchApiTest {
             jsonPath("$.total") { value(2) }
             jsonPath("$.offset") { value(1) }
             jsonPath("$.hits.length()") { value(1) }
+            jsonPath("$.hits[0].versionId") { value(DE_2022.toString()) }
         }
     }
 

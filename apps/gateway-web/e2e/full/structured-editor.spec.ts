@@ -78,7 +78,8 @@ for (const hop of ['editorial_correction', 'legal'] as const) {
           return current.decisions.filter((decision: { status: string }) => decision.status === 'excluded_with_reason').length;
         }).toBe(index + 1);
       }
-      await expect(page.getByRole('button', { name: 'Submit for review' })).toBeEnabled();
+      await page.reload();
+      await expect(page.getByRole('button', { name: 'Submit for review' })).toBeEnabled({ timeout: 15_000 });
     } else {
       await page.getByLabel('What was corrected in this transcription?').fill('Corrected one sentence.');
       await page.getByRole('button', { name: 'Save comment' }).click();

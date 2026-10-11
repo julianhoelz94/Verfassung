@@ -41,13 +41,22 @@ createHttpServer((request, response) => {
   const forwarded = request.headers['x-atlas-client-ip'];
   const candidate = typeof forwarded === 'string' ? forwarded : '';
   const ip = isIP(candidate) ? candidate : request.socket.remoteAddress ?? 'unknown';
-  if (rateLimited(ip)) {
-    response.writeHead(429, { 'Retry-After': '60' }).end();
+  const authorization = request.headers.authorization;
+  if (!authorization) {
+    if (rateLimited(ip)) {
+      response.writeHead(429, { 'Retry-After': '60' }).end();
+      return;
+    }
+    response.writeHead(401, { 'Content-Type': 'application/json', 'WWW-Authenticate': 'Bearer' });
+    response.end(JSON.stringify({ error: 'MCP key required' }));
     return;
   }
-  const authorization = request.headers.authorization;
   void authenticateMcpKey(authorization).then(() => { void handler(request, response); }, (error: unknown) => {
     const status = error instanceof UpstreamError && (error.status === 401 || error.status === 403) ? error.status : 503;
+    if (status !== 503 && rateLimited(ip)) {
+      response.writeHead(429, { 'Retry-After': '60' }).end();
+      return;
+    }
     response.writeHead(status, { 'Content-Type': 'application/json', ...(status === 401 ? { 'WWW-Authenticate': 'Bearer' } : {}) });
     response.end(JSON.stringify({ error: status === 503 ? 'Authentication service unavailable' : 'MCP key required' }));
   });

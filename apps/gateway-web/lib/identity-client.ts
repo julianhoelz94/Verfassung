@@ -469,7 +469,7 @@ export async function requestRevokeMcpKey(token: string, id: string): Promise<vo
   return readOk(response, 'Unable to revoke MCP key');
 }
 
-export type OAuthGrant = { clientId: string; clientName: string; expiresAt: string };
+export type OAuthGrant = { clientId: string; clientName: string; redirectUris: string[]; expiresAt: string };
 
 export async function requestOAuthGrants(token: string): Promise<OAuthGrant[]> {
   const response = await fetch(`${identityBaseUrl()}/oauth/grants`, {

@@ -27,17 +27,24 @@ export default async function OAuthAuthorizePage({ searchParams }: { searchParam
   if (!clientName || values.response_type !== 'code' || values.code_challenge_method !== 'S256') {
     return <PageMain><PageHeader title="Connection request rejected" /><Alert tone="error">This client or redirect address is invalid.</Alert></PageMain>;
   }
+  const wantsImport = values.scope.split(' ').includes('ingestion:import');
+  const canImport = user.roles.some(role => role === 'editor' || role === 'admin');
+  const needsStepUp = wantsImport && canImport && !user.stepUpFresh;
   return (
     <PageMain>
       <PageHeader title="Connect a chat client" meta="Review the access this client is requesting." />
       {incoming.error ? <Alert tone="error">The connection could not be authorized. Check your account permissions and try again.</Alert> : null}
       <Card>
         <p><strong>{clientName}</strong> requests access as {user.email}.</p>
+        <p>Client ID: <code>{values.client_id}</code></p>
+        <p>Connection destination: <code>{new URL(values.redirect_uri).origin}</code></p>
         <p>Requested permissions: {values.scope.split(' ').join(', ')}.</p>
         <p>Constitution imports still require site review and a separate publisher.</p>
+        {wantsImport && !canImport ? <Alert tone="error">An editor or administrator account is required for import access.</Alert> : null}
+        {needsStepUp ? <p><a href={`/account/step-up?returnTo=${encodeURIComponent(returnPath)}`}>Confirm with your authenticator to allow import access</a></p> : null}
         <form action={authorizeClient}>
           {fields.map(field => <input key={field} type="hidden" name={field} value={values[field]} />)}
-          <Button name="decision" value="approve" variant="primary">Allow access</Button>{' '}
+          <Button name="decision" value="approve" variant="primary" disabled={wantsImport && (!canImport || needsStepUp)}>Allow access</Button>{' '}
           <Button name="decision" value="deny" variant="secondary">Deny</Button>
         </form>
       </Card>

@@ -130,7 +130,9 @@ export default async function AccountPage(props: AccountPageProps) {
           <CreateMcpKeyForm canImport={canImport} />
           <h3>Connected OAuth clients</h3>
           {oauthGrants.length === 0 ? <p>No active OAuth connections.</p> : oauthGrants.map((grant) => <div key={grant.clientId}>
-            <strong>{grant.clientName}</strong> · access expires {new Date(grant.expiresAt).toLocaleString()}
+            <strong>{grant.clientName}</strong> · access expires {new Date(grant.expiresAt).toLocaleString()}<br />
+            Client ID: <code>{grant.clientId}</code><br />
+            Registered destinations: {grant.redirectUris.map(uri => { try { return new URL(uri).origin; } catch { return uri; } }).join(', ')}
             <form action={revokeOAuthGrantAction}><input type="hidden" name="clientId" value={grant.clientId} /><Button>Revoke access</Button></form>
           </div>)}
           <h3>Your MCP keys</h3>

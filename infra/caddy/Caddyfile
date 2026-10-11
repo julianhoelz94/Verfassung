@@ -66,7 +66,9 @@
 		reverse_proxy identity-service:8080
 	}
 	route /oauth/register* {
-		reverse_proxy identity-service:8080
+		reverse_proxy identity-service:8080 {
+			header_up X-Atlas-Client-IP {remote_host}
+		}
 	}
 	route /oauth/revoke* {
 		reverse_proxy identity-service:8080

@@ -4,6 +4,7 @@ import com.constitutionatlas.identity.BadRequestException
 import com.constitutionatlas.identity.repo.OAuthGrant
 import com.constitutionatlas.identity.service.McpOAuthService
 import com.constitutionatlas.platform.UnauthorizedException
+import jakarta.servlet.http.HttpServletRequest
 import org.springframework.http.CacheControl
 import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
@@ -48,9 +49,10 @@ class McpOAuthController(private val oauth: McpOAuthService) {
     )
 
     @PostMapping("/oauth/register")
-    fun register(@RequestBody request: OAuthRegistrationRequest): ResponseEntity<Map<String, Any>> {
+    fun register(@RequestBody request: OAuthRegistrationRequest, servletRequest: HttpServletRequest): ResponseEntity<Map<String, Any>> {
         if (request.token_endpoint_auth_method != "none") return ResponseEntity.badRequest().body(mapOf("error" to "invalid_client_metadata"))
-        val client = oauth.register(request.client_name, request.redirect_uris)
+        val clientIp = servletRequest.getHeader("X-Atlas-Client-IP") ?: servletRequest.remoteAddr
+        val client = oauth.register(request.client_name, request.redirect_uris, clientIp)
         return ResponseEntity.status(HttpStatus.CREATED).body(
             mapOf(
                 "client_id" to client.id.toString(),

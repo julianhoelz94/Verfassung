@@ -118,13 +118,45 @@ class IdentityApiTest {
         mockMvc.get("/oauth/grants") { header("Authorization", "Bearer $session") }.andExpect {
             status { isOk() }
             jsonPath("$[0].clientId") { value(clientId) }
+            jsonPath("$[0].redirectUris[0]") { value("http://127.0.0.1:45001/callback") }
         }
+        val pendingApproval = mockMvc.post("/oauth/approve") {
+            contentType = MediaType.APPLICATION_JSON
+            header("Authorization", "Bearer $session")
+            content = """{"client_id":"$clientId","redirect_uri":"http://127.0.0.1:45001/callback","resource":"http://localhost/mcp","response_type":"code","code_challenge":"$challenge","code_challenge_method":"S256","scope":"mcp:read"}"""
+        }.andExpect { status { isOk() } }.andReturn().response.contentAsString
+        val pendingCode = java.net.URI(objectMapper.readTree(pendingApproval).get("redirect_uri").asText()).rawQuery.substringAfter("code=").substringBefore('&')
         mockMvc.delete("/oauth/grants/$clientId") { header("Authorization", "Bearer $session") }.andExpect { status { isNoContent() } }
         mockMvc.get("/me") { header("Authorization", "Bearer $access") }.andExpect { status { isUnauthorized() } }
+        mockMvc.post("/oauth/token") {
+            contentType = MediaType.APPLICATION_FORM_URLENCODED
+            param("grant_type", "authorization_code")
+            param("code", pendingCode)
+            param("client_id", clientId)
+            param("redirect_uri", "http://127.0.0.1:45001/callback")
+            param("resource", "http://localhost/mcp")
+            param("code_verifier", verifier)
+        }.andExpect { status { isBadRequest() } }
         mockMvc.post("/oauth/revoke") {
             contentType = MediaType.APPLICATION_FORM_URLENCODED
             param("token", access)
         }.andExpect { status { isOk() } }
+    }
+
+    @Test
+    fun oauthRegistrationIsLimitedPerPeer() {
+        repeat(20) { index ->
+            mockMvc.post("/oauth/register") {
+                header("X-Atlas-Client-IP", "192.0.2.101")
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"client_name":"Quota client $index","redirect_uris":["http://127.0.0.1:45001/callback"]}"""
+            }.andExpect { status { isCreated() } }
+        }
+        mockMvc.post("/oauth/register") {
+            header("X-Atlas-Client-IP", "192.0.2.101")
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"client_name":"Over quota","redirect_uris":["http://127.0.0.1:45001/callback"]}"""
+        }.andExpect { status { isTooManyRequests() } }
     }
 
     @Test

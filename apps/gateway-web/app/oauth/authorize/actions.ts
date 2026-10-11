@@ -25,6 +25,9 @@ export async function authorizeClient(form: FormData): Promise<void> {
   });
   if (!response.ok) {
     const query = new URLSearchParams(values);
+    if (response.status === 403 && values.scope.split(' ').includes('ingestion:import')) {
+      redirect(`/account/step-up?returnTo=${encodeURIComponent(`/oauth/authorize?${query}`)}`);
+    }
     query.set('error', 'permission');
     redirect(`/oauth/authorize?${query}`);
   }

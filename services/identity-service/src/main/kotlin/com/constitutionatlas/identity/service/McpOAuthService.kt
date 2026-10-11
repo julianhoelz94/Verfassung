@@ -1,6 +1,7 @@
 package com.constitutionatlas.identity.service
 
 import com.constitutionatlas.identity.BadRequestException
+import com.constitutionatlas.identity.TooManyRequestsException
 import com.constitutionatlas.identity.crypto.Tokens
 import com.constitutionatlas.identity.repo.IdentityRepository
 import com.constitutionatlas.identity.repo.OAuthClient
@@ -35,11 +36,13 @@ class McpOAuthService(
     val issuer: String get() = publicBaseUrl.trimEnd('/')
     val resource: String get() = "$issuer/mcp"
 
-    fun register(name: String, redirectUris: List<String>): OAuthClient {
+    @Transactional
+    fun register(name: String, redirectUris: List<String>, clientIp: String): OAuthClient {
         if (name.trim().length !in 1..100 || redirectUris.isEmpty() || redirectUris.size > 5 || redirectUris.distinct().size != redirectUris.size) {
             throw BadRequestException("Invalid OAuth client registration")
         }
         redirectUris.forEach(::validateRedirect)
+        if (!oauth.reserveRegistration(Tokens.sha256Hex(clientIp))) throw TooManyRequestsException("OAuth registration limit reached; retry in an hour")
         return oauth.registerClient(name.trim(), redirectUris)
     }
 
@@ -103,6 +106,7 @@ class McpOAuthService(
 
     fun grants(authorization: String?): List<OAuthGrant> = oauth.activeGrants(auth.requireSession(authorization).id)
 
+    @Transactional
     fun revokeGrant(authorization: String?, clientId: UUID) = oauth.revokeGrant(auth.requireSession(authorization).id, clientId)
 
     private fun parseClientId(value: String): UUID = try {

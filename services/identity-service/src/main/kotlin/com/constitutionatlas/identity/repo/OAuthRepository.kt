@@ -25,10 +25,24 @@ data class OAuthAccessToken(
     val scopes: List<String>,
     val expiresAt: OffsetDateTime,
 )
-data class OAuthGrant(val clientId: UUID, val clientName: String, val expiresAt: OffsetDateTime)
+data class OAuthGrant(val clientId: UUID, val clientName: String, val redirectUris: List<String>, val expiresAt: OffsetDateTime)
 
 @Repository
 class OAuthRepository(private val jdbc: JdbcTemplate) {
+    fun reserveRegistration(ipHash: String): Boolean =
+        jdbc.query(
+            """
+            INSERT INTO oauth_registration_limits (ip_hash, window_start, registrations) VALUES (?, NOW(), 1)
+            ON CONFLICT (ip_hash) DO UPDATE SET
+              window_start = CASE WHEN oauth_registration_limits.window_start <= NOW() - INTERVAL '1 hour' THEN NOW() ELSE oauth_registration_limits.window_start END,
+              registrations = CASE WHEN oauth_registration_limits.window_start <= NOW() - INTERVAL '1 hour' THEN 1 ELSE oauth_registration_limits.registrations + 1 END
+            WHERE oauth_registration_limits.window_start <= NOW() - INTERVAL '1 hour' OR oauth_registration_limits.registrations < 20
+            RETURNING registrations
+            """.trimIndent(),
+            { rs, _ -> rs.getInt(1) },
+            ipHash,
+        ).isNotEmpty()
+
     fun registerClient(name: String, redirectUris: List<String>): OAuthClient {
         val id = UUID.randomUUID()
         jdbc.update { connection ->
@@ -93,12 +107,20 @@ class OAuthRepository(private val jdbc: JdbcTemplate) {
 
     fun activeGrants(ownerId: UUID): List<OAuthGrant> =
         jdbc.query(
-            "SELECT c.id, c.name, MAX(t.expires_at) AS expires_at FROM oauth_access_tokens t JOIN oauth_clients c ON c.id = t.client_id WHERE t.owner_id = ? AND t.revoked_at IS NULL AND t.expires_at > NOW() GROUP BY c.id, c.name ORDER BY c.name, c.id",
-            { rs, _ -> OAuthGrant(rs.getObject("id", UUID::class.java), rs.getString("name"), rs.getTimestamp("expires_at").toInstant().atOffset(java.time.ZoneOffset.UTC)) },
+            "SELECT c.id, c.name, c.redirect_uris, MAX(t.expires_at) AS expires_at FROM oauth_access_tokens t JOIN oauth_clients c ON c.id = t.client_id WHERE t.owner_id = ? AND t.revoked_at IS NULL AND t.expires_at > NOW() GROUP BY c.id, c.name, c.redirect_uris ORDER BY c.name, c.id",
+            { rs, _ -> OAuthGrant(rs.getObject("id", UUID::class.java), rs.getString("name"), (rs.getArray("redirect_uris").array as Array<*>).map { it.toString() }, rs.getTimestamp("expires_at").toInstant().atOffset(java.time.ZoneOffset.UTC)) },
             ownerId,
         )
 
     fun revokeGrant(ownerId: UUID, clientId: UUID) {
+        jdbc.update("UPDATE oauth_authorization_codes SET consumed_at = NOW() WHERE owner_id = ? AND client_id = ? AND consumed_at IS NULL", ownerId, clientId)
         jdbc.update("UPDATE oauth_access_tokens SET revoked_at = NOW() WHERE owner_id = ? AND client_id = ? AND revoked_at IS NULL", ownerId, clientId)
+    }
+
+    fun purgeExpired() {
+        jdbc.update("DELETE FROM oauth_authorization_codes WHERE expires_at < NOW() - INTERVAL '1 day'")
+        jdbc.update("DELETE FROM oauth_access_tokens WHERE expires_at < NOW() - INTERVAL '1 day'")
+        jdbc.update("DELETE FROM oauth_clients c WHERE c.created_at < NOW() - INTERVAL '30 days' AND NOT EXISTS (SELECT 1 FROM oauth_access_tokens t WHERE t.client_id = c.id) AND NOT EXISTS (SELECT 1 FROM oauth_authorization_codes a WHERE a.client_id = c.id)")
+        jdbc.update("DELETE FROM oauth_registration_limits WHERE window_start < NOW() - INTERVAL '2 hours'")
     }
 }

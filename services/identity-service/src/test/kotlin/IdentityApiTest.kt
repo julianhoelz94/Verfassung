@@ -27,6 +27,8 @@ import org.testcontainers.containers.PostgreSQLContainer
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
 import java.io.File
+import java.security.MessageDigest
+import java.util.Base64
 
 @Testcontainers
 @AutoConfigureMockMvc
@@ -55,6 +57,89 @@ class IdentityApiTest {
     lateinit var outboundMailer: OutboundMailer
 
     private val objectMapper = ObjectMapper()
+
+    @Test
+    fun oauthCodeIsPkceBoundSingleUseAndRevocable() {
+        val registered = mockMvc.post("/oauth/register") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"client_name":"Test client","redirect_uris":["http://127.0.0.1:45001/callback"]}"""
+        }.andExpect { status { isCreated() } }.andReturn().response.contentAsString
+        val clientId = objectMapper.readTree(registered).get("client_id").asText()
+        val session = login("local-reviewer@example.local", "change-me")
+        val verifier = "valid-verifier-for-mcp-oauth-that-is-long-enough-0001"
+        val challenge = Base64.getUrlEncoder().withoutPadding().encodeToString(MessageDigest.getInstance("SHA-256").digest(verifier.toByteArray()))
+        val approved = mockMvc.post("/oauth/approve") {
+            contentType = MediaType.APPLICATION_JSON
+            header("Authorization", "Bearer $session")
+            content = """{"client_id":"$clientId","redirect_uri":"http://127.0.0.1:45001/callback","resource":"http://localhost/mcp","response_type":"code","code_challenge":"$challenge","code_challenge_method":"S256","scope":"mcp:read","state":"test-state"}"""
+        }.andExpect { status { isOk() } }.andReturn().response.contentAsString
+        val redirect = java.net.URI(objectMapper.readTree(approved).get("redirect_uri").asText())
+        check(redirect.rawQuery.contains("state=test-state"))
+        val code = redirect.rawQuery.split('&').first { it.startsWith("code=") }.substringAfter('=')
+        mockMvc.post("/oauth/token") {
+            contentType = MediaType.APPLICATION_FORM_URLENCODED
+            param("grant_type", "authorization_code")
+            param("code", code)
+            param("client_id", clientId)
+            param("redirect_uri", "http://127.0.0.1:45001/callback")
+            param("resource", "http://localhost/mcp")
+            param("code_verifier", "wrong-verifier-for-mcp-oauth-that-is-long-enough-0001")
+        }.andExpect { status { isUnauthorized() } }
+        val exchanged = mockMvc.post("/oauth/token") {
+            contentType = MediaType.APPLICATION_FORM_URLENCODED
+            param("grant_type", "authorization_code")
+            param("code", code)
+            param("client_id", clientId)
+            param("redirect_uri", "http://127.0.0.1:45001/callback")
+            param("resource", "http://localhost/mcp")
+            param("code_verifier", verifier)
+        }.andExpect { status { isOk() } }.andReturn().response.contentAsString
+        val access = objectMapper.readTree(exchanged).get("access_token").asText()
+        mockMvc.post("/oauth/token") {
+            contentType = MediaType.APPLICATION_FORM_URLENCODED
+            param("grant_type", "authorization_code")
+            param("code", code)
+            param("client_id", clientId)
+            param("redirect_uri", "http://127.0.0.1:45001/callback")
+            param("resource", "http://localhost/mcp")
+            param("code_verifier", verifier)
+        }.andExpect { status { isUnauthorized() } }
+        mockMvc.get("/me") { header("Authorization", "Bearer $access") }.andExpect {
+            status { isOk() }
+            jsonPath("$.resource") { value("http://localhost/mcp") }
+            jsonPath("$.scopes[0]") { value("mcp:read") }
+        }
+        mockMvc.post("/oauth/revoke") {
+            contentType = MediaType.APPLICATION_FORM_URLENCODED
+            param("token", access)
+        }.andExpect { status { isOk() } }
+        mockMvc.get("/me") { header("Authorization", "Bearer $access") }.andExpect { status { isUnauthorized() } }
+    }
+
+    @Test
+    fun oauthRejectsUnregisteredRedirectAndReviewerImportScope() {
+        mockMvc.post("/oauth/register") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"client_name":"Bad redirect","redirect_uris":["http://evil.example/callback"]}"""
+        }.andExpect { status { isBadRequest() } }
+        val registered = mockMvc.post("/oauth/register") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"client_name":"Scoped client","redirect_uris":["http://127.0.0.1:45002/callback"]}"""
+        }.andExpect { status { isCreated() } }.andReturn().response.contentAsString
+        val clientId = objectMapper.readTree(registered).get("client_id").asText()
+        val session = login("local-reviewer@example.local", "change-me")
+        val payload = """{"client_id":"$clientId","redirect_uri":"http://127.0.0.1:45002/callback","resource":"http://localhost/mcp","response_type":"code","code_challenge":"${"a".repeat(43)}","code_challenge_method":"S256","scope":"mcp:read ingestion:import"}"""
+        mockMvc.post("/oauth/approve") {
+            contentType = MediaType.APPLICATION_JSON
+            header("Authorization", "Bearer $session")
+            content = payload
+        }.andExpect { status { isForbidden() } }
+        mockMvc.post("/oauth/approve") {
+            contentType = MediaType.APPLICATION_JSON
+            header("Authorization", "Bearer $session")
+            content = payload.replace("45002", "45003").replace("ingestion:import", "")
+        }.andExpect { status { isBadRequest() } }
+    }
 
     @Test
     fun seedStoresSeparableEditorialRoles() {

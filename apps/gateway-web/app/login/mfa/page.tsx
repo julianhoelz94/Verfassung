@@ -7,7 +7,7 @@ import { LoginEnrollForm } from '../../account/MfaForms';
 import { completeMfaAction } from '../actions';
 
 type MfaPageProps = {
-  searchParams: Promise<{ error?: string; enroll?: string }>;
+  searchParams: Promise<{ error?: string; enroll?: string; next?: string }>;
 };
 
 export default async function MfaPage(props: MfaPageProps) {
@@ -16,7 +16,7 @@ export default async function MfaPage(props: MfaPageProps) {
   const challenge = await mfaChallengeToken();
   const enroll = searchParams.enroll === '1';
   if (user && !enroll) {
-    redirect('/');
+    redirect(searchParams.next?.startsWith('/oauth/authorize?') ? searchParams.next : '/');
   }
   if (!challenge && !user) {
     redirect('/login');
@@ -63,11 +63,12 @@ export default async function MfaPage(props: MfaPageProps) {
           ) : (
             <Alert tone="error">Enrollment could not be started. Sign in again.</Alert>
           )}
-          <LoginEnrollForm />
+          <LoginEnrollForm next={searchParams.next?.startsWith('/oauth/authorize?') ? searchParams.next : undefined} />
         </Card>
       ) : (
         <Card>
           <form action={completeMfaAction}>
+            {searchParams.next?.startsWith('/oauth/authorize?') ? <input type="hidden" name="next" value={searchParams.next} /> : null}
             <Input
               label="Authenticator code"
               id="code"

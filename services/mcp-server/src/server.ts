@@ -76,8 +76,9 @@ export function createServer(authorization?: string): McpServer {
   const run = <T extends Record<string, unknown>>(tool: string, action: () => Promise<T>) => runLogged(tool, action, () => auditActorId);
 
   async function requireImportKey() {
-    if (!authorization?.startsWith('Bearer ca_mcp_')) throw new UpstreamError(403, 'identity');
-    const actor = await getJson<{ id?: string; scopes: string[] }>('identity', '/me', authorization);
+    if (!authorization || !/^Bearer ca_(?:mcp|oauth)_/.test(authorization)) throw new UpstreamError(403, 'identity');
+    const actor = await getJson<{ id?: string; scopes: string[]; resource?: string }>('identity', '/me', authorization);
+    if (authorization.startsWith('Bearer ca_oauth_') && actor.resource !== `${(process.env.PUBLIC_BASE_URL ?? 'http://localhost').replace(/\/$/, '')}/mcp`) throw new UpstreamError(403, 'identity');
     if (!actor.scopes.includes('ingestion:import')) throw new UpstreamError(403, 'identity');
     auditActorId = actor.id;
   }

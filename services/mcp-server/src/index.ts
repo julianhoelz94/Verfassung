@@ -8,6 +8,9 @@ import { authenticateMcpKey, UpstreamError } from './catalog.js';
 const handler = toNodeHandler(createMcpHandler(ctx => createServer(ctx.requestInfo?.headers.get('authorization') ?? undefined), { maxRequestBodySize: 5 * 1024 * 1024 }), { maxRequestBodySize: 5 * 1024 * 1024 });
 const port = Number(process.env.PORT ?? '8080');
 const allowedOrigin = new URL(process.env.PUBLIC_BASE_URL ?? 'http://localhost').origin;
+const resource = `${(process.env.PUBLIC_BASE_URL ?? 'http://localhost').replace(/\/$/, '')}/mcp`;
+const resourceMetadataUrl = `${(process.env.PUBLIC_BASE_URL ?? 'http://localhost').replace(/\/$/, '')}/.well-known/oauth-protected-resource/mcp`;
+const challenge = `Bearer resource_metadata="${resourceMetadataUrl}"`;
 const windows = new Map<string, { expiresAt: number; count: number }>();
 
 function rateLimited(ip: string): boolean {
@@ -25,6 +28,11 @@ function rateLimited(ip: string): boolean {
 }
 
 createHttpServer((request, response) => {
+  if (request.url === '/.well-known/oauth-protected-resource/mcp' && request.method === 'GET') {
+    response.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=300', 'Access-Control-Allow-Origin': '*' });
+    response.end(JSON.stringify({ resource, authorization_servers: [allowedOrigin], scopes_supported: ['mcp:read', 'ingestion:import'], bearer_methods_supported: ['header'] }));
+    return;
+  }
   if (request.url === '/mcp/ping' && request.method === 'GET') {
     response.writeHead(200, { 'Content-Type': 'text/plain' });
     response.end('ok');
@@ -47,7 +55,7 @@ createHttpServer((request, response) => {
       response.writeHead(429, { 'Retry-After': '60' }).end();
       return;
     }
-    response.writeHead(401, { 'Content-Type': 'application/json', 'WWW-Authenticate': 'Bearer' });
+    response.writeHead(401, { 'Content-Type': 'application/json', 'WWW-Authenticate': challenge });
     response.end(JSON.stringify({ error: 'MCP key required' }));
     return;
   }
@@ -57,7 +65,7 @@ createHttpServer((request, response) => {
       response.writeHead(429, { 'Retry-After': '60' }).end();
       return;
     }
-    response.writeHead(status, { 'Content-Type': 'application/json', ...(status === 401 ? { 'WWW-Authenticate': 'Bearer' } : {}) });
+    response.writeHead(status, { 'Content-Type': 'application/json', ...(status === 401 ? { 'WWW-Authenticate': challenge } : {}) });
     response.end(JSON.stringify({ error: status === 503 ? 'Authentication service unavailable' : 'MCP key required' }));
   });
 }).listen(port, '0.0.0.0');

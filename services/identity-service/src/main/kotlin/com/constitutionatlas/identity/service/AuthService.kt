@@ -17,10 +17,12 @@ import com.constitutionatlas.identity.crypto.Tokens
 import com.constitutionatlas.identity.crypto.Totp
 import com.constitutionatlas.identity.repo.IdentityRepository
 import com.constitutionatlas.identity.repo.McpKeyRepository
+import com.constitutionatlas.identity.repo.OAuthRepository
 import com.constitutionatlas.identity.repo.StoredUser
 import com.constitutionatlas.identity.repo.toUserDto
 import com.constitutionatlas.platform.UnauthorizedException
 import io.micrometer.core.instrument.MeterRegistry
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.stereotype.Service
 import java.security.SecureRandom
@@ -33,12 +35,14 @@ import java.util.UUID
 class AuthService(
     private val identityRepository: IdentityRepository,
     private val mcpKeyRepository: McpKeyRepository,
+    private val oauthRepository: OAuthRepository,
     private val passwordEncoder: PasswordEncoder,
     private val sessionProperties: IdentitySessionProperties,
     private val loginProperties: IdentityLoginProperties,
     private val mfaProperties: IdentityMfaProperties,
     private val mfaService: MfaService,
     private val authAudit: AuthAudit,
+    @Value("\${PUBLIC_BASE_URL:http://localhost}") private val publicBaseUrl: String,
     meterRegistry: MeterRegistry,
 ) {
     private val random = SecureRandom()
@@ -274,6 +278,16 @@ class AuthService(
         if (service != null) {
             identityRepository.touchServiceToken(service.id)
             return service.toUserDto()
+        }
+        if (token.startsWith("ca_oauth_")) {
+            val access = oauthRepository.validToken(hash)
+                ?.takeIf { it.resource == "${publicBaseUrl.trimEnd('/')}/mcp" }
+                ?: throw UnauthorizedException("Invalid or expired session")
+            val owner = identityRepository.findUserById(access.ownerId)?.takeIf { it.enabled }
+                ?: throw UnauthorizedException("Invalid or expired session")
+            val roles = identityRepository.rolesForUser(owner.id)
+            val scopes = access.scopes.filter { it != "ingestion:import" || roles.any { role -> role == "editor" || role == "admin" } }
+            return UserDto(owner.id, owner.email, emptyList(), scopes = scopes, resource = access.resource)
         }
         val key = mcpKeyRepository.findValidByHash(hash)
             ?: throw UnauthorizedException("Invalid or expired session")

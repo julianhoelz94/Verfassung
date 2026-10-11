@@ -26,7 +26,7 @@
 	# Anonymous API requests share one edge quota across services. Validated account
 	# sessions and bearer credentials are exempt. Public site pages stay available.
 	@api_request {
-		path /api/catalog* /api/content* /api/amendment* /api/audit* /api/search* /api/ingestion* /api/document* /api/identity* /api/editor*
+		path /api/catalog* /api/content* /api/amendment* /api/audit* /api/search* /api/ingestion* /api/document* /api/identity* /api/editor* /oauth/token* /oauth/register* /oauth/revoke*
 	}
 	route @api_request {
 		forward_auth gateway-web:3000 {
@@ -53,6 +53,24 @@
 		expression `{env.CADDY_EXPOSE_API_DOCS} != "true"`
 	}
 	respond @docs_closed 404
+
+	route /.well-known/oauth-protected-resource/mcp {
+		reverse_proxy mcp-server:8080
+	}
+
+	route /.well-known/oauth-authorization-server {
+		reverse_proxy identity-service:8080
+	}
+
+	route /oauth/token* {
+		reverse_proxy identity-service:8080
+	}
+	route /oauth/register* {
+		reverse_proxy identity-service:8080
+	}
+	route /oauth/revoke* {
+		reverse_proxy identity-service:8080
+	}
 
 	route /api/docs/catalog* {
 		import docs_upstream catalog catalog-service

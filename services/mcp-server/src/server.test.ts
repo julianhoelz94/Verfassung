@@ -44,6 +44,16 @@ test('MCP requests reject a valid key without read scope', async () => {
   }
 });
 
+test('OAuth tokens must be issued for this MCP resource', async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => Response.json({ scopes: ['mcp:read'], resource: 'https://another.example/mcp' });
+  try {
+    await assert.rejects(authenticateMcpKey('Bearer ca_oauth_issued'), (error) => error instanceof UpstreamError && error.status === 401);
+    globalThis.fetch = async () => Response.json({ scopes: ['mcp:read'], resource: 'http://localhost/mcp' });
+    await authenticateMcpKey('Bearer ca_oauth_issued');
+  } finally { globalThis.fetch = originalFetch; }
+});
+
 test('ordered content preserves text and child order', () => {
   const text = orderedText([
     { type: 'text', text: 'Opening ' },

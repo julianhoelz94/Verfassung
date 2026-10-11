@@ -66,9 +66,17 @@ class ImportUploadService(
     fun get(id: UUID, actor: Actor): ImportUploadDto = status(owned(id, actor))
 
     @Transactional
+    fun cancel(id: UUID, actor: Actor): ImportUploadDto {
+        val upload = owned(id, actor, lock = true)
+        if (upload.status == "completed") conflict("Completed upload has already staged an item")
+        if (upload.status == "receiving") uploads.cancel(id)
+        return status(uploads.find(id)!!)
+    }
+
+    @Transactional
     fun putChunk(id: UUID, index: Int, actor: Actor, request: UploadChunkRequest): ImportUploadDto {
         val upload = owned(id, actor, lock = true)
-        if (upload.status != "receiving") conflict("Upload is already completed")
+        if (upload.status != "receiving") conflict("Upload is no longer receiving chunks")
         val count = chunkCount(upload)
         if (index !in 0 until count) bad("chunk index is out of range")
         if (request.dataBase64.length > 700_000) tooLarge("Chunk exceeds 512 KiB")
@@ -91,6 +99,7 @@ class ImportUploadService(
     fun complete(authorization: String?, id: UUID, actor: Actor): ImportUploadDto {
         val upload = owned(id, actor, lock = true)
         if (upload.status == "completed") return status(upload)
+        if (upload.status == "canceled") conflict("Upload was canceled")
         if (status(upload).missingChunks.isNotEmpty()) conflict("Upload has missing chunks")
         val payload = ByteArrayOutputStream(upload.totalBytes)
         uploads.chunks(id).forEach(payload::write)
@@ -119,7 +128,7 @@ class ImportUploadService(
     }
 
     private fun status(upload: UploadRow): ImportUploadDto {
-        val missing = if (upload.status == "completed") emptyList() else (0 until chunkCount(upload)).filterNot { it in uploads.chunkIndices(upload.id) }
+        val missing = if (upload.status != "receiving") emptyList() else (0 until chunkCount(upload)).filterNot { it in uploads.chunkIndices(upload.id) }
         return ImportUploadDto(upload.id, upload.batchId, upload.status, upload.totalBytes, CHUNK_BYTES, missing, upload.itemId)
     }
 

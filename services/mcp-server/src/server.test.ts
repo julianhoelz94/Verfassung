@@ -125,12 +125,13 @@ test('tool discovery describes read and staged-write retry behavior', async () =
     } } }),
   }));
   assert.equal(response.status, 200);
-  const body = await response.json() as { result: { tools: Array<{ name: string; annotations: { readOnlyHint: boolean; idempotentHint: boolean } }> } };
+  const body = await response.json() as { result: { tools: Array<{ name: string; annotations: { readOnlyHint: boolean; idempotentHint: boolean; destructiveHint: boolean } }> } };
   const byName = new Map(body.result.tools.map(tool => [tool.name, tool.annotations]));
   assert.equal(byName.get('list_countries')?.readOnlyHint, true);
   assert.equal(byName.get('stage_batch_item')?.idempotentHint, true);
   assert.equal(byName.get('create_import_batch')?.idempotentHint, false);
   assert.equal(byName.get('stage_constitution_import')?.readOnlyHint, false);
+  assert.equal(byName.get('cancel_import_upload')?.destructiveHint, true);
 });
 
 test('MCP countries list omits countries with no published version', async () => {
@@ -146,6 +147,29 @@ test('MCP countries list omits countries with no published version', async () =>
     globalThis.fetch = originalFetch;
   }
 });
+
+test('country cursor traverses in stable order and detects a changed collection', async () => {
+  const originalFetch = globalThis.fetch;
+  const countries = [
+    { isoCode: 'FR', name: 'France', versionCount: 1 },
+    { isoCode: 'DE', name: 'Germany', versionCount: 1 },
+    { isoCode: 'AT', name: 'Austria', versionCount: 1 },
+  ];
+  globalThis.fetch = async () => Response.json(countries);
+  try {
+    const first = (await callTool('list_countries', { limit: 2 })).structuredContent!;
+    assert.deepEqual((first.countries as CountryLike[]).map(country => country.isoCode), ['AT', 'DE']);
+    const cursor = first.nextCursor as string;
+    assert.ok(cursor);
+    const second = (await callTool('list_countries', { limit: 2, cursor })).structuredContent!;
+    assert.deepEqual((second.countries as CountryLike[]).map(country => country.isoCode), ['FR']);
+    countries.push({ isoCode: 'CH', name: 'Switzerland', versionCount: 1 });
+    const stale = await callTool('list_countries', { limit: 2, cursor });
+    assert.equal(stale.isError, true);
+  } finally { globalThis.fetch = originalFetch; }
+});
+
+type CountryLike = { isoCode: string };
 
 test('MCP search hits include public article citation links', async () => {
   const originalFetch = globalThis.fetch;
@@ -226,5 +250,22 @@ test('MCP import key refuses an unpinned full upload before calling ingestion', 
     const result = await callTool('stage_constitution_import', { payload: { isoCode: 'FR', outline: { kinds: [] } } }, 'Bearer ca_mcp_editor');
     assert.equal(result.isError, true);
     assert.deepEqual(calls.map(url => new URL(url).pathname), ['/me']);
+  } finally { globalThis.fetch = originalFetch; }
+});
+
+test('MCP importer can cancel an unfinished upload without publishing', async () => {
+  const originalFetch = globalThis.fetch;
+  const calls: Array<{ path: string; method: string }> = [];
+  globalThis.fetch = async (input, init) => {
+    const path = new URL(String(input)).pathname;
+    calls.push({ path, method: init?.method ?? 'GET' });
+    if (path === '/me') return Response.json({ id: '01900000-0000-4000-8000-000000000099', scopes: ['mcp:read', 'ingestion:import'] });
+    return Response.json({ status: 'canceled', missingChunks: [] });
+  };
+  try {
+    const result = await callTool('cancel_import_upload', { uploadId: '01900000-0000-4000-8000-000000000001' }, 'Bearer ca_mcp_editor');
+    assert.equal(result.structuredContent?.status, 'canceled');
+    assert.deepEqual(calls.map(call => call.method), ['GET', 'DELETE']);
+    assert.equal(calls.some(call => call.path.includes('publish')), false);
   } finally { globalThis.fetch = originalFetch; }
 });

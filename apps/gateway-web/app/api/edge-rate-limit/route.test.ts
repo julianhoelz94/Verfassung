@@ -18,6 +18,13 @@ describe('edge API authorization', () => {
     expect(check).toHaveBeenCalledWith(expect.stringContaining('/me'), expect.objectContaining({ headers: { Authorization: 'Bearer valid' } }));
   });
 
+  it('exempts a validated bearer credential used by an API client', async () => {
+    const check = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}', { status: 200 }));
+    const response = await GET(request({ 'x-atlas-edge-check': '1', 'x-atlas-client-ip': '198.51.100.97', authorization: 'Bearer account-key' }));
+    expect(response.status).toBe(204);
+    expect(check).toHaveBeenCalledWith(expect.stringContaining('/me'), expect.objectContaining({ headers: { Authorization: 'Bearer account-key' } }));
+  });
+
   it('counts invalid credentials as anonymous and returns Retry-After', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null, { status: 401 }));
     const headers = { 'x-atlas-edge-check': '1', 'x-atlas-client-ip': '198.51.100.96', authorization: 'Bearer invalid' };
@@ -26,5 +33,16 @@ describe('edge API authorization', () => {
     expect(response.status).toBe(429);
     expect(response.headers.get('Retry-After')).toBeTruthy();
     expect((await response.json()).code).toBe('anonymous_rate_limit');
+  });
+
+  it('shows a compact sign-in and retry message for browser API navigation', async () => {
+    const headers = { 'x-atlas-edge-check': '1', 'x-atlas-client-ip': '198.51.100.98', accept: 'text/html' };
+    for (let i = 0; i < 120; i++) await GET(request(headers));
+    const response = await GET(request(headers));
+    expect(response.status).toBe(429);
+    expect(response.headers.get('content-type')).toContain('text/html');
+    const body = await response.text();
+    expect(body).toContain('Public pages remain available');
+    expect(body).toContain('href="/login"');
   });
 });

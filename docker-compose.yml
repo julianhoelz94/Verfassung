@@ -19,6 +19,7 @@ services:
       - SEARCH_API_URL=http://search-service:8080
       - IDENTITY_API_URL=http://identity-service:8080
       - INGESTION_API_URL=http://ingestion-service:8080
+      - MCP_CURSOR_SECRET=${MCP_CURSOR_SECRET:-}
       - PUBLIC_BASE_URL=${PUBLIC_BASE_URL:-http://localhost}
     depends_on:
       catalog-service:

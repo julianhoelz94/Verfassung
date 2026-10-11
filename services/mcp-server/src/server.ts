@@ -1,10 +1,15 @@
 import { McpServer } from '@modelcontextprotocol/server';
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
-import { getJson, postJson, putJson, publicVersionUrl, requirePublishedVersion, UpstreamError } from './catalog.js';
+import { deleteJson, getJson, postJson, putJson, publicVersionUrl, requirePublishedVersion, UpstreamError } from './catalog.js';
+import { CursorError, decodeCursor, encodeCursor, fingerprint } from './cursor.js';
+import { importPayloadSchema, setupProposalSchema } from './import-schema.js';
 
 const uuid = z.string().uuid();
-const page = { offset: z.number().int().min(0).default(0), limit: z.number().int().min(1).max(50).default(20) };
+const page = { offset: z.number().int().min(0).default(0), limit: z.number().int().min(1).max(50).default(20), cursor: z.string().max(1024).optional() };
+const readOnly = { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false };
+const stagedWrite = { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false };
+const newStagedWrite = { ...stagedWrite, idempotentHint: false };
 const json = (value: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(value) }], structuredContent: value as Record<string, unknown> });
 
 type Country = { isoCode: string; name: string; versionCount: number };
@@ -54,14 +59,19 @@ async function runLogged<T extends Record<string, unknown>>(tool: string, action
     console.info(JSON.stringify({ event: 'mcp_tool', tool, actorId: actorId(), resourceId, outcome: 'ok', elapsedMs: Date.now() - started }));
     return json(value);
   } catch (error) {
-    console.warn(JSON.stringify({ event: 'mcp_tool', tool, actorId: actorId(), outcome: 'error', status: error instanceof UpstreamError ? error.status : 503, elapsedMs: Date.now() - started }));
-    const message = error instanceof UpstreamError ? error.message : 'The requested data could not be loaded.';
-    return { content: [{ type: 'text' as const, text: message }], isError: true };
+    const status = error instanceof UpstreamError ? error.status : error instanceof CursorError ? 400 : 503;
+    console.warn(JSON.stringify({ event: 'mcp_tool', tool, actorId: actorId(), outcome: 'error', status, elapsedMs: Date.now() - started }));
+    const message = error instanceof UpstreamError || error instanceof CursorError ? error.message : 'The requested data could not be loaded.';
+    const code = error instanceof CursorError ? 'invalid_cursor' : status === 401 ? 'unauthenticated' : status === 403 ? 'forbidden' : status === 404 ? 'not_found' : status === 409 ? 'conflict' : status === 413 ? 'payload_too_large' : status === 400 ? 'invalid_input' : 'upstream_unavailable';
+    return { content: [{ type: 'text' as const, text: message }], structuredContent: { code, status, message, retryable: status === 429 || status >= 500 }, isError: true };
   }
 }
 
 export function createServer(authorization?: string): McpServer {
-  const server = new McpServer({ name: 'constitution-atlas', version: '0.1.0' }, { capabilities: { tools: {} } });
+  const server = new McpServer(
+    { name: 'constitution-atlas', version: '0.1.0' },
+    { capabilities: { tools: {} }, cacheHints: { 'tools/list': { ttlMs: 60_000, cacheScope: 'private' }, 'server/discover': { ttlMs: 60_000, cacheScope: 'private' } } },
+  );
   let auditActorId: string | undefined;
   const run = <T extends Record<string, unknown>>(tool: string, action: () => Promise<T>) => runLogged(tool, action, () => auditActorId);
 
@@ -78,9 +88,16 @@ export function createServer(authorization?: string): McpServer {
     }
   }
 
+  function requireDirectUploadSize(payload: Record<string, unknown>) {
+    if (Buffer.byteLength(JSON.stringify(payload), 'utf8') > 2_097_152) {
+      throw new UpstreamError(413, 'mcp', 'Direct upload exceeds 2 MiB; use a chunked batch upload.');
+    }
+  }
+
   server.registerTool('get_import_schema', {
     description: 'Learn the structured constitution import format, hierarchy rules, and review workflow before staging content.',
     inputSchema: {},
+    annotations: readOnly,
   }, () => run('get_import_schema', async () => ({
     schemaVersion: '1.0',
     settingsGuidance,
@@ -94,12 +111,13 @@ export function createServer(authorization?: string): McpServer {
       roots: [{ logicalId: 'stable UUID', kind: 'article', label: '1', title: 'Example', content: [{ type: 'text', text: 'Text' }] }],
       setupProposal: { isoCode: 'FR', countryName: 'France', constitutionSlug: 'constitution', constitutionTitle: 'Constitution', languageCode: 'fr', sourceUrl: 'https://example.org/source', outline: { kinds: [{ kindCode: 'article', displayLabel: 'Article' }] }, sampleRoots: [{ kind: 'article', label: '1', content: [{ type: 'text', text: 'Representative text' }] }] },
     },
-    notes: ['Call get_import_setup first. For an existing constitution copy its settingsRevisionId and omit outline.', 'A new constitution needs an outline proposal and a site review before content preparation.', 'Reuse an idempotencyKey when retrying a direct upload; without one, identical payloads reuse a content-derived key.', 'Preserve source spelling, numbering and text order.', 'No MCP tool can approve or publish.'],
+    notes: ['Call get_import_setup first. For an existing constitution copy its settingsRevisionId and omit outline.', 'A new constitution needs an outline proposal and a site review before content preparation.', 'Reuse an idempotencyKey when retrying a direct upload; without one, identical payloads reuse a content-derived key.', 'Use get_import_upload to resume missing chunks or cancel_import_upload to discard an unfinished upload.', 'Preserve source spelling, numbering and text order.', 'No MCP tool can approve or publish.'],
   })));
 
   server.registerTool('find_constitution', {
     description: 'Find a constitution by country and slug before proposing an import. Does not create records.',
     inputSchema: { countryCode: z.string().regex(/^[A-Za-z]{2}$/), constitutionSlug: z.string().trim().min(1).max(120) },
+    annotations: readOnly,
   }, ({ countryCode, constitutionSlug }) => run('find_constitution', async () => {
     await requireImportKey();
     let country: CountryDetail;
@@ -113,7 +131,8 @@ export function createServer(authorization?: string): McpServer {
 
   server.registerTool('propose_constitution_setup', {
     description: 'Submit private metadata, an outline, and a small representative source sample for editor inspection before full upload.',
-    inputSchema: { proposal: z.record(z.string(), z.unknown()) },
+    inputSchema: { proposal: setupProposalSchema },
+    annotations: newStagedWrite,
   }, ({ proposal }) => run('propose_constitution_setup', async () => {
     await requireImportKey();
     const result = await postJson<{ id: string; status: string }>('ingestion', '/import-setup-proposals', proposal, authorization!);
@@ -123,6 +142,7 @@ export function createServer(authorization?: string): McpServer {
   server.registerTool('get_setup_proposal', {
     description: 'Read the status of your private constitution setup proposal and the confirmed settings pin.',
     inputSchema: { proposalId: uuid },
+    annotations: readOnly,
   }, ({ proposalId }) => run('get_setup_proposal', async () => {
     await requireImportKey();
     return await getJson<Record<string, unknown>>('ingestion', `/import-setup-proposals/${proposalId}`, authorization);
@@ -130,7 +150,8 @@ export function createServer(authorization?: string): McpServer {
 
   server.registerTool('revise_setup_proposal', {
     description: 'Replace your unconfirmed structure proposal after inspecting validation feedback.',
-    inputSchema: { proposalId: uuid, proposal: z.record(z.string(), z.unknown()) },
+    inputSchema: { proposalId: uuid, proposal: setupProposalSchema },
+    annotations: stagedWrite,
   }, ({ proposalId, proposal }) => run('revise_setup_proposal', async () => {
     await requireImportKey();
     return await putJson<Record<string, unknown>>('ingestion', `/import-setup-proposals/${proposalId}`, proposal, authorization!);
@@ -139,6 +160,7 @@ export function createServer(authorization?: string): McpServer {
   server.registerTool('get_import_setup', {
     description: 'For an editor import key, find an existing constitution and its configured content outline before uploading. A missing constitution has no outline yet.',
     inputSchema: { countryCode: z.string().regex(/^[A-Za-z]{2}$/), constitutionSlug: z.string().trim().min(1).max(120) },
+    annotations: readOnly,
   }, ({ countryCode, constitutionSlug }) => run('get_import_setup', async () => {
     await requireImportKey();
     let country: CountryDetail;
@@ -152,9 +174,11 @@ export function createServer(authorization?: string): McpServer {
 
   server.registerTool('stage_constitution_import', {
     description: 'Stage one constitution version for site review. This never publishes content.',
-    inputSchema: { payload: z.record(z.string(), z.unknown()), idempotencyKey: z.string().min(8).max(128).optional() },
+    inputSchema: { payload: importPayloadSchema, idempotencyKey: z.string().min(8).max(128).optional() },
+    annotations: stagedWrite,
   }, ({ payload, idempotencyKey }) => run('stage_constitution_import', async () => {
     await requireImportKey();
+    requireDirectUploadSize(payload);
     requireConfirmedUpload(payload);
     const retryKey = idempotencyKey ?? `ca-mcp-${createHash('sha256').update(JSON.stringify(payload)).digest('hex')}`;
     const job = await postJson<{ id: string; status: string; errors: unknown[] }>('ingestion', '/import-jobs', payload, authorization!, retryKey);
@@ -164,6 +188,7 @@ export function createServer(authorization?: string): McpServer {
   server.registerTool('create_import_batch', {
     description: 'Create a private batch handle for up to 100 constitution items. Each item has its own review status.',
     inputSchema: {},
+    annotations: newStagedWrite,
   }, () => run('create_import_batch', async () => {
     await requireImportKey();
     const batch = await postJson<{ id: string; status: string }>('ingestion', '/import-batches', {}, authorization!);
@@ -172,9 +197,11 @@ export function createServer(authorization?: string): McpServer {
 
   server.registerTool('stage_batch_item', {
     description: 'Stage one item in a batch with a stable idempotency key. Retry the same key and payload safely.',
-    inputSchema: { batchId: uuid, idempotencyKey: z.string().min(8).max(128), payload: z.record(z.string(), z.unknown()), checksumSha256: z.string().regex(/^[a-fA-F0-9]{64}$/).optional() },
+    inputSchema: { batchId: uuid, idempotencyKey: z.string().min(8).max(128), payload: importPayloadSchema, checksumSha256: z.string().regex(/^[a-fA-F0-9]{64}$/).optional() },
+    annotations: stagedWrite,
   }, ({ batchId, idempotencyKey, payload, checksumSha256 }) => run('stage_batch_item', async () => {
     await requireImportKey();
+    requireDirectUploadSize(payload);
     requireConfirmedUpload(payload);
     const item = await postJson<{ id: string; status: string; errors: unknown[] }>('ingestion', `/import-batches/${batchId}/items`, { idempotencyKey, payload, checksumSha256 }, authorization!);
     return { batchId, itemId: item.id, status: item.status, errors: item.errors, reviewUrl: `${(process.env.PUBLIC_BASE_URL ?? 'http://localhost').replace(/\/$/, '')}/admin/import/${item.id}` };
@@ -183,6 +210,7 @@ export function createServer(authorization?: string): McpServer {
   server.registerTool('get_import_batch', {
     description: 'Read independent item statuses for a batch owned by this key principal.',
     inputSchema: { batchId: uuid },
+    annotations: readOnly,
   }, ({ batchId }) => run('get_import_batch', async () => {
     await requireImportKey();
     return await getJson<Record<string, unknown>>('ingestion', `/import-batches/${batchId}`, authorization);
@@ -191,6 +219,7 @@ export function createServer(authorization?: string): McpServer {
   server.registerTool('begin_import_upload', {
     description: 'Start or resume a bounded chunked item upload in a private batch. Compute SHA-256 over the complete UTF-8 JSON bytes.',
     inputSchema: { batchId: uuid, idempotencyKey: z.string().min(8).max(128), checksumSha256: z.string().regex(/^[a-fA-F0-9]{64}$/), totalBytes: z.number().int().min(1).max(25 * 1024 * 1024) },
+    annotations: stagedWrite,
   }, ({ batchId, idempotencyKey, checksumSha256, totalBytes }) => run('begin_import_upload', async () => {
     await requireImportKey();
     return await postJson<Record<string, unknown>>('ingestion', `/import-batches/${batchId}/uploads`, { idempotencyKey, checksumSha256, totalBytes }, authorization!);
@@ -199,6 +228,7 @@ export function createServer(authorization?: string): McpServer {
   server.registerTool('put_import_chunk', {
     description: 'Send one base64 chunk by index. Repeating the same index and checksum is safe; get_import_upload reports missing chunks.',
     inputSchema: { uploadId: uuid, index: z.number().int().min(0).max(49), dataBase64: z.string().min(1).max(700_000), checksumSha256: z.string().regex(/^[a-fA-F0-9]{64}$/) },
+    annotations: stagedWrite,
   }, ({ uploadId, index, dataBase64, checksumSha256 }) => run('put_import_chunk', async () => {
     await requireImportKey();
     return await putJson<Record<string, unknown>>('ingestion', `/import-uploads/${uploadId}/chunks/${index}`, { dataBase64, checksumSha256 }, authorization!);
@@ -207,14 +237,25 @@ export function createServer(authorization?: string): McpServer {
   server.registerTool('get_import_upload', {
     description: 'Inspect a private upload and find the chunk indices still missing.',
     inputSchema: { uploadId: uuid },
+    annotations: readOnly,
   }, ({ uploadId }) => run('get_import_upload', async () => {
     await requireImportKey();
     return await getJson<Record<string, unknown>>('ingestion', `/import-uploads/${uploadId}`, authorization);
   }));
 
+  server.registerTool('cancel_import_upload', {
+    description: 'Discard an unfinished private upload and its chunks. A completed upload has already staged an item and cannot be canceled here.',
+    inputSchema: { uploadId: uuid },
+    annotations: { ...stagedWrite, destructiveHint: true },
+  }, ({ uploadId }) => run('cancel_import_upload', async () => {
+    await requireImportKey();
+    return await deleteJson<Record<string, unknown>>('ingestion', `/import-uploads/${uploadId}`, authorization!);
+  }));
+
   server.registerTool('complete_import_upload', {
     description: 'Verify the assembled checksum and stage the completed item for site review. This never publishes.',
     inputSchema: { uploadId: uuid },
+    annotations: stagedWrite,
   }, ({ uploadId }) => run('complete_import_upload', async () => {
     await requireImportKey();
     const upload = await postJson<{ itemId?: string; status: string }>('ingestion', `/import-uploads/${uploadId}/complete`, {}, authorization!);
@@ -224,6 +265,7 @@ export function createServer(authorization?: string): McpServer {
   server.registerTool('get_import_job', {
     description: 'Check the review status of an import you staged.',
     inputSchema: { jobId: uuid },
+    annotations: readOnly,
   }, ({ jobId }) => run('get_import_job', async () => {
     await requireImportKey();
     return await getJson<Record<string, unknown>>('ingestion', `/import-jobs/${jobId}`, authorization);
@@ -232,31 +274,47 @@ export function createServer(authorization?: string): McpServer {
   server.registerTool('list_countries', {
     description: 'List countries with published constitutions.',
     inputSchema: page,
-  }, ({ offset, limit }) => run('list_countries', async () => {
-    const countries = (await getJson<Country[]>('catalog', '/countries')).filter(country => country.versionCount > 0);
-    return { countries: countries.slice(offset, offset + limit), total: countries.length, nextOffset: offset + limit < countries.length ? offset + limit : null };
+    annotations: readOnly,
+  }, ({ offset, limit, cursor }) => run('list_countries', async () => {
+    const countries = (await getJson<Country[]>('catalog', '/countries')).filter(country => country.versionCount > 0).sort((a, b) => a.isoCode.localeCompare(b.isoCode));
+    const source = fingerprint(countries.map(country => country.isoCode));
+    const start = cursor ? decodeCursor(cursor, 'countries', source) : offset;
+    const next = start + limit < countries.length ? start + limit : null;
+    return { countries: countries.slice(start, start + limit), total: countries.length, nextOffset: next, nextCursor: next === null ? null : encodeCursor('countries', source, next) };
   }));
 
   server.registerTool('list_constitutions', {
     description: 'List published constitutions for a country by its two-letter ISO code.',
     inputSchema: { countryCode: z.string().regex(/^[A-Za-z]{2}$/), ...page },
-  }, ({ countryCode, offset, limit }) => run('list_constitutions', async () => {
+    annotations: readOnly,
+  }, ({ countryCode, offset, limit, cursor }) => run('list_constitutions', async () => {
     const country = await getJson<CountryDetail>('catalog', `/countries/${countryCode.toUpperCase()}`);
-    const constitutions = country.constitutions.filter(item => item.versions.length > 0).map(({ id, slug, title }) => ({ id, slug, title }));
-    return { countryCode: country.isoCode, countryName: country.name, constitutions: constitutions.slice(offset, offset + limit), total: constitutions.length, nextOffset: offset + limit < constitutions.length ? offset + limit : null };
+    const constitutions = country.constitutions.filter(item => item.versions.length > 0).map(({ id, slug, title }) => ({ id, slug, title })).sort((a, b) => a.slug.localeCompare(b.slug) || a.id.localeCompare(b.id));
+    const scope = `constitutions:${country.isoCode}`;
+    const source = fingerprint(constitutions.map(item => item.id));
+    const start = cursor ? decodeCursor(cursor, scope, source) : offset;
+    const next = start + limit < constitutions.length ? start + limit : null;
+    return { countryCode: country.isoCode, countryName: country.name, constitutions: constitutions.slice(start, start + limit), total: constitutions.length, nextOffset: next, nextCursor: next === null ? null : encodeCursor(scope, source, next) };
   }));
 
   server.registerTool('list_versions', {
     description: 'List public published versions of one constitution.',
     inputSchema: { constitutionId: uuid, ...page },
-  }, ({ constitutionId, offset, limit }) => run('list_versions', async () => {
-    const versions = await getJson<Array<{ id: string; versionLabel: string; effectiveDate?: string; languageCode: string; sourceUrl?: string; gazetteReference?: string }>>('catalog', `/constitutions/${constitutionId}/versions?listing=public`);
-    return { constitutionId, versions: versions.slice(offset, offset + limit), total: versions.length, nextOffset: offset + limit < versions.length ? offset + limit : null };
+    annotations: readOnly,
+  }, ({ constitutionId, offset, limit, cursor }) => run('list_versions', async () => {
+    const versions = (await getJson<Array<{ id: string; versionLabel: string; effectiveDate?: string; languageCode: string; sourceUrl?: string; gazetteReference?: string }>>('catalog', `/constitutions/${constitutionId}/versions?listing=public`))
+      .sort((a, b) => (a.effectiveDate ?? '').localeCompare(b.effectiveDate ?? '') || a.id.localeCompare(b.id));
+    const scope = `versions:${constitutionId}`;
+    const source = fingerprint(versions.map(version => version.id));
+    const start = cursor ? decodeCursor(cursor, scope, source) : offset;
+    const next = start + limit < versions.length ? start + limit : null;
+    return { constitutionId, versions: versions.slice(start, start + limit), total: versions.length, nextOffset: next, nextCursor: next === null ? null : encodeCursor(scope, source, next) };
   }));
 
   server.registerTool('get_constitution_outline', {
     description: 'Read the content hierarchy and display labels of a public constitution version.',
     inputSchema: { versionId: uuid },
+    annotations: readOnly,
   }, ({ versionId }) => run('get_constitution_outline', async () => {
     const version = await requirePublishedVersion(versionId);
     const outline = await getJson<{ kinds: unknown[] }>('catalog', `/versions/${version.id}/reader-settings`);
@@ -266,15 +324,20 @@ export function createServer(authorization?: string): McpServer {
   server.registerTool('list_units', {
     description: 'List top-level units of a public constitution version, without their full text.',
     inputSchema: { versionId: uuid, ...page },
-  }, ({ versionId, offset, limit }) => run('list_units', async () => {
+    annotations: readOnly,
+  }, ({ versionId, offset, limit, cursor }) => run('list_units', async () => {
     const version = await requirePublishedVersion(versionId);
-    const units = await getJson<Unit[]>('content', `/versions/${versionId}/units?offset=${offset}&limit=${limit}&includeBody=false`);
-    return { versionId, versionLabel: version.versionLabel, units: units.map(({ id, articleNumber, title, kind }) => ({ id, label: articleNumber, title, kind })), nextOffset: units.length === limit ? offset + limit : null, url: publicVersionUrl(version) };
+    const scope = `units:${versionId}`;
+    const start = cursor ? decodeCursor(cursor, scope, versionId) : offset;
+    const units = await getJson<Unit[]>('content', `/versions/${versionId}/units?offset=${start}&limit=${limit}&includeBody=false`);
+    const next = units.length === limit ? start + limit : null;
+    return { versionId, versionLabel: version.versionLabel, units: units.map(({ id, articleNumber, title, kind }) => ({ id, label: articleNumber, title, kind })), nextOffset: next, nextCursor: next === null ? null : encodeCursor(scope, versionId, next), url: publicVersionUrl(version) };
   }));
 
   server.registerTool('read_unit', {
     description: 'Read a bounded excerpt from one unit in a public version. Use offset to continue long text.',
     inputSchema: { versionId: uuid, unitId: uuid, offset: z.number().int().min(0).default(0), maxCharacters: z.number().int().min(100).max(20_000).default(8_000) },
+    annotations: readOnly,
   }, ({ versionId, unitId, offset, maxCharacters }) => run('read_unit', async () => {
     const version = await requirePublishedVersion(versionId);
     const unit = await getJson<Unit>('content', `/versions/${versionId}/units/${unitId}`);
@@ -288,6 +351,7 @@ export function createServer(authorization?: string): McpServer {
   server.registerTool('resolve_unit', {
     description: 'Read one nested unit by its logical ID in a published version.',
     inputSchema: { versionId: uuid, logicalId: uuid, offset: z.number().int().min(0).default(0), maxCharacters: z.number().int().min(100).max(20_000).default(8_000) },
+    annotations: readOnly,
   }, ({ versionId, logicalId, offset, maxCharacters }) => run('resolve_unit', async () => {
     const version = await requirePublishedVersion(versionId);
     const resolved = await getJson<{ versionId: string; logicalId: string; kind: string; pathLabels: string[]; text: string; deepLink: string }>('content', `/versions/${versionId}/resolve?logicalId=${logicalId}`);
@@ -299,6 +363,7 @@ export function createServer(authorization?: string): McpServer {
   server.registerTool('search_constitutions', {
     description: 'Search published constitutional text with optional country or version filters.',
     inputSchema: { query: z.string().trim().min(1).max(200), countryCode: z.string().regex(/^[A-Za-z]{2}$/).optional(), versionId: uuid.optional(), ...page },
+    annotations: readOnly,
   }, ({ query, countryCode, versionId, offset, limit }) => run('search_constitutions', async () => {
     if (versionId) await requirePublishedVersion(versionId);
     const params = new URLSearchParams({ q: query, limit: String(limit), offset: String(offset) });

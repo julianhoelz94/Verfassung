@@ -27,6 +27,7 @@ import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.web.servlet.MockMvc
+import org.springframework.test.web.servlet.delete
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.post
 import org.springframework.test.web.servlet.put
@@ -172,6 +173,44 @@ class ImportApiTest {
                 jsonPath("$.itemId") { value(itemId) }
             }
         Mockito.verifyNoInteractions(catalogClient, contentClient)
+        mockMvc.delete("/import-uploads/$uploadId") { header("Authorization", MCP_TOKEN) }
+            .andExpect { status { isConflict() } }
+    }
+
+    @Test
+    fun unfinishedUploadCanBeCanceledOnlyByItsOwner() {
+        val batch = json.readTree(
+            mockMvc.post("/import-batches") { header("Authorization", MCP_TOKEN) }
+                .andExpect { status { isCreated() } }.andReturn().response.contentAsString,
+        ).path("id").asText()
+        val body = """{"idempotencyKey":"cancel-item","checksumSha256":"${"0".repeat(64)}","totalBytes":8}"""
+        val uploadId = jobId(
+            mockMvc.post("/import-batches/$batch/uploads") {
+                header("Authorization", MCP_TOKEN)
+                contentType = MediaType.APPLICATION_JSON
+                content = body
+            }.andExpect { status { isCreated() } }.andReturn().response.contentAsString,
+        )
+        mockMvc.delete("/import-uploads/$uploadId") { header("Authorization", EDITOR_TOKEN) }
+            .andExpect { status { isForbidden() } }
+        mockMvc.delete("/import-uploads/$uploadId") { header("Authorization", MCP_TOKEN) }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.status") { value("canceled") }
+                jsonPath("$.missingChunks.length()") { value(0) }
+            }
+        mockMvc.delete("/import-uploads/$uploadId") { header("Authorization", MCP_TOKEN) }
+            .andExpect { status { isOk() } }
+        mockMvc.post("/import-uploads/$uploadId/complete") { header("Authorization", MCP_TOKEN) }
+            .andExpect { status { isConflict() } }
+        mockMvc.post("/import-batches/$batch/uploads") {
+            header("Authorization", MCP_TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = body
+        }.andExpect {
+            status { isCreated() }
+            jsonPath("$.status") { value("canceled") }
+        }
     }
 
     @Test

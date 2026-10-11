@@ -62,6 +62,15 @@ export async function putJson<T>(upstream: keyof typeof upstreams, path: string,
   return response.json() as Promise<T>;
 }
 
+export async function deleteJson<T>(upstream: keyof typeof upstreams, path: string, authorization: string): Promise<T> {
+  const response = await fetch(`${upstreams[upstream]}${path}`, {
+    method: 'DELETE', signal: AbortSignal.timeout(30_000),
+    headers: { Accept: 'application/json', Authorization: authorization },
+  });
+  if (!response.ok) throw await upstreamFailure(response, upstream);
+  return response.json() as Promise<T>;
+}
+
 export async function requirePublishedVersion(versionId: string): Promise<Version> {
   const version = await getJson<Version>('catalog', `/versions/${encodeURIComponent(versionId)}`);
   if (version.publicationStatus !== 'published' ||

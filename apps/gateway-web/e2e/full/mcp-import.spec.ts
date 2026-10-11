@@ -1,4 +1,4 @@
-import { expect, test, type APIRequestContext } from '@playwright/test';
+import { expect, test, type APIRequestContext } from '../fixtures/consent';
 import { randomUUID } from 'node:crypto';
 import { adminHeaders, createIsolatedConstitution, roleHeaders } from './api-fixtures';
 

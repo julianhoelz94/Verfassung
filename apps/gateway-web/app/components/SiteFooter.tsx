@@ -1,3 +1,5 @@
+import { CookieSettings } from './CookieSettings';
+
 type SiteFooterProps = {
   showApiDocs?: boolean;
 };
@@ -15,6 +17,12 @@ export function SiteFooter({ showApiDocs = false }: SiteFooterProps) {
           <a href="/about#sources">Sources</a>
           {' · '}
           <a href="/about#accessibility">Accessibility</a>
+          {' · '}
+          <a href="/impressum">Impressum</a>
+          {' · '}
+          <a href="/datenschutz">Datenschutzerklärung</a>
+          {' · '}
+          <CookieSettings />
           {showApiDocs ? (
             <>
               {' · '}

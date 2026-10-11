@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../fixtures/consent';
 import { signIn } from './auth';
 import { adminHeaders, createIsolatedConstitution } from './api-fixtures';
 

@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { expect, test, type APIRequestContext } from '@playwright/test';
+import { expect, test, type APIRequestContext } from '../fixtures/consent';
 import { adminHeaders } from './api-fixtures';
 import { signIn, signOut, startFromViewer } from './auth';
 

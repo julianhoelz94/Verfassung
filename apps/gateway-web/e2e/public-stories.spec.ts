@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './fixtures/consent';
 import { ARTICLE_1, VERSION_1949, VERSION_2022 } from './helpers';
 
 const mockOrigin = `http://127.0.0.1:${process.env.E2E_MOCK_PORT ?? 4010}`;

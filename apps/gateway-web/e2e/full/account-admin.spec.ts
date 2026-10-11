@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../fixtures/consent';
 import { authenticatorCode, signIn, signOut } from './auth';
 
 test('administrator invite, visitor activation, password change, and reset persist across logins', async ({ page }) => {

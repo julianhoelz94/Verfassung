@@ -1,5 +1,5 @@
 /* eslint-disable */
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Page } from './fixtures/consent';
 import { signInAdmin, signInEditor, signOut } from './helpers';
 
 const PHONE = { width: 390, height: 844 };

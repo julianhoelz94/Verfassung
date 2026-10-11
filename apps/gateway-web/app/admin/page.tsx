@@ -30,6 +30,10 @@ export default async function AdminIndexPage() {
           </h2>
           <p className="muted">Load a JSON corpus and follow the job until it finishes.</p>
         </Card>
+        <Card>
+          <h2 className="card-title"><Link href="/admin/legal/impressum">Legal pages</Link></h2>
+          <p className="muted">Edit and publish the <Link href="/admin/legal/impressum">Impressum</Link> and <Link href="/admin/legal/datenschutz">Datenschutzerklärung</Link>.</p>
+        </Card>
       </div>
     </PageMain>
   );

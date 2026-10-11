@@ -199,6 +199,7 @@ let enrolledMfaEmails = new Set();
 let stepUpFresh = true;
 let visualRoles = false;
 let sprint50Content = false;
+let legalPages = {};
 const WIKI_IMAGE_ID = '01900000-0000-4000-8000-000000000736';
 const WIKI_IMAGE = { documentId: WIKI_IMAGE_ID, revision: 2, alt: 'A historic flag', caption: 'Historic flag', credit: 'Archive', sourceUrl: 'https://example.org/flag', rights: 'Public domain', placement: 'before_body' };
 
@@ -221,6 +222,12 @@ function resetMockState() {
   stepUpFresh = true;
   visualRoles = false;
   sprint50Content = false;
+  const impressum = { revision: 1, content: 'Example Operator\nExample Street 1\nexample@example.org', createdAt: '2026-01-01T00:00:00Z', createdBy: identityMe.id };
+  const datenschutz = { revision: 1, content: 'Example privacy notice for browser tests.', createdAt: '2026-01-01T00:00:00Z', createdBy: identityMe.id };
+  legalPages = {
+    impressum: { key: 'impressum', draft: impressum, published: impressum, revisions: [impressum] },
+    datenschutz: { key: 'datenschutz', draft: datenschutz, published: datenschutz, revisions: [datenschutz] },
+  };
   credentials = new Map([
     ['local-editor@example.local', 'change-me'], ['local-reviewer@example.local', 'change-me'],
     ['local-publisher@example.local', 'change-me'], ['local-admin@example.local', 'change-me'],
@@ -343,6 +350,31 @@ const server = createServer(async (req, res) => {
     sprint50Content = true;
     empty(res, 204);
     return;
+  }
+
+  const legalMatch = pathname.match(/^\/api\/document\/legal-pages\/(impressum|datenschutz)(?:\/(editor(?:\/revisions)?|draft|publish))?$/);
+  if (legalMatch) {
+    const state = legalPages[legalMatch[1]];
+    const action = legalMatch[2];
+    if (method === 'GET' && !action) { json(res, state.published ? 200 : 404, state.published ?? { error: 'Not published' }); return; }
+    if (method === 'GET' && action === 'editor') { json(res, 200, { key: state.key, draft: state.draft, published: state.published }); return; }
+    if (method === 'GET' && action === 'editor/revisions') { json(res, 200, [...state.revisions].reverse()); return; }
+    if (method === 'PUT' && action === 'draft') {
+      const body = await readBody(req);
+      if (body.expectedRevision !== (state.draft?.revision ?? 0)) { json(res, 409, { error: 'Conflict' }); return; }
+      const draft = { revision: body.expectedRevision + 1, content: String(body.content).trim(), createdAt: new Date().toISOString(), createdBy: identityMe.id };
+      state.draft = draft;
+      state.revisions.push(draft);
+      json(res, 200, { key: state.key, draft, published: state.published });
+      return;
+    }
+    if (method === 'POST' && action === 'publish') {
+      const body = await readBody(req);
+      if (body.expectedRevision !== state.draft?.revision) { json(res, 409, { error: 'Conflict' }); return; }
+      state.published = state.draft;
+      json(res, 200, { key: state.key, draft: state.draft, published: state.published });
+      return;
+    }
   }
 
   if (sprint50Content && method === 'GET' && pathname === '/api/catalog/countries/DE/constitution-lifecycle') {

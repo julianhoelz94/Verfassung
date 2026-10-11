@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './fixtures/consent';
 import type { OrderedEntry } from '../lib/api';
 import { VERSION_2022 } from './helpers';
 

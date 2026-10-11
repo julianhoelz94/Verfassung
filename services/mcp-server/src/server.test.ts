@@ -109,6 +109,30 @@ async function callTool(name: string, args: Record<string, unknown>, authorizati
   return body.result;
 }
 
+test('tool discovery describes read and staged-write retry behavior', async () => {
+  const handler = createMcpHandler(() => createServer());
+  const response = await handler.fetch(new Request('http://localhost/mcp', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json, text/event-stream',
+      'MCP-Protocol-Version': '2026-07-28',
+      'Mcp-Method': 'tools/list',
+    },
+    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list', params: { _meta: {
+      'io.modelcontextprotocol/protocolVersion': '2026-07-28',
+      'io.modelcontextprotocol/clientCapabilities': {},
+    } } }),
+  }));
+  assert.equal(response.status, 200);
+  const body = await response.json() as { result: { tools: Array<{ name: string; annotations: { readOnlyHint: boolean; idempotentHint: boolean } }> } };
+  const byName = new Map(body.result.tools.map(tool => [tool.name, tool.annotations]));
+  assert.equal(byName.get('list_countries')?.readOnlyHint, true);
+  assert.equal(byName.get('stage_batch_item')?.idempotentHint, true);
+  assert.equal(byName.get('create_import_batch')?.idempotentHint, false);
+  assert.equal(byName.get('stage_constitution_import')?.readOnlyHint, false);
+});
+
 test('MCP countries list omits countries with no published version', async () => {
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async () => Response.json([

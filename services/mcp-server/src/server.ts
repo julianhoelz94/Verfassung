@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { deleteJson, getJson, postJson, putJson, publicVersionUrl, requirePublishedVersion, UpstreamError } from './catalog.js';
 import { CursorError, decodeCursor, encodeCursor, fingerprint } from './cursor.js';
 import { importPayloadSchema, setupProposalSchema } from './import-schema.js';
+import { batchCreatedOutput, batchItemOutput, batchOutput, completedUploadOutput, constitutionListOutput, countryListOutput, findConstitutionOutput, importSchemaOutput, importSetupOutput, importStagedOutput, jobOutput, outlineOutput, readUnitOutput, resolveUnitOutput, searchOutput, setupProposalCreatedOutput, setupProposalOutput, unitListOutput, uploadOutput, versionListOutput } from './output-schema.js';
 
 const uuid = z.string().uuid();
 const page = { offset: z.number().int().min(0).default(0), limit: z.number().int().min(1).max(50).default(20), cursor: z.string().max(1024).optional() };
@@ -99,6 +100,7 @@ export function createServer(authorization?: string): McpServer {
   server.registerTool('get_import_schema', {
     description: 'Learn the structured constitution import format, hierarchy rules, and review workflow before staging content.',
     inputSchema: {},
+    outputSchema: importSchemaOutput,
     annotations: readOnly,
   }, () => run('get_import_schema', async () => ({
     schemaVersion: '1.0',
@@ -119,6 +121,7 @@ export function createServer(authorization?: string): McpServer {
   server.registerTool('find_constitution', {
     description: 'Find a constitution by country and slug before proposing an import. Does not create records.',
     inputSchema: { countryCode: z.string().regex(/^[A-Za-z]{2}$/), constitutionSlug: z.string().trim().min(1).max(120) },
+    outputSchema: findConstitutionOutput,
     annotations: readOnly,
     scopeChallenge: importScope,
   }, ({ countryCode, constitutionSlug }) => run('find_constitution', async () => {
@@ -135,6 +138,7 @@ export function createServer(authorization?: string): McpServer {
   server.registerTool('propose_constitution_setup', {
     description: 'Submit private metadata, an outline, and a small representative source sample for editor inspection before full upload.',
     inputSchema: { proposal: setupProposalSchema },
+    outputSchema: setupProposalCreatedOutput,
     annotations: newStagedWrite,
     scopeChallenge: importScope,
   }, ({ proposal }) => run('propose_constitution_setup', async () => {
@@ -146,6 +150,7 @@ export function createServer(authorization?: string): McpServer {
   server.registerTool('get_setup_proposal', {
     description: 'Read the status of your private constitution setup proposal and the confirmed settings pin.',
     inputSchema: { proposalId: uuid },
+    outputSchema: setupProposalOutput,
     annotations: readOnly,
     scopeChallenge: importScope,
   }, ({ proposalId }) => run('get_setup_proposal', async () => {
@@ -156,6 +161,7 @@ export function createServer(authorization?: string): McpServer {
   server.registerTool('revise_setup_proposal', {
     description: 'Replace your unconfirmed structure proposal after inspecting validation feedback.',
     inputSchema: { proposalId: uuid, proposal: setupProposalSchema },
+    outputSchema: setupProposalOutput,
     annotations: stagedWrite,
     scopeChallenge: importScope,
   }, ({ proposalId, proposal }) => run('revise_setup_proposal', async () => {
@@ -166,6 +172,7 @@ export function createServer(authorization?: string): McpServer {
   server.registerTool('get_import_setup', {
     description: 'For an editor import key, find an existing constitution and its configured content outline before uploading. A missing constitution has no outline yet.',
     inputSchema: { countryCode: z.string().regex(/^[A-Za-z]{2}$/), constitutionSlug: z.string().trim().min(1).max(120) },
+    outputSchema: importSetupOutput,
     annotations: readOnly,
     scopeChallenge: importScope,
   }, ({ countryCode, constitutionSlug }) => run('get_import_setup', async () => {
@@ -182,6 +189,7 @@ export function createServer(authorization?: string): McpServer {
   server.registerTool('stage_constitution_import', {
     description: 'Stage one constitution version for site review. This never publishes content.',
     inputSchema: { payload: importPayloadSchema, idempotencyKey: z.string().min(8).max(128).optional() },
+    outputSchema: importStagedOutput,
     annotations: stagedWrite,
     scopeChallenge: importScope,
   }, ({ payload, idempotencyKey }) => run('stage_constitution_import', async () => {
@@ -196,6 +204,7 @@ export function createServer(authorization?: string): McpServer {
   server.registerTool('create_import_batch', {
     description: 'Create a private batch handle for up to 100 constitution items. Each item has its own review status.',
     inputSchema: {},
+    outputSchema: batchCreatedOutput,
     annotations: newStagedWrite,
     scopeChallenge: importScope,
   }, () => run('create_import_batch', async () => {
@@ -207,6 +216,7 @@ export function createServer(authorization?: string): McpServer {
   server.registerTool('stage_batch_item', {
     description: 'Stage one item in a batch with a stable idempotency key. Retry the same key and payload safely.',
     inputSchema: { batchId: uuid, idempotencyKey: z.string().min(8).max(128), payload: importPayloadSchema, checksumSha256: z.string().regex(/^[a-fA-F0-9]{64}$/).optional() },
+    outputSchema: batchItemOutput,
     annotations: stagedWrite,
     scopeChallenge: importScope,
   }, ({ batchId, idempotencyKey, payload, checksumSha256 }) => run('stage_batch_item', async () => {
@@ -220,6 +230,7 @@ export function createServer(authorization?: string): McpServer {
   server.registerTool('get_import_batch', {
     description: 'Read independent item statuses for a batch owned by this key principal.',
     inputSchema: { batchId: uuid },
+    outputSchema: batchOutput,
     annotations: readOnly,
     scopeChallenge: importScope,
   }, ({ batchId }) => run('get_import_batch', async () => {
@@ -230,6 +241,7 @@ export function createServer(authorization?: string): McpServer {
   server.registerTool('begin_import_upload', {
     description: 'Start or resume a bounded chunked item upload in a private batch. Compute SHA-256 over the complete UTF-8 JSON bytes.',
     inputSchema: { batchId: uuid, idempotencyKey: z.string().min(8).max(128), checksumSha256: z.string().regex(/^[a-fA-F0-9]{64}$/), totalBytes: z.number().int().min(1).max(25 * 1024 * 1024) },
+    outputSchema: uploadOutput,
     annotations: stagedWrite,
     scopeChallenge: importScope,
   }, ({ batchId, idempotencyKey, checksumSha256, totalBytes }) => run('begin_import_upload', async () => {
@@ -240,6 +252,7 @@ export function createServer(authorization?: string): McpServer {
   server.registerTool('put_import_chunk', {
     description: 'Send one base64 chunk by index. Repeating the same index and checksum is safe; get_import_upload reports missing chunks.',
     inputSchema: { uploadId: uuid, index: z.number().int().min(0).max(49), dataBase64: z.string().min(1).max(700_000), checksumSha256: z.string().regex(/^[a-fA-F0-9]{64}$/) },
+    outputSchema: uploadOutput,
     annotations: stagedWrite,
     scopeChallenge: importScope,
   }, ({ uploadId, index, dataBase64, checksumSha256 }) => run('put_import_chunk', async () => {
@@ -250,6 +263,7 @@ export function createServer(authorization?: string): McpServer {
   server.registerTool('get_import_upload', {
     description: 'Inspect a private upload and find the chunk indices still missing.',
     inputSchema: { uploadId: uuid },
+    outputSchema: uploadOutput,
     annotations: readOnly,
     scopeChallenge: importScope,
   }, ({ uploadId }) => run('get_import_upload', async () => {
@@ -260,6 +274,7 @@ export function createServer(authorization?: string): McpServer {
   server.registerTool('cancel_import_upload', {
     description: 'Discard an unfinished private upload and its chunks. A completed upload has already staged an item and cannot be canceled here.',
     inputSchema: { uploadId: uuid },
+    outputSchema: uploadOutput,
     annotations: { ...stagedWrite, destructiveHint: true },
     scopeChallenge: importScope,
   }, ({ uploadId }) => run('cancel_import_upload', async () => {
@@ -270,6 +285,7 @@ export function createServer(authorization?: string): McpServer {
   server.registerTool('complete_import_upload', {
     description: 'Verify the assembled checksum and stage the completed item for site review. This never publishes.',
     inputSchema: { uploadId: uuid },
+    outputSchema: completedUploadOutput,
     annotations: stagedWrite,
     scopeChallenge: importScope,
   }, ({ uploadId }) => run('complete_import_upload', async () => {
@@ -281,6 +297,7 @@ export function createServer(authorization?: string): McpServer {
   server.registerTool('get_import_job', {
     description: 'Check the review status of an import you staged.',
     inputSchema: { jobId: uuid },
+    outputSchema: jobOutput,
     annotations: readOnly,
     scopeChallenge: importScope,
   }, ({ jobId }) => run('get_import_job', async () => {
@@ -291,6 +308,7 @@ export function createServer(authorization?: string): McpServer {
   server.registerTool('list_countries', {
     description: 'List countries with published constitutions.',
     inputSchema: page,
+    outputSchema: countryListOutput,
     annotations: readOnly,
   }, ({ offset, limit, cursor }) => run('list_countries', async () => {
     const countries = (await getJson<Country[]>('catalog', '/countries')).filter(country => country.versionCount > 0).sort((a, b) => a.isoCode.localeCompare(b.isoCode));
@@ -303,6 +321,7 @@ export function createServer(authorization?: string): McpServer {
   server.registerTool('list_constitutions', {
     description: 'List published constitutions for a country by its two-letter ISO code.',
     inputSchema: { countryCode: z.string().regex(/^[A-Za-z]{2}$/), ...page },
+    outputSchema: constitutionListOutput,
     annotations: readOnly,
   }, ({ countryCode, offset, limit, cursor }) => run('list_constitutions', async () => {
     const country = await getJson<CountryDetail>('catalog', `/countries/${countryCode.toUpperCase()}`);
@@ -317,6 +336,7 @@ export function createServer(authorization?: string): McpServer {
   server.registerTool('list_versions', {
     description: 'List public published versions of one constitution.',
     inputSchema: { constitutionId: uuid, ...page },
+    outputSchema: versionListOutput,
     annotations: readOnly,
   }, ({ constitutionId, offset, limit, cursor }) => run('list_versions', async () => {
     const versions = (await getJson<Array<{ id: string; versionLabel: string; effectiveDate?: string; languageCode: string; sourceUrl?: string; gazetteReference?: string }>>('catalog', `/constitutions/${constitutionId}/versions?listing=public`))
@@ -331,6 +351,7 @@ export function createServer(authorization?: string): McpServer {
   server.registerTool('get_constitution_outline', {
     description: 'Read the content hierarchy and display labels of a public constitution version.',
     inputSchema: { versionId: uuid },
+    outputSchema: outlineOutput,
     annotations: readOnly,
   }, ({ versionId }) => run('get_constitution_outline', async () => {
     const version = await requirePublishedVersion(versionId);
@@ -341,6 +362,7 @@ export function createServer(authorization?: string): McpServer {
   server.registerTool('list_units', {
     description: 'List top-level units of a public constitution version, without their full text.',
     inputSchema: { versionId: uuid, ...page },
+    outputSchema: unitListOutput,
     annotations: readOnly,
   }, ({ versionId, offset, limit, cursor }) => run('list_units', async () => {
     const version = await requirePublishedVersion(versionId);
@@ -354,6 +376,7 @@ export function createServer(authorization?: string): McpServer {
   server.registerTool('read_unit', {
     description: 'Read a bounded excerpt from one unit in a public version. Use offset to continue long text.',
     inputSchema: { versionId: uuid, unitId: uuid, offset: z.number().int().min(0).default(0), maxCharacters: z.number().int().min(100).max(20_000).default(8_000) },
+    outputSchema: readUnitOutput,
     annotations: readOnly,
   }, ({ versionId, unitId, offset, maxCharacters }) => run('read_unit', async () => {
     const version = await requirePublishedVersion(versionId);
@@ -368,6 +391,7 @@ export function createServer(authorization?: string): McpServer {
   server.registerTool('resolve_unit', {
     description: 'Read one nested unit by its logical ID in a published version.',
     inputSchema: { versionId: uuid, logicalId: uuid, offset: z.number().int().min(0).default(0), maxCharacters: z.number().int().min(100).max(20_000).default(8_000) },
+    outputSchema: resolveUnitOutput,
     annotations: readOnly,
   }, ({ versionId, logicalId, offset, maxCharacters }) => run('resolve_unit', async () => {
     const version = await requirePublishedVersion(versionId);
@@ -380,15 +404,29 @@ export function createServer(authorization?: string): McpServer {
   server.registerTool('search_constitutions', {
     description: 'Search published constitutional text with optional country or version filters.',
     inputSchema: { query: z.string().trim().min(1).max(200), countryCode: z.string().regex(/^[A-Za-z]{2}$/).optional(), versionId: uuid.optional(), ...page },
+    outputSchema: searchOutput,
     annotations: readOnly,
-  }, ({ query, countryCode, versionId, offset, limit }) => run('search_constitutions', async () => {
+  }, ({ query, countryCode, versionId, offset, limit, cursor }) => run('search_constitutions', async () => {
     if (versionId) await requirePublishedVersion(versionId);
+    const scope = `search:${fingerprint([query, countryCode?.toUpperCase() ?? '', versionId ?? ''])}`;
     const params = new URLSearchParams({ q: query, limit: String(limit), offset: String(offset) });
     if (countryCode) params.set('country', countryCode.toUpperCase());
     if (versionId) params.set('versionId', versionId);
-    const results = await getJson<{ hits: Array<{ articleId: string; versionId: string; countryCode: string; [key: string]: unknown }>; total: number; limit: number; offset: number }>('search', `/search?${params}`);
+    type SearchResults = { hits: Array<{ articleId: string; versionId: string; countryCode: string; [key: string]: unknown }>; total: number; limit: number; offset: number; indexGeneration: number };
+    if (cursor) {
+      params.set('offset', '0');
+      params.set('limit', '1');
+      const current = await getJson<SearchResults>('search', `/search?${params}`);
+      offset = decodeCursor(cursor, scope, String(current.indexGeneration));
+      params.set('offset', String(offset));
+      params.set('limit', String(limit));
+    }
+    const results = await getJson<SearchResults>('search', `/search?${params}`);
+    if (cursor) decodeCursor(cursor, scope, String(results.indexGeneration));
+    const nextOffset = offset + results.hits.length < results.total ? offset + results.hits.length : null;
+    const nextCursor = nextOffset === null ? null : encodeCursor(scope, String(results.indexGeneration), nextOffset);
     const base = (process.env.PUBLIC_BASE_URL ?? 'http://localhost').replace(/\/$/, '');
-    return { query, results: { ...results, hits: results.hits.map(hit => ({ ...hit, url: `${base}/countries/${encodeURIComponent(hit.countryCode)}/versions/${encodeURIComponent(hit.versionId)}/articles/${encodeURIComponent(hit.articleId)}` })) } };
+    return { query, results: { ...results, nextOffset, nextCursor, hits: results.hits.map(hit => ({ ...hit, url: `${base}/countries/${encodeURIComponent(hit.countryCode)}/versions/${encodeURIComponent(hit.versionId)}/articles/${encodeURIComponent(hit.articleId)}` })) } };
   }));
 
   return server;

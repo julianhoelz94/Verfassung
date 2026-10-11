@@ -145,7 +145,7 @@ test('tool discovery describes read and staged-write retry behavior', async () =
     } } }),
   }));
   assert.equal(response.status, 200);
-  const body = await response.json() as { result: { ttlMs?: number; cacheScope?: string; tools: Array<{ name: string; annotations: { readOnlyHint: boolean; idempotentHint: boolean; destructiveHint: boolean } }> } };
+  const body = await response.json() as { result: { ttlMs?: number; cacheScope?: string; tools: Array<{ name: string; outputSchema?: { properties?: Record<string, unknown> }; annotations: { readOnlyHint: boolean; idempotentHint: boolean; destructiveHint: boolean } }> } };
   assert.equal(body.result.ttlMs, 60_000);
   assert.equal(body.result.cacheScope, 'private');
   const byName = new Map(body.result.tools.map(tool => [tool.name, tool.annotations]));
@@ -154,6 +154,8 @@ test('tool discovery describes read and staged-write retry behavior', async () =
   assert.equal(byName.get('create_import_batch')?.idempotentHint, false);
   assert.equal(byName.get('stage_constitution_import')?.readOnlyHint, false);
   assert.equal(byName.get('cancel_import_upload')?.destructiveHint, true);
+  assert.ok(body.result.tools.find(tool => tool.name === 'list_countries')?.outputSchema?.properties?.countries);
+  assert.ok(body.result.tools.find(tool => tool.name === 'search_constitutions')?.outputSchema?.properties?.results);
 });
 
 test('import tool returns an HTTP OAuth scope challenge before invocation', async () => {
@@ -209,11 +211,37 @@ type CountryLike = { isoCode: string };
 
 test('MCP search hits include public article citation links', async () => {
   const originalFetch = globalThis.fetch;
-  globalThis.fetch = async () => Response.json({ hits: [{ articleId: '01900000-0000-4000-8000-000000000001', versionId: '01900000-0000-4000-8000-000000000002', countryCode: 'FR', snippet: 'Text' }], total: 1, limit: 20, offset: 0 });
+  globalThis.fetch = async () => Response.json({ hits: [{ articleId: '01900000-0000-4000-8000-000000000001', versionId: '01900000-0000-4000-8000-000000000002', countryCode: 'FR', snippet: 'Text' }], total: 1, limit: 20, offset: 0, indexGeneration: 1 });
   try {
     const result = await callTool('search_constitutions', { query: 'Text' });
     const results = result.structuredContent?.results as { hits: Array<{ url: string }> };
     assert.match(results.hits[0].url, /\/countries\/FR\/versions\/01900000-0000-4000-8000-000000000002\/articles\/01900000-0000-4000-8000-000000000001$/);
+  } finally { globalThis.fetch = originalFetch; }
+});
+
+test('search cursor traverses one index generation and rejects a reindex', async () => {
+  const originalFetch = globalThis.fetch;
+  let generation = 3;
+  const id = (n: number) => `01900000-0000-4000-8000-${String(n).padStart(12, '0')}`;
+  globalThis.fetch = async input => {
+    const url = new URL(String(input));
+    const offset = Number(url.searchParams.get('offset') ?? 0);
+    const limit = Number(url.searchParams.get('limit') ?? 20);
+    const hits = [0, 1, 2].slice(offset, offset + limit).map(n => ({ articleId: id(n + 1), versionId: id(9), countryCode: 'FR' }));
+    return Response.json({ hits, total: 3, limit, offset, indexGeneration: generation });
+  };
+  try {
+    const first = await callTool('search_constitutions', { query: 'Text', limit: 2 });
+    const firstResults = first.structuredContent?.results as { hits: unknown[]; nextCursor: string; nextOffset: number };
+    assert.equal(firstResults.hits.length, 2);
+    assert.equal(firstResults.nextOffset, 2);
+    const second = await callTool('search_constitutions', { query: 'Text', limit: 2, cursor: firstResults.nextCursor });
+    assert.equal((second.structuredContent?.results as { hits: unknown[] }).hits.length, 1);
+    generation += 1;
+    const stale = await callTool('search_constitutions', { query: 'Text', limit: 2, cursor: firstResults.nextCursor });
+    assert.equal(stale.structuredContent?.code, 'invalid_cursor');
+    const wrongQuery = await callTool('search_constitutions', { query: 'Other', limit: 2, cursor: firstResults.nextCursor });
+    assert.equal(wrongQuery.structuredContent?.code, 'invalid_cursor');
   } finally { globalThis.fetch = originalFetch; }
 });
 
@@ -324,7 +352,7 @@ test('MCP importer can cancel an unfinished upload without publishing', async ()
     const path = new URL(String(input)).pathname;
     calls.push({ path, method: init?.method ?? 'GET' });
     if (path === '/me') return Response.json({ id: '01900000-0000-4000-8000-000000000099', scopes: ['mcp:read', 'ingestion:import'] });
-    return Response.json({ status: 'canceled', missingChunks: [] });
+    return Response.json({ id: '01900000-0000-4000-8000-000000000001', batchId: '01900000-0000-4000-8000-000000000002', status: 'canceled', totalBytes: 100, chunkBytes: 524288, missingChunks: [], itemId: null });
   };
   try {
     const result = await callTool('cancel_import_upload', { uploadId: '01900000-0000-4000-8000-000000000001' }, 'Bearer ca_mcp_editor');

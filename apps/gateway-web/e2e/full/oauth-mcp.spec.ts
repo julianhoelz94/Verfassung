@@ -37,6 +37,14 @@ test('account OAuth connects an MCP client with PKCE and permits user revocation
   const tools = await request.post('/mcp', { headers: mcpHeaders, data: { jsonrpc: '2.0', id: 1, method: 'tools/list', params: { _meta: { 'io.modelcontextprotocol/protocolVersion': '2026-07-28', 'io.modelcontextprotocol/clientCapabilities': {} } } } });
   expect(tools.status()).toBe(200);
   expect(await tools.text()).toContain('list_countries');
+  const browse = await request.post('/mcp', {
+    headers: { ...mcpHeaders, 'Mcp-Method': 'tools/call', 'Mcp-Name': 'list_countries' },
+    data: { jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'list_countries', arguments: { limit: 2 }, _meta: { 'io.modelcontextprotocol/protocolVersion': '2026-07-28', 'io.modelcontextprotocol/clientCapabilities': {} } } },
+  });
+  expect(browse.status()).toBe(200);
+  const browseBody = await browse.text();
+  expect(browseBody).toContain('countries');
+  expect(browseBody).not.toContain('"isError":true');
 
   await page.goto('/account');
   await expect(page.getByText(clientName)).toBeVisible();

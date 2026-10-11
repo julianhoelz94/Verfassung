@@ -10,6 +10,7 @@ import com.constitutionatlas.search.api.VersionFacet
 import com.constitutionatlas.search.client.IndexableArticle
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Repository
+import org.springframework.transaction.annotation.Isolation
 import org.springframework.transaction.annotation.Transactional
 import java.sql.Date
 import java.util.UUID
@@ -48,15 +49,18 @@ class SearchRepository(private val jdbcTemplate: JdbcTemplate) {
             ON CONFLICT (source) DO UPDATE SET
               last_synced_at = EXCLUDED.last_synced_at,
               document_count = EXCLUDED.document_count,
-              status = EXCLUDED.status
+              status = EXCLUDED.status,
+              generation = index_sync_state.generation + 1
             """.trimIndent(),
             documents.size,
         )
     }
 
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     fun search(query: SearchQuery): SearchPage {
+        val generation = jdbcTemplate.queryForObject("SELECT COALESCE(MAX(generation), 0) FROM index_sync_state WHERE source = 'content'", Long::class.java) ?: 0L
         if (query.text.isBlank()) {
-            return SearchPage(hits = emptyList(), total = 0, limit = query.limit, offset = query.offset)
+            return SearchPage(hits = emptyList(), total = 0, limit = query.limit, offset = query.offset, indexGeneration = generation)
         }
         val tsQuery = "plainto_tsquery('simple', ?) || plainto_tsquery('german', ?)"
         val filterSql =
@@ -123,7 +127,7 @@ class SearchRepository(private val jdbcTemplate: JdbcTemplate) {
                 query.limit,
                 query.offset,
             )
-        return SearchPage(hits = hits, total = total, limit = query.limit, offset = query.offset)
+        return SearchPage(hits = hits, total = total, limit = query.limit, offset = query.offset, indexGeneration = generation)
     }
 
     fun facets(): SearchFacets {

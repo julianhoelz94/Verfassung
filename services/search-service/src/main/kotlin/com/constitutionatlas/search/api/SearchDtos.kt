@@ -21,6 +21,7 @@ data class SearchPage(
     val total: Int,
     val limit: Int,
     val offset: Int,
+    val indexGeneration: Long = 0,
 )
 
 data class SearchQuery(

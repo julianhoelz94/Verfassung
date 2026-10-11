@@ -84,6 +84,11 @@ class ImportUploadRepository(private val jdbc: JdbcTemplate) {
         jdbc.update("DELETE FROM import_upload_chunks WHERE upload_id = ?", id)
     }
 
+    fun cancel(id: UUID) {
+        jdbc.update("UPDATE import_uploads SET status = 'canceled' WHERE id = ? AND status = 'receiving'", id)
+        jdbc.update("DELETE FROM import_upload_chunks WHERE upload_id = ?", id)
+    }
+
     fun cleanExpired(): Int = jdbc.update("DELETE FROM import_uploads WHERE expires_at <= now()")
 
     private fun map(rs: java.sql.ResultSet, @Suppress("UNUSED_PARAMETER") index: Int): UploadRow = UploadRow(

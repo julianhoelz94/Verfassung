@@ -6,7 +6,7 @@ import { currentUser } from '../../lib/session';
 import { loginAction } from './actions';
 
 type LoginPageProps = {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; next?: string }>;
 };
 
 /** Seed-account hint is shown only while identity seeding is on (never in production). */
@@ -18,7 +18,7 @@ export default async function LoginPage(props: LoginPageProps) {
   const searchParams = await props.searchParams;
   const user = await currentUser();
   if (user) {
-    redirect(canVisitEditor(user.roles) ? '/editor' : '/');
+    redirect(searchParams.next?.startsWith('/oauth/authorize?') ? searchParams.next : canVisitEditor(user.roles) ? '/editor' : '/');
   }
 
   return (
@@ -52,6 +52,7 @@ export default async function LoginPage(props: LoginPageProps) {
       ) : null}
       <Card>
         <form action={loginAction}>
+          {searchParams.next?.startsWith('/oauth/authorize?') ? <input type="hidden" name="next" value={searchParams.next} /> : null}
           <Input
             label="Email"
             id="email"

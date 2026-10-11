@@ -2,11 +2,11 @@ import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { Alert, Button, Card, Input, PageHeader } from '../components/ui';
 import { PageMain } from '../components/PageMain';
-import { requestMcpKeys, requestStartMfaEnroll } from '../../lib/identity-client';
+import { requestMcpKeys, requestOAuthGrants, requestStartMfaEnroll } from '../../lib/identity-client';
 import { SESSION_COOKIE, currentUser, mfaChallengeToken } from '../../lib/session';
 import { ConfirmEnrollForm, RegenerateRecoveryForm } from './MfaForms';
 import { changePasswordAction, revokeMfaAction, startMfaEnrollAction } from './actions';
-import { revokeMcpKeyAction } from './actions';
+import { revokeMcpKeyAction, revokeOAuthGrantAction } from './actions';
 import { CreateMcpKeyForm, RotateMcpKeyForm } from './McpKeyForms';
 
 type AccountPageProps = {
@@ -41,6 +41,7 @@ export default async function AccountPage(props: AccountPageProps) {
   }
   const sessionToken = (await cookies()).get(SESSION_COOKIE)?.value;
   const mcpKeys = sessionToken ? await requestMcpKeys(sessionToken).catch(() => []) : [];
+  const oauthGrants = sessionToken ? await requestOAuthGrants(sessionToken).catch(() => []) : [];
   const canImport = user.roles.includes('editor') || user.roles.includes('admin');
   const mcpUrl = new URL('/mcp', process.env.PUBLIC_BASE_URL || 'http://localhost').toString();
   return (
@@ -48,6 +49,10 @@ export default async function AccountPage(props: AccountPageProps) {
       <PageHeader title="Account" meta={`Signed in as ${user.email}.`} />
       {searchParams.error === 'mfa' ? (
         <Alert tone="error">Authenticator action failed. Check the code and try again.</Alert>
+      ) : searchParams.error === 'oauth' ? (
+        <Alert tone="error">The chat client connection could not be revoked. Try again.</Alert>
+      ) : searchParams.error === 'key' ? (
+        <Alert tone="error">The MCP key could not be changed. Try again.</Alert>
       ) : searchParams.error ? (
         <Alert tone="error">Password could not be changed. Check the current password and policy.</Alert>
       ) : null}
@@ -117,12 +122,19 @@ export default async function AccountPage(props: AccountPageProps) {
       <Card>
         <section className="account-section" id="mcp-keys" aria-labelledby="mcp-keys-title">
           <h2 id="mcp-keys-title">Connect a chat client</h2>
-          <p>Connect your client to <code>{mcpUrl}</code> with a personal MCP key. A read key lets you browse published constitutions; editors can create an import key to stage content. Every import remains pending review.</p>
+          <p>Connect an OAuth-capable client to <code>{mcpUrl}</code> and sign in when prompted. Approve read access, or request import access if you have editor rights. Access expires after 15 minutes and can be revoked by the client. You can also create a personal MCP key below for clients that need an Authorization header. Every import remains pending review.</p>
           <h3>Claude Code example</h3>
           <p>After copying a key, run this on your computer and replace the placeholder with the key:</p>
           <pre tabIndex={0}><code>{`claude mcp add --transport http constitution-atlas ${mcpUrl} --header "Authorization: Bearer <your-MCP-key>"`}</code></pre>
           <p><a href="https://code.claude.com/docs/en/mcp">Claude Code MCP setup instructions</a>. Use a client that supports a custom Authorization header for import keys.</p>
           <CreateMcpKeyForm canImport={canImport} />
+          <h3>Connected OAuth clients</h3>
+          {oauthGrants.length === 0 ? <p>No active OAuth connections.</p> : oauthGrants.map((grant) => <div key={grant.clientId}>
+            <strong>{grant.clientName}</strong> · access expires {new Date(grant.expiresAt).toLocaleString()}<br />
+            Client ID: <code>{grant.clientId}</code><br />
+            Registered destinations: {grant.redirectUris.map(uri => { try { return new URL(uri).origin; } catch { return uri; } }).join(', ')}
+            <form action={revokeOAuthGrantAction}><input type="hidden" name="clientId" value={grant.clientId} /><Button>Revoke access</Button></form>
+          </div>)}
           <h3>Your MCP keys</h3>
           {mcpKeys.length === 0 ? <p>No keys yet.</p> : mcpKeys.map((key) => <div key={key.id}>
             <strong>{key.name}</strong> · {key.scopes.join(', ')} · expires {new Date(key.expiresAt).toLocaleDateString()}

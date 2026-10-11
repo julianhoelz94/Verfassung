@@ -23,7 +23,7 @@ export async function adminHeaders(request: APIRequestContext) {
   return { Authorization: `Bearer ${authenticated.token}` };
 }
 
-async function roleHeaders(request: APIRequestContext, role: 'reviewer' | 'publisher') {
+export async function roleHeaders(request: APIRequestContext, role: 'reviewer' | 'publisher') {
   const login = await expectJson(await request.post('/api/identity/login', { data: {
     email: process.env[`CI_${role.toUpperCase()}_EMAIL`] ?? `ci-${role}@example.local`,
     password: process.env[`CI_${role.toUpperCase()}_PASSWORD`] ?? 'change-me',

@@ -60,7 +60,7 @@ export function RegenerateRecoveryForm() {
 
 const initialEnroll: EnrollConfirmState = {};
 
-export function LoginEnrollForm() {
+export function LoginEnrollForm({ next }: { next?: string } = {}) {
   const [state, action] = useFormState(confirmEnrollAction, initialEnroll);
   if (state.recoveryCodes) {
     return (
@@ -76,6 +76,7 @@ export function LoginEnrollForm() {
     <>
       {state.error ? <Alert tone="error">That code could not be verified.</Alert> : null}
       <form action={action}>
+        {next ? <input type="hidden" name="next" value={next} /> : null}
         <Input
           label="Authenticator code"
           id="code"

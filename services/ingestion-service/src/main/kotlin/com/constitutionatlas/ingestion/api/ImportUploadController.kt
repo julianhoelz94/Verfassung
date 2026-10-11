@@ -3,6 +3,7 @@ package com.constitutionatlas.ingestion.api
 import com.constitutionatlas.ingestion.client.WriteAccess
 import com.constitutionatlas.ingestion.service.ImportUploadService
 import org.springframework.http.HttpStatus
+import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
@@ -23,6 +24,10 @@ class ImportUploadController(private val uploads: ImportUploadService, private v
     @GetMapping("/import-uploads/{id}")
     fun get(@RequestHeader(value = "Authorization", required = false) authorization: String?, @PathVariable id: UUID): ImportUploadDto =
         uploads.get(id, access.requireImporter(authorization))
+
+    @DeleteMapping("/import-uploads/{id}")
+    fun cancel(@RequestHeader(value = "Authorization", required = false) authorization: String?, @PathVariable id: UUID): ImportUploadDto =
+        uploads.cancel(id, access.requireImporter(authorization))
 
     @PutMapping("/import-uploads/{id}/chunks/{index}")
     fun putChunk(@RequestHeader(value = "Authorization", required = false) authorization: String?, @PathVariable id: UUID, @PathVariable index: Int, @RequestBody request: UploadChunkRequest): ImportUploadDto =

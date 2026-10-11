@@ -18,6 +18,8 @@ data class UserDto(
     val stepUpFresh: Boolean = false,
     @get:JsonInclude(JsonInclude.Include.NON_EMPTY)
     val scopes: List<String> = emptyList(),
+    @get:JsonInclude(JsonInclude.Include.NON_NULL)
+    val resource: String? = null,
 )
 
 data class SessionDto(

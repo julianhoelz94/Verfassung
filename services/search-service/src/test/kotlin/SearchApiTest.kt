@@ -130,6 +130,12 @@ class SearchApiTest {
     fun searchPagesWithOffsetAndTotal() {
         reindexFixture()
 
+        val firstGeneration =
+            com.jayway.jsonpath.JsonPath.read<Int>(
+                mockMvc.get("/search") { param("q", "dignity") }.andReturn().response.contentAsString,
+                "$.indexGeneration",
+            )
+
         mockMvc.get("/search") {
             param("q", "dignity")
             param("country", "DE")
@@ -141,6 +147,7 @@ class SearchApiTest {
             jsonPath("$.limit") { value(1) }
             jsonPath("$.offset") { value(0) }
             jsonPath("$.hits.length()") { value(1) }
+            jsonPath("$.hits[0].versionId") { value(DE_1949.toString()) }
         }
 
         mockMvc.get("/search") {
@@ -153,6 +160,15 @@ class SearchApiTest {
             jsonPath("$.total") { value(2) }
             jsonPath("$.offset") { value(1) }
             jsonPath("$.hits.length()") { value(1) }
+            jsonPath("$.hits[0].versionId") { value(DE_2022.toString()) }
+            jsonPath("$.indexGeneration") { value(firstGeneration) }
+        }
+
+        reindexFixture()
+        mockMvc.get("/search") {
+            param("q", "dignity")
+        }.andExpect {
+            jsonPath("$.indexGeneration") { value(firstGeneration + 1) }
         }
     }
 

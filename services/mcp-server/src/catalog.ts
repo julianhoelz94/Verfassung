@@ -62,6 +62,15 @@ export async function putJson<T>(upstream: keyof typeof upstreams, path: string,
   return response.json() as Promise<T>;
 }
 
+export async function deleteJson<T>(upstream: keyof typeof upstreams, path: string, authorization: string): Promise<T> {
+  const response = await fetch(`${upstreams[upstream]}${path}`, {
+    method: 'DELETE', signal: AbortSignal.timeout(30_000),
+    headers: { Accept: 'application/json', Authorization: authorization },
+  });
+  if (!response.ok) throw await upstreamFailure(response, upstream);
+  return response.json() as Promise<T>;
+}
+
 export async function requirePublishedVersion(versionId: string): Promise<Version> {
   const version = await getJson<Version>('catalog', `/versions/${encodeURIComponent(versionId)}`);
   if (version.publicationStatus !== 'published' ||
@@ -72,12 +81,14 @@ export async function requirePublishedVersion(versionId: string): Promise<Versio
   return version;
 }
 
-export async function authenticateMcpKey(authorization?: string): Promise<void> {
-  if (!authorization || !/^Bearer ca_mcp_[A-Za-z0-9_-]+$/.test(authorization)) {
+export async function authenticateMcpKey(authorization?: string): Promise<{ id?: string; scopes: string[]; resource?: string }> {
+  if (!authorization || !/^Bearer ca_(?:mcp|oauth)_[A-Za-z0-9_-]+$/.test(authorization)) {
     throw new UpstreamError(401, 'identity');
   }
-  const actor = await getJson<{ scopes?: string[] }>('identity', '/me', authorization);
+  const actor = await getJson<{ id?: string; scopes?: string[]; resource?: string }>('identity', '/me', authorization);
+  if (authorization.startsWith('Bearer ca_oauth_') && actor.resource !== `${(process.env.PUBLIC_BASE_URL ?? 'http://localhost').replace(/\/$/, '')}/mcp`) throw new UpstreamError(401, 'identity');
   if (!actor.scopes?.includes('mcp:read')) throw new UpstreamError(403, 'identity');
+  return { id: actor.id, scopes: actor.scopes, resource: actor.resource };
 }
 
 export function publicVersionUrl(version: Version): string | null {

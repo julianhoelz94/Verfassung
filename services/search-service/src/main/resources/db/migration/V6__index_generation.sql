@@ -1,0 +1,1 @@
+ALTER TABLE index_sync_state ADD COLUMN generation BIGINT NOT NULL DEFAULT 0;

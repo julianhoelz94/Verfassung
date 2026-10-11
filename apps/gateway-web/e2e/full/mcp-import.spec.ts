@@ -1,6 +1,6 @@
 import { expect, test, type APIRequestContext } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
-import { adminHeaders, createIsolatedConstitution } from './api-fixtures';
+import { adminHeaders, createIsolatedConstitution, roleHeaders } from './api-fixtures';
 
 async function tool(request: APIRequestContext, name: string, args: Record<string, unknown>, key?: string) {
   const response = await request.post('/mcp', {
@@ -27,6 +27,8 @@ test('a personal MCP key discovers the pinned layout and stages only a pending r
   test.setTimeout(180_000);
   const fixture = await createIsolatedConstitution(request, `MCP journey ${randomUUID()}`);
   const admin = await adminHeaders(request);
+  const reviewer = await roleHeaders(request, 'reviewer');
+  const publisher = await roleHeaders(request, 'publisher');
   const keyResponse = await request.post('/api/identity/mcp-keys', {
     headers: admin,
     data: { name: `MCP journey ${randomUUID()}`, scopes: ['mcp:read', 'ingestion:import'] },
@@ -42,11 +44,12 @@ test('a personal MCP key discovers the pinned layout and stages only a pending r
     expect(setup.structuredContent?.constitutionId).toBe(fixture.constitutionId);
     expect(setup.structuredContent?.settingsRevisionId).toBeTruthy();
 
+    const versionLabel = `MCP ${randomUUID()}`;
     const staged = await tool(request, 'stage_constitution_import', { payload: {
       isoCode: 'XA', countryName: 'Atlas Testland', constitutionSlug: constitution.slug,
       constitutionTitle: constitution.title, constitutionId: fixture.constitutionId,
       settingsRevisionId: setup.structuredContent?.settingsRevisionId,
-      versionLabel: `MCP ${randomUUID()}`, predecessorVersionId: fixture.targetVersionId,
+      versionLabel, predecessorVersionId: fixture.targetVersionId,
       hopKind: 'legal', sourceUrl: 'https://example.org/atlas-e2e/mcp',
       articles: [{ articleNumber: '1', title: 'Human dignity', body: 'A reviewed import is required.', sortOrder: 1 }],
     } }, created.token);
@@ -59,6 +62,21 @@ test('a personal MCP key discovers the pinned layout and stages only a pending r
     const job = await (await request.get(`/api/ingestion/import-jobs/${jobId}`, { headers: admin })).json();
     expect(job.status).toBe('pending_review');
     expect(job.versionId).toBeNull();
+    const listed = async () => {
+      const detail = await (await request.get('/api/catalog/countries/XA')).json();
+      return detail.constitutions.find((item: { id: string }) => item.id === fixture.constitutionId).versions as Array<{ versionLabel: string }>;
+    };
+    expect((await listed()).some(version => version.versionLabel === versionLabel)).toBe(false);
+    const prepared = await request.post(`/api/ingestion/import-jobs/${jobId}/prepare`, { headers: admin });
+    expect(prepared.ok(), await prepared.text()).toBeTruthy();
+    const approved = await request.post(`/api/ingestion/import-jobs/${jobId}/approve`, {
+      headers: reviewer, data: { reason: 'Verified MCP source and structure before publication.' },
+    });
+    expect(approved.ok(), await approved.text()).toBeTruthy();
+    expect((await listed()).some(version => version.versionLabel === versionLabel)).toBe(false);
+    const published = await request.post(`/api/ingestion/import-jobs/${jobId}/publish`, { headers: publisher });
+    expect(published.ok(), await published.text()).toBeTruthy();
+    await expect.poll(async () => (await listed()).some(version => version.versionLabel === versionLabel)).toBe(true);
   } finally {
     expect((await request.delete(`/api/identity/mcp-keys/${created.key.id}`, { headers: admin })).status()).toBe(204);
   }

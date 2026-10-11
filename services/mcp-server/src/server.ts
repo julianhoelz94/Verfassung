@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { deleteJson, getJson, postJson, putJson, publicVersionUrl, requirePublishedVersion, UpstreamError } from './catalog.js';
 import { CursorError, decodeCursor, encodeCursor, fingerprint } from './cursor.js';
 import { importPayloadSchema, setupProposalSchema } from './import-schema.js';
+import { observeTool } from './operations.js';
 import { batchCreatedOutput, batchItemOutput, batchOutput, completedUploadOutput, constitutionListOutput, countryListOutput, findConstitutionOutput, importSchemaOutput, importSetupOutput, importStagedOutput, jobOutput, outlineOutput, readUnitOutput, resolveUnitOutput, searchOutput, setupProposalCreatedOutput, setupProposalOutput, unitListOutput, uploadOutput, versionListOutput } from './output-schema.js';
 
 const uuid = z.string().uuid();
@@ -57,10 +58,12 @@ async function runLogged<T extends Record<string, unknown>>(tool: string, action
   const started = Date.now();
   try {
     const value = await action();
+    observeTool(tool, 'ok', Date.now() - started);
     const resourceId = value.jobId ?? value.itemId ?? value.batchId ?? value.proposalId ?? value.constitutionId ?? value.uploadId;
     console.info(JSON.stringify({ event: 'mcp_tool', tool, actorId: actorId(), resourceId, outcome: 'ok', elapsedMs: Date.now() - started }));
     return json(value);
   } catch (error) {
+    observeTool(tool, 'error', Date.now() - started);
     const status = error instanceof UpstreamError ? error.status : error instanceof CursorError ? 400 : 503;
     console.warn(JSON.stringify({ event: 'mcp_tool', tool, actorId: actorId(), outcome: 'error', status, elapsedMs: Date.now() - started }));
     const message = error instanceof UpstreamError || error instanceof CursorError ? error.message : 'The requested data could not be loaded.';

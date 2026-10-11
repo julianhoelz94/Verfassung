@@ -4,6 +4,7 @@ import { createMcpHandler } from '@modelcontextprotocol/server';
 import { toNodeHandler } from '@modelcontextprotocol/node';
 import { createServer } from './server.js';
 import { authenticateMcpKey, UpstreamError } from './catalog.js';
+import { enter, metrics } from './operations.js';
 
 const handler = toNodeHandler(createMcpHandler(ctx => createServer(ctx.requestInfo?.headers.get('authorization') ?? undefined), { maxRequestBodySize: 5 * 1024 * 1024 }), { maxRequestBodySize: 5 * 1024 * 1024 });
 const port = Number(process.env.PORT ?? '8080');
@@ -38,6 +39,11 @@ createHttpServer((request, response) => {
     response.end('ok');
     return;
   }
+  if (request.url === '/internal/metrics' && request.method === 'GET') {
+    response.writeHead(200, { 'Content-Type': 'text/plain; version=0.0.4' });
+    response.end(metrics());
+    return;
+  }
   if (request.url !== '/mcp') {
     response.writeHead(404).end();
     return;
@@ -59,13 +65,31 @@ createHttpServer((request, response) => {
     response.end(JSON.stringify({ error: 'MCP key required' }));
     return;
   }
+  const leaveAuthentication = enter(`auth:${ip}`);
+  if (!leaveAuthentication) {
+    response.writeHead(429, { 'Retry-After': '1', 'Content-Type': 'application/json' });
+    response.end(JSON.stringify({ error: 'MCP authentication concurrency limit reached' }));
+    return;
+  }
   void authenticateMcpKey(authorization).then(actor => {
+    leaveAuthentication();
+    const leave = enter(actor.id ?? 'unknown');
+    if (!leave) {
+      response.writeHead(429, { 'Retry-After': '1', 'Content-Type': 'application/json' });
+      response.end(JSON.stringify({ error: 'MCP concurrency limit reached' }));
+      return;
+    }
+    response.once('close', leave);
     (request as typeof request & { auth?: { token: string; clientId: string; scopes: string[]; resource?: URL; resourceMetadataUrl: string } }).auth = {
       token: authorization.slice('Bearer '.length), clientId: actor.id ?? 'unknown', scopes: actor.scopes,
       ...(actor.resource ? { resource: new URL(actor.resource) } : {}), resourceMetadataUrl,
     };
-    void handler(request, response);
+    void handler(request, response).catch(() => {
+      if (!response.headersSent) response.writeHead(503).end();
+      else response.end();
+    }).finally(leave);
   }, (error: unknown) => {
+    leaveAuthentication();
     const status = error instanceof UpstreamError && (error.status === 401 || error.status === 403) ? error.status : 503;
     if (status !== 503 && rateLimited(ip)) {
       response.writeHead(429, { 'Retry-After': '60' }).end();

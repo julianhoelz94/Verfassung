@@ -65,7 +65,10 @@ async function runLogged<T extends Record<string, unknown>>(tool: string, action
 }
 
 export function createServer(authorization?: string): McpServer {
-  const server = new McpServer({ name: 'constitution-atlas', version: '0.1.0' }, { capabilities: { tools: {} } });
+  const server = new McpServer(
+    { name: 'constitution-atlas', version: '0.1.0' },
+    { capabilities: { tools: {} }, cacheHints: { 'tools/list': { ttlMs: 60_000, cacheScope: 'private' }, 'server/discover': { ttlMs: 60_000, cacheScope: 'private' } } },
+  );
   let auditActorId: string | undefined;
   const run = <T extends Record<string, unknown>>(tool: string, action: () => Promise<T>) => runLogged(tool, action, () => auditActorId);
 

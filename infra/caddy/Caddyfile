@@ -43,7 +43,7 @@
 
 	# Public reading stays anonymous. Caddy supplies the real peer address and asks
 	# the gateway to exempt only sessions validated by Identity. The gateway returns
-	# 429 with Retry-After after 120 anonymous requests per client IP per minute.
+	# 429 with Retry-After after 600 anonymous requests per client IP per minute.
 	@public_api {
 		method GET HEAD
 		path /api/catalog* /api/content* /api/amendment* /api/search*

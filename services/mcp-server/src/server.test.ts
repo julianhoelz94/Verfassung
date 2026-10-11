@@ -125,7 +125,9 @@ test('tool discovery describes read and staged-write retry behavior', async () =
     } } }),
   }));
   assert.equal(response.status, 200);
-  const body = await response.json() as { result: { tools: Array<{ name: string; annotations: { readOnlyHint: boolean; idempotentHint: boolean; destructiveHint: boolean } }> } };
+  const body = await response.json() as { result: { ttlMs?: number; cacheScope?: string; tools: Array<{ name: string; annotations: { readOnlyHint: boolean; idempotentHint: boolean; destructiveHint: boolean } }> } };
+  assert.equal(body.result.ttlMs, 60_000);
+  assert.equal(body.result.cacheScope, 'private');
   const byName = new Map(body.result.tools.map(tool => [tool.name, tool.annotations]));
   assert.equal(byName.get('list_countries')?.readOnlyHint, true);
   assert.equal(byName.get('stage_batch_item')?.idempotentHint, true);

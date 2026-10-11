@@ -26,9 +26,10 @@ describe('edge API authorization', () => {
   });
 
   it('counts invalid credentials as anonymous and returns Retry-After', async () => {
+    vi.spyOn(Date, 'now').mockReturnValue(1_000);
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null, { status: 401 }));
     const headers = { 'x-atlas-edge-check': '1', 'x-atlas-client-ip': '198.51.100.96', authorization: 'Bearer invalid' };
-    for (let i = 0; i < 120; i++) expect((await GET(request(headers))).status).toBe(204);
+    for (let i = 0; i < 600; i++) expect((await GET(request(headers))).status).toBe(204);
     const response = await GET(request(headers));
     expect(response.status).toBe(429);
     expect(response.headers.get('Retry-After')).toBeTruthy();
@@ -36,8 +37,9 @@ describe('edge API authorization', () => {
   });
 
   it('shows a compact sign-in and retry message for browser API navigation', async () => {
+    vi.spyOn(Date, 'now').mockReturnValue(2_000);
     const headers = { 'x-atlas-edge-check': '1', 'x-atlas-client-ip': '198.51.100.98', accept: 'text/html' };
-    for (let i = 0; i < 120; i++) await GET(request(headers));
+    for (let i = 0; i < 600; i++) await GET(request(headers));
     const response = await GET(request(headers));
     expect(response.status).toBe(429);
     expect(response.headers.get('content-type')).toContain('text/html');

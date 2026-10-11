@@ -2,7 +2,7 @@
 // A shared store is required before scaling the gateway horizontally.
 type Bucket = { tokens: number; updatedAt: number };
 const buckets = new Map<string, Bucket>();
-const CAPACITY = 120;
+const CAPACITY = 600;
 const REFILL_PER_MS = CAPACITY / 60_000;
 const MAX_BUCKETS = 20_000;
 

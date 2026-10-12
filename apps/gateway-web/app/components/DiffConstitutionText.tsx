@@ -97,6 +97,12 @@ function OrderedDiff({ entries, opposite, side, outline, oppositeOutline, legacy
   }
   return <OrderedContentTree entries={entries} outline={outline} idPrefix={`diff-${side}-`}
     renderText={(entry) => marks(entry.text ?? '', texts.get(entry)?.text ?? '')}
+    renderTableCell={(cell, entry) => {
+      const other = texts.get(entry)?.table?.rows.flatMap(row => row.cells).find(candidate => candidate.logicalId === cell.logicalId);
+      const metadataChanged = other && (other.header !== cell.header || other.rowSpan !== cell.rowSpan || other.colSpan !== cell.colSpan || JSON.stringify(other.headers ?? []) !== JSON.stringify(cell.headers ?? []));
+      return metadataChanged ? <span className="diff-cell-changed" title="Table cell structure changed">{marks(cell.text, other.text)}</span> : marks(cell.text, other?.text ?? '');
+    }}
+    renderTableCaption={(entry) => marks(entry.table?.caption ?? '', texts.get(entry)?.table?.caption ?? '')}
     renderHeading={(node, heading) => {
       const other = nodes.get(node);
       return marks(heading, other ? nodeHeading(kindByCode(oppositeOutline, other.kind), { kind: other.kind, label: other.label, number: other.label, title: other.title }) ?? '' : '');

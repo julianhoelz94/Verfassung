@@ -106,6 +106,14 @@ function comparableNodes(nodes) {
 
 async function verifyArticles(versionId, payload) {
   const articles = await api('GET', `content/versions/${versionId}/articles?includeBody=true&limit=200`);
+  if (payload.roots?.length) {
+    assertEqual(articles.length, payload.roots.length, `${payload.isoCode}/${payload.versionLabel} root count`);
+    payload.roots.forEach((root, index) => {
+      assertFields(articles[index], { kind: root.kind, articleNumber: root.label ?? '', title: root.title ?? '' }, ['kind', 'articleNumber', 'title'], `root ${index + 1}`);
+      assertEqual(articles[index].sortOrder, index + 1, `root ${index + 1} order`);
+    });
+    return;
+  }
   assertEqual(articles.length, payload.articles.length, `${payload.isoCode}/${payload.versionLabel} article count`);
   payload.articles.forEach((expected, index) => {
     const actual = articles[index];
@@ -119,6 +127,22 @@ async function verifyArticles(versionId, payload) {
     assertEqual(JSON.stringify(comparableNodes(detail.children)), JSON.stringify(comparableNodes(payload.articles[index].nodes)),
       `${payload.isoCode}/${payload.versionLabel} article ${index + 1} nested content`);
   }
+}
+function comparableEntries(entries) {
+  return (entries ?? []).map((entry) => entry.node ? { type: 'child', node: comparableRoot(entry.node) } : {
+    type: 'text', logicalId: entry.logicalId, text: entry.text ?? (entry.table?.rows.map(row => row.cells.map(cell => cell.text).join(' ')).join('\n') ?? null), format: entry.format ?? null,
+    table: entry.table ?? null, footnoteLabel: entry.footnoteLabel ?? null, references: entry.references ?? [],
+  });
+}
+function comparableRoot(node) {
+  return { logicalId: node.logicalId, kind: node.kind, label: node.label ?? null, title: node.title ?? null, content: comparableEntries(node.content) };
+}
+async function verifyRoots(versionId, payload) {
+  if (!payload.roots?.length) return;
+  const snapshot = await api('GET', `content/versions/${versionId}/content`);
+  assertEqual(JSON.stringify(snapshot.roots.map(comparableRoot)), JSON.stringify(payload.roots.map(comparableRoot)), `${payload.isoCode}/${payload.versionLabel} ordered roots`);
+  const exported = await api('GET', `content/versions/${versionId}/export`);
+  assertEqual(JSON.stringify(exported.roots.map(comparableRoot)), JSON.stringify(payload.roots.map(comparableRoot)), `${payload.isoCode}/${payload.versionLabel} export`);
 }
 
 async function ensureVersions(ids) {
@@ -152,15 +176,18 @@ async function ensureVersions(ids) {
       const actualOutline = constitution.contentOutline.kinds.map((kind) => ({
         kindCode: kind.kindCode, displayLabel: kind.displayLabel, presentation: kind.presentation,
         showLabel: kind.showLabel, showTitle: kind.showTitle, showKind: kind.showKind,
+        ...(payload.roots?.length ? { root: kind.root, allowedChildKinds: kind.allowedChildKinds } : {}),
       }));
       const expectedOutline = payload.outline.kinds.map((kind) => ({
         kindCode: kind.kindCode, displayLabel: kind.displayLabel, presentation: kind.presentation ?? 'section',
         showLabel: kind.showLabel ?? true, showTitle: kind.showTitle ?? false, showKind: kind.showKind ?? false,
+        ...(payload.roots?.length ? { root: kind.root, allowedChildKinds: kind.allowedChildKinds } : {}),
       }));
       assertEqual(JSON.stringify(actualOutline), JSON.stringify(expectedOutline), `${version.key} outline`);
       ids.constitutions[country.isoCode] = constitution.id;
       ids.versions[version.key] = existing.id;
       await verifyArticles(existing.id, payload);
+      await verifyRoots(existing.id, payload);
     }
   }
 }

@@ -1,11 +1,11 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "namespace": "atlas-e2e",
   "expected": {
-    "countries": 2,
-    "constitutions": 2,
-    "versions": 5,
-    "articles": 60,
+    "countries": 3,
+    "constitutions": 3,
+    "versions": 7,
+    "articles": 66,
     "amendments": 3
   },
   "countries": [
@@ -43,6 +43,22 @@
           "key": "xb-2023",
           "file": "xb-2023.json",
           "predecessor": "xb-2018"
+        }
+      ]
+    },
+    {
+      "isoCode": "XC",
+      "constitutionSlug": "structure-charter",
+      "versions": [
+        {
+          "key": "xc-2020",
+          "file": "xc-2020.json",
+          "predecessor": null
+        },
+        {
+          "key": "xc-2024",
+          "file": "xc-2024.json",
+          "predecessor": "xc-2020"
         }
       ]
     }

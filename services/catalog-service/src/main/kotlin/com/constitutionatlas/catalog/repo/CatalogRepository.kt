@@ -380,8 +380,8 @@ class CatalogRepository(private val jdbc: JdbcTemplate) {
             """
             INSERT INTO constitution_node_kinds (
               id, constitution_id, kind_code, display_label, sort_order, may_hold_text, may_hold_children,
-              presentation, show_label, show_title, show_kind
-            ) VALUES (?, ?, 'article', 'Article', 1, TRUE, FALSE, 'section', TRUE, TRUE, TRUE)
+              presentation, show_label, show_title, show_kind, is_root
+            ) VALUES (?, ?, 'article', 'Article', 1, TRUE, FALSE, 'section', TRUE, TRUE, TRUE, TRUE)
             """.trimIndent(),
             UUID.randomUUID(),
             constitutionId,
@@ -391,9 +391,11 @@ class CatalogRepository(private val jdbc: JdbcTemplate) {
     fun findOutline(constitutionId: UUID): ContentOutlineDto {
         val edges = jdbc.query(
             """
-            SELECT parent_kind_code, child_kind_code
-            FROM constitution_node_kind_edges
-            WHERE constitution_id = ?
+            SELECT e.parent_kind_code, e.child_kind_code
+            FROM constitution_node_kind_edges e
+            JOIN constitution_node_kinds child ON child.constitution_id = e.constitution_id AND child.kind_code = e.child_kind_code
+            WHERE e.constitution_id = ?
+            ORDER BY child.sort_order
             """.trimIndent(),
             { rs, _ -> rs.getString("parent_kind_code") to rs.getString("child_kind_code") },
             constitutionId,
@@ -402,7 +404,7 @@ class CatalogRepository(private val jdbc: JdbcTemplate) {
             """
             SELECT kind_code, display_label, sort_order, may_hold_text, may_hold_children,
                    presentation, show_label, show_title, show_kind, allow_text_alongside_children,
-                   title_policy, label_policy, label_placement, segmentation
+                   title_policy, label_policy, label_placement, segmentation, is_root
             FROM constitution_node_kinds
             WHERE constitution_id = ?
             ORDER BY sort_order
@@ -425,6 +427,7 @@ class CatalogRepository(private val jdbc: JdbcTemplate) {
                     labelPolicy = rs.getString("label_policy"),
                     labelPlacement = rs.getString("label_placement"),
                     segmentation = rs.getString("segmentation"),
+                    root = rs.getBoolean("is_root"),
                 )
             },
             constitutionId,
@@ -443,22 +446,22 @@ class CatalogRepository(private val jdbc: JdbcTemplate) {
         jdbc.update("DELETE FROM constitution_node_kind_edges WHERE constitution_id = ?", constitutionId)
         jdbc.update("DELETE FROM constitution_node_kinds WHERE constitution_id = ?", constitutionId)
         kinds.forEachIndexed { index, kind ->
-            val last = index == kinds.lastIndex
+            val children = kind.allowedChildKinds.orEmpty()
             jdbc.update(
                 """
                 INSERT INTO constitution_node_kinds (
                   id, constitution_id, kind_code, display_label, sort_order, may_hold_text, may_hold_children,
                   presentation, show_label, show_title, show_kind, allow_text_alongside_children,
-                  title_policy, label_policy, label_placement, segmentation
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                  title_policy, label_policy, label_placement, segmentation, is_root
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """.trimIndent(),
                 UUID.randomUUID(),
                 constitutionId,
                 kind.kindCode,
                 kind.displayLabel,
                 index + 1,
-                last || kind.allowTextAlongsideChildren,
-                !last,
+                children.isEmpty() || kind.allowTextAlongsideChildren,
+                children.isNotEmpty(),
                 kind.presentation,
                 kind.showLabel,
                 kind.showTitle,
@@ -468,18 +471,19 @@ class CatalogRepository(private val jdbc: JdbcTemplate) {
                 kind.labelPolicy,
                 kind.labelPlacement,
                 kind.segmentation,
+                kind.root == true,
             )
         }
-        kinds.zipWithNext().forEach { (parent, child) ->
-            jdbc.update(
+        kinds.forEach { parent ->
+            parent.allowedChildKinds.orEmpty().forEach { child -> jdbc.update(
                 """
                 INSERT INTO constitution_node_kind_edges (constitution_id, parent_kind_code, child_kind_code)
                 VALUES (?, ?, ?)
                 """.trimIndent(),
                 constitutionId,
                 parent.kindCode,
-                child.kindCode,
-            )
+                child,
+            ) }
         }
     }
 

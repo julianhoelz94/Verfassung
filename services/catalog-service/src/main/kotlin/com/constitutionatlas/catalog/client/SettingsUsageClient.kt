@@ -26,14 +26,16 @@ class SettingsUsageClient(
             versions.forEach { version ->
                 val snapshot = content.get().uri("/versions/{id}/content", version).retrieve().body(JsonNode::class.java)
                     ?: throw ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Content impact unavailable")
-                fun walk(node: JsonNode, depth: Int) {
+                val byCode = proposed.associateBy { it.kindCode }
+                fun walk(node: JsonNode, parent: OutlineKindWrite?) {
                     val logical = node.path("logicalId").asText().takeIf { it.isNotEmpty() }?.let(UUID::fromString)
                     fun violation(field: String, message: String) {
                         violations += SettingsViolation(version, logical, field, message)
                     }
-                    val level = proposed.getOrNull(depth)
-                    if (level == null || level.kindCode != node.path("kind").asText()) {
-                        violation("kind", "Occupied hierarchy differs from the proposed outline")
+                    val code = node.path("kind").asText()
+                    val level = byCode[code]
+                    if (level == null || (parent == null && level.root != true) || (parent != null && code !in parent.allowedChildKinds.orEmpty())) {
+                        violation("kind", "Stored '$code' is not allowed ${if (parent == null) "at the root" else "under '${parent.kindCode}'"}")
                         return
                     }
                     val title = node.path("title").takeUnless { it.isNull }?.asText().orEmpty()
@@ -42,13 +44,13 @@ class SettingsUsageClient(
                     if ((level.labelPolicy == "required" && label.isBlank()) || (level.labelPolicy == "none" && label.isNotEmpty())) violation("label", "Stored literal label violates the proposed policy")
                     node.path("content").forEach { entry ->
                         if (entry.path("type").asText() == "child") {
-                            walk(entry.path("node"), depth + 1)
-                        } else if (depth != proposed.lastIndex && !level.allowTextAlongsideChildren) {
+                            walk(entry.path("node"), level)
+                        } else if (level.allowedChildKinds.orEmpty().isNotEmpty() && !level.allowTextAlongsideChildren) {
                             violation("content", "Stored parent text requires permission alongside children")
                         }
                     }
                 }
-                snapshot.path("roots").forEach { walk(it, 0) }
+                snapshot.path("roots").forEach { walk(it, null) }
                 if (authorization != null) {
                     val sessions = editor.get().uri("/edit-sessions?versionId={id}", version).header("Authorization", authorization).retrieve().body(JsonNode::class.java)
                         ?: throw ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Draft impact unavailable")

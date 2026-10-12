@@ -1,8 +1,8 @@
 import type { ContentOutline } from './api';
 
-export type DraftEntry = { occurrenceId?: string | null; type: 'text' | 'child'; node?: DraftNode | null; logicalId?: string | null; revisionId?: string | null; draftId?: string | null; text?: string | null };
+export type DraftEntry = { occurrenceId?: string | null; type: 'text' | 'child'; node?: DraftNode | null; logicalId?: string | null; revisionId?: string | null; draftId?: string | null; text?: string | null; format?: 'plain' | 'table' | 'footnote' | null; table?: import('./api').OrderedTable | null; footnoteLabel?: string | null; references?: import('./api').OrderedInlineReference[] };
 export type DraftNode = { occurrenceId?: string | null; logicalId: string; revisionId?: string | null; draftId?: string | null; kind: string; label?: string | null; title?: string | null; content: DraftEntry[] };
-export type DraftOperation = { id: string; type: string; targetId: string; expectedRevisionId: string; text?: string; title?: string | null; label?: string | null; position?: number; destinationParentId?: string; destinationRevisionId?: string; parts?: { logicalId: string; text: string }[]; mergeIds?: string[]; node?: DraftNode };
+export type DraftOperation = { id: string; type: string; targetId: string; expectedRevisionId: string; text?: string; title?: string | null; label?: string | null; position?: number; destinationParentId?: string; destinationRevisionId?: string; parts?: { logicalId: string; text: string; format?: DraftEntry['format']; table?: DraftEntry['table']; footnoteLabel?: string | null; references?: DraftEntry['references'] }[]; mergeIds?: string[]; node?: DraftNode; format?: DraftEntry['format']; table?: DraftEntry['table']; footnoteLabel?: string | null; references?: DraftEntry['references'] };
 export type StructuredPreview = { sessionId: string; sourceVersionId: string; sourceGeneration: number; settingsRevisionId: string; generation: number; roots: DraftNode[]; sourceRoots: DraftNode[]; operations: DraftOperation[] };
 export function token(unit: DraftNode | DraftEntry): string { return unit.draftId ?? unit.revisionId ?? ''; }
 export function nodes(roots: DraftNode[]): DraftNode[] { return roots.flatMap(node => [node, ...nodes(node.content.flatMap(entry => entry.node ? [entry.node] : []))]); }
@@ -41,15 +41,15 @@ export function applyOperation(roots: DraftNode[], op: DraftOperation): DraftNod
     const index = content.findIndex(entry => entry.logicalId === op.targetId || entry.node?.logicalId === op.targetId);
     if (index >= 0) {
       const entry = content[index];
-      if (op.type === 'replace_text') content = content.map((item, i) => i === index ? { ...item, text: op.text, draftId: op.id } : item);
+      if (op.type === 'replace_text') content = content.map((item, i) => i === index ? { ...item, text: op.text, draftId: op.id, ...(op.format === undefined ? {} : { format: op.format, table: op.table, footnoteLabel: op.footnoteLabel, references: op.references ?? [] }) } : item);
       if (op.type === 'remove') content = content.filter((_, i) => i !== index);
       if (op.type === 'split_text') {
-        if (entry.type !== 'text' || op.parts!.map(part => part.text).join('') !== entry.text) throw new Error('Split must preserve the exact text.');
+        if (entry.type !== 'text' || (entry.format && entry.format !== 'plain') || entry.table || entry.references?.length || op.parts!.map(part => part.text).join('') !== entry.text) throw new Error('Split must preserve plain text exactly.');
         content = [...content.slice(0, index), ...op.parts!.map(part => ({ type: 'text' as const, ...part, draftId: op.id })), ...content.slice(index + 1)];
       }
       if (op.type === 'merge_text') {
         const adjacent = content.slice(index, index + op.mergeIds!.length);
-        if (adjacent.some((item, i) => item.type !== 'text' || item.logicalId !== op.mergeIds![i])) throw new Error('Merge cannot cross a child boundary.');
+        if (adjacent.some((item, i) => item.type !== 'text' || (item.format && item.format !== 'plain') || item.table || item.references?.length || item.logicalId !== op.mergeIds![i])) throw new Error('Merge cannot cross a child or rich entry boundary.');
         content = [...content.slice(0, index), { type: 'text', ...op.parts![0], draftId: op.id }, ...content.slice(index + adjacent.length)];
       }
       if (content !== result.content) result = { ...result, content, draftId: op.id };
@@ -64,9 +64,12 @@ function markInserted(node: DraftNode, id: string): DraftNode {
 }
 export function validateDraft(roots: DraftNode[], outline: ContentOutline): string[] {
   const errors: string[] = []; const identities = new Set<string>();
-  function walk(node: DraftNode, depth: number) {
-    const level = outline.kinds[depth]; const name = `${level?.displayLabel ?? node.kind} ${node.label ?? ''}`.trim();
-    if (!level || level.kindCode !== node.kind) { errors.push(`${name}: invalid level.`); return; }
+  const byCode = new Map(outline.kinds.map(kind => [kind.kindCode, kind]));
+  const rootsAllowed = new Set(outline.kinds.filter(kind => kind.root).map(kind => kind.kindCode));
+  if (rootsAllowed.size === 0 && outline.kinds[0]) rootsAllowed.add(outline.kinds[0].kindCode);
+  function walk(node: DraftNode, parent?: ContentOutline['kinds'][number]) {
+    const level = byCode.get(node.kind); const name = `${level?.displayLabel ?? node.kind} ${node.label ?? ''}`.trim();
+    if (!level || (parent ? !parent.allowedChildKinds.includes(node.kind) : !rootsAllowed.has(node.kind))) { errors.push(`${name}: invalid parent or root kind.`); return; }
     if (identities.has(node.logicalId)) errors.push(`${name}: duplicate identity.`); identities.add(node.logicalId);
     for (const field of ['title', 'label'] as const) {
       const policy = field === 'title' ? level.titlePolicy : level.labelPolicy;
@@ -74,12 +77,12 @@ export function validateDraft(roots: DraftNode[], outline: ContentOutline): stri
       if (policy === 'none' && node[field]) errors.push(`${name}: ${field} is not allowed.`);
     }
     node.content.forEach(entry => {
-      if (entry.node) { if (!level.mayHoldChildren || !level.allowedChildKinds.includes(entry.node.kind)) errors.push(`${name}: child kind is not allowed.`); walk(entry.node, depth + 1); }
+      if (entry.node) { if (!level.mayHoldChildren || !level.allowedChildKinds.includes(entry.node.kind)) errors.push(`${name}: child kind is not allowed.`); walk(entry.node, level); }
       else if (!level.mayHoldText || entry.text == null || !entry.logicalId || identities.has(entry.logicalId)) errors.push(`${name}: invalid text entry.`);
       else identities.add(entry.logicalId);
     });
   }
-  roots.forEach(node => walk(node, 0)); return errors;
+  roots.forEach(node => walk(node)); return errors;
 }
 export function sentenceParts(text: string): string[] {
   const parts: string[] = []; let start = 0;
@@ -105,7 +108,7 @@ export function draftDifferences(source: DraftNode[], target: DraftNode[]): Draf
     const result = new Map<string, Unit>();
     function walk(node: DraftNode, parent: string, position: number) {
       result.set(node.logicalId, { id: node.logicalId, revision: token(node), fields: { title: node.title ?? '', label: node.label ?? '', parent, position: String(position) } });
-      node.content.forEach((entry, index) => entry.node ? walk(entry.node, node.logicalId, index) : result.set(entry.logicalId!, { id: entry.logicalId!, revision: token(entry), fields: { text: entry.text ?? '', parent: node.logicalId, position: String(index) } }));
+      node.content.forEach((entry, index) => entry.node ? walk(entry.node, node.logicalId, index) : result.set(entry.logicalId!, { id: entry.logicalId!, revision: token(entry), fields: { text: entry.text ?? '', rich: JSON.stringify({ format: entry.format ?? 'plain', table: entry.table ?? null, footnoteLabel: entry.footnoteLabel ?? null, references: entry.references ?? [] }), parent: node.logicalId, position: String(index) } }));
     }
     roots.forEach((root, i) => walk(root, '', i)); return result;
   }
@@ -120,5 +123,5 @@ export function draftDifferences(source: DraftNode[], target: DraftNode[]): Draf
 
 /** Draft preview IDs are local anchors; historical public IDs remain version scoped. */
 export function readerNode(node: DraftNode): import('./api').OrderedNode {
-  return { ...node, label: node.label ?? null, title: node.title ?? null, revisionId: token(node), occurrenceId: `draft-${node.logicalId}`, content: node.content.map(entry => entry.node ? { type: 'child', node: readerNode(entry.node) } : { type: 'text', logicalId: entry.logicalId, revisionId: token(entry), text: entry.text, occurrenceId: `draft-${entry.logicalId}` }) };
+  return { ...node, label: node.label ?? null, title: node.title ?? null, revisionId: token(node), occurrenceId: `draft-${node.logicalId}`, content: node.content.map(entry => entry.node ? { type: 'child', node: readerNode(entry.node) } : { type: 'text', logicalId: entry.logicalId, revisionId: token(entry), text: entry.text, format: entry.format, table: entry.table, footnoteLabel: entry.footnoteLabel, references: entry.references, occurrenceId: `draft-${entry.logicalId}` }) };
 }

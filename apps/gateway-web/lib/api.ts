@@ -73,6 +73,7 @@ export type ContentOutline = {
     labelPolicy?: string;
     labelPlacement?: string;
     segmentation?: string;
+    root?: boolean;
   }[];
 };
 
@@ -599,6 +600,8 @@ export type OutlineKindWrite = {
   labelPolicy?: 'none' | 'optional' | 'required';
   labelPlacement?: 'before_title' | 'after_title' | 'inline' | 'superscript';
   segmentation?: 'plain' | 'sentence';
+  root?: boolean;
+  allowedChildKinds?: string[];
 };
 
 export type OutlineUpdateResult = {
@@ -790,7 +793,10 @@ export function restoreSettings(id: string, revisionId: string, expectedRevision
 }
 
 export type OrderedNode = { logicalId: string; revisionId: string; occurrenceId: string; kind: string; label: string | null; title: string | null; content: OrderedEntry[] };
-export type OrderedEntry = { type: 'text' | 'child'; node?: OrderedNode | null; logicalId?: string | null; revisionId?: string | null; occurrenceId?: string | null; text?: string | null };
+export type OrderedTableCell = { logicalId: string; text: string; header?: boolean; rowSpan?: number; colSpan?: number; headers?: string[] };
+export type OrderedTable = { caption?: string | null; rows: { logicalId: string; cells: OrderedTableCell[] }[] };
+export type OrderedInlineReference = { logicalId: string; start: number; end: number; target: { type: 'unit' | 'external' | 'footnote'; logicalId?: string | null; url?: string | null; footnoteId?: string | null } };
+export type OrderedEntry = { type: 'text' | 'child'; node?: OrderedNode | null; logicalId?: string | null; revisionId?: string | null; occurrenceId?: string | null; text?: string | null; format?: 'plain' | 'table' | 'footnote' | null; table?: OrderedTable | null; footnoteLabel?: string | null; references?: OrderedInlineReference[] };
 
 export function getVersionSettings(versionId: string): Promise<SettingsRevision | null> {
   return readJson<SettingsRevision>(`${catalogBaseUrl()}/versions/${encodeURIComponent(versionId)}/settings`, 'catalog');

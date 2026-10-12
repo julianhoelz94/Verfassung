@@ -9,6 +9,11 @@ import com.constitutionatlas.content.client.StructuralLevel
 import com.constitutionatlas.content.client.StructuralOutline
 import com.constitutionatlas.content.client.StructuralSettings
 import com.constitutionatlas.content.service.OrderedContentService
+import com.constitutionatlas.platform.OrderedInlineReference
+import com.constitutionatlas.platform.OrderedReferenceTarget
+import com.constitutionatlas.platform.OrderedTable
+import com.constitutionatlas.platform.OrderedTableCell
+import com.constitutionatlas.platform.OrderedTableRow
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Test
@@ -36,6 +41,61 @@ class OrderedContentApiTest {
     @Autowired lateinit var jdbc: JdbcTemplate
 
     @MockBean lateinit var catalog: CatalogClient
+
+    @Test
+    fun richEntriesPersistAndExportWithExplicitTargets() {
+        val version = UUID.randomUUID()
+        val constitution = UUID.randomUUID()
+        Mockito.`when`(catalog.getVersion(version)).thenReturn(CatalogVersion(version, "draft", constitution))
+        Mockito.`when`(catalog.getSettings(version)).thenReturn(StructuralSettings(UUID.randomUUID(), StructuralOutline(listOf(
+            StructuralLevel("article", true, false, emptyList(), root = true),
+            StructuralLevel("appendix", true, false, emptyList(), root = true),
+        ))))
+        val articleId = UUID.randomUUID()
+        val noteId = UUID.randomUUID()
+        val appendixId = UUID.randomUUID()
+        val headingId = UUID.randomUUID()
+        val table = OrderedTable("Schedule", listOf(
+            OrderedTableRow(UUID.randomUUID(), listOf(OrderedTableCell(headingId, "Duty", header = true))),
+            OrderedTableRow(UUID.randomUUID(), listOf(OrderedTableCell(UUID.randomUUID(), "Report", headers = listOf(headingId)))),
+        ))
+        val roots = listOf(
+            OrderedNodeWrite(logicalId = articleId, kind = "article", content = listOf(
+                OrderedEntryWrite("text", text = "See note.", references = listOf(OrderedInlineReference(UUID.randomUUID(), 4, 8, OrderedReferenceTarget("footnote", footnoteId = noteId)))),
+                OrderedEntryWrite("text", logicalId = noteId, text = "Source note.", format = "footnote", footnoteLabel = "1"),
+            )),
+            OrderedNodeWrite(logicalId = appendixId, kind = "appendix", content = listOf(OrderedEntryWrite("text", format = "table", table = table))),
+        )
+        val saved = content.save(version, OrderedSnapshotWrite(0, roots = roots))
+        assertThat(saved.roots[0].content[0].references.single().target.footnoteId).isEqualTo(noteId)
+        assertThat(saved.roots[1].content.single().text).isEqualTo("Duty\nReport")
+        assertThat(content.get(version).roots[1].content.single().table).isEqualTo(table)
+        assertThat(content.export(version).roots[1].content!!.single().table).isEqualTo(table)
+    }
+
+    @Test
+    fun mixedRootKindsAndSkippedLevelsKeepTheirOrder() {
+        val version = UUID.randomUUID()
+        val constitution = UUID.randomUUID()
+        Mockito.`when`(catalog.getVersion(version)).thenReturn(CatalogVersion(version, "draft", constitution))
+        Mockito.`when`(catalog.getSettings(version)).thenReturn(
+            StructuralSettings(UUID.randomUUID(), StructuralOutline(listOf(
+                StructuralLevel("article", false, true, listOf("paragraph"), root = true),
+                StructuralLevel("paragraph", true, false, emptyList()),
+                StructuralLevel("preamble", true, false, emptyList(), root = true),
+                StructuralLevel("appendix", true, false, emptyList(), root = true),
+            ))),
+        )
+        val roots = listOf(
+            OrderedNodeWrite(kind = "preamble", title = "Purpose", content = listOf(OrderedEntryWrite("text", text = "We the people."))),
+            OrderedNodeWrite(kind = "article", label = "1", content = listOf(OrderedEntryWrite("child", node = OrderedNodeWrite(kind = "paragraph", content = listOf(OrderedEntryWrite("text", text = "A right.")))))),
+            OrderedNodeWrite(kind = "appendix", content = listOf(OrderedEntryWrite("text", text = "Unnumbered schedule."))),
+        )
+        val snapshot = content.save(version, OrderedSnapshotWrite(0, roots = roots))
+        assertThat(snapshot.roots.map { it.kind }).containsExactly("preamble", "article", "appendix")
+        assertThat(snapshot.roots.last().title).isNull()
+        assertThat(content.export(version).roots.map { it.kind }).containsExactly("preamble", "article", "appendix")
+    }
 
     @Test
     fun partChapterArticleRootsPreserveKindOrderAndExportIdentity() {

@@ -191,7 +191,7 @@ class StructuredDiffReviewService(private val sources: StructuredSourceClient, p
     private fun asDiffNode(node: DraftNode, ancestry: Map<UUID, List<UUID>>): DiffNode = DiffNode(node.logicalId, node.revisionId, node.occurrenceId ?: node.draftId, node.kind, node.label, node.title, node.content.map { asDiffEntry(it, ancestry) })
     private fun asDiffEntry(entry: DraftEntry, ancestry: Map<UUID, List<UUID>>): DiffEntry = when (entry.type) {
         "child" -> DiffEntry.Child(asDiffNode(requireNotNull(entry.node), ancestry))
-        "text" -> DiffEntry.Text(requireNotNull(entry.logicalId ?: entry.draftId), entry.revisionId, entry.occurrenceId ?: entry.draftId, requireNotNull(entry.text), entry.logicalId?.let { ancestry[it] }.orEmpty())
+        "text" -> DiffEntry.Text(requireNotNull(entry.logicalId ?: entry.draftId), entry.revisionId, entry.occurrenceId ?: entry.draftId, requireNotNull(entry.text), entry.logicalId?.let { ancestry[it] }.orEmpty(), listOf(entry.format, entry.table, entry.footnoteLabel, entry.references).toString())
         else -> throw IllegalArgumentException("Unknown draft entry type '${entry.type}'")
     }
 }

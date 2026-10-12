@@ -36,6 +36,15 @@ function withoutExisting(layers: Layer[]): OutlineKindWrite[] {
   return layers.map(({ existing: _ignored, ...kind }) => kind);
 }
 
+function explicitLayers(kinds: OutlineKindWrite[], existing: boolean): Layer[] {
+  return kinds.map((kind, index) => ({
+    ...kind,
+    root: kind.root ?? index === 0,
+    allowedChildKinds: kind.allowedChildKinds ?? (kinds[index + 1] ? [kinds[index + 1]!.kindCode] : []),
+    existing,
+  }));
+}
+
 export function OutlineEditor({
   constitutionId,
   settingsRevisionId,
@@ -53,7 +62,7 @@ export function OutlineEditor({
   const [basicsSummary, setBasicsSummary] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [layers, setLayers] = useState<Layer[]>(
-    initial.map((kind) => ({ ...kind, existing: Boolean(constitutionId) })),
+    explicitLayers(initial, Boolean(constitutionId)),
   );
 
   const [impact, setImpact] = useState<SettingsImpact | null>(null);
@@ -76,7 +85,11 @@ export function OutlineEditor({
 
   function update(index: number, patch: Partial<Layer>) {
     setImpact(null);
-    setLayers((current) => current.map((layer, i) => (i === index ? { ...layer, ...patch } : layer)));
+    setLayers((current) => current.map((layer, i) => {
+      const renamed = patch.kindCode && patch.kindCode !== current[index]?.kindCode;
+      const children = renamed ? layer.allowedChildKinds?.map(code => code === current[index]?.kindCode ? patch.kindCode! : code) : layer.allowedChildKinds;
+      return i === index ? { ...layer, ...patch, allowedChildKinds: patch.allowedChildKinds ?? children } : { ...layer, allowedChildKinds: children };
+    }));
   }
 
   function addLayer() {
@@ -89,31 +102,49 @@ export function OutlineEditor({
         showLabel: true,
         showTitle: true,
         showKind: false,
+        root: false,
+        allowedChildKinds: [],
         existing: false,
       };
       const leaf = current[current.length - 1];
       // Sentence units stay terminal; add a structural level above them.
-      if (leaf?.kindCode === 'sentence') return [...current.slice(0, -1), added, leaf];
-      return [...current.map((layer) => ({ ...layer, segmentation: 'plain' as const })), added];
+      if (leaf?.kindCode === 'sentence') {
+        const parent = current[current.length - 2];
+        return [...current.slice(0, -2), ...(parent ? [{ ...parent, allowedChildKinds: parent.allowedChildKinds?.map(code => code === 'sentence' ? added.kindCode : code) }] : []), { ...added, allowedChildKinds: ['sentence'] }, leaf];
+      }
+      return [...current.slice(0, -1), ...(leaf ? [{ ...leaf, allowedChildKinds: [...(leaf.allowedChildKinds ?? []), added.kindCode], segmentation: 'plain' as const }] : []), added];
     });
   }
 
+  function addRootKind() {
+    setImpact(null);
+    setLayers(current => [...current, {
+      kindCode: `root-${current.length + 1}`, displayLabel: 'New section', presentation: 'section',
+      showLabel: false, showTitle: true, showKind: true, root: true, allowedChildKinds: [], existing: false,
+    }]);
+  }
+
   function removeLayer(index: number) {
-    if (index === 0) {
+    if (layers.length === 1) {
       return;
     }
     setImpact(null);
-    setLayers((current) => current.filter((_, i) => i !== index).map((layer, i, next) => ({ ...layer, allowTextAlongsideChildren: i === next.length - 1 ? false : layer.allowTextAlongsideChildren })));
+    setLayers((current) => current.filter((_, i) => i !== index).map(layer => {
+      const children = layer.allowedChildKinds?.filter(code => code !== current[index]?.kindCode) ?? [];
+      return { ...layer, allowedChildKinds: children, allowTextAlongsideChildren: children.length ? layer.allowTextAlongsideChildren : false };
+    }));
   }
 
-  const exampleOutline: ContentOutline = { kinds: layers.map((layer, index) => ({ ...layer, sortOrder: index + 1, mayHoldText: index === layers.length - 1 || Boolean(layer.allowTextAlongsideChildren), mayHoldChildren: index < layers.length - 1, allowedChildKinds: layers[index + 1] ? [layers[index + 1]!.kindCode] : [] })) };
-  const example = exampleNode(layers, 0, 'sample', 0);
+  const exampleOutline: ContentOutline = { kinds: layers.map((layer, index) => ({ ...layer, sortOrder: index + 1, mayHoldText: !layer.allowedChildKinds?.length || Boolean(layer.allowTextAlongsideChildren), mayHoldChildren: Boolean(layer.allowedChildKinds?.length), allowedChildKinds: layer.allowedChildKinds ?? [] })) };
+  const example = layers.filter(layer => layer.root).map((layer, index) => exampleNode(layers, layer.kindCode, `sample-${index}`, index, new Set())).filter((node): node is OrderedNode => Boolean(node));
   const codes = layers.map((layer) => layer.kindCode.trim().toLowerCase());
   const outlineError = layers.some((layer) => !layer.displayLabel.trim() || !layer.kindCode.trim())
     ? 'Give every level a name and a generated code.'
     : new Set(codes).size !== codes.length
       ? 'Each level needs a different code. Change a level name or its code under Advanced.'
-      : null;
+      : !layers.some(layer => layer.root) ? 'Choose at least one top-level kind.'
+        : layers.some(layer => layer.allowedChildKinds?.some(code => !codes.includes(code))) ? 'A child kind refers to a missing kind.'
+          : null;
 
   function advance() {
     if (step === 1) {
@@ -160,7 +191,7 @@ export function OutlineEditor({
         <h2 className="setting-inline">Starting structure <SettingInfo label="Starting structure" description="Choose a template for the initial levels. You can adjust every level before creation and revise the structure later after an impact check." changeability="review" /></h2>
         <p className="muted">Choose a starting point, then adjust every level below. Changing templates replaces the current level settings.</p>
         <div className="creation-templates">
-          {([['articles', 'Articles only', 'A short constitution with text in each article'], ['sections', 'Articles and sections', 'Two levels with plain text in each section'], ['sentences', 'Articles, paragraphs, sentences', 'Three levels with sentence editing tools']] as const).map(([id, title, detail]) => <button key={id} type="button" className="creation-template" aria-pressed={template === id} onClick={() => { setTemplate(id); setLayers(outlineFromTemplate(id).map((kind) => ({ ...kind, existing: false }))); setShowErrors(false); }}><strong>{title}</strong><span>{detail}</span></button>)}
+          {([['articles', 'Articles only', 'A short constitution with text in each article'], ['sections', 'Articles and sections', 'Two levels with plain text in each section'], ['sentences', 'Articles, paragraphs, sentences', 'Three levels with sentence editing tools']] as const).map(([id, title, detail]) => <button key={id} type="button" className="creation-template" aria-pressed={template === id} onClick={() => { setTemplate(id); setLayers(explicitLayers(outlineFromTemplate(id), false)); setShowErrors(false); }}><strong>{title}</strong><span>{detail}</span></button>)}
         </div>
       </section> : null}
       {guidedCreation && step === 3 ? <section className="card" aria-label="Review constitution"><h2>Review before creating</h2><p>{basicsSummary}</p><p>{layers.map((layer) => layer.displayLabel).join(' → ')}</p><p>The new constitution can be edited after creation. Content and versions are added in the editor.</p></section> : null}
@@ -172,7 +203,7 @@ export function OutlineEditor({
           <h3>{index + 1}. {layer.displayLabel}</h3>
           <p>Editor titles: {layer.titlePolicy ?? 'optional'} · Literal labels: {layer.labelPolicy ?? 'optional'}</p>
           <p>Public reader: {layer.presentation === 'concatenated' ? 'running text' : 'block'} · Kind {effective.showKind ? 'shown' : 'hidden'} · Label {effective.showLabel ? `shown (${(effective.labelPlacement ?? 'before_title').replaceAll('_', ' ')})` : 'hidden'} · Title {effective.showTitle ? 'shown' : 'hidden'}</p>
-          <p>{index < layers.length - 1 ? layer.allowTextAlongsideChildren ? 'Unnumbered parent text allowed alongside children' : 'Text stays in child units' : `Final text with ${layer.segmentation === 'sentence' ? 'sentence boundary assistance' : 'plain editing'}`}</p>
+          <p>{layer.root ? 'Top-level kind · ' : ''}{layer.allowedChildKinds?.length ? layer.allowTextAlongsideChildren ? 'Unnumbered parent text allowed alongside children' : 'Text stays in child units' : `Text leaf with ${layer.segmentation === 'sentence' ? 'sentence boundary assistance' : 'plain editing'}`}</p>
           </section>;
         })}
       </div> : <ol className="stack">
@@ -180,8 +211,8 @@ export function OutlineEditor({
           <li key={`${layer.kindCode}-${index}`} className="card">
             <p>
               Layer {index + 1}
-              {index === 0 ? ' (top provision)' : ''}
-              {index === layers.length - 1 ? ' · Text leaf' : ' · Structural level'}
+              {layer.root ? ' (top-level kind)' : ''}
+              {!layer.allowedChildKinds?.length ? ' · Text leaf' : ' · Structural kind'}
             </p>
             <Input
               label="Label"
@@ -213,8 +244,16 @@ export function OutlineEditor({
             />
             </details>
             <fieldset>
+              <legend>Structure</legend>
+              <label className="choice-row"><input type="checkbox" checked={Boolean(layer.root)} onChange={event => update(index, { root: event.target.checked })} /> May appear at the top level</label>
+              <p className="muted">Allowed child kinds</p>
+              {layers.filter(candidate => candidate.kindCode !== layer.kindCode).map(candidate => <label className="choice-row" key={candidate.kindCode}>
+                <input type="checkbox" checked={Boolean(layer.allowedChildKinds?.includes(candidate.kindCode))} onChange={event => update(index, { allowedChildKinds: event.target.checked ? [...(layer.allowedChildKinds ?? []), candidate.kindCode] : (layer.allowedChildKinds ?? []).filter(code => code !== candidate.kindCode) })} /> {candidate.displayLabel}
+              </label>)}
+            </fieldset>
+            <fieldset>
               <legend>Editor permissions</legend>
-              {index < layers.length - 1 ? (
+              {Boolean(layer.allowedChildKinds?.length) ? (
                 <div className="field">
                   <span className="setting-inline"><label className="choice-row"><input type="checkbox" checked={Boolean(layer.allowTextAlongsideChildren)} onChange={(event) => update(index, { allowTextAlongsideChildren: event.target.checked })} /> Allow text alongside child units</label><SettingInfo label="Allow text alongside child units" description="Allow unnumbered text before, between, or after the child units at this level." changeability="review" /></span>
                   <span className="muted">Unnumbered parent text can appear before, between, or after child units.</span>
@@ -227,7 +266,7 @@ export function OutlineEditor({
                 <option value="none">Not allowed</option><option value="optional">Optional</option><option value="required">Required</option>
               </Select>
               <p className="muted">Labels such as 46a, bis, and (2a) are entered exactly as written in the source.</p>
-              {index === layers.length - 1 ? <Select label="Text editing tools" info={{ description: 'Choose plain text editing or guided sentence boundaries for the final text level.', changeability: 'review' }} name={`segmentation-${index}`} value={layer.segmentation ?? 'plain'} onChange={(event) => update(index, { segmentation: event.target.value as Layer['segmentation'] })}>
+              {!layer.allowedChildKinds?.length ? <Select label="Text editing tools" info={{ description: 'Choose plain text editing or guided sentence boundaries for the final text level.', changeability: 'review' }} name={`segmentation-${index}`} value={layer.segmentation ?? 'plain'} onChange={(event) => update(index, { segmentation: event.target.value as Layer['segmentation'] })}>
                 <option value="plain">Plain text</option><option value="sentence">Sentence boundary assistance</option>
               </Select> : null}
             </fieldset>
@@ -300,9 +339,9 @@ export function OutlineEditor({
         <h2>{sampleRoots.length ? 'Proposed source sample' : 'Live order example'}</h2>
         <p className="muted">Parent text is unnumbered and belongs to its parent. Editor view scopes are selected separately in the editor.</p>
         <h3>Structure map</h3>
-        {(sampleRoots.length ? sampleRoots : example ? [example] : []).map(node => <ExampleMap key={node.occurrenceId} node={node} outline={exampleOutline} />)}
+        {(sampleRoots.length ? sampleRoots : example).map(node => <ExampleMap key={node.occurrenceId} node={node} outline={exampleOutline} />)}
         <h3>Reader preview</h3>
-        <OrderedContentTree entries={(sampleRoots.length ? sampleRoots : example ? [example] : []).map(node => ({ type: 'child' as const, node }))} outline={exampleOutline} />
+        <OrderedContentTree entries={(sampleRoots.length ? sampleRoots : example).map(node => ({ type: 'child' as const, node }))} outline={exampleOutline} />
         {constitutionId ? <p>Occupied structure and stricter permissions are checked before saving. Changes requiring migration need a reviewed successor.</p> : null}
       </aside>
       </div>
@@ -318,6 +357,7 @@ export function OutlineEditor({
         {(!guidedCreation || step === 2) ? <Button type="button" onClick={addLayer}>
           Add deeper layer
         </Button> : null}
+        {(!guidedCreation || step === 2) ? <Button type="button" onClick={addRootKind}>Add top-level kind</Button> : null}
         {(!guidedCreation || step === 2) ? <SettingInfo label="Add deeper layer" description="Add a nested unit level below the existing levels. Later structural changes require an impact check and may need a reviewed successor." changeability="review" /> : null}
         {(!guidedCreation || step === 2) && layers[layers.length - 1]?.kindCode === 'sentence' ? <p className="muted">New levels are added before the final sentence level.</p> : null}
         {constitutionId ? <Button type="button" onClick={checkImpact} disabled={checking}>{checking ? 'Checking impact…' : 'Preview change impact'}</Button> : null}
@@ -330,26 +370,28 @@ export function OutlineEditor({
   );
 }
 
-function exampleNode(layers: Layer[], depth: number, path: string, sibling: number): OrderedNode | null {
-  const level = layers[depth];
+function exampleNode(layers: Layer[], kindCode: string, path: string, sibling: number, ancestors: Set<string>): OrderedNode | null {
+  const level = layers.find(layer => layer.kindCode === kindCode);
   if (!level) return null;
-  const leaf = depth === layers.length - 1;
+  if (ancestors.has(kindCode)) return null;
+  const children = level.allowedChildKinds ?? [];
+  const leaf = children.length === 0;
   const content: OrderedEntry[] = [];
   function text(position: string, words: string) { content.push({ type: 'text', logicalId: `${path}-${position}`, occurrenceId: `${path}-${position}`, text: words }); }
   if (leaf) text('text', sibling === 0 ? 'Everyone has the right to equal protection.' : 'The law shall protect these rights.');
   else {
     if (level.allowTextAlongsideChildren) text('before', 'The following rights are protected.');
-    const first = exampleNode(layers, depth + 1, `${path}-a`, 0);
+    const first = exampleNode(layers, children[0], `${path}-a`, 0, new Set([...ancestors, kindCode]));
     if (first) content.push({ type: 'child', node: first });
-    if (depth < 2) {
+    if (children.length > 1) {
       if (level.allowTextAlongsideChildren) text('between', 'These rights apply to everyone.');
-      const second = exampleNode(layers, depth + 1, `${path}-b`, 1);
+      const second = exampleNode(layers, children[1], `${path}-b`, 1, new Set([...ancestors, kindCode]));
       if (second) content.push({ type: 'child', node: second });
     }
     if (level.allowTextAlongsideChildren) text('after', 'The law shall uphold these guarantees.');
   }
   return { logicalId: path, revisionId: path, occurrenceId: path, kind: level.kindCode,
-    label: level.labelPolicy === 'none' ? null : depth === 0 ? '46a' : sibling === 0 ? '(1)' : '(2a)',
+    label: level.labelPolicy === 'none' ? null : level.root ? '46a' : sibling === 0 ? '(1)' : '(2a)',
     title: level.titlePolicy === 'none' || (level.titlePolicy === 'optional' && sibling > 0) ? null : `${level.displayLabel} example`, content };
 }
 

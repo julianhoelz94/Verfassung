@@ -1,4 +1,5 @@
 import com.constitutionatlas.content.repo.OrderedContentRepository
+import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import org.assertj.core.api.Assertions.assertThat
 import org.flywaydb.core.Flyway
 import org.flywaydb.core.api.MigrationVersion
@@ -29,7 +30,7 @@ class OrderedContentMigrationTest {
         assertThat(jdbc.queryForObject("SELECT child_revision_id FROM content_revision_entries WHERE parent_revision_id = ? AND position = 1", UUID::class.java, parent)).isEqualTo(child)
         assertThat(jdbc.queryForObject("SELECT node_revision_id FROM content_occurrences WHERE id = ?", UUID::class.java, child)).isEqualTo(child)
         assertThat(jdbc.queryForObject("SELECT body FROM content_nodes WHERE id = ?", String::class.java, parent)).isEqualTo("  Parent\ntext.  ")
-        val repository = OrderedContentRepository(jdbc)
+        val repository = OrderedContentRepository(jdbc, jacksonObjectMapper())
         val before = repository.snapshot(version)
         val textLogical = before.roots.single().content.first().logicalId
         jdbc.update("UPDATE content_nodes SET body = 'Edited parent.' WHERE id = ?", parent)

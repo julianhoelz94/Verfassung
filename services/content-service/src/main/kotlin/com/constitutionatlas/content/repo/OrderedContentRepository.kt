@@ -4,6 +4,8 @@ import com.constitutionatlas.content.api.OrderedEntry
 import com.constitutionatlas.content.api.OrderedNode
 import com.constitutionatlas.content.api.OrderedSnapshot
 import com.constitutionatlas.platform.NotFoundException
+import com.constitutionatlas.platform.OrderedRichContent
+import com.fasterxml.jackson.databind.ObjectMapper
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Repository
 import java.nio.ByteBuffer
@@ -11,7 +13,7 @@ import java.security.MessageDigest
 import java.util.UUID
 
 @Repository
-class OrderedContentRepository(private val jdbc: JdbcTemplate) {
+class OrderedContentRepository(private val jdbc: JdbcTemplate, private val mapper: ObjectMapper) {
     fun exists(version: UUID): Boolean = jdbc.queryForObject("SELECT COUNT(*) FROM content_snapshots WHERE version_id = ?", Int::class.java, version)!! > 0
 
     fun seal(revision: UUID) {
@@ -99,15 +101,17 @@ class OrderedContentRepository(private val jdbc: JdbcTemplate) {
         })
     }
 
-    fun insertText(id: UUID, logical: UUID, version: UUID, predecessor: UUID?, text: String, lineage: List<UUID>) {
+    fun insertText(id: UUID, logical: UUID, version: UUID, predecessor: UUID?, text: String, lineage: List<UUID>, format: String = "plain", rich: OrderedRichContent = OrderedRichContent()) {
         jdbc.update({ connection ->
-            connection.prepareStatement("INSERT INTO content_text_revisions(id, logical_id, origin_version_id, predecessor_id, text, lineage) VALUES (?, ?, ?, ?, ?, ?)").apply {
+            connection.prepareStatement("INSERT INTO content_text_revisions(id, logical_id, origin_version_id, predecessor_id, text, lineage, entry_format, rich_content) VALUES (?, ?, ?, ?, ?, ?, ?, ?::jsonb)").apply {
                 setObject(1, id)
                 setObject(2, logical)
                 setObject(3, version)
                 setObject(4, predecessor)
                 setString(5, text)
                 setArray(6, connection.createArrayOf("uuid", lineage.toTypedArray()))
+                setString(7, format)
+                setString(8, mapper.writeValueAsString(rich))
             }
         })
     }
@@ -145,7 +149,7 @@ class OrderedContentRepository(private val jdbc: JdbcTemplate) {
             if (child != null) registerOccurrences(version, child, old, source)
             if (text != null) {
                 val record = textRecord(text)
-                occurrence(version, record.first, text, true, old[record.first], source[record.first])
+                occurrence(version, record.logicalId, text, true, old[record.logicalId], source[record.logicalId])
             }
         }
     }
@@ -178,7 +182,7 @@ class OrderedContentRepository(private val jdbc: JdbcTemplate) {
                 OrderedEntry("child", node = resolveNode(version, child, path + revision))
             } else {
                 val record = textRecord(text!!)
-                OrderedEntry("text", logicalId = record.first, revisionId = text, occurrenceId = occurrenceId(version, record.first), text = record.second, lineage = record.third)
+                OrderedEntry("text", logicalId = record.logicalId, revisionId = text, occurrenceId = occurrenceId(version, record.logicalId), text = record.text, lineage = record.lineage, format = record.format.takeIf { it != "plain" }, table = record.rich.table, footnoteLabel = record.rich.footnoteLabel, references = record.rich.references)
             }
         }
         return OrderedNode(row.logicalId, revision, occurrenceId(version, row.logicalId), row.kind, row.label, row.title, content, row.inferred, row.lineage)
@@ -190,8 +194,10 @@ class OrderedContentRepository(private val jdbc: JdbcTemplate) {
         revision,
     ).firstOrNull() ?: throw NotFoundException("Unknown node revision '$revision'")
 
-    fun textRecord(revision: UUID): Triple<UUID, String, List<UUID>> = jdbc.query("SELECT logical_id, text, lineage FROM content_text_revisions WHERE id = ?", { rs, _ -> Triple(rs.getObject(1, UUID::class.java), rs.getString(2), (rs.getArray(3).array as Array<*>).map { UUID.fromString(it.toString()) }) }, revision).firstOrNull()
+    fun textRecord(revision: UUID): TextRecord = jdbc.query("SELECT logical_id, text, lineage, entry_format, rich_content::text FROM content_text_revisions WHERE id = ?", { rs, _ -> TextRecord(rs.getObject(1, UUID::class.java), rs.getString(2), (rs.getArray(3).array as Array<*>).map { UUID.fromString(it.toString()) }, rs.getString(4), mapper.readValue(rs.getString(5), OrderedRichContent::class.java)) }, revision).firstOrNull()
         ?: throw NotFoundException("Unknown text revision '$revision'")
+
+    data class TextRecord(val logicalId: UUID, val text: String, val lineage: List<UUID>, val format: String, val rich: OrderedRichContent)
 
     fun entryReferences(revision: UUID): List<Pair<UUID?, UUID?>> = jdbc.query("SELECT text_revision_id, child_revision_id FROM content_revision_entries WHERE parent_revision_id = ? ORDER BY position", { rs, _ -> rs.getObject(1, UUID::class.java) to rs.getObject(2, UUID::class.java) }, revision)
 

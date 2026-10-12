@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import type { ArticleSummary, ContentOutline } from '../../lib/api';
+import type { ArticleSummary, ContentOutline, OrderedEntry } from '../../lib/api';
 import { articleHeading, clipOrderedEntries, clipNodes, depthStopCount, depthStopLabels, kindByCode } from '../../lib/outline';
 import { Badge, type BadgeTone, Toolbar } from './ui';
 import { ConstitutionText } from './ConstitutionText';
@@ -59,6 +59,20 @@ export function VersionReader({
     () => Object.fromEntries(articles.map((article) => [article.articleNumber, article.id])),
     [articles],
   );
+  const unitsByLogicalId = useMemo(() => {
+    const result: Record<string, { rootId: string; occurrenceId: string }> = {};
+    function index(entries: OrderedEntry[], rootId: string) {
+      for (const entry of entries) if (entry.node) {
+        result[entry.node.logicalId] = { rootId, occurrenceId: entry.node.occurrenceId };
+        index(entry.node.content, rootId);
+      }
+    }
+    for (const article of articles) {
+      if (article.logicalId) result[article.logicalId] = { rootId: article.id, occurrenceId: article.id };
+      index(article.content ?? [], article.id);
+    }
+    return result;
+  }, [articles]);
 
   function shownDepth(articleId: string): number {
     return expanded.has(articleId) ? max : depth;
@@ -146,7 +160,7 @@ export function VersionReader({
                       canEditTitles={canEditTitles}
                       returnTo={`/countries/${code}/versions/${versionId}`}
                       lang={language}
-                      crossRefs={{ code, versionId, articlesByNumber }}
+                      crossRefs={{ code, versionId, articlesByNumber, unitsByLogicalId }}
                     />
                   </div>
                 ) : (

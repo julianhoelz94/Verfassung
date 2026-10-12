@@ -49,7 +49,7 @@ export function applyOperation(roots: DraftNode[], op: DraftOperation): DraftNod
       }
       if (op.type === 'merge_text') {
         const adjacent = content.slice(index, index + op.mergeIds!.length);
-        if (adjacent.some((item, i) => item.type !== 'text' || (item.format && item.format !== 'plain') || item.table || item.references?.length || item.logicalId !== op.mergeIds![i])) throw new Error('Merge cannot cross a child or rich entry boundary.');
+        if (adjacent.some((item, i) => item.type !== 'text' || (item.format && item.format !== 'plain') || item.table || item.references?.length || item.logicalId !== op.mergeIds![i])) throw new Error('Merge cannot cross a child boundary or rich entry.');
         content = [...content.slice(0, index), { type: 'text', ...op.parts![0], draftId: op.id }, ...content.slice(index + adjacent.length)];
       }
       if (content !== result.content) result = { ...result, content, draftId: op.id };

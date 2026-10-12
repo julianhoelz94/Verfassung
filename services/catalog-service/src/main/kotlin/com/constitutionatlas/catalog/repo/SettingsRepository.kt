@@ -26,9 +26,13 @@ class SettingsRepository(private val jdbc: JdbcTemplate, private val mapper: Obj
                     rs.getObject("predecessor_id", UUID::class.java),
                     mapper.readValue(rs.getString("outline"), ContentOutlineDto::class.java).let { outline ->
                         // Revisions written before root kinds existed used the first kind as the sole root.
-                        if (outline.kinds.any { it.root }) outline else outline.copy(
-                            kinds = outline.kinds.mapIndexed { index, kind -> kind.copy(root = index == 0) },
-                        )
+                        if (outline.kinds.any { it.root }) {
+                            outline
+                        } else {
+                            outline.copy(
+                                kinds = outline.kinds.mapIndexed { index, kind -> kind.copy(root = index == 0) },
+                            )
+                        }
                     },
                 )
             },

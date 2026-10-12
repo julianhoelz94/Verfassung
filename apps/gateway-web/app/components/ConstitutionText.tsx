@@ -42,7 +42,7 @@ export function ConstitutionText({
   const children = nodes ?? (article && 'children' in article ? article.children : undefined);
   const text = body !== undefined ? body : (article?.body ?? null);
   const kindLabel =
-    kindByCode(outline, outline?.kinds[0]?.kindCode ?? 'article')?.displayLabel ?? 'Article';
+    kindByCode(outline, 'article')?.displayLabel ?? 'Article';
   function withRefs(value: string): ReactNode {
     if (!crossRefs) {
       return value;
@@ -206,7 +206,7 @@ export function OrderedContentTree({ entries, outline, withRefs = (text) => text
       if (ref.start > previous) result.push(withRefs(value.slice(previous, ref.start)));
       const target = ref.target;
       const unit = target.logicalId ? targets.get(target.logicalId) ?? crossRefs?.unitsByLogicalId?.[target.logicalId] : undefined;
-      const href = target.type === 'external' ? target.url : target.type === 'footnote' && target.footnoteId && notes.get(target.footnoteId) ? `#${idPrefix}fn-${notes.get(target.footnoteId)}` : unit && crossRefs ? `/countries/${crossRefs.code}/versions/${crossRefs.versionId}/units/${unit.rootId}#${unit.occurrenceId}` : unit ? `#${idPrefix}${unit.occurrenceId}` : undefined;
+      const href = target.type === 'external' ? target.url ?? undefined : target.type === 'footnote' && target.footnoteId && notes.get(target.footnoteId) ? `#${idPrefix}fn-${notes.get(target.footnoteId)}` : unit && crossRefs ? `/countries/${crossRefs.code}/versions/${crossRefs.versionId}/units/${unit.rootId}#${unit.occurrenceId}` : unit ? `#${idPrefix}${unit.occurrenceId}` : undefined;
       const label = value.slice(ref.start, ref.end);
       result.push(renderReference ? <span key={ref.logicalId} id={`${idPrefix}ref-${ref.logicalId}`}>{renderReference(ref, label, href, entry)}</span> : href ? <a key={ref.logicalId} id={`${idPrefix}ref-${ref.logicalId}`} className="xref" href={href}>{label}</a> : <span key={ref.logicalId} className="xref-unavailable" title="Referenced provision is unavailable here">{label}</span>);
       previous = ref.end;

@@ -130,7 +130,7 @@ async function verifyArticles(versionId, payload) {
 }
 function comparableEntries(entries) {
   return (entries ?? []).map((entry) => entry.node ? { type: 'child', node: comparableRoot(entry.node) } : {
-    type: 'text', logicalId: entry.logicalId, text: entry.text ?? (entry.table?.rows.map(row => row.cells.map(cell => cell.text).join(' ')).join('\n') ?? null), format: entry.format ?? null,
+    type: 'text', logicalId: entry.logicalId, text: entry.text ?? (entry.table?.rows.map(row => row.cells.map(cell => cell.text).join(' ')).join('\n') ?? null), format: entry.format ?? "plain",
     table: entry.table ? { caption: entry.table.caption ?? null, rows: entry.table.rows.map(row => ({ logicalId: row.logicalId, cells: row.cells.map(cell => ({ logicalId: cell.logicalId, text: cell.text, header: cell.header ?? false, rowSpan: cell.rowSpan ?? 1, colSpan: cell.colSpan ?? 1, headers: cell.headers ?? [] })) })) } : null,
     footnoteLabel: entry.footnoteLabel ?? null,
     references: (entry.references ?? []).map(ref => ({ logicalId: ref.logicalId, start: ref.start, end: ref.end, target: { type: ref.target.type, logicalId: ref.target.logicalId ?? null, url: ref.target.url ?? null, footnoteId: ref.target.footnoteId ?? null } })),

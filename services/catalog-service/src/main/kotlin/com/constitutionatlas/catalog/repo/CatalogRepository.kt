@@ -475,15 +475,17 @@ class CatalogRepository(private val jdbc: JdbcTemplate) {
             )
         }
         kinds.forEach { parent ->
-            parent.allowedChildKinds.orEmpty().forEach { child -> jdbc.update(
-                """
+            parent.allowedChildKinds.orEmpty().forEach { child ->
+                jdbc.update(
+                    """
                 INSERT INTO constitution_node_kind_edges (constitution_id, parent_kind_code, child_kind_code)
                 VALUES (?, ?, ?)
-                """.trimIndent(),
-                constitutionId,
-                parent.kindCode,
-                child,
-            ) }
+                    """.trimIndent(),
+                    constitutionId,
+                    parent.kindCode,
+                    child,
+                )
+            }
         }
     }
 

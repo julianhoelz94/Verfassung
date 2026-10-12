@@ -22,7 +22,7 @@ test('mixed roots and rich entries survive API publication and read on a narrow 
   await page.goto(`/countries/XC/versions/${version}/articles/${article.occurrenceId}`);
   await expect(page.getByRole('note')).toContainText('The revised source note.');
   await expect(page.getByRole('link', { name: 'Appendix A' })).toHaveAttribute('href', new RegExp(`/versions/${version}/units/${appendix.occurrenceId}`));
-  await expect(page.getByRole('link', { name: 'Source' })).toHaveAttribute('href', 'https://example.org/atlas-e2e/revised-source');
+  await expect(page.getByRole('link', { name: 'Source', exact: true })).toHaveAttribute('href', 'https://example.org/atlas-e2e/revised-source');
 });
 
 test('rich table, note and reference changes appear in compare and search', async ({ page, request }) => {

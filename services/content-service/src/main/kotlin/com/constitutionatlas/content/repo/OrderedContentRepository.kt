@@ -205,7 +205,8 @@ class OrderedContentRepository(private val jdbc: JdbcTemplate, private val mappe
 
     fun revisionPredecessor(id: UUID, text: Boolean): UUID? = jdbc.query(
         "SELECT predecessor_id FROM ${if (text) "content_text_revisions" else "content_node_revisions"} WHERE id = ?",
-        { rs, _ -> rs.getObject(1, UUID::class.java) }, id,
+        { rs, _ -> rs.getObject(1, UUID::class.java) },
+        id,
     ).firstOrNull()
 
     private fun legacyBodyLogicalId(logical: UUID): UUID {

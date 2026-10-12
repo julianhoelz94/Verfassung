@@ -10,5 +10,6 @@ export default async function UnitPage({ params }: { params: Promise<{ code: str
   const [country, unit, outline, snapshot, roots] = await Promise.all([getCountry(code), getUnit(versionId, unitId), getReaderOutline(versionId), getVersion(versionId), listAllUnits(versionId, true)]);
   const constitution = publicSnapshotContext(country, snapshot)?.constitution;
   if (!constitution || !unit || unit.versionId !== versionId) notFound();
-  return <PageMain><ConstitutionText article={unit} outline={outline ?? constitution.contentOutline} crossRefs={{ code, versionId, articlesByNumber: {}, unitsByLogicalId: orderedTargets(roots) }} /></PageMain>;
+  const articlesByNumber = Object.fromEntries(roots.filter(root => root.kind === 'article' && root.articleNumber).map(root => [root.articleNumber, root.id]));
+  return <PageMain><ConstitutionText article={unit} outline={outline ?? constitution.contentOutline} crossRefs={{ code, versionId, articlesByNumber, unitsByLogicalId: orderedTargets(roots) }} /></PageMain>;
 }

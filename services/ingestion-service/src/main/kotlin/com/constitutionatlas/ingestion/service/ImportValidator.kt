@@ -74,9 +74,11 @@ object ImportValidator {
                         entry.table?.let { table ->
                             if (table.rows.isEmpty() || table.rows.any { it.cells.isEmpty() }) errors += "TABLE_SHAPE" to "$entryPath: table rows need cells"
                             val headers = table.rows.flatMap { it.cells }.filter { it.header }.map { it.logicalId }.toSet()
-                            table.rows.forEachIndexed { rowIndex, row -> row.cells.forEachIndexed { cellIndex, cell ->
-                                if (cell.rowSpan !in 1..100 || cell.colSpan !in 1..100 || cell.headers.any { it !in headers }) errors += "TABLE_CELL" to "$entryPath.table.rows[$rowIndex].cells[$cellIndex]: invalid span or header target"
-                            } }
+                            table.rows.forEachIndexed { rowIndex, row ->
+                                row.cells.forEachIndexed { cellIndex, cell ->
+                                    if (cell.rowSpan !in 1..100 || cell.colSpan !in 1..100 || cell.headers.any { it !in headers }) errors += "TABLE_CELL" to "$entryPath.table.rows[$rowIndex].cells[$cellIndex]: invalid span or header target"
+                                }
+                            }
                         }
                         var previousEnd = 0
                         entry.references.sortedBy { it.start }.forEachIndexed { refIndex, ref ->

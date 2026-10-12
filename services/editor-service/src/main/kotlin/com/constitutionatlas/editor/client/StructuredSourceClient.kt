@@ -9,7 +9,7 @@ import org.springframework.web.client.RestClientException
 import java.util.UUID
 
 @JsonIgnoreProperties(ignoreUnknown = true)
-data class DraftLevel(val kindCode: String, val mayHoldText: Boolean, val mayHoldChildren: Boolean, val allowedChildKinds: List<String>, val titlePolicy: String = "optional", val labelPolicy: String = "optional")
+data class DraftLevel(val kindCode: String, val mayHoldText: Boolean, val mayHoldChildren: Boolean, val allowedChildKinds: List<String>, val titlePolicy: String = "optional", val labelPolicy: String = "optional", val root: Boolean = false)
 data class DraftOutline(val kinds: List<DraftLevel>)
 
 @JsonIgnoreProperties(ignoreUnknown = true)

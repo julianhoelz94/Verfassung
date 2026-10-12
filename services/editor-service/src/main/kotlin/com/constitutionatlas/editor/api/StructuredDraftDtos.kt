@@ -1,8 +1,8 @@
 package com.constitutionatlas.editor.api
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import com.constitutionatlas.platform.OrderedInlineReference
 import com.constitutionatlas.platform.OrderedTable
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import java.util.UUID
 
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -15,10 +15,6 @@ data class DraftNode(
     val title: String? = null,
     val content: List<DraftEntry>,
     val occurrenceId: UUID? = null,
-    val format: String? = null,
-    val table: OrderedTable? = null,
-    val footnoteLabel: String? = null,
-    val references: List<OrderedInlineReference> = emptyList(),
 )
 
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -30,6 +26,10 @@ data class DraftEntry(
     val draftId: UUID? = null,
     val text: String? = null,
     val occurrenceId: UUID? = null,
+    val format: String? = null,
+    val table: OrderedTable? = null,
+    val footnoteLabel: String? = null,
+    val references: List<OrderedInlineReference> = emptyList(),
 )
 
 @JsonIgnoreProperties(ignoreUnknown = true)

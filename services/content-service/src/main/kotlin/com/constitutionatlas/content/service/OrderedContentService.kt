@@ -9,9 +9,9 @@ import com.constitutionatlas.content.api.OrderedSnapshotWrite
 import com.constitutionatlas.content.api.ResolvedContent
 import com.constitutionatlas.content.client.CatalogClient
 import com.constitutionatlas.content.client.StructuralSettings
-import com.constitutionatlas.platform.OrderedRichContent
 import com.constitutionatlas.content.repo.OrderedContentRepository
 import com.constitutionatlas.platform.NotFoundException
+import com.constitutionatlas.platform.OrderedRichContent
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
@@ -202,17 +202,15 @@ class OrderedContentService(
             }
         }
         roots.forEach { walk(it, null) }
-        val footnotes = mutableSetOf<UUID>()
-        fun collect(node: OrderedNode) {
+        fun collect(node: OrderedNode, footnotes: MutableSet<UUID>) {
             node.content.forEach { entry ->
-                entry.node?.let(::collect)
+                entry.node?.let { collect(it, footnotes) }
                 if (entry.format == "footnote") footnotes += requireNotNull(entry.logicalId)
             }
         }
-        roots.forEach(::collect)
-        fun rich(node: OrderedNode) {
+        fun rich(node: OrderedNode, footnotes: Set<UUID>) {
             node.content.forEach { entry ->
-                entry.node?.let(::rich)
+                entry.node?.let { rich(it, footnotes) }
                 entry.table?.let { table ->
                     require(entry.format == "table" && table.rows.isNotEmpty()) { "Table needs rows at '${node.logicalId}'" }
                     val rowIds = mutableSetOf<UUID>()
@@ -234,16 +232,22 @@ class OrderedContentService(
                     require(referenceIds.add(ref.logicalId) && ref.start >= end && ref.start < ref.end && ref.end <= text.length) { "Invalid or overlapping inline reference at '${node.logicalId}'" }
                     end = ref.end
                     val target = ref.target
-                    require(when (target.type) {
-                        "unit" -> target.logicalId != null && target.url == null && target.footnoteId == null
-                        "external" -> target.url?.startsWith("https://") == true && target.logicalId == null && target.footnoteId == null
-                        "footnote" -> target.footnoteId in footnotes && target.logicalId == null && target.url == null
-                        else -> false
-                    }) { "Invalid inline target at '${node.logicalId}'" }
+                    require(
+                        when (target.type) {
+                            "unit" -> target.logicalId != null && target.url == null && target.footnoteId == null
+                            "external" -> target.url?.startsWith("https://") == true && target.logicalId == null && target.footnoteId == null
+                            "footnote" -> target.footnoteId in footnotes && target.logicalId == null && target.url == null
+                            else -> false
+                        },
+                    ) { "Invalid inline target at '${node.logicalId}'" }
                 }
             }
         }
-        roots.forEach(::rich)
+        roots.forEach { root ->
+            val footnotes = mutableSetOf<UUID>()
+            collect(root, footnotes)
+            rich(root, footnotes)
+        }
     }
 
     @Transactional

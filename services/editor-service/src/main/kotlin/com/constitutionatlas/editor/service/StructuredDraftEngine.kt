@@ -56,10 +56,18 @@ object StructuredDraftEngine {
                     require(position in 0..retained.size) { "Invalid root position" }
                     roots = retained.take(position) + root + retained.drop(position)
                 }
-                "replace_text" -> targetText { listOf(it.copy(text = operation.text ?: throw IllegalArgumentException("text is required"), draftId = operation.id,
-                    format = operation.format ?: it.format, table = if (operation.format != null) operation.table else it.table,
-                    footnoteLabel = if (operation.format != null) operation.footnoteLabel else it.footnoteLabel,
-                    references = if (operation.format != null) operation.references else it.references)) }
+                "replace_text" -> targetText {
+                    listOf(
+                        it.copy(
+                            text = operation.text ?: throw IllegalArgumentException("text is required"),
+                            draftId = operation.id,
+                            format = operation.format ?: it.format,
+                            table = if (operation.format != null) operation.table else it.table,
+                            footnoteLabel = if (operation.format != null) operation.footnoteLabel else it.footnoteLabel,
+                            references = if (operation.format != null) operation.references else it.references,
+                        ),
+                    )
+                }
                 "set_metadata" -> {
                     require(foundNode != null) { "Metadata belongs to nodes, not parent text" }
                     updateNodes { if (it.logicalId == operation.targetId) it.copy(title = operation.title, label = operation.label, draftId = operation.id) else it }

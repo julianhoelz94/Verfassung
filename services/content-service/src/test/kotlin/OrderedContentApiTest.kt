@@ -47,27 +47,45 @@ class OrderedContentApiTest {
         val version = UUID.randomUUID()
         val constitution = UUID.randomUUID()
         Mockito.`when`(catalog.getVersion(version)).thenReturn(CatalogVersion(version, "draft", constitution))
-        Mockito.`when`(catalog.getSettings(version)).thenReturn(StructuralSettings(UUID.randomUUID(), StructuralOutline(listOf(
-            StructuralLevel("article", true, false, emptyList(), root = true),
-            StructuralLevel("appendix", true, false, emptyList(), root = true),
-        ))))
+        Mockito.`when`(catalog.getSettings(version)).thenReturn(
+            StructuralSettings(
+                UUID.randomUUID(),
+                StructuralOutline(
+                    listOf(
+                        StructuralLevel("article", true, false, emptyList(), root = true),
+                        StructuralLevel("appendix", true, false, emptyList(), root = true),
+                    ),
+                ),
+            ),
+        )
         val articleId = UUID.randomUUID()
         val noteId = UUID.randomUUID()
         val unavailableId = UUID.randomUUID()
         val appendixId = UUID.randomUUID()
         val headingId = UUID.randomUUID()
-        val table = OrderedTable("Schedule", listOf(
-            OrderedTableRow(UUID.randomUUID(), listOf(OrderedTableCell(headingId, "Duty", header = true))),
-            OrderedTableRow(UUID.randomUUID(), listOf(OrderedTableCell(UUID.randomUUID(), "Report", headers = listOf(headingId)))),
-        ))
+        val table = OrderedTable(
+            "Schedule",
+            listOf(
+                OrderedTableRow(UUID.randomUUID(), listOf(OrderedTableCell(headingId, "Duty", header = true))),
+                OrderedTableRow(UUID.randomUUID(), listOf(OrderedTableCell(UUID.randomUUID(), "Report", headers = listOf(headingId)))),
+            ),
+        )
         val roots = listOf(
-            OrderedNodeWrite(logicalId = articleId, kind = "article", content = listOf(
-                OrderedEntryWrite("text", text = "See note and lost.", references = listOf(
-                    OrderedInlineReference(UUID.randomUUID(), 4, 8, OrderedReferenceTarget("footnote", footnoteId = noteId)),
-                    OrderedInlineReference(UUID.randomUUID(), 13, 17, OrderedReferenceTarget("unit", logicalId = unavailableId)),
-                )),
-                OrderedEntryWrite("text", logicalId = noteId, text = "Source note.", format = "footnote", footnoteLabel = "1"),
-            )),
+            OrderedNodeWrite(
+                logicalId = articleId,
+                kind = "article",
+                content = listOf(
+                    OrderedEntryWrite(
+                        "text",
+                        text = "See note and lost.",
+                        references = listOf(
+                            OrderedInlineReference(UUID.randomUUID(), 4, 8, OrderedReferenceTarget("footnote", footnoteId = noteId)),
+                            OrderedInlineReference(UUID.randomUUID(), 13, 17, OrderedReferenceTarget("unit", logicalId = unavailableId)),
+                        ),
+                    ),
+                    OrderedEntryWrite("text", logicalId = noteId, text = "Source note.", format = "footnote", footnoteLabel = "1"),
+                ),
+            ),
             OrderedNodeWrite(logicalId = appendixId, kind = "appendix", content = listOf(OrderedEntryWrite("text", format = "table", table = table))),
         )
         val saved = content.save(version, OrderedSnapshotWrite(0, roots = roots))
@@ -84,12 +102,17 @@ class OrderedContentApiTest {
         val constitution = UUID.randomUUID()
         Mockito.`when`(catalog.getVersion(version)).thenReturn(CatalogVersion(version, "draft", constitution))
         Mockito.`when`(catalog.getSettings(version)).thenReturn(
-            StructuralSettings(UUID.randomUUID(), StructuralOutline(listOf(
-                StructuralLevel("article", false, true, listOf("paragraph"), root = true),
-                StructuralLevel("paragraph", true, false, emptyList()),
-                StructuralLevel("preamble", true, false, emptyList(), root = true),
-                StructuralLevel("appendix", true, false, emptyList(), root = true),
-            ))),
+            StructuralSettings(
+                UUID.randomUUID(),
+                StructuralOutline(
+                    listOf(
+                        StructuralLevel("article", false, true, listOf("paragraph"), root = true),
+                        StructuralLevel("paragraph", true, false, emptyList()),
+                        StructuralLevel("preamble", true, false, emptyList(), root = true),
+                        StructuralLevel("appendix", true, false, emptyList(), root = true),
+                    ),
+                ),
+            ),
         )
         val roots = listOf(
             OrderedNodeWrite(kind = "preamble", title = "Purpose", content = listOf(OrderedEntryWrite("text", text = "We the people."))),

@@ -44,6 +44,6 @@ interface CatalogClient {
 
 interface ContentClient {
     fun replaceArticles(versionId: UUID, articles: List<ImportArticle>)
-    fun replaceRoots(versionId: UUID, roots: List<OrderedNodeWrite>): Unit = throw UnsupportedOperationException("Ordered import is unavailable")
+    fun replaceRoots(versionId: UUID, roots: List<OrderedNodeWrite>, sourceVersionId: UUID? = null): Unit = throw UnsupportedOperationException("Ordered import is unavailable")
     fun snapshot(versionId: UUID): OrderedSnapshot
 }

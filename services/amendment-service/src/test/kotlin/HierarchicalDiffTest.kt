@@ -25,6 +25,15 @@ class HierarchicalDiffTest {
     }
 
     @Test
+    fun changedTableStructureOrReferenceTargetIsVisibleWithUnchangedPlainText() {
+        val text = DiffEntry.Text(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "Duty Annual", semantic = "table:header-A")
+        val before = node(entries = listOf(text))
+        val after = before.copy(revisionId = UUID.randomUUID(), entries = listOf(text.copy(revisionId = UUID.randomUUID(), semantic = "table:header-B")))
+        val run = HierarchicalDiff.compare(beforeVersion, listOf(before), afterVersion, listOf(after))
+        assertThat(run.items.map { it.facet }).containsExactly("text_changed")
+    }
+
+    @Test
     fun oneWordLeafEditDoesNotCreateCopyOnWriteAncestorFindings() {
         val textId = UUID.randomUUID()
         val oldText = DiffEntry.Text(textId, UUID.randomUUID(), UUID.randomUUID(), "Every person has equal dignity.")

@@ -134,6 +134,10 @@ export function StructuredEditor({ review = [], preview, outline, rootId, versio
     const format = entry.format ?? 'plain';
     const updateRich = (nextEntry: { text: string; format: DraftEntry['format']; table?: DraftEntry['table']; footnoteLabel?: string | null; references?: DraftEntry['references'] }) => change({ type: 'replace_text', targetId: id, expectedRevisionId: token(entry), ...nextEntry });
     const updateTable = (table: NonNullable<DraftEntry['table']>) => updateRich({ text: table.rows.map(row => row.cells.map(cell => cell.text).join(' ')).join('\n'), format: 'table', table });
+    const updateCell = (cellId: string, patch: Partial<NonNullable<DraftEntry['table']>['rows'][number]['cells'][number]>) => {
+      if (!entry.table) return;
+      updateTable({ ...entry.table, rows: entry.table.rows.map(row => ({ ...row, cells: row.cells.map(cell => cell.logicalId === cellId ? { ...cell, ...patch } : cell) })) });
+    };
     const addReference = (target: NonNullable<DraftEntry['references']>[number]['target']) => {
       const range = ranges.current[id];
       if (!range || range.start === range.end) { setMessage('Select the reference text first.'); return; }
@@ -185,7 +189,13 @@ export function StructuredEditor({ review = [], preview, outline, rootId, versio
       {format === 'table' && entry.table ? <fieldset><legend>Table</legend>
         <label>Caption<input value={entry.table.caption ?? ''} disabled={!editable} onChange={event => updateTable({ ...entry.table!, caption: event.target.value })} /></label>
         {entry.table.rows.map((row, rowIndex) => <div key={row.logicalId} className="action-bar" aria-label={`Table row ${rowIndex + 1}`}>
-          {row.cells.map((cell, cellIndex) => <div key={cell.logicalId}><label>Cell {cellIndex + 1}<textarea value={cell.text} disabled={!editable} onChange={event => updateTable({ ...entry.table!, rows: entry.table!.rows.map((current, index) => index === rowIndex ? { ...current, cells: current.cells.map(item => item.logicalId === cell.logicalId ? { ...item, text: event.target.value } : item) } : current) })} /></label><label>Header<input type="checkbox" checked={cell.header ?? false} disabled={!editable} onChange={event => updateTable({ ...entry.table!, rows: entry.table!.rows.map((current, index) => index === rowIndex ? { ...current, cells: current.cells.map(item => item.logicalId === cell.logicalId ? { ...item, header: event.target.checked } : item) } : current) })} /></label></div>)}
+          {row.cells.map((cell, cellIndex) => <div key={cell.logicalId}>
+            <label>Cell {cellIndex + 1}<textarea value={cell.text} disabled={!editable} onChange={event => updateCell(cell.logicalId, { text: event.target.value })} /></label>
+            <label>Header<input type="checkbox" checked={cell.header ?? false} disabled={!editable} onChange={event => updateCell(cell.logicalId, { header: event.target.checked })} /></label>
+            <label>Row span<input type="number" min={1} max={100} value={cell.rowSpan ?? 1} disabled={!editable} onChange={event => updateCell(cell.logicalId, { rowSpan: Number(event.target.value) })} /></label>
+            <label>Column span<input type="number" min={1} max={100} value={cell.colSpan ?? 1} disabled={!editable} onChange={event => updateCell(cell.logicalId, { colSpan: Number(event.target.value) })} /></label>
+            <label>Header cells<select multiple value={cell.headers ?? []} disabled={!editable} onChange={event => updateCell(cell.logicalId, { headers: Array.from(event.target.selectedOptions, option => option.value) })}>{entry.table!.rows.flatMap(item => item.cells).filter(item => item.header && item.logicalId !== cell.logicalId).map(item => <option key={item.logicalId} value={item.logicalId}>{item.text || 'Untitled header'}</option>)}</select></label>
+          </div>)}
           {editable ? <button type="button" onClick={() => updateTable({ ...entry.table!, rows: entry.table!.rows.map((current, index) => index === rowIndex ? { ...current, cells: [...current.cells, { logicalId: crypto.randomUUID(), text: '' }] } : current) })}>+ Cell</button> : null}
           {editable && entry.table.rows.length > 1 ? <button type="button" onClick={() => updateTable({ ...entry.table!, rows: entry.table!.rows.filter((_, index) => index !== rowIndex) })}>Remove row</button> : null}
         </div>)}

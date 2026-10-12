@@ -203,6 +203,11 @@ class OrderedContentRepository(private val jdbc: JdbcTemplate, private val mappe
 
     fun occurrencePredecessor(id: UUID): UUID? = jdbc.query("SELECT predecessor_id FROM content_occurrences WHERE id = ?", { rs, _ -> rs.getObject(1, UUID::class.java) }, id).firstOrNull()
 
+    fun revisionPredecessor(id: UUID, text: Boolean): UUID? = jdbc.query(
+        "SELECT predecessor_id FROM ${if (text) "content_text_revisions" else "content_node_revisions"} WHERE id = ?",
+        { rs, _ -> rs.getObject(1, UUID::class.java) }, id,
+    ).firstOrNull()
+
     private fun legacyBodyLogicalId(logical: UUID): UUID {
         // Match PostgreSQL md5(logical_id::text || ':body')::uuid without UUID version-bit rewriting.
         val bytes = ByteBuffer.wrap(MessageDigest.getInstance("MD5").digest("$logical:body".toByteArray(Charsets.UTF_8)))

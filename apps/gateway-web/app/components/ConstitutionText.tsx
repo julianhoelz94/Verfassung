@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import type { ArticleDetail, ArticleSummary, ContentNode, ContentOutline, OrderedEntry, OrderedNode, OrderedTableCell } from '../../lib/api';
+import type { ArticleDetail, ArticleSummary, ContentNode, ContentOutline, OrderedEntry, OrderedInlineReference, OrderedNode, OrderedTableCell } from '../../lib/api';
 import { linkifyReferences, type CrossRefContext } from '../../lib/crossrefs';
 import { articleHeading, effectiveDisplayKind, groupNodes, kindByCode, nodeHeading } from '../../lib/outline';
 import { orderedText } from '../../lib/ordered-content';
@@ -165,11 +165,12 @@ function SectionNode({
 }
 
 /** Ordered reader rendering shares heading and sibling presentation rules with NodeTree. */
-export function OrderedContentTree({ entries, outline, withRefs = (text) => text, renderText, renderTableCell, renderTableCaption, renderHeading, renderLabel, idPrefix = '', canEditTitles = false, returnTo, indexedTargets, indexedNotes, indexedBacklinks, crossRefs }: {
+export function OrderedContentTree({ entries, outline, withRefs = (text) => text, renderText, renderTableCell, renderTableCaption, renderReference, renderHeading, renderLabel, idPrefix = '', canEditTitles = false, returnTo, indexedTargets, indexedNotes, indexedBacklinks, crossRefs }: {
   entries: OrderedEntry[]; outline?: ContentOutline; withRefs?: (text: string) => ReactNode;
   renderText?: (entry: OrderedEntry) => ReactNode;
   renderTableCell?: (cell: OrderedTableCell, entry: OrderedEntry) => ReactNode;
   renderTableCaption?: (entry: OrderedEntry) => ReactNode;
+  renderReference?: (reference: OrderedInlineReference, label: string, href: string | undefined, entry: OrderedEntry) => ReactNode;
   renderHeading?: (node: OrderedNode, heading: string) => ReactNode;
   renderLabel?: (node: OrderedNode, label: string) => ReactNode;
   idPrefix?: string;
@@ -207,7 +208,7 @@ export function OrderedContentTree({ entries, outline, withRefs = (text) => text
       const unit = target.logicalId ? targets.get(target.logicalId) ?? crossRefs?.unitsByLogicalId?.[target.logicalId] : undefined;
       const href = target.type === 'external' ? target.url : target.type === 'footnote' && target.footnoteId && notes.get(target.footnoteId) ? `#${idPrefix}fn-${notes.get(target.footnoteId)}` : unit && crossRefs ? `/countries/${crossRefs.code}/versions/${crossRefs.versionId}/units/${unit.rootId}#${unit.occurrenceId}` : unit ? `#${idPrefix}${unit.occurrenceId}` : undefined;
       const label = value.slice(ref.start, ref.end);
-      result.push(href ? <a key={ref.logicalId} id={`${idPrefix}ref-${ref.logicalId}`} className="xref" href={href}>{label}</a> : <span key={ref.logicalId} className="xref-unavailable" title="Referenced provision is unavailable here">{label}</span>);
+      result.push(renderReference ? <span key={ref.logicalId} id={`${idPrefix}ref-${ref.logicalId}`}>{renderReference(ref, label, href, entry)}</span> : href ? <a key={ref.logicalId} id={`${idPrefix}ref-${ref.logicalId}`} className="xref" href={href}>{label}</a> : <span key={ref.logicalId} className="xref-unavailable" title="Referenced provision is unavailable here">{label}</span>);
       previous = ref.end;
     }
     if (previous < value.length) result.push(withRefs(value.slice(previous)));
@@ -248,7 +249,7 @@ export function OrderedContentTree({ entries, outline, withRefs = (text) => text
       {canEditTitles && returnTo && kind?.titlePolicy !== 'none' ? <NodeTitleForm nodeId={node.occurrenceId} title={node.title} label={node.label ?? kind?.displayLabel ?? node.kind} returnTo={returnTo} /> : null}
       {superscriptLabel ? <sup className="num">{renderLabel ? renderLabel(node, superscriptLabel) : superscriptLabel}</sup> : null}
       {inlineLabel ? <span className="num">{renderLabel ? renderLabel(node, inlineLabel) : inlineLabel}</span> : null}
-      <OrderedContentTree entries={node.content} outline={outline} withRefs={withRefs} renderText={renderText} renderTableCell={renderTableCell} renderTableCaption={renderTableCaption} renderHeading={renderHeading} renderLabel={renderLabel} idPrefix={idPrefix} canEditTitles={canEditTitles} returnTo={returnTo} indexedTargets={targets} indexedNotes={notes} indexedBacklinks={backlinks} crossRefs={crossRefs} />
+      <OrderedContentTree entries={node.content} outline={outline} withRefs={withRefs} renderText={renderText} renderTableCell={renderTableCell} renderTableCaption={renderTableCaption} renderReference={renderReference} renderHeading={renderHeading} renderLabel={renderLabel} idPrefix={idPrefix} canEditTitles={canEditTitles} returnTo={returnTo} indexedTargets={targets} indexedNotes={notes} indexedBacklinks={backlinks} crossRefs={crossRefs} />
     </section>;
   })}</div>;
 }

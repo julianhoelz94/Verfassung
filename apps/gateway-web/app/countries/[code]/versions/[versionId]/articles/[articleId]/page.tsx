@@ -18,6 +18,7 @@ import {
   type CountryDetail,
 } from '../../../../../../../lib/api';
 import { atlasTitle, metaDescription, pageMetadata } from '../../../../../../../lib/page-meta';
+import { orderedTargets } from '../../../../../../../lib/ordered-content';
 import { publicSnapshotContext } from '../../../../../../../lib/reading';
 
 type ArticlePageProps = {
@@ -54,7 +55,7 @@ export default async function ArticlePage(props: ArticlePageProps) {
   try {
     [country, snapshot] = await Promise.all([getCountry(params.code), getVersion(params.versionId)]);
     article = await getUnit(params.versionId, params.articleId);
-    siblings = await listAllUnits(params.versionId, false);
+    siblings = await listAllUnits(params.versionId, true);
   } catch (e) {
     error = e instanceof ApiUnavailableError ? e.message : 'A backend service is unavailable';
     country = null;
@@ -123,6 +124,7 @@ export default async function ArticlePage(props: ArticlePageProps) {
             code: country.isoCode,
             versionId: params.versionId,
             articlesByNumber,
+            unitsByLogicalId: orderedTargets(siblings),
           }}
         />
       </article>

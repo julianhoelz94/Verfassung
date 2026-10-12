@@ -153,12 +153,13 @@ class OrderedContentService(
         val snapshot = get(version)
         fun nodeWrite(node: OrderedNode): OrderedNodeWrite = OrderedNodeWrite(
             logicalId = node.logicalId,
+            predecessorRevisionId = repository.revisionPredecessor(node.revisionId, false),
             kind = node.kind,
             label = node.label,
             title = node.title,
             content = node.content.map { entry ->
                 entry.node?.let { com.constitutionatlas.platform.OrderedEntryWrite("child", node = nodeWrite(it)) }
-                    ?: com.constitutionatlas.platform.OrderedEntryWrite("text", logicalId = entry.logicalId, text = entry.text, format = entry.format, table = entry.table, footnoteLabel = entry.footnoteLabel, references = entry.references)
+                    ?: com.constitutionatlas.platform.OrderedEntryWrite("text", logicalId = entry.logicalId, predecessorRevisionId = entry.revisionId?.let { repository.revisionPredecessor(it, true) }, text = entry.text, format = entry.format, table = entry.table, footnoteLabel = entry.footnoteLabel, references = entry.references)
             },
         )
         return com.constitutionatlas.content.api.OrderedContentExport(version, snapshot.settingsRevisionId, snapshot.roots.map(::nodeWrite))
@@ -201,10 +202,8 @@ class OrderedContentService(
             }
         }
         roots.forEach { walk(it, null) }
-        val units = mutableSetOf<UUID>()
         val footnotes = mutableSetOf<UUID>()
         fun collect(node: OrderedNode) {
-            units += node.logicalId
             node.content.forEach { entry ->
                 entry.node?.let(::collect)
                 if (entry.format == "footnote") footnotes += requireNotNull(entry.logicalId)
@@ -236,7 +235,7 @@ class OrderedContentService(
                     end = ref.end
                     val target = ref.target
                     require(when (target.type) {
-                        "unit" -> target.logicalId in units && target.url == null && target.footnoteId == null
+                        "unit" -> target.logicalId != null && target.url == null && target.footnoteId == null
                         "external" -> target.url?.startsWith("https://") == true && target.logicalId == null && target.footnoteId == null
                         "footnote" -> target.footnoteId in footnotes && target.logicalId == null && target.url == null
                         else -> false

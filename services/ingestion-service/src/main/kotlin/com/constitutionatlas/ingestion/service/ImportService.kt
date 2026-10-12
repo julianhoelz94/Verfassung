@@ -236,7 +236,7 @@ class ImportService(
         )
         try {
             if (request.roots.isNotEmpty()) {
-                contentClient.replaceRoots(version.id, request.roots)
+                contentClient.replaceRoots(version.id, request.roots, request.predecessorVersionId)
             } else {
                 contentClient.replaceArticles(version.id, request.articles)
             }

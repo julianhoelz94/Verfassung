@@ -2290,3 +2290,4 @@ button.article-toggle[aria-expanded='false']::after {
 .legal-footnote { margin-block: var(--space-2); font-size: .9em; }
 .legal-footnote a { margin-inline-start: var(--space-2); }
 .xref-unavailable { text-decoration: underline dotted; text-underline-offset: .15em; }
+.diff-cell-changed { background: #fff2bd; text-decoration: underline dotted; }

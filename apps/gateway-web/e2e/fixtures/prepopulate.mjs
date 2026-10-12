@@ -131,18 +131,51 @@ async function verifyArticles(versionId, payload) {
 function comparableEntries(entries) {
   return (entries ?? []).map((entry) => entry.node ? { type: 'child', node: comparableRoot(entry.node) } : {
     type: 'text', logicalId: entry.logicalId, text: entry.text ?? (entry.table?.rows.map(row => row.cells.map(cell => cell.text).join(' ')).join('\n') ?? null), format: entry.format ?? null,
-    table: entry.table ?? null, footnoteLabel: entry.footnoteLabel ?? null, references: entry.references ?? [],
+    table: entry.table ? { caption: entry.table.caption ?? null, rows: entry.table.rows.map(row => ({ logicalId: row.logicalId, cells: row.cells.map(cell => ({ logicalId: cell.logicalId, text: cell.text, header: cell.header ?? false, rowSpan: cell.rowSpan ?? 1, colSpan: cell.colSpan ?? 1, headers: cell.headers ?? [] })) })) } : null,
+    footnoteLabel: entry.footnoteLabel ?? null,
+    references: (entry.references ?? []).map(ref => ({ logicalId: ref.logicalId, start: ref.start, end: ref.end, target: { type: ref.target.type, logicalId: ref.target.logicalId ?? null, url: ref.target.url ?? null, footnoteId: ref.target.footnoteId ?? null } })),
   });
 }
 function comparableRoot(node) {
   return { logicalId: node.logicalId, kind: node.kind, label: node.label ?? null, title: node.title ?? null, content: comparableEntries(node.content) };
 }
-async function verifyRoots(versionId, payload) {
+async function verifyRoots(versionId, payload, sourceVersionId) {
   if (!payload.roots?.length) return;
   const snapshot = await api('GET', `content/versions/${versionId}/content`);
   assertEqual(JSON.stringify(snapshot.roots.map(comparableRoot)), JSON.stringify(payload.roots.map(comparableRoot)), `${payload.isoCode}/${payload.versionLabel} ordered roots`);
   const exported = await api('GET', `content/versions/${versionId}/export`);
   assertEqual(JSON.stringify(exported.roots.map(comparableRoot)), JSON.stringify(payload.roots.map(comparableRoot)), `${payload.isoCode}/${payload.versionLabel} export`);
+  if (sourceVersionId) {
+    const source = await api('GET', `content/versions/${sourceVersionId}/content`);
+    function lineage(roots) {
+      const result = [];
+      function visit(node) {
+        result.push([node.logicalId, node.predecessorRevisionId ?? null]);
+        for (const entry of node.content ?? []) entry.node ? visit(entry.node) : result.push([entry.logicalId, entry.predecessorRevisionId ?? null]);
+      }
+      roots.forEach(visit);
+      return result;
+    }
+    assertEqual(JSON.stringify(lineage(exported.roots)), JSON.stringify(lineage(linkPredecessors(payload.roots, source))), `${payload.isoCode}/${payload.versionLabel} predecessor lineage`);
+  }
+}
+function linkPredecessors(roots, source) {
+  const revisions = new Map();
+  function collect(node) {
+    revisions.set(node.logicalId, node.revisionId);
+    for (const entry of node.content ?? []) {
+      if (entry.node) collect(entry.node);
+      else revisions.set(entry.logicalId, entry.revisionId);
+    }
+  }
+  source.roots.forEach(collect);
+  function link(node) {
+    return { ...node, ...(revisions.has(node.logicalId) ? { predecessorRevisionId: revisions.get(node.logicalId) } : {}),
+      content: node.content.map(entry => entry.node ? { ...entry, node: link(entry.node) } : {
+        ...entry, ...(revisions.has(entry.logicalId) ? { predecessorRevisionId: revisions.get(entry.logicalId) } : {}),
+      }) };
+  }
+  return roots.map(link);
 }
 
 async function ensureVersions(ids) {
@@ -154,7 +187,8 @@ async function ensureVersions(ids) {
       let existing = constitution?.versions.find((item) => item.versionLabel === payload.versionLabel);
       if (!existing && !verifyOnly) {
         const pin = constitution ? await api('GET', `catalog/constitutions/${constitution.id}/settings`) : null;
-        const request = { ...payload, ...(pin ? { outline: undefined, constitutionId: constitution.id, settingsRevisionId: pin.id } : {}),
+        const source = version.predecessor && payload.roots?.length ? await api('GET', `content/versions/${ids.versions[version.predecessor]}/content`) : null;
+        const request = { ...payload, ...(source ? { roots: linkPredecessors(payload.roots, source) } : {}), ...(pin ? { outline: undefined, constitutionId: constitution.id, settingsRevisionId: pin.id } : {}),
           ...(version.predecessor ? { predecessorVersionId: ids.versions[version.predecessor], hopKind: 'legal' } : {}) };
         const job = await api('POST', 'ingestion/import-jobs', request, true);
         if (job.status === 'failed') throw new Error(`Import ${version.key} failed: ${JSON.stringify(job)}`);
@@ -187,7 +221,7 @@ async function ensureVersions(ids) {
       ids.constitutions[country.isoCode] = constitution.id;
       ids.versions[version.key] = existing.id;
       await verifyArticles(existing.id, payload);
-      await verifyRoots(existing.id, payload);
+      await verifyRoots(existing.id, payload, version.predecessor ? ids.versions[version.predecessor] : null);
     }
   }
 }
@@ -277,6 +311,10 @@ async function verifyTotals(ids) {
       assertFields(filtered.hits[0], { versionId: ids.versions[version.key], countryCode: country.isoCode, effectiveDate: payload.effectiveDate },
         ['versionId', 'countryCode', 'effectiveDate'], `${version.key} search hit`);
     }
+  }
+  for (const [key, term] of [['xc-2020', 'Annual'], ['xc-2024', 'Biennial'], ['xc-2024', 'revised source note']]) {
+    const result = await api('GET', `search/search?q=${encodeURIComponent(term)}&country=XC&versionId=${ids.versions[key]}&limit=50`);
+    assertEqual(result.total, 1, `${key} indexed rich content '${term}'`);
   }
 }
 

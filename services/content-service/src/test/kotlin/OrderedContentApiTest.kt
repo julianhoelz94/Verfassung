@@ -53,6 +53,7 @@ class OrderedContentApiTest {
         ))))
         val articleId = UUID.randomUUID()
         val noteId = UUID.randomUUID()
+        val unavailableId = UUID.randomUUID()
         val appendixId = UUID.randomUUID()
         val headingId = UUID.randomUUID()
         val table = OrderedTable("Schedule", listOf(
@@ -61,13 +62,17 @@ class OrderedContentApiTest {
         ))
         val roots = listOf(
             OrderedNodeWrite(logicalId = articleId, kind = "article", content = listOf(
-                OrderedEntryWrite("text", text = "See note.", references = listOf(OrderedInlineReference(UUID.randomUUID(), 4, 8, OrderedReferenceTarget("footnote", footnoteId = noteId)))),
+                OrderedEntryWrite("text", text = "See note and lost.", references = listOf(
+                    OrderedInlineReference(UUID.randomUUID(), 4, 8, OrderedReferenceTarget("footnote", footnoteId = noteId)),
+                    OrderedInlineReference(UUID.randomUUID(), 13, 17, OrderedReferenceTarget("unit", logicalId = unavailableId)),
+                )),
                 OrderedEntryWrite("text", logicalId = noteId, text = "Source note.", format = "footnote", footnoteLabel = "1"),
             )),
             OrderedNodeWrite(logicalId = appendixId, kind = "appendix", content = listOf(OrderedEntryWrite("text", format = "table", table = table))),
         )
         val saved = content.save(version, OrderedSnapshotWrite(0, roots = roots))
-        assertThat(saved.roots[0].content[0].references.single().target.footnoteId).isEqualTo(noteId)
+        assertThat(saved.roots[0].content[0].references.first().target.footnoteId).isEqualTo(noteId)
+        assertThat(saved.roots[0].content[0].references.last().target.logicalId).isEqualTo(unavailableId)
         assertThat(saved.roots[1].content.single().text).isEqualTo("Duty\nReport")
         assertThat(content.get(version).roots[1].content.single().table).isEqualTo(table)
         assertThat(content.export(version).roots[1].content!!.single().table).isEqualTo(table)

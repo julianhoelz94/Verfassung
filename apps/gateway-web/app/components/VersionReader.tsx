@@ -1,7 +1,8 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import type { ArticleSummary, ContentOutline, OrderedEntry } from '../../lib/api';
+import type { ArticleSummary, ContentOutline } from '../../lib/api';
+import { orderedTargets } from '../../lib/ordered-content';
 import { articleHeading, clipOrderedEntries, clipNodes, depthStopCount, depthStopLabels, kindByCode } from '../../lib/outline';
 import { Badge, type BadgeTone, Toolbar } from './ui';
 import { ConstitutionText } from './ConstitutionText';
@@ -59,20 +60,7 @@ export function VersionReader({
     () => Object.fromEntries(articles.map((article) => [article.articleNumber, article.id])),
     [articles],
   );
-  const unitsByLogicalId = useMemo(() => {
-    const result: Record<string, { rootId: string; occurrenceId: string }> = {};
-    function index(entries: OrderedEntry[], rootId: string) {
-      for (const entry of entries) if (entry.node) {
-        result[entry.node.logicalId] = { rootId, occurrenceId: entry.node.occurrenceId };
-        index(entry.node.content, rootId);
-      }
-    }
-    for (const article of articles) {
-      if (article.logicalId) result[article.logicalId] = { rootId: article.id, occurrenceId: article.id };
-      index(article.content ?? [], article.id);
-    }
-    return result;
-  }, [articles]);
+  const unitsByLogicalId = useMemo(() => orderedTargets(articles), [articles]);
 
   function shownDepth(articleId: string): number {
     return expanded.has(articleId) ? max : depth;
@@ -168,7 +156,7 @@ export function VersionReader({
                 )}
                 <p className="article-foot print-hide">
                   <a href={permalink}>Permalink</a>
-                  <a href={historyHref}>History of {kindByCode(outline, article.kind ?? 'article')?.displayLabel ?? 'Article'} {article.articleNumber}</a>
+                  {article.kind === 'article' && article.articleNumber ? <a href={historyHref}>History of {kindByCode(outline, article.kind)?.displayLabel ?? 'Article'} {article.articleNumber}</a> : null}
                   {changeType ? (
                     <Badge tone={changeTone(changeType)}>{changeType}</Badge>
                   ) : (

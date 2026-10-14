@@ -64,7 +64,7 @@ class SettingsService(private val catalog: CatalogRepository, private val settin
     }
 
     private fun structuralRules(kinds: List<OutlineKindWrite>): List<List<Any?>> = kinds.map { kind ->
-        listOf(kind.kindCode, kind.allowTextAlongsideChildren, kind.titlePolicy, kind.labelPolicy, kind.segmentation)
+        listOf(kind.kindCode, kind.root, kind.allowedChildKinds, kind.allowTextAlongsideChildren, kind.titlePolicy, kind.labelPolicy, kind.segmentation)
     }
 
     private fun currentKinds(constitutionId: UUID): List<OutlineKindWrite> = CatalogWriteService.normalizeOutline(
@@ -72,6 +72,7 @@ class SettingsService(private val catalog: CatalogRepository, private val settin
             OutlineKindWrite(
                 kind.kindCode, kind.displayLabel, kind.presentation, kind.showLabel, kind.showTitle, kind.showKind,
                 kind.allowTextAlongsideChildren, kind.titlePolicy, kind.labelPolicy, kind.labelPlacement, kind.segmentation,
+                kind.root, kind.allowedChildKinds,
             )
         },
     )
@@ -87,6 +88,7 @@ class SettingsService(private val catalog: CatalogRepository, private val settin
                     OutlineKindWrite(
                         kind.kindCode, kind.displayLabel, kind.presentation, kind.showLabel, kind.showTitle, kind.showKind,
                         kind.allowTextAlongsideChildren, kind.titlePolicy, kind.labelPolicy, kind.labelPlacement, kind.segmentation,
+                        kind.root, kind.allowedChildKinds,
                     )
                 },
             ),

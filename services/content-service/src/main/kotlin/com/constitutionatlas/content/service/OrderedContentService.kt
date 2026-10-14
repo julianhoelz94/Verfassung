@@ -11,6 +11,7 @@ import com.constitutionatlas.content.client.CatalogClient
 import com.constitutionatlas.content.client.StructuralSettings
 import com.constitutionatlas.content.repo.OrderedContentRepository
 import com.constitutionatlas.platform.NotFoundException
+import com.constitutionatlas.platform.OrderedRichContent
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
@@ -108,17 +109,23 @@ class OrderedContentService(
                     "text" -> {
                         require(entry.node == null) { "Text entry cannot contain a child" }
                         val textRevision = if (entry.revisionId != null) {
-                            require(entry.text == null && entry.logicalId == null && entry.predecessorRevisionId == null && entry.lineage.isEmpty()) { "Text reference cannot contain changed fields" }
+                            require(entry.text == null && entry.logicalId == null && entry.predecessorRevisionId == null && entry.lineage.isEmpty() && entry.format == null && entry.table == null && entry.footnoteLabel == null && entry.references.isEmpty()) { "Text reference cannot contain changed fields" }
                             require(entry.revisionId in allowedTexts) { "Text reference is not in the pinned snapshot" }
                             entry.revisionId
                         } else {
-                            val text = entry.text ?: throw IllegalArgumentException("Text is required at $logical/content/$position")
+                            val format = entry.format ?: "plain"
+                            require(format in setOf("plain", "table", "footnote")) { "Unknown rich content format at $logical/content/$position" }
+                            require((format == "table") == (entry.table != null)) { "Table payload and format must agree at $logical/content/$position" }
+                            require(format == "footnote" || entry.footnoteLabel == null) { "Footnote label needs a footnote entry" }
+                            require(format == "plain" || entry.references.isEmpty()) { "Inline references need a plain text entry" }
+                            val text = if (format == "table") entry.table!!.plainText() else entry.text ?: throw IllegalArgumentException("Text is required at $logical/content/$position")
+                            if (format == "table" && entry.text != null) require(entry.text == text) { "Table text does not match cells at $logical/content/$position" }
                             val textLogical = entry.logicalId ?: UUID.randomUUID()
                             entry.predecessorRevisionId?.let { require(allowedTexts[it]?.first == textLogical) { "Text predecessor does not match logical identity" } }
                             if (allowedTexts.values.any { it.first == textLogical }) require(entry.predecessorRevisionId != null) { "Existing text identity requires its predecessor revision" }
                             require(entry.lineage.all { it in allowedTexts }) { "Unknown split/merge lineage" }
                             val id = UUID.randomUUID()
-                            repository.insertText(id, textLogical, version, entry.predecessorRevisionId, text, entry.lineage)
+                            repository.insertText(id, textLogical, version, entry.predecessorRevisionId, text, entry.lineage, format, OrderedRichContent(entry.table, entry.footnoteLabel, entry.references))
                             id
                         }
                         repository.insertEntry(revision, position, textRevision, null)
@@ -146,12 +153,13 @@ class OrderedContentService(
         val snapshot = get(version)
         fun nodeWrite(node: OrderedNode): OrderedNodeWrite = OrderedNodeWrite(
             logicalId = node.logicalId,
+            predecessorRevisionId = repository.revisionPredecessor(node.revisionId, false),
             kind = node.kind,
             label = node.label,
             title = node.title,
             content = node.content.map { entry ->
                 entry.node?.let { com.constitutionatlas.platform.OrderedEntryWrite("child", node = nodeWrite(it)) }
-                    ?: com.constitutionatlas.platform.OrderedEntryWrite("text", logicalId = entry.logicalId, text = entry.text)
+                    ?: com.constitutionatlas.platform.OrderedEntryWrite("text", logicalId = entry.logicalId, predecessorRevisionId = entry.revisionId?.let { repository.revisionPredecessor(it, true) }, text = entry.text, format = entry.format, table = entry.table, footnoteLabel = entry.footnoteLabel, references = entry.references)
             },
         )
         return com.constitutionatlas.content.api.OrderedContentExport(version, snapshot.settingsRevisionId, snapshot.roots.map(::nodeWrite))
@@ -168,10 +176,15 @@ class OrderedContentService(
 
     fun validate(roots: List<OrderedNode>, settings: StructuralSettings) {
         val identities = mutableSetOf<UUID>()
-        fun walk(node: OrderedNode, depth: Int) {
+        val levels = settings.outline.kinds
+        val byCode = levels.associateBy { it.kindCode }
+        val rootsAllowed = levels.filter { it.root }.map { it.kindCode }.toSet().ifEmpty { setOfNotNull(levels.firstOrNull()?.kindCode) }
+        fun walk(node: OrderedNode, parent: com.constitutionatlas.content.client.StructuralLevel?) {
             require(identities.add(node.logicalId)) { "Duplicate node logical identity '${node.logicalId}'" }
-            val level = settings.outline.kinds.getOrNull(depth) ?: throw IllegalArgumentException("Unexpected level at '${node.logicalId}'")
-            require(node.kind == level.kindCode) { "Invalid kind '${node.kind}' at '${node.logicalId}'; expected '${level.kindCode}'" }
+            val level = byCode[node.kind] ?: throw IllegalArgumentException("Unknown kind '${node.kind}' at '${node.logicalId}'")
+            require(if (parent == null) node.kind in rootsAllowed else node.kind in parent.allowedChildKinds) {
+                "Invalid kind '${node.kind}' at '${node.logicalId}' ${if (parent == null) "at the root" else "under '${parent.kindCode}'"}"
+            }
             fun policy(value: String?, policy: String, field: String) {
                 require(policy != "required" || !value.isNullOrBlank()) { "$field is required at '${node.logicalId}'" }
                 require(policy != "none" || value.isNullOrEmpty()) { "$field is not permitted at '${node.logicalId}'" }
@@ -181,14 +194,60 @@ class OrderedContentService(
             node.content.forEach { entry ->
                 if (entry.type == "child") {
                     require(level.mayHoldChildren && entry.node!!.kind in level.allowedChildKinds) { "Child kind is not permitted at '${node.logicalId}'" }
-                    walk(entry.node!!, depth + 1)
+                    walk(entry.node!!, level)
                 } else {
                     require(level.mayHoldText) { "Parent text is not permitted at '${node.logicalId}'" }
                     require(identities.add(entry.logicalId!!)) { "Duplicate text logical identity '${entry.logicalId}'" }
                 }
             }
         }
-        roots.forEach { walk(it, 0) }
+        roots.forEach { walk(it, null) }
+        fun collect(node: OrderedNode, footnotes: MutableSet<UUID>) {
+            node.content.forEach { entry ->
+                entry.node?.let { collect(it, footnotes) }
+                if (entry.format == "footnote") footnotes += requireNotNull(entry.logicalId)
+            }
+        }
+        fun rich(node: OrderedNode, footnotes: Set<UUID>) {
+            node.content.forEach { entry ->
+                entry.node?.let { rich(it, footnotes) }
+                entry.table?.let { table ->
+                    require(entry.format == "table" && table.rows.isNotEmpty()) { "Table needs rows at '${node.logicalId}'" }
+                    val rowIds = mutableSetOf<UUID>()
+                    val cellIds = mutableSetOf<UUID>()
+                    val headerIds = table.rows.flatMap { it.cells }.filter { it.header }.map { it.logicalId }.toSet()
+                    table.rows.forEach { row ->
+                        require(rowIds.add(row.logicalId) && row.cells.isNotEmpty()) { "Duplicate or empty table row at '${node.logicalId}'" }
+                        row.cells.forEach { cell ->
+                            require(cellIds.add(cell.logicalId) && cell.rowSpan in 1..100 && cell.colSpan in 1..100) { "Invalid table cell at '${node.logicalId}'" }
+                            require(cell.headers.all { it in headerIds }) { "Unknown table header at '${node.logicalId}'" }
+                        }
+                    }
+                }
+                if (entry.format == "footnote") require(!entry.text.isNullOrBlank() && entry.table == null) { "Footnote text is required at '${node.logicalId}'" }
+                var end = 0
+                val referenceIds = mutableSetOf<UUID>()
+                entry.references.sortedBy { it.start }.forEach { ref ->
+                    val text = requireNotNull(entry.text)
+                    require(referenceIds.add(ref.logicalId) && ref.start >= end && ref.start < ref.end && ref.end <= text.length) { "Invalid or overlapping inline reference at '${node.logicalId}'" }
+                    end = ref.end
+                    val target = ref.target
+                    require(
+                        when (target.type) {
+                            "unit" -> target.logicalId != null && target.url == null && target.footnoteId == null
+                            "external" -> target.url?.startsWith("https://") == true && target.logicalId == null && target.footnoteId == null
+                            "footnote" -> target.footnoteId in footnotes && target.logicalId == null && target.url == null
+                            else -> false
+                        },
+                    ) { "Invalid inline target at '${node.logicalId}'" }
+                }
+            }
+        }
+        roots.forEach { root ->
+            val footnotes = mutableSetOf<UUID>()
+            collect(root, footnotes)
+            rich(root, footnotes)
+        }
     }
 
     @Transactional

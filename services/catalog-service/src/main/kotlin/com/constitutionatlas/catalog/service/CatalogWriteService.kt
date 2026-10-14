@@ -260,12 +260,10 @@ class CatalogWriteService(
                 if (presentation != "section" && presentation != "concatenated") {
                     throw IllegalArgumentException("presentation must be section or concatenated")
                 }
-                if (code == "sentence" && index != kinds.lastIndex) {
-                    throw IllegalArgumentException("sentence must be the final layer")
-                }
-                if (index == kinds.lastIndex && kind.allowTextAlongsideChildren) {
-                    throw IllegalArgumentException("the final layer has no child units")
-                }
+                val children = kind.allowedChildKinds?.map { it.trim().lowercase() }
+                    ?: kinds.getOrNull(index + 1)?.let { listOf(it.kindCode.trim().lowercase()) }.orEmpty()
+                if (code == "sentence" && children.isNotEmpty()) throw IllegalArgumentException("sentence cannot have child units")
+                if (children.isEmpty() && kind.allowTextAlongsideChildren) throw IllegalArgumentException("a leaf has no child units")
                 if (kind.titlePolicy !in setOf("none", "optional", "required") ||
                     kind.labelPolicy !in setOf("none", "optional", "required")
                 ) {
@@ -280,21 +278,40 @@ class CatalogWriteService(
                 if (kind.labelPlacement !in setOf("before_title", "after_title", "inline", "superscript")) {
                     throw IllegalArgumentException("labelPlacement must be before_title, after_title, inline or superscript")
                 }
-                if (kind.labelPlacement == "superscript" && index != kinds.lastIndex) throw IllegalArgumentException("superscript labels are only available on the final layer")
+                if (kind.labelPlacement == "superscript" && children.isNotEmpty()) throw IllegalArgumentException("superscript labels are only available on a leaf")
                 if (kind.segmentation !in setOf("plain", "sentence") ||
-                    (kind.segmentation == "sentence" && index != kinds.lastIndex)
+                    (kind.segmentation == "sentence" && children.isNotEmpty())
                 ) {
-                    throw IllegalArgumentException("sentence segmentation is only available on the final layer")
+                    throw IllegalArgumentException("sentence segmentation is only available on a leaf")
                 }
                 kind.copy(
                     kindCode = code,
                     displayLabel = label,
                     presentation = presentation,
+                    root = kind.root ?: (index == 0),
+                    allowedChildKinds = children,
                 )
             }
             if (normalized.map { it.kindCode }.toSet().size != normalized.size) {
                 throw IllegalArgumentException("kindCode values must be unique")
             }
+            val byCode = normalized.associateBy { it.kindCode }
+            if (normalized.none { it.root == true }) throw IllegalArgumentException("outline needs a root kind")
+            normalized.forEach { kind ->
+                val children = kind.allowedChildKinds.orEmpty()
+                if (children.size != children.distinct().size) throw IllegalArgumentException("duplicate child kind for '${kind.kindCode}'")
+                children.forEach { child ->
+                    if (child !in byCode) throw IllegalArgumentException("unknown child kind '$child' for '${kind.kindCode}'")
+                }
+            }
+            val visited = mutableSetOf<String>()
+            fun visit(code: String, path: Set<String>) {
+                if (code in path) throw IllegalArgumentException("outline cycle at '$code'")
+                if (!visited.add(code)) return
+                byCode.getValue(code).allowedChildKinds.orEmpty().forEach { visit(it, path + code) }
+            }
+            normalized.filter { it.root == true }.forEach { visit(it.kindCode, emptySet()) }
+            if (visited.size != normalized.size) throw IllegalArgumentException("every kind must be reachable from a root")
             return normalized
         }
     }

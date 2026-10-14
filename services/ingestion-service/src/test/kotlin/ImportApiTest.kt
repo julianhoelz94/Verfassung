@@ -552,6 +552,7 @@ class ImportApiTest {
             Mockito.argThat<List<com.constitutionatlas.platform.OrderedNodeWrite>> { roots ->
                 roots.single().logicalId == logical && roots.single().label == "(2a)" && roots.single().content!!.map { it.text } == listOf("Before  ", "after.")
             } ?: emptyList(),
+            Mockito.isNull(),
         )
         Mockito.verify(contentClient, Mockito.never()).replaceArticles(eqNonNull(version), Mockito.anyList())
     }

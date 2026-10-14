@@ -37,6 +37,7 @@ data class StructuralLevel(
     val allowedChildKinds: List<String>,
     val titlePolicy: String = "optional",
     val labelPolicy: String = "optional",
+    val root: Boolean = false,
 )
 
 data class StructuralOutline(val kinds: List<StructuralLevel>)

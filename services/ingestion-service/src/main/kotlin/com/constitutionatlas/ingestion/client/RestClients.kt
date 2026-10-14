@@ -139,8 +139,9 @@ class RestContentClient(
 ) : ContentClient {
     private val client: RestClient = restClient(contentUrl)
 
-    override fun replaceRoots(versionId: UUID, roots: List<OrderedNodeWrite>) {
-        client.putJson("/versions/{id}/content", OrderedSnapshotWrite(expectedGeneration = 0, roots = roots), versionId)
+    override fun replaceRoots(versionId: UUID, roots: List<OrderedNodeWrite>, sourceVersionId: UUID?) {
+        val source = sourceVersionId?.let(::snapshot)
+        client.putJson("/versions/{id}/content", OrderedSnapshotWrite(expectedGeneration = 0, sourceVersionId = sourceVersionId, sourceGeneration = source?.generation, roots = roots), versionId)
     }
 
     override fun replaceArticles(versionId: UUID, articles: List<ImportArticle>) {

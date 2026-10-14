@@ -146,7 +146,7 @@ run_prepopulate() {
   local port service url waited
   port="$(caddy_port)"
   for service in catalog content amendment identity editor search ingestion audit; do
-    url="http://127.0.0.1:${port}/api/${service}/ping"
+    url="http://127.0.0.1:${port}/api/${service}/actuator/health"
     waited=0
     until curl -sf -o /dev/null --max-time 2 "${url}"; do
       if [ "${waited}" -ge "${HTTP_READY_TIMEOUT_SECONDS}" ]; then

@@ -44,26 +44,51 @@ object ImportValidator {
         if (request.articles.isNotEmpty() && request.roots.isNotEmpty()) errors += "MIXED_FORMATS" to "Use roots or articles, not both"
         if (request.roots.isNotEmpty()) {
             val kinds = (pinnedOutline ?: request.outline)?.kinds.orEmpty()
-            val rootKind = kinds.firstOrNull()?.kindCode ?: "article"
-            if (request.roots.any { it.kind != rootKind }) errors += "ROOT_KIND" to "Roots must use the first outline kind '$rootKind'"
+            val rootKinds = kinds.filter { it.root == true }.map { it.kindCode }.toSet()
+                .ifEmpty { setOf(kinds.firstOrNull()?.kindCode ?: "article") }
+            if (request.roots.any { it.kind !in rootKinds }) errors += "ROOT_KIND" to "Roots must use one of ${rootKinds.joinToString()}"
             val allowed = allowedKinds(request, pinnedOutline)
+            val byCode = kinds.associateBy { it.kindCode }
+            fun children(kind: String): List<String> = byCode[kind]?.let { level ->
+                level.allowedChildKinds ?: kinds.getOrNull(kinds.indexOf(level) + 1)?.let { listOf(it.kindCode) }.orEmpty()
+            }.orEmpty()
             val logicalIds = mutableSetOf<java.util.UUID>()
-            fun visit(node: com.constitutionatlas.platform.OrderedNodeWrite, depth: Int) {
+            fun visit(node: com.constitutionatlas.platform.OrderedNodeWrite, parent: String?, path: String) {
                 val kind = node.kind?.trim()?.lowercase().orEmpty()
-                if (kind !in allowed) errors += "UNKNOWN_KIND" to "kind '$kind' is not in the outline"
-                if (kinds.isNotEmpty() && kind != kinds.getOrNull(depth)?.kindCode) errors += "HIERARCHY_KIND" to "Expected ${kinds.getOrNull(depth)?.kindCode ?: "no child"} at depth $depth"
-                if (kinds.getOrNull(depth)?.allowTextAlongsideChildren == false && node.content.orEmpty().any { it.type == "text" } && node.content.orEmpty().any { it.type == "child" }) {
-                    errors += "TEXT_ALONGSIDE_CHILDREN" to "Text is not allowed alongside children at depth $depth"
+                if (kind !in allowed) errors += "UNKNOWN_KIND" to "$path: kind '$kind' is not in the outline"
+                if (parent != null && kind !in children(parent)) errors += "HIERARCHY_KIND" to "$path: '$kind' is not allowed under '$parent'"
+                if (byCode[kind]?.allowTextAlongsideChildren == false && children(kind).isNotEmpty() && node.content.orEmpty().any { it.type == "text" }) {
+                    errors += "TEXT_ALONGSIDE_CHILDREN" to "$path: text is not allowed in '$kind'"
                 }
-                if (node.revisionId != null || node.predecessorRevisionId != null) errors += "REVISION_REFERENCE" to "Imports must contain complete units without foreign revision references"
+                if (node.revisionId != null || (node.predecessorRevisionId != null && request.predecessorVersionId == null)) errors += "REVISION_REFERENCE" to "$path: predecessor references require a pinned predecessor version"
                 if (node.logicalId != null && !logicalIds.add(requireNotNull(node.logicalId))) errors += "DUPLICATE_LOGICAL_ID" to "Logical identities must be unique"
-                node.content.orEmpty().forEach { entry ->
-                    entry.node?.let { visit(it, depth + 1) }
+                node.content.orEmpty().forEachIndexed { index, entry ->
+                    val entryPath = "$path.content[$index]"
+                    entry.node?.let { visit(it, kind, "$path.content[$index].node") }
                     if (entry.logicalId != null && !logicalIds.add(requireNotNull(entry.logicalId))) errors += "DUPLICATE_LOGICAL_ID" to "Logical identities must be unique"
-                    if (entry.revisionId != null || entry.predecessorRevisionId != null || entry.lineage.isNotEmpty()) errors += "REVISION_REFERENCE" to "Imports cannot refer to foreign revisions"
+                    if (entry.revisionId != null || (entry.predecessorRevisionId != null && request.predecessorVersionId == null) || entry.lineage.isNotEmpty()) errors += "REVISION_REFERENCE" to "$path.content[$index]: revision references require a pinned predecessor version"
+                    if (entry.type == "text") {
+                        val format = entry.format ?: "plain"
+                        if (format !in setOf("plain", "table", "footnote") || (format == "table") != (entry.table != null)) errors += "RICH_FORMAT" to "$entryPath: format and table payload must agree"
+                        if (format == "footnote" && entry.text.isNullOrBlank()) errors += "FOOTNOTE_BODY" to "$entryPath: footnote body is required"
+                        entry.table?.let { table ->
+                            if (table.rows.isEmpty() || table.rows.any { it.cells.isEmpty() }) errors += "TABLE_SHAPE" to "$entryPath: table rows need cells"
+                            val headers = table.rows.flatMap { it.cells }.filter { it.header }.map { it.logicalId }.toSet()
+                            table.rows.forEachIndexed { rowIndex, row ->
+                                row.cells.forEachIndexed { cellIndex, cell ->
+                                    if (cell.rowSpan !in 1..100 || cell.colSpan !in 1..100 || cell.headers.any { it !in headers }) errors += "TABLE_CELL" to "$entryPath.table.rows[$rowIndex].cells[$cellIndex]: invalid span or header target"
+                                }
+                            }
+                        }
+                        var previousEnd = 0
+                        entry.references.sortedBy { it.start }.forEachIndexed { refIndex, ref ->
+                            if (format != "plain" || ref.start < previousEnd || ref.start >= ref.end || ref.end > (entry.text?.length ?: 0)) errors += "INLINE_REFERENCE" to "$entryPath.references[$refIndex]: invalid or overlapping span"
+                            previousEnd = ref.end
+                        }
+                    }
                 }
             }
-            request.roots.forEach { visit(it, 0) }
+            request.roots.forEachIndexed { index, root -> visit(root, null, "roots[$index]") }
         }
         val numbers = request.articles.map { it.articleNumber.trim() }
         if (numbers.any { it.isBlank() }) {
@@ -88,14 +113,15 @@ object ImportValidator {
         }
         val kinds = (pinnedOutline ?: request.outline)?.kinds.orEmpty()
         if (kinds.isNotEmpty() && request.articles.isNotEmpty()) {
-            if (kinds.first().kindCode != "article") errors += "ROOT_KIND" to "Article format requires an article root; use roots for this outline"
-            fun visitArticleNode(node: ImportNode, depth: Int) {
-                if (node.kind.trim().lowercase() != kinds.getOrNull(depth)?.kindCode) {
-                    errors += "HIERARCHY_KIND" to "Expected ${kinds.getOrNull(depth)?.kindCode ?: "no child"} at depth $depth"
-                }
-                node.children.forEach { visitArticleNode(it, depth + 1) }
+            val roots = kinds.filter { it.root == true }.map { it.kindCode }.toSet().ifEmpty { setOf(kinds.first().kindCode) }
+            if ("article" !in roots) errors += "ROOT_KIND" to "Article format requires an article root; use roots for this outline"
+            val byCode = kinds.associateBy { it.kindCode }
+            fun visitArticleNode(node: ImportNode, parent: String, path: String) {
+                val expected = byCode[parent]?.let { it.allowedChildKinds ?: kinds.getOrNull(kinds.indexOf(it) + 1)?.let { next -> listOf(next.kindCode) }.orEmpty() }.orEmpty()
+                if (node.kind.trim().lowercase() !in expected) errors += "HIERARCHY_KIND" to "$path: '${node.kind}' is not allowed under '$parent'"
+                node.children.forEachIndexed { index, child -> visitArticleNode(child, node.kind, "$path.children[$index]") }
             }
-            request.articles.forEach { article -> article.nodes.forEach { visitArticleNode(it, 1) } }
+            request.articles.forEachIndexed { articleIndex, article -> article.nodes.forEachIndexed { index, node -> visitArticleNode(node, "article", "articles[$articleIndex].nodes[$index]") } }
         }
         return errors
     }

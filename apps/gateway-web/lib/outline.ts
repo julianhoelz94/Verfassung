@@ -16,6 +16,8 @@ export function toOutlineKindWrite(kind: {
   labelPolicy?: string;
   labelPlacement?: string;
   segmentation?: string;
+  root?: boolean;
+  allowedChildKinds?: string[];
 }): OutlineKindWrite {
   const presentation = asOutlinePresentation(kind.presentation);
   return {
@@ -30,6 +32,8 @@ export function toOutlineKindWrite(kind: {
     labelPolicy: (kind.labelPolicy ?? 'optional') as OutlineKindWrite['labelPolicy'],
     labelPlacement: (kind.labelPlacement ?? 'before_title') as OutlineKindWrite['labelPlacement'],
     segmentation: (kind.segmentation ?? 'plain') as OutlineKindWrite['segmentation'],
+    ...(kind.root === undefined ? {} : { root: kind.root }),
+    ...(kind.allowedChildKinds === undefined ? {} : { allowedChildKinds: kind.allowedChildKinds }),
   };
 }
 

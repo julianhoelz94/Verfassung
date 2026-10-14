@@ -2284,3 +2284,10 @@ button.article-toggle[aria-expanded='false']::after {
 
 .cookie-notice p { margin: 0 0 0.5rem; }
 .cookie-notice button { margin-top: 0.25rem; }
+.legal-table-scroll { max-width: 100%; overflow-x: auto; margin-block: var(--space-4); }
+.legal-table { border-collapse: collapse; width: 100%; min-width: 24rem; }
+.legal-table th, .legal-table td { border: 1px solid var(--color-line); padding: var(--space-2); text-align: start; vertical-align: top; }
+.legal-footnote { margin-block: var(--space-2); font-size: .9em; }
+.legal-footnote a { margin-inline-start: var(--space-2); }
+.xref-unavailable { text-decoration: underline dotted; text-underline-offset: .15em; }
+.diff-cell-changed { background: #fff2bd; text-decoration: underline dotted; }

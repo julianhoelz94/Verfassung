@@ -69,7 +69,8 @@
             "titlePolicy": "optional",
             "labelPolicy": "optional",
             "labelPlacement": "before_title",
-            "segmentation": "plain"
+            "segmentation": "plain",
+            "root": true
           },
           {
             "kindCode": "paragraph",
@@ -88,7 +89,8 @@
             "titlePolicy": "optional",
             "labelPolicy": "optional",
             "labelPlacement": "before_title",
-            "segmentation": "plain"
+            "segmentation": "plain",
+            "root": false
           },
           {
             "kindCode": "sentence",
@@ -105,7 +107,8 @@
             "titlePolicy": "optional",
             "labelPolicy": "optional",
             "labelPlacement": "before_title",
-            "segmentation": "sentence"
+            "segmentation": "sentence",
+            "root": false
           }
         ]
       },

@@ -32,6 +32,8 @@ data class ImportOutlineKind(
     val labelPolicy: String = "optional",
     val labelPlacement: String = "before_title",
     val segmentation: String = "plain",
+    val root: Boolean? = null,
+    val allowedChildKinds: List<String>? = null,
 )
 
 data class ImportOutline(

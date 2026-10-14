@@ -30,6 +30,44 @@ data class OrderedEntry(
     val text: String? = null,
     @get:JsonInclude(JsonInclude.Include.NON_EMPTY)
     val lineage: List<UUID> = emptyList(),
+    @get:JsonInclude(JsonInclude.Include.NON_NULL)
+    val format: String? = null,
+    @get:JsonInclude(JsonInclude.Include.NON_NULL)
+    val table: OrderedTable? = null,
+    @get:JsonInclude(JsonInclude.Include.NON_NULL)
+    val footnoteLabel: String? = null,
+    @get:JsonInclude(JsonInclude.Include.NON_EMPTY)
+    val references: List<OrderedInlineReference> = emptyList(),
+)
+
+data class OrderedTableCell(
+    val logicalId: UUID,
+    val text: String,
+    val header: Boolean = false,
+    val rowSpan: Int = 1,
+    val colSpan: Int = 1,
+    val headers: List<UUID> = emptyList(),
+)
+
+data class OrderedTableRow(val logicalId: UUID, val cells: List<OrderedTableCell>)
+
+data class OrderedTable(val caption: String? = null, val rows: List<OrderedTableRow>) {
+    fun plainText(): String = rows.joinToString("\n") { row -> row.cells.joinToString(" ") { it.text } }
+}
+
+data class OrderedReferenceTarget(
+    val type: String,
+    val logicalId: UUID? = null,
+    val url: String? = null,
+    val footnoteId: UUID? = null,
+)
+
+data class OrderedInlineReference(val logicalId: UUID, val start: Int, val end: Int, val target: OrderedReferenceTarget)
+
+data class OrderedRichContent(
+    val table: OrderedTable? = null,
+    val footnoteLabel: String? = null,
+    val references: List<OrderedInlineReference> = emptyList(),
 )
 
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -78,6 +116,10 @@ data class OrderedEntryWrite(
     val predecessorRevisionId: UUID? = null,
     val text: String? = null,
     val lineage: List<UUID> = emptyList(),
+    val format: String? = null,
+    val table: OrderedTable? = null,
+    val footnoteLabel: String? = null,
+    val references: List<OrderedInlineReference> = emptyList(),
 ) : StrictOrderedWrite()
 
 data class OrderedSnapshotWrite(

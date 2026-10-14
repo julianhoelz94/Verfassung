@@ -1,4 +1,5 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -28,9 +29,59 @@ const definitions = [
       { key: 'xb-2023', versionLabel: '2023', effectiveDate: '2023-05-05', numbers: [...Array.from({ length: 11 }, (_, i) => i + 1), 13], predecessor: 'xb-2018' },
     ],
   },
+  {
+    isoCode: 'XC', countryName: 'Atlas Structure Republic', constitutionSlug: 'structure-charter', constitutionTitle: 'Structure Test Charter',
+    versions: [
+      { key: 'xc-2020', versionLabel: '2020', effectiveDate: '2020-06-01', numbers: [] },
+      { key: 'xc-2024', versionLabel: '2024', effectiveDate: '2024-06-01', numbers: [], predecessor: 'xc-2020' },
+    ],
+  },
 ];
 
-const manifest = { schemaVersion: 1, namespace: 'atlas-e2e', expected: { countries: 2, constitutions: 2, versions: 5, articles: 60, amendments: 3 }, countries: [] };
+const manifest = { schemaVersion: 2, namespace: 'atlas-e2e', expected: { countries: 3, constitutions: 3, versions: 7, articles: 66, amendments: 3 }, countries: [] };
+function id(name) {
+  const hex = createHash('sha256').update(`atlas-e2e:${name}`).digest('hex');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-8${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
+}
+const xcOutline = { kinds: [
+  { kindCode: 'preamble', displayLabel: 'Preamble', root: true, allowedChildKinds: [], showTitle: true, showKind: true },
+  { kindCode: 'article', displayLabel: 'Article', root: true, allowedChildKinds: ['paragraph'], showTitle: true, showKind: true, allowTextAlongsideChildren: true },
+  { kindCode: 'paragraph', displayLabel: 'Paragraph', root: false, allowedChildKinds: [], showLabel: true },
+  { kindCode: 'appendix', displayLabel: 'Appendix', root: true, allowedChildKinds: ['clause'], showTitle: true, showKind: true, allowTextAlongsideChildren: true },
+  { kindCode: 'clause', displayLabel: 'Clause', root: false, allowedChildKinds: [], showLabel: false },
+] };
+function xcRoots(key) {
+  const changed = key === 'xc-2024';
+  const text = (name, value, extra = {}) => ({ type: 'text', logicalId: id(name), text: value, ...extra });
+  const child = (name, kind, label, title, content) => ({ type: 'child', node: { logicalId: id(name), kind, label, title, content } });
+  const footnote = text('xc-note', changed ? 'The revised source note.' : 'The original source note.', { format: 'footnote', footnoteLabel: '1' });
+  const preamble = child('xc-preamble', 'preamble', null, 'Purpose', [text('xc-preamble-text', 'We establish this charter.')]);
+  const article = child('xc-article', 'article', '1', 'Civic rights', [
+    text('xc-intro', 'Dignity applies to every person; see note 1 and Appendix A.', { references: [
+      { logicalId: id('xc-note-ref'), start: 37, end: 43, target: { type: 'footnote', footnoteId: id('xc-note') } },
+      { logicalId: id('xc-appendix-ref'), start: 48, end: 58, target: { type: 'unit', logicalId: id('xc-appendix') } },
+    ] }),
+    child('xc-paragraph', 'paragraph', '(1)', null, [text('xc-paragraph-text', 'Every person has equal standing.')]),
+    text('xc-source', 'Source', { references: [{ logicalId: id('xc-source-ref'), start: 0, end: 6, target: { type: 'external', url: changed ? 'https://example.org/atlas-e2e/revised-source' : 'https://example.org/atlas-e2e/original-source' } }] }),
+    footnote,
+  ]);
+  const appendix = child('xc-appendix', 'appendix', 'A', null, [
+    text('xc-appendix-intro', 'Schedule of civic duties.'),
+    text('xc-table', undefined, { format: 'table', table: { caption: 'Civic duties', rows: [
+      { logicalId: id('xc-row-head'), cells: [
+        { logicalId: id('xc-cell-duty'), text: 'Duty', header: true },
+        { logicalId: id('xc-cell-period'), text: 'Period', header: true },
+      ] },
+      { logicalId: id('xc-row-body'), cells: [
+        { logicalId: id('xc-cell-report'), text: 'Report', headers: [id('xc-cell-duty')] },
+        { logicalId: id('xc-cell-annual'), text: changed ? 'Biennial' : 'Annual', headers: [id('xc-cell-period')] },
+      ] },
+      { logicalId: id('xc-row-span'), cells: [{ logicalId: id('xc-cell-span'), text: 'Applies nationally', colSpan: 2, headers: [id('xc-cell-duty'), id('xc-cell-period')] }] },
+    ] } }),
+    child('xc-clause', 'clause', null, null, [text('xc-clause-text', 'This clause has no title or number.')]),
+  ]);
+  return [preamble.node, article.node, appendix.node];
+}
 for (const country of definitions) {
   const entry = { isoCode: country.isoCode, constitutionSlug: country.constitutionSlug, versions: [] };
   for (const version of country.versions) {
@@ -47,7 +98,8 @@ for (const country of definitions) {
       constitutionTitle: country.constitutionTitle, versionLabel: version.versionLabel,
       effectiveDate: version.effectiveDate, languageCode: 'en',
       sourceUrl: `https://example.org/atlas-e2e/${version.key}`, gazetteReference: `Atlas fixture ${version.versionLabel}`,
-      outline, articles,
+      outline: country.isoCode === 'XC' ? xcOutline : outline, articles,
+      ...(country.isoCode === 'XC' ? { roots: xcRoots(version.key) } : {}),
     };
     const file = `${version.key}.json`;
     writeFileSync(join(output, file), `${JSON.stringify(payload, null, 2)}\n`);
@@ -73,7 +125,7 @@ for (const version of versionEntries) {
   if (orders.some((order, index) => order !== index + 1) || new Set(numbers).size !== numbers.length) {
     throw new Error(`Invalid article order or duplicate number in ${version.file}`);
   }
-  articleCount += payload.articles.length;
+  articleCount += payload.roots?.length ?? payload.articles.length;
 }
 if (articleCount !== manifest.expected.articles || manifest.amendments.length !== manifest.expected.amendments) {
   throw new Error('Fixture article or amendment count is invalid');

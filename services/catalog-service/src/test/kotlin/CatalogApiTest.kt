@@ -353,6 +353,25 @@ class CatalogApiTest {
     }
 
     @Test
+    fun mixedRootsAndOptionalPathsRoundTripThroughCatalog() {
+        val country = uniqueCountryCode()
+        writes.createCountry(com.constitutionatlas.catalog.api.CreateCountryRequest(country, "Mixed outline country"))
+        val kinds = listOf(
+            com.constitutionatlas.catalog.api.OutlineKindWrite("article", "Article", root = true, allowedChildKinds = listOf("paragraph")),
+            com.constitutionatlas.catalog.api.OutlineKindWrite("paragraph", "Paragraph", allowedChildKinds = emptyList()),
+            com.constitutionatlas.catalog.api.OutlineKindWrite("preamble", "Preamble", root = true, allowedChildKinds = emptyList(), showLabel = false),
+            com.constitutionatlas.catalog.api.OutlineKindWrite("appendix", "Appendix", root = true, allowedChildKinds = listOf("item")),
+            com.constitutionatlas.catalog.api.OutlineKindWrite("item", "Item", allowedChildKinds = emptyList()),
+        )
+        val constitution = writes.createConstitution(country, com.constitutionatlas.catalog.api.CreateConstitutionRequest("mixed", "Mixed", kinds))
+        val stored = catalogRepository.findOutline(constitution.id).kinds.associateBy { it.kindCode }
+        assertThat(stored.filterValues { it.root }.keys).containsExactlyInAnyOrder("article", "preamble", "appendix")
+        assertThat(stored.getValue("article").allowedChildKinds).containsExactly("paragraph")
+        assertThat(stored.getValue("appendix").allowedChildKinds).containsExactly("item")
+        assertThat(stored.getValue("preamble").mayHoldText).isTrue()
+    }
+
+    @Test
     fun occupiedHierarchyChangesRequireMigration() {
         mockMvc.put("/constitutions/01900000-0000-4000-8000-000000000002/content-outline") {
             header("Authorization", TOKEN)

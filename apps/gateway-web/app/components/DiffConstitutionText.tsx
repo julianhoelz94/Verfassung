@@ -97,6 +97,18 @@ function OrderedDiff({ entries, opposite, side, outline, oppositeOutline, legacy
   }
   return <OrderedContentTree entries={entries} outline={outline} idPrefix={`diff-${side}-`}
     renderText={(entry) => marks(entry.text ?? '', texts.get(entry)?.text ?? '')}
+    renderTableCell={(cell, entry) => {
+      const other = texts.get(entry)?.table?.rows.flatMap(row => row.cells).find(candidate => candidate.logicalId === cell.logicalId);
+      const metadataChanged = other && (other.header !== cell.header || other.rowSpan !== cell.rowSpan || other.colSpan !== cell.colSpan || JSON.stringify(other.headers ?? []) !== JSON.stringify(cell.headers ?? []));
+      return metadataChanged ? <span className="diff-cell-changed" title="Table cell structure changed">{marks(cell.text, other.text)}</span> : marks(cell.text, other?.text ?? '');
+    }}
+    renderTableCaption={(entry) => marks(entry.table?.caption ?? '', texts.get(entry)?.table?.caption ?? '')}
+    renderReference={(reference, label, href, entry) => {
+      const other = texts.get(entry)?.references?.find(candidate => candidate.logicalId === reference.logicalId);
+      const changed = !other || JSON.stringify(other.target) !== JSON.stringify(reference.target) || other.start !== reference.start || other.end !== reference.end;
+      const content = changed ? <span className="diff-cell-changed" title="Reference changed">{label}</span> : label;
+      return href ? <a className="xref" href={href}>{content}</a> : <span className="xref-unavailable" title="Referenced provision is unavailable here">{content}</span>;
+    }}
     renderHeading={(node, heading) => {
       const other = nodes.get(node);
       return marks(heading, other ? nodeHeading(kindByCode(oppositeOutline, other.kind), { kind: other.kind, label: other.label, number: other.label, title: other.title }) ?? '' : '');

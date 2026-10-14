@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import type { ArticleSummary, ContentOutline } from '../../lib/api';
+import { orderedTargets } from '../../lib/ordered-content';
 import { articleHeading, clipOrderedEntries, clipNodes, depthStopCount, depthStopLabels, kindByCode } from '../../lib/outline';
 import { Badge, type BadgeTone, Toolbar } from './ui';
 import { ConstitutionText } from './ConstitutionText';
@@ -59,6 +60,7 @@ export function VersionReader({
     () => Object.fromEntries(articles.map((article) => [article.articleNumber, article.id])),
     [articles],
   );
+  const unitsByLogicalId = useMemo(() => orderedTargets(articles), [articles]);
 
   function shownDepth(articleId: string): number {
     return expanded.has(articleId) ? max : depth;
@@ -146,7 +148,7 @@ export function VersionReader({
                       canEditTitles={canEditTitles}
                       returnTo={`/countries/${code}/versions/${versionId}`}
                       lang={language}
-                      crossRefs={{ code, versionId, articlesByNumber }}
+                      crossRefs={{ code, versionId, articlesByNumber, unitsByLogicalId }}
                     />
                   </div>
                 ) : (
@@ -154,7 +156,7 @@ export function VersionReader({
                 )}
                 <p className="article-foot print-hide">
                   <a href={permalink}>Permalink</a>
-                  <a href={historyHref}>History of {kindByCode(outline, article.kind ?? 'article')?.displayLabel ?? 'Article'} {article.articleNumber}</a>
+                  {article.kind === 'article' && article.articleNumber ? <a href={historyHref}>History of {kindByCode(outline, article.kind)?.displayLabel ?? 'Article'} {article.articleNumber}</a> : null}
                   {changeType ? (
                     <Badge tone={changeTone(changeType)}>{changeType}</Badge>
                   ) : (

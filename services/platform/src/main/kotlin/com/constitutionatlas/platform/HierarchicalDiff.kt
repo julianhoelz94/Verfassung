@@ -17,7 +17,7 @@ data class DiffNode(
 )
 
 sealed interface DiffEntry {
-    data class Text(val logicalId: UUID, val revisionId: UUID?, val occurrenceId: UUID?, val text: String, val lineageRevisionIds: List<UUID> = emptyList()) : DiffEntry
+    data class Text(val logicalId: UUID, val revisionId: UUID?, val occurrenceId: UUID?, val text: String, val lineageRevisionIds: List<UUID> = emptyList(), val semantic: String? = null) : DiffEntry
     data class Child(val node: DiffNode) : DiffEntry
 }
 
@@ -129,7 +129,7 @@ object HierarchicalDiff {
             if (oldParent.node.logicalId == (pairs[newParent.node.logicalId]?.node?.logicalId ?: newParent.node.logicalId)) continue
             crossParentTexts += id
             emit("move", listOf(oldParent.textRef(oldText)), listOf(newParent.textRef(newText)))
-            if (oldText.text != newText.text) emit("text_changed", listOf(oldParent.textRef(oldText)), listOf(newParent.textRef(newText)))
+            if (oldText.text != newText.text || oldText.semantic != newText.semantic) emit("text_changed", listOf(oldParent.textRef(oldText)), listOf(newParent.textRef(newText)))
         }
 
         for ((sources, targets) in groups) {
@@ -188,7 +188,7 @@ object HierarchicalDiff {
                 val previous = sourceText[entry.logicalId]
                 if (previous == null) {
                     emit("text_added", emptyList(), listOf(target.textRef(entry)))
-                } else if (previous.text != entry.text) {
+                } else if (previous.text != entry.text || previous.semantic != entry.semantic) {
                     emit("text_changed", listOf(source.textRef(previous)), listOf(target.textRef(entry)))
                 }
             }

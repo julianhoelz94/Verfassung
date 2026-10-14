@@ -91,13 +91,21 @@ class SetupProposalService(
         if (kinds.map { it.kindCode }.toSet().size != kinds.size) invalid("outline.kinds", "kind codes must be unique")
         if (request.sampleRoots.size !in 1..5) invalid("sampleRoots", "provide 1 to 5 representative roots")
         if (mapper.writeValueAsBytes(request).size > 64 * 1024) invalid("sampleRoots", "proposal exceeds 64 KiB")
-        fun visit(node: com.constitutionatlas.platform.OrderedNodeWrite, depth: Int, path: String) {
-            if (depth >= kinds.size || node.kind != kinds[depth].kindCode) invalid(path, "expected kind ${kinds.getOrNull(depth)?.kindCode ?: "none"}")
-            if (node.content.orEmpty().any { it.type == "text" } && depth < kinds.lastIndex && !kinds[depth].allowTextAlongsideChildren) {
-                invalid(path, "text alongside child units is not allowed at this level")
+        val byCode = kinds.associateBy { it.kindCode }
+        val roots = kinds.filter { it.root == true }.map { it.kindCode }.toSet().ifEmpty { setOfNotNull(kinds.firstOrNull()?.kindCode) }
+        fun children(code: String): List<String> = byCode[code]?.let { level ->
+            level.allowedChildKinds ?: kinds.getOrNull(kinds.indexOf(level) + 1)?.let { listOf(it.kindCode) }.orEmpty()
+        }.orEmpty()
+        fun visit(node: com.constitutionatlas.platform.OrderedNodeWrite, parent: String?, path: String) {
+            val kind = node.kind.orEmpty()
+            if (kind !in byCode) invalid(path, "unknown kind '$kind'")
+            if (parent == null && kind !in roots) invalid(path, "kind '$kind' is not an allowed root")
+            if (parent != null && kind !in children(parent)) invalid(path, "kind '$kind' is not allowed under '$parent'")
+            if (node.content.orEmpty().any { it.type == "text" } && children(kind).isNotEmpty() && byCode[kind]?.allowTextAlongsideChildren != true) {
+                invalid(path, "text alongside child units is not allowed in '$kind'")
             }
-            node.content.orEmpty().forEachIndexed { index, entry -> entry.node?.let { visit(it, depth + 1, "$path.content[$index].node") } }
+            node.content.orEmpty().forEachIndexed { index, entry -> entry.node?.let { visit(it, kind, "$path.content[$index].node") } }
         }
-        request.sampleRoots.forEachIndexed { index, root -> visit(root, 0, "sampleRoots[$index]") }
+        request.sampleRoots.forEachIndexed { index, root -> visit(root, null, "sampleRoots[$index]") }
     }
 }

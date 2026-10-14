@@ -56,7 +56,18 @@ object StructuredDraftEngine {
                     require(position in 0..retained.size) { "Invalid root position" }
                     roots = retained.take(position) + root + retained.drop(position)
                 }
-                "replace_text" -> targetText { listOf(it.copy(text = operation.text ?: throw IllegalArgumentException("text is required"), draftId = operation.id)) }
+                "replace_text" -> targetText {
+                    listOf(
+                        it.copy(
+                            text = operation.text ?: throw IllegalArgumentException("text is required"),
+                            draftId = operation.id,
+                            format = operation.format ?: it.format,
+                            table = if (operation.format != null) operation.table else it.table,
+                            footnoteLabel = if (operation.format != null) operation.footnoteLabel else it.footnoteLabel,
+                            references = if (operation.format != null) operation.references else it.references,
+                        ),
+                    )
+                }
                 "set_metadata" -> {
                     require(foundNode != null) { "Metadata belongs to nodes, not parent text" }
                     updateNodes { if (it.logicalId == operation.targetId) it.copy(title = operation.title, label = operation.label, draftId = operation.id) else it }
@@ -65,7 +76,7 @@ object StructuredDraftEngine {
                     require(foundNode != null) { "Insertion target must be a parent" }
                     val entry = if (operation.type == "insert_text") {
                         val part = operation.parts.singleOrNull() ?: throw IllegalArgumentException("insert_text requires one explicitly identified text part")
-                        DraftEntry("text", logicalId = part.logicalId, draftId = operation.id, text = part.text)
+                        DraftEntry("text", logicalId = part.logicalId, draftId = operation.id, text = part.text, format = part.format, table = part.table, footnoteLabel = part.footnoteLabel, references = part.references)
                     } else {
                         val child = operation.node ?: throw IllegalArgumentException("insert_child requires a node")
                         fun newNode(node: DraftNode) {
@@ -89,6 +100,7 @@ object StructuredDraftEngine {
                 }
                 "split_text" -> targetText { entry ->
                     require(operation.parts.size >= 2 && operation.parts.joinToString("") { it.text } == entry.text) { "Split must preserve exact text and provide at least two parts" }
+                    require((entry.format == null || entry.format == "plain") && entry.table == null && entry.references.isEmpty()) { "Rich entries cannot be split as plain text" }
                     operation.parts.map { DraftEntry("text", logicalId = it.logicalId, draftId = operation.id, text = it.text) }
                 }
                 "merge_text" -> {
@@ -100,7 +112,7 @@ object StructuredDraftEngine {
                             node
                         } else {
                             val entries = node.content.drop(first).take(operation.mergeIds.size)
-                            require(entries.map { it.logicalId } == operation.mergeIds && entries.all { it.type == "text" }) { "Merge cannot cross a child boundary" }
+                            require(entries.map { it.logicalId } == operation.mergeIds && entries.all { it.type == "text" && (it.format == null || it.format == "plain") && it.table == null && it.references.isEmpty() }) { "Merge cannot cross a child or rich entry boundary" }
                             val part = operation.parts.singleOrNull() ?: throw IllegalArgumentException("Merge requires one new text identity")
                             require(part.text == entries.joinToString("") { it.text.orEmpty() }) { "Merge must preserve exact text" }
                             merged = true
@@ -153,10 +165,13 @@ object StructuredDraftEngine {
 
     fun validate(roots: List<DraftNode>, settings: DraftSettings) {
         val ids = mutableSetOf<UUID>()
-        fun walk(node: DraftNode, depth: Int) {
+        val levels = settings.outline.kinds
+        val byCode = levels.associateBy { it.kindCode }
+        val rootKinds = levels.filter { it.root }.map { it.kindCode }.toSet().ifEmpty { setOfNotNull(levels.firstOrNull()?.kindCode) }
+        fun walk(node: DraftNode, parent: com.constitutionatlas.editor.client.DraftLevel?, depth: Int) {
             require(depth < 128 && ids.add(node.logicalId)) { "Duplicate or cyclic node identity '${node.logicalId}'" }
-            val level = settings.outline.kinds.getOrNull(depth) ?: throw IllegalArgumentException("Unexpected level at '${node.logicalId}'")
-            require(node.kind == level.kindCode) { "Invalid kind/parentage at '${node.logicalId}'" }
+            val level = byCode[node.kind] ?: throw IllegalArgumentException("Unknown kind '${node.kind}' at '${node.logicalId}'")
+            require(if (parent == null) node.kind in rootKinds else node.kind in parent.allowedChildKinds) { "Invalid kind/parentage at '${node.logicalId}'" }
             require(level.titlePolicy != "required" || !node.title.isNullOrBlank()) { "Title required at '${node.logicalId}'" }
             require(level.titlePolicy != "none" || node.title.isNullOrEmpty()) { "Title forbidden at '${node.logicalId}'" }
             require(level.labelPolicy != "required" || !node.label.isNullOrBlank()) { "Literal label required at '${node.logicalId}'" }
@@ -166,12 +181,12 @@ object StructuredDraftEngine {
                     "text" -> require(level.mayHoldText && entry.node == null && entry.text != null && entry.logicalId != null && ids.add(entry.logicalId)) { "Invalid or duplicate text entry at '${node.logicalId}'" }
                     "child" -> {
                         require(level.mayHoldChildren && entry.node != null && entry.logicalId == null && entry.text == null && entry.node.kind in level.allowedChildKinds) { "Invalid child at '${node.logicalId}'" }
-                        walk(entry.node!!, depth + 1)
+                        walk(entry.node!!, level, depth + 1)
                     }
                     else -> throw IllegalArgumentException("Invalid entry type '${entry.type}'")
                 }
             }
         }
-        roots.forEach { walk(it, 0) }
+        roots.forEach { walk(it, null, 0) }
     }
 }

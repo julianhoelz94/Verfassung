@@ -383,11 +383,9 @@ function exampleNode(layers: Layer[], kindCode: string, path: string, sibling: n
     if (level.allowTextAlongsideChildren) text('before', 'The following rights are protected.');
     const first = exampleNode(layers, children[0], `${path}-a`, 0, new Set([...ancestors, kindCode]));
     if (first) content.push({ type: 'child', node: first });
-    if (children.length > 1) {
-      if (level.allowTextAlongsideChildren) text('between', 'These rights apply to everyone.');
-      const second = exampleNode(layers, children[1], `${path}-b`, 1, new Set([...ancestors, kindCode]));
-      if (second) content.push({ type: 'child', node: second });
-    }
+    if (level.allowTextAlongsideChildren) text('between', 'These rights apply to everyone.');
+    const second = exampleNode(layers, children[1] ?? children[0], `${path}-b`, 1, new Set([...ancestors, kindCode]));
+    if (second) content.push({ type: 'child', node: second });
     if (level.allowTextAlongsideChildren) text('after', 'The law shall uphold these guarantees.');
   }
   return { logicalId: path, revisionId: path, occurrenceId: path, kind: level.kindCode,

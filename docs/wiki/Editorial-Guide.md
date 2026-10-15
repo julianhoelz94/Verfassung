@@ -21,6 +21,16 @@ Your available pages and buttons depend on your assigned roles. Hiding a button 
 
 The editorial path is **open → save → submit for review → approve → publish**. Publication creates a successor snapshot. The previous published snapshot remains available. Check the chosen **legal change** or **transcription correction** path before starting a session, since those represent different histories.
 
+## Watch the editorial workflow
+
+These silent, human-paced recordings use fictional local test content. They demonstrate a transcription correction, with a separate person handling each role:
+
+1. [Edit a draft and submit it for review](media/editing-a-draft.webm)
+2. [Review and approve the draft](media/reviewing-a-draft.webm)
+3. [Publish the approved revision](media/publishing-a-revision.webm)
+
+The clips do not show sign-in or real account credentials. A live publisher may be asked for fresh MFA before the final action.
+
 ## Edit and review a constitution
 
 1. Open **Editor**. Editors can start a session from a current published version and find their work under **My sessions**.

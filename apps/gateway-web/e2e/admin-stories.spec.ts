@@ -10,7 +10,7 @@ test.beforeEach(async ({ request }) => {
 test('administrator manages a user and its access lifecycle', async ({ page }) => {
   await signInAdmin(page);
   await page.goto('/admin/users');
-  await page.getByLabel('Email').fill('new-editor@example.local');
+  await page.getByRole('textbox', { name: 'Email', exact: true }).fill('new-editor@example.local');
   await page.getByLabel('Roles (comma-separated)').first().fill('editor, reviewer');
   await page.getByRole('button', { name: 'Send invite' }).click();
   await expect(page.getByText('E2E-INVITE-ADMIN')).toBeVisible();
@@ -21,10 +21,10 @@ test('administrator manages a user and its access lifecycle', async ({ page }) =
   await expect(user).toContainText('invited');
 
   const activeUser = page.locator('.data-row').filter({ hasText: 'local-admin@example.local' });
-  await activeUser.getByLabel('Roles (comma-separated)').fill('admin, publisher');
+  await activeUser.getByRole('checkbox', { name: 'publisher' }).check();
   await activeUser.getByRole('button', { name: 'Update roles' }).click();
   await page.reload();
-  await expect(page.locator('.data-row').filter({ hasText: 'local-admin@example.local' })).toContainText('admin, publisher');
+  await expect(page.locator('.data-row').filter({ hasText: 'local-admin@example.local' }).getByRole('checkbox', { name: 'publisher' })).toBeChecked();
   await page.locator('.data-row').filter({ hasText: 'local-admin@example.local' }).getByRole('button', { name: 'Issue reset token' }).click();
   await expect(page.getByText('E2E-RESET-ADMIN')).toBeVisible();
   await page.locator('.data-row').filter({ hasText: 'local-admin@example.local' }).getByRole('button', { name: 'Disable' }).click();

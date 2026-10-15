@@ -12,7 +12,7 @@ export default async function InvitePage(props: InvitePageProps) {
     <PageMain>
       <PageHeader
         title="Accept invite"
-        meta="Set a password to activate the invited account. There is no public self-registration."
+        meta="Set a password to activate the invited account."
       />
       {searchParams.error ? <Alert tone="error">That invite is invalid or the password does not meet policy.</Alert> : null}
       <Card>

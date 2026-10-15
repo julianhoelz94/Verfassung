@@ -8,6 +8,8 @@ object MailLinks {
 
     fun invite(publicBaseUrl: String, token: String): String = page(publicBaseUrl, "invite", token)
 
+    fun registration(publicBaseUrl: String, token: String): String = page(publicBaseUrl, "register/confirm", token)
+
     private fun page(publicBaseUrl: String, path: String, token: String): String {
         val base = publicBaseUrl.trim().trimEnd('/')
         val encoded = URLEncoder.encode(token, StandardCharsets.UTF_8).replace("+", "%20")

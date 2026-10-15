@@ -2,11 +2,13 @@ import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { Alert, Button, Card, Input, PageHeader } from '../components/ui';
 import { PageMain } from '../components/PageMain';
-import { requestMcpKeys, requestOAuthGrants, requestStartMfaEnroll } from '../../lib/identity-client';
+import { requestMcpKeys, requestOAuthGrants, requestPasskeys, requestStartMfaEnroll } from '../../lib/identity-client';
+import { PasskeyManager } from '../passkeys/PasskeyManager';
 import { SESSION_COOKIE, currentUser, mfaChallengeToken } from '../../lib/session';
 import { ConfirmEnrollForm, RegenerateRecoveryForm } from './MfaForms';
 import { changePasswordAction, revokeMfaAction, startMfaEnrollAction } from './actions';
 import { revokeMcpKeyAction, revokeOAuthGrantAction } from './actions';
+import Image from 'next/image';
 import { CreateMcpKeyForm, RotateMcpKeyForm } from './McpKeyForms';
 
 type AccountPageProps = {
@@ -28,12 +30,14 @@ export default async function AccountPage(props: AccountPageProps) {
   // `startMfaEnrollAction`; `?enroll=1` only marks that enrollment was requested.
   const enrollRequested = searchParams.enroll === '1';
   let enrollSecret: string | null = null;
+  let enrollQr: string | null = null;
   let enrollChallenge: string | null = enrollRequested ? (await mfaChallengeToken()) ?? null : null;
   if (!user.mfaEnabled && enrollChallenge) {
     const token = (await cookies()).get(SESSION_COOKIE)?.value;
     try {
       const started = await requestStartMfaEnroll(enrollChallenge, token);
       enrollSecret = started.secret;
+      enrollQr = started.qrDataUrl;
       enrollChallenge = started.challengeToken;
     } catch {
       enrollSecret = null;
@@ -42,6 +46,7 @@ export default async function AccountPage(props: AccountPageProps) {
   const sessionToken = (await cookies()).get(SESSION_COOKIE)?.value;
   const mcpKeys = sessionToken ? await requestMcpKeys(sessionToken).catch(() => []) : [];
   const oauthGrants = sessionToken ? await requestOAuthGrants(sessionToken).catch(() => []) : [];
+  const passkeys = sessionToken ? await requestPasskeys(sessionToken).catch(() => []) : [];
   const canImport = user.roles.includes('editor') || user.roles.includes('admin');
   const mcpUrl = new URL('/mcp', process.env.PUBLIC_BASE_URL || 'http://localhost').toString();
   return (
@@ -66,9 +71,10 @@ export default async function AccountPage(props: AccountPageProps) {
         ) : null}
         {enrollRequested && enrollChallenge && enrollSecret ? (
           <>
-            <p>
-              Authenticator secret: <code>{enrollSecret}</code>
-            </p>
+            <p>Scan this QR code with Google Authenticator or another TOTP app, then enter its six-digit code.</p>
+            {enrollQr ? <Image src={enrollQr} alt="Authenticator setup QR code" width={208} height={208} unoptimized /> : null}
+            <p>If you cannot scan it, enter this setup key in the app: <code>{enrollSecret}</code></p>
+            <p className="muted">The key is shown only during setup. Store the recovery codes you receive after confirming.</p>
             <ConfirmEnrollForm challengeToken={enrollChallenge} />
           </>
         ) : user.mfaEnabled ? (
@@ -119,6 +125,7 @@ export default async function AccountPage(props: AccountPageProps) {
         </form>
         </section>
       </Card>
+      <Card><PasskeyManager passkeys={passkeys} /></Card>
       <Card>
         <section className="account-section" id="mcp-keys" aria-labelledby="mcp-keys-title">
           <h2 id="mcp-keys-title">Connect a chat client</h2>

@@ -1,4 +1,3 @@
-import com.constitutionatlas.identity.config.IdentityMailProperties
 import com.constitutionatlas.identity.config.IdentityMfaProperties
 import com.constitutionatlas.identity.config.IdentitySeedProperties
 import com.constitutionatlas.identity.service.ProductionIdentityGuard
@@ -9,16 +8,10 @@ import java.util.Base64
 
 class ProductionIdentityGuardTest {
     private val productionMfa = IdentityMfaProperties(encryptionKey = PRODUCTION_KEY)
-    private val productionMail =
-        IdentityMailProperties(
-            from = "noreply@verfassungen.de",
-            publicBaseUrl = "https://verfassungen.de",
-            host = "smtp.example",
-        )
 
     @Test
     fun allowsOffWithBlankCredentials() {
-        ProductionIdentityGuard(IdentitySeedProperties(mode = "off"), productionMfa, mailProperties = productionMail)
+        ProductionIdentityGuard(IdentitySeedProperties(mode = "off"), productionMfa)
             .run(DefaultApplicationArguments())
     }
 
@@ -55,14 +48,9 @@ class ProductionIdentityGuardTest {
     }
 
     @Test
-    fun rejectsMissingSmtp() {
-        assertThrows<IllegalStateException> {
-            ProductionIdentityGuard(
-                IdentitySeedProperties(mode = "off"),
-                productionMfa,
-                mailProperties = IdentityMailProperties(),
-            ).run(DefaultApplicationArguments())
-        }
+    fun permitsMailConfigurationAfterStartup() {
+        ProductionIdentityGuard(IdentitySeedProperties(mode = "off"), productionMfa)
+            .run(DefaultApplicationArguments())
     }
 
     @Test
@@ -71,7 +59,6 @@ class ProductionIdentityGuardTest {
             ProductionIdentityGuard(
                 IdentitySeedProperties(mode = "off", editorEmail = "local-editor@example.local"),
                 productionMfa,
-                mailProperties = productionMail,
             ).run(DefaultApplicationArguments())
         }
     }
@@ -82,7 +69,6 @@ class ProductionIdentityGuardTest {
             ProductionIdentityGuard(
                 IdentitySeedProperties(mode = "off", editorPassword = "change-me"),
                 productionMfa,
-                mailProperties = productionMail,
             ).run(DefaultApplicationArguments())
         }
     }
@@ -93,7 +79,6 @@ class ProductionIdentityGuardTest {
             ProductionIdentityGuard(
                 IdentitySeedProperties(mode = "off", serviceToken = "machine-token"),
                 productionMfa,
-                mailProperties = productionMail,
             ).run(DefaultApplicationArguments())
         }
     }

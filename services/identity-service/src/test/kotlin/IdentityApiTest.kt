@@ -7,6 +7,7 @@ import com.constitutionatlas.identity.service.AccountService
 import com.constitutionatlas.identity.service.IdentitySeedRunner
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.junit.jupiter.api.Test
+import org.mockito.ArgumentCaptor
 import org.mockito.Mockito
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.DefaultApplicationArguments
@@ -57,6 +58,165 @@ class IdentityApiTest {
     lateinit var outboundMailer: OutboundMailer
 
     private val objectMapper = ObjectMapper()
+
+    @Test
+    fun registrationIsClosedByDefaultAndConfirmedAccountsRemainViewers() {
+        val email = "new-registration-${System.nanoTime()}@example.test"
+        mockMvc.get("/registration/status").andExpect {
+            status { isOk() }
+            jsonPath("$.enabled") { value(false) }
+        }
+        mockMvc.post("/registration") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"email":"$email"}"""
+        }.andExpect { status { isForbidden() } }
+        val admin = login("local-admin@example.local", "change-me")
+        val settings = """{"selfRegistrationEnabled":true,"mailEnabled":true,"mailFrom":"no-reply@example.test","mailFromName":"Test","mailPublicBaseUrl":"http://localhost","smtpHost":"smtp.example.test","smtpPort":587,"smtpUsername":"","smtpAuth":false,"smtpStarttls":true,"smtpSsl":false}"""
+        try {
+            mockMvc.put("/admin/settings") {
+                header("Authorization", "Bearer $admin")
+                contentType = MediaType.APPLICATION_JSON
+                content = settings
+            }.andExpect { status { isOk() } }
+            mockMvc.get("/admin/settings") { header("Authorization", "Bearer $admin") }.andExpect {
+                status { isOk() }
+                jsonPath("$.selfRegistrationEnabled") { value(true) }
+                jsonPath("$.smtpPasswordSet") { value(false) }
+            }
+            mockMvc.put("/admin/settings") {
+                header("Authorization", "Bearer $admin")
+                contentType = MediaType.APPLICATION_JSON
+                content = settings.dropLast(1) + ",\"smtpPassword\":\"smtp-secret\"}"
+            }.andExpect { status { isOk() } }
+            mockMvc.get("/admin/settings") { header("Authorization", "Bearer $admin") }.andExpect {
+                status { isOk() }
+                jsonPath("$.smtpPasswordSet") { value(true) }
+                jsonPath("$.smtpPassword") { doesNotExist() }
+            }
+            check(jdbcTemplate.queryForObject("SELECT smtp_password_cipher FROM identity_settings WHERE id = TRUE", String::class.java) != "smtp-secret")
+            Mockito.`when`(outboundMailer.enabled).thenReturn(true)
+            mockMvc.post("/registration") {
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"email":"$email"}"""
+            }.andExpect { status { isNoContent() } }
+            val token = ArgumentCaptor.forClass(String::class.java)
+            Mockito.verify(outboundMailer).sendRegistration(eqValue(email), token.capture() ?: "")
+            mockMvc.post("/registration/confirm") {
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"token":"${token.value}","password":"Long unique registration password 2026"}"""
+            }.andExpect { status { isNoContent() } }
+            mockMvc.post("/registration/confirm") {
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"token":"${token.value}","password":"Long unique registration password 2026"}"""
+            }.andExpect { status { isBadRequest() } }
+            check(rolesFor(email) == listOf("viewer"))
+            val viewer = login(email, "Long unique registration password 2026")
+            mockMvc.put("/admin/settings") {
+                header("Authorization", "Bearer $viewer")
+                contentType = MediaType.APPLICATION_JSON
+                content = settings
+            }.andExpect { status { isForbidden() } }
+            mockMvc.post("/admin/settings/test-mail") {
+                header("Authorization", "Bearer $admin")
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"to":"arbitrary@example.test"}"""
+            }.andExpect { status { isNoContent() } }
+            Mockito.verify(outboundMailer).sendTest("arbitrary@example.test")
+            Mockito.doThrow(com.constitutionatlas.identity.MailDeliveryException()).`when`(outboundMailer).sendTest("bad@example.test")
+            mockMvc.post("/admin/settings/test-mail") {
+                header("Authorization", "Bearer $admin")
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"to":"bad@example.test"}"""
+            }.andExpect { status { isServiceUnavailable() } }
+        } finally {
+            jdbcTemplate.update("UPDATE identity_settings SET self_registration_enabled = FALSE WHERE id = TRUE")
+        }
+    }
+
+    @Test
+    fun passkeyChallengesRequireAuthenticationAndRejectInvalidResponses() {
+        mockMvc.post("/passkeys/enroll/start") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"password":"change-me"}"""
+        }.andExpect { status { isUnauthorized() } }
+        val viewer = login("local-viewer@example.local", "change-me")
+        val started = mockMvc.post("/passkeys/enroll/start") {
+            header("Authorization", "Bearer $viewer")
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"password":"change-me"}"""
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.options.publicKey.challenge") { exists() }
+        }.andReturn().response.contentAsString
+        val challengeId = objectMapper.readTree(started).get("challengeId").asText()
+        val badResponse = """{"challengeId":"$challengeId","credential":{},"label":"Laptop"}"""
+        mockMvc.post("/passkeys/enroll/finish") {
+            header("Authorization", "Bearer $viewer")
+            contentType = MediaType.APPLICATION_JSON
+            content = badResponse
+        }.andExpect { status { isBadRequest() } }
+        mockMvc.post("/passkeys/enroll/finish") {
+            header("Authorization", "Bearer $viewer")
+            contentType = MediaType.APPLICATION_JSON
+            content = badResponse
+        }.andExpect { status { isBadRequest() } }
+    }
+
+    @Test
+    fun passkeyLoginStartsAreRateLimitedAndExpiredChallengesArePurged() {
+        val ip = "198.51.100.55"
+        repeat(5) {
+            mockMvc.post("/passkeys/login/start") { header("X-Forwarded-For", ip) }
+                .andExpect { status { isOk() } }
+        }
+        mockMvc.post("/passkeys/login/start") { header("X-Forwarded-For", ip) }
+            .andExpect { status { isTooManyRequests() } }
+        jdbcTemplate.update("UPDATE passkey_challenges SET expires_at = NOW() - INTERVAL '1 second'")
+        mockMvc.post("/passkeys/login/start") { header("X-Forwarded-For", "198.51.100.56") }
+            .andExpect { status { isOk() } }
+        val expired = jdbcTemplate.queryForObject("SELECT count(*) FROM passkey_challenges WHERE expires_at < NOW()", Int::class.java)
+        check(expired == 0)
+    }
+
+    @Test
+    fun privilegedPasswordChallengeCanStartPasskeyEnrollmentAndRejectBadResponse() {
+        val admin = login("local-admin@example.local", "change-me")
+        val email = "passkey-publisher-${System.nanoTime()}@example.local"
+        val invite = mockMvc.post("/users/invites") {
+            header("Authorization", "Bearer $admin")
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"email":"$email","roles":["publisher"]}"""
+        }.andExpect { status { isCreated() } }.andReturn().response.contentAsString
+        val inviteToken = objectMapper.readTree(invite).get("inviteToken").asText()
+        mockMvc.post("/invites/accept") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"token":"$inviteToken","password":"not-a-common-pass"}"""
+        }.andExpect { status { isOk() } }
+        val login = mockMvc.post("/login") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"email":"$email","password":"not-a-common-pass"}"""
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.mfaEnrollmentRequired") { value(true) }
+        }.andReturn().response.contentAsString
+        val loginChallenge = objectMapper.readTree(login).get("challengeToken").asText()
+        val started = mockMvc.post("/passkeys/enroll/login/start") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"challengeToken":"$loginChallenge"}"""
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.options.publicKey.challenge") { exists() }
+        }.andReturn().response.contentAsString
+        val challengeId = objectMapper.readTree(started).get("challengeId").asText()
+        mockMvc.post("/passkeys/enroll/login/finish") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"challengeToken":"$loginChallenge","challengeId":"$challengeId","credential":{},"label":"Laptop"}"""
+        }.andExpect { status { isBadRequest() } }
+        mockMvc.post("/passkeys/enroll/login/finish") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"challengeToken":"$loginChallenge","challengeId":"$challengeId","credential":{},"label":"Laptop"}"""
+        }.andExpect { status { isBadRequest() } }
+    }
 
     @Test
     fun oauthCodeIsPkceBoundSingleUseAndRevocable() {

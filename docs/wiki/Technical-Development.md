@@ -35,13 +35,15 @@ Each service's Postgres database must be backed up with its migration history. T
 
 ## Keep the wiki current
 
-Page sources live in [docs/wiki](https://github.com/julianhoelz94/Verfassung/tree/main/docs/wiki). Every sprint close-out compares its changed behavior and operational steps with these pages. Update affected pages and publish the matching wiki revisions, or record why no text update was needed in the sprint's Linear completion note. Regenerate the editorial walkthrough videos from the current Playwright journey on every completed sprint, check playback and step accuracy, and publish the replacement files with the pages. Verify navigation and links after publishing. Add actual deployment commands only after the CD workflow and a production dry run are verified.
+Page sources live in [docs/wiki](https://github.com/julianhoelz94/Verfassung/tree/main/docs/wiki). Every sprint close-out compares its changed behavior and operational steps with these pages. Update affected pages, or record why no text update was needed in the sprint's Linear completion note. After a PR merges into `main`, the [wiki workflow](https://github.com/julianhoelz94/Verfassung/blob/main/.github/workflows/wiki-videos.yml) boots the full Compose stack, uploads API fixtures, records the editorial journey, and publishes the current pages and fresh clips to the GitHub Wiki. Check that workflow and the published links and playback before marking the sprint complete. Add actual site deployment commands only after its separate CD workflow and a production dry run are verified.
 
-The recording source is `apps/gateway-web/e2e/wiki-recording.spec.ts`. It signs in using the local mock fixture before recording, then writes separate editing, review, and publishing clips. From `apps/gateway-web`, with dependencies installed and free local ports:
+The recording source is `apps/gateway-web/e2e/full/wiki-recording.spec.ts`. It signs in using the real identity service before recording, then writes separate editing, review, and publishing clips. For a local rerun, start the full stack with fixtures and run from `apps/gateway-web`:
 
 ```sh
-E2E_MOCK_PORT=4410 E2E_WEB_PORT=3410 \
+./manageLocalStack.sh --start  # from repository root
+cd apps/gateway-web
+E2E_BASE_URL=http://127.0.0.1:80 \
   ./node_modules/.bin/playwright test --config=playwright.wiki-recording.config.js
 ```
 
-The files are generated in `docs/wiki/media/`. Check that the test passes and all three clips play, confirm their steps against the current user-story journey, and replace the wiki copies during sprint close-out. Do not upload Playwright traces or real credentials.
+The files are generated in `docs/wiki/media/`. Check that the test passes and all three clips play, and confirm their steps against the current user-story journey. The merge workflow replaces the wiki copies; PR checks do not write to the wiki. Do not upload Playwright traces or real credentials.

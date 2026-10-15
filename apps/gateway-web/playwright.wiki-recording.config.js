@@ -1,9 +1,18 @@
-/* eslint-disable */
-const base = require('./playwright.config');
-module.exports = {
-  ...base,
+const { defineConfig, devices } = require('@playwright/test');
+
+module.exports = defineConfig({
+  testDir: './e2e/full',
   testMatch: /wiki-recording\.spec\.ts/,
-  timeout: 360_000,
-  use: { ...base.use, actionTimeout: 15_000, navigationTimeout: 30_000, launchOptions: { slowMo: 450 } },
-  webServer: base.webServer?.map((server, index) => index === 1 ? { ...server, command: `npx next dev -p ${process.env.E2E_WEB_PORT ?? 3100}` } : server),
-};
+  fullyParallel: false,
+  workers: 1,
+  retries: 0,
+  reporter: 'list',
+  timeout: 300_000,
+  use: {
+    baseURL: process.env.E2E_BASE_URL ?? 'http://127.0.0.1:18080',
+    trace: 'off',
+    screenshot: 'off',
+    ...devices['Desktop Chrome'],
+    launchOptions: { slowMo: 450 },
+  },
+});

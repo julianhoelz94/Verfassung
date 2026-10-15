@@ -61,6 +61,8 @@ test('administrator invite, visitor activation, password change, and reset persi
   await expect(page).toHaveURL(/\/$/);
   await page.goto('/account');
   await page.getByRole('button', { name: 'Enroll authenticator' }).click();
+  await expect(page).toHaveURL(/\/account\?enroll=1$/);
+  await page.reload();
   const secret = await page.getByText(/enter this setup key in the app:/).locator('code').textContent();
   expect(secret).toBeTruthy();
   await page.getByLabel('Authenticator code').fill(authenticatorCode(secret!));

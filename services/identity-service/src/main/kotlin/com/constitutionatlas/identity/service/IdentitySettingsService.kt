@@ -67,10 +67,10 @@ class IdentitySettingsService(
                 uri?.scheme !in setOf("https", "http") ||
                 uri?.host.isNullOrBlank() ||
                 (uri?.scheme == "http" && uri.host !in setOf("localhost", "127.0.0.1")) ||
-                uri.rawUserInfo != null ||
-                uri.rawQuery != null ||
-                uri.rawFragment != null ||
-                (uri.rawPath != null && uri.rawPath != "")
+                uri?.rawUserInfo != null ||
+                uri?.rawQuery != null ||
+                uri?.rawFragment != null ||
+                (uri?.rawPath?.isNotEmpty() == true)
             ) {
                 throw BadRequestException("A valid HTTPS public URL and SMTP host are required")
             }

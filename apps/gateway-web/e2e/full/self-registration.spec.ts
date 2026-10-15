@@ -80,9 +80,10 @@ test('closed registration can be opened by admin, confirmed by mail, and creates
     await page.getByLabel('Search email').fill(email);
     await page.locator('#main-content').getByRole('button', { name: 'Search' }).click();
     const user = page.locator('.data-row').filter({ hasText: email });
-    await expect(user).toContainText('viewer');
-    await expect(user).not.toContainText('publisher');
-    await expect(user).not.toContainText('admin');
+    const roles = user.locator(':scope > div').nth(2);
+    await expect(roles).toContainText('viewer');
+    await expect(roles).not.toContainText('publisher');
+    await expect(roles).not.toContainText('admin');
   } finally {
     const headers = await adminHeaders(request);
     await request.put('/api/identity/admin/settings', { headers, data: mailSettings });

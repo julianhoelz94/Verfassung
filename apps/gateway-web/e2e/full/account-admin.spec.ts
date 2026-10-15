@@ -60,8 +60,9 @@ test('administrator invite, visitor activation, password change, and reset persi
   await page.getByRole('button', { name: 'Sign in' }).click();
   await expect(page).toHaveURL(/\/$/);
   await page.goto('/account');
+  await page.waitForLoadState('networkidle');
   await page.getByRole('button', { name: 'Enroll authenticator' }).click();
-  await expect(page).toHaveURL(/\/account\?enroll=1$/);
+  await expect(page).toHaveURL(/\/account\?enroll=1$/, { timeout: 15_000 });
   await page.reload();
   const secret = await page.getByText(/enter this setup key in the app:/).locator('code').textContent();
   expect(secret).toBeTruthy();

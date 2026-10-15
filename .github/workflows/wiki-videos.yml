@@ -16,7 +16,7 @@ jobs:
   record:
     if: github.event.pull_request.merged == true
     runs-on: ubuntu-latest
-    timeout-minutes: 50
+    timeout-minutes: 75
     env:
       COMPOSE_PROJECT_NAME: wiki-videos
       CADDY_PORT: '18080'

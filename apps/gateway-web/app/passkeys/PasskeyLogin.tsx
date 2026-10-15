@@ -26,7 +26,7 @@ export function PasskeyLogin() {
     }
   }
   return <div>
-    <Button type="button" onClick={signIn} disabled={busy}>Sign in with a passkey</Button>
+    <Button type="button" onClick={signIn} disabled={busy}>Use a passkey</Button>
     {error ? <p role="alert">{error}</p> : null}
   </div>;
 }

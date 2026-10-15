@@ -10,7 +10,7 @@ test('administrator invite, visitor activation, password change, and reset persi
 
   await signIn(page, 'admin');
   await page.goto('/admin/users');
-  await page.getByLabel('Email').fill(email);
+  await page.getByRole('textbox', { name: 'Email', exact: true }).fill(email);
   await page.getByLabel('Roles (comma-separated)').first().fill('viewer');
   await page.getByRole('button', { name: 'Send invite' }).click();
   const inviteToken = await page.getByText('Invite created.', { exact: false }).locator('code').textContent();
@@ -27,7 +27,7 @@ test('administrator invite, visitor activation, password change, and reset persi
   await expect(page).toHaveURL(/\/$/);
   await page.goto('/account');
   await expect(page.getByText(`Signed in as ${email}.`)).toBeVisible();
-  await page.getByLabel('Current password').fill(firstPassword);
+  await page.getByRole('region', { name: 'Change password' }).getByLabel('Current password').fill(firstPassword);
   await page.getByLabel('New password').fill(changedPassword);
   await Promise.all([
     page.waitForResponse((response) => response.url().includes('/account') && response.request().method() === 'POST'),
@@ -61,7 +61,7 @@ test('administrator invite, visitor activation, password change, and reset persi
   await expect(page).toHaveURL(/\/$/);
   await page.goto('/account');
   await page.getByRole('button', { name: 'Enroll authenticator' }).click();
-  const secret = await page.getByText('Authenticator secret:', { exact: false }).locator('code').textContent();
+  const secret = await page.getByText(/enter this setup key in the app:/).locator('code').textContent();
   expect(secret).toBeTruthy();
   await page.getByLabel('Authenticator code').fill(authenticatorCode(secret!));
   await page.getByRole('button', { name: 'Confirm enrollment' }).click();

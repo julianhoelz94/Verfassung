@@ -84,7 +84,7 @@ class SmtpOutboundMailer(
         try {
             val sender = mailSender()
             val message = sender.createMimeMessage()
-            val helper = MimeMessageHelper(message, StandardCharsets.UTF_8.name())
+            val helper = MimeMessageHelper(message, html != null, StandardCharsets.UTF_8.name())
             if (properties.fromName.isBlank()) {
                 helper.setFrom(properties.from)
             } else {

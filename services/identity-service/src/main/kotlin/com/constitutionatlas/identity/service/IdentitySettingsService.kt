@@ -10,6 +10,7 @@ import com.constitutionatlas.identity.repo.IdentityRepository
 import com.constitutionatlas.identity.repo.IdentitySettingsRepository
 import com.constitutionatlas.identity.repo.StoredIdentitySettings
 import com.constitutionatlas.platform.ForbiddenException
+import org.springframework.core.env.Environment
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.net.URI
@@ -19,6 +20,7 @@ class IdentitySettingsService(
     private val repository: IdentitySettingsRepository,
     private val identityRepository: IdentityRepository,
     private val authService: AuthService,
+    private val environment: Environment,
     mfaProperties: IdentityMfaProperties,
 ) {
     private val box = SecretBox(mfaProperties.encryptionKey)
@@ -58,7 +60,7 @@ class IdentitySettingsService(
         val from = request.mailFrom.trim()
         val base = request.mailPublicBaseUrl.trim().trimEnd('/')
         val uri = runCatching { URI(base) }.getOrNull()
-        if (request.smtpPort !in 1..65535 || host.length > 255 || !from.contains("@")) {
+        if (request.smtpPort !in 1..65535 || host.length > 255 || from.length > 254 || !from.matches(Regex("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$"))) {
             if (request.mailEnabled || request.selfRegistrationEnabled) throw BadRequestException("Invalid mail settings")
         }
         if (request.mailEnabled || request.selfRegistrationEnabled) {
@@ -74,7 +76,10 @@ class IdentitySettingsService(
             ) {
                 throw BadRequestException("A valid HTTPS public URL and SMTP host are required")
             }
-            if (request.smtpSsl == request.smtpStarttls) throw BadRequestException("Choose exactly one SMTP TLS mode")
+            if (request.smtpSsl && request.smtpStarttls) throw BadRequestException("Choose one SMTP TLS mode")
+            if (!request.smtpSsl && !request.smtpStarttls && !environment.activeProfiles.contains("ci")) {
+                throw BadRequestException("SMTP TLS is required")
+            }
         }
         if (request.selfRegistrationEnabled && !request.mailEnabled) {
             throw BadRequestException("Configure and enable mail before opening registration")

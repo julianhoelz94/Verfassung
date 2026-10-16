@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { anonymousApiLimit } from '../../../lib/anonymous-api-limit';
+import { requestAnonymousBrowsingPolicy } from '../../../lib/anonymous-browsing-policy';
 import { identityBaseUrl } from '../../../lib/identity-client';
 import { SESSION_COOKIE } from '../../../lib/session';
 
@@ -22,8 +23,24 @@ export async function GET(request: NextRequest) {
       // Failed validation receives the anonymous quota, never an auth bypass.
     }
   }
+  let policy;
+  try {
+    policy = await requestAnonymousBrowsingPolicy();
+  } catch {
+    return NextResponse.json({ code: 'anonymous_policy_unavailable', detail: 'Browsing settings are temporarily unavailable.' }, { status: 503 });
+  }
+  if (!policy.allowed) {
+    const originalUri = request.headers.get('x-atlas-original-uri') ?? '';
+    if (originalUri.startsWith('/api/identity') || originalUri.startsWith('/oauth/')) {
+      return new NextResponse(null, { status: 204 });
+    }
+    return NextResponse.json(
+      { code: 'anonymous_browsing_disabled', detail: 'Sign in to browse constitutions.' },
+      { status: 403, headers: { 'Cache-Control': 'no-store' } },
+    );
+  }
   const ip = request.headers.get('x-atlas-client-ip') || 'unknown';
-  const retryAfter = anonymousApiLimit(ip);
+  const retryAfter = anonymousApiLimit(ip, policy);
   if (retryAfter !== null) {
     const headers = { 'Retry-After': String(retryAfter), 'Cache-Control': 'no-store' };
     if (request.headers.get('accept')?.includes('text/html')) {

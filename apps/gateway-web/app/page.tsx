@@ -13,6 +13,8 @@ import { PageMain } from './components/PageMain';
 import { SiteSearchForm } from './components/SiteSearchForm';
 import { ServiceUnavailable } from './components/StatusMessage';
 import { Badge } from './components/ui';
+import { requestAnonymousBrowsingPolicy } from '../lib/anonymous-browsing-policy';
+import { currentUser } from '../lib/session';
 import {
   chainTipId,
   newestChanges,
@@ -22,6 +24,16 @@ import {
 } from '../lib/reading';
 
 export default async function Page() {
+  const policy = await requestAnonymousBrowsingPolicy().catch(() => null);
+  if (!policy?.allowed && !(await currentUser())) {
+    return <PageMain className="wide">
+      <section className="hero">
+        <h1 className="page-title">Constitution Atlas</h1>
+        <p className="lede">{policy ? 'Sign in to browse constitutions.' : 'Browsing settings are temporarily unavailable.'}</p>
+        <a className="btn btn-primary" href="/login">Log in</a>
+      </section>
+    </PageMain>;
+  }
   let error: string | null = null;
   let countries: CountrySummary[] = [];
   let details: CountryDetail[] = [];

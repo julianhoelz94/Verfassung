@@ -60,6 +60,49 @@ class IdentityApiTest {
     private val objectMapper = ObjectMapper()
 
     @Test
+    fun anonymousBrowsingSettingsKeepSavedPositiveLimitsWhenDisabled() {
+        val admin = login("local-admin@example.local", "change-me")
+        val viewer = login("local-viewer@example.local", "change-me")
+        val enabled = """{"allowed":true,"perIp":{"requests":3,"windowValue":2,"windowUnit":"hours"},"total":{"requests":5,"windowValue":1,"windowUnit":"days"}}"""
+        val disabled = enabled.replace("\"allowed\":true", "\"allowed\":false")
+        try {
+            mockMvc.put("/admin/anonymous-browsing") {
+                header("Authorization", "Bearer $viewer")
+                contentType = MediaType.APPLICATION_JSON
+                content = enabled
+            }.andExpect { status { isForbidden() } }
+            mockMvc.put("/admin/anonymous-browsing") {
+                header("Authorization", "Bearer $admin")
+                contentType = MediaType.APPLICATION_JSON
+                content = enabled.replace("\"requests\":3", "\"requests\":0")
+            }.andExpect { status { isBadRequest() } }
+            mockMvc.put("/admin/anonymous-browsing") {
+                header("Authorization", "Bearer $admin")
+                contentType = MediaType.APPLICATION_JSON
+                content = disabled
+            }.andExpect { status { isOk() } }
+            mockMvc.get("/anonymous-browsing").andExpect {
+                status { isOk() }
+                jsonPath("$.allowed") { value(false) }
+                jsonPath("$.perIp.requests") { value(0) }
+                jsonPath("$.total.requests") { value(0) }
+            }
+            mockMvc.get("/admin/anonymous-browsing") { header("Authorization", "Bearer $admin") }.andExpect {
+                status { isOk() }
+                jsonPath("$.perIp.requests") { value(3) }
+                jsonPath("$.total.requests") { value(5) }
+            }
+            mockMvc.put("/admin/anonymous-browsing") {
+                header("Authorization", "Bearer $admin")
+                contentType = MediaType.APPLICATION_JSON
+                content = enabled
+            }.andExpect { status { isOk() } }
+        } finally {
+            jdbcTemplate.update("UPDATE anonymous_browsing_settings SET allowed = TRUE, per_ip_requests = 600, per_ip_window_value = 1, per_ip_window_unit = 'minutes', total_requests = 6000, total_window_value = 1, total_window_unit = 'minutes' WHERE id = TRUE")
+        }
+    }
+
+    @Test
     fun registrationIsClosedByDefaultAndConfirmedAccountsRemainViewers() {
         val email = "new-registration-${System.nanoTime()}@example.test"
         mockMvc.get("/registration/status").andExpect {

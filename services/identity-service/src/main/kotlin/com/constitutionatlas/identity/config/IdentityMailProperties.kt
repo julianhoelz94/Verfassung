@@ -1,8 +1,5 @@
 package com.constitutionatlas.identity.config
 
-import org.springframework.boot.context.properties.ConfigurationProperties
-
-@ConfigurationProperties(prefix = "identity.mail")
 data class IdentityMailProperties(
     var enabled: Boolean = true,
     var from: String = "",

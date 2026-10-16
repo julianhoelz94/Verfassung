@@ -39,6 +39,13 @@ data class StoredPasswordReset(
     val usedAt: Instant?,
 )
 
+data class StoredRegistrationVerification(
+    val id: UUID,
+    val userId: UUID,
+    val expiresAt: Instant,
+    val usedAt: Instant?,
+)
+
 data class StoredMfaChallenge(
     val id: UUID,
     val userId: UUID,
@@ -484,6 +491,48 @@ class IdentityRepository(private val jdbc: JdbcTemplate) {
     fun markInviteUsed(id: UUID) {
         jdbc.update("UPDATE invites SET used_at = NOW() WHERE id = ?", id)
     }
+
+    fun insertRegistrationVerification(userId: UUID, tokenHash: String, expiresAt: Instant) {
+        jdbc.update("DELETE FROM registration_verifications WHERE user_id = ? AND used_at IS NULL", userId)
+        jdbc.update(
+            "INSERT INTO registration_verifications (id, user_id, token_hash, expires_at) VALUES (?, ?, ?, ?)",
+            UUID.randomUUID(),
+            userId,
+            tokenHash,
+            Timestamp.from(expiresAt),
+        )
+    }
+
+    fun findRegistrationVerification(tokenHash: String): StoredRegistrationVerification? =
+        jdbc.query(
+            "SELECT id, user_id, expires_at, used_at FROM registration_verifications WHERE token_hash = ?",
+            { rs, _ ->
+                StoredRegistrationVerification(
+                    rs.getObject("id", UUID::class.java),
+                    rs.getObject("user_id", UUID::class.java),
+                    rs.getTimestamp("expires_at").toInstant(),
+                    rs.getTimestamp("used_at")?.toInstant(),
+                )
+            },
+            tokenHash,
+        ).firstOrNull()
+
+    fun hasPendingRegistration(userId: UUID): Boolean =
+        jdbc.queryForObject(
+            "SELECT EXISTS (SELECT 1 FROM registration_verifications WHERE user_id = ? AND used_at IS NULL)",
+            Boolean::class.java,
+            userId,
+        ) ?: false
+
+    fun deletePendingRegistrations(userId: UUID) {
+        jdbc.update("DELETE FROM registration_verifications WHERE user_id = ? AND used_at IS NULL", userId)
+    }
+
+    fun consumeRegistrationVerification(id: UUID): Boolean =
+        jdbc.update(
+            "UPDATE registration_verifications SET used_at = NOW() WHERE id = ? AND used_at IS NULL AND expires_at > NOW()",
+            id,
+        ) == 1
 
     fun insertPasswordReset(userId: UUID, tokenHash: String, expiresAt: Instant): UUID {
         val id = UUID.randomUUID()

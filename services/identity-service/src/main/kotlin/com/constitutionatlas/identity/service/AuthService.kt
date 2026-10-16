@@ -156,6 +156,7 @@ class AuthService(
         return MfaEnrollStartDto(
             secret = secret,
             otpauthUrl = mfaService.otpauthUrl(user.email, secret),
+            qrDataUrl = mfaService.qrDataUrl(user.email, secret),
             challengeToken = issuedToken,
         )
     }
@@ -345,6 +346,9 @@ class AuthService(
         }
         return user
     }
+
+    fun issuePasskeySession(user: StoredUser, clientIp: String, userAgent: String?): LoginResponse =
+        issueSession(user, clientIp, userAgent, mfaVerified = true, revokeTokenHash = null)
 
     private fun issueSession(
         user: StoredUser,

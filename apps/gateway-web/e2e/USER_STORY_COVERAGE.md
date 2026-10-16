@@ -16,6 +16,7 @@ The journeys in the table below use `mock-api.mjs` and verify UI behavior agains
 | Draft, review, publish, and read an editorial correction | `full/roles.spec.ts`: real transcription correction |
 | Admin imports JSON and opens the published version | `full/roles.spec.ts`: administrator imports a new constitution |
 | Admin invite, visitor activation, password change and reset, MFA enrollment and recovery codes | `full/account-admin.spec.ts`: real account lifecycle |
+| Admin enables registration and mail, sends a test message, and a new user confirms a viewer account | `full/self-registration.spec.ts`: real SMTP capture and registration lifecycle |
 | Admin creates, rotates and revokes a service token | `full/account-admin.spec.ts`: real token lifecycle |
 | Admin creates a constitution and changes its outline | `full/account-admin.spec.ts`: real outline lifecycle |
 | Editor restores a change-record revision and publisher republishes it | `full/amendments.spec.ts`: real amendment revision history |

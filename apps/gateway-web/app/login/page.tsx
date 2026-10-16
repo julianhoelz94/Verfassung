@@ -4,9 +4,11 @@ import { PageMain } from '../components/PageMain';
 import { canVisitEditor } from '../../lib/nav';
 import { currentUser } from '../../lib/session';
 import { loginAction } from './actions';
+import { requestRegistrationStatus } from '../../lib/identity-client';
+import { PasskeyLogin } from '../passkeys/PasskeyLogin';
 
 type LoginPageProps = {
-  searchParams: Promise<{ error?: string; next?: string }>;
+  searchParams: Promise<{ error?: string; next?: string; registered?: string }>;
 };
 
 /** Seed-account hint is shown only while identity seeding is on (never in production). */
@@ -17,6 +19,7 @@ function seedHintEnabled(): boolean {
 export default async function LoginPage(props: LoginPageProps) {
   const searchParams = await props.searchParams;
   const user = await currentUser();
+  const registrationEnabled = await requestRegistrationStatus();
   if (user) {
     redirect(searchParams.next?.startsWith('/oauth/authorize?') ? searchParams.next : canVisitEditor(user.roles) ? '/editor' : '/');
   }
@@ -50,6 +53,7 @@ export default async function LoginPage(props: LoginPageProps) {
           </span>
         </Alert>
       ) : null}
+      {searchParams.registered ? <Alert tone="success">Account confirmed. You can sign in.</Alert> : null}
       <Card>
         <form action={loginAction}>
           {searchParams.next?.startsWith('/oauth/authorize?') ? <input type="hidden" name="next" value={searchParams.next} /> : null}
@@ -76,9 +80,11 @@ export default async function LoginPage(props: LoginPageProps) {
           <Button variant="primary">Sign in</Button>
         </form>
       </Card>
+      <Card><PasskeyLogin /></Card>
       <p>
         <a href="/reset">Forgot password</a>
       </p>
+      {registrationEnabled ? <p><a href="/register">Create an account</a></p> : null}
     </PageMain>
   );
 }

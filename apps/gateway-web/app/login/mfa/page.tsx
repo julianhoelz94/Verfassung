@@ -5,6 +5,9 @@ import { currentUser, mfaChallengeToken } from '../../../lib/session';
 import { requestStartMfaEnroll } from '../../../lib/identity-client';
 import { LoginEnrollForm } from '../../account/MfaForms';
 import { completeMfaAction } from '../actions';
+import Image from 'next/image';
+import { PasskeyLoginEnrollment } from '../../passkeys/PasskeyLoginEnrollment';
+import { PasskeyLogin } from '../../passkeys/PasskeyLogin';
 
 type MfaPageProps = {
   searchParams: Promise<{ error?: string; enroll?: string; next?: string }>;
@@ -23,12 +26,12 @@ export default async function MfaPage(props: MfaPageProps) {
   }
 
   let secret: string | null = null;
-  let otpauthUrl: string | null = null;
+  let qrDataUrl: string | null = null;
   if (enroll) {
     try {
       const started = await requestStartMfaEnroll(challenge, undefined);
       secret = started.secret;
-      otpauthUrl = started.otpauthUrl;
+      qrDataUrl = started.qrDataUrl;
     } catch {
       secret = null;
     }
@@ -40,7 +43,7 @@ export default async function MfaPage(props: MfaPageProps) {
         title={enroll ? 'Set up authenticator' : 'Authenticator code'}
         meta={
           enroll
-            ? 'Admin and publisher accounts must enroll TOTP before signing in.'
+            ? 'Set up an authenticator app or a passkey before signing in.'
             : 'Enter a 6-digit authenticator code or a recovery code.'
         }
       />
@@ -51,19 +54,16 @@ export default async function MfaPage(props: MfaPageProps) {
         <Card>
           {secret ? (
             <>
-              <p>
-                Authenticator secret: <code>{secret}</code>
-              </p>
-              {otpauthUrl ? (
-                <p className="muted">
-                  otpauth URL: <code>{otpauthUrl}</code>
-                </p>
-              ) : null}
+              <p>Scan this code with an authenticator app, then enter the six-digit code it shows.</p>
+              {qrDataUrl ? <Image src={qrDataUrl} alt="Authenticator setup QR code" width={208} height={208} unoptimized /> : null}
+              <p>If you cannot scan it, enter this setup key: <code>{secret}</code></p>
             </>
           ) : (
             <Alert tone="error">Enrollment could not be started. Sign in again.</Alert>
           )}
           <LoginEnrollForm next={searchParams.next?.startsWith('/oauth/authorize?') ? searchParams.next : undefined} />
+          {!user ? <PasskeyLoginEnrollment /> : null}
+          {!user ? <PasskeyLogin /> : null}
         </Card>
       ) : (
         <Card>

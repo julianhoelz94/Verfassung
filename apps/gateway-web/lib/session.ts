@@ -6,6 +6,8 @@ import {
   requestConfirmMfaEnroll,
   requestLogin,
   requestLogout,
+  requestPasskeyFinishLogin,
+  requestPasskeyFinishLoginEnrollment,
   type SessionUser,
 } from './identity-client';
 import { interpretMeResponse } from './interpret-me';
@@ -87,6 +89,24 @@ export async function completeMfaLogin(code: string, recoveryCode?: string): Pro
   if (!body.token) {
     throw new Error('Invalid credentials');
   }
+  await clearChallengeCookie();
+  await setSessionCookie(body.token, body.expiresInSeconds);
+  return body.user;
+}
+
+export async function completePasskeyLogin(challengeId: string, credential: unknown): Promise<SessionUser> {
+  const body = await requestPasskeyFinishLogin(challengeId, credential);
+  if (!body.token) throw new Error('Invalid passkey response');
+  await clearChallengeCookie();
+  await setSessionCookie(body.token, body.expiresInSeconds);
+  return body.user;
+}
+
+export async function completePasskeyLoginEnrollment(challengeId: string, credential: unknown): Promise<SessionUser> {
+  const challengeToken = await mfaChallengeToken();
+  if (!challengeToken) throw new Error('Login challenge expired');
+  const body = await requestPasskeyFinishLoginEnrollment(challengeToken, challengeId, credential, 'Passkey');
+  if (!body.token) throw new Error('Invalid passkey response');
   await clearChallengeCookie();
   await setSessionCookie(body.token, body.expiresInSeconds);
   return body.user;

@@ -54,6 +54,8 @@ Open **Admin** for **Users**, **Account settings**, **Outlines**, and **Import**
 
 Admin also contains **Legal pages**. Save a private draft of the Impressum or Datenschutzerklärung, review its content and then publish it as a separate action. Confirm real operator details before public launch. Changes to legal pages do not publish constitutional text.
 
+In **Anonymous browsing**, an administrator can allow or block browsing without a signed-in account. Set positive API request limits separately for each IP address and for all anonymous visitors together, using a window in minutes, hours, or days. Saving this setting requires a fresh MFA step-up. When **Allow anonymous browsing** is unchecked, the displayed limits become zero and cannot be edited; the previously saved positive limits return when browsing is allowed again. Sign-in and account creation remain available to visitors when browsing is blocked.
+
 ## Connect a research client
 
 The **Account → Connect a chat client** section offers OAuth connections and personal MCP keys. Grant only the access your client needs; editor import access stages material for review and cannot publish it. The page shows connected clients and keys, expiration, rotation and revocation controls. Copy a new key when it is shown and keep it private.

@@ -19,6 +19,7 @@ The source-of-truth boundaries should be checked against the current [repository
 ## Main flows
 
 - **Read:** browser → Caddy → gateway server component → Catalog/Content (and, for context, Amendment or Document). Public responses use published snapshots.
+- **Anonymous access:** Identity owns the saved browsing policy. The gateway checks it before showing catalog/navigation or allowing direct reader routes. Caddy asks the gateway edge limiter to enforce the configured per-IP and aggregate API rates for unsigned requests; blocked browsing returns 403, while an exceeded rate returns 429 with `Retry-After`. Sign-in and account creation routes remain available. The limiter currently keeps counters in the gateway process, so multiple gateway replicas need a shared counter store to enforce one aggregate limit.
 - **Sign in:** gateway server action → Identity; session cookie is `ca_session`. MFA challenges use a separate short-lived flow.
 - **Register:** when enabled by an administrator, Identity accepts an email request and sends a one-use confirmation link. The account remains disabled until the recipient sets a password and initially has only the viewer role. Identity stores SMTP settings and verifies passkeys against the configured public origin.
 - **Publish:** an Editor session is saved, reviewed, and approved; a publisher with fresh MFA creates a successor version. Content and Catalog publish the new snapshot, and Search is asked to reindex. The former snapshot remains immutable.

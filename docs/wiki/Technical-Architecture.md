@@ -10,6 +10,7 @@ Constitution Atlas is a Next.js gateway in front of Kotlin/Spring Boot services.
 | Identity | Accounts, roles, sessions, registration, confirmation mail, SMTP settings, MFA, and passkeys. |
 | Editor | Draft sessions, review state, and publication commands. |
 | Ingestion | Upload/import jobs and staging before review. |
+| Document | Source files and revisions, constitution/legal-change links, contextual page media, and legal-page content. |
 | Search | Derived index over published material; rebuilt from source services. |
 | Audit | Append-only activity events; not a source of constitutional text. |
 

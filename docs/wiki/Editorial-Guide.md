@@ -34,15 +34,28 @@ The clips do not show sign-in or real account credentials. A live publisher may 
 
 ## Edit and review a constitution
 
-1. Open **Editor**. Editors can start a session from a current published version and find their work under **My sessions**.
+1. Browse to a published version and choose **Edit this constitution**. Select **Correct this text** for a transcription error or **Record the next legal change** for a change in law. Return to unfinished work through **Editor → My open sessions**.
 2. Choose the constitution, source version, and content unit. Edit the structured content and save. Review the preview and the changes list, including source and target links, before submission.
 3. Submit the session. A reviewer opens **Review queue**, checks the proposed text and context, and approves or returns the work according to the controls shown.
 4. A publisher opens **Ready to publish**, confirms the approved revision and change type, completes MFA step-up, and publishes. Check the resulting version page and indexing status.
 
 **Legal changes** and **Snapshot history** are separate editorial views. A legal change record can describe the law and link exact affected units. Snapshot history shows the published text revisions and their relationship. A transcription correction does not itself create a new law.
 
+## Other editorial work
+
+- Use **Legal changes** to draft and link an amendment or other legal change to exact affected provisions. Review the source and target links before publication.
+- Use **Documents** to add source files, create file revisions, and link them to constitutions or legal changes. A file revision is distinct from a constitutional text revision.
+- Use the country or constitution page's edit action to draft contextual background and pictures. Save the private draft, then have a publisher inspect its preview and publish that page revision separately from constitutional text.
+- Use **Lifecycle** on a constitution to record adoption, commencement, suspension, restoration, repeal, and provision events. Check effective dates and the public constitution timeline after recording an event.
+
 ## Admin tasks
 
 Open **Admin** for **Users**, **Account settings**, **Outlines**, and **Import**. Search Users to find accounts, invite people, assign roles, and revoke sessions. In Account settings, configure outgoing mail, send a test email to a specified recipient, and enable or disable self-registration. New installations start with mail and self-registration disabled; configure and test mail before enabling registration. In Outlines, configure the constitution's structure and inspect its preview before authors enter text. In Import, upload content into the reviewed staging flow and inspect the resulting job; staged data is not public until the appropriate review and publication steps finish.
+
+Admin also contains **Legal pages**. Save a private draft of the Impressum or Datenschutzerklärung, review its content and then publish it as a separate action. Confirm real operator details before public launch. Changes to legal pages do not publish constitutional text.
+
+## Connect a research client
+
+The **Account → Connect a chat client** section offers OAuth connections and personal MCP keys. Grant only the access your client needs; editor import access stages material for review and cannot publish it. The page shows connected clients and keys, expiration, rotation and revocation controls. Copy a new key when it is shown and keep it private.
 
 For exact permissions, see [editorial roles](https://github.com/julianhoelz94/Verfassung/blob/main/docs/editorial-roles.md). For public reading, see [[Website user guide|User-Guide]].

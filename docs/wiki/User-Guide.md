@@ -8,7 +8,9 @@ This guide describes the public website. The exact countries and versions availa
 2. Select a country card to open its country page. The page lists its constitutions and published versions. Country and constitution context pages may include curated background information and images.
 3. Select a constitution and a published version to read its text. Use the table of contents and unit links to move through the hierarchy. A version is a snapshot: a later correction or legal change creates another published version rather than rewriting the older one.
 
-The country **Timeline** presents constitution lifecycle events and the published legal changes associated with that country. A provision may have its own commencement or suspension status, so read the displayed dates and status alongside the text.
+The country **Constitution timeline** presents constitution lifecycle events. The separate **Amendment timeline** presents published legal changes. A provision may have its own commencement or suspension status, so read the displayed dates and status alongside the text.
+
+Constitution and country pages can also contain curated background text and pictures. These contextual pages have their own published revision history. A constitution's linked **Documents** may include source files and later file revisions; check the document revision and its link to the constitution or legal change when tracing a source.
 
 ## Search and compare
 
@@ -23,6 +25,10 @@ Open **About** for the site's source labels and verification policy. A version o
 ## Share or revisit a passage
 
 Use the address of the opened version or unit as a permalink. Save the version ID with a citation, because a country's latest version can change later. The page for an older published snapshot remains distinct from the current one.
+
+## Site information and privacy
+
+Use **About** for source and verification policy, **Impressum** for the published operator details, and **Datenschutzerklärung** for the published privacy notice. On a first visit, the informational necessary-cookie notice can be dismissed and links to the legal pages. The editorial and account functions require sign-in; published texts are available to public readers.
 
 ## If something looks missing
 

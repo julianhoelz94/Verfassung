@@ -2,6 +2,8 @@
 
 This guide describes the public website. The exact countries and versions available depend on published content; an empty list does not mean a draft has been lost. Public pages show published material only.
 
+An administrator can require sign-in for browsing. In that case, the starting page shows a sign-in prompt instead of the country catalog, and the public Countries and Search links are hidden until you log in.
+
 ## Find a constitution
 
 1. Open **Countries** in the site navigation.
@@ -28,7 +30,7 @@ Use the address of the opened version or unit as a permalink. Save the version I
 
 ## Site information and privacy
 
-Use **About** for source and verification policy, **Impressum** for the published operator details, and **Datenschutzerklärung** for the published privacy notice. On a first visit, the informational necessary-cookie notice can be dismissed and links to the legal pages. The editorial and account functions require sign-in; published texts are available to public readers.
+Use **About** for source and verification policy, **Impressum** for the published operator details, and **Datenschutzerklärung** for the published privacy notice. On a first visit, the informational necessary-cookie notice can be dismissed and links to the legal pages. The editorial and account functions require sign-in; published texts are available to public readers when anonymous browsing is allowed.
 
 ## If something looks missing
 

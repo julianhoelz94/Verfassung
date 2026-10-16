@@ -24,6 +24,11 @@ function sectionHrefs(user: NavUser | null, id: string, apiDocsAvailable = false
 }
 
 describe('primaryNavLinks', () => {
+  it('hides browse and search links when anonymous browsing is disabled', () => {
+    expect(primaryNavLinks(null, false, false).map((link) => link.href)).toEqual(['/about']);
+    expect(menuSections(null, false, 0, false).find((section) => section.id === 'primary')?.links.map((link) => link.href)).toEqual(['/about']);
+    expect(primaryNavLinks({ email: 'viewer@example.local', roles: ['viewer'] }, false, false).map((link) => link.href)).toContain('/search');
+  });
   it('shows public destinations without login for anonymous visitors', () => {
     expect(hrefs(null)).toEqual(['/', '/search', '/about']);
     expect(hrefs(null).includes('/editor')).toBe(false);
@@ -113,6 +118,7 @@ describe('menuSections', () => {
     ]);
     expect(sectionHrefs(admin, 'admin', true)).toEqual([
       '/admin/users',
+      '/admin/anonymous-browsing',
       '/admin/constitutions',
       '/admin/import',
       '/api-docs',

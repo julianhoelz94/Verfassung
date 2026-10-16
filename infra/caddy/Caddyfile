@@ -24,7 +24,8 @@
 	}
 
 	# Anonymous API requests share one edge quota across services. Validated account
-	# sessions and bearer credentials are exempt. Public site pages stay available.
+	# sessions and bearer credentials are exempt. The gateway also gates public pages
+	# when anonymous browsing is disabled.
 	@api_request {
 		path /api/catalog* /api/content* /api/amendment* /api/audit* /api/search* /api/ingestion* /api/document* /api/identity* /api/editor* /oauth/token* /oauth/register* /oauth/revoke*
 	}
@@ -33,6 +34,7 @@
 			uri /api/edge-rate-limit
 			header_up X-Atlas-Client-IP {remote_host}
 			header_up X-Atlas-Edge-Check 1
+			header_up X-Atlas-Original-URI {uri}
 		}
 	}
 
@@ -168,6 +170,7 @@
 			# These are internal edge-auth headers; never forward client-supplied values.
 			header_up -X-Atlas-Edge-Check
 			header_up -X-Atlas-Client-IP
+			header_up -X-Atlas-Original-URI
 		}
 	}
 }

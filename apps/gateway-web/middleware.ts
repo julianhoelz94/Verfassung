@@ -1,6 +1,25 @@
 import { NextResponse, type NextRequest } from 'next/server';
+import { requestAnonymousBrowsingPolicy } from './lib/anonymous-browsing-policy';
+import { identityBaseUrl } from './lib/identity-client';
 
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
+  const path = request.nextUrl.pathname;
+  if (path === '/search' || path.startsWith('/countries/') || path.startsWith('/documents/') || path.startsWith('/versions/')) {
+    const policy = await requestAnonymousBrowsingPolicy().catch(() => null);
+    if (!policy?.allowed) {
+      const token = request.cookies.get('ca_session')?.value;
+      let authenticated = false;
+      if (token) {
+        try {
+          const response = await fetch(`${identityBaseUrl()}/me`, {
+            headers: { Authorization: `Bearer ${token}` }, cache: 'no-store', signal: AbortSignal.timeout(2000),
+          });
+          authenticated = response.ok;
+        } catch { /* A failed identity check cannot open browsing. */ }
+      }
+      if (!authenticated) return NextResponse.redirect(new URL('/', request.url));
+    }
+  }
   const nonce = Buffer.from(crypto.randomUUID()).toString('base64');
   const isDev = process.env.NODE_ENV === 'development';
   // Next.js inline runtime scripts take the nonce. Styles still need 'unsafe-inline'

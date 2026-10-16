@@ -35,8 +35,8 @@ export function canVisitApiDocs(roles: string[]): boolean {
   return canVisitAdmin(roles);
 }
 
-export function primaryNavLinks(user: NavUser | null, apiDocsAvailable = false): NavLink[] {
-  const links = [...PUBLIC_LINKS];
+export function primaryNavLinks(user: NavUser | null, apiDocsAvailable = false, anonymousBrowsingAllowed = true): NavLink[] {
+  const links = user || anonymousBrowsingAllowed ? [...PUBLIC_LINKS] : PUBLIC_LINKS.filter((link) => link.href === '/about');
   if (!user) {
     return links;
   }
@@ -78,12 +78,13 @@ export function editorialLinks(roles: string[], needsReviewCount = 0): NavLink[]
 export function adminLinks(): NavLink[] {
   return [
     { href: '/admin/users', label: 'Users' },
+    { href: '/admin/anonymous-browsing', label: 'Anonymous browsing' },
     { href: '/admin/constitutions', label: 'Outlines' },
     { href: '/admin/import', label: 'Import' },
   ];
 }
 
-export function menuSections(user: NavUser | null, apiDocsAvailable = false, needsReviewCount = 0): MenuSection[] {
+export function menuSections(user: NavUser | null, apiDocsAvailable = false, needsReviewCount = 0, anonymousBrowsingAllowed = true): MenuSection[] {
   const sections: MenuSection[] = [];
   if (user) {
     sections.push({
@@ -92,7 +93,7 @@ export function menuSections(user: NavUser | null, apiDocsAvailable = false, nee
       links: [],
     });
   }
-  const barLinks = primaryNavLinks(user, apiDocsAvailable).filter((link) => link.href !== '/api-docs');
+  const barLinks = primaryNavLinks(user, apiDocsAvailable, anonymousBrowsingAllowed).filter((link) => link.href !== '/api-docs');
   sections.push({
     id: 'primary',
     heading: 'Navigate',

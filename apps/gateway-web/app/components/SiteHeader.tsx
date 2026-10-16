@@ -21,6 +21,7 @@ type SiteHeaderProps = {
   user: NavUser | null;
   identityUnavailable?: boolean;
   needsReviewCount?: number;
+  anonymousBrowsingAllowed?: boolean;
 };
 
 function MenuSectionList({
@@ -69,10 +70,10 @@ function MenuSectionList({
   );
 }
 
-export function SiteHeader({ user, identityUnavailable = false, needsReviewCount = 0 }: SiteHeaderProps) {
+export function SiteHeader({ user, identityUnavailable = false, needsReviewCount = 0, anonymousBrowsingAllowed = true }: SiteHeaderProps) {
   const pathname = usePathname();
-  const links = primaryNavLinks(user);
-  const sections = menuSections(user, false, needsReviewCount);
+  const links = primaryNavLinks(user, false, anonymousBrowsingAllowed);
+  const sections = menuSections(user, false, needsReviewCount, anonymousBrowsingAllowed);
   const versionId = versionIdFromPath(pathname);
   const country = versionId ? countryFromPath(pathname) : undefined;
   return (
@@ -96,14 +97,14 @@ export function SiteHeader({ user, identityUnavailable = false, needsReviewCount
           ))}
         </nav>
         <div className="topbar-actions">
-          <SiteSearchForm
+          {(user || anonymousBrowsingAllowed) ? <SiteSearchForm
             id="header-search-inline"
             className="search-inline"
             versionId={versionId}
             country={country}
             submitVisible={false}
             ariaLabel="Header search"
-          />
+          /> : null}
           {user ? (
             <MenuDisclosure
               key={pathname}
@@ -131,7 +132,7 @@ export function SiteHeader({ user, identityUnavailable = false, needsReviewCount
           )}
         </div>
       </div>
-      <div className="search-row">
+      {(user || anonymousBrowsingAllowed) ? <div className="search-row">
         <SiteSearchForm
           id="header-search-phone"
           versionId={versionId}
@@ -139,7 +140,7 @@ export function SiteHeader({ user, identityUnavailable = false, needsReviewCount
           submitVisible
           ariaLabel="Mobile search"
         />
-      </div>
+      </div> : null}
       {identityUnavailable ? (
         <p className="muted header-status" role="status">
           Sign-in is temporarily unavailable.

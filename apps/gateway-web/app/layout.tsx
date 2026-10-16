@@ -7,6 +7,7 @@ import { cookies } from 'next/headers';
 import { getCountry, listConstitutionAmendments, listCountries } from '../lib/api';
 import { SiteFooter } from './components/SiteFooter';
 import { SiteHeader } from './components/SiteHeader';
+import { requestAnonymousBrowsingPolicy } from '../lib/anonymous-browsing-policy';
 
 export async function generateMetadata(): Promise<Metadata> {
   const base = publicBaseUrl();
@@ -27,6 +28,7 @@ type RootLayoutProps = {
 
 export default async function RootLayout({ children }: RootLayoutProps) {
   const session = await currentSession();
+  const anonymousBrowsingAllowed = session.user ? true : (await requestAnonymousBrowsingPolicy().catch(() => null))?.allowed === true;
   let needsReviewCount = 0;
   const token = (await cookies()).get(SESSION_COOKIE)?.value;
   if (session.user && token && session.user.roles.some((role) => ['admin', 'editor', 'reviewer', 'publisher'].includes(role))) {
@@ -51,7 +53,7 @@ export default async function RootLayout({ children }: RootLayoutProps) {
         <a className="skip-link" href="#main-content">
           Skip to main content
         </a>
-        <SiteHeader user={session.user} identityUnavailable={session.identityUnavailable} needsReviewCount={needsReviewCount} />
+        <SiteHeader user={session.user} identityUnavailable={session.identityUnavailable} needsReviewCount={needsReviewCount} anonymousBrowsingAllowed={anonymousBrowsingAllowed} />
         {children}
         <SiteFooter />
       </body>

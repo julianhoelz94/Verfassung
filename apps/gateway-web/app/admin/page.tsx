@@ -23,6 +23,10 @@ export default async function AdminIndexPage() {
           <p className="muted">Control registration and configure outgoing mail.</p>
         </Card>
         <Card>
+          <h2 className="card-title"><Link href="/admin/anonymous-browsing">Anonymous browsing</Link></h2>
+          <p className="muted">Control visitor access and API call rates.</p>
+        </Card>
+        <Card>
           <h2 className="card-title">
             <Link href="/admin/constitutions">Outlines</Link>
           </h2>

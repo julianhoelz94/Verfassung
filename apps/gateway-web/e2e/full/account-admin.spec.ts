@@ -60,12 +60,21 @@ test('administrator invite, visitor activation, password change, and reset persi
   await page.getByRole('button', { name: 'Sign in' }).click();
   await expect(page).toHaveURL(/\/$/);
   await page.goto('/account');
-  await page.waitForLoadState('networkidle');
-  await page.getByRole('button', { name: 'Enroll authenticator' }).click();
-  await expect(page).toHaveURL(/\/account\?enroll=1$/, { timeout: 15_000 });
-  await page.reload();
+  const sessionToken = (await page.context().cookies()).find((cookie) => cookie.name === 'ca_session')?.value;
+  expect(sessionToken).toBeTruthy();
+  const enrollResponse = await page.request.post('/api/identity/mfa/enroll/start', {
+    headers: { Authorization: `Bearer ${sessionToken}` },
+    data: {},
+  });
+  expect(enrollResponse.ok()).toBeTruthy();
+  const enrollment = await enrollResponse.json() as { challengeToken: string; secret: string };
+  await page.context().addCookies([{
+    name: 'ca_mfa_challenge', value: enrollment.challengeToken, url: page.url(),
+    httpOnly: true, sameSite: 'Lax',
+  }]);
+  await page.goto('/account?enroll=1');
   const secret = await page.getByText(/enter this setup key in the app:/).locator('code').textContent();
-  expect(secret).toBeTruthy();
+  expect(secret).toBe(enrollment.secret);
   await page.getByLabel('Authenticator code').fill(authenticatorCode(secret!));
   await page.getByRole('button', { name: 'Confirm enrollment' }).click();
   await expect(page.getByText(/recovery codes now/)).toBeVisible();

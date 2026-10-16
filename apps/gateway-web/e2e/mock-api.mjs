@@ -200,6 +200,7 @@ let stepUpFresh = true;
 let visualRoles = false;
 let sprint50Content = false;
 let legalPages = {};
+let anonymousBrowsing = { allowed: true, perIp: { requests: 600, windowValue: 1, windowUnit: 'minutes' }, total: { requests: 6000, windowValue: 1, windowUnit: 'minutes' }, revision: 0 };
 const WIKI_IMAGE_ID = '01900000-0000-4000-8000-000000000736';
 const WIKI_IMAGE = { documentId: WIKI_IMAGE_ID, revision: 2, alt: 'A historic flag', caption: 'Historic flag', credit: 'Archive', sourceUrl: 'https://example.org/flag', rights: 'Public domain', placement: 'before_body' };
 
@@ -222,6 +223,7 @@ function resetMockState() {
   stepUpFresh = true;
   visualRoles = false;
   sprint50Content = false;
+  anonymousBrowsing = { allowed: true, perIp: { requests: 600, windowValue: 1, windowUnit: 'minutes' }, total: { requests: 6000, windowValue: 1, windowUnit: 'minutes' }, revision: 0 };
   const impressum = { revision: 1, content: 'Example Operator\nExample Street 1\nexample@example.org', createdAt: '2026-01-01T00:00:00Z', createdBy: identityMe.id };
   const datenschutz = { revision: 1, content: 'Example privacy notice for browser tests.', createdAt: '2026-01-01T00:00:00Z', createdBy: identityMe.id };
   legalPages = {
@@ -819,6 +821,21 @@ const server = createServer(async (req, res) => {
     }
     json(res, 200, currentUser);
     return;
+  }
+  if (method === 'GET' && pathname === '/api/identity/anonymous-browsing') {
+    json(res, 200, anonymousBrowsing.allowed ? anonymousBrowsing : { ...anonymousBrowsing, perIp: { ...anonymousBrowsing.perIp, requests: 0 }, total: { ...anonymousBrowsing.total, requests: 0 } });
+    return;
+  }
+  if (pathname === '/api/identity/admin/anonymous-browsing' && bearer(req) === SESSION_TOKEN) {
+    if (method === 'GET') {
+      json(res, 200, anonymousBrowsing);
+      return;
+    }
+    if (method === 'PUT') {
+      anonymousBrowsing = { ...(await readBody(req)), revision: anonymousBrowsing.revision + 1 };
+      json(res, 200, anonymousBrowsing);
+      return;
+    }
   }
   if (method === 'GET' && pathname === '/api/identity/users') {
     if (bearer(req) !== SESSION_TOKEN) {

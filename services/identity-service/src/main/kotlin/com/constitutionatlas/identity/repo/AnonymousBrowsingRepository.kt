@@ -34,8 +34,12 @@ class AnonymousBrowsingRepository(private val jdbc: JdbcTemplate) {
             WHERE id = TRUE
             """.trimIndent(),
             settings.allowed,
-            settings.perIp.requests, settings.perIp.windowValue, settings.perIp.windowUnit,
-            settings.total.requests, settings.total.windowValue, settings.total.windowUnit,
+            settings.perIp.requests,
+            settings.perIp.windowValue,
+            settings.perIp.windowUnit,
+            settings.total.requests,
+            settings.total.windowValue,
+            settings.total.windowUnit,
         )
     }
 }

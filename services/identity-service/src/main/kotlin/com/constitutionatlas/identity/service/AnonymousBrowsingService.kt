@@ -17,10 +17,14 @@ class AnonymousBrowsingService(
 ) {
     fun publicPolicy(): AnonymousBrowsingSettings {
         val saved = repository.get()
-        return if (saved.allowed) saved else saved.copy(
-            perIp = saved.perIp.copy(requests = 0),
-            total = saved.total.copy(requests = 0),
-        )
+        return if (saved.allowed) {
+            saved
+        } else {
+            saved.copy(
+                perIp = saved.perIp.copy(requests = 0),
+                total = saved.total.copy(requests = 0),
+            )
+        }
     }
 
     fun read(authorization: String?): AnonymousBrowsingSettings {
@@ -41,7 +45,9 @@ class AnonymousBrowsingService(
     private fun validate(rate: AnonymousRate) {
         if (rate.requests !in 1..1_000_000 || rate.windowValue !in 1..365 ||
             rate.windowUnit !in setOf("minutes", "hours", "days")
-        ) throw BadRequestException("Anonymous browsing rates must be positive and use minutes, hours, or days")
+        ) {
+            throw BadRequestException("Anonymous browsing rates must be positive and use minutes, hours, or days")
+        }
     }
 
     private fun requireAdmin(authorization: String?) {

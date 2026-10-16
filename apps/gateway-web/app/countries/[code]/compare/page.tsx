@@ -1,3 +1,4 @@
+import { T, ui } from '../../../components/TranslationProvider';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import { CompareView } from '../../../components/CompareView';
@@ -258,7 +259,7 @@ export default async function ComparePage(props: ComparePageProps) {
           { label: 'Compare' },
         ]}
         eyebrow={`${country.name}${constitution?.title ? ` · ${constitution.title}` : ''}`}
-        title="Compare versions"
+        title={<T value={ui.attrs.countriesCodeComparePagePageHeaderTitle} />}
         actions={
           <>
             <CopyLink />
@@ -277,21 +278,21 @@ export default async function ComparePage(props: ComparePageProps) {
       {path && fromVersion && toVersion && !loadError ? (
         <>
           <div className="compare-summary">
-            <Badge tone="changed">{changedCount} changed</Badge>
-            <Badge tone="added">{addedCount} added</Badge>
-            <Badge tone="removed">{removedCount} removed</Badge>
+            <Badge tone="changed">{changedCount} <T value={ui.countries.code.compare.page.changed} /></Badge>
+            <Badge tone="added">{addedCount} <T value={ui.countries.code.compare.page.added} /></Badge>
+            <Badge tone="removed">{removedCount} <T value={ui.countries.code.compare.page.removed} /></Badge>
             <Badge>
-              {lawHops.length} amending law{lawHops.length === 1 ? '' : 's'}
+              {lawHops.length} <T value={ui.countries.code.compare.page.amendingLaw} />{lawHops.length === 1 ? '' : 's'}
             </Badge>
             <span className="muted">
               {showAll ? (
                 <>
-                  All articles are shown. <a href={hideUnchangedHref}>Only changed</a>
+                  <T value={ui.countries.code.compare.page.allArticlesAreShown} />{" "}<a href={hideUnchangedHref}><T value={ui.countries.code.compare.page.onlyChanged} /></a>
                 </>
               ) : (
                 <>
-                  Only changed articles are shown.{' '}
-                  <a href={showAllHref}>Show all {rows.length}</a>
+                  <T value={ui.countries.code.compare.page.onlyChangedArticlesAreShown} />{' '}
+                  <a href={showAllHref}><T value={ui.countries.code.compare.page.showAll} />{" "}{rows.length}</a>
                 </>
               )}
             </span>
@@ -300,8 +301,7 @@ export default async function ComparePage(props: ComparePageProps) {
           <CompareView fromLabel={fromVersion.versionLabel} toLabel={toVersion.versionLabel}>
             {lawHops.length === 0 ? (
               <p>
-                No legal changes are recorded between these versions. The side-by-side text below still compares the snapshots.
-              </p>
+                <T value={ui.countries.code.compare.page.noLegalChangesAreRecordedBetweenThese} />{" "}</p>
             ) : null}
             {lawHops.map((hop, hopIndex) => {
               const amendment = hop.amendment;
@@ -309,8 +309,8 @@ export default async function ComparePage(props: ComparePageProps) {
               return (
                 <details key={amendment.id} className="hop">
                   <summary>
-                    <Badge tone="accent">Legal change {hopIndex + 1}</Badge>
-                    {showReviewWarnings && needsReview ? <Badge tone="changed">Needs review</Badge> : null}
+                    <Badge tone="accent"><T value={ui.countries.code.compare.page.legalChange} />{" "}{hopIndex + 1}</Badge>
+                    {showReviewWarnings && needsReview ? <Badge tone="changed"><T value={ui.countries.code.compare.page.needsReview} /></Badge> : null}
                     <span>{amendment.title}</span>
                     <span className="muted">
                       {hop.source && hop.target ? (
@@ -340,7 +340,7 @@ export default async function ComparePage(props: ComparePageProps) {
                         <Badge tone={hopChangeTone(change.changeType)}>{change.changeType}</Badge>
                         {change.articleNumber ? (
                           <a href={`/countries/${country.isoCode}/articles/${encodeURIComponent(change.articleNumber)}`}>
-                            Art. {change.articleNumber}
+                            <T value={ui.countries.code.compare.page.art} />{" "}{change.articleNumber}
                           </a>
                         ) : null}
                         <span className="muted">
@@ -361,8 +361,7 @@ export default async function ComparePage(props: ComparePageProps) {
             })}
 
             <h2>
-              {fromVersion.versionLabel} and {toVersion.versionLabel} side by side
-            </h2>
+              {fromVersion.versionLabel} <T value={ui.countries.code.compare.page.and} />{" "}{toVersion.versionLabel} <T value={ui.countries.code.compare.page.sideBySide} />{" "}</h2>
             {visible.map((row) => {
               const heading = articleHeading(row.right ? toOutline : fromOutline, (row.right ?? row.left)!);
               const fromBadge = columnBadge(row.kind, 'from');
@@ -399,7 +398,7 @@ export default async function ComparePage(props: ComparePageProps) {
                           lang={fromVersion.languageCode}
                         />
                       ) : (
-                        <p className="muted">This article did not exist in the {fromVersion.versionLabel} text.</p>
+                        <p className="muted"><T value={ui.countries.code.compare.page.thisArticleDidNotExistInThe} />{" "}{fromVersion.versionLabel} <T value={ui.countries.code.compare.page.text} /></p>
                       )}
                     </section>
                     <section className="compare-col compare-col-to" aria-label={toVersion.versionLabel}>
@@ -427,7 +426,7 @@ export default async function ComparePage(props: ComparePageProps) {
                           lang={toVersion.languageCode}
                         />
                       ) : (
-                        <p className="muted">This article did not exist in the {toVersion.versionLabel} text.</p>
+                        <p className="muted"><T value={ui.countries.code.compare.page.thisArticleDidNotExistInThe} />{" "}{toVersion.versionLabel} <T value={ui.countries.code.compare.page.text} /></p>
                       )}
                     </section>
                   </div>

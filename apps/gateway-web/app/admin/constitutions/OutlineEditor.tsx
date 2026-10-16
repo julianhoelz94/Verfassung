@@ -1,5 +1,6 @@
 'use client';
 
+import { T, ui } from '../../components/TranslationProvider';
 import type { FormEvent, ReactNode } from 'react';
 import { useRef, useState } from 'react';
 import { Alert, Button, Input, Select } from '../../components/ui';
@@ -186,23 +187,23 @@ export function OutlineEditor({
       </nav> : null}
       <div hidden={guidedCreation && step !== 1}>{children}</div>
       <input type="hidden" name="outline" value={JSON.stringify(withoutExisting(layers))} />
-      {guidedCreation && step === 1 ? <div className="form-row"><Button type="button" variant="primary" onClick={advance}>Continue to structure</Button></div> : null}
+      {guidedCreation && step === 1 ? <div className="form-row"><Button type="button" variant="primary" onClick={advance}><T value={ui.admin.constitutions.outlineeditor.continueToStructure} /></Button></div> : null}
       {guidedCreation && step === 2 ? <section aria-label="Starting structure">
-        <h2 className="setting-inline">Starting structure <SettingInfo label="Starting structure" description="Choose a template for the initial levels. You can adjust every level before creation and revise the structure later after an impact check." changeability="review" /></h2>
-        <p className="muted">Choose a starting point, then adjust every level below. Changing templates replaces the current level settings.</p>
+        <h2 className="setting-inline"><T value={ui.admin.constitutions.outlineeditor.startingStructure} />{" "}<SettingInfo label="Starting structure" description="Choose a template for the initial levels. You can adjust every level before creation and revise the structure later after an impact check." changeability="review" /></h2>
+        <p className="muted"><T value={ui.admin.constitutions.outlineeditor.chooseAStartingPointThenAdjustEvery} /></p>
         <div className="creation-templates">
           {([['articles', 'Articles only', 'A short constitution with text in each article'], ['sections', 'Articles and sections', 'Two levels with plain text in each section'], ['sentences', 'Articles, paragraphs, sentences', 'Three levels with sentence editing tools']] as const).map(([id, title, detail]) => <button key={id} type="button" className="creation-template" aria-pressed={template === id} onClick={() => { setTemplate(id); setLayers(explicitLayers(outlineFromTemplate(id), false)); setShowErrors(false); }}><strong>{title}</strong><span>{detail}</span></button>)}
         </div>
       </section> : null}
-      {guidedCreation && step === 3 ? <section className="card" aria-label="Review constitution"><h2>Review before creating</h2><p>{basicsSummary}</p><p>{layers.map((layer) => layer.displayLabel).join(' → ')}</p><p>The new constitution can be edited after creation. Content and versions are added in the editor.</p></section> : null}
+      {guidedCreation && step === 3 ? <section className="card" aria-label="Review constitution"><h2><T value={ui.admin.constitutions.outlineeditor.reviewBeforeCreating} /></h2><p>{basicsSummary}</p><p>{layers.map((layer) => layer.displayLabel).join(' → ')}</p><p><T value={ui.admin.constitutions.outlineeditor.theNewConstitutionCanBeEditedAfter} /></p></section> : null}
       <div className="outline-config-layout" hidden={guidedCreation && step === 1}>
       {guidedCreation && step === 3 ? <div className="stack" aria-label="Final structure settings">
         {layers.map((layer, index) => {
           const effective = effectiveDisplayKind(exampleOutline.kinds[index])!;
           return <section className="card" key={`${layer.kindCode}-${index}`}>
           <h3>{index + 1}. {layer.displayLabel}</h3>
-          <p>Editor titles: {layer.titlePolicy ?? 'optional'} · Literal labels: {layer.labelPolicy ?? 'optional'}</p>
-          <p>Public reader: {layer.presentation === 'concatenated' ? 'running text' : 'block'} · Kind {effective.showKind ? 'shown' : 'hidden'} · Label {effective.showLabel ? `shown (${(effective.labelPlacement ?? 'before_title').replaceAll('_', ' ')})` : 'hidden'} · Title {effective.showTitle ? 'shown' : 'hidden'}</p>
+          <p><T value={ui.admin.constitutions.outlineeditor.editorTitles} />{" "}{layer.titlePolicy ?? 'optional'} <T value={ui.admin.constitutions.outlineeditor.literalLabels} />{" "}{layer.labelPolicy ?? 'optional'}</p>
+          <p><T value={ui.admin.constitutions.outlineeditor.publicReader} />{" "}{layer.presentation === 'concatenated' ? 'running text' : 'block'} <T value={ui.admin.constitutions.outlineeditor.kind} />{" "}{effective.showKind ? 'shown' : 'hidden'} <T value={ui.admin.constitutions.outlineeditor.label} />{" "}{effective.showLabel ? `shown (${(effective.labelPlacement ?? 'before_title').replaceAll('_', ' ')})` : 'hidden'} <T value={ui.admin.constitutions.outlineeditor.title} />{" "}{effective.showTitle ? 'shown' : 'hidden'}</p>
           <p>{layer.root ? 'Top-level kind · ' : ''}{layer.allowedChildKinds?.length ? layer.allowTextAlongsideChildren ? 'Unnumbered parent text allowed alongside children' : 'Text stays in child units' : `Text leaf with ${layer.segmentation === 'sentence' ? 'sentence boundary assistance' : 'plain editing'}`}</p>
           </section>;
         })}
@@ -210,12 +211,12 @@ export function OutlineEditor({
         {layers.map((layer, index) => (
           <li key={`${layer.kindCode}-${index}`} className="card">
             <p>
-              Layer {index + 1}
+              <T value={ui.admin.constitutions.outlineeditor.layer} />{" "}{index + 1}
               {layer.root ? ' (top-level kind)' : ''}
               {!layer.allowedChildKinds?.length ? ' · Text leaf' : ' · Structural kind'}
             </p>
             <Input
-              label="Label"
+              label={<T value={ui.attrs.adminConstitutionsOutlineeditorInputLabelLabel} />}
               info={{ description: 'The reader-facing name of this structural level, such as Article or Paragraph.', changeability: 'review' }}
               name={`label-${index}`}
               value={layer.displayLabel}
@@ -228,9 +229,9 @@ export function OutlineEditor({
               }}
             />
             <details className="creation-advanced">
-              <summary>Advanced · generated code</summary>
+              <summary><T value={ui.admin.constitutions.outlineeditor.advancedGeneratedCode} /></summary>
             <Input
-              label="Kind code"
+              label={<T value={ui.attrs.adminConstitutionsOutlineeditorInputLabelKind} />}
               info={{ description: 'The internal identifier for this level. It is generated from the label.', changeability: 'once', changeNote: 'Set once when this level is first saved.' }}
               name={`code-${index}`}
               value={layer.kindCode}
@@ -244,43 +245,43 @@ export function OutlineEditor({
             />
             </details>
             <fieldset>
-              <legend>Structure</legend>
-              <label className="choice-row"><input type="checkbox" checked={Boolean(layer.root)} onChange={event => update(index, { root: event.target.checked })} /> May appear at the top level</label>
-              <p className="muted">Allowed child kinds</p>
+              <legend><T value={ui.admin.constitutions.outlineeditor.structure} /></legend>
+              <label className="choice-row"><input type="checkbox" checked={Boolean(layer.root)} onChange={event => update(index, { root: event.target.checked })} /> <T value={ui.admin.constitutions.outlineeditor.mayAppearAtTheTopLevel} /></label>
+              <p className="muted"><T value={ui.admin.constitutions.outlineeditor.allowedChildKinds} /></p>
               {layers.filter(candidate => candidate.kindCode !== layer.kindCode).map(candidate => <label className="choice-row" key={candidate.kindCode}>
                 <input type="checkbox" checked={Boolean(layer.allowedChildKinds?.includes(candidate.kindCode))} onChange={event => update(index, { allowedChildKinds: event.target.checked ? [...(layer.allowedChildKinds ?? []), candidate.kindCode] : (layer.allowedChildKinds ?? []).filter(code => code !== candidate.kindCode) })} /> {candidate.displayLabel}
               </label>)}
             </fieldset>
             <fieldset>
-              <legend>Editor permissions</legend>
+              <legend><T value={ui.admin.constitutions.outlineeditor.editorPermissions} /></legend>
               {Boolean(layer.allowedChildKinds?.length) ? (
                 <div className="field">
-                  <span className="setting-inline"><label className="choice-row"><input type="checkbox" checked={Boolean(layer.allowTextAlongsideChildren)} onChange={(event) => update(index, { allowTextAlongsideChildren: event.target.checked })} /> Allow text alongside child units</label><SettingInfo label="Allow text alongside child units" description="Allow unnumbered text before, between, or after the child units at this level." changeability="review" /></span>
-                  <span className="muted">Unnumbered parent text can appear before, between, or after child units.</span>
+                  <span className="setting-inline"><label className="choice-row"><input type="checkbox" checked={Boolean(layer.allowTextAlongsideChildren)} onChange={(event) => update(index, { allowTextAlongsideChildren: event.target.checked })} /> <T value={ui.admin.constitutions.outlineeditor.allowTextAlongsideChildUnits} /></label><SettingInfo label="Allow text alongside child units" description="Allow unnumbered text before, between, or after the child units at this level." changeability="review" /></span>
+                  <span className="muted"><T value={ui.admin.constitutions.outlineeditor.unnumberedParentTextCanAppearBeforeBetween} /></span>
                 </div>
-              ) : <p>This final level holds text and has no child units.</p>}
-              <Select label="Editorial titles" info={{ description: 'Choose whether units at this level can or must have an editorial title.', changeability: 'review' }} name={`title-policy-${index}`} value={layer.titlePolicy ?? 'optional'} onChange={(event) => update(index, { titlePolicy: event.target.value as Layer['titlePolicy'], showTitle: event.target.value === 'none' ? false : layer.showTitle })}>
-                <option value="none">Not allowed</option><option value="optional">Optional</option><option value="required">Required</option>
+              ) : <p><T value={ui.admin.constitutions.outlineeditor.thisFinalLevelHoldsTextAndHas} /></p>}
+              <Select label={<T value={ui.attrs.adminConstitutionsOutlineeditorSelectLabelEditorial} />} info={{ description: 'Choose whether units at this level can or must have an editorial title.', changeability: 'review' }} name={`title-policy-${index}`} value={layer.titlePolicy ?? 'optional'} onChange={(event) => update(index, { titlePolicy: event.target.value as Layer['titlePolicy'], showTitle: event.target.value === 'none' ? false : layer.showTitle })}>
+                <option value="none"><T value={ui.admin.constitutions.outlineeditor.notAllowed} /></option><option value="optional"><T value={ui.admin.constitutions.outlineeditor.optional} /></option><option value="required"><T value={ui.admin.constitutions.outlineeditor.required} /></option>
               </Select>
-              <Select label="Literal legal labels" info={{ description: 'Choose whether source labels, such as 46a or (2a), can or must be entered.', changeability: 'review' }} name={`label-policy-${index}`} value={layer.labelPolicy ?? 'optional'} onChange={(event) => update(index, { labelPolicy: event.target.value as Layer['labelPolicy'], showLabel: event.target.value === 'none' ? false : layer.showLabel })}>
-                <option value="none">Not allowed</option><option value="optional">Optional</option><option value="required">Required</option>
+              <Select label={<T value={ui.attrs.adminConstitutionsOutlineeditorSelectLabelLiteral} />} info={{ description: 'Choose whether source labels, such as 46a or (2a), can or must be entered.', changeability: 'review' }} name={`label-policy-${index}`} value={layer.labelPolicy ?? 'optional'} onChange={(event) => update(index, { labelPolicy: event.target.value as Layer['labelPolicy'], showLabel: event.target.value === 'none' ? false : layer.showLabel })}>
+                <option value="none"><T value={ui.admin.constitutions.outlineeditor.notAllowed} /></option><option value="optional"><T value={ui.admin.constitutions.outlineeditor.optional} /></option><option value="required"><T value={ui.admin.constitutions.outlineeditor.required} /></option>
               </Select>
-              <p className="muted">Labels such as 46a, bis, and (2a) are entered exactly as written in the source.</p>
-              {!layer.allowedChildKinds?.length ? <Select label="Text editing tools" info={{ description: 'Choose plain text editing or guided sentence boundaries for the final text level.', changeability: 'review' }} name={`segmentation-${index}`} value={layer.segmentation ?? 'plain'} onChange={(event) => update(index, { segmentation: event.target.value as Layer['segmentation'] })}>
-                <option value="plain">Plain text</option><option value="sentence">Sentence boundary assistance</option>
+              <p className="muted"><T value={ui.admin.constitutions.outlineeditor.labelsSuchAs46aBisAnd2a} /></p>
+              {!layer.allowedChildKinds?.length ? <Select label={<T value={ui.attrs.adminConstitutionsOutlineeditorSelectLabelText} />} info={{ description: 'Choose plain text editing or guided sentence boundaries for the final text level.', changeability: 'review' }} name={`segmentation-${index}`} value={layer.segmentation ?? 'plain'} onChange={(event) => update(index, { segmentation: event.target.value as Layer['segmentation'] })}>
+                <option value="plain"><T value={ui.admin.constitutions.outlineeditor.plainText} /></option><option value="sentence"><T value={ui.admin.constitutions.outlineeditor.sentenceBoundaryAssistance} /></option>
               </Select> : null}
             </fieldset>
             <fieldset>
-              <legend>Public reader display</legend>
+              <legend><T value={ui.admin.constitutions.outlineeditor.publicReaderDisplay} /></legend>
             <Select
-              label="How this layer is shown"
+              label={<T value={ui.attrs.adminConstitutionsOutlineeditorSelectLabelHow} />}
               info={{ description: 'Display units as separate blocks or join them as running text in the public reader.', changeability: 'review' }}
               name={`presentation-${index}`}
               value={layer.presentation}
               onChange={(event) => update(index, { presentation: asOutlinePresentation(event.target.value) })}
             >
-              <option value="section">Block with optional heading</option>
-              <option value="concatenated">Running text (no title, joined with siblings)</option>
+              <option value="section"><T value={ui.admin.constitutions.outlineeditor.blockWithOptionalHeading} /></option>
+              <option value="concatenated"><T value={ui.admin.constitutions.outlineeditor.runningTextNoTitleJoinedWithSiblings} /></option>
             </Select>
             {(
               <>
@@ -292,7 +293,7 @@ export function OutlineEditor({
                       disabled={layer.presentation === 'concatenated'}
                       onChange={(event) => update(index, { showKind: event.target.checked })}
                     />{' '}
-                    Show kind name ({layer.displayLabel})
+                    <T value={ui.admin.constitutions.outlineeditor.showKindName} />{layer.displayLabel})
                   </label><SettingInfo label="Show kind name" description="Show the level name, such as Article, before each unit in the public reader." changeability="review" /></span>
                 </div>
                 <div className="field">
@@ -303,8 +304,7 @@ export function OutlineEditor({
                       disabled={layer.labelPolicy === 'none' || (layer.presentation === 'concatenated' && !['inline', 'superscript'].includes(layer.labelPlacement ?? 'before_title'))}
                       onChange={(event) => update(index, { showLabel: event.target.checked })}
                     />{' '}
-                    Show literal legal label
-                  </label><SettingInfo label="Show literal legal label" description="Show the exact label entered from the source next to each unit in the public reader." changeability="review" /></span>
+                    <T value={ui.admin.constitutions.outlineeditor.showLiteralLegalLabel} />{" "}</label><SettingInfo label="Show literal legal label" description="Show the exact label entered from the source next to each unit in the public reader." changeability="review" /></span>
                 </div>
                 <div className="field">
                   <span className="setting-inline"><label className="field-label choice-row">
@@ -314,56 +314,53 @@ export function OutlineEditor({
                       disabled={layer.titlePolicy === 'none' || layer.presentation === 'concatenated'}
                       onChange={(event) => update(index, { showTitle: event.target.checked })}
                     />{' '}
-                    Show editorial title
-                  </label><SettingInfo label="Show editorial title" description="Show editorial unit titles in the public reader when titles are allowed." changeability="review" /></span>
+                    <T value={ui.admin.constitutions.outlineeditor.showEditorialTitle} />{" "}</label><SettingInfo label="Show editorial title" description="Show editorial unit titles in the public reader when titles are allowed." changeability="review" /></span>
                 </div>
               </>
             )}
-              {layer.presentation === 'concatenated' ? <p className="muted">Running text hides kind names and editorial titles. Literal labels appear only inline or as superscripts; saved heading preferences return when block display is selected.</p> : null}
-              {layer.titlePolicy === 'none' || layer.labelPolicy === 'none' ? <p className="muted">A name or label set to Not allowed cannot be shown in the public reader.</p> : null}
-              {layer.titlePolicy === 'optional' && layer.showTitle && layer.presentation !== 'concatenated' ? <p className="muted">Untitled units place a visible label before their text.</p> : null}
-              <Select label="Label placement" info={{ description: 'Place literal legal labels before or after a title, inline with text, or as a superscript where supported.', changeability: 'review' }} name={`label-placement-${index}`} value={layer.labelPlacement ?? 'before_title'} disabled={layer.labelPolicy === 'none' || (!layer.showLabel && layer.presentation !== 'concatenated')} onChange={(event) => update(index, { labelPlacement: event.target.value as Layer['labelPlacement'] })}>
-                <option value="before_title" disabled={layer.presentation === 'concatenated'}>Before title</option><option value="after_title" disabled={layer.presentation === 'concatenated' || !layer.showTitle || layer.titlePolicy === 'none'}>After title</option><option value="inline" disabled={index < layers.length - 1 && !layer.allowTextAlongsideChildren}>Inline with text</option>{index === layers.length - 1 ? <option value="superscript">Superscript in text</option> : null}
+              {layer.presentation === 'concatenated' ? <p className="muted"><T value={ui.admin.constitutions.outlineeditor.runningTextHidesKindNamesAndEditorial} /></p> : null}
+              {layer.titlePolicy === 'none' || layer.labelPolicy === 'none' ? <p className="muted"><T value={ui.admin.constitutions.outlineeditor.aNameOrLabelSetToNot} /></p> : null}
+              {layer.titlePolicy === 'optional' && layer.showTitle && layer.presentation !== 'concatenated' ? <p className="muted"><T value={ui.admin.constitutions.outlineeditor.untitledUnitsPlaceAVisibleLabelBefore} /></p> : null}
+              <Select label={<T value={ui.attrs.adminConstitutionsOutlineeditorSelectLabelLabel} />} info={{ description: 'Place literal legal labels before or after a title, inline with text, or as a superscript where supported.', changeability: 'review' }} name={`label-placement-${index}`} value={layer.labelPlacement ?? 'before_title'} disabled={layer.labelPolicy === 'none' || (!layer.showLabel && layer.presentation !== 'concatenated')} onChange={(event) => update(index, { labelPlacement: event.target.value as Layer['labelPlacement'] })}>
+                <option value="before_title" disabled={layer.presentation === 'concatenated'}><T value={ui.admin.constitutions.outlineeditor.beforeTitle} /></option><option value="after_title" disabled={layer.presentation === 'concatenated' || !layer.showTitle || layer.titlePolicy === 'none'}><T value={ui.admin.constitutions.outlineeditor.afterTitle} /></option><option value="inline" disabled={index < layers.length - 1 && !layer.allowTextAlongsideChildren}><T value={ui.admin.constitutions.outlineeditor.inlineWithText} /></option>{index === layers.length - 1 ? <option value="superscript"><T value={ui.admin.constitutions.outlineeditor.superscriptInText} /></option> : null}
               </Select>
-              {!layer.showLabel && layer.presentation !== 'concatenated' ? <p className="muted">Show literal legal label to choose its placement.</p> : null}
+              {!layer.showLabel && layer.presentation !== 'concatenated' ? <p className="muted"><T value={ui.admin.constitutions.outlineeditor.showLiteralLegalLabelToChooseIts} /></p> : null}
             </fieldset>
             {index > 0 ? (
               <span className="setting-inline"><Button type="button" onClick={() => removeLayer(index)}>
-                Remove level
-              </Button><SettingInfo label="Remove level" description="Remove this structural level from the draft. Later structural changes require an impact check and may need a reviewed successor." changeability="review" /></span>
+                <T value={ui.admin.constitutions.outlineeditor.removeLevel} />{" "}</Button><SettingInfo label="Remove level" description="Remove this structural level from the draft. Later structural changes require an impact check and may need a reviewed successor." changeability="review" /></span>
             ) : null}
           </li>
         ))}
       </ol>}
       <aside className="card outline-live-preview" aria-label="Live order example">
         <h2>{sampleRoots.length ? 'Proposed source sample' : 'Live order example'}</h2>
-        <p className="muted">Parent text is unnumbered and belongs to its parent. Editor view scopes are selected separately in the editor.</p>
-        <h3>Structure map</h3>
+        <p className="muted"><T value={ui.admin.constitutions.outlineeditor.parentTextIsUnnumberedAndBelongsTo} /></p>
+        <h3><T value={ui.admin.constitutions.outlineeditor.structureMap} /></h3>
         {(sampleRoots.length ? sampleRoots : example).map(node => <ExampleMap key={node.occurrenceId} node={node} outline={exampleOutline} />)}
-        <h3>Reader preview</h3>
+        <h3><T value={ui.admin.constitutions.outlineeditor.readerPreview} /></h3>
         <OrderedContentTree entries={(sampleRoots.length ? sampleRoots : example).map(node => ({ type: 'child' as const, node }))} outline={exampleOutline} />
-        {constitutionId ? <p>Occupied structure and stricter permissions are checked before saving. Changes requiring migration need a reviewed successor.</p> : null}
+        {constitutionId ? <p><T value={ui.admin.constitutions.outlineeditor.occupiedStructureAndStricterPermissionsAreChecked} /></p> : null}
       </aside>
       </div>
       {guidedCreation && showErrors && outlineError ? <Alert tone="error">{outlineError}</Alert> : null}
-      {impactError ? <Alert tone="error">Impact could not be checked. Retry when the content and draft services are available.</Alert> : null}
-      {submitError ? <Alert tone="error">The constitution could not be saved. Try again.</Alert> : null}
+      {impactError ? <Alert tone="error"><T value={ui.admin.constitutions.outlineeditor.impactCouldNotBeCheckedRetryWhen} /></Alert> : null}
+      {submitError ? <Alert tone="error"><T value={ui.admin.constitutions.outlineeditor.theConstitutionCouldNotBeSavedTry} /></Alert> : null}
       {impact ? <section aria-live="polite" className="card">
         <h2>{impact.classification === 'migration_required' ? 'Reviewed migration required' : 'Safe to save'}</h2>
-        <p>{impact.affectedVersionIds.length} versions and {impact.affectedDraftSessionIds.length} drafts checked. Published structural settings remain pinned; public display changes apply live.</p>
+        <p>{impact.affectedVersionIds.length} <T value={ui.admin.constitutions.outlineeditor.versionsAnd} />{" "}{impact.affectedDraftSessionIds.length} <T value={ui.admin.constitutions.outlineeditor.draftsCheckedPublishedStructuralSettingsRemainPinned} /></p>
         <ul>{impact.reasons.map((reason) => <li key={reason}>{reason}</li>)}{impact.violations.map((violation, index) => <li key={index}>{violation.field}: {violation.message}</li>)}</ul>
       </section> : null}
       <div className="form-row" hidden={guidedCreation && step === 1}>
         {(!guidedCreation || step === 2) ? <Button type="button" onClick={addLayer}>
-          Add deeper layer
-        </Button> : null}
-        {(!guidedCreation || step === 2) ? <Button type="button" onClick={addRootKind}>Add top-level kind</Button> : null}
+          <T value={ui.admin.constitutions.outlineeditor.addDeeperLayer} />{" "}</Button> : null}
+        {(!guidedCreation || step === 2) ? <Button type="button" onClick={addRootKind}><T value={ui.admin.constitutions.outlineeditor.addTopLevelKind} /></Button> : null}
         {(!guidedCreation || step === 2) ? <SettingInfo label="Add deeper layer" description="Add a nested unit level below the existing levels. Later structural changes require an impact check and may need a reviewed successor." changeability="review" /> : null}
-        {(!guidedCreation || step === 2) && layers[layers.length - 1]?.kindCode === 'sentence' ? <p className="muted">New levels are added before the final sentence level.</p> : null}
+        {(!guidedCreation || step === 2) && layers[layers.length - 1]?.kindCode === 'sentence' ? <p className="muted"><T value={ui.admin.constitutions.outlineeditor.newLevelsAreAddedBeforeTheFinal} /></p> : null}
         {constitutionId ? <Button type="button" onClick={checkImpact} disabled={checking}>{checking ? 'Checking impact…' : 'Preview change impact'}</Button> : null}
         {guidedCreation ? <>
-          <Button type="button" onClick={() => { setStep(step === 3 ? 2 : 1); setShowErrors(false); }}>Back</Button>
-          {step === 2 ? <Button type="button" variant="primary" onClick={(event) => { event.preventDefault(); advance(); }}>Continue to review</Button> : <Button variant="primary" data-create="true" disabled={submitting}>{submitting ? 'Creating…' : 'Create constitution'}</Button>}
+          <Button type="button" onClick={() => { setStep(step === 3 ? 2 : 1); setShowErrors(false); }}><T value={ui.admin.constitutions.outlineeditor.back} /></Button>
+          {step === 2 ? <Button type="button" variant="primary" onClick={(event) => { event.preventDefault(); advance(); }}><T value={ui.admin.constitutions.outlineeditor.continueToReview} /></Button> : <Button variant="primary" data-create="true" disabled={submitting}>{submitting ? 'Creating…' : 'Create constitution'}</Button>}
         </> : <Button variant="primary" disabled={submitting || checking || (Boolean(constitutionId) && (!impact || impact.classification === 'migration_required' || impact.currentRevisionId !== settingsRevisionId))}>{submitting ? 'Saving…' : submitLabel}</Button>}
       </div>
     </form>
@@ -397,7 +394,7 @@ function ExampleMap({ node, outline }: { node: OrderedNode; outline: ContentOutl
   return <div className="outline-example-level">
     <strong>{kindByCode(outline, node.kind)?.displayLabel ?? node.kind} {node.label}</strong>
     <ol>{node.content.map((entry, index) => <li key={entry.node?.occurrenceId ?? entry.occurrenceId ?? index}>
-      {entry.type === 'child' && entry.node ? <ExampleMap node={entry.node} outline={outline} /> : <><small>Unnumbered parent text</small> {entry.text}</>}
+      {entry.type === 'child' && entry.node ? <ExampleMap node={entry.node} outline={outline} /> : <><small><T value={ui.admin.constitutions.outlineeditor.unnumberedParentText} /></small> {entry.text}</>}
     </li>)}</ol>
   </div>;
 }

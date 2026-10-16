@@ -1,5 +1,6 @@
 'use client';
 
+import { T, ui } from '../../components/TranslationProvider';
 import { useFormState } from 'react-dom';
 import { Alert, Button, Input } from '../../components/ui';
 import { inviteUserAction, issueResetAction, createServiceTokenAction, rotateServiceTokenAction, type TokenRevealState } from '../../account/actions';
@@ -12,15 +13,15 @@ export function InviteUserForm() {
     <>
       {state.token ? (
         <Alert tone="success">
-          Invite created. If outbound mail is configured, the recipient also received this link. One-time token:{' '}
+          <T value={ui.admin.users.tokenforms.inviteCreatedIfOutboundMailIsConfigured} />{' '}
           <code>{state.token}</code>
         </Alert>
       ) : null}
-      {state.error ? <Alert tone="error">That account action could not be completed.</Alert> : null}
+      {state.error ? <Alert tone="error"><T value={ui.admin.users.tokenforms.thatAccountActionCouldNotBeCompleted} /></Alert> : null}
       <form action={action}>
-        <Input label="Email" id="email" name="email" type="email" required />
-        <Input label="Roles (comma-separated)" id="roles" name="roles" defaultValue="viewer" />
-        <Button variant="primary">Send invite</Button>
+        <Input label={<T value={ui.attrs.adminUsersTokenformsInputLabelEmail} />} id="email" name="email" type="email" required />
+        <Input label={<T value={ui.attrs.adminUsersTokenformsInputLabelRoles} />} id="roles" name="roles" defaultValue="viewer" />
+        <Button variant="primary"><T value={ui.admin.users.tokenforms.sendInvite} /></Button>
       </form>
     </>
   );
@@ -32,14 +33,14 @@ export function IssueResetForm({ userId }: { userId: string }) {
     <>
       {state.token ? (
         <Alert tone="success">
-          Reset token issued. If outbound mail is configured, the user also received this link. One-time token:{' '}
+          <T value={ui.admin.users.tokenforms.resetTokenIssuedIfOutboundMailIs} />{' '}
           <code>{state.token}</code>
         </Alert>
       ) : null}
-      {state.error ? <Alert tone="error">That account action could not be completed.</Alert> : null}
+      {state.error ? <Alert tone="error"><T value={ui.admin.users.tokenforms.thatAccountActionCouldNotBeCompleted} /></Alert> : null}
       <form action={action}>
         <input type="hidden" name="userId" value={userId} />
-        <Button>Issue reset token</Button>
+        <Button><T value={ui.admin.users.tokenforms.issueResetToken} /></Button>
       </form>
     </>
   );
@@ -51,20 +52,20 @@ export function CreateServiceTokenForm() {
     <>
       {state.token ? (
         <Alert tone="success">
-          Token created. Copy it now; it is shown once: <code>{state.token}</code>
+          <T value={ui.admin.users.tokenforms.tokenCreatedCopyItNowItIs} />{" "}<code>{state.token}</code>
         </Alert>
       ) : null}
-      {state.error ? <Alert tone="error">That token action could not be completed.</Alert> : null}
+      {state.error ? <Alert tone="error"><T value={ui.admin.users.tokenforms.thatTokenActionCouldNotBeCompleted} /></Alert> : null}
       <form action={action}>
-        <Input label="Name" id="token-name" name="name" required />
+        <Input label={<T value={ui.attrs.adminUsersTokenformsInputLabelName} />} id="token-name" name="name" required />
         <Input
-          label="Scopes (comma-separated)"
+          label={<T value={ui.attrs.adminUsersTokenformsInputLabelScopes} />}
           id="token-scopes"
           name="scopes"
           defaultValue="catalog:write,content:write"
           required
         />
-        <Button variant="primary">Issue token</Button>
+        <Button variant="primary"><T value={ui.admin.users.tokenforms.issueToken} /></Button>
       </form>
     </>
   );
@@ -76,13 +77,13 @@ export function RotateServiceTokenForm({ tokenId }: { tokenId: string }) {
     <>
       {state.token ? (
         <Alert tone="success">
-          Token rotated. Copy it now; it is shown once: <code>{state.token}</code>
+          <T value={ui.admin.users.tokenforms.tokenRotatedCopyItNowItIs} />{" "}<code>{state.token}</code>
         </Alert>
       ) : null}
-      {state.error ? <Alert tone="error">That token action could not be completed.</Alert> : null}
+      {state.error ? <Alert tone="error"><T value={ui.admin.users.tokenforms.thatTokenActionCouldNotBeCompleted} /></Alert> : null}
       <form action={action}>
         <input type="hidden" name="tokenId" value={tokenId} />
-        <Button>Rotate</Button>
+        <Button><T value={ui.admin.users.tokenforms.rotate} /></Button>
       </form>
     </>
   );

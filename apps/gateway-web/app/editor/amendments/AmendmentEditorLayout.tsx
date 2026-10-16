@@ -1,5 +1,6 @@
 'use client';
 
+import { T, ui } from '../../components/TranslationProvider';
 import { useMemo, useState } from 'react';
 import type { Amendment, ArticleSummary, VersionSummary } from '../../../lib/api';
 import type { AmendmentRevision } from '../../../lib/amendment-editor-api';
@@ -101,7 +102,7 @@ export function AmendmentEditorLayout({
     <div className="workspace amendment-workspace">
       <section className="panel amendment-main">
         {viewingPast ? (
-          <Alert tone="info">Viewing a past revision read-only. Restore to edit, or return to the current draft.</Alert>
+          <Alert tone="info"><T value={ui.editor.amendments.amendmenteditorlayout.viewingAPastRevisionReadOnlyRestore} /></Alert>
         ) : null}
         <AmendmentForm
           key={selectedRevision?.id ?? 'current'}
@@ -124,7 +125,7 @@ export function AmendmentEditorLayout({
         {canPublish && !viewingPast ? (
           <form action="/editor/command" method="post" className="action-bar"><input type="hidden" name="command" value="amendment-publish" />
             <input type="hidden" name="amendmentId" value={amendmentId} />
-            <Button>Publish law</Button>
+            <Button><T value={ui.editor.amendments.amendmenteditorlayout.publishLaw} /></Button>
           </form>
         ) : null}
       </section>

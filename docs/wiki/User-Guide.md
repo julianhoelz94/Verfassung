@@ -38,4 +38,4 @@ Use **About** for source and verification policy, **Impressum** for the publishe
 - Search covers published content; work waiting for review is not public.
 - If a search result does not yet reflect a very recent publication, open the version page directly and try search again after indexing completes.
 
-[[Accounts and editorial work|Editorial-Guide]] · [[Documentation home|Home]]
+[[Accounts and editorial work|Editorial-Guide]] · [[Documentation home|Home]] · [[Deutsch|User-Guide-de]]

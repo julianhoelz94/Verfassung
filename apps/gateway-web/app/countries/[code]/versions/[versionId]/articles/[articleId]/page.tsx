@@ -1,3 +1,4 @@
+import { T, ui } from '../../../../../../components/TranslationProvider';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import { ConstitutionText } from '../../../../../../components/ConstitutionText';
@@ -99,18 +100,17 @@ export default async function ArticlePage(props: ArticlePageProps) {
         actions={
           <>
             <a className="btn" href={`/countries/${country.isoCode}/articles/${encodeURIComponent(article.articleNumber)}`}>
-              History of Article {article.articleNumber}
+              <T value={ui.countries.code.versions.versionid.articles.articleid.page.historyOfArticle} />{" "}{article.articleNumber}
             </a>
             <a className="btn" href={`${permalink}#article-${article.articleNumber}`}>
-              Permalink
-            </a>
+              <T value={ui.countries.code.versions.versionid.articles.articleid.page.permalink} />{" "}</a>
             <PrintLink />
           </>
         }
       />
       <article id={`article-${article.articleNumber}`}>
         {searchParams.error === 'title' ? (
-          <Alert tone="error">The section title could not be saved.</Alert>
+          <Alert tone="error"><T value={ui.countries.code.versions.versionid.articles.articleid.page.theSectionTitleCouldNotBeSaved} /></Alert>
         ) : null}
         {version ? <Provenance version={version} /> : null}
         <ConstitutionText

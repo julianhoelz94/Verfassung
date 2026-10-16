@@ -1,5 +1,6 @@
 'use client';
 
+import { T, ui } from './TranslationProvider';
 import { useEffect, useState } from 'react';
 
 export type TocItem = {
@@ -47,7 +48,7 @@ export function Toc({
 
   return (
     <nav className="toc" aria-label={ariaLabel} id={landmarkId}>
-      <h2>Contents</h2>
+      <h2><T value={ui.components.toc.contents} /></h2>
       <ol>
         {items.map((item) => (
           <li key={item.id}>

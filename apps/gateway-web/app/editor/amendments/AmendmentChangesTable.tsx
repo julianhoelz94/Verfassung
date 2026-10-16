@@ -1,5 +1,6 @@
 'use client';
 
+import { T, ui } from '../../components/TranslationProvider';
 import { useEffect, useMemo, useState } from 'react';
 import { Button, Input, Select } from '../../components/ui';
 import type { AmendmentUnitRef, ArticleSummary, OrderedEntry } from '../../../lib/api';
@@ -148,11 +149,11 @@ export function AmendmentChangesTable({
           const unit = units.find((candidate) => candidate.logicalId === event.target.value);
           updateRow(index, { [key]: unit ?? null });
         }}>
-          <option value="">Select exact unit…</option>
+          <option value=""><T value={ui.editor.amendments.amendmentchangestable.selectExactUnit} /></option>
           {filtered.map((unit) => <option key={unit.logicalId} value={unit.logicalId}>{unit.display}</option>)}
         </Select>
         {row[key]?.text ? <p className="muted">{row[key]?.breadcrumbs?.join(' › ')} — {row[key]?.text}</p> : null}
-        {row[key]?.versionId && row[key]?.versionId !== versionId ? <p className="alert alert-error" role="alert">This selection belongs to another version. Choose a unit from the selected snapshot.</p> : null}
+        {row[key]?.versionId && row[key]?.versionId !== versionId ? <p className="alert alert-error" role="alert"><T value={ui.editor.amendments.amendmentchangestable.thisSelectionBelongsToAnotherVersionChoose} /></p> : null}
       </div>
     );
   }
@@ -163,8 +164,8 @@ export function AmendmentChangesTable({
   return (
     <section className="stack" aria-labelledby="amendment-changes-title">
       <div className="section-header">
-        <h2 className="section-title" id="amendment-changes-title">Changes</h2>
-        {!readOnly ? <Button type="button" size="sm" onClick={addRow}>Add row</Button> : null}
+        <h2 className="section-title" id="amendment-changes-title"><T value={ui.editor.amendments.amendmentchangestable.changes} /></h2>
+        {!readOnly ? <Button type="button" size="sm" onClick={addRow}><T value={ui.editor.amendments.amendmentchangestable.addRow} /></Button> : null}
       </div>
       {error ? <p className="alert alert-error" role="alert">{error}</p> : null}
       <input type="hidden" name="changesJson" value={changesJson} readOnly />
@@ -173,25 +174,25 @@ export function AmendmentChangesTable({
         {rows.map((row, index) => (
           <div key={`change-${index}`} className="panel stack">
             <div className="form-row">
-              <Input id={`change-article-${index}`} name={`changeArticle-${index}`} label="Article" list={datalistId} value={row.articleNumber} disabled={readOnly} onChange={(event) => updateRow(index, { articleNumber: event.target.value })} />
-              <Select id={`change-type-${index}`} name={`changeType-${index}`} label="Change type" value={row.changeType} disabled={readOnly} onChange={(event) => updateRow(index, { changeType: event.target.value })}>
+              <Input id={`change-article-${index}`} name={`changeArticle-${index}`} label={<T value={ui.attrs.editorAmendmentsAmendmentchangestableInputLabelArticle} />} list={datalistId} value={row.articleNumber} disabled={readOnly} onChange={(event) => updateRow(index, { articleNumber: event.target.value })} />
+              <Select id={`change-type-${index}`} name={`changeType-${index}`} label={<T value={ui.attrs.editorAmendmentsAmendmentchangestableSelectLabelChange} />} value={row.changeType} disabled={readOnly} onChange={(event) => updateRow(index, { changeType: event.target.value })}>
                 {CHANGE_TYPES.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
               </Select>
-              <Input id={`change-note-${index}`} name={`changeNote-${index}`} label="Comment on this change" value={row.note} disabled={readOnly} onChange={(event) => updateRow(index, { note: event.target.value })} />
-              {!readOnly ? <Button type="button" size="sm" onClick={() => removeRow(index)}>Remove</Button> : null}
+              <Input id={`change-note-${index}`} name={`changeNote-${index}`} label={<T value={ui.attrs.editorAmendmentsAmendmentchangestableInputLabelComment} />} value={row.note} disabled={readOnly} onChange={(event) => updateRow(index, { note: event.target.value })} />
+              {!readOnly ? <Button type="button" size="sm" onClick={() => removeRow(index)}><T value={ui.editor.amendments.amendmentchangestable.remove} /></Button> : null}
             </div>
             <div className="form-row">{renderPicker(row, index, 'before')}{renderPicker(row, index, 'after')}</div>
             {row.changeType === 'changed' && row.beforeRef && row.afterRef && !sameLogicalUnit(row.beforeRef, row.afterRef) ? (
-              <Input id={`change-link-reason-${index}`} label="Reason for pairing different units" value={row.linkReviewReason ?? ''} disabled={readOnly} required={!readOnly} onChange={(event) => updateRow(index, { linkReviewReason: event.target.value })} />
+              <Input id={`change-link-reason-${index}`} label={<T value={ui.attrs.editorAmendmentsAmendmentchangestableInputLabelReason} />} value={row.linkReviewReason ?? ''} disabled={readOnly} required={!readOnly} onChange={(event) => updateRow(index, { linkReviewReason: event.target.value })} />
             ) : null}
             {row.changeType === 'changed' && row.beforeRef && row.afterRef ? <div className="stack" aria-label="Before and after wording">
-              <p><strong>What changed:</strong> Wording changed in {row.afterRef.label ?? row.articleNumber ?? 'this unit'}.</p>
+              <p><strong><T value={ui.editor.amendments.amendmentchangestable.whatChanged} /></strong> <T value={ui.editor.amendments.amendmentchangestable.wordingChangedIn} />{" "}{row.afterRef.label ?? row.articleNumber ?? 'this unit'}.</p>
               {row.beforeRef.text ? <p><del>{row.beforeRef.text}</del></p> : null}
               {row.afterRef.text ? <p><ins>{row.afterRef.text}</ins></p> : null}
             </div> : null}
-            {row.changeType === 'added' && row.afterRef ? <div className="stack"><p><strong>What changed:</strong> Added {row.afterRef.label ?? row.articleNumber ?? 'this unit'}.</p>{row.afterRef.text ? <p><ins>{row.afterRef.text}</ins></p> : null}</div> : null}
-            {row.changeType === 'removed' && row.beforeRef ? <div className="stack"><p><strong>What changed:</strong> Removed {row.beforeRef.label ?? row.articleNumber ?? 'this unit'}.</p>{row.beforeRef.text ? <p><del>{row.beforeRef.text}</del></p> : null}</div> : null}
-            {row.legacyLinkUnresolved ? <p className="muted" role="status">This older change has no verified exact unit link.</p> : null}
+            {row.changeType === 'added' && row.afterRef ? <div className="stack"><p><strong><T value={ui.editor.amendments.amendmentchangestable.whatChanged} /></strong> <T value={ui.editor.amendments.amendmentchangestable.added} />{" "}{row.afterRef.label ?? row.articleNumber ?? 'this unit'}.</p>{row.afterRef.text ? <p><ins>{row.afterRef.text}</ins></p> : null}</div> : null}
+            {row.changeType === 'removed' && row.beforeRef ? <div className="stack"><p><strong><T value={ui.editor.amendments.amendmentchangestable.whatChanged} /></strong> <T value={ui.editor.amendments.amendmentchangestable.removed} />{" "}{row.beforeRef.label ?? row.articleNumber ?? 'this unit'}.</p>{row.beforeRef.text ? <p><del>{row.beforeRef.text}</del></p> : null}</div> : null}
+            {row.legacyLinkUnresolved ? <p className="muted" role="status"><T value={ui.editor.amendments.amendmentchangestable.thisOlderChangeHasNoVerifiedExact} /></p> : null}
           </div>
         ))}
       </div>

@@ -1,5 +1,6 @@
 'use client';
 
+import { T, ui } from '../components/TranslationProvider';
 import { useMemo, useState } from 'react';
 import { Button, Input, TextArea } from '../components/ui';
 import type { ChangeRecordChange, ChangeRecordUnitRef } from '../../lib/editor-api';
@@ -117,10 +118,10 @@ export function PublishForm({ sessionId, versionId, articleId, hopKind, status, 
         if (!unit) return;
         updateChange(index, { [field]: unit.ref, articleId: unit.articleId, articleNumber: unit.articleNumber });
       }}>
-        <option value="">Select exact unit…</option>
+        <option value=""><T value={ui.editor.publishform.selectExactUnit} /></option>
         {visible.map((unit) => <option key={unit.logicalId} value={unit.logicalId}>{unit.display}</option>)}
       </select>
-      {selected ? <p className="muted">Selected: {selected.display}</p> : null}
+      {selected ? <p className="muted"><T value={ui.editor.publishform.selected} />{" "}{selected.display}</p> : null}
     </div>;
   }
   return (
@@ -131,31 +132,31 @@ export function PublishForm({ sessionId, versionId, articleId, hopKind, status, 
           <input type="hidden" name="command" value="details" />
           {fields}
           {hopKind === 'legal' ? <>
-            <Input id="recordTitle" name="recordTitle" label="Title" defaultValue={record?.title ?? ''} required />
-            <TextArea id="recordComment" name="recordComment" label="Comment" defaultValue={record?.comment ?? ''} required rows={3} />
-            <Input id="documentUrl" name="documentUrl" label="Document URL" defaultValue={record?.documents[0]?.url ?? ''} required type="url" />
-            <Input id="documentLabel" name="documentLabel" label="Document label" defaultValue={record?.documents[0]?.label ?? ''} />
-            {structuredDraft ? <fieldset className="stack"><legend>Exact constitutional units</legend>
-              <p className="muted">Choose the source unit and draft unit for each change. Draft unit identities are resolved to the published snapshot after the legal version is created.</p>
+            <Input id="recordTitle" name="recordTitle" label={<T value={ui.attrs.editorPublishformInputLabelTitle} />} defaultValue={record?.title ?? ''} required />
+            <TextArea id="recordComment" name="recordComment" label={<T value={ui.attrs.editorPublishformTextAreaLabelComment} />} defaultValue={record?.comment ?? ''} required rows={3} />
+            <Input id="documentUrl" name="documentUrl" label={<T value={ui.attrs.editorPublishformInputLabelDocumentURL} />} defaultValue={record?.documents[0]?.url ?? ''} required type="url" />
+            <Input id="documentLabel" name="documentLabel" label={<T value={ui.attrs.editorPublishformInputLabelDocumentLabel} />} defaultValue={record?.documents[0]?.label ?? ''} />
+            {structuredDraft ? <fieldset className="stack"><legend><T value={ui.editor.publishform.exactConstitutionalUnits} /></legend>
+              <p className="muted"><T value={ui.editor.publishform.chooseTheSourceUnitAndDraftUnit} /></p>
           <input type="hidden" name="changesJson" value={JSON.stringify(changes)} readOnly />
               {changes.map((row, index) => <div className="panel stack" key={`publish-change-${index}`}>
                 <div className="form-row">
-                  <label htmlFor={`publish-${index}-type`}>Change type</label>
+                  <label htmlFor={`publish-${index}-type`}><T value={ui.editor.publishform.changeType} /></label>
                   <select id={`publish-${index}-type`} value={row.changeType} onChange={(event) => updateChange(index, { changeType: event.target.value as ChangeRecordChange['changeType'] })}>
-                    <option value="changed">Changed</option><option value="added">Added</option><option value="removed">Removed</option>
+                    <option value="changed"><T value={ui.editor.publishform.changed} /></option><option value="added"><T value={ui.editor.publishform.added} /></option><option value="removed"><T value={ui.editor.publishform.removed} /></option>
                   </select>
-                  <Input id={`publish-${index}-note`} label="Comment on this change" value={row.note ?? ''} onChange={(event) => updateChange(index, { note: event.target.value })} />
-                  <Button type="button" onClick={() => setChanges((current) => current.length > 1 ? current.filter((_, rowIndex) => rowIndex !== index) : [newChange()])}>Remove</Button>
+                  <Input id={`publish-${index}-note`} label={<T value={ui.attrs.editorPublishformInputLabelCommentOn} />} value={row.note ?? ''} onChange={(event) => updateChange(index, { note: event.target.value })} />
+                  <Button type="button" onClick={() => setChanges((current) => current.length > 1 ? current.filter((_, rowIndex) => rowIndex !== index) : [newChange()])}><T value={ui.editor.publishform.remove} /></Button>
                 </div>
                 <div className="form-row">{picker(row, index, 'before')}{picker(row, index, 'after')}</div>
-                {row.changeType === 'changed' && row.beforeRef && row.afterRef && row.beforeRef.logicalId !== row.afterRef.logicalId ? <Input id={`publish-${index}-reason`} label="Reason for pairing different units" required value={row.linkReviewReason ?? ''} onChange={(event) => updateChange(index, { linkReviewReason: event.target.value })} /> : null}
+                {row.changeType === 'changed' && row.beforeRef && row.afterRef && row.beforeRef.logicalId !== row.afterRef.logicalId ? <Input id={`publish-${index}-reason`} label={<T value={ui.attrs.editorPublishformInputLabelReasonFor} />} required value={row.linkReviewReason ?? ''} onChange={(event) => updateChange(index, { linkReviewReason: event.target.value })} /> : null}
               </div>)}
-              <Button type="button" onClick={() => setChanges((current) => [...current, newChange()])}>Add change</Button>
+              <Button type="button" onClick={() => setChanges((current) => [...current, newChange()])}><T value={ui.editor.publishform.addChange} /></Button>
             </fieldset> : null}
           </> : (
-            <TextArea id="comment" name="comment" label="What was corrected in this transcription?" defaultValue={comment ?? ''} required rows={3} />
+            <TextArea id="comment" name="comment" label={<T value={ui.attrs.editorPublishformTextAreaLabelWhatWas} />} defaultValue={comment ?? ''} required rows={3} />
           )}
-          <Button>Save {hopKind === 'legal' ? 'change record' : 'comment'}</Button>
+          <Button><T value={ui.editor.publishform.save} />{" "}{hopKind === 'legal' ? 'change record' : 'comment'}</Button>
         </form>
       ) : (
         hopKind === 'legal' && record ? (

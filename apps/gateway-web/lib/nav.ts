@@ -1,3 +1,5 @@
+import { ui, type UiMessage } from './messages';
+
 export type NavUser = {
   email: string;
   roles: string[];
@@ -6,21 +8,23 @@ export type NavUser = {
 export type NavLink = {
   href: string;
   label: string;
+  message?: UiMessage;
   badgeCount?: number;
 };
 
 export type MenuSection = {
   id: 'identity' | 'primary' | 'editorial' | 'admin' | 'account';
   heading?: string;
+  headingMessage?: UiMessage;
   phoneOnly?: boolean;
   identity?: { email: string; roles: string[] };
   links: NavLink[];
 };
 
 const PUBLIC_LINKS: NavLink[] = [
-  { href: '/', label: 'Countries' },
-  { href: '/search', label: 'Search' },
-  { href: '/about', label: 'About' },
+  { href: '/', label: 'Countries', message: ui.nav.countries },
+  { href: '/search', label: 'Search', message: ui.nav.search },
+  { href: '/about', label: 'About', message: ui.nav.about },
 ];
 
 export function canVisitEditor(roles: string[]): boolean {
@@ -41,13 +45,13 @@ export function primaryNavLinks(user: NavUser | null, apiDocsAvailable = false, 
     return links;
   }
   if (canVisitEditor(user.roles)) {
-    links.push({ href: '/editor', label: 'Editor' });
+    links.push({ href: '/editor', label: 'Editor', message: ui.nav.editor });
   }
   if (canVisitAdmin(user.roles)) {
-    links.push({ href: '/admin', label: 'Admin' });
+    links.push({ href: '/admin', label: 'Admin', message: ui.nav.admin });
   }
   if (apiDocsAvailable && canVisitApiDocs(user.roles)) {
-    links.push({ href: '/api-docs', label: 'API docs' });
+    links.push({ href: '/api-docs', label: 'API docs', message: ui.nav.apiDocs });
   }
   return links;
 }
@@ -59,28 +63,28 @@ export function editorialLinks(roles: string[], needsReviewCount = 0): NavLink[]
   const isReviewer = isAdmin || roles.includes('reviewer');
   const isPublisher = isAdmin || roles.includes('publisher');
   if (isEditor) {
-    links.push({ href: '/editor?mine=1', label: 'My sessions' });
+    links.push({ href: '/editor?mine=1', label: 'My sessions', message: ui.nav.mySessions });
   }
   if (isEditor || isReviewer) {
-    links.push({ href: '/editor?status=reviewing', label: 'Review queue' });
+    links.push({ href: '/editor?status=reviewing', label: 'Review queue', message: ui.nav.reviewQueue });
   }
   if (isPublisher) {
-    links.push({ href: '/editor?status=approved', label: 'Ready to publish' });
+    links.push({ href: '/editor?status=approved', label: 'Ready to publish', message: ui.nav.readyToPublish });
   }
   if (isEditor || isReviewer || isPublisher) {
-    links.push({ href: '/editor/documents', label: 'Documents' });
-    links.push({ href: '/editor/amendments', label: 'Legal changes', badgeCount: needsReviewCount || undefined });
-    links.push({ href: '/editor/history', label: 'Snapshot history' });
+    links.push({ href: '/editor/documents', label: 'Documents', message: ui.nav.documents });
+    links.push({ href: '/editor/amendments', label: 'Legal changes', message: ui.nav.legalChanges, badgeCount: needsReviewCount || undefined });
+    links.push({ href: '/editor/history', label: 'Snapshot history', message: ui.nav.snapshotHistory });
   }
   return links;
 }
 
 export function adminLinks(): NavLink[] {
   return [
-    { href: '/admin/users', label: 'Users' },
-    { href: '/admin/anonymous-browsing', label: 'Anonymous browsing' },
-    { href: '/admin/constitutions', label: 'Outlines' },
-    { href: '/admin/import', label: 'Import' },
+    { href: '/admin/users', label: 'Users', message: ui.nav.users },
+    { href: '/admin/anonymous-browsing', label: 'Anonymous browsing', message: ui.nav.anonymousBrowsing },
+    { href: '/admin/constitutions', label: 'Outlines', message: ui.nav.outlines },
+    { href: '/admin/import', label: 'Import', message: ui.nav.import },
   ];
 }
 
@@ -96,38 +100,38 @@ export function menuSections(user: NavUser | null, apiDocsAvailable = false, nee
   const barLinks = primaryNavLinks(user, apiDocsAvailable, anonymousBrowsingAllowed).filter((link) => link.href !== '/api-docs');
   sections.push({
     id: 'primary',
-    heading: 'Navigate',
+    heading: 'Navigate', headingMessage: ui.nav.navigate,
     phoneOnly: true,
     links: barLinks,
   });
   if (user && canVisitEditor(user.roles)) {
     sections.push({
       id: 'editorial',
-      heading: 'Editorial',
+      heading: 'Editorial', headingMessage: ui.nav.editorial,
       links: editorialLinks(user.roles, needsReviewCount),
     });
   }
   if (user && canVisitAdmin(user.roles)) {
     const links = [...adminLinks()];
     if (apiDocsAvailable) {
-      links.push({ href: '/api-docs', label: 'API docs' });
+      links.push({ href: '/api-docs', label: 'API docs', message: ui.nav.apiDocs });
     }
     sections.push({
       id: 'admin',
-      heading: 'Admin',
+      heading: 'Admin', headingMessage: ui.nav.admin,
       links,
     });
   }
   if (user) {
     sections.push({
       id: 'account',
-      heading: 'Account',
-      links: [{ href: '/account', label: 'Account' }, { href: '/account#mcp-keys', label: 'MCP keys' }],
+      heading: 'Account', headingMessage: ui.nav.account,
+      links: [{ href: '/account', label: 'Account', message: ui.nav.account }, { href: '/account#mcp-keys', label: 'MCP keys', message: ui.nav.mcpKeys }],
     });
   } else {
     sections.push({
       id: 'account',
-      links: [{ href: '/login', label: 'Log in' }],
+      links: [{ href: '/login', label: 'Log in', message: ui.nav.logIn }],
     });
   }
   return sections.filter((section) => section.identity || section.links.length > 0);

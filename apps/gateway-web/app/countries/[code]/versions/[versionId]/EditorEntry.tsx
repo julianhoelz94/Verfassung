@@ -1,3 +1,4 @@
+import { T, ui } from '../../../../components/TranslationProvider';
 import { listAllSessions, type EditSessionSummary } from '../../../../../lib/editor-api';
 
 type SessionWithVersion = { session: EditSessionSummary; versionLabel: string };
@@ -44,26 +45,26 @@ export async function EditorEntry({ versions, viewedVersionId, viewedVersionLabe
   const waiting = sessions.filter(({ session }) => session.status === 'reviewing' || session.status === 'approved');
 
   return <section id="editor-entry" className="card editor-entry" aria-labelledby="editor-entry-title">
-    <h2 id="editor-entry-title">Edit this constitution</h2>
-    {unavailable ? <p role="status">Edit sessions are temporarily unavailable. Try again before starting a new session.</p> : <>
+    <h2 id="editor-entry-title"><T value={ui.countries.code.versions.versionid.editorentry.editThisConstitution} /></h2>
+    {unavailable ? <p role="status"><T value={ui.countries.code.versions.versionid.editorentry.editSessionsAreTemporarilyUnavailableTryAgain} /></p> : <>
       <section aria-labelledby="existing-sessions-title">
-        <h3 id="existing-sessions-title">Existing sessions</h3>
+        <h3 id="existing-sessions-title"><T value={ui.countries.code.versions.versionid.editorentry.existingSessions} /></h3>
         {open.length ? <ul className="editor-entry-list">{open.map(({ session, versionLabel }) => <li key={session.id}>
-          <span>{versionLabel} · {workType(session.hopKind)} · Last edited {lastEdit(session.updatedAt)}</span>
-          <a className="btn btn-sm" href={sessionHref(session)}>Continue editing</a>
-        </li>)}</ul> : <p className="muted">You have no open sessions for this constitution.</p>}
-        {waiting.length ? <div className="editor-entry-waiting"><h4>In review or approved</h4><ul>{waiting.map(({ session, versionLabel }) => <li key={session.id}>
+          <span>{versionLabel} · {workType(session.hopKind)} <T value={ui.countries.code.versions.versionid.editorentry.lastEdited} />{" "}{lastEdit(session.updatedAt)}</span>
+          <a className="btn btn-sm" href={sessionHref(session)}><T value={ui.countries.code.versions.versionid.editorentry.continueEditing} /></a>
+        </li>)}</ul> : <p className="muted"><T value={ui.countries.code.versions.versionid.editorentry.youHaveNoOpenSessionsForThis} /></p>}
+        {waiting.length ? <div className="editor-entry-waiting"><h4><T value={ui.countries.code.versions.versionid.editorentry.inReviewOrApproved} /></h4><ul>{waiting.map(({ session, versionLabel }) => <li key={session.id}>
           {versionLabel} · {workType(session.hopKind)} · {session.status}
-          {session.status === 'reviewing' && canReview || session.status === 'approved' && canPublish ? <> · <a href={sessionHref(session)}>Open {session.status === 'reviewing' ? 'review' : 'publish'} view</a></> : null}
+          {session.status === 'reviewing' && canReview || session.status === 'approved' && canPublish ? <> · <a href={sessionHref(session)}><T value={ui.countries.code.versions.versionid.editorentry.open} />{" "}{session.status === 'reviewing' ? 'review' : 'publish'} <T value={ui.countries.code.versions.versionid.editorentry.view} /></a></> : null}
         </li>)}</ul></div> : null}
       </section>
       <section aria-labelledby="new-session-title">
-        <h3 id="new-session-title">Start a new session</h3>
-        <p className="muted">Source version: {viewedVersionLabel}</p>
+        <h3 id="new-session-title"><T value={ui.countries.code.versions.versionid.editorentry.startANewSession} /></h3>
+        <p className="muted"><T value={ui.countries.code.versions.versionid.editorentry.sourceVersion} />{" "}{viewedVersionLabel}</p>
         {([['legal', 'Record the next legal change', allowLegalStart], ['editorial_correction', 'Correct this text', true]] as const).map(([kind, label, allowed]) => {
           if (!allowed) return null;
           const existing = sessions.find(({ session }) => session.versionId === viewedVersionId && session.hopKind === kind);
-          if (existing) return <p key={kind}>{label}: {existing.session.status === 'open' ? <a href={sessionHref(existing.session)}>Continue your open session</a> : `Already ${existing.session.status}. Open its workflow above when your role permits.`}</p>;
+          if (existing) return <p key={kind}>{label}: {existing.session.status === 'open' ? <a href={sessionHref(existing.session)}><T value={ui.countries.code.versions.versionid.editorentry.continueYourOpenSession} /></a> : `Already ${existing.session.status}. Open its workflow above when your role permits.`}</p>;
           return <form key={kind} action="/editor/command" method="post">
             <input type="hidden" name="command" value="open" />
             <input type="hidden" name="versionId" value={viewedVersionId} />

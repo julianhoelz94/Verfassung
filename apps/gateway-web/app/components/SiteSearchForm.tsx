@@ -1,3 +1,4 @@
+import { T, ui } from './TranslationProvider';
 type SiteSearchFormProps = {
   id: string;
   className?: string;
@@ -40,8 +41,7 @@ export function SiteSearchForm({
       </label>
       <input id={inputId} type="search" name="q" placeholder={placeholder ?? fieldLabel} />
       <button type="submit" className={submitVisible ? submitClassName : 'visually-hidden'}>
-        Search
-      </button>
+        <T value={ui.components.sitesearchform.search} />{" "}</button>
     </form>
   );
 }

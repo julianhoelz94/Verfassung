@@ -1,5 +1,6 @@
 'use client';
 
+import { T, ui } from '../components/TranslationProvider';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '../components/ui';
@@ -28,7 +29,7 @@ export function PasskeyLoginEnrollment() {
   }
 
   return <div>
-    <Button type="button" onClick={enroll} disabled={busy}>Set up a passkey instead</Button>
+    <Button type="button" onClick={enroll} disabled={busy}><T value={ui.passkeys.passkeyloginenrollment.setUpAPasskeyInstead} /></Button>
     {error ? <p role="alert">{error}</p> : null}
   </div>;
 }

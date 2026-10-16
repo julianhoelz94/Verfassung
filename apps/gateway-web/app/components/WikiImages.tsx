@@ -1,3 +1,4 @@
+import { T, ui } from './TranslationProvider';
 import type { WikiImage } from '../../lib/api';
 
 export function WikiImages({ images, preview = false }: { images: WikiImage[]; preview?: boolean }) {
@@ -18,7 +19,7 @@ export function WikiImages({ images, preview = false }: { images: WikiImage[]; p
               {image.caption}
               {image.credit ? ` · ${image.credit}` : null}
               {image.rights ? ` · ${image.rights}` : null}
-              {image.sourceUrl ? <> · <a href={image.sourceUrl}>Source</a></> : null}
+              {image.sourceUrl ? <> · <a href={image.sourceUrl}><T value={ui.components.wikiimages.source} /></a></> : null}
             </figcaption>
           ) : null}
         </figure>

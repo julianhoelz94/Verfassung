@@ -1,5 +1,6 @@
 'use client';
 
+import { T, ui } from '../../components/TranslationProvider';
 import { useState } from 'react';
 import { Input, Select } from '../../components/ui';
 import type { CountrySummary } from '../../../lib/api';
@@ -14,7 +15,7 @@ export function ConstitutionCountryFields({ countries, onCountryChange }: { coun
   return (
     <>
       <Select
-        label="Country"
+        label={<T value={ui.attrs.adminConstitutionsConstitutioncountryfieldsSelectLabelCountry} />}
         info={{ description: 'Choose the country that this constitution belongs to, or create a new country.', changeability: 'once' }}
         name="countryChoice"
         value={choice}
@@ -25,12 +26,12 @@ export function ConstitutionCountryFields({ countries, onCountryChange }: { coun
             {country.name} ({country.isoCode})
           </option>
         ))}
-        <option value={NEW_COUNTRY}>New country</option>
+        <option value={NEW_COUNTRY}><T value={ui.admin.constitutions.constitutioncountryfields.newCountry} /></option>
       </Select>
       {isNew ? (
         <>
           <Input
-            label="Country code"
+            label={<T value={ui.attrs.adminConstitutionsConstitutioncountryfieldsInputLabelCountry} />}
             info={{ description: 'The two-letter country code used in public links and listings.', changeability: 'once' }}
             name="isoCode"
             required
@@ -43,7 +44,7 @@ export function ConstitutionCountryFields({ countries, onCountryChange }: { coun
             value={isoCode}
             onChange={(event) => setIsoCode(event.target.value.toUpperCase())}
           />
-          <Input label="Country name" info={{ description: 'The public name shown on the country page and in selectors.', changeability: 'once' }} name="countryName" required autoComplete="off" placeholder="France" />
+          <Input label={<T value={ui.attrs.adminConstitutionsConstitutioncountryfieldsInputLabelCountry2} />} info={{ description: 'The public name shown on the country page and in selectors.', changeability: 'once' }} name="countryName" required autoComplete="off" placeholder="France" />
         </>
       ) : (
         <input type="hidden" name="isoCode" value={choice} />

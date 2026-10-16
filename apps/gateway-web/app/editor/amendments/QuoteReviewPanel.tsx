@@ -1,3 +1,4 @@
+import { T, ui } from '../../components/TranslationProvider';
 import type { Amendment, VersionSummary } from '../../../lib/api';
 import type { AmendmentRevision } from '../../../lib/amendment-editor-api';
 import { Badge, Button } from '../../components/ui';
@@ -24,11 +25,11 @@ function QuoteSide({ label, reviewed, live, contentByVersion }: { label: string;
   return (
     <section className="panel quote-review-side">
       <h2 className="panel-title">{label}</h2>
-      <p><strong>Last reviewed</strong><br />{reviewed?.versionLabel ?? 'No quoted snapshot'}</p>
-      <p><strong>Live tip</strong><br />{live?.versionLabel ?? 'No quoted snapshot'}</p>
-      {reviewed && live && reviewed.id !== live.id ? <Badge tone="changed">Updated since review</Badge> : <Badge tone="added">Current</Badge>}
-      {reviewed ? <details><summary>Last-reviewed constitutional text</summary><ul>{(contentByVersion[reviewed.id] ?? []).map((text) => <li key={text}>{text}</li>)}</ul></details> : null}
-      {live && live.id !== reviewed?.id ? <details><summary>Live constitutional text</summary><ul>{(contentByVersion[live.id] ?? []).map((text) => <li key={text}>{text}</li>)}</ul></details> : null}
+      <p><strong><T value={ui.editor.amendments.quotereviewpanel.lastReviewed} /></strong><br />{reviewed?.versionLabel ?? 'No quoted snapshot'}</p>
+      <p><strong><T value={ui.editor.amendments.quotereviewpanel.liveTip} /></strong><br />{live?.versionLabel ?? 'No quoted snapshot'}</p>
+      {reviewed && live && reviewed.id !== live.id ? <Badge tone="changed"><T value={ui.editor.amendments.quotereviewpanel.updatedSinceReview} /></Badge> : <Badge tone="added"><T value={ui.editor.amendments.quotereviewpanel.current} /></Badge>}
+      {reviewed ? <details><summary><T value={ui.editor.amendments.quotereviewpanel.lastReviewedConstitutionalText} /></summary><ul>{(contentByVersion[reviewed.id] ?? []).map((text) => <li key={text}>{text}</li>)}</ul></details> : null}
+      {live && live.id !== reviewed?.id ? <details><summary><T value={ui.editor.amendments.quotereviewpanel.liveConstitutionalText} /></summary><ul>{(contentByVersion[live.id] ?? []).map((text) => <li key={text}>{text}</li>)}</ul></details> : null}
     </section>
   );
 }
@@ -40,11 +41,11 @@ export function QuoteReviewPanel({ amendment, publishedRevision, versions, canCo
   const targetLive = liveVersionFor(target, versions);
   return (
     <section aria-labelledby="quote-review-title">
-      <h2 id="quote-review-title" className="section-title">Flagged record review</h2>
+      <h2 id="quote-review-title" className="section-title"><T value={ui.editor.amendments.quotereviewpanel.flaggedRecordReview} /></h2>
       <div className="quote-review-grid">
         <QuoteSide label="Source" reviewed={source} live={sourceLive} contentByVersion={contentByVersion} />
         <section className="panel quote-review-instrument">
-          <h2 className="panel-title">Instrument</h2>
+          <h2 className="panel-title"><T value={ui.editor.amendments.quotereviewpanel.instrument} /></h2>
           <p><strong>{publishedRevision?.title ?? amendment.title}</strong></p>
           <p>{publishedRevision?.comment ?? amendment.comment ?? 'No reviewer comment.'}</p>
           <ul>
@@ -57,7 +58,7 @@ export function QuoteReviewPanel({ amendment, publishedRevision, versions, canCo
           {canConfirm ? (
             <form action="/editor/command" method="post"><input type="hidden" name="command" value="amendment-confirm" />
               <input type="hidden" name="amendmentId" value={amendment.id} />
-              <Button type="submit">Confirm live quotes and republish</Button>
+              <Button type="submit"><T value={ui.editor.amendments.quotereviewpanel.confirmLiveQuotesAndRepublish} /></Button>
             </form>
           ) : null}
         </section>

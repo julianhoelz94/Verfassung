@@ -9,6 +9,7 @@ export type SessionUser = {
   mfaEnabled?: boolean;
   mfaRequired?: boolean;
   stepUpFresh?: boolean;
+  languagePreference?: 'auto' | 'en' | 'de';
 };
 
 export type LoginResult = {
@@ -64,6 +65,22 @@ export async function requestMe(
   if (!response.ok) {
     return null;
   }
+  return (await response.json()) as SessionUser;
+}
+
+export async function requestUpdateLanguagePreference(
+  token: string,
+  languagePreference: 'auto' | 'en' | 'de',
+  fetchImpl: FetchLike = fetch,
+  baseUrl: string = identityBaseUrl(),
+): Promise<SessionUser> {
+  const response = await fetchImpl(`${baseUrl}/me/language`, {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ languagePreference }),
+    cache: 'no-store',
+  });
+  if (!response.ok) throw new IdentityApiError('Language preference could not be saved', response.status);
   return (await response.json()) as SessionUser;
 }
 

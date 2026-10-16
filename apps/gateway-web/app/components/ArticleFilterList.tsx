@@ -1,5 +1,6 @@
 'use client';
 
+import { T, ui } from './TranslationProvider';
 import { useMemo, useState } from 'react';
 import { Badge } from './ui';
 
@@ -51,7 +52,7 @@ export function ArticleFilterList({ articles, selectedId, hrefBase, draftIds, un
                 <span>
                   {unitLabel ?? 'Art.'} {article.articleNumber} {article.title}
                 </span>
-                {draftSet.has(article.id) ? <Badge tone="changed">draft</Badge> : null}
+                {draftSet.has(article.id) ? <Badge tone="changed"><T value={ui.components.articlefilterlist.draft} /></Badge> : null}
               </a>
             </li>
           );

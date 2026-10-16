@@ -25,6 +25,7 @@ import {
   requestRotateMcpKey,
   requestRevokeMcpKey,
   requestRevokeOAuthGrant,
+  requestUpdateLanguagePreference,
 } from '../../lib/identity-client';
 import { requireAdminUser } from '../../lib/admin';
 import { safeReturnTo } from '../../lib/return-to';
@@ -55,6 +56,20 @@ export async function changePasswordAction(formData: FormData): Promise<void> {
     redirect('/account?error=1');
   }
   redirect('/account?saved=1');
+}
+
+export async function updateLanguagePreferenceAction(formData: FormData): Promise<void> {
+  const token = await tokenOrRedirect();
+  const preference = String(formData.get('languagePreference') ?? '');
+  if (preference !== 'auto' && preference !== 'en' && preference !== 'de') {
+    redirect('/account?error=language');
+  }
+  try {
+    await requestUpdateLanguagePreference(token, preference);
+  } catch {
+    redirect('/account?error=language');
+  }
+  redirect('/account?languageSaved=1');
 }
 
 export async function requestResetAction(formData: FormData): Promise<void> {

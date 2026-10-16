@@ -1,3 +1,4 @@
+import { T, ui } from '../components/TranslationProvider';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { Alert, Button, Card, Input, PageHeader } from '../components/ui';
@@ -6,10 +7,11 @@ import { requestMcpKeys, requestOAuthGrants, requestPasskeys, requestStartMfaEnr
 import { PasskeyManager } from '../passkeys/PasskeyManager';
 import { SESSION_COOKIE, currentUser, mfaChallengeToken } from '../../lib/session';
 import { ConfirmEnrollForm, RegenerateRecoveryForm } from './MfaForms';
-import { changePasswordAction, revokeMfaAction, startMfaEnrollAction } from './actions';
+import { changePasswordAction, revokeMfaAction, startMfaEnrollAction, updateLanguagePreferenceAction } from './actions';
 import { revokeMcpKeyAction, revokeOAuthGrantAction } from './actions';
 import Image from 'next/image';
 import { CreateMcpKeyForm, RotateMcpKeyForm } from './McpKeyForms';
+import { availableLocales } from '../../lib/locale';
 
 type AccountPageProps = {
   searchParams: Promise<{
@@ -17,6 +19,7 @@ type AccountPageProps = {
     saved?: string;
     enroll?: string;
     mfaRevoked?: string;
+    languageSaved?: string;
   }>;
 };
 
@@ -51,41 +54,60 @@ export default async function AccountPage(props: AccountPageProps) {
   const mcpUrl = new URL('/mcp', process.env.PUBLIC_BASE_URL || 'http://localhost').toString();
   return (
     <PageMain>
-      <PageHeader title="Account" meta={`Signed in as ${user.email}.`} />
+      <PageHeader title={<T value={ui.attrs.accountPagePageHeaderTitleAccount} />} meta={`Signed in as ${user.email}.`} />
       {searchParams.error === 'mfa' ? (
-        <Alert tone="error">Authenticator action failed. Check the code and try again.</Alert>
+        <Alert tone="error"><T value={ui.account.page.authenticatorActionFailedCheckTheCodeAnd} /></Alert>
       ) : searchParams.error === 'oauth' ? (
-        <Alert tone="error">The chat client connection could not be revoked. Try again.</Alert>
+        <Alert tone="error"><T value={ui.account.page.theChatClientConnectionCouldNotBe} /></Alert>
       ) : searchParams.error === 'key' ? (
-        <Alert tone="error">The MCP key could not be changed. Try again.</Alert>
+        <Alert tone="error"><T value={ui.account.page.theMcpKeyCouldNotBeChanged} /></Alert>
+      ) : searchParams.error === 'language' ? (
+        <Alert tone="error"><T value={ui.account.page.languagePreferenceCouldNotBeSaved} /></Alert>
       ) : searchParams.error ? (
-        <Alert tone="error">Password could not be changed. Check the current password and policy.</Alert>
+        <Alert tone="error"><T value={ui.account.page.passwordCouldNotBeChangedCheckThe} /></Alert>
       ) : null}
-      {searchParams.saved ? <Alert tone="success">Password updated.</Alert> : null}
-      {searchParams.mfaRevoked ? <Alert tone="success">Authenticator enrollment was revoked.</Alert> : null}
+      {searchParams.saved ? <Alert tone="success"><T value={ui.account.page.passwordUpdated} /></Alert> : null}
+      {searchParams.mfaRevoked ? <Alert tone="success"><T value={ui.account.page.authenticatorEnrollmentWasRevoked} /></Alert> : null}
+      {searchParams.languageSaved ? <Alert tone="success"><T value={ui.account.page.languagePreferenceSaved} /></Alert> : null}
+      <Card>
+        <section className="account-section" aria-labelledby="language-title">
+          <h2 id="language-title"><T value={ui.account.page.language} /></h2>
+          <p><T value={ui.account.page.chooseTheWebsiteLanguageAutomaticFollowsYour} /></p>
+          <form action={updateLanguagePreferenceAction}>
+            <label htmlFor="languagePreference"><T value={ui.account.page.websiteLanguage} /></label>
+            <select id="languagePreference" name="languagePreference" defaultValue={user.languagePreference ?? 'auto'}>
+              <option value="auto"><T value={ui.account.page.automaticDeviceLanguage} /></option>
+              {availableLocales.map((locale) => (
+                <option value={locale} key={locale}><T value={ui.languageNames[locale]} /></option>
+              ))}
+            </select>
+            <Button variant="primary"><T value={ui.account.page.saveLanguage} /></Button>
+          </form>
+        </section>
+      </Card>
       <Card>
         <section className="account-section" aria-labelledby="authenticator-title">
-        <h2 id="authenticator-title">Authenticator</h2>
+        <h2 id="authenticator-title"><T value={ui.account.page.authenticator} /></h2>
         {user.mfaRequired && !user.mfaEnabled ? (
-          <p>Admin and publisher accounts must enroll an authenticator.</p>
+          <p><T value={ui.account.page.adminAndPublisherAccountsMustEnrollAn} /></p>
         ) : null}
         {enrollRequested && enrollChallenge && enrollSecret ? (
           <>
-            <p>Scan this QR code with Google Authenticator or another TOTP app, then enter its six-digit code.</p>
+            <p><T value={ui.account.page.scanThisQrCodeWithGoogleAuthenticator} /></p>
             {enrollQr ? <Image src={enrollQr} alt="Authenticator setup QR code" width={208} height={208} unoptimized /> : null}
-            <p>If you cannot scan it, enter this setup key in the app: <code>{enrollSecret}</code></p>
-            <p className="muted">The key is shown only during setup. Store the recovery codes you receive after confirming.</p>
+            <p><T value={ui.account.page.ifYouCannotScanItEnterThis} />{" "}<code>{enrollSecret}</code></p>
+            <p className="muted"><T value={ui.account.page.theKeyIsShownOnlyDuringSetup} /></p>
             <ConfirmEnrollForm challengeToken={enrollChallenge} />
           </>
         ) : user.mfaEnabled ? (
           <>
-            <p>Authenticator app is enrolled{user.stepUpFresh ? ' and recently confirmed.' : '.'}</p>
+            <p><T value={ui.account.page.authenticatorAppIsEnrolled} />{user.stepUpFresh ? ' and recently confirmed.' : '.'}</p>
             {user.mfaRequired ? (
-              <p className="muted">Authenticator enrollment is required for this account and cannot be revoked.</p>
+              <p className="muted"><T value={ui.account.page.authenticatorEnrollmentIsRequiredForThisAccount} /></p>
             ) : (
               <form action={revokeMfaAction}>
-                <Input label="Authenticator code" id="revokeCode" name="code" inputMode="numeric" required />
-                <Button>Revoke authenticator</Button>
+                <Input label={<T value={ui.attrs.accountPageInputLabelAuthenticatorCode} />} id="revokeCode" name="code" inputMode="numeric" required />
+                <Button><T value={ui.account.page.revokeAuthenticator} /></Button>
               </form>
             )}
             <RegenerateRecoveryForm />
@@ -93,19 +115,19 @@ export default async function AccountPage(props: AccountPageProps) {
         ) : (
           <>
             {enrollRequested ? (
-              <Alert tone="error">Enrollment could not be started. Try again.</Alert>
+              <Alert tone="error"><T value={ui.account.page.enrollmentCouldNotBeStartedTryAgain} /></Alert>
             ) : null}
             <form action={startMfaEnrollAction}>
-              <Button variant="primary">Enroll authenticator</Button>
+              <Button variant="primary"><T value={ui.account.page.enrollAuthenticator} /></Button>
             </form>
           </>
         )}
         </section>
         <section className="account-section" aria-labelledby="password-title">
-        <h2 id="password-title">Change password</h2>
+        <h2 id="password-title"><T value={ui.account.page.changePassword} /></h2>
         <form action={changePasswordAction}>
           <Input
-            label="Current password"
+            label={<T value={ui.attrs.accountPageInputLabelCurrentPassword} />}
             id="currentPassword"
             name="currentPassword"
             type="password"
@@ -113,7 +135,7 @@ export default async function AccountPage(props: AccountPageProps) {
             required
           />
           <Input
-            label="New password"
+            label={<T value={ui.attrs.accountPageInputLabelNewPassword} />}
             id="newPassword"
             name="newPassword"
             type="password"
@@ -121,33 +143,33 @@ export default async function AccountPage(props: AccountPageProps) {
             required
             minLength={12}
           />
-          <Button variant="primary">Update password</Button>
+          <Button variant="primary"><T value={ui.account.page.updatePassword} /></Button>
         </form>
         </section>
       </Card>
       <Card><PasskeyManager passkeys={passkeys} /></Card>
       <Card>
         <section className="account-section" id="mcp-keys" aria-labelledby="mcp-keys-title">
-          <h2 id="mcp-keys-title">Connect a chat client</h2>
-          <p>Connect an OAuth-capable client to <code>{mcpUrl}</code> and sign in when prompted. Approve read access, or request import access if you have editor rights. Access expires after 15 minutes and can be revoked by the client. You can also create a personal MCP key below for clients that need an Authorization header. Every import remains pending review.</p>
-          <h3>Claude Code example</h3>
-          <p>After copying a key, run this on your computer and replace the placeholder with the key:</p>
+          <h2 id="mcp-keys-title"><T value={ui.account.page.connectAChatClient} /></h2>
+          <p><T value={ui.account.page.connectAnOauthCapableClientTo} />{" "}<code>{mcpUrl}</code> <T value={ui.account.page.andSignInWhenPromptedApproveRead} /></p>
+          <h3><T value={ui.account.page.claudeCodeExample} /></h3>
+          <p><T value={ui.account.page.afterCopyingAKeyRunThisOn} /></p>
           <pre tabIndex={0}><code>{`claude mcp add --transport http constitution-atlas ${mcpUrl} --header "Authorization: Bearer <your-MCP-key>"`}</code></pre>
-          <p><a href="https://code.claude.com/docs/en/mcp">Claude Code MCP setup instructions</a>. Use a client that supports a custom Authorization header for import keys.</p>
+          <p><a href="https://code.claude.com/docs/en/mcp"><T value={ui.account.page.claudeCodeMcpSetupInstructions} /></a><T value={ui.account.page.useAClientThatSupportsACustom} /></p>
           <CreateMcpKeyForm canImport={canImport} />
-          <h3>Connected OAuth clients</h3>
-          {oauthGrants.length === 0 ? <p>No active OAuth connections.</p> : oauthGrants.map((grant) => <div key={grant.clientId}>
-            <strong>{grant.clientName}</strong> · access expires {new Date(grant.expiresAt).toLocaleString()}<br />
-            Client ID: <code>{grant.clientId}</code><br />
-            Registered destinations: {grant.redirectUris.map(uri => { try { return new URL(uri).origin; } catch { return uri; } }).join(', ')}
-            <form action={revokeOAuthGrantAction}><input type="hidden" name="clientId" value={grant.clientId} /><Button>Revoke access</Button></form>
+          <h3><T value={ui.account.page.connectedOauthClients} /></h3>
+          {oauthGrants.length === 0 ? <p><T value={ui.account.page.noActiveOauthConnections} /></p> : oauthGrants.map((grant) => <div key={grant.clientId}>
+            <strong>{grant.clientName}</strong> <T value={ui.account.page.accessExpires} />{" "}{new Date(grant.expiresAt).toLocaleString()}<br />
+            <T value={ui.account.page.clientId} />{" "}<code>{grant.clientId}</code><br />
+            <T value={ui.account.page.registeredDestinations} />{" "}{grant.redirectUris.map(uri => { try { return new URL(uri).origin; } catch { return uri; } }).join(', ')}
+            <form action={revokeOAuthGrantAction}><input type="hidden" name="clientId" value={grant.clientId} /><Button><T value={ui.account.page.revokeAccess} /></Button></form>
           </div>)}
-          <h3>Your MCP keys</h3>
-          {mcpKeys.length === 0 ? <p>No keys yet.</p> : mcpKeys.map((key) => <div key={key.id}>
-            <strong>{key.name}</strong> · {key.scopes.join(', ')} · expires {new Date(key.expiresAt).toLocaleDateString()}
-            {key.revokedAt ? <span> · revoked</span> : <>
+          <h3><T value={ui.account.page.yourMcpKeys} /></h3>
+          {mcpKeys.length === 0 ? <p><T value={ui.account.page.noKeysYet} /></p> : mcpKeys.map((key) => <div key={key.id}>
+            <strong>{key.name}</strong> · {key.scopes.join(', ')} <T value={ui.account.page.expires} />{" "}{new Date(key.expiresAt).toLocaleDateString()}
+            {key.revokedAt ? <span> <T value={ui.account.page.revoked} /></span> : <>
               <RotateMcpKeyForm keyId={key.id} />
-              <form action={revokeMcpKeyAction}><input type="hidden" name="keyId" value={key.id} /><Button>Revoke</Button></form>
+              <form action={revokeMcpKeyAction}><input type="hidden" name="keyId" value={key.id} /><Button><T value={ui.account.page.revoke} /></Button></form>
             </>}
           </div>)}
         </section>

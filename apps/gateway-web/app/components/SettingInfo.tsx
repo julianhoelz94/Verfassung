@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
+import { T, ui } from './TranslationProvider';
+import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 
 export type SettingChangeability = 'once' | 'later' | 'review';
 
@@ -11,7 +12,7 @@ const changeabilityText: Record<SettingChangeability, string> = {
 };
 
 export function SettingInfo({ label, description, changeability, changeNote }: {
-  label: string;
+  label: ReactNode;
   description: string;
   changeability: SettingChangeability;
   changeNote?: string;
@@ -54,7 +55,7 @@ export function SettingInfo({ label, description, changeability, changeNote }: {
 
   return (
     <span className="setting-info" ref={root}>
-      <span id={`${id}-context`} className="visually-hidden">About {label}</span>
+      <span id={`${id}-context`} className="visually-hidden"><T value={ui.components.settinginfo.about} />{" "}{label}</span>
       <button
         type="button"
         className="setting-info-trigger"
@@ -63,7 +64,7 @@ export function SettingInfo({ label, description, changeability, changeNote }: {
         aria-expanded={open}
         aria-controls={open ? id : undefined}
         onClick={() => setOpen((value) => !value)}
-      >i</button>
+      ><T value={ui.components.settinginfo.i} /></button>
       {open ? (
         <span className="setting-info-box" id={id} role="note" ref={box} style={{ left: boxOffset }}>
           <strong>{label}</strong>

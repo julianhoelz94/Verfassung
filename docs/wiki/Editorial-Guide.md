@@ -10,6 +10,10 @@ Your available pages and buttons depend on your assigned roles. Hiding a button 
 4. For a protected publication action, complete the requested fresh MFA **step-up**. A prior login alone may no longer be recent enough.
 5. Use the reset or invitation link sent for your account when setting or recovering a password. Ask an administrator if your role or access is wrong.
 
+### Choose a language
+
+Under **Account → Language**, choose **Automatic (device language)**, **English**, or **Deutsch**. Automatic uses your device or browser language and falls back to English when that language is unavailable. An explicit choice is saved with your account and follows you to other devices. This changes the website interface and guide language, not the wording of published constitutional texts.
+
 ## Role summary
 
 | Role | Main work |
@@ -60,4 +64,4 @@ In **Anonymous browsing**, an administrator can allow or block browsing without 
 
 The **Account → Connect a chat client** section offers OAuth connections and personal MCP keys. Grant only the access your client needs; editor import access stages material for review and cannot publish it. The page shows connected clients and keys, expiration, rotation and revocation controls. Copy a new key when it is shown and keep it private.
 
-For exact permissions, see [editorial roles](https://github.com/julianhoelz94/Verfassung/blob/main/docs/editorial-roles.md). For public reading, see [[Website user guide|User-Guide]].
+For exact permissions, see [editorial roles](https://github.com/julianhoelz94/Verfassung/blob/main/docs/editorial-roles.md). For public reading, see [[Website user guide|User-Guide]]. · [[Deutsch|Editorial-Guide-de]]

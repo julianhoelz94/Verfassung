@@ -410,6 +410,32 @@ class IdentityApiTest {
     }
 
     @Test
+    fun languagePreferencePersistsAcrossSessionsAndRejectsUnsupportedValues() {
+        val first = login("local-viewer@example.local", "change-me")
+        try {
+            mockMvc.put("/me/language") {
+                header("Authorization", "Bearer $first")
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"languagePreference":"de"}"""
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.languagePreference") { value("de") }
+            }
+            mockMvc.put("/me/language") {
+                header("Authorization", "Bearer $first")
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"languagePreference":"fr"}"""
+            }.andExpect { status { isBadRequest() } }
+            val second = login("local-viewer@example.local", "change-me")
+            mockMvc.get("/me") { header("Authorization", "Bearer $second") }.andExpect {
+                jsonPath("$.languagePreference") { value("de") }
+            }
+        } finally {
+            jdbcTemplate.update("UPDATE users SET language_preference = 'auto' WHERE email = ?", "local-viewer@example.local")
+        }
+    }
+
+    @Test
     fun loginReturnsExpiresInSecondsAndRotatesPreviousSession() {
         val first = login("local-editor@example.local", "change-me")
         check(first.length >= 43)

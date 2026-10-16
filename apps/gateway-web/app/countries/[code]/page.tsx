@@ -1,3 +1,4 @@
+import { T, ui } from '../../components/TranslationProvider';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import { PageMain } from '../../components/PageMain';
@@ -88,24 +89,23 @@ export default async function CountryPage(props: CountryPageProps) {
         meta={
           <>
             <span>
-              {country.constitutions.length} constitution
-              {country.constitutions.length === 1 ? '' : 's'}
+              {country.constitutions.length} <T value={ui.countries.code.page.constitution} />{" "}{country.constitutions.length === 1 ? '' : 's'}
             </span>
             <span>
-              {versionTotal} version{versionTotal === 1 ? '' : 's'}
+              {versionTotal} <T value={ui.countries.code.page.version} />{versionTotal === 1 ? '' : 's'}
             </span>
           </>
         }
         actions={
           <>
-            <a className="btn btn-sm" href={`/countries/${country.isoCode}/constitution-timeline`}>Constitution timeline</a>
-            <a className="btn btn-sm" href={`/countries/${country.isoCode}/timeline`}>Amendment timeline</a>
+            <a className="btn btn-sm" href={`/countries/${country.isoCode}/constitution-timeline`}><T value={ui.countries.code.page.constitutionTimeline} /></a>
+            <a className="btn btn-sm" href={`/countries/${country.isoCode}/timeline`}><T value={ui.countries.code.page.amendmentTimeline} /></a>
           </>
         }
       />
       {countryWiki ? (
         <section className="card">
-          <h2>About {country.name}</h2>
+          <h2><T value={ui.countries.code.page.about} />{" "}{country.name}</h2>
           <p>{countryWiki.summary}</p>
           <WikiImages images={countryWiki.images.filter((image) => image.placement === 'before_body')} />
           <WikiBody body={countryWiki.body} />
@@ -114,7 +114,7 @@ export default async function CountryPage(props: CountryPageProps) {
         </section>
       ) : null}
       {showEditorialLinks ? (
-        <p><a href={`/editor/wiki/country/${country.id}?code=${country.isoCode}`}>Edit country page</a></p>
+        <p><a href={`/editor/wiki/country/${country.id}?code=${country.isoCode}`}><T value={ui.countries.code.page.editCountryPage} /></a></p>
       ) : null}
       {country.constitutions.map((constitution) => {
         const publicLine = orderVersions(publicVersions(constitution.versions));
@@ -130,10 +130,10 @@ export default async function CountryPage(props: CountryPageProps) {
               <p>{constitutionWikis.get(constitution.id)?.summary}</p>
             ) : null}
             {showEditorialLinks ? (
-              <p><a href={`/editor/wiki/constitution/${constitution.id}?code=${country.isoCode}`}>Edit constitution page</a></p>
+              <p><a href={`/editor/wiki/constitution/${constitution.id}?code=${country.isoCode}`}><T value={ui.countries.code.page.editConstitutionPage} /></a></p>
             ) : null}
             {canRecordLifecycle ? (
-              <p><a href={`/editor/lifecycle/${constitution.id}?code=${country.isoCode}`}>Record lifecycle event</a></p>
+              <p><a href={`/editor/lifecycle/${constitution.id}?code=${country.isoCode}`}><T value={ui.countries.code.page.recordLifecycleEvent} /></a></p>
             ) : null}
             <p className="muted">
               {constitution.interim ? 'Interim constitution · ' : ''}
@@ -145,7 +145,7 @@ export default async function CountryPage(props: CountryPageProps) {
             </p>
             {constitution.contentOutline && constitution.contentOutline.kinds.length > 0 ? (
               <p className="muted">
-                Structure:{' '}
+                <T value={ui.countries.code.page.structure} />{' '}
                 {constitution.contentOutline.kinds.map((kind) => kind.displayLabel).join(' → ')}
               </p>
             ) : null}
@@ -162,37 +162,33 @@ export default async function CountryPage(props: CountryPageProps) {
             </div>
             <div className="card-actions">
               <a className="btn btn-sm" href={`/countries/${country.isoCode}/timeline`}>
-                Timeline
-              </a>
+                <T value={ui.countries.code.page.timeline} />{" "}</a>
               {showEditorialLinks ? (
                 <a
                   className="btn btn-sm btn-ghost"
                   href={`/editor/history?constitutionId=${encodeURIComponent(constitution.id)}`}
                 >
-                  Version history
-                </a>
+                  <T value={ui.countries.code.page.versionHistory} />{" "}</a>
               ) : null}
               {tipId ? (
                 <a className="btn btn-sm btn-ghost" href={`/countries/${country.isoCode}/versions/${tipId}`}>
-                  Read latest
-                </a>
+                  <T value={ui.countries.code.page.readLatest} />{" "}</a>
               ) : null}
               {previousPublic && newestPublic ? (
                 <a
                   className="btn btn-sm btn-ghost"
                   href={`/countries/${country.isoCode}/compare?from=${previousPublic.id}&to=${newestPublic.id}`}
                 >
-                  Compare
-                </a>
+                  <T value={ui.countries.code.page.compare} />{" "}</a>
               ) : null}
             </div>
             {(documentsByConstitution.get(constitution.id) ?? []).length ? <div>
-              <h3>Documents</h3>
+              <h3><T value={ui.countries.code.page.documents} /></h3>
               <ul className="link-list">{(documentsByConstitution.get(constitution.id) ?? []).map((link) => <li key={link.documentId}>
                 <a href={`/documents/${link.documentId}${link.revisionId ? `?revision=${link.document.revision.revision}` : ''}`}>{link.document.revision.title}</a>
               </li>)}</ul>
             </div> : null}
-            <h3 className="country-compare-heading">Compare versions</h3>
+            <h3 className="country-compare-heading"><T value={ui.countries.code.page.compareVersions} /></h3>
             <CompareForm code={country.isoCode} versions={publicLine} variant="inline" />
           </section>
         );

@@ -1,3 +1,4 @@
+import { T, ui } from '../components/TranslationProvider';
 import { redirect } from 'next/navigation';
 import { Alert, Button, Card, Input, PageHeader } from '../components/ui';
 import { PageMain } from '../components/PageMain';
@@ -27,16 +28,11 @@ export default async function LoginPage(props: LoginPageProps) {
   return (
     <PageMain>
       <PageHeader
-        title="Log in"
+        title={<T value={ui.attrs.loginPagePageHeaderTitleLogIn} />}
         meta={
           seedHintEnabled() ? (
             <>
-              Use a seeded local account. local-editor@example.local can edit, review, and publish. Dedicated
-              reviewer and publisher accounts exist for separated duties. Editor, admin, and publisher accounts need
-              a current six-digit code from an authenticator app configured with <code>IDENTITY_SEED_TOTP_SECRET</code>.
-              If that setting is absent, use <code>CAATLASMFASEED22</code> as the authenticator secret.
-              Seeding creates missing users only; changing a password in the env file does not update an existing user.
-            </>
+              <T value={ui.login.page.useASeededLocalAccountLocalEditor} />{" "}<code>IDENTITY_SEED_TOTP_SECRET</code><T value={ui.login.page.ifThatSettingIsAbsentUse} />{" "}<code>CAATLASMFASEED22</code> <T value={ui.login.page.asTheAuthenticatorSecretSeedingCreatesMissing} />{" "}</>
           ) : (
             'Sign in with your editorial account.'
           )
@@ -53,12 +49,12 @@ export default async function LoginPage(props: LoginPageProps) {
           </span>
         </Alert>
       ) : null}
-      {searchParams.registered ? <Alert tone="success">Account confirmed. You can sign in.</Alert> : null}
+      {searchParams.registered ? <Alert tone="success"><T value={ui.login.page.accountConfirmedYouCanSignIn} /></Alert> : null}
       <Card>
         <form action={loginAction}>
           {searchParams.next?.startsWith('/oauth/authorize?') ? <input type="hidden" name="next" value={searchParams.next} /> : null}
           <Input
-            label="Email"
+            label={<T value={ui.attrs.loginPageInputLabelEmail} />}
             id="email"
             name="email"
             type="email"
@@ -69,7 +65,7 @@ export default async function LoginPage(props: LoginPageProps) {
             aria-describedby={searchParams.error ? 'login-error' : undefined}
           />
           <Input
-            label="Password"
+            label={<T value={ui.attrs.loginPageInputLabelPassword} />}
             id="password"
             name="password"
             type="password"
@@ -77,14 +73,14 @@ export default async function LoginPage(props: LoginPageProps) {
             aria-required="true"
             autoComplete="current-password"
           />
-          <Button variant="primary">Sign in</Button>
+          <Button variant="primary"><T value={ui.login.page.signIn} /></Button>
         </form>
       </Card>
       <Card><PasskeyLogin /></Card>
       <p>
-        <a href="/reset">Forgot password</a>
+        <a href="/reset"><T value={ui.login.page.forgotPassword} /></a>
       </p>
-      {registrationEnabled ? <p><a href="/register">Create an account</a></p> : null}
+      {registrationEnabled ? <p><a href="/register"><T value={ui.login.page.createAnAccount} /></a></p> : null}
     </PageMain>
   );
 }

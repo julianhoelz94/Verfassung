@@ -1,5 +1,6 @@
 'use client';
 
+import { T, ui } from '../../components/TranslationProvider';
 import { useState } from 'react';
 import type { CountryDetail, CountrySummary } from '../../../lib/api';
 import { Input } from '../../components/ui';
@@ -18,27 +19,27 @@ export function ConstitutionBasicsFields({ countries, details }: { countries: Co
   const [countryCode, setCountryCode] = useState(countries[0]?.isoCode ?? '');
   const predecessors = details.find((country) => country.isoCode === countryCode)?.constitutions ?? [];
   const slugField = <>
-    <Input label="Catalog slug" info={{ description: 'A readable catalog identifier generated from the title. You can adjust it before creation.', changeability: 'later', changeNote: 'Can be changed later. The old slug remains an alias for catalog lookups.' }} name="slug" required pattern="[a-z0-9]+(?:-[a-z0-9]+)*" value={slug} onChange={(event) => { setEditedSlug(true); setSlug(slugify(event.target.value)); }} />
-    {showSlug && !slug ? <p role="alert">Enter a catalog slug using Latin letters and numbers to continue.</p> : null}
-    <p className="muted">The catalog uses this slug to identify the constitution.</p>
+    <Input label={<T value={ui.attrs.adminConstitutionsConstitutionbasicsfieldsInputLabelCatalog} />} info={{ description: 'A readable catalog identifier generated from the title. You can adjust it before creation.', changeability: 'later', changeNote: 'Can be changed later. The old slug remains an alias for catalog lookups.' }} name="slug" required pattern="[a-z0-9]+(?:-[a-z0-9]+)*" value={slug} onChange={(event) => { setEditedSlug(true); setSlug(slugify(event.target.value)); }} />
+    {showSlug && !slug ? <p role="alert"><T value={ui.admin.constitutions.constitutionbasicsfields.enterACatalogSlugUsingLatinLetters} /></p> : null}
+    <p className="muted"><T value={ui.admin.constitutions.constitutionbasicsfields.theCatalogUsesThisSlugToIdentify} /></p>
   </>;
   return <section className="creation-basics" aria-label="Constitution basics">
-    <h2>Basics</h2>
-    <p>Choose the country and give the constitution its public name. A catalog slug is generated from the title.</p>
+    <h2><T value={ui.admin.constitutions.constitutionbasicsfields.basics} /></h2>
+    <p><T value={ui.admin.constitutions.constitutionbasicsfields.chooseTheCountryAndGiveTheConstitution} /></p>
     <ConstitutionCountryFields countries={countries} onCountryChange={setCountryCode} />
     {predecessors.length > 0 ? (
       <div className="field">
-        <div className="field-label-row"><label htmlFor="predecessor-constitution">Previous constitution</label><SettingInfo label="Previous constitution" description="Connect this constitution to the earlier constitution it replaces. The timeline uses this relationship." changeability="once" /></div>
+        <div className="field-label-row"><label htmlFor="predecessor-constitution"><T value={ui.admin.constitutions.constitutionbasicsfields.previousConstitution} /></label><SettingInfo label="Previous constitution" description="Connect this constitution to the earlier constitution it replaces. The timeline uses this relationship." changeability="once" /></div>
         <select id="predecessor-constitution" key={countryCode} name="predecessorConstitutionId" defaultValue="">
-          <option value="">No predecessor recorded</option>
+          <option value=""><T value={ui.admin.constitutions.constitutionbasicsfields.noPredecessorRecorded} /></option>
           {predecessors.map((constitution) => (
             <option key={constitution.id} value={constitution.id}>{constitution.title}</option>
           ))}
         </select>
       </div>
     ) : null}
-    <div className="setting-inline"><label><input type="checkbox" name="interim" /> Interim constitution</label><SettingInfo label="Interim constitution" description="Mark a temporary or transitional constitution. This label does not set an end date or change its legal status; record those as lifecycle events." changeability="once" /></div>
-    <Input label="Constitution title" info={{ description: 'The public name of this distinct constitution, shown on country pages and timelines.', changeability: 'later' }} name="title" required value={title} onChange={(event) => {
+    <div className="setting-inline"><label><input type="checkbox" name="interim" /> <T value={ui.admin.constitutions.constitutionbasicsfields.interimConstitution} /></label><SettingInfo label="Interim constitution" description="Mark a temporary or transitional constitution. This label does not set an end date or change its legal status; record those as lifecycle events." changeability="once" /></div>
+    <Input label={<T value={ui.attrs.adminConstitutionsConstitutionbasicsfieldsInputLabelConstitution} />} info={{ description: 'The public name of this distinct constitution, shown on country pages and timelines.', changeability: 'later' }} name="title" required value={title} onChange={(event) => {
       const next = event.target.value;
       setTitle(next);
       if (!editedSlug) {
@@ -47,7 +48,7 @@ export function ConstitutionBasicsFields({ countries, details }: { countries: Co
         if (next.trim() && !generated) setShowSlug(true);
       }
     }} />
-    {showSlug ? <div className="creation-advanced" role="group" aria-label="Catalog slug"><h3>Catalog slug</h3>{slugField}</div>
-      : <details className="creation-advanced"><summary>Advanced · catalog slug</summary>{slugField}</details>}
+    {showSlug ? <div className="creation-advanced" role="group" aria-label="Catalog slug"><h3><T value={ui.admin.constitutions.constitutionbasicsfields.catalogSlug} /></h3>{slugField}</div>
+      : <details className="creation-advanced"><summary><T value={ui.admin.constitutions.constitutionbasicsfields.advancedCatalogSlug} /></summary>{slugField}</details>}
   </section>;
 }

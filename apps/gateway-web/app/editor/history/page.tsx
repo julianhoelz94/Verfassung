@@ -1,3 +1,4 @@
+import { T, ui } from '../../components/TranslationProvider';
 import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { PageMain } from '../../components/PageMain';
@@ -58,7 +59,7 @@ export default async function SnapshotHistoryPage(props: HistoryPageProps) {
   if (!canVisitEditor(user.roles)) {
     return (
       <PageMain className="wide">
-        <PageHeader title="Snapshot history" meta={`Signed in as ${user.email}, but this account has no editorial role.`} />
+        <PageHeader title={<T value={ui.attrs.editorHistoryPagePageHeaderTitleSnapshot} />} meta={`Signed in as ${user.email}, but this account has no editorial role.`} />
       </PageMain>
     );
   }
@@ -103,29 +104,29 @@ export default async function SnapshotHistoryPage(props: HistoryPageProps) {
   return (
     <PageMain className="wide">
       <PageHeader
-        title="Snapshot history"
-        eyebrow="Editorial workspace"
+        title={<T value={ui.attrs.editorHistoryPagePageHeaderTitleSnapshot} />}
+        eyebrow={<T value={ui.attrs.editorHistoryPagePageHeaderEyebrowEditorial} />}
         meta={`Signed in as ${user.email}. Roles: ${user.roles.join(', ')}.`}
       />
       {constitutions.length > 0 && selectedConstitution ? (
         <form method="get" className="toolbar">
-          <Select id="constitutionId" name="constitutionId" label="Constitution" defaultValue={selectedConstitution.id}>
+          <Select id="constitutionId" name="constitutionId" label={<T value={ui.attrs.editorHistoryPageSelectLabelConstitution} />} defaultValue={selectedConstitution.id}>
             {constitutions.map((constitution) => (
               <option key={constitution.id} value={constitution.id}>
                 {constitution.title}
               </option>
             ))}
           </Select>
-          <Button type="submit">Show history</Button>
+          <Button type="submit"><T value={ui.editor.history.page.showHistory} /></Button>
         </form>
       ) : (
-        <Alert tone="error">No constitutions are available yet.</Alert>
+        <Alert tone="error"><T value={ui.editor.history.page.noConstitutionsAreAvailableYet} /></Alert>
       )}
       {selectedConstitution ? (
         <section>
           <h2 className="section-title">{selectedConstitution.title}</h2>
           {orderedVersions.length === 0 ? (
-            <p className="muted">No version snapshots recorded for this constitution yet.</p>
+            <p className="muted"><T value={ui.editor.history.page.noVersionSnapshotsRecordedForThisConstitution} /></p>
           ) : (
             <DataList columns={5}>
               {legalGroups.map(({ legalId, legal, editorial }) => (
@@ -145,7 +146,7 @@ export default async function SnapshotHistoryPage(props: HistoryPageProps) {
                       value: (
                         <span className="chip-row">
                           <Badge tone="info">{hopKindLabel(legal.hopKind)}</Badge>
-                          {editorial.length ? <Badge tone="changed">{editorial.length} editorial revision{editorial.length === 1 ? '' : 's'}</Badge> : null}
+                          {editorial.length ? <Badge tone="changed">{editorial.length} <T value={ui.editor.history.page.editorialRevision} />{editorial.length === 1 ? '' : 's'}</Badge> : null}
                         </span>
                       ),
                     },
@@ -155,7 +156,7 @@ export default async function SnapshotHistoryPage(props: HistoryPageProps) {
                         <ol>
                           {editorial.map((version) => (
                             <li key={version.id}>
-                              {version.versionLabel} · Editorial correction · {version.publicationComment ?? 'No publication comment'}
+                              {version.versionLabel} <T value={ui.editor.history.page.editorialCorrection} />{" "}{version.publicationComment ?? 'No publication comment'}
                             </li>
                           ))}
                         </ol>
@@ -173,11 +174,11 @@ export default async function SnapshotHistoryPage(props: HistoryPageProps) {
                             <li key={amendment.id}>
                               <a href={`/editor/amendments/${amendment.id}`}>{amendment.title}</a>
                               {amendment.comment ? ` — ${amendment.comment}` : ''}
-                              {amendment.reviewStatus === 'needs_review' ? <Badge tone="changed">Needs review</Badge> : null}
+                              {amendment.reviewStatus === 'needs_review' ? <Badge tone="changed"><T value={ui.editor.history.page.needsReview} /></Badge> : null}
                             </li>
                           ))}
                         </ul>
-                      ) : <span className="chip-row">No change record <Badge tone={legal.latestPublished ? 'added' : 'changed'}>{legal.latestPublished ? 'Latest published' : 'Historical'}</Badge></span>,
+                      ) : <span className="chip-row"><T value={ui.editor.history.page.noChangeRecord} />{" "}<Badge tone={legal.latestPublished ? 'added' : 'changed'}>{legal.latestPublished ? 'Latest published' : 'Historical'}</Badge></span>,
                     },
                   ]}
                 />

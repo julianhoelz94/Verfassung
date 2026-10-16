@@ -1,3 +1,4 @@
+import { T, ui } from '../../../components/TranslationProvider';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import { PageMain } from '../../../components/PageMain';
@@ -123,31 +124,31 @@ export default async function ConstitutionTimelinePage({ params, searchParams }:
           { href: `/countries/${country.isoCode}`, label: country.name },
           { label: 'Constitution timeline' },
         ]}
-        title="Constitution timeline"
-        actions={<a className="btn btn-sm" href={`/countries/${country.isoCode}/timeline`}>Amendment timeline</a>}
+        title={<T value={ui.attrs.countriesCodeConstitutionTimelinePagePageHeaderTitle} />}
+        actions={<a className="btn btn-sm" href={`/countries/${country.isoCode}/timeline`}><T value={ui.countries.code.constitutionTimeline.page.amendmentTimeline} /></a>}
       />
-      <p>Adoption, suspension, restoration, and replacement of constitutions in {country.name}.</p>
+      <p><T value={ui.countries.code.constitutionTimeline.page.adoptionSuspensionRestorationAndReplacementOfConstitutions} />{" "}{country.name}.</p>
       <section className="card">
-        <h2>Status on a date</h2>
+        <h2><T value={ui.countries.code.constitutionTimeline.page.statusOnADate} /></h2>
         <form method="get">
-          <label htmlFor="constitution-timeline-date">Date</label>
+          <label htmlFor="constitution-timeline-date"><T value={ui.countries.code.constitutionTimeline.page.date} /></label>
           <input id="constitution-timeline-date" type="date" name="on" defaultValue={on} />
-          <button type="submit">Show status</button>
+          <button type="submit"><T value={ui.countries.code.constitutionTimeline.page.showStatus} /></button>
         </form>
-        {inForce.length === 0 ? <p>No constitution is recorded as in force on {on}.</p> : (
+        {inForce.length === 0 ? <p><T value={ui.countries.code.constitutionTimeline.page.noConstitutionIsRecordedAsInForce} />{" "}{on}.</p> : (
           <ul>{inForce.map(({ constitution }) => (
-            <li key={constitution.id}><a href={`/countries/${country.isoCode}/constitutions/${constitution.id}`}>{constitution.title}</a> is in force</li>
+            <li key={constitution.id}><a href={`/countries/${country.isoCode}/constitutions/${constitution.id}`}>{constitution.title}</a> <T value={ui.countries.code.constitutionTimeline.page.isInForce} /></li>
           ))}</ul>
         )}
         <details>
-          <summary>All constitution statuses</summary>
+          <summary><T value={ui.countries.code.constitutionTimeline.page.allConstitutionStatuses} /></summary>
           <ul>{statusOn.map(({ constitution, status }) => (
             <li key={constitution.id}>{constitution.title}: {status}</li>
           ))}</ul>
         </details>
         {provisionsNotInForce.length > 0 ? (
           <div>
-            <h3>Provisions not in force on this date</h3>
+            <h3><T value={ui.countries.code.constitutionTimeline.page.provisionsNotInForceOnThisDate} /></h3>
             <ul>
               {provisionsNotInForce.map(([key, row]) => {
                 const logicalId = key.split(':')[1];
@@ -159,7 +160,7 @@ export default async function ConstitutionTimelinePage({ params, searchParams }:
           </div>
         ) : null}
       </section>
-      {dated.length === 0 ? <p>No dated constitution events are recorded yet.</p> : null}
+      {dated.length === 0 ? <p><T value={ui.countries.code.constitutionTimeline.page.noDatedConstitutionEventsAreRecordedYet} /></p> : null}
       <ol>
         {dated.map((event) => {
           const constitution = constitutionsById.get(event.constitutionId);
@@ -176,11 +177,11 @@ export default async function ConstitutionTimelinePage({ params, searchParams }:
                 {constitution.interim ? ' (interim)' : ''}
               </h2>
               {event.scope === 'whole' && event.eventType === 'adopted' && predecessor ? (
-                <p>Replaces <a href={`/countries/${country.isoCode}/constitutions/${predecessor.id}`}>{predecessor.title}</a></p>
+                <p><T value={ui.countries.code.constitutionTimeline.page.replaces} />{" "}<a href={`/countries/${country.isoCode}/constitutions/${predecessor.id}`}>{predecessor.title}</a></p>
               ) : null}
               {event.note ? <p>{event.note}</p> : null}
               {versions.length > 0 ? (
-                <p>Published versions: {versions.map((version, index) => (
+                <p><T value={ui.countries.code.constitutionTimeline.page.publishedVersions} />{" "}{versions.map((version, index) => (
                   <span key={version.id}>{index > 0 ? ' · ' : ''}<a href={`/countries/${country.isoCode}/versions/${version.currentVersionId ?? version.id}`}>{version.versionLabel}</a></span>
                 ))}</p>
               ) : null}
@@ -197,14 +198,14 @@ export default async function ConstitutionTimelinePage({ params, searchParams }:
                   })}
                 </ul>
               ) : null}
-              {event.sourceUrl ? <p><a href={event.sourceUrl}>Source</a></p> : null}
+              {event.sourceUrl ? <p><a href={event.sourceUrl}><T value={ui.countries.code.constitutionTimeline.page.source} /></a></p> : null}
             </li>
           );
         })}
       </ol>
       {undated.length > 0 ? (
         <section>
-          <h2>Dates not recorded</h2>
+          <h2><T value={ui.countries.code.constitutionTimeline.page.datesNotRecorded} /></h2>
           <ul>
             {undated.map((constitution) => (
               <li key={constitution.id}><a href={`/countries/${country.isoCode}/constitutions/${constitution.id}`}>{constitution.title}</a></li>

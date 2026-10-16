@@ -1,3 +1,4 @@
+import { T, ui } from '../../../components/TranslationProvider';
 import { AdminForbidden } from '../../../components/AdminForbidden';
 import { PageMain } from '../../../components/PageMain';
 import { Alert, Button, Card, PageHeader } from '../../../components/ui';
@@ -25,45 +26,45 @@ export default async function AdminLegalPage({
   const title = key === 'impressum' ? 'Impressum' : 'Datenschutzerklärung';
   return (
     <PageMain>
-      <PageHeader title={`${title} bearbeiten`} meta="Save a private draft, review it, then publish it separately." />
-      {message.error ? <Alert tone="error">The legal page could not be saved or published. Reload and try again.</Alert> : null}
-      {message.saved ? <Alert tone="info">Draft saved. The public page has not changed.</Alert> : null}
-      {message.published ? <Alert tone="info">Published revision updated.</Alert> : null}
+      <PageHeader title={`${title} bearbeiten`} meta={<T value={ui.attrs.adminLegalKeyPagePageHeaderMeta} />} />
+      {message.error ? <Alert tone="error"><T value={ui.admin.legal.key.page.theLegalPageCouldNotBeSaved} /></Alert> : null}
+      {message.saved ? <Alert tone="info"><T value={ui.admin.legal.key.page.draftSavedThePublicPageHasNot} /></Alert> : null}
+      {message.published ? <Alert tone="info"><T value={ui.admin.legal.key.page.publishedRevisionUpdated} /></Alert> : null}
       <Card>
         <form action={saveLegalDraftAction} className="stack">
           <input type="hidden" name="key" value={key} />
           <input type="hidden" name="expectedRevision" value={state?.draft?.revision ?? 0} />
-          <label htmlFor="legal-content">{title} text</label>
+          <label htmlFor="legal-content">{title} <T value={ui.admin.legal.key.page.text} /></label>
           <textarea id="legal-content" name="content" rows={18} maxLength={30000} required defaultValue={state?.draft?.content ?? exampleLegalPage(key as LegalPageKey)} />
-          <p className="muted">The initial example uses fictional details. Replace and verify all operator facts, contact details, and processing claims before publication. Plain text only.</p>
-          <Button variant="primary">Save draft</Button>
+          <p className="muted"><T value={ui.admin.legal.key.page.theInitialExampleUsesFictionalDetailsReplace} /></p>
+          <Button variant="primary"><T value={ui.admin.legal.key.page.saveDraft} /></Button>
         </form>
       </Card>
       <Card>
-        <h2>Publication</h2>
-        <p>Published revision: {state?.published?.revision ?? 'none'}. Draft revision: {state?.draft?.revision ?? 'none'}.</p>
+        <h2><T value={ui.admin.legal.key.page.publication} /></h2>
+        <p><T value={ui.admin.legal.key.page.publishedRevision} />{" "}{state?.published?.revision ?? 'none'}<T value={ui.admin.legal.key.page.draftRevision} />{" "}{state?.draft?.revision ?? 'none'}.</p>
         {state?.draft ? (
           <form action={publishLegalPageAction}>
             <input type="hidden" name="key" value={key} />
             <input type="hidden" name="expectedRevision" value={state.draft.revision} />
-            <Button variant="primary">Publish reviewed text</Button>
+            <Button variant="primary"><T value={ui.admin.legal.key.page.publishReviewedText} /></Button>
           </form>
         ) : null}
       </Card>
       {revisions.length > 0 ? (
         <Card>
-          <h2>Revision history</h2>
+          <h2><T value={ui.admin.legal.key.page.revisionHistory} /></h2>
           <ul>
             {revisions.map((revision) => (
               <li key={revision.revision}>
                 <details>
-                  <summary>Revision {revision.revision} · {new Date(revision.createdAt).toLocaleString('de-DE')}{state?.published?.revision === revision.revision ? ' · published' : ''}</summary>
+                  <summary><T value={ui.admin.legal.key.page.revision} />{" "}{revision.revision} · {new Date(revision.createdAt).toLocaleString('de-DE')}{state?.published?.revision === revision.revision ? ' · published' : ''}</summary>
                   <pre className="legal-page-content">{revision.content}</pre>
                   <form action={saveLegalDraftAction}>
                     <input type="hidden" name="key" value={key} />
                     <input type="hidden" name="expectedRevision" value={state?.draft?.revision ?? 0} />
                     <input type="hidden" name="content" value={revision.content} />
-                    <Button>Restore as new draft</Button>
+                    <Button><T value={ui.admin.legal.key.page.restoreAsNewDraft} /></Button>
                   </form>
                 </details>
               </li>

@@ -1,3 +1,4 @@
+import { T, ui } from '../../../../components/TranslationProvider';
 import { notFound } from 'next/navigation';
 import { ConstitutionText } from '../../../../components/ConstitutionText';
 import { PageMain } from '../../../../components/PageMain';
@@ -125,13 +126,13 @@ export default async function ArticleHistoryPage(props: HistoryPageProps) {
                         <span className="muted">
                           {change.changedOn ? (
                             <>
-                              changed <FormattedDate value={change.changedOn} />
+                              <T value={ui.countries.code.articles.articlenumber.page.changed} />{" "}<FormattedDate value={change.changedOn} />
                             </>
                           ) : null}
                           {change.effectiveOn ? (
                             <>
                               {change.changedOn ? ' · ' : ''}
-                              effective <FormattedDate value={change.effectiveOn} />
+                              <T value={ui.countries.code.articles.articlenumber.page.effective} />{" "}<FormattedDate value={change.effectiveOn} />
                             </>
                           ) : null}
                           {amendment.sourceReference ? ` · ${amendment.sourceReference}` : ''}
@@ -152,8 +153,7 @@ export default async function ArticleHistoryPage(props: HistoryPageProps) {
                     className="btn"
                     href={`/countries/${country.isoCode}/compare?from=${encodeURIComponent(previous.version.id)}&to=${encodeURIComponent(snapshot.version.id)}`}
                   >
-                    Compare with previous
-                  </a>
+                    <T value={ui.countries.code.articles.articlenumber.page.compareWithPrevious} />{" "}</a>
                 </div>
               ) : null}
               <h2>

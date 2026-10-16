@@ -1,5 +1,6 @@
 'use client';
 
+import { T, ui } from '../components/TranslationProvider';
 import { useFormState } from 'react-dom';
 import { Alert, Button, Input } from '../components/ui';
 import { confirmEnrollAction, type EnrollConfirmState } from '../login/actions';
@@ -10,7 +11,7 @@ const initial: RecoveryRevealState = {};
 function RecoveryCodes({ codes }: { codes: string[] }) {
   return (
     <Alert tone="success">
-      Store these recovery codes now; they are shown only once.{' '}
+      <T value={ui.account.mfaforms.storeTheseRecoveryCodesNowTheyAre} />{' '}
       {codes.map((code) => (
         <code key={code}>{code} </code>
       ))}
@@ -18,7 +19,7 @@ function RecoveryCodes({ codes }: { codes: string[] }) {
   );
 }
 
-const failed = <Alert tone="error">Authenticator action failed. Check the code and try again.</Alert>;
+const failed = <Alert tone="error"><T value={ui.account.mfaforms.authenticatorActionFailedCheckTheCodeAnd} /></Alert>;
 
 export function ConfirmEnrollForm({ challengeToken }: { challengeToken: string }) {
   const [state, action] = useFormState(confirmAccountMfaAction, initial);
@@ -27,7 +28,7 @@ export function ConfirmEnrollForm({ challengeToken }: { challengeToken: string }
       <>
         <RecoveryCodes codes={state.recoveryCodes} />
         <p>
-          <a href="/account">Back to account</a>
+          <a href="/account"><T value={ui.account.mfaforms.backToAccount} /></a>
         </p>
       </>
     );
@@ -37,8 +38,8 @@ export function ConfirmEnrollForm({ challengeToken }: { challengeToken: string }
       {state.error ? failed : null}
       <form action={action}>
         <input type="hidden" name="challengeToken" value={challengeToken} />
-        <Input label="Authenticator code" id="enrollCode" name="code" inputMode="numeric" required />
-        <Button variant="primary">Confirm enrollment</Button>
+        <Input label={<T value={ui.attrs.accountMfaformsInputLabelAuthenticatorCode} />} id="enrollCode" name="code" inputMode="numeric" required />
+        <Button variant="primary"><T value={ui.account.mfaforms.confirmEnrollment} /></Button>
       </form>
     </>
   );
@@ -51,8 +52,8 @@ export function RegenerateRecoveryForm() {
       {state.recoveryCodes ? <RecoveryCodes codes={state.recoveryCodes} /> : null}
       {state.error ? failed : null}
       <form action={action}>
-        <Input label="Authenticator code" id="recoveryRotateCode" name="code" inputMode="numeric" required />
-        <Button>Replace recovery codes</Button>
+        <Input label={<T value={ui.attrs.accountMfaformsInputLabelAuthenticatorCode} />} id="recoveryRotateCode" name="code" inputMode="numeric" required />
+        <Button><T value={ui.account.mfaforms.replaceRecoveryCodes} /></Button>
       </form>
     </>
   );
@@ -67,25 +68,25 @@ export function LoginEnrollForm({ next }: { next?: string } = {}) {
       <>
         <RecoveryCodes codes={state.recoveryCodes} />
         <p>
-          <a href={state.continueTo ?? '/'}>Continue</a>
+          <a href={state.continueTo ?? '/'}><T value={ui.account.mfaforms.continue} /></a>
         </p>
       </>
     );
   }
   return (
     <>
-      {state.error ? <Alert tone="error">That code could not be verified.</Alert> : null}
+      {state.error ? <Alert tone="error"><T value={ui.account.mfaforms.thatCodeCouldNotBeVerified} /></Alert> : null}
       <form action={action}>
         {next ? <input type="hidden" name="next" value={next} /> : null}
         <Input
-          label="Authenticator code"
+          label={<T value={ui.attrs.accountMfaformsInputLabelAuthenticatorCode} />}
           id="code"
           name="code"
           inputMode="numeric"
           autoComplete="one-time-code"
           required
         />
-        <Button variant="primary">Confirm enrollment</Button>
+        <Button variant="primary"><T value={ui.account.mfaforms.confirmEnrollment} /></Button>
       </form>
     </>
   );

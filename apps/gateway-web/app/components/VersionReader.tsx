@@ -1,5 +1,6 @@
 'use client';
 
+import { T, ui } from './TranslationProvider';
 import { useMemo, useState } from 'react';
 import type { ArticleSummary, ContentOutline } from '../../lib/api';
 import { orderedTargets } from '../../lib/ordered-content';
@@ -91,7 +92,7 @@ export function VersionReader({
       <section>
         <Toolbar label="Reading options">
           <details className="toc-mobile">
-            <summary className="btn btn-sm toc-button">Contents</summary>
+            <summary className="btn btn-sm toc-button"><T value={ui.components.versionreader.contents} /></summary>
             {toc}
           </details>
           <Segmented
@@ -155,8 +156,8 @@ export function VersionReader({
                   <div id={regionId} hidden />
                 )}
                 <p className="article-foot print-hide">
-                  <a href={permalink}>Permalink</a>
-                  {article.kind === 'article' && article.articleNumber ? <a href={historyHref}>History of {kindByCode(outline, article.kind)?.displayLabel ?? 'Article'} {article.articleNumber}</a> : null}
+                  <a href={permalink}><T value={ui.components.versionreader.permalink} /></a>
+                  {article.kind === 'article' && article.articleNumber ? <a href={historyHref}><T value={ui.components.versionreader.historyOf} />{" "}{kindByCode(outline, article.kind)?.displayLabel ?? 'Article'} {article.articleNumber}</a> : null}
                   {changeType ? (
                     <Badge tone={changeTone(changeType)}>{changeType}</Badge>
                   ) : (

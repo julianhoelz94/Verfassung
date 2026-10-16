@@ -1,3 +1,4 @@
+import { T, ui } from '../../components/TranslationProvider';
 import { redirect } from 'next/navigation';
 import { Alert, Button, Card, Input, PageHeader } from '../../components/ui';
 import { PageMain } from '../../components/PageMain';
@@ -48,18 +49,18 @@ export default async function MfaPage(props: MfaPageProps) {
         }
       />
       {searchParams.error ? (
-        <Alert tone="error">That code could not be verified.</Alert>
+        <Alert tone="error"><T value={ui.login.mfa.page.thatCodeCouldNotBeVerified} /></Alert>
       ) : null}
       {enroll ? (
         <Card>
           {secret ? (
             <>
-              <p>Scan this code with an authenticator app, then enter the six-digit code it shows.</p>
+              <p><T value={ui.login.mfa.page.scanThisCodeWithAnAuthenticatorApp} /></p>
               {qrDataUrl ? <Image src={qrDataUrl} alt="Authenticator setup QR code" width={208} height={208} unoptimized /> : null}
-              <p>If you cannot scan it, enter this setup key: <code>{secret}</code></p>
+              <p><T value={ui.login.mfa.page.ifYouCannotScanItEnterThis} />{" "}<code>{secret}</code></p>
             </>
           ) : (
-            <Alert tone="error">Enrollment could not be started. Sign in again.</Alert>
+            <Alert tone="error"><T value={ui.login.mfa.page.enrollmentCouldNotBeStartedSignIn} /></Alert>
           )}
           <LoginEnrollForm next={searchParams.next?.startsWith('/oauth/authorize?') ? searchParams.next : undefined} />
           {!user ? <PasskeyLoginEnrollment /> : null}
@@ -70,14 +71,14 @@ export default async function MfaPage(props: MfaPageProps) {
           <form action={completeMfaAction}>
             {searchParams.next?.startsWith('/oauth/authorize?') ? <input type="hidden" name="next" value={searchParams.next} /> : null}
             <Input
-              label="Authenticator code"
+              label={<T value={ui.attrs.loginMfaPageInputLabelAuthenticator} />}
               id="code"
               name="code"
               inputMode="numeric"
               autoComplete="one-time-code"
             />
-            <Input label="Recovery code" id="recoveryCode" name="recoveryCode" autoComplete="off" />
-            <Button variant="primary">Continue</Button>
+            <Input label={<T value={ui.attrs.loginMfaPageInputLabelRecovery} />} id="recoveryCode" name="recoveryCode" autoComplete="off" />
+            <Button variant="primary"><T value={ui.login.mfa.page.continue} /></Button>
           </form>
         </Card>
       )}

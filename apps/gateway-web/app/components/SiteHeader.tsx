@@ -1,5 +1,6 @@
 'use client';
 
+import { T, ui, useTranslation } from './TranslationProvider';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { logoutAction } from '../login/actions';
@@ -33,6 +34,7 @@ function MenuSectionList({
   pathname: string;
   user: NavUser | null;
 }) {
+  const t = useTranslation();
   return (
     <>
       {sections.map((section) => (
@@ -49,19 +51,19 @@ function MenuSectionList({
               </div>
             </div>
           ) : null}
-          {section.heading ? <div className="menu-label">{section.heading}</div> : null}
+          {section.heading ? <div className="menu-label">{section.headingMessage ? t(section.headingMessage) : section.heading}</div> : null}
           {section.links.map((link) => (
             <a
               key={link.href}
               href={link.href}
               aria-current={isCurrentNavHref(pathname, link.href) ? 'page' : undefined}
             >
-              {link.label}{link.badgeCount ? <Badge tone="changed">{link.badgeCount}</Badge> : null}
+              {link.message ? t(link.message) : link.label}{link.badgeCount ? <Badge tone="changed">{link.badgeCount}</Badge> : null}
             </a>
           ))}
           {section.id === 'account' && user ? (
             <form action={logoutAction}>
-              <button type="submit">Sign out</button>
+              <button type="submit"><T value={ui.components.siteheader.signOut} /></button>
             </form>
           ) : null}
         </div>
@@ -71,6 +73,7 @@ function MenuSectionList({
 }
 
 export function SiteHeader({ user, identityUnavailable = false, needsReviewCount = 0, anonymousBrowsingAllowed = true }: SiteHeaderProps) {
+  const t = useTranslation();
   const pathname = usePathname();
   const links = primaryNavLinks(user, false, anonymousBrowsingAllowed);
   const sections = menuSections(user, false, needsReviewCount, anonymousBrowsingAllowed);
@@ -83,7 +86,7 @@ export function SiteHeader({ user, identityUnavailable = false, needsReviewCount
           <span className="brand-mark" aria-hidden="true">
             §
           </span>
-          <span className="brand-name">Constitution Atlas</span>
+          <span className="brand-name"><T value={ui.components.siteheader.constitutionAtlas} /></span>
         </Link>
         <nav className="nav-primary" aria-label="Primary">
           {links.map((link) => (
@@ -92,7 +95,7 @@ export function SiteHeader({ user, identityUnavailable = false, needsReviewCount
               href={link.href}
               aria-current={isCurrentNavHref(pathname, link.href) ? 'page' : undefined}
             >
-              {link.label}
+              {link.message ? t(link.message) : link.label}
             </a>
           ))}
         </nav>
@@ -123,8 +126,7 @@ export function SiteHeader({ user, identityUnavailable = false, needsReviewCount
           ) : (
             <>
               <a className="btn btn-sm login-desktop" href="/login">
-                Log in
-              </a>
+                <T value={ui.components.siteheader.logIn} />{" "}</a>
               <MenuDisclosure key={pathname} className="menu-phone" label="Menu" trigger={<span aria-hidden="true">☰</span>}>
                 <MenuSectionList sections={sections} pathname={pathname} user={user} />
               </MenuDisclosure>
@@ -143,8 +145,7 @@ export function SiteHeader({ user, identityUnavailable = false, needsReviewCount
       </div> : null}
       {identityUnavailable ? (
         <p className="muted header-status" role="status">
-          Sign-in is temporarily unavailable.
-        </p>
+          <T value={ui.components.siteheader.signInIsTemporarilyUnavailable} />{" "}</p>
       ) : null}
     </header>
   );

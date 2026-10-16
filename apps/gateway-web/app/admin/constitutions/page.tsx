@@ -1,3 +1,4 @@
+import { T, ui } from '../../components/TranslationProvider';
 import { AdminForbidden } from '../../components/AdminForbidden';
 import { Alert, Card, DataList, DataRow, PageHeader } from '../../components/ui';
 import { PageMain } from '../../components/PageMain';
@@ -30,16 +31,16 @@ export default async function AdminConstitutionsPage(props: AdminConstitutionsPa
   return (
     <PageMain className="wide">
       <PageHeader
-        title="Constitutions"
-        meta="Create a constitution with a guided structure and a live reader preview."
+        title={<T value={ui.attrs.adminConstitutionsPagePageHeaderTitleConstitutions} />}
+        meta={<T value={ui.attrs.adminConstitutionsPagePageHeaderMetaCreate} />}
       />
       {searchParams.error === 'forbidden' ? (
-        <Alert tone="error">Administrator role required.</Alert>
+        <Alert tone="error"><T value={ui.admin.constitutions.page.administratorRoleRequired} /></Alert>
       ) : searchParams.error ? (
-        <Alert tone="error">That outline change could not be saved.</Alert>
+        <Alert tone="error"><T value={ui.admin.constitutions.page.thatOutlineChangeCouldNotBeSaved} /></Alert>
       ) : null}
       <Card>
-        <h2 className="card-title">New constitution</h2>
+        <h2 className="card-title"><T value={ui.admin.constitutions.page.newConstitution} /></h2>
         <OutlineEditor action={createConstitutionAction} initial={DEFAULT_NEW_OUTLINE} guidedCreation>
           <ConstitutionBasicsFields countries={countries} details={details.filter((country): country is CountryDetail => country != null)} />
         </OutlineEditor>

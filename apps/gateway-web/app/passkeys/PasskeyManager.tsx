@@ -1,5 +1,6 @@
 'use client';
 
+import { T, ui } from '../components/TranslationProvider';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button, Input } from '../components/ui';
@@ -45,15 +46,15 @@ export function PasskeyManager({ passkeys }: { passkeys: PasskeyInfo[] }) {
     }
   }
   return <section className="account-section" aria-labelledby="passkeys-title">
-    <h2 id="passkeys-title">Passkeys</h2>
-    <p>Use a device passkey to sign in. You can keep your authenticator app as well.</p>
+    <h2 id="passkeys-title"><T value={ui.passkeys.passkeymanager.passkeys} /></h2>
+    <p><T value={ui.passkeys.passkeymanager.useADevicePasskeyToSignIn} /></p>
     {passkeys.length ? <ul>{passkeys.map((key) => <li key={key.id}>
-      {key.label} · added {new Date(key.createdAt).toLocaleDateString()}
-      <Button type="button" onClick={() => revoke(key.id)} disabled={busy || !password}>Remove</Button>
-    </li>)}</ul> : <p>No passkeys yet.</p>}
-    <Input label="Passkey name" id="passkey-name" value={label} onChange={(event) => setLabel(event.target.value)} placeholder="My laptop" />
-    <Input label="Current password" id="passkey-password" type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} required />
-    <Button type="button" variant="primary" onClick={enroll} disabled={busy || !password}>Add passkey</Button>
+      {key.label} <T value={ui.passkeys.passkeymanager.added} />{" "}{new Date(key.createdAt).toLocaleDateString()}
+      <Button type="button" onClick={() => revoke(key.id)} disabled={busy || !password}><T value={ui.passkeys.passkeymanager.remove} /></Button>
+    </li>)}</ul> : <p><T value={ui.passkeys.passkeymanager.noPasskeysYet} /></p>}
+    <Input label={<T value={ui.attrs.passkeysPasskeymanagerInputLabelPasskeyName} />} id="passkey-name" value={label} onChange={(event) => setLabel(event.target.value)} placeholder="My laptop" />
+    <Input label={<T value={ui.attrs.passkeysPasskeymanagerInputLabelCurrentPassword} />} id="passkey-password" type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} required />
+    <Button type="button" variant="primary" onClick={enroll} disabled={busy || !password}><T value={ui.passkeys.passkeymanager.addPasskey} /></Button>
     {message ? <p role="status">{message}</p> : null}
   </section>;
 }

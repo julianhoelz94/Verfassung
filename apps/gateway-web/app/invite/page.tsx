@@ -1,3 +1,4 @@
+import { T, ui } from '../components/TranslationProvider';
 import { Alert, Button, Card, Input, PageHeader } from '../components/ui';
 import { PageMain } from '../components/PageMain';
 import { acceptInviteAction } from '../account/actions';
@@ -11,15 +12,15 @@ export default async function InvitePage(props: InvitePageProps) {
   return (
     <PageMain>
       <PageHeader
-        title="Accept invite"
-        meta="Set a password to activate the invited account."
+        title={<T value={ui.attrs.invitePagePageHeaderTitleAcceptInvite} />}
+        meta={<T value={ui.attrs.invitePagePageHeaderMetaSetA} />}
       />
-      {searchParams.error ? <Alert tone="error">That invite is invalid or the password does not meet policy.</Alert> : null}
+      {searchParams.error ? <Alert tone="error"><T value={ui.invite.page.thatInviteIsInvalidOrThePassword} /></Alert> : null}
       <Card>
         <form action={acceptInviteAction}>
-          <Input label="Invite token" id="token" name="token" defaultValue={searchParams.token ?? ''} required />
+          <Input label={<T value={ui.attrs.invitePageInputLabelInviteToken} />} id="token" name="token" defaultValue={searchParams.token ?? ''} required />
           <Input
-            label="Password"
+            label={<T value={ui.attrs.invitePageInputLabelPassword} />}
             id="password"
             name="password"
             type="password"
@@ -27,7 +28,7 @@ export default async function InvitePage(props: InvitePageProps) {
             required
             minLength={12}
           />
-          <Button variant="primary">Activate account</Button>
+          <Button variant="primary"><T value={ui.invite.page.activateAccount} /></Button>
         </form>
       </Card>
     </PageMain>

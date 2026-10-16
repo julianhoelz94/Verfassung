@@ -1,3 +1,4 @@
+import { T, ui } from '../../components/TranslationProvider';
 import { notFound } from 'next/navigation';
 import { PageHeader } from '../../components/ui';
 import { PageMain } from '../../components/PageMain';
@@ -12,7 +13,7 @@ export default async function PublicDocumentPage(props: { params: Promise<{ id: 
   return <PageMain>
     <PageHeader title={document.revision.title} meta={`Document revision ${document.revision.revision}`} />
     {document.revision.description ? <p>{document.revision.description}</p> : null}
-    {document.revision.sourceUrl ? <p><a href={document.revision.sourceUrl} rel="noreferrer">Original source</a></p> : null}
-    {document.revision.fileName ? <p><a href={`/api/document/documents/${id}/revisions/${document.revision.revision}/file`}>Download {document.revision.fileName}</a></p> : null}
+    {document.revision.sourceUrl ? <p><a href={document.revision.sourceUrl} rel="noreferrer"><T value={ui.documents.id.page.originalSource} /></a></p> : null}
+    {document.revision.fileName ? <p><a href={`/api/document/documents/${id}/revisions/${document.revision.revision}/file`}><T value={ui.documents.id.page.download} />{" "}{document.revision.fileName}</a></p> : null}
   </PageMain>;
 }

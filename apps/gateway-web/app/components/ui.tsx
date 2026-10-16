@@ -53,7 +53,7 @@ export function Chip({ href, active, children }: ChipProps) {
 
 type PageHeaderProps = {
   breadcrumbs?: { href?: string; label: string }[];
-  eyebrow?: string;
+  eyebrow?: ReactNode;
   title: ReactNode;
   meta?: ReactNode;
   actions?: ReactNode;
@@ -117,7 +117,7 @@ export function DataRow({ cells }: { cells: { label: string; value: ReactNode }[
   );
 }
 
-type InputProps = InputHTMLAttributes<HTMLInputElement> & { label: string; info?: FieldInfo };
+type InputProps = InputHTMLAttributes<HTMLInputElement> & { label: ReactNode; info?: FieldInfo };
 
 export function Input({ label, id, className, info, ...props }: InputProps) {
   const inputId = id ?? props.name;
@@ -135,7 +135,7 @@ export function Input({ label, id, className, info, ...props }: InputProps) {
   );
 }
 
-type TextAreaProps = TextareaHTMLAttributes<HTMLTextAreaElement> & { label: string };
+type TextAreaProps = TextareaHTMLAttributes<HTMLTextAreaElement> & { label: ReactNode };
 
 export function TextArea({ label, id, className, ...props }: TextAreaProps) {
   const inputId = id ?? props.name;
@@ -147,7 +147,7 @@ export function TextArea({ label, id, className, ...props }: TextAreaProps) {
   );
 }
 
-type SelectProps = SelectHTMLAttributes<HTMLSelectElement> & { label: string; children: ReactNode; info?: FieldInfo };
+type SelectProps = SelectHTMLAttributes<HTMLSelectElement> & { label: ReactNode; children: ReactNode; info?: FieldInfo };
 
 export function Select({ label, id, className, children, info, ...props }: SelectProps) {
   const inputId = id ?? props.name;

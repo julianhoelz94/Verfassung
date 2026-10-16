@@ -10,7 +10,7 @@ import { FormattedDate } from '../../../lib/format-date';
 import { SESSION_COOKIE } from '../../../lib/session';
 
 type AdminUsersPageProps = {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; q?: string; status?: string; role?: string }>;
 };
 
 function statusTone(user: AdminUser): 'added' | 'removed' | 'info' | 'neutral' {
@@ -44,6 +44,12 @@ export default async function AdminUsersPage(props: AdminUsersPageProps) {
       tokens = [];
     }
   }
+  const query = (searchParams.q ?? '').trim().toLowerCase();
+  const shownUsers = users.filter((user) =>
+    (!query || user.email.toLowerCase().includes(query)) &&
+    (!searchParams.status || user.status === searchParams.status) &&
+    (!searchParams.role || user.roles.includes(searchParams.role))
+  );
   return (
     <PageMain className="wide">
       <PageHeader title="Users" meta="Invite accounts, set roles, rotate machine tokens, and revoke access." />
@@ -57,8 +63,23 @@ export default async function AdminUsersPage(props: AdminUsersPageProps) {
         <h2 className="card-title">Invite</h2>
         <InviteUserForm />
       </Card>
+      <Card>
+        <h2 className="card-title">Find users</h2>
+        <form method="get" action="/admin/users" className="form-row">
+          <Input label="Search email" id="user-search" name="q" type="search" defaultValue={searchParams.q ?? ''} />
+          <label>Status <select name="status" defaultValue={searchParams.status ?? ''}>
+            <option value="">All</option><option value="active">Active</option><option value="pending_confirmation">Pending confirmation</option><option value="invited">Invited</option><option value="disabled">Disabled</option>
+          </select></label>
+          <label>Role <select name="role" defaultValue={searchParams.role ?? ''}>
+            <option value="">All</option><option value="viewer">Viewer</option><option value="editor">Editor</option><option value="reviewer">Reviewer</option><option value="publisher">Publisher</option><option value="admin">Admin</option>
+          </select></label>
+          <Button>Search</Button>
+        </form>
+        <p className="muted">Showing {shownUsers.length} of {users.length} users.</p>
+      </Card>
+      {shownUsers.length === 0 && !usersError ? <p>No users match these filters.</p> : null}
       <DataList columns={4}>
-        {users.map((item) => (
+        {shownUsers.map((item) => (
           <DataRow
             key={item.id}
             cells={[
@@ -73,6 +94,8 @@ export default async function AdminUsersPage(props: AdminUsersPageProps) {
                 value:
                   item.status === 'invited' ? (
                     <span className="muted">Waiting for the invite to be accepted.</span>
+                  ) : item.status === 'pending_confirmation' ? (
+                    <span className="muted">Waiting for email confirmation.</span>
                   ) : item.enabled ? (
                     <div className="form-row">
                       <form action={disableUserAction}>
@@ -82,12 +105,14 @@ export default async function AdminUsersPage(props: AdminUsersPageProps) {
                       <IssueResetForm userId={item.id} />
                       <form action={updateRolesAction}>
                         <input type="hidden" name="userId" value={item.id} />
-                        <Input
-                          label="Roles (comma-separated)"
-                          id={`roles-${item.id}`}
-                          name="roles"
-                          defaultValue={item.roles.join(', ')}
-                        />
+                        <fieldset>
+                          <legend>Roles</legend>
+                          {(['viewer', 'editor', 'reviewer', 'publisher', 'admin'] as const).map((role) =>
+                            <label key={role} className="form-row">
+                              <input type="checkbox" name="role" value={role} defaultChecked={item.roles.includes(role)} /> {role}
+                            </label>
+                          )}
+                        </fieldset>
                         <Button>Update roles</Button>
                       </form>
                     </div>

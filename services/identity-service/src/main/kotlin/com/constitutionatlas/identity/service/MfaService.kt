@@ -11,9 +11,12 @@ import com.constitutionatlas.identity.crypto.Totp
 import com.constitutionatlas.identity.repo.IdentityRepository
 import com.constitutionatlas.identity.repo.StoredMfaChallenge
 import com.constitutionatlas.platform.UnauthorizedException
+import com.google.zxing.BarcodeFormat
+import com.google.zxing.qrcode.QRCodeWriter
 import org.springframework.stereotype.Service
 import java.security.SecureRandom
 import java.time.Instant
+import java.util.Base64
 import java.util.UUID
 
 @Service
@@ -129,6 +132,19 @@ class MfaService(
 
     fun otpauthUrl(email: String, secret: String): String =
         Totp.otpauthUrl(mfaProperties.issuer, email, secret)
+
+    fun qrDataUrl(email: String, secret: String): String {
+        val matrix = QRCodeWriter().encode(otpauthUrl(email, secret), BarcodeFormat.QR_CODE, 1, 1)
+        val cells = buildString {
+            for (y in 0 until matrix.height) {
+                for (x in 0 until matrix.width) {
+                    if (matrix.get(x, y)) append("<rect x=\"$x\" y=\"$y\" width=\"1\" height=\"1\"/>")
+                }
+            }
+        }
+        val svg = "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 ${matrix.width} ${matrix.height}\" width=\"208\" height=\"208\" shape-rendering=\"crispEdges\"><rect width=\"${matrix.width}\" height=\"${matrix.height}\" fill=\"white\"/><g fill=\"black\">$cells</g></svg>"
+        return "data:image/svg+xml;base64," + Base64.getEncoder().encodeToString(svg.toByteArray(Charsets.UTF_8))
+    }
 
     fun hashToken(value: String): String = Tokens.sha256Hex(value)
 

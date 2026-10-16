@@ -19,6 +19,10 @@ export default async function AdminIndexPage() {
           <p className="muted">Invite accounts, set roles, and revoke sessions.</p>
         </Card>
         <Card>
+          <h2 className="card-title"><Link href="/admin/settings">Account settings</Link></h2>
+          <p className="muted">Control registration and configure outgoing mail.</p>
+        </Card>
+        <Card>
           <h2 className="card-title">
             <Link href="/admin/constitutions">Outlines</Link>
           </h2>

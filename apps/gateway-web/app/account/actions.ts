@@ -82,6 +82,8 @@ export async function acceptInviteAction(formData: FormData): Promise<void> {
 }
 
 function parseRoles(formData: FormData, fallback = ''): string[] {
+  const selected = formData.getAll('role').map(String).filter(Boolean);
+  if (selected.length) return selected;
   return String(formData.get('roles') ?? fallback)
     .split(',')
     .map((role) => role.trim())

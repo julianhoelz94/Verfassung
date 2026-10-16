@@ -88,6 +88,115 @@ export type AdminUser = {
   createdAt: string;
 };
 
+export type IdentitySettings = {
+  selfRegistrationEnabled: boolean;
+  mailEnabled: boolean;
+  mailFrom: string;
+  mailFromName: string;
+  mailPublicBaseUrl: string;
+  smtpHost: string;
+  smtpPort: number;
+  smtpUsername: string;
+  smtpPasswordSet: boolean;
+  smtpAuth: boolean;
+  smtpStarttls: boolean;
+  smtpSsl: boolean;
+};
+
+export type PasskeyStart = { challengeId: string; options: Record<string, unknown> };
+export type PasskeyInfo = { id: string; label: string; createdAt: string; lastUsedAt?: string | null };
+
+export async function requestPasskeyStartLogin(fetchImpl: FetchLike = fetch, baseUrl = identityBaseUrl()): Promise<PasskeyStart> {
+  return readOk(await fetchImpl(`${baseUrl}/passkeys/login/start`, { method: 'POST', cache: 'no-store' }), 'Unable to start passkey sign-in');
+}
+
+export async function requestPasskeyFinishLogin(challengeId: string, credential: unknown, fetchImpl: FetchLike = fetch, baseUrl = identityBaseUrl()): Promise<LoginResult> {
+  return readOk(await fetchImpl(`${baseUrl}/passkeys/login/finish`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ challengeId, credential }), cache: 'no-store',
+  }), 'Unable to sign in with passkey');
+}
+
+export async function requestPasskeyStartEnrollment(token: string, password: string, fetchImpl: FetchLike = fetch, baseUrl = identityBaseUrl()): Promise<PasskeyStart> {
+  return readOk(await fetchImpl(`${baseUrl}/passkeys/enroll/start`, {
+    method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ password }), cache: 'no-store',
+  }), 'Unable to start passkey setup');
+}
+
+export async function requestPasskeyStartLoginEnrollment(challengeToken: string, fetchImpl: FetchLike = fetch, baseUrl = identityBaseUrl()): Promise<PasskeyStart> {
+  return readOk(await fetchImpl(`${baseUrl}/passkeys/enroll/login/start`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ challengeToken }), cache: 'no-store',
+  }), 'Unable to start passkey setup');
+}
+
+export async function requestPasskeyFinishLoginEnrollment(challengeToken: string, challengeId: string, credential: unknown, label: string, fetchImpl: FetchLike = fetch, baseUrl = identityBaseUrl()): Promise<LoginResult> {
+  return readOk(await fetchImpl(`${baseUrl}/passkeys/enroll/login/finish`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ challengeToken, challengeId, credential, label }), cache: 'no-store',
+  }), 'Unable to save passkey');
+}
+
+export async function requestPasskeyFinishEnrollment(token: string, challengeId: string, credential: unknown, label: string, fetchImpl: FetchLike = fetch, baseUrl = identityBaseUrl()): Promise<void> {
+  return readOk(await fetchImpl(`${baseUrl}/passkeys/enroll/finish`, {
+    method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ challengeId, credential, label }), cache: 'no-store',
+  }), 'Unable to save passkey');
+}
+
+export async function requestPasskeys(token: string, fetchImpl: FetchLike = fetch, baseUrl = identityBaseUrl()): Promise<PasskeyInfo[]> {
+  return readOk(await fetchImpl(`${baseUrl}/passkeys`, { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' }), 'Unable to load passkeys');
+}
+
+export async function requestRevokePasskey(token: string, id: string, password: string, fetchImpl: FetchLike = fetch, baseUrl = identityBaseUrl()): Promise<void> {
+  return readOk(await fetchImpl(`${baseUrl}/passkeys/${encodeURIComponent(id)}`, {
+    method: 'DELETE', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ password }), cache: 'no-store',
+  }), 'Unable to revoke passkey');
+}
+
+export async function requestRegistrationStatus(fetchImpl: FetchLike = fetch, baseUrl = identityBaseUrl()): Promise<boolean> {
+  const response = await fetchImpl(`${baseUrl}/registration/status`, { cache: 'no-store' });
+  if (!response.ok) return false;
+  return ((await response.json()) as { enabled: boolean }).enabled;
+}
+
+export async function requestRegistration(email: string, fetchImpl: FetchLike = fetch, baseUrl = identityBaseUrl()): Promise<void> {
+  const response = await fetchImpl(`${baseUrl}/registration`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email }), cache: 'no-store',
+  });
+  return readOk(response, 'Unable to request registration');
+}
+
+export async function requestConfirmRegistration(token: string, password: string, fetchImpl: FetchLike = fetch, baseUrl = identityBaseUrl()): Promise<void> {
+  const response = await fetchImpl(`${baseUrl}/registration/confirm`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token, password }), cache: 'no-store',
+  });
+  return readOk(response, 'Unable to confirm registration');
+}
+
+export async function requestIdentitySettings(token: string, fetchImpl: FetchLike = fetch, baseUrl = identityBaseUrl()): Promise<IdentitySettings> {
+  const response = await fetchImpl(`${baseUrl}/admin/settings`, { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' });
+  return readOk(response, 'Unable to load identity settings');
+}
+
+export async function updateIdentitySettings(token: string, settings: Omit<IdentitySettings, 'smtpPasswordSet'> & { smtpPassword?: string }, fetchImpl: FetchLike = fetch, baseUrl = identityBaseUrl()): Promise<IdentitySettings> {
+  const response = await fetchImpl(`${baseUrl}/admin/settings`, {
+    method: 'PUT', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(settings), cache: 'no-store',
+  });
+  return readOk(response, 'Unable to save identity settings');
+}
+
+export async function sendTestMail(token: string, to: string, fetchImpl: FetchLike = fetch, baseUrl = identityBaseUrl()): Promise<void> {
+  const response = await fetchImpl(`${baseUrl}/admin/settings/test-mail`, {
+    method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ to }), cache: 'no-store',
+  });
+  return readOk(response, 'Unable to send test mail');
+}
+
 async function readOk<T>(response: Response, fallback: string): Promise<T> {
   if (!response.ok) {
     let code: string | undefined;
@@ -265,6 +374,7 @@ export async function requestCompleteMfaLogin(
 export type MfaEnrollStart = {
   secret: string;
   otpauthUrl: string;
+  qrDataUrl: string;
   challengeToken: string;
 };
 

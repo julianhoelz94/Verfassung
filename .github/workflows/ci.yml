@@ -308,6 +308,7 @@ jobs:
     timeout-minutes: 50
     env:
       COMPOSE_PROJECT_NAME: full-stack-e2e
+      COMPOSE_FILE: docker-compose.yml:docker-compose.e2e.yml
       CADDY_PORT: '18080'
       GATEWAY_PORT: '13000'
       SESSION_COOKIE_SECURE: 'false'
@@ -344,7 +345,7 @@ jobs:
           done
       - name: Start production stack
         run: |
-          docker compose --env-file env/ci.env.example up -d --build edge-proxy
+          docker compose --env-file env/ci.env.example up -d --build edge-proxy mailpit
           for attempt in $(seq 1 90); do
             ready=true
             for service in catalog content amendment identity ingestion search document; do

@@ -19,6 +19,7 @@ jobs:
     timeout-minutes: 75
     env:
       COMPOSE_PROJECT_NAME: wiki-videos
+      COMPOSE_FILE: docker-compose.yml:docker-compose.e2e.yml
       CADDY_PORT: '18080'
       GATEWAY_PORT: '13000'
       SESSION_COOKIE_SECURE: 'false'
@@ -49,7 +50,7 @@ jobs:
         run: |
           set -euo pipefail
           for service in identity-service catalog-service content-service editor-service \
-            audit-service amendment-service search-service ingestion-service; do
+            audit-service amendment-service search-service ingestion-service document-service; do
             ./gradlew --no-daemon -p "services/${service}" bootJar -x test
             test -s "services/${service}/build/libs/app.jar"
           done
@@ -60,10 +61,10 @@ jobs:
           npx playwright install --with-deps chromium
       - name: Start full stack
         run: |
-          docker compose --env-file env/ci.env.example up -d --build edge-proxy
+          docker compose --env-file env/ci.env.example up -d --build edge-proxy mailpit
           for attempt in $(seq 1 90); do
             ready=true
-            for service in catalog content amendment identity ingestion search; do
+            for service in catalog content amendment identity ingestion search document; do
               status=$(curl --silent --output /dev/null --write-out '%{http_code}' "http://127.0.0.1:18080/api/${service}/actuator/health" || true)
               if [ "$status" != 200 ]; then ready=false; break; fi
             done
@@ -75,6 +76,7 @@ jobs:
       - name: Upload real API fixtures
         working-directory: apps/gateway-web
         run: |
+          npm run fixtures:generate
           npm run prepopulate
           npm run prepopulate -- --verify-only
       - name: Record full-stack editorial journey

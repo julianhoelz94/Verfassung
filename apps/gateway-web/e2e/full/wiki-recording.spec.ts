@@ -1,13 +1,31 @@
-import { expect, test, type Browser, type Page } from '@playwright/test';
+import { expect, test, type APIRequestContext, type Browser, type Page } from '@playwright/test';
 import { mkdir, mkdtemp, rename, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { authenticatorCode, signIn } from './auth';
+import { authenticatorCode, signIn, startFromViewer } from './auth';
 
 type Role = 'editor' | 'reviewer' | 'publisher';
 const outputDir = process.env.WIKI_VIDEO_DIR ?? join(__dirname, '../../../../docs/wiki/media');
 const baseURL = process.env.E2E_BASE_URL ?? 'http://127.0.0.1:18080';
 const correction = 'Dignity and civic equality protect every person. Verified transcription.';
+
+async function publishedVersion(request: APIRequestContext): Promise<{ countryIso: string; versionId: string }> {
+  const countries = await (await request.get('/api/catalog/countries')).json();
+  for (const summary of countries) {
+    const country = await (await request.get(`/api/catalog/countries/${summary.isoCode}`)).json();
+    for (const constitution of country.constitutions ?? []) {
+      for (const version of constitution.versions ?? []) {
+        const versionId = version.currentVersionId ?? version.id;
+        if (!versionId) continue;
+        const response = await request.get(`/api/content/versions/${versionId}/articles?includeBody=true`);
+        if (response.ok() && (await response.json()).some((article: { children?: unknown[] }) => !article.children?.length)) {
+          return { countryIso: summary.isoCode, versionId };
+        }
+      }
+    }
+  }
+  throw new Error('No published constitution with a plain article is available for recording');
+}
 
 async function caption(page: Page, label: string) {
   await page.evaluate((text) => {
@@ -40,6 +58,7 @@ async function record(browser: Browser, role: Role, file: string, stagingDir: st
     recordVideo: { dir: stagingDir, size: { width: 1280, height: 720 } },
   });
   await context.addInitScript(() => {
+    localStorage.setItem('ca_cookie_notice_v1', 'dismissed');
     const style = document.createElement('style');
     style.textContent = 'input[type=password], input[autocomplete="one-time-code"], input[name*="code" i], input[id*="code" i] { filter: blur(12px) !important; }';
     document.addEventListener('DOMContentLoaded', () => document.head.append(style), { once: true });
@@ -62,19 +81,18 @@ test('record editing, review, and publishing against the full stack', async ({ b
   const stagingDir = await mkdtemp(join(tmpdir(), 'wiki-videos-'));
   try {
     const clips: string[] = [];
+    const source = await publishedVersion(request);
     let sessionUrl = '';
     let sourceVersionId = '';
     let articleNumber = '';
     let publishedVersionId = '';
 
     clips.push(await record(browser, 'editor', 'editing-a-draft.webm', stagingDir, async (page) => {
-      await page.goto('/editor');
-      await expect(page.getByLabel('Correct this text')).toBeVisible();
+      await page.goto(`/countries/${source.countryIso}/versions/${source.versionId}`);
+      await expect(page.getByRole('link', { name: 'Edit this constitution' })).toBeVisible();
       await caption(page, 'Editor · Choose a published text');
-      sourceVersionId = (await page.getByLabel('Correct this text').locator('option').first().getAttribute('value')) ?? '';
-      expect(sourceVersionId).toBeTruthy();
-      await page.getByLabel('Correct this text').selectOption(sourceVersionId);
-      await page.getByRole('button', { name: 'Correct this text' }).click();
+      sourceVersionId = source.versionId;
+      await startFromViewer(page, source.countryIso, sourceVersionId, 'editorial_correction');
       await expect(page).toHaveURL(/sessionId=/);
       const articles = await (await request.get(`/api/content/versions/${sourceVersionId}/articles?includeBody=true`)).json();
       const article = articles.find((item: { children?: unknown[] }) => !item.children?.length);

@@ -7,7 +7,7 @@ Constitution Atlas is a Next.js gateway in front of Kotlin/Spring Boot services.
 | Catalog | Countries, constitutions, outlines, versions, and publication metadata. |
 | Content | Versioned constitutional text and ordered content nodes. |
 | Amendment | Legal changes, transitions, revisions, and exact change links. |
-| Identity | Accounts, roles, sessions, MFA, and credentials. |
+| Identity | Accounts, roles, sessions, registration, confirmation mail, SMTP settings, MFA, and passkeys. |
 | Editor | Draft sessions, review state, and publication commands. |
 | Ingestion | Upload/import jobs and staging before review. |
 | Search | Derived index over published material; rebuilt from source services. |
@@ -19,6 +19,7 @@ The source-of-truth boundaries should be checked against the current [repository
 
 - **Read:** browser → Caddy → gateway server component → Catalog/Content (and, for context, Amendment or Document). Public responses use published snapshots.
 - **Sign in:** gateway server action → Identity; session cookie is `ca_session`. MFA challenges use a separate short-lived flow.
+- **Register:** when enabled by an administrator, Identity accepts an email request and sends a one-use confirmation link. The account remains disabled until the recipient sets a password and initially has only the viewer role. Identity stores SMTP settings and verifies passkeys against the configured public origin.
 - **Publish:** an Editor session is saved, reviewed, and approved; a publisher with fresh MFA creates a successor version. Content and Catalog publish the new snapshot, and Search is asked to reindex. The former snapshot remains immutable.
 - **Import:** Ingestion stages proposed content. Separate reviewer and publisher actions are required before public visibility; no upload by itself publishes content.
 

@@ -4,10 +4,11 @@ Your available pages and buttons depend on your assigned roles. Hiding a button 
 
 ## Sign in and secure your account
 
-1. Choose **Log in** from the account menu and enter the credentials provided by an administrator. Follow the authenticator challenge when prompted.
-2. Open **Account** to review your account and authenticator setup. Administrator and publisher accounts require an authenticator. Keep recovery material private.
-3. For a protected publication action, complete the requested fresh MFA **step-up**. A prior login alone may no longer be recent enough.
-4. Use the reset or invitation link sent for your account when setting or recovering a password. Ask an administrator if your role or access is wrong.
+1. Choose **Log in** from the account menu. Use your password or an enrolled passkey, and follow any authenticator challenge. When an administrator has enabled registration, use **Register** on the login page to request an account by email.
+2. For registration, open the one-use email confirmation link within 24 hours and set your password. The new account starts as a viewer; an administrator must grant editorial roles. If registration is unavailable, ask an administrator for an invitation.
+3. Open **Account** to review your account and set up an authenticator using the QR code or manual key. Save the recovery codes privately. You can enroll a passkey after entering your current password. Administrator and publisher accounts require additional verification for protected actions.
+4. For a protected publication action, complete the requested fresh MFA **step-up**. A prior login alone may no longer be recent enough.
+5. Use the reset or invitation link sent for your account when setting or recovering a password. Ask an administrator if your role or access is wrong.
 
 ## Role summary
 
@@ -42,6 +43,6 @@ The clips do not show sign-in or real account credentials. A live publisher may 
 
 ## Admin tasks
 
-Open **Admin** for **Users**, **Outlines**, and **Import**. In Users, invite accounts, assign roles, and revoke sessions. In Outlines, configure the constitution's structure and inspect its preview before authors enter text. In Import, upload content into the reviewed staging flow and inspect the resulting job; staged data is not public until the appropriate review and publication steps finish.
+Open **Admin** for **Users**, **Account settings**, **Outlines**, and **Import**. Search Users to find accounts, invite people, assign roles, and revoke sessions. In Account settings, configure outgoing mail, send a test email to a specified recipient, and enable or disable self-registration. New installations start with mail and self-registration disabled; configure and test mail before enabling registration. In Outlines, configure the constitution's structure and inspect its preview before authors enter text. In Import, upload content into the reviewed staging flow and inspect the resulting job; staged data is not public until the appropriate review and publication steps finish.
 
 For exact permissions, see [editorial roles](https://github.com/julianhoelz94/Verfassung/blob/main/docs/editorial-roles.md). For public reading, see [[Website user guide|User-Guide]].

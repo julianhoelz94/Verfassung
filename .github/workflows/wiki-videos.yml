@@ -27,7 +27,7 @@ jobs:
       PREPOPULATE_TEST_STACK: 'true'
       PREPOPULATE_BASE_URL: http://127.0.0.1:18080
       E2E_BASE_URL: http://127.0.0.1:18080
-      WIKI_VIDEO_DIR: ${{ runner.temp }}/wiki-videos
+      WIKI_VIDEO_DIR: ${{ github.workspace }}/wiki-videos
       CI_ADMIN_EMAIL: ci-admin@example.local
       CI_ADMIN_PASSWORD: change-me
       CI_VIEWER_EMAIL: ci-viewer@example.local
@@ -90,7 +90,7 @@ jobs:
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: wiki-videos
-          path: ${{ runner.temp }}/wiki-videos/*.webm
+          path: ${{ github.workspace }}/wiki-videos/*.webm
           if-no-files-found: error
           retention-days: 1
       - name: Stack logs

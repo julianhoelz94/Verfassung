@@ -1,3 +1,4 @@
+import { T, ui } from '../components/TranslationProvider';
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { PageMain } from '../components/PageMain';
@@ -14,7 +15,7 @@ export default async function ImpressumPage() {
   if (!page) notFound();
   return (
     <PageMain>
-      <PageHeader title="Impressum" />
+      <PageHeader title={<T value={ui.attrs.impressumPagePageHeaderTitleImpressum} />} />
       <div className="legal-page-content" lang="de">{page.content}</div>
     </PageMain>
   );

@@ -16,11 +16,14 @@ data class UserDto(
     val mfaEnabled: Boolean = false,
     val mfaRequired: Boolean = false,
     val stepUpFresh: Boolean = false,
+    val languagePreference: String = "auto",
     @get:JsonInclude(JsonInclude.Include.NON_EMPTY)
     val scopes: List<String> = emptyList(),
     @get:JsonInclude(JsonInclude.Include.NON_NULL)
     val resource: String? = null,
 )
+
+data class LanguagePreferenceRequest(val languagePreference: String)
 
 data class SessionDto(
     val token: String,

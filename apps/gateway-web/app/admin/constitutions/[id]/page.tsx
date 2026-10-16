@@ -1,3 +1,4 @@
+import { T, ui } from '../../../components/TranslationProvider';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { AdminForbidden } from '../../../components/AdminForbidden';
@@ -46,24 +47,22 @@ export default async function AdminOutlinePage(props: AdminOutlinePageProps) {
         meta={match.country?.name}
       />
       {searchParams.saved ? (
-        <Alert tone="success">Settings saved. Historical versions retain their structural settings.</Alert>
+        <Alert tone="success"><T value={ui.admin.constitutions.id.page.settingsSavedHistoricalVersionsRetainTheirStructural} /></Alert>
       ) : null}
-      {(match.constitution.versions ?? []).length === 0 ? <Alert tone="info">The structure is ready. <Link href="/admin/import">Import the first version</Link> or <Link href="/editor">open the editor</Link> to continue.</Alert> : null}
-      {searchParams.migration ? <Alert tone="error">This change requires a reviewed successor migration. Existing versions have been preserved.</Alert> : null}
-      {searchParams.error ? <Alert tone="error">The outline could not be saved.</Alert> : null}
-      {searchParams.documentError ? <Alert tone="error">The document link could not be changed. Reload and try again.</Alert> : null}
+      {(match.constitution.versions ?? []).length === 0 ? <Alert tone="info"><T value={ui.admin.constitutions.id.page.theStructureIsReady} />{" "}<Link href="/admin/import"><T value={ui.admin.constitutions.id.page.importTheFirstVersion} /></Link> <T value={ui.admin.constitutions.id.page.or} />{" "}<Link href="/editor"><T value={ui.admin.constitutions.id.page.openTheEditor} /></Link> <T value={ui.admin.constitutions.id.page.toContinue} /></Alert> : null}
+      {searchParams.migration ? <Alert tone="error"><T value={ui.admin.constitutions.id.page.thisChangeRequiresAReviewedSuccessorMigration} /></Alert> : null}
+      {searchParams.error ? <Alert tone="error"><T value={ui.admin.constitutions.id.page.theOutlineCouldNotBeSaved} /></Alert> : null}
+      {searchParams.documentError ? <Alert tone="error"><T value={ui.admin.constitutions.id.page.theDocumentLinkCouldNotBeChanged} /></Alert> : null}
       <p>
-        Depth is the number of layers. The top layer is the provision the public table of contents lists. A concatenated
-        layer (typical for sentences) has no heading and is joined with its siblings.
-      </p>
+        <T value={ui.admin.constitutions.id.page.depthIsTheNumberOfLayersThe} />{" "}</p>
       <OutlineEditor constitutionId={params.id} initial={kinds} settingsRevisionId={settings.id} />
       <DocumentLinks targetType="constitution" targetId={params.id} returnTo={`/admin/constitutions/${params.id}`} canEdit />
       {settings.predecessorId ? <form action={restoreOutlineAction} className="card">
-        <h2>Settings history</h2><p>Restore the previous revision after checking its impact on stored content.</p>
+        <h2><T value={ui.admin.constitutions.id.page.settingsHistory} /></h2><p><T value={ui.admin.constitutions.id.page.restoreThePreviousRevisionAfterCheckingIts} /></p>
         <input type="hidden" name="constitutionId" value={params.id} />
         <input type="hidden" name="settingsRevisionId" value={settings.id} />
         <input type="hidden" name="revisionId" value={settings.predecessorId} />
-        <button type="submit">Restore previous settings</button>
+        <button type="submit"><T value={ui.admin.constitutions.id.page.restorePreviousSettings} /></button>
       </form> : null}
     </PageMain>
   );

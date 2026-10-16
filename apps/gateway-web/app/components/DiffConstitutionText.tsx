@@ -1,3 +1,4 @@
+import { T, ui } from './TranslationProvider';
 import type { ArticleSummary, ContentNode, ContentOutline, OrderedEntry, OrderedNode } from '../../lib/api';
 import { articleHeading, asOutlinePresentation, concatenatedText, effectiveDisplayKind, kindByCode, nodeHeading } from '../../lib/outline';
 import { OrderedContentTree } from './ConstitutionText';
@@ -206,7 +207,7 @@ function DiffBody({ left, right, side, leftLabel, rightLabel, labelPlacement }: 
 }) {
   const segs = segsForSide(diffText(left, right), side);
   if (segs.length === 0) {
-    return <p className="constitution-body muted">No text in this version.</p>;
+    return <p className="constitution-body muted"><T value={ui.components.diffconstitutiontext.noTextInThisVersion} /></p>;
   }
   return (
     <p className="constitution-body">

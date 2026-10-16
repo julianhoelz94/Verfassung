@@ -1,3 +1,4 @@
+import { T, ui } from '../../components/TranslationProvider';
 import { redirect } from 'next/navigation';
 import { Alert, Button, Card, Input, PageHeader } from '../../components/ui';
 import { PageMain } from '../../components/PageMain';
@@ -16,20 +17,20 @@ export default async function StepUpPage(props: StepUpPageProps) {
   }
   return (
     <PageMain>
-      <PageHeader title="Confirm it is you" meta="Publishing and role changes need a recent authenticator code." />
-      {searchParams.error ? <Alert tone="error">That authenticator code could not be verified.</Alert> : null}
+      <PageHeader title={<T value={ui.attrs.accountStepUpPagePageHeaderTitleConfirm} />} meta={<T value={ui.attrs.accountStepUpPagePageHeaderMetaPublishing} />} />
+      {searchParams.error ? <Alert tone="error"><T value={ui.account.stepUp.page.thatAuthenticatorCodeCouldNotBeVerified} /></Alert> : null}
       <Card>
         <form action={stepUpAction}>
           <input type="hidden" name="returnTo" value={searchParams.returnTo ?? '/account'} />
           <Input
-            label="Authenticator code"
+            label={<T value={ui.attrs.accountStepUpPageInputLabelAuthenticator} />}
             id="code"
             name="code"
             inputMode="numeric"
             autoComplete="one-time-code"
             required
           />
-          <Button variant="primary">Continue</Button>
+          <Button variant="primary"><T value={ui.account.stepUp.page.continue} /></Button>
         </form>
       </Card>
     </PageMain>

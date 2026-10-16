@@ -1,3 +1,4 @@
+import { T, ui } from '../../../../components/TranslationProvider';
 import { notFound } from 'next/navigation';
 import { PageMain } from '../../../../components/PageMain';
 import { PageHeader } from '../../../../components/ui';
@@ -38,10 +39,10 @@ export default async function ConstitutionOverview({ params }: Props) {
           constitution.lifecycleStatus === 'uncertain' ? 'Status uncertain' :
           constitution.lifecycleStatus === 'repealed' ? 'Repealed' : 'Status not recorded'}
       </p>
-      <p><a href={`/countries/${country.isoCode}/constitution-timeline`}>View country constitution timeline</a></p>
+      <p><a href={`/countries/${country.isoCode}/constitution-timeline`}><T value={ui.countries.code.constitutions.constitutionid.page.viewCountryConstitutionTimeline} /></a></p>
       {lifecycle.length > 0 ? (
         <section>
-          <h2>Lifecycle dates</h2>
+          <h2><T value={ui.countries.code.constitutions.constitutionid.page.lifecycleDates} /></h2>
           <ul>{lifecycle.map((event) => (
             <li key={event.id}><time dateTime={event.eventDate}>{event.dateCertainty === 'approximate' ? 'Circa ' : ''}{event.eventDate}</time> · {event.eventType}</li>
           ))}</ul>
@@ -49,7 +50,7 @@ export default async function ConstitutionOverview({ params }: Props) {
       ) : null}
       {wiki ? (
         <section className="card">
-          <h2>About this constitution</h2>
+          <h2><T value={ui.countries.code.constitutions.constitutionid.page.aboutThisConstitution} /></h2>
           <p>{wiki.summary}</p>
           <WikiImages images={wiki.images.filter((image) => image.placement === 'before_body')} />
           <WikiBody body={wiki.body} />
@@ -58,8 +59,8 @@ export default async function ConstitutionOverview({ params }: Props) {
         </section>
       ) : null}
       <section>
-        <h2>Versions</h2>
-        {versions.length === 0 ? <p>No published versions yet.</p> : (
+        <h2><T value={ui.countries.code.constitutions.constitutionid.page.versions} /></h2>
+        {versions.length === 0 ? <p><T value={ui.countries.code.constitutions.constitutionid.page.noPublishedVersionsYet} /></p> : (
           <ul>
             {versions.map((version) => (
               <li key={version.id}>

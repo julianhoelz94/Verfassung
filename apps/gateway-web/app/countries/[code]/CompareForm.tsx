@@ -1,3 +1,4 @@
+import { T, ui } from '../../components/TranslationProvider';
 import type { VersionSummary } from '../../../lib/api';
 import { orderVersions } from '../../../lib/compare';
 import { formatDate } from '../../../lib/format-date';
@@ -22,7 +23,7 @@ export function CompareForm({
 }: CompareFormProps) {
   const ordered = orderVersions(versions);
   if (ordered.length < 2) {
-    return <p className="muted">Publish at least two versions to compare them.</p>;
+    return <p className="muted"><T value={ui.countries.code.compareform.publishAtLeastTwoVersionsToCompare} /></p>;
   }
   const defaultFrom = fromId ?? ordered[0]?.id;
   const defaultTo = toId ?? ordered[ordered.length - 1]?.id;
@@ -34,8 +35,7 @@ export function CompareForm({
     >
       {showAll ? <input type="hidden" name="all" value="1" /> : null}
       <label htmlFor="compare-from">
-        From
-        <select id="compare-from" name="from" defaultValue={defaultFrom}>
+        <T value={ui.countries.code.compareform.from} />{" "}<select id="compare-from" name="from" defaultValue={defaultFrom}>
           {ordered.map((version) => (
             <option key={version.id} value={version.id}>
               {version.versionLabel}
@@ -45,8 +45,7 @@ export function CompareForm({
         </select>
       </label>
       <label htmlFor="compare-to">
-        To
-        <select id="compare-to" name="to" defaultValue={defaultTo}>
+        <T value={ui.countries.code.compareform.to} />{" "}<select id="compare-to" name="to" defaultValue={defaultTo}>
           {ordered.map((version) => (
             <option key={`to-${version.id}`} value={version.id}>
               {version.versionLabel}
@@ -55,7 +54,7 @@ export function CompareForm({
           ))}
         </select>
       </label>
-      <Button variant="primary">Compare</Button>
+      <Button variant="primary"><T value={ui.countries.code.compareform.compare} /></Button>
     </form>
   );
 }

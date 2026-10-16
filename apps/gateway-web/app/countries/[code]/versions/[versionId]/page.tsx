@@ -1,3 +1,4 @@
+import { T, ui } from '../../../../components/TranslationProvider';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import { PageMain } from '../../../../components/PageMain';
@@ -105,7 +106,7 @@ export default async function VersionPage(props: VersionPageProps) {
   ];
   const title = version.version.effectiveDate ? (
     <>
-      Version in force since <FormattedDate value={version.version.effectiveDate} />
+      <T value={ui.countries.code.versions.versionid.page.versionInForceSince} />{" "}<FormattedDate value={version.version.effectiveDate} />
     </>
   ) : (
     `Version ${version.version.versionLabel}`
@@ -133,7 +134,7 @@ export default async function VersionPage(props: VersionPageProps) {
             {(version.constitution.latestVersionId
               ? params.versionId === version.constitution.latestVersionId
               : version.version.latestPublished) ? (
-              <Badge tone="accent">Latest</Badge>
+              <Badge tone="accent"><T value={ui.countries.code.versions.versionid.page.latest} /></Badge>
             ) : null}
             <Badge tone="info">{verificationLabel(version.version)}</Badge>
             <span>{version.version.languageCode}</span>
@@ -141,21 +142,18 @@ export default async function VersionPage(props: VersionPageProps) {
             <span>{provenanceLabel(version.version.provenance)}</span>
             {sourceHref ? (
               <a href={sourceHref} rel="noreferrer">
-                Source
-              </a>
+                <T value={ui.countries.code.versions.versionid.page.source} />{" "}</a>
             ) : null}
           </>
         }
         actions={
           <>
-            {canEdit ? <a className="btn btn-primary" href="#editor-entry">Edit this constitution</a> : null}
+            {canEdit ? <a className="btn btn-primary" href="#editor-entry"><T value={ui.countries.code.versions.versionid.page.editThisConstitution} /></a> : null}
             <a className="btn" href={`/countries/${country.isoCode}/timeline`}>
-              Timeline
-            </a>
+              <T value={ui.countries.code.versions.versionid.page.timeline} />{" "}</a>
             {neighbors.previous ? (
               <a className="btn" href={neighbors.previous.href}>
-                Compare with previous
-              </a>
+                <T value={ui.countries.code.versions.versionid.page.compareWithPrevious} />{" "}</a>
             ) : null}
             <PrintLink />
           </>
@@ -170,7 +168,7 @@ export default async function VersionPage(props: VersionPageProps) {
         canPublish={canPublish}
       /> : null}
       {documentLinks.length ? <section className="card">
-        <h2>Constitution documents</h2>
+        <h2><T value={ui.countries.code.versions.versionid.page.constitutionDocuments} /></h2>
         <ul className="link-list">{documentLinks.map((link) => <li key={link.documentId}>
           <a href={`/documents/${link.documentId}${link.revisionId ? `?revision=${link.document.revision.revision}` : ''}`}>{link.document.revision.title}</a>
           {link.revisionId ? ` · revision ${link.document.revision.revision}` : null}
@@ -185,10 +183,10 @@ export default async function VersionPage(props: VersionPageProps) {
         submitClassName="btn"
       />
       {searchParams.error === 'title' ? (
-        <Alert tone="error">The section title could not be saved.</Alert>
+        <Alert tone="error"><T value={ui.countries.code.versions.versionid.page.theSectionTitleCouldNotBeSaved} /></Alert>
       ) : null}
       {articles.length === 0 ? (
-        <p>No articles are published in this version.</p>
+        <p><T value={ui.countries.code.versions.versionid.page.noArticlesArePublishedInThisVersion} /></p>
       ) : (
         <VersionReader
           code={country.isoCode}

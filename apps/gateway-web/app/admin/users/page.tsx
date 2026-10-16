@@ -1,3 +1,4 @@
+import { T, ui } from '../../components/TranslationProvider';
 import { cookies } from 'next/headers';
 import { AdminForbidden } from '../../components/AdminForbidden';
 import { Alert, Badge, Button, Card, DataList, DataRow, Input, PageHeader } from '../../components/ui';
@@ -52,32 +53,32 @@ export default async function AdminUsersPage(props: AdminUsersPageProps) {
   );
   return (
     <PageMain className="wide">
-      <PageHeader title="Users" meta="Invite accounts, set roles, rotate machine tokens, and revoke access." />
+      <PageHeader title={<T value={ui.attrs.adminUsersPagePageHeaderTitleUsers} />} meta={<T value={ui.attrs.adminUsersPagePageHeaderMetaInvite} />} />
       {searchParams.error === 'forbidden' ? (
-        <Alert tone="error">Administrator role required.</Alert>
+        <Alert tone="error"><T value={ui.admin.users.page.administratorRoleRequired} /></Alert>
       ) : searchParams.error ? (
-        <Alert tone="error">That account action could not be completed.</Alert>
+        <Alert tone="error"><T value={ui.admin.users.page.thatAccountActionCouldNotBeCompleted} /></Alert>
       ) : null}
-      {usersError ? <Alert tone="error">The user list could not be loaded.</Alert> : null}
+      {usersError ? <Alert tone="error"><T value={ui.admin.users.page.theUserListCouldNotBeLoaded} /></Alert> : null}
       <Card>
-        <h2 className="card-title">Invite</h2>
+        <h2 className="card-title"><T value={ui.admin.users.page.invite} /></h2>
         <InviteUserForm />
       </Card>
       <Card>
-        <h2 className="card-title">Find users</h2>
+        <h2 className="card-title"><T value={ui.admin.users.page.findUsers} /></h2>
         <form method="get" action="/admin/users" className="form-row">
-          <Input label="Search email" id="user-search" name="q" type="search" defaultValue={searchParams.q ?? ''} />
-          <label>Status <select name="status" defaultValue={searchParams.status ?? ''}>
-            <option value="">All</option><option value="active">Active</option><option value="pending_confirmation">Pending confirmation</option><option value="invited">Invited</option><option value="disabled">Disabled</option>
+          <Input label={<T value={ui.attrs.adminUsersPageInputLabelSearch} />} id="user-search" name="q" type="search" defaultValue={searchParams.q ?? ''} />
+          <label><T value={ui.admin.users.page.status} />{" "}<select name="status" defaultValue={searchParams.status ?? ''}>
+            <option value=""><T value={ui.admin.users.page.all} /></option><option value="active"><T value={ui.admin.users.page.active} /></option><option value="pending_confirmation"><T value={ui.admin.users.page.pendingConfirmation} /></option><option value="invited"><T value={ui.admin.users.page.invited} /></option><option value="disabled"><T value={ui.admin.users.page.disabled} /></option>
           </select></label>
-          <label>Role <select name="role" defaultValue={searchParams.role ?? ''}>
-            <option value="">All</option><option value="viewer">Viewer</option><option value="editor">Editor</option><option value="reviewer">Reviewer</option><option value="publisher">Publisher</option><option value="admin">Admin</option>
+          <label><T value={ui.admin.users.page.role} />{" "}<select name="role" defaultValue={searchParams.role ?? ''}>
+            <option value=""><T value={ui.admin.users.page.all} /></option><option value="viewer"><T value={ui.admin.users.page.viewer} /></option><option value="editor"><T value={ui.admin.users.page.editor} /></option><option value="reviewer"><T value={ui.admin.users.page.reviewer} /></option><option value="publisher"><T value={ui.admin.users.page.publisher} /></option><option value="admin"><T value={ui.admin.users.page.admin} /></option>
           </select></label>
-          <Button>Search</Button>
+          <Button><T value={ui.admin.users.page.search} /></Button>
         </form>
-        <p className="muted">Showing {shownUsers.length} of {users.length} users.</p>
+        <p className="muted"><T value={ui.admin.users.page.showing} />{" "}{shownUsers.length} <T value={ui.admin.users.page.of} />{" "}{users.length} <T value={ui.admin.users.page.users} /></p>
       </Card>
-      {shownUsers.length === 0 && !usersError ? <p>No users match these filters.</p> : null}
+      {shownUsers.length === 0 && !usersError ? <p><T value={ui.admin.users.page.noUsersMatchTheseFilters} /></p> : null}
       <DataList columns={4}>
         {shownUsers.map((item) => (
           <DataRow
@@ -93,33 +94,33 @@ export default async function AdminUsersPage(props: AdminUsersPageProps) {
                 label: 'Actions',
                 value:
                   item.status === 'invited' ? (
-                    <span className="muted">Waiting for the invite to be accepted.</span>
+                    <span className="muted"><T value={ui.admin.users.page.waitingForTheInviteToBeAccepted} /></span>
                   ) : item.status === 'pending_confirmation' ? (
-                    <span className="muted">Waiting for email confirmation.</span>
+                    <span className="muted"><T value={ui.admin.users.page.waitingForEmailConfirmation} /></span>
                   ) : item.enabled ? (
                     <div className="form-row">
                       <form action={disableUserAction}>
                         <input type="hidden" name="userId" value={item.id} />
-                        <Button>Disable</Button>
+                        <Button><T value={ui.admin.users.page.disable} /></Button>
                       </form>
                       <IssueResetForm userId={item.id} />
                       <form action={updateRolesAction}>
                         <input type="hidden" name="userId" value={item.id} />
                         <fieldset>
-                          <legend>Roles</legend>
+                          <legend><T value={ui.admin.users.page.roles} /></legend>
                           {(['viewer', 'editor', 'reviewer', 'publisher', 'admin'] as const).map((role) =>
                             <label key={role} className="form-row">
                               <input type="checkbox" name="role" value={role} defaultChecked={item.roles.includes(role)} /> {role}
                             </label>
                           )}
                         </fieldset>
-                        <Button>Update roles</Button>
+                        <Button><T value={ui.admin.users.page.updateRoles} /></Button>
                       </form>
                     </div>
                   ) : (
                     <form action={enableUserAction}>
                       <input type="hidden" name="userId" value={item.id} />
-                      <Button variant="primary">Activate</Button>
+                      <Button variant="primary"><T value={ui.admin.users.page.activate} /></Button>
                     </form>
                   ),
               },
@@ -128,8 +129,8 @@ export default async function AdminUsersPage(props: AdminUsersPageProps) {
         ))}
       </DataList>
       <Card>
-        <h2 className="card-title">Service tokens</h2>
-        <p className="muted">Machine tokens expire after 90 days unless rotated. The plaintext secret is shown once.</p>
+        <h2 className="card-title"><T value={ui.admin.users.page.serviceTokens} /></h2>
+        <p className="muted"><T value={ui.admin.users.page.machineTokensExpireAfter90DaysUnless} /></p>
         <CreateServiceTokenForm />
       </Card>
       <DataList columns={4}>
@@ -142,7 +143,7 @@ export default async function AdminUsersPage(props: AdminUsersPageProps) {
               {
                 label: 'Expires',
                 value: item.revokedAt ? (
-                  <Badge tone="removed">Revoked</Badge>
+                  <Badge tone="removed"><T value={ui.admin.users.page.revoked} /></Badge>
                 ) : (
                   <FormattedDate value={item.expiresAt} />
                 ),
@@ -150,13 +151,13 @@ export default async function AdminUsersPage(props: AdminUsersPageProps) {
               {
                 label: 'Actions',
                 value: item.revokedAt ? (
-                  <span className="muted">Revoked</span>
+                  <span className="muted"><T value={ui.admin.users.page.revoked} /></span>
                 ) : (
                   <div className="form-row">
                     <RotateServiceTokenForm tokenId={item.id} />
                     <form action={revokeServiceTokenAction}>
                       <input type="hidden" name="tokenId" value={item.id} />
-                      <Button>Revoke</Button>
+                      <Button><T value={ui.admin.users.page.revoke} /></Button>
                     </form>
                   </div>
                 ),

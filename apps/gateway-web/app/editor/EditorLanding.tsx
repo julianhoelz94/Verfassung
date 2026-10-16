@@ -1,3 +1,4 @@
+import { T, ui } from '../components/TranslationProvider';
 import Link from 'next/link';
 import { getCountry, getVersion, listCountries, type CountryDetail } from '../../lib/api';
 import { editorErrorMessage, listAllSessions, type EditSessionSummary } from '../../lib/editor-api';
@@ -66,11 +67,11 @@ export async function EditorLanding({ email, roles, status, error }: { email: st
   const message = editorErrorMessage(error);
 
   return <PageMain className="wide">
-    <PageHeader title="Editor" eyebrow={heading} meta={`Signed in as ${email}.`} />
+    <PageHeader title={<T value={ui.attrs.editorEditorlandingPageHeaderTitleEditor} />} eyebrow={heading} meta={`Signed in as ${email}.`} />
     <h2 className="section-title">{heading}</h2>
     {message ? <Alert tone="error">{message}</Alert> : null}
-    {unavailable ? <Alert tone="error">Edit sessions are temporarily unavailable. Try again.</Alert> : rows.length === 0 ?
-      <p className="muted">{queue ? `No sessions are ${queue === 'reviewing' ? 'waiting for review' : 'approved for publish'}.` : <>No open sessions. <Link href="/">Browse countries</Link> and choose a constitution to start editing.</>}</p> :
+    {unavailable ? <Alert tone="error"><T value={ui.editor.editorlanding.editSessionsAreTemporarilyUnavailableTryAgain} /></Alert> : rows.length === 0 ?
+      <p className="muted">{queue ? `No sessions are ${queue === 'reviewing' ? 'waiting for review' : 'approved for publish'}.` : <><T value={ui.editor.editorlanding.noOpenSessions} />{" "}<Link href="/"><T value={ui.editor.editorlanding.browseCountries} /></Link> <T value={ui.editor.editorlanding.andChooseAConstitutionToStartEditing} /></>}</p> :
       countries.map((country) => <section key={country} className="editor-session-country">
         <h2>{country}</h2>
         {[...new Set(rows.filter((row) => row.country === country).map((row) => row.constitution))].map((constitution) =>
@@ -78,11 +79,11 @@ export async function EditorLanding({ email, roles, status, error }: { email: st
             <h3>{constitution}</h3>
             <ul className="editor-session-list">{rows.filter((row) => row.country === country && row.constitution === constitution).map(({ session, version }) =>
               <li key={session.id}>
-                <div><strong>{version}</strong><span>{workType(session.hopKind)} · Last edited {lastEdit(session.updatedAt)}</span></div>
+                <div><strong>{version}</strong><span>{workType(session.hopKind)} <T value={ui.editor.editorlanding.lastEdited} />{" "}{lastEdit(session.updatedAt)}</span></div>
                 <a className="btn btn-sm" href={sessionHref(session)}>{queue ? queue === 'reviewing' ? 'Open review' : 'Open publish view' : 'Continue editing'}</a>
               </li>)}</ul>
           </section>)}
       </section>)}
-    {queue && canEdit ? <p><a href="/editor">My open sessions</a></p> : null}
+    {queue && canEdit ? <p><a href="/editor"><T value={ui.editor.editorlanding.myOpenSessions} /></a></p> : null}
   </PageMain>;
 }

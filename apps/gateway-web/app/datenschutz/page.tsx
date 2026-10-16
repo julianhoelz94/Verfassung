@@ -1,3 +1,4 @@
+import { T, ui } from '../components/TranslationProvider';
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { PageMain } from '../components/PageMain';
@@ -11,7 +12,7 @@ export default async function DatenschutzPage() {
   if (!page) notFound();
   return (
     <PageMain>
-      <PageHeader title="Datenschutzerklärung" meta={`Stand: ${new Date(page.createdAt).toLocaleDateString('de-DE')}`} />
+      <PageHeader title={<T value={ui.attrs.datenschutzPagePageHeaderTitleDatenschutzerklaRung} />} meta={`Stand: ${new Date(page.createdAt).toLocaleDateString('de-DE')}`} />
       <div className="legal-page-content" lang="de">{page.content}</div>
     </PageMain>
   );

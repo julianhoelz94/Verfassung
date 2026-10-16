@@ -1,3 +1,4 @@
+import { T, ui } from '../../components/TranslationProvider';
 import { cookies } from 'next/headers';
 import { AdminForbidden } from '../../components/AdminForbidden';
 import { PageMain } from '../../components/PageMain';
@@ -14,34 +15,34 @@ export default async function IdentitySettingsPage({ searchParams }: { searchPar
   const user = await currentUser();
   const settings = token ? await requestIdentitySettings(token).catch(() => null) : null;
   return <PageMain>
-    <PageHeader title="Account settings" meta="Control registration and outbound email." />
+    <PageHeader title={<T value={ui.attrs.adminSettingsPagePageHeaderTitleAccount} />} meta={<T value={ui.attrs.adminSettingsPagePageHeaderMetaControl} />} />
     {params.error ? <Alert tone="error">{params.error === 'test' ? 'Test email could not be delivered. Check the settings and SMTP service.' : 'Settings could not be saved. Check the values and try again.'}</Alert> : null}
-    {params.saved ? <Alert tone="success">Settings saved.</Alert> : null}
-    {params.tested ? <Alert tone="success">Test email sent.</Alert> : null}
-    {!settings ? <Alert tone="error">Account settings could not be loaded.</Alert> : <>
+    {params.saved ? <Alert tone="success"><T value={ui.admin.settings.page.settingsSaved} /></Alert> : null}
+    {params.tested ? <Alert tone="success"><T value={ui.admin.settings.page.testEmailSent} /></Alert> : null}
+    {!settings ? <Alert tone="error"><T value={ui.admin.settings.page.accountSettingsCouldNotBeLoaded} /></Alert> : <>
       <Card><form action={saveIdentitySettingsAction}>
-        <h2 className="card-title">Registration</h2>
-        <label><input type="checkbox" name="selfRegistrationEnabled" defaultChecked={settings.selfRegistrationEnabled} /> Allow people to register themselves</label>
-        <p className="muted">Off by default. New accounts receive only the viewer role and must confirm their email.</p>
-        <h2 className="card-title">Outgoing mail</h2>
-        <label><input type="checkbox" name="mailEnabled" defaultChecked={settings.mailEnabled} /> Enable outgoing mail</label>
-        <Input label="From address" id="mailFrom" name="mailFrom" type="email" defaultValue={settings.mailFrom} />
-        <Input label="Sender name" id="mailFromName" name="mailFromName" defaultValue={settings.mailFromName} />
-        <Input label="Public site URL" id="mailPublicBaseUrl" name="mailPublicBaseUrl" type="url" defaultValue={settings.mailPublicBaseUrl} />
-        <Input label="SMTP host" id="smtpHost" name="smtpHost" defaultValue={settings.smtpHost} />
-        <Input label="SMTP port" id="smtpPort" name="smtpPort" type="number" min={1} max={65535} defaultValue={settings.smtpPort} />
-        <Input label="SMTP username" id="smtpUsername" name="smtpUsername" defaultValue={settings.smtpUsername} />
+        <h2 className="card-title"><T value={ui.admin.settings.page.registration} /></h2>
+        <label><input type="checkbox" name="selfRegistrationEnabled" defaultChecked={settings.selfRegistrationEnabled} /> <T value={ui.admin.settings.page.allowPeopleToRegisterThemselves} /></label>
+        <p className="muted"><T value={ui.admin.settings.page.offByDefaultNewAccountsReceiveOnly} /></p>
+        <h2 className="card-title"><T value={ui.admin.settings.page.outgoingMail} /></h2>
+        <label><input type="checkbox" name="mailEnabled" defaultChecked={settings.mailEnabled} /> <T value={ui.admin.settings.page.enableOutgoingMail} /></label>
+        <Input label={<T value={ui.attrs.adminSettingsPageInputLabelFrom} />} id="mailFrom" name="mailFrom" type="email" defaultValue={settings.mailFrom} />
+        <Input label={<T value={ui.attrs.adminSettingsPageInputLabelSender} />} id="mailFromName" name="mailFromName" defaultValue={settings.mailFromName} />
+        <Input label={<T value={ui.attrs.adminSettingsPageInputLabelPublic} />} id="mailPublicBaseUrl" name="mailPublicBaseUrl" type="url" defaultValue={settings.mailPublicBaseUrl} />
+        <Input label={<T value={ui.attrs.adminSettingsPageInputLabelSMTP} />} id="smtpHost" name="smtpHost" defaultValue={settings.smtpHost} />
+        <Input label={<T value={ui.attrs.adminSettingsPageInputLabelSMTP2} />} id="smtpPort" name="smtpPort" type="number" min={1} max={65535} defaultValue={settings.smtpPort} />
+        <Input label={<T value={ui.attrs.adminSettingsPageInputLabelSMTP3} />} id="smtpUsername" name="smtpUsername" defaultValue={settings.smtpUsername} />
         <Input label={settings.smtpPasswordSet ? 'New SMTP password (leave blank to keep current)' : 'SMTP password'} id="smtpPassword" name="smtpPassword" type="password" autoComplete="new-password" />
-        <label><input type="checkbox" name="smtpAuth" defaultChecked={settings.smtpAuth} /> SMTP authentication</label>
-        <label><input type="checkbox" name="smtpStarttls" defaultChecked={settings.smtpStarttls} /> STARTTLS</label>
-        <label><input type="checkbox" name="smtpSsl" defaultChecked={settings.smtpSsl} /> Implicit TLS</label>
-        <Button variant="primary">Save settings</Button>
+        <label><input type="checkbox" name="smtpAuth" defaultChecked={settings.smtpAuth} /> <T value={ui.admin.settings.page.smtpAuthentication} /></label>
+        <label><input type="checkbox" name="smtpStarttls" defaultChecked={settings.smtpStarttls} /> <T value={ui.admin.settings.page.starttls} /></label>
+        <label><input type="checkbox" name="smtpSsl" defaultChecked={settings.smtpSsl} /> <T value={ui.admin.settings.page.implicitTls} /></label>
+        <Button variant="primary"><T value={ui.admin.settings.page.saveSettings} /></Button>
       </form></Card>
-      <Card><h2 className="card-title">Test mail</h2>
-        <p>Send a test message to any address after saving the settings.</p>
+      <Card><h2 className="card-title"><T value={ui.admin.settings.page.testMail} /></h2>
+        <p><T value={ui.admin.settings.page.sendATestMessageToAnyAddress} /></p>
         <form action={sendTestMailAction}>
-          <Input label="Recipient" id="test-mail-to" name="to" type="email" required defaultValue={user?.email ?? ''} />
-          <Button>Send test email</Button>
+          <Input label={<T value={ui.attrs.adminSettingsPageInputLabelRecipient} />} id="test-mail-to" name="to" type="email" required defaultValue={user?.email ?? ''} />
+          <Button><T value={ui.admin.settings.page.sendTestEmail} /></Button>
         </form>
       </Card>
     </>}

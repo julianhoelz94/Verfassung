@@ -1,3 +1,4 @@
+import { T, ui } from './TranslationProvider';
 import { CookieSettings } from './CookieSettings';
 
 type SiteFooterProps = {
@@ -9,24 +10,23 @@ export function SiteFooter({ showApiDocs = false }: SiteFooterProps) {
     <footer className="footer">
       <div className="footer-inner">
         <p>
-          Texts are shown as published in our catalog, with source and verification labels.
-        </p>
+          <T value={ui.components.sitefooter.textsAreShownAsPublishedInOur} />{" "}</p>
         <nav aria-label="Footer">
-          <a href="/about">About</a>
+          <a href="/about"><T value={ui.components.sitefooter.about} /></a>
           {' · '}
-          <a href="/about#sources">Sources</a>
+          <a href="/about#sources"><T value={ui.components.sitefooter.sources} /></a>
           {' · '}
-          <a href="/about#accessibility">Accessibility</a>
+          <a href="/about#accessibility"><T value={ui.components.sitefooter.accessibility} /></a>
           {' · '}
-          <a href="/impressum">Impressum</a>
+          <a href="/impressum"><T value={ui.components.sitefooter.impressum} /></a>
           {' · '}
-          <a href="/datenschutz">Datenschutzerklärung</a>
+          <a href="/datenschutz"><T value={ui.components.sitefooter.datenschutzerklarung} /></a>
           {' · '}
           <CookieSettings />
           {showApiDocs ? (
             <>
               {' · '}
-              <a href="/api-docs">API docs</a>
+              <a href="/api-docs"><T value={ui.components.sitefooter.apiDocs} /></a>
             </>
           ) : null}
         </nav>

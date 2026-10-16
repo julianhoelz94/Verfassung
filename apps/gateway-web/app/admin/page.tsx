@@ -1,3 +1,4 @@
+import { T, ui } from '../components/TranslationProvider';
 import Link from 'next/link';
 import { AdminForbidden } from '../components/AdminForbidden';
 import { PageMain } from '../components/PageMain';
@@ -10,37 +11,37 @@ export default async function AdminIndexPage() {
   }
   return (
     <PageMain>
-      <PageHeader title="Admin" meta="User accounts, constitution outlines, and import jobs." />
+      <PageHeader title={<T value={ui.attrs.adminPagePageHeaderTitleAdmin} />} meta={<T value={ui.attrs.adminPagePageHeaderMetaUserAccounts} />} />
       <div className="card-grid">
         <Card>
           <h2 className="card-title">
-            <Link href="/admin/users">Users</Link>
+            <Link href="/admin/users"><T value={ui.admin.page.users} /></Link>
           </h2>
-          <p className="muted">Invite accounts, set roles, and revoke sessions.</p>
+          <p className="muted"><T value={ui.admin.page.inviteAccountsSetRolesAndRevokeSessions} /></p>
         </Card>
         <Card>
-          <h2 className="card-title"><Link href="/admin/settings">Account settings</Link></h2>
-          <p className="muted">Control registration and configure outgoing mail.</p>
+          <h2 className="card-title"><Link href="/admin/settings"><T value={ui.admin.page.accountSettings} /></Link></h2>
+          <p className="muted"><T value={ui.admin.page.controlRegistrationAndConfigureOutgoingMail} /></p>
         </Card>
         <Card>
-          <h2 className="card-title"><Link href="/admin/anonymous-browsing">Anonymous browsing</Link></h2>
-          <p className="muted">Control visitor access and API call rates.</p>
+          <h2 className="card-title"><Link href="/admin/anonymous-browsing"><T value={ui.admin.page.anonymousBrowsing} /></Link></h2>
+          <p className="muted"><T value={ui.admin.page.controlVisitorAccessAndApiCallRates} /></p>
         </Card>
         <Card>
           <h2 className="card-title">
-            <Link href="/admin/constitutions">Outlines</Link>
+            <Link href="/admin/constitutions"><T value={ui.admin.page.outlines} /></Link>
           </h2>
-          <p className="muted">Create constitutions and edit their section outline.</p>
+          <p className="muted"><T value={ui.admin.page.createConstitutionsAndEditTheirSectionOutline} /></p>
         </Card>
         <Card>
           <h2 className="card-title">
-            <Link href="/admin/import">Import</Link>
+            <Link href="/admin/import"><T value={ui.admin.page.import} /></Link>
           </h2>
-          <p className="muted">Load a JSON corpus and follow the job until it finishes.</p>
+          <p className="muted"><T value={ui.admin.page.loadAJsonCorpusAndFollowThe} /></p>
         </Card>
         <Card>
-          <h2 className="card-title"><Link href="/admin/legal/impressum">Legal pages</Link></h2>
-          <p className="muted">Edit and publish the <Link href="/admin/legal/impressum">Impressum</Link> and <Link href="/admin/legal/datenschutz">Datenschutzerklärung</Link>.</p>
+          <h2 className="card-title"><Link href="/admin/legal/impressum"><T value={ui.admin.page.legalPages} /></Link></h2>
+          <p className="muted"><T value={ui.admin.page.editAndPublishThe} />{" "}<Link href="/admin/legal/impressum"><T value={ui.admin.page.impressum} /></Link> <T value={ui.admin.page.and} />{" "}<Link href="/admin/legal/datenschutz"><T value={ui.admin.page.datenschutzerklarung} /></Link>.</p>
         </Card>
       </div>
     </PageMain>

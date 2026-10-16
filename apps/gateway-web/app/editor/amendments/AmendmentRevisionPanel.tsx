@@ -1,5 +1,6 @@
 'use client';
 
+import { T, ui } from '../../components/TranslationProvider';
 import { useMemo } from 'react';
 import type { Amendment } from '../../../lib/api';
 import type { AmendmentRevision } from '../../../lib/amendment-editor-api';
@@ -78,20 +79,19 @@ export function AmendmentRevisionPanel({
         <input type="hidden" name="amendmentId" value={amendmentId} />
         <input type="hidden" name="revisionBody" value={JSON.stringify(selectedRevision)} />
         <Button type="submit" size="sm">
-          Restore as new draft
-        </Button>
+          <T value={ui.editor.amendments.amendmentrevisionpanel.restoreAsNewDraft} />{" "}</Button>
       </form>
     ) : null;
 
   return (
     <>
       <details className="panel panel-side revision-panel-phone">
-        <summary className="panel-title">Revision history</summary>
+        <summary className="panel-title"><T value={ui.editor.amendments.amendmentrevisionpanel.revisionHistory} /></summary>
         {list}
         {restoreForm}
       </details>
       <aside className="panel panel-side revision-panel-desktop" aria-label="Revision history">
-        <p className="panel-title">Revision history</p>
+        <p className="panel-title"><T value={ui.editor.amendments.amendmentrevisionpanel.revisionHistory} /></p>
         {list}
         {restoreForm}
       </aside>

@@ -1,5 +1,6 @@
 'use client';
 
+import { T, ui } from './TranslationProvider';
 import { useEffect, useState, type ReactNode } from 'react';
 
 export function FiltersPanel({ children }: { children: ReactNode }) {
@@ -19,7 +20,7 @@ export function FiltersPanel({ children }: { children: ReactNode }) {
 
   return (
     <details className="filters-disclosure">
-      <summary className="btn btn-sm">Filters</summary>
+      <summary className="btn btn-sm"><T value={ui.components.filterspanel.filters} /></summary>
       {children}
     </details>
   );

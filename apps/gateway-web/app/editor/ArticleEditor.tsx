@@ -1,5 +1,6 @@
 'use client';
 
+import { T, ui } from '../components/TranslationProvider';
 import { Button, Input, TextArea } from '../components/ui';
 
 type ArticleEditorProps = {
@@ -25,10 +26,10 @@ export function ArticleEditor({
       <input type="hidden" name="sessionId" value={sessionId} />
       <input type="hidden" name="versionId" value={versionId} />
       <input type="hidden" name="articleId" value={articleId} />
-      <Input id="title" name="title" label="Title" defaultValue={title} />
-      <TextArea id="body" name="body" label="Article text" defaultValue={body} rows={18} className="constitution-body" />
+      <Input id="title" name="title" label={<T value={ui.attrs.editorArticleeditorInputLabelTitle} />} defaultValue={title} />
+      <TextArea id="body" name="body" label={<T value={ui.attrs.editorArticleeditorTextAreaLabelArticleText} />} defaultValue={body} rows={18} className="constitution-body" />
       <div className="action-bar">
-        <Button variant="primary">Save draft</Button>
+        <Button variant="primary"><T value={ui.editor.articleeditor.saveDraft} /></Button>
       </div>
     </form>
   );

@@ -1,3 +1,4 @@
+import { T, ui } from '../components/TranslationProvider';
 import { Alert, Button, Card, Input, PageHeader } from '../components/ui';
 import { PageMain } from '../components/PageMain';
 import { confirmResetAction, requestResetAction } from '../account/actions';
@@ -11,23 +12,23 @@ export default async function ResetPage(props: ResetPageProps) {
   return (
     <PageMain>
       <PageHeader
-        title="Reset password"
-        meta="Enter your email to request a reset. The response is the same whether or not that account exists. When outbound mail is configured, a link is emailed; an administrator can also issue a one-time token from Users."
+        title={<T value={ui.attrs.resetPagePageHeaderTitleResetPassword} />}
+        meta={<T value={ui.attrs.resetPagePageHeaderMetaEnterYour} />}
       />
       {searchParams.sent ? (
-        <Alert>If that account exists, a reset was issued. Check email when mail is configured, or ask an administrator for a token.</Alert>
+        <Alert><T value={ui.reset.page.ifThatAccountExistsAResetWas} /></Alert>
       ) : null}
-      {searchParams.error ? <Alert tone="error">That reset link is invalid or the password does not meet policy.</Alert> : null}
+      {searchParams.error ? <Alert tone="error"><T value={ui.reset.page.thatResetLinkIsInvalidOrThe} /></Alert> : null}
       <Card>
         <form action={requestResetAction}>
-          <Input label="Email" id="reset-email" name="email" type="email" autoComplete="username" required />
-          <Button variant="primary">Request reset</Button>
+          <Input label={<T value={ui.attrs.resetPageInputLabelEmail} />} id="reset-email" name="email" type="email" autoComplete="username" required />
+          <Button variant="primary"><T value={ui.reset.page.requestReset} /></Button>
         </form>
-        <h2>Confirm reset</h2>
+        <h2><T value={ui.reset.page.confirmReset} /></h2>
         <form action={confirmResetAction}>
-          <Input label="Reset token" id="token" name="token" defaultValue={searchParams.token ?? ''} required />
+          <Input label={<T value={ui.attrs.resetPageInputLabelResetToken} />} id="token" name="token" defaultValue={searchParams.token ?? ''} required />
           <Input
-            label="New password"
+            label={<T value={ui.attrs.resetPageInputLabelNewPassword} />}
             id="newPassword"
             name="newPassword"
             type="password"
@@ -35,7 +36,7 @@ export default async function ResetPage(props: ResetPageProps) {
             required
             minLength={12}
           />
-          <Button variant="primary">Set new password</Button>
+          <Button variant="primary"><T value={ui.reset.page.setNewPassword} /></Button>
         </form>
       </Card>
     </PageMain>

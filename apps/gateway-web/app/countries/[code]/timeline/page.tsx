@@ -1,3 +1,4 @@
+import { T, ui } from '../../../components/TranslationProvider';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import { PageMain } from '../../../components/PageMain';
@@ -117,21 +118,19 @@ export default async function TimelinePage(props: TimelinePageProps) {
           { href: `/countries/${country.isoCode}`, label: country.name },
           { label: 'Timeline' },
         ]}
-        title="Amendment timeline"
+        title={<T value={ui.attrs.countriesCodeTimelinePagePageHeaderTitle} />}
         actions={
           tipId ? (
             <a className="btn" href={`/countries/${country.isoCode}/versions/${tipId}`}>
-              Read latest
-            </a>
+              <T value={ui.countries.code.timeline.page.readLatest} />{" "}</a>
           ) : (
             <a className="btn" href={`/countries/${country.isoCode}`}>
-              Versions
-            </a>
+              <T value={ui.countries.code.timeline.page.versions} />{" "}</a>
           )
         }
       />
       {amendments.length === 0 ? (
-        <p>No legal changes are recorded for this constitution.</p>
+        <p><T value={ui.countries.code.timeline.page.noLegalChangesAreRecordedForThis} /></p>
       ) : null}
       <ol className="timeline">
         {amendments.map((amendment) => {
@@ -179,13 +178,11 @@ export default async function TimelinePage(props: TimelinePageProps) {
                       className="btn btn-sm"
                       href={`/countries/${country.isoCode}/compare?from=${encodeURIComponent(source?.id ?? amendment.sourceVersionId)}&to=${encodeURIComponent(target?.id ?? amendment.targetVersionId)}`}
                     >
-                      Compare with previous
-                      {source && target ? ` (${source.versionLabel} → ${target.versionLabel})` : ''}
+                      <T value={ui.countries.code.timeline.page.compareWithPrevious} />{" "}{source && target ? ` (${source.versionLabel} → ${target.versionLabel})` : ''}
                     </a>
                     {target ? (
                       <a className="btn btn-sm btn-ghost" href={`/countries/${country.isoCode}/versions/${snapshotVersionId(target)}`}>
-                        Read
-                      </a>
+                        <T value={ui.countries.code.timeline.page.read} />{" "}</a>
                     ) : null}
                   </div>
                 ) : null}

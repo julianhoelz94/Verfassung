@@ -1,3 +1,4 @@
+import { T, ui } from '../../../components/TranslationProvider';
 import { notFound, redirect } from 'next/navigation';
 import { PageMain } from '../../../components/PageMain';
 import { PageHeader } from '../../../components/ui';
@@ -69,8 +70,8 @@ export default async function LifecycleEditor({ params, searchParams }: Props) {
           { label: 'Lifecycle' },
         ]}
       />
-      {query.saved ? <p role="status">Lifecycle event recorded.</p> : null}
-      {query.error ? <p role="alert">The event could not be recorded. Check the date and transition.</p> : null}
+      {query.saved ? <p role="status"><T value={ui.editor.lifecycle.constitutionid.page.lifecycleEventRecorded} /></p> : null}
+      {query.error ? <p role="alert"><T value={ui.editor.lifecycle.constitutionid.page.theEventCouldNotBeRecordedCheck} /></p> : null}
       <ol>
         {events.map((event) => (
           <li key={event.id}>
@@ -81,10 +82,10 @@ export default async function LifecycleEditor({ params, searchParams }: Props) {
       </ol>
       {provisionEvents.length > 0 ? (
         <section>
-          <h2>Provision events</h2>
+          <h2><T value={ui.editor.lifecycle.constitutionid.page.provisionEvents} /></h2>
           <ol>
             {provisionEvents.map((event) => (
-              <li key={event.id}><time dateTime={event.eventDate}>{event.eventDate}</time> · {event.eventType} · {event.logicalUnitIds.length} unit(s)</li>
+              <li key={event.id}><time dateTime={event.eventDate}>{event.eventDate}</time> · {event.eventType} · {event.logicalUnitIds.length} <T value={ui.editor.lifecycle.constitutionid.page.unitS} /></li>
             ))}
           </ol>
         </section>
@@ -93,64 +94,64 @@ export default async function LifecycleEditor({ params, searchParams }: Props) {
         <form action={appendLifecycleAction} className="card">
           <input type="hidden" name="constitutionId" value={constitutionId} />
           <input type="hidden" name="code" value={code.toLowerCase()} />
-          <label htmlFor="event-type">Event</label>
+          <label htmlFor="event-type"><T value={ui.editor.lifecycle.constitutionid.page.event} /></label>
           <select id="event-type" name="eventType" required>
             {allowed.map((kind) => <option key={kind} value={kind}>{labels[kind]}</option>)}
           </select>
-          <label htmlFor="event-date">Effective date</label>
+          <label htmlFor="event-date"><T value={ui.editor.lifecycle.constitutionid.page.effectiveDate} /></label>
           <input id="event-date" type="date" name="eventDate" min={last?.eventDate} required />
-          <label htmlFor="event-certainty">Date certainty</label>
+          <label htmlFor="event-certainty"><T value={ui.editor.lifecycle.constitutionid.page.dateCertainty} /></label>
           <select id="event-certainty" name="dateCertainty" defaultValue="exact">
-            <option value="exact">Exact date</option>
-            <option value="approximate">Approximate date</option>
+            <option value="exact"><T value={ui.editor.lifecycle.constitutionid.page.exactDate} /></option>
+            <option value="approximate"><T value={ui.editor.lifecycle.constitutionid.page.approximateDate} /></option>
           </select>
-          <p>If the date is unknown, leave the lifecycle event unrecorded and describe the uncertainty on the constitution page.</p>
-          <label htmlFor="event-source">Source URL</label>
+          <p><T value={ui.editor.lifecycle.constitutionid.page.ifTheDateIsUnknownLeaveThe} /></p>
+          <label htmlFor="event-source"><T value={ui.editor.lifecycle.constitutionid.page.sourceUrl} /></label>
           <input id="event-source" type="url" name="sourceUrl" />
-          <label htmlFor="event-note">Note</label>
+          <label htmlFor="event-note"><T value={ui.editor.lifecycle.constitutionid.page.note} /></label>
           <textarea id="event-note" name="note" rows={3} />
-          <button className="btn" type="submit">Record event</button>
+          <button className="btn" type="submit"><T value={ui.editor.lifecycle.constitutionid.page.recordEvent} /></button>
         </form>
-      ) : <p>This constitution has been repealed.</p>}
+      ) : <p><T value={ui.editor.lifecycle.constitutionid.page.thisConstitutionHasBeenRepealed} /></p>}
       {sourceVersionId ? (
         <section className="card">
-          <h2>Record a provision event</h2>
+          <h2><T value={ui.editor.lifecycle.constitutionid.page.recordAProvisionEvent} /></h2>
           <form method="get">
             <input type="hidden" name="code" value={code} />
-            <label htmlFor="scope-version">Source version</label>
+            <label htmlFor="scope-version"><T value={ui.editor.lifecycle.constitutionid.page.sourceVersion} /></label>
             <select id="scope-version" name="versionId" defaultValue={sourceVersionId}>
               {versions.map((version) => (
                 <option key={version.id} value={version.currentVersionId ?? version.id}>{version.versionLabel}</option>
               ))}
             </select>
-            <button type="submit">Choose version</button>
+            <button type="submit"><T value={ui.editor.lifecycle.constitutionid.page.chooseVersion} /></button>
           </form>
           <form action={appendProvisionAction}>
             <input type="hidden" name="constitutionId" value={constitutionId} />
             <input type="hidden" name="code" value={code.toLowerCase()} />
             <input type="hidden" name="sourceVersionId" value={sourceVersionId} />
-            <label htmlFor="provision-event-type">Event</label>
+            <label htmlFor="provision-event-type"><T value={ui.editor.lifecycle.constitutionid.page.event} /></label>
             <select id="provision-event-type" name="eventType" required>
-              <option value="deferred">Commencement deferred</option>
-              <option value="commenced">Entered into force</option>
-              <option value="suspended">Suspended</option>
-              <option value="restored">Restored</option>
+              <option value="deferred"><T value={ui.editor.lifecycle.constitutionid.page.commencementDeferred} /></option>
+              <option value="commenced"><T value={ui.editor.lifecycle.constitutionid.page.enteredIntoForce} /></option>
+              <option value="suspended"><T value={ui.editor.lifecycle.constitutionid.page.suspended} /></option>
+              <option value="restored"><T value={ui.editor.lifecycle.constitutionid.page.restored} /></option>
             </select>
-            <label htmlFor="provision-event-date">Effective date</label>
+            <label htmlFor="provision-event-date"><T value={ui.editor.lifecycle.constitutionid.page.effectiveDate} /></label>
             <input id="provision-event-date" type="date" name="eventDate" required />
             <fieldset>
-              <legend>Affected provisions</legend>
+              <legend><T value={ui.editor.lifecycle.constitutionid.page.affectedProvisions} /></legend>
               {units.map((unit) => (
                 <label key={unit.id} style={{ display: 'block', paddingLeft: `${unit.depth}rem` }}>
                   <input type="checkbox" name="logicalUnitIds" value={unit.id} /> {unit.label}
                 </label>
               ))}
             </fieldset>
-            <label htmlFor="provision-event-source">Source URL</label>
+            <label htmlFor="provision-event-source"><T value={ui.editor.lifecycle.constitutionid.page.sourceUrl} /></label>
             <input id="provision-event-source" type="url" name="sourceUrl" />
-            <label htmlFor="provision-event-note">Note</label>
+            <label htmlFor="provision-event-note"><T value={ui.editor.lifecycle.constitutionid.page.note} /></label>
             <textarea id="provision-event-note" name="note" rows={3} />
-            <button className="btn" type="submit">Record provision event</button>
+            <button className="btn" type="submit"><T value={ui.editor.lifecycle.constitutionid.page.recordProvisionEvent} /></button>
           </form>
         </section>
       ) : null}

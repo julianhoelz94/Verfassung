@@ -1,3 +1,4 @@
+import { T, ui } from '../components/TranslationProvider';
 import { redirect } from 'next/navigation';
 import { ArticleFilterList } from '../components/ArticleFilterList';
 import { ConstitutionText } from '../components/ConstitutionText';
@@ -56,7 +57,7 @@ export default async function EditorPage(props: EditorPageProps) {
   if (!canEdit && !canReview && !canPublish) {
     return (
       <PageMain>
-        <PageHeader title="Editor" meta={`Signed in as ${user.email}, but this account has no editorial role.`} />
+        <PageHeader title={<T value={ui.attrs.editorPagePageHeaderTitleEditor} />} meta={`Signed in as ${user.email}, but this account has no editorial role.`} />
       </PageMain>
     );
   }
@@ -129,10 +130,10 @@ export default async function EditorPage(props: EditorPageProps) {
   const alerts = (
     <>
       {errorMessage ? <Alert tone="error">{errorMessage}</Alert> : null}
-      {searchParams.saved ? <Alert tone="success">Draft saved.</Alert> : null}
-      {searchParams.detailsSaved ? <Alert tone="success">Publish details saved.</Alert> : null}
-      {searchParams.reviewed ? <Alert tone="success">Submitted for review.</Alert> : null}
-      {searchParams.approved ? <Alert tone="success">Review approved. A publisher can now publish.</Alert> : null}
+      {searchParams.saved ? <Alert tone="success"><T value={ui.editor.page.draftSaved} /></Alert> : null}
+      {searchParams.detailsSaved ? <Alert tone="success"><T value={ui.editor.page.publishDetailsSaved} /></Alert> : null}
+      {searchParams.reviewed ? <Alert tone="success"><T value={ui.editor.page.submittedForReview} /></Alert> : null}
+      {searchParams.approved ? <Alert tone="success"><T value={ui.editor.page.reviewApprovedAPublisherCanNowPublish} /></Alert> : null}
       {searchParams.published ? (
         <Alert tone="success">
           {searchParams.newVersionLabel
@@ -140,7 +141,7 @@ export default async function EditorPage(props: EditorPageProps) {
             : 'Published as a new version.'}
         </Alert>
       ) : null}
-      {searchParams.amendmentPending ? <Alert tone="error">The snapshot was published, but the change record or review status is pending retry.</Alert> : null}
+      {searchParams.amendmentPending ? <Alert tone="error"><T value={ui.editor.page.theSnapshotWasPublishedButTheChange} /></Alert> : null}
     </>
   );
 
@@ -166,8 +167,7 @@ export default async function EditorPage(props: EditorPageProps) {
         actions={
           publicHref ? (
             <a className="btn btn-ghost" href={publicHref}>
-              View public page
-            </a>
+              <T value={ui.editor.page.viewPublicPage} />{" "}</a>
           ) : null
         }
       />
@@ -176,7 +176,7 @@ export default async function EditorPage(props: EditorPageProps) {
         <EditorDraftState><div className="workspace">
           <aside className="panel" aria-label="Top-level units">
             <h2 className="panel-title">{(settings?.outline ?? selectedConstitution?.contentOutline)?.kinds[0]?.kindCode === 'article' ? 'Articles' : 'Top-level units'}</h2>
-            <p className="muted">{draftIds.length} changed</p>
+            <p className="muted">{draftIds.length} <T value={ui.editor.page.changed} /></p>
             <ArticleFilterList
               articles={articles}
               selectedId={selected?.id}
@@ -216,8 +216,8 @@ export default async function EditorPage(props: EditorPageProps) {
             ) : null}
             {selected && versionId && searchParams.sessionId && canEdit && session.status === 'open' && !structured && selected.children && selected.children.length > 0 ? (
               <details>
-                <summary className="btn btn-sm">Section titles</summary>
-                <p className="muted">Name nested layers such as paragraphs. Titles are stored on the published tree.</p>
+                <summary className="btn btn-sm"><T value={ui.editor.page.sectionTitles} /></summary>
+                <p className="muted"><T value={ui.editor.page.nameNestedLayersSuchAsParagraphsTitles} /></p>
                 <ConstitutionText
                   nodes={selected.children}
                   showHeading={false}
@@ -230,8 +230,7 @@ export default async function EditorPage(props: EditorPageProps) {
             <div className="action-bar">
               {canEdit && session.status === 'open' ? (
                 <a className="btn" href="/editor">
-                  Discard changes
-                </a>
+                  <T value={ui.editor.page.discardChanges} />{" "}</a>
               ) : null}
               {canEdit && session.status === 'open' ? (
                 <form action="/editor/command" method="post">
@@ -244,35 +243,35 @@ export default async function EditorPage(props: EditorPageProps) {
                 <form action="/editor/command" method="post">
                   <input type="hidden" name="command" value="approve" />
                   {hiddenFields}
-                  <Button>Approve review</Button>
+                  <Button><T value={ui.editor.page.approveReview} /></Button>
                 </form>
               ) : null}
             </div>
           </section>
           <aside className="panel panel-side" aria-label="Session">
-            <p className="panel-title">Session</p>
+            <p className="panel-title"><T value={ui.editor.page.session} /></p>
             <dl className="provenance provenance-list">
               <div>
-                <dt>Status</dt>
+                <dt><T value={ui.editor.page.status} /></dt>
                 <dd>
                   <Badge tone="changed">{session.status}</Badge>
                 </dd>
               </div>
               <div>
-                <dt>Opened by</dt>
+                <dt><T value={ui.editor.page.openedBy} /></dt>
                 <dd>{session.actorId === user.id ? 'you' : session.actorId.slice(0, 8)}</dd>
               </div>
               <div>
-                <dt>Changed articles</dt>
+                <dt><T value={ui.editor.page.changedArticles} /></dt>
                 <dd>{changedLabels.length > 0 ? changedLabels.join(', ') : 'None yet'}</dd>
               </div>
               <div>
-                <dt>Revisions</dt>
+                <dt><T value={ui.editor.page.revisions} /></dt>
                 <dd>{session.revisionCount}</dd>
               </div>
               {preview.searchIndexStatus ? (
                 <div>
-                  <dt>Search index</dt>
+                  <dt><T value={ui.editor.page.searchIndex} /></dt>
                   <dd>
                     <Badge
                       tone={
@@ -310,7 +309,7 @@ export default async function EditorPage(props: EditorPageProps) {
             ) : null}
             {selected ? (
               <>
-                <p className="panel-title">Preview</p>
+                <p className="panel-title"><T value={ui.editor.page.preview} /></p>
                 {structured && selectedRoot ? <OrderedContentTree entries={[{ type: 'child', node: readerNode(selectedRoot) }]} outline={settings?.outline} /> : <ConstitutionText
                   article={{
                     articleNumber: selected.articleNumber,
@@ -327,7 +326,7 @@ export default async function EditorPage(props: EditorPageProps) {
           </aside>
         </div></EditorDraftState>
       ) : (
-        <Alert tone="error">This session could not be loaded, or the version has no top-level units yet.</Alert>
+        <Alert tone="error"><T value={ui.editor.page.thisSessionCouldNotBeLoadedOr} /></Alert>
       )}
     </PageMain>
   );

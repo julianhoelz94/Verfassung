@@ -3,21 +3,27 @@ import type { ReactNode } from 'react';
 import type { Metadata } from 'next';
 import { publicBaseUrl } from '../lib/site-url';
 import { currentSession, SESSION_COOKIE } from '../lib/session';
-import { cookies } from 'next/headers';
+import { cookies, headers } from 'next/headers';
 import { getCountry, listConstitutionAmendments, listCountries } from '../lib/api';
 import { SiteFooter } from './components/SiteFooter';
 import { SiteHeader } from './components/SiteHeader';
 import { requestAnonymousBrowsingPolicy } from '../lib/anonymous-browsing-policy';
+import { resolveLocale } from '../lib/locale';
+import { message, ui } from '../lib/messages';
+import { TranslationProvider } from './components/TranslationProvider';
 
 export async function generateMetadata(): Promise<Metadata> {
   const base = publicBaseUrl();
+  const session = await currentSession();
+  const locale = resolveLocale(session.user?.languagePreference, (await headers()).get('accept-language'));
+  const description = message(locale, ui.shell.siteDescription);
   return {
     metadataBase: new URL(base),
     title: 'Constitution Atlas',
-    description: 'Browse versioned constitutions',
+    description,
     openGraph: {
       title: 'Constitution Atlas',
-      description: 'Browse versioned constitutions',
+      description,
     },
   };
 }
@@ -28,6 +34,7 @@ type RootLayoutProps = {
 
 export default async function RootLayout({ children }: RootLayoutProps) {
   const session = await currentSession();
+  const locale = resolveLocale(session.user?.languagePreference, (await headers()).get('accept-language'));
   const anonymousBrowsingAllowed = session.user ? true : (await requestAnonymousBrowsingPolicy().catch(() => null))?.allowed === true;
   let needsReviewCount = 0;
   const token = (await cookies()).get(SESSION_COOKIE)?.value;
@@ -48,14 +55,16 @@ export default async function RootLayout({ children }: RootLayoutProps) {
     }
   }
   return (
-    <html lang="en">
+    <html lang={locale}>
       <body>
+        <TranslationProvider locale={locale}>
         <a className="skip-link" href="#main-content">
-          Skip to main content
+          {message(locale, ui.shell.skipToMain)}
         </a>
         <SiteHeader user={session.user} identityUnavailable={session.identityUnavailable} needsReviewCount={needsReviewCount} anonymousBrowsingAllowed={anonymousBrowsingAllowed} />
         {children}
         <SiteFooter />
+        </TranslationProvider>
       </body>
     </html>
   );

@@ -2,7 +2,7 @@ import { expect, test } from '../fixtures/consent';
 import { signIn } from './auth';
 import { adminHeaders } from './api-fixtures';
 
-test('admin saves and publishes an imprint in two steps with atomic contact updates and separate languages', async ({ page, request }) => {
+test('admin saves and publishes an imprint in two steps with atomic contact updates and separate languages', async ({ page, request, browser }) => {
   test.setTimeout(120_000);
   const headers = await adminHeaders(request);
   const existing = await (await request.get('/api/document/legal-pages/impressum/editor', { headers })).json();
@@ -34,9 +34,18 @@ test('admin saves and publishes an imprint in two steps with atomic contact upda
   await expect(page.getByText('Draft saved. The public page has not changed.')).toBeVisible();
   await page.getByRole('button', { name: 'Publish reviewed imprint' }).click();
   await expect(page.getByText('Published revision updated.')).toBeVisible();
-  await page.goto('/impressum');
-  await expect(page.getByText('Reviewed German imprint prose for the test stack.')).toBeVisible();
-  await expect(page.getByText('Atlas Browser Test Operator')).toBeVisible();
+  const germanPage = await browser.newPage({ locale: 'de-DE' });
+  try {
+    await germanPage.addInitScript(() => {
+      try { localStorage.setItem('ca_cookie_notice_v1', 'dismissed'); }
+      catch { /* Keep the site usable when storage is disabled. */ }
+    });
+    await germanPage.goto(new URL('/impressum', page.url()).href);
+    await expect(germanPage.getByText('Reviewed German imprint prose for the test stack.')).toBeVisible();
+    await expect(germanPage.getByText('Atlas Browser Test Operator')).toBeVisible();
+  } finally {
+    await germanPage.close();
+  }
   await page.goto('/admin/legal/impressum_en');
   await page.getByLabel('Imprint text').fill('Reviewed English imprint prose for the test stack.');
   await page.getByLabel('Street address', { exact: true }).fill('2 Test Lane');

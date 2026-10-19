@@ -68,7 +68,7 @@ test('administrator invite, visitor activation, password change, and reset persi
   expect(sessionToken).toBeTruthy();
   const enrollResponse = await page.request.post('/api/identity/mfa/enroll/start', {
     headers: { Authorization: `Bearer ${sessionToken}` },
-    data: {},
+    data: { password: resetPassword },
   });
   expect(enrollResponse.ok()).toBeTruthy();
   const enrollment = await enrollResponse.json() as { challengeToken: string; secret: string };

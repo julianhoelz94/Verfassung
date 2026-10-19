@@ -116,6 +116,10 @@ class PasskeyRepository(
         return row.takeIf { jdbc.update("UPDATE passkey_challenges SET used_at = NOW() WHERE id = ? AND used_at IS NULL", id) == 1 }
     }
 
+    fun deleteChallenges(userId: UUID) {
+        jdbc.update("DELETE FROM passkey_challenges WHERE user_id = ?", userId)
+    }
+
     private fun registered(stored: StoredPasskey): RegisteredCredential =
         RegisteredCredential.builder()
             .credentialId(WebAuthnBytes(stored.credentialId))

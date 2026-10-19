@@ -49,6 +49,7 @@ data class MfaLoginRequest(
 
 data class MfaEnrollStartRequest(
     val challengeToken: String? = null,
+    val password: String? = null,
 )
 
 data class MfaEnrollStartDto(

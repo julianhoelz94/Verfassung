@@ -13,7 +13,6 @@ import com.constitutionatlas.identity.api.UpdateContentTranslationUserRequest
 import com.constitutionatlas.identity.config.IdentityMfaProperties
 import com.constitutionatlas.identity.crypto.SecretBox
 import com.constitutionatlas.identity.repo.ContentTranslationRepository
-import com.constitutionatlas.identity.repo.IdentityRepository
 import com.constitutionatlas.platform.ForbiddenException
 import org.springframework.stereotype.Service
 import java.security.MessageDigest
@@ -22,7 +21,6 @@ import java.time.YearMonth
 @Service
 class ContentTranslationService(
     private val repository: ContentTranslationRepository,
-    private val identityRepository: IdentityRepository,
     private val authService: AuthService,
     private val providerClient: ContentTranslationProvider,
     mfaProperties: IdentityMfaProperties,
@@ -129,10 +127,7 @@ class ContentTranslationService(
         )
     }
 
-    private fun requireAdmin(authorization: String?) {
-        val actor = authService.requireSession(authorization)
-        if ("admin" !in identityRepository.rolesForUser(actor.id)) throw ForbiddenException("Administrator role required")
-    }
+    private fun requireAdmin(authorization: String?) = authService.requireAdminSession(authorization)
 
     private fun validateKey(value: String): String {
         val trimmed = value.trim()

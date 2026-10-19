@@ -13,6 +13,7 @@ import { MfaLoginForm } from './MfaLoginForm';
 import { MfaSetup } from '../../components/MfaSetup';
 import { PasskeyLoginEnrollment } from '../../passkeys/PasskeyLoginEnrollment';
 import { PasskeyLogin } from '../../passkeys/PasskeyLogin';
+import { identityRequestFetch } from '../../../lib/identity-request';
 
 type MfaPageProps = {
   searchParams: Promise<{ error?: string; enroll?: string; next?: string; method?: string }>;
@@ -36,7 +37,7 @@ export default async function MfaPage(props: MfaPageProps) {
   let qrDataUrl: string | null = null;
   if (enroll) {
     try {
-      const started = await requestStartMfaEnroll(challenge, undefined);
+      const started = await requestStartMfaEnroll(challenge, undefined, undefined, await identityRequestFetch());
       secret = started.secret;
       qrDataUrl = started.qrDataUrl;
     } catch {
@@ -61,12 +62,13 @@ export default async function MfaPage(props: MfaPageProps) {
             <Alert tone="error"><T value={ui.login.mfa.page.enrollmentCouldNotBeStartedSignIn} /></Alert>
           )}
           <LoginEnrollForm next={searchParams.next?.startsWith('/oauth/authorize?') ? searchParams.next : undefined} />
-          {setup.completed && !user ? <PasskeyLoginEnrollment /> : null}
-          {setup.completed && !user ? <PasskeyLogin /> : null}
+          {setup.completed && !user ? <PasskeyLoginEnrollment next={searchParams.next} /> : null}
+          {setup.completed && !user ? <PasskeyLogin next={searchParams.next} /> : null}
         </Card>
       ) : (
         <Card>
           <MfaLoginForm next={searchParams.next?.startsWith('/oauth/authorize?') ? searchParams.next : undefined} recovery={searchParams.method === 'recovery'} focus={['recovery', 'authenticator'].includes(searchParams.method ?? '')} />
+          {setup.completed && !user ? <PasskeyLogin next={searchParams.next} /> : null}
         </Card>
       )}
     </PageMain>

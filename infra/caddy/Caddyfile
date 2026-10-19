@@ -134,7 +134,9 @@
 
 	route /api/identity* {
 		uri strip_prefix /api/identity
-		reverse_proxy identity-service:8080
+		reverse_proxy identity-service:8080 {
+			header_up X-Atlas-Client-IP {client_ip}
+		}
 	}
 
 	route /api/editor* {

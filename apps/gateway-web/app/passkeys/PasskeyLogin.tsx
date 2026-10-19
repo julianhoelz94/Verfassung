@@ -6,9 +6,10 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '../components/ui';
 import { getPasskey } from '../../lib/webauthn';
-import { finishPasskeyLogin, startPasskeyLogin } from './actions';
+import { finishPasskeyLogin, startPasskeyLogin, startPasskeyStepUp, finishPasskeyStepUp } from './actions';
+import { safeReturnTo } from '../../lib/return-to';
 
-export function PasskeyLogin() {
+export function PasskeyLogin({ next, stepUp = false }: { next?: string; stepUp?: boolean } = {}) {
   const t = useTranslation();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -17,10 +18,15 @@ export function PasskeyLogin() {
     setBusy(true);
     setError('');
     try {
-      const started = await startPasskeyLogin();
+      const started = stepUp ? await startPasskeyStepUp() : await startPasskeyLogin();
       const credential = await getPasskey(started.options);
-      const result = await finishPasskeyLogin(started.challengeId, credential);
-      router.push(result.roles.some((role) => ['editor', 'reviewer', 'publisher', 'admin'].includes(role)) ? '/editor' : '/');
+      if (stepUp) {
+        await finishPasskeyStepUp(started.challengeId, credential);
+        router.push(safeReturnTo(next ?? '/account', '/account'));
+      } else {
+        const result = await finishPasskeyLogin(started.challengeId, credential);
+        router.push(next?.startsWith('/oauth/authorize?') ? next : result.roles.some((role) => ['editor', 'reviewer', 'publisher', 'admin'].includes(role)) ? '/editor' : '/');
+      }
       router.refresh();
     } catch {
       setError(t(ui.state.passkeySignInFailed));

@@ -19,13 +19,16 @@ import com.constitutionatlas.identity.crypto.Totp
 import com.constitutionatlas.identity.repo.IdentityRepository
 import com.constitutionatlas.identity.repo.McpKeyRepository
 import com.constitutionatlas.identity.repo.OAuthRepository
+import com.constitutionatlas.identity.repo.PasskeyRepository
 import com.constitutionatlas.identity.repo.StoredUser
 import com.constitutionatlas.identity.repo.toUserDto
+import com.constitutionatlas.platform.ForbiddenException
 import com.constitutionatlas.platform.UnauthorizedException
 import io.micrometer.core.instrument.MeterRegistry
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
 import java.security.SecureRandom
 import java.time.Instant
 import java.time.OffsetDateTime
@@ -39,6 +42,7 @@ class AuthService(
     private val setupRepository: com.constitutionatlas.identity.setup.SetupRepository,
     private val mcpKeyRepository: McpKeyRepository,
     private val oauthRepository: OAuthRepository,
+    private val passkeyRepository: PasskeyRepository,
     private val passwordEncoder: PasswordEncoder,
     private val sessionProperties: IdentitySessionProperties,
     private val loginProperties: IdentityLoginProperties,
@@ -54,6 +58,13 @@ class AuthService(
     private val loginFailures = meterRegistry.counter("identity.login.failures")
     private val loginLockouts = meterRegistry.counter("identity.login.lockouts")
 
+    init {
+        require(loginProperties.failureThreshold > 0 && loginProperties.lockouts.isNotEmpty() && loginProperties.lockouts.all { it.seconds > 0 }) {
+            "Login throttling requires a positive threshold and lockout durations"
+        }
+    }
+
+    @Transactional(noRollbackFor = [UnauthorizedException::class, TooManyRequestsException::class])
     fun login(
         email: String,
         password: String,
@@ -62,12 +73,15 @@ class AuthService(
         existingAuthorization: String?,
     ): LoginResponse {
         val normalized = email.trim().lowercase()
+        if (normalized.length > 254 || password.toByteArray(Charsets.UTF_8).size > 72) throw UnauthorizedException("Invalid credentials")
         val ipKey = "ip:${clientIp.ifBlank { "unknown" }}"
         val emailKey = "email:$normalized"
         rejectIfLocked(emailKey)
         rejectIfLocked(ipKey)
 
-        val user = identityRepository.findUserByEmail(normalized)
+        val user = identityRepository.findUserByEmail(normalized)?.let { identityRepository.lockUser(it.id) }
+        rejectIfLocked(emailKey)
+        rejectIfLocked(ipKey)
         val matches = passwordEncoder.matches(password, user?.passwordHash ?: dummyHash)
         if (user == null || !user.enabled || !matches || !setupAllows(user.id)) {
             loginAttempts.increment()
@@ -92,7 +106,8 @@ class AuthService(
             runCatching { Tokens.sha256Hex(Tokens.requireBearer(token)) }.getOrNull()
         }
         val dto = identityRepository.toUserDto(user)
-        if (dto.mfaRequired && !dto.mfaEnabled) {
+        val hasSecondFactor = identityRepository.hasSecondFactor(user.id)
+        if (dto.mfaRequired && !hasSecondFactor) {
             val challenge = mfaService.createChallenge(user.id, "enroll", revokeHash)
             return LoginResponse(
                 user = dto,
@@ -100,7 +115,7 @@ class AuthService(
                 challengeToken = challenge,
             )
         }
-        if (dto.mfaEnabled) {
+        if (hasSecondFactor) {
             val challenge = mfaService.createChallenge(user.id, "login", revokeHash)
             return LoginResponse(
                 user = dto,
@@ -111,6 +126,7 @@ class AuthService(
         return issueSession(user, clientIp, userAgent, mfaVerified = false, revokeTokenHash = revokeHash)
     }
 
+    @Transactional(noRollbackFor = [UnauthorizedException::class, TooManyRequestsException::class])
     fun completeMfaLogin(
         challengeToken: String,
         code: String?,
@@ -120,11 +136,12 @@ class AuthService(
     ): LoginResponse {
         val challenge = mfaService.requireChallenge(challengeToken, "login")
         val user =
-            identityRepository.findUserById(challenge.userId)
+            identityRepository.lockUser(challenge.userId)
                 ?: throw UnauthorizedException("Invalid credentials")
         if (!user.enabled) {
             throw UnauthorizedException("Invalid credentials")
         }
+        mfaService.requireChallenge(challengeToken, "login")
         rejectMfaThrottle(user.id, clientIp)
         val totpOk = !code.isNullOrBlank() && mfaService.verifyEnrolledTotp(user.id, code)
         val recoveryOk =
@@ -137,7 +154,7 @@ class AuthService(
             throw UnauthorizedException("Invalid credentials")
         }
         clearMfaThrottle(user.id, clientIp)
-        identityRepository.deleteChallenge(challenge.id)
+        if (!identityRepository.consumeChallenge(challenge.id)) throw UnauthorizedException("Invalid credentials")
         return issueSession(
             user,
             clientIp,
@@ -147,13 +164,20 @@ class AuthService(
         )
     }
 
+    @Transactional(noRollbackFor = [UnauthorizedException::class, TooManyRequestsException::class])
     fun startEnroll(
         authorization: String?,
         challengeToken: String?,
         clientIp: String,
         userAgent: String?,
+        password: String? = null,
     ): MfaEnrollStartDto {
         val (user, token) = enrollActor(authorization, challengeToken)
+        if (token == null) verifyPassword(user, password.orEmpty())
+        if (identityRepository.hasSecondFactor(user.id)) {
+            if (authorization == null || requireSession(authorization).id != user.id) throw UnauthorizedException("Use an existing second factor")
+            requireFreshStepUp(authorization)
+        }
         val (secret, issuedToken) = mfaService.startEnroll(user.id, token)
         authAudit.recordMfaChange(user.id, user.email, clientIp, userAgent, mapOf("kind" to "enroll_started"))
         return MfaEnrollStartDto(
@@ -164,6 +188,7 @@ class AuthService(
         )
     }
 
+    @Transactional(noRollbackFor = [UnauthorizedException::class, TooManyRequestsException::class])
     fun confirmEnroll(
         authorization: String?,
         challengeToken: String?,
@@ -174,8 +199,13 @@ class AuthService(
         val token = challengeToken?.trim().orEmpty().ifBlank { null }
         val challenge = mfaService.requireChallenge(token ?: "", "enroll")
         val user =
-            identityRepository.findUserById(challenge.userId)
+            identityRepository.lockUser(challenge.userId)?.takeIf { it.enabled && setupAllows(it.id) }
                 ?: throw UnauthorizedException("Invalid credentials")
+        mfaService.requireChallenge(token ?: "", "enroll")
+        if (identityRepository.hasSecondFactor(user.id)) {
+            if (authorization == null) throw UnauthorizedException("Use an existing second factor")
+            requireFreshStepUp(authorization)
+        }
         if (authorization != null) {
             val sessionUser = requireActiveSession(Tokens.sha256Hex(Tokens.requireBearer(authorization)))
             if (sessionUser.id != user.id) {
@@ -189,11 +219,14 @@ class AuthService(
             throw UnauthorizedException("Invalid credentials")
         }
         clearMfaThrottle(user.id, clientIp)
+        if (!identityRepository.consumeChallenge(challenge.id)) throw UnauthorizedException("Invalid credentials")
         val recovery = mfaService.enrollConfirmed(user.id, secret)
-        identityRepository.deleteChallenge(challenge.id)
+        identityRepository.deleteChallengesForUser(user.id)
+        passkeyRepository.deleteChallenges(user.id)
         authAudit.recordMfaChange(user.id, user.email, clientIp, userAgent, mapOf("kind" to "enrolled"))
         val session =
             if (authorization == null) {
+                identityRepository.deleteSessionsForUser(user.id)
                 issueSession(
                     user,
                     clientIp,
@@ -203,6 +236,7 @@ class AuthService(
                 )
             } else {
                 val hash = Tokens.sha256Hex(Tokens.requireBearer(authorization))
+                identityRepository.deleteOtherSessions(user.id, hash)
                 identityRepository.markSessionMfa(hash, Instant.now())
                 null
             }
@@ -214,6 +248,7 @@ class AuthService(
         )
     }
 
+    @Transactional(noRollbackFor = [UnauthorizedException::class, TooManyRequestsException::class])
     fun stepUp(
         authorization: String?,
         code: String,
@@ -221,7 +256,7 @@ class AuthService(
         userAgent: String?,
     ) {
         val hash = Tokens.sha256Hex(Tokens.requireBearer(authorization))
-        val user = requireActiveSession(hash)
+        val user = requireLockedSession(authorization)
         rejectMfaThrottle(user.id, clientIp)
         if (!mfaService.verifyEnrolledTotp(user.id, code)) {
             recordMfaFailure(user.id, clientIp)
@@ -232,13 +267,14 @@ class AuthService(
         authAudit.recordMfaChange(user.id, user.email, clientIp, userAgent, mapOf("kind" to "step_up"))
     }
 
+    @Transactional(noRollbackFor = [UnauthorizedException::class, TooManyRequestsException::class])
     fun revokeMfa(
         authorization: String?,
         code: String,
         clientIp: String,
         userAgent: String?,
     ) {
-        val user = requireActiveSession(Tokens.sha256Hex(Tokens.requireBearer(authorization)))
+        val user = requireLockedSession(authorization)
         if (identityRepository.toUserDto(user).mfaRequired) {
             throw ConflictException("MFA is required for this account")
         }
@@ -252,13 +288,14 @@ class AuthService(
         authAudit.recordMfaChange(user.id, user.email, clientIp, userAgent, mapOf("kind" to "revoked"))
     }
 
+    @Transactional(noRollbackFor = [UnauthorizedException::class, TooManyRequestsException::class])
     fun regenerateRecovery(
         authorization: String?,
         code: String,
         clientIp: String,
         userAgent: String?,
     ): MfaRecoveryDto {
-        val user = requireActiveSession(Tokens.sha256Hex(Tokens.requireBearer(authorization)))
+        val user = requireLockedSession(authorization)
         rejectMfaThrottle(user.id, clientIp)
         if (!mfaService.verifyEnrolledTotp(user.id, code)) {
             recordMfaFailure(user.id, clientIp)
@@ -270,10 +307,13 @@ class AuthService(
         return MfaRecoveryDto(codes)
     }
 
+    @Transactional(noRollbackFor = [UnauthorizedException::class])
     fun me(bearerToken: String?): UserDto {
         val token = Tokens.requireBearer(bearerToken)
         val hash = Tokens.sha256Hex(token)
-        if (identityRepository.findUserByValidTokenHash(hash) != null) {
+        val sessionOwner = identityRepository.findUserByValidTokenHash(hash)
+        if (sessionOwner != null) {
+            identityRepository.lockUser(sessionOwner.id)
             val user = requireActiveSession(hash)
             identityRepository.touchSession(hash)
             return identityRepository.toUserDto(user, hash, mfaProperties.stepUpTtl)
@@ -288,17 +328,19 @@ class AuthService(
             val access = oauthRepository.validToken(hash)
                 ?.takeIf { it.resource == "${publicBaseUrl.trimEnd('/')}/mcp" }
                 ?: throw UnauthorizedException("Invalid or expired session")
-            val owner = identityRepository.findUserById(access.ownerId)?.takeIf { it.enabled }
+            val owner = identityRepository.lockUser(access.ownerId)?.takeIf { it.enabled }
                 ?: throw UnauthorizedException("Invalid or expired session")
+            if (oauthRepository.validToken(hash) == null) throw UnauthorizedException("Invalid or expired session")
             val roles = identityRepository.rolesForUser(owner.id)
             val scopes = access.scopes.filter { it != "ingestion:import" || roles.any { role -> role == "editor" || role == "admin" } }
             return UserDto(owner.id, owner.email, emptyList(), scopes = scopes, resource = access.resource)
         }
         val key = mcpKeyRepository.findValidByHash(hash)
             ?: throw UnauthorizedException("Invalid or expired session")
-        val owner = identityRepository.findUserById(key.ownerId)
+        val owner = identityRepository.lockUser(key.ownerId)
             ?.takeIf { it.enabled }
             ?: throw UnauthorizedException("Invalid or expired session")
+        if (mcpKeyRepository.findValidByHash(hash) == null) throw UnauthorizedException("Invalid or expired session")
         val roles = identityRepository.rolesForUser(owner.id)
         val scopes = key.scopes.filter { it != "ingestion:import" || roles.any { role -> role == "editor" || role == "admin" } }
         mcpKeyRepository.touch(key.id)
@@ -315,9 +357,11 @@ class AuthService(
         return identityRepository.toUserDto(user.copy(languagePreference = preference), hash, mfaProperties.stepUpTtl)
     }
 
+    @Transactional
     fun logout(bearerToken: String?, clientIp: String, userAgent: String?) {
         val hash = Tokens.sha256Hex(Tokens.requireBearer(bearerToken))
         val user = identityRepository.findUserByValidTokenHash(hash)
+        if (user != null) identityRepository.lockUser(user.id)
         identityRepository.deleteSessionByTokenHash(hash)
         if (user != null) {
             authAudit.record("logout", user.id, user.id, user.email, clientIp, userAgent)
@@ -331,8 +375,9 @@ class AuthService(
         return identityRepository.listSessions(user.id, hash)
     }
 
+    @Transactional
     fun revokeSession(bearerToken: String?, sessionId: UUID, clientIp: String, userAgent: String?) {
-        val user = requireActiveSession(Tokens.sha256Hex(Tokens.requireBearer(bearerToken)))
+        val user = requireLockedSession(bearerToken)
         if (!identityRepository.sessionBelongsToUser(sessionId, user.id)) {
             throw UnauthorizedException("Invalid or expired session")
         }
@@ -340,8 +385,9 @@ class AuthService(
         authAudit.record("session_revoked", user.id, user.id, user.email, clientIp, userAgent)
     }
 
+    @Transactional
     fun revokeAllSessions(bearerToken: String?, clientIp: String, userAgent: String?) {
-        val user = requireActiveSession(Tokens.sha256Hex(Tokens.requireBearer(bearerToken)))
+        val user = requireLockedSession(bearerToken)
         identityRepository.deleteSessionsForUser(user.id)
         authAudit.record("session_revoked", user.id, user.id, user.email, clientIp, userAgent, mapOf("scope" to "all"))
     }
@@ -355,12 +401,13 @@ class AuthService(
         val hash = Tokens.sha256Hex(Tokens.requireBearer(authorization))
         val user = requireActiveSession(hash)
         val dto = identityRepository.toUserDto(user, hash, mfaProperties.stepUpTtl)
-        if (!dto.stepUpFresh) {
+        if (!identityRepository.hasSecondFactor(user.id) || !identityRepository.sessionMfaVerified(hash) || !dto.stepUpFresh) {
             throw StepUpRequiredException()
         }
         return user
     }
 
+    @Transactional
     fun issuePasskeySession(user: StoredUser, clientIp: String, userAgent: String?): LoginResponse =
         issueSession(user, clientIp, userAgent, mfaVerified = true, revokeTokenHash = null)
 
@@ -371,6 +418,9 @@ class AuthService(
         mfaVerified: Boolean,
         revokeTokenHash: String?,
     ): LoginResponse {
+        val current = identityRepository.lockUser(user.id)?.takeIf { it.enabled && it.passwordHash == user.passwordHash }
+            ?: throw UnauthorizedException("Invalid credentials")
+        if (identityRepository.toUserDto(current).mfaRequired && !mfaVerified) throw UnauthorizedException("Second factor required")
         if (!setupAllows(user.id)) throw UnauthorizedException("Deployment setup is incomplete")
         if (!revokeTokenHash.isNullOrBlank()) {
             identityRepository.deleteSessionByTokenHash(revokeTokenHash)
@@ -403,17 +453,55 @@ class AuthService(
         if (!challengeToken.isNullOrBlank()) {
             val challenge = mfaService.requireChallenge(challengeToken, "enroll")
             val user =
-                identityRepository.findUserById(challenge.userId)
+                identityRepository.lockUser(challenge.userId)?.takeIf { it.enabled }
                     ?: throw UnauthorizedException("Invalid credentials")
             if (!setupAllows(user.id)) throw UnauthorizedException("Deployment setup is incomplete")
             return user to challengeToken
         }
-        val user = requireActiveSession(Tokens.sha256Hex(Tokens.requireBearer(authorization)))
+        val user = requireLockedSession(authorization)
         return user to null
     }
 
     fun requireSession(authorization: String?): StoredUser =
         requireActiveSession(Tokens.sha256Hex(Tokens.requireBearer(authorization)))
+
+    /** Call inside a credential mutation transaction, then recheck after any revocation wins the lock. */
+    fun requireLockedSession(authorization: String?): StoredUser {
+        val user = requireSession(authorization)
+        identityRepository.lockUser(user.id) ?: throw UnauthorizedException("Invalid credentials")
+        return requireSession(authorization)
+    }
+
+    @Transactional(noRollbackFor = [UnauthorizedException::class])
+    fun requireAdminSession(authorization: String?): StoredUser {
+        val user = requireLockedSession(authorization)
+        if ("admin" !in identityRepository.rolesForUser(user.id)) throw ForbiddenException("Administrator role required")
+        return user
+    }
+
+    /** Reauthentication has its own owner-scoped budget, including callers with a stolen session. */
+    fun verifyPassword(user: StoredUser, password: String) {
+        val key = "reauth:${user.id}"
+        rejectIfLocked(key)
+        if (password.toByteArray(Charsets.UTF_8).size > 72 || !passwordEncoder.matches(password, user.passwordHash)) {
+            recordFailure(key)
+            throw UnauthorizedException("Invalid credentials")
+        }
+        identityRepository.clearThrottle(key)
+    }
+
+    /** Revoke personal authentication material; automation service tokens have an independent lifecycle. */
+    fun revokeCredentials(userId: UUID, keepSessionHash: String? = null) {
+        if (keepSessionHash == null) {
+            identityRepository.deleteSessionsForUser(userId)
+        } else {
+            identityRepository.deleteOtherSessions(userId, keepSessionHash)
+        }
+        identityRepository.deleteChallengesForUser(userId)
+        passkeyRepository.deleteChallenges(userId)
+        mcpKeyRepository.revokeAll(userId)
+        oauthRepository.revokeAll(userId)
+    }
 
     fun rejectLocked(vararg keys: String) {
         keys.forEach { rejectIfLocked(it) }
@@ -457,6 +545,10 @@ class AuthService(
 
     private fun requireActiveSession(tokenHash: String) =
         identityRepository.findUserByValidTokenHash(tokenHash)?.takeIf { setupAllows(it.id) }?.also {
+            if (identityRepository.toUserDto(it).mfaRequired && !identityRepository.sessionMfaVerified(tokenHash)) {
+                identityRepository.deleteSessionByTokenHash(tokenHash)
+                throw UnauthorizedException("Second factor required")
+            }
             val lastSeen = identityRepository.lastSeenAt(tokenHash) ?: throw UnauthorizedException("Invalid or expired session")
             if (lastSeen.isBefore(Instant.now().minus(sessionProperties.idleTimeout))) {
                 identityRepository.deleteSessionByTokenHash(tokenHash)
@@ -474,18 +566,7 @@ class AuthService(
     }
 
     private fun recordFailure(key: String) {
-        val existing = identityRepository.findThrottle(key)
-        val failures = (existing?.failureCount ?: 0) + 1
-        val lockedUntil =
-            if (failures >= loginProperties.failureThreshold) {
-                val index =
-                    ((failures - loginProperties.failureThreshold) / loginProperties.failureThreshold)
-                        .coerceAtMost(loginProperties.lockouts.lastIndex)
-                Instant.now().plus(loginProperties.lockouts[index])
-            } else {
-                null
-            }
-        identityRepository.upsertThrottle(key, failures, lockedUntil)
+        identityRepository.recordThrottleFailure(key, loginProperties.failureThreshold, loginProperties.lockouts.map { it.seconds })
     }
 
     companion object {

@@ -135,6 +135,17 @@ export async function requestPasskeyFinishLogin(challengeId: string, credential:
   }, fetchImpl), 'Unable to sign in with passkey');
 }
 
+export async function requestPasskeyStartStepUp(token: string, fetchImpl: FetchLike = fetch): Promise<PasskeyStart> {
+  return readOk(await fetchWithTimeout(`${identityBaseUrl()}/passkeys/step-up/start`, { method: 'POST', headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' }, fetchImpl), 'Unable to start passkey verification');
+}
+
+export async function requestPasskeyFinishStepUp(token: string, challengeId: string, credential: unknown, fetchImpl: FetchLike = fetch): Promise<void> {
+  return readOk(await fetchWithTimeout(`${identityBaseUrl()}/passkeys/step-up/finish`, {
+    method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ challengeId, credential }), cache: 'no-store',
+  }, fetchImpl), 'Unable to verify passkey');
+}
+
 export async function requestPasskeyStartEnrollment(token: string, password: string, fetchImpl: FetchLike = fetch, baseUrl = identityBaseUrl()): Promise<PasskeyStart> {
   return readOk(await fetchWithTimeout(`${baseUrl}/passkeys/enroll/start`, {
     method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
@@ -399,10 +410,11 @@ export type MfaEnrollStart = {
 export async function requestStartMfaEnroll(
   challengeToken?: string,
   sessionToken?: string,
+  password?: string,
   fetchImpl: FetchLike = fetch,
   baseUrl = identityBaseUrl(),
 ): Promise<MfaEnrollStart> {
-  return postJson('/mfa/enroll/start', 'Unable to start MFA enrollment', { challengeToken }, {
+  return postJson('/mfa/enroll/start', 'Unable to start MFA enrollment', { challengeToken, password }, {
     token: sessionToken,
     fetchImpl,
     baseUrl,

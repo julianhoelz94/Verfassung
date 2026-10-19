@@ -39,6 +39,7 @@ unrelated issues remain intact. Delivery PR: #139.
 | Dead helpers, props, imports, wrappers and an unchecked Map parser | Remove unreferenced gateway command/API helpers and props; parse conflict codes through typed JSON nodes; enable unused locals/parameters in both TypeScript projects and use the ESLint CLI without deprecated Next lint wrapping |
 | Navigation/data maps described pre-review imports, schema and access rules | Refresh ownership, current immutable content, staged imports, setup, transport and verification documentation; remove machine-specific links |
 | Post-merge Catalog tests exposed a random country-code collision with the reservation test's fixed `QZ` | Allocate generated test countries deterministically in a separate namespace and use the allocator for reservations; retain all publication/idempotency assertions |
+| Wiki fixture verification exposed concurrent Search index replacements inserting the same document ID | Serialize each rebuild before loading its source snapshot; keep readers on the committed generation; PostgreSQL concurrency test requires one source load at a time and complete final replacement |
 
 ## Removed files and intentional retention
 
@@ -112,3 +113,8 @@ PR #139 merged as `bf2c41f16e19051483e232544dd05e1f48250156` after both independ
 reviews and required PR/push CI passed. Post-merge main CI exposed the Catalog
 test-data collision above; its correction is part of Sprint 60 close-out. Main CI
 and published Wiki page/video verification remain required before completion.
+
+The user subsequently requested a deeper Identity security review before closing
+Sprint 60. Its confirmed attack paths, corrections and evidence are recorded in
+[the security review](sprint-60-identity-security.md). This remains part of the same
+sprint and branch; its required review/CI/publication gates also precede completion.

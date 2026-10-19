@@ -53,6 +53,7 @@ class McpOAuthService(
         return client
     }
 
+    @Transactional
     fun authorize(
         authorization: String?,
         clientId: String,
@@ -71,10 +72,10 @@ class McpOAuthService(
         if (state != null && state.length > 512) throw BadRequestException("OAuth state is too long")
         val scopes = scope.split(' ').filter { it.isNotBlank() }.distinct()
         if ("mcp:read" !in scopes || scopes.any { it !in setOf("mcp:read", "ingestion:import") }) throw BadRequestException("Invalid MCP scope")
-        val owner = auth.requireSession(authorization)
+        val owner = auth.requireLockedSession(authorization)
         if ("ingestion:import" in scopes) {
             if (identities.rolesForUser(owner.id).none { it == "editor" || it == "admin" }) throw ForbiddenException("Editor role required")
-            if (!auth.me(authorization).stepUpFresh) throw ForbiddenException("Fresh MFA step-up required")
+            auth.requireFreshStepUp(authorization)
         }
         val code = Tokens.urlToken(random)
         oauth.storeCode(OAuthCode(Tokens.sha256Hex(code), client.id, owner.id, redirectUri, resource, scopes, codeChallenge), OffsetDateTime.now(ZoneOffset.UTC).plusMinutes(5))
@@ -89,6 +90,8 @@ class McpOAuthService(
             throw BadRequestException("Invalid OAuth token request")
         }
         val stored = oauth.validCode(Tokens.sha256Hex(code)) ?: throw UnauthorizedException("Invalid authorization code")
+        identities.lockUser(stored.ownerId)?.takeIf { it.enabled } ?: throw UnauthorizedException("Invalid authorization code")
+        if (oauth.validCode(stored.codeHash) == null) throw UnauthorizedException("Invalid authorization code")
         if (stored.clientId != parseClientId(clientId) || stored.redirectUri != redirectUri || stored.resource != requestedResource) {
             throw UnauthorizedException("Invalid authorization code")
         }
@@ -107,7 +110,7 @@ class McpOAuthService(
     fun grants(authorization: String?): List<OAuthGrant> = oauth.activeGrants(auth.requireSession(authorization).id)
 
     @Transactional
-    fun revokeGrant(authorization: String?, clientId: UUID) = oauth.revokeGrant(auth.requireSession(authorization).id, clientId)
+    fun revokeGrant(authorization: String?, clientId: UUID) = oauth.revokeGrant(auth.requireLockedSession(authorization).id, clientId)
 
     private fun parseClientId(value: String): UUID = try {
         UUID.fromString(value)

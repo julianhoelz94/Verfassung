@@ -53,6 +53,8 @@ Shared Kotlin HTTP deadlines live in `services/platform` (2 s connect, 5 s read 
 
 For host Testcontainers tests, set `DOCKER_HOST` to the socket reported by `docker context inspect --format '{{.Endpoints.docker.Host}}'` if the default Unix socket is absent. OrbStack helper containers use `TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/var/run/docker.sock`.
 
+Identity serializes credential issuance and revocation on the owner's PostgreSQL row. Recheck session/code/credential validity after acquiring the lock: a request waiting behind a reset must not mint credentials. Authentication failure counters increment atomically and survive rejected authentication transactions. Factor freshness comes from stored session proof for every role. The transport validator checks that both public OAuth-registration routes replace client-supplied peer headers. See the [Sprint 60 security review](https://github.com/julianhoelz94/Verfassung/blob/main/docs/design/sprint-60-identity-security.md) for attack reproductions and regression evidence.
+
 ## Maintain the Wiki
 
 Edit [docs/wiki](https://github.com/julianhoelz94/Verfassung/tree/main/docs/wiki) with the affected feature. Each sprint close-out must update the relevant pages or record why no update was needed in Linear.

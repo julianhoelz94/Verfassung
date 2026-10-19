@@ -187,6 +187,7 @@ class AuthController(private val authService: AuthService) {
             request?.challengeToken,
             clientIp(httpRequest),
             httpRequest.getHeader("User-Agent"),
+            request?.password,
         )
 
     @PostMapping("/mfa/enroll/confirm")

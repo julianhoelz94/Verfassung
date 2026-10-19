@@ -15,14 +15,15 @@ export function StartMfaEnrollForm() {
   return <form onSubmit={async event => {
     event.preventDefault();
     if (pending) return;
+    const password = String(new FormData(event.currentTarget).get('password') ?? '');
     setPending(true);
     try {
-      const started = await startMfaEnrollAction();
+      const started = await startMfaEnrollAction(password);
       window.location.assign(started ? '/account?enroll=1' : '/account?error=mfa');
     } catch {
       window.location.assign('/account?error=mfa');
     }
-  }}><Button variant="primary" disabled={pending}><T value={ui.account.page.enrollAuthenticator} /></Button></form>;
+  }}><Input label={<T value={ui.attrs.loginPageInputLabelPassword} />} id="mfaPassword" name="password" type="password" autoComplete="current-password" required /><Button variant="primary" disabled={pending}><T value={ui.account.page.enrollAuthenticator} /></Button></form>;
 }
 
 const initial: RecoveryRevealState = {};

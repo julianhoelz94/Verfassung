@@ -52,6 +52,7 @@ test('viewer changes password, enrolls MFA and receives recovery codes', async (
   await page.reload();
   await expect(page.getByText('Password updated.')).toBeVisible();
   await page.waitForLoadState('networkidle');
+  await page.locator('#mfaPassword').fill('replacement-password');
   await page.getByRole('button', { name: 'Set up authenticator app' }).click();
   await expect(page).toHaveURL(/\/account\?enroll=1$/, { timeout: 15_000 });
   await page.getByText("Can't scan the QR code?", { exact: true }).click();

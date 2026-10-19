@@ -4,7 +4,7 @@
 
 | I need to… | Open | Finish by… |
 | --- | --- | --- |
-| Invite someone or change roles | **Users** | Save the roles; revoke sessions if needed. |
+| Invite someone or change roles | **Users** | Save the roles; the affected user must sign in again. |
 | Configure email and registration | **Site settings** | Send a test email before enabling registration. |
 | Choose website languages | **Site settings** | Save available languages and the default. |
 | Change visitor access | **Anonymous browsing** | Save the policy and limits with fresh MFA. |
@@ -19,6 +19,8 @@
 *Choose where the content belongs before uploading. “Paste JSON instead” opens advanced input.*
 
 ## First installation
+
+Changing roles or disabling an account revokes its sessions, pending enrollment challenges and personal MCP/OAuth credentials. Disabling an invited account also invalidates the invitation. Re-enabling does not restore revoked credentials. Automation service tokens retain separate rotation/revocation controls.
 
 
 A new installation opens only the setup login until the designated deployment administrator finishes configuration. Production prepares HTTPS before showing the password form. Sign in using the administrator credentials supplied in the deployment environment, complete authenticator setup when requested, and follow the grouped setup page.

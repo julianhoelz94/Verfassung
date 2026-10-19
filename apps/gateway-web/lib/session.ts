@@ -1,5 +1,6 @@
 import { fetchWithTimeout } from './fetch-with-timeout';
-import { cookies, headers } from 'next/headers';
+import { cookies } from 'next/headers';
+import { identityRequestFetch } from './identity-request';
 import { redirect } from 'next/navigation';
 import {
   identityBaseUrl,
@@ -42,15 +43,6 @@ function cookieSecure(): boolean {
   return process.env.NODE_ENV === 'production';
 }
 
-async function incomingClientIp(): Promise<string | undefined> {
-  const incoming = await headers();
-  const forwarded = incoming.get('x-forwarded-for')?.split(',')[0]?.trim();
-  if (forwarded) {
-    return forwarded;
-  }
-  return incoming.get('x-real-ip')?.trim() || undefined;
-}
-
 export async function login(
   email: string,
   password: string,
@@ -60,11 +52,7 @@ export async function login(
   if (existing) {
     extraHeaders.Authorization = `Bearer ${existing}`;
   }
-  const clientIp = await incomingClientIp();
-  if (clientIp) {
-    extraHeaders['X-Forwarded-For'] = clientIp;
-  }
-  const body = await requestLogin(email, password, fetch, identityBaseUrl(), extraHeaders);
+  const body = await requestLogin(email, password, await identityRequestFetch(), identityBaseUrl(), extraHeaders);
   if (body.mfaRequired && body.challengeToken) {
     await setChallengeCookie(body.challengeToken);
     return { mfa: 'challenge' };
@@ -86,7 +74,7 @@ export async function completeMfaLogin(code: string, recoveryCode?: string): Pro
   if (!challengeToken) {
     throw new Error('MFA challenge expired');
   }
-  const body = await requestCompleteMfaLogin(challengeToken, code || undefined, recoveryCode || undefined);
+  const body = await requestCompleteMfaLogin(challengeToken, code || undefined, recoveryCode || undefined, await identityRequestFetch());
   if (!body.token) {
     throw new Error('Invalid credentials');
   }
@@ -96,7 +84,7 @@ export async function completeMfaLogin(code: string, recoveryCode?: string): Pro
 }
 
 export async function completePasskeyLogin(challengeId: string, credential: unknown): Promise<SessionUser> {
-  const body = await requestPasskeyFinishLogin(challengeId, credential);
+  const body = await requestPasskeyFinishLogin(challengeId, credential, await identityRequestFetch());
   if (!body.token) throw new Error('Invalid passkey response');
   await clearChallengeCookie();
   await setSessionCookie(body.token, body.expiresInSeconds);
@@ -106,7 +94,7 @@ export async function completePasskeyLogin(challengeId: string, credential: unkn
 export async function completePasskeyLoginEnrollment(challengeId: string, credential: unknown): Promise<SessionUser> {
   const challengeToken = await mfaChallengeToken();
   if (!challengeToken) throw new Error('Login challenge expired');
-  const body = await requestPasskeyFinishLoginEnrollment(challengeToken, challengeId, credential, 'Passkey');
+  const body = await requestPasskeyFinishLoginEnrollment(challengeToken, challengeId, credential, 'Passkey', await identityRequestFetch());
   if (!body.token) throw new Error('Invalid passkey response');
   await clearChallengeCookie();
   await setSessionCookie(body.token, body.expiresInSeconds);
@@ -117,7 +105,7 @@ export async function confirmMfaEnrollment(code: string): Promise<{ user: Sessio
   const store = await cookies();
   const challengeToken = store.get(MFA_CHALLENGE_COOKIE)?.value;
   const sessionToken = store.get(SESSION_COOKIE)?.value;
-  const body = await requestConfirmMfaEnroll(code, challengeToken, sessionToken);
+  const body = await requestConfirmMfaEnroll(code, challengeToken, sessionToken, await identityRequestFetch());
   await clearChallengeCookie();
   if (body.token) {
     await setSessionCookie(body.token, body.expiresInSeconds);
@@ -162,7 +150,7 @@ export async function mfaChallengeToken(): Promise<string | undefined> {
 export async function logout(): Promise<void> {
   const token = (await cookies()).get(SESSION_COOKIE)?.value;
   if (token) {
-    await requestLogout(token).catch(() => undefined);
+    await requestLogout(token, await identityRequestFetch()).catch(() => undefined);
   }
   (await cookies()).delete(SESSION_COOKIE);
   await clearChallengeCookie();

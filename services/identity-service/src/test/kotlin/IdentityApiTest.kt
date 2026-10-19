@@ -1181,7 +1181,7 @@ class IdentityApiTest {
             mockMvc.post("/mfa/enroll/start") {
                 header("Authorization", "Bearer $viewer")
                 contentType = MediaType.APPLICATION_JSON
-                content = "{}"
+                content = """{"password":"change-me"}"""
             }.andExpect {
                 status { isOk() }
                 jsonPath("$.secret") { exists() }
@@ -1212,7 +1212,7 @@ class IdentityApiTest {
         mockMvc.post("/mfa/enroll/start") {
             header("Authorization", "Bearer $viewer")
             contentType = MediaType.APPLICATION_JSON
-            content = "{}"
+            content = """{"password":"change-me"}"""
         }.andExpect { status { isConflict() } }
         val recoveryCode = objectMapper.readTree(confirmed).get("recoveryCodes").get(0).asText()
         mockMvc.post("/logout") {

@@ -36,7 +36,15 @@ with tempfile.TemporaryDirectory(prefix='atlas-transport-') as directory:
                 headers = proxy.get('headers', {}).get('request', {})
                 replaced = {name.lower(): value for name, value in headers.get('set', {}).items()}
                 appended = {name.lower() for name in headers.get('add', {})}
-                assert replaced.get('x-atlas-client-ip') == ['{http.vars.client_ip}'] and 'x-atlas-client-ip' not in appended, f'{path} must replace attacker-supplied client IP headers'
+                for name in ('x-atlas-client-ip', 'x-forwarded-for'):
+                    assert replaced.get(name) == ['{http.vars.client_ip}'] and name not in appended, f'{path} must replace attacker-supplied {name}'
+        gateways = [node for node in objects(adapted) if node.get('handler') == 'reverse_proxy' and any(upstream.get('dial') == 'gateway-web:3000' for upstream in node.get('upstreams', []))]
+        assert gateways, 'Public requests must reach the gateway through a trusted proxy'
+        for proxy in gateways:
+            headers = proxy.get('headers', {}).get('request', {})
+            replaced = {name.lower(): value for name, value in headers.get('set', {}).items()}
+            for name in ('x-atlas-client-ip', 'x-forwarded-for'):
+                assert replaced.get(name) == ['{http.vars.client_ip}'], f'Gateway must pin {name}'
         if mode == 'external-proxy':
             servers = adapted['apps']['http']['servers'].values()
             server = next(server for server in servers if ':80' in server['listen'])

@@ -243,9 +243,4 @@ class AuthController(private val authService: AuthService) {
     ) {
         authService.revokeMfa(authorization, request.code, clientIp(httpRequest), httpRequest.getHeader("User-Agent"))
     }
-
-    private fun clientIp(request: HttpServletRequest): String {
-        val forwarded = request.getHeader("X-Forwarded-For")?.split(",")?.firstOrNull()?.trim()
-        return forwarded?.ifBlank { null } ?: request.remoteAddr ?: "unknown"
-    }
 }

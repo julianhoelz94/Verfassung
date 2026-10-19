@@ -33,6 +33,7 @@
 		forward_auth gateway-web:3000 {
 			uri /api/edge-rate-limit
 			header_up X-Atlas-Client-IP {client_ip}
+			header_up X-Forwarded-For {client_ip}
 			header_up X-Atlas-Edge-Check 1
 			header_up X-Atlas-Original-URI {uri}
 		}
@@ -70,6 +71,7 @@
 	route /oauth/register* {
 		reverse_proxy identity-service:8080 {
 			header_up X-Atlas-Client-IP {client_ip}
+			header_up X-Forwarded-For {client_ip}
 		}
 	}
 	route /oauth/revoke* {
@@ -136,6 +138,7 @@
 		uri strip_prefix /api/identity
 		reverse_proxy identity-service:8080 {
 			header_up X-Atlas-Client-IP {client_ip}
+			header_up X-Forwarded-For {client_ip}
 		}
 	}
 
@@ -162,6 +165,7 @@
 	route /mcp* {
 		reverse_proxy mcp-server:8080 {
 			header_up X-Atlas-Client-IP {client_ip}
+			header_up X-Forwarded-For {client_ip}
 		}
 	}
 
@@ -170,9 +174,11 @@
 		reverse_proxy gateway-web:3000 {
 			header_up Host {$ATLAS_CANONICAL_HOST}
 			header_up X-Forwarded-Host {$ATLAS_CANONICAL_HOST}
-			# These are internal edge-auth headers; never forward client-supplied values.
+			# Only the internal forward_auth request may carry the edge-check marker.
+			# Pin the peer separately for gateway Identity requests.
 			header_up -X-Atlas-Edge-Check
-			header_up -X-Atlas-Client-IP
+			header_up X-Atlas-Client-IP {client_ip}
+			header_up X-Forwarded-For {client_ip}
 			header_up -X-Atlas-Original-URI
 		}
 	}

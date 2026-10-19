@@ -83,8 +83,4 @@ class PasskeyController(private val service: PasskeyService) {
     ) {
         service.revoke(authorization, credentialId, request.password)
     }
-
-    private fun clientIp(request: HttpServletRequest): String =
-        request.getHeader("X-Forwarded-For")?.split(",")?.firstOrNull()?.trim()?.ifBlank { null }
-            ?: request.remoteAddr ?: "unknown"
 }

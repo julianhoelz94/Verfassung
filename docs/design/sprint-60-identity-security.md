@@ -24,6 +24,7 @@ they do not establish whether any deployed installation was exploited.
 | Login checked limits before waiting on an owner lock | Queued attempts continued checking passwords after an earlier attempt locked the account | Recheck email/IP limits after acquiring the lock; six queued requests permit only five password failures |
 | Public Identity OAuth alias forwarded an untrusted peer header | Changing `X-Atlas-Client-IP` bypassed the registration quota | Both public routes replace that header; real isolated Caddy tests reproduce the old bypass and reject forged/duplicate headers; all transport modes enforce the adapted-route invariant |
 | Gateway authentication calls dropped the original client IP | Passkey/MFA failures shared the gateway's IP bucket and could lock out other visitors | Pass Caddy's trusted peer and browser agent through server-side Identity requests; regression keeps distinct visitor identities separate while preserving credentials and cancellation |
+| Raw forwarded IP chains were trusted behind an external proxy | Forging the leftmost entry could evade IP limits or target another visitor's budget | Pin Caddy's computed peer on gateway and Identity routes; server actions and Identity APIs use only the pinned header, with real external-proxy regression |
 | Recovery codes contained only about 50 bits of randomness | A leaked hash database made offline recovery-code guessing cheaper than necessary | New codes contain about 100 random bits in four readable groups; existing stored codes still verify, and regeneration replaces them; API tests enforce the stronger minimum and one-use behavior |
 | Passkey-only users had no UI route to refresh expired proof | Corrected freshness checks stranded them on a TOTP-only confirmation page | Account-bound WebAuthn step-up refreshes the current session; reject cross-account/public-login reuse of its challenges; preserve safe return/OAuth destinations |
 
@@ -44,6 +45,9 @@ its eight-thread PostgreSQL test permits exactly one successful consumer.
   reset or role change wins that lock. Login/logout and service-token issuance use
   the same ordering. Already-issued automation service tokens keep their explicit
   lifecycle and are not personal credentials tied to their creator's enabled flag.
+- Caddy is the sole public entry point. It replaces the peer header on public
+  routes; Identity and the gateway trust that pinned value, never raw client
+  forwarding chains. Internal service ports must remain private.
 - Failed password/MFA verification commits its throttling updates despite returning
   an authentication error. Successful credential changes remain transactional.
 - Password change keeps the current authenticated session and revokes other

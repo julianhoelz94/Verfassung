@@ -1,4 +1,4 @@
-name: Refresh wiki videos
+name: Refresh wiki illustrations and videos
 
 on:
   pull_request_target:
@@ -27,7 +27,8 @@ jobs:
       PREPOPULATE_TEST_STACK: 'true'
       PREPOPULATE_BASE_URL: http://127.0.0.1:18080
       E2E_BASE_URL: http://127.0.0.1:18080
-      WIKI_VIDEO_DIR: ${{ github.workspace }}/wiki-videos
+      WIKI_VIDEO_DIR: ${{ github.workspace }}/wiki-media
+      WIKI_MEDIA_CAPTURE: merged
       CI_ADMIN_EMAIL: ci-admin@example.local
       CI_ADMIN_PASSWORD: change-me
       CI_VIEWER_EMAIL: ci-viewer@example.local
@@ -79,20 +80,25 @@ jobs:
           npm run fixtures:generate
           npm run prepopulate
           npm run prepopulate -- --verify-only
-      - name: Record full-stack editorial journey
+      - name: Capture illustrations and paced walkthroughs
         working-directory: apps/gateway-web
         run: ./node_modules/.bin/playwright test --config=playwright.wiki-recording.config.js
-      - name: Verify clips
+      - name: Prepare browser playback and validate all media
         run: |
-          test -s "$WIKI_VIDEO_DIR/editing-a-draft.webm"
-          test -s "$WIKI_VIDEO_DIR/reviewing-a-draft.webm"
-          test -s "$WIKI_VIDEO_DIR/publishing-a-revision.webm"
+          sudo apt-get update -qq
+          sudo apt-get install -y ffmpeg
+          python3 scripts/check-wiki-docs.py
+          python3 scripts/prepare-wiki-media.py "$WIKI_VIDEO_DIR" wiki-player --revision "${{ github.event.pull_request.merge_commit_sha }}"
+          node scripts/check-wiki-player.mjs wiki-player
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: wiki-videos
-          path: ${{ github.workspace }}/wiki-videos/*.webm
+          name: wiki-media
+          path: ${{ github.workspace }}/wiki-media/*
           if-no-files-found: error
-          retention-days: 1
+          retention-days: 7
+      - uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3
+        with:
+          path: wiki-player
       - name: Stack logs
         if: failure()
         run: docker compose --env-file env/ci.env.example logs --no-color --tail=200 > wiki-stack-logs.txt
@@ -108,8 +114,21 @@ jobs:
         if: always()
         run: docker compose --env-file env/ci.env.example down -v
 
-  publish:
+  player:
     needs: record
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4
+
+  publish:
+    needs: [record, player]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -120,9 +139,9 @@ jobs:
           persist-credentials: false
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
-          name: wiki-videos
+          name: wiki-media
           path: docs/wiki/media
-      - name: Publish pages and fresh clips to GitHub Wiki
+      - name: Publish pages, embedded illustrations and fresh clips to GitHub Wiki
         env:
           WIKI_TOKEN: ${{ github.token }}
         run: |
@@ -139,8 +158,8 @@ jobs:
           git clone "https://github.com/${GITHUB_REPOSITORY}.wiki.git" wiki
           mkdir -p wiki/media
           cp docs/wiki/*.md wiki/
-          cp docs/wiki/media/*.webm wiki/media/
-          git -C wiki add -- '*.md' media/*.webm
+          cp docs/wiki/media/*.png docs/wiki/media/*.webm docs/wiki/media/*.mp4 wiki/media/
+          git -C wiki add -- '*.md' media/
           if git -C wiki diff --cached --quiet; then exit 0; fi
           git -C wiki -c user.name='github-actions[bot]' \
             -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \

@@ -1,24 +1,38 @@
-# Website user guide
+# Read and compare constitutions
 
-This guide describes the public website. The exact countries and versions available depend on published content; an empty list does not mean a draft has been lost. Public pages show published material only.
+**Start here:** Countries → country → constitution → version. Public pages show published content. If sign-in is required, use the [[account guide|Account-Guide]].
 
-An administrator can require sign-in for browsing. In that case, the starting page shows a sign-in prompt instead of the country catalog, and the public Countries and Search links are hidden until you log in.
+## Read a text
 
-## Find a constitution
+1. Open **Countries** and select a country.
+2. Choose its constitution and the legal version you need.
+3. Follow the table of contents to a provision. Open its heading or choose **Full text** to show the wording.
+4. Check its effective date and status.
 
-1. Open **Countries** in the site navigation.
-2. Select a country card to open its country page. The page lists its constitutions and published versions. Country and constitution context pages may include curated background information and images.
-3. Select a constitution and a published version to read its text. Use the table of contents and unit links to move through the hierarchy. The version choices represent changes in law. They open the current corrected text for that legal version. Exact text snapshots remain available through saved permalinks.
+![Country page with constitutions and legal versions](https://raw.githubusercontent.com/wiki/julianhoelz94/Verfassung/media/reading-country-en.png)
+*Choose the constitution first, then its legal version.*
 
-The country **Constitution timeline** presents constitution lifecycle events. The separate **Amendment timeline** presents published legal changes. A provision may have its own commencement or suspension status, so read the displayed dates and status alongside the text.
+![Constitution reader with the table of contents](https://raw.githubusercontent.com/wiki/julianhoelz94/Verfassung/media/reading-text-en.png)
+*Move through the text while keeping its version context.*
 
-Constitution and country pages can also contain curated background text and pictures. These contextual pages have their own published revision history. A constitution's linked **Documents** may include source files and later file revisions; check the document revision and its link to the constitution or legal change when tracing a source.
+## Search, compare or follow history
 
-## Search and compare
+| Task | Start here |
+| --- | --- |
+| Find a passage | **Search**, enter a term and open a result. |
+| Compare texts | A country's **Compare** page, then select two versions. |
+| Constitutional history | **Constitution timeline**: adoption, commencement and lifecycle events. |
+| Changes in law | **Amendment timeline**: published legal changes. |
 
-- Use **Search** in the main navigation to search published text. Open a result to read it in its version context. Search may briefly lag a new publication while the index updates; the published version page is the primary reading view.
-- Use **Compare** from a country to select two published versions. Review additions, removals, and changed passages in context. Structural changes can include moved or newly grouped units, so read both version pages when exact placement matters.
-- Use the version and legal-change links to follow how a text changed over time. An editorial correction and a legal change are different events: a correction fixes the recorded text; a legal change represents a change in the law.
+![Comparison page with version selectors and changed text](https://raw.githubusercontent.com/wiki/julianhoelz94/Verfassung/media/reading-compare-en.png)
+*Check both selected versions before reading the changes.*
+
+To cite a passage, save the opened provision's address and version ID. Older links stay available. A transcription correction does not itself create a new law.
+
+## Sources, languages and exceptions
+
+<details>
+<summary>Details about sources, text corrections, translation and missing content</summary>
 
 ## Text corrections and legal history
 
@@ -36,13 +50,7 @@ Use the address of the opened version or unit as a permalink. Save the version I
 
 ## Language and content translation
 
-The website follows your device language when it supports it (currently English and German); otherwise it uses the site default. The administrator may restrict the available website languages; a disabled saved preference falls back to the configured default. In **Account**, choose **Website language** to use a specific language or return to **Automatic device language**. Interface text and these guides are maintained translations, not generated while you browse.
-
-Constitution, amendment, and background content can remain in its source language. On supported content pages, select **Translate this content** to request a machine translation into your website language. Sign-in is required; visitors who are not signed in see the control and a sign-in prompt. The translated view always offers **Show original**. Machine translation is an aid to reading; check the original and cited source for exact wording. If an editor has published a version in your language, the site shows that authored version first.
-
-In **Account → Content translation**, enable **Always translate content** to apply this choice automatically on supported pages when no authored version is available. You can also enter a personal Google Translate API key. The key is encrypted on the server, is never shown again, and is used only for your translation requests. It uses your own Google project quota instead of the site's shared Google quota. The administrator may disable machine translation for the whole site or switch between Google and DeepL. When enabled, the text you choose to translate is sent to that provider.
-
-The English and German imprint texts are published separately. Operator address and contact details are maintained once and displayed with either language version.
+Use [[Account → Website language|Account-Guide#choose-a-language-or-translate-content]] to change the interface language or request content translation. Authored texts and machine translations are distinct; always check the source for exact wording.
 
 ## Site information and privacy
 
@@ -54,4 +62,6 @@ Use **About** for source and verification policy, **Impressum** for the publishe
 - Search covers published content; work waiting for review is not public.
 - If a search result does not yet reflect a very recent publication, open the version page directly and try search again after indexing completes.
 
-[[Accounts and editorial work|Editorial-Guide]] · [[Documentation home|Home]] · [[Deutsch|User-Guide-de]]
+</details>
+
+[[Account guide|Account-Guide]] · [[Documentation home|Home]] · [[Deutsch|User-Guide-de]]

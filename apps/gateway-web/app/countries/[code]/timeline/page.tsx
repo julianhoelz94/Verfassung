@@ -1,7 +1,11 @@
+import { changeTypeMessage } from '../../../../lib/ui-labels';
+import { T } from '../../../components/TranslationProvider';
+import { ui } from '../../../../lib/messages';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import { PageMain } from '../../../components/PageMain';
 import { AmendmentUnitLinks } from '../../../components/AmendmentUnitLinks';
+import { ContentTranslationRegion } from '../../../components/ContentTranslationRegion';
 import { ServiceUnavailable } from '../../../components/StatusMessage';
 import { Badge, PageHeader, type BadgeTone } from '../../../components/ui';
 import {
@@ -74,7 +78,7 @@ export default async function TimelinePage(props: TimelinePageProps) {
   if (error) {
     return (
       <PageMain className="wide">
-        <ServiceUnavailable service="Amendment" retryHref={`/countries/${params.code}/timeline`} />
+        <ServiceUnavailable service={ui.services.amendment} retryHref={`/countries/${params.code}/timeline`} />
       </PageMain>
     );
   }
@@ -113,25 +117,23 @@ export default async function TimelinePage(props: TimelinePageProps) {
     <PageMain className="wide">
       <PageHeader
         breadcrumbs={[
-          { href: '/', label: 'Countries' },
+          { href: '/', label: <T value={ui.nav.countries} /> },
           { href: `/countries/${country.isoCode}`, label: country.name },
-          { label: 'Timeline' },
+          { label: <T value={ui.remainingStatus.timeline} /> },
         ]}
-        title="Amendment timeline"
+        title={<T value={ui.attrs.countriesCodeTimelinePagePageHeaderTitle} />}
         actions={
           tipId ? (
             <a className="btn" href={`/countries/${country.isoCode}/versions/${tipId}`}>
-              Read latest
-            </a>
+              <T value={ui.countries.code.timeline.page.readLatest} />{" "}</a>
           ) : (
             <a className="btn" href={`/countries/${country.isoCode}`}>
-              Versions
-            </a>
+              <T value={ui.countries.code.timeline.page.versions} />{" "}</a>
           )
         }
       />
       {amendments.length === 0 ? (
-        <p>No legal changes are recorded for this constitution.</p>
+        <p><T value={ui.countries.code.timeline.page.noLegalChangesAreRecordedForThis} /></p>
       ) : null}
       <ol className="timeline">
         {amendments.map((amendment) => {
@@ -139,19 +141,21 @@ export default async function TimelinePage(props: TimelinePageProps) {
           const target = versionForPin(amendment.targetVersionId);
           return (
             <li key={amendment.id} className="timeline-item">
-              <FormattedDate className="timeline-date" value={amendment.enactedOn} fallback="Date unknown" />
+              <FormattedDate className="timeline-date" value={amendment.enactedOn} fallback={<T value={ui.remainingStatus.dateUnknown} />} />
               <article className="card">
-                <h2 className="card-title">{amendment.title}</h2>
+                <ContentTranslationRegion sourceLanguage={target?.languageCode ?? source?.languageCode ?? 'en'}>
+                <h2 className="card-title" data-translate-content>{amendment.title}</h2>
                 <p className="muted">
-                  {target ? `Version ${target.versionLabel}` : 'Version'}
+                  <T value={ui.remainingStatus.version} /> {target?.versionLabel}
                   {amendment.sourceReference ? ` · ${amendment.sourceReference}` : ''}
                 </p>
-                {amendment.comment || amendment.summary ? <p>{amendment.comment ?? amendment.summary}</p> : null}
+                {amendment.comment || amendment.summary ? <p data-translate-content>{amendment.comment ?? amendment.summary}</p> : null}
+                </ContentTranslationRegion>
                 {amendment.documents?.length ? (
                   <ul className="link-list">
                     {amendment.documents.map((document, index) => (
                       <li key={`${document.url ?? document.fileId ?? document.label ?? 'document'}-${index}`}>
-                        {document.url ? <a href={document.url} rel="noreferrer">{document.label ?? document.url}</a> : document.label ?? 'Archived document'}
+                        {document.url ? <a href={document.url} rel="noreferrer">{document.label ?? document.url}</a> : document.label ?? <T value={ui.remainingStatus.archivedDocument} />}
                       </li>
                     ))}
                   </ul>
@@ -166,7 +170,7 @@ export default async function TimelinePage(props: TimelinePageProps) {
                   {amendment.changes.map((change) => (
                     <div className="stack" key={change.id}>
                       <Badge tone={changeTone(change.changeType)}>
-                        {change.changeType}
+                        {<T value={changeTypeMessage(change.changeType)} />}
                         {change.articleNumber ? ` Art. ${change.articleNumber}` : ''}
                       </Badge>
                       <AmendmentUnitLinks change={change} />
@@ -179,13 +183,11 @@ export default async function TimelinePage(props: TimelinePageProps) {
                       className="btn btn-sm"
                       href={`/countries/${country.isoCode}/compare?from=${encodeURIComponent(source?.id ?? amendment.sourceVersionId)}&to=${encodeURIComponent(target?.id ?? amendment.targetVersionId)}`}
                     >
-                      Compare with previous
-                      {source && target ? ` (${source.versionLabel} → ${target.versionLabel})` : ''}
+                      <T value={ui.countries.code.timeline.page.compareWithPrevious} />{" "}{source && target ? ` (${source.versionLabel} → ${target.versionLabel})` : ''}
                     </a>
                     {target ? (
                       <a className="btn btn-sm btn-ghost" href={`/countries/${country.isoCode}/versions/${snapshotVersionId(target)}`}>
-                        Read
-                      </a>
+                        <T value={ui.countries.code.timeline.page.read} />{" "}</a>
                     ) : null}
                   </div>
                 ) : null}

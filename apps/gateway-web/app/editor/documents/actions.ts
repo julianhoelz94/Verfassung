@@ -66,7 +66,7 @@ export async function uploadDocumentAction(form: FormData): Promise<void> {
   redirect(`/editor/documents/${encodeURIComponent(id)}?saved=1`);
 }
 
-export async function attachDocumentAction(form: FormData): Promise<void> {
+export async function attachDocumentAction(form: FormData): Promise<string> {
   const authorization = await writer();
   const targetType = String(form.get('targetType')) as 'constitution' | 'version' | 'amendment';
   const targetId = String(form.get('targetId'));
@@ -74,10 +74,10 @@ export async function attachDocumentAction(form: FormData): Promise<void> {
   try {
     await attachDocument(targetType, targetId, String(form.get('documentId')), String(form.get('revisionId') || '') || null, authorization, String(form.get('scopeRevisionId') || '') || null);
   } catch {
-    redirect(`${returnTo}${returnTo.includes('?') ? '&' : '?'}documentError=attach`);
+    return `${returnTo}${returnTo.includes('?') ? '&' : '?'}documentError=attach`;
   }
   revalidatePath(returnTo.split('?')[0]);
-  redirect(returnTo);
+  return returnTo;
 }
 
 export async function detachDocumentAction(form: FormData): Promise<void> {

@@ -28,6 +28,16 @@ Open **About** for the site's source labels and verification policy. A version o
 
 Use the address of the opened version or unit as a permalink. Save the version ID with a citation, because a country's latest version can change later. The page for an older published snapshot remains distinct from the current one.
 
+## Language and content translation
+
+The website follows your device language when it supports it (currently English and German); otherwise it uses English. In **Account**, choose **Website language** to use a specific language or return to **Automatic device language**. Interface text and these guides are maintained translations, not generated while you browse.
+
+Constitution, amendment, and background content can remain in its source language. On supported content pages, select **Translate this content** to request a machine translation into your website language. Sign-in is required; visitors who are not signed in see the control and a sign-in prompt. The translated view always offers **Show original**. Machine translation is an aid to reading; check the original and cited source for exact wording. If an editor has published a version in your language, the site shows that authored version first.
+
+In **Account → Content translation**, enable **Always translate content** to apply this choice automatically on supported pages when no authored version is available. You can also enter a personal Google Translate API key. The key is encrypted on the server, is never shown again, and is used only for your translation requests. It uses your own Google project quota instead of the site's shared Google quota. The administrator may disable machine translation for the whole site or switch between Google and DeepL. When enabled, the text you choose to translate is sent to that provider.
+
+The English and German imprint texts are published separately. Operator address and contact details are maintained once and displayed with either language version.
+
 ## Site information and privacy
 
 Use **About** for source and verification policy, **Impressum** for the published operator details, and **Datenschutzerklärung** for the published privacy notice. On a first visit, the informational necessary-cookie notice can be dismissed and links to the legal pages. The editorial and account functions require sign-in; published texts are available to public readers when anonymous browsing is allowed.
@@ -38,4 +48,4 @@ Use **About** for source and verification policy, **Impressum** for the publishe
 - Search covers published content; work waiting for review is not public.
 - If a search result does not yet reflect a very recent publication, open the version page directly and try search again after indexing completes.
 
-[[Accounts and editorial work|Editorial-Guide]] · [[Documentation home|Home]]
+[[Accounts and editorial work|Editorial-Guide]] · [[Documentation home|Home]] · [[Deutsch|User-Guide-de]]

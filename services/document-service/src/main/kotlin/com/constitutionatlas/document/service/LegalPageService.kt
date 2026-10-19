@@ -1,10 +1,14 @@
 package com.constitutionatlas.document.service
 
 import com.constitutionatlas.document.api.DocumentConflictException
+import com.constitutionatlas.document.api.ImprintDetailsDto
+import com.constitutionatlas.document.api.ImprintDetailsStateDto
 import com.constitutionatlas.document.api.LegalPageRevisionDto
 import com.constitutionatlas.document.api.LegalPageStateDto
 import com.constitutionatlas.document.api.PublishLegalPageRequest
+import com.constitutionatlas.document.api.SaveImprintDetailsRequest
 import com.constitutionatlas.document.api.SaveLegalPageDraftRequest
+import com.constitutionatlas.document.repo.ImprintDetailsRepository
 import com.constitutionatlas.document.repo.LegalPageRepository
 import com.constitutionatlas.platform.Actor
 import com.constitutionatlas.platform.ForbiddenException
@@ -16,10 +20,11 @@ import org.springframework.transaction.annotation.Transactional
 @Service
 class LegalPageService(
     private val repository: LegalPageRepository,
+    private val imprintDetailsRepository: ImprintDetailsRepository,
     private val identityClient: IdentityClient,
 ) {
     fun validateKey(key: String) {
-        if (key !in setOf("impressum", "datenschutz")) throw NotFoundException("Legal page not found")
+        if (key !in setOf("impressum", "datenschutz", "impressum_en", "datenschutz_en")) throw NotFoundException("Legal page not found")
     }
 
     fun admin(authorization: String?): Actor {
@@ -41,6 +46,31 @@ class LegalPageService(
     fun published(key: String): LegalPageRevisionDto =
         state(key).published ?: throw NotFoundException("Legal page not published")
 
+    fun imprintDetails(): ImprintDetailsDto =
+        imprintDetailsRepository.state().published ?: throw NotFoundException("Imprint details not published")
+
+    fun imprintDetailsState(): ImprintDetailsStateDto = imprintDetailsRepository.state()
+
+    @Transactional
+    fun saveImprintDetails(request: SaveImprintDetailsRequest, actor: Actor): ImprintDetailsStateDto {
+        require(request.expectedRevision >= 0) { "Invalid expected revision" }
+        val fields = listOf(request.name, request.streetAddress, request.postalCode, request.city, request.country, request.email)
+        require(fields.all { it.isNotBlank() && it.length <= 255 }) { "Imprint details must be complete" }
+        require(request.email.matches(Regex("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$"))) { "Invalid contact email" }
+        if (!imprintDetailsRepository.save(request, actor.id)) throw DocumentConflictException("Imprint details changed")
+        return imprintDetailsState()
+    }
+
+    @Transactional
+    fun publishImprintDetails(request: PublishLegalPageRequest, actor: Actor): ImprintDetailsStateDto {
+        val draft = imprintDetailsState().draft ?: throw DocumentConflictException("Imprint details draft missing")
+        require(draft.name != "Verfassung Atlas Musterbetrieb" && draft.email != "kontakt@example.org") {
+            "Replace example contact details before publication"
+        }
+        if (!imprintDetailsRepository.publish(request.expectedRevision)) throw DocumentConflictException("Imprint details changed")
+        return imprintDetailsState()
+    }
+
     @Transactional
     fun saveDraft(key: String, request: SaveLegalPageDraftRequest, actor: Actor): LegalPageStateDto {
         validateKey(key)
@@ -58,9 +88,21 @@ class LegalPageService(
     @Transactional
     fun publish(key: String, request: PublishLegalPageRequest, actor: Actor): LegalPageStateDto {
         validateKey(key)
+        if (key.startsWith("impressum")) {
+            require(imprintDetailsRepository.state().published != null) { "Publish the shared imprint details first" }
+        }
         require(request.expectedRevision > 0) { "A saved draft is required" }
         val draft = state(key).draft ?: throw DocumentConflictException("Legal page draft missing")
-        require(!draft.content.contains("BEISPIEL — VOR VERÖFFENTLICHUNG ERSETZEN")) {
+        if (key.startsWith("impressum") && draft.separateContact) {
+            val details = imprintDetailsRepository.state().published!!
+            require(listOf(details.streetAddress, details.postalCode, details.email).none { draft.content.contains(it, ignoreCase = true) }) {
+                "Remove contact and address details from the legal prose before publication"
+            }
+        }
+        require(
+            !draft.content.contains("BEISPIEL — VOR VERÖFFENTLICHUNG ERSETZEN") &&
+                !draft.content.contains("EXAMPLE — REPLACE BEFORE PUBLICATION"),
+        ) {
             "Replace example legal details before publication"
         }
         if (!repository.publish(key, request.expectedRevision)) throw DocumentConflictException("Legal page draft changed")

@@ -1,5 +1,8 @@
 'use client';
 
+import { T, useTranslation } from '../../components/TranslationProvider';
+import { ui, type UiMessage } from '../../../lib/messages';
+import { builtinKindMessage } from '../../../lib/ui-labels';
 import { useEffect, useMemo, useState } from 'react';
 import { Button, Input, Select } from '../../components/ui';
 import type { AmendmentUnitRef, ArticleSummary, OrderedEntry } from '../../../lib/api';
@@ -17,9 +20,9 @@ export type ChangeRow = {
 type SelectableUnit = AmendmentUnitRef & { logicalId: string; display: string };
 
 const CHANGE_TYPES = [
-  { value: 'added', label: 'Added' },
-  { value: 'changed', label: 'Changed' },
-  { value: 'removed', label: 'Removed' },
+  { value: 'added', label: ui.remainingStatus.added },
+  { value: 'changed', label: ui.remainingStatus.changed },
+  { value: 'removed', label: ui.remainingStatus.removed },
 ] as const;
 
 type AmendmentChangesTableProps = {
@@ -41,13 +44,17 @@ function unitLabel(kind?: string | null, label?: string | null, title?: string |
   return [kind, label, title].filter(Boolean).join(' ');
 }
 
-export function treeUnits(versionId: string, roots: ArticleSummary[]): SelectableUnit[] {
+export function treeUnits(versionId: string, roots: ArticleSummary[], t: (value: UiMessage) => string = value => value.en): SelectableUnit[] {
+  const kindLabel = (kind: string) => {
+    const label = builtinKindMessage(kind);
+    return label ? t(label) : kind;
+  };
   const result: SelectableUnit[] = [];
   const visitEntries = (entries: OrderedEntry[] | undefined, parentPath: string[], rootOccurrenceId: string) => {
     for (const entry of entries ?? []) {
       const node = entry.node;
       if (node?.logicalId && node.revisionId && node.occurrenceId) {
-        const label = unitLabel(node.kind, node.label, node.title);
+        const label = unitLabel(kindLabel(node.kind), node.label, node.title);
         const breadcrumbs = [...parentPath, label];
         const text = (node.content ?? []).filter((item) => item.type === 'text').map((item) => item.text ?? '').join(' ').trim();
         result.push({
@@ -59,10 +66,10 @@ export function treeUnits(versionId: string, roots: ArticleSummary[]): Selectabl
         visitEntries(node.content, breadcrumbs, rootOccurrenceId);
       } else if (entry.type === 'text' && entry.logicalId && entry.revisionId && entry.occurrenceId) {
         const text = entry.text ?? '';
-        const breadcrumbs = [...parentPath, 'Parent text'];
+        const breadcrumbs = [...parentPath, t(ui.remainingStatus.parentText)];
         result.push({
           versionId, logicalId: entry.logicalId, occurrenceId: entry.occurrenceId, rootOccurrenceId, revisionId: entry.revisionId,
-          unitKind: 'text_entry', kind: 'parent_text', label: 'Parent text', breadcrumbs, text,
+          unitKind: 'text_entry', kind: 'parent_text', label: t(ui.remainingStatus.parentText), breadcrumbs, text,
           deepLink: `/versions/${encodeURIComponent(versionId)}/units/${encodeURIComponent(rootOccurrenceId)}?occurrenceId=${encodeURIComponent(entry.occurrenceId)}`,
           display: `${breadcrumbs.join(' › ')} — ${text.slice(0, 120)}`,
         });
@@ -72,7 +79,7 @@ export function treeUnits(versionId: string, roots: ArticleSummary[]): Selectabl
   for (const root of roots) {
     if (!root.logicalId || !root.revisionId) continue;
     const rootOccurrenceId = root.id;
-    const label = unitLabel(root.kind ?? 'Article', root.articleNumber, root.title);
+    const label = unitLabel(root.kind ? kindLabel(root.kind) : t(ui.remainingStatus.article), root.articleNumber, root.title);
     const text = root.body ?? '';
     result.push({
       versionId, logicalId: root.logicalId, occurrenceId: root.id, rootOccurrenceId, revisionId: root.revisionId,
@@ -93,6 +100,7 @@ export function AmendmentChangesTable({
   initialRows, articleNumbers, unitTreesByVersion, sourceVersionId, targetVersionId,
   readOnly = false, error, onRowsChange,
 }: AmendmentChangesTableProps) {
+  const t = useTranslation();
   const [rows, setRows] = useState<ChangeRow[]>(initialRows.length > 0 ? initialRows : [emptyRow()]);
   const [search, setSearch] = useState<Record<string, string>>({});
 
@@ -101,8 +109,8 @@ export function AmendmentChangesTable({
   }, [initialRows]);
 
   const unitsByVersion = useMemo(() => Object.fromEntries(
-    Object.entries(unitTreesByVersion).map(([versionId, roots]) => [versionId, treeUnits(versionId, roots)]),
-  ), [unitTreesByVersion]);
+    Object.entries(unitTreesByVersion).map(([versionId, roots]) => [versionId, treeUnits(versionId, roots, t)]),
+  ), [unitTreesByVersion, t]);
   const changesJson = useMemo(() => JSON.stringify(rows.map((row) => ({
     articleNumber: row.articleNumber.trim() || null,
     changeType: row.changeType,
@@ -143,16 +151,16 @@ export function AmendmentChangesTable({
     const filtered = units.filter((unit) => `${unit.display} ${unit.logicalId}`.toLocaleLowerCase().includes(query.toLocaleLowerCase())).slice(0, 100);
     return (
       <div className="stack">
-        <Input id={`change-${index}-${side}-search`} label={`Find ${side === 'before' ? 'source' : 'target'} unit`} type="search" value={query} disabled={readOnly} onChange={(event) => setSearch((current) => ({ ...current, [queryKey]: event.target.value }))} />
-        <Select id={`change-${index}-${side}-unit`} label={`${side === 'before' ? 'Before' : 'After'} unit`} value={row[key]?.logicalId ?? ''} disabled={readOnly || !versionId} onChange={(event) => {
+        <Input id={`change-${index}-${side}-search`} label={t(side === 'before' ? ui.remainingStatus.findSourceUnit : ui.remainingStatus.findTargetUnit)} type="search" value={query} disabled={readOnly} onChange={(event) => setSearch((current) => ({ ...current, [queryKey]: event.target.value }))} />
+        <Select id={`change-${index}-${side}-unit`} label={t(side === 'before' ? ui.remainingStatus.beforeUnit : ui.remainingStatus.afterUnit)} value={row[key]?.logicalId ?? ''} disabled={readOnly || !versionId} onChange={(event) => {
           const unit = units.find((candidate) => candidate.logicalId === event.target.value);
           updateRow(index, { [key]: unit ?? null });
         }}>
-          <option value="">Select exact unit…</option>
+          <option value=""><T value={ui.editor.amendments.amendmentchangestable.selectExactUnit} /></option>
           {filtered.map((unit) => <option key={unit.logicalId} value={unit.logicalId}>{unit.display}</option>)}
         </Select>
         {row[key]?.text ? <p className="muted">{row[key]?.breadcrumbs?.join(' › ')} — {row[key]?.text}</p> : null}
-        {row[key]?.versionId && row[key]?.versionId !== versionId ? <p className="alert alert-error" role="alert">This selection belongs to another version. Choose a unit from the selected snapshot.</p> : null}
+        {row[key]?.versionId && row[key]?.versionId !== versionId ? <p className="alert alert-error" role="alert"><T value={ui.editor.amendments.amendmentchangestable.thisSelectionBelongsToAnotherVersionChoose} /></p> : null}
       </div>
     );
   }
@@ -163,8 +171,8 @@ export function AmendmentChangesTable({
   return (
     <section className="stack" aria-labelledby="amendment-changes-title">
       <div className="section-header">
-        <h2 className="section-title" id="amendment-changes-title">Changes</h2>
-        {!readOnly ? <Button type="button" size="sm" onClick={addRow}>Add row</Button> : null}
+        <h2 className="section-title" id="amendment-changes-title"><T value={ui.editor.amendments.amendmentchangestable.changes} /></h2>
+        {!readOnly ? <Button type="button" size="sm" onClick={addRow}><T value={ui.editor.amendments.amendmentchangestable.addRow} /></Button> : null}
       </div>
       {error ? <p className="alert alert-error" role="alert">{error}</p> : null}
       <input type="hidden" name="changesJson" value={changesJson} readOnly />
@@ -173,25 +181,25 @@ export function AmendmentChangesTable({
         {rows.map((row, index) => (
           <div key={`change-${index}`} className="panel stack">
             <div className="form-row">
-              <Input id={`change-article-${index}`} name={`changeArticle-${index}`} label="Article" list={datalistId} value={row.articleNumber} disabled={readOnly} onChange={(event) => updateRow(index, { articleNumber: event.target.value })} />
-              <Select id={`change-type-${index}`} name={`changeType-${index}`} label="Change type" value={row.changeType} disabled={readOnly} onChange={(event) => updateRow(index, { changeType: event.target.value })}>
-                {CHANGE_TYPES.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+              <Input id={`change-article-${index}`} name={`changeArticle-${index}`} label={<T value={ui.attrs.editorAmendmentsAmendmentchangestableInputLabelArticle} />} list={datalistId} value={row.articleNumber} disabled={readOnly} onChange={(event) => updateRow(index, { articleNumber: event.target.value })} />
+              <Select id={`change-type-${index}`} name={`changeType-${index}`} label={<T value={ui.attrs.editorAmendmentsAmendmentchangestableSelectLabelChange} />} value={row.changeType} disabled={readOnly} onChange={(event) => updateRow(index, { changeType: event.target.value })}>
+                {CHANGE_TYPES.map((option) => <option key={option.value} value={option.value}><T value={option.label} /></option>)}
               </Select>
-              <Input id={`change-note-${index}`} name={`changeNote-${index}`} label="Comment on this change" value={row.note} disabled={readOnly} onChange={(event) => updateRow(index, { note: event.target.value })} />
-              {!readOnly ? <Button type="button" size="sm" onClick={() => removeRow(index)}>Remove</Button> : null}
+              <Input id={`change-note-${index}`} name={`changeNote-${index}`} label={<T value={ui.attrs.editorAmendmentsAmendmentchangestableInputLabelComment} />} value={row.note} disabled={readOnly} onChange={(event) => updateRow(index, { note: event.target.value })} />
+              {!readOnly ? <Button type="button" size="sm" onClick={() => removeRow(index)}><T value={ui.editor.amendments.amendmentchangestable.remove} /></Button> : null}
             </div>
             <div className="form-row">{renderPicker(row, index, 'before')}{renderPicker(row, index, 'after')}</div>
             {row.changeType === 'changed' && row.beforeRef && row.afterRef && !sameLogicalUnit(row.beforeRef, row.afterRef) ? (
-              <Input id={`change-link-reason-${index}`} label="Reason for pairing different units" value={row.linkReviewReason ?? ''} disabled={readOnly} required={!readOnly} onChange={(event) => updateRow(index, { linkReviewReason: event.target.value })} />
+              <Input id={`change-link-reason-${index}`} label={<T value={ui.attrs.editorAmendmentsAmendmentchangestableInputLabelReason} />} value={row.linkReviewReason ?? ''} disabled={readOnly} required={!readOnly} onChange={(event) => updateRow(index, { linkReviewReason: event.target.value })} />
             ) : null}
-            {row.changeType === 'changed' && row.beforeRef && row.afterRef ? <div className="stack" aria-label="Before and after wording">
-              <p><strong>What changed:</strong> Wording changed in {row.afterRef.label ?? row.articleNumber ?? 'this unit'}.</p>
+            {row.changeType === 'changed' && row.beforeRef && row.afterRef ? <div className="stack" aria-label={t(ui.accessibility.beforeAfterWording)}>
+              <p><strong><T value={ui.editor.amendments.amendmentchangestable.whatChanged} /></strong> <T value={ui.editor.amendments.amendmentchangestable.wordingChangedIn} />{" "}{row.afterRef.label ?? row.articleNumber ?? t(ui.remainingStatus.thisUnit)}.</p>
               {row.beforeRef.text ? <p><del>{row.beforeRef.text}</del></p> : null}
               {row.afterRef.text ? <p><ins>{row.afterRef.text}</ins></p> : null}
             </div> : null}
-            {row.changeType === 'added' && row.afterRef ? <div className="stack"><p><strong>What changed:</strong> Added {row.afterRef.label ?? row.articleNumber ?? 'this unit'}.</p>{row.afterRef.text ? <p><ins>{row.afterRef.text}</ins></p> : null}</div> : null}
-            {row.changeType === 'removed' && row.beforeRef ? <div className="stack"><p><strong>What changed:</strong> Removed {row.beforeRef.label ?? row.articleNumber ?? 'this unit'}.</p>{row.beforeRef.text ? <p><del>{row.beforeRef.text}</del></p> : null}</div> : null}
-            {row.legacyLinkUnresolved ? <p className="muted" role="status">This older change has no verified exact unit link.</p> : null}
+            {row.changeType === 'added' && row.afterRef ? <div className="stack"><p><strong><T value={ui.editor.amendments.amendmentchangestable.whatChanged} /></strong> <T value={ui.editor.amendments.amendmentchangestable.added} />{" "}{row.afterRef.label ?? row.articleNumber ?? t(ui.remainingStatus.thisUnit)}.</p>{row.afterRef.text ? <p><ins>{row.afterRef.text}</ins></p> : null}</div> : null}
+            {row.changeType === 'removed' && row.beforeRef ? <div className="stack"><p><strong><T value={ui.editor.amendments.amendmentchangestable.whatChanged} /></strong> <T value={ui.editor.amendments.amendmentchangestable.removed} />{" "}{row.beforeRef.label ?? row.articleNumber ?? t(ui.remainingStatus.thisUnit)}.</p>{row.beforeRef.text ? <p><del>{row.beforeRef.text}</del></p> : null}</div> : null}
+            {row.legacyLinkUnresolved ? <p className="muted" role="status"><T value={ui.editor.amendments.amendmentchangestable.thisOlderChangeHasNoVerifiedExact} /></p> : null}
           </div>
         ))}
       </div>

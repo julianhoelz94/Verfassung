@@ -1,6 +1,9 @@
+import { T } from '../../../../../../components/TranslationProvider';
+import { ui } from '../../../../../../../lib/messages';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import { ConstitutionText } from '../../../../../../components/ConstitutionText';
+import { ContentTranslationRegion } from '../../../../../../components/ContentTranslationRegion';
 import { PageMain } from '../../../../../../components/PageMain';
 import { PrintLink } from '../../../../../../components/PrintLink';
 import { Provenance } from '../../../../../../components/Provenance';
@@ -66,7 +69,7 @@ export default async function ArticlePage(props: ArticlePageProps) {
     return (
       <PageMain>
         <ServiceUnavailable
-          service="Content"
+          service={ui.services.content}
           retryHref={`/countries/${params.code}/versions/${params.versionId}/articles/${params.articleId}`}
         />
       </PageMain>
@@ -89,9 +92,9 @@ export default async function ArticlePage(props: ArticlePageProps) {
     <PageMain>
       <PageHeader
         breadcrumbs={[
-          { href: '/', label: 'Countries' },
+          { href: '/', label: <T value={ui.nav.countries} /> },
           { href: `/countries/${country.isoCode}`, label: country.name },
-          { href: `/countries/${country.isoCode}/versions/${params.versionId}`, label: 'Articles' },
+          { href: `/countries/${country.isoCode}/versions/${params.versionId}`, label: <T value={ui.remainingStatus.articles} /> },
           { label: `Article ${article.articleNumber}` },
         ]}
         eyebrow={constitution ? `${country.name} · ${constitution.title}` : country.name}
@@ -99,20 +102,20 @@ export default async function ArticlePage(props: ArticlePageProps) {
         actions={
           <>
             <a className="btn" href={`/countries/${country.isoCode}/articles/${encodeURIComponent(article.articleNumber)}`}>
-              History of Article {article.articleNumber}
+              <T value={ui.countries.code.versions.versionid.articles.articleid.page.historyOfArticle} />{" "}{article.articleNumber}
             </a>
             <a className="btn" href={`${permalink}#article-${article.articleNumber}`}>
-              Permalink
-            </a>
+              <T value={ui.countries.code.versions.versionid.articles.articleid.page.permalink} />{" "}</a>
             <PrintLink />
           </>
         }
       />
       <article id={`article-${article.articleNumber}`}>
         {searchParams.error === 'title' ? (
-          <Alert tone="error">The section title could not be saved.</Alert>
+          <Alert tone="error"><T value={ui.countries.code.versions.versionid.articles.articleid.page.theSectionTitleCouldNotBeSaved} /></Alert>
         ) : null}
         {version ? <Provenance version={version} /> : null}
+        <ContentTranslationRegion sourceLanguage={version?.languageCode ?? 'en'}>
         <ConstitutionText
           article={article}
           nodes={article.children}
@@ -127,6 +130,7 @@ export default async function ArticlePage(props: ArticlePageProps) {
             unitsByLogicalId: orderedTargets(siblings),
           }}
         />
+        </ContentTranslationRegion>
       </article>
     </PageMain>
   );

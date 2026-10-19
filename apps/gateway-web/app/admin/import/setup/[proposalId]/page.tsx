@@ -1,3 +1,6 @@
+import { statusMessage } from '../../../../../lib/ui-labels';
+import { T } from '../../../../components/TranslationProvider';
+import { ui } from '../../../../../lib/messages';
 import { notFound } from 'next/navigation';
 import { AdminForbidden } from '../../../../components/AdminForbidden';
 import { Alert, Button, Card, PageHeader } from '../../../../components/ui';
@@ -13,7 +16,7 @@ type Props = { params: Promise<{ proposalId: string }>; searchParams: Promise<{ 
 
 export default async function SetupProposalPage({ params, searchParams }: Props) {
   const user = await currentUser();
-  if (!user || !user.roles.some(role => role === 'editor' || role === 'admin')) return <AdminForbidden title="Constitution setup" />;
+  if (!user || !user.roles.some(role => role === 'editor' || role === 'admin')) return <AdminForbidden title={ui.forbidden.constitutionSetup} />;
   const { proposalId } = await params;
   const proposal = await getSetupProposal(proposalId, await requireSessionBearer()).catch(() => null);
   if (!proposal) notFound();
@@ -21,28 +24,28 @@ export default async function SetupProposalPage({ params, searchParams }: Props)
   const payload = proposal.payload;
   const kinds = (payload.outline?.kinds ?? []) as OutlineKindWrite[];
   return <PageMain className="wide">
-    <PageHeader title="Constitution setup proposal" meta={`Status: ${proposal.status}`} />
-    {error ? <Alert tone="error">The setup action could not be completed. Check the proposal and your rights.</Alert> : null}
+    <PageHeader title={<T value={ui.attrs.adminImportSetupProposalidPagePageHeader} />} meta={<><T value={ui.importActions.status} /> <T value={statusMessage(proposal.status)} /></>} />
+    {error ? <Alert tone="error"><T value={ui.admin.import.setup.proposalid.page.theSetupActionCouldNotBeCompleted} /></Alert> : null}
     <Card>
-      <h2>Source and identity</h2>
+      <h2><T value={ui.admin.import.setup.proposalid.page.sourceAndIdentity} /></h2>
       <p>{String(payload.countryName ?? '')} ({String(payload.isoCode ?? '')}) · {String(payload.constitutionTitle ?? '')}</p>
-      <p>Slug: <code>{String(payload.constitutionSlug ?? '')}</code> · Language: {String(payload.languageCode ?? '')}</p>
-      <p>Source: {String(payload.sourceUrl || payload.gazetteReference || '')}</p>
-      <p>Proposed hierarchy: {kinds.map(kind => kind.displayLabel).join(' → ')}</p>
+      <p><T value={ui.admin.import.setup.proposalid.page.slug} />{" "}<code>{String(payload.constitutionSlug ?? '')}</code> <T value={ui.admin.import.setup.proposalid.page.language} />{" "}{String(payload.languageCode ?? '')}</p>
+      <p><T value={ui.admin.import.setup.proposalid.page.source} />{" "}{String(payload.sourceUrl || payload.gazetteReference || '')}</p>
+      <p><T value={ui.admin.import.setup.proposalid.page.proposedHierarchy} />{" "}{kinds.map(kind => kind.displayLabel).join(' → ')}</p>
     </Card>
     {proposal.status === 'proposed' ? <>
-      <OutlineEditor initial={kinds} sampleRoots={previewRoots(payload.sampleRoots)} action={saveSetupOutlineAction} submitLabel="Save proposed structure">
+      <OutlineEditor initial={kinds} sampleRoots={previewRoots(payload.sampleRoots)} action={saveSetupOutlineAction} submitLabel={ui.remainingStatus.saveProposedStructure}>
         <input type="hidden" name="proposalId" value={proposal.id} />
       </OutlineEditor>
-      <Card><h2>Final review</h2><p>Confirm only after checking the source sample, labels, nesting and reader layout. Confirmation creates the constitution and returns a settings revision for the full upload.</p>
-        <form action={transitionSetupAction}><input type="hidden" name="proposalId" value={proposal.id} /><input type="hidden" name="action" value="confirm" /><Button variant="primary">Confirm structure</Button></form>
-        <form action={transitionSetupAction}><input type="hidden" name="proposalId" value={proposal.id} /><input type="hidden" name="action" value="withdraw" /><Button>Withdraw proposal</Button></form>
+      <Card><h2><T value={ui.admin.import.setup.proposalid.page.finalReview} /></h2><p><T value={ui.admin.import.setup.proposalid.page.confirmOnlyAfterCheckingTheSourceSample} /></p>
+        <form action={transitionSetupAction}><input type="hidden" name="proposalId" value={proposal.id} /><input type="hidden" name="action" value="confirm" /><Button variant="primary"><T value={ui.admin.import.setup.proposalid.page.confirmStructure} /></Button></form>
+        <form action={transitionSetupAction}><input type="hidden" name="proposalId" value={proposal.id} /><input type="hidden" name="action" value="withdraw" /><Button><T value={ui.admin.import.setup.proposalid.page.withdrawProposal} /></Button></form>
       </Card>
     </> : null}
-    {proposal.status === 'confirmed' ? <Card><h2>Ready for content upload</h2>
-      <p>Constitution ID: <code>{proposal.constitutionId}</code></p>
-      <p>Settings revision: <code>{proposal.settingsRevisionId}</code></p>
-      <p>Give both IDs to your chat client. The full import remains pending review after upload.</p>
+    {proposal.status === 'confirmed' ? <Card><h2><T value={ui.admin.import.setup.proposalid.page.readyForContentUpload} /></h2>
+      <p><T value={ui.admin.import.setup.proposalid.page.constitutionId} />{" "}<code>{proposal.constitutionId}</code></p>
+      <p><T value={ui.admin.import.setup.proposalid.page.settingsRevision} />{" "}<code>{proposal.settingsRevisionId}</code></p>
+      <p><T value={ui.admin.import.setup.proposalid.page.giveBothIdsToYourChatClient} /></p>
     </Card> : null}
   </PageMain>;
 }

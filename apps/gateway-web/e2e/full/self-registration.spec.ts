@@ -81,7 +81,7 @@ test('closed registration can be opened by admin, confirmed by mail, and creates
     await page.locator('#main-content').getByRole('button', { name: 'Search' }).click();
     const user = page.locator('.data-row').filter({ hasText: email });
     const roles = user.locator(':scope > div').nth(2);
-    await expect(roles).toContainText('viewer');
+    await expect(roles).toContainText('Reader');
     await expect(roles).not.toContainText('publisher');
     await expect(roles).not.toContainText('admin');
   } finally {

@@ -1,3 +1,6 @@
+import { currentLocale } from '../../../lib/server-locale';
+import { T } from '../../components/TranslationProvider';
+import { ui } from '../../../lib/messages';
 import Link from 'next/link';
 import { listDocumentLinkEvents, listDocumentLinks, listDocumentRevisions, listDocuments } from '../../../lib/document-api';
 import { requireSessionBearer } from '../../../lib/session';
@@ -12,6 +15,7 @@ export async function DocumentLinks(props: {
   returnTo: string;
   canEdit: boolean;
 }) {
+  const locale = await currentLocale();
   const authorization = await requireSessionBearer();
   const [linksResult, documentsResult, eventsResult] = await Promise.allSettled([
     listDocumentLinks(props.targetType, props.targetId, props.scopeRevisionId, authorization),
@@ -25,26 +29,26 @@ export async function DocumentLinks(props: {
   const available = documents.filter((document) => document.status === 'active' && !links.some((link) => link.documentId === document.id));
   const revisions = props.canEdit ? await Promise.all(available.map((document) => listDocumentRevisions(document.id, authorization).catch(() => []))) : [];
   return <section className="card stack">
-    <h2>Linked documents</h2>
-    {unavailable ? <Alert tone="error">Document service is unavailable. Links may be incomplete; try reloading before editing.</Alert> : null}
+    <h2><T value={ui.editor.documents.documentlinks.linkedDocuments} /></h2>
+    {unavailable ? <Alert tone="error"><T value={ui.editor.documents.documentlinks.documentServiceIsUnavailableLinksMayBe} /></Alert> : null}
     {links.length ? <ul className="link-list">{links.map((link) => <li key={link.documentId}>
       <Link href={`/documents/${link.documentId}${link.revisionId ? `?revision=${link.document.revision.revision}` : ''}`}>{link.document.revision.title}</Link>
-      {' '}· {link.revisionId ? `Pinned revision ${link.document.revision.revision}` : `Current revision ${link.document.currentRevision}`}
-      {' '}<Link href={`/editor/documents/${link.documentId}`}>Inspect history</Link>
+      {' '}· <T value={link.revisionId ? ui.editor.documents.documentlinks.pinnedRevision : ui.editor.documents.documentlinks.currentRevision} />{' '}{link.revisionId ? link.document.revision.revision : link.document.currentRevision}
+      {' '}<Link href={`/editor/documents/${link.documentId}`}><T value={ui.editor.documents.documentlinks.inspectHistory} /></Link>
       {props.canEdit ? <form action={detachDocumentAction} className="inline-form">
         <input type="hidden" name="targetType" value={props.targetType} /><input type="hidden" name="targetId" value={props.targetId} />
         <input type="hidden" name="scopeRevisionId" value={props.scopeRevisionId ?? ''} />
         <input type="hidden" name="documentId" value={link.documentId} /><input type="hidden" name="returnTo" value={props.returnTo} />
-        <button type="submit">Detach</button>
+        <button type="submit"><T value={ui.editor.documents.documentlinks.detach} /></button>
       </form> : null}
-    </li>)}</ul> : <p>No managed documents linked.</p>}
+    </li>)}</ul> : <p><T value={ui.editor.documents.documentlinks.noManagedDocumentsLinked} /></p>}
     {props.canEdit && !unavailable ? <>
-      <h3>Attach an existing document</h3>
+      <h3><T value={ui.editor.documents.documentlinks.attachAnExistingDocument} /></h3>
       <DocumentPicker documents={available} revisions={revisions} targetType={props.targetType} targetId={props.targetId} scopeRevisionId={props.scopeRevisionId} returnTo={props.returnTo} />
-      <p><Link href={`/editor/documents/new?returnTo=${encodeURIComponent(props.returnTo)}`} target="_blank">Create a document in a new tab</Link> to keep this editor open.</p>
+      <p><Link href={`/editor/documents/new?returnTo=${encodeURIComponent(props.returnTo)}`} target="_blank"><T value={ui.editor.documents.documentlinks.createADocumentInANewTab} /></Link> <T value={ui.editor.documents.documentlinks.toKeepThisEditorOpen} /></p>
     </> : null}
-    {events.length ? <details><summary>Link history</summary><ol>{events.map((event) => <li key={event.id}>
-      {event.action} · <Link href={`/editor/documents/${event.documentId}`}>{event.documentId}</Link> · {new Date(event.occurredAt).toLocaleString('en')}
+    {events.length ? <details><summary><T value={ui.editor.documents.documentlinks.linkHistory} /></summary><ol>{events.map((event) => <li key={event.id}>
+      <T value={event.action === 'attach' ? ui.editor.documents.documentlinks.attached : ui.editor.documents.documentlinks.detached} /> · <Link href={`/editor/documents/${event.documentId}`}>{event.documentId}</Link> · {new Date(event.occurredAt).toLocaleString(locale)}
     </li>)}</ol></details> : null}
   </section>;
 }

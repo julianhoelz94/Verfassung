@@ -1,5 +1,10 @@
 'use client';
 
+import { changeTypeMessage } from '../../../lib/ui-labels';
+
+import { T, useTranslation } from '../../components/TranslationProvider';
+import { ui } from '../../../lib/messages';
+import { statusMessage } from '../../../lib/ui-labels';
 import { useMemo, useRef, useState, useTransition } from 'react';
 import type { Amendment, AmendmentDocument, ArticleSummary, VersionSummary } from '../../../lib/api';
 import { Alert, Badge, Button, Input, Select, TextArea } from '../../components/ui';
@@ -71,6 +76,7 @@ export function AmendmentForm({
   canReviewDiff = false,
   canAcknowledgeDiff = false,
 }: AmendmentFormProps) {
+  const t = useTranslation();
   const [sourceVersionId, setSourceVersionId] = useState(amendment?.sourceVersionId ?? versions[0]?.id ?? '');
   const [targetVersionId, setTargetVersionId] = useState(amendment?.targetVersionId ?? latestVersionId ?? '');
   const [changeRows, setChangeRows] = useState<ChangeRow[]>(() => initialRows(amendment));
@@ -97,7 +103,7 @@ export function AmendmentForm({
 
   function handleSuggest() {
     if (!suggestSourceId || !suggestTargetId) {
-      setSuggestError('Choose both source and target versions.');
+      setSuggestError(t(ui.remainingStatus.chooseSourceTarget));
       return;
     }
     startTransition(async () => {
@@ -142,20 +148,20 @@ export function AmendmentForm({
       <input type="hidden" name="constitutionId" value={constitutionId} />
       {amendment?.status ? (
         <p>
-          Status:{' '}
+          <T value={ui.editor.amendments.amendmentform.status} />{' '}
           <Badge
             tone={
               amendment.status === 'published' ? 'added' : amendment.status === 'withdrawn' ? 'removed' : 'changed'
             }
           >
-            {amendment.status}
+            <T value={statusMessage(amendment.status)} />
           </Badge>
         </p>
       ) : null}
       <Input
         id="amendment-title"
         name="title"
-        label="Title"
+        label={<T value={ui.attrs.editorAmendmentsAmendmentformInputLabelTitle} />}
         defaultValue={amendment?.title ?? ''}
         required
         disabled={readOnly}
@@ -163,7 +169,7 @@ export function AmendmentForm({
       <Input
         id="amendment-citation"
         name="sourceReference"
-        label="Citation"
+        label={<T value={ui.attrs.editorAmendmentsAmendmentformInputLabelCitation} />}
         defaultValue={amendment?.sourceReference ?? ''}
         disabled={readOnly}
       />
@@ -171,7 +177,7 @@ export function AmendmentForm({
         <Input
           id="amendment-enacted"
           name="enactedOn"
-          label="Enacted date"
+          label={<T value={ui.attrs.editorAmendmentsAmendmentformInputLabelEnacted} />}
           type="date"
           defaultValue={amendment?.enactedOn ?? ''}
           disabled={readOnly}
@@ -179,7 +185,7 @@ export function AmendmentForm({
         <Input
           id="amendment-effective"
           name="effectiveOn"
-          label="Effective date"
+          label={<T value={ui.attrs.editorAmendmentsAmendmentformInputLabelEffective} />}
           type="date"
           defaultValue={amendment?.effectiveOn ?? ''}
           disabled={readOnly}
@@ -188,15 +194,15 @@ export function AmendmentForm({
       <TextArea
         id="amendment-summary"
         name="summary"
-        label="Summary"
+        label={<T value={ui.attrs.editorAmendmentsAmendmentformTextAreaLabelSummary} />}
         defaultValue={amendment?.summary ?? ''}
         disabled={readOnly}
       />
-      <TextArea id="amendment-comment" name="comment" label="Comment" defaultValue={amendment?.comment ?? ''} required disabled={readOnly} rows={4} />
+      <TextArea id="amendment-comment" name="comment" label={<T value={ui.attrs.editorAmendmentsAmendmentformTextAreaLabelComment} />} defaultValue={amendment?.comment ?? ''} required disabled={readOnly} rows={4} />
       <input type="hidden" name="documentsJson" value={JSON.stringify(documents)} />
       <fieldset className="stack">
-        <legend>Documents</legend>
-        <p>Save the legal change, then attach a managed document below. Older references remain available here.</p>
+        <legend><T value={ui.editor.amendments.amendmentform.documents} /></legend>
+        <p><T value={ui.editor.amendments.amendmentform.saveTheLegalChangeThenAttachA} /></p>
         {documents.length ? <ul className="link-list">{documents.map((document, index) => <li key={index}>
           {document.url ? <a href={document.url} rel="noreferrer">{document.label || document.url}</a> : document.label || document.fileId || 'Archived document'}
         </li>)}</ul> : null}
@@ -205,12 +211,12 @@ export function AmendmentForm({
         <Select
           id="amendment-source-version"
           name="sourceVersionId"
-          label="Source version (optional)"
+          label={<T value={ui.attrs.editorAmendmentsAmendmentformSelectLabelSource} />}
           value={sourceVersionId}
           disabled={readOnly}
           onChange={(event) => setSourceVersionId(event.target.value)}
         >
-          <option value="">None</option>
+          <option value=""><T value={ui.editor.amendments.amendmentform.none} /></option>
           {versions.map((version) => (
             <option key={version.id} value={version.id}>
               {versionLabel(version)}
@@ -220,12 +226,12 @@ export function AmendmentForm({
         <Select
           id="amendment-target-version"
           name="targetVersionId"
-          label="Target version (optional)"
+          label={<T value={ui.attrs.editorAmendmentsAmendmentformSelectLabelTarget} />}
           value={targetVersionId}
           disabled={readOnly}
           onChange={(event) => setTargetVersionId(event.target.value)}
         >
-          <option value="">None</option>
+          <option value=""><T value={ui.editor.amendments.amendmentform.none} /></option>
           {versions.map((version) => (
             <option key={version.id} value={version.id}>
               {versionLabel(version)}
@@ -237,11 +243,10 @@ export function AmendmentForm({
         contentAvailable ? (
           <div className="action-bar">
             <Button type="button" onClick={openSuggestDialog}>
-              Fill from two versions
-            </Button>
+              <T value={ui.editor.amendments.amendmentform.fillFromTwoVersions} />{" "}</Button>
           </div>
         ) : (
-          <Alert tone="error">Content service is unavailable. Fill from two versions is disabled.</Alert>
+          <Alert tone="error"><T value={ui.editor.amendments.amendmentform.contentServiceIsUnavailableFillFromTwo} /></Alert>
         )
       ) : null}
       <div className={diffReview ? 'amendment-review-layout' : undefined}>
@@ -255,28 +260,27 @@ export function AmendmentForm({
           onRowsChange={setChangeRows}
         />
         {diffReview ? <DiffReviewQueue key={diffReview.revisionId} target={{ kind: 'amendment', id: amendmentId }} initial={diffReview}
-          rows={(amendment?.changes ?? []).map((change, index) => ({ id: change.id, label: `${index + 1}. ${change.changeType} ${change.articleNumber ?? ''} ${change.note ?? ''}`.trim() }))}
+          rows={(amendment?.changes ?? []).map((change, index) => ({ id: change.id, label: `${index + 1}. ${t(changeTypeMessage(change.changeType))} ${change.articleNumber ?? ''} ${change.note ?? ''}`.trim() }))}
           canDecide={canReviewDiff && !readOnly || canAcknowledgeDiff} canAcknowledge={canAcknowledgeDiff}
           onAddRow={!readOnly ? addCandidateRow : undefined} /> : null}
       </div>
       <div className="action-bar">
         {canSave ? (
           <Button variant="primary" type="submit">
-            Save draft
-          </Button>
+            <T value={ui.editor.amendments.amendmentform.saveDraft} />{" "}</Button>
         ) : null}
         {canWithdraw && amendmentId !== 'new' ? (
-          <Button formAction="/editor/command?command=amendment-withdraw" formMethod="post">Withdraw</Button>
+          <Button formAction="/editor/command?command=amendment-withdraw" formMethod="post"><T value={ui.editor.amendments.amendmentform.withdraw} /></Button>
         ) : null}
       </div>
       <dialog ref={suggestDialogRef} className="dialog">
         <div className="stack">
-          <h2 className="section-title">Fill from two versions</h2>
-          <p className="muted">Compare two snapshots and merge suggested changes into the table below. Nothing is saved until you save the draft.</p>
+          <h2 className="section-title"><T value={ui.editor.amendments.amendmentform.fillFromTwoVersions} /></h2>
+          <p className="muted"><T value={ui.editor.amendments.amendmentform.compareTwoSnapshotsAndMergeSuggestedChanges} /></p>
           <Select
             id="suggest-source-version"
             name="suggestSourceVersion"
-            label="Source version"
+            label={<T value={ui.attrs.editorAmendmentsAmendmentformSelectLabelSource2} />}
             value={suggestSourceId}
             onChange={(event) => setSuggestSourceId(event.target.value)}
           >
@@ -289,7 +293,7 @@ export function AmendmentForm({
           <Select
             id="suggest-target-version"
             name="suggestTargetVersion"
-            label="Target version"
+            label={<T value={ui.attrs.editorAmendmentsAmendmentformSelectLabelTarget2} />}
             value={suggestTargetId}
             onChange={(event) => setSuggestTargetId(event.target.value)}
           >
@@ -302,10 +306,9 @@ export function AmendmentForm({
           {suggestError ? <Alert tone="error">{suggestError}</Alert> : null}
           <div className="action-bar">
             <Button type="button" onClick={closeSuggestDialog}>
-              Cancel
-            </Button>
+              <T value={ui.editor.amendments.amendmentform.cancel} />{" "}</Button>
             <Button type="button" variant="primary" disabled={pending} onClick={handleSuggest}>
-              {pending ? 'Suggesting…' : 'Suggest changes'}
+              <T value={pending ? ui.remainingStatus.suggesting : ui.remainingStatus.suggestChanges} />
             </Button>
           </div>
         </div>

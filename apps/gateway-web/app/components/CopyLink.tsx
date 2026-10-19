@@ -2,6 +2,8 @@
 
 import { useState } from 'react';
 import { Button } from './ui';
+import { T } from './TranslationProvider';
+import { ui } from '../../lib/messages';
 
 export function CopyLink() {
   const [copied, setCopied] = useState(false);
@@ -19,7 +21,7 @@ export function CopyLink() {
         }
       }}
     >
-      {copied ? 'Copied' : 'Copy link'}
+      {copied ? <T value={ui.extraComponents.copyLink.copied} /> : <T value={ui.extraComponents.copyLink.copyLink} />}
     </Button>
   );
 }

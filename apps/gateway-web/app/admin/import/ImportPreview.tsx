@@ -1,3 +1,5 @@
+import { T } from '../../components/TranslationProvider';
+import { ui } from '../../../lib/messages';
 import type { ContentOutline, OrderedEntry, OrderedNode } from '../../../lib/api';
 import { OrderedContentTree } from '../../components/ConstitutionText';
 
@@ -44,12 +46,12 @@ export function ImportPreview({ payload }: { payload: Row }) {
   const roots = children(payload.roots).length ? children(payload.roots) : children(payload.articles);
   const outline = previewOutline(payload);
   return <>
-    <h2>Proposed structure and sample</h2>
+    <h2><T value={ui.admin.import.importpreview.proposedStructureAndSample} /></h2>
     <p>{string(payload.countryName)} · {string(payload.constitutionTitle)} · {string(payload.versionLabel)}</p>
-    {outline ? <table><thead><tr><th>Kind</th><th>Display</th><th>Presentation</th></tr></thead><tbody>{outline.kinds.map(kind => <tr key={kind.kindCode}>
+    {outline ? <table><thead><tr><th><T value={ui.admin.import.importpreview.kind} /></th><th><T value={ui.admin.import.importpreview.display} /></th><th><T value={ui.admin.import.importpreview.presentation} /></th></tr></thead><tbody>{outline.kinds.map(kind => <tr key={kind.kindCode}>
       <td>{kind.kindCode}</td><td>{kind.displayLabel}</td><td>{kind.presentation}</td>
-    </tr>)}</tbody></table> : <p>Uses the constitution’s existing layout revision {string(payload.settingsRevisionId)}.</p>}
+    </tr>)}</tbody></table> : <p><T value={ui.admin.import.importpreview.usesTheConstitutionsExistingLayoutRevision} />{" "}{string(payload.settingsRevisionId)}.</p>}
     <OrderedContentTree entries={previewRoots(roots).map(node => ({ type: 'child', node }))} outline={outline} />
-    {roots.length > 100 ? <p>Showing the first 100 top-level units of {roots.length}.</p> : null}
+    {roots.length > 100 ? <p><T value={ui.admin.import.importpreview.showingTheFirst100TopLevelUnits} />{" "}{roots.length}.</p> : null}
   </>;
 }

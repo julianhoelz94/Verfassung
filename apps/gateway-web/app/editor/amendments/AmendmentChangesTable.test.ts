@@ -16,7 +16,7 @@ describe('treeUnits', () => {
     const units = treeUnits('version-1', roots);
     expect(units.map((unit) => unit.logicalId)).toEqual(['root-logical', 'parent-text', 'sentence', 'sentence-text']);
     expect(units[1]).toMatchObject({ unitKind: 'text_entry', occurrenceId: 'parent-occurrence', rootOccurrenceId: 'root-occurrence' });
-    expect(units[2]?.breadcrumbs).toEqual(['article 46a Rights', 'sentence (2a)']);
+    expect(units[2]?.breadcrumbs).toEqual(['Article 46a Rights', 'Sentence (2a)']);
     expect(units[1]?.deepLink).toBe('/versions/version-1/units/root-occurrence?occurrenceId=parent-occurrence');
   });
 });

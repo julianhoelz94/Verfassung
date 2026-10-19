@@ -1,5 +1,9 @@
 'use client';
 
+import { changeTypeMessage } from '../../lib/ui-labels';
+
+import { T, useTranslation } from '../components/TranslationProvider';
+import { ui } from '../../lib/messages';
 import { useMemo, useState } from 'react';
 import { Button, Input, TextArea } from '../components/ui';
 import type { ChangeRecordChange, ChangeRecordUnitRef } from '../../lib/editor-api';
@@ -67,6 +71,7 @@ type PublishFormProps = {
 };
 
 export function PublishForm({ sessionId, versionId, articleId, hopKind, status, canEdit, canPublish, record, comment, structuredDraft, diffReview, canReviewDiff = false }: PublishFormProps) {
+  const t = useTranslation();
   const [changes, setChanges] = useState<ChangeRecordChange[]>(() => record?.changes?.length ? record.changes : [newChange()]);
   const [search, setSearch] = useState<Record<string, string>>({});
   const beforeUnits = useMemo(() => unitOptions(structuredDraft?.sourceRoots ?? [], versionId, true), [structuredDraft, versionId]);
@@ -110,59 +115,59 @@ export function PublishForm({ sessionId, versionId, articleId, hopKind, status, 
     const field = side === 'before' ? 'beforeRef' : 'afterRef';
     const selected = list.find((unit) => unit.logicalId === row[field]?.logicalId);
     return <div className="stack">
-      <Input id={`publish-${index}-${side}-search`} label={`Find ${side === 'before' ? 'source' : 'draft'} unit`} type="search" value={query} onChange={(event) => setSearch((current) => ({ ...current, [queryKey]: event.target.value }))} />
-      <label htmlFor={`publish-${index}-${side}-unit`}>{side === 'before' ? 'Before unit' : 'Draft after unit'}</label>
+      <Input id={`publish-${index}-${side}-search`} label={t(side === 'before' ? ui.editorDynamic.findSourceUnit : ui.editorDynamic.findDraftUnit)} type="search" value={query} onChange={(event) => setSearch((current) => ({ ...current, [queryKey]: event.target.value }))} />
+      <label htmlFor={`publish-${index}-${side}-unit`}><T value={side === 'before' ? ui.editorDynamic.beforeUnit : ui.editorDynamic.draftAfterUnit} /></label>
       <select id={`publish-${index}-${side}-unit`} value={row[field]?.logicalId ?? ''} required onChange={(event) => {
         const unit = list.find((candidate) => candidate.logicalId === event.target.value);
         if (!unit) return;
         updateChange(index, { [field]: unit.ref, articleId: unit.articleId, articleNumber: unit.articleNumber });
       }}>
-        <option value="">Select exact unit…</option>
+        <option value=""><T value={ui.editor.publishform.selectExactUnit} /></option>
         {visible.map((unit) => <option key={unit.logicalId} value={unit.logicalId}>{unit.display}</option>)}
       </select>
-      {selected ? <p className="muted">Selected: {selected.display}</p> : null}
+      {selected ? <p className="muted"><T value={ui.editor.publishform.selected} />{" "}{selected.display}</p> : null}
     </div>;
   }
   return (
-    <section className="stack" aria-label={hopKind === 'legal' ? 'Change record' : 'Transcription comment'}>
-      <h3>{hopKind === 'legal' ? 'Change record' : 'Transcription comment'}</h3>
+    <section id="editor-change-record" className="stack" aria-label={t(hopKind === 'legal' ? ui.editorDynamic.changeRecord : ui.editorDynamic.transcriptionComment)}>
+      <h3><T value={hopKind === 'legal' ? ui.editorDynamic.changeRecord : ui.editorDynamic.transcriptionComment} /></h3>
       {status === 'open' && canEdit ? (
         <form action="/editor/command" method="post" className="stack">
           <input type="hidden" name="command" value="details" />
           {fields}
           {hopKind === 'legal' ? <>
-            <Input id="recordTitle" name="recordTitle" label="Title" defaultValue={record?.title ?? ''} required />
-            <TextArea id="recordComment" name="recordComment" label="Comment" defaultValue={record?.comment ?? ''} required rows={3} />
-            <Input id="documentUrl" name="documentUrl" label="Document URL" defaultValue={record?.documents[0]?.url ?? ''} required type="url" />
-            <Input id="documentLabel" name="documentLabel" label="Document label" defaultValue={record?.documents[0]?.label ?? ''} />
-            {structuredDraft ? <fieldset className="stack"><legend>Exact constitutional units</legend>
-              <p className="muted">Choose the source unit and draft unit for each change. Draft unit identities are resolved to the published snapshot after the legal version is created.</p>
+            <Input id="recordTitle" name="recordTitle" label={<T value={ui.attrs.editorPublishformInputLabelTitle} />} defaultValue={record?.title ?? ''} required />
+            <TextArea id="recordComment" name="recordComment" label={<T value={ui.attrs.editorPublishformTextAreaLabelComment} />} defaultValue={record?.comment ?? ''} required rows={3} />
+            <Input id="documentUrl" name="documentUrl" label={<T value={ui.attrs.editorPublishformInputLabelDocumentURL} />} defaultValue={record?.documents[0]?.url ?? ''} required type="url" />
+            <Input id="documentLabel" name="documentLabel" label={<T value={ui.attrs.editorPublishformInputLabelDocumentLabel} />} defaultValue={record?.documents[0]?.label ?? ''} />
+            {structuredDraft ? <fieldset className="stack"><legend><T value={ui.editor.publishform.exactConstitutionalUnits} /></legend>
+              <p className="muted"><T value={ui.editor.publishform.chooseTheSourceUnitAndDraftUnit} /></p>
           <input type="hidden" name="changesJson" value={JSON.stringify(changes)} readOnly />
               {changes.map((row, index) => <div className="panel stack" key={`publish-change-${index}`}>
                 <div className="form-row">
-                  <label htmlFor={`publish-${index}-type`}>Change type</label>
+                  <label htmlFor={`publish-${index}-type`}><T value={ui.editor.publishform.changeType} /></label>
                   <select id={`publish-${index}-type`} value={row.changeType} onChange={(event) => updateChange(index, { changeType: event.target.value as ChangeRecordChange['changeType'] })}>
-                    <option value="changed">Changed</option><option value="added">Added</option><option value="removed">Removed</option>
+                    <option value="changed"><T value={ui.editor.publishform.changed} /></option><option value="added"><T value={ui.editor.publishform.added} /></option><option value="removed"><T value={ui.editor.publishform.removed} /></option>
                   </select>
-                  <Input id={`publish-${index}-note`} label="Comment on this change" value={row.note ?? ''} onChange={(event) => updateChange(index, { note: event.target.value })} />
-                  <Button type="button" onClick={() => setChanges((current) => current.length > 1 ? current.filter((_, rowIndex) => rowIndex !== index) : [newChange()])}>Remove</Button>
+                  <Input id={`publish-${index}-note`} label={<T value={ui.attrs.editorPublishformInputLabelCommentOn} />} value={row.note ?? ''} onChange={(event) => updateChange(index, { note: event.target.value })} />
+                  <Button type="button" onClick={() => setChanges((current) => current.length > 1 ? current.filter((_, rowIndex) => rowIndex !== index) : [newChange()])}><T value={ui.editor.publishform.remove} /></Button>
                 </div>
                 <div className="form-row">{picker(row, index, 'before')}{picker(row, index, 'after')}</div>
-                {row.changeType === 'changed' && row.beforeRef && row.afterRef && row.beforeRef.logicalId !== row.afterRef.logicalId ? <Input id={`publish-${index}-reason`} label="Reason for pairing different units" required value={row.linkReviewReason ?? ''} onChange={(event) => updateChange(index, { linkReviewReason: event.target.value })} /> : null}
+                {row.changeType === 'changed' && row.beforeRef && row.afterRef && row.beforeRef.logicalId !== row.afterRef.logicalId ? <Input id={`publish-${index}-reason`} label={<T value={ui.attrs.editorPublishformInputLabelReasonFor} />} required value={row.linkReviewReason ?? ''} onChange={(event) => updateChange(index, { linkReviewReason: event.target.value })} /> : null}
               </div>)}
-              <Button type="button" onClick={() => setChanges((current) => [...current, newChange()])}>Add change</Button>
+              <Button type="button" onClick={() => setChanges((current) => [...current, newChange()])}><T value={ui.editor.publishform.addChange} /></Button>
             </fieldset> : null}
           </> : (
-            <TextArea id="comment" name="comment" label="What was corrected in this transcription?" defaultValue={comment ?? ''} required rows={3} />
+            <TextArea id="comment" name="comment" label={<T value={ui.attrs.editorPublishformTextAreaLabelWhatWas} />} defaultValue={comment ?? ''} required rows={3} />
           )}
-          <Button>Save {hopKind === 'legal' ? 'change record' : 'comment'}</Button>
+          <Button><T value={ui.editor.publishform.save} />{" "}<T value={hopKind === 'legal' ? ui.remainingStatus.changeRecord : ui.remainingStatus.comment} /></Button>
         </form>
       ) : (
         hopKind === 'legal' && record ? (
           <div className="stack">
             <p><strong>{record.title}</strong></p>
             <p>{record.comment}</p>
-            {record.changes?.map((change, index) => <p key={`${change.articleId}-${index}`}>{change.changeType}: {change.beforeRef?.logicalId ?? '—'} → {change.afterRef?.logicalId ?? '—'}{change.note ? ` · ${change.note}` : ''}</p>)}
+            {record.changes?.map((change, index) => <p key={`${change.articleId}-${index}`}>{<T value={changeTypeMessage(change.changeType)} />}: {change.beforeRef?.logicalId ?? '—'} → {change.afterRef?.logicalId ?? '—'}{change.note ? ` · ${change.note}` : ''}</p>)}
             {record.documents.length > 0 ? (
               <ul>
                 {record.documents.map((document, index) => (
@@ -172,7 +177,7 @@ export function PublishForm({ sessionId, versionId, articleId, hopKind, status, 
                         {document.label ?? document.url}
                       </a>
                     ) : (
-                      document.label ?? 'Archived document'
+                      document.label ?? <T value={ui.remainingStatus.archivedDocument} />
                     )}
                   </li>
                 ))}
@@ -180,7 +185,7 @@ export function PublishForm({ sessionId, versionId, articleId, hopKind, status, 
             ) : null}
           </div>
         ) : (
-          <p className="muted">{comment ?? 'No comment saved.'}</p>
+          <p className="muted">{comment ?? t(ui.editorDynamic.noComment)}</p>
         )
       )}
       {status === 'approved' && canPublish ? (
@@ -188,12 +193,12 @@ export function PublishForm({ sessionId, versionId, articleId, hopKind, status, 
           <input type="hidden" name="command" value="publish" />
           {fields}
           <Button variant="primary" disabled={!ready}>
-            {hopKind === 'legal' ? 'Publish new legal version' : 'Publish transcription'}
+            <T value={hopKind === 'legal' ? ui.editorDynamic.publishLegalVersion : ui.editorDynamic.publishTranscription} />
           </Button>
         </form>
       ) : null}
       {diffReview ? <DiffReviewQueue key={diffReview.draftGeneration} target={{ kind: 'editor', id: sessionId }} initial={diffReview}
-        rows={(record?.changes ?? []).flatMap((change, index) => change.id ? [{ id: change.id, label: `${index + 1}. ${change.changeType} ${change.articleNumber} ${change.note ?? ''}`.trim() }] : [])}
+        rows={(record?.changes ?? []).flatMap((change, index) => change.id ? [{ id: change.id, label: `${index + 1}. ${t(changeTypeMessage(change.changeType))} ${change.articleNumber} ${change.note ?? ''}`.trim() }] : [])}
         canDecide={status === 'open' && canEdit || canReviewDiff}
         canAcknowledge={canReviewDiff}
         onAddRow={status === 'open' && canEdit ? addCandidateRow : undefined} /> : null}

@@ -1,3 +1,5 @@
+import { T } from '../../components/TranslationProvider';
+import { ui } from '../../../lib/messages';
 import { cookies } from 'next/headers';
 import { AdminForbidden } from '../../components/AdminForbidden';
 import { PageMain } from '../../components/PageMain';
@@ -8,15 +10,15 @@ import { SESSION_COOKIE } from '../../../lib/session';
 import { AnonymousBrowsingForm } from './AnonymousBrowsingForm';
 
 export default async function AnonymousBrowsingPage({ searchParams }: { searchParams: Promise<{ error?: string; saved?: string }> }) {
-  if (!(await requireAdminPage())) return <AdminForbidden title="Anonymous browsing" />;
+  if (!(await requireAdminPage())) return <AdminForbidden title={ui.forbidden.anonymousBrowsing} />;
   const token = (await cookies()).get(SESSION_COOKIE)?.value;
   const policy = token ? await requestAdminAnonymousBrowsingPolicy(token).catch(() => null) : null;
   const params = await searchParams;
   return <PageMain>
-    <PageHeader title="Anonymous browsing" meta="Control access and API call rates for visitors who are not signed in." />
-    {params.error ? <Alert tone="error">Settings could not be saved. Check that every rate is positive and try again.</Alert> : null}
-    {params.saved ? <Alert tone="success">Anonymous browsing settings saved.</Alert> : null}
-    {!policy ? <Alert tone="error">Anonymous browsing settings could not be loaded.</Alert> :
+    <PageHeader title={<T value={ui.attrs.adminAnonymousBrowsingPagePageHeaderTitleAnonymous} />} meta={<T value={ui.attrs.adminAnonymousBrowsingPagePageHeaderMetaControl} />} />
+    {params.error ? <Alert tone="error"><T value={ui.admin.anonymousBrowsing.page.settingsCouldNotBeSavedCheckThat} /></Alert> : null}
+    {params.saved ? <Alert tone="success"><T value={ui.admin.anonymousBrowsing.page.anonymousBrowsingSettingsSaved} /></Alert> : null}
+    {!policy ? <Alert tone="error"><T value={ui.admin.anonymousBrowsing.page.anonymousBrowsingSettingsCouldNotBeLoaded} /></Alert> :
       <Card><AnonymousBrowsingForm policy={policy} /></Card>}
   </PageMain>;
 }

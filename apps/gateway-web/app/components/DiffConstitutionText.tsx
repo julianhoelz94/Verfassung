@@ -1,6 +1,9 @@
+import { T } from './TranslationProvider';
+import { ui } from '../../lib/messages';
 import type { ArticleSummary, ContentNode, ContentOutline, OrderedEntry, OrderedNode } from '../../lib/api';
 import { articleHeading, asOutlinePresentation, concatenatedText, effectiveDisplayKind, kindByCode, nodeHeading } from '../../lib/outline';
 import { OrderedContentTree } from './ConstitutionText';
+import { LocalizedTitle } from './LocalizedRegion';
 import { alignNodes, diffText, segsForSide, type DiffSeg } from '../../lib/text-diff';
 
 type ArticleLike = Pick<ArticleSummary, 'articleNumber' | 'title' | 'body' | 'children' | 'content' | 'kind' | 'legacyIdentity'>;
@@ -100,14 +103,14 @@ function OrderedDiff({ entries, opposite, side, outline, oppositeOutline, legacy
     renderTableCell={(cell, entry) => {
       const other = texts.get(entry)?.table?.rows.flatMap(row => row.cells).find(candidate => candidate.logicalId === cell.logicalId);
       const metadataChanged = other && (other.header !== cell.header || other.rowSpan !== cell.rowSpan || other.colSpan !== cell.colSpan || JSON.stringify(other.headers ?? []) !== JSON.stringify(cell.headers ?? []));
-      return metadataChanged ? <span className="diff-cell-changed" title="Table cell structure changed">{marks(cell.text, other.text)}</span> : marks(cell.text, other?.text ?? '');
+      return metadataChanged ? <LocalizedTitle className="diff-cell-changed" label={ui.accessibilityDynamic.tableCellChanged}>{marks(cell.text, other.text)}</LocalizedTitle> : marks(cell.text, other?.text ?? '');
     }}
     renderTableCaption={(entry) => marks(entry.table?.caption ?? '', texts.get(entry)?.table?.caption ?? '')}
     renderReference={(reference, label, href, entry) => {
       const other = texts.get(entry)?.references?.find(candidate => candidate.logicalId === reference.logicalId);
       const changed = !other || JSON.stringify(other.target) !== JSON.stringify(reference.target) || other.start !== reference.start || other.end !== reference.end;
-      const content = changed ? <span className="diff-cell-changed" title="Reference changed">{label}</span> : label;
-      return href ? <a className="xref" href={href}>{content}</a> : <span className="xref-unavailable" title="Referenced provision is unavailable here">{content}</span>;
+      const content = changed ? <LocalizedTitle className="diff-cell-changed" label={ui.accessibilityDynamic.referenceChanged}>{label}</LocalizedTitle> : label;
+      return href ? <a className="xref" href={href}>{content}</a> : <LocalizedTitle className="xref-unavailable" label={ui.accessibilityDynamic.referenceUnavailable}>{content}</LocalizedTitle>;
     }}
     renderHeading={(node, heading) => {
       const other = nodes.get(node);
@@ -206,7 +209,7 @@ function DiffBody({ left, right, side, leftLabel, rightLabel, labelPlacement }: 
 }) {
   const segs = segsForSide(diffText(left, right), side);
   if (segs.length === 0) {
-    return <p className="constitution-body muted">No text in this version.</p>;
+    return <p className="constitution-body muted"><T value={ui.components.diffconstitutiontext.noTextInThisVersion} /></p>;
   }
   return (
     <p className="constitution-body">

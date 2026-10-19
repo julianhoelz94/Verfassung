@@ -59,7 +59,7 @@ jobs:
         working-directory: apps/gateway-web
         run: |
           npm ci
-          npx playwright install --with-deps chromium
+          npx playwright install --with-deps chromium chrome
       - name: Start full stack
         run: |
           docker compose --env-file env/ci.env.example up -d --build edge-proxy mailpit
@@ -83,6 +83,13 @@ jobs:
       - name: Capture illustrations and paced walkthroughs
         working-directory: apps/gateway-web
         run: ./node_modules/.bin/playwright test --config=playwright.wiki-recording.config.js
+      - name: Retain CI captures for inspection if media validation fails
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: wiki-captures
+          path: ${{ github.workspace }}/wiki-media/*
+          if-no-files-found: error
+          retention-days: 7
       - name: Prepare browser playback and validate all media
         run: |
           sudo apt-get update -qq

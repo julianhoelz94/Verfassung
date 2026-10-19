@@ -19,7 +19,8 @@ const server = createServer(async (request, response) => {
   } catch { response.writeHead(404).end(); }
 });
 await new Promise(done => server.listen(0, '127.0.0.1', done));
-const browser = await chromium.launch();
+// Use Chrome's H.264 support to validate the MP4 files users will play.
+const browser = await chromium.launch({ channel:'chrome' });
 try {
   const page = await browser.newPage();
   const downloads = [];
@@ -29,7 +30,8 @@ try {
   assert.equal(await page.locator('video[autoplay]').count(), 0);
   for (const width of [390, 1280]) {
     await page.setViewportSize({ width, height:900 });
-    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+    const layout = await page.evaluate(() => ({ viewport:innerWidth, content:document.documentElement.scrollWidth }));
+    assert.ok(layout.content <= layout.viewport, `Player overflows at ${layout.viewport}px: content is ${layout.content}px wide`);
   }
   for (const video of await page.locator('video').all()) {
     const poster = await video.getAttribute('poster');

@@ -38,7 +38,7 @@ for (const locale of ['en', 'de'] as const) test.describe(`setup settings in ${l
     await expect(registration).not.toBeChecked();
     await expect(mail.getByText(m.registrationNeedsMail[locale], { exact: true })).toBeVisible();
     await expect(mail.getByRole('button', { name: ui.admin.settings.page.sendTestEmail[locale], exact: true })).toBeDisabled();
-    await save.click();
+    await Promise.all([page.waitForEvent('load'), save.click()]);
     await expect(page).toHaveURL(/\/setup\?saved=1$/);
     await page.reload();
     await expect(defer).toBeChecked();
@@ -47,7 +47,7 @@ for (const locale of ['en', 'de'] as const) test.describe(`setup settings in ${l
     expect(await (await request.get(`${mock}/api/identity/registration/status`)).json()).toEqual({ enabled: false });
 
     // Saving the separate general form must preserve the email decision.
-    await page.getByRole('button', { name: m.save[locale], exact: true }).click();
+    await Promise.all([page.waitForEvent('load'), page.getByRole('button', { name: m.save[locale], exact: true }).click()]);
     await expect(page).toHaveURL(/\/setup\?saved=1$/);
     await page.reload();
     await expect(defer).toBeChecked();
@@ -58,7 +58,7 @@ for (const locale of ['en', 'de'] as const) test.describe(`setup settings in ${l
     await expect(registration).toBeEnabled();
     await expect(registration).not.toBeChecked();
     await registration.check();
-    await save.click();
+    await Promise.all([page.waitForEvent('load'), save.click()]);
     await expect(page).toHaveURL(/\/setup\?saved=1$/);
     await page.reload();
     await expect(defer).not.toBeChecked();
@@ -84,7 +84,7 @@ for (const locale of ['en', 'de'] as const) test.describe(`setup settings in ${l
     await enabled.check();
     await expect(mail.locator('#smtpHost')).toBeEnabled();
     await expect(enabled).toBeDisabled();
-    await mail.getByRole('button', { name: reviewUi.saveRegistrationMail[locale], exact: true }).click();
+    await Promise.all([page.waitForEvent('load'), mail.getByRole('button', { name: reviewUi.saveRegistrationMail[locale], exact: true }).click()]);
     await expect(page).toHaveURL(/\/setup\?saved=1$/);
     await page.reload();
     await expect(defer).not.toBeChecked();

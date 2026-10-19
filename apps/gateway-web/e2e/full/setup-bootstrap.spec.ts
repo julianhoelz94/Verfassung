@@ -30,7 +30,7 @@ test('new deployment stays closed until the administrator completes setup', asyn
   await page.reload();
   await expect(page.getByLabel('Configure email later', { exact: true })).toBeChecked();
   await page.getByLabel('I have reviewed access and registration settings', { exact: true }).check();
-  await page.getByRole('button', { name: 'Save preferences', exact: true }).click();
+  await Promise.all([page.waitForEvent('load'), page.getByRole('button', { name: 'Save preferences', exact: true }).click()]);
   await expect(page).toHaveURL(/\/setup\?saved=1$/, { timeout: 15_000 });
   await expect(page.getByText('Changes saved.', { exact: true })).toBeVisible();
   await page.reload();

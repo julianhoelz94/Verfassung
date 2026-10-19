@@ -1,4 +1,3 @@
-import Link from 'next/link';
 import { T } from '../../components/TranslationProvider';
 import { ui } from '../../../lib/messages';
 import { cookies } from 'next/headers';
@@ -19,7 +18,7 @@ export default async function AnonymousBrowsingPage({ searchParams }: { searchPa
   const returnTo = params.returnTo === '/setup' || params.returnTo === '/admin/settings' ? params.returnTo : undefined;
   return <PageMain>
     <PageHeader title={<T value={ui.attrs.adminAnonymousBrowsingPagePageHeaderTitleAnonymous} />} meta={<T value={ui.attrs.adminAnonymousBrowsingPagePageHeaderMetaControl} />}
-      actions={returnTo ? <Link className="btn btn-secondary" href={`${returnTo}#${returnTo === '/setup' ? 'preferences' : 'general'}`}><T value={returnTo === '/setup' ? m.backToSetup : m.backToSettings} /></Link> : undefined} />
+      actions={returnTo ? <a className="btn btn-secondary" href={`${returnTo}#${returnTo === '/setup' ? 'preferences' : 'general'}`}><T value={returnTo === '/setup' ? m.backToSetup : m.backToSettings} /></a> : undefined} />
     {params.error ? <Alert tone="error"><T value={ui.admin.anonymousBrowsing.page.settingsCouldNotBeSavedCheckThat} /></Alert> : null}
     {params.saved ? <Alert tone="success"><T value={ui.admin.anonymousBrowsing.page.anonymousBrowsingSettingsSaved} /></Alert> : null}
     {!policy ? <Alert tone="error"><T value={ui.admin.anonymousBrowsing.page.anonymousBrowsingSettingsCouldNotBeLoaded} /></Alert> :

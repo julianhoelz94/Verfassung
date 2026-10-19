@@ -68,10 +68,13 @@ its eight-thread PostgreSQL test permits exactly one successful consumer.
 Six initial API/concurrency regressions failed against `2e0dc04`, reproducing the
 passkey, promotion, OAuth freshness, invite-disable, stale-enrollment and one-use
 link defects. Their first correction pass succeeded. The full Identity check then
-passed with the added PostgreSQL revocation-race, reauthentication and throttle
-tests. Final queued-login and passkey-step-up coverage, independent correction
-reviews, gateway/browser checks and required PR/main/Wiki CI complete close-out;
-final results are recorded in the Sprint 60 Linear plan.
+passed 74 tests, including queued-login, account-bound step-up, PostgreSQL
+revocation-race, reauthentication and throttle regressions. Search passes 11 tests;
+the gateway passes 222 unit tests, lint, production build and 73 mock journeys.
+Independent code review is clear, and actual external-proxy verification passes
+24 header cases and three guards. A durable proxy regression runs in CI. Required
+PR/main, real WebAuthn/browser and Wiki checks complete close-out; final results
+are recorded in the Sprint 60 Linear plan.
 
 This is a source review with controlled exploit regressions, not a production
 penetration test or incident investigation. Transport trust configuration,

@@ -55,12 +55,21 @@ try:
     docker('network', 'create', NETWORK)
     with tempfile.TemporaryDirectory(prefix=NAME) as directory:
         folder = Path(directory)
-        (folder / 'gateway.py').write_text('''from http.server import BaseHTTPRequestHandler, HTTPServer
+        (folder / 'gateway.py').write_text('''from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+import json
+import threading
 class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
-        if self.path == '/api/setup-gate':
+        if self.path in {'/api/setup-gate', '/api/edge-rate-limit'}:
             self.send_response(204)
             self.end_headers()
+            return
+        if self.path != '/login' or self.server.server_port != 3000:
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.end_headers()
+            self.wfile.write(json.dumps({name: self.headers.get_all(name) for name in
+                ('X-Atlas-Client-IP', 'X-Forwarded-For', 'X-Atlas-Edge-Check')}).encode())
             return
         self.send_response(200)
         self.send_header('Content-Type', 'text/html')
@@ -69,12 +78,13 @@ class Handler(BaseHTTPRequestHandler):
     do_POST = do_GET
     def log_message(self, *_):
         pass
-HTTPServer(('0.0.0.0', 3000), Handler).serve_forever()
+threading.Thread(target=ThreadingHTTPServer(('0.0.0.0', 8080), Handler).serve_forever, daemon=True).start()
+ThreadingHTTPServer(('0.0.0.0', 3000), Handler).serve_forever()
 ''')
         gateway = NAME + '-gateway'
         CONTAINERS.append(gateway)
         docker('run', '-d', '--name', gateway, '--network', NETWORK,
-               '--network-alias', 'gateway-web', '-v', str(folder) + ':/test:ro',
+               '--network-alias', 'gateway-web', '--network-alias', 'identity-service', '-v', str(folder) + ':/test:ro',
                '--entrypoint', 'python3', IMAGE, '/test/gateway.py')
         # The initial probe must reject the front proxy's private CA. Replace
         # this file in place later so the next real probe can verify its chain.
@@ -90,6 +100,8 @@ https://''' + HOST + ''' {
     tls internal
     reverse_proxy edge:80 {
         header_up X-Forwarded-Proto https
+        # Model a trusted upstream which appends its peer to an untrusted chain.
+        header_up X-Forwarded-For "{header.X-Forwarded-For}, {remote_host}"
     }
 }
 :80 {
@@ -171,6 +183,24 @@ https://''' + HOST + ''' {
         expect_code(403, edge_http + '/api/identity/login', headers=['X-Forwarded-Proto: https'], data='{}')
         expect_code(426, front_http + '/api/identity/login', data='{}')
         print('Proxy readiness: verified public certificate opens login; spoofed and insecure requests remain blocked: passed')
+
+        baseline = json.loads(expect_code(200, public + '/security-header-probe', **tls))
+        peer = baseline['X-Atlas-Client-IP']
+        assert len(peer) == 1 and peer == baseline['X-Forwarded-For'], baseline
+        for path in ('/oauth/register', '/api/identity/oauth/register', '/api/identity/login',
+                     '/api/identity/passkeys/login/start', '/api/identity/password/reset/request',
+                     '/security-header-probe', '/account'):
+            for forged in ('203.0.113.99', '198.51.100.10, 203.0.113.99'):
+                echoed = json.loads(expect_code(200, public + path, headers=[
+                    'X-Forwarded-For: ' + forged, 'x-forwarded-for: 192.0.2.77',
+                    'X-Atlas-Client-IP: 192.0.2.10', 'x-atlas-client-ip: 192.0.2.11',
+                    'X-Atlas-Edge-Check: 1',
+                ], data='{}', **tls))
+                assert echoed['X-Atlas-Client-IP'] == peer, (path, echoed)
+                assert echoed['X-Forwarded-For'] == peer, (path, echoed)
+                if path in {'/security-header-probe', '/account'}:
+                    assert echoed['X-Atlas-Edge-Check'] is None, (path, echoed)
+        print('Proxy peer identity: forged chains and duplicate headers cannot change gateway/Identity rate-limit identities: passed')
 except Exception:
     for container in CONTAINERS:
         subprocess.run(['docker', 'logs', '--tail', '35', container], check=False)

@@ -18,7 +18,7 @@ than reformatted or deleted merely to reduce counts.
 
 Linear tracks the approved scope in the Sprint 60 milestone and linked plan. Issue
 creation was attempted but rejected by the workspace free issue limit. Existing
-unrelated issues remain intact. Delivery PR: #139.
+unrelated issues remain intact. Delivery PRs: #139 (cleanup), #141 (Catalog test isolation), and #142 (Identity security and Search rebuild serialization).
 
 ## Findings and corrections
 
@@ -73,7 +73,7 @@ packages are needed. No cross-database writes or schema changes were introduced.
 | Content | Ordered revisions, generation/receipt checks, snapshot member validation, legacy compatibility and strict writes; shared transport/JSON/base and invariant documentation |
 | Amendment | Staff/public revision selection, mutation roles, version pins, review/diff contracts and repository constraints; shared transport, retain domain contracts |
 | Editor | Owned sessions, pinned structured replay/publication, successor reservation, durable side effects and downstream clients; shared transport, typed error parsing and publication documentation |
-| Identity/setup | Password/session/MFA/passkey flows, recovery ownership/use, bootstrap gates and saved/effective policy settings; atomic recovery fix and shared audit transport |
+| Identity/setup | Password/session/MFA/passkey flows, recovery ownership/use, bootstrap gates and saved/effective policy settings; atomic recovery fix and shared audit transport; extended factor/credential/proxy audit in the linked security report |
 | Ingestion | Staging/review/publication separation, uploads/proposals, idempotency/outbox and request-thread auth; shared limits/transport, parent scope restoration |
 | Search | Published traversal, index replacement/read transactions, pagination/generation and authorization; shared transport, retain derived-index semantics |
 | Audit | Append-only event attribution, reader/appender scopes, repositories and health; remove unused local transport copy |
@@ -118,3 +118,11 @@ The user subsequently requested a deeper Identity security review before closing
 Sprint 60. Its confirmed attack paths, corrections and evidence are recorded in
 [the security review](sprint-60-identity-security.md). This remains part of the same
 sprint and branch; its required review/CI/publication gates also precede completion.
+
+The expanded local check passes 74 Identity tests (including 13 new security
+regressions), 11 Search tests and 222 gateway unit tests; lint and production
+build pass. Independent external-proxy verification passes 24 forged-header cases
+and three guards. The durable CI proxy test also exercises forwarded-chain and
+duplicate-header spoofing through a trusted upstream. The security correction
+review and verifier are clear; required CI and publication are recorded in Linear
+when they finish.

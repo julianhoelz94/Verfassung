@@ -1,4 +1,4 @@
-# Only the Kotlin build inputs enter the root build context.
+# Kotlin build inputs and the shared language registry enter the root context.
 **
 !gradlew
 !gradle/

@@ -102,6 +102,8 @@ The integrated Linux screenshot generation passed all 10 cases and produces 174 
 
 Independent review restored discovery of the privacy-notice editor through a labelled legal-page selector. Additional review tightened native disclosure markers, language-link spacing, legal contact-field alignment, the desktop settings-sidebar selector and German import wording. Browser fixtures now include normal SMTP settings and a bound import structure; the audit asserts destination URLs and rejects failed-loading states instead of counting redirects or error pages as coverage.
 
+Final real-stack CI also exposed a test race in logout verification when the browser was already on the home URL. The helper now waits for the signed-out header before reloading, then verifies that state survives the reload. This replaces a premature reload with an assertion of completed, persisted logout.
+
 The duplicate/dead-code scan removed superseded button/alert styles and an unused history helper. Shared `Disclosure`, `MfaSetup`, and `SnapshotNotice` components avoid repeating the new behavior. No public APIs, applied migrations or contract fixtures were removed.
 
 The before images in `screenshots/sprint-59/` were captured with fictional data from the baseline development server. Its editor image shows the session hub, not an active editing session; browser coverage separately includes the active correction editor. After images use the production build. Linux screenshot baselines live in `apps/gateway-web/e2e/snapshots/` and cover both languages for the newer page templates.

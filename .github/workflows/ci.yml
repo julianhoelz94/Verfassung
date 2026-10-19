@@ -225,6 +225,7 @@ jobs:
           python3 scripts/test-local-https.py
           python3 scripts/test-acme-http01.py
           python3 scripts/test-proxy-https.py
+          python3 scripts/test-proxy-https.py --docs-enabled
 
   mcp-server:
     runs-on: ubuntu-latest

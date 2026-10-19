@@ -11,8 +11,10 @@ export const dynamic = 'force-dynamic';
 export async function GET(request: NextRequest) {
   // Caddy sets this header only for its internal forward_auth request.
   if (request.headers.get('x-atlas-edge-check') !== '1') return new NextResponse(null, { status: 403 });
+  // Swagger's interactive API aliases have the same policy as their canonical routes.
+  const originalUri = (request.headers.get('x-atlas-original-uri') ?? '').replace(/^\/api\/docs\//, '/api/');
   try {
-    if (!(await setupStatus()).completed && setupPathAllowed(request.headers.get('x-atlas-original-uri') ?? '', false)) return new NextResponse(null, { status: 204 });
+    if (!(await setupStatus()).completed && setupPathAllowed(originalUri, false)) return new NextResponse(null, { status: 204 });
   } catch { return NextResponse.json({ code: 'setup_unavailable' }, { status: 503 }); }
   const token = request.cookies.get(SESSION_COOKIE)?.value;
   const credential = token ? `Bearer ${token}` : request.headers.get('authorization');
@@ -35,7 +37,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ code: 'anonymous_policy_unavailable', detail: 'Browsing settings are temporarily unavailable.' }, { status: 503 });
   }
   if (!policy.allowed) {
-    const originalUri = request.headers.get('x-atlas-original-uri') ?? '';
     if (originalUri.startsWith('/api/identity') || originalUri.startsWith('/oauth/')) {
       return new NextResponse(null, { status: 204 });
     }

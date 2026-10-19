@@ -35,7 +35,12 @@ for (const locale of ['en', 'de']) for (const width of sizes) {
     const evidence: Array<{ route: string; status: number | undefined; heading: string | null }> = [];
     try {
       for (const route of [...uiRoutes, ...uiStates]) await test.step(route.entry, async () => {
-        if ('setup' in route && route.setup) await request.post(`${mock}/__sprint59_setup`, { data: { completed: false } });
+        if ('setup' in route && route.setup) {
+          await request.post(`${mock}/__sprint59_setup`, { data: { completed: false } });
+          await publicPage.goto('/impressum');
+          await expect(publicPage.locator('.topbar').getByRole('link', { name: locale === 'en' ? 'Log in' : 'Einloggen', exact: true })).toBeVisible();
+          await expect(publicPage.locator('.nav-primary a')).toHaveCount(0);
+        }
         if ('session' in route && route.session) expect((await request.post(`${mock}/api/editor/edit-sessions`, { data: { versionId: '01900000-0000-4000-8000-000000000804', hopKind: 'editorial_correction' } })).ok()).toBeTruthy();
         const page = 'staff' in route && route.staff ? staffPage : publicPage;
         const response = await page.goto(route.path);

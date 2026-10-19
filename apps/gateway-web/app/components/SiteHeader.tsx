@@ -134,7 +134,7 @@ export function SiteHeader({ user, identityUnavailable = false, needsReviewCount
             </MenuDisclosure>
           ) : (
             <>
-              <a className="btn btn-sm login-desktop" href="/login">
+              <a className={setupInProgress ? 'btn btn-sm' : 'btn btn-sm login-desktop'} href="/login">
                 <T value={ui.components.siteheader.logIn} />{" "}</a>
               {!setupInProgress ? <MenuDisclosure key={pathname} className="menu-phone" label={ui.searchForm.menu} trigger={<span aria-hidden="true">☰</span>}>
                 <MenuSectionList sections={sections} pathname={pathname} user={user} />

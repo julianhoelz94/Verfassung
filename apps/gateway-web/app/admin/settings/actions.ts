@@ -5,8 +5,9 @@ import { updateTranslationSiteSettings } from '../../../lib/content-translation'
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { requireAdminUser } from '../../../lib/admin';
-import { IdentityApiError, sendTestMail, updateIdentitySettings } from '../../../lib/identity-client';
+import { IdentityApiError, requestIdentitySettings, sendTestMail, updateIdentitySettings } from '../../../lib/identity-client';
 import { SESSION_COOKIE } from '../../../lib/session';
+import { setupRequest, type SetupDetails } from '../../../lib/deployment-setup';
 
 async function adminToken() {
   await requireAdminUser('/admin/settings?error=forbidden');
@@ -20,20 +21,33 @@ export async function saveIdentitySettingsAction(formData: FormData): Promise<st
   const target = formData.get('returnTo') === '/setup' ? '/setup' : '/admin/settings';
   const checked = (name: string) => formData.get(name) === 'on';
   try {
+    const { smtpPasswordSet: _passwordSet, ...current } = await requestIdentitySettings(token);
+    const deferred = formData.has('hasMailDeferredPreference') && checked('mailDeferred');
+    const mailEnabled = !deferred && checked('mailEnabled');
+    const value = (name: string, fallback: string) => String(formData.get(name) ?? fallback);
     await updateIdentitySettings(token, {
-      selfRegistrationEnabled: checked('selfRegistrationEnabled'),
-      mailEnabled: checked('mailEnabled'),
-      mailFrom: String(formData.get('mailFrom') ?? ''),
-      mailFromName: String(formData.get('mailFromName') ?? ''),
-      mailPublicBaseUrl: String(formData.get('mailPublicBaseUrl') ?? ''),
-      smtpHost: String(formData.get('smtpHost') ?? ''),
-      smtpPort: Number(formData.get('smtpPort') ?? 587),
-      smtpUsername: String(formData.get('smtpUsername') ?? ''),
-      smtpPassword: String(formData.get('smtpPassword') ?? ''),
-      smtpAuth: checked('smtpAuth'),
-      smtpStarttls: checked('smtpStarttls'),
-      smtpSsl: checked('smtpSsl'),
+      ...current,
+      selfRegistrationEnabled: mailEnabled && checked('selfRegistrationEnabled'),
+      mailEnabled,
+      ...(mailEnabled ? {
+        mailFrom: value('mailFrom', current.mailFrom),
+        mailFromName: value('mailFromName', current.mailFromName),
+        mailPublicBaseUrl: value('mailPublicBaseUrl', current.mailPublicBaseUrl),
+        smtpHost: value('smtpHost', current.smtpHost),
+        smtpPort: Number(formData.get('smtpPort') ?? current.smtpPort),
+        smtpUsername: value('smtpUsername', current.smtpUsername),
+        smtpPassword: value('smtpPassword', ''),
+        smtpAuth: checked('smtpAuth'),
+        smtpStarttls: checked('smtpStarttls'),
+        smtpSsl: checked('smtpSsl'),
+      } : {}),
     });
+    if (formData.has('hasMailDeferredPreference')) {
+      const details = await setupRequest<SetupDetails>('/setup', `Bearer ${token}`);
+      if (details.preferences.mailDeferred !== deferred) {
+        await setupRequest('/setup', `Bearer ${token}`, 'PUT', { ...details.preferences, mailDeferred: deferred });
+      }
+    }
   } catch (error) {
     if (error instanceof IdentityApiError && error.code === 'step_up_required') {
       return `/account/step-up?returnTo=${encodeURIComponent(target)}`;

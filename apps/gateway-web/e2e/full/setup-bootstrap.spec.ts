@@ -23,8 +23,14 @@ test('new deployment stays closed until the administrator completes setup', asyn
   await expect(page).toHaveURL(/\/setup$/);
   await expect(page.getByRole('button', { name: 'Finish setup and open the site' })).toBeDisabled();
   await page.getByLabel('Configure email later', { exact: true }).check();
+  await expect(page.locator('#smtpHost')).toBeDisabled();
+  await expect(page.locator('input[name="selfRegistrationEnabled"]')).toBeDisabled();
+  await page.getByRole('button', { name: 'Save registration and mail settings', exact: true }).click();
+  await expect(page).toHaveURL(/\/setup\?saved=1$/);
+  await page.reload();
+  await expect(page.getByLabel('Configure email later', { exact: true })).toBeChecked();
   await page.getByLabel('I have reviewed access and registration settings', { exact: true }).check();
-  await page.getByRole('button', { name: 'Save preferences', exact: true }).click();
+  await Promise.all([page.waitForEvent('load'), page.getByRole('button', { name: 'Save preferences', exact: true }).click()]);
   await expect(page).toHaveURL(/\/setup\?saved=1$/, { timeout: 15_000 });
   await expect(page.getByText('Changes saved.', { exact: true })).toBeVisible();
   await page.reload();

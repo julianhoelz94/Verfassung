@@ -9,6 +9,9 @@ import { SESSION_COOKIE } from '../../../lib/session';
 const page = '/admin/anonymous-browsing';
 
 export async function saveAnonymousBrowsingAction(formData: FormData): Promise<void> {
+  const returnTo = formData.get('returnTo');
+  const target = returnTo === '/setup' || returnTo === '/admin/settings' ? `${page}?returnTo=${encodeURIComponent(returnTo)}` : page;
+  const result = (key: string) => `${target}${target.includes('?') ? '&' : '?'}${key}`;
   await requireAdminUser(`${page}?error=forbidden`);
   const token = (await cookies()).get(SESSION_COOKIE)?.value;
   if (!token) redirect('/login');
@@ -25,9 +28,9 @@ export async function saveAnonymousBrowsingAction(formData: FormData): Promise<v
     });
   } catch (error) {
     if (error instanceof Error && 'code' in error && error.code === 'step_up_required') {
-      redirect(`/account/step-up?returnTo=${encodeURIComponent(page)}`);
+      redirect(`/account/step-up?returnTo=${encodeURIComponent(target)}`);
     }
-    redirect(`${page}?error=save`);
+    redirect(result('error=save'));
   }
-  redirect(`${page}?saved=1`);
+  redirect(result('saved=1'));
 }

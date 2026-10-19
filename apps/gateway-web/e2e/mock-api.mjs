@@ -963,6 +963,10 @@ const server = createServer(async (req, res) => {
       return;
     }
     if (method === 'PUT') {
+      if (!stepUpFresh) {
+        json(res, 403, { error: 'Fresh authentication required', code: 'step_up_required' });
+        return;
+      }
       anonymousBrowsing = { ...(await readBody(req)), revision: anonymousBrowsing.revision + 1 };
       json(res, 200, anonymousBrowsing);
       return;

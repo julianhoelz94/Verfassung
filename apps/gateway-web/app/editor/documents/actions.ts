@@ -35,7 +35,7 @@ export async function createDocumentAction(form: FormData): Promise<string> {
   return `/editor/documents/${document.id}?created=1&returnTo=${encodeURIComponent(returnTo)}`;
 }
 
-export async function reviseDocumentAction(form: FormData): Promise<void> {
+export async function reviseDocumentAction(form: FormData): Promise<string> {
   const authorization = await writer();
   const id = String(form.get('id') ?? '');
   try {
@@ -46,24 +46,24 @@ export async function reviseDocumentAction(form: FormData): Promise<void> {
       expectedRevision: Number(form.get('expectedRevision')),
     }, authorization);
   } catch {
-    redirect(`/editor/documents/${encodeURIComponent(id)}?error=conflict`);
+    return `/editor/documents/${encodeURIComponent(id)}?error=conflict`;
   }
   revalidatePath(`/editor/documents/${id}`);
-  redirect(`/editor/documents/${encodeURIComponent(id)}?saved=1`);
+  return `/editor/documents/${encodeURIComponent(id)}?saved=1`;
 }
 
-export async function uploadDocumentAction(form: FormData): Promise<void> {
+export async function uploadDocumentAction(form: FormData): Promise<string> {
   const authorization = await writer();
   const id = String(form.get('id') ?? '');
   const file = form.get('file');
-  if (!(file instanceof File)) redirect(`/editor/documents/${encodeURIComponent(id)}?error=file`);
+  if (!(file instanceof File)) return `/editor/documents/${encodeURIComponent(id)}?error=file`;
   try {
     await uploadDocument(id, Number(form.get('expectedRevision')), file, authorization);
   } catch {
-    redirect(`/editor/documents/${encodeURIComponent(id)}?error=file`);
+    return `/editor/documents/${encodeURIComponent(id)}?error=file`;
   }
   revalidatePath(`/editor/documents/${id}`);
-  redirect(`/editor/documents/${encodeURIComponent(id)}?saved=1`);
+  return `/editor/documents/${encodeURIComponent(id)}?saved=1`;
 }
 
 export async function attachDocumentAction(form: FormData): Promise<string> {
@@ -80,7 +80,7 @@ export async function attachDocumentAction(form: FormData): Promise<string> {
   return returnTo;
 }
 
-export async function detachDocumentAction(form: FormData): Promise<void> {
+export async function detachDocumentAction(form: FormData): Promise<string> {
   const authorization = await writer();
   const targetType = String(form.get('targetType')) as 'constitution' | 'version' | 'amendment';
   const targetId = String(form.get('targetId'));
@@ -88,8 +88,8 @@ export async function detachDocumentAction(form: FormData): Promise<void> {
   try {
     await detachDocument(targetType, targetId, String(form.get('documentId')), authorization, String(form.get('scopeRevisionId') || '') || null);
   } catch {
-    redirect(`${returnTo}${returnTo.includes('?') ? '&' : '?'}documentError=detach`);
+    return `${returnTo}${returnTo.includes('?') ? '&' : '?'}documentError=detach`;
   }
   revalidatePath(returnTo.split('?')[0]);
-  redirect(returnTo);
+  return returnTo;
 }

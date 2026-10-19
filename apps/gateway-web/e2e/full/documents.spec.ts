@@ -19,6 +19,7 @@ test('document revisions link from both editors and appear on public readers wit
   const documentId = new URL(page.url()).pathname.split('/').at(-1)!;
   await page.getByLabel('Title').fill(`${title} revised`);
   await page.getByRole('button', { name: 'Save revision' }).click();
+  await expect(page.getByRole('heading', { name: `${title} revised`, exact: true })).toBeVisible({ timeout: 15_000 });
   await expect(page.getByText('Document revision saved.')).toBeVisible();
   await page.getByLabel('PDF or text file, up to 20 MB').setInputFiles({ name: 'source.txt', mimeType: 'text/plain', buffer: Buffer.from('Official source file') });
   await page.getByRole('button', { name: 'Upload file' }).click();
@@ -38,6 +39,17 @@ test('document revisions link from both editors and appear on public readers wit
     return (await response.json()).some((link: { documentId: string }) => link.documentId === documentId);
   }).toBe(true);
   await expect(page.getByRole('link', { name: `${title} revised` })).toBeVisible({ timeout: 15_000 });
+  const linkedDocument = page.getByRole('listitem').filter({ has: page.getByRole('link', { name: `${title} revised`, exact: true }) });
+  await linkedDocument.getByRole('button', { name: 'Detach', exact: true }).click();
+  await expect.poll(async () => {
+    const response = await request.get(`/api/document/links/constitution/${fixture.constitutionId}`, { headers });
+    expect(response.ok()).toBeTruthy();
+    return (await response.json()).some((link: { documentId: string }) => link.documentId === documentId);
+  }).toBe(false);
+  await expect(page.getByRole('link', { name: `${title} revised`, exact: true })).toHaveCount(0);
+  await page.getByLabel('Select a document').selectOption(documentId);
+  await page.getByRole('button', { name: 'Attach' }).click();
+  await expect(page.getByRole('link', { name: `${title} revised`, exact: true })).toBeVisible({ timeout: 15_000 });
   await page.goto(`/countries/${fixture.countryIso}/versions/${fixture.targetVersionId}`);
   await expect(page.getByRole('heading', { name: 'Constitution documents' })).toBeVisible();
   await expect(page.getByRole('link', { name: `${title} revised` })).toBeVisible({ timeout: 15_000 });

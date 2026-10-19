@@ -8,7 +8,7 @@ Start at [CODEMAPS/INDEX.md](https://github.com/julianhoelz94/Verfassung/blob/ma
 
 ## Run the local stack
 
-Install a Docker-compatible engine, JDK 21, and Node 20. From the repository root:
+Install OrbStack (preferred) or another Docker-compatible engine with Compose; Bash and curl are also required. Java and Node on the host are optional for development checks. From the repository root:
 
 ```sh
 cp env/local-stack.env.example env/local-stack.env  # once; keep real values out of git
@@ -17,11 +17,16 @@ cp env/local-stack.env.example env/local-stack.env  # once; keep real values out
 ./manageLocalStack.sh --stop                     # keeps database volumes
 ```
 
-The local start flow builds service jars and images and can upload test fixtures. `--start --no-build` reuses images; `--rebuild <service...>` applies source changes; `--only-prepopulate` runs the API-based fixture upload against an already running stack. `--reset` removes local database volumes and is destructive. See the [README](https://github.com/julianhoelz94/Verfassung/blob/main/README.md) and [stack script](https://github.com/julianhoelz94/Verfassung/blob/main/manageLocalStack.sh) for current flags and prerequisites.
+The local start flow compiles all services and builds images inside OrbStack or Docker, one image at a time with a single Gradle worker. It checks all nine service health endpoints, then uploads deterministic test fixtures with a Node tool container; backup jobs run only when explicitly requested.
+
+`--start --no-build` reuses images; `--rebuild <service...>` applies source changes; `--only-prepopulate` runs the API-based fixture upload against an already running stack; add `--verify-only` to check saved fixtures without uploading.
+
+A daemon-wide lock prevents overlapping local-stack builds. `docker buildx history ls` shows build records. In OrbStack, select the `build-monitor` container and open Logs to follow compilations; its completed logs remain available after it stops. OrbStack also shows runtime containers and images. `--reset` removes local database volumes and is destructive. See the [README](https://github.com/julianhoelz94/Verfassung/blob/main/README.md) and [stack script](https://github.com/julianhoelz94/Verfassung/blob/main/manageLocalStack.sh) for current flags and prerequisites.
 
 ## Verify changes
 
 ```sh
+python3 scripts/test_local_stack.py     # orchestration and overlapping-build guards
 cd services/<name> && ./gradlew test     # changed service
 cd services/<name> && ./gradlew check    # includes formatting checks
 cd apps/gateway-web && npm run lint && npm run build

@@ -1,0 +1,15 @@
+# Only the Kotlin build inputs enter the root build context.
+**
+!gradlew
+!gradle/
+!gradle/**
+!services/
+!services/platform/
+!services/platform/**
+!services/*-service/
+!services/*-service/**
+**/build
+**/.gradle
+**/.kotlin
+**/*.env
+**/*.log

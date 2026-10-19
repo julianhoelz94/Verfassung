@@ -8,12 +8,12 @@ Product work and sprint status live in [`backlog.md`](backlog.md). This file is 
 
 ## Host prerequisites (install yourself)
 
-These are not provided by the repo. Compose images contain a JRE (Kotlin services), Node (gateway), Caddy, and Postgres; you still need a Docker-compatible engine and JDK 21 on the host.
+The local stack needs only OrbStack (preferred) or another Docker-compatible engine with Compose, Bash, and curl. Compilation and fixture upload run in containers. The Java and Node tools below are optional for running checks outside Docker.
 
 | Tool | Version | Needed for | Install |
 | --- | --- | --- | --- |
 | OrbStack or Docker Desktop | current, with the engine running | Local stack (`./manageLocalStack.sh`) and Testcontainers | [OrbStack](https://orbstack.dev/) or [Docker Desktop for Mac](https://www.docker.com/products/docker-desktop/) |
-| Temurin JDK | **21** (LTS) | Host `./gradlew test` / `bootJar` (local stack Kotlin images) | [Adoptium Temurin 21](https://adoptium.net/temurin/releases/?version=21) (macOS `.pkg` needs admin). Without sudo: unpack the macOS aarch64/x64 `.tar.gz` under `~/.local/java/temurin-21` (`Contents/Home`) and set `JAVA_HOME` + `PATH` in `~/.zshrc`. |
+| Temurin JDK | **21** (LTS) | Optional host service tests/builds | [Adoptium Temurin 21](https://adoptium.net/temurin/releases/?version=21) (macOS `.pkg` needs admin). Without sudo: unpack the macOS aarch64/x64 `.tar.gz` under `~/.local/java/temurin-21` (`Contents/Home`) and set `JAVA_HOME` + `PATH` in `~/.zshrc`. |
 | Gradle | **9.7.1** (matches CI and the repo wrapper) | Host `./gradlew test` / `bootJar` | Wrapper at repo root (`./gradlew`); each `services/<name>/gradlew` delegates to it. Prefer the wrapper over Homebrew’s `gradle` formula so the patch version stays pinned. |
 | Node.js + npm | **20** | `cd apps/gateway-web && npm ci && npm run lint && npm run build` | [Node 20](https://nodejs.org/) or `nvm install 20` |
 
@@ -40,13 +40,14 @@ cp env/local-stack.env.example env/local-stack.env   # once
 - Compare (seed DE): <http://localhost/countries/DE/compare>
 - API docs: `http://localhost/api/docs/<service>/swagger-ui/index.html`
 
-Service names: `catalog`, `content`, `amendment`, `identity`, `editor`, `search`, `ingestion`, `audit`.
+Service names: `catalog`, `content`, `amendment`, `identity`, `editor`, `search`, `ingestion`, `audit`, `document`, `mcp`.
 
 ```bash
-./manageLocalStack.sh --start              # host bootJar + image build, then up and prepopulate
+./manageLocalStack.sh --start              # serial container builds, then up and prepopulate
 ./manageLocalStack.sh --start --no-build   # fast restart using existing images, then prepopulate
 ./manageLocalStack.sh --start --no-prepopulate # start without fixture data
 ./manageLocalStack.sh --only-prepopulate   # populate an already running stack
+./manageLocalStack.sh --only-prepopulate --verify-only # check fixtures without uploading
 ./manageLocalStack.sh --rebuild content-service amendment-service gateway-web
 ./manageLocalStack.sh --rebuild --no-prepopulate catalog-service
 ./manageLocalStack.sh --status
@@ -55,15 +56,25 @@ Service names: `catalog`, `content`, `amendment`, `identity`, `editor`, `search`
 ./manageLocalStack.sh --reset --prune      # also docker system prune -af
 ```
 
-`--start` runs `./gradlew bootJar` on the host for each Kotlin service, then copies `app.jar` onto `eclipse-temurin:21-jre`. Gateway and Caddy still build in Docker. After Flyway or gateway changes, `--rebuild` those services (catalog/content also recreates search so the index rebuilds).
+`--start` compiles all nine Kotlin services with Java 21 inside Docker and builds the gateway, MCP server, and Caddy images. Builds run **one image at a time**; Gradle uses one worker and no parallel projects. A daemon-wide lock rejects overlapping local-stack builds, including from other checkouts. Compilation output streams to the terminal and to the `build-monitor` container: open it in OrbStack and select **Logs** to follow every build. The log remains in `.local-stack/build.log`; Docker BuildKit also retains build records (`docker buildx history ls`). No host JARs, JDK, Node installation, or `npm ci` are needed for this flow. Each local Java service uses a 256 MiB maximum heap and Serial GC to leave room for the other services in the VM (`LOCAL_JAVA_TOOL_OPTIONS` overrides these JVM options). Linux build outputs stay inside Docker, and a locked Gradle dependency cache is reused between builds.
 
-`--start` and `--rebuild` prepopulate after the services become reachable. Prepopulation uses the seeded `LOCAL_ADMIN_EMAIL` and `LOCAL_ADMIN_PASSWORD` from `env/local-stack.env`, targets only localhost, and verifies existing fixture data on repeated runs. Use `--no-prepopulate` to leave the stack's data as it is.
+Existing env files gain only missing keys from the local example on startup; configured values are preserved. This supplies new local service-token settings to older checkouts.
 
-The script uses the selected Docker context. If its engine is stopped on macOS, it opens OrbStack for the `orbstack` context or Docker Desktop for other contexts. Select OrbStack with `docker context use orbstack` if needed. Builds run two Kotlin services at a time (`GRADLE_BUILD_JOBS=1` for a memory-constrained machine) and batch the Docker image builds. A fresh checkout still needs one full build; subsequent restarts can use `--start --no-build`. Use `--rebuild <service>` to apply source changes to a running stack.
+The script uses `docker-compose.yml` plus `docker-compose.local.yml`, with the stable Compose project name `verfassung` (override with `COMPOSE_PROJECT_NAME`). CI retains its tested-JAR packaging flow. After source changes, use `--rebuild <service...>`; catalog/content rebuilds also recreate search so its derived index rebuilds. `--start --no-build` restarts existing images. Every start/rebuild checks all nine private service health endpoints, including document-service, before reporting success, independently of public browsing quotas.
+
+`--start` and `--rebuild` then run the `prepopulate` container, which generates deterministic fixtures, uploads through the real APIs with separate reviewer/publisher accounts, checks existing records, and rebuilds/verifies search. It uses the seeded accounts in `env/local-stack.env`; read-back requests authenticate too, so quotas or disabled anonymous browsing do not block fixture maintenance. The container shares Caddy's network namespace so the localhost-only safety guard remains enforced. Fixture verification keeps the original legal IDs and checks the current search snapshot separately, so additional local data and published editorial corrections do not break restarts. Interrupted fixture imports resume from their existing review/publication state after matching the staged source content. Repeated uploads reuse existing fixture IDs; `--only-prepopulate --verify-only` checks saved content without uploading or rebuilding search. Runtime IDs are saved to `apps/gateway-web/e2e/fixtures/generated/.runtime/prepopulate-ids.json`. Use `--no-prepopulate` to skip fixture changes.
+
+The script uses the selected Docker context. Select OrbStack with `docker context use orbstack`; if that engine is stopped on macOS, the script opens OrbStack. Other contexts retain the Docker Desktop startup fallback. Inspect containers and images in OrbStack, or use `./manageLocalStack.sh --status`. If a build was forcibly killed and left `verfassung-local-build-lock`, verify that no build is running before removing that lock container with `docker rm verfassung-local-build-lock`.
+
+Backups are an explicit one-shot operation in the local stack rather than an application container started on every boot:
+
+```bash
+docker compose -p verfassung -f docker-compose.yml -f docker-compose.local.yml --env-file env/local-stack.env run --rm backup-service
+```
 
 ## Backup and restore
 
-`infra/backup/backup.sh` dumps all eight databases (including `search`) into `./backups/<timestamp>/`. Compose runs it on the `backup-service` container.
+`infra/backup/backup.sh` dumps all nine service databases (including `search` and `document`) into `./backups/<timestamp>/`. Compose runs it on the `backup-service` container.
 
 Restore drill (destroys current rows in those databases):
 

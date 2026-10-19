@@ -8,13 +8,14 @@ ROOT="$(cd "$(dirname "$0")" && pwd)"
 cd "$ROOT"
 
 ENV_FILE="env/local-stack.env"
-COMPOSE_CMD=(docker compose --progress=plain)
+COMPOSE_CMD=(docker compose --parallel 1 --progress=plain -p "${COMPOSE_PROJECT_NAME:-verfassung}"
+  -f docker-compose.yml -f docker-compose.local.yml)
 if [ "${COMPOSE_VERBOSE:-}" = "1" ]; then
   COMPOSE_CMD+=(--verbose)
 fi
 
 # Compose service names — keep in sync with docker-compose.yml.
-# Kotlin images copy a host bootJar (app.jar); gateway-web, mcp-server, and edge-proxy build in Docker.
+# All compilation and image builds run sequentially inside the selected Docker engine.
 BUILD_ORDER=(
   edge-proxy
   gateway-web
@@ -31,9 +32,8 @@ BUILD_ORDER=(
 )
 
 DOCKER_STARTUP_TIMEOUT_SECONDS="${DOCKER_STARTUP_TIMEOUT_SECONDS:-120}"
-HTTP_READY_TIMEOUT_SECONDS="${HTTP_READY_TIMEOUT_SECONDS:-90}"
+HTTP_READY_TIMEOUT_SECONDS="${HTTP_READY_TIMEOUT_SECONDS:-180}"
 MIN_FREE_MB="${MIN_FREE_MB:-2048}"
-GRADLE_BUILD_JOBS="${GRADLE_BUILD_JOBS:-2}"
 
 compose() {
   "${COMPOSE_CMD[@]}" --env-file "${ENV_FILE}" "$@"
@@ -41,7 +41,7 @@ compose() {
 
 caddy_port() {
   local port="${CADDY_PORT:-80}"
-  if [ -f "${ENV_FILE}" ]; then
+  if [ -z "${CADDY_PORT:-}" ] && [ -f "${ENV_FILE}" ]; then
     local from_file
     from_file="$(grep -E '^CADDY_PORT=' "${ENV_FILE}" 2>/dev/null | tail -1 | cut -d= -f2- || true)"
     if [ -n "${from_file}" ]; then
@@ -113,6 +113,22 @@ ensure_env_file() {
     echo "Missing ${ENV_FILE}; copying from ${ENV_FILE}.example"
     cp "${ENV_FILE}.example" "${ENV_FILE}"
   fi
+  if [ "${1:-}" = "--keep-existing" ]; then return; fi
+  # Existing checkouts also need defaults introduced after their first startup.
+  # Never source dotenv files as shell code or overwrite a configured value.
+  local line key added=0
+  while IFS= read -r line || [ -n "${line}" ]; do
+    key="${line%%=*}"
+    if [[ "${key}" =~ ^[A-Z_][A-Z0-9_]*$ ]] && [[ "${line}" == *=* ]] &&
+        ! grep -Eq "^[[:space:]]*(export[[:space:]]+)?${key}[[:space:]]*=" "${ENV_FILE}"; then
+      if [ "${added}" -eq 0 ]; then
+        printf '\n# Missing local defaults added by manageLocalStack.sh\n' >> "${ENV_FILE}"
+        added=1
+      fi
+      printf '%s\n' "${line}" >> "${ENV_FILE}"
+      echo "Added missing local setting: ${key}"
+    fi
+  done < "${ENV_FILE}.example"
 }
 
 ensure_disk_space() {
@@ -142,29 +158,46 @@ wait_for_http() {
   echo "Ready at ${url}"
 }
 
-run_prepopulate() {
-  local port service url waited
-  port="$(caddy_port)"
-  for service in catalog content amendment identity editor search ingestion audit; do
-    url="http://127.0.0.1:${port}/api/${service}/actuator/health"
-    waited=0
-    until curl -sf -o /dev/null --max-time 2 "${url}"; do
-      if [ "${waited}" -ge "${HTTP_READY_TIMEOUT_SECONDS}" ]; then
-        echo "${service} did not become ready at ${url} within ${HTTP_READY_TIMEOUT_SECONDS}s." >&2
-        return 1
-      fi
-      sleep 3
-      waited=$((waited + 3))
-    done
+wait_for_services() {
+  local deadline=$((SECONDS + HTTP_READY_TIMEOUT_SECONDS)) result previous=""
+  # Edge browsing policy and public quotas must not mask backend readiness.
+  until result="$(compose exec -T gateway-web node -e '
+    const services = process.argv.slice(1);
+    Promise.all(services.map(async service => {
+      try {
+        const response = await fetch(`http://${service}-service:8080/actuator/health`, {
+          signal: AbortSignal.timeout(3000),
+        });
+        return response.ok && (await response.json()).status === "UP";
+      } catch { return false; }
+    })).then(healthy => {
+      const missing = services.filter((_, index) => !healthy[index]);
+      if (missing.length) {
+        console.log(`Not ready: ${missing.join(", ")}`);
+        process.exitCode = 1;
+      } else {
+        services.forEach(service => console.log(`Healthy: ${service}`));
+      }
+    });
+  ' catalog content amendment identity editor search ingestion audit document 2>&1)"; do
+    if [ "${result}" != "${previous}" ]; then
+      printf '%s\n' "${result}"
+      previous="${result}"
+    fi
+    if [ "${SECONDS}" -ge "${deadline}" ]; then
+      echo "Backend health checks timed out after ${HTTP_READY_TIMEOUT_SECONDS}s." >&2
+      compose ps -a
+      compose logs --tail=20 "${BUILD_ORDER[@]}"
+      return 1
+    fi
+    sleep 2
   done
-  echo "======== Prepopulating local stack ========"
-  (
-    cd "${ROOT}/apps/gateway-web"
-    npm run fixtures:generate
-    PREPOPULATE_TEST_STACK=true \
-      PREPOPULATE_BASE_URL="http://127.0.0.1:${port}" \
-      node --env-file="${ROOT}/${ENV_FILE}" e2e/fixtures/prepopulate.mjs
-  )
+  printf '%s\n' "${result}"
+}
+
+run_prepopulate() {
+  echo "======== Prepopulating local stack (container) ========"
+  compose run --rm --no-deps prepopulate "$@"
 }
 
 is_known_service() {
@@ -199,80 +232,42 @@ normalize_service() {
   esac
 }
 
-is_kotlin_service() {
-  case "$1" in
-    mcp-server) return 1 ;;
-    *-service) return 0 ;;
-    *) return 1 ;;
-  esac
+# A daemon-wide container lock also protects invocations from another checkout.
+# The trap removes only the lock owned by this invocation; a second build fails fast.
+acquire_build_lock() {
+  if ! docker create --name verfassung-local-build-lock --label atlas.local-build-lock=true \
+      --entrypoint /bin/true node:22-alpine >/dev/null; then
+    echo "Another local-stack build owns verfassung-local-build-lock. Wait for it to finish." >&2
+    echo "After an interrupted build, check Docker processes before removing that lock container." >&2
+    return 1
+  fi
+  trap cleanup_build EXIT
+  trap 'exit 130' INT
+  trap 'exit 143' TERM
+}
+
+cleanup_build() {
+  local status=$?
+  echo "Build finished (exit ${status})." >> "${ROOT}/.local-stack/build.log" || true
+  # Give the log follower time to flush its final lines before stopping it.
+  sleep 1
+  compose stop -t 2 build-monitor >/dev/null 2>&1 || true
+  docker rm -f verfassung-local-build-lock >/dev/null 2>&1 || true
 }
 
 build_services() {
-  local service i failed=0 batch_failed
-  local -a pids=()
-  local -a running_services=()
-  local -a log_files=()
-  local -a statuses=()
-  local log_dir
-  case "${GRADLE_BUILD_JOBS}" in
-    ''|*[!0-9]*) echo "GRADLE_BUILD_JOBS must be a positive integer." >&2; return 1 ;;
-  esac
-  if [ "${GRADLE_BUILD_JOBS}" -lt 1 ]; then
-    echo "GRADLE_BUILD_JOBS must be a positive integer." >&2
-    return 1
-  fi
-
-  log_dir="$(mktemp -d "${TMPDIR:-/tmp}/atlas-gradle-build.XXXXXX")"
-  echo "======== Building Kotlin artifacts (up to ${GRADLE_BUILD_JOBS} in parallel) ========"
-
+  local service
+  acquire_build_lock
+  mkdir -p "${ROOT}/.local-stack"
+  echo "Building $* (one image at a time)." > "${ROOT}/.local-stack/build.log"
+  compose up -d --no-deps --force-recreate build-monitor
+  echo "Follow build-monitor → Logs in OrbStack, or .local-stack/build.log."
   for service in "$@"; do
-    if is_kotlin_service "${service}"; then
-      local_log="${log_dir}/${service}.log"
-      log_files+=("${local_log}")
-      echo "Queued ${service}"
-      ./gradlew --console=plain -p "services/${service}" bootJar -x test >"${local_log}" 2>&1 &
-      pids+=("$!")
-      running_services+=("${service}")
-      if [ "${#pids[@]}" -ge "${GRADLE_BUILD_JOBS}" ]; then
-        batch_failed=0
-        for ((i=0; i<${#pids[@]}; i++)); do
-          if wait "${pids[i]}"; then statuses+=(0); else statuses+=(1); batch_failed=1; failed=1; fi
-        done
-        for ((i=0; i<${#pids[@]}; i++)); do
-          if [ "${statuses[i]}" -eq 0 ]; then
-            echo "  OK   ${running_services[i]}"
-          else
-            echo "  FAIL ${running_services[i]}" >&2
-            sed "s/^/[${running_services[i]}] /" "${log_files[i]}" >&2
-          fi
-        done
-        pids=()
-        running_services=()
-        log_files=()
-        statuses=()
-        if [ "${batch_failed}" -ne 0 ]; then
-          rm -rf "${log_dir}"
-          return 1
-        fi
-      fi
-    fi
+    echo "======== Building ${service} ========" | tee -a "${ROOT}/.local-stack/build.log"
+    compose build "${service}" 2>&1 | tee -a "${ROOT}/.local-stack/build.log"
   done
-  for ((i=0; i<${#pids[@]}; i++)); do
-    if wait "${pids[i]}"; then statuses+=(0); else statuses+=(1); failed=1; fi
-  done
-  for ((i=0; i<${#pids[@]}; i++)); do
-    if [ "${statuses[i]}" -eq 0 ]; then
-      echo "  OK   ${running_services[i]}"
-    else
-      echo "  FAIL ${running_services[i]}" >&2
-      sed "s/^/[${running_services[i]}] /" "${log_files[i]}" >&2
-    fi
-  done
-  rm -rf "${log_dir}"
-  if [ "${failed}" -ne 0 ]; then return 1; fi
-
-  echo "======== Building images: $* ========"
-  compose build "$@"
+  cleanup_build
+  trap - EXIT INT TERM
 }
 
 usage() {
@@ -283,7 +278,8 @@ Usage: $0 <command> [args]
 Commands:
   --start [--no-build] [--no-prepopulate]
                            Build and start the stack, then prepopulate it
-  --only-prepopulate       Prepopulate an already running local stack
+  --only-prepopulate [--verify-only]
+                           Upload/verify fixtures in a container against the running stack
   --rebuild [--no-prepopulate] <service...>
                            Rebuild services, recreate containers, then prepopulate
   --stop                   Stop containers; keep named Postgres volumes
@@ -295,7 +291,8 @@ Services (compose names, or short: catalog, content, …, gateway, caddy):
   ${BUILD_ORDER[*]}
 
 Rebuild catalog or content also recreates search-service (SEARCH_REINDEX_ON_STARTUP).
-Env: COMPOSE_VERBOSE=1  GRADLE_BUILD_JOBS=${GRADLE_BUILD_JOBS}  MIN_FREE_MB=${MIN_FREE_MB}  HTTP_READY_TIMEOUT_SECONDS=${HTTP_READY_TIMEOUT_SECONDS}
+Builds: one image at a time; no host JDK, Gradle, Node, or npm required.
+Env: COMPOSE_VERBOSE=1  MIN_FREE_MB=${MIN_FREE_MB}  HTTP_READY_TIMEOUT_SECONDS=${HTTP_READY_TIMEOUT_SECONDS}
 EOF
   exit "${code}"
 }
@@ -334,6 +331,7 @@ case "${COMMAND}" in
     echo "======== Container status ========"
     compose ps
     wait_for_http
+    wait_for_services
     if [ "${NO_PREPOPULATE}" -eq 0 ]; then
       run_prepopulate
     fi
@@ -342,10 +340,12 @@ case "${COMMAND}" in
     ;;
 
   --only-prepopulate|-only-prepopulate)
-    if [ "$#" -gt 0 ]; then usage 1; fi
-    ensure_env_file
+    if [ "$#" -gt 1 ] || { [ "$#" -eq 1 ] && [ "$1" != "--verify-only" ]; }; then usage 1; fi
+    ensure_docker_running
+    ensure_env_file --keep-existing
     wait_for_http
-    run_prepopulate
+    wait_for_services
+    run_prepopulate "$@"
     ;;
 
   --rebuild)
@@ -396,6 +396,7 @@ case "${COMMAND}" in
     compose up -d --no-build --remove-orphans --force-recreate "${SERVICES[@]}"
     compose ps
     wait_for_http
+    wait_for_services
     if [ "${NO_PREPOPULATE}" -eq 0 ]; then
       run_prepopulate
     fi
@@ -412,7 +413,7 @@ case "${COMMAND}" in
 
   --status)
     ensure_docker_running
-    ensure_env_file
+    ensure_env_file --keep-existing
     compose ps
     print_urls
     ;;

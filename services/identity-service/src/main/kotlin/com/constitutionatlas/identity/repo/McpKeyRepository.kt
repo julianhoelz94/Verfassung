@@ -80,4 +80,8 @@ class McpKeyRepository(private val jdbc: JdbcTemplate) {
     fun touch(id: UUID) {
         jdbc.update("UPDATE mcp_keys SET last_used_at = NOW() WHERE id = ?", id)
     }
+
+    fun revokeAll(ownerId: UUID) {
+        jdbc.update("UPDATE mcp_keys SET revoked_at = NOW() WHERE owner_id = ? AND revoked_at IS NULL", ownerId)
+    }
 }

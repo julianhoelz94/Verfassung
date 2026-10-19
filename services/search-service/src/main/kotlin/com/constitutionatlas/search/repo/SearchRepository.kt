@@ -11,12 +11,19 @@ import com.constitutionatlas.search.client.IndexableArticle
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Repository
 import org.springframework.transaction.annotation.Isolation
+import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
 import java.sql.Date
 import java.util.UUID
 
 @Repository
 class SearchRepository(private val jdbcTemplate: JdbcTemplate) {
+    /** Readers retain the committed index while one rebuild fetches and replaces its snapshot. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    fun lockForRebuild() {
+        jdbcTemplate.execute("LOCK TABLE search_documents IN SHARE ROW EXCLUSIVE MODE")
+    }
+
     @Transactional
     fun replaceAll(documents: List<IndexableArticle>) {
         jdbcTemplate.update("DELETE FROM search_documents")

@@ -4,6 +4,8 @@ import com.constitutionatlas.platform.UnauthorizedException
 import com.constitutionatlas.search.SearchServiceApplication
 import com.constitutionatlas.search.client.IndexSource
 import com.constitutionatlas.search.client.IndexableArticle
+import com.constitutionatlas.search.service.SearchIndexService
+import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito
@@ -11,6 +13,7 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.test.mock.mockito.MockBean
+import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.web.servlet.MockMvc
@@ -21,6 +24,10 @@ import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
 import java.time.LocalDate
 import java.util.UUID
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 
 @Testcontainers
 @AutoConfigureMockMvc
@@ -28,6 +35,10 @@ import java.util.UUID
 class SearchApiTest {
     @Autowired
     lateinit var mockMvc: MockMvc
+
+    @Autowired lateinit var index: SearchIndexService
+
+    @Autowired lateinit var jdbc: JdbcTemplate
 
     @MockBean
     lateinit var indexSource: IndexSource
@@ -40,7 +51,7 @@ class SearchApiTest {
 
     @BeforeEach
     fun stubIdentity() {
-        Mockito.reset(identityClient)
+        Mockito.reset(identityClient, indexSource)
         Mockito.`when`(identityClient.authenticate(null)).thenThrow(UnauthorizedException("Missing session"))
         Mockito.`when`(identityClient.authenticate(TOKEN)).thenReturn(publisher)
     }
@@ -64,6 +75,45 @@ class SearchApiTest {
             jsonPath("$.hits[0].versionLabel") { value("2022") }
             jsonPath("$.hits[0].effectiveDate") { value("2022-12-19") }
             jsonPath("$.hits[0].snippet") { value(org.hamcrest.Matchers.containsString("<mark>")) }
+        }
+    }
+
+    @Test
+    fun concurrentRebuildsSerializeSourceReadsAndPublishCompleteGenerations() {
+        val started = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        val loads = AtomicInteger()
+        val document = IndexableArticle(UUID.randomUUID(), DE_2022, "DE", "Germany", "Basic Law", "2022", null, "1", "", "body")
+        Mockito.`when`(indexSource.loadPublishedArticles()).thenAnswer {
+            val generation = loads.incrementAndGet()
+            if (generation == 1) {
+                started.countDown()
+                check(release.await(5, TimeUnit.SECONDS))
+            }
+            listOf(document.copy(title = "Generation $generation"))
+        }
+        val pool = Executors.newFixedThreadPool(2)
+        try {
+            val first = pool.submit<com.constitutionatlas.search.api.ReindexResult> { index.reindex() }
+            check(started.await(5, TimeUnit.SECONDS))
+            val second = pool.submit<com.constitutionatlas.search.api.ReindexResult> { index.reindex() }
+            val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(3)
+            var blocked = false
+            while (!blocked && System.nanoTime() < deadline) {
+                blocked = jdbc.queryForObject("SELECT EXISTS (SELECT 1 FROM pg_stat_activity WHERE wait_event_type = 'Lock' AND query LIKE 'LOCK TABLE search_documents%')", Boolean::class.java) == true
+                if (!blocked) Thread.sleep(10)
+            }
+            assertThat(blocked).isTrue()
+            assertThat(loads.get()).isEqualTo(1)
+            release.countDown()
+            assertThat(first.get(10, TimeUnit.SECONDS).documentCount).isEqualTo(1)
+            assertThat(second.get(10, TimeUnit.SECONDS).documentCount).isEqualTo(1)
+            assertThat(jdbc.queryForObject("SELECT title FROM search_documents WHERE document_id = ?", String::class.java, document.articleId)).isEqualTo("Generation 2")
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM search_documents", Int::class.java)!!).isEqualTo(1)
+        } finally {
+            release.countDown()
+            pool.shutdownNow()
+            check(pool.awaitTermination(5, TimeUnit.SECONDS))
         }
     }
 

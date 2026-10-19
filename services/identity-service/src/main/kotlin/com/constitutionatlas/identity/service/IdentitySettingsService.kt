@@ -6,10 +6,8 @@ import com.constitutionatlas.identity.api.UpdateIdentitySettingsRequest
 import com.constitutionatlas.identity.config.IdentityMfaProperties
 import com.constitutionatlas.identity.crypto.SecretBox
 import com.constitutionatlas.identity.mail.OutboundMailer
-import com.constitutionatlas.identity.repo.IdentityRepository
 import com.constitutionatlas.identity.repo.IdentitySettingsRepository
 import com.constitutionatlas.identity.repo.StoredIdentitySettings
-import com.constitutionatlas.platform.ForbiddenException
 import org.springframework.core.env.Environment
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -19,7 +17,6 @@ import java.net.URI
 class IdentitySettingsService(
     private val repository: IdentitySettingsRepository,
     private val setupRepository: com.constitutionatlas.identity.setup.SetupRepository,
-    private val identityRepository: IdentityRepository,
     private val authService: AuthService,
     private val environment: Environment,
     mfaProperties: IdentityMfaProperties,
@@ -145,11 +142,7 @@ class IdentitySettingsService(
         mailer.sendTest(address)
     }
 
-    private fun requireAdmin(authorization: String?): com.constitutionatlas.identity.repo.StoredUser {
-        val user = authService.requireSession(authorization)
-        if ("admin" !in identityRepository.rolesForUser(user.id)) throw ForbiddenException("Administrator role required")
-        return user
-    }
+    private fun requireAdmin(authorization: String?) = authService.requireAdminSession(authorization)
 
     private fun dto(current: StoredIdentitySettings) = IdentitySettingsDto(
         selfRegistrationEnabled = current.selfRegistrationEnabled,

@@ -20,6 +20,8 @@
 
 ## Erste Einrichtung
 
+Eine Rollenänderung oder Kontosperre widerruft Sitzungen, offene Einrichtungsabfragen und persönliche MCP/OAuth-Zugangsdaten. Die Sperre eines eingeladenen Kontos macht auch die Einladung ungültig. Eine erneute Aktivierung stellt widerrufene Zugangsdaten nicht wieder her. Automatisierungs-Tokens werden weiterhin separat ausgetauscht oder widerrufen.
+
 
 Neue Installationen bleiben für Besucher und andere Konten gesperrt, bis der in der Bereitstellungsumgebung festgelegte Administrator die Einrichtung abschließt. In Produktion wird HTTPS vor der Passworteingabe vorbereitet. Nach Anmeldung und gegebenenfalls Authenticator-Einrichtung führt die Einrichtungsseite durch Sprachen, Zugriff, Betreiberangaben und E-Mail. Anfangs sind alle unterstützten Website-Sprachen verfügbar.
 

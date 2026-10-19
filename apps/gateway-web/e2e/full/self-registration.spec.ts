@@ -14,7 +14,7 @@ test('closed registration can be opened by admin, confirmed by mail, and creates
   const mailSettings = {
     selfRegistrationEnabled: false, mailEnabled: false,
     mailFrom: 'no-reply@example.test', mailFromName: 'Constitution Atlas',
-    mailPublicBaseUrl: 'http://127.0.0.1:18080', smtpHost: 'mailpit', smtpPort: 1025,
+    mailPublicBaseUrl: String(test.info().project.use.baseURL), smtpHost: 'mailpit', smtpPort: 1025,
     smtpUsername: '', smtpAuth: false, smtpStarttls: false, smtpSsl: false,
   };
 

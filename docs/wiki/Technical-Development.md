@@ -51,7 +51,11 @@ Check maps against code. Never edit an applied migration.
 
 Shared Kotlin HTTP deadlines live in `services/platform` (2 s connect, 5 s read by default). Domain clients own authentication; import publication delivery explicitly keeps a 60 s read deadline. Content, Editor and Ingestion opt into the same bounded JSON reader. Gateway requests use a shared 10 s deadline while retaining caller cancellation and shorter limits. Translation batches allow 30 s and document streaming allows 60 s; write commands are not retried automatically. TypeScript rejects unused locals and parameters in both Node projects. The repository hygiene check rejects generated artifacts and exact Kotlin implementation copies outside imports/packages.
 
+WebAuthn browser tests need a DNS hostname that matches `PUBLIC_BASE_URL`; the full-stack suite uses `http://localhost:18080`. Chromium rejects raw IP relying-party IDs, including `127.0.0.1`. OAuth resources and mail links derive the same configured test origin.
+
 For host Testcontainers tests, set `DOCKER_HOST` to the socket reported by `docker context inspect --format '{{.Endpoints.docker.Host}}'` if the default Unix socket is absent. OrbStack helper containers use `TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/var/run/docker.sock`.
+
+Identity serializes credential issuance and revocation on the owner's PostgreSQL row. Recheck session/code/credential validity after acquiring the lock: a request waiting behind a reset must not mint credentials. Authentication failure counters increment atomically and survive rejected authentication transactions. Factor freshness comes from stored session proof for every role. Caddy pins its computed peer address on gateway and Identity routes; server actions and Identity trust only that pinned header, never the raw forwarded chain. Keep internal service ports private. The transport validator checks these replacements in all four modes, and the real external-proxy test sends forged chains and duplicate headers through a trusted upstream. See the [Sprint 60 security review](https://github.com/julianhoelz94/Verfassung/blob/main/docs/design/sprint-60-identity-security.md) for attack reproductions and regression evidence.
 
 ## Maintain the Wiki
 

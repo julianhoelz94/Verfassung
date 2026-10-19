@@ -51,8 +51,7 @@ class McpOAuthController(private val oauth: McpOAuthService) {
     @PostMapping("/oauth/register")
     fun register(@RequestBody request: OAuthRegistrationRequest, servletRequest: HttpServletRequest): ResponseEntity<Map<String, Any>> {
         if (request.token_endpoint_auth_method != "none") return ResponseEntity.badRequest().body(mapOf("error" to "invalid_client_metadata"))
-        val clientIp = servletRequest.getHeader("X-Atlas-Client-IP") ?: servletRequest.remoteAddr
-        val client = oauth.register(request.client_name, request.redirect_uris, clientIp)
+        val client = oauth.register(request.client_name, request.redirect_uris, clientIp(servletRequest))
         return ResponseEntity.status(HttpStatus.CREATED).body(
             mapOf(
                 "client_id" to client.id.toString(),

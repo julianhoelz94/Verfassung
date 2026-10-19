@@ -18,7 +18,7 @@ than reformatted or deleted merely to reduce counts.
 
 Linear tracks the approved scope in the Sprint 60 milestone and linked plan. Issue
 creation was attempted but rejected by the workspace free issue limit. Existing
-unrelated issues remain intact. Delivery PR: #139.
+unrelated issues remain intact. Delivery PRs: #139 (cleanup), #141 (Catalog test isolation), and #142 (Identity security and Search rebuild serialization).
 
 ## Findings and corrections
 
@@ -39,6 +39,7 @@ unrelated issues remain intact. Delivery PR: #139.
 | Dead helpers, props, imports, wrappers and an unchecked Map parser | Remove unreferenced gateway command/API helpers and props; parse conflict codes through typed JSON nodes; enable unused locals/parameters in both TypeScript projects and use the ESLint CLI without deprecated Next lint wrapping |
 | Navigation/data maps described pre-review imports, schema and access rules | Refresh ownership, current immutable content, staged imports, setup, transport and verification documentation; remove machine-specific links |
 | Post-merge Catalog tests exposed a random country-code collision with the reservation test's fixed `QZ` | Allocate generated test countries deterministically in a separate namespace and use the allocator for reservations; retain all publication/idempotency assertions |
+| Wiki fixture verification exposed concurrent Search index replacements inserting the same document ID | Serialize each rebuild before loading its source snapshot; keep readers on the committed generation; PostgreSQL concurrency test requires one source load at a time and complete final replacement |
 
 ## Removed files and intentional retention
 
@@ -72,7 +73,7 @@ packages are needed. No cross-database writes or schema changes were introduced.
 | Content | Ordered revisions, generation/receipt checks, snapshot member validation, legacy compatibility and strict writes; shared transport/JSON/base and invariant documentation |
 | Amendment | Staff/public revision selection, mutation roles, version pins, review/diff contracts and repository constraints; shared transport, retain domain contracts |
 | Editor | Owned sessions, pinned structured replay/publication, successor reservation, durable side effects and downstream clients; shared transport, typed error parsing and publication documentation |
-| Identity/setup | Password/session/MFA/passkey flows, recovery ownership/use, bootstrap gates and saved/effective policy settings; atomic recovery fix and shared audit transport |
+| Identity/setup | Password/session/MFA/passkey flows, recovery ownership/use, bootstrap gates and saved/effective policy settings; atomic recovery fix and shared audit transport; extended factor/credential/proxy audit in the linked security report |
 | Ingestion | Staging/review/publication separation, uploads/proposals, idempotency/outbox and request-thread auth; shared limits/transport, parent scope restoration |
 | Search | Published traversal, index replacement/read transactions, pagination/generation and authorization; shared transport, retain derived-index semantics |
 | Audit | Append-only event attribution, reader/appender scopes, repositories and health; remove unused local transport copy |
@@ -112,3 +113,16 @@ PR #139 merged as `bf2c41f16e19051483e232544dd05e1f48250156` after both independ
 reviews and required PR/push CI passed. Post-merge main CI exposed the Catalog
 test-data collision above; its correction is part of Sprint 60 close-out. Main CI
 and published Wiki page/video verification remain required before completion.
+
+The user subsequently requested a deeper Identity security review before closing
+Sprint 60. Its confirmed attack paths, corrections and evidence are recorded in
+[the security review](sprint-60-identity-security.md). This remains part of the same
+sprint and branch; its required review/CI/publication gates also precede completion.
+
+The expanded local check passes 74 Identity tests (including 13 new security
+regressions), 11 Search tests and 222 gateway unit tests; lint and production
+build pass. Independent external-proxy verification passes 24 forged-header cases
+and three guards. The durable CI proxy test also exercises forwarded-chain and
+duplicate-header spoofing through a trusted upstream. The security correction
+review and verifier are clear; required CI and publication are recorded in Linear
+when they finish.

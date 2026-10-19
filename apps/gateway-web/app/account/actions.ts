@@ -30,6 +30,7 @@ import {
 } from '../../lib/identity-client';
 import { requireAdminUser } from '../../lib/admin';
 import { safeReturnTo } from '../../lib/return-to';
+import { identityRequestFetch } from '../../lib/identity-request';
 import { SESSION_COOKIE, setChallengeCookie } from '../../lib/session';
 import { updateTranslationUserSettings } from '../../lib/content-translation';
 
@@ -54,6 +55,7 @@ export async function changePasswordAction(formData: FormData): Promise<string> 
       token,
       String(formData.get('currentPassword') ?? ''),
       String(formData.get('newPassword') ?? ''),
+      await identityRequestFetch(),
     );
   } catch {
     return '/account?error=1';
@@ -92,13 +94,13 @@ export async function updateContentTranslationPreferenceAction(formData: FormDat
 }
 
 export async function requestResetAction(formData: FormData): Promise<void> {
-  await requestPasswordReset(String(formData.get('email') ?? '')).catch(() => undefined);
+  await requestPasswordReset(String(formData.get('email') ?? ''), await identityRequestFetch()).catch(() => undefined);
   redirect('/reset?sent=1');
 }
 
 export async function confirmResetAction(formData: FormData): Promise<void> {
   try {
-    await requestConfirmReset(String(formData.get('token') ?? ''), String(formData.get('newPassword') ?? ''));
+    await requestConfirmReset(String(formData.get('token') ?? ''), String(formData.get('newPassword') ?? ''), await identityRequestFetch());
   } catch {
     redirect('/reset?error=1');
   }
@@ -108,7 +110,7 @@ export async function confirmResetAction(formData: FormData): Promise<void> {
 export async function acceptInviteAction(formData: FormData): Promise<void> {
   const inviteToken = String(formData.get('token') ?? '');
   try {
-    await requestAcceptInvite(inviteToken, String(formData.get('password') ?? ''));
+    await requestAcceptInvite(inviteToken, String(formData.get('password') ?? ''), await identityRequestFetch());
   } catch {
     redirect(`/invite?token=${encodeURIComponent(inviteToken)}&error=1`);
   }
@@ -185,11 +187,11 @@ export type RecoveryRevealState = {
   error?: boolean;
 };
 
-export async function startMfaEnrollAction(): Promise<boolean> {
+export async function startMfaEnrollAction(password: string): Promise<boolean> {
   const token = await tokenOrRedirect();
   let challengeToken: string;
   try {
-    const started = await requestStartMfaEnroll(undefined, token);
+    const started = await requestStartMfaEnroll(undefined, token, password, await identityRequestFetch());
     challengeToken = started.challengeToken;
   } catch {
     return false;
@@ -209,6 +211,7 @@ export async function confirmAccountMfaAction(
       String(formData.get('code') ?? ''),
       String(formData.get('challengeToken') ?? ''),
       token,
+      await identityRequestFetch(),
     );
     return { recoveryCodes: confirmed.recoveryCodes };
   } catch {
@@ -219,7 +222,7 @@ export async function confirmAccountMfaAction(
 export async function revokeMfaAction(formData: FormData): Promise<void> {
   const token = await tokenOrRedirect();
   try {
-    await requestRevokeMfa(token, String(formData.get('code') ?? ''));
+    await requestRevokeMfa(token, String(formData.get('code') ?? ''), await identityRequestFetch());
   } catch {
     redirect('/account?error=mfa');
   }
@@ -232,7 +235,7 @@ export async function regenerateRecoveryAction(
 ): Promise<RecoveryRevealState> {
   const token = await tokenOrRedirect();
   try {
-    const result = await requestRegenerateRecovery(token, String(formData.get('code') ?? ''));
+    const result = await requestRegenerateRecovery(token, String(formData.get('code') ?? ''), await identityRequestFetch());
     return { recoveryCodes: result.recoveryCodes };
   } catch {
     return { error: true };
@@ -243,7 +246,7 @@ export async function stepUpAction(formData: FormData): Promise<void> {
   const token = await tokenOrRedirect();
   const returnTo = safeReturnTo(String(formData.get('returnTo') ?? '/account'), '/account');
   try {
-    await requestStepUp(token, String(formData.get('code') ?? ''));
+    await requestStepUp(token, String(formData.get('code') ?? ''), await identityRequestFetch());
   } catch {
     redirect(`/account/step-up?error=1&returnTo=${encodeURIComponent(returnTo)}`);
   }

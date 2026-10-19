@@ -8,10 +8,10 @@
 2. Wählen Sie die Verfassung und die benötigte rechtliche Fassung.
 3. Springen Sie über das Inhaltsverzeichnis zur Vorschrift. Beachten Sie Datum und Status.
 
-![Länderseite mit verfügbaren Verfassungen und Fassungen](media/reading-country-de.png)
+![Länderseite mit verfügbaren Verfassungen und Fassungen](https://raw.githubusercontent.com/wiki/julianhoelz94/Verfassung/media/reading-country-de.png)
 *Zuerst die Verfassung, dann die rechtliche Fassung wählen.*
 
-![Verfassungstext mit Inhaltsverzeichnis](media/reading-text-de.png)
+![Verfassungstext mit Inhaltsverzeichnis](https://raw.githubusercontent.com/wiki/julianhoelz94/Verfassung/media/reading-text-de.png)
 *Das Inhaltsverzeichnis führt durch den ausgewählten Text.*
 
 ## Suchen, vergleichen und Geschichte verfolgen
@@ -23,7 +23,7 @@
 | Verfassungsgeschichte | **Verfassungszeitstrahl**: Annahme, Inkrafttreten und weitere Ereignisse. |
 | Rechtsänderungen | **Änderungszeitstrahl**: veröffentlichte Rechtsänderungen. |
 
-![Vergleich mit Fassungswahl und geänderten Texten](media/reading-compare-de.png)
+![Vergleich mit Fassungswahl und geänderten Texten](https://raw.githubusercontent.com/wiki/julianhoelz94/Verfassung/media/reading-compare-de.png)
 *Prüfen Sie die ausgewählten Fassungen vor dem Lesen.*
 
 Zum Zitieren speichern Sie die Adresse der geöffneten Vorschrift und die Fassungs-ID. Alte Links bleiben erreichbar. Eine Textkorrektur ist keine neue Rechtsänderung.
@@ -32,22 +32,6 @@ Zum Zitieren speichern Sie die Adresse der geöffneten Vorschrift und die Fassun
 
 <details>
 <summary>Details zu Quellen, Textkorrekturen, Übersetzung und fehlenden Inhalten</summary>
-
-## Eine Verfassung finden
-
-1. Öffnen Sie **Länder** in der Navigation.
-2. Wählen Sie eine Länderkarte aus. Die Länderseite zeigt die Verfassungen und ihre veröffentlichten Versionen. Länder- und Verfassungsseiten können ergänzende Hintergrundinformationen und Bilder enthalten.
-3. Wählen Sie eine Verfassung und eine veröffentlichte Version, um den Text zu lesen. Mit dem Inhaltsverzeichnis und den Links zu einzelnen Einheiten navigieren Sie durch die Gliederung. Jede Version ist eine Momentaufnahme: Eine spätere Berichtigung oder Rechtsänderung erzeugt eine weitere veröffentlichte Version, statt die ältere zu überschreiben.
-
-Die **Verfassungszeitleiste** eines Landes zeigt Ereignisse im Lebenszyklus der Verfassungen. Die getrennte **Änderungszeitleiste** zeigt veröffentlichte Rechtsänderungen. Einzelne Bestimmungen können eigene Daten für Inkrafttreten oder Aussetzung haben. Beachten Sie deshalb die angezeigten Daten und Statusangaben neben dem Text.
-
-Länder- und Verfassungsseiten können außerdem redaktionell gepflegte Hintergrundtexte und Bilder enthalten. Diese Kontextseiten besitzen einen eigenen Veröffentlichungsverlauf. Verknüpfte **Dokumente** einer Verfassung können Quelldateien und spätere Dateiversionen enthalten. Prüfen Sie beim Nachvollziehen einer Quelle die Dateiversion und ihre Verknüpfung mit der Verfassung oder Rechtsänderung.
-
-## Suchen und vergleichen
-
-- Mit **Suche** in der Hauptnavigation durchsuchen Sie veröffentlichte Texte. Öffnen Sie ein Ergebnis, um es im Zusammenhang seiner Version zu lesen. Nach einer Veröffentlichung kann die Suche kurz hinterherhinken, während der Index aktualisiert wird. Die veröffentlichte Versionsseite ist die maßgebliche Leseansicht.
-- Über **Vergleichen** auf einer Länderseite wählen Sie zwei veröffentlichte Versionen. Prüfen Sie Ergänzungen, Streichungen und geänderte Passagen im Zusammenhang. Bei Strukturänderungen können Einheiten verschoben oder neu gruppiert worden sein. Lesen Sie beide Versionsseiten, wenn die genaue Einordnung wichtig ist.
-- Über die Links zu Versionen und Rechtsänderungen verfolgen Sie, wie sich ein Text verändert hat. Eine redaktionelle Berichtigung und eine Rechtsänderung sind unterschiedliche Ereignisse: Die Berichtigung korrigiert die Erfassung des Textes, die Rechtsänderung beschreibt eine Änderung des Rechts.
 
 ## Herkunft eines Textes prüfen
 

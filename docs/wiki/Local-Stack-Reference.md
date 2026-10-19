@@ -33,3 +33,14 @@ Then restart the app containers so they reconnect. Flyway history is part of eac
 
 
 [[Development and operations|Technical-Development]]
+
+## Environment profiles
+
+Copy the matching example; never commit secrets.
+
+| Profile | Use |
+| --- | --- |
+| local-stack | Local Compose development |
+| ci | Automated test fixtures |
+| testing | Staging-like configuration |
+| production | Deployment placeholders; no verified rollout yet |

@@ -108,6 +108,8 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '20'
+      - name: Check Wiki navigation and illustration references
+        run: python3 scripts/check-wiki-docs.py
       - name: Install gateway dependencies
         working-directory: apps/gateway-web
         run: npm ci

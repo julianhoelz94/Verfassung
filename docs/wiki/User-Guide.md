@@ -8,10 +8,10 @@
 2. Choose its constitution and the legal version you need.
 3. Follow the table of contents to a provision. Check its effective date and status.
 
-![Country page with constitutions and legal versions](media/reading-country-en.png)
+![Country page with constitutions and legal versions](https://raw.githubusercontent.com/wiki/julianhoelz94/Verfassung/media/reading-country-en.png)
 *Choose the constitution first, then its legal version.*
 
-![Constitution reader with the table of contents](media/reading-text-en.png)
+![Constitution reader with the table of contents](https://raw.githubusercontent.com/wiki/julianhoelz94/Verfassung/media/reading-text-en.png)
 *Move through the text while keeping its version context.*
 
 ## Search, compare or follow history
@@ -23,7 +23,7 @@
 | Constitutional history | **Constitution timeline**: adoption, commencement and lifecycle events. |
 | Changes in law | **Amendment timeline**: published legal changes. |
 
-![Comparison page with version selectors and changed text](media/reading-compare-en.png)
+![Comparison page with version selectors and changed text](https://raw.githubusercontent.com/wiki/julianhoelz94/Verfassung/media/reading-compare-en.png)
 *Check both selected versions before reading the changes.*
 
 To cite a passage, save the opened provision's address and version ID. Older links stay available. A transcription correction does not itself create a new law.
@@ -32,22 +32,6 @@ To cite a passage, save the opened provision's address and version ID. Older lin
 
 <details>
 <summary>Details about sources, text corrections, translation and missing content</summary>
-
-## Find a constitution
-
-1. Open **Countries** in the site navigation.
-2. Select a country card to open its country page. The page lists its constitutions and published versions. Country and constitution context pages may include curated background information and images.
-3. Select a constitution and a published version to read its text. Use the table of contents and unit links to move through the hierarchy. The version choices represent changes in law. They open the current corrected text for that legal version. Exact text snapshots remain available through saved permalinks.
-
-The country **Constitution timeline** presents constitution lifecycle events. The separate **Amendment timeline** presents published legal changes. A provision may have its own commencement or suspension status, so read the displayed dates and status alongside the text.
-
-Constitution and country pages can also contain curated background text and pictures. These contextual pages have their own published revision history. A constitution's linked **Documents** may include source files and later file revisions; check the document revision and its link to the constitution or legal change when tracing a source.
-
-## Search and compare
-
-- Use **Search** in the main navigation to search published text. Open a result to read it in its version context. Search may briefly lag a new publication while the index updates; the published version page is the primary reading view.
-- Use **Compare** from a country to select two published versions. Review additions, removals, and changed passages in context. Structural changes can include moved or newly grouped units, so read both version pages when exact placement matters.
-- Use the version and legal-change links to follow how a text changed over time. An editorial correction and a legal change are different events: a correction fixes the recorded text; a legal change represents a change in the law.
 
 ## Text corrections and legal history
 

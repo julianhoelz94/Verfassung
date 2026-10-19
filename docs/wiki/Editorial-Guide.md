@@ -13,7 +13,7 @@
 
 **Result:** the saved draft waits in the review queue. Resume unfinished work through **My open sessions**; returning to the session list keeps saved work.
 
-![Draft editor with text and workflow controls](media/editor-draft-en.png)
+![Draft editor with text and workflow controls](https://raw.githubusercontent.com/wiki/julianhoelz94/Verfassung/media/editor-draft-en.png)
 *Save and inspect the draft before submitting it.*
 
 [▶ Watch editing and submission](https://julianhoelz94.github.io/Verfassung/#editing-a-draft-en)
@@ -28,7 +28,7 @@
 
 **Result:** approved work appears under **Ready to publish**. Approval does not publish it.
 
-![Submitted draft awaiting review](media/editor-review-en.png)
+![Submitted draft awaiting review](https://raw.githubusercontent.com/wiki/julianhoelz94/Verfassung/media/editor-review-en.png)
 *Check the proposed text and its context before approval.*
 
 [▶ Watch review and approval](https://julianhoelz94.github.io/Verfassung/#reviewing-a-draft-en)
@@ -43,7 +43,7 @@
 
 **Result:** a successor snapshot is public. The previous snapshot remains available. A transcription correction does not itself record a new law.
 
-![Approved draft before publication](media/editor-publish-en.png)
+![Approved draft before publication](https://raw.githubusercontent.com/wiki/julianhoelz94/Verfassung/media/editor-publish-en.png)
 *Publication is a separate decision after approval.*
 
 [▶ Watch publication](https://julianhoelz94.github.io/Verfassung/#publishing-a-revision-en)

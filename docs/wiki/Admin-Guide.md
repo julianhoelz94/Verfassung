@@ -12,10 +12,10 @@
 | Import content | **Import** | Choose existing/new structure, upload JSON, inspect the preview and job. |
 | Publish operator or privacy details | **Legal pages** | Save, inspect the saved preview, then publish. |
 
-![Administration overview grouped by task](media/admin-overview-en.png)
+![Administration overview grouped by task](https://raw.githubusercontent.com/wiki/julianhoelz94/Verfassung/media/admin-overview-en.png)
 *Choose the task group before opening a workspace.*
 
-![Import page with structure selection before file upload](media/admin-import-en.png)
+![Import page with structure selection before file upload](https://raw.githubusercontent.com/wiki/julianhoelz94/Verfassung/media/admin-import-en.png)
 *Choose where the content belongs before uploading. “Paste JSON instead” opens advanced input.*
 
 ## First installation

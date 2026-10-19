@@ -12,10 +12,10 @@
 | Inhalte importieren | **Import** | Bestehende/neue Struktur wählen, JSON hochladen und Auftrag prüfen. |
 | Betreiber-/Datenschutztexte veröffentlichen | **Rechtliche Seiten** | Speichern, gespeicherte Vorschau prüfen, dann veröffentlichen. |
 
-![Nach Aufgaben gruppierte Administrationsübersicht](media/admin-overview-de.png)
+![Nach Aufgaben gruppierte Administrationsübersicht](https://raw.githubusercontent.com/wiki/julianhoelz94/Verfassung/media/admin-overview-de.png)
 *Wählen Sie zuerst die Aufgabe, dann den Arbeitsbereich.*
 
-![Import mit Strukturwahl vor dem Hochladen](media/admin-import-de.png)
+![Import mit Strukturwahl vor dem Hochladen](https://raw.githubusercontent.com/wiki/julianhoelz94/Verfassung/media/admin-import-de.png)
 *Zuerst das Ziel wählen, dann hochladen. „Stattdessen JSON einfügen“ öffnet die erweiterte Eingabe.*
 
 ## Erste Einrichtung

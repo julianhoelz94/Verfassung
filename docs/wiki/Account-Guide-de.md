@@ -41,7 +41,7 @@ Die deutschen und englischen Impressumstexte werden getrennt veröffentlicht. An
 Unter **Konto → Chat-Client verbinden** finden Sie OAuth-Verbindungen und persönliche MCP-Schlüssel. Erteilen Sie Ihrem Client nur die benötigten Rechte. Ein Import mit Bearbeiterrechten bereitet Inhalte zur Prüfung vor und kann sie nicht veröffentlichen. Die Seite zeigt verbundene Clients und Schlüssel sowie Ablauf-, Rotations- und Widerrufsmöglichkeiten. Kopieren Sie einen neuen Schlüssel, sobald er angezeigt wird, und bewahren Sie ihn geschützt auf.
 
 
-![Kontosicherheit und Passkey-Verwaltung](media/account-security-de.png)
+![Kontosicherheit und Passkey-Verwaltung](https://raw.githubusercontent.com/wiki/julianhoelz94/Verfassung/media/account-security-de.png)
 *Die Sicherheitseinstellungen sind im Konto gebündelt. Zugangsdaten werden nicht gezeigt.*
 
 [[Lesen|User-Guide-de]] · [[Redaktion|Editorial-Guide-de]] · [[English|Account-Guide]]

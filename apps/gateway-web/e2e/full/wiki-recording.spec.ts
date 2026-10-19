@@ -1,15 +1,26 @@
 import { expect, test, type APIRequestContext, type Browser, type Page } from '@playwright/test';
-import { mkdir, mkdtemp, rename, rm, stat } from 'node:fs/promises';
+import { mkdir, mkdtemp, rename, rm, stat, copyFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { authenticatorCode, signIn, startFromViewer } from './auth';
+import { ui, message, type UiMessage } from '../../lib/messages';
+import { authenticatorCode, signIn } from './auth';
+import { illustrate, installPresentation, Walkthrough } from './wiki-presentation';
 
-type Role = 'editor' | 'reviewer' | 'publisher';
+type Locale = 'en' | 'de';
+type Role = 'editor' | 'reviewer' | 'publisher' | 'admin';
 const outputDir = process.env.WIKI_VIDEO_DIR ?? join(__dirname, '../../../../docs/wiki/media');
+const capture = process.env.WIKI_MEDIA_CAPTURE === 'merged';
 const baseURL = process.env.E2E_BASE_URL ?? 'http://127.0.0.1:18080';
-const correction = 'Dignity and civic equality protect every person. Verified transcription.';
 
-async function publishedVersion(request: APIRequestContext): Promise<{ countryIso: string; versionId: string }> {
+// Screenshots are published evidence, not local test baselines. Only the merged-PR
+// workflow may refresh them; regular PR/full-stack suites exclude this file.
+test.beforeAll(() => {
+  if (process.env.CI !== 'true' || !['merged', 'verify'].includes(process.env.WIKI_MEDIA_CAPTURE ?? '')) {
+    throw new Error('Wiki journeys require CI: verify without media, or capture after a merge');
+  }
+});
+
+async function publishedVersion(request: APIRequestContext) {
   const countries = await (await request.get('/api/catalog/countries')).json();
   for (const summary of countries) {
     const country = await (await request.get(`/api/catalog/countries/${summary.isoCode}`)).json();
@@ -18,141 +29,163 @@ async function publishedVersion(request: APIRequestContext): Promise<{ countryIs
         const versionId = version.currentVersionId ?? version.id;
         if (!versionId) continue;
         const response = await request.get(`/api/content/versions/${versionId}/articles?includeBody=true`);
-        if (response.ok() && (await response.json()).some((article: { children?: unknown[] }) => !article.children?.length)) {
-          return { countryIso: summary.isoCode, versionId };
-        }
+        if (!response.ok()) continue;
+        const article = (await response.json()).find((item: { children?: unknown[] }) => !item.children?.length);
+        if (article) return { countryIso:summary.isoCode as string, versionId:versionId as string, article };
       }
     }
   }
-  throw new Error('No published constitution with a plain article is available for recording');
+  throw new Error('No published constitution with a plain article is available');
 }
 
-async function caption(page: Page, label: string) {
-  await page.evaluate((text) => {
-    document.getElementById('wiki-video-caption')?.remove();
-    const box = document.createElement('div');
-    box.id = 'wiki-video-caption';
-    box.textContent = text;
-    Object.assign(box.style, {
-      position: 'fixed', top: '18px', right: '18px', zIndex: '2147483647',
-      maxWidth: '380px', padding: '12px 16px', borderRadius: '10px',
-      background: '#172b4d', color: 'white', font: '600 16px/1.4 system-ui',
-      boxShadow: '0 4px 18px #0004', pointerEvents: 'none',
+async function authenticated(browser: Browser, role: Role, locale: Locale) {
+  // Authenticate before creating the recording context. Credentials never appear.
+  const login = await browser.newContext({ baseURL, locale:'en-GB' });
+  try {
+    await signIn(await login.newPage(), role);
+    return await browser.newContext({
+      baseURL, locale:locale === 'de' ? 'de-DE' : 'en-GB',
+      storageState:await login.storageState(), viewport:{ width:1280, height:900 },
     });
-    document.body.append(box);
-  }, label);
-  await page.waitForTimeout(2800);
+  } finally { await login.close(); }
 }
 
-async function record(browser: Browser, role: Role, file: string, stagingDir: string,
-  walk: (page: Page) => Promise<void>): Promise<string> {
-  // Sign-in occurs before recording, so credentials never appear in the clip.
-  const login = await browser.newContext({ baseURL });
-  const loginPage = await login.newPage();
-  await signIn(loginPage, role);
+async function record(browser: Browser, role: Exclude<Role, 'admin'>, locale: Locale, file: string, staging: string,
+  walk: (page: Page, presentation: Walkthrough) => Promise<void>) {
+  const login = await authenticated(browser, role, locale);
   const state = await login.storageState();
   await login.close();
-
   const context = await browser.newContext({
-    baseURL, storageState: state, viewport: { width: 1280, height: 720 },
-    recordVideo: { dir: stagingDir, size: { width: 1280, height: 720 } },
+    baseURL, locale:locale === 'de' ? 'de-DE' : 'en-GB', storageState:state,
+    viewport:{ width:1280, height:900 }, recordVideo:capture ? { dir:staging, size:{ width:1280, height:900 } } : undefined,
   });
-  await context.addInitScript(() => {
-    localStorage.setItem('ca_cookie_notice_v1', 'dismissed');
-    const style = document.createElement('style');
-    style.textContent = 'input[type=password], input[autocomplete="one-time-code"], input[name*="code" i], input[id*="code" i] { filter: blur(12px) !important; }';
-    document.addEventListener('DOMContentLoaded', () => document.head.append(style), { once: true });
-  });
+  await installPresentation(context);
   const page = await context.newPage();
   const video = page.video();
-  try {
-    await walk(page);
-  } finally {
-    await context.close();
-  }
-  if (!video) throw new Error(`No video was captured for ${role}`);
-  const staged = join(stagingDir, file);
-  await rename(await video.path(), staged);
-  if ((await stat(staged)).size < 10_000) throw new Error(`Video is unexpectedly small: ${file}`);
-  return staged;
+  try { await walk(page, new Walkthrough(page)); }
+  finally { await context.close(); }
+  if (!capture) return '';
+  if (!video) throw new Error(`No video captured for ${role}`);
+  const path = join(staging, file);
+  await rename(await video.path(), path);
+  if ((await stat(path)).size < 10_000) throw new Error(`Video unexpectedly small: ${file}`);
+  return path;
 }
 
-test('record editing, review, and publishing against the full stack', async ({ browser, request }) => {
-  const stagingDir = await mkdtemp(join(tmpdir(), 'wiki-videos-'));
-  try {
-    const clips: string[] = [];
+for (const locale of ['en', 'de'] as const) {
+  test(`capture ${locale} wiki illustrations and editorial walkthroughs`, async ({ browser, request }) => {
+    const staging = await mkdtemp(join(tmpdir(), 'wiki-media-'));
+    const paths: string[] = [];
+    const text = (en: string, de: string) => locale === 'de' ? de : en;
+    const t = (value: UiMessage) => message(locale, value);
     const source = await publishedVersion(request);
-    let sessionUrl = '';
-    let sourceVersionId = '';
-    let articleNumber = '';
+    const correction = `Dignity and civic equality protect every person. Verified transcription (${locale}).`;
+    let sessionId = '';
     let publishedVersionId = '';
+    const shot = async (page: Page, name: string, target?: ReturnType<Page['locator']>) => {
+      const path = join(staging, `${name}-${locale}.png`);
+      await expect(page.locator('html')).toHaveAttribute('lang', locale);
+      if (capture) { await illustrate(page, path, target); paths.push(path); }
+    };
+    try {
+      const publicContext = await browser.newContext({ baseURL, locale:locale === 'de' ? 'de-DE' : 'en-GB', viewport:{ width:1280, height:900 } });
+      await installPresentation(publicContext);
+      try {
+        const page = await publicContext.newPage();
+        await page.goto(`/countries/${source.countryIso}`);
+        await expect(page.getByRole('heading', { level:1 })).toBeVisible();
+        await expect(page.locator('a[href*="/versions/"]').first()).toBeVisible();
+        await shot(page, 'reading-country');
+        await page.goto(`/countries/${source.countryIso}/versions/${source.versionId}`);
+        await expect(page.getByRole('heading', { level:1 })).toBeVisible();
+        await shot(page, 'reading-text');
+        await page.goto(`/countries/${source.countryIso}/compare`);
+        await expect(page.locator('#compare-from')).toBeVisible();
+        await expect(page.locator('#compare-to')).toBeVisible();
+        await shot(page, 'reading-compare');
+      } finally { await publicContext.close(); }
+      const admin = await authenticated(browser, 'admin', locale);
+      await installPresentation(admin);
+      try {
+        const page = await admin.newPage();
+        await page.goto('/account');
+        await shot(page, 'account-security', page.locator('#security'));
+        await page.goto('/admin');
+        await expect(page.getByRole('heading', { level:1 })).toBeVisible();
+        await shot(page, 'admin-overview');
+        await page.goto('/admin/import');
+        await expect(page.locator('input[type=file]')).toBeAttached();
+        await shot(page, 'admin-import');
+      } finally { await admin.close(); }
 
-    clips.push(await record(browser, 'editor', 'editing-a-draft.webm', stagingDir, async (page) => {
-      await page.goto(`/countries/${source.countryIso}/versions/${source.versionId}`);
-      await expect(page.getByRole('link', { name: 'Edit this constitution' })).toBeVisible();
-      await caption(page, 'Editor · Choose a published text');
-      sourceVersionId = source.versionId;
-      await startFromViewer(page, source.countryIso, sourceVersionId, 'editorial_correction');
-      await expect(page).toHaveURL(/sessionId=/);
-      const articles = await (await request.get(`/api/content/versions/${sourceVersionId}/articles?includeBody=true`)).json();
-      const article = articles.find((item: { children?: unknown[] }) => !item.children?.length);
-      expect(article).toBeTruthy();
-      articleNumber = article.articleNumber;
-      const target = new URL(page.url());
-      target.searchParams.set('articleId', article.id);
-      await page.goto(target.toString());
-      await caption(page, 'Edit the selected article');
-      await page.locator('#draft-form textarea').first().fill(correction);
-      await page.getByRole('button', { name: 'Save draft' }).click();
-      await expect(page.getByText('Draft saved.')).toBeVisible();
-      await caption(page, 'Describe the transcription correction');
-      await page.getByLabel('What was corrected in this transcription?').fill(`Verified Article ${articleNumber} transcription.`);
-      await page.getByRole('button', { name: 'Save comment' }).click();
-      await caption(page, 'Submit the saved draft for review');
-      await page.getByRole('button', { name: 'Submit for review' }).click();
-      await expect(page.getByText('Submitted for review.')).toBeVisible();
-      sessionUrl = page.url();
-      await caption(page, 'The draft is waiting for an independent reviewer');
-    }));
-
-    clips.push(await record(browser, 'reviewer', 'reviewing-a-draft.webm', stagingDir, async (page) => {
-      await page.goto('/editor?status=reviewing');
-      await expect(page.getByRole('heading', { name: 'Review queue' })).toBeVisible();
-      await caption(page, 'Reviewer · Open the review queue');
-      await page.goto(sessionUrl);
-      await expect(page.getByText(correction).first()).toBeVisible();
-      await caption(page, 'Compare the draft with its published source');
-      await page.getByRole('button', { name: 'Approve review' }).click();
-      await expect(page.getByText('Review approved. A publisher can now publish.')).toBeVisible();
-      await caption(page, 'The revision is approved for publication');
-    }));
-
-    clips.push(await record(browser, 'publisher', 'publishing-a-revision.webm', stagingDir, async (page) => {
-      await page.goto('/editor?status=approved');
-      await expect(page.getByRole('heading', { name: 'Ready to publish' })).toBeVisible();
-      await caption(page, 'Publisher · Open approved work');
-      await page.goto(sessionUrl);
-      await expect(page.getByText(correction).first()).toBeVisible();
-      await caption(page, 'Check the approved text and publication details');
-      await page.getByRole('button', { name: 'Publish transcription' }).click();
-      await expect(page).toHaveURL(/(?:published=1|\/account\/step-up\?)/, { timeout: 15_000 });
-      if (/\/account\/step-up\?/.test(page.url())) {
-        await caption(page, 'Complete the fresh authenticator check');
-        await page.getByLabel('Authenticator code').fill(authenticatorCode(process.env.IDENTITY_SEED_TOTP_SECRET ?? 'CAATLASMFASEED22'));
-        await page.getByRole('button', { name: 'Continue' }).click();
+      paths.push(await record(browser, 'editor', locale, `editing-a-draft-${locale}.webm`, staging, async (page, watch) => {
+        await page.goto(`/countries/${source.countryIso}/versions/${source.versionId}`);
+        await watch.explain(text('Editor: start from the published text.', 'Bearbeitung: Beginnen Sie beim veröffentlichten Text.'));
+        await watch.click(page.getByRole('link', { name:t(ui.countries.code.versions.versionid.page.editThisConstitution) }));
+        await watch.explain(text('Choose a text correction for a transcription error.', 'Wählen Sie die Textkorrektur für einen Übertragungsfehler.'));
+        await watch.click(page.locator('#editor-entry').getByRole('button', { name:t(ui.remainingStatus.correctThisText) }));
+        await expect(page).toHaveURL(/sessionId=/);
+        sessionId = new URL(page.url()).searchParams.get('sessionId') ?? '';
+        expect(sessionId).toBeTruthy();
+        const articleLink = page.locator(`a[href*="articleId=${source.article.id}"]`).first();
+        if (await articleLink.count()) await watch.click(articleLink);
+        await expect(page.locator('#draft-form input[name=articleId]')).toHaveValue(source.article.id);
+        await watch.explain(text('Edit the selected article, then save the draft.', 'Bearbeiten Sie den Artikel und speichern Sie den Entwurf.'));
+        await watch.type(page.locator('#draft-form textarea').first(), correction);
+        await shot(page, 'editor-draft', page.locator('#draft-form'));
+        await watch.click(page.locator('#draft-form button[type=submit]'));
+        await expect(page.getByText(t(ui.editor.page.draftSaved), { exact:true })).toBeVisible();
+        await watch.explain(text('Describe the correction so the reviewer can check it.', 'Beschreiben Sie die Korrektur für die anschließende Prüfung.'));
+        await watch.type(page.getByLabel(t(ui.attrs.editorPublishformTextAreaLabelWhatWas)), text('Checked the transcription against its source.', 'Übertragung anhand der Quelle geprüft.'));
+        await watch.click(page.locator('form').filter({ has:page.locator('input[name=command][value=details]') }).getByRole('button').last());
+        await watch.explain(text('Submit the saved draft for independent review.', 'Reichen Sie den gespeicherten Entwurf zur Prüfung ein.'));
+        await watch.click(page.getByRole('button', { name:t(ui.editor.editordraftstate.submitForReview) }));
+        await expect(page.getByText(t(ui.editor.page.submittedForReview), { exact:true })).toBeVisible();
+        await watch.explain(text('The draft is now waiting in the review queue.', 'Der Entwurf wartet jetzt in der Prüfliste.'));
+      }));
+      paths.push(await record(browser, 'reviewer', locale, `reviewing-a-draft-${locale}.webm`, staging, async (page, watch) => {
+        await page.goto('/editor?status=reviewing');
+        await expect(page.getByRole('heading', { name:t(ui.nav.reviewQueue), exact:true })).toBeVisible();
+        await watch.explain(text('Reviewer: open the submitted session from the queue.', 'Prüfung: Öffnen Sie die eingereichte Sitzung aus der Prüfliste.'));
+        await watch.click(page.locator(`a[href*="sessionId=${sessionId}"]`).first());
+        await expect(page.getByText(correction).first()).toBeVisible();
+        await watch.explain(text('Compare the draft, its source and the correction comment.', 'Vergleichen Sie Entwurf, Quelle und Korrekturkommentar.'));
+        await shot(page, 'editor-review');
+        await watch.click(page.getByRole('button', { name:t(ui.editor.page.approveReview) }));
+        await expect(page.getByText(t(ui.editor.page.reviewApprovedAPublisherCanNowPublish), { exact:true })).toBeVisible();
+        await watch.explain(text('Approved for publication. The public text has not changed yet.', 'Freigegeben. Der öffentliche Text ist noch unverändert.'));
+      }));
+      paths.push(await record(browser, 'publisher', locale, `publishing-a-revision-${locale}.webm`, staging, async (page, watch) => {
+        await page.goto('/editor?status=approved');
+        await expect(page.getByRole('heading', { name:t(ui.nav.readyToPublish), exact:true })).toBeVisible();
+        await watch.explain(text('Publisher: open the approved session.', 'Veröffentlichung: Öffnen Sie die freigegebene Sitzung.'));
+        await watch.click(page.locator(`a[href*="sessionId=${sessionId}"]`).first());
+        await expect(page.getByText(correction).first()).toBeVisible();
+        await watch.explain(text('Check the approved text and its change type.', 'Kontrollieren Sie Text und Änderungsart.'));
+        await shot(page, 'editor-publish');
+        await watch.click(page.getByRole('button', { name:t(ui.editorDynamic.publishTranscription) }));
+        await expect(page).toHaveURL(/(?:published=1|\/account\/step-up\?)/, { timeout:15_000 });
+        if (/\/account\/step-up\?/.test(page.url())) {
+          await watch.explain(text('Confirm your identity with a fresh authenticator code.', 'Bestätigen Sie Ihre Identität mit einem aktuellen Authenticator-Code.'));
+          await page.getByLabel(t(ui.attrs.accountStepUpPageInputLabelAuthenticator)).fill(authenticatorCode(process.env.IDENTITY_SEED_TOTP_SECRET ?? 'CAATLASMFASEED22'));
+          await watch.click(page.getByRole('button', { name:text('Continue', 'Weiter'), exact:true }));
+        }
+        await expect(page.getByText(t(ui.editorDynamic.publishedAsVersion), { exact:false })).toBeVisible();
+        publishedVersionId = new URL(page.url()).searchParams.get('newVersionId') ?? '';
+        expect(publishedVersionId).toBeTruthy();
+        await watch.explain(text('Published. Open the public version to verify the corrected text.', 'Veröffentlicht. Prüfen Sie den korrigierten Text in der öffentlichen Fassung.'));
+        await watch.click(page.getByRole('link', { name:t(ui.editor.page.viewPublicPage) }));
+        const currentText = page.locator(`.snapshot-notice a[href*="/versions/${publishedVersionId}"]`);
+        if (await currentText.count()) await watch.click(currentText);
+        await expect(page.getByText(correction).first()).toBeVisible();
+        await watch.explain(text('The correction is public; the previous snapshot is preserved.', 'Die Korrektur ist öffentlich; der vorherige Textstand bleibt erhalten.'));
+      }));
+      const published = await (await request.get(`/api/content/versions/${publishedVersionId}/articles?includeBody=true`)).json();
+      expect(published.find((item: { articleNumber: string }) => item.articleNumber === source.article.articleNumber).body).toContain(`Verified transcription (${locale}).`);
+      if (capture) {
+        await mkdir(outputDir, { recursive:true });
+        for (const path of paths) await copyFile(path, join(outputDir, path.split('/').pop()!));
       }
-      await expect(page.getByText(/Published as version/)).toBeVisible();
-      publishedVersionId = new URL(page.url()).searchParams.get('newVersionId') ?? '';
-      expect(publishedVersionId).toBeTruthy();
-      await caption(page, 'The corrected version is published');
-    }));
-
-    const published = await (await request.get(`/api/content/versions/${publishedVersionId}/articles?includeBody=true`)).json();
-    const changed = published.find((item: { articleNumber: string }) => item.articleNumber === articleNumber);
-    expect(changed.body).toContain('Verified transcription.');
-    await mkdir(outputDir, { recursive: true });
-    for (const clip of clips) await rename(clip, join(outputDir, clip.split('/').pop()!));
-  } finally {
-    await rm(stagingDir, { recursive: true, force: true });
-  }
-});
+    } finally { await rm(staging, { recursive:true, force:true }); }
+  });
+}

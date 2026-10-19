@@ -40,7 +40,7 @@ The English and German imprint texts are published separately. Operator address 
 The **Account → Connect a chat client** section offers OAuth connections and personal MCP keys. Grant only the access your client needs; editor import access stages material for review and cannot publish it. The page shows connected clients and keys, expiration, rotation and revocation controls. Copy a new key when it is shown and keep it private.
 
 
-![Account security and passkey controls](media/account-security-en.png)
+![Account security and passkey controls](https://raw.githubusercontent.com/wiki/julianhoelz94/Verfassung/media/account-security-en.png)
 *Security settings are grouped in the Account page. No credentials are shown.*
 
 [[Reading guide|User-Guide]] · [[Editorial guide|Editorial-Guide]] · [[Deutsch|Account-Guide-de]]

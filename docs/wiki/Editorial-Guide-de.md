@@ -13,7 +13,7 @@
 
 **Ergebnis:** Der Entwurf wartet in der Prüfwarteschlange. Gespeicherte Arbeit bleibt bei der Rückkehr zur Sitzungsübersicht erhalten.
 
-![Entwurfsbearbeitung mit Text und Arbeitsablauf](media/editor-draft-de.png)
+![Entwurfsbearbeitung mit Text und Arbeitsablauf](https://raw.githubusercontent.com/wiki/julianhoelz94/Verfassung/media/editor-draft-de.png)
 *Vor dem Einreichen speichern und kontrollieren.*
 
 [▶ Bearbeitung und Einreichung ansehen](https://julianhoelz94.github.io/Verfassung/#editing-a-draft-de)
@@ -28,7 +28,7 @@
 
 **Ergebnis:** Die Sitzung ist bereit zur Veröffentlichung. Die Freigabe veröffentlicht noch nichts.
 
-![Eingereichter Entwurf zur Prüfung](media/editor-review-de.png)
+![Eingereichter Entwurf zur Prüfung](https://raw.githubusercontent.com/wiki/julianhoelz94/Verfassung/media/editor-review-de.png)
 *Text und Kontext vor der Freigabe prüfen.*
 
 [▶ Prüfung und Freigabe ansehen](https://julianhoelz94.github.io/Verfassung/#reviewing-a-draft-de)
@@ -43,7 +43,7 @@
 
 **Ergebnis:** Ein neuer Textstand ist öffentlich. Der vorherige bleibt erreichbar. Eine Textberichtigung ist kein neues Gesetz.
 
-![Freigegebener Entwurf vor der Veröffentlichung](media/editor-publish-de.png)
+![Freigegebener Entwurf vor der Veröffentlichung](https://raw.githubusercontent.com/wiki/julianhoelz94/Verfassung/media/editor-publish-de.png)
 *Veröffentlichung und Prüfung sind getrennte Entscheidungen.*
 
 [▶ Veröffentlichung ansehen](https://julianhoelz94.github.io/Verfassung/#publishing-a-revision-de)

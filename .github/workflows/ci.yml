@@ -381,7 +381,9 @@ jobs:
         working-directory: apps/gateway-web
         run: npm run test:e2e:full
       - name: Verify local HTTPS authentication and deployment persistence
+        shell: bash
         run: |
+          set -euo pipefail
           snapshot() {
             docker compose --env-file env/ci.env.example exec -T identity-db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "SELECT md5(string_agg(id::text || password_hash, chr(10) ORDER BY id)) FROM users; SELECT json_build_array(completed_at, bootstrap_admin_id, mail_deferred, access_reviewed, enabled_languages, default_language) FROM deployment_setup;"'
           }

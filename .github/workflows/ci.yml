@@ -108,8 +108,11 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '20'
-      - name: Check Wiki navigation and illustration references
-        run: python3 scripts/check-wiki-docs.py
+      - name: Check repository hygiene, restore preflight and Wiki references
+        run: |
+          python3 scripts/check-repository-hygiene.py
+          python3 scripts/test_backup_restore.py
+          python3 scripts/check-wiki-docs.py
       - name: Install gateway dependencies
         working-directory: apps/gateway-web
         run: npm ci
@@ -128,6 +131,7 @@ jobs:
         working-directory: apps/gateway-web
         run: |
           npm test
+          npm run typecheck
           npm run lint
           npm run build
 

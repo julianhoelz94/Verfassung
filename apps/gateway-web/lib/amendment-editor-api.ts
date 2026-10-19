@@ -1,3 +1,4 @@
+import { fetchWithTimeout } from './fetch-with-timeout';
 import { ui } from './messages';
 import type { Locale } from './locale';
 import { cookies } from 'next/headers';
@@ -68,7 +69,7 @@ export function amendmentErrorMessage(key: string | undefined, locale: Locale = 
   if (!key) {
     return null;
   }
-  return (key in AMENDMENT_ERROR_MESSAGES
+  return (Object.hasOwn(AMENDMENT_ERROR_MESSAGES, key)
     ? AMENDMENT_ERROR_MESSAGES[key as AmendmentErrorKey]
     : AMENDMENT_ERROR_MESSAGES.failed)[locale];
 }
@@ -92,7 +93,7 @@ async function authHeader(): Promise<string> {
 }
 
 async function amendmentFetch(path: string, init: RequestInit = {}): Promise<Response> {
-  return fetch(`${amendmentBaseUrl()}${path}`, {
+  return fetchWithTimeout(`${amendmentBaseUrl()}${path}`, {
     ...init,
     cache: 'no-store',
     headers: {

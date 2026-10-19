@@ -1,3 +1,4 @@
+import { fetchWithTimeout } from '../../../lib/fetch-with-timeout';
 import { T } from '../../components/TranslationProvider';
 import { ui } from '../../../lib/messages';
 import { currentUser } from '../../../lib/session';
@@ -23,7 +24,7 @@ export default async function OAuthAuthorizePage({ searchParams }: { searchParam
   let clientName: string | null = null;
   try {
     const clientQuery = new URLSearchParams({ redirect_uri: values.redirect_uri, resource: values.resource });
-    const response = await fetch(`${identityBaseUrl()}/oauth/clients/${encodeURIComponent(values.client_id)}?${clientQuery}`, { cache: 'no-store' });
+    const response = await fetchWithTimeout(`${identityBaseUrl()}/oauth/clients/${encodeURIComponent(values.client_id)}?${clientQuery}`, { cache: 'no-store' });
     if (response.ok) clientName = ((await response.json()) as { client_name: string }).client_name;
   } catch { /* Show a safe error without redirecting to an unverified client. */ }
   if (!clientName || values.response_type !== 'code' || values.code_challenge_method !== 'S256') {

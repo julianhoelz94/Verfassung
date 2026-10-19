@@ -1,3 +1,4 @@
+import { fetchWithTimeout } from './lib/fetch-with-timeout';
 import { NextResponse, type NextRequest } from 'next/server';
 import { requestAnonymousBrowsingPolicy } from './lib/anonymous-browsing-policy';
 import { setupStatus, setupPathAllowed } from './lib/deployment-setup';
@@ -15,7 +16,7 @@ export async function middleware(request: NextRequest) {
       let admin = false;
       if (token) {
         try {
-          const me = await fetch(`${identityBaseUrl()}/me`, { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store', signal: AbortSignal.timeout(2000) });
+          const me = await fetchWithTimeout(`${identityBaseUrl()}/me`, { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store', signal: AbortSignal.timeout(2000) });
           if (me.ok) admin = ((await me.json()) as { roles: string[] }).roles.includes('admin');
         } catch { /* Fail closed. */ }
       }
@@ -33,7 +34,7 @@ export async function middleware(request: NextRequest) {
       let authenticated = false;
       if (token) {
         try {
-          const response = await fetch(`${identityBaseUrl()}/me`, {
+          const response = await fetchWithTimeout(`${identityBaseUrl()}/me`, {
             headers: { Authorization: `Bearer ${token}` }, cache: 'no-store', signal: AbortSignal.timeout(2000),
           });
           authenticated = response.ok;

@@ -3,6 +3,7 @@ package com.constitutionatlas.editor.client
 import com.constitutionatlas.editor.ConflictException
 import com.constitutionatlas.editor.DownstreamException
 import com.constitutionatlas.platform.NotFoundException
+import com.constitutionatlas.platform.timedRestClient
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.springframework.beans.factory.annotation.Value
@@ -188,8 +189,7 @@ class RestCatalogClient(
 
         private fun parseConflictCode(body: String): String? =
             try {
-                @Suppress("UNCHECKED_CAST")
-                objectMapper.readValue(body, Map::class.java)["code"] as? String
+                objectMapper.readTree(body)?.get("code")?.takeIf { it.isTextual }?.textValue()
             } catch (_: Exception) {
                 null
             }

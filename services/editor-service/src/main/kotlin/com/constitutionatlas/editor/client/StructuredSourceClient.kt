@@ -2,6 +2,7 @@ package com.constitutionatlas.editor.client
 
 import com.constitutionatlas.editor.DownstreamException
 import com.constitutionatlas.editor.api.DraftSource
+import com.constitutionatlas.platform.timedRestClient
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Component

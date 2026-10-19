@@ -18,11 +18,14 @@ export class UpstreamError extends Error {
 
 async function upstreamFailure(response: Response, upstream: string): Promise<UpstreamError> {
   if (![400, 409, 413].includes(response.status)) return new UpstreamError(response.status, upstream);
-  const body = await response.text().catch(() => '');
-  let detail = '';
-  try { const data = JSON.parse(body) as { detail?: string; title?: string; message?: string }; detail = data.detail || data.message || data.title || ''; }
-  catch { detail = ''; }
-  return new UpstreamError(response.status, upstream, detail.slice(0, 1000));
+  const body: unknown = await response.json().catch(() => null);
+  let detail: string | undefined;
+  if (body && typeof body === 'object') {
+    const fields = body as Record<string, unknown>;
+    detail = [fields.detail, fields.message, fields.title]
+      .find((value): value is string => typeof value === 'string' && value.length > 0);
+  }
+  return new UpstreamError(response.status, upstream, detail?.slice(0, 1000));
 }
 
 const upstreams = {
@@ -33,42 +36,44 @@ const upstreams = {
   ingestion: process.env.INGESTION_API_URL ?? 'http://ingestion-service:8080',
 };
 
-export async function getJson<T>(upstream: keyof typeof upstreams, path: string, authorization?: string): Promise<T> {
+/** Preserve read/write deadlines and caller credentials through one transport path; never retry writes. */
+async function requestJson<T>(
+  upstream: keyof typeof upstreams,
+  path: string,
+  method: 'GET' | 'POST' | 'PUT' | 'DELETE',
+  authorization?: string,
+  body?: unknown,
+  idempotencyKey?: string,
+): Promise<T> {
   const response = await fetch(`${upstreams[upstream]}${path}`, {
-    signal: AbortSignal.timeout(8_000),
-    headers: { Accept: 'application/json', ...(authorization ? { Authorization: authorization } : {}) },
+    method,
+    signal: AbortSignal.timeout(method === 'GET' ? 8_000 : 30_000),
+    headers: {
+      Accept: 'application/json',
+      ...(authorization ? { Authorization: authorization } : {}),
+      ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+      ...(idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {}),
+    },
+    ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
   });
   if (!response.ok) throw await upstreamFailure(response, upstream);
   return response.json() as Promise<T>;
 }
 
-export async function postJson<T>(upstream: keyof typeof upstreams, path: string, body: unknown, authorization: string, idempotencyKey?: string): Promise<T> {
-  const response = await fetch(`${upstreams[upstream]}${path}`, {
-    method: 'POST', signal: AbortSignal.timeout(30_000),
-    headers: { Accept: 'application/json', Authorization: authorization, 'Content-Type': 'application/json', ...(idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {}) },
-    body: JSON.stringify(body),
-  });
-  if (!response.ok) throw await upstreamFailure(response, upstream);
-  return response.json() as Promise<T>;
+export function getJson<T>(upstream: keyof typeof upstreams, path: string, authorization?: string): Promise<T> {
+  return requestJson(upstream, path, 'GET', authorization);
 }
 
-export async function putJson<T>(upstream: keyof typeof upstreams, path: string, body: unknown, authorization: string): Promise<T> {
-  const response = await fetch(`${upstreams[upstream]}${path}`, {
-    method: 'PUT', signal: AbortSignal.timeout(30_000),
-    headers: { Accept: 'application/json', Authorization: authorization, 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-  if (!response.ok) throw await upstreamFailure(response, upstream);
-  return response.json() as Promise<T>;
+export function postJson<T>(upstream: keyof typeof upstreams, path: string, body: unknown, authorization: string, idempotencyKey?: string): Promise<T> {
+  return requestJson(upstream, path, 'POST', authorization, body, idempotencyKey);
 }
 
-export async function deleteJson<T>(upstream: keyof typeof upstreams, path: string, authorization: string): Promise<T> {
-  const response = await fetch(`${upstreams[upstream]}${path}`, {
-    method: 'DELETE', signal: AbortSignal.timeout(30_000),
-    headers: { Accept: 'application/json', Authorization: authorization },
-  });
-  if (!response.ok) throw await upstreamFailure(response, upstream);
-  return response.json() as Promise<T>;
+export function putJson<T>(upstream: keyof typeof upstreams, path: string, body: unknown, authorization: string): Promise<T> {
+  return requestJson(upstream, path, 'PUT', authorization, body);
+}
+
+export function deleteJson<T>(upstream: keyof typeof upstreams, path: string, authorization: string): Promise<T> {
+  return requestJson(upstream, path, 'DELETE', authorization);
 }
 
 export async function requirePublishedVersion(versionId: string): Promise<Version> {

@@ -1,5 +1,8 @@
 'use client';
 
+import { fetchWithTimeout } from '../../lib/fetch-with-timeout';
+
+
 import { T, useTranslation } from '../components/TranslationProvider';
 import { ui, type UiMessage } from '../../lib/messages';
 import { useEffect, useRef, useState } from 'react';
@@ -64,7 +67,7 @@ export function StructuredEditor({ review = [], preview, outline, rootId, versio
     try {
       const params = new URLSearchParams({ sessionId: preview.sessionId, scope: view });
       if (fullRootId) params.set('rootId', fullRootId);
-      const response = await fetch(`/editor/view?${params}`, { cache: 'no-store' });
+      const response = await fetchWithTimeout(`/editor/view?${params}`, { cache: 'no-store' });
       if (!response.ok) throw new LocalizedEditorError(ui.editorDefaults.viewRetry);
       const loaded: StructuredPreview = await response.json();
       if (loaded.generation !== preview.generation || loaded.settingsRevisionId !== preview.settingsRevisionId) throw new LocalizedEditorError(ui.editorDefaults.sessionChanged);

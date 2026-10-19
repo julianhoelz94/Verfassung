@@ -1,3 +1,4 @@
+import { fetchWithTimeout } from './fetch-with-timeout';
 import { identityBaseUrl } from './identity-client';
 
 export type SetupStatus = { completed: boolean; tlsMode: string; publicUrl: string };
@@ -11,7 +12,7 @@ export type SetupDetails = {
 };
 
 export async function setupRequest<T>(path: string, bearer?: string, method = 'GET', body?: unknown): Promise<T> {
-  const response = await fetch(`${identityBaseUrl()}${path}`, {
+  const response = await fetchWithTimeout(`${identityBaseUrl()}${path}`, {
     method, cache: 'no-store', signal: AbortSignal.timeout(5000),
     headers: { ...(bearer ? { Authorization: bearer } : {}), ...(body ? { 'Content-Type': 'application/json' } : {}) },
     ...(body ? { body: JSON.stringify(body) } : {}),

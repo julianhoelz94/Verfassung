@@ -2,7 +2,7 @@ package com.constitutionatlas.search.client
 
 import com.constitutionatlas.platform.OrderedContentText
 import com.constitutionatlas.platform.OrderedEntry
-import com.constitutionatlas.search.timedRestClient
+import com.constitutionatlas.platform.timedRestClient
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean

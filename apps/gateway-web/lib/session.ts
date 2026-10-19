@@ -1,3 +1,4 @@
+import { fetchWithTimeout } from './fetch-with-timeout';
 import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import {
@@ -179,7 +180,7 @@ export async function currentSession(): Promise<{ user: SessionUser | null; iden
     return { user: null, identityUnavailable: false };
   }
   try {
-    const response = await fetch(`${identityBaseUrl()}/me`, {
+    const response = await fetchWithTimeout(`${identityBaseUrl()}/me`, {
       headers: { Authorization: `Bearer ${token}` },
       cache: 'no-store',
     });

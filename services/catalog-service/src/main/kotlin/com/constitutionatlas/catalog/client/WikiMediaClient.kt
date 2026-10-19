@@ -2,6 +2,7 @@ package com.constitutionatlas.catalog.client
 
 import com.constitutionatlas.catalog.ConflictException
 import com.constitutionatlas.catalog.api.WikiImage
+import com.constitutionatlas.platform.timedRestClient
 import com.fasterxml.jackson.databind.JsonNode
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Component

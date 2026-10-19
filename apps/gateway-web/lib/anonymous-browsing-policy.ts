@@ -1,3 +1,4 @@
+import { fetchWithTimeout } from './fetch-with-timeout';
 import { identityBaseUrl } from './identity-client';
 
 export type AnonymousRate = { requests: number; windowValue: number; windowUnit: 'minutes' | 'hours' | 'days' };
@@ -7,16 +8,16 @@ export async function requestAnonymousBrowsingPolicy(
   fetchImpl: typeof fetch = fetch,
   baseUrl: string = identityBaseUrl(),
 ): Promise<AnonymousBrowsingPolicy> {
-  const response = await fetchImpl(`${baseUrl}/anonymous-browsing`, {
+  const response = await fetchWithTimeout(`${baseUrl}/anonymous-browsing`, {
     cache: 'no-store',
     signal: AbortSignal.timeout(2000),
-  });
+  }, fetchImpl);
   if (!response.ok) throw new Error('Anonymous browsing policy unavailable');
   return (await response.json()) as AnonymousBrowsingPolicy;
 }
 
 export async function requestAdminAnonymousBrowsingPolicy(token: string): Promise<AnonymousBrowsingPolicy> {
-  const response = await fetch(`${identityBaseUrl()}/admin/anonymous-browsing`, {
+  const response = await fetchWithTimeout(`${identityBaseUrl()}/admin/anonymous-browsing`, {
     headers: { Authorization: `Bearer ${token}` }, cache: 'no-store',
   });
   if (!response.ok) throw new Error('Unable to load anonymous browsing settings');
@@ -24,7 +25,7 @@ export async function requestAdminAnonymousBrowsingPolicy(token: string): Promis
 }
 
 export async function updateAnonymousBrowsingPolicy(token: string, policy: AnonymousBrowsingPolicy): Promise<void> {
-  const response = await fetch(`${identityBaseUrl()}/admin/anonymous-browsing`, {
+  const response = await fetchWithTimeout(`${identityBaseUrl()}/admin/anonymous-browsing`, {
     method: 'PUT',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     body: JSON.stringify(policy), cache: 'no-store',

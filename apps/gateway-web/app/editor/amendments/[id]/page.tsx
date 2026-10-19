@@ -185,7 +185,6 @@ export default async function AmendmentDetailPage(props: AmendmentDetailPageProp
           unitTreesByVersion={unitTreesByVersion}
           latestVersionId={latestVersionId}
           canSave={canSave}
-          canPublish={false}
           canWithdraw={false}
           readOnly={readOnly}
           contentAvailable={contentAvailable}

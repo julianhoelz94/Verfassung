@@ -29,8 +29,10 @@ export function amendmentsBetween(
   versions: VersionSummary[],
 ): Amendment[] {
   const ordered = orderVersions(versions);
-  const fromIndex = ordered.findIndex((version) => version.id === fromId);
-  const toIndex = ordered.findIndex((version) => version.id === toId);
+  const positions = new Map(ordered.map((version, index) => [version.id, index]));
+  const positionOf = (id: string | null | undefined): number => id == null ? -1 : (positions.get(id) ?? -1);
+  const fromIndex = positionOf(fromId);
+  const toIndex = positionOf(toId);
   if (fromIndex < 0 || toIndex < 0 || fromIndex >= toIndex) {
     return [];
   }
@@ -42,21 +44,21 @@ export function amendmentsBetween(
       if (amendment.status && amendment.status !== 'published') {
         return false;
       }
-      const sourceIndex = ordered.findIndex((version) => version.id === amendment.sourceVersionId);
-      const targetIndex = ordered.findIndex((version) => version.id === amendment.targetVersionId);
+      const sourceIndex = positionOf(amendment.sourceVersionId);
+      const targetIndex = positionOf(amendment.targetVersionId);
       if (sourceIndex < 0 || targetIndex < 0) {
         return false;
       }
       return sourceIndex < targetIndex && fromIndex <= sourceIndex && targetIndex <= toIndex;
     })
     .sort((left, right) => {
-      const leftSource = ordered.findIndex((version) => version.id === left.sourceVersionId);
-      const rightSource = ordered.findIndex((version) => version.id === right.sourceVersionId);
+      const leftSource = positionOf(left.sourceVersionId);
+      const rightSource = positionOf(right.sourceVersionId);
       if (leftSource !== rightSource) {
         return leftSource - rightSource;
       }
-      const leftTarget = ordered.findIndex((version) => version.id === left.targetVersionId);
-      const rightTarget = ordered.findIndex((version) => version.id === right.targetVersionId);
+      const leftTarget = positionOf(left.targetVersionId);
+      const rightTarget = positionOf(right.targetVersionId);
       return leftTarget - rightTarget;
     });
 }
@@ -163,10 +165,6 @@ export function netArticleKind(
 
 export function compareRowId(articleNumber: string): string {
   return `compare-article-${articleNumber}`;
-}
-
-export function compareArticleNumbers(a: string, b: string): number {
-  return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
 }
 
 export function canonicalCompareQuery(

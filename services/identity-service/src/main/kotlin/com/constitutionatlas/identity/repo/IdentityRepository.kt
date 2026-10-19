@@ -624,30 +624,13 @@ class IdentityRepository(private val jdbc: JdbcTemplate) {
         jdbc.update("DELETE FROM mfa_recovery_codes WHERE user_id = ?", userId)
     }
 
-    fun findUnusedRecovery(codeHash: String): UUID? =
-        jdbc.query(
-            """
-            SELECT id FROM mfa_recovery_codes
-            WHERE code_hash = ? AND used_at IS NULL
-            """.trimIndent(),
-            { rs, _ -> rs.getObject("id", UUID::class.java) },
+    /** The conditional update claims a code once, including concurrent login/step-up requests. */
+    fun consumeRecoveryCode(userId: UUID, codeHash: String): Boolean =
+        jdbc.update(
+            "UPDATE mfa_recovery_codes SET used_at = NOW() WHERE user_id = ? AND code_hash = ? AND used_at IS NULL",
+            userId,
             codeHash,
-        ).firstOrNull()
-
-    fun recoveryBelongsToUser(id: UUID, userId: UUID): Boolean {
-        val count =
-            jdbc.queryForObject(
-                "SELECT COUNT(*) FROM mfa_recovery_codes WHERE id = ? AND user_id = ?",
-                Int::class.java,
-                id,
-                userId,
-            )
-        return (count ?: 0) > 0
-    }
-
-    fun markRecoveryUsed(id: UUID) {
-        jdbc.update("UPDATE mfa_recovery_codes SET used_at = NOW() WHERE id = ?", id)
-    }
+        ) == 1
 
     fun insertChallenge(
         userId: UUID,

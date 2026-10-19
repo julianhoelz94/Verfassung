@@ -62,7 +62,7 @@ class IdentityClientConfig {
     @Bean
     @ConditionalOnProperty("DEPLOYMENT_SETUP_GATE_ENABLED", havingValue = "true")
     fun deploymentSetupFilter(@Value("\${identity.api.url}") identityUrl: String, identityClient: IdentityClient): DeploymentSetupFilter =
-        DeploymentSetupFilter(identityUrl, identityClient)
+        DeploymentSetupFilter(timedRestClient(identityUrl), identityClient)
 
     @Bean
     @ConditionalOnMissingBean(IdentityClient::class)

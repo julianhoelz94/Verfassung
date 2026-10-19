@@ -4,6 +4,7 @@ import com.constitutionatlas.content.CatalogUnavailableException
 import com.constitutionatlas.content.VersionPublishedException
 import com.constitutionatlas.platform.IdentityClient
 import com.constitutionatlas.platform.NotFoundException
+import com.constitutionatlas.platform.timedRestClient
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import jakarta.servlet.FilterChain
 import jakarta.servlet.http.HttpServletRequest

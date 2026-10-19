@@ -3,6 +3,7 @@ package com.constitutionatlas.amendment.client
 import com.constitutionatlas.amendment.ContentUnavailableException
 import com.constitutionatlas.amendment.api.AmendmentUnitRefDto
 import com.constitutionatlas.platform.OrderedEntry
+import com.constitutionatlas.platform.timedRestClient
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean

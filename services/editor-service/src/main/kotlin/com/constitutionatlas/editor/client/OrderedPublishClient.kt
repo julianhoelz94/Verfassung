@@ -2,6 +2,7 @@ package com.constitutionatlas.editor.client
 
 import com.constitutionatlas.platform.OrderedSnapshot
 import com.constitutionatlas.platform.OrderedSnapshotWrite
+import com.constitutionatlas.platform.timedRestClient
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType

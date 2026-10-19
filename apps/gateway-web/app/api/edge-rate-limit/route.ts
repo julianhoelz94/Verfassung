@@ -1,3 +1,4 @@
+import { fetchWithTimeout } from '../../../lib/fetch-with-timeout';
 import { NextRequest, NextResponse } from 'next/server';
 import { anonymousApiLimit } from '../../../lib/anonymous-api-limit';
 import { requestAnonymousBrowsingPolicy } from '../../../lib/anonymous-browsing-policy';
@@ -17,7 +18,7 @@ export async function GET(request: NextRequest) {
   const credential = token ? `Bearer ${token}` : request.headers.get('authorization');
   if (credential) {
     try {
-      const response = await fetch(`${identityBaseUrl()}/me`, {
+      const response = await fetchWithTimeout(`${identityBaseUrl()}/me`, {
         headers: { Authorization: credential },
         cache: 'no-store',
         signal: AbortSignal.timeout(2000),

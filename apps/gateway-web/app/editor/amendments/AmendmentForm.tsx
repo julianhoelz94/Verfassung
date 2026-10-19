@@ -22,7 +22,6 @@ type AmendmentFormProps = {
   unitTreesByVersion: Record<string, ArticleSummary[]>;
   latestVersionId?: string | null;
   canSave: boolean;
-  canPublish: boolean;
   canWithdraw: boolean;
   readOnly: boolean;
   contentAvailable?: boolean;
@@ -68,7 +67,6 @@ export function AmendmentForm({
   unitTreesByVersion,
   latestVersionId,
   canSave,
-  canPublish,
   canWithdraw,
   readOnly,
   contentAvailable = true,

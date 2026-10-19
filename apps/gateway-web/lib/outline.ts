@@ -1,4 +1,4 @@
-import type { ArticleDetail, ArticleSummary, ContentNode, ContentOutline, OrderedEntry, OutlineKindWrite } from './api';
+import type { ArticleDetail, ContentNode, ContentOutline, OrderedEntry, OutlineKindWrite } from './api';
 
 export function asOutlinePresentation(value: string | undefined): OutlineKindWrite['presentation'] {
   return value === 'concatenated' ? 'concatenated' : 'section';

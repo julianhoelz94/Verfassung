@@ -115,7 +115,6 @@ export function AmendmentEditorLayout({
           unitTreesByVersion={unitTreesByVersion}
           latestVersionId={latestVersionId}
           canSave={canSave && !viewingPast}
-          canPublish={canPublish && !viewingPast}
           canWithdraw={canWithdraw && !viewingPast}
           readOnly={readOnly || viewingPast}
           contentAvailable={contentAvailable}

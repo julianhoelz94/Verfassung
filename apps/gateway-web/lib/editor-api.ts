@@ -1,3 +1,4 @@
+import { fetchWithTimeout } from './fetch-with-timeout';
 import { ui } from './messages';
 import type { Locale } from './locale';
 import { cookies } from 'next/headers';
@@ -104,7 +105,7 @@ export function editorErrorMessage(key: string | undefined, locale: Locale = 'en
   if (!key) {
     return null;
   }
-  return (key in EDITOR_ERROR_MESSAGES ? EDITOR_ERROR_MESSAGES[key as EditorErrorKey] : EDITOR_ERROR_MESSAGES.failed)[locale];
+  return (Object.hasOwn(EDITOR_ERROR_MESSAGES, key) ? EDITOR_ERROR_MESSAGES[key as EditorErrorKey] : EDITOR_ERROR_MESSAGES.failed)[locale];
 }
 
 export class EditorApiError extends Error {
@@ -126,7 +127,7 @@ async function authHeader(): Promise<string> {
 }
 
 async function editorFetch(path: string, init: RequestInit = {}): Promise<Response> {
-  return fetch(`${editorBaseUrl()}${path}`, {
+  return fetchWithTimeout(`${editorBaseUrl()}${path}`, {
     ...init,
     cache: 'no-store',
     headers: {

@@ -23,7 +23,7 @@ describe('optional catalog wiki pages', () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(null, { status: 503 })));
     await expect(getWikiPage('country', 'target')).rejects.toBeInstanceOf(ApiUnavailableError);
     vi.stubGlobal('fetch', vi.fn(async () => new Response('{')));
-    await expect(getWikiPage('country', 'target')).rejects.toBeInstanceOf(SyntaxError);
+    await expect(getWikiPage('country', 'target')).rejects.toBeInstanceOf(ApiUnavailableError);
   });
 
   it('supports a no-content response for optional reads', async () => {

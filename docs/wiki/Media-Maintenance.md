@@ -1,6 +1,6 @@
 # Wiki illustrations and videos
 
-**All screenshots and recordings are generated in CI after a PR merges into main.** Do not capture or replace documentation screenshots from a developer's local stack. PR checks validate the guides and scripts without publishing or updating images.
+**All screenshots and recordings are generated in CI after a PR merges into main.** Generated files under `docs/wiki/media/` are ignored in the application repository; current published media lives in the Wiki and documentation player. Old raw links remain in the Wiki for compatibility. Do not capture or replace documentation screenshots from a developer's local stack. PR checks validate the guides and scripts without publishing or updating images.
 
 ## How publication works
 

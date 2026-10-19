@@ -8,7 +8,6 @@ import { PageMain } from '../components/PageMain';
 import { SearchSnippet } from '../components/SearchSnippet';
 import { Card, PageHeader, Pager } from '../components/ui';
 import {
-  ApiUnavailableError,
   searchArticles,
   searchFacets,
   type SearchFacets,

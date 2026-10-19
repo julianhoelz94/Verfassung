@@ -30,7 +30,9 @@ class ContentTranslationRepository(private val jdbc: JdbcTemplate) {
             """INSERT INTO user_content_translation_settings (user_id, always_translate, google_key_cipher)
                VALUES (?, ?, ?) ON CONFLICT (user_id) DO UPDATE SET
                always_translate = EXCLUDED.always_translate, google_key_cipher = EXCLUDED.google_key_cipher""",
-            userId, alwaysTranslate, cipher,
+            userId,
+            alwaysTranslate,
+            cipher,
         )
     }
 
@@ -38,7 +40,11 @@ class ContentTranslationRepository(private val jdbc: JdbcTemplate) {
         """SELECT translated_text FROM content_translation_cache
            WHERE scope = ? AND provider = ? AND source_hash = ? AND source_language = ? AND target_language = ?""",
         { rs, _ -> rs.getString("translated_text") },
-        scope, provider, hash, source, target,
+        scope,
+        provider,
+        hash,
+        source,
+        target,
     ).firstOrNull()
 
     fun cache(scope: String, provider: String, hash: String, source: String, target: String, translated: String) {
@@ -46,7 +52,12 @@ class ContentTranslationRepository(private val jdbc: JdbcTemplate) {
             """INSERT INTO content_translation_cache
                (scope, provider, source_hash, source_language, target_language, translated_text)
                VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT DO NOTHING""",
-            scope, provider, hash, source, target, translated,
+            scope,
+            provider,
+            hash,
+            source,
+            target,
+            translated,
         )
     }
 
@@ -63,7 +74,9 @@ class ContentTranslationRepository(private val jdbc: JdbcTemplate) {
         val accepted = jdbc.update(
             """UPDATE content_translation_google_usage SET reserved_characters = reserved_characters + ?
                WHERE billing_month = ? AND reserved_characters + ? <= 500000""",
-            characters, month, characters,
+            characters,
+            month,
+            characters,
         ) == 1
         if (accepted) jdbc.update("INSERT INTO content_translation_google_reservations(characters) VALUES (?)", characters)
         return accepted
@@ -71,6 +84,7 @@ class ContentTranslationRepository(private val jdbc: JdbcTemplate) {
 
     fun googleUsed(month: String): Int = jdbc.query(
         "SELECT reserved_characters FROM content_translation_google_usage WHERE billing_month = ?",
-        { rs, _ -> rs.getInt(1) }, month,
+        { rs, _ -> rs.getInt(1) },
+        month,
     ).firstOrNull() ?: 0
 }

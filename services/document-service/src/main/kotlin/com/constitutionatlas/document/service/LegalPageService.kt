@@ -1,13 +1,13 @@
 package com.constitutionatlas.document.service
 
 import com.constitutionatlas.document.api.DocumentConflictException
+import com.constitutionatlas.document.api.ImprintDetailsDto
+import com.constitutionatlas.document.api.ImprintDetailsStateDto
 import com.constitutionatlas.document.api.LegalPageRevisionDto
 import com.constitutionatlas.document.api.LegalPageStateDto
 import com.constitutionatlas.document.api.PublishLegalPageRequest
-import com.constitutionatlas.document.api.SaveLegalPageDraftRequest
-import com.constitutionatlas.document.api.ImprintDetailsDto
-import com.constitutionatlas.document.api.ImprintDetailsStateDto
 import com.constitutionatlas.document.api.SaveImprintDetailsRequest
+import com.constitutionatlas.document.api.SaveLegalPageDraftRequest
 import com.constitutionatlas.document.repo.ImprintDetailsRepository
 import com.constitutionatlas.document.repo.LegalPageRepository
 import com.constitutionatlas.platform.Actor
@@ -99,8 +99,10 @@ class LegalPageService(
                 "Remove contact and address details from the legal prose before publication"
             }
         }
-        require(!draft.content.contains("BEISPIEL — VOR VERÖFFENTLICHUNG ERSETZEN") &&
-            !draft.content.contains("EXAMPLE — REPLACE BEFORE PUBLICATION")) {
+        require(
+            !draft.content.contains("BEISPIEL — VOR VERÖFFENTLICHUNG ERSETZEN") &&
+                !draft.content.contains("EXAMPLE — REPLACE BEFORE PUBLICATION"),
+        ) {
             "Replace example legal details before publication"
         }
         if (!repository.publish(key, request.expectedRevision)) throw DocumentConflictException("Legal page draft changed")

@@ -20,19 +20,31 @@ class ContentTranslationProvider(private val mapper: ObjectMapper) {
             "google" -> HttpRequest.newBuilder(
                 URI.create("https://translation.googleapis.com/language/translate/v2?key=${URLEncoder.encode(apiKey, StandardCharsets.UTF_8)}"),
             ).header("Content-Type", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofString(mapper.writeValueAsString(mapOf(
-                    "q" to sourceTexts,
-                    "target" to targetLanguage,
-                    "format" to "text",
-                ) + (if (sourceLanguage == "auto") emptyMap() else mapOf("source" to sourceLanguage))))).timeout(Duration.ofSeconds(20)).build()
+                .POST(
+                    HttpRequest.BodyPublishers.ofString(
+                        mapper.writeValueAsString(
+                            mapOf(
+                                "q" to sourceTexts,
+                                "target" to targetLanguage,
+                                "format" to "text",
+                            ) + (if (sourceLanguage == "auto") emptyMap() else mapOf("source" to sourceLanguage)),
+                        ),
+                    ),
+                ).timeout(Duration.ofSeconds(20)).build()
             "deepl" -> HttpRequest.newBuilder(
                 URI.create(if (apiKey.endsWith(":fx")) "https://api-free.deepl.com/v2/translate" else "https://api.deepl.com/v2/translate"),
             ).header("Content-Type", "application/json")
                 .header("Authorization", "DeepL-Auth-Key $apiKey")
-                .POST(HttpRequest.BodyPublishers.ofString(mapper.writeValueAsString(mapOf(
-                    "text" to sourceTexts,
-                    "target_lang" to targetLanguage.uppercase(),
-                ) + (if (sourceLanguage == "auto") emptyMap() else mapOf("source_lang" to sourceLanguage.uppercase()))))).timeout(Duration.ofSeconds(20)).build()
+                .POST(
+                    HttpRequest.BodyPublishers.ofString(
+                        mapper.writeValueAsString(
+                            mapOf(
+                                "text" to sourceTexts,
+                                "target_lang" to targetLanguage.uppercase(),
+                            ) + (if (sourceLanguage == "auto") emptyMap() else mapOf("source_lang" to sourceLanguage.uppercase())),
+                        ),
+                    ),
+                ).timeout(Duration.ofSeconds(20)).build()
             else -> error("Unsupported translation provider")
         }
         val response = http.send(request, HttpResponse.BodyHandlers.ofString())

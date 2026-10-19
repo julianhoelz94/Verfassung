@@ -4,10 +4,10 @@ import com.constitutionatlas.identity.BadRequestException
 import com.constitutionatlas.identity.TooManyRequestsException
 import com.constitutionatlas.identity.api.ContentTranslationSiteDto
 import com.constitutionatlas.identity.api.ContentTranslationUserDto
-import com.constitutionatlas.identity.api.TranslateContentRequest
-import com.constitutionatlas.identity.api.TranslateContentResponse
 import com.constitutionatlas.identity.api.TranslateContentBatchRequest
 import com.constitutionatlas.identity.api.TranslateContentBatchResponse
+import com.constitutionatlas.identity.api.TranslateContentRequest
+import com.constitutionatlas.identity.api.TranslateContentResponse
 import com.constitutionatlas.identity.api.UpdateContentTranslationSiteRequest
 import com.constitutionatlas.identity.api.UpdateContentTranslationUserRequest
 import com.constitutionatlas.identity.config.IdentityMfaProperties

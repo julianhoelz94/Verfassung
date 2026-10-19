@@ -1,7 +1,7 @@
 package com.constitutionatlas.identity.service
 
-import com.constitutionatlas.identity.ConflictException
 import com.constitutionatlas.identity.BadRequestException
+import com.constitutionatlas.identity.ConflictException
 import com.constitutionatlas.identity.StepUpRequiredException
 import com.constitutionatlas.identity.TooManyRequestsException
 import com.constitutionatlas.identity.api.LoginResponse

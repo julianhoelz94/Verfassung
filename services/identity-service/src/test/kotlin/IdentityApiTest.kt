@@ -3,9 +3,9 @@ import com.constitutionatlas.identity.client.AuditClient
 import com.constitutionatlas.identity.client.AuthAudit
 import com.constitutionatlas.identity.crypto.Totp
 import com.constitutionatlas.identity.mail.OutboundMailer
+import com.constitutionatlas.identity.repo.ContentTranslationRepository
 import com.constitutionatlas.identity.service.AccountService
 import com.constitutionatlas.identity.service.IdentitySeedRunner
-import com.constitutionatlas.identity.repo.ContentTranslationRepository
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.junit.jupiter.api.Test
 import org.mockito.ArgumentCaptor

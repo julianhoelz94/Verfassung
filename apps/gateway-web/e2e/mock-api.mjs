@@ -363,13 +363,20 @@ const server = createServer(async (req, res) => {
     return;
   }
 
+  if (method === 'POST' && pathname === '/__unpublished_imprint_contact') {
+    imprintDetailsState.published = null;
+    imprintDetailsState.draft = null;
+    empty(res, 204);
+    return;
+  }
+
   if (pathname.startsWith('/api/document/legal-pages/imprint-details')) {
     const action = pathname.slice('/api/document/legal-pages/imprint-details'.length);
     if (method === 'GET' && !action) { json(res, 200, imprintDetailsState.published); return; }
     if (bearer(req) !== SESSION_TOKEN) { json(res, 401, { error: 'Login required' }); return; }
     if (method === 'GET' && action === '/editor') { json(res, 200, imprintDetailsState); return; }
     const body = await readBody(req);
-    if (body.expectedRevision !== imprintDetailsState.draft.revision) { json(res, 409, { error: 'Conflict' }); return; }
+    if (body.expectedRevision !== (imprintDetailsState.draft?.revision ?? 0)) { json(res, 409, { error: 'Conflict' }); return; }
     if (method === 'PUT' && action === '/draft') {
       imprintDetailsState.draft = { ...body, revision: body.expectedRevision + 1 };
       json(res, 200, imprintDetailsState); return;
@@ -392,6 +399,10 @@ const server = createServer(async (req, res) => {
     if (method === 'PUT' && action === 'draft') {
       const body = await readBody(req);
       if (body.expectedRevision !== (state.draft?.revision ?? 0)) { json(res, 409, { error: 'Conflict' }); return; }
+      if (body.contact) {
+        if (body.contact.expectedRevision !== (imprintDetailsState.draft?.revision ?? 0)) { json(res, 409, { error: 'Contact changed' }); return; }
+        imprintDetailsState.draft = { ...body.contact, revision: body.contact.expectedRevision + 1 };
+      }
       const draft = { revision: body.expectedRevision + 1, content: String(body.content).trim(), separateContact: legalMatch[1].startsWith('impressum'), createdAt: new Date().toISOString(), createdBy: identityMe.id };
       state.draft = draft;
       state.revisions.push(draft);
@@ -401,6 +412,10 @@ const server = createServer(async (req, res) => {
     if (method === 'POST' && action === 'publish') {
       const body = await readBody(req);
       if (body.expectedRevision !== state.draft?.revision) { json(res, 409, { error: 'Conflict' }); return; }
+      if (body.expectedContactRevision !== undefined) {
+        if (body.expectedContactRevision !== imprintDetailsState.draft?.revision) { json(res, 409, { error: 'Contact changed' }); return; }
+        imprintDetailsState.published = imprintDetailsState.draft;
+      }
       state.published = state.draft;
       json(res, 200, { key: state.key, draft: state.draft, published: state.published });
       return;

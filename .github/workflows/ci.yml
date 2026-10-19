@@ -20,6 +20,10 @@ jobs:
       services: ${{ steps.list.outputs.services }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Check local-stack orchestration
+        run: |
+          bash -n manageLocalStack.sh
+          python3 scripts/test_local_stack.py
       - id: list
         name: List microservices
         run: |
@@ -149,8 +153,9 @@ jobs:
         with:
           name: playwright-report
           path: |
-            apps/gateway-web/playwright-report
-            apps/gateway-web/test-results
+            apps/gateway-web/test-results/**/*.png
+            apps/gateway-web/test-results/**/error-context.md
+          if-no-files-found: ignore
           retention-days: 7
 
   visual-e2e:
@@ -172,8 +177,9 @@ jobs:
         with:
           name: playwright-visual-report
           path: |
-            apps/gateway-web/playwright-report
-            apps/gateway-web/test-results
+            apps/gateway-web/test-results/**/*.png
+            apps/gateway-web/test-results/**/error-context.md
+          if-no-files-found: ignore
           retention-days: 7
 
   images:
@@ -195,6 +201,9 @@ jobs:
         run: ./gradlew -p services/${{ matrix.service }} bootJar -x test
       - name: Build ${{ matrix.service }} image
         run: docker build -t constitution-atlas/${{ matrix.service }}:ci services/${{ matrix.service }}
+      - name: Verify local Identity source image and language registry
+        if: matrix.service == 'identity-service'
+        run: docker build -f infra/local-stack/Dockerfile --build-arg SERVICE=identity-service -t constitution-atlas/identity-service:local-ci .
 
   gateway-image:
     runs-on: ubuntu-latest

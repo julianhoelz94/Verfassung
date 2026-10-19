@@ -83,6 +83,10 @@ class LegalPageService(
         val content = request.content.trim()
         require(content.isNotEmpty() && content.length <= 30_000) { "Legal page must contain 1 to 30000 characters" }
         require(request.expectedRevision >= 0) { "Invalid expected revision" }
+        request.contact?.let { contact ->
+            require(key.startsWith("impressum")) { "Shared contact details belong to the imprint" }
+            saveImprintDetails(contact, actor)
+        }
         repository.ensure(key)
         if (!repository.advanceDraft(key, request.expectedRevision)) throw DocumentConflictException("Legal page draft changed")
         val revision = request.expectedRevision + 1
@@ -94,6 +98,10 @@ class LegalPageService(
     @Transactional
     fun publish(key: String, request: PublishLegalPageRequest, actor: Actor): LegalPageStateDto {
         validateKey(key)
+        request.expectedContactRevision?.let { revision ->
+            require(key.startsWith("impressum")) { "Shared contact details belong to the imprint" }
+            publishImprintDetails(PublishLegalPageRequest(revision), actor)
+        }
         if (key.startsWith("impressum")) {
             require(imprintDetailsRepository.state().published != null) { "Publish the shared imprint details first" }
         }

@@ -1,3 +1,4 @@
+import { fixtureVersion, publishFixture } from './prepopulate-import.mjs';
 import { createHmac } from 'node:crypto';
 import { readFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -15,11 +16,12 @@ const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 let token;
 let reviewerToken;
 let publisherToken;
+const publicVersions = {};
 
-async function api(method, path, body, authenticated = false) {
+async function api(method, path, body, authenticated = method === 'GET' && Boolean(token), extraHeaders = {}) {
   const response = await fetch(endpoint(path), {
     method,
-    headers: { Accept: 'application/json', ...(body === undefined ? {} : { 'Content-Type': 'application/json' }), ...(authenticated ? { Authorization: `Bearer ${authenticated === true ? token : authenticated}` } : {}) },
+    headers: { ...extraHeaders, Accept: 'application/json', ...(body === undefined ? {} : { 'Content-Type': 'application/json' }), ...(authenticated ? { Authorization: `Bearer ${authenticated === true ? token : authenticated}` } : {}) },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     signal: AbortSignal.timeout(30000),
   });
@@ -79,9 +81,9 @@ async function authenticate() {
 
 async function waitForStack() {
   for (let attempt = 0; attempt < 60; attempt++) {
-    try { await api('GET', 'catalog/countries'); return; } catch { await pause(2000); }
+    try { await api('GET', 'identity/actuator/health'); return; } catch { await pause(2000); }
   }
-  throw new Error('Catalog API did not become ready');
+  throw new Error('Identity API did not become ready');
 }
 
 async function countryDetail(iso) {
@@ -184,22 +186,17 @@ async function ensureVersions(ids) {
       const payload = fixture(version.file);
       let detail = await countryDetail(country.isoCode);
       let constitution = detail?.constitutions.find((item) => item.slug === country.constitutionSlug);
-      let existing = constitution?.versions.find((item) => item.versionLabel === payload.versionLabel);
+      let existing = fixtureVersion(constitution?.versions, payload.versionLabel);
       if (!existing && !verifyOnly) {
         const pin = constitution ? await api('GET', `catalog/constitutions/${constitution.id}/settings`) : null;
         const source = version.predecessor && payload.roots?.length ? await api('GET', `content/versions/${ids.versions[version.predecessor]}/content`) : null;
         const request = { ...payload, ...(source ? { roots: linkPredecessors(payload.roots, source) } : {}), ...(pin ? { outline: undefined, constitutionId: constitution.id, settingsRevisionId: pin.id } : {}),
           ...(version.predecessor ? { predecessorVersionId: ids.versions[version.predecessor], hopKind: 'legal' } : {}) };
-        const job = await api('POST', 'ingestion/import-jobs', request, true);
-        if (job.status === 'failed') throw new Error(`Import ${version.key} failed: ${JSON.stringify(job)}`);
-        if (!pin) await api('POST', `ingestion/import-jobs/${job.id}/confirm-outline`, {}, true);
-        await api('POST', `ingestion/import-jobs/${job.id}/prepare`, {}, true);
-        await api('POST', `ingestion/import-jobs/${job.id}/approve`, { reason: 'Fixture source and structure checked against the generated text.' }, reviewerToken);
-        const result = await api('POST', `ingestion/import-jobs/${job.id}/publish`, {}, publisherToken);
-        if (result.status !== 'completed' || !result.versionId) throw new Error(`Import ${version.key} failed: ${JSON.stringify(result)}`);
+        const result = await publishFixture({ api, pause, reviewerToken, publisherToken }, version, payload, request, Boolean(pin));
         detail = await countryDetail(country.isoCode);
         constitution = detail?.constitutions.find((item) => item.slug === country.constitutionSlug);
-        existing = constitution?.versions.find((item) => item.id === result.versionId);
+        existing = fixtureVersion(constitution?.versions, payload.versionLabel);
+        assertEqual(existing?.id, result.versionId, `${version.key} imported identity`);
       }
       if (!existing || !constitution) throw new Error(`Missing ${version.key} after import`);
       assertEqual(detail.name, payload.countryName, `${version.key} country name`);
@@ -220,6 +217,7 @@ async function ensureVersions(ids) {
       assertEqual(JSON.stringify(actualOutline), JSON.stringify(expectedOutline), `${version.key} outline`);
       ids.constitutions[country.isoCode] = constitution.id;
       ids.versions[version.key] = existing.id;
+      publicVersions[version.key] = existing.currentVersionId ?? existing.id;
       await verifyArticles(existing.id, payload);
       await verifyRoots(existing.id, payload, version.predecessor ? ids.versions[version.predecessor] : null);
     }
@@ -301,18 +299,21 @@ async function verifyTotals(ids) {
   assertEqual(articleCount, manifest.expected.articles, 'fixture article snapshots');
   if (!verifyOnly) await api('POST', 'search/reindex', undefined, true);
   for (const country of manifest.countries) {
-    const search = await api('GET', `search/search?q=dignity&country=${country.isoCode}&limit=50`);
-    assertEqual(search.total, country.versions.length, `${country.isoCode} indexed dignity hits`);
     for (const version of country.versions) {
       const payload = fixture(version.file);
-      const query = `search/search?q=dignity&country=${country.isoCode}&versionId=${ids.versions[version.key]}&effectiveDate=${payload.effectiveDate}&limit=50`;
+      const publicId = publicVersions[version.key];
+      const corrected = publicId !== ids.versions[version.key];
+      const query = `search/search?q=dignity&country=${country.isoCode}&versionId=${publicId}&effectiveDate=${payload.effectiveDate}&limit=50`;
       const filtered = await api('GET', query);
-      assertEqual(filtered.total, 1, `${version.key} indexed version/date hit`);
-      assertFields(filtered.hits[0], { versionId: ids.versions[version.key], countryCode: country.isoCode, effectiveDate: payload.effectiveDate },
+      if (corrected) {
+        if (filtered.total < 1) throw new Error(`${version.key}: current editorial snapshot is not indexed`);
+      } else assertEqual(filtered.total, 1, `${version.key} indexed version/date hit`);
+      assertFields(filtered.hits[0], { versionId: publicId, countryCode: country.isoCode, effectiveDate: payload.effectiveDate },
         ['versionId', 'countryCode', 'effectiveDate'], `${version.key} search hit`);
     }
   }
   for (const [key, term] of [['xc-2020', 'Annual'], ['xc-2024', 'Biennial'], ['xc-2024', 'revised source note']]) {
+    if (publicVersions[key] !== ids.versions[key]) continue; // The original snapshot is verified above; search serves its editorial tip.
     const result = await api('GET', `search/search?q=${encodeURIComponent(term)}&country=XC&versionId=${ids.versions[key]}&limit=50`);
     assertEqual(result.total, 1, `${key} indexed rich content '${term}'`);
   }

@@ -8,7 +8,7 @@ Start at [CODEMAPS/INDEX.md](https://github.com/julianhoelz94/Verfassung/blob/ma
 
 ## Run the local stack
 
-Install a Docker-compatible engine, JDK 21, and Node 20. From the repository root:
+Install OrbStack (preferred) or another Docker-compatible engine with Compose; Bash and curl are also required. Java and Node on the host are optional for development checks. From the repository root:
 
 ```sh
 cp env/local-stack.env.example env/local-stack.env  # once; keep real values out of git
@@ -17,11 +17,16 @@ cp env/local-stack.env.example env/local-stack.env  # once; keep real values out
 ./manageLocalStack.sh --stop                     # keeps database volumes
 ```
 
-The local start flow builds service jars and images and can upload test fixtures. `--start --no-build` reuses images; `--rebuild <service...>` applies source changes; `--only-prepopulate` runs the API-based fixture upload against an already running stack. `--reset` removes local database volumes and is destructive. See the [README](https://github.com/julianhoelz94/Verfassung/blob/main/README.md) and [stack script](https://github.com/julianhoelz94/Verfassung/blob/main/manageLocalStack.sh) for current flags and prerequisites.
+The local start flow compiles all services and builds images inside OrbStack or Docker, one image at a time with a single Gradle worker. It checks all nine service health endpoints, then uploads deterministic test fixtures with a Node tool container; backup jobs run only when explicitly requested.
+
+`--start --no-build` reuses images; `--rebuild <service...>` applies source changes; `--only-prepopulate` runs the API-based fixture upload against an already running stack; add `--verify-only` to check saved fixtures without uploading.
+
+A daemon-wide lock prevents overlapping local-stack builds. `docker buildx history ls` shows build records. In OrbStack, select the `build-monitor` container and open Logs to follow compilations; its completed logs remain available after it stops. OrbStack also shows runtime containers and images. `--reset` removes local database volumes and is destructive. See the [README](https://github.com/julianhoelz94/Verfassung/blob/main/README.md) and [stack script](https://github.com/julianhoelz94/Verfassung/blob/main/manageLocalStack.sh) for current flags and prerequisites.
 
 ## Verify changes
 
 ```sh
+python3 scripts/test_local_stack.py     # orchestration and overlapping-build guards
 cd services/<name> && ./gradlew test     # changed service
 cd services/<name> && ./gradlew check    # includes formatting checks
 cd apps/gateway-web && npm run lint && npm run build
@@ -55,6 +60,6 @@ The files are generated in `docs/wiki/media/`. Check that the test passes and al
 
 A fresh local database uses the same setup restriction and completion rules as production. The local profile explicitly defaults to `TLS_MODE=local-http`, `PUBLIC_BASE_URL=http://localhost`, `SESSION_COOKIE_SECURE=false`, and loopback-bound published ports. No public certificate authority or host trust change is needed. Finish setup before loading content; the stack script then supports `--only-prepopulate` through the real APIs. CI may explicitly select `SETUP_FIXTURE_COMPLETE=true` for existing journeys; production rejects that fixture flag.
 
-For optional local HTTPS, set `TLS_MODE=local-https`, use `PUBLIC_BASE_URL=https://localhost`, and enable secure cookies. Caddy stores its internal CA and certificates in the persistent `caddy-data` volume. Run `scripts/export-local-ca.sh` to export only the public root certificate, review it, then explicitly trust it in your host/browser if desired. The script never installs trust or exports the private key. The fixture loader exports the public root for its own curl/Node requests without disabling certificate validation. Preserve Caddy volumes across rebuilds.
+For optional local HTTPS, set `TLS_MODE=local-https`, use `PUBLIC_BASE_URL=https://localhost`, and enable secure cookies. Caddy stores its internal CA and certificates in the persistent `caddy-data` volume. Run `scripts/export-local-ca.sh` to export only the public root certificate, review it, then explicitly trust it in your host/browser if desired. The script never installs trust or exports the private key. The container-based fixture loader checks setup completion before authentication and exports only the public root to `.local-stack/local-root.crt` for its Node requests, without disabling certificate validation. Preserve Caddy volumes across rebuilds.
 
 Transport checks include `python3 -m unittest discover -s infra/caddy -p 'test_*.py'`, generated-config validation in `scripts/check-transport-configs.py`, and actual local certificate issuance/trust/persistence in `scripts/test-local-https.py`. These use disposable containers/volumes. The isolated HTTP-01 test in `scripts/test-acme-http01.py` uses the official Pebble ACME server to verify real issuance and explicit challenge failure. `scripts/test-proxy-https.py` verifies proxy trust, scheme rejection and login gating until the public certificate verifies. These private tests do not verify a public Let's Encrypt challenge.

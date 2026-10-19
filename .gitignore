@@ -55,3 +55,5 @@ node_modules/
 # Python verification helpers
 __pycache__/
 *.pyc
+# Local build output streamed to the OrbStack build-monitor container
+.local-stack/

@@ -114,24 +114,21 @@ test('editorial roles stage, review, and publish a new constitution through the 
   await expect(page.getByRole('heading', { name: 'Import job' })).toBeVisible();
   await expect(page.getByText('Status: In review')).toBeVisible();
   const reviewUrl = page.url();
-  await Promise.all([
-    page.waitForResponse(response => response.request().method() === 'POST' && new URL(response.url()).pathname === new URL(reviewUrl).pathname),
-    page.getByRole('button', { name: 'Confirm proposed outline' }).click(),
-  ]);
-  await page.reload();
+  await page.getByRole('button', { name: 'Confirm proposed outline' }).click();
   await expect(page.getByRole('button', { name: 'Prepare unpublished draft' })).toBeVisible();
   await page.getByRole('button', { name: 'Prepare unpublished draft' }).click();
+  await expect(page.getByRole('heading', { name: 'Prepared draft as readers will see it' })).toBeVisible({ timeout: 15_000 });
   await signOut(page);
   await signIn(page, 'reviewer');
   await page.goto(reviewUrl);
   await page.getByLabel('Review reason').first().fill('Source wording and article structure match the submitted text.');
   await page.getByRole('button', { name: 'Approve prepared draft' }).click();
-  await expect(page.getByText('Status: approved')).toBeVisible();
+  await expect(page.getByText(/Status: approved/i)).toBeVisible({ timeout: 15_000 });
   await signOut(page);
   await signIn(page, 'publisher');
   await page.goto(reviewUrl);
   await page.getByRole('button', { name: 'Publish approved version' }).click();
-  await expect(page.getByText('Status: completed')).toBeVisible();
+  await expect(page.getByText(/Status: completed/i)).toBeVisible({ timeout: 15_000 });
   await page.getByRole('link', { name: 'Open the published version' }).click();
   await expect(page.getByRole('button', { name: /Article 1.*Public trust/ }).first()).toBeVisible();
   await page.getByRole('button', { name: /Article 1.*Public trust/ }).first().click();

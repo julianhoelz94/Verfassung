@@ -1,0 +1,19 @@
+# Only the Kotlin build inputs enter the root build context.
+**
+!gradlew
+!gradle/
+!gradle/**
+!apps/
+!apps/gateway-web/
+!apps/gateway-web/lib/
+!apps/gateway-web/lib/supported-languages.json
+!services/
+!services/platform/
+!services/platform/**
+!services/*-service/
+!services/*-service/**
+**/build
+**/.gradle
+**/.kotlin
+**/*.env
+**/*.log

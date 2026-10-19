@@ -1,3 +1,4 @@
+import { NavigatingActionForm } from '../../../components/NavigatingActionForm';
 import { T } from '../../../components/TranslationProvider';
 import { ui } from '../../../../lib/messages';
 import Link from 'next/link';
@@ -29,20 +30,20 @@ export default async function DocumentDetailPage(props: { params: Promise<{ id: 
     {document.revision.sourceUrl ? <p><a href={document.revision.sourceUrl} rel="noreferrer"><T value={ui.editor.documents.id.page.source} /></a></p> : null}
     {document.revision.fileName ? <p><a href={`/editor/documents/${id}/revisions/${document.currentRevision}/file`}><T value={ui.editor.documents.id.page.download} />{" "}{document.revision.fileName}</a></p> : null}
     {writable ? <div className="form-row">
-      <form action={reviseDocumentAction} className="stack card">
+      <NavigatingActionForm action={reviseDocumentAction} className="stack card">
         <h2><T value={ui.editor.documents.id.page.newMetadataRevision} /></h2>
         <input type="hidden" name="id" value={id} /><input type="hidden" name="expectedRevision" value={document.currentRevision} />
         <label htmlFor="document-title"><T value={ui.editor.documents.id.page.title} /></label><input id="document-title" name="title" defaultValue={document.revision.title} required maxLength={500} />
         <label htmlFor="document-description"><T value={ui.editor.documents.id.page.description} /></label><textarea id="document-description" name="description" defaultValue={document.revision.description ?? ''} />
         <label htmlFor="document-source"><T value={ui.editor.documents.id.page.sourceUrl} /></label><input id="document-source" name="sourceUrl" type="url" defaultValue={document.revision.sourceUrl ?? ''} />
         <button><T value={ui.editor.documents.id.page.saveRevision} /></button>
-      </form>
-      <form action={uploadDocumentAction} className="stack card">
+      </NavigatingActionForm>
+      <NavigatingActionForm action={uploadDocumentAction} className="stack card">
         <h2><T value={ui.editor.documents.id.page.uploadAFileRevision} /></h2>
         <input type="hidden" name="id" value={id} /><input type="hidden" name="expectedRevision" value={document.currentRevision} />
         <label htmlFor="document-file"><T value={ui.editor.documents.id.page.pdfOrTextFileUpTo20} /></label><input id="document-file" name="file" type="file" accept="application/pdf,text/plain" required />
         <button><T value={ui.editor.documents.id.page.uploadFile} /></button>
-      </form>
+      </NavigatingActionForm>
     </div> : null}
     <h2><T value={ui.editor.documents.id.page.revisionHistory} /></h2>
     <ol>{revisions.map((revision) => <li key={revision.id}>

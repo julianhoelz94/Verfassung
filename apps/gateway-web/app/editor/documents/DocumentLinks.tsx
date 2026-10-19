@@ -1,3 +1,4 @@
+import { NavigatingActionForm } from '../../components/NavigatingActionForm';
 import { currentLocale } from '../../../lib/server-locale';
 import { T } from '../../components/TranslationProvider';
 import { ui } from '../../../lib/messages';
@@ -35,12 +36,12 @@ export async function DocumentLinks(props: {
       <Link href={`/documents/${link.documentId}${link.revisionId ? `?revision=${link.document.revision.revision}` : ''}`}>{link.document.revision.title}</Link>
       {' '}· <T value={link.revisionId ? ui.editor.documents.documentlinks.pinnedRevision : ui.editor.documents.documentlinks.currentRevision} />{' '}{link.revisionId ? link.document.revision.revision : link.document.currentRevision}
       {' '}<Link href={`/editor/documents/${link.documentId}`}><T value={ui.editor.documents.documentlinks.inspectHistory} /></Link>
-      {props.canEdit ? <form action={detachDocumentAction} className="inline-form">
+      {props.canEdit ? <NavigatingActionForm action={detachDocumentAction} className="inline-form">
         <input type="hidden" name="targetType" value={props.targetType} /><input type="hidden" name="targetId" value={props.targetId} />
         <input type="hidden" name="scopeRevisionId" value={props.scopeRevisionId ?? ''} />
         <input type="hidden" name="documentId" value={link.documentId} /><input type="hidden" name="returnTo" value={props.returnTo} />
         <button type="submit"><T value={ui.editor.documents.documentlinks.detach} /></button>
-      </form> : null}
+      </NavigatingActionForm> : null}
     </li>)}</ul> : <p><T value={ui.editor.documents.documentlinks.noManagedDocumentsLinked} /></p>}
     {props.canEdit && !unavailable ? <>
       <h3><T value={ui.editor.documents.documentlinks.attachAnExistingDocument} /></h3>

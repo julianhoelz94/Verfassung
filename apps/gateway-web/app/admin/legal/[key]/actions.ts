@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { requireAdminUser } from '../../../../lib/admin';
 import { requireSessionBearer } from '../../../../lib/session';
-import { publishLegalPage, saveLegalPageDraft, saveImprintDetails, publishImprintDetails, type LegalPageKey } from '../../../../lib/legal-pages';
+import { publishLegalPage, saveLegalPageDraft, LegalPageWriteError, type LegalPageKey } from '../../../../lib/legal-pages';
 
 function keyFrom(formData: FormData): LegalPageKey {
   const key = String(formData.get('key') ?? '');
@@ -16,9 +16,18 @@ export async function saveLegalDraftAction(formData: FormData): Promise<string> 
   await requireAdminUser(`/admin/legal/${key}?error=forbidden`);
   const bearer = await requireSessionBearer();
   try {
-    await saveLegalPageDraft(key, String(formData.get('content') ?? ''), Number(formData.get('expectedRevision')), bearer);
-  } catch {
-    return `/admin/legal/${key}?error=save`;
+    const contact = key.startsWith('impressum') && formData.has('expectedContactRevision') ? {
+      expectedRevision: Number(formData.get('expectedContactRevision')),
+      name: String(formData.get('name') ?? '').trim(),
+      streetAddress: String(formData.get('streetAddress') ?? '').trim(),
+      postalCode: String(formData.get('postalCode') ?? '').trim(),
+      city: String(formData.get('city') ?? '').trim(),
+      country: String(formData.get('country') ?? '').trim(),
+      email: String(formData.get('email') ?? '').trim(),
+    } : undefined;
+    await saveLegalPageDraft(key, String(formData.get('content') ?? ''), Number(formData.get('expectedRevision')), bearer, contact);
+  } catch (error) {
+    return `/admin/legal/${key}?error=${error instanceof LegalPageWriteError ? error.reason : 'save'}`;
   }
   return `/admin/legal/${key}?saved=1`;
 }
@@ -28,40 +37,10 @@ export async function publishLegalPageAction(formData: FormData): Promise<string
   await requireAdminUser(`/admin/legal/${key}?error=forbidden`);
   const bearer = await requireSessionBearer();
   try {
-    await publishLegalPage(key, Number(formData.get('expectedRevision')), bearer);
-  } catch {
-    return `/admin/legal/${key}?error=publish`;
+    await publishLegalPage(key, Number(formData.get('expectedRevision')), bearer, key.startsWith('impressum') ? Number(formData.get('expectedContactRevision')) : undefined);
+  } catch (error) {
+    return `/admin/legal/${key}?error=${error instanceof LegalPageWriteError ? error.reason : 'publish'}`;
   }
   revalidatePath(key.startsWith('impressum') ? '/impressum' : '/datenschutz');
   return `/admin/legal/${key}?published=1`;
-}
-
-export async function saveImprintDetailsAction(formData: FormData): Promise<string> {
-  await requireAdminUser('/admin/legal/impressum?error=forbidden');
-  const bearer = await requireSessionBearer();
-  try {
-    await saveImprintDetails({
-      name: String(formData.get('name') ?? ''),
-      streetAddress: String(formData.get('streetAddress') ?? ''),
-      postalCode: String(formData.get('postalCode') ?? ''),
-      city: String(formData.get('city') ?? ''),
-      country: String(formData.get('country') ?? ''),
-      email: String(formData.get('email') ?? ''),
-    }, Number(formData.get('expectedRevision')), bearer);
-  } catch {
-    return '/admin/legal/impressum?error=details';
-  }
-  return '/admin/legal/impressum?saved=1';
-}
-
-export async function publishImprintDetailsAction(formData: FormData): Promise<string> {
-  await requireAdminUser('/admin/legal/impressum?error=forbidden');
-  const bearer = await requireSessionBearer();
-  try {
-    await publishImprintDetails(Number(formData.get('expectedRevision')), bearer);
-  } catch {
-    return '/admin/legal/impressum?error=details';
-  }
-  revalidatePath('/impressum');
-  return '/admin/legal/impressum?published=1';
 }

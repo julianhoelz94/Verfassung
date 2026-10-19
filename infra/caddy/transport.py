@@ -83,7 +83,8 @@ def render(env):
             ca = env.get("ACME_TEST_DIRECTORY", ca)
             if any(char in ca for char in "\n\r{} "):
                 raise ValueError("Invalid ACME test directory")
-        tls = "tls {\nissuer acme {\n dir " + ca + "\n disable_tlsalpn_challenge\n}\n}"
+        test_directory = "\n test_dir " + ca if env.get("PROFILE") in {"ci", "testing"} and env.get("ACME_TEST_DIRECTORY") else ""
+        tls = "tls {\nissuer acme {\n dir " + ca + test_directory + "\n disable_tlsalpn_challenge\n}\n}"
     return prelude + "https://" + url.hostname + " {\n" + tls + common + "}\n:80 {\nreverse_proxy 127.0.0.1:8081\n}\n"
 
 

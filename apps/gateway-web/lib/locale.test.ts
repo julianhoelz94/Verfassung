@@ -22,3 +22,13 @@ describe('resolveLocale', () => {
     expect(resolveLocale('auto', 'de;q=0,en;q=0.5')).toBe('en');
   });
 });
+
+describe('deployment language policy', () => {
+  it('falls back when the saved preference is disabled', () => {
+    expect(resolveLocale('en', 'en-US', ['de'], 'de')).toBe('de');
+  });
+  it('ignores disabled device choices and uses the configured default', () => {
+    expect(resolveLocale('auto', 'en;q=1,de;q=0.5', ['de'], 'de')).toBe('de');
+    expect(resolveLocale('auto', null, ['en', 'de'], 'de')).toBe('de');
+  });
+});

@@ -203,6 +203,12 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - run: docker build -t constitution-atlas/gateway-web:ci apps/gateway-web
       - run: docker build -t constitution-atlas/edge-proxy:ci infra/caddy
+      - name: Validate transport modes and policy
+        run: |
+          python3 -m unittest discover -s infra/caddy -p 'test_*.py'
+          python3 scripts/check-transport-configs.py
+          python3 scripts/test-local-https.py
+          python3 scripts/test-acme-http01.py
 
   mcp-server:
     runs-on: ubuntu-latest
@@ -312,6 +318,7 @@ jobs:
       CADDY_PORT: '18080'
       GATEWAY_PORT: '13000'
       SESSION_COOKIE_SECURE: 'false'
+      SETUP_FIXTURE_COMPLETE: 'false'
       PUBLIC_BASE_URL: http://127.0.0.1:18080
       PREPOPULATE_TEST_STACK: 'true'
       PREPOPULATE_BASE_URL: http://127.0.0.1:18080
@@ -357,6 +364,9 @@ jobs:
           done
           docker compose --env-file env/ci.env.example ps
           exit 1
+      - name: Verify fresh deployment setup before fixtures
+        working-directory: apps/gateway-web
+        run: E2E_SETUP_FRESH=true npx playwright test --config=playwright.full.config.js setup-bootstrap.spec.ts
       - name: Generate, upload, and verify API fixtures
         working-directory: apps/gateway-web
         run: |

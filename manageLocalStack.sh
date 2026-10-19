@@ -144,7 +144,7 @@ wait_for_http() {
 
 run_prepopulate() {
   local port service url waited base_url tls_mode ca_file="" result=0
-  local -a curl_options=()
+  local -a curl_options=(--fail --silent)
   port="$(caddy_port)"
   base_url="$(node --env-file="${ROOT}/${ENV_FILE}" -p 'process.env.PUBLIC_BASE_URL || "http://localhost"')"
   tls_mode="$(node --env-file="${ROOT}/${ENV_FILE}" -p 'process.env.TLS_MODE || "local-http"')"

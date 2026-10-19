@@ -1,6 +1,7 @@
 'use server';
 
 import { redirect } from 'next/navigation';
+import { setupStatus } from '../../lib/deployment-setup';
 import { canVisitEditor } from '../../lib/nav';
 import { IdentityApiError } from '../../lib/identity-client';
 import { completeMfaLogin, confirmMfaEnrollment, login, logout } from '../../lib/session';
@@ -30,6 +31,7 @@ export async function loginAction(formData: FormData): Promise<void> {
   if ('mfa' in result) {
     redirect(result.mfa === 'enroll' ? `/login/mfa?enroll=1${nextQuery}` : next ? `/login/mfa?next=${encodeURIComponent(next)}` : '/login/mfa');
   }
+  if (!(await setupStatus()).completed) redirect('/setup');
   if (next) redirect(next);
   redirect(canVisitEditor(result.user.roles) ? '/editor' : '/');
 }
@@ -49,6 +51,7 @@ export async function completeMfaAction(formData: FormData): Promise<void> {
   } catch {
     redirect(`/login/mfa?error=1${next ? `&next=${encodeURIComponent(next)}` : ''}`);
   }
+  if (!(await setupStatus()).completed) redirect('/setup');
   if (next) redirect(next);
   redirect(canVisitEditor(user.roles) ? '/editor' : '/');
 }
@@ -69,7 +72,7 @@ export async function confirmEnrollAction(_prev: EnrollConfirmState, formData: F
     const confirmed = await confirmMfaEnrollment(code);
     return {
       recoveryCodes: confirmed.recoveryCodes,
-      continueTo: oauthReturnPath(formData.get('next')) ?? (canVisitEditor(confirmed.user.roles) ? '/editor' : '/'),
+      continueTo: !(await setupStatus()).completed ? '/setup' : oauthReturnPath(formData.get('next')) ?? (canVisitEditor(confirmed.user.roles) ? '/editor' : '/'),
     };
   } catch {
     return { error: true };

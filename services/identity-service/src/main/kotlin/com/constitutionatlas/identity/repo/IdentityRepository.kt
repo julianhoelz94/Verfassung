@@ -18,6 +18,7 @@ data class StoredUser(
     val passwordHash: String,
     val enabled: Boolean = true,
     val createdAt: OffsetDateTime = OffsetDateTime.now(ZoneOffset.UTC),
+    val languagePreference: String = "auto",
 )
 
 data class StoredThrottle(
@@ -100,21 +101,21 @@ class IdentityRepository(private val jdbc: JdbcTemplate) {
 
     fun findUserByEmail(email: String): StoredUser? =
         jdbc.query(
-            "SELECT id, email, password_hash, enabled, created_at FROM users WHERE lower(email) = lower(?)",
+            "SELECT id, email, password_hash, enabled, created_at, language_preference FROM users WHERE lower(email) = lower(?)",
             userMapper,
             email,
         ).firstOrNull()
 
     fun findUserById(id: UUID): StoredUser? =
         jdbc.query(
-            "SELECT id, email, password_hash, enabled, created_at FROM users WHERE id = ?",
+            "SELECT id, email, password_hash, enabled, created_at, language_preference FROM users WHERE id = ?",
             userMapper,
             id,
         ).firstOrNull()
 
     fun listUsers(): List<StoredUser> =
         jdbc.query(
-            "SELECT id, email, password_hash, enabled, created_at FROM users ORDER BY email",
+            "SELECT id, email, password_hash, enabled, created_at, language_preference FROM users ORDER BY email",
             userMapper,
         )
 
@@ -132,6 +133,10 @@ class IdentityRepository(private val jdbc: JdbcTemplate) {
 
     fun updatePasswordHash(userId: UUID, passwordHash: String) {
         jdbc.update("UPDATE users SET password_hash = ? WHERE id = ?", passwordHash, userId)
+    }
+
+    fun updateLanguagePreference(userId: UUID, preference: String) {
+        jdbc.update("UPDATE users SET language_preference = ? WHERE id = ?", preference, userId)
     }
 
     fun assignRole(userId: UUID, roleId: UUID) {
@@ -180,6 +185,7 @@ class IdentityRepository(private val jdbc: JdbcTemplate) {
             mfaEnabled = enabled,
             mfaRequired = required,
             stepUpFresh = stepUpFresh,
+            languagePreference = user.languagePreference,
         )
     }
 
@@ -211,7 +217,7 @@ class IdentityRepository(private val jdbc: JdbcTemplate) {
     fun findUserByValidTokenHash(tokenHash: String): StoredUser? =
         jdbc.query(
             """
-            SELECT u.id, u.email, u.password_hash, u.enabled, u.created_at
+            SELECT u.id, u.email, u.password_hash, u.enabled, u.created_at, u.language_preference
             FROM sessions s
             JOIN users u ON u.id = s.user_id
             WHERE s.token_hash = ?
@@ -759,6 +765,7 @@ class IdentityRepository(private val jdbc: JdbcTemplate) {
             passwordHash = rs.getString("password_hash"),
             enabled = rs.getBoolean("enabled"),
             createdAt = rs.getTimestamp("created_at").toInstant().atOffset(ZoneOffset.UTC),
+            languagePreference = rs.getString("language_preference"),
         )
     }
 

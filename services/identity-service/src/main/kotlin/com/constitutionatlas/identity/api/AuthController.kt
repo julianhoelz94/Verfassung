@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
+import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestHeader
 import org.springframework.web.bind.annotation.ResponseStatus
@@ -104,6 +105,13 @@ class AuthController(private val authService: AuthService) {
     )
     fun me(@RequestHeader(value = "Authorization", required = false) authorization: String?): UserDto =
         authService.me(authorization)
+
+    @PutMapping("/me/language")
+    @SecurityRequirement(name = "bearer-session")
+    fun updateLanguagePreference(
+        @RequestHeader(value = "Authorization", required = false) authorization: String?,
+        @RequestBody request: LanguagePreferenceRequest,
+    ): UserDto = authService.updateLanguagePreference(authorization, request.languagePreference)
 
     @PostMapping("/logout")
     @ResponseStatus(HttpStatus.NO_CONTENT)

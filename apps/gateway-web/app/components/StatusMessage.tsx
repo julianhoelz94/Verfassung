@@ -1,8 +1,12 @@
+import type { ReactNode } from 'react';
+import { T } from './TranslationProvider';
+import { ui, type UiMessage } from '../../lib/messages';
+
 type StatusMessageProps = {
-  title: string;
-  message: string;
+  title: ReactNode;
+  message: ReactNode;
   actionHref?: string;
-  actionLabel?: string;
+  actionLabel?: ReactNode;
 };
 
 export function StatusMessage({ title, message, actionHref, actionLabel }: StatusMessageProps) {
@@ -15,13 +19,13 @@ export function StatusMessage({ title, message, actionHref, actionLabel }: Statu
   );
 }
 
-export function ServiceUnavailable({ service, retryHref = '/' }: { service: string; retryHref?: string }) {
+export function ServiceUnavailable({ service, retryHref = '/' }: { service: UiMessage; retryHref?: string }) {
   return (
     <StatusMessage
-      title={`${service} is unavailable`}
-      message="This page could not load data from that service. The rest of the site is still available."
+      title={<><T value={service} /> <T value={ui.extraComponents.statusMessage.isUnavailable} /></>}
+      message={<T value={ui.extraComponents.statusMessage.thisPageCouldNotLoad} />}
       actionHref={retryHref}
-      actionLabel="Try again"
+      actionLabel={<T value={ui.extraComponents.statusMessage.tryAgain} />}
     />
   );
 }

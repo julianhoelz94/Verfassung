@@ -1,5 +1,8 @@
 'use server';
 
+import { currentLocale } from '../../../lib/server-locale';
+import { ui } from '../../../lib/messages';
+
 import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import {
@@ -55,13 +58,13 @@ export async function suggestChangesAction(
     return await suggestChanges({ sourceVersionId, targetVersionId });
   } catch (error) {
     if (error instanceof AmendmentApiError) {
-      return { error: amendmentErrorMessage(error.key) ?? 'Could not suggest changes.' };
+      return { error: amendmentErrorMessage(error.key, await currentLocale()) ?? ui.errors.suggestChangesFailed[await currentLocale()] };
     }
-    return { error: 'Could not suggest changes.' };
+    return { error: ui.errors.suggestChangesFailed[await currentLocale()] };
   }
 }
 
-export async function restoreRevisionAction(formData: FormData): Promise<void> {
+export async function restoreRevisionAction(formData: FormData): Promise<string> {
   const amendmentId = String(formData.get('amendmentId') ?? '').trim();
   const raw = String(formData.get('revisionBody') ?? '');
   if (!amendmentId || !raw) {
@@ -92,5 +95,11 @@ export async function restoreRevisionAction(formData: FormData): Promise<void> {
       linkReviewReason: change.linkReviewReason ?? null,
     })),
   };
-  await runDetailCommand(formData, amendmentId, () => appendRevision(amendmentId, body), { saved: '1' });
+  try {
+    await appendRevision(amendmentId, body);
+  } catch (error) {
+    return amendmentDetailPath(amendmentId, { error: error instanceof AmendmentApiError ? error.key : 'save_failed' });
+  }
+  revalidatePath(amendmentDetailPath(amendmentId));
+  return amendmentDetailPath(amendmentId, { saved: '1' });
 }

@@ -1,3 +1,6 @@
+import { T } from '../../../../components/TranslationProvider';
+import { ui } from '../../../../../lib/messages';
+import { currentLocale } from '../../../../../lib/server-locale';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import { PageMain } from '../../../../components/PageMain';
@@ -6,6 +9,7 @@ import { SiteSearchForm } from '../../../../components/SiteSearchForm';
 import { ServiceUnavailable } from '../../../../components/StatusMessage';
 import { Alert, Badge, PageHeader, Pager } from '../../../../components/ui';
 import { VersionReader } from '../../../../components/VersionReader';
+import { ContentTranslationRegion } from '../../../../components/ContentTranslationRegion';
 import {
   ApiUnavailableError,
   listAllUnits,
@@ -51,6 +55,7 @@ export async function generateMetadata(props: VersionPageProps): Promise<Metadat
 }
 
 export default async function VersionPage(props: VersionPageProps) {
+  const locale = await currentLocale();
   const params = await props.params;
   const searchParams = await props.searchParams;
   let country: CountryDetail | null = null;
@@ -69,7 +74,7 @@ export default async function VersionPage(props: VersionPageProps) {
   if (error) {
     return (
       <PageMain className="wide">
-        <ServiceUnavailable service="Content" retryHref={`/countries/${params.code}/versions/${params.versionId}`} />
+        <ServiceUnavailable service={ui.services.content} retryHref={`/countries/${params.code}/versions/${params.versionId}`} />
       </PageMain>
     );
   }
@@ -105,7 +110,7 @@ export default async function VersionPage(props: VersionPageProps) {
   ];
   const title = version.version.effectiveDate ? (
     <>
-      Version in force since <FormattedDate value={version.version.effectiveDate} />
+      <T value={ui.countries.code.versions.versionid.page.versionInForceSince} />{" "}<FormattedDate value={version.version.effectiveDate} />
     </>
   ) : (
     `Version ${version.version.versionLabel}`
@@ -122,7 +127,7 @@ export default async function VersionPage(props: VersionPageProps) {
     <PageMain className="wide">
       <PageHeader
         breadcrumbs={[
-          { href: '/', label: 'Countries' },
+          { href: '/', label: <T value={ui.nav.countries} /> },
           { href: `/countries/${country.isoCode}`, label: country.name },
           { label: version.version.versionLabel },
         ]}
@@ -133,29 +138,26 @@ export default async function VersionPage(props: VersionPageProps) {
             {(version.constitution.latestVersionId
               ? params.versionId === version.constitution.latestVersionId
               : version.version.latestPublished) ? (
-              <Badge tone="accent">Latest</Badge>
+              <Badge tone="accent"><T value={ui.countries.code.versions.versionid.page.latest} /></Badge>
             ) : null}
-            <Badge tone="info">{verificationLabel(version.version)}</Badge>
+            <Badge tone="info">{verificationLabel(version.version, locale)}</Badge>
             <span>{version.version.languageCode}</span>
             {version.version.gazetteReference ? <span>{version.version.gazetteReference}</span> : null}
-            <span>{provenanceLabel(version.version.provenance)}</span>
+            <span>{provenanceLabel(version.version.provenance, locale)}</span>
             {sourceHref ? (
               <a href={sourceHref} rel="noreferrer">
-                Source
-              </a>
+                <T value={ui.countries.code.versions.versionid.page.source} />{" "}</a>
             ) : null}
           </>
         }
         actions={
           <>
-            {canEdit ? <a className="btn btn-primary" href="#editor-entry">Edit this constitution</a> : null}
+            {canEdit ? <a className="btn btn-primary" href="#editor-entry"><T value={ui.countries.code.versions.versionid.page.editThisConstitution} /></a> : null}
             <a className="btn" href={`/countries/${country.isoCode}/timeline`}>
-              Timeline
-            </a>
+              <T value={ui.countries.code.versions.versionid.page.timeline} />{" "}</a>
             {neighbors.previous ? (
               <a className="btn" href={neighbors.previous.href}>
-                Compare with previous
-              </a>
+                <T value={ui.countries.code.versions.versionid.page.compareWithPrevious} />{" "}</a>
             ) : null}
             <PrintLink />
           </>
@@ -170,7 +172,7 @@ export default async function VersionPage(props: VersionPageProps) {
         canPublish={canPublish}
       /> : null}
       {documentLinks.length ? <section className="card">
-        <h2>Constitution documents</h2>
+        <h2><T value={ui.countries.code.versions.versionid.page.constitutionDocuments} /></h2>
         <ul className="link-list">{documentLinks.map((link) => <li key={link.documentId}>
           <a href={`/documents/${link.documentId}${link.revisionId ? `?revision=${link.document.revision.revision}` : ''}`}>{link.document.revision.title}</a>
           {link.revisionId ? ` · revision ${link.document.revision.revision}` : null}
@@ -185,11 +187,12 @@ export default async function VersionPage(props: VersionPageProps) {
         submitClassName="btn"
       />
       {searchParams.error === 'title' ? (
-        <Alert tone="error">The section title could not be saved.</Alert>
+        <Alert tone="error"><T value={ui.countries.code.versions.versionid.page.theSectionTitleCouldNotBeSaved} /></Alert>
       ) : null}
       {articles.length === 0 ? (
-        <p>No articles are published in this version.</p>
+        <p><T value={ui.countries.code.versions.versionid.page.noArticlesArePublishedInThisVersion} /></p>
       ) : (
+        <ContentTranslationRegion sourceLanguage={version.version.languageCode}>
         <VersionReader
           code={country.isoCode}
           versionId={params.versionId}
@@ -199,6 +202,7 @@ export default async function VersionPage(props: VersionPageProps) {
           changeByArticle={changeByArticle}
           unchangedSinceLabel={previousPublished?.versionLabel}
         />
+        </ContentTranslationRegion>
       )}
       <Pager
         previous={

@@ -7,6 +7,8 @@ The documentation follows the way people use and operate the website. Start with
 1. [[Website user guide|User-Guide]] — browse countries, read a version, search, compare, and understand sources and history.
 2. [[Accounts and editorial work|Editorial-Guide]] — sign in, manage an account, edit, review, publish, and administer content according to your role.
 
+Deutsch: [[Benutzerhandbuch der Website|User-Guide-de]] · [[Konten und redaktionelle Arbeit|Editorial-Guide-de]].
+
 ## Part 2 · Deployment information
 
 3. [[Deployment information|Deployment-Information]] — **pending**. The repository does not yet define a CD workflow or a verified production rollout. This section records what must be documented when those exist; it is not a runbook.

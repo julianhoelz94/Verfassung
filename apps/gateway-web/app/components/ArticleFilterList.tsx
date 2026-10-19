@@ -1,5 +1,7 @@
 'use client';
 
+import { T, useTranslation } from './TranslationProvider';
+import { ui } from '../../lib/messages';
 import { useMemo, useState } from 'react';
 import { Badge } from './ui';
 
@@ -18,6 +20,7 @@ type ArticleFilterListProps = {
 };
 
 export function ArticleFilterList({ articles, selectedId, hrefBase, draftIds, unitLabel }: ArticleFilterListProps) {
+  const t = useTranslation();
   const [query, setQuery] = useState('');
   const draftSet = useMemo(() => new Set(draftIds), [draftIds]);
   const filtered = useMemo(() => {
@@ -38,8 +41,8 @@ export function ArticleFilterList({ articles, selectedId, hrefBase, draftIds, un
         type="search"
         value={query}
         onChange={(event) => setQuery(event.target.value)}
-        placeholder={unitLabel ? `Filter ${unitLabel} units` : 'Filter articles'}
-        aria-label={unitLabel ? `Filter ${unitLabel} units` : 'Filter articles'}
+        placeholder={t(unitLabel ? ui.readerDynamic.filterUnits : ui.readerDynamic.filterArticles)}
+        aria-label={t(unitLabel ? ui.readerDynamic.filterUnits : ui.readerDynamic.filterArticles)}
       />
       <ul className="article-list">
         {filtered.map((article) => {
@@ -51,7 +54,7 @@ export function ArticleFilterList({ articles, selectedId, hrefBase, draftIds, un
                 <span>
                   {unitLabel ?? 'Art.'} {article.articleNumber} {article.title}
                 </span>
-                {draftSet.has(article.id) ? <Badge tone="changed">draft</Badge> : null}
+                {draftSet.has(article.id) ? <Badge tone="changed"><T value={ui.components.articlefilterlist.draft} /></Badge> : null}
               </a>
             </li>
           );

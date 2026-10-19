@@ -43,7 +43,8 @@ class AnonymousBrowsingService(
     }
 
     private fun validate(rate: AnonymousRate) {
-        if (rate.requests !in 1..1_000_000 || rate.windowValue !in 1..365 ||
+        if (rate.requests !in 1..1_000_000 ||
+            rate.windowValue !in 1..365 ||
             rate.windowUnit !in setOf("minutes", "hours", "days")
         ) {
             throw BadRequestException("Anonymous browsing rates must be positive and use minutes, hours, or days")

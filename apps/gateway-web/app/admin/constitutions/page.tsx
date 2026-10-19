@@ -1,3 +1,5 @@
+import { T } from '../../components/TranslationProvider';
+import { ui } from '../../../lib/messages';
 import { AdminForbidden } from '../../components/AdminForbidden';
 import { Alert, Card, DataList, DataRow, PageHeader } from '../../components/ui';
 import { PageMain } from '../../components/PageMain';
@@ -16,7 +18,7 @@ type AdminConstitutionsPageProps = {
 export default async function AdminConstitutionsPage(props: AdminConstitutionsPageProps) {
   const searchParams = await props.searchParams;
   if (!(await requireAdminPage())) {
-    return <AdminForbidden title="Outlines" />;
+    return <AdminForbidden title={ui.forbidden.outlines} />;
   }
   const { countries, details } = await loadCountriesWithDetails(await requireSessionBearer());
   const rows = details.flatMap((country) =>
@@ -30,16 +32,16 @@ export default async function AdminConstitutionsPage(props: AdminConstitutionsPa
   return (
     <PageMain className="wide">
       <PageHeader
-        title="Constitutions"
-        meta="Create a constitution with a guided structure and a live reader preview."
+        title={<T value={ui.attrs.adminConstitutionsPagePageHeaderTitleConstitutions} />}
+        meta={<T value={ui.attrs.adminConstitutionsPagePageHeaderMetaCreate} />}
       />
       {searchParams.error === 'forbidden' ? (
-        <Alert tone="error">Administrator role required.</Alert>
+        <Alert tone="error"><T value={ui.admin.constitutions.page.administratorRoleRequired} /></Alert>
       ) : searchParams.error ? (
-        <Alert tone="error">That outline change could not be saved.</Alert>
+        <Alert tone="error"><T value={ui.admin.constitutions.page.thatOutlineChangeCouldNotBeSaved} /></Alert>
       ) : null}
       <Card>
-        <h2 className="card-title">New constitution</h2>
+        <h2 className="card-title"><T value={ui.admin.constitutions.page.newConstitution} /></h2>
         <OutlineEditor action={createConstitutionAction} initial={DEFAULT_NEW_OUTLINE} guidedCreation>
           <ConstitutionBasicsFields countries={countries} details={details.filter((country): country is CountryDetail => country != null)} />
         </OutlineEditor>
@@ -49,13 +51,13 @@ export default async function AdminConstitutionsPage(props: AdminConstitutionsPa
           <DataRow
             key={row.constitution.id}
             cells={[
-              { label: 'Country', value: row.countryName },
+              { label: <T value={ui.remainingStatus.country} />, value: row.countryName },
               {
-                label: 'Title',
+                label: <T value={ui.remainingStatus.title} />,
                 value: <a href={`/admin/constitutions/${row.constitution.id}`}>{row.constitution.title}</a>,
               },
               {
-                label: 'Layers',
+                label: <T value={ui.remainingStatus.layers} />,
                 value:
                   (row.constitution.contentOutline?.kinds ?? []).map((kind) => kind.displayLabel).join(' → ') ||
                   'No layers',

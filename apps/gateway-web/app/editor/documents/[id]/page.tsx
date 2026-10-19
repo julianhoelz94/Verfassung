@@ -1,3 +1,5 @@
+import { T } from '../../../components/TranslationProvider';
+import { ui } from '../../../../lib/messages';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { Alert, PageHeader } from '../../../components/ui';
@@ -19,34 +21,34 @@ export default async function DocumentDetailPage(props: { params: Promise<{ id: 
   ]);
   const writable = user.roles.some((role) => ['editor', 'publisher', 'admin'].includes(role)) && document.status === 'active';
   return <PageMain className="wide">
-    <PageHeader title={document.revision.title} breadcrumbs={[{ href: '/editor/documents', label: 'Documents' }, { label: document.revision.title }]} meta={`Revision ${document.currentRevision} · ${document.status}`} />
-    {params.created ? <Alert tone="success">Document created. You can attach it from the editor.</Alert> : null}
-    {params.saved ? <Alert tone="success">Document revision saved.</Alert> : null}
-    {params.error ? <Alert tone="error">The document could not be saved. Reload to check its latest revision and permissions.</Alert> : null}
-    {params.returnTo ? <p><Link href={params.returnTo}>Return to editor</Link></p> : null}
-    {document.revision.sourceUrl ? <p><a href={document.revision.sourceUrl} rel="noreferrer">Source</a></p> : null}
-    {document.revision.fileName ? <p><a href={`/editor/documents/${id}/revisions/${document.currentRevision}/file`}>Download {document.revision.fileName}</a></p> : null}
+    <PageHeader title={document.revision.title} breadcrumbs={[{ href: '/editor/documents', label: <T value={ui.nav.documents} /> }, { label: document.revision.title }]} meta={<><T value={ui.remainingStatus.revision} /> {document.currentRevision} · <T value={document.status === 'active' ? ui.remainingStatus.active : ui.remainingStatus.archived} /></>} />
+    {params.created ? <Alert tone="success"><T value={ui.editor.documents.id.page.documentCreatedYouCanAttachItFrom} /></Alert> : null}
+    {params.saved ? <Alert tone="success"><T value={ui.editor.documents.id.page.documentRevisionSaved} /></Alert> : null}
+    {params.error ? <Alert tone="error"><T value={ui.editor.documents.id.page.theDocumentCouldNotBeSavedReload} /></Alert> : null}
+    {params.returnTo ? <p><Link href={params.returnTo}><T value={ui.editor.documents.id.page.returnToEditor} /></Link></p> : null}
+    {document.revision.sourceUrl ? <p><a href={document.revision.sourceUrl} rel="noreferrer"><T value={ui.editor.documents.id.page.source} /></a></p> : null}
+    {document.revision.fileName ? <p><a href={`/editor/documents/${id}/revisions/${document.currentRevision}/file`}><T value={ui.editor.documents.id.page.download} />{" "}{document.revision.fileName}</a></p> : null}
     {writable ? <div className="form-row">
       <form action={reviseDocumentAction} className="stack card">
-        <h2>New metadata revision</h2>
+        <h2><T value={ui.editor.documents.id.page.newMetadataRevision} /></h2>
         <input type="hidden" name="id" value={id} /><input type="hidden" name="expectedRevision" value={document.currentRevision} />
-        <label htmlFor="document-title">Title</label><input id="document-title" name="title" defaultValue={document.revision.title} required maxLength={500} />
-        <label htmlFor="document-description">Description</label><textarea id="document-description" name="description" defaultValue={document.revision.description ?? ''} />
-        <label htmlFor="document-source">Source URL</label><input id="document-source" name="sourceUrl" type="url" defaultValue={document.revision.sourceUrl ?? ''} />
-        <button>Save revision</button>
+        <label htmlFor="document-title"><T value={ui.editor.documents.id.page.title} /></label><input id="document-title" name="title" defaultValue={document.revision.title} required maxLength={500} />
+        <label htmlFor="document-description"><T value={ui.editor.documents.id.page.description} /></label><textarea id="document-description" name="description" defaultValue={document.revision.description ?? ''} />
+        <label htmlFor="document-source"><T value={ui.editor.documents.id.page.sourceUrl} /></label><input id="document-source" name="sourceUrl" type="url" defaultValue={document.revision.sourceUrl ?? ''} />
+        <button><T value={ui.editor.documents.id.page.saveRevision} /></button>
       </form>
       <form action={uploadDocumentAction} className="stack card">
-        <h2>Upload a file revision</h2>
+        <h2><T value={ui.editor.documents.id.page.uploadAFileRevision} /></h2>
         <input type="hidden" name="id" value={id} /><input type="hidden" name="expectedRevision" value={document.currentRevision} />
-        <label htmlFor="document-file">PDF or text file, up to 20 MB</label><input id="document-file" name="file" type="file" accept="application/pdf,text/plain" required />
-        <button>Upload file</button>
+        <label htmlFor="document-file"><T value={ui.editor.documents.id.page.pdfOrTextFileUpTo20} /></label><input id="document-file" name="file" type="file" accept="application/pdf,text/plain" required />
+        <button><T value={ui.editor.documents.id.page.uploadFile} /></button>
       </form>
     </div> : null}
-    <h2>Revision history</h2>
+    <h2><T value={ui.editor.documents.id.page.revisionHistory} /></h2>
     <ol>{revisions.map((revision) => <li key={revision.id}>
-      <Link href={`/documents/${id}?revision=${revision.revision}`}>Revision {revision.revision}: {revision.title}</Link> · {new Date(revision.createdAt).toLocaleString('en')}
-      {revision.fileName ? <> · <a href={`/api/document/documents/${id}/revisions/${revision.revision}/file`}>Download file</a></> : null}
+      <Link href={`/documents/${id}?revision=${revision.revision}`}><T value={ui.editor.documents.id.page.revision} />{" "}{revision.revision}: {revision.title}</Link> · {new Date(revision.createdAt).toLocaleString('en')}
+      {revision.fileName ? <> · <a href={`/api/document/documents/${id}/revisions/${revision.revision}/file`}><T value={ui.editor.documents.id.page.downloadFile} /></a></> : null}
     </li>)}</ol>
-    <h2>Lifecycle</h2><ol>{events.map((event) => <li key={event.id}>{event.eventType} · {new Date(event.occurredAt).toLocaleString('en')}</li>)}</ol>
+    <h2><T value={ui.editor.documents.id.page.lifecycle} /></h2><ol>{events.map((event) => <li key={event.id}>{event.eventType} · {new Date(event.occurredAt).toLocaleString('en')}</li>)}</ol>
   </PageMain>;
 }

@@ -1,10 +1,14 @@
 'use client';
 
+import { T, useLocale, useTranslation } from './TranslationProvider';
+import { ui } from '../../lib/messages';
 import { useEffect, useState } from 'react';
 
 export const COOKIE_NOTICE_KEY = 'ca_cookie_notice_v1';
 
 export function CookieSettings() {
+  const t = useTranslation();
+  const locale = useLocale();
   const [open, setOpen] = useState(false);
   useEffect(() => {
     try {
@@ -26,14 +30,13 @@ export function CookieSettings() {
   return (
     <>
       <button className="footer-link-button" type="button" onClick={() => setOpen(true)}>
-        Cookie-Einstellungen
-      </button>
+        <T value={ui.components.cookiesettings.cookieEinstellungen} />{" "}</button>
       {open ? (
-        <section className="cookie-notice" aria-label="Cookie-Einstellungen" lang="de">
-          <p><strong>Cookies auf dieser Website</strong></p>
-          <p>Wir nutzen notwendige Cookies für Anmeldung und Sicherheit. Keine Analyse- oder Werbe-Cookies.</p>
-          <p>Das Schließen dieses Hinweises merken wir uns lokal. Mehr in der <a href="/datenschutz">Datenschutzerklärung</a> und im <a href="/impressum">Impressum</a>.</p>
-          <button className="btn btn-secondary btn-sm" type="button" onClick={dismiss}>Verstanden</button>
+        <section className="cookie-notice" aria-label={t(ui.accessibility.cookieSettings)} lang={locale}>
+          <p><strong><T value={ui.components.cookiesettings.cookiesAufDieserWebsite} /></strong></p>
+          <p><T value={ui.components.cookiesettings.wirNutzenNotwendigeCookiesFurAnmeldungUnd} /></p>
+          <p><T value={ui.components.cookiesettings.dasSchlieenDiesesHinweisesMerkenWirUns} />{" "}<a href="/datenschutz"><T value={ui.components.cookiesettings.datenschutzerklarung} /></a> <T value={ui.components.cookiesettings.undIm} />{" "}<a href="/impressum"><T value={ui.components.cookiesettings.impressum} /></a>.</p>
+          <button className="btn btn-secondary btn-sm" type="button" onClick={dismiss}><T value={ui.components.cookiesettings.verstanden} /></button>
         </section>
       ) : null}
     </>

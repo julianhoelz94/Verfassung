@@ -57,6 +57,21 @@ class DocumentApiTest {
     fun legalPagesKeepDraftPrivateAndRequireAdminForPublication() {
         val key = "impressum"
         mvc.get("/legal-pages/$key").andExpect { status { isNotFound() } }
+        mvc.put("/legal-pages/imprint-details/draft") {
+            header("Authorization", ADMIN)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"expectedRevision":0,"name":"Atlas Foundation","streetAddress":"Main Street 1","postalCode":"10000","city":"Berlin","country":"Germany","email":"contact@atlas.example"}"""
+        }.andExpect { status { isOk() } }
+        mvc.post("/legal-pages/imprint-details/publish") {
+            header("Authorization", ADMIN)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"expectedRevision":1}"""
+        }.andExpect { status { isOk() } }
+        mvc.get("/legal-pages/imprint-details").andExpect {
+            status { isOk() }
+            jsonPath("$.name") { value("Atlas Foundation") }
+            jsonPath("$.email") { value("contact@atlas.example") }
+        }
         mvc.get("/legal-pages/$key/editor").andExpect { status { isUnauthorized() } }
         mvc.get("/legal-pages/$key/editor") { header("Authorization", VIEWER) }.andExpect { status { isForbidden() } }
         mvc.put("/legal-pages/$key/draft") {
@@ -82,6 +97,7 @@ class DocumentApiTest {
         mvc.get("/legal-pages/$key").andExpect {
             status { isOk() }
             jsonPath("$.content") { value("Operator and contact") }
+            jsonPath("$.separateContact") { value(true) }
         }
         mvc.put("/legal-pages/$key/draft") {
             header("Authorization", ADMIN)

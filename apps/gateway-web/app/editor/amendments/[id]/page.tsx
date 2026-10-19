@@ -1,3 +1,8 @@
+import { SignedInSummary } from '../../../components/SignedInSummary';
+import { T } from '../../../components/TranslationProvider';
+import { ui } from '../../../../lib/messages';
+import { message } from '../../../../lib/messages';
+import { currentLocale } from '../../../../lib/server-locale';
 import { notFound, redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { PageMain } from '../../../components/PageMain';
@@ -66,6 +71,7 @@ async function loadContentByVersion(versions: VersionSummary[]): Promise<{ artic
 }
 
 export default async function AmendmentDetailPage(props: AmendmentDetailPageProps) {
+  const locale = await currentLocale();
   const { id } = await props.params;
   const searchParams = await props.searchParams;
   const user = await currentUser();
@@ -75,7 +81,7 @@ export default async function AmendmentDetailPage(props: AmendmentDetailPageProp
   if (!canVisitEditor(user.roles)) {
     return (
       <PageMain className="wide">
-        <PageHeader title="Amending law" meta={`Signed in as ${user.email}, but this account has no editorial role.`} />
+        <PageHeader title={<T value={ui.attrs.editorAmendmentsIdPagePageHeaderTitle} />} meta={<SignedInSummary email={user.email} noEditorialRole />} />
       </PageMain>
     );
   }
@@ -95,8 +101,8 @@ export default async function AmendmentDetailPage(props: AmendmentDetailPageProp
   if (!constitutionId) {
     return (
       <PageMain className="wide">
-        <PageHeader title="Legal change" />
-        <Alert tone="error">No constitution is available for this form.</Alert>
+        <PageHeader title={<T value={ui.attrs.editorAmendmentsIdPagePageHeaderTitle2} />} />
+        <Alert tone="error"><T value={ui.editor.amendments.id.page.noConstitutionIsAvailableForThisForm} /></Alert>
       </PageMain>
     );
   }
@@ -139,27 +145,27 @@ export default async function AmendmentDetailPage(props: AmendmentDetailPageProp
   const canWithdraw = canPublish && amendment?.status === 'published';
   const canRestore = canEdit;
 
-  const errorMessage = amendmentErrorMessage(searchParams.error);
-  const title = isNew ? 'New amending law' : (amendment?.title ?? 'Amending law');
+  const errorMessage = amendmentErrorMessage(searchParams.error, locale);
+  const title = isNew ? message(locale, ui.remainingStatus.newAmendingLaw) : (amendment?.title ?? message(locale, ui.remainingStatus.amendingLaw));
 
   return (
     <PageMain className="wide">
       <PageHeader
           breadcrumbs={[
-          { href: '/editor/amendments', label: 'Legal changes' },
-          { label: isNew ? 'New' : amendment?.title ?? id.slice(0, 8) },
+          { href: '/editor/amendments', label: <T value={ui.nav.legalChanges} /> },
+          { label: isNew ? <T value={ui.remainingStatus.new} /> : amendment?.title ?? id.slice(0, 8) },
         ]}
         title={title}
-        meta={`Signed in as ${user.email}. Roles: ${user.roles.join(', ')}.`}
+        meta={<SignedInSummary email={user.email} roles={user.roles} />}
       />
-      {amendment?.reviewStatus === 'needs_review' ? <Alert tone="info">Needs review: quotes or document pins are stale.</Alert> : null}
+      {amendment?.reviewStatus === 'needs_review' ? <Alert tone="info"><T value={ui.editor.amendments.id.page.needsReviewQuotesOrDocumentPinsAre} /></Alert> : null}
       {errorMessage ? <Alert tone="error">{errorMessage}</Alert> : null}
-      {searchParams.documentError ? <Alert tone="error">The document link could not be changed. Reload and try again.</Alert> : null}
-      {searchParams.saved ? <Alert tone="success">Draft saved.</Alert> : null}
-      {searchParams.published ? <Alert tone="success">Amending law published.</Alert> : null}
-      {searchParams.confirmed ? <Alert tone="success">Quotes confirmed and the legal change republished.</Alert> : null}
-      {searchParams.withdrawn ? <Alert tone="success">Amending law withdrawn.</Alert> : null}
-      {diffReviewUnavailable ? <Alert tone="info">Difference review requires two published snapshots. Publish the selected versions before reviewing this draft.</Alert> : null}
+      {searchParams.documentError ? <Alert tone="error"><T value={ui.editor.amendments.id.page.theDocumentLinkCouldNotBeChanged} /></Alert> : null}
+      {searchParams.saved ? <Alert tone="success"><T value={ui.editor.amendments.id.page.draftSaved} /></Alert> : null}
+      {searchParams.published ? <Alert tone="success"><T value={ui.editor.amendments.id.page.amendingLawPublished} /></Alert> : null}
+      {searchParams.confirmed ? <Alert tone="success"><T value={ui.editor.amendments.id.page.quotesConfirmedAndTheLegalChangeRepublished} /></Alert> : null}
+      {searchParams.withdrawn ? <Alert tone="success"><T value={ui.editor.amendments.id.page.amendingLawWithdrawn} /></Alert> : null}
+      {diffReviewUnavailable ? <Alert tone="info"><T value={ui.editor.amendments.id.page.differenceReviewRequiresTwoPublishedSnapshotsPublish} /></Alert> : null}
       {amendment?.reviewStatus === 'needs_review' ? (
         <QuoteReviewPanel
           amendment={amendment}

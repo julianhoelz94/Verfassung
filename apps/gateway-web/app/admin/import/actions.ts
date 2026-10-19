@@ -6,9 +6,9 @@ import { createImportJob, createSetupProposal, isImportRequest, parseImportJson,
 
 function hasRole(roles: string[], role: string) { return roles.includes(role) || roles.includes('admin'); }
 
-export async function createImportAction(formData: FormData): Promise<void> {
+export async function createImportAction(formData: FormData): Promise<string> {
   const user = await currentUser();
-  if (!user || !hasRole(user.roles, 'editor')) redirect('/admin/import?error=forbidden');
+  if (!user || !hasRole(user.roles, 'editor')) return '/admin/import?error=forbidden';
   const uploaded = formData.get('file');
   const pasted = String(formData.get('payload') ?? '');
   let raw = pasted;
@@ -19,35 +19,35 @@ export async function createImportAction(formData: FormData): Promise<void> {
   try {
     payload = parseImportJson(raw);
   } catch {
-    redirect('/admin/import?error=json');
+    return '/admin/import?error=json';
   }
   if (!isImportRequest(payload)) {
-    redirect('/admin/import?error=invalid');
+    return '/admin/import?error=invalid';
   }
   let jobId: string;
   try {
     const job = await createImportJob(payload, await requireSessionBearer());
     jobId = job.id;
   } catch {
-    redirect('/admin/import?error=1');
+    return '/admin/import?error=1';
   }
-  redirect(`/admin/import/${encodeURIComponent(jobId)}`);
+  return `/admin/import/${encodeURIComponent(jobId)}`;
 }
 
-export async function createSetupProposalAction(formData: FormData): Promise<void> {
+export async function createSetupProposalAction(formData: FormData): Promise<string> {
   const user = await currentUser();
-  if (!user || !hasRole(user.roles, 'editor')) redirect('/admin/import?error=forbidden');
+  if (!user || !hasRole(user.roles, 'editor')) return '/admin/import?error=forbidden';
   let payload: unknown;
   try { payload = parseImportJson(String(formData.get('proposal') ?? '')); }
-  catch { redirect('/admin/import?error=json'); }
+  catch { return '/admin/import?error=json'; }
   let proposalId: string;
   try {
     const proposal = await createSetupProposal(payload, await requireSessionBearer());
     proposalId = proposal.id;
   } catch {
-    redirect('/admin/import?error=proposal');
+    return '/admin/import?error=proposal';
   }
-  redirect(`/admin/import/setup/${encodeURIComponent(proposalId)}`);
+  return `/admin/import/setup/${encodeURIComponent(proposalId)}`;
 }
 
 export async function transitionImportAction(formData: FormData): Promise<void> {

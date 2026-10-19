@@ -2,6 +2,8 @@
 
 - [[Website user guide|User-Guide]]
 - [[Accounts and editorial work|Editorial-Guide]]
+- [[Benutzerhandbuch der Website (Deutsch)|User-Guide-de]]
+- [[Konten und redaktionelle Arbeit (Deutsch)|Editorial-Guide-de]]
 
 **2 · Deployment information**
 

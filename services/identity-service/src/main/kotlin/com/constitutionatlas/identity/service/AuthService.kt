@@ -1,5 +1,6 @@
 package com.constitutionatlas.identity.service
 
+import com.constitutionatlas.identity.BadRequestException
 import com.constitutionatlas.identity.ConflictException
 import com.constitutionatlas.identity.StepUpRequiredException
 import com.constitutionatlas.identity.TooManyRequestsException
@@ -299,6 +300,16 @@ class AuthService(
         val scopes = key.scopes.filter { it != "ingestion:import" || roles.any { role -> role == "editor" || role == "admin" } }
         mcpKeyRepository.touch(key.id)
         return UserDto(owner.id, owner.email, emptyList(), scopes = scopes)
+    }
+
+    fun updateLanguagePreference(bearerToken: String?, preference: String): UserDto {
+        if (preference !in setOf("auto", "en", "de")) {
+            throw BadRequestException("Unsupported language preference")
+        }
+        val hash = Tokens.sha256Hex(Tokens.requireBearer(bearerToken))
+        val user = requireActiveSession(hash)
+        identityRepository.updateLanguagePreference(user.id, preference)
+        return identityRepository.toUserDto(user.copy(languagePreference = preference), hash, mfaProperties.stepUpTtl)
     }
 
     fun logout(bearerToken: String?, clientIp: String, userAgent: String?) {

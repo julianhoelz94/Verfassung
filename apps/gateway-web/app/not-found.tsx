@@ -1,14 +1,16 @@
 import { PageMain } from './components/PageMain';
 import { StatusMessage } from './components/StatusMessage';
+import { T } from './components/TranslationProvider';
+import { ui } from '../lib/messages';
 
 export default function NotFound() {
   return (
     <PageMain>
       <StatusMessage
-        title="Page not found"
-        message="That country, version, or article is not in the catalog. It is missing, not a service outage."
+        title={<T value={ui.notFound.title} />}
+        message={<T value={ui.notFound.message} />}
         actionHref="/"
-        actionLabel="Back to countries"
+        actionLabel={<T value={ui.notFound.backToCountries} />}
       />
     </PageMain>
   );

@@ -1,3 +1,6 @@
+import { message, ui } from './messages';
+import type { Locale } from './locale';
+
 export function httpUrl(value: string | null | undefined): string | null {
   if (!value) {
     return null;
@@ -13,16 +16,16 @@ export function httpUrl(value: string | null | undefined): string | null {
   return null;
 }
 
-export function provenanceLabel(provenance: string): string {
+export function provenanceLabel(provenance: string, locale: Locale = 'en'): string {
   switch (provenance) {
     case 'official':
-      return 'Official text';
+      return message(locale, ui.remainingStatus.officialText);
     case 'imported':
-      return 'Imported text — not an official publication';
+      return message(locale, ui.remainingStatus.importedText);
     case 'demo':
-      return 'Demo / sample text — not official';
+      return message(locale, ui.remainingStatus.demoText);
     default:
-      return 'Source kind not recorded — not claimed as official';
+      return message(locale, ui.remainingStatus.sourceKindUnknown);
   }
 }
 
@@ -30,11 +33,11 @@ export function verificationLabel(version: {
   verificationState: string;
   verifiedBy: string | null;
   verifiedAt: string | null;
-}): string {
+}, locale: Locale = 'en'): string {
   if (version.verificationState === 'verified') {
-    const who = version.verifiedBy ? ` by ${version.verifiedBy}` : '';
-    const when = version.verifiedAt ? ` on ${version.verifiedAt.slice(0, 10)}` : '';
-    return `Verified${who}${when}`;
+    const who = version.verifiedBy ? ` ${message(locale, ui.remainingStatus.verifiedBy)} ${version.verifiedBy}` : '';
+    const when = version.verifiedAt ? ` ${message(locale, ui.remainingStatus.verifiedOn)} ${new Intl.DateTimeFormat(locale, { dateStyle: 'long', timeZone: 'UTC' }).format(new Date(version.verifiedAt))}` : '';
+    return `${message(locale, ui.remainingStatus.verified)}${who}${when}`;
   }
-  return 'Not independently verified';
+  return message(locale, ui.remainingStatus.notVerified);
 }

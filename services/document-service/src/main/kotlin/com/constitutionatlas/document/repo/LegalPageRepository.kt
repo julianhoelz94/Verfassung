@@ -9,8 +9,8 @@ import java.util.UUID
 @Repository
 class LegalPageRepository(private val jdbc: JdbcTemplate) {
     fun history(key: String): List<LegalPageRevisionDto> = jdbc.query(
-        "SELECT revision, content, created_at, created_by FROM legal_page_revisions WHERE page_key = ? ORDER BY revision DESC",
-        { rs, _ -> LegalPageRevisionDto(rs.getInt("revision"), rs.getString("content"), rs.getObject("created_at", java.time.OffsetDateTime::class.java), rs.getObject("created_by", UUID::class.java)) },
+        "SELECT revision, content, created_at, created_by, separate_contact FROM legal_page_revisions WHERE page_key = ? ORDER BY revision DESC",
+        { rs, _ -> LegalPageRevisionDto(rs.getInt("revision"), rs.getString("content"), rs.getObject("created_at", java.time.OffsetDateTime::class.java), rs.getObject("created_by", UUID::class.java), rs.getBoolean("separate_contact")) },
         key,
     )
 
@@ -30,8 +30,8 @@ class LegalPageRepository(private val jdbc: JdbcTemplate) {
     fun revision(key: String, number: Int?): LegalPageRevisionDto? {
         if (number == null) return null
         return jdbc.query(
-            "SELECT revision, content, created_at, created_by FROM legal_page_revisions WHERE page_key = ? AND revision = ?",
-            { rs, _ -> LegalPageRevisionDto(rs.getInt("revision"), rs.getString("content"), rs.getObject("created_at", java.time.OffsetDateTime::class.java), rs.getObject("created_by", UUID::class.java)) },
+            "SELECT revision, content, created_at, created_by, separate_contact FROM legal_page_revisions WHERE page_key = ? AND revision = ?",
+            { rs, _ -> LegalPageRevisionDto(rs.getInt("revision"), rs.getString("content"), rs.getObject("created_at", java.time.OffsetDateTime::class.java), rs.getObject("created_by", UUID::class.java), rs.getBoolean("separate_contact")) },
             key,
             number,
         ).firstOrNull()
@@ -45,7 +45,7 @@ class LegalPageRepository(private val jdbc: JdbcTemplate) {
         jdbc.update("UPDATE legal_pages SET draft_revision = draft_revision + 1 WHERE page_key = ? AND draft_revision = ?", key, expected) == 1
 
     fun insertRevision(key: String, number: Int, content: String, actorId: UUID) {
-        jdbc.update("INSERT INTO legal_page_revisions(page_key, revision, content, created_by) VALUES (?, ?, ?, ?)", key, number, content, actorId)
+        jdbc.update("INSERT INTO legal_page_revisions(page_key, revision, content, created_by, separate_contact) VALUES (?, ?, ?, ?, ?)", key, number, content, actorId, key.startsWith("impressum"))
     }
 
     fun publish(key: String, expected: Int): Boolean =

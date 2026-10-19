@@ -8,6 +8,7 @@ data class LegalPageRevisionDto(
     val content: String,
     val createdAt: OffsetDateTime,
     val createdBy: UUID,
+    val separateContact: Boolean = false,
 )
 
 data class LegalPageStateDto(
@@ -22,3 +23,28 @@ data class SaveLegalPageDraftRequest(
 )
 
 data class PublishLegalPageRequest(val expectedRevision: Int)
+
+data class ImprintDetailsDto(
+    val revision: Int,
+    val name: String,
+    val streetAddress: String,
+    val postalCode: String,
+    val city: String,
+    val country: String,
+    val email: String,
+)
+
+data class ImprintDetailsStateDto(
+    val draft: ImprintDetailsDto?,
+    val published: ImprintDetailsDto?,
+)
+
+data class SaveImprintDetailsRequest(
+    val expectedRevision: Int,
+    val name: String,
+    val streetAddress: String,
+    val postalCode: String,
+    val city: String,
+    val country: String,
+    val email: String,
+)

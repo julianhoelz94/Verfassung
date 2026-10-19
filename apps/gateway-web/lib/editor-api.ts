@@ -1,3 +1,5 @@
+import { ui } from './messages';
+import type { Locale } from './locale';
 import { cookies } from 'next/headers';
 import { SESSION_COOKIE } from './session';
 import type { DiffReviewState, ReviewDecisionInput } from './diff-review';
@@ -77,32 +79,32 @@ export type ChangeRecordChange = {
  * put arbitrary text into the trusted error banner.
  */
 export const EDITOR_ERROR_MESSAGES = {
-  sign_in: 'Sign in required.',
-  step_up: 'Recent authenticator confirmation is required.',
-  forbidden: 'You do not have permission for that action.',
-  not_ready: 'This draft is not ready for that action.',
-  not_tip: 'Publish only from the latest snapshot in the chain.',
-  not_editorial_tip: 'This text has a newer transcription. Open a session on its current snapshot.',
-  not_legal_tip: 'A newer law exists. Record the next legal change from the current law.',
-  invalid: 'The draft could not be published.',
-  open_failed: 'Could not open an edit session.',
-  list_failed: 'Could not list edit sessions.',
-  save_failed: 'Could not save draft.',
-  review_failed: 'Could not submit for review.',
-  approve_failed: 'Could not approve this draft.',
-  publish_failed: 'Could not publish.',
-  session_id: 'Enter a session id.',
-  title: 'The section title could not be saved.',
-  failed: 'The editor action could not be completed.',
+  sign_in: ui.errors.signIn,
+  step_up: ui.errors.stepUp,
+  forbidden: ui.errors.forbidden,
+  not_ready: ui.errors.draftNotReady,
+  not_tip: ui.errors.notTip,
+  not_editorial_tip: ui.errors.notEditorialTip,
+  not_legal_tip: ui.errors.notLegalTip,
+  invalid: ui.errors.publishDraftFailed,
+  open_failed: ui.errors.openSessionFailed,
+  list_failed: ui.errors.listSessionsFailed,
+  save_failed: ui.errors.saveDraftFailed,
+  review_failed: ui.errors.submitReviewFailed,
+  approve_failed: ui.errors.approveDraftFailed,
+  publish_failed: ui.errors.publishFailed,
+  session_id: ui.errors.sessionIdRequired,
+  title: ui.errors.titleSaveFailed,
+  failed: ui.errors.editorFailed,
 } as const;
 
 export type EditorErrorKey = keyof typeof EDITOR_ERROR_MESSAGES;
 
-export function editorErrorMessage(key: string | undefined): string | null {
+export function editorErrorMessage(key: string | undefined, locale: Locale = 'en'): string | null {
   if (!key) {
     return null;
   }
-  return key in EDITOR_ERROR_MESSAGES ? EDITOR_ERROR_MESSAGES[key as EditorErrorKey] : EDITOR_ERROR_MESSAGES.failed;
+  return (key in EDITOR_ERROR_MESSAGES ? EDITOR_ERROR_MESSAGES[key as EditorErrorKey] : EDITOR_ERROR_MESSAGES.failed)[locale];
 }
 
 export class EditorApiError extends Error {
@@ -110,7 +112,7 @@ export class EditorApiError extends Error {
     readonly key: EditorErrorKey,
     readonly code?: string,
   ) {
-    super(EDITOR_ERROR_MESSAGES[key]);
+    super(EDITOR_ERROR_MESSAGES[key].en);
     this.name = 'EditorApiError';
   }
 }

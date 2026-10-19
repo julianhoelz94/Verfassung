@@ -118,7 +118,7 @@ test('edit, review, and publish a draft', async ({ page }) => {
   await expect(page).toHaveURL(/saved=1/);
   await expect(page.getByText('Draft saved.')).toBeVisible();
   await expect(page.getByLabel('Session').getByText('Draft body for the e2e journey.')).toBeVisible();
-  await expect(page.locator('.badge', { hasText: 'draft' })).toBeVisible();
+  await expect(page.getByLabel('Session').getByText('Draft', { exact: true })).toBeVisible();
   await page.getByLabel('What was corrected in this transcription?').fill('Corrected text.');
   await page.getByRole('button', { name: 'Save comment' }).click();
   await expect(page).toHaveURL(/detailsSaved=1/);
@@ -298,8 +298,6 @@ test('editor inspects and restores a legal-change revision as a new draft', asyn
     page.waitForResponse((response) => response.request().method() === 'POST' && response.url().includes('/editor/amendments/')),
     history.getByRole('button', { name: 'Restore as new draft' }).click(),
   ]);
-  // Allow the server action's client-side redirect to settle after its POST response.
-  await page.waitForTimeout(3000);
   await expect(page.getByText('Draft saved.')).toBeVisible({ timeout: 20_000 });
   await expect(page).toHaveURL(/saved=1/);
   await expect(page.getByLabel('Title', { exact: true })).toHaveValue('Update to Article 1');
@@ -312,7 +310,7 @@ test('publisher withdraws an incorrect published legal-change record', async ({ 
   await page.goto('/editor/amendments/01900000-0000-4000-8000-000000000301');
   await page.getByRole('button', { name: 'Withdraw' }).click();
   await expect(page.getByText('Amending law withdrawn.')).toBeVisible();
-  await expect(page.getByText('withdrawn', { exact: true })).toBeVisible();
+  await expect(page.getByText('Withdrawn', { exact: true })).toBeVisible();
 });
 
 test('legal successor passes queues and requires fresh authentication before publication', async ({ page, request }) => {

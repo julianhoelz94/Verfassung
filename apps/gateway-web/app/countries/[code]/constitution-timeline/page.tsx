@@ -1,3 +1,6 @@
+import { lifecycleStatusMessage } from '../../../../lib/lifecycle-label';
+import { T } from '../../../components/TranslationProvider';
+import { ui, type UiMessage } from '../../../../lib/messages';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import { PageMain } from '../../../components/PageMain';
@@ -17,19 +20,19 @@ import { publicVersions } from '../../../../lib/reading';
 
 type Props = { params: Promise<{ code: string }>; searchParams: Promise<{ on?: string }> };
 
-const labels: Record<ConstitutionLifecycleEvent['eventType'], string> = {
-  adopted: 'Adopted',
-  commenced: 'Entered into force',
-  suspended: 'Suspended',
-  restored: 'Restored',
-  repealed: 'Repealed',
+const labels: Record<ConstitutionLifecycleEvent['eventType'], UiMessage> = {
+  adopted: ui.lifecycleEvents.adopted,
+  commenced: ui.lifecycleEvents.commenced,
+  suspended: ui.lifecycleEvents.suspended,
+  restored: ui.lifecycleEvents.restored,
+  repealed: ui.lifecycleEvents.repealed,
 };
 
-const provisionLabels: Record<ProvisionLifecycleEvent['eventType'], string> = {
-  deferred: 'Commencement deferred for provisions',
-  commenced: 'Provisions entered into force',
-  suspended: 'Provisions suspended',
-  restored: 'Provisions restored',
+const provisionLabels: Record<ProvisionLifecycleEvent['eventType'], UiMessage> = {
+  deferred: ui.lifecycleEvents.provisionDeferred,
+  commenced: ui.lifecycleEvents.provisionCommenced,
+  suspended: ui.lifecycleEvents.provisionSuspended,
+  restored: ui.lifecycleEvents.provisionRestored,
 };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -59,7 +62,7 @@ export default async function ConstitutionTimelinePage({ params, searchParams }:
   } catch {
     return (
       <PageMain className="wide">
-        <ServiceUnavailable service="Catalog" retryHref={`/countries/${code}/constitution-timeline`} />
+        <ServiceUnavailable service={ui.services.catalog} retryHref={`/countries/${code}/constitution-timeline`} />
       </PageMain>
     );
   }
@@ -90,76 +93,76 @@ export default async function ConstitutionTimelinePage({ params, searchParams }:
       .filter((event) => event.constitutionId === constitution.id && event.eventDate <= on)
       .at(-1);
     const status = last?.dateCertainty === 'approximate'
-      ? 'uncertain (last event date is approximate)'
+      ? 'uncertain_approximate'
       : last?.eventType === 'commenced' || last?.eventType === 'restored'
-      ? 'in force'
+      ? 'in_force'
       : last?.eventType === 'adopted'
-        ? 'adopted, awaiting commencement'
+        ? 'awaiting_commencement'
         : last?.eventType === 'suspended'
           ? 'suspended'
           : last?.eventType === 'repealed'
             ? 'repealed'
-            : 'not recorded';
+            : 'not_recorded';
     return { constitution, status };
   });
-  const inForce = statusOn.filter((row) => row.status === 'in force');
+  const inForce = statusOn.filter((row) => row.status === 'in_force');
   const provisionStatus = new Map<string, { event: ProvisionLifecycleEvent; state: string }>();
   (provisionEvents ?? []).filter((event) => event.eventDate <= on)
     .sort((a, b) => a.eventDate.localeCompare(b.eventDate) || a.id.localeCompare(b.id))
     .forEach((event) => event.logicalUnitIds.forEach((id) => {
       provisionStatus.set(`${event.constitutionId}:${id}`, {
         event,
-        state: event.eventType === 'deferred' ? 'not yet in force' :
-          event.eventType === 'suspended' ? 'suspended' : 'in force',
+        state: event.eventType === 'deferred' ? 'awaiting_commencement' :
+          event.eventType === 'suspended' ? 'suspended' : 'in_force',
       });
     }));
-  const provisionsNotInForce = [...provisionStatus.entries()].filter(([, row]) => row.state !== 'in force');
+  const provisionsNotInForce = [...provisionStatus.entries()].filter(([, row]) => row.state !== 'in_force');
 
   return (
     <PageMain className="wide">
       <PageHeader
         breadcrumbs={[
-          { href: '/', label: 'Countries' },
+          { href: '/', label: <T value={ui.nav.countries} /> },
           { href: `/countries/${country.isoCode}`, label: country.name },
-          { label: 'Constitution timeline' },
+          { label: <T value={ui.remainingStatus.constitutionTimeline} /> },
         ]}
-        title="Constitution timeline"
-        actions={<a className="btn btn-sm" href={`/countries/${country.isoCode}/timeline`}>Amendment timeline</a>}
+        title={<T value={ui.attrs.countriesCodeConstitutionTimelinePagePageHeaderTitle} />}
+        actions={<a className="btn btn-sm" href={`/countries/${country.isoCode}/timeline`}><T value={ui.countries.code.constitutionTimeline.page.amendmentTimeline} /></a>}
       />
-      <p>Adoption, suspension, restoration, and replacement of constitutions in {country.name}.</p>
+      <p><T value={ui.countries.code.constitutionTimeline.page.adoptionSuspensionRestorationAndReplacementOfConstitutions} />{" "}{country.name}.</p>
       <section className="card">
-        <h2>Status on a date</h2>
+        <h2><T value={ui.countries.code.constitutionTimeline.page.statusOnADate} /></h2>
         <form method="get">
-          <label htmlFor="constitution-timeline-date">Date</label>
+          <label htmlFor="constitution-timeline-date"><T value={ui.countries.code.constitutionTimeline.page.date} /></label>
           <input id="constitution-timeline-date" type="date" name="on" defaultValue={on} />
-          <button type="submit">Show status</button>
+          <button type="submit"><T value={ui.countries.code.constitutionTimeline.page.showStatus} /></button>
         </form>
-        {inForce.length === 0 ? <p>No constitution is recorded as in force on {on}.</p> : (
+        {inForce.length === 0 ? <p><T value={ui.countries.code.constitutionTimeline.page.noConstitutionIsRecordedAsInForce} />{" "}{on}.</p> : (
           <ul>{inForce.map(({ constitution }) => (
-            <li key={constitution.id}><a href={`/countries/${country.isoCode}/constitutions/${constitution.id}`}>{constitution.title}</a> is in force</li>
+            <li key={constitution.id}><a href={`/countries/${country.isoCode}/constitutions/${constitution.id}`}>{constitution.title}</a> <T value={ui.countries.code.constitutionTimeline.page.isInForce} /></li>
           ))}</ul>
         )}
         <details>
-          <summary>All constitution statuses</summary>
+          <summary><T value={ui.countries.code.constitutionTimeline.page.allConstitutionStatuses} /></summary>
           <ul>{statusOn.map(({ constitution, status }) => (
-            <li key={constitution.id}>{constitution.title}: {status}</li>
+            <li key={constitution.id}>{constitution.title}: <T value={status === 'uncertain_approximate' ? ui.lifecycleEvents.uncertainDate : lifecycleStatusMessage(status)} /></li>
           ))}</ul>
         </details>
         {provisionsNotInForce.length > 0 ? (
           <div>
-            <h3>Provisions not in force on this date</h3>
+            <h3><T value={ui.countries.code.constitutionTimeline.page.provisionsNotInForceOnThisDate} /></h3>
             <ul>
               {provisionsNotInForce.map(([key, row]) => {
                 const logicalId = key.split(':')[1];
                 const resolved = units.get(`${row.event.sourceVersionId}:${logicalId}`);
                 const constitution = constitutionsById.get(row.event.constitutionId);
-                return <li key={key}>{constitution?.title}: {resolved?.pathLabels.join(' → ') || 'Unit reference needs review'} · {row.state}</li>;
+                return <li key={key}>{constitution?.title}: {resolved?.pathLabels.join(' → ') || <T value={ui.lifecycleEvents.unitNeedsReview} />} · {<T value={lifecycleStatusMessage(row.state)} />}</li>;
               })}
             </ul>
           </div>
         ) : null}
       </section>
-      {dated.length === 0 ? <p>No dated constitution events are recorded yet.</p> : null}
+      {dated.length === 0 ? <p><T value={ui.countries.code.constitutionTimeline.page.noDatedConstitutionEventsAreRecordedYet} /></p> : null}
       <ol>
         {dated.map((event) => {
           const constitution = constitutionsById.get(event.constitutionId);
@@ -170,17 +173,17 @@ export default async function ConstitutionTimelinePage({ params, searchParams }:
           const versions = publicVersions(constitution.versions);
           return (
             <li key={event.id} className="card">
-              <p><time dateTime={event.eventDate}>{event.scope === 'whole' && event.dateCertainty === 'approximate' ? 'Circa ' : ''}{event.eventDate}</time> · {event.scope === 'whole' ? labels[event.eventType] : provisionLabels[event.eventType]}</p>
+              <p><time dateTime={event.eventDate}>{event.scope === 'whole' && event.dateCertainty === 'approximate' ? <T value={ui.remainingStatus.circa} /> : ''}{event.eventDate}</time> · {<T value={event.scope === 'whole' ? labels[event.eventType] : provisionLabels[event.eventType]} />}</p>
               <h2 className="card-title">
                 <a href={`/countries/${country.isoCode}/constitutions/${constitution.id}`}>{constitution.title}</a>
                 {constitution.interim ? ' (interim)' : ''}
               </h2>
               {event.scope === 'whole' && event.eventType === 'adopted' && predecessor ? (
-                <p>Replaces <a href={`/countries/${country.isoCode}/constitutions/${predecessor.id}`}>{predecessor.title}</a></p>
+                <p><T value={ui.countries.code.constitutionTimeline.page.replaces} />{" "}<a href={`/countries/${country.isoCode}/constitutions/${predecessor.id}`}>{predecessor.title}</a></p>
               ) : null}
               {event.note ? <p>{event.note}</p> : null}
               {versions.length > 0 ? (
-                <p>Published versions: {versions.map((version, index) => (
+                <p><T value={ui.countries.code.constitutionTimeline.page.publishedVersions} />{" "}{versions.map((version, index) => (
                   <span key={version.id}>{index > 0 ? ' · ' : ''}<a href={`/countries/${country.isoCode}/versions/${version.currentVersionId ?? version.id}`}>{version.versionLabel}</a></span>
                 ))}</p>
               ) : null}
@@ -188,7 +191,7 @@ export default async function ConstitutionTimelinePage({ params, searchParams }:
                 <ul>
                   {event.logicalUnitIds.map((logicalId) => {
                     const resolved = units.get(`${event.sourceVersionId}:${logicalId}`);
-                    const label = resolved?.pathLabels.join(' → ') || 'Unit reference needs review';
+                    const label = resolved?.pathLabels.join(' → ') || <T value={ui.lifecycleEvents.unitNeedsReview} />;
                     return (
                       <li key={logicalId}>
                         {resolved ? <a href={resolved.deepLink}>{label}</a> : label}
@@ -197,14 +200,14 @@ export default async function ConstitutionTimelinePage({ params, searchParams }:
                   })}
                 </ul>
               ) : null}
-              {event.sourceUrl ? <p><a href={event.sourceUrl}>Source</a></p> : null}
+              {event.sourceUrl ? <p><a href={event.sourceUrl}><T value={ui.countries.code.constitutionTimeline.page.source} /></a></p> : null}
             </li>
           );
         })}
       </ol>
       {undated.length > 0 ? (
         <section>
-          <h2>Dates not recorded</h2>
+          <h2><T value={ui.countries.code.constitutionTimeline.page.datesNotRecorded} /></h2>
           <ul>
             {undated.map((constitution) => (
               <li key={constitution.id}><a href={`/countries/${country.isoCode}/constitutions/${constitution.id}`}>{constitution.title}</a></li>

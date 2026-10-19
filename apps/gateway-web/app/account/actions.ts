@@ -2,6 +2,7 @@
 
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
+import { revalidatePath } from 'next/cache';
 import {
   IdentityApiError,
   requestAcceptInvite,
@@ -25,10 +26,12 @@ import {
   requestRotateMcpKey,
   requestRevokeMcpKey,
   requestRevokeOAuthGrant,
+  requestUpdateLanguagePreference,
 } from '../../lib/identity-client';
 import { requireAdminUser } from '../../lib/admin';
 import { safeReturnTo } from '../../lib/return-to';
 import { SESSION_COOKIE, setChallengeCookie } from '../../lib/session';
+import { updateTranslationUserSettings } from '../../lib/content-translation';
 
 async function tokenOrRedirect(): Promise<string> {
   const token = (await cookies()).get(SESSION_COOKIE)?.value;
@@ -55,6 +58,36 @@ export async function changePasswordAction(formData: FormData): Promise<void> {
     redirect('/account?error=1');
   }
   redirect('/account?saved=1');
+}
+
+export async function updateLanguagePreferenceAction(formData: FormData): Promise<boolean> {
+  const token = await tokenOrRedirect();
+  const preference = String(formData.get('languagePreference') ?? '');
+  if (preference !== 'auto' && preference !== 'en' && preference !== 'de') {
+    return false;
+  }
+  try {
+    await requestUpdateLanguagePreference(token, preference);
+  } catch {
+    return false;
+  }
+  revalidatePath('/', 'layout');
+  return true;
+}
+
+export async function updateContentTranslationPreferenceAction(formData: FormData): Promise<void> {
+  const token = await tokenOrRedirect();
+  try {
+    await updateTranslationUserSettings(token, {
+      alwaysTranslate: formData.get('alwaysTranslate') === 'on',
+      personalGoogleKey: String(formData.get('personalGoogleKey') ?? ''),
+      clearPersonalGoogleKey: formData.get('clearPersonalGoogleKey') === 'on',
+    });
+  } catch {
+    redirect('/account?error=translation');
+  }
+  revalidatePath('/account');
+  redirect('/account?translationSaved=1');
 }
 
 export async function requestResetAction(formData: FormData): Promise<void> {
@@ -151,18 +184,18 @@ export type RecoveryRevealState = {
   error?: boolean;
 };
 
-export async function startMfaEnrollAction(): Promise<void> {
+export async function startMfaEnrollAction(): Promise<boolean> {
   const token = await tokenOrRedirect();
   let challengeToken: string;
   try {
     const started = await requestStartMfaEnroll(undefined, token);
     challengeToken = started.challengeToken;
   } catch {
-    redirect('/account?error=mfa');
+    return false;
   }
   // Same httpOnly cookie the login enrollment flow uses; keeps the challenge out of the URL.
   await setChallengeCookie(challengeToken);
-  redirect('/account?enroll=1');
+  return true;
 }
 
 export async function confirmAccountMfaAction(

@@ -9,7 +9,7 @@
 	}
 }
 
-:80 {
+(atlas_routes) {
 	encode gzip
 
 	# Baseline browser hardening for every response (UI and API). A Content-Security-Policy
@@ -32,7 +32,7 @@
 	route @api_request {
 		forward_auth gateway-web:3000 {
 			uri /api/edge-rate-limit
-			header_up X-Atlas-Client-IP {remote_host}
+			header_up X-Atlas-Client-IP {client_ip}
 			header_up X-Atlas-Edge-Check 1
 			header_up X-Atlas-Original-URI {uri}
 		}
@@ -69,7 +69,7 @@
 	}
 	route /oauth/register* {
 		reverse_proxy identity-service:8080 {
-			header_up X-Atlas-Client-IP {remote_host}
+			header_up X-Atlas-Client-IP {client_ip}
 		}
 	}
 	route /oauth/revoke* {
@@ -159,14 +159,15 @@
 
 	route /mcp* {
 		reverse_proxy mcp-server:8080 {
-			header_up X-Atlas-Client-IP {remote_host}
+			header_up X-Atlas-Client-IP {client_ip}
 		}
 	}
 
 	route {
 		# Pin Host so Next.js server actions cannot follow a client-controlled Host (GHSA-89xv-2m56-2m9x).
 		reverse_proxy gateway-web:3000 {
-			header_up Host {upstream_hostport}
+			header_up Host {$ATLAS_CANONICAL_HOST}
+			header_up X-Forwarded-Host {$ATLAS_CANONICAL_HOST}
 			# These are internal edge-auth headers; never forward client-supplied values.
 			header_up -X-Atlas-Edge-Check
 			header_up -X-Atlas-Client-IP

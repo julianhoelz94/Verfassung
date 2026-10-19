@@ -38,6 +38,7 @@ data class ImprintDetailsDto(
 data class ImprintDetailsStateDto(
     val draft: ImprintDetailsDto?,
     val published: ImprintDetailsDto?,
+    val managedFields: List<String> = emptyList(),
 )
 
 data class SaveImprintDetailsRequest(

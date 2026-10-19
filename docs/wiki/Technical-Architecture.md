@@ -16,6 +16,14 @@ Constitution Atlas is a Next.js gateway in front of Kotlin/Spring Boot services.
 
 The source-of-truth boundaries should be checked against the current [repository map](https://github.com/julianhoelz94/Verfassung/blob/main/docs/CODEMAPS/INDEX.md) and [ADR 0001](https://github.com/julianhoelz94/Verfassung/blob/main/docs/adr/0001-platform-boundaries.md) when adding a feature.
 
+## Deployment setup and transport
+
+Identity owns durable setup state, the designated bootstrap administrator, deferred email, and the website language policy. Document owns operator details and legal-page drafts/publications. The gateway remains database-free. A setup restriction is enforced at Caddy, the gateway, Identity authentication, and the shared service filter. Until completion, only the bootstrap administrator can use setup operations; content APIs and existing machine/client credentials stay blocked. Existing databases with users receive an explicit legacy-installation migration so an upgrade does not unexpectedly lock out an established site.
+
+Caddy owns direct certificate issuance/renewal with Let's Encrypt HTTP-01. Its supervisor presents credential-free HTTP progress, verifies the issued TLS certificate, and redirects to HTTPS. Caddy's admin socket is private. In external-proxy mode, configured proxy CIDRs and forwarded HTTPS are required; the external proxy owns issuance/renewal. Direct backend ports must remain private. Production rejects local HTTP and CI fixture exceptions.
+
+Configuration is evaluated from actual runtime environment values and owning-service storage. Nonblank environment overrides mask saved values without replacing them. Removing the override restores the saved configuration. Legal environment values prefill private operator drafts; they require save/review/publication and cannot silently rewrite published revisions.
+
 ## Main flows
 
 - **Read:** browser → Caddy → gateway server component → Catalog/Content (and, for context, Amendment or Document). Public responses use published snapshots.
@@ -32,3 +40,5 @@ Version history has two axes: legal changes and editorial corrections. The legal
 Through Caddy, a browser calls `/api/catalog/countries`. Within Compose, a service or gateway calls `http://catalog-service:8080/countries`; the `/api/catalog` prefix is stripped at the edge. Consult the [Caddy configuration](https://github.com/julianhoelz94/Verfassung/blob/main/infra/caddy/Caddyfile) and [API map](https://github.com/julianhoelz94/Verfassung/blob/main/docs/CODEMAPS/backend.md) before adding routes.
 
 [[Development and operations|Technical-Development]] · [[Documentation home|Home]]
+
+The edge evaluates proxy source-address and forwarded-scheme guards before routing, and keeps the login form behind a verified public HTTPS readiness check. Certificate renewal warnings remain visible in administrator connection settings while a previous certificate is still valid; successful renewal clears the warning.

@@ -857,6 +857,8 @@ const server = createServer(async (req, res) => {
     json(res, 200, { recoveryCodes: ['RECOVERY-NEW'] });
     return;
   }
+  if (method === 'GET' && pathname === '/api/identity/setup/status') return json(res, 200, { completed: true, tlsMode: 'local-http', publicUrl: 'http://localhost' });
+  if (method === 'GET' && pathname === '/api/identity/site/languages') return json(res, 200, { supported: ['en', 'de'], enabled: ['en', 'de'], defaultLanguage: 'en', managed: false });
   if (method === 'GET' && pathname === '/api/identity/me') {
     if (bearer(req) !== SESSION_TOKEN) {
       json(res, 401, { error: 'Unauthorized' });

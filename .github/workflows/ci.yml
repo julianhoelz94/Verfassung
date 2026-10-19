@@ -153,8 +153,9 @@ jobs:
         with:
           name: playwright-report
           path: |
-            apps/gateway-web/playwright-report
-            apps/gateway-web/test-results
+            apps/gateway-web/test-results/**/*.png
+            apps/gateway-web/test-results/**/error-context.md
+          if-no-files-found: ignore
           retention-days: 7
 
   visual-e2e:
@@ -176,8 +177,9 @@ jobs:
         with:
           name: playwright-visual-report
           path: |
-            apps/gateway-web/playwright-report
-            apps/gateway-web/test-results
+            apps/gateway-web/test-results/**/*.png
+            apps/gateway-web/test-results/**/error-context.md
+          if-no-files-found: ignore
           retention-days: 7
 
   images:
@@ -199,6 +201,9 @@ jobs:
         run: ./gradlew -p services/${{ matrix.service }} bootJar -x test
       - name: Build ${{ matrix.service }} image
         run: docker build -t constitution-atlas/${{ matrix.service }}:ci services/${{ matrix.service }}
+      - name: Verify local Identity source image and language registry
+        if: matrix.service == 'identity-service'
+        run: docker build -f infra/local-stack/Dockerfile --build-arg SERVICE=identity-service -t constitution-atlas/identity-service:local-ci .
 
   gateway-image:
     runs-on: ubuntu-latest
@@ -207,6 +212,13 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - run: docker build -t constitution-atlas/gateway-web:ci apps/gateway-web
       - run: docker build -t constitution-atlas/edge-proxy:ci infra/caddy
+      - name: Validate transport modes and policy
+        run: |
+          python3 -m unittest discover -s infra/caddy -p 'test_*.py'
+          python3 scripts/check-transport-configs.py
+          python3 scripts/test-local-https.py
+          python3 scripts/test-acme-http01.py
+          python3 scripts/test-proxy-https.py
 
   mcp-server:
     runs-on: ubuntu-latest
@@ -316,6 +328,7 @@ jobs:
       CADDY_PORT: '18080'
       GATEWAY_PORT: '13000'
       SESSION_COOKIE_SECURE: 'false'
+      SETUP_FIXTURE_COMPLETE: 'false'
       PUBLIC_BASE_URL: http://127.0.0.1:18080
       PREPOPULATE_TEST_STACK: 'true'
       PREPOPULATE_BASE_URL: http://127.0.0.1:18080
@@ -361,6 +374,9 @@ jobs:
           done
           docker compose --env-file env/ci.env.example ps
           exit 1
+      - name: Verify fresh deployment setup before fixtures
+        working-directory: apps/gateway-web
+        run: E2E_SETUP_FRESH=true npx playwright test --config=playwright.full.config.js setup-bootstrap.spec.ts
       - name: Generate, upload, and verify API fixtures
         working-directory: apps/gateway-web
         run: |
@@ -373,6 +389,30 @@ jobs:
       - name: Full-stack browser journeys
         working-directory: apps/gateway-web
         run: npm run test:e2e:full
+      - name: Verify local HTTPS authentication and deployment persistence
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        shell: bash
+        run: |
+          set -euo pipefail
+          snapshot() {
+            docker compose --env-file env/ci.env.example exec -T identity-db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "SELECT md5(string_agg(id::text || password_hash, chr(10) ORDER BY id)) FROM users; SELECT json_build_array(completed_at, bootstrap_admin_id, mail_deferred, access_reviewed, enabled_languages, default_language) FROM deployment_setup;"'
+          }
+          snapshot > /tmp/setup-before-https.txt
+          TLS_MODE=local-https PUBLIC_BASE_URL=https://localhost:18443 NEXT_PUBLIC_BASE_URL=https://localhost:18443 SESSION_COOKIE_SECURE=true CADDY_HTTPS_PORT=18443 \
+            docker compose --env-file env/ci.env.example up -d --no-deps --force-recreate edge-proxy gateway-web identity-service
+          for attempt in $(seq 1 90); do
+            if docker compose --env-file env/ci.env.example exec -T edge-proxy cat /data/caddy/pki/authorities/local/root.crt > /tmp/atlas-local-root.crt 2>/dev/null && \
+              curl --fail --silent --cacert /tmp/atlas-local-root.crt https://localhost:18443/api/identity/setup/status > /tmp/https-setup.json; then break; fi
+            sleep 2
+          done
+          python3 -c 'import json; assert json.load(open("/tmp/https-setup.json"))["completed"] is True'
+          snapshot > /tmp/setup-after-https.txt
+          cmp /tmp/setup-before-https.txt /tmp/setup-after-https.txt
+          E2E_TLS_CERT_SPKI="$(openssl s_client -connect localhost:18443 -servername localhost -CAfile /tmp/atlas-local-root.crt -verify_return_error -verify_hostname localhost </dev/null 2>/dev/null | openssl x509 -pubkey -noout | openssl pkey -pubin -outform DER | openssl dgst -sha256 -binary | openssl base64 -A)"
+          export E2E_TLS_CERT_SPKI
+          cd apps/gateway-web
+          E2E_TLS_SMOKE=true E2E_BASE_URL=https://localhost:18443 E2E_HTTP_BASE_URL=http://127.0.0.1:18080 \
+            npx playwright test --config=playwright.full.config.js setup-https.spec.ts
       - name: Stack logs
         if: failure()
         run: docker compose --env-file env/ci.env.example logs --no-color --tail=200 > full-stack-logs.txt

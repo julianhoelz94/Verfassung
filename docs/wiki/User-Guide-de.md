@@ -49,3 +49,6 @@ Unter **Über** finden Sie die Quellen- und Prüfgrundsätze, im **Impressum** d
 - Wenn ein Suchergebnis eine sehr neue Veröffentlichung noch nicht zeigt, öffnen Sie die Versionsseite direkt und versuchen Sie die Suche nach Abschluss der Indexierung erneut.
 
 [[Konten und redaktionelle Arbeit|Editorial-Guide-de]] · [[Dokumentationsübersicht|Home]] · [[English|User-Guide]]
+
+
+Administratoren können die verfügbaren Website-Sprachen einschränken. Eine nicht mehr verfügbare gespeicherte Sprache verwendet die festgelegte Standardsprache. Vor Abschluss der ersten Einrichtung können Besucher noch keine Inhalte öffnen.

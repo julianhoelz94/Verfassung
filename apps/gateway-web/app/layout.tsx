@@ -3,19 +3,19 @@ import type { ReactNode } from 'react';
 import type { Metadata } from 'next';
 import { publicBaseUrl } from '../lib/site-url';
 import { currentSession, SESSION_COOKIE } from '../lib/session';
-import { cookies, headers } from 'next/headers';
+import { cookies } from 'next/headers';
 import { getCountry, listConstitutionAmendments, listCountries } from '../lib/api';
 import { SiteFooter } from './components/SiteFooter';
 import { SiteHeader } from './components/SiteHeader';
 import { requestAnonymousBrowsingPolicy } from '../lib/anonymous-browsing-policy';
-import { resolveLocale } from '../lib/locale';
+import { currentLocale } from '../lib/server-locale';
+import { setupStatus } from '../lib/deployment-setup';
 import { message, ui } from '../lib/messages';
 import { TranslationProvider } from './components/TranslationProvider';
 
 export async function generateMetadata(): Promise<Metadata> {
   const base = publicBaseUrl();
-  const session = await currentSession();
-  const locale = resolveLocale(session.user?.languagePreference, (await headers()).get('accept-language'));
+  const locale = await currentLocale();
   const description = message(locale, ui.shell.siteDescription);
   return {
     metadataBase: new URL(base),
@@ -34,11 +34,12 @@ type RootLayoutProps = {
 
 export default async function RootLayout({ children }: RootLayoutProps) {
   const session = await currentSession();
-  const locale = resolveLocale(session.user?.languagePreference, (await headers()).get('accept-language'));
-  const anonymousBrowsingAllowed = session.user ? true : (await requestAnonymousBrowsingPolicy().catch(() => null))?.allowed === true;
+  const locale = await currentLocale();
+  const setupComplete = (await setupStatus().catch(() => null))?.completed === true;
+  const anonymousBrowsingAllowed = !setupComplete ? false : session.user ? true : (await requestAnonymousBrowsingPolicy().catch(() => null))?.allowed === true;
   let needsReviewCount = 0;
   const token = (await cookies()).get(SESSION_COOKIE)?.value;
-  if (session.user && token && session.user.roles.some((role) => ['admin', 'editor', 'reviewer', 'publisher'].includes(role))) {
+  if (setupComplete && session.user && token && session.user.roles.some((role) => ['admin', 'editor', 'reviewer', 'publisher'].includes(role))) {
     try {
       const countries = (await listCountries()) ?? [];
       const details = await Promise.all(countries.map((country) => getCountry(country.isoCode)));
@@ -61,7 +62,7 @@ export default async function RootLayout({ children }: RootLayoutProps) {
         <a className="skip-link" href="#main-content">
           {message(locale, ui.shell.skipToMain)}
         </a>
-        <SiteHeader user={session.user} identityUnavailable={session.identityUnavailable} needsReviewCount={needsReviewCount} anonymousBrowsingAllowed={anonymousBrowsingAllowed} />
+        <SiteHeader user={setupComplete ? session.user : null} identityUnavailable={session.identityUnavailable} needsReviewCount={needsReviewCount} anonymousBrowsingAllowed={anonymousBrowsingAllowed} />
         {children}
         <SiteFooter />
         </TranslationProvider>

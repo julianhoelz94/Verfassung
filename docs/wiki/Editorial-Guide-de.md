@@ -73,3 +73,12 @@ Unter **Anonymes Lesen** kann ein Administrator das Lesen ohne Anmeldung erlaube
 Unter **Konto → Chat-Client verbinden** finden Sie OAuth-Verbindungen und persönliche MCP-Schlüssel. Erteilen Sie Ihrem Client nur die benötigten Rechte. Ein Import mit Bearbeiterrechten bereitet Inhalte zur Prüfung vor und kann sie nicht veröffentlichen. Die Seite zeigt verbundene Clients und Schlüssel sowie Ablauf-, Rotations- und Widerrufsmöglichkeiten. Kopieren Sie einen neuen Schlüssel, sobald er angezeigt wird, und bewahren Sie ihn geschützt auf.
 
 Die genauen Berechtigungen stehen unter [redaktionelle Rollen](https://github.com/julianhoelz94/Verfassung/blob/main/docs/editorial-roles.md). Das öffentliche Lesen erläutert das [[Benutzerhandbuch der Website|User-Guide-de]]. · [[English|Editorial-Guide]]
+
+
+## Erste Einrichtung und Website-Einstellungen
+
+Neue Installationen bleiben für Besucher und andere Konten gesperrt, bis der in der Bereitstellungsumgebung festgelegte Administrator die Einrichtung abschließt. In Produktion wird HTTPS vor der Passworteingabe vorbereitet. Nach Anmeldung und gegebenenfalls Authenticator-Einrichtung führt die Einrichtungsseite durch Sprachen, Zugriff, Betreiberangaben und E-Mail. Anfangs sind alle unterstützten Website-Sprachen verfügbar.
+
+Tatsächliche Betreiberangaben sowie die erforderlichen deutschen und englischen Rechtstexte müssen geprüft und ausdrücklich veröffentlicht werden. E-Mail kann auf später verschoben werden; davon abhängige Registrierung bleibt dann gesperrt. Vor dem Öffnen der Website prüft der Server die Pflichtangaben erneut. Die Prüfung der tatsächlichen Produktions- und Hosting-Angaben aus VER-269 bleibt erforderlich.
+
+Fortschritt und Abschluss liegen dauerhaft in der Identity-Datenbank. Ein Anwendungsupdate startet die Einrichtung nicht erneut. Später bleiben die Einstellungen unter **Admin → Website-Einstellungen** erreichbar. Durch die Bereitstellungsumgebung vorgegebene Werte sind entsprechend gekennzeichnet; Geheimnisse werden nur als eingerichtet oder nicht eingerichtet angezeigt.

@@ -1,3 +1,5 @@
+import { NavigatingActionForm } from '../../components/NavigatingActionForm';
+import { setupStatus } from '../../../lib/deployment-setup';
 import { currentLocale } from '../../../lib/server-locale';
 import { message } from '../../../lib/messages';
 import { T } from '../../components/TranslationProvider';
@@ -19,6 +21,7 @@ type MfaPageProps = {
 
 export default async function MfaPage(props: MfaPageProps) {
   const locale = await currentLocale();
+  const setup = await setupStatus();
   const searchParams = await props.searchParams;
   const user = await currentUser();
   const challenge = await mfaChallengeToken();
@@ -63,12 +66,12 @@ export default async function MfaPage(props: MfaPageProps) {
             <Alert tone="error"><T value={ui.login.mfa.page.enrollmentCouldNotBeStartedSignIn} /></Alert>
           )}
           <LoginEnrollForm next={searchParams.next?.startsWith('/oauth/authorize?') ? searchParams.next : undefined} />
-          {!user ? <PasskeyLoginEnrollment /> : null}
-          {!user ? <PasskeyLogin /> : null}
+          {setup.completed && !user ? <PasskeyLoginEnrollment /> : null}
+          {setup.completed && !user ? <PasskeyLogin /> : null}
         </Card>
       ) : (
         <Card>
-          <form action={completeMfaAction}>
+          <NavigatingActionForm action={completeMfaAction}>
             {searchParams.next?.startsWith('/oauth/authorize?') ? <input type="hidden" name="next" value={searchParams.next} /> : null}
             <Input
               label={<T value={ui.attrs.loginMfaPageInputLabelAuthenticator} />}
@@ -79,7 +82,7 @@ export default async function MfaPage(props: MfaPageProps) {
             />
             <Input label={<T value={ui.attrs.loginMfaPageInputLabelRecovery} />} id="recoveryCode" name="recoveryCode" autoComplete="off" />
             <Button variant="primary"><T value={ui.login.mfa.page.continue} /></Button>
-          </form>
+          </NavigatingActionForm>
         </Card>
       )}
     </PageMain>

@@ -1275,6 +1275,7 @@ class IdentityApiTest {
         @JvmStatic
         @DynamicPropertySource
         fun databaseProperties(registry: DynamicPropertyRegistry) {
+            registry.add("SETUP_FIXTURE_COMPLETE") { "true" }
             registry.add("spring.datasource.url", postgres::getJdbcUrl)
             registry.add("spring.datasource.username", postgres::getUsername)
             registry.add("spring.datasource.password", postgres::getPassword)

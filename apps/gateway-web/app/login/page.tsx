@@ -1,3 +1,4 @@
+import { NavigatingActionForm } from '../components/NavigatingActionForm';
 import { T } from '../components/TranslationProvider';
 import { ui } from '../../lib/messages';
 import { redirect } from 'next/navigation';
@@ -7,6 +8,8 @@ import { canVisitEditor } from '../../lib/nav';
 import { currentUser } from '../../lib/session';
 import { loginAction } from './actions';
 import { requestRegistrationStatus } from '../../lib/identity-client';
+import { setupStatus } from '../../lib/deployment-setup';
+import { setupMessages as m } from '../../lib/setup-messages';
 import { PasskeyLogin } from '../passkeys/PasskeyLogin';
 
 type LoginPageProps = {
@@ -21,8 +24,10 @@ function seedHintEnabled(): boolean {
 export default async function LoginPage(props: LoginPageProps) {
   const searchParams = await props.searchParams;
   const user = await currentUser();
+  const setup = await setupStatus();
   const registrationEnabled = await requestRegistrationStatus();
   if (user) {
+    if (!setup.completed) redirect('/setup');
     redirect(searchParams.next?.startsWith('/oauth/authorize?') ? searchParams.next : canVisitEditor(user.roles) ? '/editor' : '/');
   }
 
@@ -51,8 +56,9 @@ export default async function LoginPage(props: LoginPageProps) {
         </Alert>
       ) : null}
       {searchParams.registered ? <Alert tone="success"><T value={ui.login.page.accountConfirmedYouCanSignIn} /></Alert> : null}
+      {!setup.completed ? <Alert tone="info"><T value={m.adminOnly} /></Alert> : null}
       <Card>
-        <form action={loginAction}>
+        <NavigatingActionForm action={loginAction}>
           {searchParams.next?.startsWith('/oauth/authorize?') ? <input type="hidden" name="next" value={searchParams.next} /> : null}
           <Input
             label={<T value={ui.attrs.loginPageInputLabelEmail} />}
@@ -75,13 +81,13 @@ export default async function LoginPage(props: LoginPageProps) {
             autoComplete="current-password"
           />
           <Button variant="primary"><T value={ui.login.page.signIn} /></Button>
-        </form>
+        </NavigatingActionForm>
       </Card>
-      <Card><PasskeyLogin /></Card>
-      <p>
+      {setup.completed ? <Card><PasskeyLogin /></Card> : null}
+      {setup.completed ? <p>
         <a href="/reset"><T value={ui.login.page.forgotPassword} /></a>
-      </p>
-      {registrationEnabled ? <p><a href="/register"><T value={ui.login.page.createAnAccount} /></a></p> : null}
+      </p> : null}
+      {setup.completed && registrationEnabled ? <p><a href="/register"><T value={ui.login.page.createAnAccount} /></a></p> : null}
     </PageMain>
   );
 }

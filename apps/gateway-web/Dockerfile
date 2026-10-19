@@ -5,7 +5,7 @@ COPY package.json package-lock.json ./
 RUN npm ci
 COPY . .
 # `public/` is empty in git; make sure it exists so the runtime COPY below never fails.
-RUN mkdir -p public && npm run build && npm prune --omit=dev
+RUN mkdir -p public && npm run build && rm -rf .next/cache && npm prune --omit=dev
 
 # Runtime stage: production deps only, non-root user.
 FROM node:20-alpine

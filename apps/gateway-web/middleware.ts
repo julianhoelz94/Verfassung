@@ -1,9 +1,31 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { requestAnonymousBrowsingPolicy } from './lib/anonymous-browsing-policy';
+import { setupStatus, setupPathAllowed } from './lib/deployment-setup';
 import { identityBaseUrl } from './lib/identity-client';
 
 export async function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname;
+  if (path !== '/api/setup-gate' && path !== '/api/edge-rate-limit') {
+    let setup;
+    try { setup = await setupStatus(); } catch {
+      return new NextResponse('Setup status is temporarily unavailable. / Der Einrichtungsstatus ist vorübergehend nicht verfügbar.', { status: 503, headers: { 'Cache-Control': 'no-store' } });
+    }
+    if (!setup.completed) {
+      const token = request.cookies.get('ca_session')?.value;
+      let admin = false;
+      if (token) {
+        try {
+          const me = await fetch(`${identityBaseUrl()}/me`, { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store', signal: AbortSignal.timeout(2000) });
+          if (me.ok) admin = ((await me.json()) as { roles: string[] }).roles.includes('admin');
+        } catch { /* Fail closed. */ }
+      }
+      if (!setupPathAllowed(path, admin) || (path === '/login' && admin)) {
+        if (path.startsWith('/api/')) return NextResponse.json({ code: 'setup_required' }, { status: 403 });
+        return NextResponse.redirect(new URL(admin ? '/setup' : '/login', request.url));
+      }
+    }
+  }
+
   if (path === '/search' || path.startsWith('/countries/') || path.startsWith('/documents/') || path.startsWith('/versions/')) {
     const policy = await requestAnonymousBrowsingPolicy().catch(() => null);
     if (!policy?.allowed) {

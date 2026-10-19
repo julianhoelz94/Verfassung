@@ -24,6 +24,12 @@ if args[0] == 'create':
 elif args[0] == 'rm':
     (root / 'lock').unlink(missing_ok=True)
 elif args[0] == 'compose' and 'exec' in args:
+    if any('setup/status' in arg for arg in args):
+        print(os.environ.get('FAKE_SETUP_STATUS', 'complete local-http localhost'))
+        sys.exit(0)
+    if args[-1].endswith('/root.crt'):
+        print('public-test-root')
+        sys.exit(0)
     if os.environ.get('FAKE_DOCUMENT_DOWN') == '1':
         print('Not ready: document', file=sys.stderr)
         sys.exit(1)
@@ -56,7 +62,8 @@ class LocalStackTest(unittest.TestCase):
             tool.write_text(content)
             tool.chmod(0o755)
         self.env = {**os.environ, 'PATH': f'{self.bin}:{os.environ["PATH"]}',
-                    'FAKE_ENGINE': str(self.root), 'HTTP_READY_TIMEOUT_SECONDS': '0'}
+                    'FAKE_ENGINE': str(self.root), 'HTTP_READY_TIMEOUT_SECONDS': '0',
+                    'MIN_FREE_MB': '0'}
 
     def run_stack(self, *args, **env):
         return subprocess.run(['bash', 'manageLocalStack.sh', *args], cwd=self.root,
@@ -89,6 +96,21 @@ class LocalStackTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertTrue(any(args[-2:] == ['prepopulate', '--verify-only'] for args in self.events()))
         self.assertFalse(any('build' in args for args in self.events()))
+
+    def test_pending_setup_skips_fixture_authentication(self):
+        result = self.run_stack('--only-prepopulate', FAKE_SETUP_STATUS='pending local-http localhost')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('Complete first-deployment setup', result.stdout)
+        self.assertFalse(any('run' in args for args in self.events()))
+
+    def test_local_https_exports_only_public_ca_for_fixture_container(self):
+        result = self.run_stack('--only-prepopulate', '--verify-only', FAKE_SETUP_STATUS='complete local-https localhost')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        run = next(args for args in self.events() if args[0] == 'compose' and 'run' in args)
+        self.assertIn('PREPOPULATE_BASE_URL=https://localhost', run)
+        self.assertIn('NODE_EXTRA_CA_CERTS=/local-state/local-root.crt', run)
+        self.assertEqual(run[-2:], ['prepopulate', '--verify-only'])
+        self.assertEqual((self.root / '.local-stack/local-root.crt').read_text(), 'public-test-root\n')
 
     def test_no_prepopulate_still_requires_document_health(self):
         result = self.run_stack('--start', '--no-build', '--no-prepopulate', FAKE_DOCUMENT_DOWN='1')

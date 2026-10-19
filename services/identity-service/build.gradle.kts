@@ -52,3 +52,8 @@ dependencies {
 tasks.withType<Test> {
   useJUnitPlatform()
 }
+
+// One supported-language registry shared with the gateway.
+tasks.processResources {
+  from("../../apps/gateway-web/lib/supported-languages.json")
+}

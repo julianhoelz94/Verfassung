@@ -34,7 +34,7 @@ export async function publishLegalPageAction(formData: FormData): Promise<void> 
   } catch {
     redirect(`/admin/legal/${key}?error=publish`);
   }
-  revalidatePath(`/${key}`);
+  revalidatePath(key.startsWith('impressum') ? '/impressum' : '/datenschutz');
   revalidatePath(`/admin/legal/${key}`);
   redirect(`/admin/legal/${key}?published=1`);
 }

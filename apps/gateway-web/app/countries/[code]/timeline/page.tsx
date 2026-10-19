@@ -1,3 +1,4 @@
+import { changeTypeMessage } from '../../../../lib/ui-labels';
 import { T } from '../../../components/TranslationProvider';
 import { ui } from '../../../../lib/messages';
 import { notFound } from 'next/navigation';
@@ -169,7 +170,7 @@ export default async function TimelinePage(props: TimelinePageProps) {
                   {amendment.changes.map((change) => (
                     <div className="stack" key={change.id}>
                       <Badge tone={changeTone(change.changeType)}>
-                        {change.changeType}
+                        {<T value={changeTypeMessage(change.changeType)} />}
                         {change.articleNumber ? ` Art. ${change.articleNumber}` : ''}
                       </Badge>
                       <AmendmentUnitLinks change={change} />

@@ -2,20 +2,30 @@
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { translateContentAction } from '../content-translation/actions';
 import { T, useLocale } from './TranslationProvider';
 import { ui } from '../../lib/messages';
 
-export function ContentTranslation({ children, sourceLanguage, authenticated, enabled, alwaysTranslate }: {
+type ContentTranslationProps = {
   children: ReactNode;
   sourceLanguage: string;
   authenticated: boolean;
   enabled: boolean;
   alwaysTranslate: boolean;
-}) {
+};
+
+export function ContentTranslation(props: ContentTranslationProps) {
+  const pathname = usePathname();
+  const locale = useLocale();
+  return <ContentTranslationBody key={`${pathname}:${locale}:${props.sourceLanguage}`} {...props} />;
+}
+
+function ContentTranslationBody({ children, sourceLanguage, authenticated, enabled, alwaysTranslate }: ContentTranslationProps) {
   const locale = useLocale();
   const originalRef = useRef<HTMLDivElement>(null);
   const originalTexts = useRef<Map<Text, string>>(new Map());
+  const originalLanguages = useRef<Map<Element, string>>(new Map());
   const [translated, setTranslated] = useState(false);
   const [showingOriginal, setShowingOriginal] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -75,6 +85,11 @@ export function ContentTranslation({ children, sourceLanguage, authenticated, en
         }).join('');
         node.textContent = before.replace(value, translatedText);
       }
+      originalRef.current.querySelectorAll('[lang]').forEach(element => {
+        if (element.closest('code, pre, [data-no-translate]')) return;
+        originalLanguages.current.set(element, element.getAttribute('lang')!);
+        element.setAttribute('lang', locale);
+      });
       setTranslated(true);
     } catch {
       setFailed(true);
@@ -87,17 +102,17 @@ export function ContentTranslation({ children, sourceLanguage, authenticated, en
     if (alwaysTranslate && authenticated && enabled && sourceLanguage.toLowerCase().split('-')[0] !== locale && !translated && !busy && !failed && !showingOriginal) void translate();
   }, [alwaysTranslate, authenticated, enabled, sourceLanguage, locale, translated, busy, failed, showingOriginal, translate]);
 
-  useEffect(() => { setShowingOriginal(false); }, [sourceLanguage, locale]);
-
   const showOriginal = () => {
     originalTexts.current.forEach((value, node) => { if (node.isConnected) node.textContent = value; });
     originalTexts.current.clear();
+    originalLanguages.current.forEach((value, element) => { if (element.isConnected) element.setAttribute('lang', value); });
+    originalLanguages.current.clear();
     setShowingOriginal(true);
     setTranslated(false);
   };
 
   const sameLanguage = sourceLanguage.toLowerCase().split('-')[0] === locale;
-  return <section className="content-translation">
+  return <div className="content-translation">
     {!sameLanguage ? <div className="inline-actions">
       {translated ? <button type="button" className="btn" onClick={showOriginal}><T value={ui.contentTranslation.showOriginal} /></button>
         : <button type="button" className="btn" onClick={() => { setShowingOriginal(false); void translate(); }} disabled={!authenticated || !enabled || busy}><T value={ui.contentTranslation.translate} /></button>}
@@ -105,6 +120,6 @@ export function ContentTranslation({ children, sourceLanguage, authenticated, en
       {authenticated && !enabled ? <span><T value={ui.contentTranslation.unavailable} /></span> : null}
       {failed ? <span role="alert"><T value={ui.contentTranslation.failed} /></span> : null}
     </div> : null}
-    <div ref={originalRef} lang={translated ? locale : sourceLanguage}>{children}</div>
-  </section>;
+    <div ref={originalRef} lang={translated ? locale : sourceLanguage === 'auto' ? undefined : sourceLanguage}>{children}</div>
+  </div>;
 }

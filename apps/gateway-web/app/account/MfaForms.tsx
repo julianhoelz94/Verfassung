@@ -3,9 +3,25 @@
 import { T } from '../components/TranslationProvider';
 import { ui } from '../../lib/messages';
 import { useFormState } from 'react-dom';
+import { useState } from 'react';
 import { Alert, Button, Input } from '../components/ui';
 import { confirmEnrollAction, type EnrollConfirmState } from '../login/actions';
-import { confirmAccountMfaAction, regenerateRecoveryAction, type RecoveryRevealState } from './actions';
+import { confirmAccountMfaAction, regenerateRecoveryAction, startMfaEnrollAction, type RecoveryRevealState } from './actions';
+
+export function StartMfaEnrollForm() {
+  const [pending, setPending] = useState(false);
+  return <form onSubmit={async event => {
+    event.preventDefault();
+    if (pending) return;
+    setPending(true);
+    try {
+      const started = await startMfaEnrollAction();
+      window.location.assign(started ? '/account?enroll=1' : '/account?error=mfa');
+    } catch {
+      window.location.assign('/account?error=mfa');
+    }
+  }}><Button variant="primary" disabled={pending}><T value={ui.account.page.enrollAuthenticator} /></Button></form>;
+}
 
 const initial: RecoveryRevealState = {};
 

@@ -1,3 +1,4 @@
+import { currentLocale } from '../../../lib/server-locale';
 import { T } from '../../components/TranslationProvider';
 import { ui } from '../../../lib/messages';
 import Link from 'next/link';
@@ -14,6 +15,7 @@ export async function DocumentLinks(props: {
   returnTo: string;
   canEdit: boolean;
 }) {
+  const locale = await currentLocale();
   const authorization = await requireSessionBearer();
   const [linksResult, documentsResult, eventsResult] = await Promise.allSettled([
     listDocumentLinks(props.targetType, props.targetId, props.scopeRevisionId, authorization),
@@ -31,7 +33,7 @@ export async function DocumentLinks(props: {
     {unavailable ? <Alert tone="error"><T value={ui.editor.documents.documentlinks.documentServiceIsUnavailableLinksMayBe} /></Alert> : null}
     {links.length ? <ul className="link-list">{links.map((link) => <li key={link.documentId}>
       <Link href={`/documents/${link.documentId}${link.revisionId ? `?revision=${link.document.revision.revision}` : ''}`}>{link.document.revision.title}</Link>
-      {' '}· {link.revisionId ? `Pinned revision ${link.document.revision.revision}` : `Current revision ${link.document.currentRevision}`}
+      {' '}· <T value={link.revisionId ? ui.editor.documents.documentlinks.pinnedRevision : ui.editor.documents.documentlinks.currentRevision} />{' '}{link.revisionId ? link.document.revision.revision : link.document.currentRevision}
       {' '}<Link href={`/editor/documents/${link.documentId}`}><T value={ui.editor.documents.documentlinks.inspectHistory} /></Link>
       {props.canEdit ? <form action={detachDocumentAction} className="inline-form">
         <input type="hidden" name="targetType" value={props.targetType} /><input type="hidden" name="targetId" value={props.targetId} />
@@ -46,7 +48,7 @@ export async function DocumentLinks(props: {
       <p><Link href={`/editor/documents/new?returnTo=${encodeURIComponent(props.returnTo)}`} target="_blank"><T value={ui.editor.documents.documentlinks.createADocumentInANewTab} /></Link> <T value={ui.editor.documents.documentlinks.toKeepThisEditorOpen} /></p>
     </> : null}
     {events.length ? <details><summary><T value={ui.editor.documents.documentlinks.linkHistory} /></summary><ol>{events.map((event) => <li key={event.id}>
-      {event.action} · <Link href={`/editor/documents/${event.documentId}`}>{event.documentId}</Link> · {new Date(event.occurredAt).toLocaleString('en')}
+      <T value={event.action === 'attach' ? ui.editor.documents.documentlinks.attached : ui.editor.documents.documentlinks.detached} /> · <Link href={`/editor/documents/${event.documentId}`}>{event.documentId}</Link> · {new Date(event.occurredAt).toLocaleString(locale)}
     </li>)}</ol></details> : null}
   </section>;
 }

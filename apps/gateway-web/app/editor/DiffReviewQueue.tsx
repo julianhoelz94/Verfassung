@@ -1,7 +1,7 @@
 'use client';
 
 import { T, useTranslation } from '../components/TranslationProvider';
-import { ui } from '../../lib/messages';
+import { ui, type UiMessage } from '../../lib/messages';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { DiffReviewState, ReviewCandidate, ReviewDecisionInput, ReviewRef } from '../../lib/diff-review';
@@ -23,8 +23,23 @@ function label(ref: ReviewRef): string {
   return ref.path.join(' › ') || ref.label || ref.kind;
 }
 
-function statusText(status: string): string {
-  return status.replaceAll('_', ' ');
+function reviewLabel(status: string): UiMessage {
+  switch (status) {
+    case 'open': return ui.reviewLabels.open;
+    case 'linked': return ui.reviewLabels.linked;
+    case 'excluded_with_reason': return ui.reviewLabels.excluded;
+    case 'needs_recheck': return ui.reviewLabels.needsRecheck;
+    case 'move': return ui.reviewLabels.move;
+    case 'split': return ui.reviewLabels.split;
+    case 'merge': return ui.reviewLabels.merge;
+    case 'metadata': return ui.reviewLabels.metadata;
+    case 'text_changed': return ui.reviewLabels.textChanged;
+    case 'text_added': return ui.reviewLabels.textAdded;
+    case 'text_removed': return ui.reviewLabels.textRemoved;
+    case 'added': return ui.remainingStatus.added;
+    case 'removed': return ui.remainingStatus.removed;
+    default: return ui.remainingStatus.unknown;
+  }
 }
 
 function wording(refs: ReviewRef[]): string {
@@ -33,6 +48,7 @@ function wording(refs: ReviewRef[]): string {
 
 export function DiffReviewQueue({ target, initial, rows, canDecide, canAcknowledge, onAddRow }: Props) {
   const t = useTranslation();
+  const statusText = (status: string) => t(reviewLabel(status));
   const router = useRouter();
   const [review, setReview] = useState(initial);
   const [selectedKey, setSelectedKey] = useState(initial.candidates[(initial.currentPosition ?? 1) - 1]?.key ?? initial.candidates[0]?.key ?? '');
@@ -160,10 +176,10 @@ export function DiffReviewQueue({ target, initial, rows, canDecide, canAcknowled
       {selected ? <div ref={activeRef} className="stack diff-review-active" tabIndex={-1} aria-live="polite">
         <p className="muted"><T value={ui.editor.diffreviewqueue.difference} />{" "}{review.candidates.findIndex((candidate) => candidate.key === selected.key) + 1} <T value={ui.editor.diffreviewqueue.of} />{" "}{review.candidates.length} · {statusText(selectedDecision?.status ?? 'open')}</p>
         <h3>{statusText(selected.facet)} · {label(selected.afterRefs[0] ?? selected.beforeRefs[0])}</h3>
-        <p><T value={ui.editor.diffreviewqueue.level} />{" "}{selected.level}{selected.ambiguous ? ' · Ambiguous pairing: confirm multiple exact rows or exclude with a reviewed reason.' : ''}</p>
+        <p><T value={ui.editor.diffreviewqueue.level} />{" "}{selected.level}{selected.ambiguous ? <T value={ui.reviewLabels.ambiguousPairing} /> : ''}</p>
         <div className="diff-review-sides">
-          <div><h4><T value={ui.editor.diffreviewqueue.before} /></h4><p>{selected.beforeRefs.map(label).join('; ') || 'No source unit'}</p><p className="diff-review-text">{segsForSide(spans, 'from').map((seg, index) => seg.type === 'remove' ? <del key={index}>{seg.text}</del> : <span key={index}>{seg.text}</span>)}</p>{selected.beforeRefs.map((ref) => <code key={`${ref.logicalId}-${ref.occurrenceId}`}>{ref.versionId ?? 'draft'} · {ref.logicalId}</code>)}</div>
-          <div><h4><T value={ui.editor.diffreviewqueue.after} /></h4><p>{selected.afterRefs.map(label).join('; ') || 'No target unit'}</p><p className="diff-review-text">{segsForSide(spans, 'to').map((seg, index) => seg.type === 'add' ? <ins key={index}>{seg.text}</ins> : <span key={index}>{seg.text}</span>)}</p>{selected.afterRefs.map((ref) => <code key={`${ref.logicalId}-${ref.occurrenceId}`}>{ref.versionId ?? 'draft'} · {ref.logicalId}</code>)}</div>
+          <div><h4><T value={ui.editor.diffreviewqueue.before} /></h4><p>{selected.beforeRefs.map(label).join('; ') || t(ui.reviewLabels.noSourceUnit)}</p><p className="diff-review-text">{segsForSide(spans, 'from').map((seg, index) => seg.type === 'remove' ? <del key={index}>{seg.text}</del> : <span key={index}>{seg.text}</span>)}</p>{selected.beforeRefs.map((ref) => <code key={`${ref.logicalId}-${ref.occurrenceId}`}>{ref.versionId ?? t(ui.workflow.draft)} · {ref.logicalId}</code>)}</div>
+          <div><h4><T value={ui.editor.diffreviewqueue.after} /></h4><p>{selected.afterRefs.map(label).join('; ') || t(ui.reviewLabels.noTargetUnit)}</p><p className="diff-review-text">{segsForSide(spans, 'to').map((seg, index) => seg.type === 'add' ? <ins key={index}>{seg.text}</ins> : <span key={index}>{seg.text}</span>)}</p>{selected.afterRefs.map((ref) => <code key={`${ref.logicalId}-${ref.occurrenceId}`}>{ref.versionId ?? t(ui.workflow.draft)} · {ref.logicalId}</code>)}</div>
         </div>
         <div className="action-bar"><Button type="button" disabled={selectedIndex <= 0} onClick={() => navigation(selectedIndex - 1)}><T value={ui.editor.diffreviewqueue.previous} /></Button><Button type="button" disabled={selectedIndex >= visible.length - 1} onClick={() => navigation(selectedIndex + 1)}><T value={ui.editor.diffreviewqueue.next} /></Button><Button type="button" onClick={() => { const next = visible.find((candidate) => !decisionReadyForReview(candidate, decisions.get(candidate.key)) && candidate.key !== selected.key) ?? (canAcknowledge ? visible.find((candidate) => !decisionResolved(candidate, decisions.get(candidate.key)) && candidate.key !== selected.key) : undefined); if (next) choose(next.key); }}><T value={ui.editor.diffreviewqueue.nextUnreviewed} /></Button></div>
         {canDecide ? <div className="stack">

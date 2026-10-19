@@ -1,3 +1,4 @@
+import { changeTypeMessage } from '../../../../../lib/ui-labels';
 import { T } from '../../../../components/TranslationProvider';
 import { ui } from '../../../../../lib/messages';
 import { notFound } from 'next/navigation';
@@ -123,7 +124,7 @@ export default async function ArticleHistoryPage(props: HistoryPageProps) {
                   {incoming.map((amendment) =>
                     amendment.changes.map((change) => (
                       <div key={change.id} className="change-row">
-                        <Badge tone={changeTone(change.changeType)}>{change.changeType}</Badge>
+                        <Badge tone={changeTone(change.changeType)}>{<T value={changeTypeMessage(change.changeType)} />}</Badge>
                         <span className="muted">
                           {change.changedOn ? (
                             <>

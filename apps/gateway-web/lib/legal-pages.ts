@@ -38,11 +38,11 @@ async function read<T>(path: string, options: RequestInit = {}): Promise<T | nul
 }
 
 export function publicLegalPage(key: LegalPageKey): Promise<LegalPageRevision | null> {
-  return read(`/legal-pages/${key}`, { next: { revalidate: 60 } });
+  return read(`/legal-pages/${key}`, { cache: 'no-store' });
 }
 
 export function publicImprintDetails(): Promise<ImprintDetails | null> {
-  return read('/legal-pages/imprint-details', { next: { revalidate: 60 } });
+  return read('/legal-pages/imprint-details', { cache: 'no-store' });
 }
 
 export function adminImprintDetails(bearer: string): Promise<ImprintDetailsState | null> {

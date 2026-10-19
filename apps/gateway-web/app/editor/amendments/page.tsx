@@ -1,3 +1,4 @@
+import { currentLocale } from '../../../lib/server-locale';
 import { SignedInSummary } from '../../components/SignedInSummary';
 import { T } from '../../components/TranslationProvider';
 import { ui } from '../../../lib/messages';
@@ -79,7 +80,7 @@ export default async function AmendmentsPage(props: AmendmentsPageProps) {
     }
   }
 
-  const errorMessage = amendmentErrorMessage(searchParams.error);
+  const errorMessage = amendmentErrorMessage(searchParams.error, await currentLocale());
   const visibleAmendments = searchParams.review === 'needs_review'
     ? amendments.filter((amendment) => amendment.reviewStatus === 'needs_review')
     : amendments;

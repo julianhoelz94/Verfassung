@@ -14,6 +14,7 @@ export function DocumentPicker(props: {
   scopeRevisionId?: string | null;
   returnTo: string;
 }) {
+  const [attaching, setAttaching] = useState(false);
   const [query, setQuery] = useState('');
   const [selectedId, setSelectedId] = useState('');
   const visible = props.documents.filter((document) => document.revision.title.toLocaleLowerCase().includes(query.toLocaleLowerCase()));
@@ -27,15 +28,22 @@ export function DocumentPicker(props: {
       <option value=""><T value={ui.editor.documents.documentpicker.chooseADocument} /></option>
       {visible.map((document) => <option key={document.id} value={document.id}>{document.revision.title}</option>)}
     </select>
-    {selected ? <form action={attachDocumentAction} className="form-row">
+    {selected ? <form onSubmit={async (event) => {
+      event.preventDefault();
+      if (attaching) return;
+      const data = new FormData(event.currentTarget);
+      setAttaching(true);
+      try { window.location.assign(await attachDocumentAction(data)); }
+      finally { setAttaching(false); }
+    }} className="form-row">
       <input type="hidden" name="targetType" value={props.targetType} /><input type="hidden" name="targetId" value={props.targetId} />
       <input type="hidden" name="scopeRevisionId" value={props.scopeRevisionId ?? ''} />
       <input type="hidden" name="documentId" value={selected.id} /><input type="hidden" name="returnTo" value={props.returnTo} />
       <label htmlFor="linked-document-revision"><T value={ui.editor.documents.documentpicker.revisionToCite} /></label>
       <select id="linked-document-revision" name="revisionId" defaultValue={selected.revision.id} key={selected.id}>
-        {(props.revisions[selectedIndex] ?? []).map((revision) => <option key={revision.id} value={revision.id}><T value={ui.editor.documents.documentpicker.revision} />{" "}{revision.revision}{revision.id === selected.revision.id ? ' (current)' : ''}</option>)}
+        {(props.revisions[selectedIndex] ?? []).map((revision) => <option key={revision.id} value={revision.id}><T value={ui.editor.documents.documentpicker.revision} />{" "}{revision.revision}{revision.id === selected.revision.id ? <T value={ui.editor.documents.documentlinks.current} /> : null}</option>)}
       </select>
-      <button type="submit"><T value={ui.editor.documents.documentpicker.attach} /></button>
+      <button type="submit" disabled={attaching}><T value={ui.editor.documents.documentpicker.attach} /></button>
     </form> : null}
   </div>;
 }

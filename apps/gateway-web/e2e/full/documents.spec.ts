@@ -31,6 +31,11 @@ test('document revisions link from both editors and appear on public readers wit
   await page.getByLabel('Select a document').selectOption(documentId);
   await page.getByRole('button', { name: 'Attach' }).click();
   await expect(page.getByRole('heading', { name: 'Linked documents' })).toBeVisible();
+  await expect.poll(async () => {
+    const response = await request.get(`/api/document/links/constitution/${fixture.constitutionId}`, { headers });
+    expect(response.ok()).toBeTruthy();
+    return (await response.json()).some((link: { documentId: string }) => link.documentId === documentId);
+  }).toBe(true);
   await expect(page.getByRole('link', { name: `${title} revised` })).toBeVisible({ timeout: 15_000 });
   await page.goto(`/countries/${fixture.countryIso}/versions/${fixture.targetVersionId}`);
   await expect(page.getByRole('heading', { name: 'Constitution documents' })).toBeVisible();
@@ -49,7 +54,7 @@ test('document revisions link from both editors and appear on public readers wit
   await page.getByLabel('Select a document').selectOption(documentId);
   const attachment = page.waitForResponse((response) => response.request().method() === 'POST' && response.url().includes(`/editor/amendments/${amendmentId}`));
   await page.getByRole('button', { name: 'Attach' }).click();
-  expect((await attachment).status()).toBe(303);
+  expect((await attachment).status()).toBe(200);
   await page.reload();
   await expect(page.getByRole('link', { name: `${title} revised` })).toBeVisible({ timeout: 15_000 });
   const savedRevision = await request.post(`/api/amendment/amendments/${amendmentId}/revisions`, { headers, data: {

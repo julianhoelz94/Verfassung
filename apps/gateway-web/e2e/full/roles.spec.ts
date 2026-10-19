@@ -112,7 +112,7 @@ test('editorial roles stage, review, and publish a new constitution through the 
   }));
   await page.getByRole('button', { name: 'Stage for review' }).click();
   await expect(page.getByRole('heading', { name: 'Import job' })).toBeVisible();
-  await expect(page.getByText('Status: pending_review')).toBeVisible();
+  await expect(page.getByText('Status: In review')).toBeVisible();
   const reviewUrl = page.url();
   await Promise.all([
     page.waitForResponse(response => response.request().method() === 'POST' && new URL(response.url()).pathname === new URL(reviewUrl).pathname),

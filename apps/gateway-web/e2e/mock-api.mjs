@@ -200,6 +200,7 @@ let stepUpFresh = true;
 let visualRoles = false;
 let sprint50Content = false;
 let legalPages = {};
+let imprintDetailsState;
 let translationSite = { provider: 'google', sharedKeyConfigured: true, sharedGoogleCharactersUsed: 0, sharedGoogleCharacterLimit: 500000 };
 let translationUser = { alwaysTranslate: false, personalGoogleKeyConfigured: false };
 let anonymousBrowsing = { allowed: true, perIp: { requests: 600, windowValue: 1, windowUnit: 'minutes' }, total: { requests: 6000, windowValue: 1, windowUnit: 'minutes' }, revision: 0 };
@@ -228,14 +229,16 @@ function resetMockState() {
   translationSite = { provider: 'google', sharedKeyConfigured: true, sharedGoogleCharactersUsed: 0, sharedGoogleCharacterLimit: 500000 };
   translationUser = { alwaysTranslate: false, personalGoogleKeyConfigured: false };
   anonymousBrowsing = { allowed: true, perIp: { requests: 600, windowValue: 1, windowUnit: 'minutes' }, total: { requests: 6000, windowValue: 1, windowUnit: 'minutes' }, revision: 0 };
-  const impressum = { revision: 1, content: 'Example publisher information', createdAt: '2026-01-01T00:00:00Z', createdBy: identityMe.id };
-  const impressumEn = { revision: 1, content: 'English publisher information', createdAt: '2026-01-01T00:00:00Z', createdBy: identityMe.id };
+  const impressum = { revision: 1, content: 'Example publisher information', separateContact: true, createdAt: '2026-01-01T00:00:00Z', createdBy: identityMe.id };
+  const impressumEn = { revision: 1, content: 'English publisher information', separateContact: true, createdAt: '2026-01-01T00:00:00Z', createdBy: identityMe.id };
   const datenschutz = { revision: 1, content: 'Example privacy notice for browser tests.', createdAt: '2026-01-01T00:00:00Z', createdBy: identityMe.id };
   legalPages = {
     impressum: { key: 'impressum', draft: impressum, published: impressum, revisions: [impressum] },
     impressum_en: { key: 'impressum_en', draft: impressumEn, published: impressumEn, revisions: [impressumEn] },
     datenschutz: { key: 'datenschutz', draft: datenschutz, published: datenschutz, revisions: [datenschutz] },
   };
+  const contact = { revision: 1, name: 'Atlas Foundation', streetAddress: 'Main Street 1', postalCode: '10000', city: 'Berlin', country: 'Germany', email: 'contact@atlas.example' };
+  imprintDetailsState = { draft: contact, published: contact };
   credentials = new Map([
     ['local-editor@example.local', 'change-me'], ['local-reviewer@example.local', 'change-me'],
     ['local-publisher@example.local', 'change-me'], ['local-admin@example.local', 'change-me'],
@@ -360,13 +363,28 @@ const server = createServer(async (req, res) => {
     return;
   }
 
-  if (pathname === '/api/document/legal-pages/imprint-details') {
-    json(res, 200, { revision: 1, name: 'Atlas Foundation', streetAddress: 'Main Street 1', postalCode: '10000', city: 'Berlin', country: 'Germany', email: 'contact@atlas.example' });
+  if (pathname.startsWith('/api/document/legal-pages/imprint-details')) {
+    const action = pathname.slice('/api/document/legal-pages/imprint-details'.length);
+    if (method === 'GET' && !action) { json(res, 200, imprintDetailsState.published); return; }
+    if (bearer(req) !== SESSION_TOKEN) { json(res, 401, { error: 'Login required' }); return; }
+    if (method === 'GET' && action === '/editor') { json(res, 200, imprintDetailsState); return; }
+    const body = await readBody(req);
+    if (body.expectedRevision !== imprintDetailsState.draft.revision) { json(res, 409, { error: 'Conflict' }); return; }
+    if (method === 'PUT' && action === '/draft') {
+      imprintDetailsState.draft = { ...body, revision: body.expectedRevision + 1 };
+      json(res, 200, imprintDetailsState); return;
+    }
+    if (method === 'POST' && action === '/publish') {
+      imprintDetailsState.published = imprintDetailsState.draft;
+      json(res, 200, imprintDetailsState); return;
+    }
+    json(res, 404, { error: 'Not found' });
     return;
   }
   const legalMatch = pathname.match(/^\/api\/document\/legal-pages\/(impressum(?:_en)?|datenschutz(?:_en)?)(?:\/(editor(?:\/revisions)?|draft|publish))?$/);
   if (legalMatch) {
     const state = legalPages[legalMatch[1]];
+    if (!state) { json(res, 404, { error: 'Not published' }); return; }
     const action = legalMatch[2];
     if (method === 'GET' && !action) { json(res, state.published ? 200 : 404, state.published ?? { error: 'Not published' }); return; }
     if (method === 'GET' && action === 'editor') { json(res, 200, { key: state.key, draft: state.draft, published: state.published }); return; }
@@ -374,7 +392,7 @@ const server = createServer(async (req, res) => {
     if (method === 'PUT' && action === 'draft') {
       const body = await readBody(req);
       if (body.expectedRevision !== (state.draft?.revision ?? 0)) { json(res, 409, { error: 'Conflict' }); return; }
-      const draft = { revision: body.expectedRevision + 1, content: String(body.content).trim(), createdAt: new Date().toISOString(), createdBy: identityMe.id };
+      const draft = { revision: body.expectedRevision + 1, content: String(body.content).trim(), separateContact: legalMatch[1].startsWith('impressum'), createdAt: new Date().toISOString(), createdBy: identityMe.id };
       state.draft = draft;
       state.revisions.push(draft);
       json(res, 200, { key: state.key, draft, published: state.published });

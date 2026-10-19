@@ -1,3 +1,4 @@
+import { statusMessage } from '../../../../../lib/ui-labels';
 import { T } from '../../../../components/TranslationProvider';
 import { ui } from '../../../../../lib/messages';
 import { notFound } from 'next/navigation';
@@ -23,7 +24,7 @@ export default async function SetupProposalPage({ params, searchParams }: Props)
   const payload = proposal.payload;
   const kinds = (payload.outline?.kinds ?? []) as OutlineKindWrite[];
   return <PageMain className="wide">
-    <PageHeader title={<T value={ui.attrs.adminImportSetupProposalidPagePageHeader} />} meta={`Status: ${proposal.status}`} />
+    <PageHeader title={<T value={ui.attrs.adminImportSetupProposalidPagePageHeader} />} meta={<><T value={ui.importActions.status} /> <T value={statusMessage(proposal.status)} /></>} />
     {error ? <Alert tone="error"><T value={ui.admin.import.setup.proposalid.page.theSetupActionCouldNotBeCompleted} /></Alert> : null}
     <Card>
       <h2><T value={ui.admin.import.setup.proposalid.page.sourceAndIdentity} /></h2>

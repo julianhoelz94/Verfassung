@@ -10,8 +10,8 @@ import { PageMain } from '../components/PageMain';
 import { requestMcpKeys, requestOAuthGrants, requestPasskeys, requestStartMfaEnroll } from '../../lib/identity-client';
 import { PasskeyManager } from '../passkeys/PasskeyManager';
 import { SESSION_COOKIE, currentUser, mfaChallengeToken } from '../../lib/session';
-import { ConfirmEnrollForm, RegenerateRecoveryForm } from './MfaForms';
-import { changePasswordAction, revokeMfaAction, startMfaEnrollAction, updateContentTranslationPreferenceAction } from './actions';
+import { ConfirmEnrollForm, RegenerateRecoveryForm, StartMfaEnrollForm } from './MfaForms';
+import { changePasswordAction, revokeMfaAction, updateContentTranslationPreferenceAction } from './actions';
 import { revokeMcpKeyAction, revokeOAuthGrantAction } from './actions';
 import Image from 'next/image';
 import { CreateMcpKeyForm, RotateMcpKeyForm } from './McpKeyForms';
@@ -128,9 +128,7 @@ export default async function AccountPage(props: AccountPageProps) {
             {enrollRequested ? (
               <Alert tone="error"><T value={ui.account.page.enrollmentCouldNotBeStartedTryAgain} /></Alert>
             ) : null}
-            <form action={startMfaEnrollAction}>
-              <Button variant="primary"><T value={ui.account.page.enrollAuthenticator} /></Button>
-            </form>
+            <StartMfaEnrollForm />
           </>
         )}
         </section>

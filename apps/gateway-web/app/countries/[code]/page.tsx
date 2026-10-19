@@ -112,8 +112,7 @@ export default async function CountryPage(props: CountryPageProps) {
       {countryWiki ? (
         <section className="card">
           <h2><T value={ui.countries.code.page.about} />{" "}{country.name}</h2>
-          <ContentTranslationRegion sourceLanguage="auto"><p data-translate-content>{countryWiki.summary}</p><WikiBody body={countryWiki.body} /></ContentTranslationRegion>
-          <WikiImages images={countryWiki.images.filter((image) => image.placement === 'before_body')} />
+          <ContentTranslationRegion sourceLanguage="auto"><p data-translate-content>{countryWiki.summary}</p><WikiImages images={countryWiki.images.filter((image) => image.placement === 'before_body')} /><WikiBody body={countryWiki.body} /></ContentTranslationRegion>
           <WikiImages images={countryWiki.images.filter((image) => image.placement !== 'before_body')} />
           <WikiSources sourceUrls={countryWiki.sourceUrls ?? []} />
         </section>

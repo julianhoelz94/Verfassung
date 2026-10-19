@@ -1,3 +1,4 @@
+import { statusMessage } from '../../lib/ui-labels';
 import { SignedInSummary } from '../components/SignedInSummary';
 import { currentLocale } from '../../lib/server-locale';
 import { message } from '../../lib/messages';
@@ -131,7 +132,7 @@ export default async function EditorPage(props: EditorPageProps) {
     .filter((article) => draftIds.includes(article.id))
     .map((article) => `${kindLabel(article.kind)} ${article.articleNumber}`);
   if (structured) sourceArticles.filter(article => article.logicalId && changedRootIds.includes(article.logicalId) && !articles.some(target => target.logicalId === article.logicalId)).forEach(article => changedLabels.push(`Removed ${kindLabel(article.kind)} ${article.articleNumber}`));
-  const errorMessage = editorErrorMessage(searchParams.error);
+  const errorMessage = editorErrorMessage(searchParams.error, locale);
   const alerts = (
     <>
       {errorMessage ? <Alert tone="error">{errorMessage}</Alert> : null}
@@ -259,7 +260,7 @@ export default async function EditorPage(props: EditorPageProps) {
               <div>
                 <dt><T value={ui.editor.page.status} /></dt>
                 <dd>
-                  <Badge tone="changed">{session.status}</Badge>
+                  <Badge tone="changed">{<T value={statusMessage(session.status)} />}</Badge>
                 </dd>
               </div>
               <div>

@@ -184,18 +184,18 @@ export type RecoveryRevealState = {
   error?: boolean;
 };
 
-export async function startMfaEnrollAction(): Promise<void> {
+export async function startMfaEnrollAction(): Promise<boolean> {
   const token = await tokenOrRedirect();
   let challengeToken: string;
   try {
     const started = await requestStartMfaEnroll(undefined, token);
     challengeToken = started.challengeToken;
   } catch {
-    redirect('/account?error=mfa');
+    return false;
   }
   // Same httpOnly cookie the login enrollment flow uses; keeps the challenge out of the URL.
   await setChallengeCookie(challengeToken);
-  redirect('/account?enroll=1');
+  return true;
 }
 
 export async function confirmAccountMfaAction(

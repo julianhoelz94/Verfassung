@@ -1,5 +1,7 @@
 'use client';
 
+import { changeTypeMessage } from '../../lib/ui-labels';
+
 import { T, useTranslation } from './TranslationProvider';
 import { ui } from '../../lib/messages';
 import { useMemo, useState } from 'react';
@@ -161,7 +163,7 @@ export function VersionReader({
                   <a href={permalink}><T value={ui.components.versionreader.permalink} /></a>
                   {article.kind === 'article' && article.articleNumber ? <a href={historyHref}><T value={ui.components.versionreader.historyOf} />{" "}{kindByCode(outline, article.kind)?.displayLabel ?? t(ui.remainingStatus.article)} {article.articleNumber}</a> : null}
                   {changeType ? (
-                    <Badge tone={changeTone(changeType)}>{changeType}</Badge>
+                    <Badge tone={changeTone(changeType)}>{<T value={changeTypeMessage(changeType)} />}</Badge>
                   ) : (
                     <span className="muted">
                       {unchangedSinceLabel ? `${t(ui.readerDynamic.unchangedSince)} ${unchangedSinceLabel}` : t(ui.readerDynamic.unchanged)}

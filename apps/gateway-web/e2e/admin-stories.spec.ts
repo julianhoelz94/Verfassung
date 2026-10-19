@@ -17,19 +17,19 @@ test('administrator manages a user and its access lifecycle', async ({ page }) =
 
   await page.reload();
   const user = page.locator('.data-row').filter({ hasText: 'new-editor@example.local' });
-  await expect(user).toContainText('editor, reviewer');
-  await expect(user).toContainText('invited');
+  await expect(user).toContainText('Editor, Reviewer');
+  await expect(user).toContainText('Invited');
 
   const activeUser = page.locator('.data-row').filter({ hasText: 'local-admin@example.local' });
-  await activeUser.getByRole('checkbox', { name: 'publisher' }).check();
+  await activeUser.getByRole('checkbox', { name: 'Publisher' }).check();
   await activeUser.getByRole('button', { name: 'Update roles' }).click();
   await page.reload();
-  await expect(page.locator('.data-row').filter({ hasText: 'local-admin@example.local' }).getByRole('checkbox', { name: 'publisher' })).toBeChecked();
+  await expect(page.locator('.data-row').filter({ hasText: 'local-admin@example.local' }).getByRole('checkbox', { name: 'Publisher' })).toBeChecked();
   await page.locator('.data-row').filter({ hasText: 'local-admin@example.local' }).getByRole('button', { name: 'Issue reset token' }).click();
   await expect(page.getByText('E2E-RESET-ADMIN')).toBeVisible();
   await page.locator('.data-row').filter({ hasText: 'local-admin@example.local' }).getByRole('button', { name: 'Disable' }).click();
   let persistedUser = page.locator('.data-row').filter({ hasText: 'local-admin@example.local' });
-  await expect(persistedUser).toContainText('disabled');
+  await expect(persistedUser).toContainText('Disabled');
   await expect(persistedUser.getByRole('button', { name: 'Activate' })).toBeVisible();
   await persistedUser.getByRole('button', { name: 'Activate' }).click();
   persistedUser = page.locator('.data-row').filter({ hasText: 'local-admin@example.local' });
@@ -69,7 +69,7 @@ test('administrator stages constitution JSON for review without publishing it', 
   }));
   await page.getByRole('button', { name: 'Stage for review' }).click();
   await expect(page.getByRole('heading', { name: 'Import job' })).toBeVisible();
-  await expect(page.getByText('Status: pending_review')).toBeVisible();
+  await expect(page.getByText('Status: In review')).toBeVisible();
   await expect(page.getByRole('link', { name: 'Open the published version' })).toHaveCount(0);
 });
 

@@ -145,7 +145,7 @@ export default async function AmendmentDetailPage(props: AmendmentDetailPageProp
   const canWithdraw = canPublish && amendment?.status === 'published';
   const canRestore = canEdit;
 
-  const errorMessage = amendmentErrorMessage(searchParams.error);
+  const errorMessage = amendmentErrorMessage(searchParams.error, locale);
   const title = isNew ? message(locale, ui.remainingStatus.newAmendingLaw) : (amendment?.title ?? message(locale, ui.remainingStatus.amendingLaw));
 
   return (

@@ -50,8 +50,7 @@ export default async function ConstitutionOverview({ params }: Props) {
       {wiki ? (
         <section className="card">
           <h2><T value={ui.countries.code.constitutions.constitutionid.page.aboutThisConstitution} /></h2>
-          <ContentTranslationRegion sourceLanguage="auto"><p data-translate-content>{wiki.summary}</p><WikiBody body={wiki.body} /></ContentTranslationRegion>
-          <WikiImages images={wiki.images.filter((image) => image.placement === 'before_body')} />
+          <ContentTranslationRegion sourceLanguage="auto"><p data-translate-content>{wiki.summary}</p><WikiImages images={wiki.images.filter((image) => image.placement === 'before_body')} /><WikiBody body={wiki.body} /></ContentTranslationRegion>
           <WikiImages images={wiki.images.filter((image) => image.placement !== 'before_body')} />
           <WikiSources sourceUrls={wiki.sourceUrls ?? []} />
         </section>

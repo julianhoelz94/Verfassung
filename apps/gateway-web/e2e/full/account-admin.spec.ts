@@ -44,7 +44,7 @@ test('administrator invite, visitor activation, password change, and reset persi
   await signIn(page, 'admin');
   await page.goto('/admin/users');
   const user = page.locator('.data-row').filter({ hasText: email });
-  await expect(user).toContainText('viewer');
+  await expect(user).toContainText('Reader');
   await user.getByRole('button', { name: 'Issue reset token' }).click();
   const resetToken = await user.getByText('Reset token issued.', { exact: false }).locator('code').textContent();
   expect(resetToken).toBeTruthy();

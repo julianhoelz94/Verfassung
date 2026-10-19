@@ -1,5 +1,14 @@
 import { ui, type UiMessage } from './messages';
 
+export function changeTypeMessage(changeType: string): UiMessage {
+  switch (changeType) {
+    case 'added': return ui.remainingStatus.added;
+    case 'changed': return ui.remainingStatus.changed;
+    case 'removed': return ui.remainingStatus.removed;
+    default: return ui.remainingStatus.unknown;
+  }
+}
+
 export function builtinKindMessage(kind: string): UiMessage | null {
   switch (kind.toLowerCase()) {
     case 'article': return ui.contentKinds.article;
@@ -40,6 +49,12 @@ export function statusMessage(status: string | null | undefined): UiMessage {
     case 'rejected': return ui.accountState.rejected;
     case 'cancelled': return ui.accountState.cancelled;
     case 'archived': return ui.remainingStatus.archived;
+    case 'prepared': return ui.importState.prepared;
+    case 'outline_confirmed': return ui.importState.outlineConfirmed;
+    case 'pending': return ui.importState.pending;
+    case 'processing': return ui.importState.processing;
+    case 'completed': return ui.importState.completed;
+    case 'failed': return ui.importState.failed;
     default: return ui.remainingStatus.unknown;
   }
 }

@@ -1,3 +1,4 @@
+import { changeTypeMessage } from '../lib/ui-labels';
 import { T } from './components/TranslationProvider';
 import { ui } from '../lib/messages';
 import {
@@ -185,7 +186,7 @@ export default async function Page() {
           <ul className="recent-list">
             {recentTop.map((row, index) => (
               <li key={`${row.versionId}-${row.articleNumber}-${index}`}>
-                <Badge>{row.changeType}</Badge>
+                <Badge>{<T value={changeTypeMessage(row.changeType)} />}</Badge>
                 <span>{row.articleNumber ? <><T value={ui.homeDynamic.article} /> {row.articleNumber}</> : <T value={ui.homeDynamic.anArticle} />}</span>
                 <span className="muted">
                   {row.countryName}

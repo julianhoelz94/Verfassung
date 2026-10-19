@@ -1,3 +1,5 @@
+import { ui } from './messages';
+import type { Locale } from './locale';
 import { cookies } from 'next/headers';
 import type { Amendment, AmendmentUnitRef } from './api';
 import { amendmentBaseUrl } from './api';
@@ -48,27 +50,27 @@ export type SuggestChangesBody = {
 };
 
 export const AMENDMENT_ERROR_MESSAGES = {
-  sign_in: 'Sign in required.',
-  forbidden: 'You do not have permission for that action.',
-  not_found: 'This amending law could not be found.',
-  invalid: 'The amending law could not be saved.',
-  create_failed: 'Could not create amending law.',
-  save_failed: 'Could not save draft.',
-  publish_failed: 'Could not publish amending law.',
-  withdraw_failed: 'Could not withdraw amending law.',
-  title: 'Title is required.',
-  failed: 'The amending law action could not be completed.',
+  sign_in: ui.errors.signIn,
+  forbidden: ui.errors.forbidden,
+  not_found: ui.errors.amendmentNotFound,
+  invalid: ui.errors.amendmentSaveFailed,
+  create_failed: ui.errors.createAmendmentFailed,
+  save_failed: ui.errors.saveDraftFailed,
+  publish_failed: ui.errors.publishAmendmentFailed,
+  withdraw_failed: ui.errors.withdrawAmendmentFailed,
+  title: ui.errors.titleRequired,
+  failed: ui.errors.amendmentFailed,
 } as const;
 
 export type AmendmentErrorKey = keyof typeof AMENDMENT_ERROR_MESSAGES;
 
-export function amendmentErrorMessage(key: string | undefined): string | null {
+export function amendmentErrorMessage(key: string | undefined, locale: Locale = 'en'): string | null {
   if (!key) {
     return null;
   }
-  return key in AMENDMENT_ERROR_MESSAGES
+  return (key in AMENDMENT_ERROR_MESSAGES
     ? AMENDMENT_ERROR_MESSAGES[key as AmendmentErrorKey]
-    : AMENDMENT_ERROR_MESSAGES.failed;
+    : AMENDMENT_ERROR_MESSAGES.failed)[locale];
 }
 
 export class AmendmentApiError extends Error {
@@ -76,7 +78,7 @@ export class AmendmentApiError extends Error {
     readonly key: AmendmentErrorKey,
     readonly code?: string,
   ) {
-    super(AMENDMENT_ERROR_MESSAGES[key]);
+    super(AMENDMENT_ERROR_MESSAGES[key].en);
     this.name = 'AmendmentApiError';
   }
 }

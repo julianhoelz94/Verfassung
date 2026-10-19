@@ -1,5 +1,7 @@
 'use client';
 
+import { changeTypeMessage } from '../../lib/ui-labels';
+
 import { T, useTranslation } from '../components/TranslationProvider';
 import { ui } from '../../lib/messages';
 import { useMemo, useState } from 'react';
@@ -165,7 +167,7 @@ export function PublishForm({ sessionId, versionId, articleId, hopKind, status, 
           <div className="stack">
             <p><strong>{record.title}</strong></p>
             <p>{record.comment}</p>
-            {record.changes?.map((change, index) => <p key={`${change.articleId}-${index}`}>{change.changeType}: {change.beforeRef?.logicalId ?? '—'} → {change.afterRef?.logicalId ?? '—'}{change.note ? ` · ${change.note}` : ''}</p>)}
+            {record.changes?.map((change, index) => <p key={`${change.articleId}-${index}`}>{<T value={changeTypeMessage(change.changeType)} />}: {change.beforeRef?.logicalId ?? '—'} → {change.afterRef?.logicalId ?? '—'}{change.note ? ` · ${change.note}` : ''}</p>)}
             {record.documents.length > 0 ? (
               <ul>
                 {record.documents.map((document, index) => (
@@ -196,7 +198,7 @@ export function PublishForm({ sessionId, versionId, articleId, hopKind, status, 
         </form>
       ) : null}
       {diffReview ? <DiffReviewQueue key={diffReview.draftGeneration} target={{ kind: 'editor', id: sessionId }} initial={diffReview}
-        rows={(record?.changes ?? []).flatMap((change, index) => change.id ? [{ id: change.id, label: `${index + 1}. ${change.changeType} ${change.articleNumber} ${change.note ?? ''}`.trim() }] : [])}
+        rows={(record?.changes ?? []).flatMap((change, index) => change.id ? [{ id: change.id, label: `${index + 1}. ${t(changeTypeMessage(change.changeType))} ${change.articleNumber} ${change.note ?? ''}`.trim() }] : [])}
         canDecide={status === 'open' && canEdit || canReviewDiff}
         canAcknowledge={canReviewDiff}
         onAddRow={status === 'open' && canEdit ? addCandidateRow : undefined} /> : null}

@@ -69,7 +69,7 @@ export async function EditorLanding({ email, roles, status, error }: { email: st
   rows.sort((a, b) => a.country.localeCompare(b.country) || a.constitution.localeCompare(b.constitution) || b.session.updatedAt.localeCompare(a.session.updatedAt));
   const countries = [...new Set(rows.map((row) => row.country))];
   const heading = localize(locale, queue === 'reviewing' ? ui.nav.reviewQueue : queue === 'approved' ? ui.nav.readyToPublish : ui.editor.editorlanding.myOpenSessions);
-  const message = editorErrorMessage(error);
+  const message = editorErrorMessage(error, locale);
 
   return <PageMain className="wide">
     <PageHeader title={<T value={ui.attrs.editorEditorlandingPageHeaderTitleEditor} />} eyebrow={heading} meta={`${localize(locale, ui.remainingStatus.signedInAs)} ${email}.`} />

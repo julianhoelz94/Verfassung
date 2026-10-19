@@ -1,3 +1,4 @@
+import { changeTypeMessage } from '../../../../lib/ui-labels';
 import { T } from '../../../components/TranslationProvider';
 import { ui } from '../../../../lib/messages';
 import { currentLocale } from '../../../../lib/server-locale';
@@ -340,7 +341,7 @@ export default async function ComparePage(props: ComparePageProps) {
                   <div className="stack">
                     {amendment.changes.map((change) => (
                       <div key={change.id} className="change-row">
-                        <Badge tone={hopChangeTone(change.changeType)}>{change.changeType}</Badge>
+                        <Badge tone={hopChangeTone(change.changeType)}>{<T value={changeTypeMessage(change.changeType)} />}</Badge>
                         {change.articleNumber ? (
                           <a href={`/countries/${country.isoCode}/articles/${encodeURIComponent(change.articleNumber)}`}>
                             <T value={ui.countries.code.compare.page.art} />{" "}{change.articleNumber}

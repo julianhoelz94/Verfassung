@@ -1,5 +1,7 @@
 'use client';
 
+import { changeTypeMessage } from '../../../lib/ui-labels';
+
 import { T, useTranslation } from '../../components/TranslationProvider';
 import { ui } from '../../../lib/messages';
 import { statusMessage } from '../../../lib/ui-labels';
@@ -258,7 +260,7 @@ export function AmendmentForm({
           onRowsChange={setChangeRows}
         />
         {diffReview ? <DiffReviewQueue key={diffReview.revisionId} target={{ kind: 'amendment', id: amendmentId }} initial={diffReview}
-          rows={(amendment?.changes ?? []).map((change, index) => ({ id: change.id, label: `${index + 1}. ${change.changeType} ${change.articleNumber ?? ''} ${change.note ?? ''}`.trim() }))}
+          rows={(amendment?.changes ?? []).map((change, index) => ({ id: change.id, label: `${index + 1}. ${t(changeTypeMessage(change.changeType))} ${change.articleNumber ?? ''} ${change.note ?? ''}`.trim() }))}
           canDecide={canReviewDiff && !readOnly || canAcknowledgeDiff} canAcknowledge={canAcknowledgeDiff}
           onAddRow={!readOnly ? addCandidateRow : undefined} /> : null}
       </div>

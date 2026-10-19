@@ -32,7 +32,7 @@ export default async function AdminLegalPage({
   const title = message(locale, key.startsWith('impressum') ? ui.legal.imprint : ui.legal.privacyNotice);
   return (
     <PageMain>
-      <PageHeader title={`${message(locale, ui.legal.edit)} ${title}`} meta={<T value={ui.attrs.adminLegalKeyPagePageHeaderMeta} />} />
+      <PageHeader title={<T value={key.startsWith('impressum') ? ui.legal.editImprint : ui.legal.editPrivacyNotice} />} meta={<T value={ui.attrs.adminLegalKeyPagePageHeaderMeta} />} />
       <nav className="inline-actions" aria-label={title}>
         <Link href={`/admin/legal/${key.startsWith('impressum') ? 'impressum' : 'datenschutz'}`}><T value={ui.legal.germanVersion} /></Link>
         <Link href={`/admin/legal/${key.startsWith('impressum') ? 'impressum_en' : 'datenschutz_en'}`}><T value={ui.legal.englishVersion} /></Link>

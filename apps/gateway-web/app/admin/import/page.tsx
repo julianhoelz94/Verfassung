@@ -1,3 +1,4 @@
+import { statusMessage } from '../../../lib/ui-labels';
 import { T } from '../../components/TranslationProvider';
 import { ui } from '../../../lib/messages';
 import { AdminForbidden } from '../../components/AdminForbidden';
@@ -54,7 +55,7 @@ export default async function AdminImportPage(props: AdminImportPageProps) {
       <Card>
         <h2><T value={ui.admin.import.page.recentImports} /></h2>
         {jobs.length === 0 ? <p><T value={ui.admin.import.page.noImportsYet} /></p> : <ul>{jobs.map(job => <li key={job.id}>
-          <a href={`/admin/import/${encodeURIComponent(job.id)}`}>{job.isoCode ?? 'Constitution'} · {job.id}</a> — {job.status}
+          <a href={`/admin/import/${encodeURIComponent(job.id)}`}>{job.isoCode ?? <T value={ui.remainingStatus.constitution} />} · {job.id}</a> — {<T value={statusMessage(job.status)} />}
         </li>)}</ul>}
       </Card>
     </PageMain>

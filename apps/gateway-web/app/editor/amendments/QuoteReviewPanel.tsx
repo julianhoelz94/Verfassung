@@ -1,3 +1,4 @@
+import { changeTypeMessage } from '../../../lib/ui-labels';
 import { T } from '../../components/TranslationProvider';
 import { ui } from '../../../lib/messages';
 import type { ReactNode } from 'react';
@@ -53,7 +54,7 @@ export function QuoteReviewPanel({ amendment, publishedRevision, versions, canCo
           <ul>
             {(publishedRevision?.changes ?? amendment.changes).map((change, index) => (
               <li key={`${change.articleNumber ?? 'change'}-${index}`}>
-                {change.articleNumber ? <><T value={ui.quoteReview.article} /> {change.articleNumber}: </> : ''}{change.changeType}{change.note ? ` — ${change.note}` : ''}
+                {change.articleNumber ? <><T value={ui.quoteReview.article} /> {change.articleNumber}: </> : ''}{<T value={changeTypeMessage(change.changeType)} />}{change.note ? ` — ${change.note}` : ''}
               </li>
             ))}
           </ul>

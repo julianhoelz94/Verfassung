@@ -1,3 +1,4 @@
+import { statusMessage } from '../../../../lib/ui-labels';
 import { T } from '../../../components/TranslationProvider';
 import { ui } from '../../../../lib/messages';
 import { notFound } from 'next/navigation';
@@ -52,7 +53,7 @@ export default async function ImportJobPage(props: ImportJobPageProps) {
       : null;
   return (
     <PageMain className="wide">
-      <PageHeader title={<T value={ui.attrs.adminImportJobidPagePageHeaderTitle} />} meta={<><T value={ui.importActions.status} /> {job.status}</>} />
+      <PageHeader title={<T value={ui.attrs.adminImportJobidPagePageHeaderTitle} />} meta={<><T value={ui.importActions.status} /> {<T value={statusMessage(job.status)} />}</>} />
       {searchParams.error ? <Alert tone="error"><T value={searchParams.error === 'reason' ? ui.importActions.reasonRequired : ui.importActions.actionFailed} /></Alert> : null}
       {job.status === 'pending_review' ? <Alert><T value={ui.admin.import.jobid.page.thisImportIsPendingReviewItIs} /></Alert> : null}
       {job.status === 'failed' ? <Alert tone="error"><T value={ui.admin.import.jobid.page.theImportFailed} /></Alert> : null}

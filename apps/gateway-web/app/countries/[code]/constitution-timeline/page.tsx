@@ -1,3 +1,4 @@
+import { lifecycleStatusMessage } from '../../../../lib/lifecycle-label';
 import { T } from '../../../components/TranslationProvider';
 import { ui, type UiMessage } from '../../../../lib/messages';
 import { notFound } from 'next/navigation';
@@ -92,30 +93,30 @@ export default async function ConstitutionTimelinePage({ params, searchParams }:
       .filter((event) => event.constitutionId === constitution.id && event.eventDate <= on)
       .at(-1);
     const status = last?.dateCertainty === 'approximate'
-      ? 'uncertain (last event date is approximate)'
+      ? 'uncertain_approximate'
       : last?.eventType === 'commenced' || last?.eventType === 'restored'
-      ? 'in force'
+      ? 'in_force'
       : last?.eventType === 'adopted'
-        ? 'adopted, awaiting commencement'
+        ? 'awaiting_commencement'
         : last?.eventType === 'suspended'
           ? 'suspended'
           : last?.eventType === 'repealed'
             ? 'repealed'
-            : 'not recorded';
+            : 'not_recorded';
     return { constitution, status };
   });
-  const inForce = statusOn.filter((row) => row.status === 'in force');
+  const inForce = statusOn.filter((row) => row.status === 'in_force');
   const provisionStatus = new Map<string, { event: ProvisionLifecycleEvent; state: string }>();
   (provisionEvents ?? []).filter((event) => event.eventDate <= on)
     .sort((a, b) => a.eventDate.localeCompare(b.eventDate) || a.id.localeCompare(b.id))
     .forEach((event) => event.logicalUnitIds.forEach((id) => {
       provisionStatus.set(`${event.constitutionId}:${id}`, {
         event,
-        state: event.eventType === 'deferred' ? 'not yet in force' :
-          event.eventType === 'suspended' ? 'suspended' : 'in force',
+        state: event.eventType === 'deferred' ? 'awaiting_commencement' :
+          event.eventType === 'suspended' ? 'suspended' : 'in_force',
       });
     }));
-  const provisionsNotInForce = [...provisionStatus.entries()].filter(([, row]) => row.state !== 'in force');
+  const provisionsNotInForce = [...provisionStatus.entries()].filter(([, row]) => row.state !== 'in_force');
 
   return (
     <PageMain className="wide">
@@ -144,7 +145,7 @@ export default async function ConstitutionTimelinePage({ params, searchParams }:
         <details>
           <summary><T value={ui.countries.code.constitutionTimeline.page.allConstitutionStatuses} /></summary>
           <ul>{statusOn.map(({ constitution, status }) => (
-            <li key={constitution.id}>{constitution.title}: {status}</li>
+            <li key={constitution.id}>{constitution.title}: <T value={status === 'uncertain_approximate' ? ui.lifecycleEvents.uncertainDate : lifecycleStatusMessage(status)} /></li>
           ))}</ul>
         </details>
         {provisionsNotInForce.length > 0 ? (
@@ -155,7 +156,7 @@ export default async function ConstitutionTimelinePage({ params, searchParams }:
                 const logicalId = key.split(':')[1];
                 const resolved = units.get(`${row.event.sourceVersionId}:${logicalId}`);
                 const constitution = constitutionsById.get(row.event.constitutionId);
-                return <li key={key}>{constitution?.title}: {resolved?.pathLabels.join(' → ') || 'Unit reference needs review'} · {row.state}</li>;
+                return <li key={key}>{constitution?.title}: {resolved?.pathLabels.join(' → ') || <T value={ui.lifecycleEvents.unitNeedsReview} />} · {<T value={lifecycleStatusMessage(row.state)} />}</li>;
               })}
             </ul>
           </div>
@@ -190,7 +191,7 @@ export default async function ConstitutionTimelinePage({ params, searchParams }:
                 <ul>
                   {event.logicalUnitIds.map((logicalId) => {
                     const resolved = units.get(`${event.sourceVersionId}:${logicalId}`);
-                    const label = resolved?.pathLabels.join(' → ') || 'Unit reference needs review';
+                    const label = resolved?.pathLabels.join(' → ') || <T value={ui.lifecycleEvents.unitNeedsReview} />;
                     return (
                       <li key={logicalId}>
                         {resolved ? <a href={resolved.deepLink}>{label}</a> : label}

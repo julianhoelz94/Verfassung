@@ -50,6 +50,12 @@ async function authenticated(browser: Browser, role: Role, locale: Locale) {
   } finally { await login.close(); }
 }
 
+async function selectArticle(page: Page, watch: Walkthrough, articleId: string) {
+  const articleLink = page.locator(`a[href*="articleId=${articleId}"]`).first();
+  await watch.click(articleLink);
+  await expect(articleLink).toHaveAttribute('aria-current', 'true');
+}
+
 async function record(browser: Browser, role: Exclude<Role, 'admin'>, locale: Locale, file: string, staging: string,
   walk: (page: Page, presentation: Walkthrough) => Promise<void>) {
   const login = await authenticated(browser, role, locale);
@@ -127,8 +133,7 @@ for (const locale of ['en', 'de'] as const) {
         await expect(page).toHaveURL(/sessionId=/);
         sessionId = new URL(page.url()).searchParams.get('sessionId') ?? '';
         expect(sessionId).toBeTruthy();
-        const articleLink = page.locator(`a[href*="articleId=${source.article.id}"]`).first();
-        if (await articleLink.count()) await watch.click(articleLink);
+        await selectArticle(page, watch, source.article.id);
         await expect(page.locator('#draft-form input[name=articleId]')).toHaveValue(source.article.id);
         await watch.explain(text('Edit the selected article, then save the draft.', 'Bearbeiten Sie den Artikel und speichern Sie den Entwurf.'));
         await watch.type(page.locator('#draft-form textarea').first(), correction);
@@ -148,6 +153,7 @@ for (const locale of ['en', 'de'] as const) {
         await expect(page.getByRole('heading', { name:t(ui.nav.reviewQueue), exact:true })).toBeVisible();
         await watch.explain(text('Reviewer: open the submitted session from the queue.', 'Prüfung: Öffnen Sie die eingereichte Sitzung aus der Prüfliste.'));
         await watch.click(page.locator(`a[href*="sessionId=${sessionId}"]`).first());
+        await selectArticle(page, watch, source.article.id);
         await expect(page.getByText(correction).first()).toBeVisible();
         await watch.explain(text('Compare the draft, its source and the correction comment.', 'Vergleichen Sie Entwurf, Quelle und Korrekturkommentar.'));
         await shot(page, 'editor-review');
@@ -160,6 +166,7 @@ for (const locale of ['en', 'de'] as const) {
         await expect(page.getByRole('heading', { name:t(ui.nav.readyToPublish), exact:true })).toBeVisible();
         await watch.explain(text('Publisher: open the approved session.', 'Veröffentlichung: Öffnen Sie die freigegebene Sitzung.'));
         await watch.click(page.locator(`a[href*="sessionId=${sessionId}"]`).first());
+        await selectArticle(page, watch, source.article.id);
         await expect(page.getByText(correction).first()).toBeVisible();
         await watch.explain(text('Check the approved text and its change type.', 'Kontrollieren Sie Text und Änderungsart.'));
         await shot(page, 'editor-publish');

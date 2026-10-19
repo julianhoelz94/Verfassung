@@ -188,7 +188,7 @@ https://''' + HOST + ''' {
         peer = baseline['X-Atlas-Client-IP']
         assert len(peer) == 1 and peer == baseline['X-Forwarded-For'], baseline
         for path in ('/oauth/register', '/api/identity/oauth/register', '/api/identity/login',
-                     '/api/identity/passkeys/login/start', '/api/identity/password/reset/request',
+                     '/api/identity/passkeys/login/start', '/api/identity/password/reset',
                      '/security-header-probe', '/account'):
             for forged in ('203.0.113.99', '198.51.100.10, 203.0.113.99'):
                 echoed = json.loads(expect_code(200, public + path, headers=[

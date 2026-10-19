@@ -13,7 +13,10 @@ CLIPS = (('editing-a-draft', 'editor-draft', 45, 'Edit and submit', 'Bearbeiten 
 
 
 def command(*args):
-    return subprocess.run(args, check=True, capture_output=True, text=True).stdout
+    result = subprocess.run(args, capture_output=True, text=True)
+    if result.returncode:
+        raise RuntimeError(f'{args[0]} failed: {result.stderr.strip()}')
+    return result.stdout
 
 
 def prepare(source, output, revision):

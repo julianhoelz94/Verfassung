@@ -22,7 +22,7 @@
 
 **Erforderlich: Prüfer oder Administrator.**
 
-1. Öffnen Sie die Prüfwarteschlange und die eingereichte Sitzung.
+1. Öffnen Sie **Prüfliste** und die eingereichte Sitzung.
 2. Vergleichen Sie Entwurf und Quelle. Prüfen Sie Kommentar, betroffene Einheiten und Änderungsart.
 3. Geben Sie die Prüfung frei oder geben Sie die Arbeit über die angebotenen Aktionen zurück.
 
@@ -37,7 +37,7 @@
 
 **Erforderlich: Herausgeber oder Administrator.**
 
-1. Öffnen Sie die zur Veröffentlichung bereite Sitzung.
+1. Öffnen Sie **Bereit zur Veröffentlichung** und die freigegebene Sitzung.
 2. Bestätigen Sie Text und Änderungsart; führen Sie bei Aufforderung die frische MFA-Prüfung durch.
 3. Veröffentlichen Sie und prüfen Sie Text sowie Suchindexstatus der neuen Fassung.
 

@@ -14,9 +14,6 @@ concurrency:
 
 jobs:
   record:
-    permissions:
-      contents: read
-      pull-requests: read
     if: github.event.pull_request.merged == true
     runs-on: ubuntu-latest
     timeout-minutes: 75
@@ -50,10 +47,6 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '20'
-      - name: Require merged Sprint 59 UI
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: test "$(gh api "repos/${GITHUB_REPOSITORY}/pulls/136" --jq .merged)" = true
       - name: Build full-stack service jars
         run: |
           set -euo pipefail

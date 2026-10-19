@@ -43,13 +43,7 @@ Verwenden Sie die Adresse der geöffneten Version oder Einheit als dauerhaften L
 
 ## Sprache und Inhaltsübersetzung
 
-Die Website richtet sich nach der Gerätesprache, sofern sie unterstützt wird (derzeit Deutsch und Englisch). Andernfalls verwendet sie Englisch. Unter **Konto** können Sie bei **Sprache der Website** eine Sprache wählen oder zu **Automatisch: Gerätesprache** zurückkehren. Die Oberflächentexte und diese Handbücher sind vorab gepflegte Übersetzungen.
-
-Verfassungs-, Änderungs- und Hintergrundtexte können in ihrer Ausgangssprache vorliegen. Auf unterstützten Inhaltsseiten können Sie mit **Diesen Inhalt übersetzen** eine maschinelle Übersetzung in Ihre Website-Sprache anfordern. Dafür müssen Sie angemeldet sein; nicht angemeldete Besucher sehen die Schaltfläche und einen Anmeldehinweis. In der übersetzten Ansicht steht immer **Original anzeigen** zur Verfügung. Maschinelle Übersetzungen sind eine Lesehilfe. Für den genauen Wortlaut prüfen Sie das Original und die angegebene Quelle. Ist eine redaktionell veröffentlichte Fassung in Ihrer Sprache vorhanden, wird diese bevorzugt angezeigt.
-
-Unter **Konto → Inhaltsübersetzung** können Sie **Inhalte immer übersetzen** aktivieren. Die Einstellung gilt auf unterstützten Seiten, wenn keine redaktionelle Fassung verfügbar ist. Sie können auch einen persönlichen Google-Translate-API-Schlüssel hinterlegen. Er wird auf dem Server verschlüsselt gespeichert, später nicht mehr angezeigt und nur für Ihre Übersetzungsanfragen verwendet. Die Zeichen werden dann Ihrem eigenen Google-Projekt statt dem gemeinsamen Website-Kontingent zugerechnet. Administratoren können die maschinelle Übersetzung für die ganze Website deaktivieren oder zwischen Google und DeepL wechseln. Bei aktiver Übersetzung wird der ausgewählte Text an den Anbieter gesendet.
-
-Die deutschen und englischen Impressumstexte werden getrennt veröffentlicht. Anschrift und Kontaktdaten des Betreibers werden einmal gepflegt und in beiden Sprachfassungen angezeigt.
+Unter [[Konto → Sprache der Website|Account-Guide-de#sprache-und-inhaltsübersetzung]] ändern Sie die Sprache oder fordern eine Inhaltsübersetzung an. Redaktionelle Sprachfassungen und maschinelle Übersetzungen sind getrennt; prüfen Sie den genauen Wortlaut am Original.
 
 ## Angaben zur Website und Datenschutz
 

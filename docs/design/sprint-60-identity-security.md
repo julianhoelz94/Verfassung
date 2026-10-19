@@ -76,6 +76,11 @@ Independent code review is clear, and actual external-proxy verification passes
 PR/main, real WebAuthn/browser and Wiki checks complete close-out; final results
 are recorded in the Sprint 60 Linear plan.
 
+The first real WebAuthn CI run exposed an invalid test relying-party ID: Chromium
+rejects `127.0.0.1` even in a secure loopback context. Identical independent probes
+succeeded on `localhost`. Full-stack CI, OAuth resources and mail links now share
+the configured localhost origin; production RP/origin validation stays strict.
+
 This is a source review with controlled exploit regressions, not a production
 penetration test or incident investigation. Transport trust configuration,
 production secrets, SMTP and external identity clients still depend on the actual

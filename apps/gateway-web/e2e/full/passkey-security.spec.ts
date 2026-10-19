@@ -1,3 +1,4 @@
+import { isIP } from 'node:net';
 import { expect, test } from '../fixtures/consent';
 import { signIn, signOut } from './auth';
 
@@ -5,6 +6,7 @@ test.use({ trace: 'off' });
 
 test('an existing passkey protects password login and confirms the current session', async ({ page, context }) => {
   test.setTimeout(120_000);
+  expect(isIP(new URL(String(test.info().project.use.baseURL)).hostname), 'WebAuthn requires a DNS hostname; use localhost for the test stack').toBe(0);
   const email = `passkey-security-${Date.now()}@example.local`;
   const password = 'A unique device secret 2026!';
   await signIn(page, 'admin');
@@ -34,7 +36,7 @@ test('an existing passkey protects password login and confirms the current sessi
     await page.locator('#passkey-name').fill('Security test device');
     await page.locator('#passkey-password').fill(password);
     await page.getByRole('button', { name: 'Add passkey', exact: true }).click();
-    await expect(page.getByRole('status').filter({ hasText: 'Passkey added.' })).toBeVisible();
+    await expect(page.locator('[aria-labelledby="passkeys-title"]').getByRole('status')).toHaveText('Passkey added.');
     await expect(page.getByText('Security test device', { exact: false })).toBeVisible();
 
     const before = (await context.cookies()).find(cookie => cookie.name === 'ca_session')!.value;

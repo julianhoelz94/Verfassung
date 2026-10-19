@@ -335,10 +335,10 @@ jobs:
       GATEWAY_PORT: '13000'
       SESSION_COOKIE_SECURE: 'false'
       SETUP_FIXTURE_COMPLETE: 'false'
-      PUBLIC_BASE_URL: http://127.0.0.1:18080
+      PUBLIC_BASE_URL: http://localhost:18080
       PREPOPULATE_TEST_STACK: 'true'
-      PREPOPULATE_BASE_URL: http://127.0.0.1:18080
-      E2E_BASE_URL: http://127.0.0.1:18080
+      PREPOPULATE_BASE_URL: http://localhost:18080
+      E2E_BASE_URL: http://localhost:18080
       CI_ADMIN_EMAIL: ci-admin@example.local
       CI_ADMIN_PASSWORD: change-me
       CI_VIEWER_EMAIL: ci-viewer@example.local

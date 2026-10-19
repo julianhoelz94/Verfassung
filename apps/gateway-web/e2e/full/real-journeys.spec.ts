@@ -74,7 +74,7 @@ test('viewer signs in, sees the public site, and signs out', async ({ page }) =>
   await page.getByRole('button', { name: 'Sign in' }).click();
   await expect(page.getByRole('button', { name: 'Account menu' })).toBeVisible();
   await page.goto('/account');
-  await expect(page.getByRole('heading', { name: 'Account' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Account', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Account menu' }).click();
   await page.getByRole('button', { name: 'Sign out' }).click();
   await expect.poll(async () => (await page.context().cookies()).some((cookie) => cookie.name === 'ca_session')).toBe(false);

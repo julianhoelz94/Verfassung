@@ -11,10 +11,10 @@ type StatusMessageProps = {
 
 export function StatusMessage({ title, message, actionHref, actionLabel }: StatusMessageProps) {
   return (
-    <section className="status-panel" role="status" aria-live="polite">
+    <section className="status-panel card" role="status" aria-live="polite">
       <h1>{title}</h1>
       <p>{message}</p>
-      {actionHref && actionLabel ? <a href={actionHref}>{actionLabel}</a> : null}
+      {actionHref && actionLabel ? <a className="btn" href={actionHref}>{actionLabel}</a> : null}
     </section>
   );
 }

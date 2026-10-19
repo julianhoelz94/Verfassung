@@ -73,6 +73,11 @@ export async function EditorLanding({ email, roles, status, error }: { email: st
 
   return <PageMain className="wide">
     <PageHeader title={<T value={ui.attrs.editorEditorlandingPageHeaderTitleEditor} />} eyebrow={heading} meta={`${localize(locale, ui.remainingStatus.signedInAs)} ${email}.`} />
+    <nav className="section-nav" aria-label={localize(locale, ui.nav.editorial)}>
+      {canEdit ? <Link href="/editor?mine=1" aria-current={!queue ? 'page' : undefined}><T value={ui.editor.editorlanding.myOpenSessions} /></Link> : null}
+      {canReview ? <Link href="/editor?status=reviewing" aria-current={queue === 'reviewing' ? 'page' : undefined}><T value={ui.nav.reviewQueue} /></Link> : null}
+      {canPublish ? <Link href="/editor?status=approved" aria-current={queue === 'approved' ? 'page' : undefined}><T value={ui.nav.readyToPublish} /></Link> : null}
+    </nav>
     <h2 className="section-title">{heading}</h2>
     {message ? <Alert tone="error">{message}</Alert> : null}
     {unavailable ? <Alert tone="error"><T value={ui.editor.editorlanding.editSessionsAreTemporarilyUnavailableTryAgain} /></Alert> : rows.length === 0 ?

@@ -10,9 +10,10 @@ import { adminImprintDetails, adminLegalPage, adminLegalPageRevisions, type Lega
 import { exampleLegalPage } from '../../../../lib/legal-page-examples';
 import { publishLegalPageAction, saveLegalDraftAction } from './actions';
 import { notFound } from 'next/navigation';
-import Link from 'next/link';
 import { currentLocale } from '../../../../lib/server-locale';
 import { message } from '../../../../lib/messages';
+import { reviewUi } from '../../../../lib/ui-review-messages';
+import { LocalizedRegion } from '../../../components/LocalizedRegion';
 
 export default async function AdminLegalPage({
   params,
@@ -38,9 +39,13 @@ export default async function AdminLegalPage({
   return (
     <PageMain>
       <PageHeader title={<T value={key.startsWith('impressum') ? ui.legal.editImprint : ui.legal.editPrivacyNotice} />} meta={<T value={ui.attrs.adminLegalKeyPagePageHeaderMeta} />} />
+      <LocalizedRegion as="nav" className="section-nav" label={reviewUi.legalPages}>
+        <a href={`/admin/legal/impressum${key.endsWith('_en') ? '_en' : ''}`} aria-current={key.startsWith('impressum') ? 'page' : undefined}><T value={ui.legal.imprint} /></a>
+        <a href={`/admin/legal/datenschutz${key.endsWith('_en') ? '_en' : ''}`} aria-current={key.startsWith('datenschutz') ? 'page' : undefined}><T value={ui.legal.privacyNotice} /></a>
+      </LocalizedRegion>
       <nav className="inline-actions" aria-label={title}>
-        <Link href={`/admin/legal/${key.startsWith('impressum') ? 'impressum' : 'datenschutz'}`}><T value={ui.legal.germanVersion} /></Link>
-        <Link href={`/admin/legal/${key.startsWith('impressum') ? 'impressum_en' : 'datenschutz_en'}`}><T value={ui.legal.englishVersion} /></Link>
+        <a href={`/admin/legal/${key.startsWith('impressum') ? 'impressum' : 'datenschutz'}`}><T value={ui.legal.germanVersion} /></a>
+        <a href={`/admin/legal/${key.startsWith('impressum') ? 'impressum_en' : 'datenschutz_en'}`}><T value={ui.legal.englishVersion} /></a>
       </nav>
       {paramsMessage.error ? <Alert tone="error"><T value={errorMessage} /></Alert> : null}
       {paramsMessage.saved ? <Alert tone="info"><T value={ui.admin.legal.key.page.draftSavedThePublicPageHasNot} /></Alert> : null}

@@ -1,3 +1,5 @@
+import { Disclosure } from '../../components/Disclosure';
+import { reviewUi } from '../../../lib/ui-review-messages';
 import { SignedInSummary } from '../../components/SignedInSummary';
 import { T } from '../../components/TranslationProvider';
 import { ui, type UiMessage } from '../../../lib/messages';
@@ -26,10 +28,6 @@ function hopKindLabel(hopKind: string | undefined): UiMessage {
     return ui.remainingStatus.unknown;
   }
   return HOP_KIND_LABELS[hopKind] ?? ui.remainingStatus.unknown;
-}
-
-function isStaffOnly(version: VersionSummary): boolean {
-  return version.hopKind === 'editorial_correction' || version.listing === 'staff';
 }
 
 function legalIdentity(version: VersionSummary): string {
@@ -155,13 +153,16 @@ export default async function SnapshotHistoryPage(props: HistoryPageProps) {
                     {
                       label: <T value={ui.remainingStatus.editorialRevisions} />,
                       value: editorial.length ? (
+                        <Disclosure summary={<T value={reviewUi.textCorrections} />}>
+                        <p className="muted"><T value={reviewUi.correctionHint} /></p>
                         <ol>
                           {editorial.map((version) => (
                             <li key={version.id}>
-                              {version.versionLabel} <T value={ui.editor.history.page.editorialCorrection} />{" "}{version.publicationComment ?? <T value={ui.remainingStatus.noPublicationComment} />}
+                              {countryCode ? <a href={`/countries/${countryCode}/versions/${version.id}`}>{version.versionLabel}</a> : version.versionLabel} <T value={ui.editor.history.page.editorialCorrection} />{" "}{version.publicationComment ?? <T value={ui.remainingStatus.noPublicationComment} />}
                             </li>
                           ))}
                         </ol>
+                        </Disclosure>
                       ) : <T value={ui.editorDefaults.noEditorialRevisions} />,
                     },
                     {

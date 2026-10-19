@@ -58,6 +58,7 @@ test('administrator creates, rotates and revokes a service token', async ({ page
 test('administrator stages constitution JSON for review without publishing it', async ({ page }) => {
   await signInAdmin(page);
   await page.goto('/admin/import');
+  await page.getByText('Paste JSON instead', { exact: true }).click();
   await page.getByLabel('Import JSON').fill(JSON.stringify({
     isoCode: 'US',
     countryName: 'United States',
@@ -163,4 +164,51 @@ test('outline mixed-content preview follows permissions on desktop and mobile', 
   await expect(preview).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBeTruthy();
   await page.screenshot({ path: testInfo.outputPath('outline-mobile.png'), fullPage: true });
+});
+
+test('administrator can find both legal pages and switch their language', async ({ page }) => {
+  await signInAdmin(page);
+  await page.goto('/admin');
+  await page.locator('main').getByRole('link', { name: 'Legal pages', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Edit imprint' })).toBeVisible();
+  await page.getByRole('navigation', { name: 'Legal pages', exact: true }).getByRole('link', { name: 'Privacy notice', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Edit privacy notice' })).toBeVisible();
+  await page.getByRole('link', { name: 'English version', exact: true }).click();
+  await expect(page).toHaveURL(/\/admin\/legal\/datenschutz_en$/);
+  await expect(page.getByRole('navigation', { name: 'Legal pages', exact: true }).getByRole('link', { name: 'Imprint', exact: true })).toHaveAttribute('href', '/admin/legal/impressum_en');
+  await page.getByRole('navigation', { name: 'Legal pages', exact: true }).getByRole('link', { name: 'Imprint', exact: true }).click();
+  await expect(page).toHaveURL(/\/admin\/legal\/impressum_en$/);
+  await page.getByRole('link', { name: 'German version', exact: true }).click();
+  await expect(page).toHaveURL(/\/admin\/legal\/impressum$/);
+});
+
+test('administrator previews a structure proposal uploaded as a JSON file', async ({ page, request }) => {
+  expect((await request.post(`${mockOrigin}/__sprint59_content`)).ok()).toBeTruthy();
+  await signInAdmin(page);
+  await page.goto('/admin/import');
+  await page.getByRole('link', { name: /Set up a new constitution/ }).click();
+  await expect(page.getByLabel('Setup proposal JSON')).toBeHidden();
+  await page.getByLabel('Structure proposal file (JSON)').setInputFiles({
+    name: 'structure.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify({
+      isoCode: 'DE', countryName: 'Germany', constitutionSlug: 'uploaded-proposal', constitutionTitle: 'Uploaded structure proposal',
+      languageCode: 'en', sourceUrl: 'https://example.org/source', outline: { kinds: [] }, sampleRoots: [],
+    })),
+  });
+  await page.getByRole('button', { name: 'Preview proposed structure' }).click();
+  await expect(page).toHaveURL(/\/admin\/import\/setup\/[^/?]+$/);
+  await expect(page.getByRole('heading', { name: 'Source and identity' })).toBeVisible();
+  await expect(page.getByText('Germany (DE) · Uploaded structure proposal')).toBeVisible();
+});
+
+test('administrator saves grouped registration and mail settings', async ({ page, request }) => {
+  expect((await request.post(`${mockOrigin}/__sprint59_content`)).ok()).toBeTruthy();
+  await signInAdmin(page);
+  await page.goto('/admin/settings');
+  await page.locator('#smtpHost').fill('smtp.example.local');
+  await page.getByRole('checkbox', { name: 'Allow people to register themselves' }).uncheck();
+  await page.getByRole('button', { name: 'Save registration and mail settings' }).click();
+  await expect(page.getByText('Settings saved.', { exact: true })).toBeVisible();
+  await page.reload();
+  await expect(page.locator('#smtpHost')).toHaveValue('smtp.example.local');
+  await expect(page.getByRole('checkbox', { name: 'Allow people to register themselves' })).not.toBeChecked();
 });

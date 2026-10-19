@@ -54,3 +54,9 @@ E2E_BASE_URL=http://127.0.0.1:80 \
 ```
 
 The files are generated in `docs/wiki/media/`. Check that the test passes and all three clips play, and confirm their steps against the current user-story journey. The merge workflow replaces the wiki copies; PR checks do not write to the wiki. Do not upload Playwright traces or real credentials.
+
+## UI verification coverage
+
+The maintained [Sprint 59 audit](https://github.com/julianhoelz94/Verfassung/blob/main/docs/design/sprint-59-ui-review.md) records every page entry point and its disposition. `e2e/ui-review.spec.ts` checks the route inventory against source, then renders each page in English and German at 390, 820 and 1440px, checking headings, overflow and accessibility. Newer task screens have Linux screenshot baselines alongside the original visual suite; CI runs both suites. `e2e/mfa-review.spec.ts` covers selected-method MFA and secondary correction history. The real-stack account journeys decode the rendered QR pixels, confirm enrollment and verify single-use recovery codes. Authenticator tests disable retained traces.
+
+From `apps/gateway-web`, run `npm run test:e2e` for the mock journeys, and `npm run test:e2e:full` against a fixture-populated stack. Generate or verify screenshot baselines only in the prescribed Linux Playwright image. Inspect changed images before committing them; a baseline update alone is not proof of a usable layout.

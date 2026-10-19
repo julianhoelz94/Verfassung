@@ -1,3 +1,4 @@
+import { SnapshotNotice } from '../../../../components/SnapshotNotice';
 import { T } from '../../../../components/TranslationProvider';
 import { ui } from '../../../../../lib/messages';
 import { currentLocale } from '../../../../../lib/server-locale';
@@ -24,7 +25,7 @@ import { neighborCompareLinks, orderVersions } from '../../../../../lib/compare'
 import { FormattedDate } from '../../../../../lib/format-date';
 import { atlasTitle, metaDescription, pageMetadata } from '../../../../../lib/page-meta';
 import { httpUrl, provenanceLabel, verificationLabel } from '../../../../../lib/provenance';
-import { publicSnapshotContext } from '../../../../../lib/reading';
+import { publicSnapshotContext, snapshotVersionId, publicVersions } from '../../../../../lib/reading';
 import { listDocumentLinks } from '../../../../../lib/document-api';
 import { currentUser } from '../../../../../lib/session';
 import { EditorEntry } from './EditorEntry';
@@ -85,7 +86,7 @@ export default async function VersionPage(props: VersionPageProps) {
     notFound();
   }
 
-  const line = orderVersions(version.constitution.versions);
+  const line = orderVersions(publicVersions(version.constitution.versions));
   const currentIndex = line.findIndex((item) => item.id === version.version.id);
   const previousPublished = currentIndex > 0 ? line[currentIndex - 1] : undefined;
   const nextPublished = currentIndex >= 0 ? line[currentIndex + 1] : undefined;
@@ -163,6 +164,7 @@ export default async function VersionPage(props: VersionPageProps) {
           </>
         }
       />
+      <SnapshotNotice code={country.isoCode} viewedId={params.versionId} currentId={version.version.currentVersionId ?? version.version.id} />
       {canEdit ? <EditorEntry
         versions={version.constitution.versions}
         viewedVersionId={params.versionId}
@@ -208,7 +210,7 @@ export default async function VersionPage(props: VersionPageProps) {
         previous={
           previousPublished
             ? {
-                href: `/countries/${country.isoCode}/versions/${previousPublished.id}`,
+                href: `/countries/${country.isoCode}/versions/${snapshotVersionId(previousPublished)}`,
                 label: `← ${previousPublished.versionLabel}`,
               }
             : undefined
@@ -216,7 +218,7 @@ export default async function VersionPage(props: VersionPageProps) {
         next={
           nextPublished
             ? {
-                href: `/countries/${country.isoCode}/versions/${nextPublished.id}`,
+                href: `/countries/${country.isoCode}/versions/${snapshotVersionId(nextPublished)}`,
                 label: `${nextPublished.versionLabel} →`,
               }
             : undefined

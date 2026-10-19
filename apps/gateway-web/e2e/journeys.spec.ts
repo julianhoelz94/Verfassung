@@ -34,6 +34,7 @@ test('search finds a published article', async ({ page }) => {
 
 test('linear compare shows a structured change', async ({ page }) => {
   await page.goto('/countries/DE');
+  await page.locator('summary').filter({ hasText: 'Compare versions' }).click();
   await page.getByRole('button', { name: 'Compare' }).click();
   await expect(page.getByRole('heading', { name: /side by side/ })).toBeVisible();
   await expect(page.locator('.compare-article h2 .badge').first()).toHaveText('Changed');
@@ -109,7 +110,7 @@ test('edit, review, and publish a draft', async ({ page }) => {
   await expect(page.getByRole('link', { name: /Art\. 1 Human dignity/ })).toBeVisible();
   await expect(page.getByRole('link', { name: /Art\. 2/ })).toHaveCount(0);
   await page.getByLabel('Filter articles').fill('');
-  await expect(page.getByRole('link', { name: 'Discard changes' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Back to my sessions' })).toBeVisible();
   await expect(page.getByText('Preview', { exact: true })).toBeVisible();
   await expect(page.getByText('Section titles', { exact: true })).toBeVisible();
   await page.getByLabel('Title', { exact: true }).fill('Human dignity (draft)');
@@ -276,6 +277,7 @@ test('editorial correction hop stays off the public timeline', async ({ page }) 
   await page.goto('/editor/history');
   await expect(page.getByRole('heading', { name: 'Snapshot history' })).toBeVisible();
   await expect(page.getByRole('link', { name: '2022-1' })).toBeVisible();
+  await page.getByText('Text corrections', { exact: true }).first().click();
   await expect(page.getByText('Editorial correction', { exact: true })).toBeVisible();
   await expect(page.getByText('No publication comment')).toBeVisible();
 });

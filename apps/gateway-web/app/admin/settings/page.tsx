@@ -1,3 +1,4 @@
+import { reviewUi } from '../../../lib/ui-review-messages';
 import { NavigatingActionForm } from '../../components/NavigatingActionForm';
 import { T } from '../../components/TranslationProvider';
 import { ui } from '../../../lib/messages';
@@ -18,18 +19,22 @@ export default async function IdentitySettingsPage({ searchParams }: { searchPar
   const user = await currentUser();
   const settings = token ? await requestIdentitySettings(token).catch(() => null) : null;
   const translationSettings = token ? await translationSiteSettings(token).catch(() => null) : null;
-  return <PageMain>
-    <PageHeader title={<T value={ui.attrs.adminSettingsPagePageHeaderTitleAccount} />} meta={<T value={ui.attrs.adminSettingsPagePageHeaderMetaControl} />} />
+  return <PageMain className="wide settings-page">
+    <PageHeader title={<T value={reviewUi.siteSettings} />} meta={<T value={reviewUi.siteSettingsHint} />} />
     {params.error ? <Alert tone="error"><T value={params.error === 'test' ? ui.adminSettingsDynamic.mailTestFailed : ui.adminSettingsDynamic.saveFailed} /></Alert> : null}
     {params.saved ? <Alert tone="success"><T value={ui.admin.settings.page.settingsSaved} /></Alert> : null}
     {params.tested ? <Alert tone="success"><T value={ui.admin.settings.page.testEmailSent} /></Alert> : null}
     {!settings ? <Alert tone="error"><T value={ui.admin.settings.page.accountSettingsCouldNotBeLoaded} /></Alert> : <>
-      <Card><NavigatingActionForm action={saveIdentitySettingsAction}>
-        <h2 className="card-title"><T value={ui.admin.settings.page.registration} /></h2>
+      <Card><NavigatingActionForm action={saveIdentitySettingsAction} className="settings-form">
+        <fieldset>
+        <legend><T value={ui.admin.settings.page.registration} /></legend>
         <label><input type="checkbox" name="selfRegistrationEnabled" defaultChecked={settings.selfRegistrationEnabled} /> <T value={ui.admin.settings.page.allowPeopleToRegisterThemselves} /></label>
-        <p className="muted"><T value={ui.admin.settings.page.offByDefaultNewAccountsReceiveOnly} /></p>
-        <h2 className="card-title"><T value={ui.admin.settings.page.outgoingMail} /></h2>
+        <p className="muted"><T value={reviewUi.registrationHint} /></p>
+        </fieldset>
+        <fieldset>
+        <legend><T value={ui.admin.settings.page.outgoingMail} /></legend>
         <label><input type="checkbox" name="mailEnabled" defaultChecked={settings.mailEnabled} /> <T value={ui.admin.settings.page.enableOutgoingMail} /></label>
+        <div className="form-grid">
         <Input label={<T value={ui.attrs.adminSettingsPageInputLabelFrom} />} id="mailFrom" name="mailFrom" type="email" defaultValue={settings.mailFrom} />
         <Input label={<T value={ui.attrs.adminSettingsPageInputLabelSender} />} id="mailFromName" name="mailFromName" defaultValue={settings.mailFromName} />
         <Input label={<T value={ui.attrs.adminSettingsPageInputLabelPublic} />} id="mailPublicBaseUrl" name="mailPublicBaseUrl" type="url" defaultValue={settings.mailPublicBaseUrl} />
@@ -37,10 +42,14 @@ export default async function IdentitySettingsPage({ searchParams }: { searchPar
         <Input label={<T value={ui.attrs.adminSettingsPageInputLabelSMTP2} />} id="smtpPort" name="smtpPort" type="number" min={1} max={65535} defaultValue={settings.smtpPort} />
         <Input label={<T value={ui.attrs.adminSettingsPageInputLabelSMTP3} />} id="smtpUsername" name="smtpUsername" defaultValue={settings.smtpUsername} />
         <Input label={<T value={settings.smtpPasswordSet ? ui.adminSettingsDynamic.newSmtpPassword : ui.adminSettingsDynamic.smtpPassword} />} id="smtpPassword" name="smtpPassword" type="password" autoComplete="new-password" />
+        </div>
+        <div className="form-actions">
         <label><input type="checkbox" name="smtpAuth" defaultChecked={settings.smtpAuth} /> <T value={ui.admin.settings.page.smtpAuthentication} /></label>
         <label><input type="checkbox" name="smtpStarttls" defaultChecked={settings.smtpStarttls} /> <T value={ui.admin.settings.page.starttls} /></label>
         <label><input type="checkbox" name="smtpSsl" defaultChecked={settings.smtpSsl} /> <T value={ui.admin.settings.page.implicitTls} /></label>
-        <Button variant="primary"><T value={ui.admin.settings.page.saveSettings} /></Button>
+        </div>
+        </fieldset>
+        <div className="form-actions"><Button variant="primary"><T value={reviewUi.saveRegistrationMail} /></Button></div>
       </NavigatingActionForm></Card>
       <Card><h2 className="card-title"><T value={ui.admin.settings.page.testMail} /></h2>
         <p><T value={ui.admin.settings.page.sendATestMessageToAnyAddress} /></p>

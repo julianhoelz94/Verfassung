@@ -1,4 +1,5 @@
 import { ui, type UiMessage } from './messages';
+import { reviewUi } from './ui-review-messages';
 
 export type NavUser = {
   email: string;
@@ -82,9 +83,11 @@ export function editorialLinks(roles: string[], needsReviewCount = 0): NavLink[]
 export function adminLinks(): NavLink[] {
   return [
     { href: '/admin/users', label: 'Users', message: ui.nav.users },
+    { href: '/admin/settings', label: 'Site settings', message: reviewUi.siteSettings },
     { href: '/admin/anonymous-browsing', label: 'Anonymous browsing', message: ui.nav.anonymousBrowsing },
     { href: '/admin/constitutions', label: 'Outlines', message: ui.nav.outlines },
     { href: '/admin/import', label: 'Import', message: ui.nav.import },
+    { href: '/admin/legal/impressum', label: 'Legal pages', message: reviewUi.legalPages },
   ];
 }
 

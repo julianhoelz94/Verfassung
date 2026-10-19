@@ -44,6 +44,7 @@ test('invalid credentials leave the visitor signed out', async ({ page }) => {
   await page.getByLabel('Email').fill('local-editor@example.local');
   await page.getByLabel('Password').fill('wrong-password');
   await page.getByRole('button', { name: 'Sign in' }).click();
+  await expect(page).toHaveURL(/\/login\?error=credentials$/, { timeout: 10_000 });
   await expect(page.getByText('Invalid email or password.')).toBeVisible();
   expect((await page.context().cookies()).some((cookie) => cookie.name === 'ca_session')).toBe(false);
 });

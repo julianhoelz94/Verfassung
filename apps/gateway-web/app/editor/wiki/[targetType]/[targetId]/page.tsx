@@ -1,3 +1,4 @@
+import { reviewUi } from '../../../../../lib/ui-review-messages';
 import { NavigatingActionForm } from '../../../../components/NavigatingActionForm';
 import { currentLocale } from '../../../../../lib/server-locale';
 import { message } from '../../../../../lib/messages';
@@ -43,12 +44,12 @@ export default async function WikiEditor({ params, searchParams }: Props) {
 
   return (
     <PageMain className="wide">
-      <PageHeader title={`Edit ${targetType} page`} actions={<a className="btn btn-sm" href={publicHref}><T value={ui.editor.wiki.targettype.targetid.page.viewPublicPage} /></a>} />
+      <PageHeader title={<T value={targetType === 'country' ? reviewUi.editCountry : reviewUi.editConstitution} />} actions={<a className="btn btn-sm" href={publicHref}><T value={ui.editor.wiki.targettype.targetid.page.viewPublicPage} /></a>} />
       {query.saved ? <p role="status"><T value={ui.editor.wiki.targettype.targetid.page.draftSaved} /></p> : null}
       {query.published ? <p role="status"><T value={ui.editor.wiki.targettype.targetid.page.pagePublished} /></p> : null}
       {query.error ? <p role="alert"><T value={ui.editor.wiki.targettype.targetid.page.thePageCouldNotBeSavedOr} /></p> : null}
       {canEdit ? (
-        <NavigatingActionForm action={saveWikiAction} className="card">
+        <NavigatingActionForm action={saveWikiAction} className="stack card">
           <input type="hidden" name="targetType" value={targetType} />
           <input type="hidden" name="targetId" value={targetId} />
           <input type="hidden" name="code" value={code} />

@@ -1,3 +1,4 @@
+import { reviewUi } from '../../../../lib/ui-review-messages';
 import { T } from '../../../components/TranslationProvider';
 import { ui, type UiMessage } from '../../../../lib/messages';
 import { notFound, redirect } from 'next/navigation';
@@ -64,7 +65,7 @@ export default async function LifecycleEditor({ params, searchParams }: Props) {
   return (
     <PageMain className="wide">
       <PageHeader
-        title={`Lifecycle · ${constitution.title}`}
+        title={<><T value={reviewUi.lifecycle} /> · {constitution.title}</>}
         breadcrumbs={[
           { href: '/', label: <T value={ui.nav.countries} /> },
           { href: `/countries/${code}`, label: country.name },

@@ -8,7 +8,7 @@ An administrator can require sign-in for browsing. In that case, the starting pa
 
 1. Open **Countries** in the site navigation.
 2. Select a country card to open its country page. The page lists its constitutions and published versions. Country and constitution context pages may include curated background information and images.
-3. Select a constitution and a published version to read its text. Use the table of contents and unit links to move through the hierarchy. A version is a snapshot: a later correction or legal change creates another published version rather than rewriting the older one.
+3. Select a constitution and a published version to read its text. Use the table of contents and unit links to move through the hierarchy. The version choices represent changes in law. They open the current corrected text for that legal version. Exact text snapshots remain available through saved permalinks.
 
 The country **Constitution timeline** presents constitution lifecycle events. The separate **Amendment timeline** presents published legal changes. A provision may have its own commencement or suspension status, so read the displayed dates and status alongside the text.
 
@@ -19,6 +19,12 @@ Constitution and country pages can also contain curated background text and pict
 - Use **Search** in the main navigation to search published text. Open a result to read it in its version context. Search may briefly lag a new publication while the index updates; the published version page is the primary reading view.
 - Use **Compare** from a country to select two published versions. Review additions, removals, and changed passages in context. Structural changes can include moved or newly grouped units, so read both version pages when exact placement matters.
 - Use the version and legal-change links to follow how a text changed over time. An editorial correction and a legal change are different events: a correction fixes the recorded text; a legal change represents a change in the law.
+
+## Text corrections and legal history
+
+Reading pages emphasize legal versions, effective dates and legal changes. Routine typo and transcription fixes do not add another legal version to the version choices or a legal-change event to the timeline. Editorial details are secondary: staff can open **Structure and editorial details → Text corrections**, or use **Editorial → Snapshot history**, to inspect them. Correction entries remain collapsed until requested.
+
+If you deliberately open a saved older text snapshot, a compact archive notice identifies it and offers **Read current text**. The older link continues to identify the same published text. Article history shows legal versions rather than a feed of typo corrections. On document pages, revision information is available under **Document details and revisions**.
 
 ## Check a text's provenance
 

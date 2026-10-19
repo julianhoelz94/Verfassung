@@ -23,7 +23,7 @@ test.describe('German device language', () => {
     await page.getByLabel('Sprache der Website').selectOption('en');
     await page.getByRole('button', { name: 'Sprache speichern' }).click();
     await expect(page.locator('html')).toHaveAttribute('lang', 'en');
-    await expect(page.getByRole('heading', { name: 'Account' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Account', exact: true })).toBeVisible();
 
     await page.reload();
     await expect(page.getByLabel('Website language')).toHaveValue('en');

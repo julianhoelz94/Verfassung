@@ -35,16 +35,17 @@ export async function createImportAction(formData: FormData): Promise<string> {
 
 export async function createSetupProposalAction(formData: FormData): Promise<string> {
   const user = await currentUser();
-  if (!user || !hasRole(user.roles, 'editor')) return '/admin/import?error=forbidden';
+  if (!user || !hasRole(user.roles, 'editor')) return '/admin/import?mode=new&error=forbidden';
   let payload: unknown;
-  try { payload = parseImportJson(String(formData.get('proposal') ?? '')); }
-  catch { return '/admin/import?error=json'; }
+  const file = formData.get('proposalFile');
+  try { payload = parseImportJson(file instanceof File && file.size > 0 ? await file.text() : String(formData.get('proposal') ?? '')); }
+  catch { return '/admin/import?mode=new&error=json'; }
   let proposalId: string;
   try {
     const proposal = await createSetupProposal(payload, await requireSessionBearer());
     proposalId = proposal.id;
   } catch {
-    return '/admin/import?error=proposal';
+    return '/admin/import?mode=new&error=proposal';
   }
   return `/admin/import/setup/${encodeURIComponent(proposalId)}`;
 }

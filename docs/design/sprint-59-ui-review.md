@@ -25,55 +25,63 @@ Warm paper and white surfaces, teal actions, serif reading text and sans-serif c
 
 ## Route coverage
 
-Initial source review completed; browser and final disposition pending. Shared layout improvements apply to every rendered route. Dynamic routes include representative fixture data, missing-data states and applicable roles.
+Source review and implementation completed. Browser verification is in progress; the route inventory and nine additional task variants are executable in `apps/gateway-web/e2e/fixtures/ui-routes.ts`. Shared layout improvements apply to every rendered route. Dynamic routes include representative fixture data, missing-data states and applicable roles.
 
 | Route entry point | Role / variants | Final disposition and evidence |
 | --- | --- | --- |
-| `/` | Public | Pending browser review |
-| `/about` | Public | Pending browser review |
-| `/account` | Signed-in account | Pending browser review |
-| `/account/step-up` | Signed-in account | Pending browser review |
-| `/admin` | Admin (imports also editorial roles) | Pending browser review |
-| `/admin/anonymous-browsing` | Admin (imports also editorial roles) | Pending browser review |
-| `/admin/constitutions` | Admin (imports also editorial roles) | Pending browser review |
-| `/admin/constitutions/[id]` | Admin (imports also editorial roles) | Pending browser review |
-| `/admin/import` | Admin (imports also editorial roles) | Pending browser review |
-| `/admin/import/[jobId]` | Admin (imports also editorial roles) | Pending browser review |
-| `/admin/import/setup/[proposalId]` | Admin (imports also editorial roles) | Pending browser review |
-| `/admin/legal/[key]` | Admin (imports also editorial roles) | Pending browser review |
-| `/admin/settings` | Admin (imports also editorial roles) | Pending browser review |
-| `/admin/users` | Admin (imports also editorial roles) | Pending browser review |
-| `/countries/[code]` | Public | Pending browser review |
-| `/countries/[code]/articles/[articleNumber]` | Public | Pending browser review |
-| `/countries/[code]/compare` | Public | Pending browser review |
-| `/countries/[code]/constitution-timeline` | Public | Pending browser review |
-| `/countries/[code]/constitutions/[constitutionId]` | Public | Pending browser review |
-| `/countries/[code]/timeline` | Public | Pending browser review |
-| `/countries/[code]/versions/[versionId]` | Public | Pending browser review |
-| `/countries/[code]/versions/[versionId]/articles/[articleId]` | Public | Pending browser review |
-| `/countries/[code]/versions/[versionId]/units/[unitId]` | Public | Pending browser review |
-| `/datenschutz` | Public | Pending browser review |
-| `/documents/[id]` | Public | Pending browser review |
-| `/editor` | Editor / reviewer / publisher / admin | Pending browser review |
-| `/editor/amendments` | Editor / reviewer / publisher / admin | Pending browser review |
-| `/editor/amendments/[id]` | Editor / reviewer / publisher / admin | Pending browser review |
-| `/editor/documents` | Editor / reviewer / publisher / admin | Pending browser review |
-| `/editor/documents/[id]` | Editor / reviewer / publisher / admin | Pending browser review |
-| `/editor/documents/new` | Editor / reviewer / publisher / admin | Pending browser review |
-| `/editor/history` | Editor / reviewer / publisher / admin | Pending browser review |
-| `/editor/lifecycle/[constitutionId]` | Editor / reviewer / publisher / admin | Pending browser review |
-| `/editor/wiki/[targetType]/[targetId]` | Editor / reviewer / publisher / admin | Pending browser review |
-| `/impressum` | Public | Pending browser review |
-| `/invite` | Anonymous / challenged / signed in | Pending browser review |
-| `/login` | Anonymous / challenged / signed in | Pending browser review |
-| `/login/mfa` | Anonymous / challenged / signed in | Pending browser review |
-| `/oauth/authorize` | Anonymous / challenged / signed in | Pending browser review |
-| `/register` | Anonymous / challenged / signed in | Pending browser review |
-| `/register/confirm` | Anonymous / challenged / signed in | Pending browser review |
-| `/reset` | Anonymous / challenged / signed in | Pending browser review |
-| `/search` | Public | Pending browser review |
-| `/versions/[versionId]/units/[unitId]` | Public | Pending browser review |
+| `/` | Public | Retained country discovery; shared spacing, type and wrapping improved; browser evidence pending |
+| `/about` | Public | Retained concise site purpose; shared reading measure and title rhythm; browser evidence pending |
+| `/account` | Signed-in account | Preferences / security / connections navigation; optional technical details, QR-first setup and recovery management; browser evidence pending |
+| `/account/step-up` | Signed-in account | Retained focused verification form; shared form spacing and accessible controls; browser evidence pending |
+| `/admin` | Admin (imports also editorial roles) | Grouped people/access and publication tasks; settings and legal destinations discoverable; browser evidence pending |
+| `/admin/anonymous-browsing` | Admin (imports also editorial roles) | Retained saved/effective policy workflow; wrapping controls and consistent fieldsets; browser evidence pending |
+| `/admin/constitutions` | Admin (imports also editorial roles) | Retained guided identity / structure / review creation; responsive shared outline panels; browser evidence pending |
+| `/admin/constitutions/[id]` | Admin (imports also editorial roles) | Retained structure impact / save workflow; consistent panels and readable form rhythm; browser evidence pending |
+| `/admin/import` | Admin (imports also editorial roles) | Existing/new workflow choice; file-first upload, optional JSON and prerequisites; browser evidence pending |
+| `/admin/import/[jobId]` | Admin (imports also editorial roles) | Retained private preview and separate prepare / review / publish actions; readable panels; browser evidence pending |
+| `/admin/import/setup/[proposalId]` | Admin (imports also editorial roles) | Retained source / structure / final review sequence; responsive shared outline panels; browser evidence pending |
+| `/admin/legal/[key]` | Admin (imports also editorial roles) | Added discoverable imprint/privacy selector preserving language; aligned operator fields and spaced language links; browser evidence pending |
+| `/admin/settings` | Admin (imports also editorial roles) | Site settings title; registration/mail groups, responsive fields and explicit save scope; browser evidence pending |
+| `/admin/users` | Admin (imports also editorial roles) | Retained user lifecycle and token actions; consistent wrapping action rows and larger controls; browser evidence pending |
+| `/countries/[code]` | Public | Reading and legal history primary; structure/corrections secondary; ordinary links read current corrected snapshot; browser evidence pending |
+| `/countries/[code]/articles/[articleNumber]` | Public | Legal versions only, current corrected content, localized title and valid nested heading levels; browser evidence pending |
+| `/countries/[code]/compare` | Public | Retained legal comparison controls; readable wrapping and shared spacing; browser evidence pending |
+| `/countries/[code]/constitution-timeline` | Public | Retained legal chronology emphasis; shared responsive cards and typography; browser evidence pending |
+| `/countries/[code]/constitutions/[constitutionId]` | Public | Retained contextual wiki and source content; shared reading rhythm; browser evidence pending |
+| `/countries/[code]/timeline` | Public | Retained legal-change timeline and source links; wrapping actions and panels; browser evidence pending |
+| `/countries/[code]/versions/[versionId]` | Public | Legal-only pager using current corrected snapshots; exact older pins get compact archive notice; browser evidence pending |
+| `/countries/[code]/versions/[versionId]/articles/[articleId]` | Public | Exact snapshot links retained; compact archive notice with current-text action; browser evidence pending |
+| `/countries/[code]/versions/[versionId]/units/[unitId]` | Public | Added page title, breadcrumbs, print action, content language and compact archive notice; browser evidence pending |
+| `/datenschutz` | Public | Retained published legal text and language fallback; shared reading measure; browser evidence pending |
+| `/documents/[id]` | Public | Source/download primary; technical revisions secondary unless a revision was explicitly requested; browser evidence pending |
+| `/editor` | Editor / reviewer / publisher / admin | Visible role-aware queues; Back to my sessions accurately describes navigation; responsive panels; browser evidence pending |
+| `/editor/amendments` | Editor / reviewer / publisher / admin | Retained legal-change list and creation entry; shared form/list spacing; browser evidence pending |
+| `/editor/amendments/[id]` | Editor / reviewer / publisher / admin | Retained source/target and quote-review workflow; shared panel and action wrapping; browser evidence pending |
+| `/editor/documents` | Editor / reviewer / publisher / admin | Retained document discovery; shared cards, statuses and action rhythm; browser evidence pending |
+| `/editor/documents/[id]` | Editor / reviewer / publisher / admin | Separated detail edits and file replacement; revision/event maintenance secondary; browser evidence pending |
+| `/editor/documents/new` | Editor / reviewer / publisher / admin | Retained document creation; shared aligned form spacing and file control; browser evidence pending |
+| `/editor/history` | Editor / reviewer / publisher / admin | Text corrections collapsed with immutable snapshot links; legal history remains distinct; browser evidence pending |
+| `/editor/lifecycle/[constitutionId]` | Editor / reviewer / publisher / admin | Localized task title; retained event semantics; consistent form controls; browser evidence pending |
+| `/editor/wiki/[targetType]/[targetId]` | Editor / reviewer / publisher / admin | Localized country/constitution task title and consistently stacked editing form; browser evidence pending |
+| `/impressum` | Public | Retained published operator text/contact workflow; shared reading measure; browser evidence pending |
+| `/invite` | Anonymous / challenged / signed in | Retained focused invite acceptance; shared form rhythm and readable status messages; browser evidence pending |
+| `/login` | Anonymous / challenged / signed in | Plain service-unavailable explanation and focused sign-in controls; browser evidence pending |
+| `/login/mfa` | Anonymous / challenged / signed in | Authenticator first, explicit recovery switch, only selected field validated; QR-first forced enrollment; browser evidence pending |
+| `/oauth/authorize` | Anonymous / challenged / signed in | Retained explicit consent and permission scope; shared card/action spacing; browser evidence pending |
+| `/register` | Anonymous / challenged / signed in | Retained email-first registration; shared concise form layout; browser evidence pending |
+| `/register/confirm` | Anonymous / challenged / signed in | Retained password confirmation and token states; shared status and form layout; browser evidence pending |
+| `/reset` | Anonymous / challenged / signed in | Retained password reset flow; shared readable form controls; browser evidence pending |
+| `/search` | Public | Retained search/filter/result workflow; responsive shared cards and wrapping labels; browser evidence pending |
+| `/versions/[versionId]/units/[unitId]` | Public | Retained exact-snapshot redirect; audit requires correct destination; browser evidence pending |
 
 ## Verification record
 
 Baseline screenshots, route/state/language checks, focused MFA and correction-history journeys, mock and real-stack verification, independent review, CI, merge and Wiki publication will be recorded here as they complete. Screenshots use fictional fixtures and must not expose live credentials. Authenticator setup evidence must use synthetic keys only.
+
+## Review corrections
+
+Independent review restored discovery of the privacy-notice editor through a labelled legal-page selector. Additional review tightened native disclosure markers, language-link spacing, legal contact-field alignment, the desktop settings-sidebar selector and German import wording. Browser fixtures now include normal SMTP settings and a bound import structure; the audit asserts destination URLs and rejects failed-loading states instead of counting redirects or error pages as coverage.
+
+The duplicate/dead-code scan removed superseded button/alert styles and an unused history helper. Shared `Disclosure`, `MfaSetup`, and `SnapshotNotice` components avoid repeating the new behavior. No public APIs, applied migrations or contract fixtures were removed.
+
+The before images in `screenshots/sprint-59/` were captured with fictional data from the baseline development server. Its editor image shows the session hub, not an active editing session; browser coverage separately includes the active correction editor. After images use the production build. Linux screenshot baselines live in `apps/gateway-web/e2e/snapshots/` and cover both languages for the newer page templates.

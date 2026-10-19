@@ -39,18 +39,18 @@ export async function logoutAction(): Promise<void> {
   redirect('/');
 }
 
-export async function completeMfaAction(formData: FormData): Promise<void> {
-  const code = String(formData.get('code') ?? '');
-  const recoveryCode = String(formData.get('recoveryCode') ?? '');
+export async function completeMfaAction(formData: FormData): Promise<string> {
+  const recovery = formData.get('method') === 'recovery';
+  const code = recovery ? '' : String(formData.get('code') ?? '').trim();
+  const recoveryCode = recovery ? String(formData.get('recoveryCode') ?? '').trim() : '';
   const next = oauthReturnPath(formData.get('next'));
   let user;
   try {
     user = await completeMfaLogin(code, recoveryCode || undefined);
   } catch {
-    redirect(`/login/mfa?error=1${next ? `&next=${encodeURIComponent(next)}` : ''}`);
+    return `/login/mfa?error=1${recovery ? '&method=recovery' : ''}${next ? `&next=${encodeURIComponent(next)}` : ''}`;
   }
-  if (next) redirect(next);
-  redirect(canVisitEditor(user.roles) ? '/editor' : '/');
+  return next ?? (canVisitEditor(user.roles) ? '/editor' : '/');
 }
 
 export type EnrollConfirmState = {

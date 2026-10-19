@@ -99,6 +99,7 @@ test('editorial roles stage, review, and publish a new constitution through the 
   const slug = `admin-journey-${Date.now()}`;
   await signIn(page, 'admin');
   await page.goto('/admin/import');
+  await page.getByText('Paste JSON instead', { exact: true }).click();
   await page.getByLabel('Import JSON').fill(JSON.stringify({
     isoCode: 'XC',
     countryName: 'Atlas Admin Testland',

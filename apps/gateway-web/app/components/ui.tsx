@@ -66,9 +66,9 @@ export function PageHeader({ breadcrumbs, eyebrow, title, meta, actions }: PageH
   return (
     <div className="page-header">
       <div className="page-heading">
+        {breadcrumbs && breadcrumbs.length > 0 ? <Breadcrumbs items={breadcrumbs} /> : null}
         {eyebrow ? <p className="eyebrow">{eyebrow}</p> : null}
         <h1 className="page-title">{title}</h1>
-        {breadcrumbs && breadcrumbs.length > 0 ? <Breadcrumbs items={breadcrumbs} /> : null}
         {meta ? <div className="page-meta">{meta}</div> : null}
       </div>
       {actions ? <div className="page-actions">{actions}</div> : null}
@@ -184,8 +184,8 @@ export function Alert({ children, tone = 'info' }: AlertProps) {
   );
 }
 
-export function Card({ children, className }: { children: ReactNode; className?: string }) {
-  return <section className={['card', className].filter(Boolean).join(' ')}>{children}</section>;
+export function Card({ children, className, id }: { children: ReactNode; className?: string; id?: string }) {
+  return <section id={id} className={['card', className].filter(Boolean).join(' ')}>{children}</section>;
 }
 
 const WORKFLOW_STEPS = [ui.workflow.draft, ui.workflow.inReview, ui.workflow.approved, ui.workflow.published] as const;

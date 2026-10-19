@@ -1,3 +1,5 @@
+import { Disclosure } from '../../components/Disclosure';
+import { reviewUi } from '../../../lib/ui-review-messages';
 import { T } from '../../components/TranslationProvider';
 import { ui } from '../../../lib/messages';
 import { message } from '../../../lib/messages';
@@ -17,7 +19,7 @@ import { canVisitEditor } from '../../../lib/nav';
 import { currentUser } from '../../../lib/session';
 import { orderVersions } from '../../../lib/compare';
 import { atlasTitle, metaDescription, pageMetadata } from '../../../lib/page-meta';
-import { chainTipId, publicVersions } from '../../../lib/reading';
+import { chainTipId, publicVersions, snapshotVersionId } from '../../../lib/reading';
 import { CompareForm } from './CompareForm';
 import { listDocumentLinks } from '../../../lib/document-api';
 
@@ -133,27 +135,15 @@ export default async function CountryPage(props: CountryPageProps) {
             {constitutionWikis.get(constitution.id) ? (
               <p>{constitutionWikis.get(constitution.id)?.summary}</p>
             ) : null}
-            {showEditorialLinks ? (
-              <p><a href={`/editor/wiki/constitution/${constitution.id}?code=${country.isoCode}`}><T value={ui.countries.code.page.editConstitutionPage} /></a></p>
-            ) : null}
-            {canRecordLifecycle ? (
-              <p><a href={`/editor/lifecycle/${constitution.id}?code=${country.isoCode}`}><T value={ui.countries.code.page.recordLifecycleEvent} /></a></p>
-            ) : null}
             <p className="muted">
               {constitution.interim ? <><T value={ui.lifecycle.interimConstitution} /> · </> : null}
               <T value={lifecycleStatusMessage(constitution.lifecycleStatus)} />
             </p>
-            {constitution.contentOutline && constitution.contentOutline.kinds.length > 0 ? (
-              <p className="muted">
-                <T value={ui.countries.code.page.structure} />{' '}
-                {constitution.contentOutline.kinds.map((kind) => kind.displayLabel).join(' → ')}
-              </p>
-            ) : null}
             <div className="chip-row">
               {publicLine.map((version) => (
                 <Chip
                   key={version.id}
-                  href={`/countries/${country.isoCode}/versions/${version.id}`}
+                  href={`/countries/${country.isoCode}/versions/${snapshotVersionId(version)}`}
                   active={version.id === newestPublic?.id}
                 >
                   {version.versionLabel}
@@ -163,15 +153,8 @@ export default async function CountryPage(props: CountryPageProps) {
             <div className="card-actions">
               <a className="btn btn-sm" href={`/countries/${country.isoCode}/timeline`}>
                 <T value={ui.countries.code.page.timeline} />{" "}</a>
-              {showEditorialLinks ? (
-                <a
-                  className="btn btn-sm btn-ghost"
-                  href={`/editor/history?constitutionId=${encodeURIComponent(constitution.id)}`}
-                >
-                  <T value={ui.countries.code.page.versionHistory} />{" "}</a>
-              ) : null}
               {tipId ? (
-                <a className="btn btn-sm btn-ghost" href={`/countries/${country.isoCode}/versions/${tipId}`}>
+                <a className="btn btn-sm btn-primary" href={`/countries/${country.isoCode}/versions/${tipId}`}>
                   <T value={ui.countries.code.page.readLatest} />{" "}</a>
               ) : null}
               {previousPublic && newestPublic ? (
@@ -188,8 +171,31 @@ export default async function CountryPage(props: CountryPageProps) {
                 <a href={`/documents/${link.documentId}${link.revisionId ? `?revision=${link.document.revision.revision}` : ''}`}>{link.document.revision.title}</a>
               </li>)}</ul>
             </div> : null}
-            <h3 className="country-compare-heading"><T value={ui.countries.code.page.compareVersions} /></h3>
-            <CompareForm code={country.isoCode} versions={publicLine} variant="inline" />
+            <Disclosure summary={<T value={ui.countries.code.page.compareVersions} />}>
+              <CompareForm code={country.isoCode} versions={publicLine} variant="inline" />
+            </Disclosure>
+            <Disclosure summary={<T value={reviewUi.constitutionDetails} />}>
+            {showEditorialLinks ? (
+              <p><a href={`/editor/wiki/constitution/${constitution.id}?code=${country.isoCode}`}><T value={ui.countries.code.page.editConstitutionPage} /></a></p>
+            ) : null}
+            {canRecordLifecycle ? (
+              <p><a href={`/editor/lifecycle/${constitution.id}?code=${country.isoCode}`}><T value={ui.countries.code.page.recordLifecycleEvent} /></a></p>
+            ) : null}
+
+            {constitution.contentOutline && constitution.contentOutline.kinds.length > 0 ? (
+              <p className="muted">
+                <T value={ui.countries.code.page.structure} />{' '}
+                {constitution.contentOutline.kinds.map((kind) => kind.displayLabel).join(' → ')}
+              </p>
+            ) : null}
+              {showEditorialLinks ? (
+                <a
+
+                  href={`/editor/history?constitutionId=${encodeURIComponent(constitution.id)}`}
+                >
+                  <T value={reviewUi.textCorrections} />{" "}</a>
+              ) : null}
+            </Disclosure>
           </section>
         );
       })}

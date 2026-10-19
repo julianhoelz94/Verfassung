@@ -43,10 +43,12 @@ test('admin publishes legal prose and one shared address for both languages', as
   await expect(page.getByRole('heading', { name: 'Edit imprint' })).toBeVisible();
   await page.getByLabel('Street address').fill('Main Street 2');
   await page.getByRole('button', { name: 'Save contact draft' }).click();
+  await expect(page.getByText('Draft saved. The public page has not changed.')).toBeVisible();
   await page.goto('/impressum');
   await expect(page.getByText('Main Street 1')).toBeVisible();
   await page.goto('/admin/legal/impressum');
   await page.getByRole('button', { name: 'Publish reviewed contact' }).click();
+  await expect(page.getByText('Published revision updated.')).toBeVisible();
   await page.goto('/admin/legal/impressum_en');
   const revised = 'Reviewed English legal prose\n<script>window.injected=true</script>';
   await page.getByLabel('Imprint text').fill(revised);
@@ -66,4 +68,20 @@ test('admin publishes legal prose and one shared address for both languages', as
   expect(germanHtml).toContain('Example publisher information');
   expect(germanHtml).toContain('Main Street 2');
   expect(germanHtml).not.toContain('Main Street 1');
+});
+
+
+test('imprint publication explains the missing shared-contact step in both languages', async ({ page, request }) => {
+  await request.post(`${MOCK_ORIGIN}/__unpublished_imprint_contact`);
+  await signInAdmin(page);
+  for (const key of ['impressum', 'impressum_en']) {
+    await page.goto(`/admin/legal/${key}`);
+    await expect(page.getByText('Save and publish the shared contact details before publishing the imprint text.')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Edit shared contact details' })).toHaveAttribute('href', '/admin/legal/impressum#imprint-contact');
+    await expect(page.getByRole('button', { name: 'Publish reviewed text' })).toBeDisabled();
+  }
+  await page.getByRole('link', { name: 'Edit shared contact details' }).click();
+  await page.getByRole('button', { name: 'Publish reviewed contact' }).click();
+  await expect(page.getByText('Published revision updated.')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Publish reviewed text' })).toBeEnabled();
 });

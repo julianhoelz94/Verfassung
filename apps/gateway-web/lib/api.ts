@@ -264,7 +264,9 @@ export async function readJson<T>(url: string, service: string, authorization?: 
   if (!response.ok) {
     throw new ApiUnavailableError(service);
   }
-  return (await response.json()) as T;
+  // Spring nullable endpoints return an empty 200 before a resource exists.
+  const body = await response.text();
+  return body.trim() ? JSON.parse(body) as T : null;
 }
 
 export function catalogBaseUrl(): string {

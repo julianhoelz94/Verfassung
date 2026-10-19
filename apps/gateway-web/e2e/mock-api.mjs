@@ -363,6 +363,12 @@ const server = createServer(async (req, res) => {
     return;
   }
 
+  if (method === 'POST' && pathname === '/__unpublished_imprint_contact') {
+    imprintDetailsState.published = null;
+    empty(res, 204);
+    return;
+  }
+
   if (pathname.startsWith('/api/document/legal-pages/imprint-details')) {
     const action = pathname.slice('/api/document/legal-pages/imprint-details'.length);
     if (method === 'GET' && !action) { json(res, 200, imprintDetailsState.published); return; }

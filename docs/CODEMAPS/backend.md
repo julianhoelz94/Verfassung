@@ -44,7 +44,9 @@ Tree in `content_nodes` is the only write model; `articles` is a view of roots. 
 | GET | `/links/{constitution\|version\|amendment}/{id}` (amendment: `scopeRevisionId`) |
 | POST/DELETE | `/links/{constitution\|version\|amendment}/{id}` and `/{documentId}` |
 
-Tests: `DocumentApiTest.kt`. Migration: `scripts/migrate_document_references.py`.
+Legal pages use `LegalPageController` → `LegalPageService` → legal-page and shared-contact repositories in the same database. `PUT /legal-pages/{key}/draft` accepts optional `contact` details with their expected revision; `POST /legal-pages/{key}/publish` accepts `expectedContactRevision`. For imprint keys, these combined writes are transactional: either text and contact both advance, or neither does. German and English text remain separate; public contact details are shared. Existing separate contact endpoints remain compatible.
+
+Tests: `DocumentApiTest.kt`, `ImprintWorkflowTest.kt`. Migration: `scripts/migrate_document_references.py`.
 
 ## amendment — `services/amendment-service`
 

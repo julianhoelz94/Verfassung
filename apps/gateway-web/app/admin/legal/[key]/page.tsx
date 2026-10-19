@@ -8,7 +8,7 @@ import { requireAdminPage } from '../../../../lib/admin';
 import { requireSessionBearer } from '../../../../lib/session';
 import { adminImprintDetails, adminLegalPage, adminLegalPageRevisions, type LegalPageKey } from '../../../../lib/legal-pages';
 import { exampleLegalPage } from '../../../../lib/legal-page-examples';
-import { publishLegalPageAction, saveLegalDraftAction, saveImprintDetailsAction, publishImprintDetailsAction } from './actions';
+import { publishLegalPageAction, saveLegalDraftAction } from './actions';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { currentLocale } from '../../../../lib/server-locale';
@@ -28,7 +28,7 @@ export default async function AdminLegalPage({
   const state = await adminLegalPage(key as LegalPageKey, bearer);
   const revisions = await adminLegalPageRevisions(key as LegalPageKey, bearer);
   const imprintDetails = key.startsWith('impressum') ? await adminImprintDetails(bearer) : null;
-  const imprintContactMissing = key.startsWith('impressum') && !imprintDetails?.published;
+  const imprintDraftIncomplete = key.startsWith('impressum') && !imprintDetails?.draft;
   const paramsMessage = await searchParams;
   const errorMessage = Object.prototype.hasOwnProperty.call(ui.legal.errors, paramsMessage.error ?? '')
     ? ui.legal.errors[paramsMessage.error as keyof typeof ui.legal.errors]
@@ -50,6 +50,15 @@ export default async function AdminLegalPage({
         <NavigatingActionForm action={saveLegalDraftAction} className="stack">
           <input type="hidden" name="key" value={key} />
           <input type="hidden" name="expectedRevision" value={state?.draft?.revision ?? 0} />
+          {imprintDetails ? <fieldset className="stack">
+            <legend><T value={ui.legal.imprintDetails} /></legend>
+            <p><T value={ui.legal.sharedContactHelp} /></p>
+            <input type="hidden" name="expectedContactRevision" value={imprintDetails.draft?.revision ?? 0} />
+            {(['name', 'streetAddress', 'postalCode', 'city', 'country', 'email'] as const).map((field) => <label key={field}>
+              <T value={ui.legal[field]} />
+              <input name={field} type={field === 'email' ? 'email' : 'text'} required maxLength={255} defaultValue={imprintDetails.draft?.[field] ?? ''} />
+            </label>)}
+          </fieldset> : null}
           <label htmlFor="legal-content">{title} <T value={ui.admin.legal.key.page.text} /></label>
           <textarea id="legal-content" name="content" rows={18} maxLength={30000} required defaultValue={state?.draft?.content ?? exampleLegalPage(key as LegalPageKey)} />
           <p className="muted"><T value={ui.admin.legal.key.page.theInitialExampleUsesFictionalDetailsReplace} /></p>
@@ -57,33 +66,26 @@ export default async function AdminLegalPage({
           <Button variant="primary"><T value={ui.admin.legal.key.page.saveDraft} /></Button>
         </NavigatingActionForm>
       </Card>
-      {key === 'impressum' && imprintDetails ? <Card>
-        <h2 id="imprint-contact"><T value={ui.legal.imprintDetails} /></h2>
-        <NavigatingActionForm action={saveImprintDetailsAction} className="stack">
-          <input type="hidden" name="expectedRevision" value={imprintDetails.draft?.revision ?? 0} />
-          {(['name', 'streetAddress', 'postalCode', 'city', 'country', 'email'] as const).map((field) => <label key={field}>
-            <T value={ui.legal[field]} />
-            <input name={field} type={field === 'email' ? 'email' : 'text'} required maxLength={255} defaultValue={imprintDetails.draft?.[field] ?? ''} />
-          </label>)}
-          <Button variant="primary"><T value={ui.legal.saveDetails} /></Button>
-        </NavigatingActionForm>
-        {imprintDetails.draft ? <NavigatingActionForm action={publishImprintDetailsAction}>
-          <input type="hidden" name="expectedRevision" value={imprintDetails.draft.revision} />
-          <Button><T value={ui.legal.publishDetails} /></Button>
-        </NavigatingActionForm> : null}
-      </Card> : null}
       <Card>
         <h2><T value={ui.admin.legal.key.page.publication} /></h2>
-        {imprintContactMissing ? <Alert tone="info">
-          <T value={ui.legal.errors.contact_required} />{' '}
-          <Link href="/admin/legal/impressum#imprint-contact"><T value={ui.legal.manageContact} /></Link>
-        </Alert> : null}
+        <p><T value={ui.legal.reviewSavedDraft} /></p>
         <p><T value={ui.admin.legal.key.page.publishedRevision} />{" "}{state?.published?.revision ?? message(locale, ui.legal.none)}<T value={ui.admin.legal.key.page.draftRevision} />{" "}{state?.draft?.revision ?? message(locale, ui.legal.none)}.</p>
         {state?.draft ? (
           <NavigatingActionForm action={publishLegalPageAction}>
             <input type="hidden" name="key" value={key} />
             <input type="hidden" name="expectedRevision" value={state.draft.revision} />
-            <Button variant="primary" disabled={imprintContactMissing}><T value={ui.admin.legal.key.page.publishReviewedText} /></Button>
+            {key.startsWith('impressum') ? <input type="hidden" name="expectedContactRevision" value={imprintDetails?.draft?.revision ?? 0} /> : null}
+            <details open>
+              <summary><T value={ui.legal.savedPreview} /></summary>
+              <pre className="legal-page-content">{state.draft.content}</pre>
+              {imprintDetails?.draft ? <address>
+                {imprintDetails.draft.name}<br />{imprintDetails.draft.streetAddress}<br />
+                {imprintDetails.draft.postalCode} {imprintDetails.draft.city}<br />
+                {imprintDetails.draft.country}<br />{imprintDetails.draft.email}
+              </address> : null}
+            </details>
+            {imprintDraftIncomplete ? <p><T value={ui.legal.errors.contact_required} /></p> : null}
+            <Button variant="primary" disabled={imprintDraftIncomplete}><T value={key.startsWith('impressum') ? ui.legal.publishImprint : ui.admin.legal.key.page.publishReviewedText} /></Button>
           </NavigatingActionForm>
         ) : null}
       </Card>

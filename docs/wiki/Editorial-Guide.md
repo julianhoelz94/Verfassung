@@ -58,9 +58,9 @@ Open **Admin** for **Users**, **Account settings**, **Outlines**, and **Import**
 
 Admin also contains **Legal pages**. Save a private draft of the Impressum or Datenschutzerklärung, review its content and then publish it as a separate action. Confirm real operator details before public launch. Changes to legal pages do not publish constitutional text.
 
-The German and English legal texts have separate drafts and publication steps. Maintain the imprint's mandatory name, address and email in the shared contact fields; publish those reviewed fields before publishing either imprint text. Keep those details out of the language-specific body so a later address change has one source. Do not publish the sample legal text. A missing English publication falls back to the German original with a notice.
+The German and English legal texts have separate drafts and publication steps. Edit the imprint text and its shared name, address and email in one form. Choose **Save draft** once, review the **Saved draft preview**, then choose **Publish reviewed imprint**. Each action updates the selected language's text and the shared contact details together. The other language's text remains unchanged; the published contact record is shared by both languages. Keep contact details out of the prose and replace the sample text before publication. A missing English publication falls back to the German original with a notice.
 
-When no shared contact record is published, **Publish reviewed text** is disabled and links to **Edit shared contact details**. Use **Save contact draft**, then **Publish reviewed contact**, and finally publish the reviewed text for each language. Publication errors identify example content, duplicated contact details, or a changed draft that needs reloading.
+Validation failures publish neither the text nor contact changes. Errors identify example content, duplicated contact details, or a stale draft that needs reloading. Unsaved edits are not included in publication; review the saved preview before publishing.
 
 An imprint published before this feature may still contain its address in the body. Its public display keeps that legacy body without appending the new shared contact record. Remove the embedded address, save a new draft, and publish it to switch to the shared record.
 

@@ -71,26 +71,6 @@ export function adminImprintDetails(bearer: string): Promise<ImprintDetailsState
   return read('/legal-pages/imprint-details/editor', { cache: 'no-store', headers: { Authorization: bearer } });
 }
 
-export async function saveImprintDetails(details: Omit<ImprintDetails, 'revision'>, expectedRevision: number, bearer: string): Promise<ImprintDetailsState> {
-  const response = await fetch(`${base()}/legal-pages/imprint-details/draft`, {
-    method: 'PUT', cache: 'no-store',
-    headers: { Authorization: bearer, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ ...details, expectedRevision }),
-  });
-  if (!response.ok) await rejectWrite(response);
-  return response.json() as Promise<ImprintDetailsState>;
-}
-
-export async function publishImprintDetails(expectedRevision: number, bearer: string): Promise<ImprintDetailsState> {
-  const response = await fetch(`${base()}/legal-pages/imprint-details/publish`, {
-    method: 'POST', cache: 'no-store',
-    headers: { Authorization: bearer, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ expectedRevision }),
-  });
-  if (!response.ok) await rejectWrite(response);
-  return response.json() as Promise<ImprintDetailsState>;
-}
-
 export function adminLegalPage(key: LegalPageKey, bearer: string): Promise<LegalPageState | null> {
   return read(`/legal-pages/${key}/editor`, { cache: 'no-store', headers: { Authorization: bearer } });
 }
@@ -110,10 +90,10 @@ async function write(key: LegalPageKey, action: 'draft' | 'publish', body: objec
   return response.json() as Promise<LegalPageState>;
 }
 
-export function saveLegalPageDraft(key: LegalPageKey, content: string, expectedRevision: number, bearer: string): Promise<LegalPageState> {
-  return write(key, 'draft', { content, expectedRevision }, bearer);
+export function saveLegalPageDraft(key: LegalPageKey, content: string, expectedRevision: number, bearer: string, contact?: Omit<ImprintDetails, 'revision'> & { expectedRevision: number }): Promise<LegalPageState> {
+  return write(key, 'draft', { content, expectedRevision, contact }, bearer);
 }
 
-export function publishLegalPage(key: LegalPageKey, expectedRevision: number, bearer: string): Promise<LegalPageState> {
-  return write(key, 'publish', { expectedRevision }, bearer);
+export function publishLegalPage(key: LegalPageKey, expectedRevision: number, bearer: string, expectedContactRevision?: number): Promise<LegalPageState> {
+  return write(key, 'publish', { expectedRevision, expectedContactRevision }, bearer);
 }

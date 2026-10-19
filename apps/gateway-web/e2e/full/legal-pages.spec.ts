@@ -6,8 +6,9 @@ test('admin publishes shared contact before reviewed imprint text and keeps lang
   test.setTimeout(120_000);
   const headers = await adminHeaders(request);
   const existing = await (await request.get('/api/document/legal-pages/impressum/editor', { headers })).json();
+  const existingEnglish = await (await request.get('/api/document/legal-pages/impressum_en/editor', { headers })).json();
   const contact = await (await request.get('/api/document/legal-pages/imprint-details/editor', { headers })).json();
-  test.skip(!process.env.CI && (!!existing.draft || !!contact.draft), 'Preserve existing operator legal content when running against a developer stack.');
+  test.skip(!process.env.CI && (!!existing.draft || !!existingEnglish.draft || !!contact.draft), 'Preserve existing operator legal content when running against a developer stack.');
   await signIn(page, 'admin');
   await page.goto('/admin/legal/impressum');
   await page.getByLabel('Imprint text').fill('EXAMPLE — REPLACE BEFORE PUBLICATION');

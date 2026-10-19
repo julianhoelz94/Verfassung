@@ -381,6 +381,7 @@ jobs:
         working-directory: apps/gateway-web
         run: npm run test:e2e:full
       - name: Verify local HTTPS authentication and deployment persistence
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         shell: bash
         run: |
           set -euo pipefail

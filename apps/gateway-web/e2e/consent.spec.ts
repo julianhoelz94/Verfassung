@@ -43,10 +43,13 @@ test('admin publishes legal prose and one shared address for both languages', as
   await expect(page.getByRole('heading', { name: 'Edit imprint' })).toBeVisible();
   await page.getByLabel('Street address').fill('Main Street 2');
   await page.getByRole('button', { name: 'Save contact draft' }).click();
+  await expect(page).toHaveURL(/\/admin\/legal\/impressum\?saved=1$/);
+  await expect(page.getByLabel('Street address')).toHaveValue('Main Street 2');
   await page.goto('/impressum');
   await expect(page.getByText('Main Street 1')).toBeVisible();
   await page.goto('/admin/legal/impressum');
   await page.getByRole('button', { name: 'Publish reviewed contact' }).click();
+  await expect(page).toHaveURL(/\/admin\/legal\/impressum\?published=1$/);
   await page.goto('/admin/legal/impressum_en');
   const revised = 'Reviewed English legal prose\n<script>window.injected=true</script>';
   await page.getByLabel('Imprint text').fill(revised);

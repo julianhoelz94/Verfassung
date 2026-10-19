@@ -1,5 +1,7 @@
 'use client';
 
+import { NavigatingActionForm } from './NavigatingActionForm';
+
 import { T, useTranslation } from './TranslationProvider';
 import { ui } from '../../lib/messages';
 import { roleMessage } from '../../lib/ui-labels';
@@ -64,9 +66,9 @@ function MenuSectionList({
             </a>
           ))}
           {section.id === 'account' && user ? (
-            <form action={logoutAction}>
+            <NavigatingActionForm action={logoutAction}>
               <button type="submit"><T value={ui.components.siteheader.signOut} /></button>
-            </form>
+            </NavigatingActionForm>
           ) : null}
         </div>
       ))}

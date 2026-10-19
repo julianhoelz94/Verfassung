@@ -1,3 +1,4 @@
+import { NavigatingActionForm } from '../../components/NavigatingActionForm';
 import { setupStatus } from '../../../lib/deployment-setup';
 import { currentLocale } from '../../../lib/server-locale';
 import { message } from '../../../lib/messages';
@@ -70,7 +71,7 @@ export default async function MfaPage(props: MfaPageProps) {
         </Card>
       ) : (
         <Card>
-          <form action={completeMfaAction}>
+          <NavigatingActionForm action={completeMfaAction}>
             {searchParams.next?.startsWith('/oauth/authorize?') ? <input type="hidden" name="next" value={searchParams.next} /> : null}
             <Input
               label={<T value={ui.attrs.loginMfaPageInputLabelAuthenticator} />}
@@ -81,7 +82,7 @@ export default async function MfaPage(props: MfaPageProps) {
             />
             <Input label={<T value={ui.attrs.loginMfaPageInputLabelRecovery} />} id="recoveryCode" name="recoveryCode" autoComplete="off" />
             <Button variant="primary"><T value={ui.login.mfa.page.continue} /></Button>
-          </form>
+          </NavigatingActionForm>
         </Card>
       )}
     </PageMain>

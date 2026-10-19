@@ -1,3 +1,4 @@
+import { NavigatingActionForm } from '../components/NavigatingActionForm';
 import { T } from '../components/TranslationProvider';
 import { ui } from '../../lib/messages';
 import { redirect } from 'next/navigation';
@@ -57,7 +58,7 @@ export default async function LoginPage(props: LoginPageProps) {
       {searchParams.registered ? <Alert tone="success"><T value={ui.login.page.accountConfirmedYouCanSignIn} /></Alert> : null}
       {!setup.completed ? <Alert tone="info"><T value={m.adminOnly} /></Alert> : null}
       <Card>
-        <form action={loginAction}>
+        <NavigatingActionForm action={loginAction}>
           {searchParams.next?.startsWith('/oauth/authorize?') ? <input type="hidden" name="next" value={searchParams.next} /> : null}
           <Input
             label={<T value={ui.attrs.loginPageInputLabelEmail} />}
@@ -80,7 +81,7 @@ export default async function LoginPage(props: LoginPageProps) {
             autoComplete="current-password"
           />
           <Button variant="primary"><T value={ui.login.page.signIn} /></Button>
-        </form>
+        </NavigatingActionForm>
       </Card>
       {setup.completed ? <Card><PasskeyLogin /></Card> : null}
       {setup.completed ? <p>

@@ -1,3 +1,4 @@
+import { NavigatingActionForm } from '../components/NavigatingActionForm';
 import { T } from '../components/TranslationProvider';
 import { Alert, Button, Card } from '../components/ui';
 import { ui } from '../../lib/messages';
@@ -8,7 +9,7 @@ import { saveSetupPreferences } from './actions';
 
 export function SetupPreferences({ details, returnTo }: { details: SetupDetails; returnTo: '/setup' | '/admin/settings' }) {
   return <Card><h2><T value={m.general} /></h2>
-    <form action={saveSetupPreferences} className="stack">
+    <NavigatingActionForm action={saveSetupPreferences} className="stack">
       <input type="hidden" name="returnTo" value={returnTo} />
       <fieldset><legend><T value={m.languages} /></legend>
         <p><T value={m.languageHint} /></p>
@@ -34,6 +35,6 @@ export function SetupPreferences({ details, returnTo }: { details: SetupDetails;
         <label><input type="checkbox" name="accessReviewed" defaultChecked={details.preferences.accessReviewed} /> <T value={m.accessReviewed} /></label>
       </fieldset>
       <Button variant="primary"><T value={m.save} /></Button>
-    </form>
+    </NavigatingActionForm>
   </Card>;
 }

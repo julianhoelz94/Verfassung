@@ -1,10 +1,8 @@
 'use server';
-import { redirect } from 'next/navigation';
-import { revalidatePath } from 'next/cache';
 import { requireSessionBearer } from '../../lib/session';
 import { setupRequest } from '../../lib/deployment-setup';
 
-export async function saveSetupPreferences(form: FormData): Promise<void> {
+export async function saveSetupPreferences(form: FormData): Promise<string> {
   const bearer = await requireSessionBearer();
   const target = form.get('returnTo') === '/admin/settings' ? '/admin/settings' : '/setup';
   try {
@@ -12,14 +10,12 @@ export async function saveSetupPreferences(form: FormData): Promise<void> {
       enabledLanguages: form.getAll('enabledLanguages').map(String), defaultLanguage: String(form.get('defaultLanguage') ?? ''),
       mailDeferred: form.get('mailDeferred') === 'on', accessReviewed: form.get('accessReviewed') === 'on',
     });
-  } catch { redirect(`${target}?error=setup`); }
-  revalidatePath("/", "layout");
-  redirect(`${target}?saved=1`);
+  } catch { return `${target}?error=setup`; }
+  return `${target}?saved=1`;
 }
 
-export async function completeSetup(): Promise<void> {
+export async function completeSetup(): Promise<string> {
   const bearer = await requireSessionBearer();
-  try { await setupRequest('/setup/complete', bearer, 'POST'); } catch { redirect('/setup?error=finish'); }
-  revalidatePath('/', 'layout');
-  redirect('/admin/settings?completed=1');
+  try { await setupRequest('/setup/complete', bearer, 'POST'); } catch { return '/setup?error=finish'; }
+  return '/admin/settings?completed=1';
 }

@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import type { Metadata } from 'next';
 import { publicBaseUrl } from '../lib/site-url';
 import { currentSession, SESSION_COOKIE } from '../lib/session';
-import { cookies, headers } from 'next/headers';
+import { cookies } from 'next/headers';
 import { getCountry, listConstitutionAmendments, listCountries } from '../lib/api';
 import { SiteFooter } from './components/SiteFooter';
 import { SiteHeader } from './components/SiteHeader';
@@ -15,7 +15,6 @@ import { TranslationProvider } from './components/TranslationProvider';
 
 export async function generateMetadata(): Promise<Metadata> {
   const base = publicBaseUrl();
-  const session = await currentSession();
   const locale = await currentLocale();
   const description = message(locale, ui.shell.siteDescription);
   return {

@@ -1,7 +1,6 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { redirect } from 'next/navigation';
 import { requireAdminUser } from '../../../../lib/admin';
 import { requireSessionBearer } from '../../../../lib/session';
 import { publishLegalPage, saveLegalPageDraft, saveImprintDetails, publishImprintDetails, type LegalPageKey } from '../../../../lib/legal-pages';
@@ -12,34 +11,32 @@ function keyFrom(formData: FormData): LegalPageKey {
   return key as LegalPageKey;
 }
 
-export async function saveLegalDraftAction(formData: FormData): Promise<void> {
+export async function saveLegalDraftAction(formData: FormData): Promise<string> {
   const key = keyFrom(formData);
   await requireAdminUser(`/admin/legal/${key}?error=forbidden`);
   const bearer = await requireSessionBearer();
   try {
     await saveLegalPageDraft(key, String(formData.get('content') ?? ''), Number(formData.get('expectedRevision')), bearer);
   } catch {
-    redirect(`/admin/legal/${key}?error=save`);
+    return `/admin/legal/${key}?error=save`;
   }
-  revalidatePath(`/admin/legal/${key}`);
-  redirect(`/admin/legal/${key}?saved=1`);
+  return `/admin/legal/${key}?saved=1`;
 }
 
-export async function publishLegalPageAction(formData: FormData): Promise<void> {
+export async function publishLegalPageAction(formData: FormData): Promise<string> {
   const key = keyFrom(formData);
   await requireAdminUser(`/admin/legal/${key}?error=forbidden`);
   const bearer = await requireSessionBearer();
   try {
     await publishLegalPage(key, Number(formData.get('expectedRevision')), bearer);
   } catch {
-    redirect(`/admin/legal/${key}?error=publish`);
+    return `/admin/legal/${key}?error=publish`;
   }
   revalidatePath(key.startsWith('impressum') ? '/impressum' : '/datenschutz');
-  revalidatePath(`/admin/legal/${key}`);
-  redirect(`/admin/legal/${key}?published=1`);
+  return `/admin/legal/${key}?published=1`;
 }
 
-export async function saveImprintDetailsAction(formData: FormData): Promise<void> {
+export async function saveImprintDetailsAction(formData: FormData): Promise<string> {
   await requireAdminUser('/admin/legal/impressum?error=forbidden');
   const bearer = await requireSessionBearer();
   try {
@@ -52,21 +49,19 @@ export async function saveImprintDetailsAction(formData: FormData): Promise<void
       email: String(formData.get('email') ?? ''),
     }, Number(formData.get('expectedRevision')), bearer);
   } catch {
-    redirect('/admin/legal/impressum?error=details');
+    return '/admin/legal/impressum?error=details';
   }
-  revalidatePath('/admin/legal/impressum');
-  redirect('/admin/legal/impressum?saved=1');
+  return '/admin/legal/impressum?saved=1';
 }
 
-export async function publishImprintDetailsAction(formData: FormData): Promise<void> {
+export async function publishImprintDetailsAction(formData: FormData): Promise<string> {
   await requireAdminUser('/admin/legal/impressum?error=forbidden');
   const bearer = await requireSessionBearer();
   try {
     await publishImprintDetails(Number(formData.get('expectedRevision')), bearer);
   } catch {
-    redirect('/admin/legal/impressum?error=details');
+    return '/admin/legal/impressum?error=details';
   }
   revalidatePath('/impressum');
-  revalidatePath('/admin/legal/impressum');
-  redirect('/admin/legal/impressum?published=1');
+  return '/admin/legal/impressum?published=1';
 }

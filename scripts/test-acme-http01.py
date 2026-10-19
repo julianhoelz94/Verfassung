@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Real HTTP-01 validation with an isolated Pebble CA; never contacts Let's Encrypt."""
 import json
-import os
 from pathlib import Path
 import ssl
 import subprocess

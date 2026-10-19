@@ -1,3 +1,4 @@
+import { NavigatingActionForm } from '../components/NavigatingActionForm';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { requireSessionBearer } from '../../lib/session';
@@ -37,7 +38,7 @@ export default async function SetupPage({ searchParams }: { searchParams: Promis
     <section id="email"><MailSettings settings={settings} email={admin.email} managed={details.settings.filter(field => !field.editable).map(field => field.key)} returnTo="/setup" /></section>
     <section id="review"><Card><h2><T value={m.review} /></h2><p><T value={m.reviewHint} /></p>
       {details.required.length ? <><h3><T value={m.required} /></h3><ul>{details.required.map(key => <li key={key}><T value={requiredMessages[key] ?? m.required} /></li>)}</ul></> : null}
-      <form action={completeSetup}><Button variant="primary" disabled={details.required.length > 0}><T value={m.finish} /></Button></form>
+      <NavigatingActionForm action={completeSetup}><Button variant="primary" disabled={details.required.length > 0}><T value={m.finish} /></Button></NavigatingActionForm>
     </Card></section>
   </PageMain>;
 }

@@ -5,7 +5,7 @@ const expect = baseExpect.configure({ timeout: 20_000 });
 const enabled = process.env.E2E_TLS_SMOKE === 'true';
 const spki = process.env.E2E_TLS_CERT_SPKI;
 
-// Pin only the disposable local CA. Normal browser journeys retain their usual
+// Pin only the disposable local certificate. Normal browser journeys retain their usual
 // certificate checks, and this never changes the host/browser trust store.
 test.use({ launchOptions: { args: enabled && spki ? [`--ignore-certificate-errors-spki-list=${spki}`] : [] } });
 

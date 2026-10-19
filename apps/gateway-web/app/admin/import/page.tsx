@@ -1,3 +1,4 @@
+import { NavigatingActionForm } from '../../components/NavigatingActionForm';
 import { statusMessage } from '../../../lib/ui-labels';
 import { T } from '../../components/TranslationProvider';
 import { ui } from '../../../lib/messages';
@@ -38,19 +39,19 @@ export default async function AdminImportPage(props: AdminImportPageProps) {
       {canImport ? <Card>
         <h2><T value={ui.admin.import.page.newConstitutionSetup} /></h2>
         <p><T value={ui.admin.import.page.submitCountryTitleSourceProposedLevelsAnd} /></p>
-        <form action={createSetupProposalAction}>
+        <NavigatingActionForm action={createSetupProposalAction}>
           <TextArea label={<T value={ui.attrs.adminImportPageTextAreaLabelSetup} />} id="proposal" name="proposal" rows={10} spellCheck={false} />
           <Button><T value={ui.admin.import.page.createPrivateSetupProposal} /></Button>
-        </form>
+        </NavigatingActionForm>
       </Card> : null}
       {canImport ? <Card>
         <h2><T value={ui.admin.import.page.uploadAVersion} /></h2>
         <p><T value={ui.admin.import.page.useTheConfirmedConstitutionIdAndSettings} /></p>
-        <form action={createImportAction}>
+        <NavigatingActionForm action={createImportAction}>
           <TextArea label={<T value={ui.attrs.adminImportPageTextAreaLabelImport} />} id="payload" name="payload" rows={16} spellCheck={false} />
           <Input label={<T value={ui.attrs.adminImportPageInputLabelJSON} />} id="file" name="file" type="file" accept="application/json,.json" />
           <Button variant="primary"><T value={ui.admin.import.page.stageForReview} /></Button>
-        </form>
+        </NavigatingActionForm>
       </Card> : null}
       <Card>
         <h2><T value={ui.admin.import.page.recentImports} /></h2>

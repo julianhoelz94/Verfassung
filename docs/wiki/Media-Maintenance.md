@@ -6,7 +6,7 @@
 
 1. The [merged-PR workflow](https://github.com/julianhoelz94/Verfassung/blob/main/.github/workflows/wiki-videos.yml) checks out the merge commit and starts a disposable full stack in CI.
 2. Real API fixtures are uploaded and read back. The documentation journey captures 18 illustrations and six clips in English/German.
-3. Media validation checks PNG dimensions, clip duration/resolution and full MP4 decoding. A Chromium check plays all six clips and verifies the player fits desktop and phone widths without downloads.
+3. Media validation checks PNG dimensions, clip duration/resolution and full MP4 decoding. A Chrome check plays all six clips and verifies the player fits desktop and phone widths without downloads.
 4. The player is deployed to GitHub Pages. Only then are Wiki pages, inline screenshots and fresh clips published together.
 5. Verify the workflow, public Wiki images and browser playback before recording completion.
 
@@ -32,5 +32,7 @@ Authentication happens before each recording. CI uses fictional seed accounts an
 Update the journey, labels and guide together. Keep image names synchronized with the inventory in `prepare-wiki-media.py`; `check-wiki-docs.py` rejects undeclared or unused illustrations. Use meaningful state assertions before capture, not timing sleeps as readiness checks. Viewing pauses are intentional presentation time.
 
 A failed capture, encoding or playback check blocks publication. Correct the source in a PR and merge it; CI then regenerates the complete media set. A rerun of a failed merged-PR workflow uses that merge's source and does not require a local capture. GitHub Pages must be configured for GitHub Actions; its hosting is only for documentation media, separate from application CD.
+
+The workflow retains the raw `wiki-captures` artifact for seven days before validating the player. Inspect those CI images and clips when validation fails; published media still requires every check to pass.
 
 [[Development and operations|Technical-Development]] · [[Documentation home|Home]]

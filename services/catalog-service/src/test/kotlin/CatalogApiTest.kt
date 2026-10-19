@@ -72,7 +72,8 @@ class CatalogApiTest {
     private val viewer =
         Actor(UUID.fromString("01900000-0000-4000-8000-000000000414"), "local-viewer@example.local", listOf("viewer"))
 
-    private fun uniqueCountryCode(): String = generateSequence { ('A'..'Z').shuffled().take(2).joinToString("") }
+    // Keep generated countries separate from fixed fixtures and independent of randomness.
+    private fun uniqueCountryCode(): String = ('A'..'Z').asSequence().map { "Q$it" }
         .first { catalogRepository.findCountrySummary(it) == null }
 
     @Test
@@ -259,8 +260,9 @@ class CatalogApiTest {
 
     @Test
     fun successorReservationRetriesRequireCompleteContentAndRejectChangedPayload() {
-        writes.createCountry(com.constitutionatlas.catalog.api.CreateCountryRequest("QZ", "Reservation country"))
-        val constitution = writes.createConstitution("QZ", com.constitutionatlas.catalog.api.CreateConstitutionRequest("reservation-${UUID.randomUUID()}", "Reservation test"))
+        val countryCode = uniqueCountryCode()
+        writes.createCountry(com.constitutionatlas.catalog.api.CreateCountryRequest(countryCode, "Reservation country"))
+        val constitution = writes.createConstitution(countryCode, com.constitutionatlas.catalog.api.CreateConstitutionRequest("reservation-${UUID.randomUUID()}", "Reservation test"))
         val initial = writes.createDraftVersion(constitution.id, com.constitutionatlas.catalog.api.CreateVersionRequest("0"))
         writes.publishVersion(initial.id)
         val attempt = UUID.randomUUID()
@@ -994,8 +996,7 @@ class CatalogApiTest {
 
     @Test
     fun editorialHopOnOlderLawAfterLaterLegalExists() {
-        val countryCode = generateSequence { ('A'..'Z').shuffled().take(2).joinToString("") }
-            .first { catalogRepository.findCountrySummary(it) == null }
+        val countryCode = uniqueCountryCode()
         mockMvc.post("/countries") {
             header("Authorization", TOKEN)
             contentType = MediaType.APPLICATION_JSON

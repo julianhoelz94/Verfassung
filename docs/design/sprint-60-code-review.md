@@ -38,6 +38,7 @@ unrelated issues remain intact. Delivery PR: #139.
 | Image signature/dimension parsing obscured document persistence and revision/link behavior | Extract the unchanged fail-closed image validator; API tests retain all supported image fixtures, invalid files and pinned-publication behavior |
 | Dead helpers, props, imports, wrappers and an unchecked Map parser | Remove unreferenced gateway command/API helpers and props; parse conflict codes through typed JSON nodes; enable unused locals/parameters in both TypeScript projects and use the ESLint CLI without deprecated Next lint wrapping |
 | Navigation/data maps described pre-review imports, schema and access rules | Refresh ownership, current immutable content, staged imports, setup, transport and verification documentation; remove machine-specific links |
+| Post-merge Catalog tests exposed a random country-code collision with the reservation test's fixed `QZ` | Allocate generated test countries deterministically in a separate namespace and use the allocator for reservations; retain all publication/idempotency assertions |
 
 ## Removed files and intentional retention
 
@@ -103,9 +104,11 @@ packages are needed. No cross-database writes or schema changes were introduced.
   passes. The reviewer caught the non-regular-dump edge case; both rechecked its
   correction and the remaining gateway transport/pagination improvements.
 - Final production-build browser run: 73 journeys pass; the Linux visual snapshot
-  test runs in its pinned CI image. Required full-stack/visual CI is in progress.
+  test runs in its pinned CI image. Required PR/push full-stack and visual CI passed.
 
 ## Delivery evidence
 
-Pending final reviewer/verifier correction loops, required PR checks, merge, main
-CI, and published Wiki page/video verification. Completion is not claimed here.
+PR #139 merged as `bf2c41f16e19051483e232544dd05e1f48250156` after both independent
+reviews and required PR/push CI passed. Post-merge main CI exposed the Catalog
+test-data collision above; its correction is part of Sprint 60 close-out. Main CI
+and published Wiki page/video verification remain required before completion.

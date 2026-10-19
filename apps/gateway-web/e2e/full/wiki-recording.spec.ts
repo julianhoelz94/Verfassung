@@ -91,6 +91,7 @@ for (const locale of ['en', 'de'] as const) {
     const shot = async (page: Page, name: string, target?: ReturnType<Page['locator']>) => {
       const path = join(staging, `${name}-${locale}.png`);
       await expect(page.locator('html')).toHaveAttribute('lang', locale);
+      if (target) await expect(target).toBeVisible();
       if (capture) { await illustrate(page, path, target); paths.push(path); }
     };
     try {
@@ -122,7 +123,8 @@ for (const locale of ['en', 'de'] as const) {
         await expect(page.getByRole('heading', { level:1 })).toBeVisible();
         await shot(page, 'admin-overview');
         await page.goto('/admin/import');
-        await expect(page.locator('input[type=file]')).toBeAttached();
+        await expect(page.getByRole('heading', { level:1 })).toBeVisible();
+        await expect(page.locator('input[type=file]')).toBeVisible();
         await shot(page, 'admin-import');
       } finally { await admin.close(); }
 

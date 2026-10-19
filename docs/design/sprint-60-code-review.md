@@ -6,7 +6,9 @@ contracts remain the constraints for refactoring.
 
 ## Baseline and method
 
-Base: `5232c4277a50922af56b55816ce7b7319be09d3d`. The initial inventory contains
+Initial base: `5232c4277a50922af56b55816ce7b7319be09d3d`. Before final CI, integrate
+`c089860` (the concurrent Wiki player/footer fix) without changing its behavior.
+The initial inventory contains
 1,128 tracked files and 548 Kotlin, TypeScript, JavaScript, Python and shell files
 (59,710 lines). Inventory and source/duplicate/reference scans cover the repository;
 manual review concentrates on ownership, authorization, immutable publication,
@@ -100,7 +102,8 @@ packages are needed. No cross-database writes or schema changes were introduced.
 - Independent reviewer and verifier cleared the combined diff and correction
   passes. The reviewer caught the non-regular-dump edge case; both rechecked its
   correction and the remaining gateway transport/pagination improvements.
-- Final mocked browser journeys and required full-stack/visual CI are in progress.
+- Final production-build browser run: 73 journeys pass; the Linux visual snapshot
+  test runs in its pinned CI image. Required full-stack/visual CI is in progress.
 
 ## Delivery evidence
 

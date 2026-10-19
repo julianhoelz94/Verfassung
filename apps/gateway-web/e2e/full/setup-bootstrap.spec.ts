@@ -1,5 +1,7 @@
-import { expect, test } from '../fixtures/consent';
+import { expect as baseExpect, test } from '../fixtures/consent';
 import { authenticatorCode } from './auth';
+
+const expect = baseExpect.configure({ timeout: 20_000 });
 
 test('new deployment stays closed until the administrator completes setup', async ({ page, request }, testInfo) => {
   test.skip(process.env.E2E_SETUP_FRESH !== 'true', 'Run against a fresh deployment before uploading fixtures.');
@@ -23,6 +25,7 @@ test('new deployment stays closed until the administrator completes setup', asyn
   await page.getByLabel('Configure email later', { exact: true }).check();
   await page.getByLabel('I have reviewed access and registration settings', { exact: true }).check();
   await page.getByRole('button', { name: 'Save preferences', exact: true }).click();
+  await expect(page).toHaveURL(/\/setup\?saved=1$/, { timeout: 15_000 });
   await expect(page.getByText('Changes saved.', { exact: true })).toBeVisible();
   await page.reload();
   await expect(page.getByLabel('Configure email later', { exact: true })).toBeChecked();

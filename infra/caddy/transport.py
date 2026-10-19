@@ -54,11 +54,12 @@ def render(env):
     globals_ = ["auto_https disable_redirects", "admin unix//run/caddy/admin.sock"]
     if proxies:
         globals_.append("servers {\n trusted_proxies static " + " ".join(proxies) + "\n trusted_proxies_strict\n}")
-    common = """
-    route {
+    def routes(guard="", readiness=""):
+        return "\nroute {\n" + guard + """
         handle /setup/transport/status {
             reverse_proxy 127.0.0.1:8081
         }
+""" + readiness + """
         forward_auth gateway-web:3000 {
             uri /api/setup-gate
             header_up X-Atlas-Edge-Check 1
@@ -69,10 +70,11 @@ def render(env):
 """
     prelude = "{\n" + "\n".join(globals_) + "\n}\nimport /etc/caddy/Caddyfile\n:8082 {\nhandle /setup/transport/status {\nreverse_proxy 127.0.0.1:8081\n}\nrespond 404\n}\n"
     if mode == "local-http":
-        return prelude + ":80 {\n" + common + "}\n"
+        return prelude + ":80 {\n" + routes() + "}\n"
     if mode == "external-proxy":
         guard = "\n@untrusted not remote_ip " + " ".join(proxies) + "\nrespond @untrusted 403\n@insecure not header X-Forwarded-Proto https\nrespond @insecure 426\n"
-        return prelude + ":80 {\n" + guard + common + "}\n"
+        readiness = "forward_auth 127.0.0.1:8081 {\n uri /internal/transport-ready\n}\n"
+        return prelude + ":80 {\n" + routes(guard, readiness) + "}\n"
     if mode == "local-https":
         tls = "tls internal"
     else:
@@ -85,7 +87,7 @@ def render(env):
                 raise ValueError("Invalid ACME test directory")
         test_directory = "\n test_dir " + ca if env.get("PROFILE") in {"ci", "testing"} and env.get("ACME_TEST_DIRECTORY") else ""
         tls = "tls {\nissuer acme {\n dir " + ca + test_directory + "\n disable_tlsalpn_challenge\n}\n}"
-    return prelude + "https://" + url.hostname + " {\n" + tls + common + "}\n:80 {\nreverse_proxy 127.0.0.1:8081\n}\n"
+    return prelude + "https://" + url.hostname + " {\n" + tls + routes() + "}\n:80 {\nreverse_proxy 127.0.0.1:8081\n}\n"
 
 
 def update(**values):
@@ -101,8 +103,8 @@ def observe(line):
     logger, message = event.get("logger", ""), event.get("msg", "")
     if logger.startswith("tls.obtain") and "obtaining certificate" in message:
         update(state="validating", ready=False, message="Validating domain and issuing certificate / Domainprüfung und Zertifikatsausstellung")
-    elif logger.startswith("tls.obtain") and "certificate obtained successfully" in message:
-        update(state="checking", ready=False, message="Certificate issued; checking HTTPS / Zertifikat ausgestellt; HTTPS wird geprüft")
+    elif logger.startswith(("tls.obtain", "tls.renew")) and message in {"certificate obtained successfully", "certificate renewed successfully"}:
+        update(state="checking", message="Certificate issued; checking HTTPS / Zertifikat ausgestellt; HTTPS wird geprüft", lastCertificateError=None)
     elif event.get("level") == "error" and logger.startswith("tls"):
         error = str(event.get("error", "")).lower()
         if "dns" in error or "nxdomain" in error:
@@ -111,7 +113,15 @@ def observe(line):
             message = "Certificate authority rate limit; automatic retry pending / CA-Ratenlimit; automatischer Neuversuch folgt"
         else:
             message = "Certificate validation failed. Check DNS and public ports 80/443; Caddy will retry / Zertifikatsprüfung fehlgeschlagen. DNS und öffentliche Ports 80/443 prüfen; Caddy versucht es erneut"
-        update(state="failed", message=message)
+        update(state="failed", message=message, lastCertificateError=message)
+
+
+def record_readiness(valid):
+    with LOCK:
+        if valid:
+            STATUS.update(state="ready", ready=True, message="HTTPS ready / HTTPS bereit")
+        elif STATUS["ready"]:
+            STATUS.update(state="failed", ready=False, message="HTTPS certificate unavailable / HTTPS-Zertifikat nicht verfügbar")
 
 
 def probe(mode, url):
@@ -160,6 +170,9 @@ def main():
                 body = json.dumps(state).encode()
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json")
+            elif self.path == "/internal/transport-ready" and state["ready"]:
+                self.send_response(204)
+                body = b""
             elif state["ready"] and mode in {"managed-acme", "local-https"}:
                 self.send_response(303)
                 target = self.path if self.path.startswith("/") and not self.path.startswith("//") and "\\" not in self.path else "/"
@@ -169,7 +182,7 @@ def main():
                 # No script or password form is served over HTTP. Refreshes also
                 # cause the redirect as soon as certificate verification succeeds.
                 body = ("<!doctype html><html lang=en><meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1'><meta http-equiv=refresh content=3><title>HTTPS setup</title><main style='max-width:38rem;margin:4rem auto;padding:1rem;font:1.1rem system-ui'><h1>Preparing a secure connection / Sichere Verbindung vorbereiten</h1><p>" + html.escape(state["message"]) + "</p><p>This page refreshes automatically. Login becomes available over HTTPS. / Diese Seite aktualisiert sich automatisch. Die Anmeldung erfolgt über HTTPS.</p></main></html>").encode()
-                self.send_response(503 if state["state"] == "failed" else 200)
+                self.send_response(503 if state["state"] == "failed" or self.path == "/internal/transport-ready" else 200)
                 self.send_header("Content-Type", "text/html; charset=utf-8")
             self.send_header("Cache-Control", "no-store")
             self.send_header("X-Content-Type-Options", "nosniff")
@@ -200,11 +213,7 @@ def main():
     def monitor():
         while process.poll() is None:
             if mode in {"managed-acme", "local-https", "external-proxy"}:
-                valid = probe(mode, url)
-                if valid:
-                    update(state="ready", ready=True, message="HTTPS ready / HTTPS bereit")
-                elif STATUS["ready"]:
-                    update(state="failed", ready=False, message="HTTPS certificate unavailable / HTTPS-Zertifikat nicht verfügbar")
+                record_readiness(probe(mode, url))
             time.sleep(2)
     threading.Thread(target=monitor, daemon=True).start()
     for line in process.stdout:

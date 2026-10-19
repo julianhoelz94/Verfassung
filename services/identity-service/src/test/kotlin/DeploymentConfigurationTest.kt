@@ -26,6 +26,14 @@ class DeploymentConfigurationTest {
     }
 
     @Test
+    fun opaqueSmtpPasswordPreservesWhitespace() {
+        val config = DeploymentConfiguration(environment().withProperty("SMTP_PASSWORD", " secret ").withProperty("SMTP_HOST", " mail.example.org "), jacksonObjectMapper())
+        check(config.value("SMTP_PASSWORD") == " secret ")
+        check(config.value("SMTP_HOST") == "mail.example.org")
+        check(DeploymentConfiguration(environment().withProperty("SMTP_PASSWORD", "  "), jacksonObjectMapper()).value("SMTP_PASSWORD") == null)
+    }
+
+    @Test
     fun productionRejectsLocalTransportAndFixtures() {
         val env = environment().apply { setActiveProfiles("production") }
         assertThrows<IllegalStateException> { DeploymentConfiguration(env, jacksonObjectMapper()).validateTransport() }

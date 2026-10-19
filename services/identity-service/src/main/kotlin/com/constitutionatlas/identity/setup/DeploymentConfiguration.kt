@@ -17,7 +17,7 @@ class DeploymentConfiguration(private val environment: Environment, mapper: Obje
     val publicUrl: String = value("PUBLIC_BASE_URL") ?: "http://localhost"
     val production: Boolean get() = environment.activeProfiles.contains("production")
     val fixture: Boolean get() = value("SETUP_FIXTURE_COMPLETE") == "true"
-    fun value(key: String): String? = environment.getProperty(key)?.trim()?.takeIf { it.isNotEmpty() }
+    fun value(key: String): String? = environment.getProperty(key)?.takeIf { it.isNotBlank() }?.let { if (key == "SMTP_PASSWORD") it else it.trim() }
 
     fun validateTransport() {
         check(tlsMode in setOf("local-http", "local-https", "managed-acme", "external-proxy")) { "Invalid TLS_MODE" }

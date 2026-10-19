@@ -3,6 +3,10 @@ import transport
 
 
 class TransportTest(unittest.TestCase):
+    def setUp(self):
+        transport.STATUS.clear()
+        transport.STATUS.update(state="preparing", ready=False, message="Preparing HTTPS")
+
     def env(self, mode="local-http", **extra):
         return dict(PROFILE="local-stack", TLS_MODE=mode, PUBLIC_BASE_URL="http://localhost" if mode == "local-http" else "https://localhost", **extra)
 
@@ -57,6 +61,17 @@ class TransportTest(unittest.TestCase):
         transport.observe('{"logger":"tls.obtain","level":"error","error":"DNS NXDOMAIN secret@example.org"}')
         self.assertEqual("failed", transport.STATUS["state"])
         self.assertNotIn("secret", transport.STATUS["message"])
+
+    def test_renewal_failure_stays_visible_while_previous_certificate_is_valid(self):
+        transport.record_readiness(True)
+        transport.observe('{"logger":"tls.renew","level":"error","error":"DNS NXDOMAIN private-value"}')
+        warning = transport.STATUS["lastCertificateError"]
+        transport.record_readiness(True)
+        self.assertTrue(transport.STATUS["ready"])
+        self.assertEqual(warning, transport.STATUS["lastCertificateError"])
+        self.assertNotIn("private-value", warning)
+        transport.observe('{"logger":"tls.renew","msg":"certificate renewed successfully"}')
+        self.assertIsNone(transport.STATUS["lastCertificateError"])
 
 
 if __name__ == "__main__":

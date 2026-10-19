@@ -28,8 +28,10 @@ class IdentitySettingsService(
     private val box = SecretBox(mfaProperties.encryptionKey)
 
     fun registrationEnabled(): Boolean =
-        environmentSettings.effective(repository.get()).selfRegistrationEnabled && !setupRepository.get().mailDeferred &&
-            currentMail().configured() && runCatching { validateConfiguration() }.isSuccess
+        environmentSettings.effective(repository.get()).selfRegistrationEnabled &&
+            !setupRepository.get().mailDeferred &&
+            currentMail().configured() &&
+            runCatching { validateConfiguration() }.isSuccess
 
     fun publicRegistrationStatus(): Map<String, Boolean> = mapOf("enabled" to registrationEnabled())
 

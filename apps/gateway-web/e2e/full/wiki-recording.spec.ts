@@ -180,11 +180,13 @@ for (const locale of ['en', 'de'] as const) {
         await expect(page.getByText(t(ui.editorDynamic.publishedAsVersion), { exact:false })).toBeVisible();
         publishedVersionId = new URL(page.url()).searchParams.get('newVersionId') ?? '';
         expect(publishedVersionId).toBeTruthy();
-        await watch.explain(text('Published. Open the public version to verify the corrected text.', 'Veröffentlicht. Prüfen Sie den korrigierten Text in der öffentlichen Fassung.'));
-        await watch.click(page.getByRole('link', { name:t(ui.editor.page.viewPublicPage) }));
-        const currentText = page.locator(`.snapshot-notice a[href*="/versions/${publishedVersionId}"]`);
-        if (await currentText.count()) await watch.click(currentText);
-        await expect(page.getByText(correction).first()).toBeVisible();
+        await watch.explain(text('Published. Reopen the version from its country page.', 'Veröffentlicht. Öffnen Sie die Fassung auf der Länderseite erneut.'));
+        await page.goto(`/countries/${source.countryIso}`);
+        await watch.click(page.locator(`a[href="/countries/${source.countryIso}/versions/${publishedVersionId}"]`).first());
+        await expect(page).toHaveURL(new RegExp(`/versions/${publishedVersionId}$`));
+        const publicCorrection = page.getByText(correction).first();
+        await expect(publicCorrection).toBeVisible();
+        await watch.point(publicCorrection);
         await watch.explain(text('The correction is public; the previous snapshot is preserved.', 'Die Korrektur ist öffentlich; der vorherige Textstand bleibt erhalten.'));
       }));
       const published = await (await request.get(`/api/content/versions/${publishedVersionId}/articles?includeBody=true`)).json();

@@ -75,8 +75,10 @@ class SetupService(
         if (policy.managed && (request.enabledLanguages != policy.enabled || request.defaultLanguage != policy.defaultLanguage)) {
             throw BadRequestException("Languages are managed by deployment configuration")
         }
-        if (request.enabledLanguages.isEmpty() || request.enabledLanguages.distinct().size != request.enabledLanguages.size ||
-            request.enabledLanguages.any { it !in configuration.supported } || request.defaultLanguage !in request.enabledLanguages
+        if (request.enabledLanguages.isEmpty() ||
+            request.enabledLanguages.distinct().size != request.enabledLanguages.size ||
+            request.enabledLanguages.any { it !in configuration.supported } ||
+            request.defaultLanguage !in request.enabledLanguages
         ) {
             throw BadRequestException("Choose at least one supported language and an enabled default")
         }

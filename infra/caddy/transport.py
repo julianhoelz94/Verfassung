@@ -62,6 +62,8 @@ def render(env):
 """ + readiness + """
         forward_auth gateway-web:3000 {
             uri /api/setup-gate
+            header_up X-Atlas-Client-IP {client_ip}
+            header_up X-Forwarded-For {client_ip}
             header_up X-Atlas-Edge-Check 1
             header_up X-Atlas-Original-URI {uri}
         }

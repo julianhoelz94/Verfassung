@@ -8,7 +8,7 @@ import { Button } from '../components/ui';
 import { createPasskey } from '../../lib/webauthn';
 import { finishPasskeyLoginEnrollment, startPasskeyLoginEnrollment } from './actions';
 
-export function PasskeyLoginEnrollment() {
+export function PasskeyLoginEnrollment({ next }: { next?: string } = {}) {
   const t = useTranslation();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -21,7 +21,7 @@ export function PasskeyLoginEnrollment() {
       const started = await startPasskeyLoginEnrollment();
       const credential = await createPasskey(started.options);
       const result = await finishPasskeyLoginEnrollment(started.challengeId, credential);
-      router.push(result.roles.some((role) => ['editor', 'reviewer', 'publisher', 'admin'].includes(role)) ? '/editor' : '/');
+      router.push(next?.startsWith('/oauth/authorize?') ? next : result.roles.some((role) => ['editor', 'reviewer', 'publisher', 'admin'].includes(role)) ? '/editor' : '/');
       router.refresh();
     } catch {
       setError(t(ui.state.passkeyEnrollmentFailed));

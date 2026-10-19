@@ -117,6 +117,11 @@ class OAuthRepository(private val jdbc: JdbcTemplate) {
         jdbc.update("UPDATE oauth_access_tokens SET revoked_at = NOW() WHERE owner_id = ? AND client_id = ? AND revoked_at IS NULL", ownerId, clientId)
     }
 
+    fun revokeAll(ownerId: UUID) {
+        jdbc.update("UPDATE oauth_authorization_codes SET consumed_at = NOW() WHERE owner_id = ? AND consumed_at IS NULL", ownerId)
+        jdbc.update("UPDATE oauth_access_tokens SET revoked_at = NOW() WHERE owner_id = ? AND revoked_at IS NULL", ownerId)
+    }
+
     fun purgeExpired() {
         jdbc.update("DELETE FROM oauth_authorization_codes WHERE expires_at < NOW() - INTERVAL '1 day'")
         jdbc.update("DELETE FROM oauth_access_tokens WHERE expires_at < NOW() - INTERVAL '1 day'")

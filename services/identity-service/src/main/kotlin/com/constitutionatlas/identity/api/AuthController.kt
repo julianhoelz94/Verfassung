@@ -187,6 +187,7 @@ class AuthController(private val authService: AuthService) {
             request?.challengeToken,
             clientIp(httpRequest),
             httpRequest.getHeader("User-Agent"),
+            request?.password,
         )
 
     @PostMapping("/mfa/enroll/confirm")
@@ -241,10 +242,5 @@ class AuthController(private val authService: AuthService) {
         @RequestHeader(value = "Authorization", required = false) authorization: String?,
     ) {
         authService.revokeMfa(authorization, request.code, clientIp(httpRequest), httpRequest.getHeader("User-Agent"))
-    }
-
-    private fun clientIp(request: HttpServletRequest): String {
-        val forwarded = request.getHeader("X-Forwarded-For")?.split(",")?.firstOrNull()?.trim()
-        return forwarded?.ifBlank { null } ?: request.remoteAddr ?: "unknown"
     }
 }

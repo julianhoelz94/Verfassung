@@ -7,13 +7,16 @@ import com.constitutionatlas.search.api.SearchQuery
 import com.constitutionatlas.search.client.IndexSource
 import com.constitutionatlas.search.repo.SearchRepository
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
 
 @Service
 class SearchIndexService(
     private val indexSource: IndexSource,
     private val searchRepository: SearchRepository,
 ) {
+    @Transactional
     fun reindex(): ReindexResult {
+        searchRepository.lockForRebuild()
         val documents = indexSource.loadPublishedArticles()
         searchRepository.replaceAll(documents)
         return ReindexResult(documents.size, "ready")

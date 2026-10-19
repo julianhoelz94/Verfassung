@@ -12,8 +12,8 @@ import com.constitutionatlas.identity.repo.McpKeyRepository
 import com.constitutionatlas.identity.repo.StoredMcpKey
 import com.constitutionatlas.platform.ForbiddenException
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
 import java.security.SecureRandom
-import java.time.Instant
 import java.util.UUID
 
 @Service
@@ -30,8 +30,9 @@ class McpKeyService(
         return keys.list(owner.id).map { it.dto() }
     }
 
+    @Transactional
     fun create(authorization: String?, request: CreateMcpKeyRequest, ip: String, agent: String?): McpKeyCreatedDto {
-        val owner = auth.requireSession(authorization)
+        val owner = auth.requireLockedSession(authorization)
         val name = request.name.trim()
         if (name.isEmpty() || name.length > 100) throw BadRequestException("Key name must contain 1 to 100 characters")
         val scopes = parseScopes(request.scopes)
@@ -45,8 +46,9 @@ class McpKeyService(
         return McpKeyCreatedDto(key.dto(), plaintext)
     }
 
+    @Transactional
     fun rotate(authorization: String?, id: UUID, ip: String, agent: String?): McpKeyCreatedDto {
-        val owner = auth.requireSession(authorization)
+        val owner = auth.requireLockedSession(authorization)
         val key = keys.findOwned(owner.id, id)?.takeIf { it.revokedAt == null }
             ?: throw BadRequestException("Unknown active MCP key")
         authorizeImport(owner.id, key.scopes, authorization)
@@ -58,8 +60,9 @@ class McpKeyService(
         return McpKeyCreatedDto((keys.findOwned(owner.id, id) ?: error("Key missing after rotation")).dto(), plaintext)
     }
 
+    @Transactional
     fun revoke(authorization: String?, id: UUID, ip: String, agent: String?) {
-        val owner = auth.requireSession(authorization)
+        val owner = auth.requireLockedSession(authorization)
         if (!keys.revoke(owner.id, id)) throw BadRequestException("Unknown active MCP key")
         audit.record("mcp_key_revoked", owner.id, owner.id, owner.email, ip, agent, mapOf("keyId" to id))
     }
@@ -69,11 +72,7 @@ class McpKeyService(
         if (users.rolesForUser(ownerId).none { it == "editor" || it == "admin" }) {
             throw ForbiddenException("Editor role required for import keys")
         }
-        val hash = Tokens.sha256Hex(Tokens.requireBearer(authorization))
-        val stepUpAt = users.stepUpAt(hash)
-        if (!users.mfaEnabled(ownerId) || stepUpAt == null || stepUpAt.isBefore(Instant.now().minusSeconds(300))) {
-            throw com.constitutionatlas.identity.StepUpRequiredException()
-        }
+        auth.requireFreshStepUp(authorization)
     }
 
     private fun parseScopes(raw: List<String>): List<String> {

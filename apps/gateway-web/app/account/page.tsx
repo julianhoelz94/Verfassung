@@ -10,6 +10,7 @@ import { Alert, Button, Card, Input, PageHeader } from '../components/ui';
 import { PageMain } from '../components/PageMain';
 import { requestMcpKeys, requestOAuthGrants, requestPasskeys, requestStartMfaEnroll } from '../../lib/identity-client';
 import { PasskeyManager } from '../passkeys/PasskeyManager';
+import { identityRequestFetch } from '../../lib/identity-request';
 import { SESSION_COOKIE, currentUser, mfaChallengeToken } from '../../lib/session';
 import { ConfirmEnrollForm, RegenerateRecoveryForm, StartMfaEnrollForm } from './MfaForms';
 import { changePasswordAction, revokeMfaAction, updateContentTranslationPreferenceAction } from './actions';
@@ -49,7 +50,7 @@ export default async function AccountPage(props: AccountPageProps) {
   if (!user.mfaEnabled && enrollChallenge) {
     const token = (await cookies()).get(SESSION_COOKIE)?.value;
     try {
-      const started = await requestStartMfaEnroll(enrollChallenge, token);
+      const started = await requestStartMfaEnroll(enrollChallenge, token, undefined, await identityRequestFetch());
       enrollSecret = started.secret;
       enrollQr = started.qrDataUrl;
       enrollChallenge = started.challengeToken;
@@ -112,7 +113,7 @@ export default async function AccountPage(props: AccountPageProps) {
         <p className="muted"><T value={reviewUi.securityHint} /></p>
         <section className="account-section" aria-labelledby="authenticator-title">
         <h3 id="authenticator-title"><T value={ui.account.page.authenticator} /></h3>
-        {user.mfaRequired && !user.mfaEnabled ? (
+        {user.mfaRequired && !user.mfaEnabled && passkeys.length === 0 ? (
           <p><T value={ui.account.page.adminAndPublisherAccountsMustEnrollAn} /></p>
         ) : null}
         {enrollRequested && enrollChallenge && enrollSecret ? (

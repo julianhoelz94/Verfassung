@@ -4,15 +4,12 @@ import com.constitutionatlas.identity.BadRequestException
 import com.constitutionatlas.identity.repo.AnonymousBrowsingRepository
 import com.constitutionatlas.identity.repo.AnonymousBrowsingSettings
 import com.constitutionatlas.identity.repo.AnonymousRate
-import com.constitutionatlas.identity.repo.IdentityRepository
-import com.constitutionatlas.platform.ForbiddenException
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
 @Service
 class AnonymousBrowsingService(
     private val repository: AnonymousBrowsingRepository,
-    private val identityRepository: IdentityRepository,
     private val authService: AuthService,
 ) {
     fun publicPolicy(): AnonymousBrowsingSettings {
@@ -51,8 +48,5 @@ class AnonymousBrowsingService(
         }
     }
 
-    private fun requireAdmin(authorization: String?) {
-        val user = authService.requireSession(authorization)
-        if ("admin" !in identityRepository.rolesForUser(user.id)) throw ForbiddenException("Administrator role required")
-    }
+    private fun requireAdmin(authorization: String?) = authService.requireAdminSession(authorization)
 }

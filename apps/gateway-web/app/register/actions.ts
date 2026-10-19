@@ -2,10 +2,11 @@
 
 import { redirect } from 'next/navigation';
 import { requestConfirmRegistration, requestRegistration } from '../../lib/identity-client';
+import { identityRequestFetch } from '../../lib/identity-request';
 
 export async function registerAction(formData: FormData): Promise<void> {
   try {
-    await requestRegistration(String(formData.get('email') ?? ''));
+    await requestRegistration(String(formData.get('email') ?? ''), await identityRequestFetch());
   } catch {
     redirect('/register?error=1');
   }
@@ -15,7 +16,7 @@ export async function registerAction(formData: FormData): Promise<void> {
 export async function confirmRegistrationAction(formData: FormData): Promise<void> {
   const token = String(formData.get('token') ?? '');
   try {
-    await requestConfirmRegistration(token, String(formData.get('password') ?? ''));
+    await requestConfirmRegistration(token, String(formData.get('password') ?? ''), await identityRequestFetch());
   } catch {
     redirect(`/register/confirm?token=${encodeURIComponent(token)}&error=1`);
   }

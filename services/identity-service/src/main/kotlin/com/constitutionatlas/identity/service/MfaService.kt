@@ -146,11 +146,11 @@ class MfaService(
 
     private fun newRecoveryCode(): String {
         val alphabet = "abcdefghijkmnpqrstuvwxyz23456789"
-        val chars = CharArray(10) { alphabet[random.nextInt(alphabet.length)] }
+        val chars = CharArray(20) { alphabet[random.nextInt(alphabet.length)] }
         return String(chars)
     }
 
-    private fun formatRecovery(code: String): String = "${code.substring(0, 5)}-${code.substring(5)}"
+    private fun formatRecovery(code: String): String = code.chunked(5).joinToString("-")
 
     private fun normalizeRecovery(code: String): String =
         code.lowercase().replace("-", "").replace(" ", "")

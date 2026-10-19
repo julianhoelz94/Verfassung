@@ -84,7 +84,7 @@ export default async function LoginPage(props: LoginPageProps) {
           <Button variant="primary"><T value={ui.login.page.signIn} /></Button>
         </NavigatingActionForm>
       </Card>
-      {setup.completed ? <Card><PasskeyLogin /></Card> : null}
+      {setup.completed ? <Card><PasskeyLogin next={searchParams.next} /></Card> : null}
       {setup.completed ? <p>
         <a href="/reset"><T value={ui.login.page.forgotPassword} /></a>
       </p> : null}

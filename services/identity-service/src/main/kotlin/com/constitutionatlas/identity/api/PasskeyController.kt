@@ -59,6 +59,17 @@ class PasskeyController(private val service: PasskeyService) {
     @PostMapping("/passkeys/login/start")
     fun startLogin(request: HttpServletRequest): PasskeyStart = service.startLogin(clientIp(request))
 
+    @PostMapping("/passkeys/step-up/start")
+    fun startStepUp(@RequestHeader(value = "Authorization", required = false) authorization: String?): PasskeyStart = service.startStepUp(authorization)
+
+    @PostMapping("/passkeys/step-up/finish")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    fun finishStepUp(
+        @RequestHeader(value = "Authorization", required = false) authorization: String?,
+        @RequestBody body: FinishPasskeyLoginRequest,
+        request: HttpServletRequest,
+    ) = service.finishStepUp(authorization, body.challengeId, body.credential, clientIp(request), request.getHeader("User-Agent"))
+
     @PostMapping("/passkeys/login/finish")
     fun finishLogin(@RequestBody body: FinishPasskeyLoginRequest, request: HttpServletRequest): LoginResponse =
         service.finishLogin(body.challengeId, body.credential, clientIp(request), request.getHeader("User-Agent"))
@@ -72,8 +83,4 @@ class PasskeyController(private val service: PasskeyService) {
     ) {
         service.revoke(authorization, credentialId, request.password)
     }
-
-    private fun clientIp(request: HttpServletRequest): String =
-        request.getHeader("X-Forwarded-For")?.split(",")?.firstOrNull()?.trim()?.ifBlank { null }
-            ?: request.remoteAddr ?: "unknown"
 }

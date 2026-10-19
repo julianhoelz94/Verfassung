@@ -274,13 +274,18 @@ class IdentityApiTest {
     fun passkeyLoginStartsAreRateLimitedAndExpiredChallengesArePurged() {
         val ip = "198.51.100.55"
         repeat(5) {
-            mockMvc.post("/passkeys/login/start") { header("X-Forwarded-For", ip) }
-                .andExpect { status { isOk() } }
+            mockMvc.post("/passkeys/login/start") {
+                header("X-Atlas-Client-IP", ip)
+                header("X-Forwarded-For", "203.0.113.$it, $ip")
+            }.andExpect { status { isOk() } }
         }
-        mockMvc.post("/passkeys/login/start") { header("X-Forwarded-For", ip) }
+        mockMvc.post("/passkeys/login/start") {
+            header("X-Atlas-Client-IP", ip)
+            header("X-Forwarded-For", "203.0.113.99, $ip")
+        }
             .andExpect { status { isTooManyRequests() } }
         jdbcTemplate.update("UPDATE passkey_challenges SET expires_at = NOW() - INTERVAL '1 second'")
-        mockMvc.post("/passkeys/login/start") { header("X-Forwarded-For", "198.51.100.56") }
+        mockMvc.post("/passkeys/login/start") { header("X-Atlas-Client-IP", "198.51.100.56") }
             .andExpect { status { isOk() } }
         val expired = jdbcTemplate.queryForObject("SELECT count(*) FROM passkey_challenges WHERE expires_at < NOW()", Int::class.java)
         check(expired == 0)
@@ -553,13 +558,13 @@ class IdentityApiTest {
         val unknown =
             mockMvc.post("/login") {
                 contentType = MediaType.APPLICATION_JSON
-                header("X-Forwarded-For", "198.51.100.10")
+                header("X-Atlas-Client-IP", "198.51.100.10")
                 content = """{"email":"missing@example.local","password":"wrong"}"""
             }.andExpect { status { isUnauthorized() } }.andReturn().response.contentAsString
         val bad =
             mockMvc.post("/login") {
                 contentType = MediaType.APPLICATION_JSON
-                header("X-Forwarded-For", "198.51.100.11")
+                header("X-Atlas-Client-IP", "198.51.100.11")
                 content = """{"email":"local-editor@example.local","password":"wrong"}"""
             }.andExpect { status { isUnauthorized() } }.andReturn().response.contentAsString
         check(unknown == bad)
@@ -571,13 +576,13 @@ class IdentityApiTest {
         repeat(5) {
             mockMvc.post("/login") {
                 contentType = MediaType.APPLICATION_JSON
-                header("X-Forwarded-For", "203.0.113.50")
+                header("X-Atlas-Client-IP", "203.0.113.50")
                 content = """{"email":"locked-user@example.local","password":"wrong"}"""
             }.andExpect { status { isUnauthorized() } }
         }
         mockMvc.post("/login") {
             contentType = MediaType.APPLICATION_JSON
-            header("X-Forwarded-For", "203.0.113.50")
+            header("X-Atlas-Client-IP", "203.0.113.50")
             content = """{"email":"locked-user@example.local","password":"change-me"}"""
         }.andExpect { status { isTooManyRequests() } }
         login("local-editor@example.local", "change-me")
@@ -839,7 +844,7 @@ class IdentityApiTest {
     fun badPasswordIsUnauthorized() {
         mockMvc.post("/login") {
             contentType = MediaType.APPLICATION_JSON
-            header("X-Forwarded-For", "198.51.100.12")
+            header("X-Atlas-Client-IP", "198.51.100.12")
             content = """{"email":"local-editor@example.local","password":"wrong"}"""
         }.andExpect { status { isUnauthorized() } }
     }
@@ -1181,7 +1186,7 @@ class IdentityApiTest {
             mockMvc.post("/mfa/enroll/start") {
                 header("Authorization", "Bearer $viewer")
                 contentType = MediaType.APPLICATION_JSON
-                content = "{}"
+                content = """{"password":"change-me"}"""
             }.andExpect {
                 status { isOk() }
                 jsonPath("$.secret") { exists() }
@@ -1212,7 +1217,7 @@ class IdentityApiTest {
         mockMvc.post("/mfa/enroll/start") {
             header("Authorization", "Bearer $viewer")
             contentType = MediaType.APPLICATION_JSON
-            content = "{}"
+            content = """{"password":"change-me"}"""
         }.andExpect { status { isConflict() } }
         val recoveryCode = objectMapper.readTree(confirmed).get("recoveryCodes").get(0).asText()
         mockMvc.post("/logout") {

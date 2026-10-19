@@ -5,6 +5,7 @@ import { Alert, Button, Card, Input, PageHeader } from '../../components/ui';
 import { PageMain } from '../../components/PageMain';
 import { currentUser } from '../../../lib/session';
 import { stepUpAction } from '../actions';
+import { PasskeyLogin } from '../../passkeys/PasskeyLogin';
 
 type StepUpPageProps = {
   searchParams: Promise<{ error?: string; returnTo?: string }>;
@@ -34,6 +35,7 @@ export default async function StepUpPage(props: StepUpPageProps) {
           <Button variant="primary"><T value={ui.account.stepUp.page.continue} /></Button>
         </form>
       </Card>
+      <Card><PasskeyLogin stepUp next={searchParams.returnTo} /></Card>
     </PageMain>
   );
 }

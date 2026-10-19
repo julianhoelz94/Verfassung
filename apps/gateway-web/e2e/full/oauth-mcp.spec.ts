@@ -2,7 +2,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { expect, test } from '../fixtures/consent';
 
 test('account OAuth connects an MCP client with PKCE and permits user revocation', async ({ page, request }) => {
-  const base = process.env.E2E_BASE_URL ?? 'http://127.0.0.1:18080';
+  const base = String(test.info().project.use.baseURL);
   const callback = `${base}/oauth/callback-test`;
   const resource = `${base}/mcp`;
   const clientName = `OAuth journey ${Date.now()}`;

@@ -12,7 +12,7 @@ If **Register** is offered, request access by email. Open the one-use confirmati
 
 ## Secure your account
 
-1. Open **Account → Account security** and start authenticator setup.
+1. Open **Account → Account security**, confirm your current password and start authenticator setup.
 2. Scan the QR code and enter the app's six-digit code. **Can't scan the QR code?** reveals the manual key when needed.
 3. Save the new recovery codes privately: they are shown once.
 4. Optionally enroll a passkey after confirming your current password.
@@ -23,6 +23,10 @@ If **Register** is offered, request access by email. Open the one-use confirmati
 **No authenticator available?** Choose **Use a recovery code** at the challenge. Each code works once. **Use authenticator app instead** returns to normal entry. **Replace recovery codes** opens confirmation and invalidates the old set when completed.
 
 Administrators and publishers need extra verification for protected actions. A fresh MFA check may be requested even when you are already signed in.
+
+An enrolled passkey protects password sign-in too: a password cannot restart first-time enrollment. Choose **Use a passkey** at the challenge or confirmation page. Adding or removing passkeys requires fresh verification when a second factor already exists. Administrators and publishers cannot remove their last second factor. Import credentials require an actual recent second-factor check, including for editor accounts where MFA is otherwise optional.
+
+A password change revokes other sessions, pending enrollment/reset links and personal MCP/OAuth credentials. A password reset, account disablement or role change revokes all sessions, pending enrollment challenges and personal client credentials. Sign in and reconnect affected clients. A disabled invitation cannot activate its account.
 
 ## Choose a language or translate content
 

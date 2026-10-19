@@ -220,10 +220,5 @@ class AccountController(
         )
     }
 
-    private fun clientIp(request: HttpServletRequest): String {
-        val forwarded = request.getHeader("X-Forwarded-For")?.split(",")?.firstOrNull()?.trim()
-        return forwarded?.ifBlank { null } ?: request.remoteAddr ?: "unknown"
-    }
-
     private fun userAgent(request: HttpServletRequest): String? = request.getHeader("User-Agent")
 }

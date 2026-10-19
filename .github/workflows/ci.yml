@@ -380,6 +380,26 @@ jobs:
       - name: Full-stack browser journeys
         working-directory: apps/gateway-web
         run: npm run test:e2e:full
+      - name: Verify local HTTPS authentication and deployment persistence
+        run: |
+          snapshot() {
+            docker compose --env-file env/ci.env.example exec -T identity-db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "SELECT md5(string_agg(id::text || password_hash, chr(10) ORDER BY id)) FROM users; SELECT json_build_array(completed_at, bootstrap_admin_id, mail_deferred, access_reviewed, enabled_languages, default_language) FROM deployment_setup;"'
+          }
+          snapshot > /tmp/setup-before-https.txt
+          TLS_MODE=local-https PUBLIC_BASE_URL=https://localhost:18443 NEXT_PUBLIC_BASE_URL=https://localhost:18443 SESSION_COOKIE_SECURE=true CADDY_HTTPS_PORT=18443 \
+            docker compose --env-file env/ci.env.example up -d --no-deps --force-recreate edge-proxy gateway-web identity-service
+          for attempt in $(seq 1 90); do
+            if docker compose --env-file env/ci.env.example exec -T edge-proxy cat /data/caddy/pki/authorities/local/root.crt > /tmp/atlas-local-root.crt 2>/dev/null && \
+              curl --fail --silent --cacert /tmp/atlas-local-root.crt https://localhost:18443/api/identity/setup/status > /tmp/https-setup.json; then break; fi
+            sleep 2
+          done
+          python3 -c 'import json; assert json.load(open("/tmp/https-setup.json"))["completed"] is True'
+          snapshot > /tmp/setup-after-https.txt
+          cmp /tmp/setup-before-https.txt /tmp/setup-after-https.txt
+          export E2E_TLS_CERT_SPKI="$(openssl x509 -in /tmp/atlas-local-root.crt -pubkey -noout | openssl pkey -pubin -outform DER | openssl dgst -sha256 -binary | openssl base64 -A)"
+          cd apps/gateway-web
+          E2E_TLS_SMOKE=true E2E_BASE_URL=https://localhost:18443 E2E_HTTP_BASE_URL=http://127.0.0.1:18080 \
+            npx playwright test --config=playwright.full.config.js setup-https.spec.ts
       - name: Stack logs
         if: failure()
         run: docker compose --env-file env/ci.env.example logs --no-color --tail=200 > full-stack-logs.txt

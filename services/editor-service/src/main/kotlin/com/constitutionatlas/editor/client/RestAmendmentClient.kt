@@ -3,6 +3,7 @@ package com.constitutionatlas.editor.client
 import com.constitutionatlas.editor.DownstreamException
 import com.constitutionatlas.editor.api.ChangeRecordRequest
 import com.constitutionatlas.platform.DiffItem
+import com.constitutionatlas.platform.timedRestClient
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean

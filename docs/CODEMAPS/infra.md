@@ -1,4 +1,4 @@
-<!-- Generated: 2026-09-06 | Files scanned: ~250 | Token estimate: ~700 -->
+<!-- Reviewed: 2026-10-19 -->
 # Infra
 
 **Rules:** `infra/AGENTS.md`, `.agents/skills/local-stack`
@@ -48,7 +48,7 @@ Shared: `gradle/service-conventions.gradle`. New service: copy sibling (`.agents
 ## CI (`.github/workflows/ci.yml`)
 
 1. Discover `services/*/build.gradle.kts` → matrix `./gradlew check`
-2. `apps/gateway-web`: `npm test`, `lint`, `build`
+2. `apps/gateway-web`: `npm test`, `typecheck`, `lint`, `build`
 3. Playwright e2e (mock API)
 4. Image builds (host bootJar + `docker build`)
 5. `publish-journey`: Compose identity+catalog+content+editor (CI-6) and `scripts/publish_journey.py`
@@ -59,6 +59,14 @@ Dependabot: `.github/dependabot.yml`.
 
 ## Gateway scripts (`apps/gateway-web/package.json`)
 
-`npm run dev` (port 3000), `lint`, `build`, `test`, `test:e2e`.
+`npm run dev` (port 3000), `lint`, `typecheck`, `build`, `test`, `test:e2e`.
 
 Host tools for the local stack: OrbStack or Docker Desktop, Bash, curl. JDK 21 and Node 20 are optional for host checks. See `README.md`.
+
+## Local host verification
+
+Testcontainers needs the active engine socket when `/var/run/docker.sock` is absent.
+Set `DOCKER_HOST` to `docker context inspect --format '{{.Endpoints.docker.Host}}'`;
+for OrbStack, `TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/var/run/docker.sock` identifies
+the socket inside helper containers. These are local shell settings, not committed
+application configuration. Keep service checks/builds serial.

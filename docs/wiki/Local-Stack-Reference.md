@@ -29,6 +29,8 @@ Restore drill (destroys current rows in those databases):
 docker compose --env-file env/local-stack.env run --rm --entrypoint sh backup-service /backup/restore.sh /backups/20260828-120000
 ```
 
+The restore preflight checks that all nine dumps are regular, readable and nonempty files before replacing any schema. This catches incomplete backup directories before they change data; it does not validate SQL contents or make a multi-database restore atomic.
+
 Then restart the app containers so they reconnect. Flyway history is part of each dump.
 
 

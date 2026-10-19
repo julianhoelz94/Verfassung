@@ -1,6 +1,7 @@
 package com.constitutionatlas.document.service
 
 import com.constitutionatlas.platform.NotFoundException
+import com.constitutionatlas.platform.timedRestClient
 import com.fasterxml.jackson.databind.JsonNode
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.HttpStatus

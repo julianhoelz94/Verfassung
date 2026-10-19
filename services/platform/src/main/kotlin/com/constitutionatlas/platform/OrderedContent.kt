@@ -6,6 +6,11 @@ import com.fasterxml.jackson.annotation.JsonInclude
 import com.fasterxml.jackson.databind.JsonNode
 import java.util.UUID
 
+/**
+ * [logicalId] survives revisions; [revisionId] identifies immutable content;
+ * [occurrenceId] identifies its position in this version. Labels are authored text,
+ * not identity, and [content] preserves the order of text and child units.
+ */
 @JsonIgnoreProperties(ignoreUnknown = true)
 data class OrderedNode(
     val logicalId: UUID,

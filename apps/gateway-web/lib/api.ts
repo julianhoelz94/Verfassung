@@ -1,3 +1,4 @@
+import { fetchWithTimeout } from './fetch-with-timeout';
 import './contracts';
 
 export type VersionSummary = {
@@ -251,7 +252,7 @@ export class ApiUnavailableError extends Error {
 export async function readJson<T>(url: string, service: string, authorization?: string): Promise<T | null> {
   let response: Response;
   try {
-    response = await fetch(url, {
+    response = await fetchWithTimeout(url, {
       cache: 'no-store',
       headers: authorization ? { Authorization: authorization } : undefined,
     });
@@ -265,8 +266,13 @@ export async function readJson<T>(url: string, service: string, authorization?: 
     throw new ApiUnavailableError(service);
   }
   // Spring nullable endpoints return an empty 200 before a resource exists.
-  const body = await response.text();
-  return body.trim() ? JSON.parse(body) as T : null;
+  try {
+    const body = await response.text();
+    return body.trim() ? JSON.parse(body) as T : null;
+  } catch {
+    // Invalid/truncated upstream JSON uses the same recoverable page state as an outage.
+    throw new ApiUnavailableError(service);
+  }
 }
 
 export function catalogBaseUrl(): string {
@@ -492,21 +498,8 @@ export type ArticlePage = {
   limit: number | null;
 };
 
-export async function listArticles(
-  versionId: string,
-  offset?: number,
-  limit?: number,
-): Promise<ArticleSummary[] | null> {
-  const page = await listArticlePage(versionId, offset, limit);
-  return page?.items ?? null;
-}
-
 export function listArticlePage(versionId: string, offset?: number, limit?: number, includeBody?: boolean): Promise<ArticlePage | null> {
   return listContentPage('articles', versionId, offset, limit, includeBody);
-}
-
-export function listUnitPage(versionId: string, offset?: number, limit?: number, includeBody?: boolean): Promise<ArticlePage | null> {
-  return listContentPage('units', versionId, offset, limit, includeBody);
 }
 
 async function listContentPage(resource: 'articles' | 'units', versionId: string, offset?: number, limit?: number, includeBody?: boolean, authorization?: string): Promise<ArticlePage | null> {
@@ -524,7 +517,7 @@ async function listContentPage(resource: 'articles' | 'units', versionId: string
   const url = `${contentBaseUrl()}/versions/${encodeURIComponent(versionId)}/${resource}${query ? `?${query}` : ''}`;
   let response: Response;
   try {
-    response = await fetch(url, { cache: 'no-store', headers: authorization ? { Authorization: authorization } : undefined });
+    response = await fetchWithTimeout(url, { cache: 'no-store', headers: authorization ? { Authorization: authorization } : undefined });
   } catch {
     throw new ApiUnavailableError('content');
   }
@@ -534,7 +527,13 @@ async function listContentPage(resource: 'articles' | 'units', versionId: string
   if (!response.ok) {
     throw new ApiUnavailableError('content');
   }
-  const items = (await response.json()) as ArticleSummary[];
+  let items: ArticleSummary[];
+  try {
+    items = (await response.json()) as ArticleSummary[];
+    if (!Array.isArray(items)) throw new Error('Invalid content page');
+  } catch {
+    throw new ApiUnavailableError('content');
+  }
   const total = Number(response.headers.get('X-Total-Count') ?? items.length);
   return { items, total, offset: offset ?? 0, limit: limit ?? null };
 }
@@ -606,11 +605,6 @@ export type OutlineKindWrite = {
   allowedChildKinds?: string[];
 };
 
-export type OutlineUpdateResult = {
-  outline: ContentOutline;
-  versionIds: string[];
-};
-
 export async function sendJson<T>(
   url: string,
   service: string,
@@ -624,7 +618,7 @@ export async function sendJson<T>(
   }
   let response: Response;
   try {
-    response = await fetch(url, {
+    response = await fetchWithTimeout(url, {
       method,
       cache: 'no-store',
       headers,
@@ -636,35 +630,11 @@ export async function sendJson<T>(
   if (!response.ok) {
     throw new ApiUnavailableError(service);
   }
-  return (await response.json()) as T;
-}
-
-export function putContentOutline(
-  constitutionId: string,
-  kinds: OutlineKindWrite[],
-  authorization?: string,
-): Promise<OutlineUpdateResult> {
-  return sendJson<OutlineUpdateResult>(
-    `${catalogBaseUrl()}/constitutions/${encodeURIComponent(constitutionId)}/content-outline`,
-    'catalog',
-    'PUT',
-    { kinds },
-    authorization,
-  );
-}
-
-export async function restructureVersion(
-  versionId: string,
-  keepKinds: string[],
-  authorization?: string,
-): Promise<void> {
-  await sendJson<{ absorbed: number }>(
-    `${contentBaseUrl()}/versions/${encodeURIComponent(versionId)}/restructure`,
-    'content',
-    'POST',
-    { keepKinds },
-    authorization,
-  );
+  try {
+    return (await response.json()) as T;
+  } catch {
+    throw new ApiUnavailableError(service);
+  }
 }
 
 export async function createCountry(

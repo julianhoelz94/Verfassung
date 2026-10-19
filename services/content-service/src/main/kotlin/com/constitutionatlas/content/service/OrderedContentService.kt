@@ -39,6 +39,11 @@ class OrderedContentService(
         return repository.snapshot(version)
     }
 
+    /**
+     * Revision references may reuse only members of the pinned source/target snapshots.
+     * Changed nodes receive new immutable revisions; the generation check protects
+     * concurrent writers and publication receipts make retries payload-specific.
+     */
     @Transactional
     fun save(version: UUID, request: OrderedSnapshotWrite): OrderedSnapshot {
         val requestHash = java.security.MessageDigest.getInstance("SHA-256").digest(request.toString().toByteArray()).joinToString("") { "%02x".format(it) }

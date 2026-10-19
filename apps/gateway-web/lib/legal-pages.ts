@@ -1,3 +1,4 @@
+import { fetchWithTimeout } from './fetch-with-timeout';
 export type LegalPageKey = 'impressum' | 'datenschutz' | 'impressum_en' | 'datenschutz_en';
 
 export type LegalPageRevision = {
@@ -53,7 +54,7 @@ function base(): string {
 }
 
 async function read<T>(path: string, options: RequestInit = {}): Promise<T | null> {
-  const response = await fetch(`${base()}${path}`, options);
+  const response = await fetchWithTimeout(`${base()}${path}`, options);
   if (response.status === 404) return null;
   if (!response.ok) throw new Error(`Legal page service returned ${response.status}`);
   return response.json() as Promise<T>;
@@ -80,7 +81,7 @@ export async function adminLegalPageRevisions(key: LegalPageKey, bearer: string)
 }
 
 async function write(key: LegalPageKey, action: 'draft' | 'publish', body: object, bearer: string): Promise<LegalPageState> {
-  const response = await fetch(`${base()}/legal-pages/${key}/${action}`, {
+  const response = await fetchWithTimeout(`${base()}/legal-pages/${key}/${action}`, {
     method: action === 'draft' ? 'PUT' : 'POST',
     cache: 'no-store',
     headers: { Authorization: bearer, 'Content-Type': 'application/json' },

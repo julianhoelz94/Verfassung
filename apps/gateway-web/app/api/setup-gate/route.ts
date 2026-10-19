@@ -1,3 +1,4 @@
+import { fetchWithTimeout } from '../../../lib/fetch-with-timeout';
 import { NextRequest, NextResponse } from 'next/server';
 import { setupPathAllowed, setupStatus } from '../../../lib/deployment-setup';
 import { identityBaseUrl } from '../../../lib/identity-client';
@@ -12,12 +13,12 @@ export async function GET(request: NextRequest) {
     const token = request.cookies.get('ca_session')?.value;
     let admin = false;
     if (token) {
-      const me = await fetch(`${identityBaseUrl()}/me`, { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store', signal: AbortSignal.timeout(2000) });
+      const me = await fetchWithTimeout(`${identityBaseUrl()}/me`, { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store', signal: AbortSignal.timeout(2000) });
       if (me.ok) admin = ((await me.json()) as { roles: string[] }).roles.includes('admin');
     }
     // API callers use bearer sessions; cookies are only a browser convenience.
     if (!admin && request.headers.get('authorization')) {
-      const me = await fetch(`${identityBaseUrl()}/me`, { headers: { Authorization: request.headers.get('authorization')! }, cache: 'no-store', signal: AbortSignal.timeout(2000) });
+      const me = await fetchWithTimeout(`${identityBaseUrl()}/me`, { headers: { Authorization: request.headers.get('authorization')! }, cache: 'no-store', signal: AbortSignal.timeout(2000) });
       if (me.ok) admin = ((await me.json()) as { roles: string[] }).roles.includes('admin');
     }
     if (setupPathAllowed(path, admin)) return new NextResponse(null, { status: 204 });

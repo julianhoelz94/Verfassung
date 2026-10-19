@@ -1,5 +1,8 @@
 'use server';
 
+import { fetchWithTimeout } from '../../../lib/fetch-with-timeout';
+
+
 import { redirect } from 'next/navigation';
 import { identityBaseUrl } from '../../../lib/identity-client';
 import { requireSessionBearer } from '../../../lib/session';
@@ -9,7 +12,7 @@ const fields = ['client_id', 'redirect_uri', 'resource', 'response_type', 'code_
 export async function authorizeClient(form: FormData): Promise<void> {
   const values = Object.fromEntries(fields.map(field => [field, String(form.get(field) ?? '')])) as Record<string, string>;
   const clientQuery = new URLSearchParams({ redirect_uri: values.redirect_uri, resource: values.resource });
-  const clientResponse = await fetch(`${identityBaseUrl()}/oauth/clients/${encodeURIComponent(values.client_id)}?${clientQuery}`, { cache: 'no-store' });
+  const clientResponse = await fetchWithTimeout(`${identityBaseUrl()}/oauth/clients/${encodeURIComponent(values.client_id)}?${clientQuery}`, { cache: 'no-store' });
   if (!clientResponse.ok) redirect('/account?oauth=invalid');
   if (form.get('decision') === 'deny') {
     const destination = new URL(values.redirect_uri);
@@ -19,7 +22,7 @@ export async function authorizeClient(form: FormData): Promise<void> {
   }
   if (form.get('decision') !== 'approve') redirect('/account?oauth=invalid');
   const authorization = await requireSessionBearer();
-  const response = await fetch(`${identityBaseUrl()}/oauth/approve`, {
+  const response = await fetchWithTimeout(`${identityBaseUrl()}/oauth/approve`, {
     method: 'POST', headers: { Authorization: authorization, 'Content-Type': 'application/json' },
     body: JSON.stringify(values), cache: 'no-store',
   });

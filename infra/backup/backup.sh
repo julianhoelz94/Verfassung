@@ -9,22 +9,9 @@ OUT_DIR="/backups/$TS"
 RETENTION_DAYS="${BACKUP_RETENTION_DAYS:-30}"
 mkdir -p "$OUT_DIR"
 
-wait_for_postgres() {
-  host="$1"
-  db="$2"
-  i=0
-  until pg_isready -h "$host" -U postgres -d "$db" >/dev/null 2>&1; do
-    i=$((i + 1))
-    if [ "$i" -ge 60 ]; then
-      echo "Postgres at ${host}/${db} was not ready after 60s" >&2
-      exit 1
-    fi
-    echo "Waiting for ${host} (${i}/60)..."
-    sleep 1
-  done
-}
+. "$(dirname "$0")/postgres.sh"
 
-for name in catalog content amendment identity editor audit ingestion search document; do
+for name in $BACKUP_DATABASES; do
   host="${name}-db"
   db="${name}_db"
   wait_for_postgres "$host" "$db"

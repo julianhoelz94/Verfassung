@@ -1,3 +1,4 @@
+import { fetchWithTimeout } from './fetch-with-timeout';
 import { IdentityApiError, identityBaseUrl } from './identity-client';
 
 export type TranslationSiteSettings = {
@@ -13,7 +14,7 @@ export type TranslationUserSettings = {
 };
 
 async function read<T>(path: string, token?: string): Promise<T> {
-  const response = await fetch(`${identityBaseUrl()}/content-translation/${path}`, {
+  const response = await fetchWithTimeout(`${identityBaseUrl()}/content-translation/${path}`, {
     headers: token ? { Authorization: `Bearer ${token}` } : undefined,
     cache: 'no-store',
   });
@@ -22,12 +23,12 @@ async function read<T>(path: string, token?: string): Promise<T> {
 }
 
 async function write<T>(path: string, method: 'PUT' | 'POST', body: object, token: string): Promise<T> {
-  const response = await fetch(`${identityBaseUrl()}/content-translation/${path}`, {
+  const response = await fetchWithTimeout(`${identityBaseUrl()}/content-translation/${path}`, {
     method,
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
     cache: 'no-store',
-  });
+  }, fetch, path === 'translate-batch' ? 30_000 : undefined);
   if (!response.ok) {
     const body = await response.json().catch(() => ({})) as { error?: string; code?: string };
     throw new IdentityApiError(body.error ?? 'Content translation failed', response.status, body.code);

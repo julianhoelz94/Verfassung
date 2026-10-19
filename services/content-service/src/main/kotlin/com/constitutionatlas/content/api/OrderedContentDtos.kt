@@ -1,7 +1,5 @@
 package com.constitutionatlas.content.api
 
-import com.fasterxml.jackson.annotation.JsonAnySetter
-import com.fasterxml.jackson.databind.JsonNode
 import java.util.UUID
 
 typealias OrderedNode = com.constitutionatlas.platform.OrderedNode
@@ -28,9 +26,6 @@ data class ResolvedContent(
     val deepLink: String,
 )
 
-open class StrictContentWrite {
-    @JsonAnySetter
-    fun rejectUnknown(name: String, value: JsonNode): Unit = throw IllegalArgumentException("Unexpected content field '$name'")
-}
+typealias StrictContentWrite = com.constitutionatlas.platform.StrictOrderedWrite
 
 data class OrderedContentExport(val versionId: UUID, val settingsRevisionId: UUID?, val roots: List<OrderedNodeWrite>)

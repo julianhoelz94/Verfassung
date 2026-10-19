@@ -11,6 +11,7 @@ import com.constitutionatlas.platform.OrderedSnapshotWrite
 import org.springframework.stereotype.Service
 import java.util.UUID
 
+/** Publishes a copy-on-write successor against pinned source/settings generations. Retries reuse the session reservation. */
 @Service
 class StructuredPublicationService(private val drafts: StructuredDraftRepository, private val sources: StructuredSourceClient, private val client: OrderedPublishClient) {
     fun lock(session: UUID) = drafts.lockSession(session)

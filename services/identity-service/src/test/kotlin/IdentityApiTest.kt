@@ -1,6 +1,7 @@
 import com.constitutionatlas.identity.IdentityServiceApplication
 import com.constitutionatlas.identity.client.AuditClient
 import com.constitutionatlas.identity.client.AuthAudit
+import com.constitutionatlas.identity.crypto.Tokens
 import com.constitutionatlas.identity.crypto.Totp
 import com.constitutionatlas.identity.mail.OutboundMailer
 import com.constitutionatlas.identity.repo.ContentTranslationRepository
@@ -31,6 +32,10 @@ import org.testcontainers.junit.jupiter.Testcontainers
 import java.io.File
 import java.security.MessageDigest
 import java.util.Base64
+import java.util.UUID
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
 @Testcontainers
 @AutoConfigureMockMvc
@@ -53,6 +58,9 @@ class IdentityApiTest {
     lateinit var accountService: AccountService
 
     @Autowired
+    lateinit var mfaService: com.constitutionatlas.identity.service.MfaService
+
+    @Autowired
     lateinit var authAudit: AuthAudit
 
     @MockBean
@@ -62,6 +70,31 @@ class IdentityApiTest {
     lateinit var outboundMailer: OutboundMailer
 
     private val objectMapper = ObjectMapper()
+
+    @Test
+    fun recoveryCodeHasExactlyOneWinnerUnderConcurrentUse() {
+        val userId = jdbcTemplate.queryForObject("SELECT id FROM users WHERE email = ?", UUID::class.java, "local-viewer@example.local")!!
+        val code = "RACE" + UUID.randomUUID().toString().replace("-", "").uppercase()
+        val hash = Tokens.sha256Hex(code.lowercase())
+        jdbcTemplate.update("INSERT INTO mfa_recovery_codes (id, user_id, code_hash) VALUES (?, ?, ?)", UUID.randomUUID(), userId, hash)
+        val pool = Executors.newFixedThreadPool(8)
+        val start = CountDownLatch(1)
+        try {
+            val attempts = (1..8).map {
+                pool.submit<Boolean> {
+                    check(start.await(5, TimeUnit.SECONDS))
+                    mfaService.useRecoveryCode(userId, code, "127.0.0.1", "concurrent-test", "local-viewer@example.local")
+                }
+            }
+            start.countDown()
+            check(attempts.count { it.get(10, TimeUnit.SECONDS) } == 1)
+            check(!mfaService.useRecoveryCode(userId, code, "127.0.0.1", "replay-test", "local-viewer@example.local"))
+        } finally {
+            pool.shutdownNow()
+            check(pool.awaitTermination(5, TimeUnit.SECONDS))
+            jdbcTemplate.update("DELETE FROM mfa_recovery_codes WHERE code_hash = ?", hash)
+        }
+    }
 
     @Test
     fun personalGoogleKeyIsStoredEncryptedAndSharedQuotaHasAHardCap() {

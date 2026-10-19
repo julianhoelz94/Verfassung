@@ -69,11 +69,7 @@ class MfaService(
         email: String,
     ): Boolean {
         val hash = Tokens.sha256Hex(normalizeRecovery(recoveryCode))
-        val id = identityRepository.findUnusedRecovery(hash) ?: return false
-        if (!identityRepository.recoveryBelongsToUser(id, userId)) {
-            return false
-        }
-        identityRepository.markRecoveryUsed(id)
+        if (!identityRepository.consumeRecoveryCode(userId, hash)) return false
         authAudit.recordMfaChange(userId, email, clientIp, userAgent, mapOf("kind" to "recovery_used"))
         return true
     }

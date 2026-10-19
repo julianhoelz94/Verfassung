@@ -44,15 +44,17 @@ class WriteAccess(private val identityClient: IdentityClient) {
     }
 }
 
+/** Request-thread credentials for synchronous downstream calls; nested scopes restore their parent. */
 object DownstreamAuth {
     private val holder = ThreadLocal<String?>()
 
     fun <T> withAuthorization(authorization: String?, block: () -> T): T {
+        val previous = holder.get()
         holder.set(authorization)
         return try {
             block()
         } finally {
-            holder.remove()
+            if (previous == null) holder.remove() else holder.set(previous)
         }
     }
 

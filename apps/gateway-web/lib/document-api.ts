@@ -1,3 +1,4 @@
+import { fetchWithTimeout } from './fetch-with-timeout';
 import { ApiUnavailableError } from './api';
 
 export type DocumentRevision = {
@@ -46,7 +47,7 @@ function base(): string {
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   let response: Response;
   try {
-    response = await fetch(`${base()}${path}`, { cache: 'no-store', ...options });
+    response = await fetchWithTimeout(`${base()}${path}`, { cache: 'no-store', ...options });
   } catch {
     throw new ApiUnavailableError('document');
   }

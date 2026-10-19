@@ -3,6 +3,7 @@ package com.constitutionatlas.catalog.client
 import com.constitutionatlas.catalog.api.OutlineKindWrite
 import com.constitutionatlas.catalog.api.SettingsUsage
 import com.constitutionatlas.catalog.api.SettingsViolation
+import com.constitutionatlas.platform.timedRestClient
 import com.fasterxml.jackson.databind.JsonNode
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.HttpStatus

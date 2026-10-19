@@ -21,33 +21,8 @@ function amendmentDetailPath(id: string, extra: Record<string, string> = {}): st
   return query ? `/editor/amendments/${encodeURIComponent(id)}?${query}` : `/editor/amendments/${encodeURIComponent(id)}`;
 }
 
-function amendmentListPath(extra: Record<string, string> = {}): string {
-  const params = new URLSearchParams(extra);
-  const query = params.toString();
-  return query ? `/editor/amendments?${query}` : '/editor/amendments';
-}
-
 function redirectDetail(id: string, extra: Record<string, string> = {}): never {
   redirect(amendmentDetailPath(id, extra));
-}
-
-async function runDetailCommand(
-  formData: FormData,
-  amendmentId: string,
-  command: () => Promise<unknown>,
-  success: Record<string, string>,
-): Promise<void> {
-  try {
-    await command();
-  } catch (error) {
-    if (error instanceof AmendmentApiError) {
-      redirectDetail(amendmentId, { error: error.key });
-    }
-    throw error;
-  }
-  // Refresh the current detail before a query-only redirect after a mutation.
-  revalidatePath(amendmentDetailPath(amendmentId));
-  redirectDetail(amendmentId, success);
 }
 
 export async function suggestChangesAction(

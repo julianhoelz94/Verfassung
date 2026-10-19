@@ -5,7 +5,7 @@ Date: 2026-09-11
 
 Supersedes ADR 0004 **points 2–4** (one constitution-wide snapshot chain; hop kinds `legal_amendment` / `official_errata`; public “latest” as that chain’s tip). ADR 0004 points **1 and 5–7** stay in force: the public timeline is curated, not a dump of publishes; each amendment (now a change record) has a linear staff-only revision history; AMD-5 may suggest change rows but must not persist a record on every publish; article-text publish no longer auto-records a law; change-record metadata still skips the article-text reviewer queue.
 
-Working graph (not in git): [legal vs editorial chain](/Users/julianhoelz/.cursor/projects/Users-julianhoelz-Documents-Verfassung/canvases/legal-vs-editorial-chain.canvas.tsx). Git-tracked note and staff UI contract: [`docs/design/two-axis-versions.md`](../design/two-axis-versions.md) ([Sprint UI reference](../design/two-axis-versions.md#sprint-ui-reference)).
+Git-tracked model and staff UI contract: [`docs/design/two-axis-versions.md`](../design/two-axis-versions.md) ([Sprint UI reference](../design/two-axis-versions.md#sprint-ui-reference)).
 
 This ADR does not reopen ARCH-4, ARCH-6, AMD-5 matching, or ADR 0002 permalinks.
 

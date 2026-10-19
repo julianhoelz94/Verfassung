@@ -118,7 +118,7 @@ export default async function LifecycleEditor({ params, searchParams }: Props) {
       {sourceVersionId ? (
         <section className="card">
           <h2><T value={ui.editor.lifecycle.constitutionid.page.recordAProvisionEvent} /></h2>
-          <form method="get">
+          <form method="get" className="stack form-section">
             <input type="hidden" name="code" value={code} />
             <label htmlFor="scope-version"><T value={ui.editor.lifecycle.constitutionid.page.sourceVersion} /></label>
             <select id="scope-version" name="versionId" defaultValue={sourceVersionId}>
@@ -128,7 +128,7 @@ export default async function LifecycleEditor({ params, searchParams }: Props) {
             </select>
             <button type="submit"><T value={ui.editor.lifecycle.constitutionid.page.chooseVersion} /></button>
           </form>
-          <form action={appendProvisionAction}>
+          <form action={appendProvisionAction} className="stack">
             <input type="hidden" name="constitutionId" value={constitutionId} />
             <input type="hidden" name="code" value={code.toLowerCase()} />
             <input type="hidden" name="sourceVersionId" value={sourceVersionId} />

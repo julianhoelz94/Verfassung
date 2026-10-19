@@ -18,7 +18,7 @@ async function passwordSignIn(page: Page, email = 'local-admin@example.local') {
 test('authenticator is the default; only the selected recovery method is submitted', async ({ page }) => {
   await passwordSignIn(page);
   await expect(page.getByLabel('Recovery code')).toHaveCount(0);
-  await page.getByRole('button', { name: 'Use a recovery code', exact: true }).click();
+  await page.getByRole('link', { name: 'Use a recovery code', exact: true }).click();
   await expect(page.getByLabel('Recovery code')).toBeFocused();
   await expect(page.getByLabel('Authenticator code', { exact: true })).toHaveCount(0);
   await page.getByLabel('Recovery code').fill('invalid-recovery');
@@ -28,7 +28,7 @@ test('authenticator is the default; only the selected recovery method is submitt
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
   await expect(page.getByRole('alert')).toBeVisible();
   await expect(page.getByLabel('Recovery code')).toBeVisible();
-  await page.getByRole('button', { name: 'Use authenticator app instead', exact: true }).click();
+  await page.getByRole('link', { name: 'Use authenticator app instead', exact: true }).click();
   await expect(page.getByLabel('Authenticator code', { exact: true })).toBeFocused();
   await page.getByLabel('Authenticator code', { exact: true }).fill('123456');
   await page.locator('form.mfa-form').evaluate(form => {
@@ -54,14 +54,14 @@ test('first-login QR enrollment and one-use recovery codes work with manual fall
   await page.waitForLoadState('networkidle');
   await signOut(page);
   await passwordSignIn(page);
-  await page.getByRole('button', { name: 'Use a recovery code', exact: true }).click();
+  await page.getByRole('link', { name: 'Use a recovery code', exact: true }).click();
   await page.getByLabel('Recovery code').fill('RECOVERY-ONE');
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
   await expect(page).toHaveURL(/\/editor$/);
   await page.waitForLoadState('networkidle');
   await signOut(page);
   await passwordSignIn(page);
-  await page.getByRole('button', { name: 'Use a recovery code', exact: true }).click();
+  await page.getByRole('link', { name: 'Use a recovery code', exact: true }).click();
   await page.getByLabel('Recovery code').fill('RECOVERY-ONE');
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
   await expect(page.getByRole('alert')).toBeVisible();
@@ -119,14 +119,14 @@ test.describe('German MFA', () => {
     await page.context().clearCookies();
     await login();
     await expect(page.locator('input[name="recoveryCode"]')).toHaveCount(0);
-    const recovery = page.getByRole('button', { name: 'Wiederherstellungscode verwenden', exact: true });
+    const recovery = page.getByRole('link', { name: 'Wiederherstellungscode verwenden', exact: true });
     await recovery.focus();
     await page.keyboard.press('Enter');
     await expect(page.locator('input[name="recoveryCode"]')).toBeFocused();
     await page.locator('input[name="recoveryCode"]').fill('invalid');
     await page.locator('form.mfa-form').getByRole('button', { name: 'Weiter', exact: true }).click();
     await expect(page.getByRole('alert')).toBeVisible();
-    await page.getByRole('button', { name: 'Stattdessen Authenticator-App verwenden', exact: true }).click();
+    await page.getByRole('link', { name: 'Stattdessen Authenticator-App verwenden', exact: true }).click();
     await expect(page.locator('input[name="code"]')).toBeFocused();
     await page.locator('input[name="code"]').fill(authenticatorCode(secret));
     await page.locator('form.mfa-form').getByRole('button', { name: 'Weiter', exact: true }).click();
@@ -142,10 +142,10 @@ test('a phone editor can reach Save draft and reopen the saved text', async ({ p
   expect(response.ok()).toBeTruthy();
   const session = await response.json();
   await page.goto(`/editor?sessionId=${session.id}&versionId=${REVIEW_CURRENT}`);
-  await page.getByLabel('Article text', { exact: true }).fill('Saved from a narrow phone viewport.');
+  await page.getByRole('textbox', { name: 'Article text', exact: true }).fill('Saved from a narrow phone viewport.');
   await page.getByRole('button', { name: 'Save draft', exact: true }).click();
   await expect(page).toHaveURL(/saved=1/);
   await page.reload();
-  await expect(page.getByLabel('Article text', { exact: true })).toHaveValue('Saved from a narrow phone viewport.');
+  await expect(page.getByRole('textbox', { name: 'Article text', exact: true })).toHaveValue('Saved from a narrow phone viewport.');
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBeTruthy();
 });

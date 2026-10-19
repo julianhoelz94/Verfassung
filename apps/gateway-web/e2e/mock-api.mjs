@@ -563,6 +563,11 @@ const server = createServer(async (req, res) => {
     return;
   }
 
+  const exported = pathname.match(/^\/api\/content\/versions\/([^/]+)\/export$/);
+  if (uiReview && method === 'GET' && exported) {
+    json(res, 200, { roots: articlesFor(exported[1], true).map(mockUnit).map(unit => ({ ...unit, label: unit.articleNumber })) });
+    return;
+  }
   const units = pathname.match(/^\/api\/content\/versions\/([^/]+)\/units(?:\/([^/]+))?$/);
   if (method === 'GET' && units) {
     const items = articlesFor(units[1], true).map(mockUnit);

@@ -3,6 +3,9 @@ import type { UiMessage } from './messages';
 /** Task-oriented labels shared by the reader and staff workspaces. */
 export const reviewUi = {
   signInHint: { en: 'Sign in to your account.', de: 'Melden Sie sich bei Ihrem Konto an.' },
+  structureProposed: { en: 'Awaiting structure review', de: 'Struktur wartet auf Prüfung' },
+  structureConfirming: { en: 'Preparing confirmation', de: 'Bestätigung wird vorbereitet' },
+  structureConfirmed: { en: 'Structure confirmed', de: 'Struktur bestätigt' },
   onThisPage: { en: 'On this page', de: 'Auf dieser Seite' },
   preferences: { en: 'Language and preferences', de: 'Sprache und Einstellungen' },
   security: { en: 'Account security', de: 'Kontosicherheit' },

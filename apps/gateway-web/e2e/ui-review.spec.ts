@@ -45,6 +45,8 @@ for (const locale of ['en', 'de']) for (const width of sizes) {
         expect(heading).not.toMatch(/Something went wrong|Etwas ist schief|not found|nicht gefunden/i);
         await expect(page.getByRole('alert').filter({ hasText: /could not be loaded|could not be retrieved|temporarily unavailable|konnte[n]? nicht geladen|vorübergehend nicht verfügbar/i })).toHaveCount(0);
         if (route.entry === '/admin/settings') await expect(page.locator('#smtpHost')).toBeVisible();
+        if (route.entry === '/admin/import/setup/[proposalId]') await expect(page.locator('.page-meta')).toContainText(locale === 'en' ? 'Awaiting structure review' : 'Struktur wartet auf Prüfung');
+        if (route.entry === '/editor/lifecycle/[constitutionId]') await expect(page.locator('input[name="logicalUnitIds"]').first()).toBeVisible();
         if (route.entry === 'import-new-structure') await expect(page.locator('#proposalFile')).toBeVisible();
         if (route.entry === 'editor-active-correction') await expect(page.getByRole('button', { name: locale === 'en' ? 'Save draft' : 'Entwurf speichern', exact: true })).toBeVisible();
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), `Page overflow at ${route.path}`).toBeTruthy();
@@ -58,7 +60,7 @@ for (const locale of ['en', 'de']) for (const width of sizes) {
         }
         if ('snapshot' in route && route.snapshot && process.platform === 'linux' && process.env.E2E_SKIP_VISUAL !== 'true') {
           const name = route.entry.replace(/\//g, '-').replace(/[\[\]]/g, '').replace(/^-/, '');
-          await expect(page).toHaveScreenshot(`review-${name}-${locale}-${width}.png`, { fullPage: true });
+          await expect(page).toHaveScreenshot(`review-${name}-${locale}-${width}.png`, { fullPage: true, timeout: 15_000 });
         }
         evidence.push({ route: route.entry, status: response?.status(), heading });
       });

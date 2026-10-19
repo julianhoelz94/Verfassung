@@ -64,7 +64,7 @@ export default async function WikiEditor({ params, searchParams }: Props) {
           <textarea id="wiki-sources" name="sourceUrls" rows={3} defaultValue={(current?.sourceUrls ?? []).join('\n')} />
           <h2><T value={ui.editor.wiki.targettype.targetid.page.pictures} /></h2>
           {current?.images.map((image, index) => (
-            <fieldset key={image.documentId}>
+            <fieldset key={image.documentId} className="stack">
               <legend><T value={ui.editor.wiki.targettype.targetid.page.picture} />{" "}{index + 1}</legend>
               <WikiImages images={[image]} preview />
               <label htmlFor={`replace-${image.documentId}`}><T value={ui.editor.wiki.targettype.targetid.page.replacePictureFile} /></label>

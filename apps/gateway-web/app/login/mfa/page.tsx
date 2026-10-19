@@ -64,7 +64,7 @@ export default async function MfaPage(props: MfaPageProps) {
         </Card>
       ) : (
         <Card>
-          <MfaLoginForm next={searchParams.next?.startsWith('/oauth/authorize?') ? searchParams.next : undefined} recovery={searchParams.method === 'recovery'} />
+          <MfaLoginForm next={searchParams.next?.startsWith('/oauth/authorize?') ? searchParams.next : undefined} recovery={searchParams.method === 'recovery'} focus={['recovery', 'authenticator'].includes(searchParams.method ?? '')} />
         </Card>
       )}
     </PageMain>

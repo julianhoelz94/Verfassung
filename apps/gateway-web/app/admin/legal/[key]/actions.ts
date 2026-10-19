@@ -54,6 +54,7 @@ export async function saveImprintDetailsAction(formData: FormData): Promise<void
   } catch {
     redirect('/admin/legal/impressum?error=details');
   }
+  revalidatePath('/admin/legal/impressum');
   redirect('/admin/legal/impressum?saved=1');
 }
 
@@ -66,5 +67,6 @@ export async function publishImprintDetailsAction(formData: FormData): Promise<v
     redirect('/admin/legal/impressum?error=details');
   }
   revalidatePath('/impressum');
+  revalidatePath('/admin/legal/impressum');
   redirect('/admin/legal/impressum?published=1');
 }

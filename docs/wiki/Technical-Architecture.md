@@ -40,3 +40,5 @@ Version history has two axes: legal changes and editorial corrections. The legal
 Through Caddy, a browser calls `/api/catalog/countries`. Within Compose, a service or gateway calls `http://catalog-service:8080/countries`; the `/api/catalog` prefix is stripped at the edge. Consult the [Caddy configuration](https://github.com/julianhoelz94/Verfassung/blob/main/infra/caddy/Caddyfile) and [API map](https://github.com/julianhoelz94/Verfassung/blob/main/docs/CODEMAPS/backend.md) before adding routes.
 
 [[Development and operations|Technical-Development]] · [[Documentation home|Home]]
+
+The edge evaluates proxy source-address and forwarded-scheme guards before routing, and keeps the login form behind a verified public HTTPS readiness check. Certificate renewal warnings remain visible in administrator connection settings while a previous certificate is still valid; successful renewal clears the warning.

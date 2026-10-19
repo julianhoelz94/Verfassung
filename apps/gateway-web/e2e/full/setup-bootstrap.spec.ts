@@ -33,15 +33,21 @@ test('new deployment stays closed until the administrator completes setup', asyn
     await page.setViewportSize({ width, height: 1000 });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   }
+  await expect(page.getByRole('button', { name: 'Save preferences', exact: true })).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath('setup-desktop.png'), fullPage: true });
   await page.goto('/admin/legal/impressum');
   for (const [field, value] of Object.entries({ name: 'Atlas integration operator', streetAddress: 'Integration Street 58', postalCode: '10115', city: 'Berlin', country: 'Germany', email: 'operator@example.test' })) await page.locator(`input[name="${field}"]`).fill(value);
   await page.getByRole('button', { name: 'Save contact draft', exact: true }).click();
+  await expect(page).toHaveURL(/\/admin\/legal\/impressum\?saved=1$/);
+  await expect(page.getByRole('button', { name: 'Publish reviewed contact', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Publish reviewed contact', exact: true }).click();
+  await expect(page).toHaveURL(/\/admin\/legal\/impressum\?published=1$/);
   for (const key of ['impressum', 'datenschutz', 'impressum_en', 'datenschutz_en']) {
     await page.goto(`/admin/legal/${key}`);
     await page.locator('#legal-content').fill(`Integration-only reviewed ${key} for the isolated deployment. Operator information is maintained in the shared contact record.`);
     await page.getByRole('button', { name: 'Save draft', exact: true }).click();
+    await expect(page).toHaveURL(new RegExp('/admin/legal/' + key + '[?]saved=1$'));
+    await expect(page.getByRole('button', { name: 'Publish reviewed text', exact: true })).toBeVisible();
     await page.getByRole('button', { name: 'Publish reviewed text', exact: true }).click();
     await expect(page.getByText('Published revision updated.', { exact: true })).toBeVisible();
   }

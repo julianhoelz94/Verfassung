@@ -69,9 +69,26 @@ test('administrator stages constitution JSON for review without publishing it', 
     articles: [{ articleNumber: '1', title: 'Legislative power', body: 'All legislative powers.' }],
   }));
   await page.getByRole('button', { name: 'Stage for review' }).click();
-  await expect(page.getByRole('heading', { name: 'Import job' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Review import' })).toBeVisible();
   await expect(page.getByText('Status: In review')).toBeVisible();
   await expect(page.getByRole('link', { name: 'Open the published version' })).toHaveCount(0);
+  await page.goto('/editor?status=reviewing');
+  const item = page.locator('.editor-session-list li').filter({ hasText: '1789' });
+  await item.getByRole('link', { name: 'Open review' }).click();
+  await expect(page).toHaveURL(/\/editor\?importJobId=/);
+  await page.getByRole('button', { name: 'Prepare unpublished draft' }).click();
+  await expect(page.getByRole('heading', { name: 'Prepared draft as readers will see it' })).toBeVisible();
+  await page.getByLabel('Review reason').first().fill('Checked my imported text against the original source.');
+  await page.getByRole('button', { name: 'Approve prepared draft' }).click();
+  await expect(page.getByRole('button', { name: 'Publish approved version' })).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole('button', { name: 'Publish approved version' })).toBeVisible();
+  await page.goto('/editor?status=approved');
+  await page.locator('.editor-session-list li').filter({ hasText: '1789' }).getByRole('link', { name: 'Open publish view' }).click();
+  await page.getByRole('button', { name: 'Publish approved version' }).click();
+  await expect(page.getByRole('link', { name: 'Open the published version' })).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole('link', { name: 'Open the published version' })).toBeVisible();
 });
 
 test('administrator creates a constitution and changes its outline settings', async ({ page }) => {

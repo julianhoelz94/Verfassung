@@ -410,6 +410,9 @@ class ImportApiTest {
             status { isCreated() }
             jsonPath("$.status") { value("pending_review") }
             jsonPath("$.isoCode") { value("FR") }
+            jsonPath("$.countryName") { value("France") }
+            jsonPath("$.constitutionTitle") { value("Constitution of 1958") }
+            jsonPath("$.versionLabel") { value("1958") }
         }.andReturn()
         Mockito.verifyNoInteractions(catalogClient, contentClient)
         val id = jobId(staged.response.contentAsString)
@@ -440,6 +443,73 @@ class ImportApiTest {
         )
         Mockito.verify(catalogClient).publishVersion(versionId, UUID.fromString(id))
         Mockito.verify(catalogClient).replaceOutline(anyUuid(), Mockito.anyList())
+    }
+
+    @Test
+    fun sameAdminCanSubmitApproveAndPublishWithFreshMfa() {
+        val constitutionId = UUID.randomUUID()
+        val versionId = UUID.randomUUID()
+        stubCatalog("FR", "France", "1958", "Constitution of 1958", "1958", constitutionId, versionId)
+        Mockito.`when`(contentClient.snapshot(versionId)).thenReturn(OrderedSnapshot(versionId, 1, null, emptyList()))
+        val staged = mockMvc.post("/import-jobs") {
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"isoCode":"FR","countryName":"France","constitutionSlug":"1958","constitutionTitle":"Constitution of 1958","versionLabel":"1958","sourceUrl":"https://example.org/source","outline":{"kinds":[{"kindCode":"article","displayLabel":"Article"}]},"articles":[{"articleNumber":"1","title":"Sovereignty","body":"France is a republic.","sortOrder":1}]}"""
+        }.andExpect { status { isCreated() } }.andReturn()
+        val id = jobId(staged.response.contentAsString)
+        confirmOutline(id)
+        prepare(id)
+        mockMvc.post("/import-jobs/$id/approve") {
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"reason":"Verified my imported draft against the source."}"""
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.status") { value("approved") }
+            jsonPath("$.approvedBy") { value(admin.id.toString()) }
+        }
+        Mockito.verify(catalogClient, Mockito.never()).publishVersion(anyUuid(), anyUuid())
+        mockMvc.post("/import-jobs/$id/publish") { header("Authorization", TOKEN) }
+            .andExpect { status { isForbidden() } }
+        Mockito.`when`(identityClient.authenticate(TOKEN)).thenReturn(admin.copy(stepUpFresh = true))
+        mockMvc.post("/import-jobs/$id/publish") { header("Authorization", TOKEN) }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.status") { value("completed") }
+                jsonPath("$.submittedBy") { value(admin.id.toString()) }
+                jsonPath("$.approvedBy") { value(admin.id.toString()) }
+                jsonPath("$.publishedBy") { value(admin.id.toString()) }
+            }
+        mockMvc.get("/import-jobs/$id/decisions") { header("Authorization", TOKEN) }
+            .andExpect {
+                jsonPath("$.length()") { value(1) }
+                jsonPath("$[0].decidedBy") { value(admin.id.toString()) }
+            }
+        Mockito.verify(catalogClient, Mockito.times(1)).publishVersion(versionId, UUID.fromString(id))
+    }
+
+    @Test
+    fun submitterCanRejectOwnImportWithARecordedReason() {
+        val staged = mockMvc.post("/import-jobs") {
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"isoCode":"FR","countryName":"France","constitutionSlug":"rejected","constitutionTitle":"Constitution","versionLabel":"1","sourceUrl":"https://example.org/source","articles":[{"articleNumber":"1","title":"First","sortOrder":1}]}"""
+        }.andExpect { status { isCreated() } }.andReturn()
+        val id = jobId(staged.response.contentAsString)
+        mockMvc.post("/import-jobs/$id/reject") {
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"reason":"My uploaded text needs corrections before review."}"""
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.status") { value("rejected") }
+        }
+        mockMvc.get("/import-jobs/$id/decisions") { header("Authorization", TOKEN) }
+            .andExpect {
+                jsonPath("$[0].decision") { value("rejected") }
+                jsonPath("$[0].decidedBy") { value(admin.id.toString()) }
+                jsonPath("$[0].reason") { value("My uploaded text needs corrections before review.") }
+            }
     }
 
     @Test

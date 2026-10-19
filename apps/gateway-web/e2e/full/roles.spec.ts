@@ -112,7 +112,7 @@ test('editorial roles stage, review, and publish a new constitution through the 
     articles: [{ articleNumber: '1', title: 'Public trust', body: 'Public trust protects every person.', sortOrder: 1 }],
   }));
   await page.getByRole('button', { name: 'Stage for review' }).click();
-  await expect(page.getByRole('heading', { name: 'Import job' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Review import' })).toBeVisible();
   await expect(page.getByText('Status: In review')).toBeVisible();
   const reviewUrl = page.url();
   await page.getByRole('button', { name: 'Confirm proposed outline' }).click();

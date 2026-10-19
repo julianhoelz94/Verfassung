@@ -1,6 +1,6 @@
 import { expect, test, type APIRequestContext } from '../fixtures/consent';
 import { randomUUID } from 'node:crypto';
-import { adminHeaders, createIsolatedConstitution, roleHeaders } from './api-fixtures';
+import { adminHeaders, createIsolatedConstitution } from './api-fixtures';
 
 async function tool(request: APIRequestContext, name: string, args: Record<string, unknown>, key?: string) {
   const response = await request.post('/mcp', {
@@ -23,12 +23,10 @@ async function tool(request: APIRequestContext, name: string, args: Record<strin
   return (await response.json()).result as { isError?: boolean; structuredContent?: Record<string, unknown> };
 }
 
-test('a personal MCP key discovers the pinned layout and stages only a pending review', async ({ request }) => {
+test('an admin reviews and publishes their MCP import in the editor journey', async ({ page, request }, testInfo) => {
   test.setTimeout(180_000);
   const fixture = await createIsolatedConstitution(request, `MCP journey ${randomUUID()}`);
   const admin = await adminHeaders(request);
-  const reviewer = await roleHeaders(request, 'reviewer');
-  const publisher = await roleHeaders(request, 'publisher');
   const keyResponse = await request.post('/api/identity/mcp-keys', {
     headers: admin,
     data: { name: `MCP journey ${randomUUID()}`, scopes: ['mcp:read', 'ingestion:import'] },
@@ -67,15 +65,28 @@ test('a personal MCP key discovers the pinned layout and stages only a pending r
       return detail.constitutions.find((item: { id: string }) => item.id === fixture.constitutionId).versions as Array<{ versionLabel: string }>;
     };
     expect((await listed()).some(version => version.versionLabel === versionLabel)).toBe(false);
-    const prepared = await request.post(`/api/ingestion/import-jobs/${jobId}/prepare`, { headers: admin });
-    expect(prepared.ok(), await prepared.text()).toBeTruthy();
-    const approved = await request.post(`/api/ingestion/import-jobs/${jobId}/approve`, {
-      headers: reviewer, data: { reason: 'Verified MCP source and structure before publication.' },
-    });
-    expect(approved.ok(), await approved.text()).toBeTruthy();
+    await page.context().addCookies([{ name: 'ca_session', value: admin.Authorization.slice('Bearer '.length), url: String(testInfo.project.use.baseURL), httpOnly: true, sameSite: 'Lax' }]);
+    await page.goto('/editor?status=reviewing');
+    await page.locator('.editor-session-list li').filter({ hasText: versionLabel }).getByRole('link', { name: 'Open review' }).click();
+    await expect(page).toHaveURL(new RegExp(`/editor\\?importJobId=${jobId}`));
+    await page.getByRole('button', { name: 'Prepare unpublished draft' }).click();
+    await expect(page.getByRole('heading', { name: 'Prepared draft as readers will see it' })).toBeVisible();
+    await expect(page.getByText('A reviewed import is required.', { exact: true }).first()).toBeVisible();
+    await page.getByLabel('Review reason').first().fill('Verified my MCP source and structure before publication.');
+    await page.getByRole('button', { name: 'Approve prepared draft' }).click();
+    await expect(page.getByRole('button', { name: 'Publish approved version' })).toBeVisible();
+    await page.reload();
+    await expect(page.getByRole('button', { name: 'Publish approved version' })).toBeVisible();
     expect((await listed()).some(version => version.versionLabel === versionLabel)).toBe(false);
-    const published = await request.post(`/api/ingestion/import-jobs/${jobId}/publish`, { headers: publisher });
-    expect(published.ok(), await published.text()).toBeTruthy();
+    await page.goto('/editor?status=approved');
+    await page.locator('.editor-session-list li').filter({ hasText: versionLabel }).getByRole('link', { name: 'Open publish view' }).click();
+    await page.getByRole('button', { name: 'Publish approved version' }).click();
+    await expect(page.getByRole('link', { name: 'Open the published version' })).toBeVisible();
+    await page.reload();
+    await expect(page.getByRole('link', { name: 'Open the published version' })).toBeVisible();
+    const completed = await (await request.get(`/api/ingestion/import-jobs/${jobId}`, { headers: admin })).json();
+    expect(completed.approvedBy).toBe(completed.submittedBy);
+    expect(completed.publishedBy).toBe(completed.submittedBy);
     await expect.poll(async () => (await listed()).some(version => version.versionLabel === versionLabel)).toBe(true);
   } finally {
     expect((await request.delete(`/api/identity/mcp-keys/${created.key.id}`, { headers: admin })).status()).toBe(204);

@@ -348,6 +348,13 @@ export const ui = {
     accountSettings: { en: 'Account settings', de: 'Kontoeinstellungen' },
     users: { en: 'Users', de: 'Nutzer' },
   },
+  importReview: {
+    title: { en: 'Review import', de: 'Import prüfen' },
+    kind: { en: 'Constitution import', de: 'Verfassungsimport' },
+    unavailable: { en: 'Imports are temporarily unavailable. Try again.', de: 'Importe sind vorübergehend nicht verfügbar. Versuchen Sie es erneut.' },
+    source: { en: 'Open source text', de: 'Quelltext öffnen' },
+    submittedContent: { en: 'Submitted content and structure', de: 'Eingereichte Inhalte und Gliederung' },
+  },
   importActions: {
     status: { en: 'Status:', de: 'Status:' },
     reasonRequired: { en: 'Enter a reason of 10 to 2000 characters.', de: 'Geben Sie eine Begründung mit 10 bis 2000 Zeichen ein.' },

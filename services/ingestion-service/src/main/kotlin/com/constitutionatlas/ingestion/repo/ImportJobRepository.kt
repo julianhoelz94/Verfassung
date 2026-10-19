@@ -126,13 +126,12 @@ class ImportJobRepository(
     @Transactional
     fun approve(jobId: UUID, actorId: UUID, snapshot: OrderedSnapshot, reason: String): Boolean {
         val changed = jdbc.update(
-            "UPDATE import_jobs SET status = 'approved', approved_by = ?, approved_at = NOW(), approved_generation = ?, approved_settings_revision_id = ?, updated_at = NOW() WHERE id = ? AND status = 'pending_review' AND version_id = ? AND (submitted_by IS NULL OR submitted_by <> ?)",
+            "UPDATE import_jobs SET status = 'approved', approved_by = ?, approved_at = NOW(), approved_generation = ?, approved_settings_revision_id = ?, updated_at = NOW() WHERE id = ? AND status = 'pending_review' AND version_id = ?",
             actorId,
             snapshot.generation,
             snapshot.settingsRevisionId,
             jobId,
             snapshot.versionId,
-            actorId,
         ) == 1
         if (changed) recordDecision(jobId, actorId, "approved", reason)
         return changed
@@ -141,10 +140,9 @@ class ImportJobRepository(
     @Transactional
     fun reject(jobId: UUID, actorId: UUID, reason: String): Boolean {
         val changed = jdbc.update(
-            "UPDATE import_jobs SET status = 'rejected', approved_by = ?, updated_at = NOW() WHERE id = ? AND status = 'pending_review' AND (submitted_by IS NULL OR submitted_by <> ?)",
+            "UPDATE import_jobs SET status = 'rejected', approved_by = ?, updated_at = NOW() WHERE id = ? AND status = 'pending_review'",
             actorId,
             jobId,
-            actorId,
         ) == 1
         if (changed) recordDecision(jobId, actorId, "rejected", reason)
         return changed
@@ -168,10 +166,9 @@ class ImportJobRepository(
     )
 
     fun claimPublication(jobId: UUID, actorId: UUID): Boolean = jdbc.update(
-        "UPDATE import_jobs SET status = 'publishing', published_by = ?, updated_at = NOW() WHERE id = ? AND status = 'approved' AND approved_by <> ?",
+        "UPDATE import_jobs SET status = 'publishing', published_by = ?, updated_at = NOW() WHERE id = ? AND status = 'approved'",
         actorId,
         jobId,
-        actorId,
     ) == 1
 
     fun publishFailed(jobId: UUID) {
@@ -249,19 +246,20 @@ class ImportJobRepository(
         val job = jdbc.query(
             "SELECT id, status, version_id, payload, submitted_by, prepared_by, approved_by, published_by, outline_confirmed_by FROM import_jobs WHERE id = ?",
             { rs, _ ->
-                val payload = rs.getString("payload")
-                val iso =
-                    runCatching { objectMapper.readTree(payload).path("isoCode").asText(null) }.getOrNull()
+                val payload = runCatching { objectMapper.readTree(rs.getString("payload")) }.getOrNull()
                 JobRow(
                     rs.getObject("id", UUID::class.java),
                     rs.getString("status"),
                     rs.getObject("version_id", UUID::class.java),
-                    iso?.ifBlank { null },
+                    payload?.path("isoCode")?.asText(null)?.ifBlank { null },
                     rs.getObject("submitted_by", UUID::class.java),
                     rs.getObject("prepared_by", UUID::class.java),
                     rs.getObject("approved_by", UUID::class.java),
                     rs.getObject("published_by", UUID::class.java),
                     rs.getObject("outline_confirmed_by", UUID::class.java),
+                    payload?.path("countryName")?.asText(null),
+                    payload?.path("constitutionTitle")?.asText(null),
+                    payload?.path("versionLabel")?.asText(null),
                 )
             },
             jobId,
@@ -271,7 +269,7 @@ class ImportJobRepository(
             { rs, _ -> ImportErrorDto(rs.getString("code"), rs.getString("message")) },
             jobId,
         )
-        return ImportJobDto(job.id, job.status, job.versionId, errors, job.isoCode, job.submittedBy, job.preparedBy, job.approvedBy, job.publishedBy, job.outlineConfirmedBy)
+        return ImportJobDto(job.id, job.status, job.versionId, errors, job.isoCode, job.submittedBy, job.preparedBy, job.approvedBy, job.publishedBy, job.outlineConfirmedBy, job.countryName, job.constitutionTitle, job.versionLabel)
     }
 
     private data class JobRow(
@@ -284,5 +282,8 @@ class ImportJobRepository(
         val approvedBy: UUID?,
         val publishedBy: UUID?,
         val outlineConfirmedBy: UUID?,
+        val countryName: String?,
+        val constitutionTitle: String?,
+        val versionLabel: String?,
     )
 }

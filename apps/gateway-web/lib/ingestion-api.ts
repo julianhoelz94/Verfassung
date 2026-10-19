@@ -16,6 +16,9 @@ export type ImportJob = {
   approvedBy?: string | null;
   publishedBy?: string | null;
   outlineConfirmedBy?: string | null;
+  countryName?: string | null;
+  constitutionTitle?: string | null;
+  versionLabel?: string | null;
 };
 
 const REQUIRED_STRINGS = ['isoCode', 'countryName', 'constitutionSlug', 'constitutionTitle', 'versionLabel'] as const;

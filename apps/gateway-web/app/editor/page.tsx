@@ -21,6 +21,7 @@ import { StructuredEditor } from './StructuredEditor';
 import { PublishForm } from './PublishForm';
 import { LegacyPublishForm } from './LegacyPublishForm';
 import { EditorLanding } from './EditorLanding';
+import { ImportReview } from './ImportReview';
 import { reviewUi } from '../../lib/ui-review-messages';
 
 type EditorPageProps = {
@@ -31,6 +32,7 @@ type EditorPageProps = {
     selectedNode?: string;
     versionId?: string;
     sessionId?: string;
+    importJobId?: string;
     articleId?: string;
     saved?: string;
     detailsSaved?: string;
@@ -69,10 +71,14 @@ export default async function EditorPage(props: EditorPageProps) {
     );
   }
 
+  if (searchParams.importJobId) {
+    return <ImportReview jobId={searchParams.importJobId} error={searchParams.error} />;
+  }
+
   const preview = searchParams.sessionId ? await getDraftPreview(searchParams.sessionId) : null;
   const session = preview?.session;
   if (!session) {
-    return <EditorLanding email={user.email} roles={user.roles} status={searchParams.status} error={searchParams.error} />;
+    return <EditorLanding userId={user.id} email={user.email} roles={user.roles} status={searchParams.status} error={searchParams.error} />;
   }
 
   let countries: CountrySummary[] = [];

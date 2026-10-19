@@ -60,7 +60,7 @@ export default async function AdminImportPage({ searchParams }: AdminImportPageP
     <Card>
       <h2><T value={ui.admin.import.page.recentImports} /></h2>
       {!jobs ? <Alert tone="error"><T value={ui.errors.servicesUnavailable} /></Alert> : jobs.length === 0 ? <p className="muted"><T value={ui.admin.import.page.noImportsYet} /></p> : <ul className="task-list">{jobs.map(job => <li key={job.id}>
-        <a href={`/admin/import/${encodeURIComponent(job.id)}`}>{job.isoCode ?? <T value={ui.remainingStatus.constitution} />} <span className="muted">#{job.id.slice(-6)}</span></a>
+        <a href={`/editor?importJobId=${encodeURIComponent(job.id)}`}>{job.isoCode ?? <T value={ui.remainingStatus.constitution} />} <span className="muted">#{job.id.slice(-6)}</span></a>
         <Badge tone="info"><T value={statusMessage(job.status)} /></Badge>
       </li>)}</ul>}
     </Card>

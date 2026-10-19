@@ -24,6 +24,7 @@ class SettingsEnvironment(private val configuration: DeploymentConfiguration, pr
 
     fun effective(stored: StoredIdentitySettings): StoredIdentitySettings {
         val tree = mapper.valueToTree<ObjectNode>(stored)
+        if (tree.path("mailPublicBaseUrl").asText().isBlank()) tree.put("mailPublicBaseUrl", configuration.publicUrl)
         overrides.forEach { (key, value) -> tree.set<com.fasterxml.jackson.databind.JsonNode>(key, mapper.valueToTree(value)) }
         return mapper.treeToValue(tree, StoredIdentitySettings::class.java)
     }

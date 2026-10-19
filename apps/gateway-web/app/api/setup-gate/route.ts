@@ -21,6 +21,7 @@ export async function GET(request: NextRequest) {
       if (me.ok) admin = ((await me.json()) as { roles: string[] }).roles.includes('admin');
     }
     if (setupPathAllowed(path, admin)) return new NextResponse(null, { status: 204 });
+    if (!/^\/(api|oauth|mcp)(\/|$)/.test(path)) return new NextResponse(null, { status: 303, headers: { Location: admin ? '/setup' : '/login', 'Cache-Control': 'no-store' } });
     return NextResponse.json({ code: 'setup_required' }, { status: 403, headers: { 'Cache-Control': 'no-store' } });
   } catch {
     return NextResponse.json({ code: 'setup_unavailable' }, { status: 503, headers: { 'Cache-Control': 'no-store' } });

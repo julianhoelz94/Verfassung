@@ -17,6 +17,7 @@ async function adminToken() {
 
 export async function saveIdentitySettingsAction(formData: FormData): Promise<string> {
   const token = await adminToken();
+  const target = formData.get('returnTo') === '/setup' ? '/setup' : '/admin/settings';
   const checked = (name: string) => formData.get(name) === 'on';
   try {
     await updateIdentitySettings(token, {
@@ -35,24 +36,25 @@ export async function saveIdentitySettingsAction(formData: FormData): Promise<st
     });
   } catch (error) {
     if (error instanceof IdentityApiError && error.code === 'step_up_required') {
-      return `/account/step-up?returnTo=${encodeURIComponent('/admin/settings')}`;
+      return `/account/step-up?returnTo=${encodeURIComponent(target)}`;
     }
-    return '/admin/settings?error=save';
+    return `${target}?error=save`;
   }
-  return '/admin/settings?saved=1';
+  return `${target}?saved=1`;
 }
 
 export async function sendTestMailAction(formData: FormData): Promise<string> {
   const token = await adminToken();
+  const target = formData.get('returnTo') === '/setup' ? '/setup' : '/admin/settings';
   try {
     await sendTestMail(token, String(formData.get('to') ?? ''));
   } catch (error) {
     if (error instanceof IdentityApiError && error.code === 'step_up_required') {
-      return `/account/step-up?returnTo=${encodeURIComponent('/admin/settings')}`;
+      return `/account/step-up?returnTo=${encodeURIComponent(target)}`;
     }
-    return '/admin/settings?error=test';
+    return `${target}?error=test`;
   }
-  return '/admin/settings?tested=1';
+  return `${target}?tested=1`;
 }
 
 export async function saveContentTranslationSettingsAction(formData: FormData): Promise<string> {

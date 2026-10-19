@@ -24,7 +24,7 @@ export type ImprintDetails = {
   email: string;
 };
 
-export type ImprintDetailsState = { draft: ImprintDetails | null; published: ImprintDetails | null };
+export type ImprintDetailsState = { draft: ImprintDetails | null; published: ImprintDetails | null; managedFields?: string[] };
 
 function base(): string {
   return process.env.DOCUMENT_API_URL ?? 'http://localhost/api/document';

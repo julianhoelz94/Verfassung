@@ -14,6 +14,7 @@ import ssl
 import subprocess
 import threading
 import time
+import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -34,7 +35,7 @@ def configuration(env):
         raise ValueError("PUBLIC_BASE_URL must use a DNS hostname without wildcards")
     if mode == "local-http" and env.get("CADDY_BIND_ADDRESS", "127.0.0.1") not in {"127.0.0.1", "::1"}:
         raise ValueError("Local HTTP must bind published ports to loopback")
-    if mode.startswith("local-") and (profile not in {"local-stack", "testing", "ci"} or url.hostname != "localhost"):
+    if mode.startswith("local-") and (profile not in {"local-stack", "testing", "ci"} or url.hostname not in {"localhost", "127.0.0.1"}):
         raise ValueError("Local TLS modes require localhost and an explicit development profile")
     if url.scheme != ("http" if mode == "local-http" else "https"):
         raise ValueError("TLS mode and public URL scheme disagree")
@@ -66,7 +67,7 @@ def render(env):
         import atlas_routes
     }
 """
-    prelude = "{\n" + "\n".join(globals_) + "\n}\nimport /etc/caddy/Caddyfile\n"
+    prelude = "{\n" + "\n".join(globals_) + "\n}\nimport /etc/caddy/Caddyfile\n:8082 {\nhandle /setup/transport/status {\nreverse_proxy 127.0.0.1:8081\n}\nrespond 404\n}\n"
     if mode == "local-http":
         return prelude + ":80 {\n" + common + "}\n"
     if mode == "external-proxy":
@@ -113,6 +114,12 @@ def observe(line):
 
 
 def probe(mode, url):
+    if mode == "external-proxy":
+        try:
+            with urllib.request.urlopen(url.geturl().rstrip('/') + "/setup/transport/status", timeout=3) as response:
+                return response.status == 200
+        except (OSError, ValueError):
+            return False
     context = ssl.create_default_context()
     if mode == "local-https":
         root = Path("/data/caddy/pki/authorities/local/root.crt")
@@ -142,7 +149,7 @@ def main():
     if mode == "local-http":
         update(state="local", ready=True, message="Local development — HTTPS not required / Lokale Entwicklung — HTTPS nicht erforderlich")
     elif mode == "external-proxy":
-        update(state="proxy", ready=True, message="HTTPS managed by the trusted reverse proxy / HTTPS durch den vertrauenswürdigen Reverse-Proxy")
+        update(state="checking", ready=False, message="HTTPS managed by the trusted reverse proxy / HTTPS durch den vertrauenswürdigen Reverse-Proxy")
 
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self):
@@ -154,7 +161,8 @@ def main():
                 self.send_header("Content-Type", "application/json")
             elif state["ready"] and mode in {"managed-acme", "local-https"}:
                 self.send_response(303)
-                self.send_header("Location", origin + "/login")
+                target = self.path if self.path.startswith("/") and not self.path.startswith("//") and "\\" not in self.path else "/"
+                self.send_header("Location", origin + target)
                 body = b""
             else:
                 # No script or password form is served over HTTP. Refreshes also
@@ -190,7 +198,7 @@ def main():
 
     def monitor():
         while process.poll() is None:
-            if mode in {"managed-acme", "local-https"}:
+            if mode in {"managed-acme", "local-https", "external-proxy"}:
                 valid = probe(mode, url)
                 if valid:
                     update(state="ready", ready=True, message="HTTPS ready / HTTPS bereit")

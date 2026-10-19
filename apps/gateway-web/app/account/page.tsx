@@ -1,3 +1,4 @@
+import { siteLanguages } from '../../lib/deployment-setup';
 import { SignedInSummary } from '../components/SignedInSummary';
 import { currentLocale } from '../../lib/server-locale';
 import { message } from '../../lib/messages';
@@ -82,7 +83,7 @@ export default async function AccountPage(props: AccountPageProps) {
         <section className="account-section" aria-labelledby="language-title">
           <h2 id="language-title"><T value={ui.account.page.language} /></h2>
           <p><T value={ui.account.page.chooseTheWebsiteLanguageAutomaticFollowsYour} /></p>
-          <LanguagePreferenceForm preference={user.languagePreference ?? 'auto'} />
+          <LanguagePreferenceForm enabled={(await siteLanguages()).enabled} preference={user.languagePreference ?? 'auto'} />
         </section>
       </Card>
       {translationSettings ? <Card>

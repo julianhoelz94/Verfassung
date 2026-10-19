@@ -52,9 +52,19 @@ The clips do not show sign-in or real account credentials. A live publisher may 
 - Use the country or constitution page's edit action to draft contextual background and pictures. Save the private draft, then have a publisher inspect its preview and publish that page revision separately from constitutional text.
 - Use **Lifecycle** on a constitution to record adoption, commencement, suspension, restoration, repeal, and provision events. Check effective dates and the public constitution timeline after recording an event.
 
+## First installation
+
+A new installation opens only the setup login until the designated deployment administrator finishes configuration. Production prepares HTTPS before showing the password form. Sign in using the administrator credentials supplied in the deployment environment, complete authenticator setup when requested, and follow the grouped setup page.
+
+Review the available website languages (all supported languages are selected initially), visitor access and registration policy. Supply and explicitly publish the real shared operator contact details and the required German/English legal texts. Email may be deferred; email-dependent registration stays unavailable until valid mail settings are saved. The final review lists remaining required work and opens access only when server validation succeeds.
+
+Setup progress and completion are stored in Identity Postgres. Ordinary container replacement and application upgrades do not restart the wizard. Keep the same databases and encryption key. After completion, settings remain available under **Admin → Site settings**, including languages, access, email, legal information, and connection status. Values supplied through the deployment environment are identified as managed there; secret values are never displayed.
+
+The wizard does not replace verification of actual production operator/hosting information tracked by VER-269.
+
 ## Admin tasks
 
-Open **Admin** for **Users**, **Account settings**, **Outlines**, and **Import**. Search Users to find accounts, invite people, assign roles, and revoke sessions. In Account settings, configure outgoing mail, send a test email to a specified recipient, and enable or disable self-registration. New installations start with mail and self-registration disabled; configure and test mail before enabling registration. In Outlines, configure the constitution's structure and inspect its preview before authors enter text. In Import, upload content into the reviewed staging flow and inspect the resulting job; staged data is not public until the appropriate review and publication steps finish.
+Open **Admin** for **Users**, **Site settings**, **Outlines**, and **Import**. Search Users to find accounts, invite people, assign roles, and revoke sessions. In Site settings, configure outgoing mail, send a test email to a specified recipient, and enable or disable self-registration. New installations start with mail and self-registration disabled; configure and test mail before enabling registration. In Outlines, configure the constitution's structure and inspect its preview before authors enter text. In Import, upload content into the reviewed staging flow and inspect the resulting job; staged data is not public until the appropriate review and publication steps finish.
 
 Admin also contains **Legal pages**. Save a private draft of the Impressum or Datenschutzerklärung, review its content and then publish it as a separate action. Confirm real operator details before public launch. Changes to legal pages do not publish constitutional text.
 
@@ -62,7 +72,7 @@ The German and English legal texts have separate drafts and publication steps. M
 
 An imprint published before this feature may still contain its address in the body. Its public display keeps that legacy body without appending the new shared contact record. Remove the embedded address, save a new draft, and publish it to switch to the shared record.
 
-Under **Admin → Account settings → Content translation**, choose Disabled, Google Translate or DeepL and configure the matching shared API key. Provider changes require a key for the new provider. The shared Google path reserves characters before each provider call and stops at 500,000 characters per UTC month or any rolling 31-day period. Cached results do not consume another reservation. A user's personal Google key bypasses the shared quota. Review provider data handling before enabling translation; source content is sent only after a signed-in user opts in or enables the account-wide automatic setting.
+Under **Admin → Site settings → Content translation**, choose Disabled, Google Translate or DeepL and configure the matching shared API key. Provider changes require a key for the new provider. The shared Google path reserves characters before each provider call and stops at 500,000 characters per UTC month or any rolling 31-day period. Cached results do not consume another reservation. A user's personal Google key bypasses the shared quota. Review provider data handling before enabling translation; source content is sent only after a signed-in user opts in or enables the account-wide automatic setting.
 
 In **Anonymous browsing**, an administrator can allow or block browsing without a signed-in account. Set positive API request limits separately for each IP address and for all anonymous visitors together, using a window in minutes, hours, or days. Saving this setting requires a fresh MFA step-up. When **Allow anonymous browsing** is unchecked, the displayed limits become zero and cannot be edited; the previously saved positive limits return when browsing is allowed again. Sign-in and account creation remain available to visitors when browsing is blocked.
 

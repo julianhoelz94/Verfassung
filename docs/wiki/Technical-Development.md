@@ -49,3 +49,12 @@ E2E_BASE_URL=http://127.0.0.1:80 \
 ```
 
 The files are generated in `docs/wiki/media/`. Check that the test passes and all three clips play, and confirm their steps against the current user-story journey. The merge workflow replaces the wiki copies; PR checks do not write to the wiki. Do not upload Playwright traces or real credentials.
+
+
+## Local setup and HTTPS
+
+A fresh local database uses the same setup restriction and completion rules as production. The local profile explicitly defaults to `TLS_MODE=local-http`, `PUBLIC_BASE_URL=http://localhost`, `SESSION_COOKIE_SECURE=false`, and loopback-bound published ports. No public certificate authority or host trust change is needed. Finish setup before loading content; the stack script then supports `--only-prepopulate` through the real APIs. CI may explicitly select `SETUP_FIXTURE_COMPLETE=true` for existing journeys; production rejects that fixture flag.
+
+For optional local HTTPS, set `TLS_MODE=local-https`, use `PUBLIC_BASE_URL=https://localhost`, and enable secure cookies. Caddy stores its internal CA and certificates in the persistent `caddy-data` volume. Run `scripts/export-local-ca.sh` to export only the public root certificate, review it, then explicitly trust it in your host/browser if desired. The script never installs trust or exports the private key. The fixture loader exports the public root for its own curl/Node requests without disabling certificate validation. Preserve Caddy volumes across rebuilds.
+
+Transport checks include `python3 -m unittest discover -s infra/caddy -p 'test_*.py'`, generated-config validation in `scripts/check-transport-configs.py`, and actual local certificate issuance/trust/persistence in `scripts/test-local-https.py`. These use disposable containers/volumes. A local CA test does not verify a public Let's Encrypt challenge.

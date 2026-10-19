@@ -1,4 +1,5 @@
-export const availableLocales = ['en', 'de'] as const;
+import supportedLanguages from './supported-languages.json';
+export const availableLocales = supportedLanguages as readonly ('en' | 'de')[];
 export type Locale = (typeof availableLocales)[number];
 export type LanguagePreference = 'auto' | Locale;
 
@@ -7,8 +8,13 @@ function supportedLocale(tag: string): Locale | null {
   return availableLocales.find((locale) => locale === base) ?? null;
 }
 
-export function resolveLocale(preference: string | undefined, acceptLanguage: string | null): Locale {
-  if (preference && preference !== 'auto') return supportedLocale(preference) ?? 'en';
+export function resolveLocale(preference: string | undefined, acceptLanguage: string | null, enabled: readonly string[] = availableLocales, fallback: string = 'en'): Locale {
+  const valid = availableLocales.filter(locale => enabled.includes(locale));
+  const defaultLocale = valid.find(locale => locale === fallback) ?? valid[0] ?? 'en';
+  if (preference && preference !== 'auto') {
+    const selected = supportedLocale(preference);
+    return selected && valid.includes(selected) ? selected : defaultLocale;
+  }
   const choices = (acceptLanguage ?? '')
     .split(',')
     .map((part, index) => {
@@ -21,7 +27,7 @@ export function resolveLocale(preference: string | undefined, acceptLanguage: st
     .sort((a, b) => b.weight - a.weight || a.index - b.index);
   for (const choice of choices) {
     const locale = supportedLocale(choice.tag);
-    if (locale) return locale;
+    if (locale && valid.includes(locale)) return locale;
   }
-  return 'en';
+  return defaultLocale;
 }

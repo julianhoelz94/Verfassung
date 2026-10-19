@@ -143,14 +143,33 @@ wait_for_http() {
 }
 
 run_prepopulate() {
-  local port service url waited
+  local port service url waited base_url tls_mode ca_file="" result=0
+  local -a curl_options=()
   port="$(caddy_port)"
+  base_url="$(node --env-file="${ROOT}/${ENV_FILE}" -p 'process.env.PUBLIC_BASE_URL || "http://localhost"')"
+  tls_mode="$(node --env-file="${ROOT}/${ENV_FILE}" -p 'process.env.TLS_MODE || "local-http"')"
+  if [ "${tls_mode}" = "local-https" ]; then
+    ca_file="$(mktemp "${TMPDIR:-/tmp}/atlas-local-ca.XXXXXX")"
+    if ! compose exec -T edge-proxy cat /data/caddy/pki/authorities/local/root.crt > "${ca_file}"; then
+      rm -f "${ca_file}"
+      return 1
+    fi
+    curl_options=(--cacert "${ca_file}")
+  fi
+  local setup_status
+  setup_status="$(curl "${curl_options[@]}" -sf --max-time 5 "${base_url}/api/identity/setup/status")" || { rm -f "${ca_file}"; return 1; }
+  if ! printf '%s' "$setup_status" | python3 -c 'import json,sys; sys.exit(0 if json.load(sys.stdin).get("completed") is True else 1)'; then
+    echo "Complete first-deployment setup at ${base_url}/login before loading fixtures. Then run ./manageLocalStack.sh --only-prepopulate."
+    rm -f "${ca_file}"
+    return 0
+  fi
   for service in catalog content amendment identity editor search ingestion audit; do
-    url="http://127.0.0.1:${port}/api/${service}/actuator/health"
+    url="${base_url}/api/${service}/actuator/health"
     waited=0
-    until curl -sf -o /dev/null --max-time 2 "${url}"; do
+    until curl "${curl_options[@]}" -sf -o /dev/null --max-time 2 "${url}"; do
       if [ "${waited}" -ge "${HTTP_READY_TIMEOUT_SECONDS}" ]; then
         echo "${service} did not become ready at ${url} within ${HTTP_READY_TIMEOUT_SECONDS}s." >&2
+        rm -f "${ca_file}"
         return 1
       fi
       sleep 3
@@ -161,10 +180,13 @@ run_prepopulate() {
   (
     cd "${ROOT}/apps/gateway-web"
     npm run fixtures:generate
+    if [ -n "${ca_file}" ]; then export NODE_EXTRA_CA_CERTS="${ca_file}"; fi
     PREPOPULATE_TEST_STACK=true \
-      PREPOPULATE_BASE_URL="http://127.0.0.1:${port}" \
+      PREPOPULATE_BASE_URL="${base_url}" \
       node --env-file="${ROOT}/${ENV_FILE}" e2e/fixtures/prepopulate.mjs
-  )
+  ) || result=$?
+  rm -f "${ca_file}"
+  return "$result"
 }
 
 is_known_service() {

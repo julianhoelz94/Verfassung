@@ -32,6 +32,8 @@ class SetupService(
     private val managed: SettingsEnvironment,
     @Value("\${DOCUMENT_API_URL:http://localhost/api/document}") documentUrl: String,
 ) {
+    @Value("\${SETUP_TRANSPORT_STATUS_URL:http://edge-proxy:8082}")
+    private lateinit var transportUrl: String
     private val document = timedRestClient(documentUrl)
     fun status(): SetupStatus = SetupStatus(repository.get().completedAt != null, configuration.tlsMode, configuration.publicUrl)
     fun languages(): LanguagePolicy = configuration.languages(repository.get())
@@ -79,7 +81,7 @@ class SetupService(
             throw BadRequestException("Choose at least one supported language and an enabled default")
         }
         if (request.mailDeferred && settings.read(authorization).selfRegistrationEnabled) throw BadRequestException("Disable self-registration before deferring email")
-        repository.languages(request.enabledLanguages, request.defaultLanguage)
+        if (!policy.managed) repository.languages(request.enabledLanguages, request.defaultLanguage)
         repository.preferences(request.mailDeferred, request.accessReviewed)
         return read(authorization)
     }
@@ -90,6 +92,10 @@ class SetupService(
         auth.requireFreshStepUp(authorization)
         val state = repository.get(lock = true)
         if (state.completedAt != null) return status()
+        if (configuration.tlsMode != "local-http") {
+            val transport = timedRestClient(transportUrl).get().uri("/setup/transport/status").retrieve().body(Map::class.java)
+            if (transport?.get("ready") != true) throw BadRequestException("A verified HTTPS connection is required")
+        }
         val required = missing(authorization, state)
         if (required.isNotEmpty()) throw BadRequestException("Complete required setup: ${required.joinToString(", ")}")
         repository.complete()
@@ -100,7 +106,10 @@ class SetupService(
         if (state.completedAt != null) return@buildList
         if (!state.accessReviewed) add("access-review")
         val mail = settings.currentMail()
-        if (!state.mailDeferred && !mail.configured()) add("email-or-defer")
+        if (!state.mailDeferred) {
+            val validMail = runCatching { settings.validateConfiguration() }.isSuccess
+            if (!mail.configured() || !validMail) add("email-or-defer")
+        }
         if (state.mailDeferred && settings.registrationEnabled()) add("disable-registration-before-deferring-email")
         if (!published("imprint-details", authorization)) add("operator-details")
         val keys = listOf("impressum", "datenschutz") + if ("en" in languages().enabled) listOf("impressum_en", "datenschutz_en") else emptyList()

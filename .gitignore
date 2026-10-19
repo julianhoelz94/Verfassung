@@ -51,3 +51,7 @@ bin/
 .kotlin/
 node_modules/
 .next/
+
+# Python verification helpers
+__pycache__/
+*.pyc

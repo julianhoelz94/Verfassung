@@ -1,7 +1,6 @@
 services:
   edge-proxy:
     build: ./infra/caddy
-    container_name: edge-proxy
     ports:
       - "${CADDY_BIND_ADDRESS:-127.0.0.1}:${CADDY_PORT:-80}:80"
       - "${CADDY_BIND_ADDRESS:-127.0.0.1}:${CADDY_HTTPS_PORT:-443}:443"
@@ -66,7 +65,6 @@ services:
       - INGESTION_API_URL=http://ingestion-service:8080
       - "PUBLIC_BASE_URL=${PUBLIC_BASE_URL:-http://localhost}"
       - "NEXT_PUBLIC_BASE_URL=${PUBLIC_BASE_URL:-http://localhost}"
-    container_name: gateway-web
     # Loopback only: Caddy (edge-proxy) is the public entry point and applies the
     # security headers and write-auth guard. Direct :3000 stays available on the host
     # for local debugging but is not reachable from other machines.
@@ -220,6 +218,7 @@ services:
       - SMTP_STARTTLS=${SMTP_STARTTLS:-}
       - SMTP_SSL=${SMTP_SSL:-}
       - DOCUMENT_API_URL=http://document-service:8080
+      - SETUP_TRANSPORT_STATUS_URL=http://edge-proxy:8082
     depends_on:
       identity-db:
         condition: service_healthy
@@ -348,7 +347,6 @@ services:
 
   backup-service:
     image: postgres:16
-    container_name: backup-service
     command: ["sh", "/backup/backup.sh"]
     volumes:
       - ./infra/backup:/backup

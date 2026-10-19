@@ -69,6 +69,7 @@ class LegalPageService(
     @Transactional
     fun publishImprintDetails(request: PublishLegalPageRequest, actor: Actor): ImprintDetailsStateDto {
         val draft = imprintDetailsRepository.state().draft ?: throw DocumentConflictException("Imprint details draft missing")
+        require(imprintEnvironment.draft(draft) == draft) { "Save deployment-prefilled operator details before publication" }
         require(draft.name != "Verfassung Atlas Musterbetrieb" && draft.email != "kontakt@example.org") {
             "Replace example contact details before publication"
         }

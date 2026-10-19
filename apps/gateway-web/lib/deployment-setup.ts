@@ -34,6 +34,7 @@ export function setupPathAllowed(uri: string, administrator: boolean): boolean {
   try { path = decodeURIComponent(uri.split('?')[0]); } catch { return false; }
   if (path.includes('\\') || path.includes('..') || path.includes('//')) return false;
   if (path.startsWith('/_next/static/') || path === '/favicon.ico') return true;
+  if (/^\/api\/(catalog|content|amendment|identity|editor|search|ingestion|audit|document)\/(internal\/ping|actuator\/health)$/.test(path)) return true;
   if (publicPaths.has(path)) return true;
   if (/^\/api\/document\/legal-pages\/(imprint-details|impressum|datenschutz|impressum_en|datenschutz_en)$/.test(path)) return true;
   return administrator && (administratorPaths.has(path) || /^\/admin\/legal\/(impressum|datenschutz|impressum_en|datenschutz_en)$/.test(path) || /^\/api\/document\/legal-pages\/(imprint-details|impressum|datenschutz|impressum_en|datenschutz_en)\/(editor(\/revisions)?|draft|publish)$/.test(path));

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { anonymousApiLimit } from '../../../lib/anonymous-api-limit';
 import { requestAnonymousBrowsingPolicy } from '../../../lib/anonymous-browsing-policy';
 import { identityBaseUrl } from '../../../lib/identity-client';
+import { setupStatus, setupPathAllowed } from '../../../lib/deployment-setup';
 import { SESSION_COOKIE } from '../../../lib/session';
 
 export const dynamic = 'force-dynamic';
@@ -9,6 +10,9 @@ export const dynamic = 'force-dynamic';
 export async function GET(request: NextRequest) {
   // Caddy sets this header only for its internal forward_auth request.
   if (request.headers.get('x-atlas-edge-check') !== '1') return new NextResponse(null, { status: 403 });
+  try {
+    if (!(await setupStatus()).completed && setupPathAllowed(request.headers.get('x-atlas-original-uri') ?? '', false)) return new NextResponse(null, { status: 204 });
+  } catch { return NextResponse.json({ code: 'setup_unavailable' }, { status: 503 }); }
   const token = request.cookies.get(SESSION_COOKIE)?.value;
   const credential = token ? `Bearer ${token}` : request.headers.get('authorization');
   if (credential) {

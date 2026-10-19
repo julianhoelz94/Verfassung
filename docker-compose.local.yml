@@ -93,6 +93,8 @@ services:
       PREPOPULATE_BASE_URL: http://127.0.0.1
     volumes:
       - ./apps/gateway-web/e2e/fixtures:/fixtures
+      # Exported public CA only; no Caddy private keys enter the fixture container.
+      - ./.local-stack:/local-state:ro
     entrypoint:
       - sh
       - -c

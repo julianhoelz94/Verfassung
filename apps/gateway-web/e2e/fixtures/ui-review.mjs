@@ -25,6 +25,8 @@ export function testTotp(secret = MFA_TEST_SECRET) {
 
 /** Additional opt-in fixture coverage for newer document and ingestion screens. */
 export function reviewFixtures(germany) {
+  const languages = { supported: ['en', 'de'], enabled: ['en', 'de'], defaultLanguage: 'en', managed: false };
+  const setup = { status: { completed: true, tlsMode: 'local-http', publicUrl: 'https://atlas.example.org' }, preferences: { mailDeferred: false, accessReviewed: true, enabledLanguages: ['en', 'de'], defaultLanguage: 'en' }, languages, settings: [], required: [], completedAt: '2026-01-01T00:00:00Z', legacyInstallation: false };
   let settings = { selfRegistrationEnabled: true, mailEnabled: true, mailFrom: 'atlas@example.local', mailFromName: 'Constitution Atlas', mailPublicBaseUrl: 'https://atlas.example.org', smtpHost: 'mailpit', smtpPort: 1025, smtpUsername: '', smtpPasswordSet: false, smtpAuth: false, smtpStarttls: false, smtpSsl: false };
   const constitution = germany.constitutions[0];
   const legal = constitution.versions.at(-1);
@@ -35,7 +37,11 @@ export function reviewFixtures(germany) {
   let proposal = { id: REVIEW_PROPOSAL, ownerId: revision.createdBy, status: 'proposed', constitutionId: null, settingsRevisionId: null, confirmedBy: null, payload: { isoCode: 'DE', countryName: 'Germany', constitutionSlug: 'review-charter', constitutionTitle: 'UI review charter', languageCode: 'en', sourceUrl: 'https://example.org/source', outline: constitution.contentOutline, sampleRoots: [] } };
   const job = { id: REVIEW_JOB, status: 'pending_review', versionId: null, isoCode: 'DE', errors: [] };
   return { country, corrections, async response(req, method, pathname, readBody) {
+    if (method === 'POST' && pathname === '/__sprint59_setup') { setup.status.completed = (await readBody(req)).completed; setup.required = setup.status.completed ? [] : ['operator-details']; return { ok: true }; }
     if (method === 'GET') {
+      if (pathname === '/api/identity/setup/status') return setup.status;
+      if (pathname === '/api/identity/site/languages') return languages;
+      if (pathname === '/api/identity/setup') return setup;
       if (pathname === '/api/identity/admin/settings') return settings;
       if (pathname === '/api/identity/registration/status') return { enabled: true };
       if (pathname === '/api/identity/oauth/clients/ui-review-client') return { client_name: 'UI review client' };
@@ -48,6 +54,7 @@ export function reviewFixtures(germany) {
       if (pathname === `/api/ingestion/import-jobs/${REVIEW_JOB}/decisions`) return [];
       if (pathname === `/api/ingestion/import-setup-proposals/${REVIEW_PROPOSAL}`) return proposal;
     }
+    if (method === 'PUT' && pathname === '/api/identity/setup') { setup.preferences = await readBody(req); languages.enabled = setup.preferences.enabledLanguages; languages.defaultLanguage = setup.preferences.defaultLanguage; return setup; }
     if (method === 'PUT' && pathname === '/api/identity/admin/settings') { const { smtpPassword, ...values } = await readBody(req); settings = { ...settings, ...values, smtpPasswordSet: Boolean(smtpPassword) || settings.smtpPasswordSet }; return settings; }
     if (method === 'POST' && pathname === '/api/ingestion/import-setup-proposals') { proposal = { ...proposal, payload: await readBody(req) }; return proposal; }
     return undefined;

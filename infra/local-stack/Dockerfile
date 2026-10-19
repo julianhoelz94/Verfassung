@@ -5,6 +5,7 @@ WORKDIR /workspace
 COPY --chmod=755 gradlew ./gradlew
 COPY gradle ./gradle
 COPY services/platform ./services/platform
+COPY apps/gateway-web/lib/supported-languages.json ./apps/gateway-web/lib/supported-languages.json
 ARG SERVICE
 COPY services/${SERVICE} ./services/${SERVICE}
 # One Gradle worker, no project parallelism or separate Kotlin daemon. The locked
@@ -13,7 +14,10 @@ RUN --mount=type=cache,id=atlas-local-gradle,target=/root/.gradle,sharing=locked
     ./gradlew --no-daemon --console=plain --max-workers=1 --no-parallel \
       -Pkotlin.compiler.execution.strategy=in-process \
       -p services/${SERVICE} bootJar -x test && \
-    cp services/${SERVICE}/build/libs/app.jar /workspace/app.jar
+    cp services/${SERVICE}/build/libs/app.jar /workspace/app.jar && \
+    if [ "${SERVICE}" = "identity-service" ]; then \
+      jar tf /workspace/app.jar | grep -qx BOOT-INF/classes/supported-languages.json; \
+    fi
 
 FROM eclipse-temurin:21-jre
 WORKDIR /app

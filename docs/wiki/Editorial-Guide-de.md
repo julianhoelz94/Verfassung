@@ -81,3 +81,12 @@ Im Konto führen Abschnittslinks zu Sprache und Einstellungen, Kontosicherheit u
 Zur Authenticator-Einrichtung scannen Sie den QR-Code und bestätigen den sechsstelligen App-Code. **QR-Code lässt sich nicht scannen?** zeigt bei Bedarf den manuellen Einrichtungsschlüssel. Bei der normalen Anmeldung bleibt das Feld für Wiederherstellungscodes verborgen. **Wiederherstellungscode verwenden** öffnet es; **Stattdessen Authenticator-App verwenden** führt zurück. Jeder Wiederherstellungscode funktioniert einmal. Neu erzeugte Codes werden einmal zum Speichern angezeigt. Im Konto öffnet **Wiederherstellungscodes ersetzen** die Bestätigung; alte Codes werden dadurch ungültig.
 
 Die Administration bietet **Website-Einstellungen** für Registrierung, E-Mails und Übersetzung. Im Import wählen Sie zwischen einer bestehenden Verfassung und einem neuen Strukturvorschlag und laden anschließend eine JSON-Datei hoch. **Stattdessen JSON einfügen** öffnet die erweiterte Texteingabe. Prüfung und Veröffentlichung bleiben getrennte Schritte. **Zurück zu meinen Sitzungen** im Editor löscht keine gespeicherten Änderungen.
+
+
+## Erste Einrichtung und Website-Einstellungen
+
+Neue Installationen bleiben für Besucher und andere Konten gesperrt, bis der in der Bereitstellungsumgebung festgelegte Administrator die Einrichtung abschließt. In Produktion wird HTTPS vor der Passworteingabe vorbereitet. Nach Anmeldung und gegebenenfalls Authenticator-Einrichtung führt die Einrichtungsseite durch Sprachen, Zugriff, Betreiberangaben und E-Mail. Anfangs sind alle unterstützten Website-Sprachen verfügbar.
+
+Tatsächliche Betreiberangaben sowie die erforderlichen deutschen und englischen Rechtstexte müssen geprüft und ausdrücklich veröffentlicht werden. E-Mail kann auf später verschoben werden; davon abhängige Registrierung bleibt dann gesperrt. Vor dem Öffnen der Website prüft der Server die Pflichtangaben erneut. Die Prüfung der tatsächlichen Produktions- und Hosting-Angaben aus VER-269 bleibt erforderlich.
+
+Fortschritt und Abschluss liegen dauerhaft in der Identity-Datenbank. Ein Anwendungsupdate startet die Einrichtung nicht erneut. Später bleiben die Einstellungen unter **Admin → Website-Einstellungen** erreichbar. Durch die Bereitstellungsumgebung vorgegebene Werte sind entsprechend gekennzeichnet; Geheimnisse werden nur als eingerichtet oder nicht eingerichtet angezeigt.

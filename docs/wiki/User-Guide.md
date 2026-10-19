@@ -36,7 +36,7 @@ Use the address of the opened version or unit as a permalink. Save the version I
 
 ## Language and content translation
 
-The website follows your device language when it supports it (currently English and German); otherwise it uses English. In **Account**, choose **Website language** to use a specific language or return to **Automatic device language**. Interface text and these guides are maintained translations, not generated while you browse.
+The website follows your device language when it supports it (currently English and German); otherwise it uses the site default. The administrator may restrict the available website languages; a disabled saved preference falls back to the configured default. In **Account**, choose **Website language** to use a specific language or return to **Automatic device language**. Interface text and these guides are maintained translations, not generated while you browse.
 
 Constitution, amendment, and background content can remain in its source language. On supported content pages, select **Translate this content** to request a machine translation into your website language. Sign-in is required; visitors who are not signed in see the control and a sign-in prompt. The translated view always offers **Show original**. Machine translation is an aid to reading; check the original and cited source for exact wording. If an editor has published a version in your language, the site shows that authored version first.
 

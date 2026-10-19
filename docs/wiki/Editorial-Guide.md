@@ -58,6 +58,16 @@ The clips do not show sign-in or real account credentials. A live publisher may 
 - Use the country or constitution page's edit action to draft contextual background and pictures. Save the private draft, then have a publisher inspect its preview and publish that page revision separately from constitutional text.
 - Use **Lifecycle** on a constitution to record adoption, commencement, suspension, restoration, repeal, and provision events. Check effective dates and the public constitution timeline after recording an event.
 
+## First installation
+
+A new installation opens only the setup login until the designated deployment administrator finishes configuration. Production prepares HTTPS before showing the password form. Sign in using the administrator credentials supplied in the deployment environment, complete authenticator setup when requested, and follow the grouped setup page.
+
+Review the available website languages (all supported languages are selected initially), visitor access and registration policy. Supply and explicitly publish the real shared operator contact details and the required German/English legal texts. Email may be deferred; email-dependent registration stays unavailable until valid mail settings are saved. The final review lists remaining required work and opens access only when server validation succeeds.
+
+Setup progress and completion are stored in Identity Postgres. Ordinary container replacement and application upgrades do not restart the wizard. Keep the same databases and encryption key. After completion, settings remain available under **Admin → Site settings**, including languages, access, email, legal information, and connection status. Values supplied through the deployment environment are identified as managed there; secret values are never displayed.
+
+The wizard does not replace verification of actual production operator/hosting information tracked by VER-269.
+
 ## Admin tasks
 
 Open **Admin** for **Users**, **Site settings**, **Outlines**, and **Import**. Search Users to find accounts, invite people, assign roles, and revoke sessions. In Site settings, configure outgoing mail, send a test email to a specified recipient, and enable or disable self-registration. New installations start with mail and self-registration disabled; configure and test mail before enabling registration. In Outlines, configure the constitution's structure and inspect its preview before authors enter text. In Import, choose an existing constitution or a new structure proposal, then select the JSON file. **Paste JSON instead** opens the advanced text input. Inspect the structure preview and resulting job; staged data is not public until the appropriate review and publication steps finish.

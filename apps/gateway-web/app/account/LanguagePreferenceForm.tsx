@@ -7,7 +7,7 @@ import { availableLocales } from '../../lib/locale';
 import { ui } from '../../lib/messages';
 import { updateLanguagePreferenceAction } from './actions';
 
-export function LanguagePreferenceForm({ preference }: { preference: string }) {
+export function LanguagePreferenceForm({ preference, enabled = availableLocales }: { preference: string; enabled?: readonly string[] }) {
   const [saving, setSaving] = useState(false);
   return (
     <form className="preference-form" onSubmit={async (event) => {
@@ -22,9 +22,9 @@ export function LanguagePreferenceForm({ preference }: { preference: string }) {
       }
     }}>
       <label htmlFor="languagePreference"><T value={ui.account.page.websiteLanguage} /></label>
-      <select id="languagePreference" name="languagePreference" defaultValue={preference}>
+      <select id="languagePreference" name="languagePreference" defaultValue={preference === 'auto' || enabled.includes(preference) ? preference : 'auto'}>
         <option value="auto"><T value={ui.account.page.automaticDeviceLanguage} /></option>
-        {availableLocales.map((locale) => (
+        {availableLocales.filter(locale => enabled.includes(locale)).map((locale) => (
           <option value={locale} key={locale}><T value={ui.languageNames[locale]} /></option>
         ))}
       </select>

@@ -26,12 +26,16 @@ for (const locale of ['en', 'de']) for (const width of sizes) {
     const staffContext = await browser.newContext({ baseURL, locale, viewport: { width, height: 900 } });
     await staffContext.addCookies([{ name: 'ca_session', value: 'e2e-session-token', url: baseURL, httpOnly: true, sameSite: 'Lax' }]);
     await publicContext.addCookies([{ name: 'ca_mfa_challenge', value: 'e2e-mfa-challenge', url: baseURL, httpOnly: true, sameSite: 'Lax' }]);
-    for (const context of [publicContext, staffContext]) await context.addInitScript(() => localStorage.setItem('ca_cookie_notice_v1', 'dismissed'));
+    for (const context of [publicContext, staffContext]) {
+      await context.addInitScript(() => localStorage.setItem('ca_cookie_notice_v1', 'dismissed'));
+      await context.route('**/setup/transport/status', route => route.fulfill({ json: { ready: true, message: locale === 'en' ? 'Local connection ready.' : 'Lokale Verbindung bereit.' } }));
+    }
     const publicPage = await publicContext.newPage();
     const staffPage = await staffContext.newPage();
     const evidence: Array<{ route: string; status: number | undefined; heading: string | null }> = [];
     try {
       for (const route of [...uiRoutes, ...uiStates]) await test.step(route.entry, async () => {
+        if ('setup' in route && route.setup) await request.post(`${mock}/__sprint59_setup`, { data: { completed: false } });
         if ('session' in route && route.session) expect((await request.post(`${mock}/api/editor/edit-sessions`, { data: { versionId: '01900000-0000-4000-8000-000000000804', hopKind: 'editorial_correction' } })).ok()).toBeTruthy();
         const page = 'staff' in route && route.staff ? staffPage : publicPage;
         const response = await page.goto(route.path);
@@ -47,6 +51,7 @@ for (const locale of ['en', 'de']) for (const width of sizes) {
         if (route.entry === '/admin/settings') await expect(page.locator('#smtpHost')).toBeVisible();
         if (route.entry === '/admin/import/setup/[proposalId]') await expect(page.locator('.page-meta')).toContainText(locale === 'en' ? 'Awaiting structure review' : 'Struktur wartet auf Prüfung');
         if (route.entry === '/editor/lifecycle/[constitutionId]') await expect(page.locator('input[name="logicalUnitIds"]').first()).toBeVisible();
+        if (route.entry === '/setup') await expect(page.getByRole('button', { name: locale === 'en' ? 'Finish setup and open the site' : 'Einrichtung abschließen und Website öffnen' })).toBeDisabled();
         if (route.entry === 'import-new-structure') await expect(page.locator('#proposalFile')).toBeVisible();
         if (route.entry === 'editor-active-correction') await expect(page.getByRole('button', { name: locale === 'en' ? 'Save draft' : 'Entwurf speichern', exact: true })).toBeVisible();
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), `Page overflow at ${route.path}`).toBeTruthy();
@@ -63,6 +68,7 @@ for (const locale of ['en', 'de']) for (const width of sizes) {
           await expect(page).toHaveScreenshot(`review-${name}-${locale}-${width}.png`, { fullPage: true, timeout: 15_000 });
         }
         evidence.push({ route: route.entry, status: response?.status(), heading });
+        if ('setup' in route && route.setup) await request.post(`${mock}/__sprint59_setup`, { data: { completed: true } });
       });
       await testInfo.attach(`route-audit-${locale}-${width}.json`, { body: JSON.stringify(evidence, null, 2), contentType: 'application/json' });
     } finally { await publicContext.close(); await staffContext.close(); }

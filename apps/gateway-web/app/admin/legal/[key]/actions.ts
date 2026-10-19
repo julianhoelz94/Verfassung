@@ -29,7 +29,6 @@ export async function saveLegalDraftAction(formData: FormData): Promise<string> 
   } catch (error) {
     return `/admin/legal/${key}?error=${error instanceof LegalPageWriteError ? error.reason : 'save'}`;
   }
-  revalidatePath(`/admin/legal/${key}`);
   return `/admin/legal/${key}?saved=1`;
 }
 
@@ -43,6 +42,5 @@ export async function publishLegalPageAction(formData: FormData): Promise<string
     return `/admin/legal/${key}?error=${error instanceof LegalPageWriteError ? error.reason : 'publish'}`;
   }
   revalidatePath(key.startsWith('impressum') ? '/impressum' : '/datenschutz');
-  revalidatePath(`/admin/legal/${key}`);
   return `/admin/legal/${key}?published=1`;
 }

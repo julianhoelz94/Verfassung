@@ -1,3 +1,4 @@
+vi.mock('../../../lib/deployment-setup', async (original) => ({ ...await original<typeof import('../../../lib/deployment-setup')>(), setupStatus: async () => ({ completed: true, tlsMode: 'local-http', publicUrl: 'http://localhost' }) }));
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { GET } from './route';

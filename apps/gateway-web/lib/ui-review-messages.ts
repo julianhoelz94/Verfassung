@@ -33,7 +33,7 @@ export const reviewUi = {
   archivedSnapshot: { en: 'You are reading an archived text snapshot. The legal version is unchanged.', de: 'Sie lesen einen archivierten Textstand. Die Rechtsfassung ist unverändert.' },
   readCurrentText: { en: 'Read current text', de: 'Aktuellen Text lesen' },
   siteSettings: { en: 'Site settings', de: 'Website-Einstellungen' },
-  siteSettingsHint: { en: 'Registration, outgoing mail and content translation.', de: 'Registrierung, ausgehende E-Mails und Inhaltsübersetzung.' },
+  siteSettingsHint: { en: 'Languages, access, email, connection and content translation.', de: 'Sprachen, Zugriff, E-Mail, Verbindung und Inhaltsübersetzung.' },
   peopleAccess: { en: 'People and access', de: 'Personen und Zugriff' },
   contentManagement: { en: 'Content and publication', de: 'Inhalt und Veröffentlichung' },
   adminHint: { en: 'Manage access, configure the website and prepare content for publication.', de: 'Verwalten Sie Zugriffe, konfigurieren Sie die Website und bereiten Sie Inhalte zur Veröffentlichung vor.' },

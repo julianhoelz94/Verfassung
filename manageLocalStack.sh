@@ -196,8 +196,32 @@ wait_for_services() {
 }
 
 run_prepopulate() {
+  local result state tls_mode hostname
+  local -a run_options=(--rm --no-deps)
+  result="$(compose exec -T gateway-web node -e '
+    fetch("http://identity-service:8080/setup/status", { signal: AbortSignal.timeout(5000) })
+      .then(async response => {
+        if (!response.ok) throw new Error("Setup status unavailable");
+        const status = await response.json();
+        console.log(`${status.completed === true ? "complete" : "pending"} ${status.tlsMode} ${new URL(status.publicUrl).hostname}`);
+      }).catch(() => { console.error("Cannot check deployment setup; fixtures were not loaded."); process.exitCode = 1; });
+  ')" || return 1
+  read -r state tls_mode hostname <<< "${result}"
+  if [ "${state}" = "pending" ]; then
+    echo "Complete first-deployment setup at the site's login page before loading fixtures. Then run ./manageLocalStack.sh --only-prepopulate."
+    return 0
+  fi
+  if [ "${state}" != "complete" ]; then
+    echo "Invalid deployment setup status; fixtures were not loaded." >&2
+    return 1
+  fi
+  if [ "${tls_mode}" = "local-https" ]; then
+    mkdir -p "${ROOT}/.local-stack"
+    compose exec -T edge-proxy cat /data/caddy/pki/authorities/local/root.crt > "${ROOT}/.local-stack/local-root.crt" || return 1
+    run_options+=(-e "PREPOPULATE_BASE_URL=https://${hostname}" -e NODE_EXTRA_CA_CERTS=/local-state/local-root.crt)
+  fi
   echo "======== Prepopulating local stack (container) ========"
-  compose run --rm --no-deps prepopulate "$@"
+  compose run "${run_options[@]}" prepopulate "$@"
 }
 
 is_known_service() {

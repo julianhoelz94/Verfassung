@@ -24,7 +24,7 @@ export type ImprintDetails = {
   email: string;
 };
 
-export type ImprintDetailsState = { draft: ImprintDetails | null; published: ImprintDetails | null };
+export type ImprintDetailsState = { draft: ImprintDetails | null; published: ImprintDetails | null; managedFields?: string[] };
 
 export type LegalPageErrorReason = 'contact_required' | 'example_contact' | 'example_text' | 'duplicate_contact' | 'invalid_contact' | 'conflict' | 'unavailable';
 

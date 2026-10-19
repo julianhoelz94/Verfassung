@@ -51,7 +51,8 @@ export const uiRoutes = [
   { entry: '/reset', path: '/reset?token=e2e-reset-token' },
   { entry: '/search', path: '/search?q=dignity' },
   { entry: '/versions/[versionId]/units/[unitId]', path: `/versions/${version}/units/${article}` },
-] satisfies Array<{ entry: string; path: string; staff?: boolean; challenged?: boolean; snapshot?: boolean }>;
+  { entry: '/setup', path: '/setup', staff: true, setup: true, snapshot: true },
+] satisfies Array<{ entry: string; path: string; staff?: boolean; challenged?: boolean; setup?: boolean; snapshot?: boolean }>;
 
 // Query and dynamic variants that share an entry point but expose another task.
 export const uiStates = [

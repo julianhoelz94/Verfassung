@@ -1,3 +1,4 @@
+import { setupStatus } from '../../../lib/deployment-setup';
 import { currentLocale } from '../../../lib/server-locale';
 import { message } from '../../../lib/messages';
 import { T } from '../../components/TranslationProvider';
@@ -19,6 +20,7 @@ type MfaPageProps = {
 
 export default async function MfaPage(props: MfaPageProps) {
   const locale = await currentLocale();
+  const setup = await setupStatus();
   const searchParams = await props.searchParams;
   const user = await currentUser();
   const challenge = await mfaChallengeToken();
@@ -59,8 +61,8 @@ export default async function MfaPage(props: MfaPageProps) {
             <Alert tone="error"><T value={ui.login.mfa.page.enrollmentCouldNotBeStartedSignIn} /></Alert>
           )}
           <LoginEnrollForm next={searchParams.next?.startsWith('/oauth/authorize?') ? searchParams.next : undefined} />
-          {!user ? <PasskeyLoginEnrollment /> : null}
-          {!user ? <PasskeyLogin /> : null}
+          {setup.completed && !user ? <PasskeyLoginEnrollment /> : null}
+          {setup.completed && !user ? <PasskeyLogin /> : null}
         </Card>
       ) : (
         <Card>

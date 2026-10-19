@@ -18,21 +18,27 @@ import java.net.URI
 @Service
 class IdentitySettingsService(
     private val repository: IdentitySettingsRepository,
+    private val setupRepository: com.constitutionatlas.identity.setup.SetupRepository,
     private val identityRepository: IdentityRepository,
     private val authService: AuthService,
     private val environment: Environment,
     mfaProperties: IdentityMfaProperties,
+    private val environmentSettings: com.constitutionatlas.identity.setup.SettingsEnvironment,
 ) {
     private val box = SecretBox(mfaProperties.encryptionKey)
 
-    fun registrationEnabled(): Boolean = repository.get().selfRegistrationEnabled
+    fun registrationEnabled(): Boolean =
+        environmentSettings.effective(repository.get()).selfRegistrationEnabled &&
+            !setupRepository.get().mailDeferred &&
+            currentMail().configured() &&
+            runCatching { validateConfiguration() }.isSuccess
 
     fun publicRegistrationStatus(): Map<String, Boolean> = mapOf("enabled" to registrationEnabled())
 
     fun currentMail(): com.constitutionatlas.identity.config.IdentityMailProperties {
-        val current = repository.get()
+        val current = environmentSettings.effective(repository.get())
         return com.constitutionatlas.identity.config.IdentityMailProperties(
-            enabled = current.mailEnabled,
+            enabled = current.mailEnabled && !setupRepository.get().mailDeferred,
             from = current.mailFrom,
             fromName = current.mailFromName,
             publicBaseUrl = current.mailPublicBaseUrl,
@@ -48,14 +54,53 @@ class IdentitySettingsService(
 
     fun read(authorization: String?): IdentitySettingsDto {
         requireAdmin(authorization)
-        return dto(repository.get())
+        return dto(environmentSettings.effective(repository.get()))
     }
 
     @Transactional
-    fun update(authorization: String?, request: UpdateIdentitySettingsRequest): IdentitySettingsDto {
+    fun update(authorization: String?, incoming: UpdateIdentitySettingsRequest): IdentitySettingsDto {
+        val request = environmentSettings.request(incoming)
         requireAdmin(authorization)
         authService.requireFreshStepUp(authorization)
-        val old = repository.get()
+        val old = environmentSettings.effective(repository.get())
+        val (host, from, base) = validate(request)
+        val cipher = when {
+            request.clearSmtpPassword -> null
+            !request.smtpPassword.isNullOrBlank() -> box.encrypt(request.smtpPassword)
+            else -> old.smtpPasswordCipher
+        }
+        if (request.mailEnabled && request.smtpAuth && (request.smtpUsername.isBlank() || cipher == null)) {
+            throw BadRequestException("SMTP authentication requires a username and password")
+        }
+        val updated = StoredIdentitySettings(
+            request.selfRegistrationEnabled,
+            request.mailEnabled,
+            from,
+            request.mailFromName.trim(),
+            base,
+            host,
+            request.smtpPort,
+            request.smtpUsername.trim(),
+            cipher,
+            request.smtpAuth,
+            request.smtpStarttls,
+            request.smtpSsl,
+        )
+        repository.update(environmentSettings.writable(updated, repository.get()))
+        if (updated.mailEnabled) {
+            val state = setupRepository.get()
+            setupRepository.preferences(false, state.accessReviewed)
+        }
+        return dto(environmentSettings.effective(repository.get()))
+    }
+
+    fun validateConfiguration() {
+        val value = environmentSettings.effective(repository.get())
+        validate(UpdateIdentitySettingsRequest(value.selfRegistrationEnabled, value.mailEnabled, value.mailFrom, value.mailFromName, value.mailPublicBaseUrl, value.smtpHost, value.smtpPort, value.smtpUsername, smtpAuth = value.smtpAuth, smtpStarttls = value.smtpStarttls, smtpSsl = value.smtpSsl))
+        if (value.mailEnabled && value.smtpAuth && (value.smtpUsername.isBlank() || value.smtpPasswordCipher == null)) throw BadRequestException("SMTP authentication requires a username and password")
+    }
+
+    private fun validate(request: UpdateIdentitySettingsRequest): Triple<String, String, String> {
         val host = request.smtpHost.trim()
         val from = request.mailFrom.trim()
         val base = request.mailPublicBaseUrl.trim().trimEnd('/')
@@ -84,30 +129,7 @@ class IdentitySettingsService(
         if (request.selfRegistrationEnabled && !request.mailEnabled) {
             throw BadRequestException("Configure and enable mail before opening registration")
         }
-        val cipher = when {
-            request.clearSmtpPassword -> null
-            !request.smtpPassword.isNullOrBlank() -> box.encrypt(request.smtpPassword)
-            else -> old.smtpPasswordCipher
-        }
-        if (request.mailEnabled && request.smtpAuth && (request.smtpUsername.isBlank() || cipher == null)) {
-            throw BadRequestException("SMTP authentication requires a username and password")
-        }
-        val updated = StoredIdentitySettings(
-            request.selfRegistrationEnabled,
-            request.mailEnabled,
-            from,
-            request.mailFromName.trim(),
-            base,
-            host,
-            request.smtpPort,
-            request.smtpUsername.trim(),
-            cipher,
-            request.smtpAuth,
-            request.smtpStarttls,
-            request.smtpSsl,
-        )
-        repository.update(updated)
-        return dto(updated)
+        return Triple(host, from, base)
     }
 
     fun testMail(authorization: String?, to: String, mailer: OutboundMailer) {

@@ -55,3 +55,6 @@ Unter **Über** finden Sie die Quellen- und Prüfgrundsätze, im **Impressum** d
 Die Versionsauswahl und die Zeitleisten zeigen Rechtsfassungen, Geltungsdaten und rechtliche Änderungen. Tippfehler- und Abschriftkorrekturen erscheinen nicht als neue Rechtsfassung. Redaktionelle Details stehen im Hintergrund: Mitarbeitende öffnen **Struktur und redaktionelle Details → Textkorrekturen** oder den Momentaufnahmeverlauf im Redaktionsmenü. Einzelne Korrekturen werden erst auf Wunsch aufgeklappt.
 
 Ein gespeicherter älterer Textstand bleibt unter seinem bisherigen Link erreichbar. Ein kurzer Archivhinweis bietet **Aktuellen Text lesen** an. Der Artikelverlauf zeigt Rechtsfassungen statt einzelner Tippfehlerkorrekturen. Dokumentrevisionen stehen unter **Dokumentdetails und Revisionen**.
+
+
+Administratoren können die verfügbaren Website-Sprachen einschränken. Eine nicht mehr verfügbare gespeicherte Sprache verwendet die festgelegte Standardsprache. Vor Abschluss der ersten Einrichtung können Besucher noch keine Inhalte öffnen.

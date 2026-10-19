@@ -38,6 +38,7 @@ export default async function AdminLegalPage({
   const title = message(locale, key.startsWith('impressum') ? ui.legal.imprint : ui.legal.privacyNotice);
   return (
     <PageMain>
+      <p><Link href="/setup"><T value={{ en: 'Return to setup', de: 'Zurück zur Einrichtung' }} /></Link></p>
       <PageHeader title={<T value={key.startsWith('impressum') ? ui.legal.editImprint : ui.legal.editPrivacyNotice} />} meta={<T value={ui.attrs.adminLegalKeyPagePageHeaderMeta} />} />
       <LocalizedRegion as="nav" className="section-nav" label={reviewUi.legalPages}>
         <a href={`/admin/legal/impressum${key.endsWith('_en') ? '_en' : ''}`} aria-current={key.startsWith('impressum') ? 'page' : undefined}><T value={ui.legal.imprint} /></a>
@@ -61,7 +62,7 @@ export default async function AdminLegalPage({
             <input type="hidden" name="expectedContactRevision" value={imprintDetails.draft?.revision ?? 0} />
             {(['name', 'streetAddress', 'postalCode', 'city', 'country', 'email'] as const).map((field) => <label key={field}>
               <T value={ui.legal[field]} />
-              <input name={field} type={field === 'email' ? 'email' : 'text'} required maxLength={255} defaultValue={imprintDetails.draft?.[field] ?? ''} />
+              <input name={field} type={field === 'email' ? 'email' : 'text'} readOnly={imprintDetails.managedFields?.includes(field)} required maxLength={255} defaultValue={imprintDetails.draft?.[field] ?? ''} />
             </label>)}
           </fieldset> : null}
           <label htmlFor="legal-content">{title} <T value={ui.admin.legal.key.page.text} /></label>

@@ -17,6 +17,7 @@ import {
 } from '../../../../lib/api';
 import { atlasTitle, metaDescription, pageMetadata } from '../../../../lib/page-meta';
 import { publicVersions } from '../../../../lib/reading';
+import { Disclosure } from '../../../components/Disclosure';
 
 type Props = { params: Promise<{ code: string }>; searchParams: Promise<{ on?: string }> };
 
@@ -132,9 +133,10 @@ export default async function ConstitutionTimelinePage({ params, searchParams }:
       <p><T value={ui.countries.code.constitutionTimeline.page.adoptionSuspensionRestorationAndReplacementOfConstitutions} />{" "}{country.name}.</p>
       <section className="card">
         <h2><T value={ui.countries.code.constitutionTimeline.page.statusOnADate} /></h2>
-        <form method="get">
-          <label htmlFor="constitution-timeline-date"><T value={ui.countries.code.constitutionTimeline.page.date} /></label>
-          <input id="constitution-timeline-date" type="date" name="on" defaultValue={on} />
+        <form method="get" className="date-filter">
+          <label className="field" htmlFor="constitution-timeline-date"><T value={ui.countries.code.constitutionTimeline.page.date} />
+            <input id="constitution-timeline-date" type="date" name="on" defaultValue={on} />
+          </label>
           <button type="submit"><T value={ui.countries.code.constitutionTimeline.page.showStatus} /></button>
         </form>
         {inForce.length === 0 ? <p><T value={ui.countries.code.constitutionTimeline.page.noConstitutionIsRecordedAsInForce} />{" "}{on}.</p> : (
@@ -142,12 +144,11 @@ export default async function ConstitutionTimelinePage({ params, searchParams }:
             <li key={constitution.id}><a href={`/countries/${country.isoCode}/constitutions/${constitution.id}`}>{constitution.title}</a> <T value={ui.countries.code.constitutionTimeline.page.isInForce} /></li>
           ))}</ul>
         )}
-        <details>
-          <summary><T value={ui.countries.code.constitutionTimeline.page.allConstitutionStatuses} /></summary>
+        <Disclosure summary={<T value={ui.countries.code.constitutionTimeline.page.allConstitutionStatuses} />}>
           <ul>{statusOn.map(({ constitution, status }) => (
             <li key={constitution.id}>{constitution.title}: <T value={status === 'uncertain_approximate' ? ui.lifecycleEvents.uncertainDate : lifecycleStatusMessage(status)} /></li>
           ))}</ul>
-        </details>
+        </Disclosure>
         {provisionsNotInForce.length > 0 ? (
           <div>
             <h3><T value={ui.countries.code.constitutionTimeline.page.provisionsNotInForceOnThisDate} /></h3>

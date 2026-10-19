@@ -11,6 +11,7 @@ import { requestRegistrationStatus } from '../../lib/identity-client';
 import { setupStatus } from '../../lib/deployment-setup';
 import { setupMessages as m } from '../../lib/setup-messages';
 import { PasskeyLogin } from '../passkeys/PasskeyLogin';
+import { reviewUi } from '../../lib/ui-review-messages';
 
 type LoginPageProps = {
   searchParams: Promise<{ error?: string; next?: string; registered?: string }>;
@@ -40,7 +41,7 @@ export default async function LoginPage(props: LoginPageProps) {
             <>
               <T value={ui.login.page.useASeededLocalAccountLocalEditor} />{" "}<code>IDENTITY_SEED_TOTP_SECRET</code><T value={ui.login.page.ifThatSettingIsAbsentUse} />{" "}<code>CAATLASMFASEED22</code> <T value={ui.login.page.asTheAuthenticatorSecretSeedingCreatesMissing} />{" "}</>
           ) : (
-            'Sign in with your editorial account.'
+            <T value={reviewUi.signInHint} />
           )
         }
       />

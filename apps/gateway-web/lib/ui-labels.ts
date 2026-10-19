@@ -1,4 +1,5 @@
 import { ui, type UiMessage } from './messages';
+import { reviewUi } from './ui-review-messages';
 
 export function changeTypeMessage(changeType: string): UiMessage {
   switch (changeType) {
@@ -51,6 +52,9 @@ export function statusMessage(status: string | null | undefined): UiMessage {
     case 'archived': return ui.remainingStatus.archived;
     case 'prepared': return ui.importState.prepared;
     case 'outline_confirmed': return ui.importState.outlineConfirmed;
+    case 'proposed': return reviewUi.structureProposed;
+    case 'confirming': return reviewUi.structureConfirming;
+    case 'confirmed': return reviewUi.structureConfirmed;
     case 'pending': return ui.importState.pending;
     case 'processing': return ui.importState.processing;
     case 'completed': return ui.importState.completed;

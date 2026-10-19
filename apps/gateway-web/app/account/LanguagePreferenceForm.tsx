@@ -10,7 +10,7 @@ import { updateLanguagePreferenceAction } from './actions';
 export function LanguagePreferenceForm({ preference, enabled = availableLocales }: { preference: string; enabled?: readonly string[] }) {
   const [saving, setSaving] = useState(false);
   return (
-    <form onSubmit={async (event) => {
+    <form className="preference-form" onSubmit={async (event) => {
       event.preventDefault();
       if (saving) return;
       setSaving(true);

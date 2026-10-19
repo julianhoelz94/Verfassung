@@ -6,13 +6,19 @@ Your available pages and buttons depend on your assigned roles. Hiding a button 
 
 1. Choose **Log in** from the account menu. Use your password or an enrolled passkey, and follow any authenticator challenge. When an administrator has enabled registration, use **Register** on the login page to request an account by email.
 2. For registration, open the one-use email confirmation link within 24 hours and set your password. The new account starts as a viewer; an administrator must grant editorial roles. If registration is unavailable, ask an administrator for an invitation.
-3. Open **Account** to review your account and set up an authenticator using the QR code or manual key. Save the recovery codes privately. You can enroll a passkey after entering your current password. Administrator and publisher accounts require additional verification for protected actions.
+3. Open **Account → Account security** to set up an authenticator. Scan the QR code, then enter the app’s six-digit code. Use **Can’t scan the QR code?** only when you need the manual setup key. Save the recovery codes privately. You can enroll a passkey after entering your current password. Administrator and publisher accounts require additional verification for protected actions.
 4. For a protected publication action, complete the requested fresh MFA **step-up**. A prior login alone may no longer be recent enough.
 5. Use the reset or invitation link sent for your account when setting or recovering a password. Ask an administrator if your role or access is wrong.
 
 ### Choose a language
 
 Under **Account → Language**, choose **Automatic (device language)**, **English**, or **Deutsch**. Automatic uses your device or browser language and falls back to English when that language is unavailable. An explicit choice is saved with your account and follows you to other devices. This changes the website interface and guide language, not the wording of published constitutional texts.
+
+### Recovery and connected clients
+
+Normal MFA sign-in shows the authenticator-code field. Choose **Use a recovery code** when your authenticator is unavailable; choose **Use authenticator app instead** to return. Only the selected method is submitted. Each recovery code works once. In Account security, **Replace recovery codes** opens the confirmation form; replacement invalidates the old codes. Newly generated codes are shown once so you can save them.
+
+Account has section links for language/preferences, security and connected clients. Connection instructions and the command example are optional details; key creation, expiry and revocation remain available in the connected-clients section. Leaving an editor through **Back to my sessions** does not delete saved work.
 
 ## Role summary
 
@@ -64,7 +70,7 @@ The wizard does not replace verification of actual production operator/hosting i
 
 ## Admin tasks
 
-Open **Admin** for **Users**, **Site settings**, **Outlines**, and **Import**. Search Users to find accounts, invite people, assign roles, and revoke sessions. In Site settings, configure outgoing mail, send a test email to a specified recipient, and enable or disable self-registration. New installations start with mail and self-registration disabled; configure and test mail before enabling registration. In Outlines, configure the constitution's structure and inspect its preview before authors enter text. In Import, upload content into the reviewed staging flow and inspect the resulting job; staged data is not public until the appropriate review and publication steps finish.
+Open **Admin** for **Users**, **Site settings**, **Outlines**, and **Import**. Search Users to find accounts, invite people, assign roles, and revoke sessions. In Site settings, configure outgoing mail, send a test email to a specified recipient, and enable or disable self-registration. New installations start with mail and self-registration disabled; configure and test mail before enabling registration. In Outlines, configure the constitution's structure and inspect its preview before authors enter text. In Import, choose an existing constitution or a new structure proposal, then select the JSON file. **Paste JSON instead** opens the advanced text input. Inspect the structure preview and resulting job; staged data is not public until the appropriate review and publication steps finish.
 
 Admin also contains **Legal pages**. Save a private draft of the Impressum or Datenschutzerklärung, review its content and then publish it as a separate action. Confirm real operator details before public launch. Changes to legal pages do not publish constitutional text.
 

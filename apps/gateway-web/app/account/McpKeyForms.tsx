@@ -19,9 +19,9 @@ export function CreateMcpKeyForm({ canImport }: { canImport: boolean }) {
   const [state, action] = useFormState(createMcpKeyAction, initial);
   return <>
     <Reveal state={state} />
-    <form action={action}>
+    <form action={action} className="stack">
       <Input label={<T value={ui.attrs.accountMcpkeyformsInputLabelKeyName} />} id="mcp-key-name" name="name" required maxLength={100} />
-      {canImport ? <label><input type="checkbox" name="importEnabled" /> <T value={ui.account.mcpkeyforms.allowStagingConstitutionImports} /></label> : null}
+      {canImport ? <label className="choice-row"><input type="checkbox" name="importEnabled" /> <T value={ui.account.mcpkeyforms.allowStagingConstitutionImports} /></label> : null}
       <Button variant="primary"><T value={ui.account.mcpkeyforms.createMcpKey} /></Button>
     </form>
   </>;

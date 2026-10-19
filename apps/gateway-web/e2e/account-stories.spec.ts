@@ -52,13 +52,15 @@ test('viewer changes password, enrolls MFA and receives recovery codes', async (
   await page.reload();
   await expect(page.getByText('Password updated.')).toBeVisible();
   await page.waitForLoadState('networkidle');
-  await page.getByRole('button', { name: 'Enroll authenticator' }).click();
+  await page.getByRole('button', { name: 'Set up authenticator app' }).click();
   await expect(page).toHaveURL(/\/account\?enroll=1$/, { timeout: 15_000 });
-  await expect(page.getByText(/enter this setup key in the app:/)).toContainText('E2ESECRET');
+  await page.getByText("Can't scan the QR code?", { exact: true }).click();
+  await expect(page.locator('.setup-key')).toHaveText('E2ESECRET');
   await page.locator('#enrollCode').fill('123456');
   await page.getByRole('button', { name: 'Confirm enrollment' }).click();
   await expect(page.getByText('RECOVERY-ONE')).toBeVisible();
   await page.getByRole('link', { name: 'Back to account' }).click();
+  await page.locator('summary').filter({ hasText: /^Replace recovery codes$/ }).click();
   await page.locator('#recoveryRotateCode').fill('123456');
   await page.getByRole('button', { name: 'Replace recovery codes' }).click();
   await expect(page.getByText('RECOVERY-NEW')).toBeVisible();

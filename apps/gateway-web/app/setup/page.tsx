@@ -1,3 +1,4 @@
+import { LocalizedRegion } from '../components/LocalizedRegion';
 import { NavigatingActionForm } from '../components/NavigatingActionForm';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
@@ -22,9 +23,13 @@ export default async function SetupPage({ searchParams }: { searchParams: Promis
   if (details.status.completed) redirect('/admin/settings');
   const settings = await requestIdentitySettings(bearer.replace(/^Bearer /, ''));
   const params = await searchParams;
-  return <PageMain>
+  return <PageMain className="wide settings-page">
     <PageHeader title={<T value={m.title} />} meta={<T value={m.introduction} />} />
-    <nav aria-label="Setup"><a href="#connection"><T value={m.connection} /></a> · <a href="#preferences"><T value={m.general} /></a> · <a href="#operator"><T value={m.operator} /></a> · <a href="#email"><T value={m.email} /></a> · <a href="#review"><T value={m.review} /></a></nav>
+    <div className="settings-layout">
+    <LocalizedRegion as="nav" className="section-nav" label={m.progress}>
+      <a href="#connection"><T value={m.connection} /></a><a href="#preferences"><T value={m.general} /></a><a href="#operator"><T value={m.operator} /></a><a href="#email"><T value={m.email} /></a><a href="#review"><T value={m.review} /></a>
+    </LocalizedRegion>
+    <div className="settings-content">
     {params.error ? <Alert tone="error"><T value={m.error} /> <a href="/account/step-up?returnTo=%2Fsetup"><T value={m.stepUp} /></a></Alert> : null}
     {params.saved || params.tested ? <Alert tone="success"><T value={m.saved} /></Alert> : null}
     <section id="connection"><ConnectionSettings status={details.status} /></section>
@@ -40,5 +45,6 @@ export default async function SetupPage({ searchParams }: { searchParams: Promis
       {details.required.length ? <><h3><T value={m.required} /></h3><ul>{details.required.map(key => <li key={key}><T value={requiredMessages[key] ?? m.required} /></li>)}</ul></> : null}
       <NavigatingActionForm action={completeSetup}><Button variant="primary" disabled={details.required.length > 0}><T value={m.finish} /></Button></NavigatingActionForm>
     </Card></section>
+    </div></div>
   </PageMain>;
 }

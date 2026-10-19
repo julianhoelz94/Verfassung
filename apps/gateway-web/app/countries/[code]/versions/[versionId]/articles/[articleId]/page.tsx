@@ -1,3 +1,4 @@
+import { SnapshotNotice } from '../../../../../../components/SnapshotNotice';
 import { T } from '../../../../../../components/TranslationProvider';
 import { ui } from '../../../../../../../lib/messages';
 import { notFound } from 'next/navigation';
@@ -95,10 +96,10 @@ export default async function ArticlePage(props: ArticlePageProps) {
           { href: '/', label: <T value={ui.nav.countries} /> },
           { href: `/countries/${country.isoCode}`, label: country.name },
           { href: `/countries/${country.isoCode}/versions/${params.versionId}`, label: <T value={ui.remainingStatus.articles} /> },
-          { label: `Article ${article.articleNumber}` },
+          { label: <><T value={ui.contentKinds.article} /> {article.articleNumber}</> },
         ]}
         eyebrow={constitution ? `${country.name} · ${constitution.title}` : country.name}
-        title={`Article ${article.articleNumber} — ${article.title}`}
+        title={<><T value={ui.contentKinds.article} /> {article.articleNumber} — {article.title}</>}
         actions={
           <>
             <a className="btn" href={`/countries/${country.isoCode}/articles/${encodeURIComponent(article.articleNumber)}`}>
@@ -110,6 +111,7 @@ export default async function ArticlePage(props: ArticlePageProps) {
           </>
         }
       />
+      <SnapshotNotice code={country.isoCode} viewedId={params.versionId} currentId={version.currentVersionId ?? version.id} />
       <article id={`article-${article.articleNumber}`}>
         {searchParams.error === 'title' ? (
           <Alert tone="error"><T value={ui.countries.code.versions.versionid.articles.articleid.page.theSectionTitleCouldNotBeSaved} /></Alert>

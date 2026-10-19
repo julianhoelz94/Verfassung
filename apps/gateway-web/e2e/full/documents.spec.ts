@@ -24,6 +24,7 @@ test('document revisions link from both editors and appear on public readers wit
   await page.getByLabel('PDF or text file, up to 20 MB').setInputFiles({ name: 'source.txt', mimeType: 'text/plain', buffer: Buffer.from('Official source file') });
   await page.getByRole('button', { name: 'Upload file' }).click();
   await expect(page.getByRole('link', { name: 'Download source.txt' })).toBeVisible();
+  await page.getByText('Document details and revisions', { exact: true }).click();
   await expect(page.getByRole('link', { name: /Revision 1:/ })).toBeVisible();
   expect((await request.get(`/api/document/documents/${documentId}`)).status()).toBe(404);
   expect((await request.get(`/api/document/documents/${documentId}/revisions`)).status()).toBe(401);

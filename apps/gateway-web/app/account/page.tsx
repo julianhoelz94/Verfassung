@@ -14,7 +14,10 @@ import { SESSION_COOKIE, currentUser, mfaChallengeToken } from '../../lib/sessio
 import { ConfirmEnrollForm, RegenerateRecoveryForm, StartMfaEnrollForm } from './MfaForms';
 import { changePasswordAction, revokeMfaAction, updateContentTranslationPreferenceAction } from './actions';
 import { revokeMcpKeyAction, revokeOAuthGrantAction } from './actions';
-import Image from 'next/image';
+import { MfaSetup } from '../components/MfaSetup';
+import { Disclosure } from '../components/Disclosure';
+import { reviewUi } from '../../lib/ui-review-messages';
+import { NavigatingActionForm } from '../components/NavigatingActionForm';
 import { CreateMcpKeyForm, RotateMcpKeyForm } from './McpKeyForms';
 import { LanguagePreferenceForm } from './LanguagePreferenceForm';
 import { translationUserSettings } from '../../lib/content-translation';
@@ -62,7 +65,7 @@ export default async function AccountPage(props: AccountPageProps) {
   const canImport = user.roles.includes('editor') || user.roles.includes('admin');
   const mcpUrl = new URL('/mcp', process.env.PUBLIC_BASE_URL || 'http://localhost').toString();
   return (
-    <PageMain>
+    <PageMain className="wide">
       <PageHeader title={<T value={ui.attrs.accountPagePageHeaderTitleAccount} />} meta={<SignedInSummary email={user.email} />} />
       {searchParams.error === 'mfa' ? (
         <Alert tone="error"><T value={ui.account.page.authenticatorActionFailedCheckTheCodeAnd} /></Alert>
@@ -79,7 +82,14 @@ export default async function AccountPage(props: AccountPageProps) {
       {searchParams.mfaRevoked ? <Alert tone="success"><T value={ui.account.page.authenticatorEnrollmentWasRevoked} /></Alert> : null}
       {searchParams.languageSaved ? <Alert tone="success"><T value={ui.account.page.languagePreferenceSaved} /></Alert> : null}
       {searchParams.translationSaved ? <Alert tone="success"><T value={ui.admin.settings.page.settingsSaved} /></Alert> : null}
-      <Card>
+      <div className="settings-layout">
+      <nav className="section-nav" aria-label={message(locale, reviewUi.onThisPage)}>
+        <a href="#preferences"><T value={reviewUi.preferences} /></a>
+        <a href="#security"><T value={reviewUi.security} /></a>
+        <a href="#mcp-keys"><T value={reviewUi.connections} /></a>
+      </nav>
+      <div className="settings-content">
+      <Card id="preferences">
         <section className="account-section" aria-labelledby="language-title">
           <h2 id="language-title"><T value={ui.account.page.language} /></h2>
           <p><T value={ui.account.page.chooseTheWebsiteLanguageAutomaticFollowsYour} /></p>
@@ -97,30 +107,31 @@ export default async function AccountPage(props: AccountPageProps) {
           <Button variant="primary"><T value={ui.contentTranslation.save} /></Button>
         </form>
       </Card> : null}
-      <Card>
+      <Card id="security">
+        <h2><T value={reviewUi.security} /></h2>
+        <p className="muted"><T value={reviewUi.securityHint} /></p>
         <section className="account-section" aria-labelledby="authenticator-title">
-        <h2 id="authenticator-title"><T value={ui.account.page.authenticator} /></h2>
+        <h3 id="authenticator-title"><T value={ui.account.page.authenticator} /></h3>
         {user.mfaRequired && !user.mfaEnabled ? (
           <p><T value={ui.account.page.adminAndPublisherAccountsMustEnrollAn} /></p>
         ) : null}
         {enrollRequested && enrollChallenge && enrollSecret ? (
           <>
-            <p><T value={ui.account.page.scanThisQrCodeWithGoogleAuthenticator} /></p>
-            {enrollQr ? <Image src={enrollQr} alt={message(locale, ui.accessibility.authenticatorQr)} width={208} height={208} unoptimized /> : null}
-            <p><T value={ui.account.page.ifYouCannotScanItEnterThis} />{" "}<code>{enrollSecret}</code></p>
-            <p className="muted"><T value={ui.account.page.theKeyIsShownOnlyDuringSetup} /></p>
+            <MfaSetup secret={enrollSecret} qrDataUrl={enrollQr} qrLabel={message(locale, ui.accessibility.authenticatorQr)} />
             <ConfirmEnrollForm challengeToken={enrollChallenge} />
           </>
         ) : user.mfaEnabled ? (
           <>
-            <p><T value={ui.account.page.authenticatorAppIsEnrolled} />{user.stepUpFresh ? ' and recently confirmed.' : '.'}</p>
+            <p><T value={user.stepUpFresh ? reviewUi.authenticatorConfirmed : ui.account.page.authenticatorAppIsEnrolled} /></p>
             {user.mfaRequired ? (
               <p className="muted"><T value={ui.account.page.authenticatorEnrollmentIsRequiredForThisAccount} /></p>
             ) : (
+              <Disclosure summary={<T value={reviewUi.removeAuthenticator} />}>
               <form action={revokeMfaAction}>
                 <Input label={<T value={ui.attrs.accountPageInputLabelAuthenticatorCode} />} id="revokeCode" name="code" inputMode="numeric" required />
-                <Button><T value={ui.account.page.revokeAuthenticator} /></Button>
+                <Button><T value={reviewUi.removeAuthenticator} /></Button>
               </form>
+              </Disclosure>
             )}
             <RegenerateRecoveryForm />
           </>
@@ -134,8 +145,8 @@ export default async function AccountPage(props: AccountPageProps) {
         )}
         </section>
         <section className="account-section" aria-labelledby="password-title">
-        <h2 id="password-title"><T value={ui.account.page.changePassword} /></h2>
-        <form action={changePasswordAction}>
+        <h3 id="password-title"><T value={ui.account.page.changePassword} /></h3>
+        <NavigatingActionForm action={changePasswordAction}>
           <Input
             label={<T value={ui.attrs.accountPageInputLabelCurrentPassword} />}
             id="currentPassword"
@@ -154,24 +165,29 @@ export default async function AccountPage(props: AccountPageProps) {
             minLength={12}
           />
           <Button variant="primary"><T value={ui.account.page.updatePassword} /></Button>
-        </form>
+        </NavigatingActionForm>
         </section>
       </Card>
       <Card><PasskeyManager passkeys={passkeys} /></Card>
       <Card>
         <section className="account-section" id="mcp-keys" aria-labelledby="mcp-keys-title">
           <h2 id="mcp-keys-title"><T value={ui.account.page.connectAChatClient} /></h2>
+          <p><T value={reviewUi.connectionHint} /></p>
+          <Disclosure summary={<T value={reviewUi.connectionHelp} />}>
           <p><T value={ui.account.page.connectAnOauthCapableClientTo} />{" "}<code>{mcpUrl}</code> <T value={ui.account.page.andSignInWhenPromptedApproveRead} /></p>
           <h3><T value={ui.account.page.claudeCodeExample} /></h3>
           <p><T value={ui.account.page.afterCopyingAKeyRunThisOn} /></p>
           <pre tabIndex={0}><code>{`claude mcp add --transport http constitution-atlas ${mcpUrl} --header "Authorization: Bearer <your-MCP-key>"`}</code></pre>
           <p><a href="https://code.claude.com/docs/en/mcp"><T value={ui.account.page.claudeCodeMcpSetupInstructions} /></a><T value={ui.account.page.useAClientThatSupportsACustom} /></p>
+          </Disclosure>
           <CreateMcpKeyForm canImport={canImport} />
           <h3><T value={ui.account.page.connectedOauthClients} /></h3>
           {oauthGrants.length === 0 ? <p><T value={ui.account.page.noActiveOauthConnections} /></p> : oauthGrants.map((grant) => <div key={grant.clientId}>
             <strong>{grant.clientName}</strong> <T value={ui.account.page.accessExpires} />{" "}{new Date(grant.expiresAt).toLocaleString()}<br />
+            <Disclosure summary={<T value={reviewUi.connectionDetails} />}>
             <T value={ui.account.page.clientId} />{" "}<code>{grant.clientId}</code><br />
             <T value={ui.account.page.registeredDestinations} />{" "}{grant.redirectUris.map(uri => { try { return new URL(uri).origin; } catch { return uri; } }).join(', ')}
+            </Disclosure>
             <form action={revokeOAuthGrantAction}><input type="hidden" name="clientId" value={grant.clientId} /><Button><T value={ui.account.page.revokeAccess} /></Button></form>
           </div>)}
           <h3><T value={ui.account.page.yourMcpKeys} /></h3>
@@ -184,6 +200,8 @@ export default async function AccountPage(props: AccountPageProps) {
           </div>)}
         </section>
       </Card>
+      </div>
+      </div>
     </PageMain>
   );
 }

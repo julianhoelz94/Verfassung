@@ -13,6 +13,7 @@ test('country links open context editors before a wiki page exists and save a pr
 
   await page.goto(`/countries/${fixture.countryIso}`);
   const charter = page.locator('section.card').filter({ has: page.getByRole('heading', { name: title, exact: true }) });
+  await charter.locator('summary').filter({ hasText: 'Structure and editorial details' }).click();
   await charter.getByRole('link', { name: 'Edit constitution page', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Edit constitution page' })).toBeVisible();
   await expect(page.getByLabel('Short description')).toHaveValue('');

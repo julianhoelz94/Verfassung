@@ -21,6 +21,7 @@ import { StructuredEditor } from './StructuredEditor';
 import { PublishForm } from './PublishForm';
 import { LegacyPublishForm } from './LegacyPublishForm';
 import { EditorLanding } from './EditorLanding';
+import { reviewUi } from '../../lib/ui-review-messages';
 
 type EditorPageProps = {
   searchParams: Promise<{
@@ -236,7 +237,7 @@ export default async function EditorPage(props: EditorPageProps) {
             <div className="action-bar">
               {canEdit && session.status === 'open' ? (
                 <a className="btn" href="/editor">
-                  <T value={ui.editor.page.discardChanges} />{" "}</a>
+                  <T value={reviewUi.returnToSessions} />{" "}</a>
               ) : null}
               {canEdit && session.status === 'open' ? (
                 <form action="/editor/command" method="post">

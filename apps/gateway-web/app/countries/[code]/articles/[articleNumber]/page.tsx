@@ -1,3 +1,4 @@
+import { publicVersions, snapshotVersionId } from '../../../../../lib/reading';
 import { changeTypeMessage } from '../../../../../lib/ui-labels';
 import { T } from '../../../../components/TranslationProvider';
 import { ui, type UiMessage } from '../../../../../lib/messages';
@@ -27,6 +28,7 @@ type HistoryPageProps = {
 
 type ArticleSnapshot = {
   version: VersionSummary;
+  snapshotId: string;
   article: ArticleSummary;
   articles: ArticleSummary[];
 };
@@ -72,16 +74,16 @@ export default async function ArticleHistoryPage(props: HistoryPageProps) {
     notFound();
   }
 
-  const versions = orderVersions(constitution.versions);
+  const versions = orderVersions(publicVersions(constitution.versions));
   let snapshots: ArticleSnapshot[] = [];
   let amendments: Amendment[] = [];
   let loadError: UiMessage | null = null;
   try {
-    const versionArticles = await Promise.all(versions.map((version) => listAllArticles(version.id, true)));
+    const versionArticles = await Promise.all(versions.map((version) => listAllArticles(snapshotVersionId(version), true)));
     snapshots = versions.flatMap((version, index) => {
       const articles = versionArticles[index] ?? [];
       const article = articles.find((item) => item.articleNumber === articleNumber);
-      return article ? [{ version, article, articles }] : [];
+      return article ? [{ version, snapshotId: snapshotVersionId(version), article, articles }] : [];
     });
   } catch (e) {
     loadError = ui.errors.servicesUnavailable;
@@ -102,10 +104,10 @@ export default async function ArticleHistoryPage(props: HistoryPageProps) {
         breadcrumbs={[
           { href: '/', label: <T value={ui.nav.countries} /> },
           { href: `/countries/${country.isoCode}`, label: country.name },
-          { label: `History of Article ${articleNumber}` },
+          { label: <><T value={ui.countries.code.versions.versionid.articles.articleid.page.historyOfArticle} /> {articleNumber}</> },
         ]}
         eyebrow={`${country.name} · ${constitution.title}`}
-        title={`History of Article ${articleNumber}`}
+        title={<><T value={ui.countries.code.versions.versionid.articles.articleid.page.historyOfArticle} /> {articleNumber}</>}
       />
       {loadError ? <p role="alert"><T value={loadError} /></p> : null}
       <div className="stack">
@@ -173,11 +175,12 @@ export default async function ArticleHistoryPage(props: HistoryPageProps) {
               />
               <ConstitutionText
                 article={snapshot.article}
+                headingLevel="h3"
                 outline={constitution.contentOutline}
                 lang={snapshot.version.languageCode}
                 crossRefs={{
                   code: country.isoCode,
-                  versionId: snapshot.version.id,
+                  versionId: snapshot.snapshotId,
                   articlesByNumber,
                 }}
               />

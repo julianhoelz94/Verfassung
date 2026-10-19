@@ -1,22 +1,21 @@
-import { NavigatingActionForm } from '../../components/NavigatingActionForm';
 import { setupStatus } from '../../../lib/deployment-setup';
 import { currentLocale } from '../../../lib/server-locale';
 import { message } from '../../../lib/messages';
 import { T } from '../../components/TranslationProvider';
 import { ui } from '../../../lib/messages';
 import { redirect } from 'next/navigation';
-import { Alert, Button, Card, Input, PageHeader } from '../../components/ui';
+import { Alert, Card, PageHeader } from '../../components/ui';
 import { PageMain } from '../../components/PageMain';
 import { currentUser, mfaChallengeToken } from '../../../lib/session';
 import { requestStartMfaEnroll } from '../../../lib/identity-client';
 import { LoginEnrollForm } from '../../account/MfaForms';
-import { completeMfaAction } from '../actions';
-import Image from 'next/image';
+import { MfaLoginForm } from './MfaLoginForm';
+import { MfaSetup } from '../../components/MfaSetup';
 import { PasskeyLoginEnrollment } from '../../passkeys/PasskeyLoginEnrollment';
 import { PasskeyLogin } from '../../passkeys/PasskeyLogin';
 
 type MfaPageProps = {
-  searchParams: Promise<{ error?: string; enroll?: string; next?: string }>;
+  searchParams: Promise<{ error?: string; enroll?: string; next?: string; method?: string }>;
 };
 
 export default async function MfaPage(props: MfaPageProps) {
@@ -57,11 +56,7 @@ export default async function MfaPage(props: MfaPageProps) {
       {enroll ? (
         <Card>
           {secret ? (
-            <>
-              <p><T value={ui.login.mfa.page.scanThisCodeWithAnAuthenticatorApp} /></p>
-              {qrDataUrl ? <Image src={qrDataUrl} alt={message(locale, ui.accessibility.authenticatorQr)} width={208} height={208} unoptimized /> : null}
-              <p><T value={ui.login.mfa.page.ifYouCannotScanItEnterThis} />{" "}<code>{secret}</code></p>
-            </>
+            <MfaSetup secret={secret} qrDataUrl={qrDataUrl} qrLabel={message(locale, ui.accessibility.authenticatorQr)} />
           ) : (
             <Alert tone="error"><T value={ui.login.mfa.page.enrollmentCouldNotBeStartedSignIn} /></Alert>
           )}
@@ -71,18 +66,7 @@ export default async function MfaPage(props: MfaPageProps) {
         </Card>
       ) : (
         <Card>
-          <NavigatingActionForm action={completeMfaAction}>
-            {searchParams.next?.startsWith('/oauth/authorize?') ? <input type="hidden" name="next" value={searchParams.next} /> : null}
-            <Input
-              label={<T value={ui.attrs.loginMfaPageInputLabelAuthenticator} />}
-              id="code"
-              name="code"
-              inputMode="numeric"
-              autoComplete="one-time-code"
-            />
-            <Input label={<T value={ui.attrs.loginMfaPageInputLabelRecovery} />} id="recoveryCode" name="recoveryCode" autoComplete="off" />
-            <Button variant="primary"><T value={ui.login.mfa.page.continue} /></Button>
-          </NavigatingActionForm>
+          <MfaLoginForm next={searchParams.next?.startsWith('/oauth/authorize?') ? searchParams.next : undefined} recovery={searchParams.method === 'recovery'} focus={['recovery', 'authenticator'].includes(searchParams.method ?? '')} />
         </Card>
       )}
     </PageMain>

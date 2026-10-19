@@ -2,6 +2,7 @@ import { NavigatingActionForm } from '../components/NavigatingActionForm';
 import { T } from '../components/TranslationProvider';
 import { Alert, Button, Card } from '../components/ui';
 import { ui } from '../../lib/messages';
+import { reviewUi } from '../../lib/ui-review-messages';
 import { setupMessages as m } from '../../lib/setup-messages';
 import type { SetupDetails } from '../../lib/deployment-setup';
 import type { Locale } from '../../lib/locale';
@@ -11,7 +12,7 @@ export function SetupPreferences({ details, returnTo }: { details: SetupDetails;
   return <Card><h2><T value={m.general} /></h2>
     <NavigatingActionForm action={saveSetupPreferences} className="stack">
       <input type="hidden" name="returnTo" value={returnTo} />
-      <fieldset><legend><T value={m.languages} /></legend>
+      <fieldset className="stack"><legend><T value={m.languages} /></legend>
         <p><T value={m.languageHint} /></p>
         {details.languages.managed ? <Alert><T value={m.managed} /></Alert> : null}
         {details.languages.supported.map(language => <label key={language}>
@@ -30,7 +31,7 @@ export function SetupPreferences({ details, returnTo }: { details: SetupDetails;
         <p><T value={m.deferHint} /></p>
       </fieldset>
       <fieldset><legend><T value={m.access} /></legend>
-        <p><T value={m.accessHint} /></p>
+        <p><T value={details.status.completed ? reviewUi.accessAfterSetup : m.accessHint} /></p>
         <p><a href="/admin/anonymous-browsing"><T value={m.accessLink} /></a></p>
         <label><input type="checkbox" name="accessReviewed" defaultChecked={details.preferences.accessReviewed} /> <T value={m.accessReviewed} /></label>
       </fieldset>

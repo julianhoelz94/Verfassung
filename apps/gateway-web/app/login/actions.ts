@@ -31,8 +31,7 @@ export async function loginAction(formData: FormData): Promise<string> {
     return result.mfa === 'enroll' ? `/login/mfa?enroll=1${nextQuery}` : next ? `/login/mfa?next=${encodeURIComponent(next)}` : '/login/mfa';
   }
   if (!(await setupStatus()).completed) return '/setup';
-  if (next) return next;
-  return canVisitEditor(result.user.roles) ? '/editor' : '/';
+  return next ?? (canVisitEditor(result.user.roles) ? '/editor' : '/');
 }
 
 export async function logoutAction(): Promise<string> {
@@ -41,18 +40,18 @@ export async function logoutAction(): Promise<string> {
 }
 
 export async function completeMfaAction(formData: FormData): Promise<string> {
-  const code = String(formData.get('code') ?? '');
-  const recoveryCode = String(formData.get('recoveryCode') ?? '');
+  const recovery = formData.get('method') === 'recovery';
+  const code = recovery ? '' : String(formData.get('code') ?? '').trim();
+  const recoveryCode = recovery ? String(formData.get('recoveryCode') ?? '').trim() : '';
   const next = oauthReturnPath(formData.get('next'));
   let user;
   try {
     user = await completeMfaLogin(code, recoveryCode || undefined);
   } catch {
-    return `/login/mfa?error=1${next ? `&next=${encodeURIComponent(next)}` : ''}`;
+    return `/login/mfa?error=1${recovery ? '&method=recovery' : ''}${next ? `&next=${encodeURIComponent(next)}` : ''}`;
   }
   if (!(await setupStatus()).completed) return '/setup';
-  if (next) return next;
-  return canVisitEditor(user.roles) ? '/editor' : '/';
+  return next ?? (canVisitEditor(user.roles) ? '/editor' : '/');
 }
 
 export type EnrollConfirmState = {

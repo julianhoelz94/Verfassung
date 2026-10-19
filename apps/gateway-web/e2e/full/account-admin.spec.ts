@@ -1,5 +1,9 @@
+import { setupSecretFromQr } from '../qr';
 import { expect, test } from '../fixtures/consent';
 import { authenticatorCode, signIn, signOut } from './auth';
+
+// Enrollment and recovery values must not enter retained browser traces.
+test.use({ trace: 'off' });
 
 test('administrator invite, visitor activation, password change, and reset persist across logins', async ({ page }) => {
   test.setTimeout(120_000);
@@ -73,12 +77,17 @@ test('administrator invite, visitor activation, password change, and reset persi
     httpOnly: true, sameSite: 'Lax',
   }]);
   await page.goto('/account?enroll=1');
-  const secret = await page.getByText(/enter this setup key in the app:/).locator('code').textContent();
+  const secret = await setupSecretFromQr(page);
+  await expect(page.locator('.setup-key')).not.toBeVisible();
+  await page.getByText("Can't scan the QR code?", { exact: true }).click();
+  await expect(page.locator('.setup-key')).toHaveText(secret);
   expect(secret).toBe(enrollment.secret);
   await page.getByLabel('Authenticator code').fill(authenticatorCode(secret!));
   await page.getByRole('button', { name: 'Confirm enrollment' }).click();
   await expect(page.getByText(/recovery codes now/)).toBeVisible();
   await page.getByRole('link', { name: 'Back to account' }).click();
+  await expect(page.locator('#recoveryRotateCode')).not.toBeVisible();
+  await page.locator('summary').filter({ hasText: /^Replace recovery codes$/ }).click();
   await page.locator('#recoveryRotateCode').fill(authenticatorCode(secret!));
   await page.getByRole('button', { name: 'Replace recovery codes' }).click();
   await expect(page.getByText(/recovery codes now/)).toBeVisible();
@@ -132,4 +141,56 @@ test('administrator creates a constitution and updates its outline presentation'
   await expect(page.getByText('Settings saved. Historical versions retain their structural settings.')).toBeVisible();
   await page.reload();
   await expect(page.getByLabel('How this layer is shown').nth(1)).toHaveValue('concatenated');
+});
+
+test('publisher enrolls with the rendered QR and uses a recovery code once', async ({ page }) => {
+  test.setTimeout(120_000);
+  const email = `qr-mfa-${Date.now()}@example.local`;
+  const password = 'Sprint-59-publisher-setup-password';
+  await signIn(page, 'admin');
+  await page.goto('/admin/users');
+  await page.getByRole('textbox', { name: 'Email', exact: true }).fill(email);
+  await page.getByLabel('Roles (comma-separated)').first().fill('publisher');
+  await page.getByRole('button', { name: 'Send invite', exact: true }).click();
+  const token = await page.getByText('Invite created.', { exact: false }).locator('code').textContent();
+  expect(token).toBeTruthy();
+  await signOut(page);
+  await page.goto(`/invite?token=${encodeURIComponent(token!)}`);
+  await page.getByLabel('Password', { exact: true }).fill(password);
+  await page.getByRole('button', { name: 'Activate account', exact: true }).click();
+  async function passwordLogin() {
+    await page.goto('/login');
+    await page.getByLabel('Email').fill(email);
+    await page.getByLabel('Password', { exact: true }).fill(password);
+    await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+  }
+  await passwordLogin();
+  await expect(page).toHaveURL(/\/login\/mfa\?enroll=1$/);
+  const secret = await setupSecretFromQr(page);
+  await expect(page.locator('.setup-key')).not.toBeVisible();
+  await page.getByLabel('Authenticator code', { exact: true }).fill(authenticatorCode(secret));
+  await page.getByRole('button', { name: 'Confirm enrollment', exact: true }).click();
+  await expect(page.locator('.recovery-codes')).toBeVisible();
+  const recovery = await page.locator('.recovery-codes code').first().textContent();
+  expect(recovery).toBeTruthy();
+  await page.getByRole('link', { name: 'Continue', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Editor', exact: true })).toBeVisible();
+  await signOut(page);
+  await passwordLogin();
+  await expect(page.getByLabel('Recovery code')).toHaveCount(0);
+  await page.getByRole('link', { name: 'Use a recovery code', exact: true }).click();
+  await page.getByLabel('Recovery code').fill(recovery!);
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
+  await expect(page).toHaveURL(/\/editor$/);
+  await signOut(page);
+  await passwordLogin();
+  await page.getByRole('link', { name: 'Use a recovery code', exact: true }).click();
+  await page.getByLabel('Recovery code').fill(recovery!);
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
+  await expect(page.getByRole('alert')).toBeVisible();
+  await expect(page).toHaveURL(/method=recovery/);
+  await page.getByRole('link', { name: 'Use authenticator app instead', exact: true }).click();
+  await page.getByLabel('Authenticator code', { exact: true }).fill(authenticatorCode(secret));
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
+  await expect(page).toHaveURL(/\/editor$/);
 });

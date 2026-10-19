@@ -1,3 +1,5 @@
+import QRCode from 'qrcode';
+import { reviewFixtures, testTotp, MFA_TEST_SECRET } from './fixtures/ui-review.mjs';
 import { createHash } from 'node:crypto';
 import { createServer } from 'node:http';
 import { readFileSync } from 'node:fs';
@@ -66,7 +68,7 @@ const articlesById = new Map([
 ]);
 
 function articlesFor(versionId, includeBody) {
-  const source = versionId === VERSION_1949 ? articles2022.map(to1949) : articles2022;
+  const source = (versionId === VERSION_1949 ? articles2022.map(to1949) : articles2022).map(article => ({ ...article, versionId }));
   return source.map((article) => {
     const detail = articlesById.get(article.id);
     if (!includeBody) {
@@ -196,6 +198,9 @@ let createdConstitutions = [];
 const settingsRevisions = new Map();
 let nodeTitleOverrides = new Map();
 let enrolledMfaEmails = new Set();
+let recoveryCodes = new Map();
+let uiReview;
+let forceEnrollment = false;
 let stepUpFresh = true;
 let visualRoles = false;
 let sprint50Content = false;
@@ -223,6 +228,9 @@ function resetMockState() {
   settingsRevisions.clear();
   nodeTitleOverrides = new Map();
   enrolledMfaEmails = new Set();
+  recoveryCodes = new Map();
+  uiReview = undefined;
+  forceEnrollment = false;
   stepUpFresh = true;
   visualRoles = false;
   sprint50Content = false;
@@ -338,6 +346,20 @@ const server = createServer(async (req, res) => {
     resetMockState();
     empty(res, 204);
     return;
+  }
+  if (method === 'POST' && pathname === '/__sprint59_content') {
+    uiReview = reviewFixtures(germany);
+    sprint50Content = true;
+    extraVersions.push(...uiReview.corrections);
+    json(res, 200, { ok: true }); return;
+  }
+  if (method === 'POST' && pathname === '/__mfa_enrollment') {
+    forceEnrollment = true;
+    json(res, 200, { ok: true }); return;
+  }
+  if (uiReview) {
+    const response = await uiReview.response(req, method, pathname, readBody);
+    if (response !== undefined) { json(res, 200, response); return; }
   }
   if (method === 'POST' && pathname === '/__editor_sessions') {
     const body = await readBody(req);
@@ -469,7 +491,7 @@ const server = createServer(async (req, res) => {
     return;
   }
   if (method === 'GET' && pathname === '/api/catalog/countries/DE') {
-    const baseConstitutions = germany.constitutions.map((item) => item.id === CONSTITUTION_ID
+    const baseConstitutions = (uiReview?.country ?? germany).constitutions.map((item) => item.id === CONSTITUTION_ID
       ? { ...item, versions: [...item.versions, ...extraVersions] }
       : item);
     json(res, 200, { ...germany, constitutions: [...baseConstitutions, ...createdConstitutions] });
@@ -523,7 +545,7 @@ const server = createServer(async (req, res) => {
   const constitutionVersionsMatch = pathname.match(/^\/api\/catalog\/constitutions\/([^/]+)\/versions$/);
   if (method === 'GET' && constitutionVersionsMatch) {
     const constitution = germany.constitutions.find((item) => item.id === constitutionVersionsMatch[1]);
-    const versions = [...(constitution?.versions ?? []), ...extraVersions];
+    const versions = [...(uiReview?.country.constitutions[0].versions ?? constitution?.versions ?? []), ...extraVersions];
     const listing = searchParams.get('listing');
     const filtered =
       listing === 'all'
@@ -541,6 +563,11 @@ const server = createServer(async (req, res) => {
     return;
   }
 
+  const exported = pathname.match(/^\/api\/content\/versions\/([^/]+)\/export$/);
+  if (uiReview && method === 'GET' && exported) {
+    json(res, 200, { roots: articlesFor(exported[1], true).map(mockUnit).map(unit => ({ ...unit, label: unit.articleNumber })) });
+    return;
+  }
   const units = pathname.match(/^\/api\/content\/versions\/([^/]+)\/units(?:\/([^/]+))?$/);
   if (method === 'GET' && units) {
     const items = articlesFor(units[1], true).map(mockUnit);
@@ -773,6 +800,12 @@ const server = createServer(async (req, res) => {
       json(res, 401, { error: 'Invalid credentials' });
       return;
     }
+    if (forceEnrollment) {
+      pendingMfaEmail = body.email;
+      currentUser = { ...userForEmail(body.email), mfaEnabled: false };
+      forceEnrollment = false;
+      json(res, 200, { user: currentUser, mfaEnrollmentRequired: true, challengeToken: MFA_CHALLENGE }); return;
+    }
     if (MFA_EMAILS.has(body.email) || enrolledMfaEmails.has(body.email)) {
       pendingMfaEmail = body.email;
       json(res, 200, {
@@ -792,7 +825,8 @@ const server = createServer(async (req, res) => {
   }
   if (method === 'POST' && pathname === '/api/identity/login/mfa') {
     const body = await readBody(req);
-    if (body.challengeToken !== MFA_CHALLENGE || body.code !== MFA_CODE) {
+    const valid = body.challengeToken === MFA_CHALLENGE && (body.recoveryCode ? recoveryCodes.get(pendingMfaEmail)?.delete(body.recoveryCode) : [MFA_CODE, testTotp()].includes(body.code));
+    if (body.challengeToken !== MFA_CHALLENGE || !valid) {
       json(res, 401, { error: 'Invalid authenticator or recovery code' });
       return;
     }
@@ -839,21 +873,24 @@ const server = createServer(async (req, res) => {
     return;
   }
   if (method === 'POST' && pathname === '/api/identity/mfa/enroll/start') {
-    json(res, 200, { secret: 'E2ESECRET', otpauthUrl: 'otpauth://totp/e2e', challengeToken: 'e2e-enroll-challenge' });
+    const otpauthUrl = `otpauth://totp/Constitution%20Atlas:e2e?secret=${MFA_TEST_SECRET}&issuer=Constitution%20Atlas`;
+    json(res, 200, { secret: MFA_TEST_SECRET, otpauthUrl, qrDataUrl: await QRCode.toDataURL(otpauthUrl), challengeToken: 'e2e-enroll-challenge' });
     return;
   }
   if (method === 'POST' && pathname === '/api/identity/mfa/enroll/confirm') {
     const body = await readBody(req);
-    if (body.code !== MFA_CODE) {
+    if (![MFA_CODE, testTotp()].includes(body.code)) {
       json(res, 400, { error: 'Invalid code' });
       return;
     }
     enrolledMfaEmails.add(currentUser.email);
     currentUser = { ...currentUser, mfaEnabled: true };
-    json(res, 200, { recoveryCodes: ['RECOVERY-ONE', 'RECOVERY-TWO'] });
+    recoveryCodes.set(currentUser.email, new Set(['RECOVERY-ONE', 'RECOVERY-TWO']));
+    json(res, 200, { recoveryCodes: ['RECOVERY-ONE', 'RECOVERY-TWO'], token: SESSION_TOKEN, expiresInSeconds: 86400, user: currentUser });
     return;
   }
   if (method === 'POST' && pathname === '/api/identity/mfa/recovery/regenerate') {
+    recoveryCodes.set(currentUser.email, new Set(['RECOVERY-NEW']));
     json(res, 200, { recoveryCodes: ['RECOVERY-NEW'] });
     return;
   }

@@ -7,6 +7,8 @@ import { useState } from 'react';
 import { Alert, Button, Input } from '../components/ui';
 import { confirmEnrollAction, type EnrollConfirmState } from '../login/actions';
 import { confirmAccountMfaAction, regenerateRecoveryAction, startMfaEnrollAction, type RecoveryRevealState } from './actions';
+import { Disclosure } from '../components/Disclosure';
+import { reviewUi } from '../../lib/ui-review-messages';
 
 export function StartMfaEnrollForm() {
   const [pending, setPending] = useState(false);
@@ -27,12 +29,10 @@ const initial: RecoveryRevealState = {};
 
 function RecoveryCodes({ codes }: { codes: string[] }) {
   return (
-    <Alert tone="success">
-      <T value={ui.account.mfaforms.storeTheseRecoveryCodesNowTheyAre} />{' '}
-      {codes.map((code) => (
-        <code key={code}>{code} </code>
-      ))}
-    </Alert>
+    <div className="recovery-codes" role="status">
+      <p><T value={ui.account.mfaforms.storeTheseRecoveryCodesNowTheyAre} /></p>
+      <ul>{codes.map((code) => <li key={code}><code>{code}</code></li>)}</ul>
+    </div>
   );
 }
 
@@ -67,11 +67,14 @@ export function RegenerateRecoveryForm() {
   return (
     <>
       {state.recoveryCodes ? <RecoveryCodes codes={state.recoveryCodes} /> : null}
+      <Disclosure summary={<T value={reviewUi.recoveryManage} />} open={Boolean(state.error)}>
+      <p><T value={reviewUi.recoveryReplaceHint} /></p>
       {state.error ? failed : null}
       <form action={action}>
         <Input label={<T value={ui.attrs.accountMfaformsInputLabelAuthenticatorCode} />} id="recoveryRotateCode" name="code" inputMode="numeric" required />
         <Button><T value={ui.account.mfaforms.replaceRecoveryCodes} /></Button>
       </form>
+      </Disclosure>
     </>
   );
 }
@@ -79,7 +82,8 @@ export function RegenerateRecoveryForm() {
 const initialEnroll: EnrollConfirmState = {};
 
 export function LoginEnrollForm({ next }: { next?: string } = {}) {
-  const [state, action] = useFormState(confirmEnrollAction, initialEnroll);
+  const [state, setState] = useState<EnrollConfirmState>(initialEnroll);
+  const [pending, setPending] = useState(false);
   if (state.recoveryCodes) {
     return (
       <>
@@ -93,7 +97,15 @@ export function LoginEnrollForm({ next }: { next?: string } = {}) {
   return (
     <>
       {state.error ? <Alert tone="error"><T value={ui.account.mfaforms.thatCodeCouldNotBeVerified} /></Alert> : null}
-      <form action={action}>
+      <form aria-busy={pending} onSubmit={async event => {
+        event.preventDefault();
+        if (pending) return;
+        const data = new FormData(event.currentTarget);
+        setPending(true);
+        try { setState(await confirmEnrollAction(initialEnroll, data)); }
+        catch { setState({ error: true }); }
+        finally { setPending(false); }
+      }}>
         {next ? <input type="hidden" name="next" value={next} /> : null}
         <Input
           label={<T value={ui.attrs.accountMfaformsInputLabelAuthenticatorCode} />}
@@ -103,7 +115,7 @@ export function LoginEnrollForm({ next }: { next?: string } = {}) {
           autoComplete="one-time-code"
           required
         />
-        <Button variant="primary"><T value={ui.account.mfaforms.confirmEnrollment} /></Button>
+        <Button variant="primary" disabled={pending}><T value={ui.account.mfaforms.confirmEnrollment} /></Button>
       </form>
     </>
   );

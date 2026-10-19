@@ -39,8 +39,10 @@ export async function signOut(page: Page) {
   await page.getByRole('button', { name: 'Account menu' }).click();
   await page.getByRole('button', { name: 'Sign out' }).click();
   await expect(page).toHaveURL(/\/$/);
+  // The home URL can already match before the logout action finishes.
+  await expect(page.getByRole('link', { name: 'Log in', exact: true })).toBeVisible();
   await page.reload();
-  await expect(page.getByRole('link', { name: 'Log in' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Log in', exact: true })).toBeVisible();
 }
 
 export async function startFromViewer(page: Page, countryIso: string, versionId: string, kind: 'legal' | 'editorial_correction') {

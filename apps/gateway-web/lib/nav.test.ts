@@ -118,9 +118,11 @@ describe('menuSections', () => {
     ]);
     expect(sectionHrefs(admin, 'admin', true)).toEqual([
       '/admin/users',
+      '/admin/settings',
       '/admin/anonymous-browsing',
       '/admin/constitutions',
       '/admin/import',
+      '/admin/legal/impressum',
       '/api-docs',
     ]);
     expect(sectionHrefs(admin, 'primary', true)).toEqual(['/', '/search', '/about', '/editor', '/admin']);

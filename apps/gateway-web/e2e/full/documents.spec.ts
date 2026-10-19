@@ -55,7 +55,6 @@ test('document revisions link from both editors and appear on public readers wit
   const attachment = page.waitForResponse((response) => response.request().method() === 'POST' && response.url().includes(`/editor/amendments/${amendmentId}`));
   await page.getByRole('button', { name: 'Attach' }).click();
   expect((await attachment).status()).toBe(200);
-  await page.reload();
   await expect(page.getByRole('link', { name: `${title} revised` })).toBeVisible({ timeout: 15_000 });
   const savedRevision = await request.post(`/api/amendment/amendments/${amendmentId}/revisions`, { headers, data: {
     title: `${title} law`, comment: 'Source citation after a draft edit.', documents: [], changes: [],

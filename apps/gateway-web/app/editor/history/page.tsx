@@ -162,7 +162,7 @@ export default async function SnapshotHistoryPage(props: HistoryPageProps) {
                             </li>
                           ))}
                         </ol>
-                      ) : 'No editorial revisions',
+                      ) : <T value={ui.editorDefaults.noEditorialRevisions} />,
                     },
                     {
                       label: <T value={ui.remainingStatus.effective} />,

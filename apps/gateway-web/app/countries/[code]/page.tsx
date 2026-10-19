@@ -58,7 +58,7 @@ export default async function CountryPage(props: CountryPageProps) {
   if (error) {
     return (
       <PageMain className="wide">
-        <ServiceUnavailable service="Catalog" retryHref={`/countries/${code}`} />
+        <ServiceUnavailable service={ui.services.catalog} retryHref={`/countries/${code}`} />
       </PageMain>
     );
   }

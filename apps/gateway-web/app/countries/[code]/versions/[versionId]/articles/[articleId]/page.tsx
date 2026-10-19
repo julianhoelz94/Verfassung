@@ -69,7 +69,7 @@ export default async function ArticlePage(props: ArticlePageProps) {
     return (
       <PageMain>
         <ServiceUnavailable
-          service="Content"
+          service={ui.services.content}
           retryHref={`/countries/${params.code}/versions/${params.versionId}/articles/${params.articleId}`}
         />
       </PageMain>

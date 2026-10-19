@@ -34,7 +34,7 @@ export function DocumentPicker(props: {
       const data = new FormData(event.currentTarget);
       setAttaching(true);
       try { window.location.assign(await attachDocumentAction(data)); }
-      finally { setAttaching(false); }
+      catch { setAttaching(false); }
     }} className="form-row">
       <input type="hidden" name="targetType" value={props.targetType} /><input type="hidden" name="targetId" value={props.targetId} />
       <input type="hidden" name="scopeRevisionId" value={props.scopeRevisionId ?? ''} />

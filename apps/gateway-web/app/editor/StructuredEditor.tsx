@@ -1,12 +1,30 @@
 'use client';
 
 import { T, useTranslation } from '../components/TranslationProvider';
-import { ui } from '../../lib/messages';
+import { ui, type UiMessage } from '../../lib/messages';
 import { useEffect, useRef, useState } from 'react';
 import type { ContentOutline } from '../../lib/api';
 import { applyOperation, draftDifferences, findNode, nodes, scopedNodes, sentenceParts, token, validateDraft, type DraftDifference, type DraftEntry, type DraftNode, type DraftOperation, type StructuredPreview } from '../../lib/structured-editor';
 import { useDraftState } from './EditorDraftState';
 import { Button } from '../components/ui';
+
+class LocalizedEditorError extends Error {
+  constructor(readonly copy: UiMessage) { super(copy.en); }
+}
+
+function differenceField(field: string): UiMessage {
+  switch (field) {
+    case 'title': return ui.remainingStatus.title;
+    case 'label': return ui.remainingStatus.label;
+    case 'text': return ui.editorDynamic.text;
+    case 'parent': return ui.editorDynamic.parentText;
+    case 'position': return ui.editorDefaults.position;
+    case 'rich': return ui.editorDefaults.rich;
+    case 'inserted': return ui.editorDefaults.inserted;
+    case 'removed': return ui.editor.publishform.removed;
+    default: return ui.editor.structurededitor.changes;
+  }
+}
 
 type ReviewDifference = DraftDifference & { sourceLink?: string; targetLink?: string };
 type Props = { review?: ReviewDifference[]; preview: StructuredPreview; outline: ContentOutline; rootId: string; versionId: string; articleId: string; constitutionId: string; editable: boolean; scope?: string; selectedNode?: string; publishedVersionId?: string | null; unitMapping?: Record<string, string> | null };
@@ -35,7 +53,7 @@ export function StructuredEditor({ review = [], preview, outline, rootId, versio
   const [referenceTargets, setReferenceTargets] = useState<Record<string, string>>({});
   const allNodes = nodes(roots);
   const root = roots.find(root => nodes([root]).some(node => node.logicalId === selection || node.content.some(entry => entry.logicalId === selection))) ?? findNode(roots, rootId) ?? roots[0];
-  const errors = validateDraft(roots, outline);
+  const errors = validateDraft(roots, outline, t);
   const loadedIds = new Set(nodes([...sourceRoots, ...roots]).flatMap(node => [node.logicalId, ...node.content.map(entry => entry.logicalId).filter((id): id is string => Boolean(id))]));
   const differences: ReviewDifference[] = [...review.filter(item => !loadedIds.has(item.logicalId)), ...draftDifferences(sourceRoots, roots)];
   function remember(view: string, selected: string) {
@@ -47,9 +65,9 @@ export function StructuredEditor({ review = [], preview, outline, rootId, versio
       const params = new URLSearchParams({ sessionId: preview.sessionId, scope: view });
       if (fullRootId) params.set('rootId', fullRootId);
       const response = await fetch(`/editor/view?${params}`, { cache: 'no-store' });
-      if (!response.ok) throw new Error('Could not load this editor view. Try again.');
+      if (!response.ok) throw new LocalizedEditorError(ui.editorDefaults.viewRetry);
       const loaded: StructuredPreview = await response.json();
-      if (loaded.generation !== preview.generation || loaded.settingsRevisionId !== preview.settingsRevisionId) throw new Error('This session changed. Save or reload before navigating.');
+      if (loaded.generation !== preview.generation || loaded.settingsRevisionId !== preview.settingsRevisionId) throw new LocalizedEditorError(ui.editorDefaults.sessionChanged);
       if (fullRootId) {
         const newRoot = loaded.roots.find(root => root.logicalId === fullRootId);
         const original = loaded.sourceRoots.find(root => root.logicalId === fullRootId);
@@ -61,7 +79,7 @@ export function StructuredEditor({ review = [], preview, outline, rootId, versio
         if (original) setSourceRoots(current => current.map(root => root.logicalId === fullRootId ? original : root));
       } else setOverviewRoots(loaded.roots);
       setScope(view); setSelection(selected); remember(view, selected);
-    } catch (error) { setMessage(error instanceof Error ? error.message : t(ui.state.viewLoadFailed)); }
+    } catch (error) { setMessage(t(error instanceof LocalizedEditorError ? error.copy : ui.state.viewLoadFailed)); }
     finally { setLoading(false); }
   }
   function changeScope(view: string) {
@@ -88,7 +106,7 @@ export function StructuredEditor({ review = [], preview, outline, rootId, versio
         return command;
       }, () => nextRoots);
       setHistory([...history, { roots, operations }]); setRoots(nextRoots); setOperations(nextOperations); setMessage(t(ui.state.unsavedChanges));
-    } catch (error) { setMessage(error instanceof Error ? error.message : t(ui.state.invalidChange)); }
+    } catch { setMessage(t(ui.state.invalidChange)); }
   }
   function change(op: Omit<DraftOperation, 'id'>) { transaction(emit => { emit(op); }); }
   function undo() {
@@ -99,7 +117,7 @@ export function StructuredEditor({ review = [], preview, outline, rootId, versio
       const level = outline.kinds.find(kind => kind.kindCode === kindCode);
       if (!level || ancestors.has(kindCode)) throw new Error(`Invalid kind ${kindCode}`);
       const childKind = level.allowedChildKinds[0];
-      return { logicalId: crypto.randomUUID(), kind: level.kindCode, label: level.labelPolicy === 'required' ? 'New label' : null, title: level.titlePolicy === 'required' ? 'New title' : null, content: childKind ? [{ type: 'child', node: createNode(childKind, new Set([...ancestors, kindCode])) }] : [{ type: 'text', logicalId: crypto.randomUUID(), text: '' }] };
+      return { logicalId: crypto.randomUUID(), kind: level.kindCode, label: level.labelPolicy === 'required' ? t(ui.editorDefaults.newLabel) : null, title: level.titlePolicy === 'required' ? t(ui.editorDefaults.newTitle) : null, content: childKind ? [{ type: 'child', node: createNode(childKind, new Set([...ancestors, kindCode])) }] : [{ type: 'text', logicalId: crypto.randomUUID(), text: '' }] };
   }
   function newChild(parent: DraftNode, position: number, kindCode: string) {
     change({ type: 'insert_child', targetId: parent.logicalId, expectedRevisionId: token(parent), position, node: createNode(kindCode) });
@@ -110,15 +128,15 @@ export function StructuredEditor({ review = [], preview, outline, rootId, versio
     return <section key={node.logicalId} className={`structured-unit ${selection === node.logicalId ? 'is-selected' : ''}`} aria-label={`${level.displayLabel} ${node.label ?? ''}`}>
       <div className="structured-heading">
         <button type="button" className="btn btn-sm" onClick={() => select(node.logicalId)} aria-pressed={selection === node.logicalId}>{level.displayLabel} {node.label}</button>
-        {level.labelPolicy !== 'none' ? <label><T value={ui.editor.structurededitor.literalLabel} /><input aria-label={`${level.displayLabel} literal label`} value={node.label ?? ''} disabled={!editable} required={level.labelPolicy === 'required'} onChange={event => change({ type: 'set_metadata', targetId: node.logicalId, expectedRevisionId: token(node), label: event.target.value, title: node.title })} /></label> : null}
-        {level.titlePolicy !== 'none' ? <label><T value={ui.editor.structurededitor.title} /><input aria-label={`${level.displayLabel} title`} value={node.title ?? ''} disabled={!editable} required={level.titlePolicy === 'required'} onChange={event => change({ type: 'set_metadata', targetId: node.logicalId, expectedRevisionId: token(node), title: event.target.value, label: node.label })} /></label> : null}
+        {level.labelPolicy !== 'none' ? <label><T value={ui.editor.structurededitor.literalLabel} /><input aria-label={`${level.displayLabel} ${t(ui.editorDefaults.literalLabel)}`} value={node.label ?? ''} disabled={!editable} required={level.labelPolicy === 'required'} onChange={event => change({ type: 'set_metadata', targetId: node.logicalId, expectedRevisionId: token(node), label: event.target.value, title: node.title })} /></label> : null}
+        {level.titlePolicy !== 'none' ? <label><T value={ui.editor.structurededitor.title} /><input aria-label={`${level.displayLabel} ${t(ui.editorDefaults.titleLabel)}`} value={node.title ?? ''} disabled={!editable} required={level.titlePolicy === 'required'} onChange={event => change({ type: 'set_metadata', targetId: node.logicalId, expectedRevisionId: token(node), title: event.target.value, label: node.label })} /></label> : null}
       </div>
       <div className={level.presentation === 'concatenated' ? 'sentence-canvas' : 'structured-content'}>
         {Array.from({ length: node.content.length + 1 }, (_, position) => <div key={position} className="structured-slot">
-          {editable ? <div className="structured-insert" aria-label={`Insert at position ${position + 1} in ${level.displayLabel}`}>
+          {editable ? <div className="structured-insert" aria-label={t(ui.editorDefaults.insertPosition).replace('{position}', String(position + 1)).replace('{kind}', level.displayLabel)}>
             {level.mayHoldText ? <button type="button" onClick={() => change({ type: 'insert_text', targetId: node.logicalId, expectedRevisionId: token(node), position, parts: [{ logicalId: crypto.randomUUID(), text: '' }] })}>+ <T value={level.mayHoldChildren ? ui.editorDynamic.parentText : ui.editorDynamic.text} /></button> : null}
-            {level.mayHoldText ? <button type="button" onClick={() => change({ type: 'insert_text', targetId: node.logicalId, expectedRevisionId: token(node), position, parts: [{ logicalId: crypto.randomUUID(), text: 'Heading\nValue', format: 'table', table: { caption: '', rows: [{ logicalId: crypto.randomUUID(), cells: [{ logicalId: crypto.randomUUID(), text: 'Heading', header: true }] }, { logicalId: crypto.randomUUID(), cells: [{ logicalId: crypto.randomUUID(), text: 'Value' }] }] } }] })}><T value={ui.editor.structurededitor.table} /></button> : null}
-            {level.mayHoldText ? <button type="button" onClick={() => change({ type: 'insert_text', targetId: node.logicalId, expectedRevisionId: token(node), position, parts: [{ logicalId: crypto.randomUUID(), text: 'Source note', format: 'footnote', footnoteLabel: '1' }] })}><T value={ui.editor.structurededitor.footnote} /></button> : null}
+            {level.mayHoldText ? <button type="button" onClick={() => change({ type: 'insert_text', targetId: node.logicalId, expectedRevisionId: token(node), position, parts: [{ logicalId: crypto.randomUUID(), text: `${t(ui.editorDefaults.heading)}\n${t(ui.editorDefaults.value)}`, format: 'table', table: { caption: '', rows: [{ logicalId: crypto.randomUUID(), cells: [{ logicalId: crypto.randomUUID(), text: t(ui.editorDefaults.heading), header: true }] }, { logicalId: crypto.randomUUID(), cells: [{ logicalId: crypto.randomUUID(), text: t(ui.editorDefaults.value) }] }] } }] })}><T value={ui.editor.structurededitor.table} /></button> : null}
+            {level.mayHoldText ? <button type="button" onClick={() => change({ type: 'insert_text', targetId: node.logicalId, expectedRevisionId: token(node), position, parts: [{ logicalId: crypto.randomUUID(), text: t(ui.editorDefaults.sourceNote), format: 'footnote', footnoteLabel: '1' }] })}><T value={ui.editor.structurededitor.footnote} /></button> : null}
             {level.allowedChildKinds.map(kindCode => <button key={kindCode} type="button" onClick={() => newChild(node, position, kindCode)}>+ {kindName(kindCode)}</button>)}
           </div> : null}
           {node.content[position] ? renderEntry(node.content[position], node, position, children) : null}
@@ -166,7 +184,7 @@ export function StructuredEditor({ review = [], preview, outline, rootId, versio
         if (level.segmentation !== 'sentence' || level.mayHoldChildren || parent.content.length !== 1) return;
         const container = nodes(current()).find(node => node.content.some(item => item.node?.logicalId === parent.logicalId));
         for (let i = 1; i < identified.length; i++) {
-          const child: DraftNode = { logicalId: crypto.randomUUID(), kind: parent.kind, label: level.labelPolicy === 'required' ? 'New label' : null, title: level.titlePolicy === 'required' ? 'New title' : null, content: [] };
+          const child: DraftNode = { logicalId: crypto.randomUUID(), kind: parent.kind, label: level.labelPolicy === 'required' ? t(ui.editorDefaults.newLabel) : null, title: level.titlePolicy === 'required' ? t(ui.editorDefaults.newTitle) : null, content: [] };
           const currentContainer = container ? findNode(current(), container.logicalId)! : findNode(current(), parent.logicalId)!;
           const at = container ? currentContainer.content.findIndex(item => item.node?.logicalId === parent.logicalId) + i : current().findIndex(node => node.logicalId === parent.logicalId) + i;
           emit({ type: container ? 'insert_child' : 'insert_root', targetId: currentContainer.logicalId, expectedRevisionId: token(currentContainer), position: at, node: child });
@@ -192,13 +210,13 @@ export function StructuredEditor({ review = [], preview, outline, rootId, versio
     return <div className={`sentence-box ${selection === id ? 'is-selected' : ''}`} key={id}>
       {format === 'table' && entry.table ? <fieldset><legend><T value={ui.editor.structurededitor.table2} /></legend>
         <label><T value={ui.editor.structurededitor.caption} /><input value={entry.table.caption ?? ''} disabled={!editable} onChange={event => updateTable({ ...entry.table!, caption: event.target.value })} /></label>
-        {entry.table.rows.map((row, rowIndex) => <div key={row.logicalId} className="action-bar" aria-label={`Table row ${rowIndex + 1}`}>
+        {entry.table.rows.map((row, rowIndex) => <div key={row.logicalId} className="action-bar" aria-label={`${t(ui.editorDefaults.tableRow)} ${rowIndex + 1}`}>
           {row.cells.map((cell, cellIndex) => <div key={cell.logicalId}>
             <label><T value={ui.editor.structurededitor.cell} />{" "}{cellIndex + 1}<textarea value={cell.text} disabled={!editable} onChange={event => updateCell(cell.logicalId, { text: event.target.value })} /></label>
             <label><T value={ui.editor.structurededitor.header} /><input type="checkbox" checked={cell.header ?? false} disabled={!editable} onChange={event => updateCell(cell.logicalId, { header: event.target.checked })} /></label>
             <label><T value={ui.editor.structurededitor.rowSpan} /><input type="number" min={1} max={100} value={cell.rowSpan ?? 1} disabled={!editable} onChange={event => updateCell(cell.logicalId, { rowSpan: Number(event.target.value) })} /></label>
             <label><T value={ui.editor.structurededitor.columnSpan} /><input type="number" min={1} max={100} value={cell.colSpan ?? 1} disabled={!editable} onChange={event => updateCell(cell.logicalId, { colSpan: Number(event.target.value) })} /></label>
-            <label><T value={ui.editor.structurededitor.headerCells} /><select multiple value={cell.headers ?? []} disabled={!editable} onChange={event => updateCell(cell.logicalId, { headers: Array.from(event.target.selectedOptions, option => option.value) })}>{entry.table!.rows.flatMap(item => item.cells).filter(item => item.header && item.logicalId !== cell.logicalId).map(item => <option key={item.logicalId} value={item.logicalId}>{item.text || 'Untitled header'}</option>)}</select></label>
+            <label><T value={ui.editor.structurededitor.headerCells} /><select multiple value={cell.headers ?? []} disabled={!editable} onChange={event => updateCell(cell.logicalId, { headers: Array.from(event.target.selectedOptions, option => option.value) })}>{entry.table!.rows.flatMap(item => item.cells).filter(item => item.header && item.logicalId !== cell.logicalId).map(item => <option key={item.logicalId} value={item.logicalId}>{item.text || t(ui.editorDefaults.untitledHeader)}</option>)}</select></label>
           </div>)}
           {editable ? <button type="button" onClick={() => updateTable({ ...entry.table!, rows: entry.table!.rows.map((current, index) => index === rowIndex ? { ...current, cells: [...current.cells, { logicalId: crypto.randomUUID(), text: '' }] } : current) })}><T value={ui.editor.structurededitor.cell2} /></button> : null}
           {editable && entry.table!.rows.length > 1 ? <button type="button" onClick={() => updateTable({ ...entry.table!, rows: entry.table!.rows.filter((_, index) => index !== rowIndex) })}><T value={ui.editor.structurededitor.removeRow} /></button> : null}
@@ -250,6 +268,6 @@ export function StructuredEditor({ review = [], preview, outline, rootId, versio
       <button type="button" disabled={roots.length < 2} onClick={() => change({ type: 'remove', targetId: root.logicalId, expectedRevisionId: token(root) })}><T value={ui.editor.structurededitor.removeTopLevelUnit} /></button>
     </div> : null}
     {editable ? <div className="action-bar"><Button variant="primary" disabled={loading || !operations.length || errors.length > 0}><T value={ui.editor.structurededitor.saveDraft} /></Button><button type="button" disabled={!history.length} onClick={undo}><T value={ui.editor.structurededitor.undo} /></button></div> : null}
-    <details open={!editable}><summary><T value={ui.editor.structurededitor.entryLevelReview} />{differences.length} <T value={ui.editor.structurededitor.changes} /></summary>{differences.length ? <ol>{differences.map((difference, index) => <li key={index}><strong>{difference.field}</strong><div><del>{difference.before}</del> → <ins>{difference.after}</ins></div><div>{(difference.sourceLink ?? reference(difference.logicalId, false)) ? <a href={difference.sourceLink ?? reference(difference.logicalId, false)}><T value={ui.editor.structurededitor.sourceSnapshot} /></a> : null} {(difference.targetLink ?? reference(difference.logicalId, true)) ? <a href={difference.targetLink ?? reference(difference.logicalId, true)}><T value={ui.editor.structurededitor.publishedSuccessor} /></a> : null}</div><details><summary><T value={ui.editor.structurededitor.revisionDetails} /></summary><small><T value={ui.editor.structurededitor.unit} />{" "}{difference.logicalId} <T value={ui.editor.structurededitor.sourceRevision} />{" "}{difference.sourceRevisionId ?? 'new'} <T value={ui.editor.structurededitor.target} />{" "}{difference.targetRevisionId ?? 'removed'}</small></details></li>)}</ol> : <p><T value={ui.editor.structurededitor.noChanges} /></p>}</details>
+    <details open={!editable}><summary><T value={ui.editor.structurededitor.entryLevelReview} />{differences.length} <T value={ui.editor.structurededitor.changes} /></summary>{differences.length ? <ol>{differences.map((difference, index) => <li key={index}><strong>{t(differenceField(difference.field))}</strong><div><del>{difference.before}</del> → <ins>{difference.after}</ins></div><div>{(difference.sourceLink ?? reference(difference.logicalId, false)) ? <a href={difference.sourceLink ?? reference(difference.logicalId, false)}><T value={ui.editor.structurededitor.sourceSnapshot} /></a> : null} {(difference.targetLink ?? reference(difference.logicalId, true)) ? <a href={difference.targetLink ?? reference(difference.logicalId, true)}><T value={ui.editor.structurededitor.publishedSuccessor} /></a> : null}</div><details><summary><T value={ui.editor.structurededitor.revisionDetails} /></summary><small><T value={ui.editor.structurededitor.unit} />{" "}{difference.logicalId} <T value={ui.editor.structurededitor.sourceRevision} />{" "}{difference.sourceRevisionId ?? t(ui.remainingStatus.new)} <T value={ui.editor.structurededitor.target} />{" "}{difference.targetRevisionId ?? t(ui.editor.publishform.removed)}</small></details></li>)}</ol> : <p><T value={ui.editor.structurededitor.noChanges} /></p>}</details>
   </form>;
 }

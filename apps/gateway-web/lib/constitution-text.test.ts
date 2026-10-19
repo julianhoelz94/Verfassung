@@ -1,4 +1,5 @@
 import { createElement } from 'react';
+import { TranslationProvider } from '../app/components/TranslationProvider';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import type { ContentNode, ContentOutline, OrderedEntry } from './api';
@@ -13,6 +14,18 @@ const outline: ContentOutline = { kinds: [
 const nodes: ContentNode[] = ['First.', 'Second.'].map((body, index) => ({ id: `${index}`, kind: 'sentence', label: `(${index})`, number: null, title: 'Hidden title', body, sortOrder: index, children: [] }));
 const entries: OrderedEntry[] = nodes.map((node) => ({ type: 'child', node: { logicalId: node.id, revisionId: node.id, occurrenceId: node.id, kind: node.kind, label: node.label, title: node.title, content: [{ type: 'text', text: node.body }] } }));
 describe('reader presentation', () => {
+  it('localizes table and footnote navigation labels without changing authored text', () => {
+    const content: OrderedEntry[] = [
+      { type: 'text', logicalId: 'table', format: 'table', text: 'Original heading', table: { caption: '', rows: [{ logicalId: 'row', cells: [{ logicalId: 'cell', header: true, text: 'Original heading' }] }] } },
+      { type: 'text', logicalId: 'note', format: 'footnote', text: 'Original source note' },
+    ];
+    const html = renderToStaticMarkup(createElement(TranslationProvider, { locale: 'de' }, createElement(OrderedContentTree, { entries: content, indexedBacklinks: new Map([['note', ['reference']]]) })));
+    expect(html).toContain('aria-label="Rechtstabelle"');
+    expect(html).toContain('aria-label="Zurück zum Fußnotenverweis 1"');
+    expect(html).toContain('Original heading');
+    expect(html).toContain('Original source note');
+  });
+
   it('shares concatenated presentation between ordered previews and legacy readers', () => {
     const legacy = renderToStaticMarkup(createElement(NodeTree, { nodes, outline }));
     const ordered = renderToStaticMarkup(createElement(OrderedContentTree, { entries, outline }));

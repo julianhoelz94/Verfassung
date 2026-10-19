@@ -1,6 +1,6 @@
 import { changeTypeMessage } from '../../../../../lib/ui-labels';
 import { T } from '../../../../components/TranslationProvider';
-import { ui } from '../../../../../lib/messages';
+import { ui, type UiMessage } from '../../../../../lib/messages';
 import { notFound } from 'next/navigation';
 import { ConstitutionText } from '../../../../components/ConstitutionText';
 import { PageMain } from '../../../../components/PageMain';
@@ -53,7 +53,7 @@ export default async function ArticleHistoryPage(props: HistoryPageProps) {
     return (
       <PageMain>
         <ServiceUnavailable
-          service="Catalog"
+          service={ui.services.catalog}
           retryHref={`/countries/${params.code}/articles/${encodeURIComponent(articleNumber)}`}
         />
       </PageMain>
@@ -75,7 +75,7 @@ export default async function ArticleHistoryPage(props: HistoryPageProps) {
   const versions = orderVersions(constitution.versions);
   let snapshots: ArticleSnapshot[] = [];
   let amendments: Amendment[] = [];
-  let loadError: string | null = null;
+  let loadError: UiMessage | null = null;
   try {
     const versionArticles = await Promise.all(versions.map((version) => listAllArticles(version.id, true)));
     snapshots = versions.flatMap((version, index) => {
@@ -84,7 +84,7 @@ export default async function ArticleHistoryPage(props: HistoryPageProps) {
       return article ? [{ version, article, articles }] : [];
     });
   } catch (e) {
-    loadError = e instanceof ApiUnavailableError ? e.message : 'A backend service is unavailable';
+    loadError = ui.errors.servicesUnavailable;
   }
   try {
     amendments = (await listAmendmentsByArticle(constitution.id, articleNumber)) ?? [];
@@ -107,7 +107,7 @@ export default async function ArticleHistoryPage(props: HistoryPageProps) {
         eyebrow={`${country.name} · ${constitution.title}`}
         title={`History of Article ${articleNumber}`}
       />
-      {loadError ? <p role="alert">{loadError.endsWith('.') ? loadError : `${loadError}.`}</p> : null}
+      {loadError ? <p role="alert"><T value={loadError} /></p> : null}
       <div className="stack">
         {snapshots.map((snapshot, index) => {
           const previous = snapshots[index - 1];

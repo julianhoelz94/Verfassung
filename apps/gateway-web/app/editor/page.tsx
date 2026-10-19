@@ -93,7 +93,7 @@ export default async function EditorPage(props: EditorPageProps) {
   const selectedVersion = selectedConstitution?.versions.find((version) => version.id === versionId || version.currentVersionId === versionId);
   const settings = session && versionId ? await getVersionSettings(versionId) : null;
   const displayOutline = settings?.outline ?? selectedConstitution?.contentOutline;
-  const kindLabel = (kind?: string) => kind ? displayOutline?.kinds.find((item) => item.kindCode === kind)?.displayLabel ?? kind : 'Unit';
+  const kindLabel = (kind?: string) => kind ? displayOutline?.kinds.find((item) => item.kindCode === kind)?.displayLabel ?? kind : message(locale, ui.editorDynamic.unit);
   const units: ArticleSummary[] = versionId ? await listAllUnits(versionId, false, staffAuthorization) : [];
   const legacySource = units.some(unit => unit.legacyIdentity);
   const structured = session && !legacySource && !(preview?.drafts?.length) ? await getStructuredDraft(session.id) : null;
@@ -131,7 +131,7 @@ export default async function EditorPage(props: EditorPageProps) {
   const changedLabels = articles
     .filter((article) => draftIds.includes(article.id))
     .map((article) => `${kindLabel(article.kind)} ${article.articleNumber}`);
-  if (structured) sourceArticles.filter(article => article.logicalId && changedRootIds.includes(article.logicalId) && !articles.some(target => target.logicalId === article.logicalId)).forEach(article => changedLabels.push(`Removed ${kindLabel(article.kind)} ${article.articleNumber}`));
+  if (structured) sourceArticles.filter(article => article.logicalId && changedRootIds.includes(article.logicalId) && !articles.some(target => target.logicalId === article.logicalId)).forEach(article => changedLabels.push(`${message(locale, ui.editor.publishform.removed)} ${kindLabel(article.kind)} ${article.articleNumber}`));
   const errorMessage = editorErrorMessage(searchParams.error, locale);
   const alerts = (
     <>

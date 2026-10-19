@@ -1,4 +1,5 @@
 import type { ContentOutline } from './api';
+import { ui, type UiMessage } from './messages';
 
 export type DraftEntry = { occurrenceId?: string | null; type: 'text' | 'child'; node?: DraftNode | null; logicalId?: string | null; revisionId?: string | null; draftId?: string | null; text?: string | null; format?: 'plain' | 'table' | 'footnote' | null; table?: import('./api').OrderedTable | null; footnoteLabel?: string | null; references?: import('./api').OrderedInlineReference[] };
 export type DraftNode = { occurrenceId?: string | null; logicalId: string; revisionId?: string | null; draftId?: string | null; kind: string; label?: string | null; title?: string | null; content: DraftEntry[] };
@@ -62,23 +63,23 @@ export function applyOperation(roots: DraftNode[], op: DraftOperation): DraftNod
 function markInserted(node: DraftNode, id: string): DraftNode {
   return { ...node, draftId: id, content: node.content.map(entry => entry.node ? { ...entry, node: markInserted(entry.node, id) } : { ...entry, draftId: id }) };
 }
-export function validateDraft(roots: DraftNode[], outline: ContentOutline): string[] {
+export function validateDraft(roots: DraftNode[], outline: ContentOutline, translate: (value: UiMessage) => string = value => value.en): string[] {
   const errors: string[] = []; const identities = new Set<string>();
   const byCode = new Map(outline.kinds.map(kind => [kind.kindCode, kind]));
   const rootsAllowed = new Set(outline.kinds.filter(kind => kind.root).map(kind => kind.kindCode));
   if (rootsAllowed.size === 0 && outline.kinds[0]) rootsAllowed.add(outline.kinds[0].kindCode);
   function walk(node: DraftNode, parent?: ContentOutline['kinds'][number]) {
     const level = byCode.get(node.kind); const name = `${level?.displayLabel ?? node.kind} ${node.label ?? ''}`.trim();
-    if (!level || (parent ? !parent.allowedChildKinds.includes(node.kind) : !rootsAllowed.has(node.kind))) { errors.push(`${name}: invalid parent or root kind.`); return; }
-    if (identities.has(node.logicalId)) errors.push(`${name}: duplicate identity.`); identities.add(node.logicalId);
+    if (!level || (parent ? !parent.allowedChildKinds.includes(node.kind) : !rootsAllowed.has(node.kind))) { errors.push(`${name}: ${translate(ui.draftValidation.invalidParent)}`); return; }
+    if (identities.has(node.logicalId)) errors.push(`${name}: ${translate(ui.draftValidation.duplicateIdentity)}`); identities.add(node.logicalId);
     for (const field of ['title', 'label'] as const) {
       const policy = field === 'title' ? level.titlePolicy : level.labelPolicy;
-      if (policy === 'required' && !node[field]?.trim()) errors.push(`${name}: ${field} is required.`);
-      if (policy === 'none' && node[field]) errors.push(`${name}: ${field} is not allowed.`);
+      if (policy === 'required' && !node[field]?.trim()) errors.push(`${name}: ${translate(field === 'title' ? ui.draftValidation.titleRequired : ui.draftValidation.labelRequired)}`);
+      if (policy === 'none' && node[field]) errors.push(`${name}: ${translate(field === 'title' ? ui.draftValidation.titleNotAllowed : ui.draftValidation.labelNotAllowed)}`);
     }
     node.content.forEach(entry => {
-      if (entry.node) { if (!level.mayHoldChildren || !level.allowedChildKinds.includes(entry.node.kind)) errors.push(`${name}: child kind is not allowed.`); walk(entry.node, level); }
-      else if (!level.mayHoldText || entry.text == null || !entry.logicalId || identities.has(entry.logicalId)) errors.push(`${name}: invalid text entry.`);
+      if (entry.node) { if (!level.mayHoldChildren || !level.allowedChildKinds.includes(entry.node.kind)) errors.push(`${name}: ${translate(ui.draftValidation.childNotAllowed)}`); walk(entry.node, level); }
+      else if (!level.mayHoldText || entry.text == null || !entry.logicalId || identities.has(entry.logicalId)) errors.push(`${name}: ${translate(ui.draftValidation.invalidText)}`);
       else identities.add(entry.logicalId);
     });
   }

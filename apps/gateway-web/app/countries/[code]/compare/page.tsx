@@ -1,6 +1,6 @@
 import { changeTypeMessage } from '../../../../lib/ui-labels';
 import { T } from '../../../components/TranslationProvider';
-import { ui } from '../../../../lib/messages';
+import { ui, message } from '../../../../lib/messages';
 import { currentLocale } from '../../../../lib/server-locale';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
@@ -127,7 +127,7 @@ export default async function ComparePage(props: ComparePageProps) {
   if (error) {
     return (
       <PageMain className="wide">
-        <ServiceUnavailable service="Catalog" retryHref={`/countries/${params.code}/compare`} />
+        <ServiceUnavailable service={ui.services.catalog} retryHref={`/countries/${params.code}/compare`} />
       </PageMain>
     );
   }
@@ -221,7 +221,7 @@ export default async function ComparePage(props: ComparePageProps) {
       toArticles = toList;
       loadError = null;
     } catch (e) {
-      loadError = e instanceof ApiUnavailableError ? e.message : 'A backend service is unavailable';
+      loadError = message(locale, ui.errors.servicesUnavailable);
     }
   }
 

@@ -62,7 +62,7 @@ export default async function ConstitutionTimelinePage({ params, searchParams }:
   } catch {
     return (
       <PageMain className="wide">
-        <ServiceUnavailable service="Catalog" retryHref={`/countries/${code}/constitution-timeline`} />
+        <ServiceUnavailable service={ui.services.catalog} retryHref={`/countries/${code}/constitution-timeline`} />
       </PageMain>
     );
   }

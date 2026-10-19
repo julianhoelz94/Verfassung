@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as axeCore from 'axe-core';
 import type { ContentOutline } from '../../lib/api';
 import type { DraftNode, DraftOperation, StructuredPreview } from '../../lib/structured-editor';
+import { TranslationProvider } from '../components/TranslationProvider';
 import { StructuredEditor } from './StructuredEditor';
 import { EditorDraftState, SubmitReviewButton } from './EditorDraftState';
 
@@ -37,10 +38,10 @@ describe('structured editor acceptance', () => {
     host = document.createElement('main'); document.body.appendChild(host); root = createRoot(host);
   });
   afterEach(async () => { await act(async () => root.unmount()); host.remove(); vi.unstubAllGlobals(); });
-  async function mount(outline: ContentOutline, roots: DraftNode[], scope?: string, extras: Partial<ComponentProps<typeof StructuredEditor>> = {}) {
+  async function mount(outline: ContentOutline, roots: DraftNode[], scope?: string, extras: Partial<ComponentProps<typeof StructuredEditor>> = {}, locale: 'en' | 'de' = 'en') {
     const preview: StructuredPreview = { sessionId: 'session', sourceVersionId: 'source', sourceGeneration: 1, settingsRevisionId: 'settings', generation: 0, sourceRoots: roots, roots, operations: [] };
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => preview }));
-    await act(async () => root.render(<EditorDraftState><StructuredEditor preview={preview} outline={outline} rootId={roots[0].logicalId} versionId="source" articleId="unit" constitutionId="constitution" editable scope={scope} {...extras} /><SubmitReviewButton disabled={false} /></EditorDraftState>));
+    await act(async () => root.render(<TranslationProvider locale={locale}><EditorDraftState><StructuredEditor preview={preview} outline={outline} rootId={roots[0].logicalId} versionId="source" articleId="unit" constitutionId="constitution" editable scope={scope} {...extras} /><SubmitReviewButton disabled={false} /></EditorDraftState></TranslationProvider>));
     return preview;
   }
   function button(name: string, index = 0): HTMLButtonElement {
@@ -54,6 +55,17 @@ describe('structured editor acceptance', () => {
   function field(label: string): HTMLInputElement { return host.querySelector(`[aria-label="${label}"]`)!; }
   function payload(): { expectedGeneration: number; operations: DraftOperation[] } { return JSON.parse((host.querySelector('[name="structuredDraft"]') as HTMLInputElement).value); }
   function texts() { return [...host.querySelectorAll('textarea')]; }
+
+  it('creates new draft metadata in the selected UI language', async () => {
+    const outline = { kinds: [level('Artikel', 0, undefined, { titlePolicy: 'required', labelPolicy: 'required' })] };
+    await mount(outline, [{ ...node('Artikel', 'article'), label: '1', title: 'Rechte' }], undefined, {}, 'de');
+    await click('Einheit auf oberster Ebene hinzufügen');
+    const inserted = payload().operations.find(operation => operation.type === 'insert_root')?.node;
+    expect(inserted?.label).toBe('Neue Bezeichnung');
+    expect(inserted?.title).toBe('Neuer Titel');
+    await change(field('Artikel Titel'), '');
+    expect(host.textContent).toContain('Ein Titel ist erforderlich.');
+  });
 
   it.each(['none', 'optional', 'required'])('honors %s title and literal-label policies for a one-level custom plain root', async policy => {
     const outline = { kinds: [level('Clause', 0, undefined, { titlePolicy: policy, labelPolicy: policy })] };

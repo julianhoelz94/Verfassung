@@ -74,7 +74,7 @@ export default async function VersionPage(props: VersionPageProps) {
   if (error) {
     return (
       <PageMain className="wide">
-        <ServiceUnavailable service="Content" retryHref={`/countries/${params.code}/versions/${params.versionId}`} />
+        <ServiceUnavailable service={ui.services.content} retryHref={`/countries/${params.code}/versions/${params.versionId}`} />
       </PageMain>
     );
   }

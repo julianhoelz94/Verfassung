@@ -51,7 +51,7 @@ export default async function Page() {
   if (error) {
     return (
       <PageMain className="wide">
-        <ServiceUnavailable service="Catalog" retryHref="/" />
+        <ServiceUnavailable service={ui.services.catalog} retryHref="/" />
       </PageMain>
     );
   }

@@ -78,7 +78,7 @@ export default async function TimelinePage(props: TimelinePageProps) {
   if (error) {
     return (
       <PageMain className="wide">
-        <ServiceUnavailable service="Amendment" retryHref={`/countries/${params.code}/timeline`} />
+        <ServiceUnavailable service={ui.services.amendment} retryHref={`/countries/${params.code}/timeline`} />
       </PageMain>
     );
   }

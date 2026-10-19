@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { T } from './TranslationProvider';
-import { ui } from '../../lib/messages';
+import { ui, type UiMessage } from '../../lib/messages';
 
 type StatusMessageProps = {
   title: ReactNode;
@@ -19,10 +19,10 @@ export function StatusMessage({ title, message, actionHref, actionLabel }: Statu
   );
 }
 
-export function ServiceUnavailable({ service, retryHref = '/' }: { service: string; retryHref?: string }) {
+export function ServiceUnavailable({ service, retryHref = '/' }: { service: UiMessage; retryHref?: string }) {
   return (
     <StatusMessage
-      title={<>{service} <T value={ui.extraComponents.statusMessage.isUnavailable} /></>}
+      title={<><T value={service} /> <T value={ui.extraComponents.statusMessage.isUnavailable} /></>}
       message={<T value={ui.extraComponents.statusMessage.thisPageCouldNotLoad} />}
       actionHref={retryHref}
       actionLabel={<T value={ui.extraComponents.statusMessage.tryAgain} />}

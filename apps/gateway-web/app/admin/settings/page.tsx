@@ -1,3 +1,4 @@
+import { NavigatingActionForm } from '../../components/NavigatingActionForm';
 import { T } from '../../components/TranslationProvider';
 import { ui } from '../../../lib/messages';
 import { cookies } from 'next/headers';
@@ -23,7 +24,7 @@ export default async function IdentitySettingsPage({ searchParams }: { searchPar
     {params.saved ? <Alert tone="success"><T value={ui.admin.settings.page.settingsSaved} /></Alert> : null}
     {params.tested ? <Alert tone="success"><T value={ui.admin.settings.page.testEmailSent} /></Alert> : null}
     {!settings ? <Alert tone="error"><T value={ui.admin.settings.page.accountSettingsCouldNotBeLoaded} /></Alert> : <>
-      <Card><form action={saveIdentitySettingsAction}>
+      <Card><NavigatingActionForm action={saveIdentitySettingsAction}>
         <h2 className="card-title"><T value={ui.admin.settings.page.registration} /></h2>
         <label><input type="checkbox" name="selfRegistrationEnabled" defaultChecked={settings.selfRegistrationEnabled} /> <T value={ui.admin.settings.page.allowPeopleToRegisterThemselves} /></label>
         <p className="muted"><T value={ui.admin.settings.page.offByDefaultNewAccountsReceiveOnly} /></p>
@@ -40,18 +41,18 @@ export default async function IdentitySettingsPage({ searchParams }: { searchPar
         <label><input type="checkbox" name="smtpStarttls" defaultChecked={settings.smtpStarttls} /> <T value={ui.admin.settings.page.starttls} /></label>
         <label><input type="checkbox" name="smtpSsl" defaultChecked={settings.smtpSsl} /> <T value={ui.admin.settings.page.implicitTls} /></label>
         <Button variant="primary"><T value={ui.admin.settings.page.saveSettings} /></Button>
-      </form></Card>
+      </NavigatingActionForm></Card>
       <Card><h2 className="card-title"><T value={ui.admin.settings.page.testMail} /></h2>
         <p><T value={ui.admin.settings.page.sendATestMessageToAnyAddress} /></p>
-        <form action={sendTestMailAction}>
+        <NavigatingActionForm action={sendTestMailAction}>
           <Input label={<T value={ui.attrs.adminSettingsPageInputLabelRecipient} />} id="test-mail-to" name="to" type="email" required defaultValue={user?.email ?? ''} />
           <Button><T value={ui.admin.settings.page.sendTestEmail} /></Button>
-        </form>
+        </NavigatingActionForm>
       </Card>
     </>}
     {translationSettings ? <Card>
       <h2><T value={ui.contentTranslation.title} /></h2>
-      <form action={saveContentTranslationSettingsAction} className="stack">
+      <NavigatingActionForm action={saveContentTranslationSettingsAction} className="stack">
         <label htmlFor="translationProvider"><T value={ui.contentTranslation.adminProvider} /></label>
         <select id="translationProvider" name="provider" defaultValue={translationSettings.provider}>
           <option value="off"><T value={ui.contentTranslation.disabled} /></option>
@@ -64,7 +65,7 @@ export default async function IdentitySettingsPage({ searchParams }: { searchPar
         {translationSettings.sharedKeyConfigured ? <p><T value={ui.contentTranslation.keyConfigured} /></p> : null}
         <p><T value={ui.contentTranslation.quota} />: {translationSettings.sharedGoogleCharactersUsed.toLocaleString()} / {translationSettings.sharedGoogleCharacterLimit.toLocaleString()}</p>
         <Button variant="primary"><T value={ui.contentTranslation.saveAdmin} /></Button>
-      </form>
+      </NavigatingActionForm>
     </Card> : null}
   </PageMain>;
 }

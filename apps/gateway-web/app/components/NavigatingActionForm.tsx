@@ -1,19 +1,24 @@
 'use client';
 
 import { useState, type ReactNode } from 'react';
+import { T } from './TranslationProvider';
+import { ui } from '../../lib/messages';
 
 /** Await the saved result before loading a fresh server-rendered page. */
-export function NavigatingActionForm({ action, children }: {
+export function NavigatingActionForm({ action, children, className }: {
   action: (data: FormData) => Promise<string>;
   children: ReactNode;
+  className?: string;
 }) {
   const [pending, setPending] = useState(false);
-  return <form aria-busy={pending} onSubmit={async (event) => {
+  const [failed, setFailed] = useState(false);
+  return <form method="post" className={className} aria-busy={pending} onSubmit={async (event) => {
     event.preventDefault();
     if (pending) return;
     const data = new FormData(event.currentTarget);
     setPending(true);
+    setFailed(false);
     try { window.location.assign(await action(data)); }
-    finally { setPending(false); }
-  }}>{children}</form>;
+    catch { setPending(false); setFailed(true); }
+  }}>{children}{failed ? <p role="alert"><T value={ui.errors.actionFailed} /></p> : null}</form>;
 }

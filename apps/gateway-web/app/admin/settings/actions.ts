@@ -15,7 +15,7 @@ async function adminToken() {
   return token;
 }
 
-export async function saveIdentitySettingsAction(formData: FormData): Promise<void> {
+export async function saveIdentitySettingsAction(formData: FormData): Promise<string> {
   const token = await adminToken();
   const checked = (name: string) => formData.get(name) === 'on';
   try {
@@ -35,27 +35,27 @@ export async function saveIdentitySettingsAction(formData: FormData): Promise<vo
     });
   } catch (error) {
     if (error instanceof IdentityApiError && error.code === 'step_up_required') {
-      redirect(`/account/step-up?returnTo=${encodeURIComponent('/admin/settings')}`);
+      return `/account/step-up?returnTo=${encodeURIComponent('/admin/settings')}`;
     }
-    redirect('/admin/settings?error=save');
+    return '/admin/settings?error=save';
   }
-  redirect('/admin/settings?saved=1');
+  return '/admin/settings?saved=1';
 }
 
-export async function sendTestMailAction(formData: FormData): Promise<void> {
+export async function sendTestMailAction(formData: FormData): Promise<string> {
   const token = await adminToken();
   try {
     await sendTestMail(token, String(formData.get('to') ?? ''));
   } catch (error) {
     if (error instanceof IdentityApiError && error.code === 'step_up_required') {
-      redirect(`/account/step-up?returnTo=${encodeURIComponent('/admin/settings')}`);
+      return `/account/step-up?returnTo=${encodeURIComponent('/admin/settings')}`;
     }
-    redirect('/admin/settings?error=test');
+    return '/admin/settings?error=test';
   }
-  redirect('/admin/settings?tested=1');
+  return '/admin/settings?tested=1';
 }
 
-export async function saveContentTranslationSettingsAction(formData: FormData): Promise<void> {
+export async function saveContentTranslationSettingsAction(formData: FormData): Promise<string> {
   const token = await adminToken();
   try {
     await updateTranslationSiteSettings(token, {
@@ -65,9 +65,9 @@ export async function saveContentTranslationSettingsAction(formData: FormData): 
     });
   } catch (error) {
     if (error instanceof IdentityApiError && error.code === 'step_up_required') {
-      redirect(`/account/step-up?returnTo=${encodeURIComponent('/admin/settings')}`);
+      return `/account/step-up?returnTo=${encodeURIComponent('/admin/settings')}`;
     }
-    redirect('/admin/settings?error=translation');
+    return '/admin/settings?error=translation';
   }
-  redirect('/admin/settings?saved=translation');
+  return '/admin/settings?saved=translation';
 }

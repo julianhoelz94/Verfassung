@@ -1,7 +1,6 @@
 import { currentLocale } from '../../lib/server-locale';
-import { message } from '../../lib/messages';
 import { T } from '../components/TranslationProvider';
-import { ui } from '../../lib/messages';
+import { ui, message } from '../../lib/messages';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { FiltersPanel } from '../components/FiltersPanel';
@@ -134,7 +133,7 @@ export default async function SearchPage(props: SearchPageProps) {
       total = page?.total ?? 0;
       limit = page?.limit ?? SEARCH_PAGE_SIZE;
     } catch (e) {
-      error = e instanceof ApiUnavailableError ? e.message : 'Search is unavailable';
+      error = message(locale, ui.errors.searchUnavailable);
       hits = [];
       total = 0;
     }

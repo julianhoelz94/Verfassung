@@ -57,9 +57,9 @@ export function VersionReader({
       articles.map((article) => ({
         id: `unit-${article.id}`,
         href: `#unit-${article.id}`,
-        label: articleHeading(outline, article) || 'Unit',
+        label: articleHeading(outline, article) || t(ui.editorDynamic.unit),
       })),
-    [articles, outline],
+    [articles, outline, t],
   );
   const articlesByNumber = useMemo(
     () => Object.fromEntries(articles.map((article) => [article.articleNumber, article.id])),
@@ -137,7 +137,7 @@ export function VersionReader({
                     disabled={depth >= max}
                     onClick={() => toggleArticle(article.id)}
                   >
-                    <span data-translate-content>{articleHeading(outline, article) || 'Unit'}</span>
+                    <span data-translate-content>{articleHeading(outline, article) || t(ui.editorDynamic.unit)}</span>
                   </button>
                 </h2>
                 {open ? (

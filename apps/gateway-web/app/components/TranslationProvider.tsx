@@ -6,7 +6,7 @@ import { message, type UiMessage } from '../../lib/messages';
 
 const LocaleContext = createContext<Locale>('en');
 
-export function TranslationProvider({ locale, children }: { locale: Locale; children: ReactNode }) {
+export function TranslationProvider({ locale, children }: { locale: Locale; children?: ReactNode }) {
   return <LocaleContext.Provider value={locale}>{children}</LocaleContext.Provider>;
 }
 

@@ -6,7 +6,8 @@
 
 1. Öffnen Sie **Länder** und wählen Sie ein Land.
 2. Wählen Sie die Verfassung und die benötigte rechtliche Fassung.
-3. Springen Sie über das Inhaltsverzeichnis zur Vorschrift. Beachten Sie Datum und Status.
+3. Springen Sie über das Inhaltsverzeichnis zur Vorschrift. Öffnen Sie deren Überschrift oder wählen Sie **Full text**, um den Wortlaut einzublenden.
+4. Beachten Sie Datum und Status.
 
 ![Länderseite mit verfügbaren Verfassungen und Fassungen](https://raw.githubusercontent.com/wiki/julianhoelz94/Verfassung/media/reading-country-de.png)
 *Zuerst die Verfassung, dann die rechtliche Fassung wählen.*

@@ -6,7 +6,8 @@
 
 1. Open **Countries** and select a country.
 2. Choose its constitution and the legal version you need.
-3. Follow the table of contents to a provision. Check its effective date and status.
+3. Follow the table of contents to a provision. Open its heading or choose **Full text** to show the wording.
+4. Check its effective date and status.
 
 ![Country page with constitutions and legal versions](https://raw.githubusercontent.com/wiki/julianhoelz94/Verfassung/media/reading-country-en.png)
 *Choose the constitution first, then its legal version.*

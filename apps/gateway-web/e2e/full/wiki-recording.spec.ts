@@ -104,7 +104,9 @@ for (const locale of ['en', 'de'] as const) {
         await shot(page, 'reading-country');
         await page.goto(`/countries/${source.countryIso}/versions/${source.versionId}`);
         await expect(page.getByRole('heading', { level:1 })).toBeVisible();
-        await shot(page, 'reading-text');
+        const detailLevel = page.getByRole('group', { name:t(ui.accessibility.detailLevel) });
+        await detailLevel.getByRole('button').last().click();
+        await shot(page, 'reading-text', detailLevel);
         await page.goto(`/countries/${source.countryIso}/compare`);
         await expect(page.locator('#compare-from')).toBeVisible();
         await expect(page.locator('#compare-to')).toBeVisible();
@@ -184,6 +186,8 @@ for (const locale of ['en', 'de'] as const) {
         await page.goto(`/countries/${source.countryIso}`);
         await watch.click(page.locator(`a[href="/countries/${source.countryIso}/versions/${publishedVersionId}"]`).first());
         await expect(page).toHaveURL(new RegExp(`/versions/${publishedVersionId}$`));
+        await watch.explain(text('Choose Full text to read the published wording.', 'Wählen Sie Full text, um den veröffentlichten Wortlaut zu lesen.'));
+        await watch.click(page.getByRole('group', { name:t(ui.accessibility.detailLevel) }).getByRole('button').last());
         const publicCorrection = page.getByText(correction).first();
         await expect(publicCorrection).toBeVisible();
         await watch.point(publicCorrection);

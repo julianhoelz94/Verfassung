@@ -33,11 +33,14 @@ test('an existing passkey protects password login and confirms the current sessi
   } });
   try {
     await page.goto('/account');
-    await page.locator('#passkey-name').fill('Security test device');
     await page.locator('#passkey-password').fill(password);
-    await page.getByRole('button', { name: 'Add passkey', exact: true }).click();
+    const addPasskey = page.getByRole('button', { name: 'Add passkey', exact: true });
+    await expect(addPasskey).toBeEnabled();
+    await page.locator('#passkey-name').fill('Security test device');
+    await addPasskey.click();
     await expect(page.locator('[aria-labelledby="passkeys-title"]').getByRole('status')).toHaveText('Passkey added.');
-    await expect(page.getByText('Security test device', { exact: false })).toBeVisible();
+    await page.reload();
+    await expect(page.locator('[aria-labelledby="passkeys-title"] li').filter({ hasText: 'Security test device' })).toBeVisible();
 
     const before = (await context.cookies()).find(cookie => cookie.name === 'ca_session')!.value;
     await page.goto('/account/step-up?returnTo=%2Faccount%3Fverified%3D1');

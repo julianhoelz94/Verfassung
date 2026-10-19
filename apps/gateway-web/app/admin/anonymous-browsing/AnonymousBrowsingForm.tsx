@@ -21,11 +21,12 @@ function RateFields({ prefix, label, rate, disabled }: { prefix: string; label: 
   </fieldset>;
 }
 
-export function AnonymousBrowsingForm({ policy }: { policy: AnonymousBrowsingPolicy }) {
+export function AnonymousBrowsingForm({ policy, returnTo }: { policy: AnonymousBrowsingPolicy; returnTo?: '/setup' | '/admin/settings' }) {
   const t = useTranslation();
   const [allowed, setAllowed] = useState(policy.allowed);
   const displayed = (rate: AnonymousRate): AnonymousRate => allowed ? rate : { ...rate, requests: 0 };
   return <form action={saveAnonymousBrowsingAction}>
+    {returnTo ? <input type="hidden" name="returnTo" value={returnTo} /> : null}
     <label><input type="checkbox" name="allowed" checked={allowed} onChange={(event) => setAllowed(event.target.checked)} /> <T value={ui.admin.anonymousBrowsing.anonymousbrowsingform.allowAnonymousBrowsing} /></label>
     <p className="muted"><T value={ui.admin.anonymousBrowsing.anonymousbrowsingform.whenOffAnonymousContentApiCallsAnd} /></p>
     {!allowed ? <p role="status"><T value={ui.admin.anonymousBrowsing.anonymousbrowsingform.effectiveRates0CallsPerIpAnd} /></p> : null}

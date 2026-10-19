@@ -354,6 +354,7 @@ export const ui = {
     unavailable: { en: 'Imports are temporarily unavailable. Try again.', de: 'Importe sind vorübergehend nicht verfügbar. Versuchen Sie es erneut.' },
     source: { en: 'Open source text', de: 'Quelltext öffnen' },
     submittedContent: { en: 'Submitted content and structure', de: 'Eingereichte Inhalte und Gliederung' },
+    previewUnavailable: { en: 'The prepared preview could not be loaded. Reload it before approving.', de: 'Die vorbereitete Vorschau konnte nicht geladen werden. Laden Sie die Seite vor der Freigabe erneut.' },
   },
   importActions: {
     status: { en: 'Status:', de: 'Status:' },

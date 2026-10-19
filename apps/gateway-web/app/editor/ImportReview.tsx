@@ -18,9 +18,10 @@ export async function ImportReview({ jobId, error }: { jobId: string; error?: st
   if (!user || !user.roles.some(role => ['editor', 'reviewer', 'publisher', 'admin'].includes(role))) {
     return <AdminForbidden title={ui.forbidden.import} />;
   }
+  const authorization = await requireSessionBearer();
   let job;
   try {
-    job = await getImportJob(jobId, await requireSessionBearer());
+    job = await getImportJob(jobId, authorization);
   } catch {
     return (
       <PageMain>
@@ -32,10 +33,12 @@ export async function ImportReview({ jobId, error }: { jobId: string; error?: st
   if (!job) {
     notFound();
   }
-  const payload = await getImportPayload(jobId, await requireSessionBearer()).catch(() => null);
-  const decisions = await getImportReviewDecisions(jobId, await requireSessionBearer()).catch(() => []);
-  const prepared = job.versionId ? await getPreparedImportContent(job.versionId, await requireSessionBearer()).catch(() => null) : null;
-  const settings = job.versionId ? await getVersionSettings(job.versionId).catch(() => null) : null;
+  const [payload, decisions, prepared, settings] = await Promise.all([
+    getImportPayload(jobId, authorization).catch(() => null),
+    getImportReviewDecisions(jobId, authorization).catch(() => []),
+    job.versionId ? getPreparedImportContent(job.versionId, authorization).catch(() => null) : null,
+    job.versionId ? getVersionSettings(job.versionId, authorization).catch(() => null) : null,
+  ]);
   const editor = user.roles.includes('editor') || user.roles.includes('admin');
   const reviewer = user.roles.includes('reviewer') || user.roles.includes('admin');
   const publisher = user.roles.includes('publisher') || user.roles.includes('admin');
@@ -53,6 +56,7 @@ export async function ImportReview({ jobId, error }: { jobId: string; error?: st
       <p><T value={ui.importActions.status} /> <T value={statusMessage(job.status)} /></p>
       {error ? <Alert tone="error"><T value={error === 'reason' ? ui.importActions.reasonRequired : ui.importActions.actionFailed} /></Alert> : null}
       {job.status === 'pending_review' ? <Alert><T value={ui.admin.import.jobid.page.thisImportIsPendingReviewItIs} /></Alert> : null}
+      {job.versionId && !prepared ? <Alert tone="error"><T value={ui.importReview.previewUnavailable} /></Alert> : null}
       {job.status === 'failed' ? <Alert tone="error"><T value={ui.admin.import.jobid.page.theImportFailed} /></Alert> : null}
       {job.status === 'completed' && versionHref ? (
         <Alert tone="success">
@@ -71,7 +75,7 @@ export async function ImportReview({ jobId, error }: { jobId: string; error?: st
         {!job.versionId && job.status === 'pending_review' && editor && payload?.outline && !job.outlineConfirmedBy ? <ActionForm action="confirm-outline" jobId={job.id} label={ui.importActions.confirmOutline} /> : null}
         {!job.versionId && job.status === 'pending_review' && editor && (!payload?.outline || job.outlineConfirmedBy) ? <ActionForm action="prepare" jobId={job.id} label={ui.importActions.prepareDraft} /> : null}
         {job.versionId && job.status === 'pending_review' && reviewer ? <>
-          <ActionForm action="approve" jobId={job.id} label={ui.importActions.approveDraft} />
+          {prepared ? <ActionForm action="approve" jobId={job.id} label={ui.importActions.approveDraft} /> : null}
           <ActionForm action="reject" jobId={job.id} label={ui.importActions.rejectImport} />
         </> : null}
         {job.status === 'approved' && publisher ? <ActionForm action="publish" jobId={job.id} label={ui.importActions.publishVersion} /> : null}

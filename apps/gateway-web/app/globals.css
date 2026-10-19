@@ -501,18 +501,13 @@ del.diff-remove {
 }
 
 .action-bar {
-  position: sticky;
-  bottom: 0;
+  position: static;
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: var(--space-2);
-  padding: var(--space-3) var(--space-4);
-  margin: var(--space-4) calc(-1 * var(--space-4)) calc(-1 * var(--space-4));
-  background: var(--color-surface);
-  border-top: 1px solid var(--color-line);
-  border-radius: 0 0 var(--radius-md) var(--radius-md);
-  box-shadow: 0 -6px 20px rgba(22, 32, 31, 0.06);
+  padding: 0;
+  margin: var(--space-4) 0 0;
 }
 
 details {
@@ -915,7 +910,7 @@ button.article-toggle[aria-expanded='false']::after {
   position: relative;
 }
 
-.search-inline input {
+.search-inline input[type='search'] {
   min-height: var(--control-min);
   width: 220px;
   padding: 0 var(--space-3) 0 36px;
@@ -1888,10 +1883,6 @@ button.article-toggle[aria-expanded='false']::after {
     border-radius: 0 0 var(--radius-md) var(--radius-md);
   }
 
-  .data-row .k {
-    display: none;
-  }
-
   .card-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -1982,14 +1973,6 @@ button.article-toggle[aria-expanded='false']::after {
     top: calc(var(--topbar-h) + var(--space-4));
   }
 
-  .action-bar {
-    position: static;
-    margin: var(--space-4) 0 0;
-    padding: 0;
-    background: transparent;
-    border: 0;
-    box-shadow: none;
-  }
 }
 
 .amendment-workspace {
@@ -2305,6 +2288,8 @@ button.article-toggle[aria-expanded='false']::after {
 .stack > .field { margin-bottom: 0; }
 .form-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); margin-top: var(--space-4); }
 .form-actions form { margin: 0; }
+.preference-form { display: grid; justify-items: start; gap: var(--space-3); }
+.panel > .panel-title:not(:first-child) { margin-top: var(--space-5); }
 .date-filter { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--space-3); }
 .date-filter .field { margin: 0; }
 .inline-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); margin-block: var(--space-3); }

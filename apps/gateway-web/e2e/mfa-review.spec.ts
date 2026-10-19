@@ -133,3 +133,19 @@ test.describe('German MFA', () => {
     await expect(page).toHaveURL(/\/editor$/);
   });
 });
+
+test('a phone editor can reach Save draft and reopen the saved text', async ({ page, request }) => {
+  await request.post(`${mock}/__sprint59_content`);
+  await signInAdmin(page);
+  await page.setViewportSize({ width: 320, height: 900 });
+  const response = await request.post(`${mock}/api/editor/edit-sessions`, { data: { versionId: REVIEW_CURRENT, hopKind: 'editorial_correction' } });
+  expect(response.ok()).toBeTruthy();
+  const session = await response.json();
+  await page.goto(`/editor?sessionId=${session.id}&versionId=${REVIEW_CURRENT}`);
+  await page.getByLabel('Article text', { exact: true }).fill('Saved from a narrow phone viewport.');
+  await page.getByRole('button', { name: 'Save draft', exact: true }).click();
+  await expect(page).toHaveURL(/saved=1/);
+  await page.reload();
+  await expect(page.getByLabel('Article text', { exact: true })).toHaveValue('Saved from a narrow phone viewport.');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBeTruthy();
+});

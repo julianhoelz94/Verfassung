@@ -16,6 +16,7 @@ import { revokeMcpKeyAction, revokeOAuthGrantAction } from './actions';
 import { MfaSetup } from '../components/MfaSetup';
 import { Disclosure } from '../components/Disclosure';
 import { reviewUi } from '../../lib/ui-review-messages';
+import { NavigatingActionForm } from '../components/NavigatingActionForm';
 import { CreateMcpKeyForm, RotateMcpKeyForm } from './McpKeyForms';
 import { LanguagePreferenceForm } from './LanguagePreferenceForm';
 import { translationUserSettings } from '../../lib/content-translation';
@@ -144,7 +145,7 @@ export default async function AccountPage(props: AccountPageProps) {
         </section>
         <section className="account-section" aria-labelledby="password-title">
         <h3 id="password-title"><T value={ui.account.page.changePassword} /></h3>
-        <form action={changePasswordAction}>
+        <NavigatingActionForm action={changePasswordAction}>
           <Input
             label={<T value={ui.attrs.accountPageInputLabelCurrentPassword} />}
             id="currentPassword"
@@ -163,7 +164,7 @@ export default async function AccountPage(props: AccountPageProps) {
             minLength={12}
           />
           <Button variant="primary"><T value={ui.account.page.updatePassword} /></Button>
-        </form>
+        </NavigatingActionForm>
         </section>
       </Card>
       <Card><PasskeyManager passkeys={passkeys} /></Card>

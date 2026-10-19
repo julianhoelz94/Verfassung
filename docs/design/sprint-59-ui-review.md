@@ -6,7 +6,7 @@ Baseline: `e0bacc3` (main, including Sprint 57 localization). Sprint 58 PR #135 
 
 ## Findings and implementation sequence
 
-| Finding | User consequence | Planned resolution |
+| Finding | User consequence | Delivered resolution |
 | --- | --- | --- |
 | Public country cards give correction history the same action treatment as reading | Routine readers see editorial maintenance as a primary task | Put correction history and structural metadata in secondary details; retain legal timeline and exact snapshot links |
 | Login always shows both authenticator and recovery fields | Two competing methods obscure the normal action | Explicit method switch, only active field submitted and validated |
@@ -85,3 +85,21 @@ Independent review restored discovery of the privacy-notice editor through a lab
 The duplicate/dead-code scan removed superseded button/alert styles and an unused history helper. Shared `Disclosure`, `MfaSetup`, and `SnapshotNotice` components avoid repeating the new behavior. No public APIs, applied migrations or contract fixtures were removed.
 
 The before images in `screenshots/sprint-59/` were captured with fictional data from the baseline development server. Its editor image shows the session hub, not an active editing session; browser coverage separately includes the active correction editor. After images use the production build. Linux screenshot baselines live in `apps/gateway-web/e2e/snapshots/` and cover both languages for the newer page templates.
+
+## Copy decisions and workflow coverage
+
+| Information / action | Decision and reason | Journey evidence |
+| --- | --- | --- |
+| Effective dates, sources and verification | Keep visible: needed to identify and assess the legal text | `public-stories`, `ordered-reader`, real-stack `real-journeys` |
+| Typo/correction feeds and internal snapshot IDs | Move to secondary details: routine readers need legal chronology; exact pins remain reproducible | `mfa-review`, `journeys`, real-stack `roles` |
+| MFA recovery entry and manual setup key | Reveal deliberately; show authenticator code / QR first; new recovery codes stay visible once | `mfa-review`, `account-stories`, real-stack `account-admin` |
+| Account command examples and connection identifiers | Move to optional help; keep permission/expiry/one-time-secret consequences beside actions | real-stack `oauth-mcp`, `mcp-import` |
+| Import JSON editors | Move behind disclosure; offer existing/new workflow choice and file upload first | `admin-stories`, real-stack `roles` |
+| “Discard changes” navigation | Rewrite as “Back to my sessions”: leaving the editor is not a deletion | `journeys`, real-stack `roles` |
+| Registration/mail/translation configuration | Rename Site settings and state each Save scope | `admin-stories`, real-stack `self-registration` |
+| Technical failure messages | Shorten normal explanation and offer retry; diagnostic details stay optional | existing session-unavailable, login-error and error-boundary states |
+| Legal-page drafts, saved preview, separate publication | Keep explicit: these explain the publication consequence | `consent`, real-stack `legal-pages` |
+
+The ordinary-role sign-in journeys cover viewer, editor, reviewer, publisher and admin navigation. Restricted direct URLs and expired administrator sessions are checked separately. Session creation/resume and empty/review/publication queues, save/submit/approve/publish, stale quote review, restore and withdrawal retain existing focused journeys. Rich nested text, tables, notes and inline references are exercised in the real-stack `rich-structure` and `structured-editor` suites using API-uploaded fixtures. These are behavior checks in addition to the route gallery; a successful gallery render alone is not used to claim publication correctness.
+
+Verification identified a real client navigation failure: successful login/password Server Actions returned HTTP 303 with the right destination, but the client sometimes remained on the old page. The affected forms now await a returned, validated destination and load a fresh page. MFA enrollment confirmation keeps its one-time recovery result in explicit client state after the session cookie changes. Independent repetition and full-suite results are recorded below.

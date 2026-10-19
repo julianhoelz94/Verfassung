@@ -10,7 +10,7 @@ function oauthReturnPath(value: FormDataEntryValue | null): string | null {
   return path.length <= 4096 && path.startsWith('/oauth/authorize?') && !path.includes('\\') ? path : null;
 }
 
-export async function loginAction(formData: FormData): Promise<void> {
+export async function loginAction(formData: FormData): Promise<string> {
   const email = String(formData.get('email') ?? '');
   const password = String(formData.get('password') ?? '');
   const next = oauthReturnPath(formData.get('next'));
@@ -20,18 +20,17 @@ export async function loginAction(formData: FormData): Promise<void> {
     result = await login(email, password);
   } catch (error) {
     if (error instanceof IdentityApiError && error.status === 401) {
-      redirect(`/login?error=credentials${nextQuery}`);
+      return `/login?error=credentials${nextQuery}`;
     }
     if (error instanceof IdentityApiError && error.status === 429) {
-      redirect(`/login?error=rate-limit${nextQuery}`);
+      return `/login?error=rate-limit${nextQuery}`;
     }
-    redirect(`/login?error=unavailable${nextQuery}`);
+    return `/login?error=unavailable${nextQuery}`;
   }
   if ('mfa' in result) {
-    redirect(result.mfa === 'enroll' ? `/login/mfa?enroll=1${nextQuery}` : next ? `/login/mfa?next=${encodeURIComponent(next)}` : '/login/mfa');
+    return result.mfa === 'enroll' ? `/login/mfa?enroll=1${nextQuery}` : next ? `/login/mfa?next=${encodeURIComponent(next)}` : '/login/mfa';
   }
-  if (next) redirect(next);
-  redirect(canVisitEditor(result.user.roles) ? '/editor' : '/');
+  return next ?? (canVisitEditor(result.user.roles) ? '/editor' : '/');
 }
 
 export async function logoutAction(): Promise<void> {

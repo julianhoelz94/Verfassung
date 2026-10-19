@@ -46,8 +46,9 @@ async function requireAdminToken(): Promise<string> {
   return tokenOrRedirect();
 }
 
-export async function changePasswordAction(formData: FormData): Promise<void> {
-  const token = await tokenOrRedirect();
+export async function changePasswordAction(formData: FormData): Promise<string> {
+  const token = (await cookies()).get(SESSION_COOKIE)?.value;
+  if (!token) return '/login';
   try {
     await requestChangePassword(
       token,
@@ -55,9 +56,9 @@ export async function changePasswordAction(formData: FormData): Promise<void> {
       String(formData.get('newPassword') ?? ''),
     );
   } catch {
-    redirect('/account?error=1');
+    return '/account?error=1';
   }
-  redirect('/account?saved=1');
+  return '/account?saved=1';
 }
 
 export async function updateLanguagePreferenceAction(formData: FormData): Promise<boolean> {

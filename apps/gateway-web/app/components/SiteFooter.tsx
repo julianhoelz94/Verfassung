@@ -1,17 +1,21 @@
-import { T, ui } from './TranslationProvider';
+import { T } from './TranslationProvider';
+import { ui } from '../../lib/messages';
 import { CookieSettings } from './CookieSettings';
+import { currentLocale } from '../../lib/server-locale';
+import { message } from '../../lib/messages';
 
 type SiteFooterProps = {
   showApiDocs?: boolean;
 };
 
-export function SiteFooter({ showApiDocs = false }: SiteFooterProps) {
+export async function SiteFooter({ showApiDocs = false }: SiteFooterProps) {
+  const locale = await currentLocale();
   return (
     <footer className="footer">
       <div className="footer-inner">
         <p>
           <T value={ui.components.sitefooter.textsAreShownAsPublishedInOur} />{" "}</p>
-        <nav aria-label="Footer">
+        <nav aria-label={message(locale, ui.accessibility.footer)}>
           <a href="/about"><T value={ui.components.sitefooter.about} /></a>
           {' · '}
           <a href="/about#sources"><T value={ui.components.sitefooter.sources} /></a>

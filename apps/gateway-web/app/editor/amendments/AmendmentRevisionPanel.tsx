@@ -1,6 +1,7 @@
 'use client';
 
-import { T, ui } from '../../components/TranslationProvider';
+import { T, useTranslation } from '../../components/TranslationProvider';
+import { ui } from '../../../lib/messages';
 import { useMemo } from 'react';
 import type { Amendment } from '../../../lib/api';
 import type { AmendmentRevision } from '../../../lib/amendment-editor-api';
@@ -32,6 +33,7 @@ export function AmendmentRevisionPanel({
   onSelectRevision,
   canRestore,
 }: AmendmentRevisionPanelProps) {
+  const t = useTranslation();
   const ordered = useMemo(
     () =>
       [...revisions].sort((a, b) => {
@@ -65,7 +67,7 @@ export function AmendmentRevisionPanel({
                 <FormattedDate value={revision.createdAt} />
               </span>
               <span className="revision-actor">{actorLabel(revision.createdBy)}</span>
-              <Badge tone={isPublic ? 'added' : 'changed'}>{isPublic ? 'This is public' : 'Draft'}</Badge>
+              <Badge tone={isPublic ? 'added' : 'changed'}><T value={isPublic ? ui.remainingStatus.thisIsPublic : ui.remainingStatus.draft} /></Badge>
             </button>
           </li>
         );
@@ -90,7 +92,7 @@ export function AmendmentRevisionPanel({
         {list}
         {restoreForm}
       </details>
-      <aside className="panel panel-side revision-panel-desktop" aria-label="Revision history">
+      <aside className="panel panel-side revision-panel-desktop" aria-label={t(ui.accessibility.revisionHistory)}>
         <p className="panel-title"><T value={ui.editor.amendments.amendmentrevisionpanel.revisionHistory} /></p>
         {list}
         {restoreForm}

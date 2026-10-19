@@ -1,4 +1,7 @@
-import { T, ui } from '../../components/TranslationProvider';
+import { T } from '../../components/TranslationProvider';
+import { RoleList } from '../../components/SignedInSummary';
+import { statusMessage, roleMessage } from '../../../lib/ui-labels';
+import { ui } from '../../../lib/messages';
 import { cookies } from 'next/headers';
 import { AdminForbidden } from '../../components/AdminForbidden';
 import { Alert, Badge, Button, Card, DataList, DataRow, Input, PageHeader } from '../../components/ui';
@@ -27,7 +30,7 @@ function statusTone(user: AdminUser): 'added' | 'removed' | 'info' | 'neutral' {
 export default async function AdminUsersPage(props: AdminUsersPageProps) {
   const searchParams = await props.searchParams;
   if (!(await requireAdminPage())) {
-    return <AdminForbidden title="Users" />;
+    return <AdminForbidden title={ui.forbidden.users} />;
   }
   const token = (await cookies()).get(SESSION_COOKIE)?.value;
   let users: AdminUser[] = [];
@@ -84,14 +87,14 @@ export default async function AdminUsersPage(props: AdminUsersPageProps) {
           <DataRow
             key={item.id}
             cells={[
-              { label: 'Email', value: item.email },
+              { label: <T value={ui.remainingStatus.email} />, value: item.email },
               {
-                label: 'Status',
-                value: <Badge tone={statusTone(item)}>{item.status}</Badge>,
+                label: <T value={ui.remainingStatus.status} />,
+                value: <Badge tone={statusTone(item)}><T value={statusMessage(item.status)} /></Badge>,
               },
-              { label: 'Roles', value: item.roles.join(', ') },
+              { label: <T value={ui.remainingStatus.roles} />, value: <RoleList roles={item.roles} /> },
               {
-                label: 'Actions',
+                label: <T value={ui.remainingStatus.actions} />,
                 value:
                   item.status === 'invited' ? (
                     <span className="muted"><T value={ui.admin.users.page.waitingForTheInviteToBeAccepted} /></span>
@@ -110,7 +113,7 @@ export default async function AdminUsersPage(props: AdminUsersPageProps) {
                           <legend><T value={ui.admin.users.page.roles} /></legend>
                           {(['viewer', 'editor', 'reviewer', 'publisher', 'admin'] as const).map((role) =>
                             <label key={role} className="form-row">
-                              <input type="checkbox" name="role" value={role} defaultChecked={item.roles.includes(role)} /> {role}
+                              <input type="checkbox" name="role" value={role} defaultChecked={item.roles.includes(role)} /> <T value={roleMessage(role)} />
                             </label>
                           )}
                         </fieldset>
@@ -138,10 +141,10 @@ export default async function AdminUsersPage(props: AdminUsersPageProps) {
           <DataRow
             key={item.id}
             cells={[
-              { label: 'Name', value: item.name },
-              { label: 'Scopes', value: item.scopes.join(', ') },
+              { label: <T value={ui.remainingStatus.name} />, value: item.name },
+              { label: <T value={ui.remainingStatus.scopes} />, value: item.scopes.join(', ') },
               {
-                label: 'Expires',
+                label: <T value={ui.remainingStatus.expires} />,
                 value: item.revokedAt ? (
                   <Badge tone="removed"><T value={ui.admin.users.page.revoked} /></Badge>
                 ) : (
@@ -149,7 +152,7 @@ export default async function AdminUsersPage(props: AdminUsersPageProps) {
                 ),
               },
               {
-                label: 'Actions',
+                label: <T value={ui.remainingStatus.actions} />,
                 value: item.revokedAt ? (
                   <span className="muted"><T value={ui.admin.users.page.revoked} /></span>
                 ) : (

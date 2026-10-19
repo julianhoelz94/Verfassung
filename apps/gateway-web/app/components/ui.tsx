@@ -1,8 +1,11 @@
 import type { ButtonHTMLAttributes, CSSProperties, InputHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes } from 'react';
 import { Breadcrumbs } from './Breadcrumbs';
 import { SettingInfo, type SettingChangeability } from './SettingInfo';
+import { LocalizedRegion } from './LocalizedRegion';
+import { ui } from '../../lib/messages';
+import { T } from './TranslationProvider';
 
-type FieldInfo = { description: string; changeability: SettingChangeability; changeNote?: string };
+type FieldInfo = { description: ReactNode; changeability: SettingChangeability; changeNote?: ReactNode };
 
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: 'primary' | 'secondary' | 'ghost';
@@ -52,7 +55,7 @@ export function Chip({ href, active, children }: ChipProps) {
 }
 
 type PageHeaderProps = {
-  breadcrumbs?: { href?: string; label: string }[];
+  breadcrumbs?: { href?: string; label: ReactNode }[];
   eyebrow?: ReactNode;
   title: ReactNode;
   meta?: ReactNode;
@@ -73,7 +76,7 @@ export function PageHeader({ breadcrumbs, eyebrow, title, meta, actions }: PageH
   );
 }
 
-type PagerLink = { href: string; label: string };
+type PagerLink = { href: string; label: ReactNode };
 
 export function Toolbar({ children, label }: { children: ReactNode; label: string }) {
   return (
@@ -88,10 +91,10 @@ export function Pager({ previous, next }: { previous?: PagerLink; next?: PagerLi
     return null;
   }
   return (
-    <nav className="pager" aria-label="Pagination">
+    <LocalizedRegion as="nav" className="pager" label={ui.accessibilityDynamic.pagination}>
       {previous ? <a href={previous.href}>{previous.label}</a> : <span />}
       {next ? <a href={next.href}>{next.label}</a> : <span />}
-    </nav>
+    </LocalizedRegion>
   );
 }
 
@@ -104,11 +107,11 @@ export function DataList({ columns = 4, children }: { columns?: number; children
   );
 }
 
-export function DataRow({ cells }: { cells: { label: string; value: ReactNode }[] }) {
+export function DataRow({ cells }: { cells: { label: ReactNode; value: ReactNode }[] }) {
   return (
     <div className="data-row">
       {cells.map((cell, index) => (
-        <div key={`${cell.label}-${index}`}>
+        <div key={index}>
           <div className="k">{cell.label}</div>
           <div>{cell.value}</div>
         </div>
@@ -185,7 +188,7 @@ export function Card({ children, className }: { children: ReactNode; className?:
   return <section className={['card', className].filter(Boolean).join(' ')}>{children}</section>;
 }
 
-const WORKFLOW_STEPS = ['Draft', 'In review', 'Approved', 'Published'] as const;
+const WORKFLOW_STEPS = [ui.workflow.draft, ui.workflow.inReview, ui.workflow.approved, ui.workflow.published] as const;
 
 const WORKFLOW_INDEX: Record<string, number> = {
   open: 0,
@@ -197,17 +200,17 @@ const WORKFLOW_INDEX: Record<string, number> = {
 export function WorkflowSteps({ status }: { status: string }) {
   const current = WORKFLOW_INDEX[status] ?? 0;
   return (
-    <div className="status-steps" aria-label="Workflow">
+    <LocalizedRegion as="div" className="status-steps" label={ui.accessibilityDynamic.workflow}>
       <ol>
         {WORKFLOW_STEPS.map((label, index) => {
           const state = index < current ? 'is-done' : index === current ? 'is-current' : undefined;
           return (
-            <li key={label} className={state}>
-              {label}
+            <li key={label.en} className={state}>
+              <T value={label} />
             </li>
           );
         })}
       </ol>
-    </div>
+    </LocalizedRegion>
   );
 }

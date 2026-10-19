@@ -1,8 +1,10 @@
-import { T, ui } from '../../../components/TranslationProvider';
+import { T } from '../../../components/TranslationProvider';
+import { ui } from '../../../../lib/messages';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import { PageMain } from '../../../components/PageMain';
 import { AmendmentUnitLinks } from '../../../components/AmendmentUnitLinks';
+import { ContentTranslationRegion } from '../../../components/ContentTranslationRegion';
 import { ServiceUnavailable } from '../../../components/StatusMessage';
 import { Badge, PageHeader, type BadgeTone } from '../../../components/ui';
 import {
@@ -114,9 +116,9 @@ export default async function TimelinePage(props: TimelinePageProps) {
     <PageMain className="wide">
       <PageHeader
         breadcrumbs={[
-          { href: '/', label: 'Countries' },
+          { href: '/', label: <T value={ui.nav.countries} /> },
           { href: `/countries/${country.isoCode}`, label: country.name },
-          { label: 'Timeline' },
+          { label: <T value={ui.remainingStatus.timeline} /> },
         ]}
         title={<T value={ui.attrs.countriesCodeTimelinePagePageHeaderTitle} />}
         actions={
@@ -138,19 +140,21 @@ export default async function TimelinePage(props: TimelinePageProps) {
           const target = versionForPin(amendment.targetVersionId);
           return (
             <li key={amendment.id} className="timeline-item">
-              <FormattedDate className="timeline-date" value={amendment.enactedOn} fallback="Date unknown" />
+              <FormattedDate className="timeline-date" value={amendment.enactedOn} fallback={<T value={ui.remainingStatus.dateUnknown} />} />
               <article className="card">
-                <h2 className="card-title">{amendment.title}</h2>
+                <ContentTranslationRegion sourceLanguage={target?.languageCode ?? source?.languageCode ?? 'en'}>
+                <h2 className="card-title" data-translate-content>{amendment.title}</h2>
                 <p className="muted">
-                  {target ? `Version ${target.versionLabel}` : 'Version'}
+                  <T value={ui.remainingStatus.version} /> {target?.versionLabel}
                   {amendment.sourceReference ? ` · ${amendment.sourceReference}` : ''}
                 </p>
-                {amendment.comment || amendment.summary ? <p>{amendment.comment ?? amendment.summary}</p> : null}
+                {amendment.comment || amendment.summary ? <p data-translate-content>{amendment.comment ?? amendment.summary}</p> : null}
+                </ContentTranslationRegion>
                 {amendment.documents?.length ? (
                   <ul className="link-list">
                     {amendment.documents.map((document, index) => (
                       <li key={`${document.url ?? document.fileId ?? document.label ?? 'document'}-${index}`}>
-                        {document.url ? <a href={document.url} rel="noreferrer">{document.label ?? document.url}</a> : document.label ?? 'Archived document'}
+                        {document.url ? <a href={document.url} rel="noreferrer">{document.label ?? document.url}</a> : document.label ?? <T value={ui.remainingStatus.archivedDocument} />}
                       </li>
                     ))}
                   </ul>

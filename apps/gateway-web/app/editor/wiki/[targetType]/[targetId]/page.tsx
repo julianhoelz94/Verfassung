@@ -1,4 +1,7 @@
-import { T, ui } from '../../../../components/TranslationProvider';
+import { currentLocale } from '../../../../../lib/server-locale';
+import { message } from '../../../../../lib/messages';
+import { T } from '../../../../components/TranslationProvider';
+import { ui } from '../../../../../lib/messages';
 import { notFound, redirect } from 'next/navigation';
 import { PageMain } from '../../../../components/PageMain';
 import { PageHeader } from '../../../../components/ui';
@@ -15,6 +18,7 @@ type Props = {
 };
 
 export default async function WikiEditor({ params, searchParams }: Props) {
+  const locale = await currentLocale();
   const { targetType, targetId } = await params;
   const query = await searchParams;
   const historyPage = Math.max(0, Math.min(1000, Number.parseInt(query.historyPage ?? '0', 10) || 0));
@@ -118,14 +122,14 @@ export default async function WikiEditor({ params, searchParams }: Props) {
         </form>
       ) : null}
       {history.length > 0 || historyPage > 0 ? (
-        <section className="card" aria-label="Page revision history">
+        <section className="card" aria-label={message(locale, ui.accessibility.pageRevisionHistory)}>
           <h2><T value={ui.editor.wiki.targettype.targetid.page.pageRevisionHistory} /></h2>
           {history.length === 0 ? <p><T value={ui.editor.wiki.targettype.targetid.page.noRevisionsOnThisPage} /></p> : null}
           <ol className="stack">
             {history.slice(0, 25).map((revision) => (
               <li key={revision.id}>
                 <details>
-                  <summary>{revision.createdAt?.slice(0, 10) ?? 'Date not recorded'} · {revision.publishedAt ? 'Published' : 'Draft'} · {revision.createdBy?.slice(0, 8) ?? 'Unknown editor'} · {revision.summary}</summary>
+                  <summary>{revision.createdAt?.slice(0, 10) ?? message(locale, ui.remainingStatus.dateNotRecorded)} · {message(locale, revision.publishedAt ? ui.remainingStatus.published : ui.remainingStatus.draft)} · {revision.createdBy?.slice(0, 8) ?? message(locale, ui.remainingStatus.unknownEditor)} · {revision.summary}</summary>
                   <p>{revision.summary}</p>
                   <WikiImages images={revision.images.filter((image) => image.placement === 'before_body')} preview />
                   <WikiBody body={revision.body} />
@@ -135,7 +139,7 @@ export default async function WikiEditor({ params, searchParams }: Props) {
               </li>
             ))}
           </ol>
-          <nav className="setting-inline" aria-label="Page revision history pages">
+          <nav className="setting-inline" aria-label={message(locale, ui.accessibility.pageRevisionHistoryPages)}>
             {historyPage > 0 ? <a href={`?code=${encodeURIComponent(code)}&historyPage=${historyPage - 1}`}><T value={ui.editor.wiki.targettype.targetid.page.newerRevisions} /></a> : null}
             {history.length > 25 ? <a href={`?code=${encodeURIComponent(code)}&historyPage=${historyPage + 1}`}><T value={ui.editor.wiki.targettype.targetid.page.olderRevisions} /></a> : null}
           </nav>

@@ -5,6 +5,7 @@ import com.constitutionatlas.identity.crypto.Totp
 import com.constitutionatlas.identity.mail.OutboundMailer
 import com.constitutionatlas.identity.service.AccountService
 import com.constitutionatlas.identity.service.IdentitySeedRunner
+import com.constitutionatlas.identity.repo.ContentTranslationRepository
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.junit.jupiter.api.Test
 import org.mockito.ArgumentCaptor
@@ -43,6 +44,9 @@ class IdentityApiTest {
     lateinit var jdbcTemplate: JdbcTemplate
 
     @Autowired
+    lateinit var contentTranslationRepository: ContentTranslationRepository
+
+    @Autowired
     lateinit var identitySeedRunner: IdentitySeedRunner
 
     @Autowired
@@ -58,6 +62,34 @@ class IdentityApiTest {
     lateinit var outboundMailer: OutboundMailer
 
     private val objectMapper = ObjectMapper()
+
+    @Test
+    fun personalGoogleKeyIsStoredEncryptedAndSharedQuotaHasAHardCap() {
+        val viewer = login("local-viewer@example.local", "change-me")
+        try {
+            mockMvc.put("/content-translation/me") {
+                header("Authorization", "Bearer $viewer")
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"alwaysTranslate":true,"personalGoogleKey":"personal-test-key-123456"}"""
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.alwaysTranslate") { value(true) }
+                jsonPath("$.personalGoogleKeyConfigured") { value(true) }
+            }
+            val cipher = jdbcTemplate.queryForObject(
+                "SELECT google_key_cipher FROM user_content_translation_settings WHERE user_id = (SELECT id FROM users WHERE email = ?)",
+                String::class.java,
+                "local-viewer@example.local",
+            )
+            check(cipher != null && !cipher.contains("personal-test-key-123456"))
+            check(contentTranslationRepository.reserveSharedGoogle("2099-12", 499_999))
+            check(!contentTranslationRepository.reserveSharedGoogle("2099-12", 2))
+        } finally {
+            jdbcTemplate.update("DELETE FROM content_translation_google_reservations")
+            jdbcTemplate.update("DELETE FROM content_translation_google_usage WHERE billing_month = '2099-12'")
+            jdbcTemplate.update("DELETE FROM user_content_translation_settings WHERE user_id = (SELECT id FROM users WHERE email = ?)", "local-viewer@example.local")
+        }
+    }
 
     @Test
     fun anonymousBrowsingSettingsKeepSavedPositiveLimitsWhenDisabled() {

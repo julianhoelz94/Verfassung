@@ -1,4 +1,6 @@
-import { T, ui } from '../../../../components/TranslationProvider';
+import { T } from '../../../../components/TranslationProvider';
+import { ui } from '../../../../../lib/messages';
+import { currentLocale } from '../../../../../lib/server-locale';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import { PageMain } from '../../../../components/PageMain';
@@ -7,6 +9,7 @@ import { SiteSearchForm } from '../../../../components/SiteSearchForm';
 import { ServiceUnavailable } from '../../../../components/StatusMessage';
 import { Alert, Badge, PageHeader, Pager } from '../../../../components/ui';
 import { VersionReader } from '../../../../components/VersionReader';
+import { ContentTranslationRegion } from '../../../../components/ContentTranslationRegion';
 import {
   ApiUnavailableError,
   listAllUnits,
@@ -52,6 +55,7 @@ export async function generateMetadata(props: VersionPageProps): Promise<Metadat
 }
 
 export default async function VersionPage(props: VersionPageProps) {
+  const locale = await currentLocale();
   const params = await props.params;
   const searchParams = await props.searchParams;
   let country: CountryDetail | null = null;
@@ -123,7 +127,7 @@ export default async function VersionPage(props: VersionPageProps) {
     <PageMain className="wide">
       <PageHeader
         breadcrumbs={[
-          { href: '/', label: 'Countries' },
+          { href: '/', label: <T value={ui.nav.countries} /> },
           { href: `/countries/${country.isoCode}`, label: country.name },
           { label: version.version.versionLabel },
         ]}
@@ -136,10 +140,10 @@ export default async function VersionPage(props: VersionPageProps) {
               : version.version.latestPublished) ? (
               <Badge tone="accent"><T value={ui.countries.code.versions.versionid.page.latest} /></Badge>
             ) : null}
-            <Badge tone="info">{verificationLabel(version.version)}</Badge>
+            <Badge tone="info">{verificationLabel(version.version, locale)}</Badge>
             <span>{version.version.languageCode}</span>
             {version.version.gazetteReference ? <span>{version.version.gazetteReference}</span> : null}
-            <span>{provenanceLabel(version.version.provenance)}</span>
+            <span>{provenanceLabel(version.version.provenance, locale)}</span>
             {sourceHref ? (
               <a href={sourceHref} rel="noreferrer">
                 <T value={ui.countries.code.versions.versionid.page.source} />{" "}</a>
@@ -188,6 +192,7 @@ export default async function VersionPage(props: VersionPageProps) {
       {articles.length === 0 ? (
         <p><T value={ui.countries.code.versions.versionid.page.noArticlesArePublishedInThisVersion} /></p>
       ) : (
+        <ContentTranslationRegion sourceLanguage={version.version.languageCode}>
         <VersionReader
           code={country.isoCode}
           versionId={params.versionId}
@@ -197,6 +202,7 @@ export default async function VersionPage(props: VersionPageProps) {
           changeByArticle={changeByArticle}
           unchangedSinceLabel={previousPublished?.versionLabel}
         />
+        </ContentTranslationRegion>
       )}
       <Pager
         previous={

@@ -1,4 +1,7 @@
-import { T, ui } from '../../components/TranslationProvider';
+import { SignedInSummary } from '../../components/SignedInSummary';
+import { T } from '../../components/TranslationProvider';
+import { ui } from '../../../lib/messages';
+import { statusMessage } from '../../../lib/ui-labels';
 import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { PageMain } from '../../components/PageMain';
@@ -53,7 +56,7 @@ export default async function AmendmentsPage(props: AmendmentsPageProps) {
   if (!canVisitEditor(user.roles)) {
     return (
       <PageMain className="wide">
-        <PageHeader title={<T value={ui.attrs.editorAmendmentsPagePageHeaderTitleLegal} />} meta={`Signed in as ${user.email}, but this account has no editorial role.`} />
+        <PageHeader title={<T value={ui.attrs.editorAmendmentsPagePageHeaderTitleLegal} />} meta={<SignedInSummary email={user.email} noEditorialRole />} />
       </PageMain>
     );
   }
@@ -89,7 +92,7 @@ export default async function AmendmentsPage(props: AmendmentsPageProps) {
       <PageHeader
         title={<T value={ui.attrs.editorAmendmentsPagePageHeaderTitleLegal} />}
         eyebrow={<T value={ui.attrs.editorAmendmentsPagePageHeaderEyebrowEditorial} />}
-        meta={`Signed in as ${user.email}. Roles: ${user.roles.join(', ')}.`}
+        meta={<SignedInSummary email={user.email} roles={user.roles} />}
         actions={
           canEdit && selectedConstitution ? (
             <a className="btn btn-primary" href={newHref}>
@@ -131,17 +134,17 @@ export default async function AmendmentsPage(props: AmendmentsPageProps) {
                   key={amendment.id}
                   cells={[
                     {
-                      label: 'Title',
+                      label: <T value={ui.remainingStatus.title} />,
                       value: <a href={`/editor/amendments/${encodeURIComponent(amendment.id)}`}>{amendment.title}</a>,
                     },
-                    { label: 'Comment', value: amendment.comment ?? amendment.summary },
+                    { label: <T value={ui.remainingStatus.commentLabel} />, value: amendment.comment ?? amendment.summary },
                     {
-                      label: 'Enacted',
+                      label: <T value={ui.remainingStatus.enacted} />,
                       value: <FormattedDate value={amendment.enactedOn} />,
                     },
                     {
-                      label: 'Status',
-                      value: <span className="chip-row"><Badge tone={statusTone(amendment.status)}>{amendment.status ?? 'draft'}</Badge>{amendment.reviewStatus === 'needs_review' ? <Badge tone="changed"><T value={ui.editor.amendments.page.needsReview} /></Badge> : null}</span>,
+                      label: <T value={ui.remainingStatus.status} />,
+                      value: <span className="chip-row"><Badge tone={statusTone(amendment.status)}><T value={statusMessage(amendment.status ?? 'draft')} /></Badge>{amendment.reviewStatus === 'needs_review' ? <Badge tone="changed"><T value={ui.editor.amendments.page.needsReview} /></Badge> : null}</span>,
                     },
                   ]}
                 />

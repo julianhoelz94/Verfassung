@@ -1,6 +1,7 @@
 'use client';
 
-import { T, ui } from './TranslationProvider';
+import { T, useTranslation } from './TranslationProvider';
+import { ui } from '../../lib/messages';
 import { useMemo, useState } from 'react';
 import type { ArticleSummary, ContentOutline } from '../../lib/api';
 import { orderedTargets } from '../../lib/ordered-content';
@@ -44,6 +45,7 @@ export function VersionReader({
   changeByArticle = {},
   unchangedSinceLabel,
 }: VersionReaderProps) {
+  const t = useTranslation();
   const max = depthStopCount(outline);
   const labels = depthStopLabels(outline);
   const [depth, setDepth] = useState(1);
@@ -90,7 +92,7 @@ export function VersionReader({
         <Toc items={tocItems} landmarkId="toc" />
       </aside>
       <section>
-        <Toolbar label="Reading options">
+        <Toolbar label={t(ui.accessibility.readingOptions)}>
           <details className="toc-mobile">
             <summary className="btn btn-sm toc-button"><T value={ui.components.versionreader.contents} /></summary>
             {toc}
@@ -98,7 +100,7 @@ export function VersionReader({
           <Segmented
             labels={labels}
             value={depth}
-            ariaLabel="Detail level"
+            ariaLabel={t(ui.accessibility.detailLevel)}
             onChange={(next) => {
               setDepth(next);
               setExpanded(new Set());
@@ -106,7 +108,7 @@ export function VersionReader({
           />
           <span className="toolbar-spacer" />
           <span className="muted">
-            {articles.length} {articles.length === 1 ? 'unit' : 'units'}
+            {articles.length} <T value={articles.length === 1 ? ui.remainingStatus.unitSingular : ui.remainingStatus.unitPlural} />
           </span>
         </Toolbar>
         <ol className="version-articles text-column" lang={language}>
@@ -133,7 +135,7 @@ export function VersionReader({
                     disabled={depth >= max}
                     onClick={() => toggleArticle(article.id)}
                   >
-                    <span>{articleHeading(outline, article) || 'Unit'}</span>
+                    <span data-translate-content>{articleHeading(outline, article) || 'Unit'}</span>
                   </button>
                 </h2>
                 {open ? (
@@ -157,12 +159,12 @@ export function VersionReader({
                 )}
                 <p className="article-foot print-hide">
                   <a href={permalink}><T value={ui.components.versionreader.permalink} /></a>
-                  {article.kind === 'article' && article.articleNumber ? <a href={historyHref}><T value={ui.components.versionreader.historyOf} />{" "}{kindByCode(outline, article.kind)?.displayLabel ?? 'Article'} {article.articleNumber}</a> : null}
+                  {article.kind === 'article' && article.articleNumber ? <a href={historyHref}><T value={ui.components.versionreader.historyOf} />{" "}{kindByCode(outline, article.kind)?.displayLabel ?? t(ui.remainingStatus.article)} {article.articleNumber}</a> : null}
                   {changeType ? (
                     <Badge tone={changeTone(changeType)}>{changeType}</Badge>
                   ) : (
                     <span className="muted">
-                      {unchangedSinceLabel ? `Unchanged since ${unchangedSinceLabel}` : 'Unchanged'}
+                      {unchangedSinceLabel ? `${t(ui.readerDynamic.unchangedSince)} ${unchangedSinceLabel}` : t(ui.readerDynamic.unchanged)}
                     </span>
                   )}
                 </p>

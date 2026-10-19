@@ -1,7 +1,9 @@
-import { T, ui } from '../../../../../../components/TranslationProvider';
+import { T } from '../../../../../../components/TranslationProvider';
+import { ui } from '../../../../../../../lib/messages';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import { ConstitutionText } from '../../../../../../components/ConstitutionText';
+import { ContentTranslationRegion } from '../../../../../../components/ContentTranslationRegion';
 import { PageMain } from '../../../../../../components/PageMain';
 import { PrintLink } from '../../../../../../components/PrintLink';
 import { Provenance } from '../../../../../../components/Provenance';
@@ -90,9 +92,9 @@ export default async function ArticlePage(props: ArticlePageProps) {
     <PageMain>
       <PageHeader
         breadcrumbs={[
-          { href: '/', label: 'Countries' },
+          { href: '/', label: <T value={ui.nav.countries} /> },
           { href: `/countries/${country.isoCode}`, label: country.name },
-          { href: `/countries/${country.isoCode}/versions/${params.versionId}`, label: 'Articles' },
+          { href: `/countries/${country.isoCode}/versions/${params.versionId}`, label: <T value={ui.remainingStatus.articles} /> },
           { label: `Article ${article.articleNumber}` },
         ]}
         eyebrow={constitution ? `${country.name} · ${constitution.title}` : country.name}
@@ -113,6 +115,7 @@ export default async function ArticlePage(props: ArticlePageProps) {
           <Alert tone="error"><T value={ui.countries.code.versions.versionid.articles.articleid.page.theSectionTitleCouldNotBeSaved} /></Alert>
         ) : null}
         {version ? <Provenance version={version} /> : null}
+        <ContentTranslationRegion sourceLanguage={version?.languageCode ?? 'en'}>
         <ConstitutionText
           article={article}
           nodes={article.children}
@@ -127,6 +130,7 @@ export default async function ArticlePage(props: ArticlePageProps) {
             unitsByLogicalId: orderedTargets(siblings),
           }}
         />
+        </ContentTranslationRegion>
       </article>
     </PageMain>
   );

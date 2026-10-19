@@ -1,4 +1,8 @@
-import { T, ui } from '../components/TranslationProvider';
+import { SignedInSummary } from '../components/SignedInSummary';
+import { currentLocale } from '../../lib/server-locale';
+import { message } from '../../lib/messages';
+import { T } from '../components/TranslationProvider';
+import { ui } from '../../lib/messages';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { Alert, Button, Card, Input, PageHeader } from '../components/ui';
@@ -7,11 +11,12 @@ import { requestMcpKeys, requestOAuthGrants, requestPasskeys, requestStartMfaEnr
 import { PasskeyManager } from '../passkeys/PasskeyManager';
 import { SESSION_COOKIE, currentUser, mfaChallengeToken } from '../../lib/session';
 import { ConfirmEnrollForm, RegenerateRecoveryForm } from './MfaForms';
-import { changePasswordAction, revokeMfaAction, startMfaEnrollAction, updateLanguagePreferenceAction } from './actions';
+import { changePasswordAction, revokeMfaAction, startMfaEnrollAction, updateContentTranslationPreferenceAction } from './actions';
 import { revokeMcpKeyAction, revokeOAuthGrantAction } from './actions';
 import Image from 'next/image';
 import { CreateMcpKeyForm, RotateMcpKeyForm } from './McpKeyForms';
-import { availableLocales } from '../../lib/locale';
+import { LanguagePreferenceForm } from './LanguagePreferenceForm';
+import { translationUserSettings } from '../../lib/content-translation';
 
 type AccountPageProps = {
   searchParams: Promise<{
@@ -20,10 +25,12 @@ type AccountPageProps = {
     enroll?: string;
     mfaRevoked?: string;
     languageSaved?: string;
+    translationSaved?: string;
   }>;
 };
 
 export default async function AccountPage(props: AccountPageProps) {
+  const locale = await currentLocale();
   const searchParams = await props.searchParams;
   const user = await currentUser();
   if (!user) {
@@ -50,11 +57,12 @@ export default async function AccountPage(props: AccountPageProps) {
   const mcpKeys = sessionToken ? await requestMcpKeys(sessionToken).catch(() => []) : [];
   const oauthGrants = sessionToken ? await requestOAuthGrants(sessionToken).catch(() => []) : [];
   const passkeys = sessionToken ? await requestPasskeys(sessionToken).catch(() => []) : [];
+  const translationSettings = sessionToken ? await translationUserSettings(sessionToken).catch(() => null) : null;
   const canImport = user.roles.includes('editor') || user.roles.includes('admin');
   const mcpUrl = new URL('/mcp', process.env.PUBLIC_BASE_URL || 'http://localhost').toString();
   return (
     <PageMain>
-      <PageHeader title={<T value={ui.attrs.accountPagePageHeaderTitleAccount} />} meta={`Signed in as ${user.email}.`} />
+      <PageHeader title={<T value={ui.attrs.accountPagePageHeaderTitleAccount} />} meta={<SignedInSummary email={user.email} />} />
       {searchParams.error === 'mfa' ? (
         <Alert tone="error"><T value={ui.account.page.authenticatorActionFailedCheckTheCodeAnd} /></Alert>
       ) : searchParams.error === 'oauth' ? (
@@ -69,22 +77,25 @@ export default async function AccountPage(props: AccountPageProps) {
       {searchParams.saved ? <Alert tone="success"><T value={ui.account.page.passwordUpdated} /></Alert> : null}
       {searchParams.mfaRevoked ? <Alert tone="success"><T value={ui.account.page.authenticatorEnrollmentWasRevoked} /></Alert> : null}
       {searchParams.languageSaved ? <Alert tone="success"><T value={ui.account.page.languagePreferenceSaved} /></Alert> : null}
+      {searchParams.translationSaved ? <Alert tone="success"><T value={ui.admin.settings.page.settingsSaved} /></Alert> : null}
       <Card>
         <section className="account-section" aria-labelledby="language-title">
           <h2 id="language-title"><T value={ui.account.page.language} /></h2>
           <p><T value={ui.account.page.chooseTheWebsiteLanguageAutomaticFollowsYour} /></p>
-          <form action={updateLanguagePreferenceAction}>
-            <label htmlFor="languagePreference"><T value={ui.account.page.websiteLanguage} /></label>
-            <select id="languagePreference" name="languagePreference" defaultValue={user.languagePreference ?? 'auto'}>
-              <option value="auto"><T value={ui.account.page.automaticDeviceLanguage} /></option>
-              {availableLocales.map((locale) => (
-                <option value={locale} key={locale}><T value={ui.languageNames[locale]} /></option>
-              ))}
-            </select>
-            <Button variant="primary"><T value={ui.account.page.saveLanguage} /></Button>
-          </form>
+          <LanguagePreferenceForm preference={user.languagePreference ?? 'auto'} />
         </section>
       </Card>
+      {translationSettings ? <Card>
+        <h2><T value={ui.contentTranslation.title} /></h2>
+        <form action={updateContentTranslationPreferenceAction} className="stack">
+          <label><input type="checkbox" name="alwaysTranslate" defaultChecked={translationSettings.alwaysTranslate} /> <T value={ui.contentTranslation.alwaysTranslate} /></label>
+          <label htmlFor="personalGoogleKey"><T value={ui.contentTranslation.personalGoogleKey} /></label>
+          <input id="personalGoogleKey" name="personalGoogleKey" type="password" autoComplete="off" />
+          <p className="muted"><T value={ui.contentTranslation.personalKeyHint} /> {translationSettings.personalGoogleKeyConfigured ? <T value={ui.contentTranslation.keyConfigured} /> : null}</p>
+          {translationSettings.personalGoogleKeyConfigured ? <label><input type="checkbox" name="clearPersonalGoogleKey" /> <T value={ui.contentTranslation.clearPersonalKey} /></label> : null}
+          <Button variant="primary"><T value={ui.contentTranslation.save} /></Button>
+        </form>
+      </Card> : null}
       <Card>
         <section className="account-section" aria-labelledby="authenticator-title">
         <h2 id="authenticator-title"><T value={ui.account.page.authenticator} /></h2>
@@ -94,7 +105,7 @@ export default async function AccountPage(props: AccountPageProps) {
         {enrollRequested && enrollChallenge && enrollSecret ? (
           <>
             <p><T value={ui.account.page.scanThisQrCodeWithGoogleAuthenticator} /></p>
-            {enrollQr ? <Image src={enrollQr} alt="Authenticator setup QR code" width={208} height={208} unoptimized /> : null}
+            {enrollQr ? <Image src={enrollQr} alt={message(locale, ui.accessibility.authenticatorQr)} width={208} height={208} unoptimized /> : null}
             <p><T value={ui.account.page.ifYouCannotScanItEnterThis} />{" "}<code>{enrollSecret}</code></p>
             <p className="muted"><T value={ui.account.page.theKeyIsShownOnlyDuringSetup} /></p>
             <ConfirmEnrollForm challengeToken={enrollChallenge} />

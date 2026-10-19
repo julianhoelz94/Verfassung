@@ -1,4 +1,5 @@
-import { T, ui } from '../components/TranslationProvider';
+import { T } from '../components/TranslationProvider';
+import { ui } from '../../lib/messages';
 import { redirect } from 'next/navigation';
 import { Alert, Button, Card, Input, PageHeader } from '../components/ui';
 import { PageMain } from '../components/PageMain';
@@ -41,11 +42,11 @@ export default async function LoginPage(props: LoginPageProps) {
       {searchParams.error ? (
         <Alert tone="error">
           <span id="login-error">
-            {searchParams.error === 'unavailable'
-              ? 'Sign-in is temporarily unavailable. Check that the local stack is running.'
+            <T value={searchParams.error === 'unavailable'
+              ? ui.loginFeedback.unavailable
               : searchParams.error === 'rate-limit'
-                ? 'Too many sign-in attempts. Wait a moment and try again.'
-                : 'Invalid email or password.'}
+                ? ui.loginFeedback.rateLimit
+                : ui.loginFeedback.invalid} />
           </span>
         </Alert>
       ) : null}

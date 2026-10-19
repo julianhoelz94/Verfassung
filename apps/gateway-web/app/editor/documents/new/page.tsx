@@ -1,4 +1,5 @@
-import { T, ui } from '../../../components/TranslationProvider';
+import { T } from '../../../components/TranslationProvider';
+import { ui } from '../../../../lib/messages';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { Alert, PageHeader } from '../../../components/ui';
@@ -13,7 +14,7 @@ export default async function NewDocumentPage(props: { searchParams: Promise<{ r
   if (!canVisitEditor(user.roles)) redirect('/editor');
   const params = await props.searchParams;
   return <PageMain>
-    <PageHeader title={<T value={ui.attrs.editorDocumentsNewPagePageHeaderTitle} />} breadcrumbs={[{ href: '/editor/documents', label: 'Documents' }, { label: 'New' }]} />
+    <PageHeader title={<T value={ui.attrs.editorDocumentsNewPagePageHeaderTitle} />} breadcrumbs={[{ href: '/editor/documents', label: <T value={ui.nav.documents} /> }, { label: <T value={ui.remainingStatus.new} /> }]} />
     {params.error ? <Alert tone="error"><T value={ui.editor.documents.new.page.documentCouldNotBeCreatedCheckThe} /></Alert> : null}
     <form action={createDocumentAction} className="stack">
       <input type="hidden" name="returnTo" value={params.returnTo ?? '/editor/documents'} />

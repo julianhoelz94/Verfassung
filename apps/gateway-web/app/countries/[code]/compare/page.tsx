@@ -1,4 +1,6 @@
-import { T, ui } from '../../../components/TranslationProvider';
+import { T } from '../../../components/TranslationProvider';
+import { ui } from '../../../../lib/messages';
+import { currentLocale } from '../../../../lib/server-locale';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import { CompareView } from '../../../components/CompareView';
@@ -110,6 +112,7 @@ function hopChangeTone(changeType: string): 'added' | 'removed' | 'changed' | 'n
 }
 
 export default async function ComparePage(props: ComparePageProps) {
+  const locale = await currentLocale();
   const params = await props.params;
   const searchParams = await props.searchParams;
   let country: CountryDetail | null = null;
@@ -153,7 +156,7 @@ export default async function ComparePage(props: ComparePageProps) {
   const showAll = searchParams.all === '1';
   const user = await currentUser();
   const showReviewWarnings = Boolean(user && canVisitEditor(user.roles));
-  const selectedError = compareRequestError(country.constitutions, fromId, toId);
+  const selectedError = compareRequestError(country.constitutions, fromId, toId, locale);
   const path = fromId && toId && constitution && !selectedError ? versionPath(versions, fromId, toId) : null;
 
   let fromArticles: ArticleSummary[] = [];
@@ -254,9 +257,9 @@ export default async function ComparePage(props: ComparePageProps) {
     <PageMain className="wide">
       <PageHeader
         breadcrumbs={[
-          { href: '/', label: 'Countries' },
+          { href: '/', label: <T value={ui.nav.countries} /> },
           { href: `/countries/${country.isoCode}`, label: country.name },
-          { label: 'Compare' },
+          { label: <T value={ui.remainingStatus.compare} /> },
         ]}
         eyebrow={`${country.name}${constitution?.title ? ` · ${constitution.title}` : ''}`}
         title={<T value={ui.attrs.countriesCodeComparePagePageHeaderTitle} />}
@@ -370,7 +373,7 @@ export default async function ComparePage(props: ComparePageProps) {
                 <section key={row.key} className={`compare-article kind-${row.kind}`}>
                   <h2 className="section-title" id={row.rowId}>
                     {heading}{' '}
-                    <Badge tone={row.kind === 'same' ? 'neutral' : row.kind}>{COMPARE_KIND_LABEL[row.kind]}</Badge>
+                    <Badge tone={row.kind === 'same' ? 'neutral' : row.kind}><T value={COMPARE_KIND_LABEL[row.kind]} /></Badge>
                   </h2>
                   <div className="compare-grid">
                     <section className="compare-col compare-col-from" aria-label={fromVersion.versionLabel}>

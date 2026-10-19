@@ -1,4 +1,5 @@
-import { T, ui } from '../components/TranslationProvider';
+import { T } from '../components/TranslationProvider';
+import { ui } from '../../lib/messages';
 import Link from 'next/link';
 import { AdminForbidden } from '../components/AdminForbidden';
 import { PageMain } from '../components/PageMain';
@@ -7,7 +8,7 @@ import { requireAdminPage } from '../../lib/admin';
 
 export default async function AdminIndexPage() {
   if (!(await requireAdminPage())) {
-    return <AdminForbidden title="Admin" />;
+    return <AdminForbidden title={ui.forbidden.admin} />;
   }
   return (
     <PageMain>

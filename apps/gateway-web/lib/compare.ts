@@ -1,14 +1,15 @@
 import type { Amendment, ArticleSummary, ConstitutionSummary, VersionSummary } from './api';
+import { ui, type UiMessage } from './messages';
 
 import { orderedText } from './ordered-content';
 
 export type CompareKind = 'added' | 'removed' | 'changed' | 'same';
 
-export const COMPARE_KIND_LABEL: Record<CompareKind, string> = {
-  added: 'Added',
-  removed: 'Removed',
-  changed: 'Changed',
-  same: 'Unchanged',
+export const COMPARE_KIND_LABEL: Record<CompareKind, UiMessage> = {
+  added: ui.remainingStatus.added,
+  removed: ui.remainingStatus.removed,
+  changed: ui.remainingStatus.changed,
+  same: ui.readerDynamic.unchanged,
 };
 
 export function orderVersions(versions: VersionSummary[]): VersionSummary[] {
@@ -78,12 +79,13 @@ export function compareRequestError(
   constitutions: ConstitutionSummary[],
   fromId: string | undefined,
   toId: string | undefined,
+  locale: import('./locale').Locale = 'en',
 ): string | null {
   if (!fromId || !toId) {
-    return 'Choose two versions to compare.';
+    return ui.remainingStatus.compareChooseTwo[locale];
   }
   if (fromId === toId) {
-    return 'Choose two different versions along the published line.';
+    return ui.remainingStatus.compareDifferentVersions[locale];
   }
   const fromConstitution = constitutions.find((constitution) =>
     constitution.versions.some((version) => version.id === fromId),
@@ -92,16 +94,16 @@ export function compareRequestError(
     constitution.versions.some((version) => version.id === toId),
   );
   if (!fromConstitution || !toConstitution) {
-    return 'Those versions are not a forward path on this constitution’s published line.';
+    return ui.remainingStatus.compareNoForwardPath[locale];
   }
   if (fromConstitution.id !== toConstitution.id) {
-    return 'Choose two versions of the same constitution.';
+    return ui.remainingStatus.compareSameConstitution[locale];
   }
   const publicLine = fromConstitution.versions.filter(
     (version) => version.listing !== 'staff' && version.hopKind !== 'editorial_correction',
   );
   if (!versionPath(publicLine, fromId, toId)) {
-    return 'Those versions are not a forward path on this constitution’s published line.';
+    return ui.remainingStatus.compareNoForwardPath[locale];
   }
   return null;
 }

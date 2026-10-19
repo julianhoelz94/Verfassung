@@ -1,4 +1,7 @@
-import { T, ui } from '../../components/TranslationProvider';
+'use client';
+
+import { T, useLocale, useTranslation } from '../../components/TranslationProvider';
+import { ui } from '../../../lib/messages';
 import type { VersionSummary } from '../../../lib/api';
 import { orderVersions } from '../../../lib/compare';
 import { formatDate } from '../../../lib/format-date';
@@ -21,6 +24,8 @@ export function CompareForm({
   showAll = false,
   variant = 'bar',
 }: CompareFormProps) {
+  const locale = useLocale();
+  const t = useTranslation();
   const ordered = orderVersions(versions);
   if (ordered.length < 2) {
     return <p className="muted"><T value={ui.countries.code.compareform.publishAtLeastTwoVersionsToCompare} /></p>;
@@ -39,7 +44,7 @@ export function CompareForm({
           {ordered.map((version) => (
             <option key={version.id} value={version.id}>
               {version.versionLabel}
-              {version.effectiveDate ? ` · in force ${formatDate(version.effectiveDate)}` : ''}
+              {version.effectiveDate ? ` · ${t(ui.remainingStatus.inForce)} ${formatDate(version.effectiveDate, locale)}` : ''}
             </option>
           ))}
         </select>
@@ -49,7 +54,7 @@ export function CompareForm({
           {ordered.map((version) => (
             <option key={`to-${version.id}`} value={version.id}>
               {version.versionLabel}
-              {version.effectiveDate ? ` · in force ${formatDate(version.effectiveDate)}` : ''}
+              {version.effectiveDate ? ` · ${t(ui.remainingStatus.inForce)} ${formatDate(version.effectiveDate, locale)}` : ''}
             </option>
           ))}
         </select>

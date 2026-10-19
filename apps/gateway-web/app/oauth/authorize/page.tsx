@@ -1,4 +1,5 @@
-import { T, ui } from '../../components/TranslationProvider';
+import { T } from '../../components/TranslationProvider';
+import { ui } from '../../../lib/messages';
 import { currentUser } from '../../../lib/session';
 import { identityBaseUrl } from '../../../lib/identity-client';
 import { Alert, Button, Card, PageHeader } from '../../components/ui';

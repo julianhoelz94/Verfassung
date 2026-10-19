@@ -1,4 +1,5 @@
-import { T, ui } from '../../../components/TranslationProvider';
+import { T } from '../../../components/TranslationProvider';
+import { ui, type UiMessage } from '../../../../lib/messages';
 import { notFound, redirect } from 'next/navigation';
 import { PageMain } from '../../../components/PageMain';
 import { PageHeader } from '../../../components/ui';
@@ -26,12 +27,12 @@ function flatten(roots: ExportedUnit[]): Array<{ id: string; label: string; dept
   return rows;
 }
 
-const labels: Record<ConstitutionLifecycleEvent['eventType'], string> = {
-  adopted: 'Adopted',
-  commenced: 'Entered into force',
-  suspended: 'Suspended',
-  restored: 'Restored',
-  repealed: 'Repealed',
+const labels: Record<ConstitutionLifecycleEvent['eventType'], UiMessage> = {
+  adopted: ui.lifecycleEvents.adopted,
+  commenced: ui.lifecycleEvents.commenced,
+  suspended: ui.lifecycleEvents.suspended,
+  restored: ui.lifecycleEvents.restored,
+  repealed: ui.lifecycleEvents.repealed,
 };
 
 export default async function LifecycleEditor({ params, searchParams }: Props) {
@@ -65,9 +66,9 @@ export default async function LifecycleEditor({ params, searchParams }: Props) {
       <PageHeader
         title={`Lifecycle · ${constitution.title}`}
         breadcrumbs={[
-          { href: '/', label: 'Countries' },
+          { href: '/', label: <T value={ui.nav.countries} /> },
           { href: `/countries/${code}`, label: country.name },
-          { label: 'Lifecycle' },
+          { label: <T value={ui.remainingStatus.lifecycle} /> },
         ]}
       />
       {query.saved ? <p role="status"><T value={ui.editor.lifecycle.constitutionid.page.lifecycleEventRecorded} /></p> : null}
@@ -75,7 +76,7 @@ export default async function LifecycleEditor({ params, searchParams }: Props) {
       <ol>
         {events.map((event) => (
           <li key={event.id}>
-            <time dateTime={event.eventDate}>{event.dateCertainty === 'approximate' ? 'Circa ' : ''}{event.eventDate}</time> · {labels[event.eventType]}
+            <time dateTime={event.eventDate}>{event.dateCertainty === 'approximate' ? <T value={ui.remainingStatus.circa} /> : ''}{event.eventDate}</time> · {<T value={labels[event.eventType]} />}
             {event.note ? ` · ${event.note}` : ''}
           </li>
         ))}
@@ -96,7 +97,7 @@ export default async function LifecycleEditor({ params, searchParams }: Props) {
           <input type="hidden" name="code" value={code.toLowerCase()} />
           <label htmlFor="event-type"><T value={ui.editor.lifecycle.constitutionid.page.event} /></label>
           <select id="event-type" name="eventType" required>
-            {allowed.map((kind) => <option key={kind} value={kind}>{labels[kind]}</option>)}
+            {allowed.map((kind) => <option key={kind} value={kind}>{<T value={labels[kind]} />}</option>)}
           </select>
           <label htmlFor="event-date"><T value={ui.editor.lifecycle.constitutionid.page.effectiveDate} /></label>
           <input id="event-date" type="date" name="eventDate" min={last?.eventDate} required />

@@ -1,4 +1,7 @@
-import { T, ui } from '../components/TranslationProvider';
+import { currentLocale } from '../../lib/server-locale';
+import { message } from '../../lib/messages';
+import { T } from '../components/TranslationProvider';
+import { ui } from '../../lib/messages';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { FiltersPanel } from '../components/FiltersPanel';
@@ -101,6 +104,7 @@ function SearchFilters({
 }
 
 export default async function SearchPage(props: SearchPageProps) {
+  const locale = await currentLocale();
   const searchParams = await props.searchParams;
   const query = searchParams.q?.trim() ?? '';
   const country = searchParams.country?.trim() ?? '';
@@ -148,8 +152,8 @@ export default async function SearchPage(props: SearchPageProps) {
   return (
     <PageMain className="wide">
       <PageHeader
-        breadcrumbs={[{ href: '/', label: 'Countries' }, { label: 'Search' }]}
-        title={query ? `Results for “${query}”` : 'Search'}
+        breadcrumbs={[{ href: '/', label: message(locale, ui.nav.countries) }, { label: message(locale, ui.remainingStatus.search) }]}
+        title={query ? `${message(locale, ui.remainingStatus.resultsFor)} “${query}”` : message(locale, ui.remainingStatus.search)}
       />
       <form className="search-page-form" action="/search" method="get">
         <label htmlFor="search-q" className="flex-grow">
@@ -158,7 +162,7 @@ export default async function SearchPage(props: SearchPageProps) {
             type="search"
             name="q"
             defaultValue={query}
-            placeholder="Across published articles"
+            placeholder={message(locale, ui.accessibility.acrossPublishedArticles)}
           />
         </label>
         <button className="btn btn-primary" type="submit">
@@ -213,12 +217,12 @@ export default async function SearchPage(props: SearchPageProps) {
               <Pager
                 previous={
                   offset > 0
-                    ? { href: searchUrl({ ...urlParams, offset: Math.max(0, offset - limit) }), label: 'Previous' }
+                    ? { href: searchUrl({ ...urlParams, offset: Math.max(0, offset - limit) }), label: <T value={ui.remainingStatus.previous} /> }
                     : undefined
                 }
                 next={
                   offset + limit < total
-                    ? { href: searchUrl({ ...urlParams, offset: offset + limit }), label: 'Next' }
+                    ? { href: searchUrl({ ...urlParams, offset: offset + limit }), label: <T value={ui.remainingStatus.next} /> }
                     : undefined
                 }
               />

@@ -1,4 +1,5 @@
-import { T, ui } from './components/TranslationProvider';
+import { T } from './components/TranslationProvider';
+import { ui } from '../lib/messages';
 import {
   ApiUnavailableError,
   getCountry,
@@ -30,7 +31,7 @@ export default async function Page() {
     return <PageMain className="wide">
       <section className="hero">
         <h1 className="page-title"><T value={ui.page.constitutionAtlas} /></h1>
-        <p className="lede">{policy ? 'Sign in to browse constitutions.' : 'Browsing settings are temporarily unavailable.'}</p>
+        <p className="lede"><T value={policy ? ui.homeDynamic.signInToBrowse : ui.homeDynamic.browsingUnavailable} /></p>
         <a className="btn btn-primary" href="/login"><T value={ui.page.logIn} /></a>
       </section>
     </PageMain>;
@@ -95,9 +96,9 @@ export default async function Page() {
         <SiteSearchForm
           id="home-search"
           className="hero-search"
-          placeholder="Try “human dignity” or “Art. 20”"
+          placeholder={ui.searchForm.homePlaceholder}
           submitClassName="btn btn-primary"
-          ariaLabel="Search published articles"
+          ariaLabel={ui.searchForm.searchPublishedArticles}
         />
         <div className="stats">
           <div>
@@ -185,7 +186,7 @@ export default async function Page() {
             {recentTop.map((row, index) => (
               <li key={`${row.versionId}-${row.articleNumber}-${index}`}>
                 <Badge>{row.changeType}</Badge>
-                <span>{row.articleNumber ? `Article ${row.articleNumber}` : 'An article'}</span>
+                <span>{row.articleNumber ? <><T value={ui.homeDynamic.article} /> {row.articleNumber}</> : <T value={ui.homeDynamic.anArticle} />}</span>
                 <span className="muted">
                   {row.countryName}
                   {row.date ? ` · ${row.date}` : ''}

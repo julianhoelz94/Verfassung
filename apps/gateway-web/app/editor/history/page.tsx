@@ -1,4 +1,6 @@
-import { T, ui } from '../../components/TranslationProvider';
+import { SignedInSummary } from '../../components/SignedInSummary';
+import { T } from '../../components/TranslationProvider';
+import { ui, type UiMessage } from '../../../lib/messages';
 import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { PageMain } from '../../components/PageMain';
@@ -13,17 +15,17 @@ type HistoryPageProps = {
   searchParams: Promise<{ constitutionId?: string }>;
 };
 
-const HOP_KIND_LABELS: Record<string, string> = {
-  initial: 'Initial',
-  legal: 'Legal change',
-  editorial_correction: 'Editorial correction',
+const HOP_KIND_LABELS: Record<string, UiMessage> = {
+  initial: ui.remainingStatus.initial,
+  legal: ui.remainingStatus.legalChange,
+  editorial_correction: ui.remainingStatus.editorialCorrection,
 };
 
-function hopKindLabel(hopKind: string | undefined): string {
+function hopKindLabel(hopKind: string | undefined): UiMessage {
   if (!hopKind) {
-    return 'Unknown';
+    return ui.remainingStatus.unknown;
   }
-  return HOP_KIND_LABELS[hopKind] ?? hopKind;
+  return HOP_KIND_LABELS[hopKind] ?? ui.remainingStatus.unknown;
 }
 
 function isStaffOnly(version: VersionSummary): boolean {
@@ -59,7 +61,7 @@ export default async function SnapshotHistoryPage(props: HistoryPageProps) {
   if (!canVisitEditor(user.roles)) {
     return (
       <PageMain className="wide">
-        <PageHeader title={<T value={ui.attrs.editorHistoryPagePageHeaderTitleSnapshot} />} meta={`Signed in as ${user.email}, but this account has no editorial role.`} />
+        <PageHeader title={<T value={ui.attrs.editorHistoryPagePageHeaderTitleSnapshot} />} meta={<SignedInSummary email={user.email} noEditorialRole />} />
       </PageMain>
     );
   }
@@ -106,7 +108,7 @@ export default async function SnapshotHistoryPage(props: HistoryPageProps) {
       <PageHeader
         title={<T value={ui.attrs.editorHistoryPagePageHeaderTitleSnapshot} />}
         eyebrow={<T value={ui.attrs.editorHistoryPagePageHeaderEyebrowEditorial} />}
-        meta={`Signed in as ${user.email}. Roles: ${user.roles.join(', ')}.`}
+        meta={<SignedInSummary email={user.email} roles={user.roles} />}
       />
       {constitutions.length > 0 && selectedConstitution ? (
         <form method="get" className="toolbar">
@@ -134,7 +136,7 @@ export default async function SnapshotHistoryPage(props: HistoryPageProps) {
                   key={legalId}
                   cells={[
                     {
-                      label: 'Label',
+                      label: <T value={ui.remainingStatus.label} />,
                       value: countryCode ? (
                         <a href={`/countries/${countryCode}/versions/${legal.currentVersionId ?? legal.id}`}>{legal.versionLabel}</a>
                       ) : (
@@ -142,32 +144,32 @@ export default async function SnapshotHistoryPage(props: HistoryPageProps) {
                       ),
                     },
                     {
-                      label: 'Hop kind',
+                      label: <T value={ui.remainingStatus.hopKind} />,
                       value: (
                         <span className="chip-row">
-                          <Badge tone="info">{hopKindLabel(legal.hopKind)}</Badge>
+                          <Badge tone="info"><T value={hopKindLabel(legal.hopKind)} /></Badge>
                           {editorial.length ? <Badge tone="changed">{editorial.length} <T value={ui.editor.history.page.editorialRevision} />{editorial.length === 1 ? '' : 's'}</Badge> : null}
                         </span>
                       ),
                     },
                     {
-                      label: 'Editorial revisions',
+                      label: <T value={ui.remainingStatus.editorialRevisions} />,
                       value: editorial.length ? (
                         <ol>
                           {editorial.map((version) => (
                             <li key={version.id}>
-                              {version.versionLabel} <T value={ui.editor.history.page.editorialCorrection} />{" "}{version.publicationComment ?? 'No publication comment'}
+                              {version.versionLabel} <T value={ui.editor.history.page.editorialCorrection} />{" "}{version.publicationComment ?? <T value={ui.remainingStatus.noPublicationComment} />}
                             </li>
                           ))}
                         </ol>
                       ) : 'No editorial revisions',
                     },
                     {
-                      label: 'Effective',
+                      label: <T value={ui.remainingStatus.effective} />,
                       value: <FormattedDate value={legal.effectiveDate} />,
                     },
                     {
-                      label: 'Outgoing change-record edges',
+                      label: <T value={ui.remainingStatus.outgoingChangeRecordEdges} />,
                       value: recordsForLegal(legalId).length ? (
                         <ul>
                           {recordsForLegal(legalId).map((amendment) => (
@@ -178,7 +180,7 @@ export default async function SnapshotHistoryPage(props: HistoryPageProps) {
                             </li>
                           ))}
                         </ul>
-                      ) : <span className="chip-row"><T value={ui.editor.history.page.noChangeRecord} />{" "}<Badge tone={legal.latestPublished ? 'added' : 'changed'}>{legal.latestPublished ? 'Latest published' : 'Historical'}</Badge></span>,
+                      ) : <span className="chip-row"><T value={ui.editor.history.page.noChangeRecord} />{" "}<Badge tone={legal.latestPublished ? 'added' : 'changed'}><T value={legal.latestPublished ? ui.remainingStatus.latestPublished : ui.remainingStatus.historical} /></Badge></span>,
                     },
                   ]}
                 />

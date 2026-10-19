@@ -1,4 +1,5 @@
-import { T, ui } from './TranslationProvider';
+import { T } from './TranslationProvider';
+import { ui } from '../../lib/messages';
 import type { WikiImage } from '../../lib/api';
 
 export function WikiImages({ images, preview = false }: { images: WikiImage[]; preview?: boolean }) {

@@ -1,10 +1,15 @@
-import { T, ui } from '../../components/TranslationProvider';
+import { T } from '../../components/TranslationProvider';
+import { ui } from '../../../lib/messages';
+import { message } from '../../../lib/messages';
+import { currentLocale } from '../../../lib/server-locale';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import { PageMain } from '../../components/PageMain';
 import { ServiceUnavailable } from '../../components/StatusMessage';
 import { WikiImages } from '../../components/WikiImages';
 import { WikiBody } from '../../components/WikiBody';
+import { ContentTranslationRegion } from '../../components/ContentTranslationRegion';
+import { lifecycleStatusMessage } from '../../../lib/lifecycle-label';
 import { WikiSources } from '../../components/WikiSources';
 import { Chip, PageHeader } from '../../components/ui';
 import { ApiUnavailableError, getCountry, getWikiPage, type CountryDetail } from '../../../lib/api';
@@ -66,6 +71,7 @@ export default async function CountryPage(props: CountryPageProps) {
   const showEditorialLinks = user ? canVisitEditor(user.roles) : false;
   const canRecordLifecycle = user?.roles.some((role) => role === 'publisher' || role === 'admin') ?? false;
   const countryWiki = await getWikiPage('country', country.id).catch(() => null);
+  const locale = await currentLocale();
   const constitutionWikis = new Map(
     await Promise.all(country.constitutions.map(async (constitution) => [
       constitution.id,
@@ -84,15 +90,15 @@ export default async function CountryPage(props: CountryPageProps) {
   return (
     <PageMain className="wide">
       <PageHeader
-        breadcrumbs={[{ href: '/', label: 'Countries' }, { label: country.name }]}
+        breadcrumbs={[{ href: '/', label: message(locale, ui.nav.countries) }, { label: country.name }]}
         title={<>{country.name}<span className="country-title-code" aria-hidden="true">{country.isoCode}</span></>}
         meta={
           <>
             <span>
-              {country.constitutions.length} <T value={ui.countries.code.page.constitution} />{" "}{country.constitutions.length === 1 ? '' : 's'}
+              {country.constitutions.length} <T value={country.constitutions.length === 1 ? ui.remainingStatus.constitutionSingular : ui.remainingStatus.constitutionPlural} />
             </span>
             <span>
-              {versionTotal} <T value={ui.countries.code.page.version} />{versionTotal === 1 ? '' : 's'}
+              {versionTotal} <T value={versionTotal === 1 ? ui.remainingStatus.versionSingular : ui.remainingStatus.versionPlural} />
             </span>
           </>
         }
@@ -106,9 +112,8 @@ export default async function CountryPage(props: CountryPageProps) {
       {countryWiki ? (
         <section className="card">
           <h2><T value={ui.countries.code.page.about} />{" "}{country.name}</h2>
-          <p>{countryWiki.summary}</p>
+          <ContentTranslationRegion sourceLanguage="auto"><p data-translate-content>{countryWiki.summary}</p><WikiBody body={countryWiki.body} /></ContentTranslationRegion>
           <WikiImages images={countryWiki.images.filter((image) => image.placement === 'before_body')} />
-          <WikiBody body={countryWiki.body} />
           <WikiImages images={countryWiki.images.filter((image) => image.placement !== 'before_body')} />
           <WikiSources sourceUrls={countryWiki.sourceUrls ?? []} />
         </section>
@@ -136,12 +141,8 @@ export default async function CountryPage(props: CountryPageProps) {
               <p><a href={`/editor/lifecycle/${constitution.id}?code=${country.isoCode}`}><T value={ui.countries.code.page.recordLifecycleEvent} /></a></p>
             ) : null}
             <p className="muted">
-              {constitution.interim ? 'Interim constitution · ' : ''}
-              {constitution.lifecycleStatus === 'in_force' ? 'In force' :
-                constitution.lifecycleStatus === 'awaiting_commencement' ? 'Adopted, not yet in force' :
-                constitution.lifecycleStatus === 'suspended' ? 'Suspended' :
-                constitution.lifecycleStatus === 'uncertain' ? 'Status uncertain' :
-                constitution.lifecycleStatus === 'repealed' ? 'Repealed' : 'Status not recorded'}
+              {constitution.interim ? <><T value={ui.lifecycle.interimConstitution} /> · </> : null}
+              <T value={lifecycleStatusMessage(constitution.lifecycleStatus)} />
             </p>
             {constitution.contentOutline && constitution.contentOutline.kinds.length > 0 ? (
               <p className="muted">

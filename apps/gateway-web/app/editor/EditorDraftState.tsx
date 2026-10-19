@@ -1,6 +1,7 @@
 'use client';
 
-import { T, ui } from '../components/TranslationProvider';
+import { T } from '../components/TranslationProvider';
+import { ui } from '../../lib/messages';
 import { createContext, useContext, useState, type ReactNode } from 'react';
 import { Button } from '../components/ui';
 const DraftState = createContext({ dirty: false, setDirty: (_value: boolean) => {} });

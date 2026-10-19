@@ -1,6 +1,8 @@
 'use client';
 
-import { T, ui } from '../../components/TranslationProvider';
+import { T, useTranslation } from '../../components/TranslationProvider';
+import { ui } from '../../../lib/messages';
+import { statusMessage } from '../../../lib/ui-labels';
 import { useMemo, useRef, useState, useTransition } from 'react';
 import type { Amendment, AmendmentDocument, ArticleSummary, VersionSummary } from '../../../lib/api';
 import { Alert, Badge, Button, Input, Select, TextArea } from '../../components/ui';
@@ -72,6 +74,7 @@ export function AmendmentForm({
   canReviewDiff = false,
   canAcknowledgeDiff = false,
 }: AmendmentFormProps) {
+  const t = useTranslation();
   const [sourceVersionId, setSourceVersionId] = useState(amendment?.sourceVersionId ?? versions[0]?.id ?? '');
   const [targetVersionId, setTargetVersionId] = useState(amendment?.targetVersionId ?? latestVersionId ?? '');
   const [changeRows, setChangeRows] = useState<ChangeRow[]>(() => initialRows(amendment));
@@ -98,7 +101,7 @@ export function AmendmentForm({
 
   function handleSuggest() {
     if (!suggestSourceId || !suggestTargetId) {
-      setSuggestError('Choose both source and target versions.');
+      setSuggestError(t(ui.remainingStatus.chooseSourceTarget));
       return;
     }
     startTransition(async () => {
@@ -149,7 +152,7 @@ export function AmendmentForm({
               amendment.status === 'published' ? 'added' : amendment.status === 'withdrawn' ? 'removed' : 'changed'
             }
           >
-            {amendment.status}
+            <T value={statusMessage(amendment.status)} />
           </Badge>
         </p>
       ) : null}
@@ -303,7 +306,7 @@ export function AmendmentForm({
             <Button type="button" onClick={closeSuggestDialog}>
               <T value={ui.editor.amendments.amendmentform.cancel} />{" "}</Button>
             <Button type="button" variant="primary" disabled={pending} onClick={handleSuggest}>
-              {pending ? 'Suggesting…' : 'Suggest changes'}
+              <T value={pending ? ui.remainingStatus.suggesting : ui.remainingStatus.suggestChanges} />
             </Button>
           </div>
         </div>

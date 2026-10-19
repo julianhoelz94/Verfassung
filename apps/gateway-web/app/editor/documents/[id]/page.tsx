@@ -1,4 +1,5 @@
-import { T, ui } from '../../../components/TranslationProvider';
+import { T } from '../../../components/TranslationProvider';
+import { ui } from '../../../../lib/messages';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { Alert, PageHeader } from '../../../components/ui';
@@ -20,7 +21,7 @@ export default async function DocumentDetailPage(props: { params: Promise<{ id: 
   ]);
   const writable = user.roles.some((role) => ['editor', 'publisher', 'admin'].includes(role)) && document.status === 'active';
   return <PageMain className="wide">
-    <PageHeader title={document.revision.title} breadcrumbs={[{ href: '/editor/documents', label: 'Documents' }, { label: document.revision.title }]} meta={`Revision ${document.currentRevision} · ${document.status}`} />
+    <PageHeader title={document.revision.title} breadcrumbs={[{ href: '/editor/documents', label: <T value={ui.nav.documents} /> }, { label: document.revision.title }]} meta={<><T value={ui.remainingStatus.revision} /> {document.currentRevision} · <T value={document.status === 'active' ? ui.remainingStatus.active : ui.remainingStatus.archived} /></>} />
     {params.created ? <Alert tone="success"><T value={ui.editor.documents.id.page.documentCreatedYouCanAttachItFrom} /></Alert> : null}
     {params.saved ? <Alert tone="success"><T value={ui.editor.documents.id.page.documentRevisionSaved} /></Alert> : null}
     {params.error ? <Alert tone="error"><T value={ui.editor.documents.id.page.theDocumentCouldNotBeSavedReload} /></Alert> : null}

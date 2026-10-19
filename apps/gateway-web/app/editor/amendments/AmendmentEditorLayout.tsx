@@ -1,6 +1,7 @@
 'use client';
 
-import { T, ui } from '../../components/TranslationProvider';
+import { T } from '../../components/TranslationProvider';
+import { ui } from '../../../lib/messages';
 import { useMemo, useState } from 'react';
 import type { Amendment, ArticleSummary, VersionSummary } from '../../../lib/api';
 import type { AmendmentRevision } from '../../../lib/amendment-editor-api';

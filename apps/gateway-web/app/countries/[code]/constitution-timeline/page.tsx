@@ -1,4 +1,5 @@
-import { T, ui } from '../../../components/TranslationProvider';
+import { T } from '../../../components/TranslationProvider';
+import { ui, type UiMessage } from '../../../../lib/messages';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import { PageMain } from '../../../components/PageMain';
@@ -18,19 +19,19 @@ import { publicVersions } from '../../../../lib/reading';
 
 type Props = { params: Promise<{ code: string }>; searchParams: Promise<{ on?: string }> };
 
-const labels: Record<ConstitutionLifecycleEvent['eventType'], string> = {
-  adopted: 'Adopted',
-  commenced: 'Entered into force',
-  suspended: 'Suspended',
-  restored: 'Restored',
-  repealed: 'Repealed',
+const labels: Record<ConstitutionLifecycleEvent['eventType'], UiMessage> = {
+  adopted: ui.lifecycleEvents.adopted,
+  commenced: ui.lifecycleEvents.commenced,
+  suspended: ui.lifecycleEvents.suspended,
+  restored: ui.lifecycleEvents.restored,
+  repealed: ui.lifecycleEvents.repealed,
 };
 
-const provisionLabels: Record<ProvisionLifecycleEvent['eventType'], string> = {
-  deferred: 'Commencement deferred for provisions',
-  commenced: 'Provisions entered into force',
-  suspended: 'Provisions suspended',
-  restored: 'Provisions restored',
+const provisionLabels: Record<ProvisionLifecycleEvent['eventType'], UiMessage> = {
+  deferred: ui.lifecycleEvents.provisionDeferred,
+  commenced: ui.lifecycleEvents.provisionCommenced,
+  suspended: ui.lifecycleEvents.provisionSuspended,
+  restored: ui.lifecycleEvents.provisionRestored,
 };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -120,9 +121,9 @@ export default async function ConstitutionTimelinePage({ params, searchParams }:
     <PageMain className="wide">
       <PageHeader
         breadcrumbs={[
-          { href: '/', label: 'Countries' },
+          { href: '/', label: <T value={ui.nav.countries} /> },
           { href: `/countries/${country.isoCode}`, label: country.name },
-          { label: 'Constitution timeline' },
+          { label: <T value={ui.remainingStatus.constitutionTimeline} /> },
         ]}
         title={<T value={ui.attrs.countriesCodeConstitutionTimelinePagePageHeaderTitle} />}
         actions={<a className="btn btn-sm" href={`/countries/${country.isoCode}/timeline`}><T value={ui.countries.code.constitutionTimeline.page.amendmentTimeline} /></a>}
@@ -171,7 +172,7 @@ export default async function ConstitutionTimelinePage({ params, searchParams }:
           const versions = publicVersions(constitution.versions);
           return (
             <li key={event.id} className="card">
-              <p><time dateTime={event.eventDate}>{event.scope === 'whole' && event.dateCertainty === 'approximate' ? 'Circa ' : ''}{event.eventDate}</time> · {event.scope === 'whole' ? labels[event.eventType] : provisionLabels[event.eventType]}</p>
+              <p><time dateTime={event.eventDate}>{event.scope === 'whole' && event.dateCertainty === 'approximate' ? <T value={ui.remainingStatus.circa} /> : ''}{event.eventDate}</time> · {<T value={event.scope === 'whole' ? labels[event.eventType] : provisionLabels[event.eventType]} />}</p>
               <h2 className="card-title">
                 <a href={`/countries/${country.isoCode}/constitutions/${constitution.id}`}>{constitution.title}</a>
                 {constitution.interim ? ' (interim)' : ''}

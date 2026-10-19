@@ -1,6 +1,7 @@
 'use client';
 
-import { T, ui } from './TranslationProvider';
+import { T } from './TranslationProvider';
+import { ui } from '../../lib/messages';
 import { Button, Input } from './ui';
 import { saveNodeTitleAction } from './node-actions';
 

@@ -1,9 +1,11 @@
 'use client';
 
-import { T, ui } from './TranslationProvider';
+import { T, useTranslation } from './TranslationProvider';
+import { ui } from '../../lib/messages';
 import { useEffect, useState, type ReactNode } from 'react';
 
 export function FiltersPanel({ children }: { children: ReactNode }) {
+  const t = useTranslation();
   const [desktop, setDesktop] = useState(false);
 
   useEffect(() => {
@@ -15,7 +17,7 @@ export function FiltersPanel({ children }: { children: ReactNode }) {
   }, []);
 
   if (desktop) {
-    return <aside className="search-sidebar" aria-label="Filters">{children}</aside>;
+    return <aside className="search-sidebar" aria-label={t(ui.accessibility.filters)}>{children}</aside>;
   }
 
   return (

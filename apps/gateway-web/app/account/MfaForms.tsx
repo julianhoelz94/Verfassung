@@ -1,6 +1,7 @@
 'use client';
 
-import { T, ui } from '../components/TranslationProvider';
+import { T } from '../components/TranslationProvider';
+import { ui } from '../../lib/messages';
 import { useFormState } from 'react-dom';
 import { Alert, Button, Input } from '../components/ui';
 import { confirmEnrollAction, type EnrollConfirmState } from '../login/actions';

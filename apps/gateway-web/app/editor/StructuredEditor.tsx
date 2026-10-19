@@ -1,6 +1,7 @@
 'use client';
 
-import { T, ui } from '../components/TranslationProvider';
+import { T, useTranslation } from '../components/TranslationProvider';
+import { ui } from '../../lib/messages';
 import { useEffect, useRef, useState } from 'react';
 import type { ContentOutline } from '../../lib/api';
 import { applyOperation, draftDifferences, findNode, nodes, scopedNodes, sentenceParts, token, validateDraft, type DraftDifference, type DraftEntry, type DraftNode, type DraftOperation, type StructuredPreview } from '../../lib/structured-editor';
@@ -10,6 +11,7 @@ import { Button } from '../components/ui';
 type ReviewDifference = DraftDifference & { sourceLink?: string; targetLink?: string };
 type Props = { review?: ReviewDifference[]; preview: StructuredPreview; outline: ContentOutline; rootId: string; versionId: string; articleId: string; constitutionId: string; editable: boolean; scope?: string; selectedNode?: string; publishedVersionId?: string | null; unitMapping?: Record<string, string> | null };
 export function StructuredEditor({ review = [], preview, outline, rootId, versionId, articleId, constitutionId, editable, scope: initialScope, selectedNode, publishedVersionId, unitMapping }: Props) {
+  const t = useTranslation();
   const [sourceRoots, setSourceRoots] = useState(preview.sourceRoots);
   const [overviewRoots, setOverviewRoots] = useState<DraftNode[]>([]);
   const [loadedRootIds, setLoadedRootIds] = useState([rootId]);
@@ -59,7 +61,7 @@ export function StructuredEditor({ review = [], preview, outline, rootId, versio
         if (original) setSourceRoots(current => current.map(root => root.logicalId === fullRootId ? original : root));
       } else setOverviewRoots(loaded.roots);
       setScope(view); setSelection(selected); remember(view, selected);
-    } catch (error) { setMessage(error instanceof Error ? error.message : 'Could not load view.'); }
+    } catch (error) { setMessage(error instanceof Error ? error.message : t(ui.state.viewLoadFailed)); }
     finally { setLoading(false); }
   }
   function changeScope(view: string) {
@@ -85,13 +87,13 @@ export function StructuredEditor({ review = [], preview, outline, rootId, versio
         nextOperations = coalesce ? [...nextOperations.slice(0, -1), command] : [...nextOperations, command];
         return command;
       }, () => nextRoots);
-      setHistory([...history, { roots, operations }]); setRoots(nextRoots); setOperations(nextOperations); setMessage('Unsaved changes');
-    } catch (error) { setMessage(error instanceof Error ? error.message : 'Invalid change'); }
+      setHistory([...history, { roots, operations }]); setRoots(nextRoots); setOperations(nextOperations); setMessage(t(ui.state.unsavedChanges));
+    } catch (error) { setMessage(error instanceof Error ? error.message : t(ui.state.invalidChange)); }
   }
   function change(op: Omit<DraftOperation, 'id'>) { transaction(emit => { emit(op); }); }
   function undo() {
     const previous = history.at(-1); if (!previous) return;
-    setRoots(previous.roots); setOperations(previous.operations); setHistory(history.slice(0, -1)); setMessage('Last change undone');
+    setRoots(previous.roots); setOperations(previous.operations); setHistory(history.slice(0, -1)); setMessage(t(ui.state.lastChangeUndone));
   }
   function createNode(kindCode: string, ancestors: Set<string> = new Set()): DraftNode {
       const level = outline.kinds.find(kind => kind.kindCode === kindCode);
@@ -114,7 +116,7 @@ export function StructuredEditor({ review = [], preview, outline, rootId, versio
       <div className={level.presentation === 'concatenated' ? 'sentence-canvas' : 'structured-content'}>
         {Array.from({ length: node.content.length + 1 }, (_, position) => <div key={position} className="structured-slot">
           {editable ? <div className="structured-insert" aria-label={`Insert at position ${position + 1} in ${level.displayLabel}`}>
-            {level.mayHoldText ? <button type="button" onClick={() => change({ type: 'insert_text', targetId: node.logicalId, expectedRevisionId: token(node), position, parts: [{ logicalId: crypto.randomUUID(), text: '' }] })}>+ {level.mayHoldChildren ? 'Parent text' : 'Text'}</button> : null}
+            {level.mayHoldText ? <button type="button" onClick={() => change({ type: 'insert_text', targetId: node.logicalId, expectedRevisionId: token(node), position, parts: [{ logicalId: crypto.randomUUID(), text: '' }] })}>+ <T value={level.mayHoldChildren ? ui.editorDynamic.parentText : ui.editorDynamic.text} /></button> : null}
             {level.mayHoldText ? <button type="button" onClick={() => change({ type: 'insert_text', targetId: node.logicalId, expectedRevisionId: token(node), position, parts: [{ logicalId: crypto.randomUUID(), text: 'Heading\nValue', format: 'table', table: { caption: '', rows: [{ logicalId: crypto.randomUUID(), cells: [{ logicalId: crypto.randomUUID(), text: 'Heading', header: true }] }, { logicalId: crypto.randomUUID(), cells: [{ logicalId: crypto.randomUUID(), text: 'Value' }] }] } }] })}><T value={ui.editor.structurededitor.table} /></button> : null}
             {level.mayHoldText ? <button type="button" onClick={() => change({ type: 'insert_text', targetId: node.logicalId, expectedRevisionId: token(node), position, parts: [{ logicalId: crypto.randomUUID(), text: 'Source note', format: 'footnote', footnoteLabel: '1' }] })}><T value={ui.editor.structurededitor.footnote} /></button> : null}
             {level.allowedChildKinds.map(kindCode => <button key={kindCode} type="button" onClick={() => newChild(node, position, kindCode)}>+ {kindName(kindCode)}</button>)}
@@ -142,9 +144,9 @@ export function StructuredEditor({ review = [], preview, outline, rootId, versio
     };
     const addReference = (target: NonNullable<DraftEntry['references']>[number]['target']) => {
       const range = ranges.current[id];
-      if (!range || range.start === range.end) { setMessage('Select the reference text first.'); return; }
-      if (target.type === 'external' && !target.url?.startsWith('https://')) { setMessage('Reference URLs must use HTTPS.'); return; }
-      if (entry.references?.some(ref => range.start < ref.end && range.end > ref.start)) { setMessage('Reference spans cannot overlap.'); return; }
+      if (!range || range.start === range.end) { setMessage(t(ui.state.selectReferenceText)); return; }
+      if (target.type === 'external' && !target.url?.startsWith('https://')) { setMessage(t(ui.state.referenceHttps)); return; }
+      if (entry.references?.some(ref => range.start < ref.end && range.end > ref.start)) { setMessage(t(ui.state.referenceOverlap)); return; }
       updateRich({ text: entry.text ?? '', format: 'plain', references: [...(entry.references ?? []), { logicalId: crypto.randomUUID(), start: range.start, end: range.end, target }] });
     };
     const editText = (value: string) => {
@@ -157,7 +159,7 @@ export function StructuredEditor({ review = [], preview, outline, rootId, versio
       updateRich({ text: value, format, footnoteLabel: entry.footnoteLabel, references });
     };
     function split(parts: string[]) {
-      if (parts.length < 2 || parts.some(part => !part)) { setMessage('Place the cursor inside the text to split it.'); return; }
+      if (parts.length < 2 || parts.some(part => !part)) { setMessage(t(ui.state.splitCursor)); return; }
       transaction((emit, current) => {
         const identified = parts.map(text => ({ logicalId: crypto.randomUUID(), text }));
         const splitCommand = emit({ type: 'split_text', targetId: id, expectedRevisionId: token(entry), parts: identified });
@@ -204,7 +206,7 @@ export function StructuredEditor({ review = [], preview, outline, rootId, versio
         {editable ? <button type="button" onClick={() => updateTable({ ...entry.table!, rows: [...entry.table!.rows, { logicalId: crypto.randomUUID(), cells: [{ logicalId: crypto.randomUUID(), text: '' }] }] })}><T value={ui.editor.structurededitor.row} /></button> : null}
       </fieldset> : <>
         {format === 'footnote' ? <label><T value={ui.editor.structurededitor.footnoteLabel} /><input value={entry.footnoteLabel ?? ''} disabled={!editable} onChange={event => updateRich({ text: entry.text ?? '', format: 'footnote', footnoteLabel: event.target.value })} /></label> : null}
-        <label>{format === 'footnote' ? 'Footnote text' : children || level.mayHoldChildren ? 'Unnumbered parent text' : `${level.displayLabel} text`}
+        <label>{format === 'footnote' ? <T value={ui.editorDynamic.footnoteText} /> : children || level.mayHoldChildren ? <T value={ui.editorDynamic.unnumberedParentText} /> : <>{level.displayLabel} <T value={ui.editorDynamic.text} /></>}
           <textarea value={entry.text ?? ''} disabled={!editable} rows={2} onFocus={() => select(id)} onSelect={event => { caret.current[id] = event.currentTarget.selectionStart; ranges.current[id] = { start: event.currentTarget.selectionStart, end: event.currentTarget.selectionEnd }; }} onChange={event => editText(event.target.value)} />
         </label>
       </>}
@@ -215,7 +217,7 @@ export function StructuredEditor({ review = [], preview, outline, rootId, versio
         {canMergeSentence ? <button type="button" onClick={mergeSentence}><T value={ui.editor.structurededitor.mergeWithNextSentence} /></button> : null}
         <button type="button" onClick={() => change({ type: 'remove', targetId: id, expectedRevisionId: token(entry) })}><T value={ui.editor.structurededitor.removeText} /></button>
       </div> : null}
-        {format === 'plain' && editable ? <div className="action-bar"><label><T value={ui.editor.structurededitor.referenceTarget} /><select value={referenceTargets[id] ?? ''} onChange={event => setReferenceTargets(current => ({ ...current, [id]: event.target.value }))}><option value=""><T value={ui.editor.structurededitor.chooseATarget} /></option>{allNodes.map(node => <option key={node.logicalId} value={`unit:${node.logicalId}`}>{kindName(node.kind)} {node.label ?? node.title ?? node.logicalId}</option>)}{nodes(root ? [root] : []).flatMap(node => node.content).filter(item => item.format === 'footnote').map(item => <option key={item.logicalId} value={`footnote:${item.logicalId}`}><T value={ui.editor.structurededitor.footnote2} />{" "}{item.footnoteLabel ?? item.logicalId}</option>)}</select></label><button type="button" onClick={() => { const [type, logicalId] = (referenceTargets[id] ?? '').split(':'); if (!logicalId) { setMessage('Choose a reference target.'); return; } addReference(type === 'footnote' ? { type: 'footnote', footnoteId: logicalId } : { type: 'unit', logicalId }); }}><T value={ui.editor.structurededitor.linkSelection} /></button><button type="button" onClick={() => { const url = window.prompt('HTTPS reference URL'); if (url) addReference({ type: 'external', url }); }}><T value={ui.editor.structurededitor.linkToUrl} /></button>{entry.references?.map(ref => <button key={ref.logicalId} type="button" onClick={() => updateRich({ text: entry.text ?? '', format: 'plain', references: entry.references?.filter(item => item.logicalId !== ref.logicalId) })}><T value={ui.editor.structurededitor.removeLink} />{" "}{(entry.text ?? '').slice(ref.start, ref.end)}</button>)}</div> : null}
+        {format === 'plain' && editable ? <div className="action-bar"><label><T value={ui.editor.structurededitor.referenceTarget} /><select value={referenceTargets[id] ?? ''} onChange={event => setReferenceTargets(current => ({ ...current, [id]: event.target.value }))}><option value=""><T value={ui.editor.structurededitor.chooseATarget} /></option>{allNodes.map(node => <option key={node.logicalId} value={`unit:${node.logicalId}`}>{kindName(node.kind)} {node.label ?? node.title ?? node.logicalId}</option>)}{nodes(root ? [root] : []).flatMap(node => node.content).filter(item => item.format === 'footnote').map(item => <option key={item.logicalId} value={`footnote:${item.logicalId}`}><T value={ui.editor.structurededitor.footnote2} />{" "}{item.footnoteLabel ?? item.logicalId}</option>)}</select></label><button type="button" onClick={() => { const [type, logicalId] = (referenceTargets[id] ?? '').split(':'); if (!logicalId) { setMessage(t(ui.state.chooseReferenceTarget)); return; } addReference(type === 'footnote' ? { type: 'footnote', footnoteId: logicalId } : { type: 'unit', logicalId }); }}><T value={ui.editor.structurededitor.linkSelection} /></button><button type="button" onClick={() => { const url = window.prompt(t(ui.state.httpsReferenceUrl)); if (url) addReference({ type: 'external', url }); }}><T value={ui.editor.structurededitor.linkToUrl} /></button>{entry.references?.map(ref => <button key={ref.logicalId} type="button" onClick={() => updateRich({ text: entry.text ?? '', format: 'plain', references: entry.references?.filter(item => item.logicalId !== ref.logicalId) })}><T value={ui.editor.structurededitor.removeLink} />{" "}{(entry.text ?? '').slice(ref.start, ref.end)}</button>)}</div> : null}
     </div>;
   }
   const scopeIndex = outline.kinds.findIndex(kind => kind.kindCode === scope);
@@ -238,12 +240,12 @@ export function StructuredEditor({ review = [], preview, outline, rootId, versio
     <input type="hidden" name="command" value="structured-save" /><input type="hidden" name="sessionId" value={preview.sessionId} /><input type="hidden" name="versionId" value={versionId} /><input type="hidden" name="articleId" value={articleId} />
     <input type="hidden" name="scope" value={scope} /><input type="hidden" name="selectedNode" value={selection} /><input type="hidden" name="structuredDraft" value={JSON.stringify({ expectedGeneration: preview.generation, operations })} />
     <div className="action-bar"><label><T value={ui.editor.structurededitor.editorView} /><select value={scope} disabled={loading} onChange={event => changeScope(event.target.value)}><option value="constitution"><T value={ui.editor.structurededitor.constitution} /></option>{outline.kinds.map(kind => <option key={kind.kindCode} value={kind.kindCode}>{kind.displayLabel}</option>)}</select></label><a href={`/admin/constitutions/${constitutionId}`}><T value={ui.editor.structurededitor.constitutionStructureSettings} /></a></div>
-    <p role="status">{loading ? 'Loading editor view…' : message || (preview.operations.length ? 'Saved draft' : 'Source snapshot')}</p>
+    <p role="status">{loading ? <T value={ui.editorDynamic.loadingEditor} /> : message || <T value={preview.operations.length ? ui.editor.structurededitor.savedDraft : ui.editor.structurededitor.sourceSnapshot} />}</p>
     {errors.length ? <div role="alert"><p><T value={ui.editor.structurededitor.resolveTheseIssuesBeforeSavingOrReview} /></p><ul>{errors.map(error => <li key={error}>{error}</li>)}</ul></div> : null}
-    <aside aria-label="Selection inspector"><p><T value={ui.editor.structurededitor.selected} />{" "}{selectedUnit?.kind ? kindName(selectedUnit.kind) : ''} {selectedUnit?.label} {selection !== selectedUnit?.logicalId ? '· Unnumbered parent text' : ''}</p></aside>
+    <aside aria-label={t(ui.accessibility.selectionInspector)}><p><T value={ui.editor.structurededitor.selected} />{" "}{selectedUnit?.kind ? kindName(selectedUnit.kind) : ''} {selectedUnit?.label} {selection !== selectedUnit?.logicalId ? <T value={ui.remainingStatus.unnumberedParentText} /> : ''}</p></aside>
     {broad ? <ul>{nodes(navigationRoots).filter(node => scope === 'constitution' ? roots.some(root => root.logicalId === node.logicalId) : node.kind === scope).map(node => <li key={node.logicalId}><button type="button" disabled={loading} onClick={() => { const nextScope = node.kind; const selectedRoot = navigationRoots.find(root => nodes([root]).some(child => child.logicalId === node.logicalId)); if (selectedRoot && !loadedRootIds.includes(selectedRoot.logicalId) && sourceRoots.some(root => root.logicalId === selectedRoot.logicalId)) void loadView(nextScope, node.logicalId, selectedRoot.logicalId); else { select(node.logicalId); setScope(nextScope); remember(nextScope, node.logicalId); } }}>{kindName(node.kind)} {node.label} {node.title}</button></li>)}</ul> : focusedNodes.length ? focusedNodes.map(node => renderNode(node)) : <p><T value={ui.editor.structurededitor.no} />{" "}{outline.kinds[scopeIndex]?.displayLabel} <T value={ui.editor.structurededitor.unitsInThisSelectionAddAChild} /></p>}
-    {editable && root ? <div className="action-bar" aria-label="Top-level unit actions">
-      {rootKinds.map(kind => <button key={kind.kindCode} type="button" onClick={() => change({ type: 'insert_root', targetId: root.logicalId, expectedRevisionId: token(root), position: roots.indexOf(root) + 1, node: createNode(kind.kindCode) })}>{rootKinds.length === 1 ? 'Add top-level unit' : `Add ${kind.displayLabel}`}</button>)}
+    {editable && root ? <div className="action-bar" aria-label={t(ui.accessibility.topLevelUnitActions)}>
+      {rootKinds.map(kind => <button key={kind.kindCode} type="button" onClick={() => change({ type: 'insert_root', targetId: root.logicalId, expectedRevisionId: token(root), position: roots.indexOf(root) + 1, node: createNode(kind.kindCode) })}>{rootKinds.length === 1 ? <T value={ui.editorDynamic.addTopLevelUnit} /> : <><T value={ui.editorDynamic.add} /> {kind.displayLabel}</>}</button>)}
       <button type="button" disabled={roots.indexOf(root) === 0} onClick={() => change({ type: 'move_root', targetId: root.logicalId, expectedRevisionId: token(root), position: roots.indexOf(root) - 1 })}><T value={ui.editor.structurededitor.moveTopLevelUnitEarlier} /></button>
       <button type="button" disabled={roots.length < 2} onClick={() => change({ type: 'remove', targetId: root.logicalId, expectedRevisionId: token(root) })}><T value={ui.editor.structurededitor.removeTopLevelUnit} /></button>
     </div> : null}

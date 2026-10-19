@@ -1,4 +1,5 @@
-import { T, ui } from '../../components/TranslationProvider';
+import { T } from '../../components/TranslationProvider';
+import { ui } from '../../../lib/messages';
 import { notFound } from 'next/navigation';
 import { PageHeader } from '../../components/ui';
 import { PageMain } from '../../components/PageMain';

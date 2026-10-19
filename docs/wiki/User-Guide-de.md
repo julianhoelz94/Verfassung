@@ -28,6 +28,16 @@ Unter **Über** finden Sie die Quellenkennzeichnungen und die Prüfgrundsätze d
 
 Verwenden Sie die Adresse der geöffneten Version oder Einheit als dauerhaften Link. Speichern Sie bei Zitaten die Versions-ID, da sich die neueste Version eines Landes später ändern kann. Eine ältere veröffentlichte Momentaufnahme behält ihre eigene Seite.
 
+## Sprache und Inhaltsübersetzung
+
+Die Website richtet sich nach der Gerätesprache, sofern sie unterstützt wird (derzeit Deutsch und Englisch). Andernfalls verwendet sie Englisch. Unter **Konto** können Sie bei **Sprache der Website** eine Sprache wählen oder zu **Automatisch: Gerätesprache** zurückkehren. Die Oberflächentexte und diese Handbücher sind vorab gepflegte Übersetzungen.
+
+Verfassungs-, Änderungs- und Hintergrundtexte können in ihrer Ausgangssprache vorliegen. Auf unterstützten Inhaltsseiten können Sie mit **Diesen Inhalt übersetzen** eine maschinelle Übersetzung in Ihre Website-Sprache anfordern. Dafür müssen Sie angemeldet sein; nicht angemeldete Besucher sehen die Schaltfläche und einen Anmeldehinweis. In der übersetzten Ansicht steht immer **Original anzeigen** zur Verfügung. Maschinelle Übersetzungen sind eine Lesehilfe. Für den genauen Wortlaut prüfen Sie das Original und die angegebene Quelle. Ist eine redaktionell veröffentlichte Fassung in Ihrer Sprache vorhanden, wird diese bevorzugt angezeigt.
+
+Unter **Konto → Inhaltsübersetzung** können Sie **Inhalte immer übersetzen** aktivieren. Die Einstellung gilt auf unterstützten Seiten, wenn keine redaktionelle Fassung verfügbar ist. Sie können auch einen persönlichen Google-Translate-API-Schlüssel hinterlegen. Er wird auf dem Server verschlüsselt gespeichert, später nicht mehr angezeigt und nur für Ihre Übersetzungsanfragen verwendet. Die Zeichen werden dann Ihrem eigenen Google-Projekt statt dem gemeinsamen Website-Kontingent zugerechnet. Administratoren können die maschinelle Übersetzung für die ganze Website deaktivieren oder zwischen Google und DeepL wechseln. Bei aktiver Übersetzung wird der ausgewählte Text an den Anbieter gesendet.
+
+Die deutschen und englischen Impressumstexte werden getrennt veröffentlicht. Anschrift und Kontaktdaten des Betreibers werden einmal gepflegt und in beiden Sprachfassungen angezeigt.
+
 ## Angaben zur Website und Datenschutz
 
 Unter **Über** finden Sie die Quellen- und Prüfgrundsätze, im **Impressum** die veröffentlichten Angaben zum Betreiber und unter **Datenschutzerklärung** die veröffentlichte Datenschutzerklärung. Beim ersten Besuch kann der Hinweis zu notwendigen Cookies geschlossen werden; er enthält Links zu den rechtlichen Seiten. Für redaktionelle Funktionen und Kontofunktionen ist eine Anmeldung erforderlich. Veröffentlichte Texte sind öffentlich lesbar, wenn anonymes Lesen erlaubt ist.

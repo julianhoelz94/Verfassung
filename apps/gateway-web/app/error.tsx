@@ -1,6 +1,7 @@
 'use client';
 
-import { T, ui } from './components/TranslationProvider';
+import { T } from './components/TranslationProvider';
+import { ui } from '../lib/messages';
 import Link from 'next/link';
 import { PageMain } from './components/PageMain';
 

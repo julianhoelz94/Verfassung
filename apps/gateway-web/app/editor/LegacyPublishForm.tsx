@@ -1,15 +1,17 @@
 'use client';
 
-import { T, ui } from '../components/TranslationProvider';
+import { T, useTranslation } from '../components/TranslationProvider';
+import { ui } from '../../lib/messages';
 import { Button, Input, TextArea } from '../components/ui';
 
 export function LegacyPublishForm({ sessionId, versionId, articleId }: { sessionId: string; versionId: string; articleId: string }) {
+  const t = useTranslation();
   const fields = <>
     <input type="hidden" name="sessionId" value={sessionId} />
     <input type="hidden" name="versionId" value={versionId} />
     <input type="hidden" name="articleId" value={articleId} />
   </>;
-  return <section className="stack" aria-label="Existing session publish">
+  return <section className="stack" aria-label={t(ui.accessibility.existingSessionPublish)}>
     <p className="muted"><T value={ui.editor.legacypublishform.thisSessionPredatesSeparatePublishJobsChoose} /></p>
     <form action="/editor/command" method="post" className="stack">
       <input type="hidden" name="command" value="publish" />

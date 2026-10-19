@@ -1,4 +1,7 @@
-import { T, ui } from '../../components/TranslationProvider';
+import { currentLocale } from '../../../lib/server-locale';
+import { message } from '../../../lib/messages';
+import { T } from '../../components/TranslationProvider';
+import { ui } from '../../../lib/messages';
 import { redirect } from 'next/navigation';
 import { Alert, Button, Card, Input, PageHeader } from '../../components/ui';
 import { PageMain } from '../../components/PageMain';
@@ -15,6 +18,7 @@ type MfaPageProps = {
 };
 
 export default async function MfaPage(props: MfaPageProps) {
+  const locale = await currentLocale();
   const searchParams = await props.searchParams;
   const user = await currentUser();
   const challenge = await mfaChallengeToken();
@@ -41,12 +45,8 @@ export default async function MfaPage(props: MfaPageProps) {
   return (
     <PageMain>
       <PageHeader
-        title={enroll ? 'Set up authenticator' : 'Authenticator code'}
-        meta={
-          enroll
-            ? 'Set up an authenticator app or a passkey before signing in.'
-            : 'Enter a 6-digit authenticator code or a recovery code.'
-        }
+        title={message(locale, enroll ? ui.loginFeedback.setupAuthenticator : ui.loginFeedback.authenticatorCode)}
+        meta={message(locale, enroll ? ui.loginFeedback.setupBeforeSignIn : ui.loginFeedback.enterCode)}
       />
       {searchParams.error ? (
         <Alert tone="error"><T value={ui.login.mfa.page.thatCodeCouldNotBeVerified} /></Alert>
@@ -56,7 +56,7 @@ export default async function MfaPage(props: MfaPageProps) {
           {secret ? (
             <>
               <p><T value={ui.login.mfa.page.scanThisCodeWithAnAuthenticatorApp} /></p>
-              {qrDataUrl ? <Image src={qrDataUrl} alt="Authenticator setup QR code" width={208} height={208} unoptimized /> : null}
+              {qrDataUrl ? <Image src={qrDataUrl} alt={message(locale, ui.accessibility.authenticatorQr)} width={208} height={208} unoptimized /> : null}
               <p><T value={ui.login.mfa.page.ifYouCannotScanItEnterThis} />{" "}<code>{secret}</code></p>
             </>
           ) : (

@@ -58,6 +58,12 @@ Open **Admin** for **Users**, **Account settings**, **Outlines**, and **Import**
 
 Admin also contains **Legal pages**. Save a private draft of the Impressum or Datenschutzerklärung, review its content and then publish it as a separate action. Confirm real operator details before public launch. Changes to legal pages do not publish constitutional text.
 
+The German and English legal texts have separate drafts and publication steps. Maintain the imprint's mandatory name, address and email in the shared contact fields; publish those reviewed fields before publishing either imprint text. Keep those details out of the language-specific body so a later address change has one source. Do not publish the sample legal text. A missing English publication falls back to the German original with a notice.
+
+An imprint published before this feature may still contain its address in the body. Its public display keeps that legacy body without appending the new shared contact record. Remove the embedded address, save a new draft, and publish it to switch to the shared record.
+
+Under **Admin → Account settings → Content translation**, choose Disabled, Google Translate or DeepL and configure the matching shared API key. Provider changes require a key for the new provider. The shared Google path reserves characters before each provider call and stops at 500,000 characters per UTC month or any rolling 31-day period. Cached results do not consume another reservation. A user's personal Google key bypasses the shared quota. Review provider data handling before enabling translation; source content is sent only after a signed-in user opts in or enables the account-wide automatic setting.
+
 In **Anonymous browsing**, an administrator can allow or block browsing without a signed-in account. Set positive API request limits separately for each IP address and for all anonymous visitors together, using a window in minutes, hours, or days. Saving this setting requires a fresh MFA step-up. When **Allow anonymous browsing** is unchecked, the displayed limits become zero and cannot be edited; the previously saved positive limits return when browsing is allowed again. Sign-in and account creation remain available to visitors when browsing is blocked.
 
 ## Connect a research client

@@ -1,4 +1,5 @@
-import { T, ui } from '../../components/TranslationProvider';
+import { T } from '../../components/TranslationProvider';
+import { ui } from '../../../lib/messages';
 import { AdminForbidden } from '../../components/AdminForbidden';
 import { Alert, Button, Card, Input, PageHeader, TextArea } from '../../components/ui';
 import { PageMain } from '../../components/PageMain';
@@ -14,7 +15,7 @@ export default async function AdminImportPage(props: AdminImportPageProps) {
   const searchParams = await props.searchParams;
   const user = await currentUser();
   if (!user || !user.roles.some(role => ['editor', 'reviewer', 'publisher', 'admin'].includes(role))) {
-    return <AdminForbidden title="Import" />;
+    return <AdminForbidden title={ui.forbidden.import} />;
   }
   const canImport = user.roles.includes('editor') || user.roles.includes('admin');
   const jobs = await listImportJobs(await requireSessionBearer()).catch(() => []);

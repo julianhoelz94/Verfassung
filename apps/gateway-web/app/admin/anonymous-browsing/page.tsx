@@ -1,4 +1,5 @@
-import { T, ui } from '../../components/TranslationProvider';
+import { T } from '../../components/TranslationProvider';
+import { ui } from '../../../lib/messages';
 import { cookies } from 'next/headers';
 import { AdminForbidden } from '../../components/AdminForbidden';
 import { PageMain } from '../../components/PageMain';
@@ -9,7 +10,7 @@ import { SESSION_COOKIE } from '../../../lib/session';
 import { AnonymousBrowsingForm } from './AnonymousBrowsingForm';
 
 export default async function AnonymousBrowsingPage({ searchParams }: { searchParams: Promise<{ error?: string; saved?: string }> }) {
-  if (!(await requireAdminPage())) return <AdminForbidden title="Anonymous browsing" />;
+  if (!(await requireAdminPage())) return <AdminForbidden title={ui.forbidden.anonymousBrowsing} />;
   const token = (await cookies()).get(SESSION_COOKIE)?.value;
   const policy = token ? await requestAdminAnonymousBrowsingPolicy(token).catch(() => null) : null;
   const params = await searchParams;

@@ -1,4 +1,8 @@
-import { T, ui } from '../components/TranslationProvider';
+import { SignedInSummary } from '../components/SignedInSummary';
+import { currentLocale } from '../../lib/server-locale';
+import { message } from '../../lib/messages';
+import { T } from '../components/TranslationProvider';
+import { ui } from '../../lib/messages';
 import { redirect } from 'next/navigation';
 import { ArticleFilterList } from '../components/ArticleFilterList';
 import { ConstitutionText } from '../components/ConstitutionText';
@@ -46,6 +50,7 @@ function hasRole(roles: string[], role: string): boolean {
 }
 
 export default async function EditorPage(props: EditorPageProps) {
+  const locale = await currentLocale();
   const searchParams = await props.searchParams;
   const user = await currentUser();
   if (!user) {
@@ -57,7 +62,7 @@ export default async function EditorPage(props: EditorPageProps) {
   if (!canEdit && !canReview && !canPublish) {
     return (
       <PageMain>
-        <PageHeader title={<T value={ui.attrs.editorPagePageHeaderTitleEditor} />} meta={`Signed in as ${user.email}, but this account has no editorial role.`} />
+        <PageHeader title={<T value={ui.attrs.editorPagePageHeaderTitleEditor} />} meta={<SignedInSummary email={user.email} noEditorialRole />} />
       </PageMain>
     );
   }
@@ -137,15 +142,15 @@ export default async function EditorPage(props: EditorPageProps) {
       {searchParams.published ? (
         <Alert tone="success">
           {searchParams.newVersionLabel
-            ? `Published as version ${searchParams.newVersionLabel}${searchParams.amendmentTitle ? ` · ${searchParams.amendmentTitle}` : ''}.`
-            : 'Published as a new version.'}
+            ? <><T value={ui.editorDynamic.publishedAsVersion} /> {searchParams.newVersionLabel}{searchParams.amendmentTitle ? ` · ${searchParams.amendmentTitle}` : ''}.</>
+            : <T value={ui.editorDynamic.publishedNewVersion} />}
         </Alert>
       ) : null}
       {searchParams.amendmentPending ? <Alert tone="error"><T value={ui.editor.page.theSnapshotWasPublishedButTheChange} /></Alert> : null}
     </>
   );
 
-  const title = `${selectedConstitution?.title ?? 'Constitution'} · ${selectedVersion?.versionLabel ?? ''}`.trim();
+  const title = `${selectedConstitution?.title ?? message(locale, ui.remainingStatus.constitution)} · ${selectedVersion?.versionLabel ?? ''}`.trim();
   const publicHref =
     selectedCountry && versionId ? `/countries/${selectedCountry.isoCode}/versions/${encodeURIComponent(versionId)}` : undefined;
   const canSave = Boolean(canEdit && session.status === 'open' && selected && versionId && searchParams.sessionId);
@@ -160,9 +165,9 @@ export default async function EditorPage(props: EditorPageProps) {
   return (
     <PageMain className="wide">
       <PageHeader
-        breadcrumbs={[{ href: '/editor', label: 'Editor' }, { label: `Session ${session.id.slice(0, 8)}` }]}
-        eyebrow={`${session.hopKind === 'legal' ? 'Next legal change' : 'Transcription correction'} · ${session.status}`}
-        title={title || 'Editor'}
+        breadcrumbs={[{ href: '/editor', label: <T value={ui.nav.editor} /> }, { label: `${message(locale, ui.remainingStatus.session)} ${session.id.slice(0, 8)}` }]}
+        eyebrow={`${message(locale, session.hopKind === 'legal' ? ui.remainingStatus.nextLegalChange : ui.remainingStatus.transcriptionCorrection)} · ${message(locale, session.status === 'open' ? ui.workflow.draft : session.status === 'reviewing' ? ui.workflow.inReview : session.status === 'approved' ? ui.workflow.approved : ui.workflow.published)}`}
+        title={title || <T value={ui.nav.editor} />}
         meta={<WorkflowSteps status={session.status} />}
         actions={
           publicHref ? (
@@ -174,8 +179,8 @@ export default async function EditorPage(props: EditorPageProps) {
       {alerts}
       {searchParams.sessionId && articles.length > 0 ? (
         <EditorDraftState><div className="workspace">
-          <aside className="panel" aria-label="Top-level units">
-            <h2 className="panel-title">{(settings?.outline ?? selectedConstitution?.contentOutline)?.kinds[0]?.kindCode === 'article' ? 'Articles' : 'Top-level units'}</h2>
+          <aside className="panel" aria-label={message(locale, ui.accessibility.topLevelUnits)}>
+            <h2 className="panel-title"><T value={(settings?.outline ?? selectedConstitution?.contentOutline)?.kinds[0]?.kindCode === 'article' ? ui.editorDynamic.articles : ui.editorDynamic.topLevelUnits} /></h2>
             <p className="muted">{draftIds.length} <T value={ui.editor.page.changed} /></p>
             <ArticleFilterList
               articles={articles}
@@ -187,7 +192,7 @@ export default async function EditorPage(props: EditorPageProps) {
           </aside>
           <section className="panel" aria-labelledby="edit-title">
             <p className="panel-title" id="edit-title">
-              {selected ? `${kindLabel(selected.kind)} ${selected.articleNumber}` : 'Unit'}
+              {selected ? `${kindLabel(selected.kind)} ${selected.articleNumber}` : message(locale, ui.editorDynamic.unit)}
             </p>
             {structured && selectedRoot && settings && versionId && selected && selectedConstitution ? <StructuredEditor
               key={`${session.id}:${structured.generation}:${selectedRoot.logicalId}`}
@@ -248,7 +253,7 @@ export default async function EditorPage(props: EditorPageProps) {
               ) : null}
             </div>
           </section>
-          <aside className="panel panel-side" aria-label="Session">
+          <aside className="panel panel-side" aria-label={message(locale, ui.accessibility.session)}>
             <p className="panel-title"><T value={ui.editor.page.session} /></p>
             <dl className="provenance provenance-list">
               <div>
@@ -259,11 +264,11 @@ export default async function EditorPage(props: EditorPageProps) {
               </div>
               <div>
                 <dt><T value={ui.editor.page.openedBy} /></dt>
-                <dd>{session.actorId === user.id ? 'you' : session.actorId.slice(0, 8)}</dd>
+                <dd>{session.actorId === user.id ? message(locale, ui.editorDynamic.you) : session.actorId.slice(0, 8)}</dd>
               </div>
               <div>
                 <dt><T value={ui.editor.page.changedArticles} /></dt>
-                <dd>{changedLabels.length > 0 ? changedLabels.join(', ') : 'None yet'}</dd>
+                <dd>{changedLabels.length > 0 ? changedLabels.join(', ') : message(locale, ui.editorDynamic.noneYet)}</dd>
               </div>
               <div>
                 <dt><T value={ui.editor.page.revisions} /></dt>

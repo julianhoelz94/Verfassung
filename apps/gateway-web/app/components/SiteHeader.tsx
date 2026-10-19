@@ -1,6 +1,8 @@
 'use client';
 
-import { T, ui, useTranslation } from './TranslationProvider';
+import { T, useTranslation } from './TranslationProvider';
+import { ui } from '../../lib/messages';
+import { roleMessage } from '../../lib/ui-labels';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { logoutAction } from '../login/actions';
@@ -45,7 +47,7 @@ function MenuSectionList({
               <div className="page-meta">
                 {section.identity.roles.map((role) => (
                   <Badge key={role} tone="accent">
-                    {role}
+                    <T value={roleMessage(role)} />
                   </Badge>
                 ))}
               </div>
@@ -88,7 +90,7 @@ export function SiteHeader({ user, identityUnavailable = false, needsReviewCount
           </span>
           <span className="brand-name"><T value={ui.components.siteheader.constitutionAtlas} /></span>
         </Link>
-        <nav className="nav-primary" aria-label="Primary">
+        <nav className="nav-primary" aria-label={t(ui.accessibility.primaryNavigation)}>
           {links.map((link) => (
             <a
               key={link.href}
@@ -106,12 +108,12 @@ export function SiteHeader({ user, identityUnavailable = false, needsReviewCount
             versionId={versionId}
             country={country}
             submitVisible={false}
-            ariaLabel="Header search"
+            ariaLabel={ui.searchForm.headerSearch}
           /> : null}
           {user ? (
             <MenuDisclosure
               key={pathname}
-              label="Account menu"
+              label={ui.searchForm.accountMenu}
               trigger={
                 <>
                   <span className="menu-trigger-phone" aria-hidden="true">
@@ -127,7 +129,7 @@ export function SiteHeader({ user, identityUnavailable = false, needsReviewCount
             <>
               <a className="btn btn-sm login-desktop" href="/login">
                 <T value={ui.components.siteheader.logIn} />{" "}</a>
-              <MenuDisclosure key={pathname} className="menu-phone" label="Menu" trigger={<span aria-hidden="true">☰</span>}>
+              <MenuDisclosure key={pathname} className="menu-phone" label={ui.searchForm.menu} trigger={<span aria-hidden="true">☰</span>}>
                 <MenuSectionList sections={sections} pathname={pathname} user={user} />
               </MenuDisclosure>
             </>
@@ -140,7 +142,7 @@ export function SiteHeader({ user, identityUnavailable = false, needsReviewCount
           versionId={versionId}
           country={country}
           submitVisible
-          ariaLabel="Mobile search"
+          ariaLabel={ui.searchForm.mobileSearch}
         />
       </div> : null}
       {identityUnavailable ? (

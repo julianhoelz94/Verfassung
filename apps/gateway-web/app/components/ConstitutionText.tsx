@@ -4,6 +4,8 @@ import { linkifyReferences, type CrossRefContext } from '../../lib/crossrefs';
 import { articleHeading, effectiveDisplayKind, groupNodes, kindByCode, nodeHeading } from '../../lib/outline';
 import { orderedText } from '../../lib/ordered-content';
 import { NodeTitleForm } from './NodeTitleForm';
+import { LocalizedTitle } from './LocalizedRegion';
+import { ui } from '../../lib/messages';
 
 export type ConstitutionCrossRefs = Omit<CrossRefContext, 'kindLabel'> & { unitsByLogicalId?: Record<string, { rootId: string; occurrenceId: string }> };
 
@@ -208,7 +210,7 @@ export function OrderedContentTree({ entries, outline, withRefs = (text) => text
       const unit = target.logicalId ? targets.get(target.logicalId) ?? crossRefs?.unitsByLogicalId?.[target.logicalId] : undefined;
       const href = target.type === 'external' ? target.url ?? undefined : target.type === 'footnote' && target.footnoteId && notes.get(target.footnoteId) ? `#${idPrefix}fn-${notes.get(target.footnoteId)}` : unit && crossRefs ? `/countries/${crossRefs.code}/versions/${crossRefs.versionId}/units/${unit.rootId}#${unit.occurrenceId}` : unit ? `#${idPrefix}${unit.occurrenceId}` : undefined;
       const label = value.slice(ref.start, ref.end);
-      result.push(renderReference ? <span key={ref.logicalId} id={`${idPrefix}ref-${ref.logicalId}`}>{renderReference(ref, label, href, entry)}</span> : href ? <a key={ref.logicalId} id={`${idPrefix}ref-${ref.logicalId}`} className="xref" href={href}>{label}</a> : <span key={ref.logicalId} className="xref-unavailable" title="Referenced provision is unavailable here">{label}</span>);
+      result.push(renderReference ? <span key={ref.logicalId} id={`${idPrefix}ref-${ref.logicalId}`}>{renderReference(ref, label, href, entry)}</span> : href ? <a key={ref.logicalId} id={`${idPrefix}ref-${ref.logicalId}`} className="xref" href={href}>{label}</a> : <LocalizedTitle key={ref.logicalId} className="xref-unavailable" label={ui.accessibilityDynamic.referenceUnavailable}>{label}</LocalizedTitle>);
       previous = ref.end;
     }
     if (previous < value.length) result.push(withRefs(value.slice(previous)));

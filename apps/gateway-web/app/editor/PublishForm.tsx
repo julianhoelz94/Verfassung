@@ -1,6 +1,7 @@
 'use client';
 
-import { T, ui } from '../components/TranslationProvider';
+import { T, useTranslation } from '../components/TranslationProvider';
+import { ui } from '../../lib/messages';
 import { useMemo, useState } from 'react';
 import { Button, Input, TextArea } from '../components/ui';
 import type { ChangeRecordChange, ChangeRecordUnitRef } from '../../lib/editor-api';
@@ -68,6 +69,7 @@ type PublishFormProps = {
 };
 
 export function PublishForm({ sessionId, versionId, articleId, hopKind, status, canEdit, canPublish, record, comment, structuredDraft, diffReview, canReviewDiff = false }: PublishFormProps) {
+  const t = useTranslation();
   const [changes, setChanges] = useState<ChangeRecordChange[]>(() => record?.changes?.length ? record.changes : [newChange()]);
   const [search, setSearch] = useState<Record<string, string>>({});
   const beforeUnits = useMemo(() => unitOptions(structuredDraft?.sourceRoots ?? [], versionId, true), [structuredDraft, versionId]);
@@ -111,8 +113,8 @@ export function PublishForm({ sessionId, versionId, articleId, hopKind, status, 
     const field = side === 'before' ? 'beforeRef' : 'afterRef';
     const selected = list.find((unit) => unit.logicalId === row[field]?.logicalId);
     return <div className="stack">
-      <Input id={`publish-${index}-${side}-search`} label={`Find ${side === 'before' ? 'source' : 'draft'} unit`} type="search" value={query} onChange={(event) => setSearch((current) => ({ ...current, [queryKey]: event.target.value }))} />
-      <label htmlFor={`publish-${index}-${side}-unit`}>{side === 'before' ? 'Before unit' : 'Draft after unit'}</label>
+      <Input id={`publish-${index}-${side}-search`} label={t(side === 'before' ? ui.editorDynamic.findSourceUnit : ui.editorDynamic.findDraftUnit)} type="search" value={query} onChange={(event) => setSearch((current) => ({ ...current, [queryKey]: event.target.value }))} />
+      <label htmlFor={`publish-${index}-${side}-unit`}><T value={side === 'before' ? ui.editorDynamic.beforeUnit : ui.editorDynamic.draftAfterUnit} /></label>
       <select id={`publish-${index}-${side}-unit`} value={row[field]?.logicalId ?? ''} required onChange={(event) => {
         const unit = list.find((candidate) => candidate.logicalId === event.target.value);
         if (!unit) return;
@@ -125,8 +127,8 @@ export function PublishForm({ sessionId, versionId, articleId, hopKind, status, 
     </div>;
   }
   return (
-    <section className="stack" aria-label={hopKind === 'legal' ? 'Change record' : 'Transcription comment'}>
-      <h3>{hopKind === 'legal' ? 'Change record' : 'Transcription comment'}</h3>
+    <section id="editor-change-record" className="stack" aria-label={t(hopKind === 'legal' ? ui.editorDynamic.changeRecord : ui.editorDynamic.transcriptionComment)}>
+      <h3><T value={hopKind === 'legal' ? ui.editorDynamic.changeRecord : ui.editorDynamic.transcriptionComment} /></h3>
       {status === 'open' && canEdit ? (
         <form action="/editor/command" method="post" className="stack">
           <input type="hidden" name="command" value="details" />
@@ -156,7 +158,7 @@ export function PublishForm({ sessionId, versionId, articleId, hopKind, status, 
           </> : (
             <TextArea id="comment" name="comment" label={<T value={ui.attrs.editorPublishformTextAreaLabelWhatWas} />} defaultValue={comment ?? ''} required rows={3} />
           )}
-          <Button><T value={ui.editor.publishform.save} />{" "}{hopKind === 'legal' ? 'change record' : 'comment'}</Button>
+          <Button><T value={ui.editor.publishform.save} />{" "}<T value={hopKind === 'legal' ? ui.remainingStatus.changeRecord : ui.remainingStatus.comment} /></Button>
         </form>
       ) : (
         hopKind === 'legal' && record ? (
@@ -173,7 +175,7 @@ export function PublishForm({ sessionId, versionId, articleId, hopKind, status, 
                         {document.label ?? document.url}
                       </a>
                     ) : (
-                      document.label ?? 'Archived document'
+                      document.label ?? <T value={ui.remainingStatus.archivedDocument} />
                     )}
                   </li>
                 ))}
@@ -181,7 +183,7 @@ export function PublishForm({ sessionId, versionId, articleId, hopKind, status, 
             ) : null}
           </div>
         ) : (
-          <p className="muted">{comment ?? 'No comment saved.'}</p>
+          <p className="muted">{comment ?? t(ui.editorDynamic.noComment)}</p>
         )
       )}
       {status === 'approved' && canPublish ? (
@@ -189,7 +191,7 @@ export function PublishForm({ sessionId, versionId, articleId, hopKind, status, 
           <input type="hidden" name="command" value="publish" />
           {fields}
           <Button variant="primary" disabled={!ready}>
-            {hopKind === 'legal' ? 'Publish new legal version' : 'Publish transcription'}
+            <T value={hopKind === 'legal' ? ui.editorDynamic.publishLegalVersion : ui.editorDynamic.publishTranscription} />
           </Button>
         </form>
       ) : null}

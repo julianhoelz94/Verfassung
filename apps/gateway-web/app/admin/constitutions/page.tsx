@@ -1,4 +1,5 @@
-import { T, ui } from '../../components/TranslationProvider';
+import { T } from '../../components/TranslationProvider';
+import { ui } from '../../../lib/messages';
 import { AdminForbidden } from '../../components/AdminForbidden';
 import { Alert, Card, DataList, DataRow, PageHeader } from '../../components/ui';
 import { PageMain } from '../../components/PageMain';
@@ -17,7 +18,7 @@ type AdminConstitutionsPageProps = {
 export default async function AdminConstitutionsPage(props: AdminConstitutionsPageProps) {
   const searchParams = await props.searchParams;
   if (!(await requireAdminPage())) {
-    return <AdminForbidden title="Outlines" />;
+    return <AdminForbidden title={ui.forbidden.outlines} />;
   }
   const { countries, details } = await loadCountriesWithDetails(await requireSessionBearer());
   const rows = details.flatMap((country) =>
@@ -50,13 +51,13 @@ export default async function AdminConstitutionsPage(props: AdminConstitutionsPa
           <DataRow
             key={row.constitution.id}
             cells={[
-              { label: 'Country', value: row.countryName },
+              { label: <T value={ui.remainingStatus.country} />, value: row.countryName },
               {
-                label: 'Title',
+                label: <T value={ui.remainingStatus.title} />,
                 value: <a href={`/admin/constitutions/${row.constitution.id}`}>{row.constitution.title}</a>,
               },
               {
-                label: 'Layers',
+                label: <T value={ui.remainingStatus.layers} />,
                 value:
                   (row.constitution.contentOutline?.kinds ?? []).map((kind) => kind.displayLabel).join(' → ') ||
                   'No layers',

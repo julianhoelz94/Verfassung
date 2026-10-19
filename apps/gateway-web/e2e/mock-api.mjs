@@ -200,6 +200,8 @@ let stepUpFresh = true;
 let visualRoles = false;
 let sprint50Content = false;
 let legalPages = {};
+let translationSite = { provider: 'google', sharedKeyConfigured: true, sharedGoogleCharactersUsed: 0, sharedGoogleCharacterLimit: 500000 };
+let translationUser = { alwaysTranslate: false, personalGoogleKeyConfigured: false };
 let anonymousBrowsing = { allowed: true, perIp: { requests: 600, windowValue: 1, windowUnit: 'minutes' }, total: { requests: 6000, windowValue: 1, windowUnit: 'minutes' }, revision: 0 };
 const WIKI_IMAGE_ID = '01900000-0000-4000-8000-000000000736';
 const WIKI_IMAGE = { documentId: WIKI_IMAGE_ID, revision: 2, alt: 'A historic flag', caption: 'Historic flag', credit: 'Archive', sourceUrl: 'https://example.org/flag', rights: 'Public domain', placement: 'before_body' };
@@ -223,11 +225,15 @@ function resetMockState() {
   stepUpFresh = true;
   visualRoles = false;
   sprint50Content = false;
+  translationSite = { provider: 'google', sharedKeyConfigured: true, sharedGoogleCharactersUsed: 0, sharedGoogleCharacterLimit: 500000 };
+  translationUser = { alwaysTranslate: false, personalGoogleKeyConfigured: false };
   anonymousBrowsing = { allowed: true, perIp: { requests: 600, windowValue: 1, windowUnit: 'minutes' }, total: { requests: 6000, windowValue: 1, windowUnit: 'minutes' }, revision: 0 };
-  const impressum = { revision: 1, content: 'Example Operator\nExample Street 1\nexample@example.org', createdAt: '2026-01-01T00:00:00Z', createdBy: identityMe.id };
+  const impressum = { revision: 1, content: 'Example publisher information', createdAt: '2026-01-01T00:00:00Z', createdBy: identityMe.id };
+  const impressumEn = { revision: 1, content: 'English publisher information', createdAt: '2026-01-01T00:00:00Z', createdBy: identityMe.id };
   const datenschutz = { revision: 1, content: 'Example privacy notice for browser tests.', createdAt: '2026-01-01T00:00:00Z', createdBy: identityMe.id };
   legalPages = {
     impressum: { key: 'impressum', draft: impressum, published: impressum, revisions: [impressum] },
+    impressum_en: { key: 'impressum_en', draft: impressumEn, published: impressumEn, revisions: [impressumEn] },
     datenschutz: { key: 'datenschutz', draft: datenschutz, published: datenschutz, revisions: [datenschutz] },
   };
   credentials = new Map([
@@ -354,7 +360,11 @@ const server = createServer(async (req, res) => {
     return;
   }
 
-  const legalMatch = pathname.match(/^\/api\/document\/legal-pages\/(impressum|datenschutz)(?:\/(editor(?:\/revisions)?|draft|publish))?$/);
+  if (pathname === '/api/document/legal-pages/imprint-details') {
+    json(res, 200, { revision: 1, name: 'Atlas Foundation', streetAddress: 'Main Street 1', postalCode: '10000', city: 'Berlin', country: 'Germany', email: 'contact@atlas.example' });
+    return;
+  }
+  const legalMatch = pathname.match(/^\/api\/document\/legal-pages\/(impressum(?:_en)?|datenschutz(?:_en)?)(?:\/(editor(?:\/revisions)?|draft|publish))?$/);
   if (legalMatch) {
     const state = legalPages[legalMatch[1]];
     const action = legalMatch[2];
@@ -820,6 +830,55 @@ const server = createServer(async (req, res) => {
       return;
     }
     json(res, 200, currentUser);
+    return;
+  }
+  if (method === 'PUT' && pathname === '/api/identity/me/language') {
+    if (bearer(req) !== SESSION_TOKEN) {
+      json(res, 401, { error: 'Unauthorized' });
+      return;
+    }
+    const { languagePreference } = await readBody(req);
+    if (!['auto', 'en', 'de'].includes(languagePreference)) {
+      json(res, 400, { error: 'Unsupported language preference' });
+      return;
+    }
+    currentUser = { ...currentUser, languagePreference };
+    json(res, 200, currentUser);
+    return;
+  }
+  if (method === 'GET' && pathname === '/api/identity/content-translation/availability') {
+    json(res, 200, { enabled: translationSite.provider !== 'off' });
+    return;
+  }
+  if (pathname === '/api/identity/content-translation/me' && bearer(req) === SESSION_TOKEN) {
+    if (method === 'GET') { json(res, 200, translationUser); return; }
+    if (method === 'PUT') {
+      const body = await readBody(req);
+      translationUser = {
+        alwaysTranslate: Boolean(body.alwaysTranslate),
+        personalGoogleKeyConfigured: body.clearPersonalGoogleKey ? false : Boolean(body.personalGoogleKey) || translationUser.personalGoogleKeyConfigured,
+      };
+      json(res, 200, translationUser);
+      return;
+    }
+  }
+  if (pathname === '/api/identity/content-translation/admin' && bearer(req) === SESSION_TOKEN) {
+    if (method === 'GET') { json(res, 200, translationSite); return; }
+    if (method === 'PUT') {
+      const body = await readBody(req);
+      translationSite = { ...translationSite, provider: body.provider, sharedKeyConfigured: body.clearSharedApiKey ? false : Boolean(body.sharedApiKey) || translationSite.sharedKeyConfigured };
+      json(res, 200, translationSite);
+      return;
+    }
+  }
+  if (method === 'POST' && ['/api/identity/content-translation/translate', '/api/identity/content-translation/translate-batch'].includes(pathname)) {
+    if (bearer(req) !== SESSION_TOKEN) { json(res, 401, { error: 'Login required' }); return; }
+    if (translationSite.provider === 'off') { json(res, 403, { error: 'Translation disabled' }); return; }
+    const body = await readBody(req);
+    const texts = body.texts ?? [body.text];
+    translationSite.sharedGoogleCharactersUsed += texts.reduce((sum, text) => sum + String(text ?? '').length, 0);
+    const translated = texts.map((text) => `[${body.targetLanguage}] ${text}`);
+    json(res, 200, body.texts ? { texts: translated, provider: translationUser.personalGoogleKeyConfigured ? 'google' : translationSite.provider } : { text: translated[0], provider: translationUser.personalGoogleKeyConfigured ? 'google' : translationSite.provider });
     return;
   }
   if (method === 'GET' && pathname === '/api/identity/anonymous-browsing') {

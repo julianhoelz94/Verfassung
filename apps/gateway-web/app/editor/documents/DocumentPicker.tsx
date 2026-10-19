@@ -1,6 +1,7 @@
 'use client';
 
-import { T, ui } from '../../components/TranslationProvider';
+import { T } from '../../components/TranslationProvider';
+import { ui } from '../../../lib/messages';
 import { useState } from 'react';
 import type { DocumentRecord, DocumentRevision } from '../../../lib/document-api';
 import { attachDocumentAction } from './actions';

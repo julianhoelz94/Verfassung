@@ -1,4 +1,5 @@
-import { T, ui } from '../../../components/TranslationProvider';
+import { T } from '../../../components/TranslationProvider';
+import { ui } from '../../../../lib/messages';
 import { notFound } from 'next/navigation';
 import { AdminForbidden } from '../../../components/AdminForbidden';
 import { Alert, Button, Card, PageHeader } from '../../../components/ui';
@@ -20,7 +21,7 @@ export default async function ImportJobPage(props: ImportJobPageProps) {
   const searchParams = await props.searchParams;
   const user = await currentUser();
   if (!user || !user.roles.some(role => ['editor', 'reviewer', 'publisher', 'admin'].includes(role))) {
-    return <AdminForbidden title="Import" />;
+    return <AdminForbidden title={ui.forbidden.import} />;
   }
   let job;
   try {
@@ -51,8 +52,8 @@ export default async function ImportJobPage(props: ImportJobPageProps) {
       : null;
   return (
     <PageMain className="wide">
-      <PageHeader title={<T value={ui.attrs.adminImportJobidPagePageHeaderTitle} />} meta={`Status: ${job.status}`} />
-      {searchParams.error ? <Alert tone="error">{searchParams.error === 'reason' ? 'Enter a reason of 10 to 2000 characters.' : 'The action could not be completed. Check the job status and your rights.'}</Alert> : null}
+      <PageHeader title={<T value={ui.attrs.adminImportJobidPagePageHeaderTitle} />} meta={<><T value={ui.importActions.status} /> {job.status}</>} />
+      {searchParams.error ? <Alert tone="error"><T value={searchParams.error === 'reason' ? ui.importActions.reasonRequired : ui.importActions.actionFailed} /></Alert> : null}
       {job.status === 'pending_review' ? <Alert><T value={ui.admin.import.jobid.page.thisImportIsPendingReviewItIs} /></Alert> : null}
       {job.status === 'failed' ? <Alert tone="error"><T value={ui.admin.import.jobid.page.theImportFailed} /></Alert> : null}
       {job.status === 'completed' && versionHref ? (
@@ -69,13 +70,13 @@ export default async function ImportJobPage(props: ImportJobPageProps) {
       </Card> : null}
       <Card>
         <h2><T value={ui.admin.import.jobid.page.reviewActions} /></h2>
-        {!job.versionId && job.status === 'pending_review' && editor && payload?.outline && !job.outlineConfirmedBy ? <ActionForm action="confirm-outline" jobId={job.id} label="Confirm proposed outline" /> : null}
-        {!job.versionId && job.status === 'pending_review' && editor && (!payload?.outline || job.outlineConfirmedBy) ? <ActionForm action="prepare" jobId={job.id} label="Prepare unpublished draft" /> : null}
+        {!job.versionId && job.status === 'pending_review' && editor && payload?.outline && !job.outlineConfirmedBy ? <ActionForm action="confirm-outline" jobId={job.id} label={ui.importActions.confirmOutline} /> : null}
+        {!job.versionId && job.status === 'pending_review' && editor && (!payload?.outline || job.outlineConfirmedBy) ? <ActionForm action="prepare" jobId={job.id} label={ui.importActions.prepareDraft} /> : null}
         {job.versionId && job.status === 'pending_review' && reviewer && !ownSubmission ? <>
-          <ActionForm action="approve" jobId={job.id} label="Approve prepared draft" />
-          <ActionForm action="reject" jobId={job.id} label="Reject import" />
+          <ActionForm action="approve" jobId={job.id} label={ui.importActions.approveDraft} />
+          <ActionForm action="reject" jobId={job.id} label={ui.importActions.rejectImport} />
         </> : null}
-        {job.status === 'approved' && publisher && !ownApproval ? <ActionForm action="publish" jobId={job.id} label="Publish approved version" /> : null}
+        {job.status === 'approved' && publisher && !ownApproval ? <ActionForm action="publish" jobId={job.id} label={ui.importActions.publishVersion} /> : null}
         {job.versionId && job.status !== 'completed' ? <p><T value={ui.admin.import.jobid.page.draftVersion} />{" "}<code>{job.versionId}</code></p> : null}
       </Card>
       {decisions.length ? <Card><h2><T value={ui.admin.import.jobid.page.reviewDecisions} /></h2><ol>{decisions.map(decision => <li key={decision.id}>
@@ -97,11 +98,11 @@ export default async function ImportJobPage(props: ImportJobPageProps) {
   );
 }
 
-function ActionForm({ action, jobId, label }: { action: 'confirm-outline' | 'prepare' | 'approve' | 'reject' | 'publish'; jobId: string; label: string }) {
+function ActionForm({ action, jobId, label }: { action: 'confirm-outline' | 'prepare' | 'approve' | 'reject' | 'publish'; jobId: string; label: import('../../../../lib/messages').UiMessage }) {
   return <form action={transitionImportAction}>
     <input type="hidden" name="jobId" value={jobId} />
     <input type="hidden" name="action" value={action} />
     {action === 'approve' || action === 'reject' ? <label><T value={ui.admin.import.jobid.page.reviewReason} /><textarea name="reason" minLength={10} maxLength={2000} required rows={3} /></label> : null}
-    <Button variant={action === 'publish' ? 'primary' : undefined}>{label}</Button>
+    <Button variant={action === 'publish' ? 'primary' : undefined}><T value={label} /></Button>
   </form>;
 }

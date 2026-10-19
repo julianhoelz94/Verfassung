@@ -1,6 +1,7 @@
 'use client';
 
-import { T, ui } from '../../components/TranslationProvider';
+import { T, useTranslation } from '../../components/TranslationProvider';
+import { ui } from '../../../lib/messages';
 import { useState } from 'react';
 import type { AnonymousBrowsingPolicy, AnonymousRate } from '../../../lib/anonymous-browsing-policy';
 import { Button } from '../../components/ui';
@@ -21,14 +22,15 @@ function RateFields({ prefix, label, rate, disabled }: { prefix: string; label: 
 }
 
 export function AnonymousBrowsingForm({ policy }: { policy: AnonymousBrowsingPolicy }) {
+  const t = useTranslation();
   const [allowed, setAllowed] = useState(policy.allowed);
   const displayed = (rate: AnonymousRate): AnonymousRate => allowed ? rate : { ...rate, requests: 0 };
   return <form action={saveAnonymousBrowsingAction}>
     <label><input type="checkbox" name="allowed" checked={allowed} onChange={(event) => setAllowed(event.target.checked)} /> <T value={ui.admin.anonymousBrowsing.anonymousbrowsingform.allowAnonymousBrowsing} /></label>
     <p className="muted"><T value={ui.admin.anonymousBrowsing.anonymousbrowsingform.whenOffAnonymousContentApiCallsAnd} /></p>
     {!allowed ? <p role="status"><T value={ui.admin.anonymousBrowsing.anonymousbrowsingform.effectiveRates0CallsPerIpAnd} /></p> : null}
-    <RateFields key={`per-ip-${allowed}`} prefix="perIp" label="Per IP address" rate={displayed(policy.perIp)} disabled={!allowed} />
-    <RateFields key={`total-${allowed}`} prefix="total" label="All anonymous requests combined" rate={displayed(policy.total)} disabled={!allowed} />
+    <RateFields key={`per-ip-${allowed}`} prefix="perIp" label={t(ui.accessibility.perIpAddress)} rate={displayed(policy.perIp)} disabled={!allowed} />
+    <RateFields key={`total-${allowed}`} prefix="total" label={t(ui.accessibility.allAnonymousRequests)} rate={displayed(policy.total)} disabled={!allowed} />
     <Button variant="primary"><T value={ui.admin.anonymousBrowsing.anonymousbrowsingform.saveAnonymousBrowsing} /></Button>
   </form>;
 }

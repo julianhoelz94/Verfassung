@@ -1,4 +1,5 @@
-import { T, ui } from '../../components/TranslationProvider';
+import { T } from '../../components/TranslationProvider';
+import { ui } from '../../../lib/messages';
 import type { ContentOutline, OrderedEntry, OrderedNode } from '../../../lib/api';
 import { OrderedContentTree } from '../../components/ConstitutionText';
 

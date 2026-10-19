@@ -1,4 +1,5 @@
-import { T, ui } from '../../../../components/TranslationProvider';
+import { T } from '../../../../components/TranslationProvider';
+import { ui } from '../../../../../lib/messages';
 import { notFound } from 'next/navigation';
 import { ConstitutionText } from '../../../../components/ConstitutionText';
 import { PageMain } from '../../../../components/PageMain';
@@ -98,7 +99,7 @@ export default async function ArticleHistoryPage(props: HistoryPageProps) {
     <PageMain>
       <PageHeader
         breadcrumbs={[
-          { href: '/', label: 'Countries' },
+          { href: '/', label: <T value={ui.nav.countries} /> },
           { href: `/countries/${country.isoCode}`, label: country.name },
           { label: `History of Article ${articleNumber}` },
         ]}
@@ -167,7 +168,7 @@ export default async function ArticleHistoryPage(props: HistoryPageProps) {
               </h2>
               <Provenance
                 version={snapshot.version}
-                label={`Source and trust · ${snapshot.version.versionLabel}`}
+                labelSuffix={snapshot.version.versionLabel}
               />
               <ConstitutionText
                 article={snapshot.article}

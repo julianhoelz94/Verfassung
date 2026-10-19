@@ -1,9 +1,12 @@
-import { T, ui } from '../../../../components/TranslationProvider';
+import { T } from '../../../../components/TranslationProvider';
+import { ui } from '../../../../../lib/messages';
 import { notFound } from 'next/navigation';
 import { PageMain } from '../../../../components/PageMain';
 import { PageHeader } from '../../../../components/ui';
 import { WikiImages } from '../../../../components/WikiImages';
 import { WikiBody } from '../../../../components/WikiBody';
+import { ContentTranslationRegion } from '../../../../components/ContentTranslationRegion';
+import { lifecycleStatusMessage } from '../../../../../lib/lifecycle-label';
 import { WikiSources } from '../../../../components/WikiSources';
 import { getConstitutionLifecycle, getCountry, getWikiPage } from '../../../../../lib/api';
 import { publicVersions } from '../../../../../lib/reading';
@@ -25,35 +28,30 @@ export default async function ConstitutionOverview({ params }: Props) {
     <PageMain className="wide">
       <PageHeader
         breadcrumbs={[
-          { href: '/', label: 'Countries' },
+          { href: '/', label: <T value={ui.nav.countries} /> },
           { href: `/countries/${country.isoCode}`, label: country.name },
           { label: constitution.title },
         ]}
         title={constitution.title}
       />
       <p>
-        {constitution.interim ? 'Interim constitution · ' : ''}
-        {constitution.lifecycleStatus === 'in_force' ? 'In force' :
-          constitution.lifecycleStatus === 'awaiting_commencement' ? 'Adopted, not yet in force' :
-          constitution.lifecycleStatus === 'suspended' ? 'Suspended' :
-          constitution.lifecycleStatus === 'uncertain' ? 'Status uncertain' :
-          constitution.lifecycleStatus === 'repealed' ? 'Repealed' : 'Status not recorded'}
+        {constitution.interim ? <><T value={ui.lifecycle.interimConstitution} /> · </> : null}
+        <T value={lifecycleStatusMessage(constitution.lifecycleStatus)} />
       </p>
       <p><a href={`/countries/${country.isoCode}/constitution-timeline`}><T value={ui.countries.code.constitutions.constitutionid.page.viewCountryConstitutionTimeline} /></a></p>
       {lifecycle.length > 0 ? (
         <section>
           <h2><T value={ui.countries.code.constitutions.constitutionid.page.lifecycleDates} /></h2>
           <ul>{lifecycle.map((event) => (
-            <li key={event.id}><time dateTime={event.eventDate}>{event.dateCertainty === 'approximate' ? 'Circa ' : ''}{event.eventDate}</time> · {event.eventType}</li>
+            <li key={event.id}><time dateTime={event.eventDate}>{event.dateCertainty === 'approximate' ? <><T value={ui.lifecycle.circa} /> </> : null}{event.eventDate}</time> · {event.eventType}</li>
           ))}</ul>
         </section>
       ) : null}
       {wiki ? (
         <section className="card">
           <h2><T value={ui.countries.code.constitutions.constitutionid.page.aboutThisConstitution} /></h2>
-          <p>{wiki.summary}</p>
+          <ContentTranslationRegion sourceLanguage="auto"><p data-translate-content>{wiki.summary}</p><WikiBody body={wiki.body} /></ContentTranslationRegion>
           <WikiImages images={wiki.images.filter((image) => image.placement === 'before_body')} />
-          <WikiBody body={wiki.body} />
           <WikiImages images={wiki.images.filter((image) => image.placement !== 'before_body')} />
           <WikiSources sourceUrls={wiki.sourceUrls ?? []} />
         </section>

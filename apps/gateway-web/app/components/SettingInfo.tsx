@@ -1,22 +1,24 @@
 'use client';
 
-import { T, ui } from './TranslationProvider';
+import { T, useTranslation } from './TranslationProvider';
+import { ui } from '../../lib/messages';
 import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 
 export type SettingChangeability = 'once' | 'later' | 'review';
 
-const changeabilityText: Record<SettingChangeability, string> = {
-  once: 'Set once when the constitution is created.',
-  later: 'Can be changed later.',
-  review: 'Can be changed later after an impact check. Existing content may require a reviewed successor.',
-};
+const changeabilityText = {
+  once: ui.help.setOnce,
+  later: ui.help.canChangeLater,
+  review: ui.help.canChangeAfterReview,
+} satisfies Record<SettingChangeability, { en: string; de: string }>;
 
 export function SettingInfo({ label, description, changeability, changeNote }: {
   label: ReactNode;
-  description: string;
+  description: ReactNode;
   changeability: SettingChangeability;
-  changeNote?: string;
+  changeNote?: ReactNode;
 }) {
+  const t = useTranslation();
   const [open, setOpen] = useState(false);
   const [boxOffset, setBoxOffset] = useState(0);
   const id = useId();
@@ -59,7 +61,7 @@ export function SettingInfo({ label, description, changeability, changeNote }: {
       <button
         type="button"
         className="setting-info-trigger"
-        aria-label="Setting information"
+        aria-label={t(ui.help.settingInformation)}
         aria-describedby={`${id}-context`}
         aria-expanded={open}
         aria-controls={open ? id : undefined}
@@ -69,7 +71,7 @@ export function SettingInfo({ label, description, changeability, changeNote }: {
         <span className="setting-info-box" id={id} role="note" ref={box} style={{ left: boxOffset }}>
           <strong>{label}</strong>
           <span>{description}</span>
-          <span className="setting-info-changeability">{changeNote ?? changeabilityText[changeability]}</span>
+          <span className="setting-info-changeability">{changeNote ?? t(changeabilityText[changeability])}</span>
         </span>
       ) : null}
     </span>

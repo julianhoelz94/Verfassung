@@ -1,5 +1,7 @@
 'use server';
 
+import { updateTranslationSiteSettings } from '../../../lib/content-translation';
+
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { requireAdminUser } from '../../../lib/admin';
@@ -51,4 +53,21 @@ export async function sendTestMailAction(formData: FormData): Promise<void> {
     redirect('/admin/settings?error=test');
   }
   redirect('/admin/settings?tested=1');
+}
+
+export async function saveContentTranslationSettingsAction(formData: FormData): Promise<void> {
+  const token = await adminToken();
+  try {
+    await updateTranslationSiteSettings(token, {
+      provider: String(formData.get('provider') ?? 'off'),
+      sharedApiKey: String(formData.get('sharedApiKey') ?? ''),
+      clearSharedApiKey: formData.get('clearSharedApiKey') === 'on',
+    });
+  } catch (error) {
+    if (error instanceof IdentityApiError && error.code === 'step_up_required') {
+      redirect(`/account/step-up?returnTo=${encodeURIComponent('/admin/settings')}`);
+    }
+    redirect('/admin/settings?error=translation');
+  }
+  redirect('/admin/settings?saved=translation');
 }

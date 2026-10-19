@@ -2,6 +2,7 @@
 
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
+import { revalidatePath } from 'next/cache';
 import {
   IdentityApiError,
   requestAcceptInvite,
@@ -30,6 +31,7 @@ import {
 import { requireAdminUser } from '../../lib/admin';
 import { safeReturnTo } from '../../lib/return-to';
 import { SESSION_COOKIE, setChallengeCookie } from '../../lib/session';
+import { updateTranslationUserSettings } from '../../lib/content-translation';
 
 async function tokenOrRedirect(): Promise<string> {
   const token = (await cookies()).get(SESSION_COOKIE)?.value;
@@ -58,18 +60,34 @@ export async function changePasswordAction(formData: FormData): Promise<void> {
   redirect('/account?saved=1');
 }
 
-export async function updateLanguagePreferenceAction(formData: FormData): Promise<void> {
+export async function updateLanguagePreferenceAction(formData: FormData): Promise<boolean> {
   const token = await tokenOrRedirect();
   const preference = String(formData.get('languagePreference') ?? '');
   if (preference !== 'auto' && preference !== 'en' && preference !== 'de') {
-    redirect('/account?error=language');
+    return false;
   }
   try {
     await requestUpdateLanguagePreference(token, preference);
   } catch {
-    redirect('/account?error=language');
+    return false;
   }
-  redirect('/account?languageSaved=1');
+  revalidatePath('/', 'layout');
+  return true;
+}
+
+export async function updateContentTranslationPreferenceAction(formData: FormData): Promise<void> {
+  const token = await tokenOrRedirect();
+  try {
+    await updateTranslationUserSettings(token, {
+      alwaysTranslate: formData.get('alwaysTranslate') === 'on',
+      personalGoogleKey: String(formData.get('personalGoogleKey') ?? ''),
+      clearPersonalGoogleKey: formData.get('clearPersonalGoogleKey') === 'on',
+    });
+  } catch {
+    redirect('/account?error=translation');
+  }
+  revalidatePath('/account');
+  redirect('/account?translationSaved=1');
 }
 
 export async function requestResetAction(formData: FormData): Promise<void> {

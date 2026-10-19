@@ -1,4 +1,5 @@
-import { T, ui } from '../../components/TranslationProvider';
+import { T } from '../../components/TranslationProvider';
+import { ui } from '../../../lib/messages';
 import Link from 'next/link';
 import { listDocumentLinkEvents, listDocumentLinks, listDocumentRevisions, listDocuments } from '../../../lib/document-api';
 import { requireSessionBearer } from '../../../lib/session';

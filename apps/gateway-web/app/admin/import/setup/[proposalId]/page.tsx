@@ -1,4 +1,5 @@
-import { T, ui } from '../../../../components/TranslationProvider';
+import { T } from '../../../../components/TranslationProvider';
+import { ui } from '../../../../../lib/messages';
 import { notFound } from 'next/navigation';
 import { AdminForbidden } from '../../../../components/AdminForbidden';
 import { Alert, Button, Card, PageHeader } from '../../../../components/ui';
@@ -14,7 +15,7 @@ type Props = { params: Promise<{ proposalId: string }>; searchParams: Promise<{ 
 
 export default async function SetupProposalPage({ params, searchParams }: Props) {
   const user = await currentUser();
-  if (!user || !user.roles.some(role => role === 'editor' || role === 'admin')) return <AdminForbidden title="Constitution setup" />;
+  if (!user || !user.roles.some(role => role === 'editor' || role === 'admin')) return <AdminForbidden title={ui.forbidden.constitutionSetup} />;
   const { proposalId } = await params;
   const proposal = await getSetupProposal(proposalId, await requireSessionBearer()).catch(() => null);
   if (!proposal) notFound();
@@ -32,7 +33,7 @@ export default async function SetupProposalPage({ params, searchParams }: Props)
       <p><T value={ui.admin.import.setup.proposalid.page.proposedHierarchy} />{" "}{kinds.map(kind => kind.displayLabel).join(' → ')}</p>
     </Card>
     {proposal.status === 'proposed' ? <>
-      <OutlineEditor initial={kinds} sampleRoots={previewRoots(payload.sampleRoots)} action={saveSetupOutlineAction} submitLabel="Save proposed structure">
+      <OutlineEditor initial={kinds} sampleRoots={previewRoots(payload.sampleRoots)} action={saveSetupOutlineAction} submitLabel={ui.remainingStatus.saveProposedStructure}>
         <input type="hidden" name="proposalId" value={proposal.id} />
       </OutlineEditor>
       <Card><h2><T value={ui.admin.import.setup.proposalid.page.finalReview} /></h2><p><T value={ui.admin.import.setup.proposalid.page.confirmOnlyAfterCheckingTheSourceSample} /></p>

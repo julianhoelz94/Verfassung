@@ -1,4 +1,5 @@
-import { T, ui } from '../../../components/TranslationProvider';
+import { T } from '../../../components/TranslationProvider';
+import { ui } from '../../../../lib/messages';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { AdminForbidden } from '../../../components/AdminForbidden';
@@ -21,7 +22,7 @@ export default async function AdminOutlinePage(props: AdminOutlinePageProps) {
   const params = await props.params;
   const searchParams = await props.searchParams;
   if (!(await requireAdminPage())) {
-    return <AdminForbidden title="Outline" />;
+    return <AdminForbidden title={ui.forbidden.outline} />;
   }
   const authorization = await requireSessionBearer();
   const { details } = await loadCountriesWithDetails(authorization);
@@ -39,8 +40,8 @@ export default async function AdminOutlinePage(props: AdminOutlinePageProps) {
     <PageMain className="wide">
       <PageHeader
         breadcrumbs={[
-          { href: '/admin', label: 'Admin' },
-          { href: '/admin/constitutions', label: 'Outlines' },
+          { href: '/admin', label: <T value={ui.nav.admin} /> },
+          { href: '/admin/constitutions', label: <T value={ui.nav.outlines} /> },
           { label: match.constitution.title },
         ]}
         title={match.constitution.title}

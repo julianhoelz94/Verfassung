@@ -1,6 +1,7 @@
 'use client';
 
-import { T, ui } from '../components/TranslationProvider';
+import { T, useTranslation } from '../components/TranslationProvider';
+import { ui } from '../../lib/messages';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { DiffReviewState, ReviewCandidate, ReviewDecisionInput, ReviewRef } from '../../lib/diff-review';
@@ -31,6 +32,7 @@ function wording(refs: ReviewRef[]): string {
 }
 
 export function DiffReviewQueue({ target, initial, rows, canDecide, canAcknowledge, onAddRow }: Props) {
+  const t = useTranslation();
   const router = useRouter();
   const [review, setReview] = useState(initial);
   const [selectedKey, setSelectedKey] = useState(initial.candidates[(initial.currentPosition ?? 1) - 1]?.key ?? initial.candidates[0]?.key ?? '');
@@ -98,10 +100,10 @@ export function DiffReviewQueue({ target, initial, rows, canDecide, canAcknowled
       const next = result.review.candidates.find((candidate) => !decisionReadyForReview(candidate, byKey.get(candidate.key)))
         ?? (canAcknowledge ? result.review.candidates.find((candidate) => !decisionResolved(candidate, byKey.get(candidate.key))) : undefined);
       choose(next?.key ?? input.key);
-      setMessage('Decision saved.');
+      setMessage(t(ui.state.decisionSaved));
       router.refresh();
     } catch {
-      setMessage('Could not update the review. Refresh and try again.');
+      setMessage(t(ui.state.reviewUpdateFailed));
     } finally {
       setPending(false);
     }
@@ -116,10 +118,10 @@ export function DiffReviewQueue({ target, initial, rows, canDecide, canAcknowled
       setReview(result.review);
       setMessage(result.review.candidates.length > previousTotal
         ? `${result.review.candidates.length - previousTotal} deeper differences were added after the pairing changed.`
-        : 'Review refreshed from the saved draft.');
+        : t(ui.state.reviewRefreshed));
       router.refresh();
     } catch {
-      setMessage('Could not refresh the review. Try again.');
+      setMessage(t(ui.state.reviewRefreshFailed));
     } finally {
       setPending(false);
     }
@@ -138,14 +140,14 @@ export function DiffReviewQueue({ target, initial, rows, canDecide, canAcknowled
       {readyForReview !== resolved ? <p>{readyForReview} <T value={ui.editor.diffreviewqueue.of} />{" "}{review.candidates.length} <T value={ui.editor.diffreviewqueue.readyForReviewerHandoff} /></p> : null}
     </div>
     {review.candidates.length === 0 ? <p role="status"><T value={ui.editor.diffreviewqueue.noDifferencesFoundForThePinnedSnapshots} /></p> : <>
-      <div className="form-row" aria-label="Difference filters">
+      <div className="form-row" aria-label={t(ui.accessibility.differenceFilters)}>
         <label><T value={ui.editor.diffreviewqueue.level} />{" "}<select value={level} onChange={(event) => setLevel(event.target.value)}><option value="all"><T value={ui.editor.diffreviewqueue.all} /></option>{levels.map((value) => <option key={value} value={value}><T value={ui.editor.diffreviewqueue.level} />{" "}{value}</option>)}</select></label>
         <label><T value={ui.editor.diffreviewqueue.type} />{" "}<select value={facet} onChange={(event) => setFacet(event.target.value)}><option value="all"><T value={ui.editor.diffreviewqueue.all} /></option>{[...new Set(review.candidates.map((candidate) => candidate.facet))].sort().map((value) => <option key={value} value={value}>{statusText(value)}</option>)}</select></label>
         <label><T value={ui.editor.diffreviewqueue.status} />{" "}<select value={status} onChange={(event) => setStatus(event.target.value)}><option value="all"><T value={ui.editor.diffreviewqueue.all} /></option>{['open', 'linked', 'excluded_with_reason', 'needs_recheck'].map((value) => <option key={value} value={value}>{statusText(value)}</option>)}</select></label>
         <label><T value={ui.editor.diffreviewqueue.scope} />{" "}<select value={scope} onChange={(event) => setScope(event.target.value)}><option value="all"><T value={ui.editor.diffreviewqueue.all} /></option>{scopes.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
       </div>
       <p className="muted"><T value={ui.editor.diffreviewqueue.showing} />{" "}{visible.length} <T value={ui.editor.diffreviewqueue.of} />{" "}{review.candidates.length} <T value={ui.editor.diffreviewqueue.differences} /></p>
-      <ul className="diff-review-levels" aria-label="Progress by level">{levels.map((value) => {
+      <ul className="diff-review-levels" aria-label={t(ui.accessibility.progressByLevel)}>{levels.map((value) => {
         const atLevel = review.candidates.filter((candidate) => candidate.level === value);
         const done = atLevel.filter((candidate) => decisionResolved(candidate, decisions.get(candidate.key))).length;
         return <li key={value}><button type="button" onClick={() => setLevel(String(value))}><T value={ui.editor.diffreviewqueue.level} />{" "}{value}: {done} <T value={ui.editor.diffreviewqueue.of} />{" "}{atLevel.length} <T value={ui.editor.diffreviewqueue.reviewed2} /></button></li>;
@@ -165,8 +167,8 @@ export function DiffReviewQueue({ target, initial, rows, canDecide, canAcknowled
         </div>
         <div className="action-bar"><Button type="button" disabled={selectedIndex <= 0} onClick={() => navigation(selectedIndex - 1)}><T value={ui.editor.diffreviewqueue.previous} /></Button><Button type="button" disabled={selectedIndex >= visible.length - 1} onClick={() => navigation(selectedIndex + 1)}><T value={ui.editor.diffreviewqueue.next} /></Button><Button type="button" onClick={() => { const next = visible.find((candidate) => !decisionReadyForReview(candidate, decisions.get(candidate.key)) && candidate.key !== selected.key) ?? (canAcknowledge ? visible.find((candidate) => !decisionResolved(candidate, decisions.get(candidate.key)) && candidate.key !== selected.key) : undefined); if (next) choose(next.key); }}><T value={ui.editor.diffreviewqueue.nextUnreviewed} /></Button></div>
         {canDecide ? <div className="stack">
-          {onAddRow ? <Button type="button" onClick={() => { onAddRow(selected); setMessage('A change row was added. Check the exact units and save the draft before linking this difference.'); }}><T value={ui.editor.diffreviewqueue.createChangeRowFromThisDifference} /></Button> : null}
-          <Button type="button" onClick={() => { document.querySelector<HTMLElement>('[aria-label="Change record"], #amendment-changes-title')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); setMessage('Correct the pairing in the exact unit selectors, save, then link the saved row.'); }}><T value={ui.editor.diffreviewqueue.correctPairingInChangeRecord} /></Button>
+          {onAddRow ? <Button type="button" onClick={() => { onAddRow(selected); setMessage(t(ui.state.changeRowAdded)); }}><T value={ui.editor.diffreviewqueue.createChangeRowFromThisDifference} /></Button> : null}
+          <Button type="button" onClick={() => { document.querySelector<HTMLElement>('#editor-change-record, #amendment-changes-title')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); setMessage(t(ui.state.correctPairing)); }}><T value={ui.editor.diffreviewqueue.correctPairingInChangeRecord} /></Button>
           <label><T value={ui.editor.diffreviewqueue.linkToSavedChangeRows} />{" "}<select multiple value={linkedIds} onChange={(event) => setLinkedIds([...event.target.selectedOptions].map((option) => option.value))}>{rows.map((row) => <option key={row.id} value={row.id}>{row.label}</option>)}</select></label>
           {selected.ambiguous && canAcknowledge ? <label className="choice-row"><input type="checkbox" checked={acknowledge} onChange={(event) => setAcknowledge(event.target.checked)} /> <T value={ui.editor.diffreviewqueue.confirmTheMultiRowPairingAsReviewer} /></label> : null}
           <Button type="button" disabled={pending || linkedIds.length === 0 || selected.ambiguous && linkedIds.length < 2} onClick={() => save({ key: selected.key, fingerprint: selected.fingerprint, status: 'linked', linkedIds, reviewerAcknowledged: selected.ambiguous && canAcknowledge && acknowledge })}><T value={ui.editor.diffreviewqueue.linkSelectedRowsAndNext} /></Button>

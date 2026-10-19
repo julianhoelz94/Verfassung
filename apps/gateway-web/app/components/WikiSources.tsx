@@ -1,8 +1,13 @@
-import { T, ui } from './TranslationProvider';
-export function WikiSources({ sourceUrls }: { sourceUrls: string[] }) {
+import { T } from './TranslationProvider';
+import { ui } from '../../lib/messages';
+import { currentLocale } from '../../lib/server-locale';
+import { message } from '../../lib/messages';
+
+export async function WikiSources({ sourceUrls }: { sourceUrls: string[] }) {
   if (!sourceUrls.length) return null;
+  const locale = await currentLocale();
   return (
-    <section aria-label="Page sources">
+    <section aria-label={message(locale, ui.accessibility.pageSources)}>
       <h3><T value={ui.components.wikisources.sources} /></h3>
       <ul>
         {sourceUrls.map((url, index) => (

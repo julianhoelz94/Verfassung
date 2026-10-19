@@ -26,13 +26,9 @@ export function SetupPreferences({ details, returnTo }: { details: SetupDetails;
         </select>
         {details.languages.managed ? <input type="hidden" name="defaultLanguage" value={details.languages.defaultLanguage} /> : null}
       </fieldset>
-      <fieldset><legend><T value={m.email} /></legend>
-        <label><input type="checkbox" name="mailDeferred" defaultChecked={details.preferences.mailDeferred} /> <T value={m.deferEmail} /></label>
-        <p><T value={m.deferHint} /></p>
-      </fieldset>
       <fieldset><legend><T value={m.access} /></legend>
         <p><T value={details.status.completed ? reviewUi.accessAfterSetup : m.accessHint} /></p>
-        <p><a href="/admin/anonymous-browsing"><T value={m.accessLink} /></a></p>
+        <p><a href={`/admin/anonymous-browsing?returnTo=${encodeURIComponent(returnTo)}`}><T value={m.accessLink} /></a></p>
         <label><input type="checkbox" name="accessReviewed" defaultChecked={details.preferences.accessReviewed} /> <T value={m.accessReviewed} /></label>
       </fieldset>
       <Button variant="primary"><T value={m.save} /></Button>

@@ -1,14 +1,15 @@
 'use server';
 import { requireSessionBearer } from '../../lib/session';
-import { setupRequest } from '../../lib/deployment-setup';
+import { setupRequest, type SetupDetails } from '../../lib/deployment-setup';
 
 export async function saveSetupPreferences(form: FormData): Promise<string> {
   const bearer = await requireSessionBearer();
   const target = form.get('returnTo') === '/admin/settings' ? '/admin/settings' : '/setup';
   try {
+    const current = await setupRequest<SetupDetails>('/setup', bearer);
     await setupRequest('/setup', bearer, 'PUT', {
       enabledLanguages: form.getAll('enabledLanguages').map(String), defaultLanguage: String(form.get('defaultLanguage') ?? ''),
-      mailDeferred: form.get('mailDeferred') === 'on', accessReviewed: form.get('accessReviewed') === 'on',
+      mailDeferred: current.preferences.mailDeferred, accessReviewed: form.get('accessReviewed') === 'on',
     });
   } catch { return `${target}?error=setup`; }
   return `${target}?saved=1`;

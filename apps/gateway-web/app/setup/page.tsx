@@ -40,7 +40,7 @@ export default async function SetupPage({ searchParams }: { searchParams: Promis
         {details.languages.enabled.includes('en') ? <><li><Link href="/admin/legal/impressum_en"><T value={m.englishImprint} /></Link></li><li><Link href="/admin/legal/datenschutz_en"><T value={m.englishPrivacy} /></Link></li></> : null}
       </ul>
     </Card></section>
-    <section id="email"><MailSettings settings={settings} email={admin.email} managed={details.settings.filter(field => !field.editable).map(field => field.key)} returnTo="/setup" /></section>
+    <section id="email"><MailSettings settings={settings} email={admin.email} mailDeferred={details.preferences.mailDeferred} managed={details.settings.filter(field => !field.editable).map(field => field.key)} returnTo="/setup" /></section>
     <section id="review"><Card><h2><T value={m.review} /></h2><p><T value={m.reviewHint} /></p>
       {details.required.length ? <><h3><T value={m.required} /></h3><ul>{details.required.map(key => <li key={key}><T value={requiredMessages[key] ?? m.required} /></li>)}</ul></> : null}
       <NavigatingActionForm action={completeSetup}><Button variant="primary" disabled={details.required.length > 0}><T value={m.finish} /></Button></NavigatingActionForm>

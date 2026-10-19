@@ -36,7 +36,8 @@ test('closed registration can be opened by admin, confirmed by mail, and creates
   try {
     await signIn(page, 'admin');
     await page.goto('/admin/settings');
-    await page.getByLabel('Allow people to register themselves').check();
+    await expect(page.getByLabel('Allow people to register themselves')).toBeDisabled();
+    await page.getByLabel('Configure email later', { exact: true }).uncheck();
     await page.getByLabel('Enable outgoing mail').check();
     await page.getByLabel('From address').fill(mailSettings.mailFrom);
     await page.getByLabel('Public site URL').fill(mailSettings.mailPublicBaseUrl);
@@ -44,9 +45,11 @@ test('closed registration can be opened by admin, confirmed by mail, and creates
     await page.getByLabel('SMTP port').fill(String(mailSettings.smtpPort));
     await page.getByLabel('SMTP authentication').uncheck();
     await page.getByLabel('STARTTLS').uncheck();
+    await page.getByLabel('Allow people to register themselves').check();
     await page.getByRole('button', { name: 'Save registration and mail settings', exact: true }).click();
     await expect(page.getByText('Settings saved.')).toBeVisible();
     await page.reload();
+    await expect(page.getByLabel('Configure email later', { exact: true })).not.toBeChecked();
     await expect(page.getByLabel('Allow people to register themselves')).toBeChecked();
 
     await page.getByLabel('Recipient').fill(testRecipient);

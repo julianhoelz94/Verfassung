@@ -42,7 +42,7 @@ export default async function IdentitySettingsPage({ searchParams }: { searchPar
       <div className="settings-content">
         {details ? <section id="general"><SetupPreferences details={details} returnTo="/admin/settings" /></section> : null}
         {details ? <section id="connection"><ConnectionSettings status={details.status} /></section> : null}
-        <section id="email"><MailSettings settings={settings} email={user?.email ?? ''} managed={details?.settings.filter(field => !field.editable).map(field => field.key)} returnTo="/admin/settings" /></section>
+        <section id="email"><MailSettings settings={settings} email={user?.email ?? ''} mailDeferred={details?.preferences.mailDeferred} managed={details?.settings.filter(field => !field.editable).map(field => field.key)} returnTo="/admin/settings" /></section>
         {translationSettings ? <Card id="translation">
           <h2><T value={ui.contentTranslation.title} /></h2>
           <NavigatingActionForm action={saveContentTranslationSettingsAction} className="stack">

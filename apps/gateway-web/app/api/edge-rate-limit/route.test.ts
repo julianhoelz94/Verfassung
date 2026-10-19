@@ -61,11 +61,23 @@ describe('edge API authorization', () => {
         ? new Response(JSON.stringify({ allowed: false, perIp: { requests: 0, windowValue: 1, windowUnit: 'minutes' }, total: { requests: 0, windowValue: 1, windowUnit: 'minutes' } }), { status: 200 })
         : new Response(null, { status: 401 }),
     );
-    const response = await GET(request({ 'x-atlas-edge-check': '1', 'x-atlas-client-ip': '198.51.100.100', 'x-atlas-original-uri': '/api/catalog/countries' }));
-    expect(response.status).toBe(403);
-    expect(response.headers.get('Retry-After')).toBeNull();
-    expect((await response.json()).code).toBe('anonymous_browsing_disabled');
-    expect((await GET(request({ 'x-atlas-edge-check': '1', 'x-atlas-original-uri': '/api/identity/login' }))).status).toBe(204);
+    for (const prefix of ['/api', '/api/docs']) {
+      const response = await GET(request({ 'x-atlas-edge-check': '1', 'x-atlas-client-ip': '198.51.100.100', 'x-atlas-original-uri': `${prefix}/catalog/countries` }));
+      expect(response.status).toBe(403);
+      expect(response.headers.get('Retry-After')).toBeNull();
+      expect((await response.json()).code).toBe('anonymous_browsing_disabled');
+      expect((await GET(request({ 'x-atlas-edge-check': '1', 'x-atlas-original-uri': `${prefix}/identity/login` }))).status).toBe(204);
+    }
+  });
+
+  it('counts Swagger API aliases against the same anonymous visitor budget', async () => {
+    vi.spyOn(Date, 'now').mockReturnValue(4_000);
+    for (const path of ['/api/catalog/countries', '/api/docs/catalog/countries', '/api/docs/content/versions']) {
+      expect((await GET(request({ 'x-atlas-edge-check': '1', 'x-atlas-client-ip': '198.51.100.101', 'x-atlas-original-uri': path }))).status).toBe(204);
+    }
+    for (const prefix of ['/api', '/api/docs']) {
+      expect((await GET(request({ 'x-atlas-edge-check': '1', 'x-atlas-client-ip': '198.51.100.101', 'x-atlas-original-uri': `${prefix}/catalog/countries` }))).status).toBe(429);
+    }
   });
 
   it('ignores client-controlled forwarded IP headers', async () => {

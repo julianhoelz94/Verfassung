@@ -25,6 +25,7 @@ they do not establish whether any deployed installation was exploited.
 | Public Identity OAuth alias forwarded an untrusted peer header | Changing `X-Atlas-Client-IP` bypassed the registration quota | Both public routes replace that header; real isolated Caddy tests reproduce the old bypass and reject forged/duplicate headers; all transport modes enforce the adapted-route invariant |
 | Gateway authentication calls dropped the original client IP | Passkey/MFA failures shared the gateway's IP bucket and could lock out other visitors | Pass Caddy's trusted peer and browser agent through server-side Identity requests; regression keeps distinct visitor identities separate while preserving credentials and cancellation |
 | Raw forwarded IP chains were trusted behind an external proxy | Forging the leftmost entry could evade IP limits or target another visitor's budget | Pin Caddy's computed peer on gateway and Identity routes; server actions and Identity APIs use only the pinned header, with real external-proxy regression |
+| Enabled Swagger aliases bypassed edge policy and retained forged peer headers | Exposed docs could bypass anonymous browsing restrictions, aggregate quotas and Identity per-IP limits | Apply canonical edge policy/write guards and pin peers on shared docs proxies; preserve disabled-docs 404 and interactive Swagger prefixes; real enabled/disabled proxy regressions cover both bypasses |
 | Recovery codes contained only about 50 bits of randomness | A leaked hash database made offline recovery-code guessing cheaper than necessary | New codes contain about 100 random bits in four readable groups; existing stored codes still verify, and regeneration replaces them; API tests enforce the stronger minimum and one-use behavior |
 | Passkey-only users had no UI route to refresh expired proof | Corrected freshness checks stranded them on a TOTP-only confirmation page | Account-bound WebAuthn step-up refreshes the current session; reject cross-account/public-login reuse of its challenges; preserve safe return/OAuth destinations |
 
@@ -70,7 +71,7 @@ passkey, promotion, OAuth freshness, invite-disable, stale-enrollment and one-us
 link defects. Their first correction pass succeeded. The full Identity check then
 passed 74 tests, including queued-login, account-bound step-up, PostgreSQL
 revocation-race, reauthentication and throttle regressions. Search passes 11 tests;
-the gateway passes 222 unit tests, lint, production build and 73 mock journeys.
+the gateway passes 223 unit tests, lint, production build and 73 mock journeys.
 Independent code review is clear, and actual external-proxy verification passes
 24 header cases and three guards. A durable proxy regression runs in CI. Required
 PR/main, real WebAuthn/browser and Wiki checks complete close-out; final results

@@ -39,6 +39,7 @@ unrelated issues remain intact. Delivery PRs: #139 (cleanup), #141 (Catalog test
 | Dead helpers, props, imports, wrappers and an unchecked Map parser | Remove unreferenced gateway command/API helpers and props; parse conflict codes through typed JSON nodes; enable unused locals/parameters in both TypeScript projects and use the ESLint CLI without deprecated Next lint wrapping |
 | Navigation/data maps described pre-review imports, schema and access rules | Refresh ownership, current immutable content, staged imports, setup, transport and verification documentation; remove machine-specific links |
 | Post-merge Catalog tests exposed a random country-code collision with the reservation test's fixed `QZ` | Allocate generated test countries deterministically in a separate namespace and use the allocator for reservations; retain all publication/idempotency assertions |
+| Optional Swagger API aliases skipped edge policy and peer-header replacement | Preserve Swagger prefix routing while applying canonical anonymous/write guards and trusted peer pinning; enabled/disabled real-proxy cases enforce the same restrictions |
 | Wiki fixture verification exposed concurrent Search index replacements inserting the same document ID | Serialize each rebuild before loading its source snapshot; keep readers on the committed generation; PostgreSQL concurrency test requires one source load at a time and complete final replacement |
 
 ## Removed files and intentional retention
@@ -120,7 +121,7 @@ Sprint 60. Its confirmed attack paths, corrections and evidence are recorded in
 sprint and branch; its required review/CI/publication gates also precede completion.
 
 The expanded local check passes 74 Identity tests (including 13 new security
-regressions), 11 Search tests and 222 gateway unit tests; lint and production
+regressions), 11 Search tests and 223 gateway unit tests; lint and production
 build pass. Independent external-proxy verification passes 24 forged-header cases
 and three guards. The durable CI proxy test also exercises forwarded-chain and
 duplicate-header spoofing through a trusted upstream. The security correction

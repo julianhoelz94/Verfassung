@@ -4,15 +4,19 @@
 Uses an isolated Docker network and a disposable Caddy internal CA. No public
 domain, host trust changes, real credentials, or existing stack are required.
 """
+import argparse
 import json
 from pathlib import Path
 import subprocess
-import sys
 import tempfile
 import time
 import uuid
 
-IMAGE = sys.argv[1] if len(sys.argv) > 1 else 'constitution-atlas/edge-proxy:ci'
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument('image', nargs='?', default='constitution-atlas/edge-proxy:ci')
+parser.add_argument('--docs-enabled', action='store_true')
+arguments = parser.parse_args()
+IMAGE = arguments.image
 NAME = 'atlas-proxy-test-' + uuid.uuid4().hex[:10]
 NETWORK = NAME + '-network'
 HOST = 'proxy.example.test'
@@ -61,7 +65,8 @@ import threading
 class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path in {'/api/setup-gate', '/api/edge-rate-limit'}:
-            self.send_response(204)
+            blocked = self.path == '/api/edge-rate-limit' and self.headers.get('X-Atlas-Original-URI') in {'/api/catalog/countries', '/api/docs/catalog/countries'}
+            self.send_response(403 if blocked else 204)
             self.end_headers()
             return
         if self.path != '/login' or self.server.server_port != 3000:
@@ -125,6 +130,7 @@ https://''' + HOST + ''' {
                '--tmpfs', '/data', '--tmpfs', '/config',
                '-v', str(folder) + ':/test:ro',
                '-e', 'PROFILE=ci', '-e', 'TLS_MODE=external-proxy',
+               '-e', 'CADDY_EXPOSE_API_DOCS=' + str(arguments.docs_enabled).lower(),
                '-e', 'PUBLIC_BASE_URL=https://' + HOST,
                '-e', 'TLS_TRUSTED_PROXIES=' + address + '/32',
                '-e', 'SSL_CERT_FILE=/test/trust.pem', IMAGE)
@@ -187,9 +193,20 @@ https://''' + HOST + ''' {
         baseline = json.loads(expect_code(200, public + '/security-header-probe', **tls))
         peer = baseline['X-Atlas-Client-IP']
         assert len(peer) == 1 and peer == baseline['X-Forwarded-For'], baseline
-        for path in ('/oauth/register', '/api/identity/oauth/register', '/api/identity/login',
-                     '/api/identity/passkeys/login/start', '/api/identity/password/reset',
-                     '/security-header-probe', '/account'):
+        paths = ['/oauth/register', '/api/identity/oauth/register', '/api/identity/login',
+                 '/api/identity/passkeys/login/start', '/api/identity/password/reset',
+                 '/security-header-probe', '/account']
+        docs_paths = ['/api/docs/identity/oauth/register', '/api/docs/identity/login']
+        if arguments.docs_enabled:
+            paths += docs_paths
+        else:
+            for path in docs_paths + ['/api/docs/catalog/countries', '/api/docs/content/versions']:
+                expect_code(404, public + path, data='{}', **tls)
+        expect_code(403, public + '/api/catalog/countries', **tls)
+        expect_code(403 if arguments.docs_enabled else 404, public + '/api/docs/catalog/countries', **tls)
+        expect_code(401, public + '/api/content/versions', data='{}', **tls)
+        expect_code(401 if arguments.docs_enabled else 404, public + '/api/docs/content/versions', data='{}', **tls)
+        for path in paths:
             for forged in ('203.0.113.99', '198.51.100.10, 203.0.113.99'):
                 echoed = json.loads(expect_code(200, public + path, headers=[
                     'X-Forwarded-For: ' + forged, 'x-forwarded-for: 192.0.2.77',
@@ -200,7 +217,7 @@ https://''' + HOST + ''' {
                 assert echoed['X-Forwarded-For'] == peer, (path, echoed)
                 if path in {'/security-header-probe', '/account'}:
                     assert echoed['X-Atlas-Edge-Check'] is None, (path, echoed)
-        print('Proxy peer identity: forged chains and duplicate headers cannot change gateway/Identity rate-limit identities: passed')
+        print(f'Proxy peer identity: {len(paths) * 2} forged-header cases pass; docs_enabled={arguments.docs_enabled}; docs aliases retain edge policy and write guards')
 except Exception:
     for container in CONTAINERS:
         subprocess.run(['docker', 'logs', '--tail', '35', container], check=False)

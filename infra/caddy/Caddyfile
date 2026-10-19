@@ -6,6 +6,8 @@
 	uri strip_prefix /api/docs/{args[0]}
 	reverse_proxy {args[1]}:8080 {
 		header_up X-Forwarded-Prefix /api/docs/{args[0]}
+		header_up X-Atlas-Client-IP {client_ip}
+		header_up X-Forwarded-For {client_ip}
 	}
 }
 
@@ -23,11 +25,19 @@
 		defer
 	}
 
+	# OpenAPI/Swagger is local-only unless CADDY_EXPOSE_API_DOCS=true (SEC-3).
+	@docs_closed {
+		path /api/docs/*
+		expression `{env.CADDY_EXPOSE_API_DOCS} != "true"`
+	}
+	respond @docs_closed 404
+
+
 	# Anonymous API requests share one edge quota across services. Validated account
 	# sessions and bearer credentials are exempt. The gateway also gates public pages
 	# when anonymous browsing is disabled.
 	@api_request {
-		path /api/catalog* /api/content* /api/amendment* /api/audit* /api/search* /api/ingestion* /api/document* /api/identity* /api/editor* /oauth/token* /oauth/register* /oauth/revoke*
+		path /api/catalog* /api/content* /api/amendment* /api/audit* /api/search* /api/ingestion* /api/document* /api/identity* /api/editor* /api/docs/* /oauth/token* /oauth/register* /oauth/revoke*
 	}
 	route @api_request {
 		forward_auth gateway-web:3000 {
@@ -44,18 +54,12 @@
 	@missing_write_auth {
 		method POST PUT PATCH DELETE
 		header !Authorization
-		path /api/catalog* /api/content* /api/amendment* /api/audit* /api/search* /api/ingestion* /api/document*
+		path /api/catalog* /api/content* /api/amendment* /api/audit* /api/search* /api/ingestion* /api/document* /api/docs/catalog* /api/docs/content* /api/docs/amendment* /api/docs/audit* /api/docs/search* /api/docs/ingestion* /api/docs/document*
 	}
 	route @missing_write_auth {
 		respond 401
 	}
 
-	# OpenAPI/Swagger is local-only unless CADDY_EXPOSE_API_DOCS=true (SEC-3).
-	@docs_closed {
-		path /api/docs/*
-		expression `{env.CADDY_EXPOSE_API_DOCS} != "true"`
-	}
-	respond @docs_closed 404
 
 	route /.well-known/oauth-protected-resource/mcp {
 		reverse_proxy mcp-server:8080

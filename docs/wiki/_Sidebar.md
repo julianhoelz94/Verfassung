@@ -1,15 +1,21 @@
-**1 · User documentation**
+[[Documentation home|Home]]
 
-- [[Website user guide|User-Guide]]
-- [[Accounts and editorial work|Editorial-Guide]]
-- [[Benutzerhandbuch der Website (Deutsch)|User-Guide-de]]
-- [[Konten und redaktionelle Arbeit (Deutsch)|Editorial-Guide-de]]
+**Use the website**
 
-**2 · Deployment information**
+- [[Read and compare|User-Guide]]
+- [[Accounts and security|Account-Guide]]
+- [[Edit, review and publish|Editorial-Guide]]
+- [[Administration and setup|Admin-Guide]]
 
-- [[Deployment information (pending)|Deployment-Information]]
+**Deutsch**
 
-**3 · Technical documentation**
+- [[Lesen und vergleichen|User-Guide-de]]
+- [[Konto und Sicherheit|Account-Guide-de]]
+- [[Bearbeiten und veröffentlichen|Editorial-Guide-de]]
+- [[Administration und Einrichtung|Admin-Guide-de]]
 
-- [[Architecture and data ownership|Technical-Architecture]]
-- [[Development and operations|Technical-Development]]
+**Develop and operate**
+
+- [[Local development|Technical-Development]]
+- [[Architecture|Technical-Architecture]]
+- [[Deployment (pending)|Deployment-Information]]

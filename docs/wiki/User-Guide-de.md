@@ -1,8 +1,37 @@
-# Benutzerhandbuch der Website
+# Verfassungen lesen und vergleichen
 
-Dieses Handbuch beschreibt den öffentlichen Teil der Website. Welche Länder und Versionen verfügbar sind, hängt von den veröffentlichten Inhalten ab. Eine leere Liste bedeutet nicht, dass ein Entwurf verloren gegangen ist. Öffentliche Seiten zeigen ausschließlich veröffentlichte Inhalte.
+**Schnelleinstieg:** Länder → Land → Verfassung → Fassung. Öffentliche Seiten zeigen veröffentlichte Inhalte. Wenn eine Anmeldung verlangt wird, hilft die [[Kontoanleitung|Account-Guide-de]].
 
-Administratoren können verlangen, dass man sich zum Lesen anmeldet. Dann erscheint auf der Startseite eine Aufforderung zur Anmeldung anstelle des Länderkatalogs. Die öffentlichen Links **Länder** und **Suche** sind bis zur Anmeldung ausgeblendet.
+## Einen Text lesen
+
+1. Öffnen Sie **Länder** und wählen Sie ein Land.
+2. Wählen Sie die Verfassung und die benötigte rechtliche Fassung.
+3. Springen Sie über das Inhaltsverzeichnis zur Vorschrift. Beachten Sie Datum und Status.
+
+![Länderseite mit verfügbaren Verfassungen und Fassungen](media/reading-country-de.png)
+*Zuerst die Verfassung, dann die rechtliche Fassung wählen.*
+
+![Verfassungstext mit Inhaltsverzeichnis](media/reading-text-de.png)
+*Das Inhaltsverzeichnis führt durch den ausgewählten Text.*
+
+## Suchen, vergleichen und Geschichte verfolgen
+
+| Aufgabe | Einstieg |
+| --- | --- |
+| Eine Passage finden | **Suche**, Begriff eingeben und Treffer öffnen. |
+| Zwei Fassungen vergleichen | **Vergleichen** beim Land, dann zwei Fassungen wählen. |
+| Verfassungsgeschichte | **Verfassungszeitstrahl**: Annahme, Inkrafttreten und weitere Ereignisse. |
+| Rechtsänderungen | **Änderungszeitstrahl**: veröffentlichte Rechtsänderungen. |
+
+![Vergleich mit Fassungswahl und geänderten Texten](media/reading-compare-de.png)
+*Prüfen Sie die ausgewählten Fassungen vor dem Lesen.*
+
+Zum Zitieren speichern Sie die Adresse der geöffneten Vorschrift und die Fassungs-ID. Alte Links bleiben erreichbar. Eine Textkorrektur ist keine neue Rechtsänderung.
+
+## Quellen, Sprachen und Sonderfälle
+
+<details>
+<summary>Details zu Quellen, Textkorrekturen, Übersetzung und fehlenden Inhalten</summary>
 
 ## Eine Verfassung finden
 
@@ -48,13 +77,6 @@ Unter **Über** finden Sie die Quellen- und Prüfgrundsätze, im **Impressum** d
 - Die Suche erfasst veröffentlichte Inhalte. Inhalte, die auf eine Prüfung warten, sind nicht öffentlich.
 - Wenn ein Suchergebnis eine sehr neue Veröffentlichung noch nicht zeigt, öffnen Sie die Versionsseite direkt und versuchen Sie die Suche nach Abschluss der Indexierung erneut.
 
-[[Konten und redaktionelle Arbeit|Editorial-Guide-de]] · [[Dokumentationsübersicht|Home]] · [[English|User-Guide]]
+</details>
 
-## Textkorrekturen und Rechtsgeschichte
-
-Die Versionsauswahl und die Zeitleisten zeigen Rechtsfassungen, Geltungsdaten und rechtliche Änderungen. Tippfehler- und Abschriftkorrekturen erscheinen nicht als neue Rechtsfassung. Redaktionelle Details stehen im Hintergrund: Mitarbeitende öffnen **Struktur und redaktionelle Details → Textkorrekturen** oder den Momentaufnahmeverlauf im Redaktionsmenü. Einzelne Korrekturen werden erst auf Wunsch aufgeklappt.
-
-Ein gespeicherter älterer Textstand bleibt unter seinem bisherigen Link erreichbar. Ein kurzer Archivhinweis bietet **Aktuellen Text lesen** an. Der Artikelverlauf zeigt Rechtsfassungen statt einzelner Tippfehlerkorrekturen. Dokumentrevisionen stehen unter **Dokumentdetails und Revisionen**.
-
-
-Administratoren können die verfügbaren Website-Sprachen einschränken. Eine nicht mehr verfügbare gespeicherte Sprache verwendet die festgelegte Standardsprache. Vor Abschluss der ersten Einrichtung können Besucher noch keine Inhalte öffnen.
+[[Konto|Account-Guide-de]] · [[Dokumentationsstart|Home]] · [[English|User-Guide]]

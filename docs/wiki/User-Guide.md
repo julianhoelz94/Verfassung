@@ -1,8 +1,37 @@
-# Website user guide
+# Read and compare constitutions
 
-This guide describes the public website. The exact countries and versions available depend on published content; an empty list does not mean a draft has been lost. Public pages show published material only.
+**Start here:** Countries → country → constitution → version. Public pages show published content. If sign-in is required, use the [[account guide|Account-Guide]].
 
-An administrator can require sign-in for browsing. In that case, the starting page shows a sign-in prompt instead of the country catalog, and the public Countries and Search links are hidden until you log in.
+## Read a text
+
+1. Open **Countries** and select a country.
+2. Choose its constitution and the legal version you need.
+3. Follow the table of contents to a provision. Check its effective date and status.
+
+![Country page with constitutions and legal versions](media/reading-country-en.png)
+*Choose the constitution first, then its legal version.*
+
+![Constitution reader with the table of contents](media/reading-text-en.png)
+*Move through the text while keeping its version context.*
+
+## Search, compare or follow history
+
+| Task | Start here |
+| --- | --- |
+| Find a passage | **Search**, enter a term and open a result. |
+| Compare texts | A country's **Compare** page, then select two versions. |
+| Constitutional history | **Constitution timeline**: adoption, commencement and lifecycle events. |
+| Changes in law | **Amendment timeline**: published legal changes. |
+
+![Comparison page with version selectors and changed text](media/reading-compare-en.png)
+*Check both selected versions before reading the changes.*
+
+To cite a passage, save the opened provision's address and version ID. Older links stay available. A transcription correction does not itself create a new law.
+
+## Sources, languages and exceptions
+
+<details>
+<summary>Details about sources, text corrections, translation and missing content</summary>
 
 ## Find a constitution
 
@@ -54,4 +83,6 @@ Use **About** for source and verification policy, **Impressum** for the publishe
 - Search covers published content; work waiting for review is not public.
 - If a search result does not yet reflect a very recent publication, open the version page directly and try search again after indexing completes.
 
-[[Accounts and editorial work|Editorial-Guide]] · [[Documentation home|Home]] · [[Deutsch|User-Guide-de]]
+</details>
+
+[[Account guide|Account-Guide]] · [[Documentation home|Home]] · [[Deutsch|User-Guide-de]]

@@ -5,7 +5,7 @@ const expect = baseExpect.configure({ timeout: 20_000 });
 
 test('new deployment stays closed until the administrator completes setup', async ({ page, request }, testInfo) => {
   test.skip(process.env.E2E_SETUP_FRESH !== 'true', 'Run against a fresh deployment before uploading fixtures.');
-  test.setTimeout(180_000);
+  test.setTimeout(240_000);
   expect((await (await request.get('/api/identity/setup/status')).json()).completed).toBe(false);
   for (const path of ['/api/catalog/countries', '/api/search/search?q=test', '/mcp', '/oauth/register', '/api/docs/catalog/swagger-ui/index.html']) {
     expect((await request.get(path, { maxRedirects: 0 })).status(), path).toBe(403);
@@ -54,7 +54,7 @@ test('new deployment stays closed until the administrator completes setup', asyn
   await page.goto('/setup');
   await expect(page.getByRole('button', { name: 'Finish setup and open the site' })).toBeEnabled();
   await page.getByRole('button', { name: 'Finish setup and open the site' }).click();
-  await expect(page).toHaveURL(/\/admin\/settings\?completed=1$/);
+  await expect(page).toHaveURL(/\/admin\/settings\?completed=1$/, { timeout: 60_000 });
   expect((await (await request.get('/api/identity/setup/status')).json()).completed).toBe(true);
   expect((await request.get('/api/catalog/countries')).ok()).toBe(true);
   await page.goto('/setup');

@@ -22,15 +22,16 @@ class IdentitySettingsService(
     private val authService: AuthService,
     private val environment: Environment,
     mfaProperties: IdentityMfaProperties,
+    private val environmentSettings: com.constitutionatlas.identity.setup.SettingsEnvironment,
 ) {
     private val box = SecretBox(mfaProperties.encryptionKey)
 
-    fun registrationEnabled(): Boolean = repository.get().selfRegistrationEnabled
+    fun registrationEnabled(): Boolean = environmentSettings.effective(repository.get()).selfRegistrationEnabled
 
     fun publicRegistrationStatus(): Map<String, Boolean> = mapOf("enabled" to registrationEnabled())
 
     fun currentMail(): com.constitutionatlas.identity.config.IdentityMailProperties {
-        val current = repository.get()
+        val current = environmentSettings.effective(repository.get())
         return com.constitutionatlas.identity.config.IdentityMailProperties(
             enabled = current.mailEnabled,
             from = current.mailFrom,
@@ -48,14 +49,15 @@ class IdentitySettingsService(
 
     fun read(authorization: String?): IdentitySettingsDto {
         requireAdmin(authorization)
-        return dto(repository.get())
+        return dto(environmentSettings.effective(repository.get()))
     }
 
     @Transactional
-    fun update(authorization: String?, request: UpdateIdentitySettingsRequest): IdentitySettingsDto {
+    fun update(authorization: String?, incoming: UpdateIdentitySettingsRequest): IdentitySettingsDto {
+        val request = environmentSettings.request(incoming)
         requireAdmin(authorization)
         authService.requireFreshStepUp(authorization)
-        val old = repository.get()
+        val old = environmentSettings.effective(repository.get())
         val host = request.smtpHost.trim()
         val from = request.mailFrom.trim()
         val base = request.mailPublicBaseUrl.trim().trimEnd('/')
@@ -106,8 +108,8 @@ class IdentitySettingsService(
             request.smtpStarttls,
             request.smtpSsl,
         )
-        repository.update(updated)
-        return dto(updated)
+        repository.update(environmentSettings.writable(updated, repository.get()))
+        return dto(environmentSettings.effective(repository.get()))
     }
 
     fun testMail(authorization: String?, to: String, mailer: OutboundMailer) {

@@ -22,6 +22,7 @@ class LegalPageService(
     private val repository: LegalPageRepository,
     private val imprintDetailsRepository: ImprintDetailsRepository,
     private val identityClient: IdentityClient,
+    private val imprintEnvironment: ImprintEnvironment,
 ) {
     fun validateKey(key: String) {
         if (key !in setOf("impressum", "datenschutz", "impressum_en", "datenschutz_en")) throw NotFoundException("Legal page not found")
@@ -49,10 +50,14 @@ class LegalPageService(
     fun imprintDetails(): ImprintDetailsDto =
         imprintDetailsRepository.state().published ?: throw NotFoundException("Imprint details not published")
 
-    fun imprintDetailsState(): ImprintDetailsStateDto = imprintDetailsRepository.state()
+    fun imprintDetailsState(): ImprintDetailsStateDto {
+        val saved = imprintDetailsRepository.state()
+        return saved.copy(draft = imprintEnvironment.draft(saved.draft), managedFields = imprintEnvironment.managedFields())
+    }
 
     @Transactional
-    fun saveImprintDetails(request: SaveImprintDetailsRequest, actor: Actor): ImprintDetailsStateDto {
+    fun saveImprintDetails(incoming: SaveImprintDetailsRequest, actor: Actor): ImprintDetailsStateDto {
+        val request = imprintEnvironment.request(incoming)
         require(request.expectedRevision >= 0) { "Invalid expected revision" }
         val fields = listOf(request.name, request.streetAddress, request.postalCode, request.city, request.country, request.email)
         require(fields.all { it.isNotBlank() && it.length <= 255 }) { "Imprint details must be complete" }
@@ -63,7 +68,7 @@ class LegalPageService(
 
     @Transactional
     fun publishImprintDetails(request: PublishLegalPageRequest, actor: Actor): ImprintDetailsStateDto {
-        val draft = imprintDetailsState().draft ?: throw DocumentConflictException("Imprint details draft missing")
+        val draft = imprintDetailsRepository.state().draft ?: throw DocumentConflictException("Imprint details draft missing")
         require(draft.name != "Verfassung Atlas Musterbetrieb" && draft.email != "kontakt@example.org") {
             "Replace example contact details before publication"
         }

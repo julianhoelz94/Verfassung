@@ -3,9 +3,19 @@ services:
     build: ./infra/caddy
     container_name: edge-proxy
     ports:
-      - "${CADDY_PORT:-80}:80"
+      - "${CADDY_BIND_ADDRESS:-127.0.0.1}:${CADDY_PORT:-80}:80"
+      - "${CADDY_BIND_ADDRESS:-127.0.0.1}:${CADDY_HTTPS_PORT:-443}:443"
     environment:
+      - PROFILE=${PROFILE:-local-stack}
+      - TLS_MODE=${TLS_MODE:-local-http}
+      - PUBLIC_BASE_URL=${PUBLIC_BASE_URL:-http://localhost}
+      - TLS_TRUSTED_PROXIES=${TLS_TRUSTED_PROXIES:-}
+      - CADDY_BIND_ADDRESS=${CADDY_BIND_ADDRESS:-127.0.0.1}
+      - ACME_TEST_DIRECTORY=${ACME_TEST_DIRECTORY:-}
       - CADDY_EXPOSE_API_DOCS=${CADDY_EXPOSE_API_DOCS:-false}
+    volumes:
+      - caddy-data:/data
+      - caddy-config:/config
     depends_on:
       - gateway-web
       - mcp-server
@@ -17,6 +27,7 @@ services:
       - CATALOG_API_URL=http://catalog-service:8080
       - CONTENT_API_URL=http://content-service:8080
       - SEARCH_API_URL=http://search-service:8080
+      - DEPLOYMENT_SETUP_GATE_ENABLED=true
       - IDENTITY_API_URL=http://identity-service:8080
       - INGESTION_API_URL=http://ingestion-service:8080
       - MCP_CURSOR_SECRET=${MCP_CURSOR_SECRET:-}
@@ -39,6 +50,7 @@ services:
       # The image is built with `next build`; run it in production mode so error output
       # is not verbose and the session cookie defaults to Secure. local-stack.env sets
       # SESSION_COOKIE_SECURE=false because Caddy serves plain http there.
+      - TLS_MODE=${TLS_MODE:-local-http}
       - NODE_ENV=production
       - SESSION_COOKIE_SECURE=${SESSION_COOKIE_SECURE:-true}
       # Gateway shows seed-account hints on /login only while identity seeding is on.
@@ -47,6 +59,7 @@ services:
       - CONTENT_API_URL=http://content-service:8080
       - AMENDMENT_API_URL=http://amendment-service:8080
       - DOCUMENT_API_URL=http://document-service:8080
+      - DEPLOYMENT_SETUP_GATE_ENABLED=true
       - IDENTITY_API_URL=http://identity-service:8080
       - EDITOR_API_URL=http://editor-service:8080
       - SEARCH_API_URL=http://search-service:8080
@@ -85,6 +98,7 @@ services:
       - SPRING_DATASOURCE_URL=jdbc:postgresql://catalog-db:5432/catalog_db
       - SPRING_DATASOURCE_USERNAME=postgres
       - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - DEPLOYMENT_SETUP_GATE_ENABLED=true
       - IDENTITY_API_URL=http://identity-service:8080
       - CONTENT_API_URL=http://content-service:8080
       - EDITOR_API_URL=http://editor-service:8080
@@ -100,6 +114,7 @@ services:
       - SPRING_DATASOURCE_URL=jdbc:postgresql://content-db:5432/content_db
       - SPRING_DATASOURCE_USERNAME=postgres
       - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - DEPLOYMENT_SETUP_GATE_ENABLED=true
       - IDENTITY_API_URL=http://identity-service:8080
       - CATALOG_API_URL=http://catalog-service:8080
     depends_on:
@@ -116,6 +131,7 @@ services:
       - SPRING_DATASOURCE_URL=jdbc:postgresql://amendment-db:5432/amendment_db
       - SPRING_DATASOURCE_USERNAME=postgres
       - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - DEPLOYMENT_SETUP_GATE_ENABLED=true
       - IDENTITY_API_URL=http://identity-service:8080
       - CONTENT_API_URL=http://content-service:8080
       - CATALOG_API_URL=http://catalog-service:8080
@@ -186,6 +202,24 @@ services:
       - PROD_ADMIN_PASSWORD=${PROD_ADMIN_PASSWORD:-}
       - PROD_VIEWER_EMAIL=${PROD_VIEWER_EMAIL:-}
       - PROD_VIEWER_PASSWORD=${PROD_VIEWER_PASSWORD:-}
+      - TLS_MODE=${TLS_MODE:-local-http}
+      - SESSION_COOKIE_SECURE=${SESSION_COOKIE_SECURE:-true}
+      - SETUP_FIXTURE_COMPLETE=${SETUP_FIXTURE_COMPLETE:-false}
+      - SITE_LANGUAGES=${SITE_LANGUAGES:-}
+      - SITE_DEFAULT_LANGUAGE=${SITE_DEFAULT_LANGUAGE:-}
+      - SITE_REGISTRATION_ENABLED=${SITE_REGISTRATION_ENABLED:-}
+      - SMTP_ENABLED=${SMTP_ENABLED:-}
+      - SMTP_FROM=${SMTP_FROM:-}
+      - SMTP_FROM_NAME=${SMTP_FROM_NAME:-}
+      - SMTP_PUBLIC_BASE_URL=${SMTP_PUBLIC_BASE_URL:-}
+      - SMTP_HOST=${SMTP_HOST:-}
+      - SMTP_PORT=${SMTP_PORT:-}
+      - SMTP_USERNAME=${SMTP_USERNAME:-}
+      - SMTP_PASSWORD=${SMTP_PASSWORD:-}
+      - SMTP_AUTH=${SMTP_AUTH:-}
+      - SMTP_STARTTLS=${SMTP_STARTTLS:-}
+      - SMTP_SSL=${SMTP_SSL:-}
+      - DOCUMENT_API_URL=http://document-service:8080
     depends_on:
       identity-db:
         condition: service_healthy
@@ -200,6 +234,7 @@ services:
       - SPRING_DATASOURCE_USERNAME=postgres
       - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD:-postgres}
       - SERVER_FORWARD_HEADERS_STRATEGY=framework
+      - DEPLOYMENT_SETUP_GATE_ENABLED=true
       - IDENTITY_API_URL=http://identity-service:8080
       - AUDIT_API_URL=http://audit-service:8080
       - CONTENT_API_URL=http://content-service:8080
@@ -231,6 +266,7 @@ services:
       - SPRING_DATASOURCE_URL=jdbc:postgresql://audit-db:5432/audit_db
       - SPRING_DATASOURCE_USERNAME=postgres
       - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - DEPLOYMENT_SETUP_GATE_ENABLED=true
       - IDENTITY_API_URL=http://identity-service:8080
     depends_on:
       audit-db:
@@ -239,11 +275,18 @@ services:
   document-service:
     build: ./services/document-service
     environment:
+      - IMPRINT_NAME=${IMPRINT_NAME:-}
+      - IMPRINT_STREET_ADDRESS=${IMPRINT_STREET_ADDRESS:-}
+      - IMPRINT_POSTAL_CODE=${IMPRINT_POSTAL_CODE:-}
+      - IMPRINT_CITY=${IMPRINT_CITY:-}
+      - IMPRINT_COUNTRY=${IMPRINT_COUNTRY:-}
+      - IMPRINT_EMAIL=${IMPRINT_EMAIL:-}
       - SPRING_PROFILES_ACTIVE=${PROFILE:-local-stack}
       - SERVER_FORWARD_HEADERS_STRATEGY=framework
       - SPRING_DATASOURCE_URL=jdbc:postgresql://document-db:5432/document_db
       - SPRING_DATASOURCE_USERNAME=postgres
       - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - DEPLOYMENT_SETUP_GATE_ENABLED=true
       - IDENTITY_API_URL=http://identity-service:8080
       - CATALOG_API_URL=http://catalog-service:8080
       - AMENDMENT_API_URL=http://amendment-service:8080
@@ -267,6 +310,7 @@ services:
       - SERVER_FORWARD_HEADERS_STRATEGY=framework
       - CATALOG_API_URL=http://catalog-service:8080
       - CONTENT_API_URL=http://content-service:8080
+      - DEPLOYMENT_SETUP_GATE_ENABLED=true
       - IDENTITY_API_URL=http://identity-service:8080
       - INGESTION_PUBLISH_TOKEN=${INGESTION_PUBLISH_TOKEN:-}
       - INGESTION_AUDIT_TOKEN=${INGESTION_AUDIT_TOKEN:-}
@@ -292,6 +336,7 @@ services:
       - CATALOG_API_URL=http://catalog-service:8080
       - CONTENT_API_URL=http://content-service:8080
       - SEARCH_REINDEX_ON_STARTUP=true
+      - DEPLOYMENT_SETUP_GATE_ENABLED=true
       - IDENTITY_API_URL=http://identity-service:8080
     depends_on:
       search-db:
@@ -424,6 +469,8 @@ services:
       start_period: 5s
 
 volumes:
+  caddy-data:
+  caddy-config:
   catalog-db-data:
   content-db-data:
   amendment-db-data:

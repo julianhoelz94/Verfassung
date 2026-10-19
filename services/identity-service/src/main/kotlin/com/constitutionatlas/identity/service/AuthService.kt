@@ -35,6 +35,8 @@ import java.util.UUID
 @Service
 class AuthService(
     private val identityRepository: IdentityRepository,
+    private val deploymentConfiguration: com.constitutionatlas.identity.setup.DeploymentConfiguration,
+    private val setupRepository: com.constitutionatlas.identity.setup.SetupRepository,
     private val mcpKeyRepository: McpKeyRepository,
     private val oauthRepository: OAuthRepository,
     private val passwordEncoder: PasswordEncoder,
@@ -67,7 +69,7 @@ class AuthService(
 
         val user = identityRepository.findUserByEmail(normalized)
         val matches = passwordEncoder.matches(password, user?.passwordHash ?: dummyHash)
-        if (user == null || !user.enabled || !matches) {
+        if (user == null || !user.enabled || !matches || !setupAllows(user.id)) {
             loginAttempts.increment()
             loginFailures.increment()
             recordFailure(emailKey)
@@ -276,6 +278,7 @@ class AuthService(
             identityRepository.touchSession(hash)
             return identityRepository.toUserDto(user, hash, mfaProperties.stepUpTtl)
         }
+        if (setupRepository.get().completedAt == null) throw UnauthorizedException("Deployment setup is incomplete")
         val service = identityRepository.findValidServiceTokenByHash(hash)
         if (service != null) {
             identityRepository.touchServiceToken(service.id)
@@ -303,7 +306,7 @@ class AuthService(
     }
 
     fun updateLanguagePreference(bearerToken: String?, preference: String): UserDto {
-        if (preference !in setOf("auto", "en", "de")) {
+        if (preference != "auto" && preference !in deploymentConfiguration.languages(setupRepository.get()).enabled) {
             throw BadRequestException("Unsupported language preference")
         }
         val hash = Tokens.sha256Hex(Tokens.requireBearer(bearerToken))
@@ -368,6 +371,7 @@ class AuthService(
         mfaVerified: Boolean,
         revokeTokenHash: String?,
     ): LoginResponse {
+        if (!setupAllows(user.id)) throw UnauthorizedException("Deployment setup is incomplete")
         if (!revokeTokenHash.isNullOrBlank()) {
             identityRepository.deleteSessionByTokenHash(revokeTokenHash)
         }
@@ -401,6 +405,7 @@ class AuthService(
             val user =
                 identityRepository.findUserById(challenge.userId)
                     ?: throw UnauthorizedException("Invalid credentials")
+            if (!setupAllows(user.id)) throw UnauthorizedException("Deployment setup is incomplete")
             return user to challengeToken
         }
         val user = requireActiveSession(Tokens.sha256Hex(Tokens.requireBearer(authorization)))
@@ -445,8 +450,13 @@ class AuthService(
         }
     }
 
+    private fun setupAllows(userId: UUID): Boolean {
+        val setup = setupRepository.get()
+        return setup.completedAt != null || setup.bootstrapAdminId == userId
+    }
+
     private fun requireActiveSession(tokenHash: String) =
-        identityRepository.findUserByValidTokenHash(tokenHash)?.also {
+        identityRepository.findUserByValidTokenHash(tokenHash)?.takeIf { setupAllows(it.id) }?.also {
             val lastSeen = identityRepository.lastSeenAt(tokenHash) ?: throw UnauthorizedException("Invalid or expired session")
             if (lastSeen.isBefore(Instant.now().minus(sessionProperties.idleTimeout))) {
                 identityRepository.deleteSessionByTokenHash(tokenHash)

@@ -20,9 +20,10 @@ data class LegalPageStateDto(
 data class SaveLegalPageDraftRequest(
     val content: String,
     val expectedRevision: Int,
+    val contact: SaveImprintDetailsRequest? = null,
 )
 
-data class PublishLegalPageRequest(val expectedRevision: Int)
+data class PublishLegalPageRequest(val expectedRevision: Int, val expectedContactRevision: Int? = null)
 
 data class ImprintDetailsDto(
     val revision: Int,

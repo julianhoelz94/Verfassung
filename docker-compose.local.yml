@@ -1,0 +1,101 @@
+# Selected explicitly by manageLocalStack.sh; CI retains its existing artifact builds.
+x-source-build: &source-build
+  context: .
+  dockerfile: infra/local-stack/Dockerfile
+
+# Nine Spring processes share the local VM. Keep their heaps and GC thread count
+# bounded rather than letting each JVM size itself for the entire VM.
+x-local-java: &local-java
+  environment:
+    JAVA_TOOL_OPTIONS: ${LOCAL_JAVA_TOOL_OPTIONS:--Xms32m -Xmx256m -XX:+UseSerialGC -XX:ActiveProcessorCount=2}
+
+services:
+  catalog-service:
+    <<: *local-java
+    build:
+      <<: *source-build
+      args:
+        SERVICE: catalog-service
+  content-service:
+    <<: *local-java
+    build:
+      <<: *source-build
+      args:
+        SERVICE: content-service
+  amendment-service:
+    <<: *local-java
+    build:
+      <<: *source-build
+      args:
+        SERVICE: amendment-service
+  identity-service:
+    <<: *local-java
+    build:
+      <<: *source-build
+      args:
+        SERVICE: identity-service
+  editor-service:
+    <<: *local-java
+    build:
+      <<: *source-build
+      args:
+        SERVICE: editor-service
+  search-service:
+    <<: *local-java
+    build:
+      <<: *source-build
+      args:
+        SERVICE: search-service
+  ingestion-service:
+    <<: *local-java
+    build:
+      <<: *source-build
+      args:
+        SERVICE: ingestion-service
+  audit-service:
+    <<: *local-java
+    build:
+      <<: *source-build
+      args:
+        SERVICE: audit-service
+  document-service:
+    <<: *local-java
+    build:
+      <<: *source-build
+      args:
+        SERVICE: document-service
+
+  # A normal container exposes BuildKit output in OrbStack's container Logs tab.
+  build-monitor:
+    image: node:22-alpine
+    profiles: [tools]
+    volumes:
+      - ./.local-stack:/logs:ro
+    command:
+      - sh
+      - -c
+      - "trap 'exit 0' TERM INT; tail -n +1 -F /logs/build.log & wait $$!"
+
+  # Backups are an explicit one-shot operation, not an application dependency.
+  backup-service:
+    profiles: [tools]
+
+  # Share Caddy's network namespace: localhost remains localhost, so the existing
+  # fixture safety guard also applies inside Docker. No host networking required.
+  prepopulate:
+    image: node:22-alpine
+    profiles: [tools]
+    network_mode: service:edge-proxy
+    working_dir: /fixtures
+    env_file: env/local-stack.env
+    environment:
+      PREPOPULATE_TEST_STACK: "true"
+      PREPOPULATE_BASE_URL: http://127.0.0.1
+    volumes:
+      - ./apps/gateway-web/e2e/fixtures:/fixtures
+    entrypoint:
+      - sh
+      - -c
+      - 'node generate.mjs && exec node prepopulate.mjs "$$@"'
+      - prepopulate
+    command: []

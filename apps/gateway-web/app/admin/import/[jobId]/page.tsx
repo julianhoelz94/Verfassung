@@ -1,3 +1,4 @@
+import { NavigatingActionForm } from '../../../components/NavigatingActionForm';
 import { statusMessage } from '../../../../lib/ui-labels';
 import { T } from '../../../components/TranslationProvider';
 import { ui } from '../../../../lib/messages';
@@ -100,10 +101,10 @@ export default async function ImportJobPage(props: ImportJobPageProps) {
 }
 
 function ActionForm({ action, jobId, label }: { action: 'confirm-outline' | 'prepare' | 'approve' | 'reject' | 'publish'; jobId: string; label: import('../../../../lib/messages').UiMessage }) {
-  return <form action={transitionImportAction}>
+  return <NavigatingActionForm action={transitionImportAction}>
     <input type="hidden" name="jobId" value={jobId} />
     <input type="hidden" name="action" value={action} />
     {action === 'approve' || action === 'reject' ? <label><T value={ui.admin.import.jobid.page.reviewReason} /><textarea name="reason" minLength={10} maxLength={2000} required rows={3} /></label> : null}
     <Button variant={action === 'publish' ? 'primary' : undefined}><T value={label} /></Button>
-  </form>;
+  </NavigatingActionForm>;
 }

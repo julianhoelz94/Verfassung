@@ -51,3 +51,6 @@ bin/
 .kotlin/
 node_modules/
 .next/
+
+# Local build output streamed to the OrbStack build-monitor container
+.local-stack/

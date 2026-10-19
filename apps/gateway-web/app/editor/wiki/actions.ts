@@ -1,7 +1,6 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { redirect } from 'next/navigation';
 import { publishWikiPage, saveWikiDraft, type WikiImage } from '../../../lib/api';
 import { attachDocument, createDocument, getDocument, uploadDocument } from '../../../lib/document-api';
 import { requireSessionBearer } from '../../../lib/session';
@@ -20,7 +19,7 @@ function editHref(targetType: string, targetId: string, code: string, status: st
   return `/editor/wiki/${targetType}/${targetId}?code=${encodeURIComponent(code)}&${status}=1`;
 }
 
-export async function saveWikiAction(form: FormData) {
+export async function saveWikiAction(form: FormData): Promise<string> {
   const { targetType, targetId, code } = target(form);
   const authorization = await requireSessionBearer();
   try {
@@ -86,21 +85,21 @@ export async function saveWikiAction(form: FormData) {
       );
     }
   } catch {
-    redirect(editHref(targetType, targetId, code, 'error'));
+    return editHref(targetType, targetId, code, 'error');
   }
   revalidatePath(`/countries/${code}`);
-  redirect(editHref(targetType, targetId, code, 'saved'));
+  return editHref(targetType, targetId, code, 'saved');
 }
 
-export async function publishWikiAction(form: FormData) {
+export async function publishWikiAction(form: FormData): Promise<string> {
   const { targetType, targetId, code } = target(form);
   const authorization = await requireSessionBearer();
   try {
     await publishWikiPage(targetType, targetId, String(form.get('revisionId') ?? ''), authorization);
   } catch {
-    redirect(editHref(targetType, targetId, code, 'error'));
+    return editHref(targetType, targetId, code, 'error');
   }
   revalidatePath(`/countries/${code}`);
   if (targetType === 'constitution') revalidatePath(`/countries/${code}/constitutions/${targetId}`);
-  redirect(editHref(targetType, targetId, code, 'published'));
+  return editHref(targetType, targetId, code, 'published');
 }

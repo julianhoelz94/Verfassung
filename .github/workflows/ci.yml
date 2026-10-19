@@ -20,6 +20,10 @@ jobs:
       services: ${{ steps.list.outputs.services }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Check local-stack orchestration
+        run: |
+          bash -n manageLocalStack.sh
+          python3 scripts/test_local_stack.py
       - id: list
         name: List microservices
         run: |

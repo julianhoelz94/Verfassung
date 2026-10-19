@@ -1,3 +1,4 @@
+import { NavigatingActionForm } from '../../../../components/NavigatingActionForm';
 import { currentLocale } from '../../../../../lib/server-locale';
 import { message } from '../../../../../lib/messages';
 import { T } from '../../../../components/TranslationProvider';
@@ -47,7 +48,7 @@ export default async function WikiEditor({ params, searchParams }: Props) {
       {query.published ? <p role="status"><T value={ui.editor.wiki.targettype.targetid.page.pagePublished} /></p> : null}
       {query.error ? <p role="alert"><T value={ui.editor.wiki.targettype.targetid.page.thePageCouldNotBeSavedOr} /></p> : null}
       {canEdit ? (
-        <form action={saveWikiAction} className="card">
+        <NavigatingActionForm action={saveWikiAction} className="card">
           <input type="hidden" name="targetType" value={targetType} />
           <input type="hidden" name="targetId" value={targetId} />
           <input type="hidden" name="code" value={code} />
@@ -104,10 +105,10 @@ export default async function WikiEditor({ params, searchParams }: Props) {
           <label htmlFor="wiki-image-source"><T value={ui.editor.wiki.targettype.targetid.page.sourceUrl} /></label>
           <input id="wiki-image-source" name="imageSource" type="url" />
           <button className="btn" type="submit"><T value={ui.editor.wiki.targettype.targetid.page.saveDraft} /></button>
-        </form>
+        </NavigatingActionForm>
       ) : null}
       {canPublish && draft && draft.id !== published?.id ? (
-        <form action={publishWikiAction} className="card">
+        <NavigatingActionForm action={publishWikiAction} className="card">
           <input type="hidden" name="targetType" value={targetType} />
           <input type="hidden" name="targetId" value={targetId} />
           <input type="hidden" name="code" value={code} />
@@ -119,7 +120,7 @@ export default async function WikiEditor({ params, searchParams }: Props) {
           <WikiImages images={draft.images.filter((image) => image.placement !== 'before_body')} preview />
           <WikiSources sourceUrls={draft.sourceUrls ?? []} />
           <button className="btn" type="submit"><T value={ui.editor.wiki.targettype.targetid.page.publishPage} /></button>
-        </form>
+        </NavigatingActionForm>
       ) : null}
       {history.length > 0 || historyPage > 0 ? (
         <section className="card" aria-label={message(locale, ui.accessibility.pageRevisionHistory)}>

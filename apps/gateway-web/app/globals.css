@@ -2288,6 +2288,8 @@ button.article-toggle[aria-expanded='false']::after {
 .stack > .field { margin-bottom: 0; }
 .form-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); margin-top: var(--space-4); }
 .form-actions form { margin: 0; }
+.btn:disabled, button:disabled { opacity: .5; cursor: not-allowed; box-shadow: none; }
+form[aria-busy='true'] :where(button, .btn) { cursor: progress; }
 .preference-form { display: grid; justify-items: start; gap: var(--space-3); }
 .panel > .panel-title:not(:first-child) { margin-top: var(--space-5); }
 .date-filter { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--space-3); }

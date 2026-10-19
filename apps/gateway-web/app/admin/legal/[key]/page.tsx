@@ -11,6 +11,7 @@ import { exampleLegalPage } from '../../../../lib/legal-page-examples';
 import { publishLegalPageAction, saveLegalDraftAction } from './actions';
 import { notFound } from 'next/navigation';
 import { currentLocale } from '../../../../lib/server-locale';
+import Link from 'next/link';
 import { message } from '../../../../lib/messages';
 import { reviewUi } from '../../../../lib/ui-review-messages';
 import { LocalizedRegion } from '../../../components/LocalizedRegion';

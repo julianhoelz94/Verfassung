@@ -1,4 +1,5 @@
 import { reviewUi } from '../../../lib/ui-review-messages';
+import Link from 'next/link';
 import { NavigatingActionForm } from '../../components/NavigatingActionForm';
 import { LocalizedRegion } from '../../components/LocalizedRegion';
 import { T } from '../../components/TranslationProvider';
@@ -34,7 +35,7 @@ export default async function IdentitySettingsPage({ searchParams }: { searchPar
     <div className="settings-layout">
       <LocalizedRegion as="nav" className="section-nav" label={m.settings}>
         {details ? <><a href="#general"><T value={m.general} /></a><a href="#connection"><T value={m.connection} /></a></> : null}
-        <a href="/admin/legal/impressum"><T value={m.operator} /></a>
+        <Link href="/admin/legal/impressum"><T value={m.operator} /></Link>
         <a href="#email"><T value={m.email} /></a>
         {translationSettings ? <a href="#translation"><T value={ui.contentTranslation.title} /></a> : null}
       </LocalizedRegion>

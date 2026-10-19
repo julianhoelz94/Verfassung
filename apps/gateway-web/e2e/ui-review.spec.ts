@@ -51,7 +51,11 @@ for (const locale of ['en', 'de']) for (const width of sizes) {
         if (route.entry === '/admin/settings') await expect(page.locator('#smtpHost')).toBeVisible();
         if (route.entry === '/admin/import/setup/[proposalId]') await expect(page.locator('.page-meta')).toContainText(locale === 'en' ? 'Awaiting structure review' : 'Struktur wartet auf Prüfung');
         if (route.entry === '/editor/lifecycle/[constitutionId]') await expect(page.locator('input[name="logicalUnitIds"]').first()).toBeVisible();
-        if (route.entry === '/setup') await expect(page.getByRole('button', { name: locale === 'en' ? 'Finish setup and open the site' : 'Einrichtung abschließen und Website öffnen' })).toBeDisabled();
+        if (route.entry === '/setup') {
+          await expect(page.getByRole('button', { name: locale === 'en' ? 'Finish setup and open the site' : 'Einrichtung abschließen und Website öffnen' })).toBeDisabled();
+          await expect(page.getByRole('button', { name: locale === 'en' ? 'Account menu' : 'Kontomenü' })).toBeVisible();
+          await expect(page.locator('.nav-primary a')).toHaveCount(0);
+        }
         if (route.entry === 'import-new-structure') await expect(page.locator('#proposalFile')).toBeVisible();
         if (route.entry === 'editor-active-correction') await expect(page.getByRole('button', { name: locale === 'en' ? 'Save draft' : 'Entwurf speichern', exact: true })).toBeVisible();
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), `Page overflow at ${route.path}`).toBeTruthy();

@@ -6,6 +6,8 @@ export const reviewUi = {
   structureProposed: { en: 'Awaiting structure review', de: 'Struktur wartet auf Prüfung' },
   structureConfirming: { en: 'Preparing confirmation', de: 'Bestätigung wird vorbereitet' },
   structureConfirmed: { en: 'Structure confirmed', de: 'Struktur bestätigt' },
+  resumeSetup: { en: 'Continue setup', de: 'Einrichtung fortsetzen' },
+  accessAfterSetup: { en: 'Choose whether visitors can browse without signing in, and review registration settings.', de: 'Legen Sie fest, ob Besucher ohne Anmeldung lesen dürfen, und prüfen Sie die Registrierungseinstellungen.' },
   onThisPage: { en: 'On this page', de: 'Auf dieser Seite' },
   preferences: { en: 'Language and preferences', de: 'Sprache und Einstellungen' },
   security: { en: 'Account security', de: 'Kontosicherheit' },

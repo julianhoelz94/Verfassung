@@ -62,7 +62,7 @@ export default async function RootLayout({ children }: RootLayoutProps) {
         <a className="skip-link" href="#main-content">
           {message(locale, ui.shell.skipToMain)}
         </a>
-        <SiteHeader user={setupComplete ? session.user : null} identityUnavailable={session.identityUnavailable} needsReviewCount={needsReviewCount} anonymousBrowsingAllowed={anonymousBrowsingAllowed} />
+        <SiteHeader user={session.user} setupInProgress={!setupComplete} identityUnavailable={session.identityUnavailable} needsReviewCount={needsReviewCount} anonymousBrowsingAllowed={anonymousBrowsingAllowed} />
         {children}
         <SiteFooter />
         </TranslationProvider>

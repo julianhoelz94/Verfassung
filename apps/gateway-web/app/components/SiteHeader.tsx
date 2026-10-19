@@ -4,6 +4,7 @@ import { NavigatingActionForm } from './NavigatingActionForm';
 
 import { T, useTranslation } from './TranslationProvider';
 import { ui } from '../../lib/messages';
+import { reviewUi } from '../../lib/ui-review-messages';
 import { roleMessage } from '../../lib/ui-labels';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
@@ -27,6 +28,7 @@ type SiteHeaderProps = {
   identityUnavailable?: boolean;
   needsReviewCount?: number;
   anonymousBrowsingAllowed?: boolean;
+  setupInProgress?: boolean;
 };
 
 function MenuSectionList({
@@ -76,17 +78,20 @@ function MenuSectionList({
   );
 }
 
-export function SiteHeader({ user, identityUnavailable = false, needsReviewCount = 0, anonymousBrowsingAllowed = true }: SiteHeaderProps) {
+export function SiteHeader({ user, identityUnavailable = false, needsReviewCount = 0, anonymousBrowsingAllowed = true, setupInProgress = false }: SiteHeaderProps) {
   const t = useTranslation();
   const pathname = usePathname();
-  const links = primaryNavLinks(user, false, anonymousBrowsingAllowed);
-  const sections = menuSections(user, false, needsReviewCount, anonymousBrowsingAllowed);
+  const links = setupInProgress ? [] : primaryNavLinks(user, false, anonymousBrowsingAllowed);
+  const sections: MenuSection[] = setupInProgress ? user ? [
+    { id: 'identity', identity: user, links: [] },
+    { id: 'account', links: [{ href: '/setup', label: 'Continue setup', message: reviewUi.resumeSetup }] },
+  ] : [] : menuSections(user, false, needsReviewCount, anonymousBrowsingAllowed);
   const versionId = versionIdFromPath(pathname);
   const country = versionId ? countryFromPath(pathname) : undefined;
   return (
     <header className="topbar">
       <div className="topbar-inner">
-        <Link className="brand" href="/">
+        <Link className="brand" href={setupInProgress && user ? '/setup' : '/'}>
           <span className="brand-mark" aria-hidden="true">
             §
           </span>
@@ -104,7 +109,7 @@ export function SiteHeader({ user, identityUnavailable = false, needsReviewCount
           ))}
         </nav>
         <div className="topbar-actions">
-          {(user || anonymousBrowsingAllowed) ? <SiteSearchForm
+          {!setupInProgress && (user || anonymousBrowsingAllowed) ? <SiteSearchForm
             id="header-search-inline"
             className="search-inline"
             versionId={versionId}
@@ -131,14 +136,14 @@ export function SiteHeader({ user, identityUnavailable = false, needsReviewCount
             <>
               <a className="btn btn-sm login-desktop" href="/login">
                 <T value={ui.components.siteheader.logIn} />{" "}</a>
-              <MenuDisclosure key={pathname} className="menu-phone" label={ui.searchForm.menu} trigger={<span aria-hidden="true">☰</span>}>
+              {!setupInProgress ? <MenuDisclosure key={pathname} className="menu-phone" label={ui.searchForm.menu} trigger={<span aria-hidden="true">☰</span>}>
                 <MenuSectionList sections={sections} pathname={pathname} user={user} />
-              </MenuDisclosure>
+              </MenuDisclosure> : null}
             </>
           )}
         </div>
       </div>
-      {(user || anonymousBrowsingAllowed) ? <div className="search-row">
+      {!setupInProgress && (user || anonymousBrowsingAllowed) ? <div className="search-row">
         <SiteSearchForm
           id="header-search-phone"
           versionId={versionId}

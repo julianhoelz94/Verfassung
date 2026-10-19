@@ -18,7 +18,7 @@ function safeReturnPath(value: FormDataEntryValue | null): string {
   return path.startsWith('/') && !path.startsWith('//') && !path.includes('\\') ? path : '/editor/documents';
 }
 
-export async function createDocumentAction(form: FormData): Promise<void> {
+export async function createDocumentAction(form: FormData): Promise<string> {
   const authorization = await writer();
   const returnTo = safeReturnPath(form.get('returnTo'));
   let document;
@@ -29,10 +29,10 @@ export async function createDocumentAction(form: FormData): Promise<void> {
       sourceUrl: String(form.get('sourceUrl') ?? ''),
     }, authorization);
   } catch {
-    redirect(`/editor/documents/new?error=save&returnTo=${encodeURIComponent(returnTo)}`);
+    return `/editor/documents/new?error=save&returnTo=${encodeURIComponent(returnTo)}`;
   }
   revalidatePath('/editor/documents');
-  redirect(`/editor/documents/${document.id}?created=1&returnTo=${encodeURIComponent(returnTo)}`);
+  return `/editor/documents/${document.id}?created=1&returnTo=${encodeURIComponent(returnTo)}`;
 }
 
 export async function reviseDocumentAction(form: FormData): Promise<void> {

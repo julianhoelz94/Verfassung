@@ -1,6 +1,5 @@
 'use server';
 
-import { redirect } from 'next/navigation';
 import { currentUser, requireSessionBearer } from '../../../lib/session';
 import { createImportJob, createSetupProposal, isImportRequest, parseImportJson, transitionImportJob } from '../../../lib/ingestion-api';
 
@@ -50,19 +49,19 @@ export async function createSetupProposalAction(formData: FormData): Promise<str
   return `/admin/import/setup/${encodeURIComponent(proposalId)}`;
 }
 
-export async function transitionImportAction(formData: FormData): Promise<void> {
+export async function transitionImportAction(formData: FormData): Promise<string> {
   const user = await currentUser();
   const jobId = String(formData.get('jobId') ?? '');
   const action = String(formData.get('action') ?? '');
   const reason = String(formData.get('reason') ?? '').trim();
   const role = { 'confirm-outline': 'editor', prepare: 'editor', approve: 'reviewer', reject: 'reviewer', publish: 'publisher' }[action as 'confirm-outline' | 'prepare' | 'approve' | 'reject' | 'publish'];
-  if (!user || !role || !hasRole(user.roles, role)) redirect(`/admin/import/${encodeURIComponent(jobId)}?error=forbidden`);
-  if (['approve', 'reject'].includes(action) && (reason.length < 10 || reason.length > 2000)) redirect(`/admin/import/${encodeURIComponent(jobId)}?error=reason`);
-  if (action === 'publish' && !user.stepUpFresh) redirect(`/account/step-up?returnTo=${encodeURIComponent(`/admin/import/${jobId}`)}`);
+  if (!user || !role || !hasRole(user.roles, role)) return `/admin/import/${encodeURIComponent(jobId)}?error=forbidden`;
+  if (['approve', 'reject'].includes(action) && (reason.length < 10 || reason.length > 2000)) return `/admin/import/${encodeURIComponent(jobId)}?error=reason`;
+  if (action === 'publish' && !user.stepUpFresh) return `/account/step-up?returnTo=${encodeURIComponent(`/admin/import/${jobId}`)}`;
   try {
     await transitionImportJob(jobId, action as 'confirm-outline' | 'prepare' | 'approve' | 'reject' | 'publish', await requireSessionBearer(), reason);
   } catch {
-    redirect(`/admin/import/${encodeURIComponent(jobId)}?error=transition`);
+    return `/admin/import/${encodeURIComponent(jobId)}?error=transition`;
   }
-  redirect(`/admin/import/${encodeURIComponent(jobId)}`);
+  return `/admin/import/${encodeURIComponent(jobId)}`;
 }

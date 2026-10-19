@@ -14,6 +14,7 @@ test('document revisions link from both editors and appear on public readers wit
   await page.getByLabel('Title').fill(title);
   await page.getByLabel('Source URL').fill('https://example.org/sprint-48-document');
   await page.getByRole('button', { name: 'Create document' }).click();
+  await expect(page).toHaveURL(/\/editor\/documents\/[^/?]+\?created=1/, { timeout: 15_000 });
   await expect(page.getByText('Document created.')).toBeVisible();
   const documentId = new URL(page.url()).pathname.split('/').at(-1)!;
   await page.getByLabel('Title').fill(`${title} revised`);

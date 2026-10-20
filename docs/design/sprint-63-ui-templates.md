@@ -10,6 +10,7 @@ Status: implementation in progress. Linear milestone: `0c315d76-26bb-449a-b211-8
 4. Pilot account, setup, and site settings. Migrate the remaining route families and remove superseded layout CSS as each owner moves.
 5. Extend shared fields with accessible help/error associations. Preserve native controls, translations, authored legal text, API ownership, authorization and publication workflows.
 6. Verify English/German at 390, 820, and 1440px and reflow at 320px; inspect Linux screenshot changes, exercise conditional/error/dense states, and update developer documentation.
+   Alignment is an explicit acceptance criterion: consistent content edges, aligned label/control tracks under wrapped labels, equal-height card rows, aligned header actions and wrapping button rows.
 7. Run independent reviewer and verifier correction loops on the full diff, pass required CI, merge, and verify the post-merge Wiki publication and editorial clips before recording completion.
 
 ## Verification

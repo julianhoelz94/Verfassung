@@ -5,13 +5,14 @@ import { ui } from '../../../lib/messages';
 import { cookies } from 'next/headers';
 import { AdminForbidden } from '../../components/AdminForbidden';
 import { Alert, Badge, Button, Card, DataList, DataRow, Input, PageHeader } from '../../components/ui';
-import { PageMain } from '../../components/PageMain';
+import { CollectionPage } from '../../components/layout/templates';
 import { disableUserAction, enableUserAction, revokeServiceTokenAction } from '../../account/actions';
 import { InviteUserForm, IssueResetForm, CreateServiceTokenForm, RotateServiceTokenForm } from './TokenForms';
 import { requireAdminPage } from '../../../lib/admin';
 import { requestUsers, requestServiceTokens, type AdminUser, type ServiceToken } from '../../../lib/identity-client';
 import { FormattedDate } from '../../../lib/format-date';
 import { SESSION_COOKIE } from '../../../lib/session';
+import { Inline, Stack } from '../../components/layout/Layout';
 
 type AdminUsersPageProps = {
   searchParams: Promise<{ error?: string; q?: string; status?: string; role?: string }>;
@@ -55,8 +56,8 @@ export default async function AdminUsersPage(props: AdminUsersPageProps) {
     (!searchParams.role || user.roles.includes(searchParams.role))
   );
   return (
-    <PageMain className="wide admin-users-page">
-      <PageHeader title={<T value={ui.attrs.adminUsersPagePageHeaderTitleUsers} />} meta={<T value={ui.attrs.adminUsersPagePageHeaderMetaInvite} />} />
+    <CollectionPage width="content" className="admin-users-page" header={<PageHeader title={<T value={ui.attrs.adminUsersPagePageHeaderTitleUsers} />} meta={<T value={ui.attrs.adminUsersPagePageHeaderMetaInvite} />} />}>
+
       {searchParams.error === 'forbidden' ? (
         <Alert tone="error"><T value={ui.admin.users.page.administratorRoleRequired} /></Alert>
       ) : searchParams.error ? (
@@ -69,7 +70,7 @@ export default async function AdminUsersPage(props: AdminUsersPageProps) {
       </Card>
       <Card>
         <h2 className="card-title"><T value={ui.admin.users.page.findUsers} /></h2>
-        <form method="get" action="/admin/users" className="form-row">
+        <Inline align="end" as="form" method="get" action="/admin/users" className="form-row">
           <Input label={<T value={ui.attrs.adminUsersPageInputLabelSearch} />} id="user-search" name="q" type="search" defaultValue={searchParams.q ?? ''} />
           <label><T value={ui.admin.users.page.status} />{" "}<select name="status" defaultValue={searchParams.status ?? ''}>
             <option value=""><T value={ui.admin.users.page.all} /></option><option value="active"><T value={ui.admin.users.page.active} /></option><option value="pending_confirmation"><T value={ui.admin.users.page.pendingConfirmation} /></option><option value="invited"><T value={ui.admin.users.page.invited} /></option><option value="disabled"><T value={ui.admin.users.page.disabled} /></option>
@@ -78,7 +79,7 @@ export default async function AdminUsersPage(props: AdminUsersPageProps) {
             <option value=""><T value={ui.admin.users.page.all} /></option><option value="viewer"><T value={ui.admin.users.page.viewer} /></option><option value="editor"><T value={ui.admin.users.page.editor} /></option><option value="reviewer"><T value={ui.admin.users.page.reviewer} /></option><option value="publisher"><T value={ui.admin.users.page.publisher} /></option><option value="admin"><T value={ui.admin.users.page.admin} /></option>
           </select></label>
           <Button><T value={ui.admin.users.page.search} /></Button>
-        </form>
+        </Inline>
         <p className="muted"><T value={ui.admin.users.page.showing} />{" "}{shownUsers.length} <T value={ui.admin.users.page.of} />{" "}{users.length} <T value={ui.admin.users.page.users} /></p>
       </Card>
       {shownUsers.length === 0 && !usersError ? <p><T value={ui.admin.users.page.noUsersMatchTheseFilters} /></p> : null}
@@ -101,19 +102,19 @@ export default async function AdminUsersPage(props: AdminUsersPageProps) {
                   ) : item.status === 'pending_confirmation' ? (
                     <span className="muted"><T value={ui.admin.users.page.waitingForEmailConfirmation} /></span>
                   ) : item.enabled ? (
-                    <div className="form-row">
-                      <form action={disableUserAction}>
+                    <Inline align="end" className="form-row">
+                      <Stack as="form" action={disableUserAction}>
                         <input type="hidden" name="userId" value={item.id} />
                         <Button><T value={ui.admin.users.page.disable} /></Button>
-                      </form>
+                      </Stack>
                       <IssueResetForm userId={item.id} />
                       <RoleEditor userId={item.id} roles={item.roles} />
-                    </div>
+                    </Inline>
                   ) : (
-                    <form action={enableUserAction}>
+                    <Stack as="form" action={enableUserAction}>
                       <input type="hidden" name="userId" value={item.id} />
                       <Button variant="primary"><T value={ui.admin.users.page.activate} /></Button>
-                    </form>
+                    </Stack>
                   ),
               },
             ]}
@@ -145,19 +146,19 @@ export default async function AdminUsersPage(props: AdminUsersPageProps) {
                 value: item.revokedAt ? (
                   <span className="muted"><T value={ui.admin.users.page.revoked} /></span>
                 ) : (
-                  <div className="form-row">
+                  <Inline align="end" className="form-row">
                     <RotateServiceTokenForm tokenId={item.id} />
-                    <form action={revokeServiceTokenAction}>
+                    <Stack as="form" action={revokeServiceTokenAction}>
                       <input type="hidden" name="tokenId" value={item.id} />
                       <Button><T value={ui.admin.users.page.revoke} /></Button>
-                    </form>
-                  </div>
+                    </Stack>
+                  </Inline>
                 ),
               },
             ]}
           />
         ))}
       </DataList>
-    </PageMain>
+    </CollectionPage>
   );
 }

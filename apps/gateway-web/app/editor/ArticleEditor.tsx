@@ -3,6 +3,7 @@
 import { T } from '../components/TranslationProvider';
 import { ui } from '../../lib/messages';
 import { Button, Input, TextArea } from '../components/ui';
+import { Stack } from '../components/layout/Layout';
 
 type ArticleEditorProps = {
   sessionId: string;
@@ -22,7 +23,7 @@ export function ArticleEditor({
   formId = 'draft-form',
 }: ArticleEditorProps) {
   return (
-    <form id={formId} action="/editor/command" method="post">
+    <Stack as="form" id={formId} action="/editor/command" method="post">
       <input type="hidden" name="command" value="save" />
       <input type="hidden" name="sessionId" value={sessionId} />
       <input type="hidden" name="versionId" value={versionId} />
@@ -32,6 +33,6 @@ export function ArticleEditor({
       <div className="action-bar">
         <Button variant="primary"><T value={ui.editor.articleeditor.saveDraft} /></Button>
       </div>
-    </form>
+    </Stack>
   );
 }

@@ -2,7 +2,7 @@ import { NavigatingActionForm } from '../../../components/NavigatingActionForm';
 import { T } from '../../../components/TranslationProvider';
 import { ui } from '../../../../lib/messages';
 import { AdminForbidden } from '../../../components/AdminForbidden';
-import { PageMain } from '../../../components/PageMain';
+import { WorkspacePage } from '../../../components/layout/templates';
 import { Alert, Button, Card, PageHeader } from '../../../components/ui';
 import { requireAdminPage } from '../../../../lib/admin';
 import { requireSessionBearer } from '../../../../lib/session';
@@ -15,6 +15,7 @@ import Link from 'next/link';
 import { message } from '../../../../lib/messages';
 import { reviewUi } from '../../../../lib/ui-review-messages';
 import { LocalizedRegion } from '../../../components/LocalizedRegion';
+import { Inline, Stack } from '../../../components/layout/Layout';
 
 export default async function AdminLegalPage({
   params,
@@ -38,26 +39,26 @@ export default async function AdminLegalPage({
   const locale = await currentLocale();
   const title = message(locale, key.startsWith('impressum') ? ui.legal.imprint : ui.legal.privacyNotice);
   return (
-    <PageMain>
+    <WorkspacePage width="reading" header={<PageHeader title={<T value={key.startsWith('impressum') ? ui.legal.editImprint : ui.legal.editPrivacyNotice} />} meta={<T value={ui.attrs.adminLegalKeyPagePageHeaderMeta} />} />}>
       <p><Link href="/setup"><T value={{ en: 'Return to setup', de: 'Zurück zur Einrichtung' }} /></Link></p>
-      <PageHeader title={<T value={key.startsWith('impressum') ? ui.legal.editImprint : ui.legal.editPrivacyNotice} />} meta={<T value={ui.attrs.adminLegalKeyPagePageHeaderMeta} />} />
+
       <LocalizedRegion as="nav" className="section-nav" label={reviewUi.legalPages}>
         <a href={`/admin/legal/impressum${key.endsWith('_en') ? '_en' : ''}`} aria-current={key.startsWith('impressum') ? 'page' : undefined}><T value={ui.legal.imprint} /></a>
         <a href={`/admin/legal/datenschutz${key.endsWith('_en') ? '_en' : ''}`} aria-current={key.startsWith('datenschutz') ? 'page' : undefined}><T value={ui.legal.privacyNotice} /></a>
       </LocalizedRegion>
-      <nav className="inline-actions" aria-label={title}>
+      <Inline as="nav" className="inline-actions" aria-label={title}>
         <a href={`/admin/legal/${key.startsWith('impressum') ? 'impressum' : 'datenschutz'}`}><T value={ui.legal.germanVersion} /></a>
         <a href={`/admin/legal/${key.startsWith('impressum') ? 'impressum_en' : 'datenschutz_en'}`}><T value={ui.legal.englishVersion} /></a>
-      </nav>
+      </Inline>
       {paramsMessage.error ? <Alert tone="error"><T value={errorMessage} /></Alert> : null}
       {paramsMessage.saved ? <Alert tone="info"><T value={ui.admin.legal.key.page.draftSavedThePublicPageHasNot} /></Alert> : null}
       {paramsMessage.published ? <Alert tone="info"><T value={ui.admin.legal.key.page.publishedRevisionUpdated} /></Alert> : null}
       {key.startsWith('impressum') && state?.published && !state.published.separateContact ? <Alert tone="info"><T value={ui.remainingStatus.legacyImprint} /></Alert> : null}
       <Card>
-        <NavigatingActionForm action={saveLegalDraftAction} className="stack">
+        <NavigatingActionForm action={saveLegalDraftAction}>
           <input type="hidden" name="key" value={key} />
           <input type="hidden" name="expectedRevision" value={state?.draft?.revision ?? 0} />
-          {imprintDetails ? <fieldset className="stack">
+          {imprintDetails ? <Stack as="fieldset">
             <legend><T value={ui.legal.imprintDetails} /></legend>
             <p><T value={ui.legal.sharedContactHelp} /></p>
             <input type="hidden" name="expectedContactRevision" value={imprintDetails.draft?.revision ?? 0} />
@@ -65,7 +66,7 @@ export default async function AdminLegalPage({
               <T value={ui.legal[field]} />
               <input name={field} type={field === 'email' ? 'email' : 'text'} readOnly={imprintDetails.managedFields?.includes(field)} required maxLength={255} defaultValue={imprintDetails.draft?.[field] ?? ''} />
             </label>)}
-          </fieldset> : null}
+          </Stack> : null}
           <label htmlFor="legal-content">{title} <T value={ui.admin.legal.key.page.text} /></label>
           <textarea id="legal-content" name="content" rows={18} maxLength={30000} required defaultValue={state?.draft?.content ?? exampleLegalPage(key as LegalPageKey)} />
           <p className="muted"><T value={ui.admin.legal.key.page.theInitialExampleUsesFictionalDetailsReplace} /></p>
@@ -117,6 +118,6 @@ export default async function AdminLegalPage({
           </ul>
         </Card>
       ) : null}
-    </PageMain>
+    </WorkspacePage>
   );
 }

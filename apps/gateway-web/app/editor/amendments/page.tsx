@@ -5,7 +5,7 @@ import { ui } from '../../../lib/messages';
 import { statusMessage } from '../../../lib/ui-labels';
 import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
-import { PageMain } from '../../components/PageMain';
+import { CollectionPage } from '../../components/layout/templates';
 import { Alert, Badge, Button, DataList, DataRow, PageHeader, Select } from '../../components/ui';
 import { FormattedDate } from '../../../lib/format-date';
 import { getCountry, listConstitutionAmendments, listCountries, type Amendment, type ConstitutionSummary } from '../../../lib/api';
@@ -56,9 +56,9 @@ export default async function AmendmentsPage(props: AmendmentsPageProps) {
   }
   if (!canVisitEditor(user.roles)) {
     return (
-      <PageMain className="wide">
-        <PageHeader title={<T value={ui.attrs.editorAmendmentsPagePageHeaderTitleLegal} />} meta={<SignedInSummary email={user.email} noEditorialRole />} />
-      </PageMain>
+      <CollectionPage width="content" header={<PageHeader title={<T value={ui.attrs.editorAmendmentsPagePageHeaderTitleLegal} />} meta={<SignedInSummary email={user.email} noEditorialRole />} />}>
+
+      </CollectionPage>
     );
   }
 
@@ -89,8 +89,7 @@ export default async function AmendmentsPage(props: AmendmentsPageProps) {
     : '/editor/amendments/new';
 
   return (
-    <PageMain className="wide">
-      <PageHeader
+    <CollectionPage width="content" header={<PageHeader
         title={<T value={ui.attrs.editorAmendmentsPagePageHeaderTitleLegal} />}
         eyebrow={<T value={ui.attrs.editorAmendmentsPagePageHeaderEyebrowEditorial} />}
         meta={<SignedInSummary email={user.email} roles={user.roles} />}
@@ -100,7 +99,8 @@ export default async function AmendmentsPage(props: AmendmentsPageProps) {
               <T value={ui.editor.amendments.page.addLegalChange} />{" "}</a>
           ) : null
         }
-      />
+      />}>
+
       {errorMessage ? <Alert tone="error">{errorMessage}</Alert> : null}
       {searchParams.saved ? <Alert tone="success"><T value={ui.editor.amendments.page.draftSaved} /></Alert> : null}
       {searchParams.published ? <Alert tone="success"><T value={ui.editor.amendments.page.amendingLawPublished} /></Alert> : null}
@@ -154,6 +154,6 @@ export default async function AmendmentsPage(props: AmendmentsPageProps) {
           )}
         </section>
       ) : null}
-    </PageMain>
+    </CollectionPage>
   );
 }

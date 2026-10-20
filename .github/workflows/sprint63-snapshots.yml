@@ -1,0 +1,29 @@
+name: Capture Sprint 63 layout evidence
+on:
+  push:
+    branches: [codex/sprint-sprint-63-reusable-ui-templates-and-vanilla-css]
+permissions:
+  contents: read
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    container: mcr.microsoft.com/playwright:v1.51.1-jammy
+    defaults:
+      run:
+        working-directory: apps/gateway-web
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - run: npm ci
+      - run: npm run build
+      - run: npx playwright test e2e/visual.spec.ts e2e/ui-review.spec.ts e2e/templates.spec.ts --update-snapshots
+        env:
+          CI: true
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: sprint63-layout-evidence
+          path: |
+            apps/gateway-web/e2e/snapshots/*.png
+            apps/gateway-web/test-results/
+          retention-days: 7

@@ -2,7 +2,7 @@ import { T } from '../../components/TranslationProvider';
 import { ui } from '../../../lib/messages';
 import { AdminForbidden } from '../../components/AdminForbidden';
 import { Alert, Card, DataList, DataRow, PageHeader } from '../../components/ui';
-import { PageMain } from '../../components/PageMain';
+import { WorkspacePage } from '../../components/layout/templates';
 import { loadCountriesWithDetails, type CountryDetail } from '../../../lib/api';
 import { requireAdminPage } from '../../../lib/admin';
 import { DEFAULT_NEW_OUTLINE } from '../../../lib/outline';
@@ -30,11 +30,11 @@ export default async function AdminConstitutionsPage(props: AdminConstitutionsPa
       : [],
   );
   return (
-    <PageMain className="wide">
-      <PageHeader
+    <WorkspacePage width="content" header={<PageHeader
         title={<T value={ui.attrs.adminConstitutionsPagePageHeaderTitleConstitutions} />}
         meta={<T value={ui.attrs.adminConstitutionsPagePageHeaderMetaCreate} />}
-      />
+      />}>
+
       {searchParams.error === 'forbidden' ? (
         <Alert tone="error"><T value={ui.admin.constitutions.page.administratorRoleRequired} /></Alert>
       ) : searchParams.error ? (
@@ -66,6 +66,6 @@ export default async function AdminConstitutionsPage(props: AdminConstitutionsPa
           />
         ))}
       </DataList>
-    </PageMain>
+    </WorkspacePage>
   );
 }

@@ -7,6 +7,7 @@ import type { CountryDetail, CountrySummary } from '../../../lib/api';
 import { Input } from '../../components/ui';
 import { SettingInfo } from '../../components/SettingInfo';
 import { ConstitutionCountryFields } from './ConstitutionCountryFields';
+import fieldStyles from '../../components/fields.module.css';
 
 function slugify(value: string): string {
   return value.normalize('NFKD').trim().toLowerCase().replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
@@ -30,8 +31,8 @@ export function ConstitutionBasicsFields({ countries, details }: { countries: Co
     <p><T value={ui.admin.constitutions.constitutionbasicsfields.chooseTheCountryAndGiveTheConstitution} /></p>
     <ConstitutionCountryFields countries={countries} onCountryChange={setCountryCode} />
     {predecessors.length > 0 ? (
-      <div className="field">
-        <div className="field-label-row"><label htmlFor="predecessor-constitution"><T value={ui.admin.constitutions.constitutionbasicsfields.previousConstitution} /></label><SettingInfo label={<T value={ui.admin.constitutions.constitutionbasicsfields.previousConstitution} />} description={<T value={ui.help.previousConstitutionHelp} />} changeability="once" /></div>
+      <div className={["field", fieldStyles.field].join(' ')}>
+        <div className={["field-label-row", fieldStyles.labelRow].join(' ')}><label htmlFor="predecessor-constitution"><T value={ui.admin.constitutions.constitutionbasicsfields.previousConstitution} /></label><SettingInfo label={<T value={ui.admin.constitutions.constitutionbasicsfields.previousConstitution} />} description={<T value={ui.help.previousConstitutionHelp} />} changeability="once" /></div>
         <select id="predecessor-constitution" key={countryCode} name="predecessorConstitutionId" defaultValue="">
           <option value=""><T value={ui.admin.constitutions.constitutionbasicsfields.noPredecessorRecorded} /></option>
           {predecessors.map((constitution) => (

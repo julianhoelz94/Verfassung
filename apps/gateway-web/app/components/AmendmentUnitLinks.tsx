@@ -3,6 +3,7 @@ import { ui } from '../../lib/messages';
 import type { AmendmentChange } from '../../lib/api';
 import { currentLocale } from '../../lib/server-locale';
 import { message } from '../../lib/messages';
+import { Inline } from './layout/Layout';
 
 export async function AmendmentUnitLinks({ change }: { change: AmendmentChange }) {
   const before = change.beforeRef?.deepLink;
@@ -12,9 +13,9 @@ export async function AmendmentUnitLinks({ change }: { change: AmendmentChange }
   }
   const locale = await currentLocale();
   return (
-    <span className="card-actions" aria-label={message(locale, ui.accessibility.exactConstitutionalUnits)}>
+    <Inline as="span" className="card-actions" aria-label={message(locale, ui.accessibility.exactConstitutionalUnits)}>
       {before ? <a className="btn btn-sm btn-ghost" href={before}><T value={ui.components.amendmentunitlinks.beforeUnit} />{change.beforeRef?.label ? ` · ${change.beforeRef.label}` : ''}</a> : null}
       {after ? <a className="btn btn-sm btn-ghost" href={after}><T value={ui.components.amendmentunitlinks.afterUnit} />{change.afterRef?.label ? ` · ${change.afterRef.label}` : ''}</a> : null}
-    </span>
+    </Inline>
   );
 }

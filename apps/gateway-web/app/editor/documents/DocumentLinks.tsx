@@ -8,6 +8,8 @@ import { requireSessionBearer } from '../../../lib/session';
 import { detachDocumentAction } from './actions';
 import { DocumentPicker } from './DocumentPicker';
 import { Alert } from '../../components/ui';
+import { Stack } from '../../components/layout/Layout';
+import surfaceStyles from '../../components/surfaces.module.css';
 
 export async function DocumentLinks(props: {
   targetType: 'constitution' | 'version' | 'amendment';
@@ -29,7 +31,7 @@ export async function DocumentLinks(props: {
   const events = eventsResult.status === 'fulfilled' ? eventsResult.value : [];
   const available = documents.filter((document) => document.status === 'active' && !links.some((link) => link.documentId === document.id));
   const revisions = props.canEdit ? await Promise.all(available.map((document) => listDocumentRevisions(document.id, authorization).catch(() => []))) : [];
-  return <section className="card stack">
+  return <Stack as="section" className={["card", surfaceStyles.card].join(' ')}>
     <h2><T value={ui.editor.documents.documentlinks.linkedDocuments} /></h2>
     {unavailable ? <Alert tone="error"><T value={ui.editor.documents.documentlinks.documentServiceIsUnavailableLinksMayBe} /></Alert> : null}
     {links.length ? <ul className="link-list">{links.map((link) => <li key={link.documentId}>
@@ -51,5 +53,5 @@ export async function DocumentLinks(props: {
     {events.length ? <details><summary><T value={ui.editor.documents.documentlinks.linkHistory} /></summary><ol>{events.map((event) => <li key={event.id}>
       <T value={event.action === 'attach' ? ui.editor.documents.documentlinks.attached : ui.editor.documents.documentlinks.detached} /> · <Link href={`/editor/documents/${event.documentId}`}>{event.documentId}</Link> · {new Date(event.occurredAt).toLocaleString(locale)}
     </li>)}</ol></details> : null}
-  </section>;
+  </Stack>;
 }

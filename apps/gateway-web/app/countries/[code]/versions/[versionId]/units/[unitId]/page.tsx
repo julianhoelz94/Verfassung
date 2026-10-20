@@ -4,7 +4,7 @@ import { orderedTargets } from '../../../../../../../lib/ordered-content';
 import { publicSnapshotContext } from '../../../../../../../lib/reading';
 import { ConstitutionText } from '../../../../../../components/ConstitutionText';
 import { ContentTranslationRegion } from '../../../../../../components/ContentTranslationRegion';
-import { PageMain } from '../../../../../../components/PageMain';
+import { ReaderPage } from '../../../../../../components/layout/templates';
 import { PageHeader } from '../../../../../../components/ui';
 import { PrintLink } from '../../../../../../components/PrintLink';
 import { SnapshotNotice } from '../../../../../../components/SnapshotNotice';
@@ -21,15 +21,15 @@ export default async function UnitPage({ params }: { params: Promise<{ code: str
   const articlesByNumber = Object.fromEntries(roots.filter(root => root.kind === 'article' && root.articleNumber).map(root => [root.articleNumber, root.id]));
   const kind = kindByCode(outline ?? constitution.contentOutline, unit.kind ?? 'article')?.displayLabel ?? unit.kind;
   const title = [kind, unit.articleNumber, unit.title].filter(Boolean).join(' · ');
-  return <PageMain>
-    <PageHeader title={title} eyebrow={constitution.title} breadcrumbs={[
+  return <ReaderPage width="reading" header={<PageHeader title={title} eyebrow={constitution.title} breadcrumbs={[
       { href: '/', label: <T value={ui.nav.countries} /> },
       { href: `/countries/${code}`, label: country!.name },
       { href: `/countries/${code}/versions/${versionId}`, label: context!.version.versionLabel },
-    ]} actions={<PrintLink />} />
+    ]} actions={<PrintLink />} />}>
+
     <SnapshotNotice code={code} viewedId={versionId} currentId={context!.version.currentVersionId ?? context!.version.id} />
     <ContentTranslationRegion sourceLanguage={context!.version.languageCode}>
       <ConstitutionText article={unit} showHeading={false} lang={context!.version.languageCode} outline={outline ?? constitution.contentOutline} crossRefs={{ code, versionId, articlesByNumber, unitsByLogicalId: orderedTargets(roots) }} />
     </ContentTranslationRegion>
-  </PageMain>;
+  </ReaderPage>;
 }

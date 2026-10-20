@@ -5,6 +5,8 @@ import type { HistoryKind } from '../../lib/history';
 import { usability } from '../../lib/usability-messages';
 import { ui } from '../../lib/messages';
 import { T, useTranslation } from './TranslationProvider';
+import { Inline } from './layout/Layout';
+import fieldStyles from './fields.module.css';
 
 export type HistoryMilestone = { kind: HistoryKind; id: string; date?: string | null; dateApproximate?: boolean; title: string; content: ReactNode };
 
@@ -80,15 +82,15 @@ export function HistoryTimeline({ items }: { items: HistoryMilestone[] }) {
   return <section className="history-timeline" aria-label={t(usability.milestones)}>
     <p className="muted"><T value={usability.milestoneHint} /></p>
     <div className="history-controls">
-      <label className="field" htmlFor="history-year"><T value={usability.jumpYear} />
+      <label className={["field", fieldStyles.field].join(' ')} htmlFor="history-year"><T value={usability.jumpYear} />
         <select id="history-year" value={items[current].date?.slice(0, 4) || ''} onChange={event => choose(groups.get(event.target.value)?.[0] ?? 0)}>
           {[...groups.keys()].map(year => <option key={year} value={year}>{year || t(usability.undated)}</option>)}
         </select>
       </label>
-      <div className="form-row">
+      <Inline align="end" className="form-row">
         <button type="button" className="btn btn-sm" disabled={current === 0} onClick={() => choose(current - 1)}><T value={usability.previous} /></button>
         <button type="button" className="btn btn-sm" disabled={current === items.length - 1} onClick={() => choose(current + 1)}><T value={usability.next} /></button>
-      </div>
+      </Inline>
     </div>
     <div ref={rail} className="history-rail" role="region" tabIndex={0} aria-label={t(usability.timelineNavigation)} onKeyDown={event => {
       let index: number;

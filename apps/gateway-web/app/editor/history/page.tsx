@@ -5,7 +5,7 @@ import { T } from '../../components/TranslationProvider';
 import { ui, type UiMessage } from '../../../lib/messages';
 import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
-import { PageMain } from '../../components/PageMain';
+import { CollectionPage } from '../../components/layout/templates';
 import { Alert, Badge, Button, DataList, DataRow, PageHeader, Select } from '../../components/ui';
 import { FormattedDate } from '../../../lib/format-date';
 import { getCountry, listConstitutionAmendments, listConstitutionVersions, listCountries, type Amendment, type ConstitutionSummary, type VersionSummary } from '../../../lib/api';
@@ -58,9 +58,9 @@ export default async function SnapshotHistoryPage(props: HistoryPageProps) {
   }
   if (!canVisitEditor(user.roles)) {
     return (
-      <PageMain className="wide">
-        <PageHeader title={<T value={ui.attrs.editorHistoryPagePageHeaderTitleSnapshot} />} meta={<SignedInSummary email={user.email} noEditorialRole />} />
-      </PageMain>
+      <CollectionPage width="content" header={<PageHeader title={<T value={ui.attrs.editorHistoryPagePageHeaderTitleSnapshot} />} meta={<SignedInSummary email={user.email} noEditorialRole />} />}>
+
+      </CollectionPage>
     );
   }
 
@@ -102,12 +102,12 @@ export default async function SnapshotHistoryPage(props: HistoryPageProps) {
   const countryCode = selectedConstitution ? isoByConstitutionId[selectedConstitution.id] : undefined;
 
   return (
-    <PageMain className="wide">
-      <PageHeader
+    <CollectionPage width="content" header={<PageHeader
         title={<T value={ui.attrs.editorHistoryPagePageHeaderTitleSnapshot} />}
         eyebrow={<T value={ui.attrs.editorHistoryPagePageHeaderEyebrowEditorial} />}
         meta={<SignedInSummary email={user.email} roles={user.roles} />}
-      />
+      />}>
+
       {constitutions.length > 0 && selectedConstitution ? (
         <form method="get" className="toolbar">
           <Select id="constitutionId" name="constitutionId" label={<T value={ui.attrs.editorHistoryPageSelectLabelConstitution} />} defaultValue={selectedConstitution.id}>
@@ -190,6 +190,6 @@ export default async function SnapshotHistoryPage(props: HistoryPageProps) {
           )}
         </section>
       ) : null}
-    </PageMain>
+    </CollectionPage>
   );
 }

@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { SearchFilters } from '../components/SearchFilters';
 import { usability } from '../../lib/usability-messages';
 import { FiltersPanel } from '../components/FiltersPanel';
-import { PageMain } from '../components/PageMain';
+import { CollectionPage, FilterLayout } from '../components/layout/templates';
 import { SearchSnippet } from '../components/SearchSnippet';
 import { Card, PageHeader, Pager } from '../components/ui';
 import {
@@ -99,11 +99,11 @@ export default async function SearchPage(props: SearchPageProps) {
   ];
 
   return (
-    <PageMain className="wide">
-      <PageHeader
+    <CollectionPage width="content" header={<PageHeader
         breadcrumbs={[{ href: '/', label: message(locale, ui.nav.countries) }, { label: message(locale, ui.remainingStatus.search) }]}
         title={query ? `${message(locale, ui.remainingStatus.resultsFor)} “${query}”` : message(locale, ui.remainingStatus.search)}
-      />
+      />}>
+
       <form className="search-page-form" action="/search" method="get">
         <label htmlFor="search-q" className="flex-grow">
           <T value={ui.search.page.keyword} />{" "}<input
@@ -116,7 +116,7 @@ export default async function SearchPage(props: SearchPageProps) {
         </label>
         <button className="btn btn-primary" type="submit">
           <T value={ui.search.page.search} />{" "}</button>
-        <div className="search-layout">
+        <FilterLayout>
           <FiltersPanel count={activeFilters.length}>
             <SearchFilters
               key={`${country}:${versionId}:${effectiveDate}`}
@@ -184,8 +184,8 @@ export default async function SearchPage(props: SearchPageProps) {
               />
             ) : null}
           </div>
-        </div>
+        </FilterLayout>
       </form>
-    </PageMain>
+    </CollectionPage>
   );
 }

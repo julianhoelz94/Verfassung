@@ -7,7 +7,7 @@ import { ui } from '../../lib/messages';
 import { redirect } from 'next/navigation';
 import { ArticleFilterList } from '../components/ArticleFilterList';
 import { ConstitutionText } from '../components/ConstitutionText';
-import { PageMain } from '../components/PageMain';
+import { WorkspacePage, WorkspaceLayout } from '../components/layout/templates';
 import { Alert, Badge, Button, PageHeader, WorkflowSteps } from '../components/ui';
 import { getCountry, listAllArticles, getArticle, listAllUnits, getUnit, getVersionSettings, listCountries, type ArticleSummary, type CountryDetail, type CountrySummary } from '../../lib/api';
 import { editorErrorMessage, getDraftPreview, getEditorDiffReview, getStructuredDraft } from '../../lib/editor-api';
@@ -23,6 +23,8 @@ import { LegacyPublishForm } from './LegacyPublishForm';
 import { EditorLanding } from './EditorLanding';
 import { ImportReview } from './ImportReview';
 import { reviewUi } from '../../lib/ui-review-messages';
+import { Stack } from '../components/layout/Layout';
+import surfaceStyles from '../components/surfaces.module.css';
 
 type EditorPageProps = {
   searchParams: Promise<{
@@ -65,9 +67,9 @@ export default async function EditorPage(props: EditorPageProps) {
   const canPublish = hasRole(user.roles, 'publisher');
   if (!canEdit && !canReview && !canPublish) {
     return (
-      <PageMain>
-        <PageHeader title={<T value={ui.attrs.editorPagePageHeaderTitleEditor} />} meta={<SignedInSummary email={user.email} noEditorialRole />} />
-      </PageMain>
+      <WorkspacePage width="reading" header={<PageHeader title={<T value={ui.attrs.editorPagePageHeaderTitleEditor} />} meta={<SignedInSummary email={user.email} noEditorialRole />} />}>
+
+      </WorkspacePage>
     );
   }
 
@@ -171,8 +173,7 @@ export default async function EditorPage(props: EditorPageProps) {
   );
 
   return (
-    <PageMain className="wide">
-      <PageHeader
+    <WorkspacePage width="content" header={<PageHeader
         breadcrumbs={[{ href: '/editor', label: <T value={ui.nav.editor} /> }, { label: `${message(locale, ui.remainingStatus.session)} ${session.id.slice(0, 8)}` }]}
         eyebrow={`${message(locale, session.hopKind === 'legal' ? ui.remainingStatus.nextLegalChange : ui.remainingStatus.transcriptionCorrection)} · ${message(locale, session.status === 'open' ? ui.workflow.draft : session.status === 'reviewing' ? ui.workflow.inReview : session.status === 'approved' ? ui.workflow.approved : ui.workflow.published)}`}
         title={title || <T value={ui.nav.editor} />}
@@ -183,11 +184,12 @@ export default async function EditorPage(props: EditorPageProps) {
               <T value={ui.editor.page.viewPublicPage} />{" "}</a>
           ) : null
         }
-      />
+      />}>
+
       {alerts}
       {searchParams.sessionId && articles.length > 0 ? (
-        <EditorDraftState><div className="workspace">
-          <aside className="panel" aria-label={message(locale, ui.accessibility.topLevelUnits)}>
+        <EditorDraftState><WorkspaceLayout>
+          <aside className={["panel", surfaceStyles.panel].join(' ')} aria-label={message(locale, ui.accessibility.topLevelUnits)}>
             <h2 className="panel-title"><T value={(settings?.outline ?? selectedConstitution?.contentOutline)?.kinds[0]?.kindCode === 'article' ? ui.editorDynamic.articles : ui.editorDynamic.topLevelUnits} /></h2>
             <p className="muted">{draftIds.length} <T value={ui.editor.page.changed} /></p>
             <ArticleFilterList
@@ -198,7 +200,7 @@ export default async function EditorPage(props: EditorPageProps) {
               unitLabel={settings?.outline.kinds[0]?.kindCode === 'article' ? undefined : settings?.outline.kinds[0]?.displayLabel}
             />
           </aside>
-          <section className="panel" aria-labelledby="edit-title">
+          <section className={["panel", surfaceStyles.panel].join(' ')} aria-labelledby="edit-title">
             <p className="panel-title" id="edit-title">
               {selected ? `${kindLabel(selected.kind)} ${selected.articleNumber}` : message(locale, ui.editorDynamic.unit)}
             </p>
@@ -246,22 +248,22 @@ export default async function EditorPage(props: EditorPageProps) {
                   <T value={reviewUi.returnToSessions} />{" "}</a>
               ) : null}
               {canEdit && session.status === 'open' ? (
-                <form action="/editor/command" method="post">
+                <Stack as="form" action="/editor/command" method="post">
                   <input type="hidden" name="command" value="review" />
                   {hiddenFields}
                   <SubmitReviewButton disabled={session.hopKind === 'legal' ? !preview.changeRecord || Boolean(structured && (!preview.changeRecord.changes?.length || !reviewComplete)) : session.hopKind === 'editorial_correction' ? !preview.publishComment : false} />
-                </form>
+                </Stack>
               ) : null}
               {canReview && session.status === 'reviewing' ? (
-                <form action="/editor/command" method="post">
+                <Stack as="form" action="/editor/command" method="post">
                   <input type="hidden" name="command" value="approve" />
                   {hiddenFields}
                   <Button><T value={ui.editor.page.approveReview} /></Button>
-                </form>
+                </Stack>
               ) : null}
             </div>
           </section>
-          <aside className="panel panel-side" aria-label={message(locale, ui.accessibility.session)}>
+          <aside className={["panel panel-side", surfaceStyles.panel].join(' ')} aria-label={message(locale, ui.accessibility.session)}>
             <p className="panel-title"><T value={ui.editor.page.session} /></p>
             <dl className="provenance provenance-list">
               <div>
@@ -337,10 +339,10 @@ export default async function EditorPage(props: EditorPageProps) {
               </>
             ) : null}
           </aside>
-        </div></EditorDraftState>
+        </WorkspaceLayout></EditorDraftState>
       ) : (
         <Alert tone="error"><T value={ui.editor.page.thisSessionCouldNotBeLoadedOr} /></Alert>
       )}
-    </PageMain>
+    </WorkspacePage>
   );
 }

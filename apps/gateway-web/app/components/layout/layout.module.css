@@ -1,0 +1,89 @@
+.related {
+  --layout-gap: var(--gap-related);
+}
+.control {
+  --layout-gap: var(--gap-control);
+}
+.field {
+  --layout-gap: var(--gap-field);
+}
+.card {
+  --layout-gap: var(--gap-card);
+}
+.section {
+  --layout-gap: var(--gap-section);
+}
+
+.stack,
+.inline,
+.grid {
+  min-width: 0;
+  gap: var(--layout-gap);
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+}
+.inline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: stretch;
+}
+.align-start {
+  align-items: flex-start;
+}
+.align-center {
+  align-items: center;
+}
+.align-end {
+  align-items: flex-end;
+}
+.align-baseline {
+  align-items: baseline;
+}
+
+/* Shared label/control/message tracks keep control edges aligned across long labels. */
+.form {
+  column-gap: var(--gap-field);
+  row-gap: var(--gap-related);
+}
+.form > :global(.field) {
+  display: grid;
+  grid-template-rows: subgrid;
+  grid-row: span 3;
+}
+
+/* Remove external rhythm only at this layout boundary, never inside authored text. */
+.stack > *,
+.inline > *,
+.grid > * {
+  margin-block: 0;
+  min-width: 0;
+}
+.stack > :where(button, .btn) {
+  align-self: flex-start;
+}
+.stack[hidden],
+.inline[hidden],
+.grid[hidden] {
+  display: none;
+}
+
+@media (min-width: 640px) {
+  .columns2,
+  .columns3 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1024px) {
+  .columns3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}

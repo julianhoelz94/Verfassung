@@ -5,7 +5,7 @@ import { ui } from '../lib/messages';
 import { Disclosure } from './components/Disclosure';
 import { reviewUi } from '../lib/ui-review-messages';
 import Link from 'next/link';
-import { PageMain } from './components/PageMain';
+import { FocusedPage } from './components/layout/templates';
 
 type ErrorPageProps = {
   error: Error & { digest?: string };
@@ -14,7 +14,7 @@ type ErrorPageProps = {
 
 export default function ErrorPage({ error, reset }: ErrorPageProps) {
   return (
-    <PageMain>
+    <FocusedPage width="reading">
       <section className="status-panel" role="alert">
         <h1><T value={ui.error.somethingWentWrong} /></h1>
         <p><T value={ui.error.thisPageCouldNotBeShownOther} /></p>
@@ -23,6 +23,6 @@ export default function ErrorPage({ error, reset }: ErrorPageProps) {
           <T value={ui.error.tryAgain} />{" "}</button>{' '}
         <Link href="/"><T value={ui.error.countries} /></Link>
       </section>
-    </PageMain>
+    </FocusedPage>
   );
 }

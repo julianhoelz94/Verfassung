@@ -5,7 +5,7 @@ import { message } from '../../../../../lib/messages';
 import { T } from '../../../../components/TranslationProvider';
 import { ui } from '../../../../../lib/messages';
 import { notFound, redirect } from 'next/navigation';
-import { PageMain } from '../../../../components/PageMain';
+import { WorkspacePage } from '../../../../components/layout/templates';
 import { PageHeader } from '../../../../components/ui';
 import { WikiSources } from '../../../../components/WikiSources';
 import { WikiImages } from '../../../../components/WikiImages';
@@ -13,6 +13,8 @@ import { WikiBody } from '../../../../components/WikiBody';
 import { getWikiDraft, getWikiHistory, getWikiPage } from '../../../../../lib/api';
 import { currentUser, requireSessionBearer } from '../../../../../lib/session';
 import { publishWikiAction, saveWikiAction } from '../../actions';
+import { Stack } from '../../../../components/layout/Layout';
+import surfaceStyles from '../../../../components/surfaces.module.css';
 
 type Props = {
   params: Promise<{ targetType: string; targetId: string }>;
@@ -43,13 +45,13 @@ export default async function WikiEditor({ params, searchParams }: Props) {
     : `/countries/${code}/constitutions/${targetId}`;
 
   return (
-    <PageMain className="wide">
-      <PageHeader title={<T value={targetType === 'country' ? reviewUi.editCountry : reviewUi.editConstitution} />} actions={<a className="btn btn-sm" href={publicHref}><T value={ui.editor.wiki.targettype.targetid.page.viewPublicPage} /></a>} />
+    <WorkspacePage width="content" header={<PageHeader title={<T value={targetType === 'country' ? reviewUi.editCountry : reviewUi.editConstitution} />} actions={<a className="btn btn-sm" href={publicHref}><T value={ui.editor.wiki.targettype.targetid.page.viewPublicPage} /></a>} />}>
+
       {query.saved ? <p role="status"><T value={ui.editor.wiki.targettype.targetid.page.draftSaved} /></p> : null}
       {query.published ? <p role="status"><T value={ui.editor.wiki.targettype.targetid.page.pagePublished} /></p> : null}
       {query.error ? <p role="alert"><T value={ui.editor.wiki.targettype.targetid.page.thePageCouldNotBeSavedOr} /></p> : null}
       {canEdit ? (
-        <NavigatingActionForm action={saveWikiAction} className="stack card">
+        <NavigatingActionForm action={saveWikiAction} className={["card", surfaceStyles.card].join(' ')}>
           <input type="hidden" name="targetType" value={targetType} />
           <input type="hidden" name="targetId" value={targetId} />
           <input type="hidden" name="code" value={code} />
@@ -64,7 +66,7 @@ export default async function WikiEditor({ params, searchParams }: Props) {
           <textarea id="wiki-sources" name="sourceUrls" rows={3} defaultValue={(current?.sourceUrls ?? []).join('\n')} />
           <h2><T value={ui.editor.wiki.targettype.targetid.page.pictures} /></h2>
           {current?.images.map((image, index) => (
-            <fieldset key={image.documentId} className="stack">
+            <Stack as="fieldset" key={image.documentId}>
               <legend><T value={ui.editor.wiki.targettype.targetid.page.picture} />{" "}{index + 1}</legend>
               <WikiImages images={[image]} preview />
               <label htmlFor={`replace-${image.documentId}`}><T value={ui.editor.wiki.targettype.targetid.page.replacePictureFile} /></label>
@@ -87,7 +89,7 @@ export default async function WikiEditor({ params, searchParams }: Props) {
               <label htmlFor={`source-${image.documentId}`}><T value={ui.editor.wiki.targettype.targetid.page.sourceUrl} /></label>
               <input id={`source-${image.documentId}`} type="url" name={`source-${image.documentId}`} defaultValue={image.sourceUrl ?? ''} />
               <label><input type="checkbox" name={`remove-${image.documentId}`} /> <T value={ui.editor.wiki.targettype.targetid.page.removePicture} /></label>
-            </fieldset>
+            </Stack>
           ))}
           <label htmlFor="wiki-image"><T value={ui.editor.wiki.targettype.targetid.page.addAPicture} /></label>
           <input id="wiki-image" type="file" name="imageFile" accept="image/jpeg,image/png,image/gif,image/webp,image/avif" />
@@ -109,7 +111,7 @@ export default async function WikiEditor({ params, searchParams }: Props) {
         </NavigatingActionForm>
       ) : null}
       {canPublish && draft && draft.id !== published?.id ? (
-        <NavigatingActionForm action={publishWikiAction} className="card">
+        <NavigatingActionForm action={publishWikiAction} className={["card", surfaceStyles.card].join(' ')}>
           <input type="hidden" name="targetType" value={targetType} />
           <input type="hidden" name="targetId" value={targetId} />
           <input type="hidden" name="code" value={code} />
@@ -124,10 +126,10 @@ export default async function WikiEditor({ params, searchParams }: Props) {
         </NavigatingActionForm>
       ) : null}
       {history.length > 0 || historyPage > 0 ? (
-        <section className="card" aria-label={message(locale, ui.accessibility.pageRevisionHistory)}>
+        <section className={["card", surfaceStyles.card].join(' ')} aria-label={message(locale, ui.accessibility.pageRevisionHistory)}>
           <h2><T value={ui.editor.wiki.targettype.targetid.page.pageRevisionHistory} /></h2>
           {history.length === 0 ? <p><T value={ui.editor.wiki.targettype.targetid.page.noRevisionsOnThisPage} /></p> : null}
-          <ol className="stack">
+          <Stack as="ol">
             {history.slice(0, 25).map((revision) => (
               <li key={revision.id}>
                 <details>
@@ -140,13 +142,13 @@ export default async function WikiEditor({ params, searchParams }: Props) {
                 </details>
               </li>
             ))}
-          </ol>
+          </Stack>
           <nav className="setting-inline" aria-label={message(locale, ui.accessibility.pageRevisionHistoryPages)}>
             {historyPage > 0 ? <a href={`?code=${encodeURIComponent(code)}&historyPage=${historyPage - 1}`}><T value={ui.editor.wiki.targettype.targetid.page.newerRevisions} /></a> : null}
             {history.length > 25 ? <a href={`?code=${encodeURIComponent(code)}&historyPage=${historyPage + 1}`}><T value={ui.editor.wiki.targettype.targetid.page.olderRevisions} /></a> : null}
           </nav>
         </section>
       ) : null}
-    </PageMain>
+    </WorkspacePage>
   );
 }

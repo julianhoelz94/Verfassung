@@ -5,7 +5,7 @@ import { ui } from '../../../../../lib/messages';
 import { currentLocale } from '../../../../../lib/server-locale';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
-import { PageMain } from '../../../../components/PageMain';
+import { ReaderPage } from '../../../../components/layout/templates';
 import { PrintLink } from '../../../../components/PrintLink';
 import { SiteSearchForm } from '../../../../components/SiteSearchForm';
 import { ServiceUnavailable } from '../../../../components/StatusMessage';
@@ -30,6 +30,7 @@ import { publicSnapshotContext, snapshotVersionId, publicVersions } from '../../
 import { listDocumentLinks } from '../../../../../lib/document-api';
 import { currentUser } from '../../../../../lib/session';
 import { EditorEntry } from './EditorEntry';
+import surfaceStyles from '../../../../components/surfaces.module.css';
 
 type VersionPageProps = {
   params: Promise<{ code: string; versionId: string }>;
@@ -75,9 +76,9 @@ export default async function VersionPage(props: VersionPageProps) {
 
   if (error) {
     return (
-      <PageMain className="wide">
+      <ReaderPage width="content">
         <ServiceUnavailable service={ui.services.content} retryHref={`/countries/${params.code}/versions/${params.versionId}`} />
-      </PageMain>
+      </ReaderPage>
     );
   }
 
@@ -126,8 +127,7 @@ export default async function VersionPage(props: VersionPageProps) {
   const allowLegalStart = Boolean(version.version.latestPublished &&
     (version.version.currentVersionId ?? version.version.id) === params.versionId);
   return (
-    <PageMain className="wide">
-      <PageHeader
+    <ReaderPage width="content" header={<PageHeader
         breadcrumbs={[
           { href: '/', label: <T value={ui.nav.countries} /> },
           { href: `/countries/${country.isoCode}`, label: country.name },
@@ -162,7 +162,8 @@ export default async function VersionPage(props: VersionPageProps) {
             <PrintLink />
           </>
         }
-      />
+      />}>
+
       <CountryNavigation code={params.code} active="reading" />
       <SnapshotNotice code={country.isoCode} viewedId={params.versionId} currentId={version.version.currentVersionId ?? version.version.id} />
       {canEdit ? <EditorEntry
@@ -173,7 +174,7 @@ export default async function VersionPage(props: VersionPageProps) {
         canReview={canReview}
         canPublish={canPublish}
       /> : null}
-      {documentLinks.length ? <section className="card">
+      {documentLinks.length ? <section className={["card", surfaceStyles.card].join(' ')}>
         <h2><T value={ui.countries.code.versions.versionid.page.constitutionDocuments} /></h2>
         <ul className="link-list">{documentLinks.map((link) => <li key={link.documentId}>
           <a href={`/documents/${link.documentId}${link.revisionId ? `?revision=${link.document.revision.revision}` : ''}`}>{link.document.revision.title}</a>
@@ -224,6 +225,6 @@ export default async function VersionPage(props: VersionPageProps) {
             : undefined
         }
       />
-    </PageMain>
+    </ReaderPage>
   );
 }

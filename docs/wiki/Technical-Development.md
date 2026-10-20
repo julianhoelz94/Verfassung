@@ -49,6 +49,14 @@ Enabled local/CI API docs: `/api/docs/<service>/swagger-ui/index.html` with `CAD
 
 Check maps against code. Never edit an applied migration.
 
+## Build website layouts
+
+The gateway uses reusable React page templates and scoped vanilla CSS. Choose `FocusedPage`, `SettingsPage`, `CollectionPage`, `ReaderPage` or `WorkspacePage` from `app/components/layout/templates.tsx`. Routes keep data loading, authorization and actions. Templates provide consistent headers, widths, notices and responsive page structure.
+
+Use `Stack`, `Inline`, `Grid` and `Section` for layout. The parent owns the gap between children, cards own their padding, and fields own label/control/help/error grouping. Keep runtime tokens in `app/styles/tokens.css`; avoid adding margins for a gap the parent already controls. Public and preview views keep the same legal-text renderer. The [UI template guide](https://github.com/julianhoelz94/Verfassung/blob/main/docs/design/ui-templates.md) documents template selection, semantic spacing, accessible fields and responsive checks.
+
+Verify English and German at 390/820/1440px and narrow reflow at 320px. The browser suite checks all route fixtures and shared settings spacing. Inspect Linux screenshot differences before updating their baselines, and retain workflow/journey checks for interactions.
+
 Shared Kotlin HTTP deadlines live in `services/platform` (2 s connect, 5 s read by default). Domain clients own authentication; import publication delivery explicitly keeps a 60 s read deadline. Content, Editor and Ingestion opt into the same bounded JSON reader. Gateway requests use a shared 10 s deadline while retaining caller cancellation and shorter limits. Translation batches allow 30 s and document streaming allows 60 s; write commands are not retried automatically. TypeScript rejects unused locals and parameters in both Node projects. The repository hygiene check rejects generated artifacts and exact Kotlin implementation copies outside imports/packages.
 
 WebAuthn browser tests need a DNS hostname that matches `PUBLIC_BASE_URL`; the full-stack suite uses `http://localhost:18080`. Chromium rejects raw IP relying-party IDs, including `127.0.0.1`. OAuth resources and mail links derive the same configured test origin.

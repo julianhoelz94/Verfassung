@@ -7,7 +7,7 @@ import { T } from '../../components/TranslationProvider';
 import { ui } from '../../../lib/messages';
 import { AdminForbidden } from '../../components/AdminForbidden';
 import { Alert, Badge, Button, Card, Input, PageHeader, TextArea } from '../../components/ui';
-import { PageMain } from '../../components/PageMain';
+import { WorkspacePage } from '../../components/layout/templates';
 import { currentUser, requireSessionBearer } from '../../../lib/session';
 import { listImportJobs } from '../../../lib/ingestion-api';
 import { createImportAction, createSetupProposalAction } from './actions';
@@ -23,8 +23,8 @@ export default async function AdminImportPage({ searchParams }: AdminImportPageP
   const jobs = await listImportJobs(await requireSessionBearer()).catch(() => null);
   const newStructure = params.mode === 'new';
   const error = params.error === 'forbidden' ? ui.admin.import.page.editorRightsRequiredForStaging : params.error === 'json' ? ui.admin.import.page.thatFileIsNotValidJson : params.error === 'invalid' ? ui.admin.import.page.theJsonIsMissingRequiredImportFields : ui.admin.import.page.theImportCouldNotBeStarted;
-  return <PageMain className="wide">
-    <PageHeader title={<T value={ui.attrs.adminImportPagePageHeaderTitleImport} />} meta={<T value={ui.attrs.adminImportPagePageHeaderMetaStage} />} />
+  return <WorkspacePage width="content" header={<PageHeader title={<T value={ui.attrs.adminImportPagePageHeaderTitleImport} />} meta={<T value={ui.attrs.adminImportPagePageHeaderMetaStage} />} />}>
+
     {params.error ? <Alert tone="error"><T value={error} /></Alert> : null}
     {canImport ? <>
       <h2 className="section-title"><T value={reviewUi.importChoice} /></h2>
@@ -36,13 +36,13 @@ export default async function AdminImportPage({ searchParams }: AdminImportPageP
       <Card id={newStructure ? 'structure' : 'upload'}>
         <h2><T value={newStructure ? reviewUi.newStructure : ui.admin.import.page.uploadAVersion} /></h2>
         <p className="muted"><T value={newStructure ? reviewUi.proposalHint : reviewUi.uploadHint} /></p>
-        {newStructure ? <NavigatingActionForm action={createSetupProposalAction} className="stack">
+        {newStructure ? <NavigatingActionForm action={createSetupProposalAction}>
           <Input label={<T value={reviewUi.proposalFile} />} id="proposalFile" name="proposalFile" type="file" accept="application/json,.json" />
           <Disclosure summary={<T value={reviewUi.pasteJson} />} open={Boolean(params.error)}>
             <TextArea label={<T value={ui.attrs.adminImportPageTextAreaLabelSetup} />} id="proposal" name="proposal" rows={10} spellCheck={false} />
           </Disclosure>
           <Button variant="primary"><T value={reviewUi.prepareStructure} /></Button>
-        </NavigatingActionForm> : <NavigatingActionForm action={createImportAction} className="stack">
+        </NavigatingActionForm> : <NavigatingActionForm action={createImportAction}>
           <Input label={<T value={ui.attrs.adminImportPageInputLabelJSON} />} id="file" name="file" type="file" accept="application/json,.json" />
           <Disclosure summary={<T value={reviewUi.pasteJson} />} open={Boolean(params.error)}>
             <TextArea label={<T value={ui.attrs.adminImportPageTextAreaLabelImport} />} id="payload" name="payload" rows={12} spellCheck={false} />
@@ -64,5 +64,5 @@ export default async function AdminImportPage({ searchParams }: AdminImportPageP
         <Badge tone="info"><T value={statusMessage(job.status)} /></Badge>
       </li>)}</ul>}
     </Card>
-  </PageMain>;
+  </WorkspacePage>;
 }

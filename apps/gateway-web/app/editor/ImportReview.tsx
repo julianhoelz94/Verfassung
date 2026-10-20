@@ -5,7 +5,7 @@ import { ui } from '../../lib/messages';
 import { notFound } from 'next/navigation';
 import { AdminForbidden } from '../components/AdminForbidden';
 import { Alert, Button, Card, PageHeader, WorkflowSteps } from '../components/ui';
-import { PageMain } from '../components/PageMain';
+import { WorkspacePage } from '../components/layout/templates';
 import { getImportJob, getImportPayload, getPreparedImportContent, getImportReviewDecisions } from '../../lib/ingestion-api';
 import { getVersionSettings } from '../../lib/api';
 import { OrderedContentTree } from '../components/ConstitutionText';
@@ -14,6 +14,7 @@ import { transitionImportAction } from '../admin/import/actions';
 import { Disclosure } from '../components/Disclosure';
 import { reviewUi } from '../../lib/ui-review-messages';
 import { ImportPreview } from '../admin/import/ImportPreview';
+import fieldStyles from '../components/fields.module.css';
 
 export async function ImportReview({ jobId, error }: { jobId: string; error?: string }) {
   const user = await currentUser();
@@ -26,10 +27,10 @@ export async function ImportReview({ jobId, error }: { jobId: string; error?: st
     job = await getImportJob(jobId, authorization);
   } catch {
     return (
-      <PageMain>
-        <PageHeader title={<T value={ui.importReview.title} />} />
+      <WorkspacePage width="reading" header={<PageHeader title={<T value={ui.importReview.title} />} />}>
+
         <Alert tone="error"><T value={ui.admin.import.jobid.page.theImportServiceIsUnavailable} /></Alert>
-      </PageMain>
+      </WorkspacePage>
     );
   }
   if (!job) {
@@ -49,12 +50,12 @@ export async function ImportReview({ jobId, error }: { jobId: string; error?: st
       ? `/countries/${encodeURIComponent(job.isoCode)}/versions/${encodeURIComponent(job.versionId)}`
       : null;
   return (
-    <PageMain className="wide import-review">
+    <WorkspacePage width="content" className="import-review" header={<PageHeader title={<T value={ui.importReview.title} />} eyebrow={<T value={ui.attrs.editorEditorlandingPageHeaderTitleEditor} />} meta={<WorkflowSteps status={job.status === 'pending_review' ? 'reviewing' : job.status === 'completed' ? 'published' : job.status} />} />}>
       <nav className="section-nav">
         <a href="/editor?status=reviewing"><T value={ui.nav.reviewQueue} /></a>
         {publisher ? <a href="/editor?status=approved"><T value={ui.nav.readyToPublish} /></a> : null}
       </nav>
-      <PageHeader title={<T value={ui.importReview.title} />} eyebrow={<T value={ui.attrs.editorEditorlandingPageHeaderTitleEditor} />} meta={<WorkflowSteps status={job.status === 'pending_review' ? 'reviewing' : job.status === 'completed' ? 'published' : job.status} />} />
+
       <p><T value={ui.importActions.status} /> <T value={statusMessage(job.status)} /></p>
       {error ? <Alert tone="error"><T value={error === 'reason' ? ui.importActions.reasonRequired : ui.importActions.actionFailed} /></Alert> : null}
       {job.status === 'pending_review' ? <Alert><T value={ui.admin.import.jobid.page.thisImportIsPendingReviewItIs} /></Alert> : null}
@@ -114,7 +115,7 @@ export async function ImportReview({ jobId, error }: { jobId: string; error?: st
           </ul>
         </Card>
       ) : null}
-    </PageMain>
+    </WorkspacePage>
   );
 }
 
@@ -123,7 +124,7 @@ function ActionForm({ action, jobId, label }: { action: 'confirm-outline' | 'pre
     <h3><T value={label} /></h3>
     <input type="hidden" name="jobId" value={jobId} />
     <input type="hidden" name="action" value={action} />
-    {action === 'approve' || action === 'reject' ? <label className="field" htmlFor={`reason-${action}`}><T value={ui.admin.import.jobid.page.reviewReason} /><textarea id={`reason-${action}`} name="reason" minLength={10} maxLength={2000} required rows={3} /></label> : null}
+    {action === 'approve' || action === 'reject' ? <label className={["field", fieldStyles.field].join(' ')} htmlFor={`reason-${action}`}><T value={ui.admin.import.jobid.page.reviewReason} /><textarea id={`reason-${action}`} name="reason" minLength={10} maxLength={2000} required rows={3} /></label> : null}
     <Button variant={action === 'publish' ? 'primary' : undefined}><T value={label} /></Button>
   </NavigatingActionForm>;
 }

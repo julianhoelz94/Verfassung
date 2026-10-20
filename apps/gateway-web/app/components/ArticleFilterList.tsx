@@ -4,6 +4,7 @@ import { T, useTranslation } from './TranslationProvider';
 import { ui } from '../../lib/messages';
 import { useMemo, useState } from 'react';
 import { Badge } from './ui';
+import fieldStyles from './fields.module.css';
 
 type FilterArticle = {
   id: string;
@@ -37,7 +38,7 @@ export function ArticleFilterList({ articles, selectedId, hrefBase, draftIds, un
   return (
     <>
       <input
-        className="field-control"
+        className={["field-control", fieldStyles.control].join(' ')}
         type="search"
         value={query}
         onChange={(event) => setQuery(event.target.value)}

@@ -8,6 +8,8 @@ import type { AmendmentRevision } from '../../../lib/amendment-editor-api';
 import { Badge, Button } from '../../components/ui';
 import { FormattedDate } from '../../../lib/format-date';
 import { restoreRevisionAction } from './actions';
+import { Stack } from '../../components/layout/Layout';
+import surfaceStyles from '../../components/surfaces.module.css';
 
 type AmendmentRevisionPanelProps = {
   amendmentId: string;
@@ -52,7 +54,7 @@ export function AmendmentRevisionPanel({
   const viewingPast = selectedRevisionId !== null;
 
   const list = (
-    <ol className="stack revision-list">
+    <Stack as="ol" className="revision-list">
       {ordered.map((revision) => {
         const isNewest = revision.id === newestId;
         const isActive = selectedRevisionId === null ? isNewest : selectedRevisionId === revision.id;
@@ -73,12 +75,12 @@ export function AmendmentRevisionPanel({
           </li>
         );
       })}
-    </ol>
+    </Stack>
   );
 
   const restoreForm =
     canRestore && viewingPast && selectedRevision ? (
-      <form onSubmit={async event => {
+      <Stack as="form" onSubmit={async (event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault();
         if (restoring) return;
         setRestoring(true);
@@ -87,22 +89,22 @@ export function AmendmentRevisionPanel({
         } catch {
           window.location.assign(`/editor/amendments/${encodeURIComponent(amendmentId)}?error=save_failed`);
         }
-      }} className="stack">
+      }}>
         <input type="hidden" name="amendmentId" value={amendmentId} />
         <input type="hidden" name="revisionBody" value={JSON.stringify(selectedRevision)} />
         <Button type="submit" size="sm" disabled={restoring}>
           <T value={ui.editor.amendments.amendmentrevisionpanel.restoreAsNewDraft} />{" "}</Button>
-      </form>
+      </Stack>
     ) : null;
 
   return (
     <>
-      <details className="panel panel-side revision-panel-phone">
+      <details className={["panel panel-side revision-panel-phone", surfaceStyles.panel].join(' ')}>
         <summary className="panel-title"><T value={ui.editor.amendments.amendmentrevisionpanel.revisionHistory} /></summary>
         {list}
         {restoreForm}
       </details>
-      <aside className="panel panel-side revision-panel-desktop" aria-label={t(ui.accessibility.revisionHistory)}>
+      <aside className={["panel panel-side revision-panel-desktop", surfaceStyles.panel].join(' ')} aria-label={t(ui.accessibility.revisionHistory)}>
         <p className="panel-title"><T value={ui.editor.amendments.amendmentrevisionpanel.revisionHistory} /></p>
         {list}
         {restoreForm}

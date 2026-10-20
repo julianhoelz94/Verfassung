@@ -9,10 +9,11 @@ import { confirmEnrollAction, type EnrollConfirmState } from '../login/actions';
 import { confirmAccountMfaAction, regenerateRecoveryAction, startMfaEnrollAction, type RecoveryRevealState } from './actions';
 import { Disclosure } from '../components/Disclosure';
 import { reviewUi } from '../../lib/ui-review-messages';
+import { Stack } from '../components/layout/Layout';
 
 export function StartMfaEnrollForm() {
   const [pending, setPending] = useState(false);
-  return <form onSubmit={async event => {
+  return <Stack as="form" onSubmit={async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (pending) return;
     const password = String(new FormData(event.currentTarget).get('password') ?? '');
@@ -23,7 +24,7 @@ export function StartMfaEnrollForm() {
     } catch {
       window.location.assign('/account?error=mfa');
     }
-  }}><Input label={<T value={ui.attrs.loginPageInputLabelPassword} />} id="mfaPassword" name="password" type="password" autoComplete="current-password" required /><Button variant="primary" disabled={pending}><T value={ui.account.page.enrollAuthenticator} /></Button></form>;
+  }}><Input label={<T value={ui.attrs.loginPageInputLabelPassword} />} id="mfaPassword" name="password" type="password" autoComplete="current-password" required /><Button variant="primary" disabled={pending}><T value={ui.account.page.enrollAuthenticator} /></Button></Stack>;
 }
 
 const initial: RecoveryRevealState = {};
@@ -54,11 +55,11 @@ export function ConfirmEnrollForm({ challengeToken }: { challengeToken: string }
   return (
     <>
       {state.error ? failed : null}
-      <form action={action}>
+      <Stack as="form" action={action}>
         <input type="hidden" name="challengeToken" value={challengeToken} />
         <Input label={<T value={ui.attrs.accountMfaformsInputLabelAuthenticatorCode} />} id="enrollCode" name="code" inputMode="numeric" required />
         <Button variant="primary"><T value={ui.account.mfaforms.confirmEnrollment} /></Button>
-      </form>
+      </Stack>
     </>
   );
 }
@@ -71,10 +72,10 @@ export function RegenerateRecoveryForm() {
       <Disclosure summary={<T value={reviewUi.recoveryManage} />} open={Boolean(state.error)}>
       <p><T value={reviewUi.recoveryReplaceHint} /></p>
       {state.error ? failed : null}
-      <form action={action}>
+      <Stack as="form" action={action}>
         <Input label={<T value={ui.attrs.accountMfaformsInputLabelAuthenticatorCode} />} id="recoveryRotateCode" name="code" inputMode="numeric" required />
         <Button><T value={ui.account.mfaforms.replaceRecoveryCodes} /></Button>
-      </form>
+      </Stack>
       </Disclosure>
     </>
   );
@@ -98,7 +99,7 @@ export function LoginEnrollForm({ next }: { next?: string } = {}) {
   return (
     <>
       {state.error ? <Alert tone="error"><T value={ui.account.mfaforms.thatCodeCouldNotBeVerified} /></Alert> : null}
-      <form aria-busy={pending} onSubmit={async event => {
+      <Stack as="form" aria-busy={pending} onSubmit={async (event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault();
         if (pending) return;
         const data = new FormData(event.currentTarget);
@@ -117,7 +118,7 @@ export function LoginEnrollForm({ next }: { next?: string } = {}) {
           required
         />
         <Button variant="primary" disabled={pending}><T value={ui.account.mfaforms.confirmEnrollment} /></Button>
-      </form>
+      </Stack>
     </>
   );
 }

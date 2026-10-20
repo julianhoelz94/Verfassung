@@ -4,6 +4,10 @@ import { SettingInfo, type SettingChangeability } from './SettingInfo';
 import { LocalizedRegion } from './LocalizedRegion';
 import { ui } from '../../lib/messages';
 import { T } from './TranslationProvider';
+import { useId } from 'react';
+import fieldStyles from './fields.module.css';
+import surfaceStyles from './surfaces.module.css';
+import headerStyles from './header.module.css';
 
 type FieldInfo = { description: ReactNode; changeability: SettingChangeability; changeNote?: ReactNode };
 
@@ -64,14 +68,14 @@ type PageHeaderProps = {
 
 export function PageHeader({ breadcrumbs, eyebrow, title, meta, actions }: PageHeaderProps) {
   return (
-    <div className="page-header">
-      <div className="page-heading">
+    <div className={`page-header ${headerStyles.header}`}>
+      <div className={headerStyles.heading}>
         {breadcrumbs && breadcrumbs.length > 0 ? <Breadcrumbs items={breadcrumbs} /> : null}
-        {eyebrow ? <p className="eyebrow">{eyebrow}</p> : null}
-        <h1 className="page-title">{title}</h1>
-        {meta ? <div className="page-meta">{meta}</div> : null}
+        {eyebrow ? <p className={headerStyles.eyebrow}>{eyebrow}</p> : null}
+        <h1 className={`page-title ${headerStyles.title}`}>{title}</h1>
+        {meta ? <div className={`page-meta ${headerStyles.meta}`}>{meta}</div> : null}
       </div>
-      {actions ? <div className="page-actions">{actions}</div> : null}
+      {actions ? <div className={`page-actions ${headerStyles.actions}`}>{actions}</div> : null}
     </div>
   );
 }
@@ -120,54 +124,57 @@ export function DataRow({ cells }: { cells: { label: ReactNode; value: ReactNode
   );
 }
 
-type InputProps = InputHTMLAttributes<HTMLInputElement> & { label: ReactNode; info?: FieldInfo };
+type FieldProps = { label: ReactNode; info?: FieldInfo; help?: ReactNode; error?: ReactNode };
 
-export function Input({ label, id, className, info, ...props }: InputProps) {
-  const inputId = id ?? props.name;
-  if (info) return (
-    <div className="field">
-      <div className="field-label-row"><label className="field-label" htmlFor={inputId}>{label}</label><SettingInfo label={label} {...info} /></div>
-      <input id={inputId} className={['field-control', className].filter(Boolean).join(' ')} {...props} />
+function Field({ label, info, help, error, id, children }: FieldProps & { id: string; children: ReactNode }) {
+  return <div className={`field ${fieldStyles.field}`}>
+    <div className={fieldStyles.labelRow}>
+      <label className={`field-label ${fieldStyles.label}`} htmlFor={id}>{label}</label>
+      {info ? <SettingInfo label={label} {...info} /> : null}
     </div>
-  );
-  return (
-    <label className="field" htmlFor={inputId}>
-      <span className="field-label">{label}</span>
-      <input id={inputId} className={['field-control', className].filter(Boolean).join(' ')} {...props} />
-    </label>
-  );
+    {children}
+    {help || error ? <div className={fieldStyles.messages}>
+      {help ? <p id={`${id}-help`} className={fieldStyles.hint}>{help}</p> : null}
+      {error ? <p id={`${id}-error`} className={fieldStyles.error}>{error}</p> : null}
+    </div> : null}
+  </div>;
 }
 
-type TextAreaProps = TextareaHTMLAttributes<HTMLTextAreaElement> & { label: ReactNode };
-
-export function TextArea({ label, id, className, ...props }: TextAreaProps) {
-  const inputId = id ?? props.name;
-  return (
-    <label className="field" htmlFor={inputId}>
-      <span className="field-label">{label}</span>
-      <textarea id={inputId} className={['field-control', className].filter(Boolean).join(' ')} {...props} />
-    </label>
-  );
+function descriptions(id: string, help: ReactNode, error: ReactNode, existing?: string) {
+  return [existing, help ? `${id}-help` : undefined, error ? `${id}-error` : undefined].filter(Boolean).join(' ') || undefined;
 }
 
-type SelectProps = SelectHTMLAttributes<HTMLSelectElement> & { label: ReactNode; children: ReactNode; info?: FieldInfo };
+type InputProps = InputHTMLAttributes<HTMLInputElement> & FieldProps;
 
-export function Select({ label, id, className, children, info, ...props }: SelectProps) {
-  const inputId = id ?? props.name;
-  if (info) return (
-    <div className="field">
-      <div className="field-label-row"><label className="field-label" htmlFor={inputId}>{label}</label><SettingInfo label={label} {...info} /></div>
-      <select id={inputId} className={['field-control', className].filter(Boolean).join(' ')} {...props}>{children}</select>
-    </div>
-  );
-  return (
-    <label className="field" htmlFor={inputId}>
-      <span className="field-label">{label}</span>
-      <select id={inputId} className={['field-control', className].filter(Boolean).join(' ')} {...props}>
-        {children}
-      </select>
-    </label>
-  );
+export function Input({ label, id, className, info, help, error, ...props }: InputProps) {
+  const generatedId = useId();
+  const inputId = id ?? props.name ?? generatedId;
+  return <Field id={inputId} label={label} info={info} help={help} error={error}>
+    <input {...props} id={inputId} className={['field-control', fieldStyles.control, className].filter(Boolean).join(' ')}
+      aria-invalid={error ? true : props['aria-invalid']} aria-describedby={descriptions(inputId, help, error, props['aria-describedby'])} />
+  </Field>;
+}
+
+type TextAreaProps = TextareaHTMLAttributes<HTMLTextAreaElement> & FieldProps;
+
+export function TextArea({ label, id, className, info, help, error, ...props }: TextAreaProps) {
+  const generatedId = useId();
+  const inputId = id ?? props.name ?? generatedId;
+  return <Field id={inputId} label={label} info={info} help={help} error={error}>
+    <textarea {...props} id={inputId} className={['field-control', fieldStyles.control, className].filter(Boolean).join(' ')}
+      aria-invalid={error ? true : props['aria-invalid']} aria-describedby={descriptions(inputId, help, error, props['aria-describedby'])} />
+  </Field>;
+}
+
+type SelectProps = SelectHTMLAttributes<HTMLSelectElement> & FieldProps;
+
+export function Select({ label, id, className, children, info, help, error, ...props }: SelectProps) {
+  const generatedId = useId();
+  const inputId = id ?? props.name ?? generatedId;
+  return <Field id={inputId} label={label} info={info} help={help} error={error}>
+    <select {...props} id={inputId} className={['field-control', fieldStyles.control, className].filter(Boolean).join(' ')}
+      aria-invalid={error ? true : props['aria-invalid']} aria-describedby={descriptions(inputId, help, error, props['aria-describedby'])}>{children}</select>
+  </Field>;
 }
 
 type AlertProps = {
@@ -185,7 +192,7 @@ export function Alert({ children, tone = 'info' }: AlertProps) {
 }
 
 export function Card({ children, className, id }: { children: ReactNode; className?: string; id?: string }) {
-  return <section id={id} className={['card', className].filter(Boolean).join(' ')}>{children}</section>;
+  return <section id={id} className={['card', surfaceStyles.card, className].filter(Boolean).join(' ')}>{children}</section>;
 }
 
 const WORKFLOW_STEPS = [ui.workflow.draft, ui.workflow.inReview, ui.workflow.approved, ui.workflow.published] as const;

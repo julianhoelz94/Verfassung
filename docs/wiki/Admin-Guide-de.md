@@ -18,6 +18,10 @@
 ![Import mit Strukturwahl vor dem Hochladen](https://raw.githubusercontent.com/wiki/julianhoelz94/Verfassung/media/admin-import-de.png)
 *Zuerst das Ziel wählen, dann hochladen. „Stattdessen JSON einfügen“ öffnet die erweiterte Eingabe.*
 
+Das Kontomenü gruppiert die Ziele zum Entdecken, zur Redaktion und zur Administration. Öffnen Sie eine Gruppe, um ihre Links zu sehen; die Gruppe des aktuellen Arbeitsbereichs ist bereits geöffnet. Konto und Abmeldung bleiben direkt erreichbar.
+
+Die Nutzerzeilen zeigen E-Mail-Adresse, Status und Rollenkennzeichnungen. **Rollen bearbeiten** öffnet die Rollenauswahl. Speichern Sie mit **Rollen aktualisieren** oder verwerfen Sie die Auswahl mit **Abbrechen**. Die Steuerelemente für Dienst-Tokens stehen in einem eigenen Abschnitt unter der Nutzerliste.
+
 ## Erste Einrichtung
 
 Eine Rollenänderung oder Kontosperre widerruft Sitzungen, offene Einrichtungsabfragen und persönliche MCP/OAuth-Zugangsdaten. Die Sperre eines eingeladenen Kontos macht auch die Einladung ungültig. Eine erneute Aktivierung stellt widerrufene Zugangsdaten nicht wieder her. Automatisierungs-Tokens werden weiterhin separat ausgetauscht oder widerrufen.

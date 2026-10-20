@@ -3,6 +3,8 @@ import { T } from '../components/TranslationProvider';
 import { ui, message } from '../../lib/messages';
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { SearchFilters } from '../components/SearchFilters';
+import { usability } from '../../lib/usability-messages';
 import { FiltersPanel } from '../components/FiltersPanel';
 import { PageMain } from '../components/PageMain';
 import { SearchSnippet } from '../components/SearchSnippet';
@@ -44,69 +46,13 @@ export async function generateMetadata(props: SearchPageProps): Promise<Metadata
 
 const EMPTY_FACETS: SearchFacets = { countries: [], versions: [], dates: [] };
 
-function SearchFilters({
-  facets,
-  versions,
-  country,
-  versionId,
-  effectiveDate,
-}: {
-  facets: SearchFacets;
-  versions: SearchFacets['versions'];
-  country: string;
-  versionId: string;
-  effectiveDate: string;
-}) {
-  return (
-    <div className="search-filter-fields">
-      <fieldset>
-        <legend><T value={ui.search.page.country} /></legend>
-        <label>
-          <input type="radio" name="country" value="" defaultChecked={!country} /> <T value={ui.search.page.anyCountry} />{" "}</label>
-        {facets.countries.map((facet) => (
-          <label key={facet.code}>
-            <input type="radio" name="country" value={facet.code} defaultChecked={country === facet.code} />
-            {facet.countryName || facet.code} ({facet.count})
-          </label>
-        ))}
-      </fieldset>
-      <fieldset>
-        <legend><T value={ui.search.page.version} /></legend>
-        <label>
-          <input type="radio" name="versionId" value="" defaultChecked={!versionId} /> <T value={ui.search.page.anyVersion} />{" "}</label>
-        {versions.map((facet) => (
-          <label key={facet.id}>
-            <input type="radio" name="versionId" value={facet.id} defaultChecked={versionId === facet.id} />
-            {facet.constitutionTitle} · {facet.label} ({facet.count})
-          </label>
-        ))}
-      </fieldset>
-      <fieldset>
-        <legend><T value={ui.search.page.effectiveDate} /></legend>
-        <label>
-          <input type="radio" name="effectiveDate" value="" defaultChecked={!effectiveDate} /> <T value={ui.search.page.anyDate} />{" "}</label>
-        {facets.dates.map((facet) => (
-          <label key={facet.effectiveDate}>
-            <input
-              type="radio"
-              name="effectiveDate"
-              value={facet.effectiveDate}
-              defaultChecked={effectiveDate === facet.effectiveDate}
-            />
-            {facet.effectiveDate} ({facet.count})
-          </label>
-        ))}
-      </fieldset>
-    </div>
-  );
-}
-
 export default async function SearchPage(props: SearchPageProps) {
   const locale = await currentLocale();
   const searchParams = await props.searchParams;
   const query = searchParams.q?.trim() ?? '';
   const country = searchParams.country?.trim() ?? '';
-  const versionId = searchParams.versionId?.trim() ?? '';
+  const requestedVersion = searchParams.versionId?.trim() ?? '';
+  let versionId = requestedVersion;
   const effectiveDate = searchParams.effectiveDate?.trim() ?? '';
   const offset = parseSearchOffset(searchParams.offset);
   let hits: SearchHit[] = [];
@@ -119,6 +65,8 @@ export default async function SearchPage(props: SearchPageProps) {
   } catch {
     facets = EMPTY_FACETS;
   }
+  const selectedVersion = facets.versions.find(version => version.id === requestedVersion);
+  if (country && selectedVersion && selectedVersion.countryCode !== country) versionId = '';
   if (query) {
     try {
       const page = await searchArticles(query, {
@@ -137,15 +85,18 @@ export default async function SearchPage(props: SearchPageProps) {
       total = 0;
     }
   }
-  const versions = country
-    ? facets.versions.filter((version) => version.countryCode === country || version.id === versionId)
-    : facets.versions;
   const urlParams = {
     q: query,
     country: country || undefined,
     versionId: versionId || undefined,
     effectiveDate: effectiveDate || undefined,
   };
+
+  const activeFilters = [
+    ...(country ? [{ key: 'country' as const, label: facets.countries.find(facet => facet.code === country)?.countryName || country }] : []),
+    ...(versionId ? [{ key: 'versionId' as const, label: selectedVersion ? `${selectedVersion.constitutionTitle} · ${selectedVersion.label}` : versionId }] : []),
+    ...(effectiveDate ? [{ key: 'effectiveDate' as const, label: effectiveDate }] : []),
+  ];
 
   return (
     <PageMain className="wide">
@@ -166,10 +117,10 @@ export default async function SearchPage(props: SearchPageProps) {
         <button className="btn btn-primary" type="submit">
           <T value={ui.search.page.search} />{" "}</button>
         <div className="search-layout">
-          <FiltersPanel>
+          <FiltersPanel count={activeFilters.length}>
             <SearchFilters
+              key={`${country}:${versionId}:${effectiveDate}`}
               facets={facets}
-              versions={versions}
               country={country}
               versionId={versionId}
               effectiveDate={effectiveDate}
@@ -178,6 +129,13 @@ export default async function SearchPage(props: SearchPageProps) {
               <T value={ui.search.page.applyFilters} />{" "}</button>
           </FiltersPanel>
           <div>
+            {activeFilters.length ? <nav className="applied-filters" aria-label={message(locale, usability.appliedFilters)}>
+              {activeFilters.map(filter => <a key={filter.key} className="chip" href={searchUrl({ ...urlParams, [filter.key]: undefined })} aria-label={`${message(locale, usability.removeFilter)}: ${filter.label}`}>
+                {filter.label}<span aria-hidden="true"> ×</span>
+              </a>)}
+              <a href={searchUrl({ q: query })}><T value={usability.clearFilters} /></a>
+            </nav> : null}
+            {requestedVersion && !versionId ? <p role="status"><T value={usability.countryChanged} /></p> : null}
             {error ? (
               <p role="alert">
                 {error}<T value={ui.search.page.browseCountriesInsteadWhileTheIndexIs} />{" "}<Link href="/"><T value={ui.search.page.countries} /></Link>

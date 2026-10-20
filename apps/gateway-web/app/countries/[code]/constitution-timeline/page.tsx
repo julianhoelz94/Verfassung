@@ -1,6 +1,9 @@
+import { CountryNavigation } from '../../../components/CountryNavigation';
+import { HistoryTimeline } from '../../../components/HistoryTimeline';
+import { currentLocale } from '../../../../lib/server-locale';
 import { lifecycleStatusMessage } from '../../../../lib/lifecycle-label';
 import { T } from '../../../components/TranslationProvider';
-import { ui, type UiMessage } from '../../../../lib/messages';
+import { message, ui, type UiMessage } from '../../../../lib/messages';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import { PageMain } from '../../../components/PageMain';
@@ -50,6 +53,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function ConstitutionTimelinePage({ params, searchParams }: Props) {
   const { code } = await params;
+  const locale = await currentLocale();
   const query = await searchParams;
   let country;
   let events;
@@ -128,9 +132,47 @@ export default async function ConstitutionTimelinePage({ params, searchParams }:
           { label: <T value={ui.remainingStatus.constitutionTimeline} /> },
         ]}
         title={<T value={ui.attrs.countriesCodeConstitutionTimelinePagePageHeaderTitle} />}
-        actions={<a className="btn btn-sm" href={`/countries/${country.isoCode}/timeline`}><T value={ui.countries.code.constitutionTimeline.page.amendmentTimeline} /></a>}
       />
-      <p><T value={ui.countries.code.constitutionTimeline.page.adoptionSuspensionRestorationAndReplacementOfConstitutions} />{" "}{country.name}.</p>
+      <CountryNavigation code={country.isoCode} active="constitutions" />
+      <HistoryTimeline items={dated.filter(event => constitutionsById.has(event.constitutionId)).map((event) => {
+          const constitution = constitutionsById.get(event.constitutionId)!;
+          const predecessor = constitution.predecessorConstitutionId
+            ? constitutionsById.get(constitution.predecessorConstitutionId)
+            : null;
+          const versions = publicVersions(constitution.versions);
+          return { id: event.id, date: event.eventDate, title: `${message(locale, event.scope === 'whole' ? labels[event.eventType] : provisionLabels[event.eventType])} · ${constitution.title}`, content: (
+            <article className="card">
+              <p><time dateTime={event.eventDate}>{event.scope === 'whole' && event.dateCertainty === 'approximate' ? <T value={ui.remainingStatus.circa} /> : ''}{event.eventDate}</time> · {<T value={event.scope === 'whole' ? labels[event.eventType] : provisionLabels[event.eventType]} />}</p>
+              <h2 className="card-title">
+                <a href={`/countries/${country.isoCode}/constitutions/${constitution.id}`}>{constitution.title}</a>
+                {constitution.interim ? ' (interim)' : ''}
+              </h2>
+              {event.scope === 'whole' && event.eventType === 'adopted' && predecessor ? (
+                <p><T value={ui.countries.code.constitutionTimeline.page.replaces} />{" "}<a href={`/countries/${country.isoCode}/constitutions/${predecessor.id}`}>{predecessor.title}</a></p>
+              ) : null}
+              {event.note ? <p>{event.note}</p> : null}
+              {versions.length > 0 ? (
+                <p><T value={ui.countries.code.constitutionTimeline.page.publishedVersions} />{" "}{versions.map((version, index) => (
+                  <span key={version.id}>{index > 0 ? ' · ' : ''}<a href={`/countries/${country.isoCode}/versions/${version.currentVersionId ?? version.id}`}>{version.versionLabel}</a></span>
+                ))}</p>
+              ) : null}
+              {event.scope === 'provisions' ? (
+                <ul>
+                  {event.logicalUnitIds.map((logicalId) => {
+                    const resolved = units.get(`${event.sourceVersionId}:${logicalId}`);
+                    const label = resolved?.pathLabels.join(' → ') || <T value={ui.lifecycleEvents.unitNeedsReview} />;
+                    return (
+                      <li key={logicalId}>
+                        {resolved ? <a href={resolved.deepLink}>{label}</a> : label}
+                      </li>
+                    );
+                  })}
+                </ul>
+              ) : null}
+              {event.sourceUrl ? <p><a href={event.sourceUrl}><T value={ui.countries.code.constitutionTimeline.page.source} /></a></p> : null}
+            </article>
+          ) };
+        })} />
       <section className="card">
         <h2><T value={ui.countries.code.constitutionTimeline.page.statusOnADate} /></h2>
         <form method="get" className="date-filter">
@@ -164,48 +206,7 @@ export default async function ConstitutionTimelinePage({ params, searchParams }:
         ) : null}
       </section>
       {dated.length === 0 ? <p><T value={ui.countries.code.constitutionTimeline.page.noDatedConstitutionEventsAreRecordedYet} /></p> : null}
-      <ol>
-        {dated.map((event) => {
-          const constitution = constitutionsById.get(event.constitutionId);
-          if (!constitution) return null;
-          const predecessor = constitution.predecessorConstitutionId
-            ? constitutionsById.get(constitution.predecessorConstitutionId)
-            : null;
-          const versions = publicVersions(constitution.versions);
-          return (
-            <li key={event.id} className="card">
-              <p><time dateTime={event.eventDate}>{event.scope === 'whole' && event.dateCertainty === 'approximate' ? <T value={ui.remainingStatus.circa} /> : ''}{event.eventDate}</time> · {<T value={event.scope === 'whole' ? labels[event.eventType] : provisionLabels[event.eventType]} />}</p>
-              <h2 className="card-title">
-                <a href={`/countries/${country.isoCode}/constitutions/${constitution.id}`}>{constitution.title}</a>
-                {constitution.interim ? ' (interim)' : ''}
-              </h2>
-              {event.scope === 'whole' && event.eventType === 'adopted' && predecessor ? (
-                <p><T value={ui.countries.code.constitutionTimeline.page.replaces} />{" "}<a href={`/countries/${country.isoCode}/constitutions/${predecessor.id}`}>{predecessor.title}</a></p>
-              ) : null}
-              {event.note ? <p>{event.note}</p> : null}
-              {versions.length > 0 ? (
-                <p><T value={ui.countries.code.constitutionTimeline.page.publishedVersions} />{" "}{versions.map((version, index) => (
-                  <span key={version.id}>{index > 0 ? ' · ' : ''}<a href={`/countries/${country.isoCode}/versions/${version.currentVersionId ?? version.id}`}>{version.versionLabel}</a></span>
-                ))}</p>
-              ) : null}
-              {event.scope === 'provisions' ? (
-                <ul>
-                  {event.logicalUnitIds.map((logicalId) => {
-                    const resolved = units.get(`${event.sourceVersionId}:${logicalId}`);
-                    const label = resolved?.pathLabels.join(' → ') || <T value={ui.lifecycleEvents.unitNeedsReview} />;
-                    return (
-                      <li key={logicalId}>
-                        {resolved ? <a href={resolved.deepLink}>{label}</a> : label}
-                      </li>
-                    );
-                  })}
-                </ul>
-              ) : null}
-              {event.sourceUrl ? <p><a href={event.sourceUrl}><T value={ui.countries.code.constitutionTimeline.page.source} /></a></p> : null}
-            </li>
-          );
-        })}
-      </ol>
+
       {undated.length > 0 ? (
         <section>
           <h2><T value={ui.countries.code.constitutionTimeline.page.datesNotRecorded} /></h2>

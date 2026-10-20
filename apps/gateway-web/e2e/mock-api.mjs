@@ -205,6 +205,7 @@ let forceEnrollment = false;
 let stepUpFresh = true;
 let visualRoles = false;
 let sprint50Content = false;
+let denseUi = false;
 let legalPages = {};
 let imprintDetailsState;
 let translationSite = { provider: 'google', sharedKeyConfigured: true, sharedGoogleCharactersUsed: 0, sharedGoogleCharacterLimit: 500000 };
@@ -236,6 +237,7 @@ function resetMockState() {
   stepUpFresh = true;
   visualRoles = false;
   sprint50Content = false;
+  denseUi = false;
   translationSite = { provider: 'google', sharedKeyConfigured: true, sharedGoogleCharactersUsed: 0, sharedGoogleCharacterLimit: 500000 };
   translationUser = { alwaysTranslate: false, personalGoogleKeyConfigured: false };
   anonymousBrowsing = { allowed: true, perIp: { requests: 600, windowValue: 1, windowUnit: 'minutes' }, total: { requests: 6000, windowValue: 1, windowUnit: 'minutes' }, revision: 0 };
@@ -348,6 +350,15 @@ const server = createServer(async (req, res) => {
     resetMockState();
     empty(res, 204);
     return;
+  }
+  if (method === 'POST' && pathname === '/__usability_content') {
+    denseUi = true;
+    sprint50Content = true;
+    managedUsers = Array.from({ length: 30 }, (_, index) => ({
+      id: `dense-user-${index}`, email: `long.editorial.account.${index}@constitution-atlas.example.local`,
+      roles: ['viewer', 'editor', 'reviewer', 'publisher', 'admin'], enabled: true, status: 'active', createdAt: '2026-01-01T00:00:00Z',
+    }));
+    empty(res, 204); return;
   }
   if (method === 'POST' && pathname === '/__sprint59_content') {
     uiReview = reviewFixtures(germany);
@@ -778,7 +789,14 @@ const server = createServer(async (req, res) => {
   }
 
   if (method === 'GET' && pathname === '/api/search/search/facets') {
-    json(res, 200, searchFacets);
+    json(res, 200, denseUi ? {
+      ...searchFacets,
+      countries: [...searchFacets.countries, { code: 'FR', countryName: 'France', count: 60 }],
+      versions: [...searchFacets.versions, ...Array.from({ length: 60 }, (_, index) => ({
+        id: `01900000-0000-4000-8000-${String(1000 + index).padStart(12, '0')}`,
+        label: String(1900 + index), constitutionTitle: 'A constitution with a long descriptive title', countryCode: 'FR', count: 10,
+      }))],
+    } : searchFacets);
     return;
   }
   if (method === 'GET' && pathname === '/api/search/search') {

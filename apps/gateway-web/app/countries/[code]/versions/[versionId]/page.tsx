@@ -1,3 +1,4 @@
+import { CountryNavigation } from '../../../../components/CountryNavigation';
 import { SnapshotNotice } from '../../../../components/SnapshotNotice';
 import { T } from '../../../../components/TranslationProvider';
 import { ui } from '../../../../../lib/messages';
@@ -164,6 +165,7 @@ export default async function VersionPage(props: VersionPageProps) {
           </>
         }
       />
+      <CountryNavigation code={params.code} active="reading" />
       <SnapshotNotice code={country.isoCode} viewedId={params.versionId} currentId={version.version.currentVersionId ?? version.version.id} />
       {canEdit ? <EditorEntry
         versions={version.constitution.versions}

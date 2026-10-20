@@ -21,8 +21,12 @@
 | --- | --- |
 | Find a passage | **Search**, enter a term and open a result. |
 | Compare texts | A country's **Compare** page, then select two versions. |
-| Constitutional history | **Constitution timeline**: adoption, commencement and lifecycle events. |
-| Changes in law | **Amendment timeline**: published legal changes. |
+| Constitutional history | **History → Constitutions**: adoption, commencement and lifecycle events. |
+| Changes in law | **History → Amendments**: published legal changes. |
+
+Country, constitution and reading pages share **Overview** and **History** navigation. Under History, choose a milestone on the horizontal rail to show its details. Events are grouped by year, with **Jump to year**, previous/next controls and a chronological list. Arrow keys move between milestones; Home/End select the first/last. Approximate dates stay marked and undated records appear separately.
+
+Search filters use compact country, version and effective-date controls. Long country/version lists offer an option search. Choosing another country clears an incompatible version filter. **Apply filters** updates the address; remove an applied filter chip or choose **Clear filters** to broaden the search. On smaller screens, open **Filters** above the results.
 
 ![Comparison page with version selectors and changed text](https://raw.githubusercontent.com/wiki/julianhoelz94/Verfassung/media/reading-compare-en.png)
 *Check both selected versions before reading the changes.*

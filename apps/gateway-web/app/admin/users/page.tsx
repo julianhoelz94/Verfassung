@@ -1,12 +1,12 @@
 import { T } from '../../components/TranslationProvider';
-import { RoleList } from '../../components/SignedInSummary';
+import { RoleEditor } from './RoleEditor';
 import { statusMessage, roleMessage } from '../../../lib/ui-labels';
 import { ui } from '../../../lib/messages';
 import { cookies } from 'next/headers';
 import { AdminForbidden } from '../../components/AdminForbidden';
 import { Alert, Badge, Button, Card, DataList, DataRow, Input, PageHeader } from '../../components/ui';
 import { PageMain } from '../../components/PageMain';
-import { disableUserAction, enableUserAction, updateRolesAction, revokeServiceTokenAction } from '../../account/actions';
+import { disableUserAction, enableUserAction, revokeServiceTokenAction } from '../../account/actions';
 import { InviteUserForm, IssueResetForm, CreateServiceTokenForm, RotateServiceTokenForm } from './TokenForms';
 import { requireAdminPage } from '../../../lib/admin';
 import { requestUsers, requestServiceTokens, type AdminUser, type ServiceToken } from '../../../lib/identity-client';
@@ -55,7 +55,7 @@ export default async function AdminUsersPage(props: AdminUsersPageProps) {
     (!searchParams.role || user.roles.includes(searchParams.role))
   );
   return (
-    <PageMain className="wide">
+    <PageMain className="wide admin-users-page">
       <PageHeader title={<T value={ui.attrs.adminUsersPagePageHeaderTitleUsers} />} meta={<T value={ui.attrs.adminUsersPagePageHeaderMetaInvite} />} />
       {searchParams.error === 'forbidden' ? (
         <Alert tone="error"><T value={ui.admin.users.page.administratorRoleRequired} /></Alert>
@@ -92,7 +92,7 @@ export default async function AdminUsersPage(props: AdminUsersPageProps) {
                 label: <T value={ui.remainingStatus.status} />,
                 value: <Badge tone={statusTone(item)}><T value={statusMessage(item.status)} /></Badge>,
               },
-              { label: <T value={ui.remainingStatus.roles} />, value: <RoleList roles={item.roles} /> },
+              { label: <T value={ui.remainingStatus.roles} />, value: <div className="role-badges">{item.roles.map(role => <Badge key={role}><T value={roleMessage(role)} /></Badge>)}</div> },
               {
                 label: <T value={ui.remainingStatus.actions} />,
                 value:
@@ -107,18 +107,7 @@ export default async function AdminUsersPage(props: AdminUsersPageProps) {
                         <Button><T value={ui.admin.users.page.disable} /></Button>
                       </form>
                       <IssueResetForm userId={item.id} />
-                      <form action={updateRolesAction}>
-                        <input type="hidden" name="userId" value={item.id} />
-                        <fieldset>
-                          <legend><T value={ui.admin.users.page.roles} /></legend>
-                          {(['viewer', 'editor', 'reviewer', 'publisher', 'admin'] as const).map((role) =>
-                            <label key={role} className="form-row">
-                              <input type="checkbox" name="role" value={role} defaultChecked={item.roles.includes(role)} /> <T value={roleMessage(role)} />
-                            </label>
-                          )}
-                        </fieldset>
-                        <Button><T value={ui.admin.users.page.updateRoles} /></Button>
-                      </form>
+                      <RoleEditor userId={item.id} roles={item.roles} />
                     </div>
                   ) : (
                     <form action={enableUserAction}>
@@ -131,7 +120,7 @@ export default async function AdminUsersPage(props: AdminUsersPageProps) {
           />
         ))}
       </DataList>
-      <Card>
+      <Card className="service-token-card">
         <h2 className="card-title"><T value={ui.admin.users.page.serviceTokens} /></h2>
         <p className="muted"><T value={ui.admin.users.page.machineTokensExpireAfter90DaysUnless} /></p>
         <CreateServiceTokenForm />

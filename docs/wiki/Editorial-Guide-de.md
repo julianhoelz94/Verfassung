@@ -39,6 +39,8 @@ MCP- und Dateiimporte erscheinen im Editor unter **Prüfliste**, gemeinsam mit e
 
 Dasselbe Konto darf importieren, prüfen und veröffentlichen, sofern es die erforderlichen Rollen besitzt. Ein zweites Konto ist nicht erforderlich. Freigabe und Veröffentlichung bleiben getrennte Aktionen. Bestehende Importlinks öffnen diesen Ablauf im Editor.
 
+Bei der Importprüfung stehen Verfassungstitel, Fassung und Lesevorschau im Vordergrund. Freigabe und Ablehnung besitzen jeweils ein ausgerichtetes Begründungsfeld und eine Aktionsschaltfläche. Unter **Technische Details** finden Sie bei Bedarf Import-ID, Entwurfsfassungs-ID, Inhaltsgeneration und Einstellungsrevision.
+
 ## 3. Veröffentlichen
 
 **Erforderlich: Herausgeber oder Administrator.**

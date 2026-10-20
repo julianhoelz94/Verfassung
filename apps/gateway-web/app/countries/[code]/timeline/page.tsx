@@ -1,3 +1,5 @@
+import { CountryNavigation } from '../../../components/CountryNavigation';
+import { HistoryTimeline } from '../../../components/HistoryTimeline';
 import { changeTypeMessage } from '../../../../lib/ui-labels';
 import { T } from '../../../components/TranslationProvider';
 import { ui } from '../../../../lib/messages';
@@ -18,7 +20,7 @@ import {
 } from '../../../../lib/api';
 import { FormattedDate } from '../../../../lib/format-date';
 import { atlasTitle, metaDescription, pageMetadata } from '../../../../lib/page-meta';
-import { chainTipId, publicVersions, snapshotVersionId } from '../../../../lib/reading';
+import { publicVersions, snapshotVersionId } from '../../../../lib/reading';
 import { sortAmendmentsByEnactment } from '../../../../lib/timeline';
 import { listDocumentLinks } from '../../../../lib/document-api';
 
@@ -107,8 +109,6 @@ export default async function TimelinePage(props: TimelinePageProps) {
       publicByLegalId.get(id) ??
       [...versionsById.values()].find((version) => version.currentVersionId === id)
     ) : undefined;
-  const primary = country.constitutions[0];
-  const tipId = primary ? chainTipId(primary) : undefined;
   const managedDocuments = new Map(await Promise.all(amendments.map(async (amendment) =>
     [amendment.id, amendment.publishedRevisionId ? await listDocumentLinks('amendment', amendment.id, amendment.publishedRevisionId).catch(() => []) : []] as const,
   )));
@@ -122,25 +122,15 @@ export default async function TimelinePage(props: TimelinePageProps) {
           { label: <T value={ui.remainingStatus.timeline} /> },
         ]}
         title={<T value={ui.attrs.countriesCodeTimelinePagePageHeaderTitle} />}
-        actions={
-          tipId ? (
-            <a className="btn" href={`/countries/${country.isoCode}/versions/${tipId}`}>
-              <T value={ui.countries.code.timeline.page.readLatest} />{" "}</a>
-          ) : (
-            <a className="btn" href={`/countries/${country.isoCode}`}>
-              <T value={ui.countries.code.timeline.page.versions} />{" "}</a>
-          )
-        }
       />
+      <CountryNavigation code={country.isoCode} active="amendments" />
       {amendments.length === 0 ? (
         <p><T value={ui.countries.code.timeline.page.noLegalChangesAreRecordedForThis} /></p>
       ) : null}
-      <ol className="timeline">
-        {amendments.map((amendment) => {
+      <HistoryTimeline items={amendments.map((amendment) => {
           const source = versionForPin(amendment.sourceVersionId);
           const target = versionForPin(amendment.targetVersionId);
-          return (
-            <li key={amendment.id} className="timeline-item">
+          return { id: amendment.id, date: amendment.enactedOn, title: amendment.title, content: (<>
               <FormattedDate className="timeline-date" value={amendment.enactedOn} fallback={<T value={ui.remainingStatus.dateUnknown} />} />
               <article className="card">
                 <ContentTranslationRegion sourceLanguage={target?.languageCode ?? source?.languageCode ?? 'en'}>
@@ -192,10 +182,8 @@ export default async function TimelinePage(props: TimelinePageProps) {
                   </div>
                 ) : null}
               </article>
-            </li>
-          );
-        })}
-      </ol>
+            </>) };
+        })} />
     </PageMain>
   );
 }

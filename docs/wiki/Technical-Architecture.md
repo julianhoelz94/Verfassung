@@ -17,7 +17,7 @@ flowchart LR
 
 | Component | Responsibility |
 | --- | --- |
-| Catalog | Countries, constitutions, outlines, versions, and publication metadata. |
+| Catalog | Jurisdictions (countries, regions, and local subdivisions), constitutions, outlines, versions, and publication metadata. |
 | Content | Versioned constitutional text and ordered content nodes. |
 | Amendment | Legal changes, transitions, revisions, and exact change links. |
 | Identity | Accounts, roles, sessions, registration, confirmation mail, SMTP settings, MFA, and passkeys. |
@@ -56,6 +56,16 @@ The edge evaluates proxy source-address and forwarded-scheme guards before routi
 Version history has two axes: legal changes and editorial corrections. The legal identity and its source revision must be kept separate; see [ADR 0005](https://github.com/julianhoelz94/Verfassung/blob/main/docs/adr/0005-two-axis-versions.md) and the [design](https://github.com/julianhoelz94/Verfassung/blob/main/docs/design/two-axis-versions.md).
 
 ## API addresses
+
+Catalog represents current and historical constitutional jurisdictions as a hierarchy without a fixed depth. Each jurisdiction has a stable UUID, sibling-unique slug, name, kind (such as `country`, `region`, `subregion`, or `municipality`), optional code, and optional parent. A constitution belongs directly to one jurisdiction; its slug aliases and predecessor constitutions are scoped to that jurisdiction. Creating a child does not copy or inherit its parent's constitution. Hierarchy relationships are creation-only in this API.
+
+Set `historical: true` for a country or region that no longer exists. Optional `existedFrom` and `existedUntil` dates describe its existence; omit dates when they are unknown, rather than inventing an exact day. An end date requires a historical jurisdiction and must not precede its start date. Historical jurisdictions remain publicly browsable and their constitutions use the normal review/publication rules. An old constitution of a country that still exists belongs to that continuing jurisdiction; the age of its constitution alone does not make the jurisdiction historical.
+
+No jurisdiction, including a country, requires a modern ISO code. Codes are metadata, not identity: historical entities may reuse a code while retaining separate UUIDs, names, slugs, constitutions, and versions. Current codes remain unique among siblings. A historical region may belong to a historical parent or be a root when that context is not recorded; it does not need to be assigned to a present-day country.
+
+`GET /jurisdictions` lists roots; `?parentId=<uuid>` lists immediate children. `GET /jurisdictions/{id}` returns the jurisdiction, ancestors from root to parent, immediate children, and its own published constitutions. Staff can also see constitution identities that have no published version. Authorized catalog writers use `POST /jurisdictions` and `POST /jurisdictions/{id}/constitutions`. Kinds do not impose a fixed order or a maximum nesting depth, and non-country roots are supported.
+
+Existing country UUIDs also identify their root jurisdiction. The `/countries` APIs continue to describe their existing country records and direct national constitutions. Creating a current country through the jurisdiction API also creates a legacy country record when it has a two-letter code and a slug matching that lowercase code. Historical and uncoded countries, as well as local constitutions, are available through the jurisdiction APIs. Country jurisdictions have no parent. Version details identify their actual owner with `jurisdictionId`; `countryCode` remains the legacy national-owner field and is null when the owner has no legacy country record. Existing version publication and editorial permissions apply at every level. Website navigation, search indexing, and ingestion clients currently use the country APIs; adopting the jurisdiction APIs in those consumers is separate work.
 
 Through Caddy, a browser calls `/api/catalog/countries`. Within Compose, a service or gateway calls `http://catalog-service:8080/countries`; the `/api/catalog` prefix is stripped at the edge. Consult the [Caddy configuration](https://github.com/julianhoelz94/Verfassung/blob/main/infra/caddy/Caddyfile) and [API map](https://github.com/julianhoelz94/Verfassung/blob/main/docs/CODEMAPS/backend.md) before adding routes.
 

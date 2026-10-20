@@ -11,11 +11,13 @@ import com.constitutionatlas.catalog.api.OutlineUpdateResult
 import com.constitutionatlas.catalog.api.SettingsWrite
 import com.constitutionatlas.catalog.api.VersionCreated
 import com.constitutionatlas.catalog.repo.CatalogRepository
+import com.constitutionatlas.catalog.repo.JurisdictionRepository
 import com.constitutionatlas.catalog.repo.SettingsRepository
 import com.constitutionatlas.platform.Actor
 import com.constitutionatlas.platform.ForbiddenException
 import com.constitutionatlas.platform.NotFoundException
 import org.springframework.dao.DataIntegrityViolationException
+import org.springframework.dao.DuplicateKeyException
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.util.UUID
@@ -28,37 +30,49 @@ class CatalogWriteService(
     private val metadataService: ConstitutionMetadataService,
     private val successorReadiness: com.constitutionatlas.catalog.client.SuccessorReadinessClient,
     private val publishAttempts: com.constitutionatlas.catalog.repo.PublishAttemptRepository,
+    private val jurisdictions: JurisdictionRepository,
 ) {
     @Transactional
     fun createCountry(request: CreateCountryRequest): CountrySummary {
         val iso = request.isoCode.trim().uppercase()
-        if (iso.length != 2) {
+        if (!Regex("^[A-Z]{2}$").matches(iso)) {
             throw IllegalArgumentException("isoCode must be two letters")
         }
         if (catalogRepository.findCountrySummary(iso) != null) {
             throw ConflictException("Country '$iso' already exists")
         }
-        return catalogRepository.insertCountry(iso, request.name.trim())
+        require(request.name.isNotBlank()) { "Country name is required" }
+        try {
+            return catalogRepository.insertCountry(iso, request.name.trim())
+        } catch (_: DuplicateKeyException) {
+            throw ConflictException("Country code or jurisdiction slug already exists", "jurisdiction_exists")
+        }
     }
 
     @Transactional
     fun createConstitution(isoCode: String, request: CreateConstitutionRequest): ConstitutionSummary {
         val country = catalogRepository.findCountrySummary(isoCode)
             ?: throw NotFoundException("Unknown country '$isoCode'")
+        return createJurisdictionConstitution(country.id, request)
+    }
+
+    @Transactional
+    fun createJurisdictionConstitution(jurisdictionId: UUID, request: CreateConstitutionRequest): ConstitutionSummary {
+        if (jurisdictions.find(jurisdictionId) == null) throw NotFoundException("Unknown jurisdiction '$jurisdictionId'")
         val slug = request.slug.trim()
-        catalogRepository.findConstitutionId(country.id, slug)?.let {
+        catalogRepository.findConstitutionId(jurisdictionId, slug)?.let {
             throw ConflictException("Constitution '$slug' already exists")
         }
         val predecessor = request.predecessorConstitutionId
-        if (predecessor != null && catalogRepository.constitutionCountryId(predecessor) != country.id) {
-            throw ConflictException("Predecessor constitution must belong to the same country", "invalid_constitution_predecessor")
+        if (predecessor != null && catalogRepository.constitutionJurisdictionId(predecessor) != jurisdictionId) {
+            throw ConflictException("Predecessor constitution must belong to the same jurisdiction", "invalid_constitution_predecessor")
         }
-        val id = catalogRepository.insertConstitution(country.id, slug, request.title.trim(), predecessor, request.interim)
+        val id = catalogRepository.insertConstitution(jurisdictionId, slug, request.title.trim(), predecessor, request.interim)
         if (!request.outline.isNullOrEmpty()) {
             catalogRepository.replaceOutline(id, normalizeOutline(request.outline))
         }
         settingsRepository.append(id, catalogRepository.findOutline(id))
-        metadataService.initialize(id, country.id, request.title.trim(), slug)
+        metadataService.initialize(id, jurisdictionId, request.title.trim(), slug)
         return ConstitutionSummary(
             id,
             slug,

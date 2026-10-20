@@ -87,7 +87,7 @@ export const renderCountryHistory = cache(async (code: string, on?: string, even
     const target = versionForPin(amendment.targetVersionId);
     return { kind: 'amendment' as const, id: amendment.id, date: amendment.enactedOn, title: amendment.title, content: (<>
         <FormattedDate className="timeline-date" value={amendment.enactedOn} fallback={<T value={ui.remainingStatus.dateUnknown} />} />
-        <article className={["card", surfaceStyles.card].join(' ')}>
+        <Stack as="article" className={["card", surfaceStyles.card].join(' ')}>
           <ContentTranslationRegion sourceLanguage={target?.languageCode ?? source?.languageCode ?? 'en'}>
           <h2 className="card-title" data-translate-content>{amendment.title}</h2>
           <p className="muted">
@@ -136,7 +136,7 @@ export const renderCountryHistory = cache(async (code: string, on?: string, even
               ) : null}
             </Inline>
           ) : null}
-        </article>
+        </Stack>
       </>) };
   });
   const allItems = sortHistory([...(lifecycle.value?.items ?? []), ...amendmentItems]);

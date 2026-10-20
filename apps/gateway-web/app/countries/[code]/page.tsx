@@ -23,7 +23,7 @@ import { atlasTitle, metaDescription, pageMetadata } from '../../../lib/page-met
 import { chainTipId, publicVersions, snapshotVersionId } from '../../../lib/reading';
 import { CompareForm } from './CompareForm';
 import { listDocumentLinks } from '../../../lib/document-api';
-import { Inline } from '../../components/layout/Layout';
+import { Inline, Stack } from '../../components/layout/Layout';
 import surfaceStyles from '../../components/surfaces.module.css';
 
 type CountryPageProps = {
@@ -126,7 +126,7 @@ export default async function CountryPage(props: CountryPageProps) {
         const newestPublic = publicLine[publicLine.length - 1];
         const previousPublic = publicLine.length >= 2 ? publicLine[publicLine.length - 2] : undefined;
         return (
-          <section key={constitution.id} className={["card", surfaceStyles.card].join(' ')}>
+          <Stack as="section" key={constitution.id} className={["card", surfaceStyles.card].join(' ')}>
             <h2 className="card-title">
               <a href={`/countries/${country.isoCode}/constitutions/${constitution.id}`}>{constitution.title}</a>
             </h2>
@@ -192,7 +192,7 @@ export default async function CountryPage(props: CountryPageProps) {
                   <T value={reviewUi.textCorrections} />{" "}</a>
               ) : null}
             </Disclosure>
-          </section>
+          </Stack>
         );
       })}
     </CollectionPage>

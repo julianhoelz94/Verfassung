@@ -214,7 +214,7 @@ export function OutlineEditor({
         })}
       </Stack> : <Stack as="ol">
         {layers.map((layer, index) => (
-          <li key={`${layer.kindCode}-${index}`} className={["card", surfaceStyles.card].join(' ')}>
+          <Stack as="li" key={`${layer.kindCode}-${index}`} className={["card", surfaceStyles.card].join(' ')}>
             <p>
               <T value={ui.admin.constitutions.outlineeditor.layer} />{" "}{index + 1}
               {layer.root ? t(ui.remainingStatus.topLevelKind) : ''}
@@ -249,15 +249,15 @@ export function OutlineEditor({
               }}
             />
             </details>
-            <fieldset>
+            <Stack as="fieldset">
               <legend><T value={ui.admin.constitutions.outlineeditor.structure} /></legend>
               <label className="choice-row"><input type="checkbox" checked={Boolean(layer.root)} onChange={event => update(index, { root: event.target.checked })} /> <T value={ui.admin.constitutions.outlineeditor.mayAppearAtTheTopLevel} /></label>
               <p className="muted"><T value={ui.admin.constitutions.outlineeditor.allowedChildKinds} /></p>
               {layers.filter(candidate => candidate.kindCode !== layer.kindCode).map(candidate => <label className="choice-row" key={candidate.kindCode}>
                 <input type="checkbox" checked={Boolean(layer.allowedChildKinds?.includes(candidate.kindCode))} onChange={event => update(index, { allowedChildKinds: event.target.checked ? [...(layer.allowedChildKinds ?? []), candidate.kindCode] : (layer.allowedChildKinds ?? []).filter(code => code !== candidate.kindCode) })} /> {candidate.displayLabel}
               </label>)}
-            </fieldset>
-            <fieldset>
+            </Stack>
+            <Stack as="fieldset">
               <legend><T value={ui.admin.constitutions.outlineeditor.editorPermissions} /></legend>
               {Boolean(layer.allowedChildKinds?.length) ? (
                 <div className={["field", fieldStyles.field].join(' ')}>
@@ -275,8 +275,8 @@ export function OutlineEditor({
               {!layer.allowedChildKinds?.length ? <Select label={<T value={ui.attrs.adminConstitutionsOutlineeditorSelectLabelText} />} info={{ description: <T value={ui.help.textEditingHelp} />, changeability: 'review' }} name={`segmentation-${index}`} value={layer.segmentation ?? 'plain'} onChange={(event) => update(index, { segmentation: event.target.value as Layer['segmentation'] })}>
                 <option value="plain"><T value={ui.admin.constitutions.outlineeditor.plainText} /></option><option value="sentence"><T value={ui.admin.constitutions.outlineeditor.sentenceBoundaryAssistance} /></option>
               </Select> : null}
-            </fieldset>
-            <fieldset>
+            </Stack>
+            <Stack as="fieldset">
               <legend><T value={ui.admin.constitutions.outlineeditor.publicReaderDisplay} /></legend>
             <Select
               label={<T value={ui.attrs.adminConstitutionsOutlineeditorSelectLabelHow} />}
@@ -330,12 +330,12 @@ export function OutlineEditor({
                 <option value="before_title" disabled={layer.presentation === 'concatenated'}><T value={ui.admin.constitutions.outlineeditor.beforeTitle} /></option><option value="after_title" disabled={layer.presentation === 'concatenated' || !layer.showTitle || layer.titlePolicy === 'none'}><T value={ui.admin.constitutions.outlineeditor.afterTitle} /></option><option value="inline" disabled={index < layers.length - 1 && !layer.allowTextAlongsideChildren}><T value={ui.admin.constitutions.outlineeditor.inlineWithText} /></option>{index === layers.length - 1 ? <option value="superscript"><T value={ui.admin.constitutions.outlineeditor.superscriptInText} /></option> : null}
               </Select>
               {!layer.showLabel && layer.presentation !== 'concatenated' ? <p className="muted"><T value={ui.admin.constitutions.outlineeditor.showLiteralLegalLabelToChooseIts} /></p> : null}
-            </fieldset>
+            </Stack>
             {index > 0 ? (
               <span className="setting-inline"><Button type="button" onClick={() => removeLayer(index)}>
                 <T value={ui.admin.constitutions.outlineeditor.removeLevel} />{" "}</Button><SettingInfo label={<T value={ui.admin.constitutions.outlineeditor.removeLevel} />} description={<T value={ui.help.removeLevelHelp} />} changeability="review" /></span>
             ) : null}
-          </li>
+          </Stack>
         ))}
       </Stack>}
       <aside className={["card outline-live-preview", surfaceStyles.card].join(' ')} aria-label={t(ui.accessibility.liveOrderExample)}>

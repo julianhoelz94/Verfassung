@@ -14,7 +14,7 @@ Import from `apps/gateway-web/app/components/layout/templates.tsx`.
 | `ReaderPage` | Legal text, contextual articles, comparison and source documents | Header, notices, content |
 | `WorkspacePage` | Editing, review, import and constitution configuration | Header, notices, content |
 
-`width="reading"` limits the page to the reading measure; `width="content"` uses the site maximum. Settings and collection/workspace templates default to content width. Focused and reader templates default to reading width. Full constitution readers use content width and place a `ReaderLayout` inside the existing shared renderer. `WorkspaceLayout` owns editor columns; its amendment variant stays in a single column. `FilterLayout` owns the responsive filter/results split. Each page has one `main#main-content`, one page heading and the existing skip-link target.
+`width="reading"` limits the page to the reading measure; `width="content"` uses the site maximum. Settings and collection/workspace templates default to content width. Focused and reader templates default to reading width. Full constitution readers use content width and place a `ReaderLayout` inside the existing shared renderer. `WorkspaceLayout` owns editor columns; its amendment variant stacks on phones and places revision history alongside the form on desktop. `FilterLayout` owns the responsive filter/results split. Each page has one `main#main-content`, one page heading and the existing skip-link target.
 
 ```tsx
 <SettingsPage
@@ -36,6 +36,8 @@ Import from `apps/gateway-web/app/components/layout/templates.tsx`.
 Use existing localized messages for product text. Navigation is a slot so route-specific permissions, destinations and translated landmark labels stay with their owner. Empty notices do not reserve vertical space. Templates do not implement routing lifecycle behavior and are unrelated to Next.js `template.tsx` files.
 
 ## Spacing ownership
+
+The global stylesheet is in the `base` cascade layer; scoped component and layout rules take precedence over base rules regardless of stylesheet order. Print-specific module rules preserve hidden action groups.
 
 Runtime tokens live only in `apps/gateway-web/app/styles/tokens.css`, imported by the root layout. The historical prototype token file imports that source instead of copying it.
 

@@ -1,5 +1,7 @@
 'use client';
 
+import { Stack } from '../components/layout/Layout';
+
 import { T, useTranslation } from '../components/TranslationProvider';
 import { ui } from '../../lib/messages';
 import { useState } from 'react';
@@ -47,7 +49,7 @@ export function PasskeyManager({ passkeys }: { passkeys: PasskeyInfo[] }) {
       setBusy(false);
     }
   }
-  return <section className="account-section" aria-labelledby="passkeys-title">
+  return <Stack as="section" className="account-section" aria-labelledby="passkeys-title">
     <h2 id="passkeys-title"><T value={ui.passkeys.passkeymanager.passkeys} /></h2>
     <p><T value={ui.passkeys.passkeymanager.useADevicePasskeyToSignIn} /></p>
     {passkeys.length ? <ul>{passkeys.map((key) => <li key={key.id}>
@@ -58,5 +60,5 @@ export function PasskeyManager({ passkeys }: { passkeys: PasskeyInfo[] }) {
     <Input label={<T value={ui.attrs.passkeysPasskeymanagerInputLabelCurrentPassword} />} id="passkey-password" type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} required />
     <Button type="button" variant="primary" onClick={enroll} disabled={busy || !password}><T value={ui.passkeys.passkeymanager.addPasskey} /></Button>
     {message ? <p role="status">{message}</p> : null}
-  </section>;
+  </Stack>;
 }

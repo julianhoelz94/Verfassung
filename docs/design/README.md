@@ -17,14 +17,14 @@ Design concept for the responsive UI redesign (backlog Sprints 19–21, UI-29 �
 Preview the prototype:
 
 ```bash
-cd docs/design && python3 -m http.server 8766
-# open http://localhost:8766/prototype/board.html?page=home   (also: version, compare, editor)
+python3 -m http.server 8766  # from the repository root, so runtime tokens are reachable
+# open http://localhost:8766/docs/design/prototype/board.html?page=home   (also: version, compare, editor)
 # two-axis mocks (Sprints 34–39) — hashes in two-axis-versions.md § Sprint UI reference:
-#   http://localhost:8766/prototype/editor-constitution.html#timeline
-#   http://localhost:8766/prototype/editor-constitution.html#legal
-#   http://localhost:8766/prototype/editor-constitution.html#correct-1949
-#   http://localhost:8766/prototype/editor-constitution.html#hop-1956
-#   http://localhost:8766/prototype/board.html?page=editor-constitution#legal
+#   http://localhost:8766/docs/design/prototype/editor-constitution.html#timeline
+#   http://localhost:8766/docs/design/prototype/editor-constitution.html#legal
+#   http://localhost:8766/docs/design/prototype/editor-constitution.html#correct-1949
+#   http://localhost:8766/docs/design/prototype/editor-constitution.html#hop-1956
+#   http://localhost:8766/docs/design/prototype/board.html?page=editor-constitution#legal
 ```
 
 Re-generate screenshots after changing the prototype: open the board at ~2000px viewport width and capture the full page into `screenshots/board-<page>.png`.

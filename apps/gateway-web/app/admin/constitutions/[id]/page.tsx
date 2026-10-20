@@ -1,4 +1,5 @@
 import { T } from '../../../components/TranslationProvider';
+import { Stack } from '../../../components/layout/Layout';
 import { ui } from '../../../../lib/messages';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
@@ -59,13 +60,13 @@ export default async function AdminOutlinePage(props: AdminOutlinePageProps) {
         <T value={ui.admin.constitutions.id.page.depthIsTheNumberOfLayersThe} />{" "}</p>
       <OutlineEditor constitutionId={params.id} initial={kinds} settingsRevisionId={settings.id} />
       <DocumentLinks targetType="constitution" targetId={params.id} returnTo={`/admin/constitutions/${params.id}`} canEdit />
-      {settings.predecessorId ? <form action={restoreOutlineAction} className={["card", surfaceStyles.card].join(' ')}>
+      {settings.predecessorId ? <Stack as="form" action={restoreOutlineAction} className={["card", surfaceStyles.card].join(' ')}>
         <h2><T value={ui.admin.constitutions.id.page.settingsHistory} /></h2><p><T value={ui.admin.constitutions.id.page.restoreThePreviousRevisionAfterCheckingIts} /></p>
         <input type="hidden" name="constitutionId" value={params.id} />
         <input type="hidden" name="settingsRevisionId" value={settings.id} />
         <input type="hidden" name="revisionId" value={settings.predecessorId} />
         <button type="submit"><T value={ui.admin.constitutions.id.page.restorePreviousSettings} /></button>
-      </form> : null}
+      </Stack> : null}
     </WorkspacePage>
   );
 }

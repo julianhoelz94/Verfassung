@@ -95,7 +95,7 @@ export default async function LifecycleEditor({ params, searchParams }: Props) {
         </section>
       ) : null}
       {allowed.length > 0 ? (
-        <form action={appendLifecycleAction} className={["card", surfaceStyles.card].join(' ')}>
+        <Stack as="form" action={appendLifecycleAction} className={["card", surfaceStyles.card].join(' ')}>
           <input type="hidden" name="constitutionId" value={constitutionId} />
           <input type="hidden" name="code" value={code.toLowerCase()} />
           <label htmlFor="event-type"><T value={ui.editor.lifecycle.constitutionid.page.event} /></label>
@@ -115,7 +115,7 @@ export default async function LifecycleEditor({ params, searchParams }: Props) {
           <label htmlFor="event-note"><T value={ui.editor.lifecycle.constitutionid.page.note} /></label>
           <textarea id="event-note" name="note" rows={3} />
           <button className="btn" type="submit"><T value={ui.editor.lifecycle.constitutionid.page.recordEvent} /></button>
-        </form>
+        </Stack>
       ) : <p><T value={ui.editor.lifecycle.constitutionid.page.thisConstitutionHasBeenRepealed} /></p>}
       {sourceVersionId ? (
         <section className={["card", surfaceStyles.card].join(' ')}>

@@ -79,7 +79,10 @@
   .editor {
     grid-template-columns: 260px minmax(0, 1fr) 300px;
   }
-  .editor > :global(.panel-side) {
+  .amendment {
+    grid-template-columns: minmax(0, 1fr) 300px;
+  }
+  .workspace > :global(.panel-side) {
     grid-column: auto;
     position: sticky;
     top: calc(var(--topbar-h) + var(--space-4));

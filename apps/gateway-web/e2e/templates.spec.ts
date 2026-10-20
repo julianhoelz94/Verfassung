@@ -19,8 +19,8 @@ for (const locale of ['en', 'de'])
       ]) {
         if (route.path === '/setup') await request.post(`${mock}/__sprint59_setup`, { data: { completed: false } });
         await page.goto(route.path);
-        await expect(page.locator('main')).toHaveAttribute('data-template', 'settings');
         await expect(page.locator('main')).toHaveCount(1);
+        await expect(page.locator('main')).toHaveAttribute('data-template', 'settings');
         await expect(page.locator('h1')).toHaveCount(1);
         const first = page.locator(route.first);
         const parent = first.locator('..');
@@ -72,4 +72,26 @@ for (const locale of ['en', 'de'])
         }
       }
     }
+    await page.goto('/account');
+    const passkeyGap = await page.locator('#passkey-password').evaluate((input) => {
+      const field = input.closest('.field')!;
+      return field.getBoundingClientRect().top - field.previousElementSibling!.getBoundingClientRect().bottom;
+    });
+    expect(passkeyGap).toBeCloseTo(16, 0);
+    await page.goto('/admin/constitutions/01900000-0000-4000-8000-000000000002');
+    const outlineGap = await page.locator('select[name="label-policy-0"]').evaluate((input) => {
+      const field = input.closest('.field')!;
+      return field.getBoundingClientRect().top - field.previousElementSibling!.getBoundingClientRect().bottom;
+    });
+    expect(outlineGap).toBeCloseTo(16, 0);
+    await page.goto('/countries/DE/articles/1');
+    const links = await page
+      .locator('main a.btn')
+      .evaluateAll((anchors) =>
+        anchors
+          .filter((anchor) => getComputedStyle(anchor.parentElement!).flexDirection === 'column')
+          .map((anchor) => getComputedStyle(anchor).alignSelf),
+      );
+    expect(links.length).toBeGreaterThan(0);
+    expect(links.every((alignment) => alignment === 'flex-start')).toBe(true);
   });

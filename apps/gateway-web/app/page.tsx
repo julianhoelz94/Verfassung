@@ -25,7 +25,7 @@ import {
   recentChangesFromAmendments,
   type RecentChange,
 } from '../lib/reading';
-import { Grid, Inline } from './components/layout/Layout';
+import { Grid, Inline, Stack } from './components/layout/Layout';
 import headerStyles from './components/header.module.css';
 import surfaceStyles from './components/surfaces.module.css';
 
@@ -135,7 +135,7 @@ export default async function Page() {
                 <div className="iso" aria-hidden="true">
                   {summary.isoCode}
                 </div>
-                <div>
+                <Stack>
                   <h3 className="card-title">
                     <a href={`/countries/${summary.isoCode}`}>{summary.name}</a>
                   </h3>
@@ -177,7 +177,7 @@ export default async function Page() {
                       </a>
                     ) : null}
                   </Inline>
-                </div>
+                </Stack>
               </article>
             );
           })}

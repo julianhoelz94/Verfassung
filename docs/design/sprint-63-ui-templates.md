@@ -1,6 +1,6 @@
 # Sprint 63 — Reusable UI templates and vanilla CSS
 
-Status: implementation and pinned browser verification complete; final review, required CI, merge and Wiki publication gates are pending. [PR #148](https://github.com/julianhoelz94/Verfassung/pull/148). Linear milestone: `0c315d76-26bb-449a-b211-8bf8aa4a2fc2` in the Verfassung project. Individual issue creation was rejected by Linear's workspace free issue limit; no issue identifier exists and unrelated issues remain untouched. Final merge/publication evidence is recorded in that milestone.
+Status: implementation and pinned browser verification complete. [PR #148](https://github.com/julianhoelz94/Verfassung/pull/148) retains final required CI and merge evidence; Wiki publication and sprint completion evidence is recorded in Linear milestone `0c315d76-26bb-449a-b211-8bf8aa4a2fc2` in the Verfassung project. Individual issue creation was rejected by Linear's workspace free issue limit; no issue identifier exists and unrelated issues remain untouched.
 
 ## Delivery scope
 
@@ -27,9 +27,10 @@ The duplicate/superseded-code scan removed old page widths, generic stack/action
 
 ## Verification evidence
 
-- Gateway Node 20: 42 Vitest files / 221 tests plus 9 Node tests passed. Host Node 24 exposes an existing Request/AbortSignal test incompatibility; CI's Node 20 verification passes.
+- Gateway Node 20 after integration with main: 43 Vitest files / 229 tests plus 9 Node tests passed, including the eight annotated reader-preview tests. Host Node 24 exposes an existing Request/AbortSignal test incompatibility; CI's Node 20 verification passes.
 - Typecheck, lint and production build passed; the independent verifier also ran focused field/axe/editor/diff-review checks and a separate lint/build. Wiki references, repository hygiene and whitespace checks passed. An HTTP preview check resolved the prototype, its CSS and both token import paths successfully.
 - [Pinned Playwright capture](https://github.com/julianhoelz94/Verfassung/actions/runs/39442062602) passed all 12 cases on `b32d140`. It includes the complete route/state gallery, keyboard/reflow checks, original visual journeys and the new EN/DE template checks.
+- Main's concurrent annotated reader preview was preserved during integration. A [fresh integrated capture](https://github.com/julianhoelz94/Verfassung/actions/runs/39444335887) passed all 12 cases on `48de017`; only the eight expected preview screenshots changed. The full Node 20 suite, lint and production build passed again on that integrated source.
 - The route audit renders 45 entry points plus nine task variants in both languages at 390/820/1440px, with axe at phone/desktop widths and narrow reflow checks at 320px. New measurements verify shared settings gaps and content edges, long-label form-control alignment, outline/passkey field gaps and global action-link alignment. Computed styles verify hero, legal-editor and MFA typography.
-- The captured set contains 207 Linux baselines; 155 changed. Before/after comparisons and route-gallery sheets were inspected for reader, account, setup/site settings, outlines, amendment/sidebar, active editor, search, documents and history layouts, including German mobile wrapping. Baseline acceptance and final required CI are separate gates.
+- The captured set contains 207 Linux baselines; 155 changed. Before/after comparisons and route-gallery sheets were inspected for reader, account, setup/site settings, outlines, amendment/sidebar, active editor, search, documents and history layouts, including German mobile wrapping. The reviewer independently cleared all original comparison/gallery sheets and the eight integrated preview comparisons before baseline acceptance. Final required CI remains a separate merge gate.
 - Developer Wiki source updated: `docs/wiki/Technical-Development.md`, linked to `docs/design/ui-templates.md`. Publication and clips are verified after merge before the sprint milestone is completed.

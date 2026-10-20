@@ -19,7 +19,7 @@ Constitution Atlas
 ├── Countries [nav]                         /
 │   ├── Country                             /countries/[code]
 │   │   ├── Version (reader)                /countries/[code]/versions/[versionId]
-│   │   │   ├── → Timeline                  /countries/[code]/timeline
+│   │   │   ├── → History                   /countries/[code]/timeline
 │   │   │   ├── → Compare with previous     /countries/[code]/compare?from=&to=
 │   │   │   ├── → Search in this version    /search?versionId=&country=
 │   │   │   ├── → Print
@@ -28,7 +28,7 @@ Constitution Atlas
 │   │   │       ├── → History of this article   /countries/[code]/articles/[articleNumber]   (UI-23)
 │   │   │       ├── → Permalink / Copy link
 │   │   │       └── → Print
-│   │   ├── Timeline                        /countries/[code]/timeline
+│   │   ├── History                         /countries/[code]/timeline
 │   │   └── Compare                         /countries/[code]/compare
 ├── Search [nav]                            /search
 │   └── Result → Article (keeps version)
@@ -183,7 +183,7 @@ Admin-only extras on public pages: `→ Edit outline` on the country page, `→ 
 
 The menu disclosure always renders sections in this order and skips empty ones:
 
-1. Identity line (email + role badges) — signed-in only
+1. Identity line (email) — signed-in only
 2. Primary destinations `(phone)` — Countries, Search, About, Editor, Admin, API docs as applicable
 3. Editorial — editor / reviewer / publisher / admin only
 4. Admin — admin only

@@ -18,6 +18,10 @@
 ![Import page with structure selection before file upload](https://raw.githubusercontent.com/wiki/julianhoelz94/Verfassung/media/admin-import-en.png)
 *Choose where the content belongs before uploading. “Paste JSON instead” opens advanced input.*
 
+The account menu groups Browse, Editorial and Admin destinations. Open a group to see its links; the current workspace group starts expanded. Account and sign-out remain directly accessible.
+
+User rows show email, status and role badges. Choose **Edit roles** to reveal the role checkboxes, then **Update roles** to save or **Cancel** to discard the selection. Service-token controls appear in a separate section below the user list.
+
 ## First installation
 
 Changing roles or disabling an account revokes its sessions, pending enrollment challenges and personal MCP/OAuth credentials. Disabling an invited account also invalidates the invitation. Re-enabling does not restore revoked credentials. Automation service tokens retain separate rotation/revocation controls.

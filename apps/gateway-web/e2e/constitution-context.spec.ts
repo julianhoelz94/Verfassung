@@ -17,9 +17,9 @@ test('visitor reads sourced country and constitution context with dated lifecycl
   expect(await page.getByRole('img', { name: 'A historic flag' }).evaluate((image) =>
     Boolean(image.compareDocumentPosition(document.querySelector('.wiki-body h3')!) & Node.DOCUMENT_POSITION_FOLLOWING),
   )).toBeTruthy();
-  await page.getByRole('link', { name: 'Constitution timeline' }).click();
-  await expect(page.getByText('Circa 1949-05-08')).toBeVisible();
-  await page.getByLabel('Date').fill('1949-05-10');
+  await page.getByRole('navigation', { name: 'Country navigation' }).getByRole('link', { name: 'History', exact: true }).click();
+  await expect(page.locator('.history-details').getByText('Circa 1949-05-08')).toBeVisible();
+  await page.getByLabel('Date', { exact: true }).fill('1949-05-10');
   await page.getByRole('button', { name: 'Show status' }).click();
   await page.getByText('All constitution statuses').click();
   await expect(page.getByText('uncertain (last event date is approximate)')).toBeVisible();

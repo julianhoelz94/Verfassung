@@ -3,7 +3,8 @@ import type { ReactNode } from 'react';
 import type { Metadata } from 'next';
 import { publicBaseUrl } from '../lib/site-url';
 import { currentSession, SESSION_COOKIE } from '../lib/session';
-import { cookies } from 'next/headers';
+import { cookies, headers } from 'next/headers';
+import { renderCountryHistory } from './countries/[code]/timeline/CountryHistoryContent';
 import { getCountry, listConstitutionAmendments, listCountries } from '../lib/api';
 import { SiteFooter } from './components/SiteFooter';
 import { SiteHeader } from './components/SiteHeader';
@@ -33,6 +34,18 @@ type RootLayoutProps = {
 };
 
 export default async function RootLayout({ children }: RootLayoutProps) {
+  // Complete public history before flushing its shell: streamed loading fallbacks
+  // cannot reveal delayed content when JavaScript is disabled. React cache shares
+  // this render with the page, so the API requests are made only once.
+  const historyRoute = (await headers()).get('x-history-route');
+  if (historyRoute) {
+    const route = new URL(historyRoute, 'http://internal');
+    await renderCountryHistory(
+      decodeURIComponent(route.pathname.split('/')[2]),
+      route.searchParams.get('on') ?? undefined,
+      route.searchParams.get('events') ?? undefined,
+    );
+  }
   const session = await currentSession();
   const locale = await currentLocale();
   const setupComplete = (await setupStatus().catch(() => null))?.completed === true;

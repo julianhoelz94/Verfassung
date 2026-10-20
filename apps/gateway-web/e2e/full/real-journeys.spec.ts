@@ -28,7 +28,8 @@ test('visitor compares legal versions and reads the source document timeline', a
   await expect(page.getByRole('heading', { name: /side by side/ })).toBeVisible();
   await expect(page.locator('ins.diff-add, del.diff-remove').first()).toBeVisible();
   await page.goto('/countries/XA/timeline');
-  await expect(page.getByRole('heading', { name: 'Amendment timeline' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'History', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Atlas Testland Civic Revision 2024', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Atlas Testland Civic Revision 2024' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Synthetic source document' }).first()).toBeVisible();
 });
@@ -58,8 +59,8 @@ test('visitor filters real search results and opens their original version', asy
   await page.goto('/search');
   await page.getByLabel('Keyword').fill('dignity');
   await page.locator('main').getByRole('button', { name: 'Search' }).click();
-  await page.getByRole('radio', { name: /Atlas Testland/ }).check();
-  await page.getByRole('radio', { name: /Atlas Test Charter.*2020/ }).check();
+  await page.getByLabel('Country', { exact: true }).selectOption('XA');
+  await page.getByLabel('Version', { exact: true }).selectOption(ids.versions['xa-2020']);
   await page.getByRole('button', { name: 'Apply filters' }).click();
   const result = page.getByRole('link', { name: /Article 1 — Human dignity/ });
   await expect(result).toHaveAttribute('href', new RegExp(`/versions/${ids.versions['xa-2020']}/articles/`));

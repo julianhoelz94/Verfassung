@@ -1,3 +1,4 @@
+import { CountryNavigation } from '../../components/CountryNavigation';
 import { Disclosure } from '../../components/Disclosure';
 import { reviewUi } from '../../../lib/ui-review-messages';
 import { T } from '../../components/TranslationProvider';
@@ -104,13 +105,8 @@ export default async function CountryPage(props: CountryPageProps) {
             </span>
           </>
         }
-        actions={
-          <>
-            <a className="btn btn-sm" href={`/countries/${country.isoCode}/constitution-timeline`}><T value={ui.countries.code.page.constitutionTimeline} /></a>
-            <a className="btn btn-sm" href={`/countries/${country.isoCode}/timeline`}><T value={ui.countries.code.page.amendmentTimeline} /></a>
-          </>
-        }
       />
+      <CountryNavigation code={country.isoCode} active="overview" />
       {countryWiki ? (
         <section className="card">
           <h2><T value={ui.countries.code.page.about} />{" "}{country.name}</h2>
@@ -151,8 +147,6 @@ export default async function CountryPage(props: CountryPageProps) {
               ))}
             </div>
             <div className="card-actions">
-              <a className="btn btn-sm" href={`/countries/${country.isoCode}/timeline`}>
-                <T value={ui.countries.code.page.timeline} />{" "}</a>
               {tipId ? (
                 <a className="btn btn-sm btn-primary" href={`/countries/${country.isoCode}/versions/${tipId}`}>
                   <T value={ui.countries.code.page.readLatest} />{" "}</a>

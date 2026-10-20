@@ -82,6 +82,7 @@ test('document revisions link from both editors and appear on public readers wit
   const detachPublished = await request.delete(`/api/document/links/amendment/${amendmentId}/${documentId}?scopeRevisionId=${publishedRevisionId}`, { headers });
   expect(detachPublished.status()).toBe(400);
   await page.goto(`/countries/${fixture.countryIso}/timeline`);
+  await page.getByRole('button', { name: `${title} law`, exact: true }).click();
   await expect(page.getByRole('link', { name: `${title} revised` })).toBeVisible();
 
   const after = await (await request.get(`/api/catalog/constitutions/${fixture.constitutionId}/versions`, { headers })).json();

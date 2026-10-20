@@ -11,6 +11,8 @@ import { getVersionSettings } from '../../lib/api';
 import { OrderedContentTree } from '../components/ConstitutionText';
 import { currentUser, requireSessionBearer } from '../../lib/session';
 import { transitionImportAction } from '../admin/import/actions';
+import { Disclosure } from '../components/Disclosure';
+import { reviewUi } from '../../lib/ui-review-messages';
 import { ImportPreview } from '../admin/import/ImportPreview';
 
 export async function ImportReview({ jobId, error }: { jobId: string; error?: string }) {
@@ -47,7 +49,7 @@ export async function ImportReview({ jobId, error }: { jobId: string; error?: st
       ? `/countries/${encodeURIComponent(job.isoCode)}/versions/${encodeURIComponent(job.versionId)}`
       : null;
   return (
-    <PageMain className="wide">
+    <PageMain className="wide import-review">
       <nav className="section-nav">
         <a href="/editor?status=reviewing"><T value={ui.nav.reviewQueue} /></a>
         {publisher ? <a href="/editor?status=approved"><T value={ui.nav.readyToPublish} /></a> : null}
@@ -72,6 +74,7 @@ export async function ImportReview({ jobId, error }: { jobId: string; error?: st
       </Card> : null}
       <Card>
         <h2><T value={ui.admin.import.jobid.page.reviewActions} /></h2>
+        <div className="review-action-grid">
         {!job.versionId && job.status === 'pending_review' && editor && payload?.outline && !job.outlineConfirmedBy ? <ActionForm action="confirm-outline" jobId={job.id} label={ui.importActions.confirmOutline} /> : null}
         {!job.versionId && job.status === 'pending_review' && editor && (!payload?.outline || job.outlineConfirmedBy) ? <ActionForm action="prepare" jobId={job.id} label={ui.importActions.prepareDraft} /> : null}
         {job.versionId && job.status === 'pending_review' && reviewer ? <>
@@ -79,13 +82,22 @@ export async function ImportReview({ jobId, error }: { jobId: string; error?: st
           <ActionForm action="reject" jobId={job.id} label={ui.importActions.rejectImport} />
         </> : null}
         {job.status === 'approved' && publisher ? <ActionForm action="publish" jobId={job.id} label={ui.importActions.publishVersion} /> : null}
-        {job.versionId && job.status !== 'completed' ? <p><T value={ui.admin.import.jobid.page.draftVersion} />{" "}<code>{job.versionId}</code></p> : null}
+        </div>
       </Card>
       {prepared ? <Card>
         <h2><T value={ui.admin.import.jobid.page.preparedDraftAsReadersWillSeeIt} /></h2>
-        <p><T value={ui.admin.import.jobid.page.contentGeneration} />{" "}{prepared.generation}<T value={ui.admin.import.jobid.page.settingsRevision} />{" "}{prepared.settingsRevisionId ?? 'unbound'}.</p>
         <OrderedContentTree entries={prepared.roots.map(node => ({ type: 'child' as const, node }))} outline={settings?.outline} />
       </Card> : null}
+      <Disclosure summary={<T value={reviewUi.technicalDetails} />}>
+        <dl className="technical-identifiers">
+          <dt>Import</dt><dd><code>{job.id}</code></dd>
+          {job.versionId ? <><dt><T value={ui.admin.import.jobid.page.draftVersion} /></dt><dd><code>{job.versionId}</code></dd></> : null}
+          {prepared ? <>
+            <dt><T value={ui.admin.import.jobid.page.contentGeneration} /></dt><dd>{prepared.generation}</dd>
+            <dt><T value={ui.admin.import.jobid.page.settingsRevision} /></dt><dd><code>{prepared.settingsRevisionId ?? 'unbound'}</code></dd>
+          </> : null}
+        </dl>
+      </Disclosure>
       {payload ? <details><summary><T value={ui.importReview.submittedContent} /></summary><ImportPreview payload={payload} /></details> : null}
       {decisions.length ? <Card><h2><T value={ui.admin.import.jobid.page.reviewDecisions} /></h2><ol>{decisions.map(decision => <li key={decision.id}>
         <strong>{decision.decision}</strong> · {new Date(decision.decidedAt).toLocaleString()}<p>{decision.reason}</p>
@@ -107,10 +119,11 @@ export async function ImportReview({ jobId, error }: { jobId: string; error?: st
 }
 
 function ActionForm({ action, jobId, label }: { action: 'confirm-outline' | 'prepare' | 'approve' | 'reject' | 'publish'; jobId: string; label: import('../../lib/messages').UiMessage }) {
-  return <NavigatingActionForm action={transitionImportAction}>
+  return <NavigatingActionForm action={transitionImportAction} className="review-action-form">
+    <h3><T value={label} /></h3>
     <input type="hidden" name="jobId" value={jobId} />
     <input type="hidden" name="action" value={action} />
-    {action === 'approve' || action === 'reject' ? <label><T value={ui.admin.import.jobid.page.reviewReason} /><textarea name="reason" minLength={10} maxLength={2000} required rows={3} /></label> : null}
+    {action === 'approve' || action === 'reject' ? <label className="field" htmlFor={`reason-${action}`}><T value={ui.admin.import.jobid.page.reviewReason} /><textarea id={`reason-${action}`} name="reason" minLength={10} maxLength={2000} required rows={3} /></label> : null}
     <Button variant={action === 'publish' ? 'primary' : undefined}><T value={label} /></Button>
   </NavigatingActionForm>;
 }

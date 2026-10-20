@@ -26,7 +26,7 @@ export const uiRoutes = [
   { entry: '/countries/[code]/compare', path: `${country}/compare` },
   { entry: '/countries/[code]/constitution-timeline', path: `${country}/constitution-timeline?on=2026-01-01`, snapshot: true },
   { entry: '/countries/[code]/constitutions/[constitutionId]', path: `${country}/constitutions/${constitution}`, snapshot: true },
-  { entry: '/countries/[code]/timeline', path: `${country}/timeline` },
+  { entry: '/countries/[code]/timeline', path: `${country}/timeline?on=2026-01-01` },
   { entry: '/countries/[code]/versions/[versionId]', path: `${country}/versions/${version}` },
   { entry: '/countries/[code]/versions/[versionId]/articles/[articleId]', path: `${country}/versions/${version}/articles/${article}` },
   { entry: '/countries/[code]/versions/[versionId]/units/[unitId]', path: `${country}/versions/${version}/units/${article}`, snapshot: true },

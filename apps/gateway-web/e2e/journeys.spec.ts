@@ -189,8 +189,9 @@ test('recorded amending law appears on the public timeline', async ({ page }) =>
   await expect(page.getByText('Amending law published.')).toBeVisible();
   await signOut(page);
   await page.goto('/countries/DE/timeline');
-  await expect(page.getByRole('heading', { name: 'Amendment timeline' })).toBeVisible();
-  await expect(page.getByText('E2E amending law')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'History', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'E2E amending law', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'E2E amending law', exact: true })).toBeVisible();
   await expect(page.getByRole('link', { name: /Before unit/ })).toHaveAttribute('href', new RegExp(`/versions/${VERSION_1949}/units/`));
   await expect(page.getByRole('link', { name: /After unit/ })).toHaveAttribute('href', new RegExp(`/versions/${VERSION_2022}/units/`));
 });
@@ -233,7 +234,8 @@ test('publisher confirms stale old-law quotes without changing the public commen
   await expect(page.locator('.badge', { hasText: 'Needs review' })).toHaveCount(0);
   await signOut(page);
   await page.goto('/countries/DE/timeline');
-  await expect(page.getByText('Update to Article 1')).toBeVisible();
+  await page.getByRole('button', { name: 'Update to Article 1', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Update to Article 1', exact: true })).toBeVisible();
   await expect(page.getByText('The published legal-change comment.')).toBeVisible();
 });
 
@@ -272,7 +274,8 @@ test('editorial correction hop stays off the public timeline', async ({ page }) 
   await signOut(page);
   await page.goto('/countries/DE/timeline');
   await expect(page.locator('.timeline-item')).toHaveCount(timelineCount);
-  await expect(page.getByText('Update to Article 1')).toBeVisible();
+  await page.getByRole('button', { name: 'Update to Article 1', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Update to Article 1', exact: true })).toBeVisible();
   await signInEditor(page);
   await page.goto('/editor/history');
   await expect(page.getByRole('heading', { name: 'Snapshot history' })).toBeVisible();

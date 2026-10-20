@@ -17,14 +17,15 @@ test('administrator manages a user and its access lifecycle', async ({ page }) =
 
   await page.reload();
   const user = page.locator('.data-row').filter({ hasText: 'new-editor@example.local' });
-  await expect(user).toContainText('Editor, Reviewer');
+  await expect(user.locator('.role-badges')).toContainText('EditorReviewer');
   await expect(user).toContainText('Invited');
 
   const activeUser = page.locator('.data-row').filter({ hasText: 'local-admin@example.local' });
+  await activeUser.getByText('Edit roles', { exact: true }).click();
   await activeUser.getByRole('checkbox', { name: 'Publisher' }).check();
   await activeUser.getByRole('button', { name: 'Update roles' }).click();
   await page.reload();
-  await expect(page.locator('.data-row').filter({ hasText: 'local-admin@example.local' }).getByRole('checkbox', { name: 'Publisher' })).toBeChecked();
+  await expect(page.locator('.data-row').filter({ hasText: 'local-admin@example.local' }).locator('.role-badges')).toContainText('Publisher');
   await page.locator('.data-row').filter({ hasText: 'local-admin@example.local' }).getByRole('button', { name: 'Issue reset token' }).click();
   await expect(page.getByText('E2E-RESET-ADMIN')).toBeVisible();
   await page.locator('.data-row').filter({ hasText: 'local-admin@example.local' }).getByRole('button', { name: 'Disable' }).click();

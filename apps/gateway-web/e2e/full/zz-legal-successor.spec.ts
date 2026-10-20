@@ -50,6 +50,7 @@ test('editor, reviewer, and publisher release a real legal successor with its so
   await page.goto(`/countries/${pair.countryIso}/versions/${newVersionId}/articles/${articles[0].id}`);
   await expect(page.getByText('A new legal duty protects public dignity in this journey.')).toBeVisible();
   await page.goto(`/countries/${pair.countryIso}/timeline`);
+  await page.getByRole('button', { name: recordTitle, exact: true }).click();
   await expect(page.getByRole('heading', { name: recordTitle })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Journey source act' })).toBeVisible();
 });

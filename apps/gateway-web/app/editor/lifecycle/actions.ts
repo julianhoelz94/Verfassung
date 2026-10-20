@@ -26,7 +26,7 @@ export async function appendLifecycleAction(form: FormData) {
     redirect(`/editor/lifecycle/${constitutionId}?code=${code}&error=1`);
   }
   revalidatePath(`/countries/${code}`);
-  revalidatePath(`/countries/${code}/constitution-timeline`);
+  revalidatePath(`/countries/${code}/timeline`);
   redirect(`/editor/lifecycle/${constitutionId}?code=${code}&saved=1`);
 }
 
@@ -50,6 +50,6 @@ export async function appendProvisionAction(form: FormData) {
   } catch {
     redirect(`/editor/lifecycle/${constitutionId}?code=${code}&versionId=${sourceVersionId}&error=1`);
   }
-  revalidatePath(`/countries/${code}/constitution-timeline`);
+  revalidatePath(`/countries/${code}/timeline`);
   redirect(`/editor/lifecycle/${constitutionId}?code=${code}&versionId=${sourceVersionId}&saved=1`);
 }

@@ -39,6 +39,8 @@ MCP and file uploads appear in the editor's **Review queue**, alongside submitte
 
 The same account can upload, review and publish when it holds the required roles. No second account is required. Approval and publication remain separate actions. Existing import links open this editor journey.
 
+Import review places the constitution title, version and reader preview ahead of technical identifiers. Approval and rejection each have an aligned reason field and action button. Open **Technical details** when you need the import ID, draft version ID, content generation or settings revision.
+
 ## 3. Publish
 
 **Requires: Publisher or Admin.**

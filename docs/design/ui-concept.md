@@ -57,7 +57,7 @@ Rules a junior developer can apply everywhere:
 - Left: brand mark (teal rounded square with §) + "Constitution Atlas". Links to `/`.
 - Centre (desktop only): primary nav from `primaryNavLinks(user)`, current page marked with `aria-current="page"` and a 3px underline.
 - Right: pill search (`≥ 640`), then either **Log in** button (anonymous) or an **avatar** button (initial of email) that opens the account menu; on phones a **☰** button opens the full menu.
-- Menu panel: one `<details>`-style disclosure (client component with Escape/outside-click close). Groups in this order: user identity (email + role badges), primary destinations (phone only), Editorial (if any editorial role), Admin (admin only), Account + Sign out. Exact contents per role are in `role-link-trees.md`.
+- Menu panel: one disclosure (client component with Escape/outside-click close). Browse, Editorial and Admin are collapsible groups; the current workspace group starts expanded. Account links and sign-out stay visible. Groups in this order: user identity (email), primary destinations (phone only), Editorial (if any editorial role), Admin (admin only), Account + Sign out. Exact contents per role are in `role-link-trees.md`.
 - Phone search row: full-width search input under the bar on public pages; on version/article pages the placeholder becomes "Search in this version" and the form carries `versionId`.
 - Identity outage: a single muted status line under the bar ("Sign-in is temporarily unavailable."), public content unaffected (keeps UI-6).
 
@@ -76,10 +76,10 @@ Each item lists layout, key components, and what changes versus today.
 
 ### 4.2 Country `/countries/[code]`
 - Page header with ISO badge and country name; meta: number of constitutions/versions.
-- One card per constitution; inside, a horizontal chip row of versions in canonical order (latest marked), and actions **Timeline**, **Compare**.
+- One card per constitution; inside, a horizontal chip row of versions in canonical order (latest marked), and actions **Read latest**, **Compare**. Overview/History navigation appears above the cards.
 
 ### 4.3 Version reader `/countries/[code]/versions/[versionId]`
-- Header: eyebrow "Germany · Basic Law", `h1` "Version in force since {date}", meta badges (Latest, verification, language, gazette, Source link), actions **Timeline**, **Compare with previous**, **Print**.
+- Header: eyebrow "Germany · Basic Law", `h1` "Version in force since {date}", meta badges (Latest, verification, language, gazette, Source link), actions **Compare with previous**, **Print**, with Overview/History navigation below the header.
 - Toolbar (sticky under the top bar): **Contents** button (phone/tablet), segmented detail control replacing the range slider (labels come from `depthStopLabels(outline)`, e.g. Articles / Paragraphs / Full text), article count on the right.
 - Desktop: TOC column listing outline groups and articles, `aria-current` follows scroll (IntersectionObserver in a small client component).
 - Text column: article header = accent article number + serif title; paragraphs as a `2.5rem 1fr` grid with the paragraph number in the gutter; article footer with Permalink, History of Art. N, and "Unchanged since {label}" or a changed badge.
@@ -99,11 +99,11 @@ Each item lists layout, key components, and what changes versus today.
 - Per changed article: section title, then two `compare-col` cards with a grey column head (version label + badge) and serif text; `<ins>`/`<del>` styled with the added/removed pairs, ready for UI-10 structured diff.
 
 ### 4.6 Timeline `/countries/[code]/timeline`
-- Vertical timeline: date on the left, card on the right with version label, change-record comment and document links, changed-article badges, and **Compare with previous** / **Read** actions. One column on phones (date above card). No errata kind badge (ADR 0005 / UI-54).
+- Country pages share Overview / History navigation. History combines lifecycle events, provision events and legal change records in one chronology. Event labels distinguish the types, with an optional event-type filter. Existing constitution-timeline URLs redirect to the common timeline while preserving date context and event fragments. Its centered horizontal line carries compact milestone markers grouped by year. Labels appear on hover or keyboard focus, remain hoverable, and dismiss with Escape. Touch users tap a marker to open the selected detail panel. A year selector and previous/next controls support long histories. Filters, controls and detail cards use compact, centered spacing. Arrow keys and Home/End navigate milestones. Native chronological links and server-rendered details remain usable without JavaScript. Print includes all details. Approximate dates stay marked; undated records are separate. Amendment details retain comments, documents, changed-unit links and Compare / Read actions. Editorial corrections remain staff history (ADR 0005).
 
 ### 4.7 Search `/search`
 - Header with the query in the `h1` ("Results for “dignity”").
-- Desktop: filter sidebar (country, version, date as radio lists with counts) + results; phone/tablet: a **Filters** disclosure above results.
+- Desktop: compact country/version selectors and effective-date select beside results; phone/tablet: a Filters disclosure with the applied-filter count. Long option lists offer search. Changing country clears an incompatible version; applied chips and Clear filters preserve the keyword and reset pagination. URLs retain the search state.
 - Result card: article link, constitution · version · date, highlighted snippet (`<mark>`, SRC-6), country name (SRC-7). Paging at the bottom.
 
 ### 4.8 Editor `/editor`
@@ -118,7 +118,7 @@ Each item lists layout, key components, and what changes versus today.
 - Publisher actions: **Publish** / **Withdraw**. Reviewers see the same pages read-only. Public timeline lists only published change records (title, comment, document links). **Needs review** is staff-only until a re-pin is published.
 
 ### 4.9 Admin `/admin/*`
-- Users, Outlines, Import share one layout: page header with a primary action, `.data-list` rows (table on tablet+, cards on phone), inline status badges, and the existing forms wrapped in `Card`s.
+- User rows show compact role badges and reveal an inline role editor with Save/Cancel on demand. Import review uses aligned reason/action forms and collapses technical identifiers. Service-token sections have explicit spacing. Users, Outlines, Import share one layout: page header with a primary action, `.data-list` rows (table on tablet+, cards on phone), inline status badges, and the existing forms wrapped in `Card`s.
 
 ### 4.10 Account, login, invite, reset
 - `.page-narrow`, one centred `Card`, no sidebar, footer visible. Error/success `Alert` above the form.

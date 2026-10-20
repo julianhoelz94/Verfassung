@@ -1,3 +1,4 @@
+import { CountryNavigation } from '../../../../components/CountryNavigation';
 import { T } from '../../../../components/TranslationProvider';
 import { ui } from '../../../../../lib/messages';
 import { notFound } from 'next/navigation';
@@ -34,11 +35,11 @@ export default async function ConstitutionOverview({ params }: Props) {
         ]}
         title={constitution.title}
       />
+      <CountryNavigation code={code} active="reading" />
       <p>
         {constitution.interim ? <><T value={ui.lifecycle.interimConstitution} /> · </> : null}
         <T value={lifecycleStatusMessage(constitution.lifecycleStatus)} />
       </p>
-      <p><a href={`/countries/${country.isoCode}/constitution-timeline`}><T value={ui.countries.code.constitutions.constitutionid.page.viewCountryConstitutionTimeline} /></a></p>
       {lifecycle.length > 0 ? (
         <section>
           <h2><T value={ui.countries.code.constitutions.constitutionid.page.lifecycleDates} /></h2>

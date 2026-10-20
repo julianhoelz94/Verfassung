@@ -45,7 +45,7 @@ for (const locale of ['en', 'de']) for (const width of sizes) {
         const page = 'staff' in route && route.staff ? staffPage : publicPage;
         const response = await page.goto(route.path);
         expect(response?.status(), route.path).toBeLessThan(400);
-        const expectedPath = route.entry === '/admin/import/[jobId]' ? '/editor' : route.entry === '/versions/[versionId]/units/[unitId]' ? `/countries/DE${route.path}` : new URL(route.path, baseURL).pathname;
+        const expectedPath = route.entry === '/admin/import/[jobId]' ? '/editor' : route.entry === '/countries/[code]/constitution-timeline' ? '/countries/DE/timeline' : route.entry === '/versions/[versionId]/units/[unitId]' ? `/countries/DE${route.path}` : new URL(route.path, baseURL).pathname;
         await expect.poll(() => new URL(page.url()).pathname, { message: `Unexpected redirect for ${route.path}` }).toBe(expectedPath);
         await expect(page.locator('h1')).toHaveCount(1);
         await expect(page.locator('h1')).toBeVisible();

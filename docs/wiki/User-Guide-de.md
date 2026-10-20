@@ -21,8 +21,12 @@
 | --- | --- |
 | Eine Passage finden | **Suche**, Begriff eingeben und Treffer öffnen. |
 | Zwei Fassungen vergleichen | **Vergleichen** beim Land, dann zwei Fassungen wählen. |
-| Verfassungsgeschichte | **Verfassungszeitstrahl**: Annahme, Inkrafttreten und weitere Ereignisse. |
-| Rechtsänderungen | **Änderungszeitstrahl**: veröffentlichte Rechtsänderungen. |
+| Verfassungsgeschichte | **Geschichte**: Annahme, Inkrafttreten, weitere Verfassungsereignisse und Rechtsänderungen auf einem Zeitstrahl. |
+| Rechtsänderungen | **Geschichte**, bei Bedarf nach **Verfassungsänderungen** filtern. |
+
+Länder-, Verfassungs- und Leseseiten verwenden dieselbe Navigation mit **Übersicht** und **Geschichte**. Geschichte zeigt Verfassungsereignisse und Verfassungsänderungen in gemeinsamer Datumsreihenfolge. Kennzeichnungen unterscheiden die Ereignisarten; **Ereignisse anzeigen** filtert bei Bedarf denselben Zeitstrahl. Kleine Marker kennzeichnen die Meilensteine direkt auf der zentrierten Zeitlinie. Zeigen Sie auf einen Marker oder fokussieren Sie ihn mit der Tastatur für die Beschriftung; wählen Sie ihn für die Details aus. Auf Touchscreens tippen Sie auf den Marker. Escape schließt die Beschriftung. Die Ereignisse sind nach Jahren gruppiert. Nutzen Sie **Zum Jahr springen**, die Vor-/Zurück-Schaltflächen oder die chronologische Liste. Die Pfeiltasten wechseln zwischen Meilensteinen; Pos1/Ende wählen den ersten/letzten. Ungefähre Datumsangaben bleiben gekennzeichnet, und Einträge ohne Datum stehen getrennt.
+
+Die Suchfilter bieten kompakte Auswahlfelder für Land, Fassung und Gültigkeitsdatum. Lange Länder- und Fassungslisten besitzen eine Optionssuche. Beim Länderwechsel wird eine unpassende Fassung zurückgesetzt. **Filter anwenden** aktualisiert die Adresse. Entfernen Sie einen aktiven Filter oder wählen Sie **Filter zurücksetzen**, um die Suche zu erweitern. Auf kleineren Bildschirmen öffnen Sie **Filter** oberhalb der Treffer.
 
 ![Vergleich mit Fassungswahl und geänderten Texten](https://raw.githubusercontent.com/wiki/julianhoelz94/Verfassung/media/reading-compare-de.png)
 *Prüfen Sie die ausgewählten Fassungen vor dem Lesen.*

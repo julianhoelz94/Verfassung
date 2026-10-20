@@ -187,8 +187,8 @@ test('publisher enrolls with the rendered QR and uses a recovery code once', asy
   await page.getByRole('link', { name: 'Use a recovery code', exact: true }).click();
   await page.getByLabel('Recovery code').fill(recovery!);
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
-  await expect(page.getByRole('alert')).toBeVisible();
-  await expect(page).toHaveURL(/method=recovery/);
+  await expect(page).toHaveURL(/\/login\/mfa\?error=1&method=recovery$/);
+  await expect(page.locator('main').getByRole('alert')).toBeVisible();
   await page.getByRole('link', { name: 'Use authenticator app instead', exact: true }).click();
   await page.getByLabel('Authenticator code', { exact: true }).fill(authenticatorCode(secret));
   await page.getByRole('button', { name: 'Continue', exact: true }).click();

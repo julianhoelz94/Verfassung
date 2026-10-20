@@ -147,8 +147,6 @@ export default async function CountryPage(props: CountryPageProps) {
               ))}
             </div>
             <div className="card-actions">
-              <a className="btn btn-sm" href={`/countries/${country.isoCode}/timeline`}>
-                <T value={ui.countries.code.page.timeline} />{" "}</a>
               {tipId ? (
                 <a className="btn btn-sm btn-primary" href={`/countries/${country.isoCode}/versions/${tipId}`}>
                   <T value={ui.countries.code.page.readLatest} />{" "}</a>

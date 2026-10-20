@@ -77,7 +77,7 @@ for (const locale of ['en', 'de']) for (const width of [390, 820, 1440]) {
       await expect(page).toHaveURL(/search\?q=dignity$/);
       await page.goBack();
       await expect(page.locator('#filter-country')).toHaveValue('FR');
-      await page.goto('/countries/DE/constitution-timeline');
+      await page.goto('/countries/DE/timeline');
       const milestones = page.locator('.history-milestone');
       await expect(milestones.first()).toHaveAttribute('aria-pressed', 'true');
       await milestones.first().focus();
@@ -90,9 +90,10 @@ for (const locale of ['en', 'de']) for (const width of [390, 820, 1440]) {
       await page.keyboard.press('Home');
       await expect(milestones.first()).toBeFocused();
       await audit('history');
-      await page.getByRole('navigation', { name: english ? 'History views' : 'Geschichtsansichten' }).getByRole('link', { name: english ? 'Amendments' : 'Verfassungsänderungen', exact: true }).click();
-      await expect(page).toHaveURL(/countries\/DE\/timeline$/);
-      await expect(page.locator('.history-views a[aria-current="page"]')).toHaveText(english ? 'Amendments' : 'Verfassungsänderungen');
+      await page.locator('#history-event-type').selectOption('amendment');
+      await page.getByRole('button', { name: english ? 'Apply' : 'Anwenden', exact: true }).click();
+      await expect(page).toHaveURL(/countries\/DE\/timeline\?events=amendment$/);
+      await expect(page.locator('.history-details > li:not([data-kind="amendment"])')).toHaveCount(0);
     } finally { await context.close(); }
   });
 }
@@ -117,7 +118,7 @@ test('pending filters survive responsive changes and applied links preserve the 
 });
 
 test('the complete chronology remains available for print and without JavaScript', async ({ page, browser }, testInfo) => {
-  await page.goto('/countries/DE/constitution-timeline');
+  await page.goto('/countries/DE/timeline');
   const count = await page.locator('.history-details > li').count();
   expect(count).toBeGreaterThan(1);
   await expect(page.locator('.history-details > li:visible')).toHaveCount(1);
@@ -126,7 +127,7 @@ test('the complete chronology remains available for print and without JavaScript
   const context = await browser.newContext({ baseURL: String(testInfo.project.use.baseURL), javaScriptEnabled: false });
   try {
     const fallback = await context.newPage();
-    await fallback.goto('/countries/DE/constitution-timeline');
+    await fallback.goto('/countries/DE/timeline');
     await expect(fallback.locator('.history-details > li:visible')).toHaveCount(count);
     await expect(fallback.getByText('Circa 1949-05-08')).toBeVisible();
   } finally { await context.close(); }

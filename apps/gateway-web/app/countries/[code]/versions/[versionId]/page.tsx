@@ -155,8 +155,6 @@ export default async function VersionPage(props: VersionPageProps) {
         actions={
           <>
             {canEdit ? <a className="btn btn-primary" href="#editor-entry"><T value={ui.countries.code.versions.versionid.page.editThisConstitution} /></a> : null}
-            <a className="btn" href={`/countries/${country.isoCode}/timeline`}>
-              <T value={ui.countries.code.versions.versionid.page.timeline} />{" "}</a>
             {neighbors.previous ? (
               <a className="btn" href={neighbors.previous.href}>
                 <T value={ui.countries.code.versions.versionid.page.compareWithPrevious} />{" "}</a>

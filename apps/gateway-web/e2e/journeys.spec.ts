@@ -189,7 +189,7 @@ test('recorded amending law appears on the public timeline', async ({ page }) =>
   await expect(page.getByText('Amending law published.')).toBeVisible();
   await signOut(page);
   await page.goto('/countries/DE/timeline');
-  await expect(page.getByRole('heading', { name: 'Amendment timeline' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'History', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'E2E amending law', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'E2E amending law', exact: true })).toBeVisible();
   await expect(page.getByRole('link', { name: /Before unit/ })).toHaveAttribute('href', new RegExp(`/versions/${VERSION_1949}/units/`));

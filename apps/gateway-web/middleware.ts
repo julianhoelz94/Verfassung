@@ -43,6 +43,14 @@ export async function middleware(request: NextRequest) {
       if (!authenticated) return NextResponse.redirect(new URL('/', request.url));
     }
   }
+  // An HTTP redirect preserves fragments on saved constitution-history URLs.
+  // Keep this after the setup and anonymous-access gates.
+  if (/^\/countries\/[^/]+\/constitution-timeline$/.test(path)) {
+    const destination = request.nextUrl.clone();
+    destination.pathname = path.replace(/constitution-timeline$/, 'timeline');
+    return NextResponse.redirect(destination);
+  }
+
   const nonce = Buffer.from(crypto.randomUUID()).toString('base64');
   const isDev = process.env.NODE_ENV === 'development';
   // Next.js inline runtime scripts take the nonce. Styles still need 'unsafe-inline'
@@ -62,6 +70,10 @@ export async function middleware(request: NextRequest) {
   ].join('; ');
 
   const requestHeaders = new Headers(request.headers);
+  requestHeaders.delete('x-history-route');
+  if (/^\/countries\/[^/]+\/timeline$/.test(path)) {
+    requestHeaders.set('x-history-route', request.nextUrl.pathname + request.nextUrl.search);
+  }
   requestHeaders.set('x-nonce', nonce);
   requestHeaders.set('Content-Security-Policy', csp);
 

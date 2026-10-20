@@ -1,10 +1,11 @@
 'use client';
 
 import { useEffect, useRef, useState, type ReactNode } from 'react';
+import type { HistoryKind } from '../../lib/history';
 import { usability } from '../../lib/usability-messages';
 import { T, useTranslation } from './TranslationProvider';
 
-export type HistoryMilestone = { id: string; date?: string | null; title: string; content: ReactNode };
+export type HistoryMilestone = { kind: HistoryKind; id: string; date?: string | null; title: string; content: ReactNode };
 
 /** The server renders the complete chronology; enhancement selects one detail panel. */
 export function HistoryTimeline({ items }: { items: HistoryMilestone[] }) {
@@ -63,14 +64,16 @@ export function HistoryTimeline({ items }: { items: HistoryMilestone[] }) {
         {[...groups].map(([year, indexes]) => <li key={year}>
           <span className="history-year">{year || t(usability.undated)} <span className="muted">({indexes.length})</span></span>
           <div className="history-year-events">{indexes.map(index => <button key={items[index].id} type="button" data-event-index={index}
-            className="history-milestone" aria-pressed={current === index} aria-controls={`history-event-${items[index].id}`} onClick={() => choose(index)}>
+            aria-label={items[index].title} aria-describedby={`history-kind-${items[index].id}`} className="history-milestone" aria-pressed={current === index} aria-controls={`history-event-${items[index].id}`} onClick={() => choose(index)}>
+            <span id={`history-kind-${items[index].id}`} className="history-kind">{t(items[index].kind === 'constitution' ? usability.constitutionEvent : usability.amendmentEvent)}</span>
             {items[index].title}
           </button>)}</div>
         </li>)}
       </ol>
     </div>
     <ol className="timeline history-details">
-      {items.map((item, index) => <li key={item.id} id={`history-event-${item.id}`} className="timeline-item" hidden={enhanced && current !== index}>
+      {items.map((item, index) => <li key={item.id} id={`history-event-${item.id}`} className="timeline-item" data-kind={item.kind} data-date={item.date ?? ''} hidden={enhanced && current !== index}>
+        <div className="history-kind">{t(item.kind === 'constitution' ? usability.constitutionEvent : usability.amendmentEvent)}</div>
         {item.content}
       </li>)}
     </ol>

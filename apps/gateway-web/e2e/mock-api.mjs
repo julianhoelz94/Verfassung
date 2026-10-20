@@ -206,6 +206,7 @@ let stepUpFresh = true;
 let visualRoles = false;
 let sprint50Content = false;
 let denseUi = false;
+let historyUnavailable = { lifecycle: false, amendments: false };
 let legalPages = {};
 let imprintDetailsState;
 let translationSite = { provider: 'google', sharedKeyConfigured: true, sharedGoogleCharactersUsed: 0, sharedGoogleCharacterLimit: 500000 };
@@ -238,6 +239,7 @@ function resetMockState() {
   visualRoles = false;
   sprint50Content = false;
   denseUi = false;
+  historyUnavailable = { lifecycle: false, amendments: false };
   translationSite = { provider: 'google', sharedKeyConfigured: true, sharedGoogleCharactersUsed: 0, sharedGoogleCharacterLimit: 500000 };
   translationUser = { alwaysTranslate: false, personalGoogleKeyConfigured: false };
   anonymousBrowsing = { allowed: true, perIp: { requests: 600, windowValue: 1, windowUnit: 'minutes' }, total: { requests: 6000, windowValue: 1, windowUnit: 'minutes' }, revision: 0 };
@@ -351,6 +353,14 @@ const server = createServer(async (req, res) => {
     empty(res, 204);
     return;
   }
+  if (method === 'POST' && pathname === '/__history_unavailable') {
+    historyUnavailable = { ...historyUnavailable, ...await readBody(req) };
+    empty(res, 204); return;
+  }
+  if (method === 'GET' && (
+    (historyUnavailable.lifecycle && /\/countries\/DE\/(constitution|provision)-lifecycle$/.test(pathname)) ||
+    (historyUnavailable.amendments && pathname.startsWith('/api/amendment/constitutions/') && pathname.endsWith('/amendments'))
+  )) { json(res, 503, { error: 'History source unavailable' }); return; }
   if (method === 'POST' && pathname === '/__usability_content') {
     denseUi = true;
     sprint50Content = true;
@@ -467,6 +477,9 @@ const server = createServer(async (req, res) => {
   if (sprint50Content && method === 'GET' && pathname === '/api/catalog/countries/DE/provision-lifecycle') {
     json(res, 200, []);
     return;
+  }
+  if (method === 'GET' && /\/api\/catalog\/countries\/DE\/(constitution|provision)-lifecycle$/.test(pathname)) {
+    json(res, 200, []); return;
   }
   if (sprint50Content && method === 'GET' && pathname === `/api/catalog/wiki/country/${germany.id}`) {
     json(res, 200, { id: '01900000-0000-4000-8000-000000000733', targetType: 'country', targetId: germany.id, predecessorId: null, summary: 'A federal republic', body: '# History\n\nHistorical context', images: [WIKI_IMAGE], sourceUrls: ['https://example.org/country-history'], createdAt: '2022-01-01T00:00:00Z', createdBy: identityMe.id, publishedAt: '2022-01-02T00:00:00Z' });

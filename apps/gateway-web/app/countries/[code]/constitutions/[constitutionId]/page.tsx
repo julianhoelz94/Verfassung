@@ -40,7 +40,6 @@ export default async function ConstitutionOverview({ params }: Props) {
         {constitution.interim ? <><T value={ui.lifecycle.interimConstitution} /> · </> : null}
         <T value={lifecycleStatusMessage(constitution.lifecycleStatus)} />
       </p>
-      <p><a href={`/countries/${country.isoCode}/constitution-timeline`}><T value={ui.countries.code.constitutions.constitutionid.page.viewCountryConstitutionTimeline} /></a></p>
       {lifecycle.length > 0 ? (
         <section>
           <h2><T value={ui.countries.code.constitutions.constitutionid.page.lifecycleDates} /></h2>

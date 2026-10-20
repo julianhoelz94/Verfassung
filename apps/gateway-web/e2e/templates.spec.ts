@@ -5,6 +5,7 @@ import type { Locator } from '@playwright/test';
 const mock = `http://127.0.0.1:${process.env.E2E_MOCK_PORT ?? 4010}`;
 
 async function expectTypography(element: Locator, properties: Record<string, string>) {
+  await expect(element).toBeVisible();
   const result = await element.evaluate((node, properties) => {
     const probe = document.createElement('span');
     for (const [property, value] of Object.entries(properties)) probe.style.setProperty(property, value);
@@ -100,12 +101,14 @@ for (const locale of ['en', 'de'])
       }
     }
     await page.goto('/account');
+    await expect(page.locator('#passkey-password')).toBeVisible();
     const passkeyGap = await page.locator('#passkey-password').evaluate((input) => {
       const field = input.closest('.field')!;
       return field.getBoundingClientRect().top - field.previousElementSibling!.getBoundingClientRect().bottom;
     });
     expect(passkeyGap).toBeCloseTo(16, 0);
     await page.goto('/admin/constitutions/01900000-0000-4000-8000-000000000002');
+    await expect(page.locator('select[name="label-policy-0"]')).toBeVisible();
     const outlineGap = await page.locator('select[name="label-policy-0"]').evaluate((input) => {
       const field = input.closest('.field')!;
       return field.getBoundingClientRect().top - field.previousElementSibling!.getBoundingClientRect().bottom;

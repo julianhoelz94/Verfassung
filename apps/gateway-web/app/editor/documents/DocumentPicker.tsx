@@ -5,6 +5,7 @@ import { ui } from '../../../lib/messages';
 import { useState } from 'react';
 import type { DocumentRecord, DocumentRevision } from '../../../lib/document-api';
 import { attachDocumentAction } from './actions';
+import { Stack, Inline } from '../../components/layout/Layout';
 
 export function DocumentPicker(props: {
   documents: DocumentRecord[];
@@ -20,7 +21,7 @@ export function DocumentPicker(props: {
   const visible = props.documents.filter((document) => document.revision.title.toLocaleLowerCase().includes(query.toLocaleLowerCase()));
   const selectedIndex = props.documents.findIndex((document) => document.id === selectedId);
   const selected = selectedIndex >= 0 ? props.documents[selectedIndex] : null;
-  return <div className="stack">
+  return <Stack>
     <label htmlFor="linked-document-search"><T value={ui.editor.documents.documentpicker.searchDocuments} /></label>
     <input id="linked-document-search" type="search" value={query} onChange={(event) => setQuery(event.target.value)} />
     <label htmlFor="linked-document-select"><T value={ui.editor.documents.documentpicker.selectADocument} /></label>
@@ -28,7 +29,7 @@ export function DocumentPicker(props: {
       <option value=""><T value={ui.editor.documents.documentpicker.chooseADocument} /></option>
       {visible.map((document) => <option key={document.id} value={document.id}>{document.revision.title}</option>)}
     </select>
-    {selected ? <form onSubmit={async (event) => {
+    {selected ? <Inline align="end" as="form" onSubmit={async (event: React.FormEvent<HTMLFormElement>) => {
       event.preventDefault();
       if (attaching) return;
       const data = new FormData(event.currentTarget);
@@ -44,6 +45,6 @@ export function DocumentPicker(props: {
         {(props.revisions[selectedIndex] ?? []).map((revision) => <option key={revision.id} value={revision.id}><T value={ui.editor.documents.documentpicker.revision} />{" "}{revision.revision}{revision.id === selected.revision.id ? <T value={ui.editor.documents.documentlinks.current} /> : null}</option>)}
       </select>
       <button type="submit" disabled={attaching}><T value={ui.editor.documents.documentpicker.attach} /></button>
-    </form> : null}
-  </div>;
+    </Inline> : null}
+  </Stack>;
 }

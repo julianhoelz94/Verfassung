@@ -12,6 +12,7 @@ import { AmendmentChangesTable, type ChangeRow } from './AmendmentChangesTable';
 import { suggestChangesAction } from './actions';
 import type { DiffReviewState, ReviewCandidate } from '../../../lib/diff-review';
 import { DiffReviewQueue } from '../DiffReviewQueue';
+import { Stack, Inline } from '../../components/layout/Layout';
 
 type AmendmentFormProps = {
   amendmentId: string;
@@ -140,7 +141,7 @@ export function AmendmentForm({
   }
 
   return (
-    <form action="/editor/command" method="post" className="stack">
+    <Stack as="form" action="/editor/command" method="post">
       <input type="hidden" name="command" value="amendment-save" />
       <input type="hidden" name="amendmentId" value={amendmentId} />
       <input type="hidden" name="constitutionId" value={constitutionId} />
@@ -171,7 +172,7 @@ export function AmendmentForm({
         defaultValue={amendment?.sourceReference ?? ''}
         disabled={readOnly}
       />
-      <div className="form-row">
+      <Inline align="end" className="form-row">
         <Input
           id="amendment-enacted"
           name="enactedOn"
@@ -188,7 +189,7 @@ export function AmendmentForm({
           defaultValue={amendment?.effectiveOn ?? ''}
           disabled={readOnly}
         />
-      </div>
+      </Inline>
       <TextArea
         id="amendment-summary"
         name="summary"
@@ -198,14 +199,14 @@ export function AmendmentForm({
       />
       <TextArea id="amendment-comment" name="comment" label={<T value={ui.attrs.editorAmendmentsAmendmentformTextAreaLabelComment} />} defaultValue={amendment?.comment ?? ''} required disabled={readOnly} rows={4} />
       <input type="hidden" name="documentsJson" value={JSON.stringify(documents)} />
-      <fieldset className="stack">
+      <Stack as="fieldset">
         <legend><T value={ui.editor.amendments.amendmentform.documents} /></legend>
         <p><T value={ui.editor.amendments.amendmentform.saveTheLegalChangeThenAttachA} /></p>
         {documents.length ? <ul className="link-list">{documents.map((document, index) => <li key={index}>
           {document.url ? <a href={document.url} rel="noreferrer">{document.label || document.url}</a> : document.label || document.fileId || 'Archived document'}
         </li>)}</ul> : null}
-      </fieldset>
-      <div className="form-row">
+      </Stack>
+      <Inline align="end" className="form-row">
         <Select
           id="amendment-source-version"
           name="sourceVersionId"
@@ -236,7 +237,7 @@ export function AmendmentForm({
             </option>
           ))}
         </Select>
-      </div>
+      </Inline>
       {!readOnly ? (
         contentAvailable ? (
           <div className="action-bar">
@@ -272,7 +273,7 @@ export function AmendmentForm({
         ) : null}
       </div>
       <dialog ref={suggestDialogRef} className="dialog">
-        <div className="stack">
+        <Stack>
           <h2 className="section-title"><T value={ui.editor.amendments.amendmentform.fillFromTwoVersions} /></h2>
           <p className="muted"><T value={ui.editor.amendments.amendmentform.compareTwoSnapshotsAndMergeSuggestedChanges} /></p>
           <Select
@@ -309,8 +310,8 @@ export function AmendmentForm({
               <T value={pending ? ui.remainingStatus.suggesting : ui.remainingStatus.suggestChanges} />
             </Button>
           </div>
-        </div>
+        </Stack>
       </dialog>
-    </form>
+    </Stack>
   );
 }

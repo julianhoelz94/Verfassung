@@ -6,6 +6,7 @@ import { useState } from 'react';
 import type { AnonymousBrowsingPolicy, AnonymousRate } from '../../../lib/anonymous-browsing-policy';
 import { Button } from '../../components/ui';
 import { saveAnonymousBrowsingAction } from './actions';
+import { Stack } from '../../components/layout/Layout';
 
 function RateFields({ prefix, label, rate, disabled }: { prefix: string; label: string; rate: AnonymousRate; disabled: boolean }) {
   return <fieldset disabled={disabled}>
@@ -25,7 +26,7 @@ export function AnonymousBrowsingForm({ policy, returnTo }: { policy: AnonymousB
   const t = useTranslation();
   const [allowed, setAllowed] = useState(policy.allowed);
   const displayed = (rate: AnonymousRate): AnonymousRate => allowed ? rate : { ...rate, requests: 0 };
-  return <form action={saveAnonymousBrowsingAction}>
+  return <Stack as="form" action={saveAnonymousBrowsingAction}>
     {returnTo ? <input type="hidden" name="returnTo" value={returnTo} /> : null}
     <label><input type="checkbox" name="allowed" checked={allowed} onChange={(event) => setAllowed(event.target.checked)} /> <T value={ui.admin.anonymousBrowsing.anonymousbrowsingform.allowAnonymousBrowsing} /></label>
     <p className="muted"><T value={ui.admin.anonymousBrowsing.anonymousbrowsingform.whenOffAnonymousContentApiCallsAnd} /></p>
@@ -33,5 +34,5 @@ export function AnonymousBrowsingForm({ policy, returnTo }: { policy: AnonymousB
     <RateFields key={`per-ip-${allowed}`} prefix="perIp" label={t(ui.accessibility.perIpAddress)} rate={displayed(policy.perIp)} disabled={!allowed} />
     <RateFields key={`total-${allowed}`} prefix="total" label={t(ui.accessibility.allAnonymousRequests)} rate={displayed(policy.total)} disabled={!allowed} />
     <Button variant="primary"><T value={ui.admin.anonymousBrowsing.anonymousbrowsingform.saveAnonymousBrowsing} /></Button>
-  </form>;
+  </Stack>;
 }

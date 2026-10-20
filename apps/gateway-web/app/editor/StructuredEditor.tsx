@@ -10,6 +10,7 @@ import type { ContentOutline } from '../../lib/api';
 import { applyOperation, draftDifferences, findNode, nodes, scopedNodes, sentenceParts, token, validateDraft, type DraftDifference, type DraftEntry, type DraftNode, type DraftOperation, type StructuredPreview } from '../../lib/structured-editor';
 import { useDraftState } from './EditorDraftState';
 import { Button } from '../components/ui';
+import { Stack } from '../components/layout/Layout';
 
 class LocalizedEditorError extends Error {
   constructor(readonly copy: UiMessage) { super(copy.en); }
@@ -257,7 +258,7 @@ export function StructuredEditor({ review = [], preview, outline, rootId, versio
     const occurrence = target ? unitMapping?.[id] : sourceUnit?.occurrenceId;
     return version && rootOccurrence ? `/versions/${encodeURIComponent(version)}/units/${encodeURIComponent(rootOccurrence)}${occurrence ? `?occurrenceId=${encodeURIComponent(occurrence)}` : ''}` : undefined;
   }
-  return <form action="/editor/command" method="post" id="draft-form">
+  return <Stack as="form" action="/editor/command" method="post" id="draft-form">
     <input type="hidden" name="command" value="structured-save" /><input type="hidden" name="sessionId" value={preview.sessionId} /><input type="hidden" name="versionId" value={versionId} /><input type="hidden" name="articleId" value={articleId} />
     <input type="hidden" name="scope" value={scope} /><input type="hidden" name="selectedNode" value={selection} /><input type="hidden" name="structuredDraft" value={JSON.stringify({ expectedGeneration: preview.generation, operations })} />
     <div className="action-bar"><label><T value={ui.editor.structurededitor.editorView} /><select value={scope} disabled={loading} onChange={event => changeScope(event.target.value)}><option value="constitution"><T value={ui.editor.structurededitor.constitution} /></option>{outline.kinds.map(kind => <option key={kind.kindCode} value={kind.kindCode}>{kind.displayLabel}</option>)}</select></label><a href={`/admin/constitutions/${constitutionId}`}><T value={ui.editor.structurededitor.constitutionStructureSettings} /></a></div>
@@ -272,5 +273,5 @@ export function StructuredEditor({ review = [], preview, outline, rootId, versio
     </div> : null}
     {editable ? <div className="action-bar"><Button variant="primary" disabled={loading || !operations.length || errors.length > 0}><T value={ui.editor.structurededitor.saveDraft} /></Button><button type="button" disabled={!history.length} onClick={undo}><T value={ui.editor.structurededitor.undo} /></button></div> : null}
     <details open={!editable}><summary><T value={ui.editor.structurededitor.entryLevelReview} />{differences.length} <T value={ui.editor.structurededitor.changes} /></summary>{differences.length ? <ol>{differences.map((difference, index) => <li key={index}><strong>{t(differenceField(difference.field))}</strong><div><del>{difference.before}</del> → <ins>{difference.after}</ins></div><div>{(difference.sourceLink ?? reference(difference.logicalId, false)) ? <a href={difference.sourceLink ?? reference(difference.logicalId, false)}><T value={ui.editor.structurededitor.sourceSnapshot} /></a> : null} {(difference.targetLink ?? reference(difference.logicalId, true)) ? <a href={difference.targetLink ?? reference(difference.logicalId, true)}><T value={ui.editor.structurededitor.publishedSuccessor} /></a> : null}</div><details><summary><T value={ui.editor.structurededitor.revisionDetails} /></summary><small><T value={ui.editor.structurededitor.unit} />{" "}{difference.logicalId} <T value={ui.editor.structurededitor.sourceRevision} />{" "}{difference.sourceRevisionId ?? t(ui.remainingStatus.new)} <T value={ui.editor.structurededitor.target} />{" "}{difference.targetRevisionId ?? t(ui.editor.publishform.removed)}</small></details></li>)}</ol> : <p><T value={ui.editor.structurededitor.noChanges} /></p>}</details>
-  </form>;
+  </Stack>;
 }

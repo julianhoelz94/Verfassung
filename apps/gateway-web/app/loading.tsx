@@ -1,11 +1,11 @@
 import { T } from './components/TranslationProvider';
 import { ui } from '../lib/messages';
-import { PageMain } from './components/PageMain';
+import { FocusedPage } from './components/layout/templates';
 
 export default function Loading() {
   return (
-    <PageMain>
+    <FocusedPage width="reading">
       <p aria-live="polite"><T value={ui.loading.loading} /></p>
-    </PageMain>
+    </FocusedPage>
   );
 }

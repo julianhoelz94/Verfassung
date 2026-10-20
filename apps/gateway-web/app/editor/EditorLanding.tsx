@@ -8,7 +8,7 @@ import { getCountry, getVersion, listCountries, type CountryDetail } from '../..
 import { editorErrorMessage, listAllSessions, type EditSessionSummary } from '../../lib/editor-api';
 import { listImportJobs, type ImportJob } from '../../lib/ingestion-api';
 import { requireSessionBearer } from '../../lib/session';
-import { PageMain } from '../components/PageMain';
+import { CollectionPage } from '../components/layout/templates';
 import { Alert, PageHeader } from '../components/ui';
 
 type SessionRow = {
@@ -87,8 +87,8 @@ export async function EditorLanding({ userId, email, roles, status, error }: { u
   const heading = localize(locale, queue === 'reviewing' ? ui.nav.reviewQueue : queue === 'approved' ? ui.nav.readyToPublish : ui.editor.editorlanding.myOpenSessions);
   const message = editorErrorMessage(error, locale);
 
-  return <PageMain className="wide">
-    <PageHeader title={<T value={ui.attrs.editorEditorlandingPageHeaderTitleEditor} />} eyebrow={heading} meta={`${localize(locale, ui.remainingStatus.signedInAs)} ${email}.`} />
+  return <CollectionPage width="content" header={<PageHeader title={<T value={ui.attrs.editorEditorlandingPageHeaderTitleEditor} />} eyebrow={heading} meta={`${localize(locale, ui.remainingStatus.signedInAs)} ${email}.`} />}>
+
     <nav className="section-nav" aria-label={localize(locale, ui.nav.editorial)}>
       {canEdit ? <Link href="/editor?mine=1" aria-current={!queue ? 'page' : undefined}><T value={ui.editor.editorlanding.myOpenSessions} /></Link> : null}
       {canReview ? <Link href="/editor?status=reviewing" aria-current={queue === 'reviewing' ? 'page' : undefined}><T value={ui.nav.reviewQueue} /></Link> : null}
@@ -113,5 +113,5 @@ export async function EditorLanding({ userId, email, roles, status, error }: { u
           </section>)}
       </section>)}
     {queue && canEdit ? <p><a href="/editor"><T value={ui.editor.editorlanding.myOpenSessions} /></a></p> : null}
-  </PageMain>;
+  </CollectionPage>;
 }

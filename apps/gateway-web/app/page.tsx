@@ -12,7 +12,7 @@ import {
 } from '../lib/api';
 import { orderVersions } from '../lib/compare';
 import { FormattedDate } from '../lib/format-date';
-import { PageMain } from './components/PageMain';
+import { CollectionPage } from './components/layout/templates';
 import { SiteSearchForm } from './components/SiteSearchForm';
 import { ServiceUnavailable } from './components/StatusMessage';
 import { Badge } from './components/ui';
@@ -25,17 +25,20 @@ import {
   recentChangesFromAmendments,
   type RecentChange,
 } from '../lib/reading';
+import { Grid, Inline, Stack } from './components/layout/Layout';
+import headerStyles from './components/header.module.css';
+import surfaceStyles from './components/surfaces.module.css';
 
 export default async function Page() {
   const policy = await requestAnonymousBrowsingPolicy().catch(() => null);
   if (!policy?.allowed && !(await currentUser())) {
-    return <PageMain className="wide">
+    return <CollectionPage width="content">
       <section className="hero">
-        <h1 className="page-title"><T value={ui.page.constitutionAtlas} /></h1>
+        <h1 className={["page-title", headerStyles.title].join(' ')}><T value={ui.page.constitutionAtlas} /></h1>
         <p className="lede"><T value={policy ? ui.homeDynamic.signInToBrowse : ui.homeDynamic.browsingUnavailable} /></p>
         <a className="btn btn-primary" href="/login"><T value={ui.page.logIn} /></a>
       </section>
-    </PageMain>;
+    </CollectionPage>;
   }
   let error: string | null = null;
   let countries: CountrySummary[] = [];
@@ -50,9 +53,9 @@ export default async function Page() {
 
   if (error) {
     return (
-      <PageMain className="wide">
+      <CollectionPage width="content">
         <ServiceUnavailable service={ui.services.catalog} retryHref="/" />
-      </PageMain>
+      </CollectionPage>
     );
   }
 
@@ -88,10 +91,10 @@ export default async function Page() {
   const recentTop = newestChanges(recent, 5);
 
   return (
-    <PageMain className="wide">
+    <CollectionPage width="content">
       <section className="hero">
-        <p className="eyebrow"><T value={ui.page.versionedConstitutions} /></p>
-        <h1 className="page-title"><T value={ui.page.readAConstitutionAsItStoodOn} /></h1>
+        <p className={["eyebrow", headerStyles.eyebrow].join(' ')}><T value={ui.page.versionedConstitutions} /></p>
+        <h1 className={["page-title", headerStyles.title].join(' ')}><T value={ui.page.readAConstitutionAsItStoodOn} /></h1>
         <p className="lede">
           <T value={ui.page.browseOfficialTextsByCountryAndVersion} />{" "}</p>
         <SiteSearchForm
@@ -116,7 +119,7 @@ export default async function Page() {
       {countries.length === 0 ? (
         <p><T value={ui.page.noCountriesArePublishedYet} /></p>
       ) : (
-        <div className="card-grid">
+        <Grid >
           {countries.map((summary) => {
             const country = details.find((item) => item.isoCode === summary.isoCode);
             const constitution = country?.constitutions[0];
@@ -128,11 +131,11 @@ export default async function Page() {
             const previous = publicLine.length >= 2 ? publicLine[publicLine.length - 2] : undefined;
             const countryArticles = country ? articlesByCountry.get(country.isoCode) : undefined;
             return (
-              <article key={summary.id} className="card country-card">
+              <article key={summary.id} className={["card country-card", surfaceStyles.card].join(' ')}>
                 <div className="iso" aria-hidden="true">
                   {summary.isoCode}
                 </div>
-                <div>
+                <Stack>
                   <h3 className="card-title">
                     <a href={`/countries/${summary.isoCode}`}>{summary.name}</a>
                   </h3>
@@ -160,7 +163,7 @@ export default async function Page() {
                     ) : null}
                     {tipVersion ? <span>{tipVersion.languageCode}</span> : null}
                   </div>
-                  <div className="card-actions">
+                  <Inline className="card-actions">
                     {tipId ? (
                       <a className="btn btn-sm" href={`/countries/${summary.isoCode}/versions/${tipId}`}>
                         <T value={ui.page.readLatest} />{" "}</a>
@@ -173,12 +176,12 @@ export default async function Page() {
                         <T value={ui.page.compare} />{" "}{previous.versionLabel} → {publicLine[publicLine.length - 1]?.versionLabel}
                       </a>
                     ) : null}
-                  </div>
-                </div>
+                  </Inline>
+                </Stack>
               </article>
             );
           })}
-        </div>
+        </Grid>
       )}
       {recentTop.length > 0 ? (
         <>
@@ -197,6 +200,6 @@ export default async function Page() {
           </ul>
         </>
       ) : null}
-    </PageMain>
+    </CollectionPage>
   );
 }

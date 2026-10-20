@@ -12,6 +12,9 @@ import { outlineExample } from '../../../lib/outline-preview';
 import { OutlineReaderPreview } from './OutlineReaderPreview';
 import { outlineFromTemplate, type ConstitutionTemplate } from '../../../lib/constitution-templates';
 import { saveOutlineAction, previewOutlineImpactAction } from './actions';
+import { Stack, Inline } from '../../components/layout/Layout';
+import surfaceStyles from '../../components/surfaces.module.css';
+import fieldStyles from '../../components/fields.module.css';
 
 type Layer = OutlineKindWrite & { existing?: boolean };
 
@@ -182,7 +185,7 @@ export function OutlineEditor({
     }
   }
   return (
-    <form ref={formRef} onSubmit={onSubmit}>
+    <Stack as="form" elementRef={formRef} onSubmit={onSubmit}>
       {constitutionId ? <input type="hidden" name="constitutionId" value={constitutionId} /> : null}
       {settingsRevisionId ? <input type="hidden" name="settingsRevisionId" value={settingsRevisionId} /> : null}
       {guidedCreation ? <nav className="creation-steps" aria-label={t(ui.accessibility.creationSteps)}>
@@ -190,7 +193,7 @@ export function OutlineEditor({
       </nav> : null}
       <div hidden={guidedCreation && step !== 1}>{children}</div>
       <input type="hidden" name="outline" value={JSON.stringify(withoutExisting(layers))} />
-      {guidedCreation && step === 1 ? <div className="form-row"><Button type="button" variant="primary" onClick={advance}><T value={ui.admin.constitutions.outlineeditor.continueToStructure} /></Button></div> : null}
+      {guidedCreation && step === 1 ? <Inline align="end" className="form-row"><Button type="button" variant="primary" onClick={advance}><T value={ui.admin.constitutions.outlineeditor.continueToStructure} /></Button></Inline> : null}
       {guidedCreation && step === 2 ? <section aria-label={t(ui.accessibility.startingStructure)}>
         <h2 className="setting-inline"><T value={ui.admin.constitutions.outlineeditor.startingStructure} />{" "}<SettingInfo label={<T value={ui.admin.constitutions.outlineeditor.startingStructure} />} description={<T value={ui.help.initialStructureHelp} />} changeability="review" /></h2>
         <p className="muted"><T value={ui.admin.constitutions.outlineeditor.chooseAStartingPointThenAdjustEvery} /></p>
@@ -198,21 +201,21 @@ export function OutlineEditor({
           {([['articles', ui.outlineDynamic.articlesOnly, ui.outlineDynamic.articlesOnlyDetail], ['sections', ui.outlineDynamic.articlesSections, ui.outlineDynamic.articlesSectionsDetail], ['sentences', ui.outlineDynamic.articlesParagraphsSentences, ui.outlineDynamic.articlesParagraphsSentencesDetail]] as const).map(([id, title, detail]) => <button key={id} type="button" className="creation-template" aria-pressed={template === id} onClick={() => { setTemplate(id); setLayers(explicitLayers(outlineFromTemplate(id), false)); setShowErrors(false); }}><strong>{t(title)}</strong><span>{t(detail)}</span></button>)}
         </div>
       </section> : null}
-      {guidedCreation && step === 3 ? <section className="card" aria-label={t(ui.accessibility.reviewConstitution)}><h2><T value={ui.admin.constitutions.outlineeditor.reviewBeforeCreating} /></h2><p>{basicsSummary}</p><p>{layers.map((layer) => layer.displayLabel).join(' → ')}</p><p><T value={ui.admin.constitutions.outlineeditor.theNewConstitutionCanBeEditedAfter} /></p></section> : null}
+      {guidedCreation && step === 3 ? <section className={["card", surfaceStyles.card].join(' ')} aria-label={t(ui.accessibility.reviewConstitution)}><h2><T value={ui.admin.constitutions.outlineeditor.reviewBeforeCreating} /></h2><p>{basicsSummary}</p><p>{layers.map((layer) => layer.displayLabel).join(' → ')}</p><p><T value={ui.admin.constitutions.outlineeditor.theNewConstitutionCanBeEditedAfter} /></p></section> : null}
       <div className="outline-config-layout" hidden={guidedCreation && step === 1}>
-      {guidedCreation && step === 3 ? <div className="stack" aria-label={t(ui.accessibility.finalStructureSettings)}>
+      {guidedCreation && step === 3 ? <Stack  aria-label={t(ui.accessibility.finalStructureSettings)}>
         {layers.map((layer, index) => {
           const effective = effectiveDisplayKind(exampleOutline.kinds[index])!;
-          return <section className="card" key={`${layer.kindCode}-${index}`}>
+          return <section className={["card", surfaceStyles.card].join(' ')} key={`${layer.kindCode}-${index}`}>
           <h3>{index + 1}. {layer.displayLabel}</h3>
           <p><T value={ui.admin.constitutions.outlineeditor.editorTitles} />{" "}{t(layer.titlePolicy === 'none' ? ui.admin.constitutions.outlineeditor.notAllowed : layer.titlePolicy === 'required' ? ui.admin.constitutions.outlineeditor.required : ui.admin.constitutions.outlineeditor.optional)} <T value={ui.admin.constitutions.outlineeditor.literalLabels} />{" "}{t(layer.labelPolicy === 'none' ? ui.admin.constitutions.outlineeditor.notAllowed : layer.labelPolicy === 'required' ? ui.admin.constitutions.outlineeditor.required : ui.admin.constitutions.outlineeditor.optional)}</p>
           <p><T value={ui.admin.constitutions.outlineeditor.publicReader} />{" "}{t(layer.presentation === 'concatenated' ? ui.outlineDynamic.runningText : ui.outlineDynamic.block)} <T value={ui.admin.constitutions.outlineeditor.kind} />{" "}{t(effective.showKind ? ui.outlineDynamic.shown : ui.outlineDynamic.hidden)} <T value={ui.admin.constitutions.outlineeditor.label} />{" "}{effective.showLabel ? `${t(ui.outlineDynamic.shown)} (${t(effective.labelPlacement === 'after_title' ? ui.admin.constitutions.outlineeditor.afterTitle : effective.labelPlacement === 'inline' ? ui.admin.constitutions.outlineeditor.inlineWithText : effective.labelPlacement === 'superscript' ? ui.admin.constitutions.outlineeditor.superscriptInText : ui.admin.constitutions.outlineeditor.beforeTitle)})` : t(ui.outlineDynamic.hidden)} <T value={ui.admin.constitutions.outlineeditor.title} />{" "}{t(effective.showTitle ? ui.outlineDynamic.shown : ui.outlineDynamic.hidden)}</p>
           <p>{layer.root ? <><T value={ui.outlineDynamic.topLevelKind} /> · </> : null}{layer.allowedChildKinds?.length ? <T value={layer.allowTextAlongsideChildren ? ui.outlineDynamic.parentTextAllowed : ui.outlineDynamic.textInChildren} /> : <><T value={ui.outlineDynamic.textLeafWith} /> <T value={layer.segmentation === 'sentence' ? ui.outlineDynamic.sentenceAssistance : ui.outlineDynamic.plainEditing} /></>}</p>
           </section>;
         })}
-      </div> : <ol className="stack">
+      </Stack> : <Stack as="ol">
         {layers.map((layer, index) => (
-          <li key={`${layer.kindCode}-${index}`} className="card">
+          <Stack as="li" key={`${layer.kindCode}-${index}`} className={["card", surfaceStyles.card].join(' ')}>
             <p>
               <T value={ui.admin.constitutions.outlineeditor.layer} />{" "}{index + 1}
               {layer.root ? t(ui.remainingStatus.topLevelKind) : ''}
@@ -247,18 +250,18 @@ export function OutlineEditor({
               }}
             />
             </details>
-            <fieldset>
+            <Stack as="fieldset">
               <legend><T value={ui.admin.constitutions.outlineeditor.structure} /></legend>
               <label className="choice-row"><input type="checkbox" checked={Boolean(layer.root)} onChange={event => update(index, { root: event.target.checked })} /> <T value={ui.admin.constitutions.outlineeditor.mayAppearAtTheTopLevel} /></label>
               <p className="muted"><T value={ui.admin.constitutions.outlineeditor.allowedChildKinds} /></p>
               {layers.filter(candidate => candidate.kindCode !== layer.kindCode).map(candidate => <label className="choice-row" key={candidate.kindCode}>
                 <input type="checkbox" checked={Boolean(layer.allowedChildKinds?.includes(candidate.kindCode))} onChange={event => update(index, { allowedChildKinds: event.target.checked ? [...(layer.allowedChildKinds ?? []), candidate.kindCode] : (layer.allowedChildKinds ?? []).filter(code => code !== candidate.kindCode) })} /> {candidate.displayLabel}
               </label>)}
-            </fieldset>
-            <fieldset>
+            </Stack>
+            <Stack as="fieldset">
               <legend><T value={ui.admin.constitutions.outlineeditor.editorPermissions} /></legend>
               {Boolean(layer.allowedChildKinds?.length) ? (
-                <div className="field">
+                <div className={["field", fieldStyles.field].join(' ')}>
                   <span className="setting-inline"><label className="choice-row"><input type="checkbox" checked={Boolean(layer.allowTextAlongsideChildren)} onChange={(event) => update(index, { allowTextAlongsideChildren: event.target.checked })} /> <T value={ui.admin.constitutions.outlineeditor.allowTextAlongsideChildUnits} /></label><SettingInfo label={<T value={ui.admin.constitutions.outlineeditor.allowTextAlongsideChildUnits} />} description={<T value={ui.help.unnumberedTextHelp} />} changeability="review" /></span>
                   <span className="muted"><T value={ui.admin.constitutions.outlineeditor.unnumberedParentTextCanAppearBeforeBetween} /></span>
                 </div>
@@ -273,8 +276,8 @@ export function OutlineEditor({
               {!layer.allowedChildKinds?.length ? <Select label={<T value={ui.attrs.adminConstitutionsOutlineeditorSelectLabelText} />} info={{ description: <T value={ui.help.textEditingHelp} />, changeability: 'review' }} name={`segmentation-${index}`} value={layer.segmentation ?? 'plain'} onChange={(event) => update(index, { segmentation: event.target.value as Layer['segmentation'] })}>
                 <option value="plain"><T value={ui.admin.constitutions.outlineeditor.plainText} /></option><option value="sentence"><T value={ui.admin.constitutions.outlineeditor.sentenceBoundaryAssistance} /></option>
               </Select> : null}
-            </fieldset>
-            <fieldset>
+            </Stack>
+            <Stack as="fieldset">
               <legend><T value={ui.admin.constitutions.outlineeditor.publicReaderDisplay} /></legend>
             <Select
               label={<T value={ui.attrs.adminConstitutionsOutlineeditorSelectLabelHow} />}
@@ -288,7 +291,7 @@ export function OutlineEditor({
             </Select>
             {(
               <>
-                <div className="field">
+                <div className={["field", fieldStyles.field].join(' ')}>
                   <span className="setting-inline"><label className="field-label choice-row">
                     <input
                       type="checkbox"
@@ -299,7 +302,7 @@ export function OutlineEditor({
                     <T value={ui.admin.constitutions.outlineeditor.showKindName} />{layer.displayLabel})
                   </label><SettingInfo label={<T value={ui.admin.constitutions.outlineeditor.showKindName} />} description={<T value={ui.help.kindNameHelp} />} changeability="review" /></span>
                 </div>
-                <div className="field">
+                <div className={["field", fieldStyles.field].join(' ')}>
                   <span className="setting-inline"><label className="field-label choice-row">
                     <input
                       type="checkbox"
@@ -309,7 +312,7 @@ export function OutlineEditor({
                     />{' '}
                     <T value={ui.admin.constitutions.outlineeditor.showLiteralLegalLabel} />{" "}</label><SettingInfo label={<T value={ui.admin.constitutions.outlineeditor.showLiteralLegalLabel} />} description={<T value={ui.help.literalLabelHelp} />} changeability="review" /></span>
                 </div>
-                <div className="field">
+                <div className={["field", fieldStyles.field].join(' ')}>
                   <span className="setting-inline"><label className="field-label choice-row">
                     <input
                       type="checkbox"
@@ -328,15 +331,15 @@ export function OutlineEditor({
                 <option value="before_title" disabled={layer.presentation === 'concatenated'}><T value={ui.admin.constitutions.outlineeditor.beforeTitle} /></option><option value="after_title" disabled={layer.presentation === 'concatenated' || !layer.showTitle || layer.titlePolicy === 'none'}><T value={ui.admin.constitutions.outlineeditor.afterTitle} /></option><option value="inline" disabled={index < layers.length - 1 && !layer.allowTextAlongsideChildren}><T value={ui.admin.constitutions.outlineeditor.inlineWithText} /></option>{index === layers.length - 1 ? <option value="superscript"><T value={ui.admin.constitutions.outlineeditor.superscriptInText} /></option> : null}
               </Select>
               {!layer.showLabel && layer.presentation !== 'concatenated' ? <p className="muted"><T value={ui.admin.constitutions.outlineeditor.showLiteralLegalLabelToChooseIts} /></p> : null}
-            </fieldset>
+            </Stack>
             {index > 0 ? (
               <span className="setting-inline"><Button type="button" onClick={() => removeLayer(index)}>
                 <T value={ui.admin.constitutions.outlineeditor.removeLevel} />{" "}</Button><SettingInfo label={<T value={ui.admin.constitutions.outlineeditor.removeLevel} />} description={<T value={ui.help.removeLevelHelp} />} changeability="review" /></span>
             ) : null}
-          </li>
+          </Stack>
         ))}
-      </ol>}
-      <aside className="card outline-live-preview" aria-label={t(ui.admin.constitutions.outlineeditor.readerPreview)}>
+      </Stack>}
+      <aside className={["card outline-live-preview", surfaceStyles.card].join(' ')} aria-label={t(ui.admin.constitutions.outlineeditor.readerPreview)}>
         <h2><T value={ui.admin.constitutions.outlineeditor.readerPreview} /></h2>
         <p className="muted"><T value={ui.outlinePreview.inspectHelp} /></p>
         {sampleRoots.length ? <p className="muted"><T value={ui.outlinePreview.sourceSample} /></p> : null}
@@ -347,12 +350,12 @@ export function OutlineEditor({
       {guidedCreation && showErrors && outlineError ? <Alert tone="error">{outlineError}</Alert> : null}
       {impactError ? <Alert tone="error"><T value={ui.admin.constitutions.outlineeditor.impactCouldNotBeCheckedRetryWhen} /></Alert> : null}
       {submitError ? <Alert tone="error"><T value={ui.admin.constitutions.outlineeditor.theConstitutionCouldNotBeSavedTry} /></Alert> : null}
-      {impact ? <section aria-live="polite" className="card">
+      {impact ? <section aria-live="polite" className={["card", surfaceStyles.card].join(' ')}>
         <h2><T value={impact.classification === 'migration_required' ? ui.outlineDynamic.migrationRequired : ui.outlineDynamic.safeToSave} /></h2>
         <p>{impact.affectedVersionIds.length} <T value={ui.admin.constitutions.outlineeditor.versionsAnd} />{" "}{impact.affectedDraftSessionIds.length} <T value={ui.admin.constitutions.outlineeditor.draftsCheckedPublishedStructuralSettingsRemainPinned} /></p>
         <ul>{impact.reasons.map((reason) => <li key={reason}>{reason}</li>)}{impact.violations.map((violation, index) => <li key={index}>{violation.field}: {violation.message}</li>)}</ul>
       </section> : null}
-      <div className="form-row" hidden={guidedCreation && step === 1}>
+      <Inline align="end" className="form-row" hidden={guidedCreation && step === 1}>
         {(!guidedCreation || step === 2) ? <Button type="button" onClick={addLayer}>
           <T value={ui.admin.constitutions.outlineeditor.addDeeperLayer} />{" "}</Button> : null}
         {(!guidedCreation || step === 2) ? <Button type="button" onClick={addRootKind}><T value={ui.admin.constitutions.outlineeditor.addTopLevelKind} /></Button> : null}
@@ -363,7 +366,7 @@ export function OutlineEditor({
           <Button type="button" onClick={() => { setStep(step === 3 ? 2 : 1); setShowErrors(false); }}><T value={ui.admin.constitutions.outlineeditor.back} /></Button>
           {step === 2 ? <Button type="button" variant="primary" onClick={(event) => { event.preventDefault(); advance(); }}><T value={ui.admin.constitutions.outlineeditor.continueToReview} /></Button> : <Button variant="primary" data-create="true" disabled={submitting}><T value={submitting ? ui.outlineDynamic.creating : ui.outlineDynamic.createConstitution} /></Button>}
         </> : <Button variant="primary" disabled={submitting || checking || (Boolean(constitutionId) && (!impact || impact.classification === 'migration_required' || impact.currentRevisionId !== settingsRevisionId))}><T value={submitting ? ui.outlineDynamic.saving : submitLabel} /></Button>}
-      </div>
-    </form>
+      </Inline>
+    </Stack>
   );
 }

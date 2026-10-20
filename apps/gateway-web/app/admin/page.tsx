@@ -3,9 +3,10 @@ import { T } from '../components/TranslationProvider';
 import { ui } from '../../lib/messages';
 import { reviewUi } from '../../lib/ui-review-messages';
 import { AdminForbidden } from '../components/AdminForbidden';
-import { PageMain } from '../components/PageMain';
+import { CollectionPage } from '../components/layout/templates';
 import { Card, PageHeader } from '../components/ui';
 import { requireAdminPage } from '../../lib/admin';
+import { Grid } from '../components/layout/Layout';
 
 export default async function AdminIndexPage() {
   if (!(await requireAdminPage())) return <AdminForbidden title={ui.forbidden.admin} />;
@@ -21,14 +22,14 @@ export default async function AdminIndexPage() {
       { href: '/admin/legal/impressum', title: reviewUi.legalPages, hint: ui.attrs.adminLegalKeyPagePageHeaderMeta },
     ] },
   ];
-  return <PageMain className="wide">
-    <PageHeader title={<T value={ui.attrs.adminPagePageHeaderTitleAdmin} />} meta={<T value={reviewUi.adminHint} />} />
+  return <CollectionPage width="content" header={<PageHeader title={<T value={ui.attrs.adminPagePageHeaderTitleAdmin} />} meta={<T value={reviewUi.adminHint} />} />}>
+
     {groups.map(group => <section key={group.title.en}>
       <h2 className="section-title"><T value={group.title} /></h2>
-      <div className="card-grid admin-grid">{group.links.map(link => <Card key={link.href}>
+      <Grid >{group.links.map(link => <Card key={link.href}>
         <h3 className="card-title"><Link href={link.href}><T value={link.title} /></Link></h3>
         <p className="muted"><T value={link.hint} /></p>
-      </Card>)}</div>
+      </Card>)}</Grid>
     </section>)}
-  </PageMain>;
+  </CollectionPage>;
 }

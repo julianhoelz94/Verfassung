@@ -5,6 +5,7 @@ import { ui } from '../../lib/messages';
 import { useFormState } from 'react-dom';
 import { Alert, Button, Input } from '../components/ui';
 import { createMcpKeyAction, rotateMcpKeyAction, type TokenRevealState } from './actions';
+import { Stack } from '../components/layout/Layout';
 
 const initial: TokenRevealState = {};
 
@@ -19,11 +20,11 @@ export function CreateMcpKeyForm({ canImport }: { canImport: boolean }) {
   const [state, action] = useFormState(createMcpKeyAction, initial);
   return <>
     <Reveal state={state} />
-    <form action={action} className="stack">
+    <Stack as="form" action={action}>
       <Input label={<T value={ui.attrs.accountMcpkeyformsInputLabelKeyName} />} id="mcp-key-name" name="name" required maxLength={100} />
       {canImport ? <label className="choice-row"><input type="checkbox" name="importEnabled" /> <T value={ui.account.mcpkeyforms.allowStagingConstitutionImports} /></label> : null}
       <Button variant="primary"><T value={ui.account.mcpkeyforms.createMcpKey} /></Button>
-    </form>
+    </Stack>
   </>;
 }
 
@@ -31,6 +32,6 @@ export function RotateMcpKeyForm({ keyId }: { keyId: string }) {
   const [state, action] = useFormState(rotateMcpKeyAction, initial);
   return <>
     <Reveal state={state} />
-    <form action={action}><input type="hidden" name="keyId" value={keyId} /><Button><T value={ui.account.mcpkeyforms.rotate} /></Button></form>
+    <Stack as="form" action={action}><input type="hidden" name="keyId" value={keyId} /><Button><T value={ui.account.mcpkeyforms.rotate} /></Button></Stack>
   </>;
 }

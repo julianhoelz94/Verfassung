@@ -5,7 +5,7 @@ import { T } from '../../components/TranslationProvider';
 import { ui } from '../../../lib/messages';
 import { redirect } from 'next/navigation';
 import { Alert, Card, PageHeader } from '../../components/ui';
-import { PageMain } from '../../components/PageMain';
+import { FocusedPage } from '../../components/layout/templates';
 import { currentUser, mfaChallengeToken } from '../../../lib/session';
 import { requestStartMfaEnroll } from '../../../lib/identity-client';
 import { LoginEnrollForm } from '../../account/MfaForms';
@@ -46,11 +46,11 @@ export default async function MfaPage(props: MfaPageProps) {
   }
 
   return (
-    <PageMain>
-      <PageHeader
+    <FocusedPage width="reading" header={<PageHeader
         title={message(locale, enroll ? ui.loginFeedback.setupAuthenticator : ui.loginFeedback.authenticatorCode)}
         meta={message(locale, enroll ? ui.loginFeedback.setupBeforeSignIn : ui.loginFeedback.enterCode)}
-      />
+      />}>
+
       {searchParams.error ? (
         <Alert tone="error"><T value={ui.login.mfa.page.thatCodeCouldNotBeVerified} /></Alert>
       ) : null}
@@ -71,6 +71,6 @@ export default async function MfaPage(props: MfaPageProps) {
           {setup.completed && !user ? <PasskeyLogin next={searchParams.next} /> : null}
         </Card>
       )}
-    </PageMain>
+    </FocusedPage>
   );
 }

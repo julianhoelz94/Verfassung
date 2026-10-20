@@ -5,7 +5,7 @@ import { message } from '../../../../lib/messages';
 import { currentLocale } from '../../../../lib/server-locale';
 import { notFound, redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
-import { PageMain } from '../../../components/PageMain';
+import { WorkspacePage } from '../../../components/layout/templates';
 import { Alert, PageHeader } from '../../../components/ui';
 import { getCountry, getVersion, listAllArticles, listAllUnits, listConstitutionVersions, listCountries, type ArticleSummary, type VersionSummary } from '../../../../lib/api';
 import { amendmentErrorMessage, getAmendment, getAmendmentDiffReview, listRevisions } from '../../../../lib/amendment-editor-api';
@@ -80,9 +80,9 @@ export default async function AmendmentDetailPage(props: AmendmentDetailPageProp
   }
   if (!canVisitEditor(user.roles)) {
     return (
-      <PageMain className="wide">
-        <PageHeader title={<T value={ui.attrs.editorAmendmentsIdPagePageHeaderTitle} />} meta={<SignedInSummary email={user.email} noEditorialRole />} />
-      </PageMain>
+      <WorkspacePage width="content" header={<PageHeader title={<T value={ui.attrs.editorAmendmentsIdPagePageHeaderTitle} />} meta={<SignedInSummary email={user.email} noEditorialRole />} />}>
+
+      </WorkspacePage>
     );
   }
 
@@ -100,10 +100,10 @@ export default async function AmendmentDetailPage(props: AmendmentDetailPageProp
   const constitutionId = await resolveConstitutionId(amendment?.constitutionId, searchParams.constitutionId);
   if (!constitutionId) {
     return (
-      <PageMain className="wide">
-        <PageHeader title={<T value={ui.attrs.editorAmendmentsIdPagePageHeaderTitle2} />} />
+      <WorkspacePage width="content" header={<PageHeader title={<T value={ui.attrs.editorAmendmentsIdPagePageHeaderTitle2} />} />}>
+
         <Alert tone="error"><T value={ui.editor.amendments.id.page.noConstitutionIsAvailableForThisForm} /></Alert>
-      </PageMain>
+      </WorkspacePage>
     );
   }
 
@@ -149,15 +149,15 @@ export default async function AmendmentDetailPage(props: AmendmentDetailPageProp
   const title = isNew ? message(locale, ui.remainingStatus.newAmendingLaw) : (amendment?.title ?? message(locale, ui.remainingStatus.amendingLaw));
 
   return (
-    <PageMain className="wide">
-      <PageHeader
+    <WorkspacePage width="content" header={<PageHeader
           breadcrumbs={[
           { href: '/editor/amendments', label: <T value={ui.nav.legalChanges} /> },
           { label: isNew ? <T value={ui.remainingStatus.new} /> : amendment?.title ?? id.slice(0, 8) },
         ]}
         title={title}
         meta={<SignedInSummary email={user.email} roles={user.roles} />}
-      />
+      />}>
+
       {amendment?.reviewStatus === 'needs_review' ? <Alert tone="info"><T value={ui.editor.amendments.id.page.needsReviewQuotesOrDocumentPinsAre} /></Alert> : null}
       {errorMessage ? <Alert tone="error">{errorMessage}</Alert> : null}
       {searchParams.documentError ? <Alert tone="error"><T value={ui.editor.amendments.id.page.theDocumentLinkCouldNotBeChanged} /></Alert> : null}
@@ -214,6 +214,6 @@ export default async function AmendmentDetailPage(props: AmendmentDetailPageProp
         />
       )}
       {!isNew && tipRevision ? <DocumentLinks targetType="amendment" targetId={id} scopeRevisionId={tipRevision.id} returnTo={`/editor/amendments/${id}`} canEdit={canEdit && amendment?.status !== 'withdrawn' && tipRevision.id !== amendment?.publishedRevisionId} /> : null}
-    </PageMain>
+    </WorkspacePage>
   );
 }

@@ -9,6 +9,8 @@ import type { DiffReviewState } from '../../../lib/diff-review';
 import { Alert, Button } from '../../components/ui';
 import { AmendmentForm } from './AmendmentForm';
 import { AmendmentRevisionPanel } from './AmendmentRevisionPanel';
+import { WorkspaceLayout } from '../../components/layout/templates';
+import surfaceStyles from '../../components/surfaces.module.css';
 
 type AmendmentEditorLayoutProps = {
   amendmentId: string;
@@ -100,8 +102,8 @@ export function AmendmentEditorLayout({
     selectedRevision !== null ? revisionToAmendment(selectedRevision, amendment) : amendment;
 
   return (
-    <div className="workspace amendment-workspace">
-      <section className="panel amendment-main">
+    <WorkspaceLayout variant="amendment">
+      <section className={["panel amendment-main", surfaceStyles.panel].join(' ')}>
         {viewingPast ? (
           <Alert tone="info"><T value={ui.editor.amendments.amendmenteditorlayout.viewingAPastRevisionReadOnlyRestore} /></Alert>
         ) : null}
@@ -139,6 +141,6 @@ export function AmendmentEditorLayout({
           canRestore={canRestore}
         />
       ) : null}
-    </div>
+    </WorkspaceLayout>
   );
 }

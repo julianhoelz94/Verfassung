@@ -5,8 +5,22 @@ import type { HistoryKind } from '../../lib/history';
 import { usability } from '../../lib/usability-messages';
 import { ui } from '../../lib/messages';
 import { T, useTranslation } from './TranslationProvider';
+import { Inline } from './layout/Layout';
+import fieldStyles from './fields.module.css';
 
 export type HistoryMilestone = { kind: HistoryKind; id: string; date?: string | null; dateApproximate?: boolean; title: string; content: ReactNode };
+
+function previewPosition(button: HTMLButtonElement) {
+  const bounds = button.getBoundingClientRect();
+  const rail = button.closest('.history-rail')?.getBoundingClientRect();
+  const visibleLeft = Math.max(0, rail?.left ?? 0);
+  const visibleRight = Math.min(window.innerWidth, rail?.right ?? window.innerWidth);
+  if (bounds.right <= visibleLeft || bounds.left >= visibleRight || bounds.bottom <= 0 || bounds.top >= window.innerHeight) return null;
+  const aboveSpace = bounds.top - 16;
+  const belowSpace = window.innerHeight - bounds.bottom - 16;
+  const below = aboveSpace < 200 && belowSpace > aboveSpace;
+  return { x: bounds.left + bounds.width / 2, top: below ? bounds.bottom + 8 : bounds.top - 8, below, maxHeight: Math.max(48, (below ? belowSpace : aboveSpace) - 8) };
+}
 
 /** The server renders the complete chronology; enhancement selects one detail panel. */
 export function HistoryTimeline({ items }: { items: HistoryMilestone[] }) {
@@ -27,16 +41,17 @@ export function HistoryTimeline({ items }: { items: HistoryMilestone[] }) {
   function showPreview(index: number, button: HTMLButtonElement) {
     cancelDismiss();
     previewAnchor.current = button;
-    const bounds = button.getBoundingClientRect();
-    const aboveSpace = bounds.top - 16;
-    const belowSpace = window.innerHeight - bounds.bottom - 16;
-    const below = aboveSpace < 200 && belowSpace > aboveSpace;
-    setPreview({ index, x: bounds.left + bounds.width / 2, top: below ? bounds.bottom + 8 : bounds.top - 8, below, maxHeight: Math.max(48, (below ? belowSpace : aboveSpace) - 8) });
+    const position = previewPosition(button);
+    setPreview(position ? { index, ...position } : null);
   }
   useEffect(() => {
     const dismiss = (event: Event) => {
       if (event.target instanceof Element && event.target.closest('#history-preview')) return;
-      setPreview(null);
+      const anchor = previewAnchor.current;
+      const position = anchor?.matches(':focus-visible') ? previewPosition(anchor) : null;
+      // Navigation can deliver its scroll event after focus opens the preview.
+      // Reposition an open keyboard preview without reopening one closed by Escape.
+      setPreview(current => current && position ? { ...current, ...position } : null);
     };
     const dismissOnEscape = (event: KeyboardEvent) => { if (event.key === 'Escape') setPreview(null); };
     window.addEventListener('keydown', dismissOnEscape);
@@ -80,15 +95,15 @@ export function HistoryTimeline({ items }: { items: HistoryMilestone[] }) {
   return <section className="history-timeline" aria-label={t(usability.milestones)}>
     <p className="muted"><T value={usability.milestoneHint} /></p>
     <div className="history-controls">
-      <label className="field" htmlFor="history-year"><T value={usability.jumpYear} />
+      <label className={["field", fieldStyles.field].join(' ')} htmlFor="history-year"><T value={usability.jumpYear} />
         <select id="history-year" value={items[current].date?.slice(0, 4) || ''} onChange={event => choose(groups.get(event.target.value)?.[0] ?? 0)}>
           {[...groups.keys()].map(year => <option key={year} value={year}>{year || t(usability.undated)}</option>)}
         </select>
       </label>
-      <div className="form-row">
+      <Inline align="end" className="form-row">
         <button type="button" className="btn btn-sm" disabled={current === 0} onClick={() => choose(current - 1)}><T value={usability.previous} /></button>
         <button type="button" className="btn btn-sm" disabled={current === items.length - 1} onClick={() => choose(current + 1)}><T value={usability.next} /></button>
-      </div>
+      </Inline>
     </div>
     <div ref={rail} className="history-rail" role="region" tabIndex={0} aria-label={t(usability.timelineNavigation)} onKeyDown={event => {
       let index: number;

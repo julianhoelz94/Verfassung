@@ -1,0 +1,13 @@
+.page {
+  min-width: 0;
+  max-width: var(--content-max);
+  margin-inline: auto;
+  padding: clamp(var(--space-5), 4vw, var(--space-7)) var(--gutter) var(--space-8);
+}
+
+.reading { max-width: calc(var(--measure) + 2 * var(--gutter)); }
+.content { max-width: var(--content-max); }
+
+@media print {
+  .page { max-width: none; padding: 0; }
+}

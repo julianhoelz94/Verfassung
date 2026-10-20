@@ -2,7 +2,7 @@ import { T } from '../components/TranslationProvider';
 import { ui } from '../../lib/messages';
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import { PageMain } from '../components/PageMain';
+import { ReaderPage } from '../components/layout/templates';
 import { PageHeader } from '../components/ui';
 import { publicLegalPage } from '../../lib/legal-pages';
 import { currentLocale } from '../../lib/server-locale';
@@ -18,10 +18,10 @@ export default async function DatenschutzPage() {
   const page = localized ?? await publicLegalPage('datenschutz');
   if (!page) notFound();
   return (
-    <PageMain>
-      <PageHeader title={<T value={ui.attrs.datenschutzPagePageHeaderTitleDatenschutzerklaRung} />} meta={new Date(page.createdAt).toLocaleDateString(locale === 'de' ? 'de-DE' : 'en-US')} />
+    <ReaderPage width="reading" header={<PageHeader title={<T value={ui.attrs.datenschutzPagePageHeaderTitleDatenschutzerklaRung} />} meta={new Date(page.createdAt).toLocaleDateString(locale === 'de' ? 'de-DE' : 'en-US')} />}>
+
       {locale === 'en' && !localized ? <p>{message(locale, ui.legal.englishUnavailable)}</p> : null}
       <div className="legal-page-content" lang={localized ? 'en' : 'de'}>{page.content}</div>
-    </PageMain>
+    </ReaderPage>
   );
 }

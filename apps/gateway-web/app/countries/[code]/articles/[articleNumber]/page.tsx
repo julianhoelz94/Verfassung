@@ -4,7 +4,7 @@ import { T } from '../../../../components/TranslationProvider';
 import { ui, type UiMessage } from '../../../../../lib/messages';
 import { notFound } from 'next/navigation';
 import { ConstitutionText } from '../../../../components/ConstitutionText';
-import { PageMain } from '../../../../components/PageMain';
+import { ReaderPage } from '../../../../components/layout/templates';
 import { Provenance } from '../../../../components/Provenance';
 import { AmendmentUnitLinks } from '../../../../components/AmendmentUnitLinks';
 import { ServiceUnavailable } from '../../../../components/StatusMessage';
@@ -21,6 +21,7 @@ import {
 } from '../../../../../lib/api';
 import { orderVersions } from '../../../../../lib/compare';
 import { FormattedDate } from '../../../../../lib/format-date';
+import { Stack } from '../../../../components/layout/Layout';
 
 type HistoryPageProps = {
   params: Promise<{ code: string; articleNumber: string }>;
@@ -53,12 +54,12 @@ export default async function ArticleHistoryPage(props: HistoryPageProps) {
 
   if (error) {
     return (
-      <PageMain>
+      <ReaderPage width="reading">
         <ServiceUnavailable
           service={ui.services.catalog}
           retryHref={`/countries/${params.code}/articles/${encodeURIComponent(articleNumber)}`}
         />
-      </PageMain>
+      </ReaderPage>
     );
   }
 
@@ -99,8 +100,7 @@ export default async function ArticleHistoryPage(props: HistoryPageProps) {
   }
 
   return (
-    <PageMain>
-      <PageHeader
+    <ReaderPage width="reading" header={<PageHeader
         breadcrumbs={[
           { href: '/', label: <T value={ui.nav.countries} /> },
           { href: `/countries/${country.isoCode}`, label: country.name },
@@ -108,9 +108,10 @@ export default async function ArticleHistoryPage(props: HistoryPageProps) {
         ]}
         eyebrow={`${country.name} · ${constitution.title}`}
         title={<><T value={ui.countries.code.versions.versionid.articles.articleid.page.historyOfArticle} /> {articleNumber}</>}
-      />
+      />}>
+
       {loadError ? <p role="alert"><T value={loadError} /></p> : null}
-      <div className="stack">
+      <Stack>
         {snapshots.map((snapshot, index) => {
           const previous = snapshots[index - 1];
           const incoming = amendments.filter(
@@ -122,7 +123,7 @@ export default async function ArticleHistoryPage(props: HistoryPageProps) {
           return (
             <section key={snapshot.version.id} className="history-version">
               {previous ? (
-                <div className="stack">
+                <Stack>
                   {incoming.map((amendment) =>
                     amendment.changes.map((change) => (
                       <div key={change.id} className="change-row">
@@ -158,7 +159,7 @@ export default async function ArticleHistoryPage(props: HistoryPageProps) {
                     href={`/countries/${country.isoCode}/compare?from=${encodeURIComponent(previous.version.id)}&to=${encodeURIComponent(snapshot.version.id)}`}
                   >
                     <T value={ui.countries.code.articles.articlenumber.page.compareWithPrevious} />{" "}</a>
-                </div>
+                </Stack>
               ) : null}
               <h2>
                 {snapshot.version.versionLabel}
@@ -187,7 +188,7 @@ export default async function ArticleHistoryPage(props: HistoryPageProps) {
             </section>
           );
         })}
-      </div>
-    </PageMain>
+      </Stack>
+    </ReaderPage>
   );
 }

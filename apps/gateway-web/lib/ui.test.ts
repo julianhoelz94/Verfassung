@@ -1,7 +1,7 @@
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import { Badge, Button, Chip, Pager, Toolbar, WorkflowSteps } from '../app/components/ui';
+import { Badge, Button, Chip, Input, Select, TextArea, Pager, Toolbar, WorkflowSteps } from '../app/components/ui';
 
 describe('Button', () => {
   it('adds ghost and sm classes', () => {
@@ -62,5 +62,33 @@ describe('WorkflowSteps', () => {
     expect(html).toContain('is-done');
     expect(html).toContain('is-current');
     expect(html).toContain('In review');
+  });
+});
+
+describe('shared form field accessibility', () => {
+  for (const Control of [Input, Select, TextArea]) {
+    it(`${Control.name} keeps the label, help, error and existing description associated`, () => {
+      document.body.innerHTML = renderToStaticMarkup(createElement(Control, {
+        id: 'field', name: 'field', label: 'Name', help: 'Use the published name.', error: 'A name is required.', 'aria-describedby': 'external-description',
+      }));
+      const control = document.getElementById('field')!;
+      expect(document.querySelector('label')?.htmlFor).toBe(control.id);
+      expect(control.getAttribute('aria-invalid')).toBe('true');
+      expect(control.getAttribute('aria-describedby')?.split(' ')).toEqual(['external-description', 'field-help', 'field-error']);
+      expect(document.getElementById('field-help')?.textContent).toBe('Use the published name.');
+      expect(document.getElementById('field-error')?.textContent).toBe('A name is required.');
+    });
+  }
+
+  it('generates distinct labelled controls when no id or name is supplied', () => {
+    document.body.innerHTML = renderToStaticMarkup(createElement('form', null,
+      createElement(Input, { label: 'First', help: 'First help' }), createElement(Input, { label: 'Second', help: 'Second help' }),
+    ));
+    const controls = [...document.querySelectorAll('input')];
+    expect(new Set(controls.map(control => control.id)).size).toBe(2);
+    for (const control of controls) {
+      expect([...document.querySelectorAll('label')].some(label => label.htmlFor === control.id)).toBe(true);
+      expect(document.getElementById(control.getAttribute('aria-describedby')!)).not.toBeNull();
+    }
   });
 });

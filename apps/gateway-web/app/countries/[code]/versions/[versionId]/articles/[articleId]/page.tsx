@@ -5,7 +5,7 @@ import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import { ConstitutionText } from '../../../../../../components/ConstitutionText';
 import { ContentTranslationRegion } from '../../../../../../components/ContentTranslationRegion';
-import { PageMain } from '../../../../../../components/PageMain';
+import { ReaderPage } from '../../../../../../components/layout/templates';
 import { PrintLink } from '../../../../../../components/PrintLink';
 import { Provenance } from '../../../../../../components/Provenance';
 import { ServiceUnavailable } from '../../../../../../components/StatusMessage';
@@ -68,12 +68,12 @@ export default async function ArticlePage(props: ArticlePageProps) {
 
   if (error) {
     return (
-      <PageMain>
+      <ReaderPage width="reading">
         <ServiceUnavailable
           service={ui.services.content}
           retryHref={`/countries/${params.code}/versions/${params.versionId}/articles/${params.articleId}`}
         />
-      </PageMain>
+      </ReaderPage>
     );
   }
 
@@ -90,8 +90,7 @@ export default async function ArticlePage(props: ArticlePageProps) {
 
   const readerOutline = await getReaderOutline(params.versionId);
   return (
-    <PageMain>
-      <PageHeader
+    <ReaderPage width="reading" header={<PageHeader
         breadcrumbs={[
           { href: '/', label: <T value={ui.nav.countries} /> },
           { href: `/countries/${country.isoCode}`, label: country.name },
@@ -110,7 +109,8 @@ export default async function ArticlePage(props: ArticlePageProps) {
             <PrintLink />
           </>
         }
-      />
+      />}>
+
       <SnapshotNotice code={country.isoCode} viewedId={params.versionId} currentId={version.currentVersionId ?? version.id} />
       <article id={`article-${article.articleNumber}`}>
         {searchParams.error === 'title' ? (
@@ -134,6 +134,6 @@ export default async function ArticlePage(props: ArticlePageProps) {
         />
         </ContentTranslationRegion>
       </article>
-    </PageMain>
+    </ReaderPage>
   );
 }

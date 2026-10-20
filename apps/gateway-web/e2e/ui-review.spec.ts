@@ -50,6 +50,7 @@ for (const locale of ['en', 'de']) for (const width of sizes) {
         await expect(page.locator('h1')).toHaveCount(1);
         await expect(page.locator('h1')).toBeVisible();
         await expect(page.locator('main')).toHaveAttribute('id', 'main-content');
+        await expect(page.locator('main')).toHaveAttribute('data-template', /^(focused|settings|collection|reader|workspace)$/);
         const heading = await page.locator('h1').textContent();
         expect(heading).not.toMatch(/Something went wrong|Etwas ist schief|not found|nicht gefunden/i);
         await expect(page.getByRole('alert').filter({ hasText: /could not be loaded|could not be retrieved|temporarily unavailable|konnte[n]? nicht geladen|vorübergehend nicht verfügbar/i })).toHaveCount(0);

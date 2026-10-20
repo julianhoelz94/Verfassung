@@ -8,7 +8,7 @@ import { CompareView } from '../../../components/CompareView';
 import { ConstitutionText } from '../../../components/ConstitutionText';
 import { CopyLink } from '../../../components/CopyLink';
 import { DiffConstitutionText } from '../../../components/DiffConstitutionText';
-import { PageMain } from '../../../components/PageMain';
+import { ReaderPage } from '../../../components/layout/templates';
 import { AmendmentUnitLinks } from '../../../components/AmendmentUnitLinks';
 import { PrintLink } from '../../../components/PrintLink';
 import { ServiceUnavailable } from '../../../components/StatusMessage';
@@ -45,6 +45,7 @@ import { publicVersions, publicVersionForSnapshot, snapshotVersionId } from '../
 import { currentUser, requireSessionBearer } from '../../../../lib/session';
 import { canVisitEditor } from '../../../../lib/nav';
 import { CompareForm } from '../CompareForm';
+import { Stack } from '../../../components/layout/Layout';
 
 type ComparePageProps = {
   params: Promise<{ code: string }>;
@@ -126,9 +127,9 @@ export default async function ComparePage(props: ComparePageProps) {
 
   if (error) {
     return (
-      <PageMain className="wide">
+      <ReaderPage width="content">
         <ServiceUnavailable service={ui.services.catalog} retryHref={`/countries/${params.code}/compare`} />
-      </PageMain>
+      </ReaderPage>
     );
   }
 
@@ -255,8 +256,7 @@ export default async function ComparePage(props: ComparePageProps) {
   const hideUnchangedHref = `/countries/${country.isoCode}/compare?${compareQuery}`;
 
   return (
-    <PageMain className="wide">
-      <PageHeader
+    <ReaderPage width="content" header={<PageHeader
         breadcrumbs={[
           { href: '/', label: <T value={ui.nav.countries} /> },
           { href: `/countries/${country.isoCode}`, label: country.name },
@@ -270,7 +270,8 @@ export default async function ComparePage(props: ComparePageProps) {
             <PrintLink />
           </>
         }
-      />
+      />}>
+
       <CompareForm
         code={country.isoCode}
         versions={versions}
@@ -338,7 +339,7 @@ export default async function ComparePage(props: ComparePageProps) {
                       ) : null}
                     </span>
                   </summary>
-                  <div className="stack">
+                  <Stack>
                     {amendment.changes.map((change) => (
                       <div key={change.id} className="change-row">
                         <Badge tone={hopChangeTone(change.changeType)}>{<T value={changeTypeMessage(change.changeType)} />}</Badge>
@@ -359,7 +360,7 @@ export default async function ComparePage(props: ComparePageProps) {
                         <AmendmentUnitLinks change={change} />
                       </div>
                     ))}
-                  </div>
+                  </Stack>
                 </details>
               );
             })}
@@ -440,6 +441,6 @@ export default async function ComparePage(props: ComparePageProps) {
           </CompareView>
         </>
       ) : null}
-    </PageMain>
+    </ReaderPage>
   );
 }

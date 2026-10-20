@@ -83,7 +83,12 @@ for (const locale of ['en', 'de']) for (const width of [390, 820, 1440]) {
       await milestones.first().focus();
       await page.keyboard.press('End');
       await expect(milestones.last()).toHaveAttribute('aria-pressed', 'true');
+      await expect(milestones.last()).toBeFocused();
+      await page.locator('.history-rail').dispatchEvent('scroll');
       await expect(page.getByRole('tooltip')).toBeVisible();
+      await page.keyboard.press('Escape');
+      await page.locator('.history-rail').dispatchEvent('scroll');
+      await expect(page.getByRole('tooltip')).toHaveCount(0);
       await page.reload();
       await expect(milestones.last()).toHaveAttribute('aria-pressed', 'true');
       await expect(page.locator('.history-details > li:visible')).toHaveCount(1);

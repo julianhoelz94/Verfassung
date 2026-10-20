@@ -2,7 +2,7 @@ import { CountryNavigation } from '../../../../components/CountryNavigation';
 import { T } from '../../../../components/TranslationProvider';
 import { ui } from '../../../../../lib/messages';
 import { notFound } from 'next/navigation';
-import { PageMain } from '../../../../components/PageMain';
+import { ReaderPage } from '../../../../components/layout/templates';
 import { PageHeader } from '../../../../components/ui';
 import { WikiImages } from '../../../../components/WikiImages';
 import { WikiBody } from '../../../../components/WikiBody';
@@ -11,6 +11,7 @@ import { lifecycleStatusMessage } from '../../../../../lib/lifecycle-label';
 import { WikiSources } from '../../../../components/WikiSources';
 import { getConstitutionLifecycle, getCountry, getWikiPage } from '../../../../../lib/api';
 import { publicVersions } from '../../../../../lib/reading';
+import surfaceStyles from '../../../../components/surfaces.module.css';
 
 type Props = { params: Promise<{ code: string; constitutionId: string }> };
 
@@ -26,15 +27,15 @@ export default async function ConstitutionOverview({ params }: Props) {
   const versions = publicVersions(constitution.versions);
 
   return (
-    <PageMain className="wide">
-      <PageHeader
+    <ReaderPage width="content" header={<PageHeader
         breadcrumbs={[
           { href: '/', label: <T value={ui.nav.countries} /> },
           { href: `/countries/${country.isoCode}`, label: country.name },
           { label: constitution.title },
         ]}
         title={constitution.title}
-      />
+      />}>
+
       <CountryNavigation code={code} active="reading" />
       <p>
         {constitution.interim ? <><T value={ui.lifecycle.interimConstitution} /> · </> : null}
@@ -49,7 +50,7 @@ export default async function ConstitutionOverview({ params }: Props) {
         </section>
       ) : null}
       {wiki ? (
-        <section className="card">
+        <section className={["card", surfaceStyles.card].join(' ')}>
           <h2><T value={ui.countries.code.constitutions.constitutionid.page.aboutThisConstitution} /></h2>
           <ContentTranslationRegion sourceLanguage="auto"><p data-translate-content>{wiki.summary}</p><WikiImages images={wiki.images.filter((image) => image.placement === 'before_body')} /><WikiBody body={wiki.body} /></ContentTranslationRegion>
           <WikiImages images={wiki.images.filter((image) => image.placement !== 'before_body')} />
@@ -68,6 +69,6 @@ export default async function ConstitutionOverview({ params }: Props) {
           </ul>
         )}
       </section>
-    </PageMain>
+    </ReaderPage>
   );
 }

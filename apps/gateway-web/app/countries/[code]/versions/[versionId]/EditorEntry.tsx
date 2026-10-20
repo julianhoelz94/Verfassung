@@ -3,6 +3,8 @@ import { ui } from '../../../../../lib/messages';
 import { message } from '../../../../../lib/messages';
 import { currentLocale } from '../../../../../lib/server-locale';
 import { listAllSessions, type EditSessionSummary } from '../../../../../lib/editor-api';
+import { Stack } from '../../../../components/layout/Layout';
+import surfaceStyles from '../../../../components/surfaces.module.css';
 
 type SessionWithVersion = { session: EditSessionSummary; versionLabel: string };
 
@@ -48,7 +50,7 @@ export async function EditorEntry({ versions, viewedVersionId, viewedVersionLabe
   const open = sessions.filter(({ session }) => session.status === 'open');
   const waiting = sessions.filter(({ session }) => session.status === 'reviewing' || session.status === 'approved');
 
-  return <section id="editor-entry" className="card editor-entry" aria-labelledby="editor-entry-title">
+  return <section id="editor-entry" className={["card editor-entry", surfaceStyles.card].join(' ')} aria-labelledby="editor-entry-title">
     <h2 id="editor-entry-title"><T value={ui.countries.code.versions.versionid.editorentry.editThisConstitution} /></h2>
     {unavailable ? <p role="status"><T value={ui.countries.code.versions.versionid.editorentry.editSessionsAreTemporarilyUnavailableTryAgain} /></p> : <>
       <section aria-labelledby="existing-sessions-title">
@@ -69,12 +71,12 @@ export async function EditorEntry({ versions, viewedVersionId, viewedVersionLabe
           if (!allowed) return null;
           const existing = sessions.find(({ session }) => session.versionId === viewedVersionId && session.hopKind === kind);
           if (existing) return <p key={kind}><T value={label} />: {existing.session.status === 'open' ? <a href={sessionHref(existing.session)}><T value={ui.countries.code.versions.versionid.editorentry.continueYourOpenSession} /></a> : <><T value={ui.remainingStatus.already} /> {message(locale, existing.session.status === 'reviewing' ? ui.remainingStatus.reviewing : ui.remainingStatus.approved)}. <T value={ui.remainingStatus.openWorkflowAbove} /></>}</p>;
-          return <form key={kind} action="/editor/command" method="post">
+          return <Stack as="form" key={kind} action="/editor/command" method="post">
             <input type="hidden" name="command" value="open" />
             <input type="hidden" name="versionId" value={viewedVersionId} />
             <input type="hidden" name="hopKind" value={kind} />
             <button className="btn" type="submit"><T value={label} /></button>
-          </form>;
+          </Stack>;
         })}
       </section>
     </>}

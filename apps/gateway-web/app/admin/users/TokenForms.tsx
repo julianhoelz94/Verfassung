@@ -5,6 +5,7 @@ import { ui } from '../../../lib/messages';
 import { useFormState } from 'react-dom';
 import { Alert, Button, Input } from '../../components/ui';
 import { inviteUserAction, issueResetAction, createServiceTokenAction, rotateServiceTokenAction, type TokenRevealState } from '../../account/actions';
+import { Stack } from '../../components/layout/Layout';
 
 const initial: TokenRevealState = {};
 
@@ -19,11 +20,11 @@ export function InviteUserForm() {
         </Alert>
       ) : null}
       {state.error ? <Alert tone="error"><T value={ui.admin.users.tokenforms.thatAccountActionCouldNotBeCompleted} /></Alert> : null}
-      <form action={action}>
+      <Stack as="form" action={action}>
         <Input label={<T value={ui.attrs.adminUsersTokenformsInputLabelEmail} />} id="email" name="email" type="email" required />
         <Input label={<T value={ui.attrs.adminUsersTokenformsInputLabelRoles} />} id="roles" name="roles" defaultValue="viewer" />
         <Button variant="primary"><T value={ui.admin.users.tokenforms.sendInvite} /></Button>
-      </form>
+      </Stack>
     </>
   );
 }
@@ -39,10 +40,10 @@ export function IssueResetForm({ userId }: { userId: string }) {
         </Alert>
       ) : null}
       {state.error ? <Alert tone="error"><T value={ui.admin.users.tokenforms.thatAccountActionCouldNotBeCompleted} /></Alert> : null}
-      <form action={action}>
+      <Stack as="form" action={action}>
         <input type="hidden" name="userId" value={userId} />
         <Button><T value={ui.admin.users.tokenforms.issueResetToken} /></Button>
-      </form>
+      </Stack>
     </>
   );
 }
@@ -57,7 +58,7 @@ export function CreateServiceTokenForm() {
         </Alert>
       ) : null}
       {state.error ? <Alert tone="error"><T value={ui.admin.users.tokenforms.thatTokenActionCouldNotBeCompleted} /></Alert> : null}
-      <form action={action}>
+      <Stack as="form" action={action}>
         <Input label={<T value={ui.attrs.adminUsersTokenformsInputLabelName} />} id="token-name" name="name" required />
         <Input
           label={<T value={ui.attrs.adminUsersTokenformsInputLabelScopes} />}
@@ -67,7 +68,7 @@ export function CreateServiceTokenForm() {
           required
         />
         <Button variant="primary"><T value={ui.admin.users.tokenforms.issueToken} /></Button>
-      </form>
+      </Stack>
     </>
   );
 }
@@ -82,10 +83,10 @@ export function RotateServiceTokenForm({ tokenId }: { tokenId: string }) {
         </Alert>
       ) : null}
       {state.error ? <Alert tone="error"><T value={ui.admin.users.tokenforms.thatTokenActionCouldNotBeCompleted} /></Alert> : null}
-      <form action={action}>
+      <Stack as="form" action={action}>
         <input type="hidden" name="tokenId" value={tokenId} />
         <Button><T value={ui.admin.users.tokenforms.rotate} /></Button>
-      </form>
+      </Stack>
     </>
   );
 }

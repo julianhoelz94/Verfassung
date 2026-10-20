@@ -15,6 +15,8 @@ import { publicVersions } from '../../../../lib/reading';
 import { Disclosure } from '../../../components/Disclosure';
 
 import type { HistoryMilestone } from '../../../components/HistoryTimeline';
+import surfaceStyles from '../../../components/surfaces.module.css';
+import fieldStyles from '../../../components/fields.module.css';
 
 const labels: Record<ConstitutionLifecycleEvent['eventType'], UiMessage> = {
   adopted: ui.lifecycleEvents.adopted,
@@ -95,7 +97,7 @@ export async function loadConstitutionHistory(country: CountryDetail, onValue?: 
       : null;
     const versions = publicVersions(constitution.versions);
     return { kind: 'constitution' as const, id: event.id, date: event.eventDate, dateApproximate: event.scope === 'whole' && event.dateCertainty === 'approximate', title: `${message(locale, event.scope === 'whole' ? labels[event.eventType] : provisionLabels[event.eventType])} · ${constitution.title}`, content: (
-      <article className="card">
+      <article className={["card", surfaceStyles.card].join(' ')}>
         <p><time dateTime={event.eventDate}>{event.scope === 'whole' && event.dateCertainty === 'approximate' ? <T value={ui.remainingStatus.circa} /> : ''}{event.eventDate}</time> · {<T value={event.scope === 'whole' ? labels[event.eventType] : provisionLabels[event.eventType]} />}</p>
         <h2 className="card-title">
           <a href={`/countries/${country.isoCode}/constitutions/${constitution.id}`}>{constitution.title}</a>
@@ -128,11 +130,11 @@ export async function loadConstitutionHistory(country: CountryDetail, onValue?: 
     ) };
   });
   return { items, status: (<>
-      <section className="card history-status">
+      <section className={["card history-status", surfaceStyles.card].join(' ')}>
         <h2><T value={ui.countries.code.constitutionTimeline.page.statusOnADate} /></h2>
         <form method="get" className="date-filter" action={`/countries/${country.isoCode}/timeline`}>
           <input type="hidden" name="events" value={eventFilter} />
-          <label className="field" htmlFor="constitution-timeline-date"><T value={ui.countries.code.constitutionTimeline.page.date} />
+          <label className={["field", fieldStyles.field].join(' ')} htmlFor="constitution-timeline-date"><T value={ui.countries.code.constitutionTimeline.page.date} />
             <input id="constitution-timeline-date" type="date" name="on" defaultValue={on} />
           </label>
           <button type="submit"><T value={ui.countries.code.constitutionTimeline.page.showStatus} /></button>

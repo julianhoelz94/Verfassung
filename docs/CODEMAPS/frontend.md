@@ -8,6 +8,11 @@ references; ADR 0005 and `docs/design/two-axis-versions.md` define version seman
 
 ## Routes and shared UI
 
+Page composition: `app/components/layout/templates.tsx`; spacing primitives:
+`app/components/layout/Layout.tsx`; runtime tokens: `app/styles/tokens.css`.
+Scoped CSS Modules own page, header, surface, field and template styles. See
+`docs/design/ui-templates.md` for spacing ownership and template selection.
+
 | Area | Entry points |
 | --- | --- |
 | Public discovery/reading | `app/page.tsx`, `search/`, `countries/[code]/`, `versions/[versionId]/units/[unitId]/` |

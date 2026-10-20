@@ -12,6 +12,7 @@ import { Badge, type BadgeTone, Toolbar } from './ui';
 import { ConstitutionText } from './ConstitutionText';
 import { Segmented } from './Segmented';
 import { Toc } from './Toc';
+import { ReaderLayout } from './layout/templates';
 
 type VersionReaderProps = {
   code: string;
@@ -89,10 +90,7 @@ export function VersionReader({
   const toc = <Toc items={tocItems} />;
 
   return (
-    <div className="reader">
-      <aside className="reader-aside">
-        <Toc items={tocItems} landmarkId="toc" />
-      </aside>
+    <ReaderLayout navigation={<Toc items={tocItems} landmarkId="toc" />}>
       <section>
         <Toolbar label={t(ui.accessibility.readingOptions)}>
           <details className="toc-mobile">
@@ -175,6 +173,6 @@ export function VersionReader({
           })}
         </ol>
       </section>
-    </div>
+    </ReaderLayout>
   );
 }

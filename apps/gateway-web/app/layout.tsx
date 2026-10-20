@@ -1,3 +1,4 @@
+import './styles/tokens.css';
 import './globals.css';
 import type { ReactNode } from 'react';
 import type { Metadata } from 'next';

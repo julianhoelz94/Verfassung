@@ -5,6 +5,8 @@ import type { ReactNode } from 'react';
 import type { Amendment, VersionSummary } from '../../../lib/api';
 import type { AmendmentRevision } from '../../../lib/amendment-editor-api';
 import { Badge, Button } from '../../components/ui';
+import { Stack } from '../../components/layout/Layout';
+import surfaceStyles from '../../components/surfaces.module.css';
 
 type QuoteReviewPanelProps = {
   amendment: Amendment;
@@ -26,7 +28,7 @@ function liveVersionFor(version: VersionSummary | null, versions: VersionSummary
 
 function QuoteSide({ label, reviewed, live, contentByVersion }: { label: ReactNode; reviewed: VersionSummary | null; live: VersionSummary | null; contentByVersion: Record<string, string[]> }) {
   return (
-    <section className="panel quote-review-side">
+    <section className={["panel quote-review-side", surfaceStyles.panel].join(' ')}>
       <h2 className="panel-title">{label}</h2>
       <p><strong><T value={ui.editor.amendments.quotereviewpanel.lastReviewed} /></strong><br />{reviewed?.versionLabel ?? <T value={ui.quoteReview.noQuotedSnapshot} />}</p>
       <p><strong><T value={ui.editor.amendments.quotereviewpanel.liveTip} /></strong><br />{live?.versionLabel ?? <T value={ui.quoteReview.noQuotedSnapshot} />}</p>
@@ -47,7 +49,7 @@ export function QuoteReviewPanel({ amendment, publishedRevision, versions, canCo
       <h2 id="quote-review-title" className="section-title"><T value={ui.editor.amendments.quotereviewpanel.flaggedRecordReview} /></h2>
       <div className="quote-review-grid">
         <QuoteSide label={<T value={ui.accessibility.source} />} reviewed={source} live={sourceLive} contentByVersion={contentByVersion} />
-        <section className="panel quote-review-instrument">
+        <section className={["panel quote-review-instrument", surfaceStyles.panel].join(' ')}>
           <h2 className="panel-title"><T value={ui.editor.amendments.quotereviewpanel.instrument} /></h2>
           <p><strong>{publishedRevision?.title ?? amendment.title}</strong></p>
           <p>{publishedRevision?.comment ?? amendment.comment ?? <T value={ui.quoteReview.noReviewerComment} />}</p>
@@ -59,10 +61,10 @@ export function QuoteReviewPanel({ amendment, publishedRevision, versions, canCo
             ))}
           </ul>
           {canConfirm ? (
-            <form action="/editor/command" method="post"><input type="hidden" name="command" value="amendment-confirm" />
+            <Stack as="form" action="/editor/command" method="post"><input type="hidden" name="command" value="amendment-confirm" />
               <input type="hidden" name="amendmentId" value={amendment.id} />
               <Button type="submit"><T value={ui.editor.amendments.quotereviewpanel.confirmLiveQuotesAndRepublish} /></Button>
-            </form>
+            </Stack>
           ) : null}
         </section>
         <QuoteSide label={<T value={ui.accessibility.target} />} reviewed={target} live={targetLive} contentByVersion={contentByVersion} />

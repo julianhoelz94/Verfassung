@@ -7,7 +7,7 @@ import { message } from '../../../lib/messages';
 import { currentLocale } from '../../../lib/server-locale';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
-import { PageMain } from '../../components/PageMain';
+import { CollectionPage } from '../../components/layout/templates';
 import { ServiceUnavailable } from '../../components/StatusMessage';
 import { WikiImages } from '../../components/WikiImages';
 import { WikiBody } from '../../components/WikiBody';
@@ -23,6 +23,8 @@ import { atlasTitle, metaDescription, pageMetadata } from '../../../lib/page-met
 import { chainTipId, publicVersions, snapshotVersionId } from '../../../lib/reading';
 import { CompareForm } from './CompareForm';
 import { listDocumentLinks } from '../../../lib/document-api';
+import { Inline, Stack } from '../../components/layout/Layout';
+import surfaceStyles from '../../components/surfaces.module.css';
 
 type CountryPageProps = {
   params: Promise<{ code: string }>;
@@ -60,9 +62,9 @@ export default async function CountryPage(props: CountryPageProps) {
 
   if (error) {
     return (
-      <PageMain className="wide">
+      <CollectionPage width="content">
         <ServiceUnavailable service={ui.services.catalog} retryHref={`/countries/${code}`} />
-      </PageMain>
+      </CollectionPage>
     );
   }
 
@@ -91,8 +93,7 @@ export default async function CountryPage(props: CountryPageProps) {
   )));
 
   return (
-    <PageMain className="wide">
-      <PageHeader
+    <CollectionPage width="content" header={<PageHeader
         breadcrumbs={[{ href: '/', label: message(locale, ui.nav.countries) }, { label: country.name }]}
         title={<>{country.name}<span className="country-title-code" aria-hidden="true">{country.isoCode}</span></>}
         meta={
@@ -105,10 +106,11 @@ export default async function CountryPage(props: CountryPageProps) {
             </span>
           </>
         }
-      />
+      />}>
+
       <CountryNavigation code={country.isoCode} active="overview" />
       {countryWiki ? (
-        <section className="card">
+        <section className={["card", surfaceStyles.card].join(' ')}>
           <h2><T value={ui.countries.code.page.about} />{" "}{country.name}</h2>
           <ContentTranslationRegion sourceLanguage="auto"><p data-translate-content>{countryWiki.summary}</p><WikiImages images={countryWiki.images.filter((image) => image.placement === 'before_body')} /><WikiBody body={countryWiki.body} /></ContentTranslationRegion>
           <WikiImages images={countryWiki.images.filter((image) => image.placement !== 'before_body')} />
@@ -124,7 +126,7 @@ export default async function CountryPage(props: CountryPageProps) {
         const newestPublic = publicLine[publicLine.length - 1];
         const previousPublic = publicLine.length >= 2 ? publicLine[publicLine.length - 2] : undefined;
         return (
-          <section key={constitution.id} className="card">
+          <Stack as="section" key={constitution.id} className={["card", surfaceStyles.card].join(' ')}>
             <h2 className="card-title">
               <a href={`/countries/${country.isoCode}/constitutions/${constitution.id}`}>{constitution.title}</a>
             </h2>
@@ -146,7 +148,7 @@ export default async function CountryPage(props: CountryPageProps) {
                 </Chip>
               ))}
             </div>
-            <div className="card-actions">
+            <Inline className="card-actions">
               {tipId ? (
                 <a className="btn btn-sm btn-primary" href={`/countries/${country.isoCode}/versions/${tipId}`}>
                   <T value={ui.countries.code.page.readLatest} />{" "}</a>
@@ -158,7 +160,7 @@ export default async function CountryPage(props: CountryPageProps) {
                 >
                   <T value={ui.countries.code.page.compare} />{" "}</a>
               ) : null}
-            </div>
+            </Inline>
             {(documentsByConstitution.get(constitution.id) ?? []).length ? <div>
               <h3><T value={ui.countries.code.page.documents} /></h3>
               <ul className="link-list">{(documentsByConstitution.get(constitution.id) ?? []).map((link) => <li key={link.documentId}>
@@ -190,9 +192,9 @@ export default async function CountryPage(props: CountryPageProps) {
                   <T value={reviewUi.textCorrections} />{" "}</a>
               ) : null}
             </Disclosure>
-          </section>
+          </Stack>
         );
       })}
-    </PageMain>
+    </CollectionPage>
   );
 }

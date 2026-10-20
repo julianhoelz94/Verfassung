@@ -3,7 +3,7 @@ import { T } from '../components/TranslationProvider';
 import { ui } from '../../lib/messages';
 import { redirect } from 'next/navigation';
 import { Alert, Button, Card, Input, PageHeader } from '../components/ui';
-import { PageMain } from '../components/PageMain';
+import { FocusedPage } from '../components/layout/templates';
 import { canVisitEditor } from '../../lib/nav';
 import { currentUser } from '../../lib/session';
 import { loginAction } from './actions';
@@ -33,8 +33,7 @@ export default async function LoginPage(props: LoginPageProps) {
   }
 
   return (
-    <PageMain>
-      <PageHeader
+    <FocusedPage width="reading" header={<PageHeader
         title={<T value={ui.attrs.loginPagePageHeaderTitleLogIn} />}
         meta={
           seedHintEnabled() ? (
@@ -44,7 +43,8 @@ export default async function LoginPage(props: LoginPageProps) {
             <T value={reviewUi.signInHint} />
           )
         }
-      />
+      />}>
+
       {searchParams.error ? (
         <Alert tone="error">
           <span id="login-error">
@@ -89,6 +89,6 @@ export default async function LoginPage(props: LoginPageProps) {
         <a href="/reset"><T value={ui.login.page.forgotPassword} /></a>
       </p> : null}
       {setup.completed && registrationEnabled ? <p><a href="/register"><T value={ui.login.page.createAnAccount} /></a></p> : null}
-    </PageMain>
+    </FocusedPage>
   );
 }

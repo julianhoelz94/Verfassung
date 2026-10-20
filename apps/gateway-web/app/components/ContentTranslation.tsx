@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import { translateContentAction } from '../content-translation/actions';
 import { T, useLocale } from './TranslationProvider';
 import { ui } from '../../lib/messages';
+import { Inline } from './layout/Layout';
 
 type ContentTranslationProps = {
   children: ReactNode;
@@ -113,13 +114,13 @@ function ContentTranslationBody({ children, sourceLanguage, authenticated, enabl
 
   const sameLanguage = sourceLanguage.toLowerCase().split('-')[0] === locale;
   return <div className="content-translation">
-    {!sameLanguage ? <div className="inline-actions">
+    {!sameLanguage ? <Inline className="inline-actions">
       {translated ? <button type="button" className="btn" onClick={showOriginal}><T value={ui.contentTranslation.showOriginal} /></button>
         : <button type="button" className="btn" onClick={() => { setShowingOriginal(false); void translate(); }} disabled={!authenticated || !enabled || busy}><T value={ui.contentTranslation.translate} /></button>}
       {!authenticated ? <span><Link href="/login"><T value={ui.contentTranslation.loginRequired} /></Link></span> : null}
       {authenticated && !enabled ? <span><T value={ui.contentTranslation.unavailable} /></span> : null}
       {failed ? <span role="alert"><T value={ui.contentTranslation.failed} /></span> : null}
-    </div> : null}
+    </Inline> : null}
     <div ref={originalRef} lang={translated ? locale : sourceLanguage === 'auto' ? undefined : sourceLanguage}>{children}</div>
   </div>;
 }

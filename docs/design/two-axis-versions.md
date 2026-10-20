@@ -77,10 +77,10 @@ Roles stay in `docs/editorial-roles.md`. Article-text reviewer queue is still fo
 Sprints 34–39 treat these static views as the **pixel and copy contract** for screens that exist. Canvas P1–P14 remain the process source of truth. Serve:
 
 ```bash
-cd docs/design && python3 -m http.server 8766
+python3 -m http.server 8766  # from the repository root, including shared runtime tokens
 ```
 
-File: [`prototype/editor-constitution.html`](prototype/editor-constitution.html) · live `http://localhost:8766/prototype/editor-constitution.html` · three widths [`board.html?page=editor-constitution`](prototype/board.html?page=editor-constitution) (same hash).
+File: [`prototype/editor-constitution.html`](prototype/editor-constitution.html) · live `http://localhost:8766/docs/design/prototype/editor-constitution.html` · three widths [`board.html?page=editor-constitution`](prototype/board.html?page=editor-constitution) (same hash).
 
 | Process | Stories | App route | Configured mock |
 | --- | --- | --- | --- |

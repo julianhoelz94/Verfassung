@@ -95,11 +95,14 @@ class CatalogRepository(private val jdbc: JdbcTemplate) {
             isoCode.uppercase(),
         ).firstOrNull() ?: return null
 
-        val constitutions = jdbc.query(
+        return CountryDetail(country.id, country.isoCode, country.name, listConstitutions(country.id))
+    }
+
+    fun listConstitutions(jurisdictionId: UUID): List<ConstitutionSummary> = jdbc.query(
             """
             SELECT id, slug, title, predecessor_constitution_id, interim
             FROM constitutions
-            WHERE country_id = ?
+            WHERE jurisdiction_id = ?
             ORDER BY title
             """.trimIndent(),
             { rs, _ ->
@@ -111,7 +114,7 @@ class CatalogRepository(private val jdbc: JdbcTemplate) {
                     rs.getBoolean("interim"),
                 )
             },
-            country.id,
+            jurisdictionId,
         ).map { row ->
             val id = row[0] as UUID
             ConstitutionSummary(
@@ -126,9 +129,6 @@ class CatalogRepository(private val jdbc: JdbcTemplate) {
                 lifecycleStatus(id),
             )
         }
-
-        return CountryDetail(country.id, country.isoCode, country.name, constitutions)
-    }
 
     fun listPublishedPublicVersions(constitutionId: UUID): List<VersionSummary> {
         val tipId = findLegalTipEditorialTipId(constitutionId, publishedOnly = true)
@@ -314,20 +314,20 @@ class CatalogRepository(private val jdbc: JdbcTemplate) {
         return CountrySummary(id, isoCode.uppercase(), name)
     }
 
-    fun findConstitutionId(countryId: UUID, slug: String): UUID? =
+    fun findConstitutionId(jurisdictionId: UUID, slug: String): UUID? =
         jdbc.query(
-            "SELECT constitution_id AS id FROM constitution_slug_aliases WHERE country_id = ? AND slug = ? UNION SELECT id FROM constitutions WHERE country_id = ? AND slug = ?",
+            "SELECT constitution_id AS id FROM constitution_slug_aliases WHERE jurisdiction_id = ? AND slug = ? UNION SELECT id FROM constitutions WHERE jurisdiction_id = ? AND slug = ?",
             { rs, _ -> rs.getObject("id", UUID::class.java) },
-            countryId,
+            jurisdictionId,
             slug,
-            countryId,
+            jurisdictionId,
             slug,
         ).firstOrNull()
 
-    fun constitutionCountryId(constitutionId: UUID): UUID? =
+    fun constitutionJurisdictionId(constitutionId: UUID): UUID? =
         jdbc.query(
-            "SELECT country_id FROM constitutions WHERE id = ?",
-            { rs, _ -> rs.getObject("country_id", UUID::class.java) },
+            "SELECT jurisdiction_id FROM constitutions WHERE id = ?",
+            { rs, _ -> rs.getObject("jurisdiction_id", UUID::class.java) },
             constitutionId,
         ).firstOrNull()
 
@@ -360,12 +360,12 @@ class CatalogRepository(private val jdbc: JdbcTemplate) {
             }
         } ?: "unknown"
 
-    fun insertConstitution(countryId: UUID, slug: String, title: String, predecessorId: UUID?, interim: Boolean): UUID {
+    fun insertConstitution(jurisdictionId: UUID, slug: String, title: String, predecessorId: UUID?, interim: Boolean): UUID {
         val id = UUID.randomUUID()
         jdbc.update(
-            "INSERT INTO constitutions (id, country_id, slug, title, predecessor_constitution_id, interim) VALUES (?, ?, ?, ?, ?, ?)",
+            "INSERT INTO constitutions (id, jurisdiction_id, slug, title, predecessor_constitution_id, interim) VALUES (?, ?, ?, ?, ?, ?)",
             id,
-            countryId,
+            jurisdictionId,
             slug,
             title,
             predecessorId,
@@ -586,10 +586,10 @@ class CatalogRepository(private val jdbc: JdbcTemplate) {
                    cv.legal_version_id,
                    tip.id AS current_version_id,
                    cv.legal_predecessor_version_id,
-                   cv.editorial_predecessor_version_id, country.iso_code AS country_code
+                   cv.editorial_predecessor_version_id, country.iso_code AS country_code, constitution.jurisdiction_id
             FROM constitution_versions cv
             JOIN constitutions constitution ON constitution.id = cv.constitution_id
-            JOIN countries country ON country.id = constitution.country_id
+            LEFT JOIN countries country ON country.id = constitution.country_id
             LEFT JOIN LATERAL (
               SELECT t.id
               FROM constitution_versions t
@@ -657,6 +657,7 @@ class CatalogRepository(private val jdbc: JdbcTemplate) {
     private val versionDetailMapper = RowMapper { rs, _ ->
         VersionDetail(
             countryCode = rs.getString("country_code"),
+            jurisdictionId = rs.getObject("jurisdiction_id", UUID::class.java),
             id = rs.getObject("id", UUID::class.java),
             constitutionId = rs.getObject("constitution_id", UUID::class.java),
             versionLabel = rs.getString("version_label"),

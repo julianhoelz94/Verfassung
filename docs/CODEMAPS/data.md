@@ -9,7 +9,7 @@ columns and indexes; historical seed/compatibility migrations must remain availa
 
 | Database | Current table families and invariants |
 | --- | --- |
-| Catalog | Countries/constitutions/sources; two-axis `constitution_versions`; outline kinds/edges; settings and metadata revisions/slug aliases; constitution and provision lifecycle events; contextual wiki pages/revisions; successor reservations and import publication holds |
+| Catalog | Current/historical jurisdiction hierarchy, countries/constitutions/sources; two-axis `constitution_versions`; outline kinds/edges; settings and metadata revisions/slug aliases; constitution and provision lifecycle events; contextual wiki pages/revisions; successor reservations and import publication holds |
 | Content | `content_snapshots`, immutable `content_node_revisions` / `content_text_revisions`, ordered `content_revision_entries`, snapshot roots/occurrences and publication receipts; legacy `content_nodes` and the `articles` compatibility view remain supported |
 | Amendment | Legal change identity/revisions/changes, published version pins, diff runs/decisions and publication-attempt receipts; legacy transitions remain for compatibility |
 | Document | Documents, immutable metadata/files/revisions and append-only lifecycle/link events; legal-page revisions/publication and shared imprint-contact revisions |
@@ -18,6 +18,8 @@ columns and indexes; historical seed/compatibility migrations must remain availa
 | Ingestion | Jobs/errors/staging records, batches/review decisions, setup proposals, resumable uploads/chunks and publication outbox |
 | Search | Rebuildable `search_documents` and `index_sync_state`; generation-pinned reads use one consistent index transaction |
 | Audit | Append-only `audit_events`; event attribution and payload are recorded without changing authored content |
+
+Catalog V25/V26 add `jurisdictions` with stable IDs, sibling-unique slugs, optional codes, historical status and optional existence dates. Existing countries retain their UUIDs as root jurisdictions. Constitutions, slug aliases and succession are scoped to `jurisdiction_id`; nullable `country_id` preserves legacy national-owner reads. Historical codes may be reused without merging identities.
 
 A logical content ID identifies a unit across revisions; a revision ID identifies
 immutable content; an occurrence ID pins its position in a version. Authored labels

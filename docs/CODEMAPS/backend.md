@@ -12,6 +12,8 @@ Paths below are **service paths**. Public: prefix `/api/<short>`.
 | Method | Path |
 | --- | --- |
 | GET | `/countries`, `/countries/{isoCode}` |
+| GET | `/jurisdictions` (roots, or `?parentId` children), `/jurisdictions/{id}` (ancestors, children, direct constitutions) |
+| POST | `/jurisdictions`, `/jurisdictions/{id}/constitutions` (catalog writer) |
 | GET | `/constitutions/{id}/versions` (`?listing=all` staff), `/versions/{id}`, `/constitutions/{id}/content-outline` |
 | PUT | `/constitutions/{id}/content-outline` |
 | POST | `/countries`, `/countries/{iso}/constitutions`, `/constitutions/{id}/versions` |

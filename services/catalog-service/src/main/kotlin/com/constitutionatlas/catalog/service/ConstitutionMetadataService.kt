@@ -22,16 +22,16 @@ class ConstitutionMetadataService(private val jdbc: JdbcTemplate) {
         constitution,
     ).firstOrNull() ?: throw NotFoundException("Unknown constitution metadata")
 
-    fun initialize(constitution: UUID, country: UUID, title: String, slug: String) {
+    fun initialize(constitution: UUID, jurisdiction: UUID, title: String, slug: String) {
         val id = UUID.randomUUID()
         jdbc.update("INSERT INTO constitution_metadata_revisions(id, constitution_id, title, slug) VALUES (?, ?, ?, ?)", id, constitution, title, slug)
         jdbc.update("UPDATE constitutions SET metadata_revision_id = ? WHERE id = ?", id, constitution)
-        jdbc.update("INSERT INTO constitution_slug_aliases(country_id, slug, constitution_id) VALUES (?, ?, ?)", country, slug, constitution)
+        jdbc.update("INSERT INTO constitution_slug_aliases(jurisdiction_id, slug, constitution_id) VALUES (?, ?, ?)", jurisdiction, slug, constitution)
     }
 
     @Transactional
     fun save(constitution: UUID, request: ConstitutionMetadataWrite): ConstitutionMetadata {
-        val country = jdbc.query("SELECT country_id FROM constitutions WHERE id = ? FOR UPDATE", { rs, _ -> rs.getObject(1, UUID::class.java) }, constitution).firstOrNull()
+        val jurisdiction = jdbc.query("SELECT jurisdiction_id FROM constitutions WHERE id = ? FOR UPDATE", { rs, _ -> rs.getObject(1, UUID::class.java) }, constitution).firstOrNull()
             ?: throw NotFoundException("Unknown constitution")
         val current = get(constitution)
         if (current.revisionId != request.expectedRevisionId) throw ConflictException("Metadata changed; reload", "stale_metadata")
@@ -39,10 +39,10 @@ class ConstitutionMetadataService(private val jdbc: JdbcTemplate) {
         val slug = request.slug.trim()
         require(title.isNotBlank() && Regex("^[a-z0-9]+(?:-[a-z0-9]+)*$").matches(slug)) { "Title and a valid lowercase slug are required" }
         if (slug != current.slug && !request.retainSlugAlias) throw ConflictException("Slug changes require permanent aliases", "slug_alias_required")
-        val reserved = jdbc.query("SELECT constitution_id FROM constitution_slug_aliases WHERE country_id = ? AND slug = ?", { rs, _ -> rs.getObject(1, UUID::class.java) }, country, slug).firstOrNull()
+        val reserved = jdbc.query("SELECT constitution_id FROM constitution_slug_aliases WHERE jurisdiction_id = ? AND slug = ?", { rs, _ -> rs.getObject(1, UUID::class.java) }, jurisdiction, slug).firstOrNull()
         if (reserved != null && reserved != constitution) throw ConflictException("Slug is already reserved", "slug_reserved")
-        jdbc.update("INSERT INTO constitution_slug_aliases(country_id, slug, constitution_id) VALUES (?, ?, ?) ON CONFLICT DO NOTHING", country, slug, constitution)
-        val owner = jdbc.queryForObject("SELECT constitution_id FROM constitution_slug_aliases WHERE country_id = ? AND slug = ?", UUID::class.java, country, slug)
+        jdbc.update("INSERT INTO constitution_slug_aliases(jurisdiction_id, slug, constitution_id) VALUES (?, ?, ?) ON CONFLICT DO NOTHING", jurisdiction, slug, constitution)
+        val owner = jdbc.queryForObject("SELECT constitution_id FROM constitution_slug_aliases WHERE jurisdiction_id = ? AND slug = ?", UUID::class.java, jurisdiction, slug)
         if (owner != constitution) throw ConflictException("Slug is already reserved", "slug_reserved")
         val id = UUID.randomUUID()
         jdbc.update("INSERT INTO constitution_metadata_revisions(id, constitution_id, predecessor_id, title, slug) VALUES (?, ?, ?, ?, ?)", id, constitution, current.revisionId, title, slug)

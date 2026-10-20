@@ -179,4 +179,5 @@ data class VersionDetail(
     val legalPredecessorVersionId: UUID? = null,
     val editorialPredecessorVersionId: UUID? = null,
     val countryCode: String? = null,
+    val jurisdictionId: UUID? = null,
 )

@@ -77,6 +77,310 @@ class CatalogApiTest {
         .first { catalogRepository.findCountrySummary(it) == null }
 
     @Test
+    fun historicalCountriesAndRegionsPublishConstitutionsWithoutIsoCodes() {
+        val countryResponse = mockMvc.post("/jurisdictions") {
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"slug":"former-union-${UUID.randomUUID()}","name":"Former union","kind":"country","historical":true,"existedFrom":"1800-01-01","existedUntil":"1900-12-31"}"""
+        }.andExpect {
+            status { isCreated() }
+            jsonPath("$.historical") { value(true) }
+            jsonPath("$.code") { value(org.hamcrest.Matchers.nullValue()) }
+            jsonPath("$.existedFrom") { value("1800-01-01") }
+            jsonPath("$.existedUntil") { value("1900-12-31") }
+        }.andReturn().response
+        val countryId = objectMapper.readTree(countryResponse.contentAsString)["id"].asText()
+        val regionResponse = mockMvc.post("/jurisdictions") {
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"parentId":"$countryId","slug":"former-region","name":"Former region","kind":"region","historical":true}"""
+        }.andExpect { status { isCreated() } }.andReturn().response
+        val regionId = objectMapper.readTree(regionResponse.contentAsString)["id"].asText()
+        listOf(countryId, regionId).forEach { jurisdictionId ->
+            val constitution = writes.createJurisdictionConstitution(UUID.fromString(jurisdictionId), com.constitutionatlas.catalog.api.CreateConstitutionRequest("charter", "Historical charter"))
+            val version = writes.createDraftVersion(constitution.id, com.constitutionatlas.catalog.api.CreateVersionRequest("1"))
+            mockMvc.post("/versions/${version.id}/publish") { header("Authorization", PUBLISHER_TOKEN) }
+                .andExpect { status { isOk() } }
+            mockMvc.get("/jurisdictions/$jurisdictionId").andExpect {
+                status { isOk() }
+                jsonPath("$.jurisdiction.historical") { value(true) }
+                jsonPath("$.constitutions[0].versions[0].id") { value(version.id.toString()) }
+            }
+            mockMvc.get("/versions/${version.id}").andExpect {
+                status { isOk() }
+                jsonPath("$.jurisdictionId") { value(jurisdictionId) }
+                jsonPath("$.countryCode") { value(org.hamcrest.Matchers.nullValue()) }
+            }
+        }
+        mockMvc.get("/jurisdictions/$regionId").andExpect {
+            status { isOk() }
+            jsonPath("$.ancestors[0].id") { value(countryId) }
+            jsonPath("$.ancestors[0].historical") { value(true) }
+        }
+        assertThat(catalogRepository.listCountries().map { it.id.toString() }).doesNotContain(countryId, regionId)
+    }
+
+    @Test
+    fun historicalJurisdictionsCanReuseCodesWithoutChangingCurrentCountryIdentity() {
+        val currentCountry = catalogRepository.findCountrySummary("DE")!!
+        val historicalIds = (1..2).map { index ->
+            val response = mockMvc.post("/jurisdictions") {
+                header("Authorization", TOKEN)
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"slug":"earlier-entity-$index-${UUID.randomUUID()}","name":"Repeated name","kind":"country","historical":true,"code":"DE"}"""
+            }.andExpect { status { isCreated() } }.andReturn().response
+            objectMapper.readTree(response.contentAsString)["id"].asText()
+        }
+        assertThat(historicalIds).doesNotHaveDuplicates().doesNotContain(currentCountry.id.toString())
+        assertThat(catalogRepository.findCountrySummary("DE")?.id).isEqualTo(currentCountry.id)
+        mockMvc.get("/jurisdictions?parentId=${currentCountry.id}").andExpect {
+            status { isOk() }
+            jsonPath("$.length()") { value(0) }
+        }
+    }
+
+    @Test
+    fun jurisdictionExistenceDatesAreOptionalAndValidated() {
+        val slug = "uncoded-country-${UUID.randomUUID()}"
+        mockMvc.post("/jurisdictions") {
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"slug":"$slug","name":"Country without an ISO assignment","kind":"country"}"""
+        }.andExpect {
+            status { isCreated() }
+            jsonPath("$.historical") { value(false) }
+            jsonPath("$.existedFrom") { value(org.hamcrest.Matchers.nullValue()) }
+            jsonPath("$.existedUntil") { value(org.hamcrest.Matchers.nullValue()) }
+        }
+        listOf(
+            """{"slug":"invalid-dates","name":"Former region","kind":"region","historical":true,"existedFrom":"1900-01-01","existedUntil":"1800-01-01"}""",
+            """{"slug":"missing-historical","name":"Former region","kind":"region","existedUntil":"1900-01-01"}""",
+        ).forEach { invalid ->
+            mockMvc.post("/jurisdictions") {
+                header("Authorization", TOKEN)
+                contentType = MediaType.APPLICATION_JSON
+                content = invalid
+            }.andExpect { status { isBadRequest() } }
+        }
+        val code = uniqueCountryCode()
+        mockMvc.post("/jurisdictions") {
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"slug":"${code.lowercase()}","code":"$code","name":"Current country","kind":"country","existedFrom":"1900-01-01"}"""
+        }.andExpect {
+            status { isCreated() }
+            jsonPath("$.existedFrom") { value("1900-01-01") }
+        }
+    }
+
+    @Test
+    fun localConstitutionsUseTheirOwnJurisdictionAtEveryDepth() {
+        val code = uniqueCountryCode()
+        val country = writes.createCountry(com.constitutionatlas.catalog.api.CreateCountryRequest(code, "Hierarchy country"))
+        var parentId = country.id.toString()
+        val ancestors = mutableListOf(parentId)
+        listOf("region", "subregion", "municipality", "district", "district").forEachIndexed { index, kind ->
+            val response = mockMvc.post("/jurisdictions") {
+                header("Authorization", TOKEN)
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"parentId":"$parentId","slug":"level-$index","name":"Level $index","kind":"$kind"}"""
+            }.andExpect { status { isCreated() } }.andReturn().response
+            val childId = objectMapper.readTree(response.contentAsString)["id"].asText()
+            mockMvc.get("/jurisdictions?parentId=$parentId").andExpect {
+                status { isOk() }
+                jsonPath("$[0].id") { value(childId) }
+            }
+            mockMvc.get("/jurisdictions/$childId").andExpect {
+                status { isOk() }
+                jsonPath("$.ancestors[*].id") { value(org.hamcrest.Matchers.contains(*ancestors.toTypedArray())) }
+            }
+            ancestors.add(childId)
+            parentId = childId
+        }
+        val constitution = mockMvc.post("/jurisdictions/$parentId/constitutions") {
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"slug":"charter","title":"Local charter"}"""
+        }.andExpect { status { isCreated() } }.andReturn().response
+        val constitutionId = UUID.fromString(objectMapper.readTree(constitution.contentAsString)["id"].asText())
+        val version = writes.createDraftVersion(constitutionId, com.constitutionatlas.catalog.api.CreateVersionRequest("1"))
+        mockMvc.get("/jurisdictions/$parentId").andExpect {
+            status { isOk() }
+            jsonPath("$.constitutions.length()") { value(0) }
+        }
+        mockMvc.get("/jurisdictions/$parentId") { header("Authorization", TOKEN) }.andExpect {
+            status { isOk() }
+            jsonPath("$.constitutions[0].id") { value(constitutionId.toString()) }
+        }
+        mockMvc.get("/versions/${version.id}").andExpect { status { isNotFound() } }
+        mockMvc.post("/versions/${version.id}/publish") { header("Authorization", PUBLISHER_TOKEN) }
+            .andExpect { status { isOk() } }
+        mockMvc.get("/versions/${version.id}").andExpect {
+            status { isOk() }
+            jsonPath("$.jurisdictionId") { value(parentId) }
+        }
+        mockMvc.get("/jurisdictions/$parentId").andExpect {
+            status { isOk() }
+            jsonPath("$.constitutions[0].versions[0].id") { value(version.id.toString()) }
+        }
+        mockMvc.get("/countries/$code") { header("Authorization", TOKEN) }.andExpect {
+            status { isOk() }
+            jsonPath("$.constitutions.length()") { value(0) }
+        }
+        assertThat(catalogRepository.listCountries().single { it.id == country.id }.versionCount).isZero()
+    }
+
+    @Test
+    fun constitutionSlugsAliasesAndSuccessionAreScopedToJurisdictions() {
+        val country = writes.createCountry(com.constitutionatlas.catalog.api.CreateCountryRequest(uniqueCountryCode(), "Scoped country"))
+        val jurisdictions = listOf("first", "second").map { slug ->
+            val response = mockMvc.post("/jurisdictions") {
+                header("Authorization", TOKEN)
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"parentId":"${country.id}","slug":"$slug","name":"Same name","kind":"region"}"""
+            }.andExpect { status { isCreated() } }.andReturn().response
+            UUID.fromString(objectMapper.readTree(response.contentAsString)["id"].asText())
+        }
+        val constitutions = jurisdictions.map { jurisdiction ->
+            writes.createJurisdictionConstitution(jurisdiction, com.constitutionatlas.catalog.api.CreateConstitutionRequest("charter", "Charter"))
+        }
+        val metadata = mockMvc.get("/constitutions/${constitutions.first().id}/metadata") { header("Authorization", TOKEN) }
+            .andReturn().response
+        val revision = objectMapper.readTree(metadata.contentAsString)["revisionId"].asText()
+        mockMvc.put("/constitutions/${constitutions.first().id}/metadata") {
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"expectedRevisionId":"$revision","title":"Renamed charter","slug":"renamed","retainSlugAlias":true}"""
+        }.andExpect { status { isOk() } }
+        assertThat(catalogRepository.findConstitutionId(jurisdictions.first(), "charter")).isEqualTo(constitutions.first().id)
+        assertThat(catalogRepository.findConstitutionId(jurisdictions.last(), "charter")).isEqualTo(constitutions.last().id)
+        mockMvc.post("/jurisdictions/${jurisdictions.first()}/constitutions") {
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"slug":"charter","title":"Alias collision"}"""
+        }.andExpect { status { isConflict() } }
+        mockMvc.post("/jurisdictions/${jurisdictions.last()}/constitutions") {
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"slug":"successor","title":"Successor","predecessorConstitutionId":"${constitutions.first().id}"}"""
+        }.andExpect {
+            status { isConflict() }
+            jsonPath("$.code") { value("invalid_constitution_predecessor") }
+        }
+        val successor = writes.createJurisdictionConstitution(
+            jurisdictions.first(),
+            com.constitutionatlas.catalog.api.CreateConstitutionRequest("successor", "Successor", predecessorConstitutionId = constitutions.first().id),
+        )
+        assertThat(successor.predecessorConstitutionId).isEqualTo(constitutions.first().id)
+    }
+
+    @Test
+    fun jurisdictionCreationValidatesParentsCodesUniquenessAndAccess() {
+        val slug = "root-${UUID.randomUUID()}"
+        val payload = """{"slug":"$slug","name":"Root region","kind":"region"}"""
+        listOf(null to 401, VIEWER_TOKEN to 403).forEach { (token, expectedStatus) ->
+            mockMvc.post("/jurisdictions") {
+                if (token != null) header("Authorization", token)
+                contentType = MediaType.APPLICATION_JSON
+                content = payload
+            }.andExpect { status { isEqualTo(expectedStatus) } }
+        }
+        val rootResponse = mockMvc.post("/jurisdictions") {
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = payload
+        }.andExpect { status { isCreated() } }.andReturn().response
+        val rootId = objectMapper.readTree(rootResponse.contentAsString)["id"].asText()
+        mockMvc.get("/jurisdictions").andExpect {
+            status { isOk() }
+            jsonPath("$[*].id") { value(org.hamcrest.Matchers.hasItem(rootId)) }
+        }
+        mockMvc.post("/jurisdictions") {
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = payload
+        }.andExpect { status { isConflict() } }
+        listOf("first" to 201, "second" to 409).forEach { (childSlug, expectedStatus) ->
+            mockMvc.post("/jurisdictions") {
+                header("Authorization", TOKEN)
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"parentId":"$rootId","slug":"$childSlug","name":"Child","kind":"region","code":"LOCAL"}"""
+            }.andExpect { status { isEqualTo(expectedStatus) } }
+        }
+        listOf(
+            """{"slug":"child","name":"Child","kind":"region","parentId":"${UUID.randomUUID()}"}""" to 404,
+            """{"slug":"child","name":"Child","kind":"country","code":"XY","parentId":"$rootId"}""" to 400,
+            """{"slug":"Invalid Slug","name":"Child","kind":"region"}""" to 400,
+            """{"slug":"child","name":" ","kind":"region"}""" to 400,
+            """{"slug":"child","name":"Child","kind":"region","code":""}""" to 400,
+        ).forEach { (invalid, expectedStatus) ->
+            mockMvc.post("/jurisdictions") {
+                header("Authorization", TOKEN)
+                contentType = MediaType.APPLICATION_JSON
+                content = invalid
+            }.andExpect { status { isEqualTo(expectedStatus) } }
+        }
+        val missing = UUID.randomUUID()
+        mockMvc.get("/jurisdictions/$missing").andExpect { status { isNotFound() } }
+        mockMvc.get("/jurisdictions?parentId=$missing").andExpect { status { isNotFound() } }
+        mockMvc.post("/jurisdictions/$rootId/constitutions") {
+            header("Authorization", VIEWER_TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"slug":"charter","title":"Charter"}"""
+        }.andExpect { status { isForbidden() } }
+        mockMvc.post("/jurisdictions/$missing/constitutions") {
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"slug":"charter","title":"Charter"}"""
+        }.andExpect { status { isNotFound() } }
+    }
+
+    @Test
+    fun countryJurisdictionsRetainExistingIdsAndLegacyApiBehavior() {
+        val code = uniqueCountryCode()
+        val response = mockMvc.post("/jurisdictions") {
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"slug":"${code.lowercase()}","code":"$code","name":"Compatible country","kind":"country"}"""
+        }.andExpect { status { isCreated() } }.andReturn().response
+        val id = objectMapper.readTree(response.contentAsString)["id"].asText()
+        mockMvc.get("/countries/$code").andExpect {
+            status { isOk() }
+            jsonPath("$.id") { value(id) }
+        }
+        val constitution = writes.createConstitution(code, com.constitutionatlas.catalog.api.CreateConstitutionRequest("national", "National constitution"))
+        mockMvc.get("/jurisdictions/$id") { header("Authorization", TOKEN) }.andExpect {
+            status { isOk() }
+            jsonPath("$.constitutions[0].id") { value(constitution.id.toString()) }
+            jsonPath("$.ancestors.length()") { value(0) }
+        }
+        assertThat(jdbcTemplate.queryForObject("SELECT country_id = jurisdiction_id FROM constitutions WHERE id = ?", Boolean::class.java, constitution.id)).isEqualTo(true)
+    }
+
+    @Test
+    fun jurisdictionMigrationPreservesExistingCountriesConstitutionsAndAliases() {
+        val schema = "jurisdiction_upgrade_${UUID.randomUUID().toString().replace("-", "")}"
+        val countryId = UUID.randomUUID()
+        val constitutionId = UUID.randomUUID()
+        val flyway = org.flywaydb.core.Flyway.configure().dataSource(postgres.jdbcUrl, postgres.username, postgres.password)
+            .schemas(schema).defaultSchema(schema)
+        try {
+            flyway.target("24").load().migrate()
+            jdbcTemplate.update("INSERT INTO $schema.countries(id, iso_code, name) VALUES (?, 'XY', 'Existing country')", countryId)
+            jdbcTemplate.update("INSERT INTO $schema.constitutions(id, country_id, slug, title) VALUES (?, ?, 'existing', 'Existing constitution')", constitutionId, countryId)
+            jdbcTemplate.update("INSERT INTO $schema.constitution_slug_aliases(country_id, slug, constitution_id) VALUES (?, 'old-slug', ?)", countryId, constitutionId)
+            flyway.target("25").load().migrate()
+            flyway.target("latest").load().migrate()
+            assertThat(jdbcTemplate.queryForObject("SELECT id FROM $schema.jurisdictions WHERE code = 'XY'", UUID::class.java)).isEqualTo(countryId)
+            assertThat(jdbcTemplate.queryForObject("SELECT historical FROM $schema.jurisdictions WHERE id = ?", Boolean::class.java, countryId) == false).isTrue()
+            assertThat(jdbcTemplate.queryForObject("SELECT jurisdiction_id FROM $schema.constitutions WHERE id = ?", UUID::class.java, constitutionId)).isEqualTo(countryId)
+            assertThat(jdbcTemplate.queryForObject("SELECT constitution_id FROM $schema.constitution_slug_aliases WHERE jurisdiction_id = ? AND slug = 'old-slug'", UUID::class.java, countryId)).isEqualTo(constitutionId)
+        } finally {
+            jdbcTemplate.execute("DROP SCHEMA IF EXISTS $schema CASCADE")
+        }
+    }
+
+    @Test
     fun importedDraftCannotBypassReviewWithOrdinaryPublisherCredential() {
         val countryCode = uniqueCountryCode()
         writes.createCountry(com.constitutionatlas.catalog.api.CreateCountryRequest(countryCode, "Import hold country"))

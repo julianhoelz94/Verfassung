@@ -151,19 +151,19 @@ class ImportService(
         val versionId = importJobRepository.find(jobId)?.versionId
             ?: throw ResponseStatusException(HttpStatus.CONFLICT, "Import has no prepared draft")
         val snapshot = DownstreamAuth.withAuthorization(authorization) { contentClient.snapshot(versionId) }
-        if (!importJobRepository.approve(jobId, actorId, snapshot, recordedReason)) throw ResponseStatusException(HttpStatus.CONFLICT, "Import is not prepared or cannot be self-approved")
+        if (!importJobRepository.approve(jobId, actorId, snapshot, recordedReason)) throw ResponseStatusException(HttpStatus.CONFLICT, "Import is not prepared for review")
         return importJobRepository.find(jobId)!!
     }
 
     fun reject(jobId: UUID, actorId: UUID, reason: String): ImportJobDto {
-        if (!importJobRepository.reject(jobId, actorId, reviewReason(reason))) throw ResponseStatusException(HttpStatus.CONFLICT, "Import is not pending or cannot be self-rejected")
+        if (!importJobRepository.reject(jobId, actorId, reviewReason(reason))) throw ResponseStatusException(HttpStatus.CONFLICT, "Import is not pending review")
         return importJobRepository.find(jobId)!!
     }
 
     fun reviewDecisions(jobId: UUID): List<com.constitutionatlas.ingestion.api.ReviewDecisionDto> = importJobRepository.reviewDecisions(jobId)
 
     fun publish(authorization: String?, jobId: UUID, actorId: UUID): ImportJobDto {
-        if (!importJobRepository.claimPublication(jobId, actorId)) throw ResponseStatusException(HttpStatus.CONFLICT, "Import is not approved or cannot be self-published")
+        if (!importJobRepository.claimPublication(jobId, actorId)) throw ResponseStatusException(HttpStatus.CONFLICT, "Import is not approved for publication")
         val versionId = importJobRepository.find(jobId)?.versionId ?: error("Prepared version missing")
         try {
             val approved = importJobRepository.approvedFingerprint(jobId) ?: error("Approved revision missing")

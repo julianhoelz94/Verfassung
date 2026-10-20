@@ -51,7 +51,7 @@ The edge evaluates proxy source-address and forwarded-scheme guards before routi
 - **Sign in:** gateway server action → Identity; session cookie is `ca_session`. MFA challenges use a separate short-lived flow.
 - **Register:** when enabled by an administrator, Identity accepts an email request and sends a one-use confirmation link. The account remains disabled until the recipient sets a password and initially has only the viewer role. Identity stores SMTP settings and verifies passkeys against the configured public origin.
 - **Publish:** an Editor session is saved, reviewed, and approved; a publisher with fresh MFA creates a successor version. Content and Catalog publish the new snapshot, and Search is asked to reindex. The former snapshot remains immutable.
-- **Import:** Ingestion stages proposed content. Separate reviewer and publisher actions are required before public visibility; no upload by itself publishes content.
+- **Import:** Ingestion stages proposed content. Imports join the editor review and publication queues. Review and publication are explicit separate actions; the same account may perform them with the required roles and fresh publication MFA. No upload by itself publishes content.
 
 Version history has two axes: legal changes and editorial corrections. The legal identity and its source revision must be kept separate; see [ADR 0005](https://github.com/julianhoelz94/Verfassung/blob/main/docs/adr/0005-two-axis-versions.md) and the [design](https://github.com/julianhoelz94/Verfassung/blob/main/docs/design/two-axis-versions.md).
 

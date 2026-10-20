@@ -6,11 +6,14 @@ import { currentLocale } from '../../lib/server-locale';
 import Link from 'next/link';
 import { getCountry, getVersion, listCountries, type CountryDetail } from '../../lib/api';
 import { editorErrorMessage, listAllSessions, type EditSessionSummary } from '../../lib/editor-api';
+import { listImportJobs, type ImportJob } from '../../lib/ingestion-api';
+import { requireSessionBearer } from '../../lib/session';
 import { PageMain } from '../components/PageMain';
 import { Alert, PageHeader } from '../components/ui';
 
 type SessionRow = {
-  session: EditSessionSummary;
+  session?: EditSessionSummary;
+  importJob?: ImportJob;
   country: string;
   constitution: string;
   version: string;
@@ -50,7 +53,7 @@ async function sessionRows(sessions: EditSessionSummary[], locale: Locale): Prom
   }));
 }
 
-export async function EditorLanding({ email, roles, status, error }: { email: string; roles: string[]; status?: string; error?: string }) {
+export async function EditorLanding({ userId, email, roles, status, error }: { userId: string; email: string; roles: string[]; status?: string; error?: string }) {
   const locale = await currentLocale();
   const canEdit = roles.includes('editor') || roles.includes('admin');
   const canReview = roles.includes('reviewer') || roles.includes('admin');
@@ -66,7 +69,20 @@ export async function EditorLanding({ email, roles, status, error }: { email: st
   } catch {
     unavailable = true;
   }
-  rows.sort((a, b) => a.country.localeCompare(b.country) || a.constitution.localeCompare(b.constitution) || b.session.updatedAt.localeCompare(a.session.updatedAt));
+  let importsUnavailable = false;
+  try {
+    const jobs = await listImportJobs(await requireSessionBearer(), queue === 'reviewing' ? 'pending_review' : queue === 'approved' ? 'approved' : undefined);
+    const imports = queue ? jobs : jobs.filter(job => job.submittedBy === userId && ['pending_review', 'preparing', 'approved'].includes(job.status));
+    rows.push(...imports.map(importJob => ({
+      importJob,
+      country: importJob.countryName ?? importJob.isoCode ?? localize(locale, ui.remainingStatus.countryUnavailable),
+      constitution: importJob.constitutionTitle ?? localize(locale, ui.importReview.kind),
+      version: importJob.versionLabel ?? importJob.id,
+    })));
+  } catch {
+    importsUnavailable = true;
+  }
+  rows.sort((a, b) => a.country.localeCompare(b.country) || a.constitution.localeCompare(b.constitution) || (b.session?.updatedAt ?? '').localeCompare(a.session?.updatedAt ?? ''));
   const countries = [...new Set(rows.map((row) => row.country))];
   const heading = localize(locale, queue === 'reviewing' ? ui.nav.reviewQueue : queue === 'approved' ? ui.nav.readyToPublish : ui.editor.editorlanding.myOpenSessions);
   const message = editorErrorMessage(error, locale);
@@ -80,17 +96,19 @@ export async function EditorLanding({ email, roles, status, error }: { email: st
     </nav>
     <h2 className="section-title">{heading}</h2>
     {message ? <Alert tone="error">{message}</Alert> : null}
-    {unavailable ? <Alert tone="error"><T value={ui.editor.editorlanding.editSessionsAreTemporarilyUnavailableTryAgain} /></Alert> : rows.length === 0 ?
+    {unavailable ? <Alert tone="error"><T value={ui.editor.editorlanding.editSessionsAreTemporarilyUnavailableTryAgain} /></Alert> : null}
+    {importsUnavailable ? <Alert tone="error"><T value={ui.importReview.unavailable} /></Alert> : null}
+    {rows.length === 0 ?
       <p className="muted">{queue ? <T value={queue === 'reviewing' ? ui.editorDynamic.noReviewSessions : ui.editorDynamic.noPublishSessions} /> : <><T value={ui.editor.editorlanding.noOpenSessions} />{" "}<Link href="/"><T value={ui.editor.editorlanding.browseCountries} /></Link> <T value={ui.editor.editorlanding.andChooseAConstitutionToStartEditing} /></>}</p> :
       countries.map((country) => <section key={country} className="editor-session-country">
         <h2>{country}</h2>
         {[...new Set(rows.filter((row) => row.country === country).map((row) => row.constitution))].map((constitution) =>
           <section key={constitution} className="editor-session-constitution">
             <h3>{constitution}</h3>
-            <ul className="editor-session-list">{rows.filter((row) => row.country === country && row.constitution === constitution).map(({ session, version }) =>
-              <li key={session.id}>
-                <div><strong>{version}</strong><span><T value={workType(session.hopKind)} /> <T value={ui.editor.editorlanding.lastEdited} />{" "}{lastEdit(session.updatedAt, locale)}</span></div>
-                <a className="btn btn-sm" href={sessionHref(session)}><T value={queue ? queue === 'reviewing' ? ui.editorDynamic.openReview : ui.editorDynamic.openPublishView : ui.editorDynamic.continueEditing} /></a>
+            <ul className="editor-session-list">{rows.filter((row) => row.country === country && row.constitution === constitution).map(({ session, importJob, version }) =>
+              <li key={session?.id ?? importJob!.id}>
+                <div><strong>{version}</strong><span>{session ? <><T value={workType(session.hopKind)} /> <T value={ui.editor.editorlanding.lastEdited} />{" "}{lastEdit(session.updatedAt, locale)}</> : <T value={ui.importReview.kind} />}</span></div>
+                <a className="btn btn-sm" href={session ? sessionHref(session) : `/editor?importJobId=${encodeURIComponent(importJob!.id)}`}><T value={importJob ? importJob.status === 'approved' ? ui.editorDynamic.openPublishView : ui.editorDynamic.openReview : queue ? queue === 'reviewing' ? ui.editorDynamic.openReview : ui.editorDynamic.openPublishView : ui.editorDynamic.continueEditing} /></a>
               </li>)}</ul>
           </section>)}
       </section>)}

@@ -30,7 +30,7 @@ export async function createImportAction(formData: FormData): Promise<string> {
   } catch {
     return '/admin/import?error=1';
   }
-  return `/admin/import/${encodeURIComponent(jobId)}`;
+  return `/editor?importJobId=${encodeURIComponent(jobId)}`;
 }
 
 export async function createSetupProposalAction(formData: FormData): Promise<string> {
@@ -53,16 +53,17 @@ export async function createSetupProposalAction(formData: FormData): Promise<str
 export async function transitionImportAction(formData: FormData): Promise<string> {
   const user = await currentUser();
   const jobId = String(formData.get('jobId') ?? '');
+  const returnTo = `/editor?importJobId=${encodeURIComponent(jobId)}`;
   const action = String(formData.get('action') ?? '');
   const reason = String(formData.get('reason') ?? '').trim();
   const role = { 'confirm-outline': 'editor', prepare: 'editor', approve: 'reviewer', reject: 'reviewer', publish: 'publisher' }[action as 'confirm-outline' | 'prepare' | 'approve' | 'reject' | 'publish'];
-  if (!user || !role || !hasRole(user.roles, role)) return `/admin/import/${encodeURIComponent(jobId)}?error=forbidden`;
-  if (['approve', 'reject'].includes(action) && (reason.length < 10 || reason.length > 2000)) return `/admin/import/${encodeURIComponent(jobId)}?error=reason`;
-  if (action === 'publish' && !user.stepUpFresh) return `/account/step-up?returnTo=${encodeURIComponent(`/admin/import/${jobId}`)}`;
+  if (!user || !role || !hasRole(user.roles, role)) return `${returnTo}&error=forbidden`;
+  if (['approve', 'reject'].includes(action) && (reason.length < 10 || reason.length > 2000)) return `${returnTo}&error=reason`;
+  if (action === 'publish' && !user.stepUpFresh) return `/account/step-up?returnTo=${encodeURIComponent(returnTo)}`;
   try {
     await transitionImportJob(jobId, action as 'confirm-outline' | 'prepare' | 'approve' | 'reject' | 'publish', await requireSessionBearer(), reason);
   } catch {
-    return `/admin/import/${encodeURIComponent(jobId)}?error=transition`;
+    return `${returnTo}&error=transition`;
   }
-  return `/admin/import/${encodeURIComponent(jobId)}`;
+  return `/editor?importJobId=${encodeURIComponent(jobId)}`;
 }

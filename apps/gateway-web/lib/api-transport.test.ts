@@ -1,9 +1,15 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { ApiUnavailableError, listArticlePage, readJson, sendJson } from './api';
+import { ApiUnavailableError, getVersionSettings, listArticlePage, readJson, sendJson } from './api';
 
 afterEach(() => vi.restoreAllMocks());
 
 describe('upstream JSON failure handling', () => {
+  it('loads private import settings with the staff authorization', async () => {
+    const fetchImpl = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}'));
+    await getVersionSettings('private-version', 'Bearer reviewer-session');
+    expect(fetchImpl).toHaveBeenCalledWith(expect.stringContaining('/versions/private-version/settings'), expect.objectContaining({ headers: { Authorization: 'Bearer reviewer-session' } }));
+  });
+
   it('preserves empty nullable responses and missing resources', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(new Response('')).mockResolvedValueOnce(new Response('', { status: 404 }));
     expect(await readJson('http://catalog/value', 'catalog')).toBeNull();

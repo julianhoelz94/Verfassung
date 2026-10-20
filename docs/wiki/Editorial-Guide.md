@@ -33,6 +33,12 @@
 
 [▶ Watch review and approval](https://julianhoelz94.github.io/Verfassung/#reviewing-a-draft-en)
 
+### Imported constitutions
+
+MCP and file uploads appear in the editor's **Review queue**, alongside submitted editing sessions. Open the import to inspect its source, submitted structure and prepared reader preview. If needed, an Editor/Admin confirms the outline and prepares the unpublished draft first. A Reviewer/Admin then enters a reason and approves or rejects it. Approved imports appear under **Ready to publish**; a Publisher/Admin publishes the exact approved draft after fresh MFA.
+
+The same account can upload, review and publish when it holds the required roles. No second account is required. Approval and publication remain separate actions. Existing import links open this editor journey.
+
 ## 3. Publish
 
 **Requires: Publisher or Admin.**

@@ -191,6 +191,7 @@ const editorState = {
 
 let pendingMfaEmail = identityMe.email;
 let currentUser = { ...identityMe };
+let importJobs = new Map();
 let managedUsers = [];
 let serviceTokens = [];
 let credentials = new Map();
@@ -222,6 +223,7 @@ function resetMockState() {
   editorState.sessionsUnavailable = false;
   pendingMfaEmail = identityMe.email;
   currentUser = { ...identityMe };
+  importJobs = new Map();
   managedUsers = [];
   serviceTokens = [];
   createdConstitutions = [];
@@ -1191,25 +1193,43 @@ const server = createServer(async (req, res) => {
     return;
   }
 
-  if (method === 'POST' && pathname === '/api/ingestion/import-jobs') {
-    json(res, 201, {
-      id: '01900000-0000-4000-8000-000000000701',
-      status: 'pending_review',
-      versionId: null,
-      isoCode: 'US',
-      errors: [],
-    });
-    return;
+  if (method === 'GET' && pathname === '/api/ingestion/import-jobs') {
+    const status = new URL(req.url, 'http://mock').searchParams.get('status');
+    json(res, 200, [...importJobs.values()].filter(job => !status || job.status === status)); return;
   }
-  if (method === 'GET' && pathname.startsWith('/api/ingestion/import-jobs/')) {
-    json(res, 200, {
-      id: pathname.split('/').pop(),
-      status: 'pending_review',
-      versionId: null,
-      isoCode: 'US',
-      errors: [],
-    });
-    return;
+  if (method === 'POST' && pathname === '/api/ingestion/import-jobs') {
+    const payload = await readBody(req);
+    const job = { id: '01900000-0000-4000-8000-000000000701', status: 'pending_review', versionId: null,
+      isoCode: payload.isoCode, countryName: payload.countryName, constitutionTitle: payload.constitutionTitle,
+      versionLabel: payload.versionLabel, submittedBy: currentUser.id, errors: [], payload, decisions: [] };
+    importJobs.set(job.id, job);
+    json(res, 201, job); return;
+  }
+  const importMatch = pathname.match(/^\/api\/ingestion\/import-jobs\/([^/]+)(?:\/(payload|decisions|confirm-outline|prepare|approve|reject|publish))?$/);
+  if (importMatch) {
+    const [, id, action] = importMatch;
+    const job = importJobs.get(id);
+    if (!job) { json(res, 404, {}); return; }
+    if (method === 'GET') { json(res, 200, action === 'payload' ? job.payload : action === 'decisions' ? job.decisions : job); return; }
+    if (method === 'POST') {
+      if (action === 'confirm-outline') job.outlineConfirmedBy = currentUser.id;
+      if (action === 'prepare') job.versionId = '01900000-0000-4000-8000-000000000705';
+      if (action === 'approve' || action === 'reject') {
+        const { reason } = await readBody(req);
+        job.status = action === 'approve' ? 'approved' : 'rejected';
+        job.approvedBy = currentUser.id;
+        job.decisions.push({ id: 'decision', decision: job.status, reason, decidedBy: currentUser.id, decidedAt: new Date().toISOString() });
+      }
+      if (action === 'publish') { job.status = 'completed'; job.publishedBy = currentUser.id; }
+      json(res, 200, job); return;
+    }
+  }
+  if (method === 'GET' && pathname === '/api/content/versions/01900000-0000-4000-8000-000000000705/content') {
+    const job = [...importJobs.values()].find(item => item.versionId);
+    json(res, 200, { generation: 1, settingsRevisionId: null, roots: (job?.payload.articles ?? []).map((article, index) => ({
+      logicalId: `import-${index}`, revisionId: `revision-${index}`, occurrenceId: `occurrence-${index}`, kind: 'article',
+      label: article.articleNumber, title: article.title, content: [{ type: 'text', text: article.body ?? '' }],
+    })) }); return;
   }
 
   json(res, 404, { error: `unhandled ${method} ${pathname}` });

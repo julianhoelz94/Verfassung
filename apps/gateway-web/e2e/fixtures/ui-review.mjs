@@ -36,7 +36,7 @@ export function reviewFixtures(germany) {
   const revision = { id: '01900000-0000-4000-8000-000000000805', documentId: REVIEW_DOCUMENT, revision: 1, title: 'Constitution source document', description: 'Fictional source for UI verification.', sourceUrl: 'https://example.org/source', fileName: null, contentType: null, createdAt: '2026-01-01T00:00:00Z', createdBy: '01900000-0000-4000-8000-000000000410' };
   const document = { id: REVIEW_DOCUMENT, currentRevision: 1, status: 'active', createdAt: revision.createdAt, revision };
   let proposal = { id: REVIEW_PROPOSAL, ownerId: revision.createdBy, status: 'proposed', constitutionId: null, settingsRevisionId: null, confirmedBy: null, payload: { isoCode: 'DE', countryName: 'Germany', constitutionSlug: 'review-charter', constitutionTitle: 'UI review charter', languageCode: 'en', sourceUrl: 'https://example.org/source', outline: constitution.contentOutline, sampleRoots: [] } };
-  const job = { id: REVIEW_JOB, status: 'pending_review', versionId: null, isoCode: 'DE', errors: [] };
+  const job = { id: REVIEW_JOB, status: 'pending_review', versionId: null, isoCode: 'DE', countryName: 'Germany', constitutionTitle: 'UI review charter', versionLabel: '2026', errors: [] };
   return { country, corrections, async response(req, method, pathname, readBody) {
     if (method === 'POST' && pathname === '/__sprint59_setup') {
       const body = await readBody(req);
@@ -62,7 +62,8 @@ export function reviewFixtures(germany) {
       if (pathname === `/api/document/documents/${REVIEW_DOCUMENT}`) return document;
       if (pathname === `/api/document/documents/${REVIEW_DOCUMENT}/revisions`) return [revision];
       if (pathname === `/api/document/documents/${REVIEW_DOCUMENT}/events`) return [{ id: 'created', eventType: 'created', occurredAt: revision.createdAt }];
-      if (pathname === '/api/ingestion/import-jobs') return [job];
+      if (pathname === '/api/ingestion/import-jobs') return !new URL(req.url, 'http://mock').searchParams.get('status') || new URL(req.url, 'http://mock').searchParams.get('status') === job.status ? [job] : [];
+      if (pathname === `/api/ingestion/import-jobs/${REVIEW_JOB}`) return job;
       if (pathname === `/api/ingestion/import-jobs/${REVIEW_JOB}/payload`) return { isoCode: 'DE', countryName: 'Germany', constitutionId: constitution.id, settingsRevisionId: '01900000-0000-4000-8000-000000000901', constitutionTitle: 'UI review charter', versionLabel: '2026', articles: [{ articleNumber: '1', title: 'Rights', body: 'All people are equal.' }] };
       if (pathname === `/api/ingestion/import-jobs/${REVIEW_JOB}/decisions`) return [];
       if (pathname === `/api/ingestion/import-setup-proposals/${REVIEW_PROPOSAL}`) return proposal;

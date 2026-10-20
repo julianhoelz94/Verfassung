@@ -75,6 +75,9 @@ data class ImportJobDto(
     val approvedBy: UUID? = null,
     val publishedBy: UUID? = null,
     val outlineConfirmedBy: UUID? = null,
+    val countryName: String? = null,
+    val constitutionTitle: String? = null,
+    val versionLabel: String? = null,
 )
 
 data class ImportBatchDto(val id: UUID, val items: List<ImportJobDto>, val status: String)

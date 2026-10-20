@@ -16,7 +16,7 @@ export const uiRoutes = [
   { entry: '/admin/constitutions', path: '/admin/constitutions', staff: true },
   { entry: '/admin/constitutions/[id]', path: `/admin/constitutions/${constitution}`, staff: true, snapshot: true },
   { entry: '/admin/import', path: '/admin/import', staff: true, snapshot: true },
-  { entry: '/admin/import/[jobId]', path: '/admin/import/01900000-0000-4000-8000-000000000701', staff: true, snapshot: true },
+  { entry: '/admin/import/[jobId]', path: '/admin/import/01900000-0000-4000-8000-000000000701', staff: true },
   { entry: '/admin/import/setup/[proposalId]', path: `/admin/import/setup/${proposal}`, staff: true, snapshot: true },
   { entry: '/admin/legal/[key]', path: '/admin/legal/impressum', staff: true, snapshot: true },
   { entry: '/admin/settings', path: '/admin/settings', staff: true, snapshot: true },

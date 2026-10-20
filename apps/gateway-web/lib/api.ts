@@ -770,6 +770,6 @@ export type OrderedTable = { caption?: string | null; rows: { logicalId: string;
 export type OrderedInlineReference = { logicalId: string; start: number; end: number; target: { type: 'unit' | 'external' | 'footnote'; logicalId?: string | null; url?: string | null; footnoteId?: string | null } };
 export type OrderedEntry = { type: 'text' | 'child'; node?: OrderedNode | null; logicalId?: string | null; revisionId?: string | null; occurrenceId?: string | null; text?: string | null; format?: 'plain' | 'table' | 'footnote' | null; table?: OrderedTable | null; footnoteLabel?: string | null; references?: OrderedInlineReference[] };
 
-export function getVersionSettings(versionId: string): Promise<SettingsRevision | null> {
-  return readJson<SettingsRevision>(`${catalogBaseUrl()}/versions/${encodeURIComponent(versionId)}/settings`, 'catalog');
+export function getVersionSettings(versionId: string, authorization?: string): Promise<SettingsRevision | null> {
+  return readJson<SettingsRevision>(`${catalogBaseUrl()}/versions/${encodeURIComponent(versionId)}/settings`, 'catalog', authorization);
 }

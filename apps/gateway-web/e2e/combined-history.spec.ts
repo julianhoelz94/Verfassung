@@ -58,3 +58,63 @@ test('history keeps its not-found response and other routes ignore a supplied in
   expect(about.ok()).toBeTruthy();
   expect(await about.text()).toContain('About');
 });
+
+test('markers sit on a centered line and reveal their labels on hover and keyboard focus', async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto('/countries/DE/timeline?on=2026-01-01');
+  const markers = page.locator('.history-milestone');
+  const tooltip = page.getByRole('tooltip');
+  await expect(markers).toHaveCount(3);
+  await expect(tooltip).toHaveCount(0);
+  const geometry = await page.locator('.history-years').evaluate(list => {
+    const bounds = list.getBoundingClientRect();
+    const container = list.parentElement!.getBoundingClientRect();
+    const line = getComputedStyle(list, '::before');
+    const lineCenter = bounds.top + parseFloat(line.top) + parseFloat(line.height) / 2;
+    return { centerOffset: (bounds.left + bounds.width / 2) - (container.left + container.width / 2),
+      markerOffsets: [...list.querySelectorAll('.history-marker')].map(marker => {
+        const rect = marker.getBoundingClientRect();
+        return rect.top + rect.height / 2 - lineCenter;
+      }) };
+  });
+  expect(Math.abs(geometry.centerOffset)).toBeLessThan(1);
+  for (const offset of geometry.markerOffsets) expect(Math.abs(offset)).toBeLessThan(1);
+  await page.screenshot({ path: testInfo.outputPath('timeline-centered.png'), fullPage: true });
+  await markers.first().hover();
+  await expect(tooltip).toContainText('Adopted');
+  await expect(tooltip).toContainText('Circa 1949-05-08');
+  await tooltip.hover();
+  await page.waitForTimeout(200);
+  await expect(tooltip).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath('timeline-hover.png'), fullPage: false });
+  await page.keyboard.press('Escape');
+  await expect(tooltip).toHaveCount(0);
+  await markers.first().hover();
+  await expect(tooltip).toBeVisible();
+  await page.getByRole('heading', { name: 'History', exact: true }).hover();
+  await expect(tooltip).toHaveCount(0);
+  await page.locator('.history-rail').focus();
+  await page.keyboard.press('Tab');
+  await expect(markers.first()).toBeFocused();
+  await expect(tooltip).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(tooltip).toHaveCount(0);
+  await page.keyboard.press('ArrowRight');
+  await expect(markers.nth(1)).toBeFocused();
+  await expect(markers.nth(1)).toHaveAttribute('aria-pressed', 'true');
+  await expect(tooltip).toContainText('Entered into force');
+});
+
+test('touch users select markers to read details without relying on hover', async ({ browser }, testInfo) => {
+  const context = await browser.newContext({ baseURL: String(testInfo.project.use.baseURL), viewport: { width: 390, height: 844 }, hasTouch: true });
+  await context.addInitScript(() => localStorage.setItem('ca_cookie_notice_v1', 'dismissed'));
+  try {
+    const page = await context.newPage();
+    await page.goto('/countries/DE/timeline?on=2026-01-01');
+    await page.locator('.history-milestone').last().tap();
+    await expect(page.getByRole('heading', { name: 'Update to Article 1', exact: true })).toBeVisible();
+    await expect(page.locator('.history-details > li:visible')).toHaveCount(1);
+    await expect(page.getByRole('tooltip')).toHaveCount(0);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBeTruthy();
+  } finally { await context.close(); }
+});

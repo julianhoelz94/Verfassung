@@ -45,7 +45,7 @@ export const renderCountryHistory = cache(async (code: string, on?: string, even
   let country: CountryDetail | null;
   try { country = await getCountry(code); }
   catch {
-    return <PageMain className="wide"><ServiceUnavailable service={ui.services.catalog} retryHref={`/countries/${code}/timeline`} /></PageMain>;
+    return <PageMain className="wide country-history"><ServiceUnavailable service={ui.services.catalog} retryHref={`/countries/${code}/timeline`} /></PageMain>;
   }
   if (!country) notFound();
   const [lifecycle, amendmentGroups] = await Promise.all([
@@ -140,7 +140,7 @@ export const renderCountryHistory = cache(async (code: string, on?: string, even
   const items = allItems.filter(item => eventFilter === 'all' || item.kind === eventFilter);
 
   return (
-    <PageMain className="wide">
+    <PageMain className="wide country-history">
       <PageHeader
         breadcrumbs={[
           { href: '/', label: <T value={ui.nav.countries} /> },

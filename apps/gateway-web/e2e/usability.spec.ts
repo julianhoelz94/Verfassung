@@ -83,6 +83,7 @@ for (const locale of ['en', 'de']) for (const width of [390, 820, 1440]) {
       await milestones.first().focus();
       await page.keyboard.press('End');
       await expect(milestones.last()).toHaveAttribute('aria-pressed', 'true');
+      await expect(page.getByRole('tooltip')).toBeVisible();
       await page.reload();
       await expect(milestones.last()).toHaveAttribute('aria-pressed', 'true');
       await expect(page.locator('.history-details > li:visible')).toHaveCount(1);
@@ -129,6 +130,6 @@ test('the complete chronology remains available for print and without JavaScript
     const fallback = await context.newPage();
     await fallback.goto('/countries/DE/timeline');
     await expect(fallback.locator('.history-details > li:visible')).toHaveCount(count);
-    await expect(fallback.getByText('Circa 1949-05-08')).toBeVisible();
+    await expect(fallback.locator('.history-details').getByText('Circa 1949-05-08')).toBeVisible();
   } finally { await context.close(); }
 });

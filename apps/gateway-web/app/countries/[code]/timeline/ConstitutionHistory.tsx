@@ -94,7 +94,7 @@ export async function loadConstitutionHistory(country: CountryDetail, onValue?: 
       ? constitutionsById.get(constitution.predecessorConstitutionId)
       : null;
     const versions = publicVersions(constitution.versions);
-    return { kind: 'constitution' as const, id: event.id, date: event.eventDate, title: `${message(locale, event.scope === 'whole' ? labels[event.eventType] : provisionLabels[event.eventType])} · ${constitution.title}`, content: (
+    return { kind: 'constitution' as const, id: event.id, date: event.eventDate, dateApproximate: event.scope === 'whole' && event.dateCertainty === 'approximate', title: `${message(locale, event.scope === 'whole' ? labels[event.eventType] : provisionLabels[event.eventType])} · ${constitution.title}`, content: (
       <article className="card">
         <p><time dateTime={event.eventDate}>{event.scope === 'whole' && event.dateCertainty === 'approximate' ? <T value={ui.remainingStatus.circa} /> : ''}{event.eventDate}</time> · {<T value={event.scope === 'whole' ? labels[event.eventType] : provisionLabels[event.eventType]} />}</p>
         <h2 className="card-title">
@@ -128,7 +128,7 @@ export async function loadConstitutionHistory(country: CountryDetail, onValue?: 
     ) };
   });
   return { items, status: (<>
-      <section className="card">
+      <section className="card history-status">
         <h2><T value={ui.countries.code.constitutionTimeline.page.statusOnADate} /></h2>
         <form method="get" className="date-filter" action={`/countries/${country.isoCode}/timeline`}>
           <input type="hidden" name="events" value={eventFilter} />

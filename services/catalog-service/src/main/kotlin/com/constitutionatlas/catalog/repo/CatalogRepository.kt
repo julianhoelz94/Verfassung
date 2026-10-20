@@ -99,36 +99,36 @@ class CatalogRepository(private val jdbc: JdbcTemplate) {
     }
 
     fun listConstitutions(jurisdictionId: UUID): List<ConstitutionSummary> = jdbc.query(
-            """
-            SELECT id, slug, title, predecessor_constitution_id, interim
-            FROM constitutions
-            WHERE jurisdiction_id = ?
-            ORDER BY title
-            """.trimIndent(),
-            { rs, _ ->
-                arrayOf(
-                    rs.getObject("id", UUID::class.java),
-                    rs.getString("slug"),
-                    rs.getString("title"),
-                    rs.getObject("predecessor_constitution_id", UUID::class.java),
-                    rs.getBoolean("interim"),
-                )
-            },
-            jurisdictionId,
-        ).map { row ->
-            val id = row[0] as UUID
-            ConstitutionSummary(
-                id,
-                row[1] as String,
-                row[2] as String,
-                findLegalTipEditorialTipId(id, publishedOnly = true),
-                listPublishedPublicVersions(id),
-                findOutline(id),
-                row[3] as UUID?,
-                row[4] as Boolean,
-                lifecycleStatus(id),
+        """
+        SELECT id, slug, title, predecessor_constitution_id, interim
+        FROM constitutions
+        WHERE jurisdiction_id = ?
+        ORDER BY title
+        """.trimIndent(),
+        { rs, _ ->
+            arrayOf(
+                rs.getObject("id", UUID::class.java),
+                rs.getString("slug"),
+                rs.getString("title"),
+                rs.getObject("predecessor_constitution_id", UUID::class.java),
+                rs.getBoolean("interim"),
             )
-        }
+        },
+        jurisdictionId,
+    ).map { row ->
+        val id = row[0] as UUID
+        ConstitutionSummary(
+            id,
+            row[1] as String,
+            row[2] as String,
+            findLegalTipEditorialTipId(id, publishedOnly = true),
+            listPublishedPublicVersions(id),
+            findOutline(id),
+            row[3] as UUID?,
+            row[4] as Boolean,
+            lifecycleStatus(id),
+        )
+    }
 
     fun listPublishedPublicVersions(constitutionId: UUID): List<VersionSummary> {
         val tipId = findLegalTipEditorialTipId(constitutionId, publishedOnly = true)

@@ -1,7 +1,7 @@
 package com.constitutionatlas.catalog.service
 
-import com.constitutionatlas.catalog.api.ContentOutlineDto
 import com.constitutionatlas.catalog.api.ConstitutionSummary
+import com.constitutionatlas.catalog.api.ContentOutlineDto
 import com.constitutionatlas.catalog.api.CountryDetail
 import com.constitutionatlas.catalog.api.CountrySummary
 import com.constitutionatlas.catalog.api.VersionDetail

@@ -104,7 +104,7 @@ test('administrator creates a constitution and changes its outline settings', as
   await expect(page.getByRole('textbox', { name: 'Label' })).toHaveCount(2);
   await page.getByRole('textbox', { name: 'Label' }).nth(1).fill('Clause');
   await page.getByLabel('Allow text alongside child units').check();
-  const preview = page.getByRole('complementary', { name: 'Live order example' });
+  const preview = page.getByRole('complementary', { name: 'Reader preview' });
   await expect(preview.getByText('The following rights are protected.', { exact: true }).first()).toBeVisible();
   await expect(preview.getByText('These rights apply to everyone.', { exact: true }).first()).toBeVisible();
   await page.getByRole('button', { name: 'Continue to review' }).click();
@@ -126,6 +126,58 @@ test('administrator creates a constitution and changes its outline settings', as
   await expect(page).toHaveURL(/saved=1/, { timeout: 30000 });
   await expect(page.getByText('Settings saved. Historical versions retain their structural settings.')).toBeVisible();
   await expect(page.getByLabel('How this layer is shown').nth(1)).toHaveValue('concatenated');
+});
+
+test('constitution preview explains units and shows running sentences throughout creation', async ({ page, browser }, testInfo) => {
+  await page.setViewportSize({ width: 1440, height: 1050 });
+  await signInAdmin(page);
+  await page.goto('/admin/constitutions');
+  await page.getByLabel('Country').selectOption('DE');
+  await page.getByLabel('Constitution title').fill('Example Constitution');
+  await page.screenshot({ path: testInfo.outputPath('01-basics.png') });
+  await page.getByRole('button', { name: 'Continue to structure' }).click();
+  const preview = page.getByRole('complementary', { name: 'Reader preview' });
+  await expect(preview.getByRole('heading', { name: 'Structure map' })).toHaveCount(0);
+  await page.getByLabel('Allow text alongside child units').nth(1).check();
+  const sentences = preview.locator('.constitution-concat').first().locator('[data-preview-kind="sentence"]');
+  await expect(sentences).toHaveCount(2);
+  await expect(preview.locator('.constitution-concat').first()).toHaveText('Everyone has the right to equal protection. The law shall protect these rights.');
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.mouse.move(0, 0);
+  await page.screenshot({ path: testInfo.outputPath('02-structure.png') });
+  await page.screenshot({ path: testInfo.outputPath('02-structure-full.png'), fullPage: true });
+  const sentence = sentences.first();
+  await sentence.hover();
+  await expect(preview.getByRole('tooltip')).toHaveCount(1);
+  await expect(preview.getByRole('tooltip')).toContainText('Text leaf · No child units');
+  await expect(preview.getByRole('tooltip')).toContainText('running text, joined with adjacent sibling units');
+  await page.screenshot({ path: testInfo.outputPath('03-sentence-annotation.png') });
+  await page.keyboard.press('Escape');
+  await expect(preview.getByRole('tooltip')).toHaveCount(0);
+  await sentence.focus();
+  await expect(preview.getByRole('tooltip')).toContainText('Text leaf · No child units');
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: 'Continue to review' }).click();
+  await expect(page.getByRole('heading', { name: 'Review before creating' })).toBeVisible();
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.mouse.move(0, 0);
+  await page.screenshot({ path: testInfo.outputPath('04-review.png'), fullPage: true });
+
+  const mobile = await browser.newContext({ storageState: await page.context().storageState(), hasTouch: true, viewport: { width: 320, height: 844 } });
+  try {
+    const phone = await mobile.newPage();
+    await phone.goto(`${new URL(page.url()).origin}/admin/constitutions`);
+    await phone.getByLabel('Constitution title').fill('Mobile Constitution');
+    await phone.getByRole('button', { name: 'Continue to structure' }).click();
+    const phonePreview = phone.getByRole('complementary', { name: 'Reader preview' });
+    await phonePreview.locator('[data-preview-kind="sentence"]').first().tap();
+    await expect(phonePreview.getByRole('tooltip')).toContainText('Text leaf · No child units');
+    const box = await phonePreview.getByRole('tooltip').boundingBox();
+    expect(box?.x).toBeGreaterThanOrEqual(0);
+    expect(box!.x + box!.width).toBeLessThanOrEqual(320);
+    expect(await phone.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBeTruthy();
+    await phone.screenshot({ path: testInfo.outputPath('05-mobile-annotation.png') });
+  } finally { await mobile.close(); }
 });
 
 test('guided creation exposes a manual catalog slug when a title cannot generate one', async ({ page }) => {
@@ -167,17 +219,18 @@ test('administrator can carry an editorial correction through every role action'
 test('outline mixed-content preview follows permissions on desktop and mobile', async ({ page }, testInfo) => {
   await signInAdmin(page);
   await page.goto('/admin/constitutions/01900000-0000-4000-8000-000000000002');
-  const preview = page.getByRole('complementary', { name: 'Live order example' });
-  await expect(preview.getByRole('heading', { name: 'Structure map' })).toBeVisible();
+  const preview = page.getByRole('complementary', { name: 'Reader preview' });
+  await expect(preview.getByRole('heading', { name: 'Structure map' })).toHaveCount(0);
   await expect(preview.getByRole('heading', { name: 'Reader preview' })).toBeVisible();
   const permission = page.getByLabel('Allow text alongside child units').first();
   await permission.check();
+  await expect(preview.locator('[data-preview-kind="article"] > .node-tree > p').first()).toHaveText('The following rights are protected.');
   await expect(preview.getByText('The following rights are protected.', { exact: true }).first()).toBeVisible();
   await expect(preview.getByText('These rights apply to everyone.', { exact: true }).first()).toBeVisible();
   await expect(preview.getByText('The law shall uphold these guarantees.', { exact: true }).first()).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath('outline-desktop.png'), fullPage: true });
   await permission.uncheck();
-  await expect(preview.getByText('The following rights are protected.', { exact: true })).toHaveCount(2);
+  await expect(preview.locator('[data-preview-kind="article"] > .node-tree > p')).toHaveCount(0);
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(preview).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBeTruthy();

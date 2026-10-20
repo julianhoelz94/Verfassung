@@ -22,6 +22,12 @@ Das Kontomenü gruppiert die Ziele zum Entdecken, zur Redaktion und zur Administ
 
 Die Nutzerzeilen zeigen E-Mail-Adresse, Status und Rollenkennzeichnungen. **Rollen bearbeiten** öffnet die Rollenauswahl. Speichern Sie mit **Rollen aktualisieren** oder verwerfen Sie die Auswahl mit **Abbrechen**. Die Steuerelemente für Dienst-Tokens stehen in einem eigenen Abschnitt unter der Nutzerliste.
 
+## Vorschau der Verfassungsstruktur
+
+Unter **Gliederungen** erstellen Sie eine Verfassung über **Grunddaten → Struktur → Prüfen und erstellen**. Die **Vorschau des Lesers** zeigt die Darstellung der konfigurierten Einheiten. Bewegen Sie den Zeiger über eine Einheit, fokussieren Sie sie mit der Tastatur oder tippen Sie darauf, um Struktur, Anzeigeeinstellungen und Bearbeitungsrechte zu prüfen. Mit Escape oder einem Tippen außerhalb schließen Sie die Erläuterung.
+
+Aufeinanderfolgende Satzeinheiten mit Fließtextdarstellung werden verbunden. Nicht nummerierter übergeordneter Text zwischen Einheiten beginnt einen eigenen Absatz. Mitgelieferte Quellenbeispiele behalten ihre ursprüngliche Reihenfolge.
+
 ## Erste Einrichtung
 
 Eine Rollenänderung oder Kontosperre widerruft Sitzungen, offene Einrichtungsabfragen und persönliche MCP/OAuth-Zugangsdaten. Die Sperre eines eingeladenen Kontos macht auch die Einladung ungültig. Eine erneute Aktivierung stellt widerrufene Zugangsdaten nicht wieder her. Automatisierungs-Tokens werden weiterhin separat ausgetauscht oder widerrufen.

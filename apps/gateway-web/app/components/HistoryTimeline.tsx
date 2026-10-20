@@ -10,6 +10,18 @@ import fieldStyles from './fields.module.css';
 
 export type HistoryMilestone = { kind: HistoryKind; id: string; date?: string | null; dateApproximate?: boolean; title: string; content: ReactNode };
 
+function previewPosition(button: HTMLButtonElement) {
+  const bounds = button.getBoundingClientRect();
+  const rail = button.closest('.history-rail')?.getBoundingClientRect();
+  const visibleLeft = Math.max(0, rail?.left ?? 0);
+  const visibleRight = Math.min(window.innerWidth, rail?.right ?? window.innerWidth);
+  if (bounds.right <= visibleLeft || bounds.left >= visibleRight || bounds.bottom <= 0 || bounds.top >= window.innerHeight) return null;
+  const aboveSpace = bounds.top - 16;
+  const belowSpace = window.innerHeight - bounds.bottom - 16;
+  const below = aboveSpace < 200 && belowSpace > aboveSpace;
+  return { x: bounds.left + bounds.width / 2, top: below ? bounds.bottom + 8 : bounds.top - 8, below, maxHeight: Math.max(48, (below ? belowSpace : aboveSpace) - 8) };
+}
+
 /** The server renders the complete chronology; enhancement selects one detail panel. */
 export function HistoryTimeline({ items }: { items: HistoryMilestone[] }) {
   const t = useTranslation();
@@ -29,16 +41,17 @@ export function HistoryTimeline({ items }: { items: HistoryMilestone[] }) {
   function showPreview(index: number, button: HTMLButtonElement) {
     cancelDismiss();
     previewAnchor.current = button;
-    const bounds = button.getBoundingClientRect();
-    const aboveSpace = bounds.top - 16;
-    const belowSpace = window.innerHeight - bounds.bottom - 16;
-    const below = aboveSpace < 200 && belowSpace > aboveSpace;
-    setPreview({ index, x: bounds.left + bounds.width / 2, top: below ? bounds.bottom + 8 : bounds.top - 8, below, maxHeight: Math.max(48, (below ? belowSpace : aboveSpace) - 8) });
+    const position = previewPosition(button);
+    setPreview(position ? { index, ...position } : null);
   }
   useEffect(() => {
     const dismiss = (event: Event) => {
       if (event.target instanceof Element && event.target.closest('#history-preview')) return;
-      setPreview(null);
+      const anchor = previewAnchor.current;
+      const position = anchor?.matches(':focus-visible') ? previewPosition(anchor) : null;
+      // Navigation can deliver its scroll event after focus opens the preview.
+      // Reposition an open keyboard preview without reopening one closed by Escape.
+      setPreview(current => current && position ? { ...current, ...position } : null);
     };
     const dismissOnEscape = (event: KeyboardEvent) => { if (event.key === 'Escape') setPreview(null); };
     window.addEventListener('keydown', dismissOnEscape);

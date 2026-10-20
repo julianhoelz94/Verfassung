@@ -1,6 +1,11 @@
 export type HistoryKind = 'constitution' | 'amendment';
 export type HistoryFilter = 'all' | HistoryKind;
 
+// Match URLSearchParams.get in the root preload when Next supplies repeated values.
+export function historyQueryValue(value?: string | string[]): string | undefined {
+  return Array.isArray(value) ? value[0] : value;
+}
+
 export function historyFilter(value?: string): HistoryFilter {
   return value === 'constitution' || value === 'amendment' ? value : 'all';
 }

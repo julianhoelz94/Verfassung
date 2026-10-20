@@ -2,10 +2,11 @@ import type { Metadata } from 'next';
 import { getCountry } from '../../../../lib/api';
 import { atlasTitle, metaDescription, pageMetadata } from '../../../../lib/page-meta';
 import { renderCountryHistory } from './CountryHistoryContent';
+import { historyQueryValue } from '../../../../lib/history';
 
 type TimelinePageProps = {
   params: Promise<{ code: string }>;
-  searchParams: Promise<{ on?: string; events?: string }>;
+  searchParams: Promise<{ on?: string | string[]; events?: string | string[] }>;
 };
 
 export async function generateMetadata(props: TimelinePageProps): Promise<Metadata> {
@@ -28,5 +29,5 @@ export async function generateMetadata(props: TimelinePageProps): Promise<Metada
 export default async function TimelinePage({ params, searchParams }: TimelinePageProps) {
   const { code } = await params;
   const { on, events } = await searchParams;
-  return renderCountryHistory(code, on, events);
+  return renderCountryHistory(code, historyQueryValue(on), historyQueryValue(events));
 }

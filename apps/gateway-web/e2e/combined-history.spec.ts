@@ -118,3 +118,14 @@ test('touch users select markers to read details without relying on hover', asyn
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBeTruthy();
   } finally { await context.close(); }
 });
+
+test('repeated history parameters retain the first value and a complete no-JavaScript response', async ({ browser }, testInfo) => {
+  const context = await browser.newContext({ baseURL: String(testInfo.project.use.baseURL), javaScriptEnabled: false });
+  try {
+    const page = await context.newPage();
+    await page.goto('/countries/DE/timeline?events=constitution&events=amendment&on=1949-05-10&on=2026-01-01');
+    await expect(page.locator('.history-details > li:visible')).toHaveCount(2);
+    await expect(page.locator('#history-event-type')).toHaveValue('constitution');
+    await expect(page.locator('#constitution-timeline-date')).toHaveValue('1949-05-10');
+  } finally { await context.close(); }
+});

@@ -57,7 +57,7 @@ Rules a junior developer can apply everywhere:
 - Left: brand mark (teal rounded square with §) + "Constitution Atlas". Links to `/`.
 - Centre (desktop only): primary nav from `primaryNavLinks(user)`, current page marked with `aria-current="page"` and a 3px underline.
 - Right: pill search (`≥ 640`), then either **Log in** button (anonymous) or an **avatar** button (initial of email) that opens the account menu; on phones a **☰** button opens the full menu.
-- Menu panel: one disclosure (client component with Escape/outside-click close). Browse, Editorial and Admin are collapsible groups; the current workspace group starts expanded. Account links and sign-out stay visible. Groups in this order: user identity (email + role badges), primary destinations (phone only), Editorial (if any editorial role), Admin (admin only), Account + Sign out. Exact contents per role are in `role-link-trees.md`.
+- Menu panel: one disclosure (client component with Escape/outside-click close). Browse, Editorial and Admin are collapsible groups; the current workspace group starts expanded. Account links and sign-out stay visible. Groups in this order: user identity (email), primary destinations (phone only), Editorial (if any editorial role), Admin (admin only), Account + Sign out. Exact contents per role are in `role-link-trees.md`.
 - Phone search row: full-width search input under the bar on public pages; on version/article pages the placeholder becomes "Search in this version" and the form carries `versionId`.
 - Identity outage: a single muted status line under the bar ("Sign-in is temporarily unavailable."), public content unaffected (keeps UI-6).
 
@@ -76,10 +76,10 @@ Each item lists layout, key components, and what changes versus today.
 
 ### 4.2 Country `/countries/[code]`
 - Page header with ISO badge and country name; meta: number of constitutions/versions.
-- One card per constitution; inside, a horizontal chip row of versions in canonical order (latest marked), and actions **Timeline**, **Compare**.
+- One card per constitution; inside, a horizontal chip row of versions in canonical order (latest marked), and actions **Read latest**, **Compare**. Overview/History navigation appears above the cards.
 
 ### 4.3 Version reader `/countries/[code]/versions/[versionId]`
-- Header: eyebrow "Germany · Basic Law", `h1` "Version in force since {date}", meta badges (Latest, verification, language, gazette, Source link), actions **Timeline**, **Compare with previous**, **Print**.
+- Header: eyebrow "Germany · Basic Law", `h1` "Version in force since {date}", meta badges (Latest, verification, language, gazette, Source link), actions **Compare with previous**, **Print**, with Overview/History navigation below the header.
 - Toolbar (sticky under the top bar): **Contents** button (phone/tablet), segmented detail control replacing the range slider (labels come from `depthStopLabels(outline)`, e.g. Articles / Paragraphs / Full text), article count on the right.
 - Desktop: TOC column listing outline groups and articles, `aria-current` follows scroll (IntersectionObserver in a small client component).
 - Text column: article header = accent article number + serif title; paragraphs as a `2.5rem 1fr` grid with the paragraph number in the gutter; article footer with Permalink, History of Art. N, and "Unchanged since {label}" or a changed badge.

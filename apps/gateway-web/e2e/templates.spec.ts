@@ -1,10 +1,36 @@
 import { test, expect } from './fixtures/consent';
 import { signInAdmin } from './helpers';
+import type { Locator } from '@playwright/test';
 
 const mock = `http://127.0.0.1:${process.env.E2E_MOCK_PORT ?? 4010}`;
 
+async function expectTypography(element: Locator, properties: Record<string, string>) {
+  const result = await element.evaluate((node, properties) => {
+    const probe = document.createElement('span');
+    for (const [property, value] of Object.entries(properties)) probe.style.setProperty(property, value);
+    document.body.append(probe);
+    const actual = getComputedStyle(node);
+    const expected = getComputedStyle(probe);
+    const result = {
+      actual: Object.fromEntries(
+        Object.keys(properties).map((property) => [property, actual.getPropertyValue(property)]),
+      ),
+      expected: Object.fromEntries(
+        Object.keys(properties).map((property) => [property, expected.getPropertyValue(property)]),
+      ),
+    };
+    probe.remove();
+    return result;
+  }, properties);
+  expect(result.actual).toEqual(result.expected);
+}
+
 for (const locale of ['en', 'de'])
-  test(`settings templates share a single responsive spacing owner in ${locale}`, async ({ page, request }) => {
+  test(`settings templates share a single responsive spacing owner in ${locale}`, async ({
+    page,
+    request,
+    browser,
+  }) => {
     test.setTimeout(120_000);
     await request.post(`${mock}/__reset`);
     await request.post(`${mock}/__sprint59_content`);
@@ -19,6 +45,7 @@ for (const locale of ['en', 'de'])
       ]) {
         if (route.path === '/setup') await request.post(`${mock}/__sprint59_setup`, { data: { completed: false } });
         await page.goto(route.path);
+        await expect(page.locator('main[data-template="settings"]')).toBeVisible();
         await expect(page.locator('main')).toHaveCount(1);
         await expect(page.locator('main')).toHaveAttribute('data-template', 'settings');
         await expect(page.locator('h1')).toHaveCount(1);
@@ -94,4 +121,33 @@ for (const locale of ['en', 'de'])
       );
     expect(links.length).toBeGreaterThan(0);
     expect(links.every((alignment) => alignment === 'flex-start')).toBe(true);
+    await page.goto('/');
+    await expectTypography(page.locator('.hero .page-title'), { 'font-size': 'var(--text-3xl)' });
+    await request.post(`${mock}/api/editor/edit-sessions`, {
+      data: {
+        versionId: '01900000-0000-4000-8000-000000000804',
+        hopKind: 'editorial_correction',
+      },
+    });
+    await page.goto(
+      '/editor?sessionId=01900000-0000-4000-8000-000000000501&versionId=01900000-0000-4000-8000-000000000804',
+    );
+    await expectTypography(page.locator('textarea.constitution-body'), {
+      'font-family': 'var(--font-text)',
+      'font-size': 'var(--text-md)',
+      'line-height': 'var(--leading-reading)',
+    });
+    await request.post(`${mock}/api/identity/login`, {
+      data: { email: 'local-admin@example.local', password: 'change-me' },
+    });
+    const origin = new URL(page.url()).origin;
+    const challenged = await browser.newContext({ baseURL: origin, locale });
+    try {
+      await challenged.addCookies([{ name: 'ca_mfa_challenge', value: 'e2e-mfa-challenge', url: origin }]);
+      const mfa = await challenged.newPage();
+      await mfa.goto('/login/mfa');
+      await expectTypography(mfa.locator('.mfa-form input[name="code"]'), { 'font-size': 'var(--text-xl)' });
+    } finally {
+      await challenged.close();
+    }
   });

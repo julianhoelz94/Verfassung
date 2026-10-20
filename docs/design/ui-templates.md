@@ -37,7 +37,7 @@ Use existing localized messages for product text. Navigation is a slot so route-
 
 ## Spacing ownership
 
-The global stylesheet is in the `base` cascade layer; scoped component and layout rules take precedence over base rules regardless of stylesheet order. Print-specific module rules preserve hidden action groups.
+The global stylesheet is in the `base` cascade layer; scoped structural layout rules take precedence over base margins regardless of stylesheet order. Typography defaults stay in the base layer at low specificity so the hero heading, legal-text editing font and larger MFA code font retain their intended variants. Print-specific module rules preserve hidden action groups.
 
 Runtime tokens live only in `apps/gateway-web/app/styles/tokens.css`, imported by the root layout. The historical prototype token file imports that source instead of copying it.
 

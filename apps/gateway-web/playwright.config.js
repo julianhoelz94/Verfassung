@@ -22,6 +22,7 @@ const apiEnv = {
 
 module.exports = defineConfig({
   testDir: './e2e',
+  testMatch: '**/*.spec.ts',
   testIgnore: /e2e\/full\//,
   fullyParallel: false,
   forbidOnly: Boolean(process.env.CI),

@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { Fragment, type ReactElement, type ReactNode } from 'react';
 import type { ArticleDetail, ArticleSummary, ContentNode, ContentOutline, OrderedEntry, OrderedInlineReference, OrderedNode, OrderedTableCell } from '../../lib/api';
 import { linkifyReferences, type CrossRefContext } from '../../lib/crossrefs';
 import { articleHeading, effectiveDisplayKind, groupNodes, kindByCode, nodeHeading } from '../../lib/outline';
@@ -167,7 +167,7 @@ function SectionNode({
 }
 
 /** Ordered reader rendering shares heading and sibling presentation rules with NodeTree. */
-export function OrderedContentTree({ entries, outline, withRefs = (text) => text, renderText, renderTableCell, renderTableCaption, renderReference, renderHeading, renderLabel, idPrefix = '', canEditTitles = false, returnTo, indexedTargets, indexedNotes, indexedBacklinks, crossRefs }: {
+export function OrderedContentTree({ entries, outline, withRefs = (text) => text, renderText, renderTableCell, renderTableCaption, renderReference, renderHeading, renderLabel, renderNode, idPrefix = '', canEditTitles = false, returnTo, indexedTargets, indexedNotes, indexedBacklinks, crossRefs }: {
   entries: OrderedEntry[]; outline?: ContentOutline; withRefs?: (text: string) => ReactNode;
   renderText?: (entry: OrderedEntry) => ReactNode;
   renderTableCell?: (cell: OrderedTableCell, entry: OrderedEntry) => ReactNode;
@@ -175,6 +175,7 @@ export function OrderedContentTree({ entries, outline, withRefs = (text) => text
   renderReference?: (reference: OrderedInlineReference, label: string, href: string | undefined, entry: OrderedEntry) => ReactNode;
   renderHeading?: (node: OrderedNode, heading: string) => ReactNode;
   renderLabel?: (node: OrderedNode, label: string) => ReactNode;
+  renderNode?: (node: OrderedNode, element: ReactElement) => ReactNode;
   idPrefix?: string;
   canEditTitles?: boolean;
   returnTo?: string;
@@ -234,7 +235,8 @@ export function OrderedContentTree({ entries, outline, withRefs = (text) => text
       const text = orderedText(unit.content);
       const previous = partIndex > 0 ? orderedText(group.entries[partIndex - 1]!.node!.content) : '';
       const space = previous && text && !/\s$/u.test(previous) && !/^\s/u.test(text) ? ' ' : '';
-      return <span key={unit.occurrenceId} id={`${idPrefix}${unit.occurrenceId}`}>{space}{kind?.showLabel && kind.labelPlacement === 'superscript' ? <sup className="num">{renderLabel ? renderLabel(unit, unit.label ?? '') : unit.label}</sup> : kind?.showLabel && kind.labelPlacement === 'inline' ? <span className="num">{renderLabel ? renderLabel(unit, unit.label ?? '') : unit.label}</span> : null}{unit.content.map((entry, textIndex) => <span key={entry.occurrenceId ?? textIndex} id={entry.occurrenceId ? `${idPrefix}${entry.occurrenceId}` : undefined}>{renderText && !entry.references?.length ? renderText(entry) : richText(entry)}</span>)}</span>;
+      const element = <span key={unit.occurrenceId} id={`${idPrefix}${unit.occurrenceId}`}>{space}{kind?.showLabel && kind.labelPlacement === 'superscript' ? <sup className="num">{renderLabel ? renderLabel(unit, unit.label ?? '') : unit.label}</sup> : kind?.showLabel && kind.labelPlacement === 'inline' ? <span className="num">{renderLabel ? renderLabel(unit, unit.label ?? '') : unit.label}</span> : null}{unit.content.map((entry, textIndex) => <span key={entry.occurrenceId ?? textIndex} id={entry.occurrenceId ? `${idPrefix}${entry.occurrenceId}` : undefined}>{renderText && !entry.references?.length ? renderText(entry) : richText(entry)}</span>)}</span>;
+      return renderNode ? <Fragment key={unit.occurrenceId}>{renderNode(unit, element)}</Fragment> : element;
     })}</p>;
     const entry = group.entries[0]!;
     if (entry.type === 'text' && entry.format === 'table' && entry.table) return <LocalizedTableRegion key={entry.occurrenceId ?? entry.logicalId ?? index} id={entry.occurrenceId ? `${idPrefix}${entry.occurrenceId}` : undefined} caption={entry.table.caption}><table className="legal-table">{entry.table.caption ? <caption>{renderTableCaption ? renderTableCaption(entry) : entry.table.caption}</caption> : null}<tbody>{entry.table.rows.map(row => <tr key={row.logicalId}>{row.cells.map(cell => cell.header ? <th key={cell.logicalId} id={`${idPrefix}cell-${cell.logicalId}`} scope="col" rowSpan={cell.rowSpan ?? 1} colSpan={cell.colSpan ?? 1}>{renderTableCell ? renderTableCell(cell, entry) : cell.text}</th> : <td key={cell.logicalId} id={`${idPrefix}cell-${cell.logicalId}`} headers={cell.headers?.map(id => `${idPrefix}cell-${id}`).join(' ') || undefined} rowSpan={cell.rowSpan ?? 1} colSpan={cell.colSpan ?? 1}>{renderTableCell ? renderTableCell(cell, entry) : cell.text}</td>)}</tr>)}</tbody></table></LocalizedTableRegion>;
@@ -246,12 +248,13 @@ export function OrderedContentTree({ entries, outline, withRefs = (text) => text
     const heading = nodeHeading(kind, { kind: node.kind, label: node.label, number: null, title: node.title });
     const superscriptLabel = kind?.showLabel && kind.labelPlacement === 'superscript' ? node.label : null;
     const inlineLabel = kind?.showLabel && kind.labelPlacement === 'inline' ? node.label : null;
-    return <section key={node.occurrenceId} id={`${idPrefix}${node.occurrenceId}`} className={`node-block node-kind-${node.kind}`}>
+    const element = <section key={node.occurrenceId} id={`${idPrefix}${node.occurrenceId}`} className={`node-block node-kind-${node.kind}`}>
       {heading ? <p className="node-heading">{renderHeading ? renderHeading(node, heading) : heading}</p> : null}
       {canEditTitles && returnTo && kind?.titlePolicy !== 'none' ? <NodeTitleForm nodeId={node.occurrenceId} title={node.title} label={node.label ?? kind?.displayLabel ?? node.kind} returnTo={returnTo} /> : null}
       {superscriptLabel ? <sup className="num">{renderLabel ? renderLabel(node, superscriptLabel) : superscriptLabel}</sup> : null}
       {inlineLabel ? <span className="num">{renderLabel ? renderLabel(node, inlineLabel) : inlineLabel}</span> : null}
-      <OrderedContentTree entries={node.content} outline={outline} withRefs={withRefs} renderText={renderText} renderTableCell={renderTableCell} renderTableCaption={renderTableCaption} renderReference={renderReference} renderHeading={renderHeading} renderLabel={renderLabel} idPrefix={idPrefix} canEditTitles={canEditTitles} returnTo={returnTo} indexedTargets={targets} indexedNotes={notes} indexedBacklinks={backlinks} crossRefs={crossRefs} />
+      <OrderedContentTree entries={node.content} outline={outline} withRefs={withRefs} renderText={renderText} renderTableCell={renderTableCell} renderTableCaption={renderTableCaption} renderReference={renderReference} renderHeading={renderHeading} renderLabel={renderLabel} renderNode={renderNode} idPrefix={idPrefix} canEditTitles={canEditTitles} returnTo={returnTo} indexedTargets={targets} indexedNotes={notes} indexedBacklinks={backlinks} crossRefs={crossRefs} />
     </section>;
+    return renderNode ? <Fragment key={node.occurrenceId}>{renderNode(node, element)}</Fragment> : element;
   })}</div>;
 }

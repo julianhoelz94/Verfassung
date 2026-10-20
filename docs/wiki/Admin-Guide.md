@@ -22,6 +22,12 @@ The account menu groups Browse, Editorial and Admin destinations. Open a group t
 
 User rows show email, status and role badges. Choose **Edit roles** to reveal the role checkboxes, then **Update roles** to save or **Cancel** to discard the selection. Service-token controls appear in a separate section below the user list.
 
+## Constitution structure preview
+
+In **Outlines**, create a constitution through **Basics → Structure → Review & create**. The **Reader preview** shows how the configured units appear to readers. Hover over a unit, focus it with the keyboard, or tap it to inspect its structure, display settings, and editing permissions; press Escape or tap outside to dismiss the annotation.
+
+Consecutive sentence units configured as running text flow together. Unnumbered parent text between units starts a separate paragraph. Supplied source samples retain their original order.
+
 ## First installation
 
 Changing roles or disabling an account revokes its sessions, pending enrollment challenges and personal MCP/OAuth credentials. Disabling an invited account also invalidates the invitation. Re-enabling does not restore revoked credentials. Automation service tokens retain separate rotation/revocation controls.

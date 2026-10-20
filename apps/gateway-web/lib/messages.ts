@@ -3,6 +3,29 @@ import type { Locale } from './locale';
 export type UiMessage = { readonly en: string; readonly de: string };
 
 export const ui = {
+  outlinePreview: {
+    inspectHelp: { en: 'Hover over a unit, focus it with the keyboard, or tap it to inspect its settings.', de: 'Bewegen Sie den Zeiger über eine Einheit, fokussieren Sie sie mit der Tastatur oder tippen Sie darauf, um ihre Einstellungen zu sehen.' },
+    sourceSample: { en: 'Showing your proposed source sample.', de: 'Ihr vorgeschlagenes Quellenbeispiel wird angezeigt.' },
+    configuration: { en: '{unit} configuration', de: 'Einstellungen für {unit}' },
+    structural: { en: 'Structural unit · Children: {children}', de: 'Struktureinheit · Untergeordnete Einheiten: {children}' },
+    leaf: { en: 'Text leaf · No child units', de: 'Textebene · Keine untergeordneten Einheiten' },
+    readerRunning: { en: 'Reader: running text, joined with adjacent sibling units', de: 'Leseansicht: Fließtext, mit benachbarten Einheiten derselben Ebene verbunden' },
+    readerBlock: { en: 'Reader: separate block', de: 'Leseansicht: eigener Block' },
+    kindAndTitle: { en: 'Kind name: {kind} · Title: {title}', de: 'Artname: {kind} · Titel: {title}' },
+    titleWhenPresent: { en: 'shown when present', de: 'angezeigt, falls vorhanden' },
+    legalLabel: { en: 'Legal label: {label}', de: 'Rechtliche Kennzeichnung: {label}' },
+    labelBefore: { en: 'shown before title', de: 'vor dem Titel angezeigt' },
+    labelAfter: { en: 'shown after title', de: 'nach dem Titel angezeigt' },
+    labelInline: { en: 'shown inline with text', de: 'im Text angezeigt' },
+    labelSuperscript: { en: 'shown superscript in text', de: 'im Text hochgestellt angezeigt' },
+    editorPolicies: { en: 'Editor titles: {titles} · Legal labels: {labels}', de: 'Redaktionelle Titel: {titles} · Rechtliche Kennzeichnungen: {labels}' },
+    parentText: { en: 'Unnumbered parent text allowed before, between, and after children', de: 'Nicht nummerierter übergeordneter Text vor, zwischen und nach untergeordneten Einheiten erlaubt' },
+    childText: { en: 'Text stays in child units', de: 'Text bleibt in den untergeordneten Einheiten' },
+    sentenceEditing: { en: 'Editing: sentence boundary assistance', de: 'Bearbeitung: Unterstützung bei Satzgrenzen' },
+    plainEditing: { en: 'Editing: plain text', de: 'Bearbeitung: Klartext' },
+    sampleDignity: { en: 'Human dignity shall be respected.', de: 'Die Würde des Menschen wird geachtet.' },
+    sampleLegalProtection: { en: 'Everyone may seek legal protection.', de: 'Alle Menschen können Rechtsschutz in Anspruch nehmen.' },
+  },
   importState: {
     prepared: { en: 'Prepared', de: 'Vorbereitet' },
     outlineConfirmed: { en: 'Outline confirmed', de: 'Gliederung bestätigt' },

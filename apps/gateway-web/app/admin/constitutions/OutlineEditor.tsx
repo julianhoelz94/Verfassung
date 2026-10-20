@@ -6,9 +6,10 @@ import type { FormEvent, ReactNode } from 'react';
 import { useRef, useState } from 'react';
 import { Alert, Button, Input, Select } from '../../components/ui';
 import { SettingInfo } from '../../components/SettingInfo';
-import type { OutlineKindWrite, SettingsImpact, ContentOutline, OrderedNode, OrderedEntry } from '../../../lib/api';
-import { asOutlinePresentation, effectiveDisplayKind, kindByCode } from '../../../lib/outline';
-import { OrderedContentTree } from '../../components/ConstitutionText';
+import type { OutlineKindWrite, SettingsImpact, ContentOutline, OrderedNode } from '../../../lib/api';
+import { asOutlinePresentation, effectiveDisplayKind } from '../../../lib/outline';
+import { outlineExample } from '../../../lib/outline-preview';
+import { OutlineReaderPreview } from './OutlineReaderPreview';
 import { outlineFromTemplate, type ConstitutionTemplate } from '../../../lib/constitution-templates';
 import { saveOutlineAction, previewOutlineImpactAction } from './actions';
 import { Stack, Inline } from '../../components/layout/Layout';
@@ -142,7 +143,7 @@ export function OutlineEditor({
   }
 
   const exampleOutline: ContentOutline = { kinds: layers.map((layer, index) => ({ ...layer, sortOrder: index + 1, mayHoldText: !layer.allowedChildKinds?.length || Boolean(layer.allowTextAlongsideChildren), mayHoldChildren: Boolean(layer.allowedChildKinds?.length), allowedChildKinds: layer.allowedChildKinds ?? [] })) };
-  const example = layers.filter(layer => layer.root).map((layer, index) => exampleNode(layers, layer.kindCode, `sample-${index}`, index, new Set(), t)).filter((node): node is OrderedNode => Boolean(node));
+  const example = outlineExample(exampleOutline, t);
   const codes = layers.map((layer) => layer.kindCode.trim().toLowerCase());
   const outlineError = layers.some((layer) => !layer.displayLabel.trim() || !layer.kindCode.trim())
     ? t(ui.remainingStatus.outlineNameRequired)
@@ -338,13 +339,11 @@ export function OutlineEditor({
           </Stack>
         ))}
       </Stack>}
-      <aside className={["card outline-live-preview", surfaceStyles.card].join(' ')} aria-label={t(ui.accessibility.liveOrderExample)}>
-        <h2><T value={sampleRoots.length ? ui.outlineDynamic.proposedSample : ui.outlineDynamic.liveExample} /></h2>
-        <p className="muted"><T value={ui.admin.constitutions.outlineeditor.parentTextIsUnnumberedAndBelongsTo} /></p>
-        <h3><T value={ui.admin.constitutions.outlineeditor.structureMap} /></h3>
-        {(sampleRoots.length ? sampleRoots : example).map(node => <ExampleMap key={node.occurrenceId} node={node} outline={exampleOutline} />)}
-        <h3><T value={ui.admin.constitutions.outlineeditor.readerPreview} /></h3>
-        <OrderedContentTree entries={(sampleRoots.length ? sampleRoots : example).map(node => ({ type: 'child' as const, node }))} outline={exampleOutline} />
+      <aside className={["card outline-live-preview", surfaceStyles.card].join(' ')} aria-label={t(ui.admin.constitutions.outlineeditor.readerPreview)}>
+        <h2><T value={ui.admin.constitutions.outlineeditor.readerPreview} /></h2>
+        <p className="muted"><T value={ui.outlinePreview.inspectHelp} /></p>
+        {sampleRoots.length ? <p className="muted"><T value={ui.outlinePreview.sourceSample} /></p> : null}
+        <OutlineReaderPreview roots={sampleRoots.length ? sampleRoots : example} outline={exampleOutline} />
         {constitutionId ? <p><T value={ui.admin.constitutions.outlineeditor.occupiedStructureAndStricterPermissionsAreChecked} /></p> : null}
       </aside>
       </div>
@@ -370,36 +369,4 @@ export function OutlineEditor({
       </Inline>
     </Stack>
   );
-}
-
-function exampleNode(layers: Layer[], kindCode: string, path: string, sibling: number, ancestors: Set<string>, t: (value: UiMessage) => string): OrderedNode | null {
-  const level = layers.find(layer => layer.kindCode === kindCode);
-  if (!level) return null;
-  if (ancestors.has(kindCode)) return null;
-  const children = level.allowedChildKinds ?? [];
-  const leaf = children.length === 0;
-  const content: OrderedEntry[] = [];
-  function text(position: string, words: string) { content.push({ type: 'text', logicalId: `${path}-${position}`, occurrenceId: `${path}-${position}`, text: words }); }
-  if (leaf) text('text', t(sibling === 0 ? ui.remainingStatus.sampleEqualProtection : ui.remainingStatus.sampleProtectRights));
-  else {
-    if (level.allowTextAlongsideChildren) text('before', t(ui.remainingStatus.sampleFollowingRights));
-    const first = exampleNode(layers, children[0], `${path}-a`, 0, new Set([...ancestors, kindCode]), t);
-    if (first) content.push({ type: 'child', node: first });
-    if (level.allowTextAlongsideChildren) text('between', t(ui.remainingStatus.sampleRightsEveryone));
-    const second = exampleNode(layers, children[1] ?? children[0], `${path}-b`, 1, new Set([...ancestors, kindCode]), t);
-    if (second) content.push({ type: 'child', node: second });
-    if (level.allowTextAlongsideChildren) text('after', t(ui.remainingStatus.sampleUpholdGuarantees));
-  }
-  return { logicalId: path, revisionId: path, occurrenceId: path, kind: level.kindCode,
-    label: level.labelPolicy === 'none' ? null : level.root ? '46a' : sibling === 0 ? '(1)' : '(2a)',
-    title: level.titlePolicy === 'none' || (level.titlePolicy === 'optional' && sibling > 0) ? null : `${level.displayLabel} ${t(ui.remainingStatus.example)}`, content };
-}
-
-function ExampleMap({ node, outline }: { node: OrderedNode; outline: ContentOutline }) {
-  return <div className="outline-example-level">
-    <strong>{kindByCode(outline, node.kind)?.displayLabel ?? node.kind} {node.label}</strong>
-    <ol>{node.content.map((entry, index) => <li key={entry.node?.occurrenceId ?? entry.occurrenceId ?? index}>
-      {entry.type === 'child' && entry.node ? <ExampleMap node={entry.node} outline={outline} /> : <><small><T value={ui.admin.constitutions.outlineeditor.unnumberedParentText} /></small> {entry.text}</>}
-    </li>)}</ol>
-  </div>;
 }

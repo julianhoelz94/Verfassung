@@ -17,7 +17,7 @@ class ImportExportController(private val exports: ImportExportService, private v
         @PathVariable id: UUID,
         @RequestParam(defaultValue = "prepared") view: String,
         @RequestParam(required = false) cursor: String?,
-    ): ImportExportPage = exports.export(id, access.authenticate(authorization), view, cursor)
+    ): ImportExportPage = exports.export(id, access.authenticate(authorization), view, cursor, authorization)
 }
 
 data class ExportValue(val path: String, val value: com.fasterxml.jackson.databind.JsonNode)
@@ -37,4 +37,6 @@ data class ImportExportPage(
     val fidelity: List<FidelityMismatch>,
     val fidelityComplete: Boolean,
     val validationErrors: List<ImportErrorDto>,
+    val counts: Map<String, Int> = emptyMap(),
+    val resourcesComplete: Boolean = false,
 )

@@ -26,7 +26,7 @@ export default async function AdminImportPage({ searchParams }: AdminImportPageP
   const error = params.error === 'forbidden' ? ui.admin.import.page.editorRightsRequiredForStaging : params.error === 'json' ? ui.admin.import.page.thatFileIsNotValidJson : params.error === 'invalid' ? ui.admin.import.page.theJsonIsMissingRequiredImportFields : ui.admin.import.page.theImportCouldNotBeStarted;
   return <WorkspacePage width="content" header={<PageHeader title={<T value={ui.attrs.adminImportPagePageHeaderTitleImport} />} meta={<T value={ui.attrs.adminImportPagePageHeaderMetaStage} />} />}>
 
-    <p><a href="/admin/migrations"><T value={migrationUi.migrations} /></a></p>
+    <p><Link href="/admin/migrations"><T value={migrationUi.migrations} /></Link></p>
     {params.error ? <Alert tone="error"><T value={error} /></Alert> : null}
     {canImport ? <>
       <h2 className="section-title"><T value={reviewUi.importChoice} /></h2>

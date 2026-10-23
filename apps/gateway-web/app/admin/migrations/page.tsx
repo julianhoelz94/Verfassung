@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { currentUser, requireSessionBearer } from '../../../lib/session';
 import { getMigrationRuns } from '../../../lib/migration-review';
@@ -12,7 +13,7 @@ export default async function MigrationRunsPage() {
   if (!user.roles.some(role => ['editor', 'reviewer', 'publisher', 'admin'].includes(role))) redirect('/');
   const runs = await getMigrationRuns(await requireSessionBearer());
   return <CollectionPage width="content" header={<PageHeader title={<T value={migrationUi.migrations} />} />}>
-    <p><a href="/admin/import"><T value={migrationUi.importQueue} /></a></p>
+    <p><Link href="/admin/import"><T value={migrationUi.importQueue} /></Link></p>
     {runs?.length ? <ul>{runs.map(run => <li key={run.id}><a href={`/admin/migrations/${run.id}`}>{run.title}</a> · {run.coverage.prepared}/{run.coverage.staged}</li>)}</ul> : <p><T value={migrationUi.noRuns} /></p>}
   </CollectionPage>;
 }

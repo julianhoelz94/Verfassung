@@ -9,6 +9,8 @@ import { OutlineEditor } from '../../../constitutions/OutlineEditor';
 import { currentUser, requireSessionBearer } from '../../../../../lib/session';
 import { getSetupProposal } from '../../../../../lib/ingestion-api';
 import type { OutlineKindWrite } from '../../../../../lib/api';
+import { getJurisdiction } from '../../../../../lib/migration-api';
+import { migrationUi } from '../../../../../lib/migration-messages';
 import { previewRoots } from '../../ImportPreview';
 import { saveSetupOutlineAction, transitionSetupAction } from '../actions';
 import { Stack } from '../../../../components/layout/Layout';
@@ -23,13 +25,14 @@ export default async function SetupProposalPage({ params, searchParams }: Props)
   if (!proposal) notFound();
   const error = (await searchParams).error;
   const payload = proposal.payload;
+  const jurisdiction = typeof payload.jurisdictionId === 'string' ? await getJurisdiction(payload.jurisdictionId) : null;
   const kinds = (payload.outline?.kinds ?? []) as OutlineKindWrite[];
   return <WorkspacePage width="content" header={<PageHeader title={<T value={ui.attrs.adminImportSetupProposalidPagePageHeader} />} meta={<><T value={ui.importActions.status} /> <T value={statusMessage(proposal.status)} /></>} />}>
 
     {error ? <Alert tone="error"><T value={ui.admin.import.setup.proposalid.page.theSetupActionCouldNotBeCompleted} /></Alert> : null}
     <Card>
       <h2><T value={ui.admin.import.setup.proposalid.page.sourceAndIdentity} /></h2>
-      <p>{String(payload.countryName ?? '')} ({String(payload.isoCode ?? '')}) · {String(payload.constitutionTitle ?? '')}</p>
+      <p>{jurisdiction ? <><a href={`/jurisdictions/${jurisdiction.jurisdiction.id}`}>{jurisdiction.jurisdiction.name}</a>{jurisdiction.jurisdiction.historical ? <> · <T value={migrationUi.historical} /></> : null}</> : <>{String(payload.countryName ?? '')} ({String(payload.isoCode ?? '')})</>} · {String(payload.constitutionTitle ?? '')}</p>
       <p><T value={ui.admin.import.setup.proposalid.page.slug} />{" "}<code>{String(payload.constitutionSlug ?? '')}</code> <T value={ui.admin.import.setup.proposalid.page.language} />{" "}{String(payload.languageCode ?? '')}</p>
       <p><T value={ui.admin.import.setup.proposalid.page.source} />{" "}{String(payload.sourceUrl || payload.gazetteReference || '')}</p>
       <p><T value={ui.admin.import.setup.proposalid.page.proposedHierarchy} />{" "}{kinds.map(kind => kind.displayLabel).join(' → ')}</p>

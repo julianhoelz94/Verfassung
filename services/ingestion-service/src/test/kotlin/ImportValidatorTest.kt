@@ -10,6 +10,15 @@ import java.util.UUID
 
 class ImportValidatorTest {
     @Test
+    fun `legacy aggregate bodies remain compatible while distinct mixed wording is rejected`() {
+        val node = com.constitutionatlas.ingestion.api.ImportNode("paragraph", body = "Exact text")
+        val article = com.constitutionatlas.ingestion.api.ImportArticle("1", "Title", "Exact text", 1, listOf(node))
+        val request = ImportRequest(isoCode = "DE", countryName = "Germany", constitutionSlug = "test", constitutionTitle = "Test", versionLabel = "1", sourceUrl = "https://example.org/source", articles = listOf(article))
+        assertTrue(ImportValidator.validate(request).none { it.first == "MIXED_LEGACY_CONTENT" })
+        assertTrue(ImportValidator.validate(request.copy(articles = listOf(article.copy(body = "Distinct opening")))).any { it.first == "MIXED_LEGACY_CONTENT" })
+    }
+
+    @Test
     fun `exported node and text ancestry require a pin without permitting stored revision reuse`() {
         val text = OrderedEntryWrite(type = "text", text = "Split text", lineage = listOf(UUID.randomUUID()))
         val root = OrderedNodeWrite(kind = "article", lineage = listOf(UUID.randomUUID()), content = listOf(text))

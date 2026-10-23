@@ -52,6 +52,9 @@ class ImportApiTest {
     @Autowired
     lateinit var importService: ImportService
 
+    @Autowired
+    lateinit var jobs: com.constitutionatlas.ingestion.repo.ImportJobRepository
+
     @MockBean
     lateinit var catalogClient: CatalogClient
 
@@ -115,6 +118,25 @@ class ImportApiTest {
 
     private fun anyUuid(): UUID = Mockito.any(UUID::class.java) ?: UUID(0, 0)
     private fun anyStr(): String = Mockito.anyString() ?: ""
+
+    @Test
+    fun stalePreparationCannotFailOrReplaceARecoveredPublishedReceipt() {
+        val job = jobs.insertPending(mapOf("isoCode" to "DE", "versionLabel" to "Fixture"), admin.id)!!
+        val old = jobs.claimPreparation(job, admin.id)!!
+        jobs.preparationFailed(job, old, "Lost response")
+        assertEquals("failed", jobs.find(job)!!.status)
+        val recovered = jobs.claimPreparation(job, admin.id)!!
+        assertEquals(emptyList<com.constitutionatlas.ingestion.api.ImportErrorDto>(), jobs.find(job)!!.errors)
+        val version = UUID.randomUUID()
+        jobs.reserveVersion(job, version, recovered)
+        jobs.prepared(job, version, recovered)
+        jdbc.update("UPDATE import_jobs SET status = 'completed' WHERE id = ?", job)
+        jobs.preparationFailed(job, old, "Late obsolete failure")
+        jobs.prepared(job, version, old)
+        assertEquals("completed", jobs.find(job)!!.status)
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException::class.java) { jobs.reserveVersion(job, UUID.randomUUID(), old) }
+        assertEquals(version, jobs.find(job)!!.versionId)
+    }
 
     @Test
     fun migrationPackagesResumeDependenciesWithoutDuplicateWritesOrScopeEscalation() {
@@ -478,7 +500,7 @@ class ImportApiTest {
         val constitutionId = UUID.fromString("01900000-0000-4000-8000-000000000501")
         val versionId = UUID.fromString("01900000-0000-4000-8000-000000000502")
         stubCatalog("FR", "France", "1958", "Constitution of 1958", "1958", constitutionId, versionId)
-        Mockito.`when`(contentClient.snapshot(versionId)).thenReturn(OrderedSnapshot(versionId, 1, null, emptyList()))
+        Mockito.`when`(contentClient.snapshot(versionId)).thenReturn(OrderedSnapshot(versionId, 1, SETTINGS_REVISION, emptyList()))
 
         val staged = mockMvc.post("/import-jobs") {
             header("Authorization", TOKEN)
@@ -541,7 +563,7 @@ class ImportApiTest {
         val constitutionId = UUID.randomUUID()
         val versionId = UUID.randomUUID()
         stubCatalog("FR", "France", "1958", "Constitution of 1958", "1958", constitutionId, versionId)
-        Mockito.`when`(contentClient.snapshot(versionId)).thenReturn(OrderedSnapshot(versionId, 1, null, emptyList()))
+        Mockito.`when`(contentClient.snapshot(versionId)).thenReturn(OrderedSnapshot(versionId, 1, SETTINGS_REVISION, emptyList()))
         val staged = mockMvc.post("/import-jobs") {
             header("Authorization", TOKEN)
             contentType = MediaType.APPLICATION_JSON
@@ -608,7 +630,7 @@ class ImportApiTest {
         val constitutionId = UUID.randomUUID()
         val versionId = UUID.randomUUID()
         stubCatalog("FR", "France", "1958", "Constitution of 1958", "1958", constitutionId, versionId)
-        Mockito.`when`(contentClient.snapshot(versionId)).thenReturn(OrderedSnapshot(versionId, 1, null, emptyList()))
+        Mockito.`when`(contentClient.snapshot(versionId)).thenReturn(OrderedSnapshot(versionId, 1, SETTINGS_REVISION, emptyList()))
         val staged = mockMvc.post("/import-jobs") {
             header("Authorization", TOKEN)
             contentType = MediaType.APPLICATION_JSON

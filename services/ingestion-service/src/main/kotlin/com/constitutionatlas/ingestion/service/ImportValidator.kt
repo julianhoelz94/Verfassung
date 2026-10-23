@@ -20,6 +20,7 @@ object ImportValidator {
 
     fun validate(request: ImportRequest, pinnedOutline: ImportOutline? = null): List<Pair<String, String>> {
         val errors = mutableListOf<Pair<String, String>>()
+        if (request.expectedCounts?.any { (key, value) -> key !in setOf("units", "textEntries", "tables", "cells", "footnotes", "references", "documents") || value < 0 } == true) errors += "MANIFEST_COUNTS" to "Manifest counts must name supported nonnegative resource counts"
         runCatching { request.sourceEvidence?.validate() }.exceptionOrNull()?.let { errors += "SOURCE_EVIDENCE" to (it.message ?: "Invalid source evidence") }
         if (request.jurisdictionId != null && request.isoCode.isNotBlank()) errors += "AMBIGUOUS_JURISDICTION" to "Use jurisdictionId or isoCode, not both"
         if (request.jurisdictionId == null && !request.isoCode.matches(Regex("[A-Za-z]{2}"))) {
@@ -94,6 +95,9 @@ object ImportValidator {
             }
             request.roots.forEachIndexed { index, root -> visit(root, null, "roots[$index]") }
         }
+        fun legacyText(node: ImportNode): String = if (node.children.isEmpty()) node.body.orEmpty() else node.children.joinToString(" ", transform = ::legacyText)
+        fun legacyMixed(node: ImportNode): Boolean = (!node.body.isNullOrEmpty() && node.children.isNotEmpty() && node.body != node.children.joinToString(" ", transform = ::legacyText)) || node.children.any(::legacyMixed)
+        if (request.articles.any { (it.body.isNotEmpty() && it.nodes.isNotEmpty() && it.body != it.nodes.joinToString(" ", transform = ::legacyText)) || it.nodes.any(::legacyMixed) }) errors += "MIXED_LEGACY_CONTENT" to "Use ordered roots to preserve distinct text alongside child units; legacy body may only repeat the child projection"
         val numbers = request.articles.map { it.articleNumber.trim() }
         if (numbers.any { it.isBlank() }) {
             errors += "BLANK_NUMBER" to "articleNumber must not be blank"

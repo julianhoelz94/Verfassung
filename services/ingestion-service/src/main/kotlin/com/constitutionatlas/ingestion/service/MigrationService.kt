@@ -40,6 +40,7 @@ class MigrationService(private val repository: MigrationRepository, private val 
         request.sources.forEach { source ->
             require(source.sourceKey.length in 1..200 && source.url.length <= 2048 && source.url.startsWith("https://")) { "Each source needs a stable key and HTTPS URL" }
             require(source.sha256 == null || source.sha256.matches(Regex("[a-f0-9]{64}"))) { "Invalid source hash" }
+            require(source.targetKeys.size <= 100 && source.targetKeys.all { it.length in 1..200 }) { "Invalid source-to-target map" }
             require(source.aliases.size <= 20 && source.aliases.all { it.length <= 2048 && it.startsWith("https://") }) { "Invalid source aliases" }
             require(source.disposition in setOf("included", "unavailable", "excluded")) { "Invalid source disposition" }
             require(source.disposition == "included" || !source.reason.isNullOrBlank()) { "Unavailable and excluded sources require reasons" }
@@ -64,7 +65,11 @@ class MigrationService(private val repository: MigrationRepository, private val 
     fun get(id: UUID, actor: Actor): MigrationRun {
         val owner = owned(id, actor)
         val manifest = repository.manifest(id)
-        val items = repository.items(id)
+        val items = repository.items(id).map { item ->
+            val jobId = item.result.path("jobId").asText().takeIf { it.isNotBlank() }?.let(UUID::fromString)
+            val job = jobId?.let(imports::getJob)
+            if (job != null && item.result.isObject) item.copy(result = item.result.deepCopy<ObjectNode>().put("status", job.status).also { value -> job.versionId?.let { value.put("versionId", it.toString()) } }) else item
+        }
         return MigrationRun(
             id,
             owner,
@@ -77,6 +82,8 @@ class MigrationService(private val repository: MigrationRepository, private val 
                 "excluded" to manifest.sources.count { it.disposition == "excluded" },
                 "staged" to items.size,
                 "prepared" to items.count { it.state == "prepared" },
+                "approved" to items.count { it.result.path("status").asText() == "approved" },
+                "published" to items.count { it.result.path("status").asText() == "completed" },
                 "blocked" to items.count { it.state in setOf("blocked", "failed") },
             ),
         )
@@ -89,14 +96,18 @@ class MigrationService(private val repository: MigrationRepository, private val 
         require(request.kind in setOf("snapshot", "document", "citation", "amendment", "document_link", "legacy_mapping", "comparison")) { "Unsupported migration resource kind" }
         require(request.payload.isObject && mapper.writeValueAsBytes(request).size <= 25 * 1024 * 1024) { "Migration item exceeds 25 MiB or is not an object" }
         val hash = hash(mapper.valueToTree(request))
-        repository.lock("migration-item:$run:${request.sourceKey}")
+        repository.lock("migration-run-items:$run")
         repository.items(run).firstOrNull { it.sourceKey == request.sourceKey }?.let {
             if (it.sha256 != hash) throw org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.CONFLICT, "Source key already identifies different content; preserve the existing item and use a new source identity")
             return it
         }
         if (repository.items(run).size >= 100) throw ResponseStatusException(HttpStatus.PAYLOAD_TOO_LARGE, "Run item limit is 100")
         if (request.kind == "snapshot") ImportValidator.requireConfirmedPinForScopedUpload(actor, mapper.treeToValue(request.payload, ImportRequest::class.java))
-        if (request.kind in setOf("document", "citation")) mapper.treeToValue(request.payload, CapturedDocumentPayload::class.java)
+        if (request.kind in setOf("document", "citation")) {
+            val capture = mapper.treeToValue(request.payload, CapturedDocumentPayload::class.java)
+            val source = repository.manifest(run).sources.firstOrNull { it.captureKey == request.sourceKey || it.sourceKey == request.sourceKey }
+            require(source?.sha256 == null || capture.fileSha256 == source.sha256) { "Capture hash differs from the source inventory" }
+        }
         if (request.kind == "document_link") mapper.treeToValue(request.payload, DocumentRelationshipPayload::class.java)
         val id = repository.insert(run, request, hash)
         if (request.kind == "snapshot") {
@@ -114,10 +125,10 @@ class MigrationService(private val repository: MigrationRepository, private val 
         if (item.state == "prepared") return item
         val missing = item.dependencies.filter { key -> items.none { it.sourceKey == key && it.state == "prepared" } }
         if (missing.isNotEmpty()) {
-            repository.finish(itemId, "blocked", item.result, "Unresolved dependencies: ${missing.joinToString()}")
+            repository.block(itemId, "Unresolved dependencies: ${missing.joinToString()}")
             return repository.items(run).first { it.id == itemId }
         }
-        if (!repository.claim(itemId)) throw org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.CONFLICT, "Resource preparation is already running; reload before retrying")
+        val attempt = repository.claim(itemId, actor.id) ?: throw org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.CONFLICT, "Resource preparation is already running; reload before retrying")
         try {
             val payload = repository.payload(itemId)
             fun dependency(key: String): JsonNode {
@@ -142,7 +153,8 @@ class MigrationService(private val repository: MigrationRepository, private val 
                     val constitution = UUID.fromString(payload.path("constitutionId").asText())
                     val record = payload.path("record").deepCopy<ObjectNode>().put("publishAttemptId", itemId.toString())
                     val amendment = domains.amendment(constitution, record, authorization)
-                    mapper.valueToTree(mapOf("amendmentId" to amendment.path("id"), "status" to amendment.path("status")))
+                    require(!amendment.path("revisionId").isMissingNode && !amendment.path("revisionId").isNull) { "Prepared amendment has no revision pin" }
+                    mapper.valueToTree(mapOf("amendmentId" to amendment.path("id"), "scopeRevisionId" to amendment.path("revisionId"), "status" to amendment.path("status")))
                 }
                 "document_link" -> {
                     val request = mapper.treeToValue(payload, DocumentRelationshipPayload::class.java)
@@ -150,19 +162,54 @@ class MigrationService(private val repository: MigrationRepository, private val 
                     val document = dependency(request.documentKey)
                     val target = dependency(request.targetKey)
                     val targetId = UUID.fromString(target.path("${request.targetType}Id").asText())
-                    domains.documentLink(request.targetType, targetId, mapOf("documentId" to document.path("documentId"), "revisionId" to document.path("revisionId")), authorization)
+                    val scope = if (request.targetType == "amendment") target.path("scopeRevisionId").asText().also { UUID.fromString(it) } else null
+                    domains.documentLink(request.targetType, targetId, mapOf("documentId" to document.path("documentId").asText(), "revisionId" to document.path("revisionId").asText(), "scopeRevisionId" to scope), authorization)
                     mapper.valueToTree(mapOf("targetType" to request.targetType, "targetId" to targetId, "documentId" to document.path("documentId"), "revisionId" to document.path("revisionId")))
                 }
-                "legacy_mapping" -> domains.legacyMapping(payload, authorization)
-                "comparison" -> domains.comparison(payload.deepCopy<ObjectNode>().put("attemptId", itemId.toString()), authorization)
+                "legacy_mapping" -> {
+                    val mapping = payload.deepCopy<ObjectNode>()
+                    mapping.remove("targetKey")?.asText()?.let { key -> mapping.put("versionId", dependency(key).path("versionId").asText()) }
+                    mapping.remove("documentKey")?.asText()?.let { key ->
+                        val document = dependency(key)
+                        mapping.set<JsonNode>("documentId", document.path("documentId"))
+                        mapping.set<JsonNode>("documentRevision", document.path("revision"))
+                    }
+                    domains.legacyMapping(mapping, authorization)
+                }
+                "comparison" -> {
+                    val definition = payload.deepCopy<ObjectNode>().put("attemptId", itemId.toString())
+                    definition.remove("sourceDocumentKey")?.asText()?.let { key ->
+                        val document = dependency(key)
+                        definition.set<JsonNode>("sourceDocumentId", document.path("documentId"))
+                        definition.set<JsonNode>("sourceDocumentRevision", document.path("revision"))
+                    }
+                    definition.path("columns").forEach { column ->
+                        if (column is ObjectNode) {
+                            column.remove("versionKey")?.asText()?.let { key ->
+                                val snapshot = dependency(key)
+                                column.set<JsonNode>("versionId", snapshot.path("versionId"))
+                                column.set<JsonNode>("constitutionId", snapshot.path("constitutionId"))
+                            }
+                        }
+                    }
+                    val comparison = domains.comparison(definition, authorization)
+                    mapper.valueToTree(mapOf("comparisonId" to comparison.path("id"), "status" to comparison.path("state")))
+                }
                 else -> throw IllegalArgumentException("Unsupported resource kind")
             }
-            repository.finish(itemId, "prepared", result)
+            repository.finishAttempt(itemId, attempt, "prepared", result)
             if (item.kind in setOf("document", "citation")) repository.scrubCapture(itemId)
         } catch (ex: RuntimeException) {
-            repository.finish(itemId, "failed", item.result, (ex.message ?: "Resource preparation failed").take(2000))
+            repository.finishAttempt(itemId, attempt, "failed", item.result, (ex.message ?: "Resource preparation failed").take(2000))
         }
         return repository.items(run).first { it.id == itemId }
+    }
+
+    fun attempts(run: UUID, item: UUID, actor: Actor, offset: Int, limit: Int): com.constitutionatlas.ingestion.api.MigrationAttemptPage {
+        owned(run, actor)
+        if (repository.items(run).none { it.id == item }) throw NotFoundException("Migration item does not belong to this run")
+        require(offset >= 0 && limit in 1..50) { "Invalid attempt page" }
+        return repository.attempts(item, offset, limit)
     }
 
     private fun hash(node: JsonNode): String {

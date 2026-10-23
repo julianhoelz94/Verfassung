@@ -16,6 +16,21 @@ fun Actor.canViewStaffCatalog(): Boolean =
 
 @Component
 class WriteAccess(private val identityClient: IdentityClient) {
+    fun requireImportPublisher(authorization: String?): Actor = identityClient.authenticate(authorization).also {
+        if ("ingestion:publish" !in it.scopes) throw ForbiddenException("Import reservation access requires ingestion:publish")
+    }
+    fun mayViewArchiveComparisons(authorization: String?): Boolean =
+        !authorization.isNullOrBlank() && runCatching { identityClient.authenticate(authorization).canViewStaffCatalog() }.getOrDefault(false)
+    fun requireArchiveReviewer(authorization: String?): Actor {
+        val actor = identityClient.authenticate(authorization)
+        if (actor.roles.none { it == "reviewer" || it == "admin" }) throw ForbiddenException("Comparison review requires reviewer or admin")
+        return actor
+    }
+    fun requireArchivePublisher(authorization: String?): Actor {
+        val actor = identityClient.authenticate(authorization)
+        if (actor.roles.none { it == "publisher" || it == "admin" } || !actor.stepUpFresh) throw ForbiddenException("Comparison publication requires publisher and fresh authenticator confirmation")
+        return actor
+    }
     fun mayViewPrivateCatalog(authorization: String?): Boolean {
         if (authorization.isNullOrBlank()) return false
         return try {

@@ -33,6 +33,9 @@ def configuration(env):
         raise ValueError("Invalid TLS_MODE or PUBLIC_BASE_URL")
     if not re.fullmatch(r"[a-zA-Z0-9.-]+", url.hostname) or "*" in url.hostname:
         raise ValueError("PUBLIC_BASE_URL must use a DNS hostname without wildcards")
+    legacy_host = env.get("ATLAS_LEGACY_HOST", "")
+    if legacy_host and not re.fullmatch(r"[a-zA-Z0-9.-]+", legacy_host):
+        raise ValueError("ATLAS_LEGACY_HOST must be one DNS hostname")
     if mode == "local-http" and env.get("CADDY_BIND_ADDRESS", "127.0.0.1") not in {"127.0.0.1", "::1"}:
         raise ValueError("Local HTTP must bind published ports to loopback")
     if mode.startswith("local-") and (profile not in {"local-stack", "testing", "ci"} or url.hostname not in {"localhost", "127.0.0.1"}):
@@ -77,6 +80,12 @@ def render(env):
         guard = "\n@untrusted not remote_ip " + " ".join(proxies) + "\nrespond @untrusted 403\n@insecure not header X-Forwarded-Proto https\nrespond @insecure 426\n"
         readiness = "forward_auth 127.0.0.1:8081 {\n uri /internal/transport-ready\n}\n"
         return prelude + ":80 {\n" + routes(guard, readiness) + "}\n"
+    legacy_host = env.get("ATLAS_LEGACY_HOST", "")
+    if legacy_host and not re.fullmatch(r"[a-zA-Z0-9.-]+", legacy_host):
+        raise ValueError("ATLAS_LEGACY_HOST must be one DNS hostname")
+    addresses = "https://" + url.hostname
+    if legacy_host and legacy_host != url.hostname and (mode == "local-https" or legacy_host != "legacy.localhost"):
+        addresses += ", https://" + legacy_host
     if mode == "local-https":
         tls = "tls internal"
     else:
@@ -89,7 +98,11 @@ def render(env):
                 raise ValueError("Invalid ACME test directory")
         test_directory = "\n test_dir " + ca if env.get("PROFILE") in {"ci", "testing"} and env.get("ACME_TEST_DIRECTORY") else ""
         tls = "tls {\nissuer acme {\n dir " + ca + test_directory + "\n disable_tlsalpn_challenge\n}\n}"
-    return prelude + "https://" + url.hostname + " {\n" + tls + routes() + "}\n:80 {\nreverse_proxy 127.0.0.1:8081\n}\n"
+    legacy_redirect = ""
+    if legacy_host and (mode == "local-https" or legacy_host != "legacy.localhost"):
+        legacy_origin = "https://" + legacy_host + ((":" + str(url.port)) if mode == "local-https" and url.port else "")
+        legacy_redirect = "@legacy_host host " + legacy_host + "\nredir @legacy_host " + legacy_origin + "{uri} 308\n"
+    return prelude + addresses + " {\n" + tls + routes() + "}\n:80 {\n" + legacy_redirect + "reverse_proxy 127.0.0.1:8081\n}\n"
 
 
 def update(**values):

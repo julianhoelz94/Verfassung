@@ -26,6 +26,8 @@ data class DownstreamVersion(
     val effectiveDate: LocalDate? = null,
     val jurisdictionId: UUID? = null,
     val sourceEvidence: com.constitutionatlas.platform.SourceEvidence? = null,
+    val languageCode: String? = null,
+    val predecessorVersionId: UUID? = null,
 )
 
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -60,6 +62,7 @@ interface CatalogClient {
 }
 
 interface ContentClient {
+    fun sealImport(versionId: UUID, attemptId: UUID, generation: Long, settingsRevisionId: UUID): Unit = throw UnsupportedOperationException("Import publication sealing is unavailable")
     fun replaceArticles(versionId: UUID, articles: List<ImportArticle>)
     fun replaceRoots(versionId: UUID, roots: List<OrderedNodeWrite>, sourceVersionId: UUID? = null): Unit = throw UnsupportedOperationException("Ordered import is unavailable")
     fun snapshot(versionId: UUID): OrderedSnapshot

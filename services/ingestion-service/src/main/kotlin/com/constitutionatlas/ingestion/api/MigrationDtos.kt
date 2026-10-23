@@ -14,6 +14,8 @@ data class MigrationSource(
     val disposition: String = "included",
     val reason: String? = null,
     val captureKey: String? = null,
+    @get:com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_EMPTY)
+    val targetKeys: List<String> = emptyList(),
 ) : StrictOrderedWrite()
 data class CreateMigrationRun(val runKey: String, val title: String, val sources: List<MigrationSource>) : StrictOrderedWrite()
 data class StageMigrationItem(val sourceKey: String, val kind: String, val dependencies: List<String> = emptyList(), val payload: JsonNode) : StrictOrderedWrite()
@@ -36,6 +38,8 @@ data class MigrationRun(
     val items: List<MigrationItem>,
     val coverage: Map<String, Int>,
 )
+data class MigrationAttempt(val number: Int, val actorId: UUID, val state: String, val error: String?, val startedAt: java.time.OffsetDateTime, val finishedAt: java.time.OffsetDateTime?)
+data class MigrationAttemptPage(val items: List<MigrationAttempt>, val nextOffset: Int?)
 data class CapturedDocumentPayload(
     val title: String,
     val description: String? = null,

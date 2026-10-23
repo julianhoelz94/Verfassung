@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { changeTypeMessage } from '../lib/ui-labels';
 import { T } from './components/TranslationProvider';
 import { ui } from '../lib/messages';
@@ -116,7 +117,7 @@ export default async function Page() {
             <strong>{amendmentCount}</strong><T value={ui.page.amendmentsRecorded} />{" "}</div>
         </div>
       </section>
-      <p><a href="/jurisdictions"><T value={migrationUi.browse} /></a></p>
+      <p><Link href="/jurisdictions"><T value={migrationUi.browse} /></Link> · <Link href="/comparisons"><T value={migrationUi.curatedComparisons} /></Link></p>
       <h2 className="section-title"><T value={ui.page.countries2} /></h2>
       {countries.length === 0 ? (
         <p><T value={ui.page.noCountriesArePublishedYet} /></p>

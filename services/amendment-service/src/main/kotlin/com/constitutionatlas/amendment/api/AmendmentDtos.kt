@@ -77,6 +77,8 @@ data class AmendmentDto(
     val reviewedSourceTipId: UUID? = null,
     @get:JsonInclude(JsonInclude.Include.NON_NULL)
     val reviewedTargetTipId: UUID? = null,
+    @get:JsonInclude(JsonInclude.Include.NON_NULL)
+    val revisionId: UUID? = null,
 )
 
 data class AmendmentChangeWriteRequest(
@@ -95,7 +97,7 @@ data class AmendmentChangeWriteRequest(
     val pendingAfterLogicalId: UUID? = null,
     val id: UUID? = null,
     val sourceChangeId: UUID? = null,
-)
+) : com.constitutionatlas.platform.StrictOrderedWrite()
 
 data class AmendmentWriteRequest(
     val kind: String? = null,
@@ -108,7 +110,7 @@ data class AmendmentWriteRequest(
     val targetVersionId: UUID? = null,
     val changes: List<AmendmentChangeWriteRequest> = emptyList(),
     val publishAttemptId: UUID? = null,
-)
+) : com.constitutionatlas.platform.StrictOrderedWrite()
 
 data class LinkTargetRequest(
     val sourceVersionId: UUID? = null,

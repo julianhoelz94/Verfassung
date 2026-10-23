@@ -209,6 +209,12 @@ class CatalogWriteService(
         return catalogRepository.findVersionCreated(reservation.versionId) ?: throw NotFoundException("Reserved version missing")
     }
 
+    fun requireImportReservation(version: UUID, attempt: UUID) {
+        if (catalogRepository.importHold(version) != attempt || publishAttempts.forVersion(version) != attempt) {
+            throw ForbiddenException("Publication attempt does not identify this held import snapshot")
+        }
+    }
+
     @Transactional
     fun publishVersion(versionId: UUID, actor: Actor? = null, importJobId: UUID? = null, authorization: String? = null): VersionCreated {
         val hold = catalogRepository.importHold(versionId)

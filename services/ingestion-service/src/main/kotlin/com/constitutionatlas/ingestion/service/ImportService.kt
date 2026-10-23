@@ -134,11 +134,11 @@ class ImportService(
             }
         }
         if (importJobRepository.find(jobId)?.errors.orEmpty().any { it.code != "PREPARATION_FAILED" }) throw ResponseStatusException(HttpStatus.CONFLICT, "Invalid staged content requires a corrected item with a new source key")
-        if (!importJobRepository.claimPreparation(jobId, actorId)) throw ResponseStatusException(HttpStatus.CONFLICT, "Import is not awaiting preparation")
+        val attempt = importJobRepository.claimPreparation(jobId, actorId) ?: throw ResponseStatusException(HttpStatus.CONFLICT, "Import is not awaiting preparation")
         try {
-            DownstreamAuth.withAuthorization(authorization) { persistDraft(jobId, request) }
+            DownstreamAuth.withAuthorization(authorization) { persistDraft(jobId, request, attempt) }
         } catch (ex: RuntimeException) {
-            importJobRepository.fail(jobId, listOf("PREPARATION_FAILED" to (ex.message ?: "draft preparation failed")))
+            importJobRepository.preparationFailed(jobId, attempt, ex.message ?: "draft preparation failed")
         }
         return importJobRepository.find(jobId)!!
     }
@@ -173,7 +173,10 @@ class ImportService(
                 throw ResponseStatusException(HttpStatus.CONFLICT, "Prepared content or layout changed after approval")
             }
             if (publishToken.isBlank()) throw ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Import publication token is not configured")
-            DownstreamAuth.withAuthorization("Bearer $publishToken") { catalogClient.publishVersion(versionId, jobId) }
+            DownstreamAuth.withAuthorization("Bearer $publishToken") {
+                contentClient.sealImport(versionId, jobId, approved.first, requireNotNull(approved.second))
+                catalogClient.publishVersion(versionId, jobId)
+            }
             importJobRepository.complete(jobId, versionId, actorId)
         } catch (ex: RuntimeException) {
             try {
@@ -210,7 +213,7 @@ class ImportService(
         catalogClient.findJurisdictionConstitution(it, request.constitutionSlug)
     } ?: if (request.jurisdictionId == null) catalogClient.findConstitution(request.isoCode.trim().uppercase(), request.constitutionSlug) else null
 
-    private fun persistDraft(jobId: UUID, request: ImportRequest) {
+    private fun persistDraft(jobId: UUID, request: ImportRequest, attempt: UUID) {
         val iso = request.isoCode.trim().uppercase()
         if (request.jurisdictionId == null && catalogClient.getCountry(iso) == null) {
             catalogClient.createCountry(iso, request.countryName.trim())
@@ -243,12 +246,12 @@ class ImportService(
             request.settingsRevisionId,
             request.sourceEvidence,
         )
-        importJobRepository.reserveVersion(jobId, version.id)
+        importJobRepository.reserveVersion(jobId, version.id, attempt)
         if (request.roots.isNotEmpty()) {
             contentClient.replaceRoots(version.id, request.roots, request.predecessorVersionId)
         } else {
             contentClient.replaceArticles(version.id, request.articles)
         }
-        importJobRepository.prepared(jobId, version.id)
+        importJobRepository.prepared(jobId, version.id, attempt)
     }
 }

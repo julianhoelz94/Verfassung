@@ -79,8 +79,7 @@ export function deleteJson<T>(upstream: keyof typeof upstreams, path: string, au
 
 export async function requirePublishedVersion(versionId: string): Promise<Version> {
   const version = await getJson<Version>('catalog', `/versions/${encodeURIComponent(versionId)}`);
-  if (version.publicationStatus !== 'published' ||
-      (version.listing !== 'public' && version.currentVersionId !== version.id)) {
+  if (version.publicationStatus !== 'published') {
     // Do not disclose whether an unpublished version exists.
     throw new UpstreamError(404, 'catalog');
   }

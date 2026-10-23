@@ -10,6 +10,9 @@ fun Actor.canWriteContent(): Boolean =
 
 @Component
 class WriteAccess(private val identityClient: IdentityClient) {
+    fun requireImportPublisher(authorization: String?): Actor = identityClient.authenticate(authorization).also {
+        if ("ingestion:publish" !in it.scopes) throw ForbiddenException("Import sealing requires ingestion:publish")
+    }
     fun requireContentWriter(authorization: String?): Actor {
         val actor = identityClient.authenticate(authorization)
         if (!actor.canWriteContent()) {

@@ -27,6 +27,16 @@ class TransportTest(unittest.TestCase):
     def test_local_https_uses_internal_ca(self):
         self.assertIn("tls internal", transport.render(self.env("local-https")))
 
+    def test_controlled_legacy_alias_gets_a_certificate_and_preserves_redirect_uri(self):
+        env = dict(PROFILE="production", TLS_MODE="managed-acme", PUBLIC_BASE_URL="https://atlas.example.org", ATLAS_LEGACY_HOST="legacy.example.org")
+        config = transport.render(env)
+        self.assertIn("https://legacy.example.org", config)
+        self.assertIn("redir @legacy_host https://legacy.example.org{uri} 308", config)
+        self.assertNotIn("https://legacy.localhost", transport.render(dict(env, ATLAS_LEGACY_HOST="legacy.localhost")))
+        for host in ["evil.example/path", "*.example.org", "host\\n{", "host:443"]:
+            with self.assertRaises(ValueError):
+                transport.render(dict(env, ATLAS_LEGACY_HOST=host))
+
     def test_acme_is_pinned_to_letsencrypt_http_challenge(self):
         env = dict(PROFILE="production", TLS_MODE="managed-acme", PUBLIC_BASE_URL="https://atlas.example.org", ACME_TEST_DIRECTORY="https://attacker.example/directory")
         config = transport.render(env)

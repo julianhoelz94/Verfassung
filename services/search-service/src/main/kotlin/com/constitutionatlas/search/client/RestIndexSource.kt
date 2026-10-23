@@ -33,7 +33,7 @@ class RestIndexSource(
             queue.addAll(detail.children)
             for (constitution in detail.constitutions) {
                 for (version in constitution.versions) {
-                    out += loadArticles(jurisdiction.code.orEmpty(), jurisdiction.name, constitution.title, version, jurisdiction)
+                    out += loadArticles(jurisdiction.code?.takeIf { jurisdiction.kind == "country" && !jurisdiction.historical && it.matches(Regex("[A-Z]{2}")) }.orEmpty(), jurisdiction.name, constitution.title, version, jurisdiction)
                 }
             }
         }
@@ -91,7 +91,7 @@ class RestIndexSource(
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    private data class JurisdictionWire(val id: UUID, val name: String, val code: String? = null, val historical: Boolean = false)
+    private data class JurisdictionWire(val id: UUID, val name: String, val code: String? = null, val historical: Boolean = false, val kind: String = "country")
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     private data class JurisdictionDetailWire(val children: List<JurisdictionWire> = emptyList(), val constitutions: List<ConstitutionWire> = emptyList())

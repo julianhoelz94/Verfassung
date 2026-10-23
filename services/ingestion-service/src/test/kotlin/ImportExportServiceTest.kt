@@ -55,7 +55,7 @@ class ImportExportServiceTest {
             assertEquals("Bearer internal-read-credential", DownstreamAuth.header())
             snapshot
         }.`when`(content).snapshot(version)
-        `when`(catalog.version(version)).thenReturn(DownstreamVersion(version, constitution, versionLabel = "1849", sourceUrl = "https://example.org/original"))
+        `when`(catalog.version(version)).thenReturn(DownstreamVersion(version, constitution, versionLabel = "1849", sourceUrl = "https://example.org/original", languageCode = "en"))
     }
 
     @Test

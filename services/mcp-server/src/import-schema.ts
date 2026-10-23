@@ -23,7 +23,7 @@ export const outlineSchema = z.strictObject({ kinds: z.array(outlineKind).min(1)
 
 const reference = z.strictObject({
   logicalId: uuid, start: z.number().int().min(0), end: z.number().int().min(0),
-  target: z.strictObject({ type: z.enum(['unit', 'footnote', 'external']), logicalId: uuid.nullable().optional(), url: z.string().url().nullable().optional(), footnoteId: uuid.nullable().optional() }),
+  target: z.strictObject({ type: z.enum(['unit', 'footnote', 'external']), logicalId: uuid.nullable().optional(), url: z.string().url().startsWith('https://').nullable().optional(), footnoteId: uuid.nullable().optional() }),
 });
 const table = z.strictObject({
   caption: nullableText,
@@ -91,6 +91,7 @@ export const setupProposalSchema = z.strictObject({
 export const importPayloadSchema = z.strictObject({
   ...sourceFields,
   sourceEvidence: z.strictObject({ dateWording: nullableText, datePrecision: z.enum(['unknown', 'year', 'month', 'day', 'range', 'uncertain']).optional(), coverage: nullableText, statusWording: nullableText, attribution: nullableText }).nullable().optional(),
+  expectedCounts: z.record(z.enum(['units', 'textEntries', 'tables', 'cells', 'footnotes', 'references', 'documents']), z.number().int().min(0)).nullable().optional(),
   versionLabel: shortText,
   effectiveDate: z.iso.date().nullable().optional(),
   predecessorVersionId: uuid.nullable().optional(),
@@ -99,7 +100,7 @@ export const importPayloadSchema = z.strictObject({
   settingsRevisionId: uuid.nullable().optional(),
   outline: outlineSchema.nullable().optional(),
   articles: z.array(z.strictObject({
-    articleNumber: shortText,
+    articleNumber: z.string().min(1).max(512),
     title: z.string().max(1000),
     body: z.string().max(1_048_576).optional(),
     sortOrder: z.number().int().min(1),

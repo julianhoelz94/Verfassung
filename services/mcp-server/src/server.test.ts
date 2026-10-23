@@ -140,11 +140,11 @@ test('direct reads reject an unpublished version without disclosing its status',
   }
 });
 
-test('direct reads reject a superseded published staff version', async () => {
+test('known published snapshot permalinks survive later editorial corrections', async () => {
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async () => Response.json({ id: 'staff', publicationStatus: 'published', listing: 'staff', currentVersionId: 'newer-tip' });
   try {
-    await assert.rejects(requirePublishedVersion('staff'), (error) => error instanceof UpstreamError && error.status === 404);
+    assert.equal((await requirePublishedVersion('staff')).id, 'staff');
   } finally {
     globalThis.fetch = originalFetch;
   }

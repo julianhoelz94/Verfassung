@@ -21,6 +21,7 @@ export default async function JurisdictionVersionPage({ params }: { params: Prom
   ]} />}>
     {detail.jurisdiction.historical ? <p><T value={migrationUi.historical} /></p> : null}
     <SourceEvidenceNotice evidence={version.sourceEvidence} versionId={versionId} />
+    <p><a href={`/constitutions/${constitution.id}/amendments`}><T value={migrationUi.amendmentRegister} /></a></p>
     <div lang={version.languageCode}><OrderedContentTree entries={snapshot.roots.map(node => ({ type: 'child', node }))} outline={outline ?? constitution.contentOutline} /></div>
   </ReaderPage>;
 }

@@ -30,6 +30,7 @@ import { listDocumentLinks } from '../../../../../lib/document-api';
 import { currentUser } from '../../../../../lib/session';
 import { EditorEntry } from './EditorEntry';
 import surfaceStyles from '../../../../components/surfaces.module.css';
+import { migrationUi } from '../../../../../lib/migration-messages';
 import { SourceEvidenceNotice } from '../../../../components/SourceEvidenceNotice';
 
 type VersionPageProps = {
@@ -165,6 +166,7 @@ export default async function VersionPage(props: VersionPageProps) {
 
       <CountryNavigation code={params.code} active="reading" />
       <SourceEvidenceNotice evidence={snapshot?.sourceEvidence} versionId={params.versionId} />
+      <p><a href={`/constitutions/${version.constitution.id}/amendments`}><T value={migrationUi.amendmentRegister} /></a></p>
       <SnapshotNotice code={country.isoCode} viewedId={params.versionId} currentId={version.version.currentVersionId ?? version.version.id} />
       {canEdit ? <EditorEntry
         versions={version.constitution.versions}

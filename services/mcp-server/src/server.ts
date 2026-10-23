@@ -103,7 +103,7 @@ export function createServer(authorization?: string): McpServer {
   server.registerTool('export_import_job', {
     description: 'Read your submitted request or the actual prepared persisted snapshot as paginated JSON-pointer leaf records. Concatenate @text chunks by index. Continue until complete=true; restart on changed-snapshot conflicts. Fidelity reports exact mismatches against the submission, never an echoed-request checksum.',
     inputSchema: { jobId: uuid, view: z.enum(['submitted', 'prepared']).default('prepared'), cursor: z.string().max(1024).optional() },
-    outputSchema: z.object({ jobId: uuid, view: z.string(), snapshotId: z.string(), records: z.array(z.object({ path: z.string(), value: z.unknown() })), totalRecords: z.number().int(), complete: z.boolean(), nextCursor: z.string().nullable(), fidelity: z.array(z.object({ path: z.string(), reason: z.string() })), fidelityComplete: z.boolean() }).passthrough(),
+    outputSchema: z.object({ jobId: uuid, view: z.string(), snapshotId: z.string(), records: z.array(z.object({ path: z.string(), value: z.unknown() })), totalRecords: z.number().int(), complete: z.boolean(), nextCursor: z.string().nullable(), fidelity: z.array(z.object({ path: z.string(), reason: z.string() })), fidelityComplete: z.boolean(), resourcesComplete: z.boolean(), counts: z.record(z.string(), z.number().int()) }).passthrough(),
     annotations: readOnly, scopeChallenge: importScope,
   }, ({ jobId, view, cursor }) => run('export_import_job', async () => {
     await requireImportKey();
@@ -144,7 +144,7 @@ export function createServer(authorization?: string): McpServer {
     inputSchema: { runKey: z.string().min(1).max(200), title: z.string().min(1).max(512), sources: z.array(z.strictObject({
       sourceKey: z.string().min(1).max(200), url: z.string().url().startsWith('https://').max(2048), sha256: z.string().regex(/^[a-f0-9]{64}$/).nullable().optional(),
       encoding: z.string().max(100).nullable().optional(), attribution: z.string().max(10000).nullable().optional(), aliases: z.array(z.string().url().startsWith('https://').max(2048)).max(20).optional(),
-      disposition: z.enum(['included', 'unavailable', 'excluded']).optional(), reason: z.string().max(10000).nullable().optional(), captureKey: z.string().max(200).nullable().optional(),
+      disposition: z.enum(['included', 'unavailable', 'excluded']).optional(), reason: z.string().max(10000).nullable().optional(), captureKey: z.string().max(200).nullable().optional(), targetKeys: z.array(z.string().min(1).max(200)).max(100).optional(),
     })).min(1).max(100) },
     outputSchema: z.object({ id: uuid, ownerId: uuid, manifest: z.record(z.string(), z.unknown()), items: z.array(z.unknown()).max(100), coverage: z.record(z.string(), z.number()) }),
     annotations: stagedWrite, scopeChallenge: importScope,
@@ -161,6 +161,13 @@ export function createServer(authorization?: string): McpServer {
     await requireImportKey(); requireDirectUploadSize(item);
     if (item.kind === 'snapshot') { const parsed = importPayloadSchema.parse(item.payload); requireConfirmedUpload(parsed); item.payload = parsed; }
     return await postJson<Record<string, unknown>>('ingestion', `/migration-runs/${runId}/items`, item, authorization!);
+  }));
+  server.registerTool('get_migration_attempts', {
+    description: 'Read paginated durable preparation attempts for an item in your migration package, including retry outcomes.',
+    inputSchema: { runId: uuid, itemId: uuid, offset: z.number().int().min(0).default(0), limit: z.number().int().min(1).max(50).default(20) },
+    outputSchema: z.object({ items: z.array(z.record(z.string(), z.unknown())).max(50), nextOffset: z.number().int().nullable() }), annotations: readOnly, scopeChallenge: importScope,
+  }, ({ runId, itemId, offset, limit }) => run('get_migration_attempts', async () => {
+    await requireImportKey(); return await getJson<Record<string, unknown>>('ingestion', `/migration-runs/${runId}/items/${itemId}/attempts?offset=${offset}&limit=${limit}`, authorization);
   }));
   server.registerTool('get_migration_run', {
     description: 'Read your durable migration package manifest, resource handles, attempts, unresolved relationships and coverage. Upload expiration does not remove this record.',

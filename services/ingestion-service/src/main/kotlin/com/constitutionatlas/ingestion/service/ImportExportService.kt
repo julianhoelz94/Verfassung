@@ -6,6 +6,7 @@ import com.constitutionatlas.ingestion.api.ImportExportPage
 import com.constitutionatlas.ingestion.client.CatalogClient
 import com.constitutionatlas.ingestion.client.ContentClient
 import com.constitutionatlas.ingestion.client.DownstreamAuth
+import com.constitutionatlas.ingestion.client.MigrationDomainClient
 import com.constitutionatlas.ingestion.repo.ImportJobRepository
 import com.constitutionatlas.platform.Actor
 import com.constitutionatlas.platform.ForbiddenException
@@ -27,8 +28,9 @@ class ImportExportService(
     private val catalog: CatalogClient,
     private val mapper: ObjectMapper,
     @Value("\${ingestion.publish.token:}") private val serviceToken: String,
+    private val domains: MigrationDomainClient? = null,
 ) {
-    fun export(id: UUID, actor: Actor, view: String, cursor: String?): ImportExportPage {
+    fun export(id: UUID, actor: Actor, view: String, cursor: String?, authorization: String? = null): ImportExportPage {
         val job = jobs.find(id) ?: throw NotFoundException("Unknown import job")
         if (actor.id != job.submittedBy && actor.roles.none { it in setOf("editor", "reviewer", "publisher", "admin") }) {
             throw ForbiddenException("Import job access requires ownership or staff role")
@@ -45,7 +47,15 @@ class ImportExportService(
         } else {
             null
         }
-        val tree = snapshot?.let { mapper.valueToTree<JsonNode>(it) } ?: submitted
+        val persistedVersion = snapshot?.let { DownstreamAuth.withAuthorization("Bearer $serviceToken") { catalog.version(it.versionId) } }
+        val linkedResources = if (snapshot != null && domains != null) domains.importLinks(id, snapshot.versionId, authorization) else mapper.createArrayNode()
+        val resourcesComplete = snapshot != null && domains != null && linkedResources?.isArray == true
+        val tree = snapshot?.let {
+            mapper.valueToTree<com.fasterxml.jackson.databind.node.ObjectNode>(it).also { value ->
+                value.set<JsonNode>("sourcePins", mapper.valueToTree(persistedVersion))
+                value.set<JsonNode>("linkedDocuments", linkedResources ?: mapper.createArrayNode())
+            }
+        } ?: submitted
         val serialized = mapper.writeValueAsBytes(tree)
         val snapshotId = MessageDigest.getInstance("SHA-256").digest(serialized).joinToString("") { "%02x".format(it) }
         val records = mutableListOf<ExportValue>()
@@ -70,27 +80,52 @@ class ImportExportService(
         }
         val next = offset + page.size
         val mismatches = mutableListOf<FidelityMismatch>()
-        val persistedVersion = snapshot?.let { DownstreamAuth.withAuthorization("Bearer $serviceToken") { catalog.version(it.versionId) } }
         if (snapshot != null) {
             if (persistedVersion == null) conflict("Prepared catalog version is unavailable")
             if (request.constitutionId != null && persistedVersion.constitutionId != request.constitutionId) mismatches += FidelityMismatch("/constitutionId", "Prepared constitution pin differs")
             if (persistedVersion.sourceUrl != request.sourceUrl || persistedVersion.gazetteReference != request.gazetteReference) mismatches += FidelityMismatch("/source", "Prepared source pins differ")
             if (persistedVersion.sourceEvidence != request.sourceEvidence) mismatches += FidelityMismatch("/sourceEvidence", "Prepared source evidence differs")
-            if (persistedVersion.effectiveDate != request.effectiveDate || persistedVersion.versionLabel != request.versionLabel) mismatches += FidelityMismatch("/version", "Prepared version metadata differs")
+            if (persistedVersion.effectiveDate != request.effectiveDate || persistedVersion.versionLabel != request.versionLabel || persistedVersion.languageCode != request.languageCode || persistedVersion.predecessorVersionId != request.predecessorVersionId) mismatches += FidelityMismatch("/version", "Prepared version metadata differs")
             if (request.settingsRevisionId != null && snapshot.settingsRevisionId != request.settingsRevisionId) mismatches += FidelityMismatch("/settingsRevisionId", "Prepared settings pin differs from submitted pin")
-            if (request.roots.isNotEmpty()) {
-                compare(submitted.path("roots"), tree.path("roots"), "/roots", mismatches)
-            } else {
-                mismatches += FidelityMismatch("/articles", "Legacy article import requires structured roots for complete fidelity verification")
-            }
+            val expectedRoots = if (request.roots.isNotEmpty()) submitted.path("roots") else mapper.valueToTree<JsonNode>(legacyImportRoots(request.articles))
+            compare(expectedRoots, tree.path("roots"), "/roots", mismatches)
+        }
+        val counts = count(tree.path("roots"), linkedResources?.size() ?: 0)
+        request.expectedCounts?.forEach { (key, expected) ->
+            if (counts[key] != expected || key == "documents" && !resourcesComplete) mismatches += FidelityMismatch("/counts/$key", "Expected $expected; persisted ${counts[key] ?: 0}")
         }
         return ImportExportPage(
             id, view, snapshotId, job.versionId, snapshot?.generation, snapshot?.settingsRevisionId ?: request.settingsRevisionId,
-            mapOf("sourceEvidence" to (if (snapshot != null) persistedVersion?.sourceEvidence else request.sourceEvidence), "sourceUrl" to (if (snapshot != null) persistedVersion?.sourceUrl else request.sourceUrl), "gazetteReference" to (if (snapshot != null) persistedVersion?.gazetteReference else request.gazetteReference), "predecessorVersionId" to request.predecessorVersionId),
+            mapOf("sourceEvidence" to (if (snapshot != null) persistedVersion?.sourceEvidence else request.sourceEvidence), "sourceUrl" to (if (snapshot != null) persistedVersion?.sourceUrl else request.sourceUrl), "gazetteReference" to (if (snapshot != null) persistedVersion?.gazetteReference else request.gazetteReference), "predecessorVersionId" to (if (snapshot != null) persistedVersion?.predecessorVersionId else request.predecessorVersionId)),
             page, records.size,
             if (next < records.size) Base64.getUrlEncoder().withoutPadding().encodeToString("$id:$view:$snapshotId:$next".toByteArray()) else null,
-            next == records.size, mismatches.take(100), mismatches.size <= 100, job.errors,
+            next == records.size, mismatches.take(100), snapshot != null && resourcesComplete && mismatches.size <= 100, job.errors, counts, resourcesComplete,
         )
+    }
+
+    private fun count(roots: JsonNode, documents: Int): Map<String, Int> {
+        val counts = mutableMapOf("units" to 0, "textEntries" to 0, "tables" to 0, "cells" to 0, "footnotes" to 0, "references" to 0, "documents" to documents)
+        fun increment(key: String, by: Int = 1) {
+            counts[key] = counts.getValue(key) + by
+        }
+        fun visit(node: JsonNode) {
+            increment("units")
+            node.path("content").forEach { entry ->
+                if (entry.path("type").asText() == "child") {
+                    visit(entry.path("node"))
+                } else {
+                    increment("textEntries")
+                    increment("references", entry.path("references").size())
+                    if (entry.path("format").asText() == "footnote") increment("footnotes")
+                    if (entry.path("format").asText() == "table") {
+                        increment("tables")
+                        entry.path("table").path("rows").forEach { row -> increment("cells", row.path("cells").size()) }
+                    }
+                }
+            }
+        }
+        roots.forEach(::visit)
+        return counts
     }
 
     private fun flatten(node: JsonNode, path: String, result: MutableList<ExportValue>) {
@@ -99,7 +134,14 @@ class ImportExportService(
             node.isArray && !node.isEmpty -> node.forEachIndexed { index, value -> flatten(value, "$path/$index", result) }
             node.isTextual && node.textValue().length > 16000 -> {
                 val text = node.textValue()
-                text.chunked(16000).forEachIndexed { index, part -> result += ExportValue("$path/@text/$index", mapper.valueToTree(part)) }
+                var start = 0
+                var index = 0
+                while (start < text.length) {
+                    var end = minOf(start + 16000, text.length)
+                    if (end < text.length && text[end - 1].isHighSurrogate() && text[end].isLowSurrogate()) end--
+                    result += ExportValue("$path/@text/${index++}", mapper.valueToTree(text.substring(start, end)))
+                    start = end
+                }
             }
             else -> result += ExportValue(path, node)
         }

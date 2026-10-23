@@ -62,6 +62,8 @@ data class ImportRequest(
     val jurisdictionId: UUID? = null,
     @get:com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
     val sourceEvidence: com.constitutionatlas.platform.SourceEvidence? = null,
+    @get:com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+    val expectedCounts: Map<String, Int>? = null,
 ) : StrictOrderedWrite()
 
 data class ImportErrorDto(

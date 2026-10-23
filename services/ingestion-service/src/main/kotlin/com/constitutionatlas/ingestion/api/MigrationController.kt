@@ -8,6 +8,7 @@ import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestHeader
+import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
 import java.util.UUID
@@ -27,6 +28,9 @@ class MigrationController(private val migrations: MigrationService, private val 
     @PostMapping("/migration-runs/{id}/items")
     @ResponseStatus(HttpStatus.CREATED)
     fun stage(@RequestHeader(value = "Authorization", required = false) authorization: String?, @PathVariable id: UUID, @RequestBody request: StageMigrationItem) = migrations.stage(id, access.requireImporter(authorization), request, authorization)
+
+    @GetMapping("/migration-runs/{id}/items/{itemId}/attempts")
+    fun attempts(@RequestHeader(value = "Authorization", required = false) authorization: String?, @PathVariable id: UUID, @PathVariable itemId: UUID, @RequestParam(defaultValue = "0") offset: Int, @RequestParam(defaultValue = "20") limit: Int) = migrations.attempts(id, itemId, access.authenticate(authorization), offset, limit)
 
     @PostMapping("/migration-runs/{id}/items/{itemId}/prepare")
     fun prepare(@RequestHeader(value = "Authorization", required = false) authorization: String?, @PathVariable id: UUID, @PathVariable itemId: UUID) = migrations.prepare(id, itemId, access.requireEditor(authorization), authorization)

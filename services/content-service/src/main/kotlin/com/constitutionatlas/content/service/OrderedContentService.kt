@@ -26,6 +26,23 @@ class OrderedContentService(
     private val catalog: CatalogClient,
     @Value("\${content.ordered-mixed-writes.enabled:true}") private val mixedWritesEnabled: Boolean,
 ) {
+    /** Seal only the already approved content; this operation cannot write or replace roots. */
+    @Transactional
+    fun sealImport(version: UUID, attempt: UUID, generation: Long, settings: UUID): OrderedSnapshot {
+        catalog.requireImportReservation(version, attempt)
+        val snapshot = get(version)
+        if (repository.lock(version) != generation || snapshot.generation != generation || snapshot.settingsRevisionId != settings || snapshot.roots.isEmpty()) stale("Approved import content or settings changed")
+        val hash = "import:$version:$generation:$settings"
+        receipts.find(attempt)?.let { existing ->
+            if (existing.versionId != version || existing.requestHash != hash || existing.generation != generation) stale("Import publication attempt changed")
+            return snapshot
+        }
+        if (receipts.forVersion(version) != null) stale("Snapshot is sealed for another publication")
+        if (catalog.getVersion(version)?.publicationStatus != "draft") stale("Import snapshot is no longer a draft")
+        receipts.insert(attempt, version, hash, generation)
+        return snapshot
+    }
+
     @Transactional
     fun get(version: UUID): OrderedSnapshot {
         if (!repository.exists(version) && catalog.getVersion(version) == null) throw NotFoundException("Unknown version '$version'")
@@ -69,6 +86,7 @@ class OrderedContentService(
         }
         if (receipts.forVersion(version) != null) stale("Successor roots are sealed for publication")
         if (repository.lock(version) != request.expectedGeneration) stale("Target roots changed")
+        if (receipts.forVersion(version) != null) stale("Successor roots are sealed for publication")
         val source = request.sourceVersionId?.let { sourceVersion ->
             val sourceMetadata = catalog.getVersion(sourceVersion) ?: throw NotFoundException("Unknown source version")
             if (request.publishAttemptId != null && sourceMetadata.publicationStatus != "published") stale("Successor source must be published")

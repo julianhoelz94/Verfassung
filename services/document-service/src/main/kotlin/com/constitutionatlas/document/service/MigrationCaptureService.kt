@@ -32,8 +32,8 @@ class MigrationCaptureService(private val captures: MigrationCaptureRepository, 
         val bytes = request.fileBase64?.let { Base64.getDecoder().decode(it) }
         require(bytes == null || (request.fileName?.length in 1..255 && bytes.size <= 10 * 1024 * 1024 && digest(bytes) == request.fileSha256)) { "Captured file name, size or checksum is invalid" }
         val hash = digest(mapper.writeValueAsBytes(request))
-        captures.lock(actor.id, request.attemptId)
-        captures.find(actor.id, request.attemptId)?.let { (previous, document, revision) ->
+        captures.lock(request.attemptId)
+        captures.find(request.attemptId)?.let { (previous, document, revision) ->
             if (hash != previous) throw org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.CONFLICT, "Capture attempt contains different evidence")
             return documents.get(document, revision)
         }

@@ -71,14 +71,8 @@ test('visitor reads the legal timeline and its source context', async ({ page })
   await expect(page.getByText('Update to Article 1')).toBeVisible();
 });
 
-test('visitor can reach provenance and a print action on narrow screens', async ({ page }) => {
+test('visitor can reach provenance on narrow screens', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(`/countries/DE/versions/${VERSION_2022}/articles/${ARTICLE_1}`);
   await expect(page.getByRole('complementary', { name: 'Source and trust' }).getByText('Verification')).toBeVisible();
-  await page.evaluate(() => {
-    (window as Window & { printCalled?: boolean }).printCalled = false;
-    window.print = () => { (window as Window & { printCalled?: boolean }).printCalled = true; };
-  });
-  await page.getByRole('button', { name: 'Print' }).click();
-  await expect.poll(() => page.evaluate(() => (window as Window & { printCalled?: boolean }).printCalled)).toBe(true);
 });

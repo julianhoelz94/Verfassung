@@ -3,7 +3,6 @@
 import { T, useTranslation } from '../components/TranslationProvider';
 import { ui } from '../../lib/messages';
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { Button } from '../components/ui';
 import { getPasskey } from '../../lib/webauthn';
 import { finishPasskeyLogin, startPasskeyLogin, startPasskeyStepUp, finishPasskeyStepUp } from './actions';
@@ -13,24 +12,24 @@ export function PasskeyLogin({ next, stepUp = false }: { next?: string; stepUp?:
   const t = useTranslation();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const router = useRouter();
   async function signIn() {
     setBusy(true);
     setError('');
     try {
       const started = stepUp ? await startPasskeyStepUp() : await startPasskeyLogin();
       const credential = await getPasskey(started.options);
+      let destination: string;
       if (stepUp) {
         await finishPasskeyStepUp(started.challengeId, credential);
-        router.push(safeReturnTo(next ?? '/account', '/account'));
+        destination = safeReturnTo(next ?? '/account', '/account');
       } else {
         const result = await finishPasskeyLogin(started.challengeId, credential);
-        router.push(next?.startsWith('/oauth/authorize?') ? next : result.roles.some((role) => ['editor', 'reviewer', 'publisher', 'admin'].includes(role)) ? '/editor' : '/');
+        destination = next?.startsWith('/oauth/authorize?') ? next : result.roles.some((role) => ['editor', 'reviewer', 'publisher', 'admin'].includes(role)) ? '/editor' : '/';
       }
-      router.refresh();
+      // Read the confirmed session on arrival; refreshing the old route can cancel a queued push.
+      window.location.assign(destination);
     } catch {
       setError(t(ui.state.passkeySignInFailed));
-    } finally {
       setBusy(false);
     }
   }

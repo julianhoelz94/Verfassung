@@ -1,6 +1,7 @@
 package com.constitutionatlas.ingestion.api
 
 import com.constitutionatlas.platform.OrderedNodeWrite
+import com.constitutionatlas.platform.StrictOrderedWrite
 import java.time.LocalDate
 import java.util.UUID
 
@@ -10,7 +11,7 @@ data class ImportNode(
     val title: String? = null,
     val body: String? = null,
     val children: List<ImportNode> = emptyList(),
-)
+) : StrictOrderedWrite()
 
 data class ImportArticle(
     val articleNumber: String,
@@ -18,7 +19,7 @@ data class ImportArticle(
     val body: String = "",
     val sortOrder: Int,
     val nodes: List<ImportNode> = emptyList(),
-)
+) : StrictOrderedWrite()
 
 data class ImportOutlineKind(
     val kindCode: String,
@@ -34,11 +35,11 @@ data class ImportOutlineKind(
     val segmentation: String = "plain",
     val root: Boolean? = null,
     val allowedChildKinds: List<String>? = null,
-)
+) : StrictOrderedWrite()
 
 data class ImportOutline(
     val kinds: List<ImportOutlineKind> = emptyList(),
-)
+) : StrictOrderedWrite()
 
 data class ImportRequest(
     val isoCode: String,
@@ -57,7 +58,7 @@ data class ImportRequest(
     val outline: ImportOutline? = null,
     val articles: List<ImportArticle> = emptyList(),
     val roots: List<OrderedNodeWrite> = emptyList(),
-)
+) : StrictOrderedWrite()
 
 data class ImportErrorDto(
     val code: String,
@@ -100,7 +101,7 @@ data class SetupProposalRequest(
     val gazetteReference: String? = null,
     val outline: ImportOutline,
     val sampleRoots: List<OrderedNodeWrite> = emptyList(),
-)
+) : StrictOrderedWrite()
 
 data class SetupProposalDto(
     val id: UUID,

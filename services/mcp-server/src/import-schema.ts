@@ -4,7 +4,7 @@ const uuid = z.string().uuid();
 const shortText = z.string().trim().min(1).max(512);
 const nullableText = z.string().max(1_048_576).nullable().optional();
 
-const outlineKind = z.object({
+const outlineKind = z.strictObject({
   kindCode: z.string().regex(/^[a-z][a-z0-9_-]{0,31}$/),
   displayLabel: shortText,
   presentation: z.enum(['section', 'concatenated']).optional(),
@@ -16,10 +16,28 @@ const outlineKind = z.object({
   labelPolicy: z.enum(['required', 'optional', 'none']).optional(),
   labelPlacement: z.enum(['before_title', 'after_title', 'inline', 'superscript']).optional(),
   segmentation: z.enum(['plain', 'sentence']).optional(),
+  root: z.boolean().nullable().optional(),
+  allowedChildKinds: z.array(z.string().regex(/^[a-z][a-z0-9_-]{0,31}$/)).max(32).nullable().optional(),
 });
-export const outlineSchema = z.object({ kinds: z.array(outlineKind).min(1).max(32) });
+export const outlineSchema = z.strictObject({ kinds: z.array(outlineKind).min(1).max(32) });
 
-const legacyNode: z.ZodTypeAny = z.lazy(() => z.object({
+const reference = z.strictObject({
+  logicalId: uuid, start: z.number().int().min(0), end: z.number().int().min(0),
+  target: z.strictObject({ type: z.enum(['unit', 'footnote', 'external']), logicalId: uuid.nullable().optional(), url: z.string().url().nullable().optional(), footnoteId: uuid.nullable().optional() }),
+});
+const table = z.strictObject({
+  caption: nullableText,
+  rows: z.array(z.strictObject({
+    logicalId: uuid,
+    cells: z.array(z.strictObject({
+      logicalId: uuid, text: z.string().max(1_048_576), header: z.boolean().optional(),
+      rowSpan: z.number().int().min(1).optional(), colSpan: z.number().int().min(1).optional(),
+      headers: z.array(uuid).optional(),
+    })).max(10_000),
+  })).max(10_000),
+});
+
+const legacyNode: z.ZodTypeAny = z.lazy(() => z.strictObject({
   kind: shortText,
   label: nullableText,
   title: nullableText,
@@ -27,14 +45,14 @@ const legacyNode: z.ZodTypeAny = z.lazy(() => z.object({
   children: z.array(legacyNode).max(10_000).optional(),
 }));
 
-const orderedNode: z.ZodTypeAny = z.lazy(() => z.object({
+export const orderedNode: z.ZodTypeAny = z.lazy(() => z.strictObject({
   revisionId: uuid.nullable().optional(),
   logicalId: uuid.nullable().optional(),
   predecessorRevisionId: uuid.nullable().optional(),
   kind: shortText.nullable().optional(),
   label: nullableText,
   title: nullableText,
-  content: z.array(z.object({
+  content: z.array(z.strictObject({
     type: z.enum(['text', 'child']),
     node: orderedNode.nullable().optional(),
     revisionId: uuid.nullable().optional(),
@@ -42,6 +60,10 @@ const orderedNode: z.ZodTypeAny = z.lazy(() => z.object({
     predecessorRevisionId: uuid.nullable().optional(),
     text: nullableText,
     lineage: z.array(uuid).max(32).optional(),
+    format: z.enum(['plain', 'table', 'footnote']).nullable().optional(),
+    table: table.nullable().optional(),
+    footnoteLabel: nullableText,
+    references: z.array(reference).max(10_000).optional(),
   })).max(10_000).nullable().optional(),
   lineage: z.array(uuid).max(32).optional(),
 }));
@@ -56,7 +78,7 @@ const sourceFields = {
   gazetteReference: shortText.nullable().optional(),
 };
 
-export const setupProposalSchema = z.object({
+export const setupProposalSchema = z.strictObject({
   ...sourceFields,
   predecessorConstitutionId: uuid.nullable().optional(),
   interim: z.boolean().optional(),
@@ -64,7 +86,7 @@ export const setupProposalSchema = z.object({
   sampleRoots: z.array(orderedNode).max(20).optional(),
 });
 
-export const importPayloadSchema = z.object({
+export const importPayloadSchema = z.strictObject({
   ...sourceFields,
   versionLabel: shortText,
   effectiveDate: z.iso.date().nullable().optional(),
@@ -73,7 +95,7 @@ export const importPayloadSchema = z.object({
   constitutionId: uuid.nullable().optional(),
   settingsRevisionId: uuid.nullable().optional(),
   outline: outlineSchema.nullable().optional(),
-  articles: z.array(z.object({
+  articles: z.array(z.strictObject({
     articleNumber: shortText,
     title: z.string().max(1000),
     body: z.string().max(1_048_576).optional(),

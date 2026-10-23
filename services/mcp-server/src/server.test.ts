@@ -5,6 +5,36 @@ import { orderedText } from './server.js';
 import { createServer } from './server.js';
 import { authenticateMcpKey, requirePublishedVersion, UpstreamError } from './catalog.js';
 import { setupProposalSchema } from './import-schema.js';
+import { randomUUID } from 'node:crypto';
+
+test('rich imports survive the actual MCP parser for direct and batch staging', async () => {
+  const originalFetch = globalThis.fetch;
+  const noteId = randomUUID();
+  const root = { logicalId: randomUUID(), kind: 'article', label: 'I a', title: null, content: [
+    { type: 'text', text: 'Wort', references: [{ logicalId: randomUUID(), start: 0, end: 4, target: { type: 'footnote', footnoteId: noteId } }] },
+    { type: 'text', logicalId: noteId, text: 'Anmerkung: spätere Redaktion.', format: 'footnote', footnoteLabel: '*' },
+    { type: 'text', format: 'table', table: { caption: 'Übersicht', rows: [{ logicalId: randomUUID(), cells: [{ logicalId: randomUUID(), text: 'unverändert', header: true, rowSpan: 2, colSpan: 1, headers: [] }] }] } },
+  ] };
+  const payload = { isoCode: 'DE', countryName: 'Deutschland', constitutionSlug: 'archiv', constitutionTitle: 'Verfassung', versionLabel: '1849', constitutionId: randomUUID(), settingsRevisionId: randomUUID(), roots: [root] };
+  let received: unknown;
+  globalThis.fetch = async (input, init) => {
+    if (String(input).endsWith('/me')) return Response.json({ scopes: ['ingestion:import'] });
+    received = JSON.parse(String(init?.body));
+    return Response.json({ id: randomUUID(), status: 'pending_review', errors: [] });
+  };
+  try {
+    assert.equal((await callTool('stage_constitution_import', { payload }, 'Bearer ca_mcp_importer')).isError, undefined);
+    assert.deepEqual(received, payload);
+    assert.equal((await callTool('stage_batch_item', { batchId: randomUUID(), idempotencyKey: 'source-item-1849', payload }, 'Bearer ca_mcp_importer')).isError, undefined);
+    assert.deepEqual((received as unknown as { payload: unknown }).payload, payload);
+    received = undefined;
+    const invalid = { ...payload, roots: [{ ...root, accidentalField: 'must not disappear' }] };
+    assert.equal((await callTool('stage_constitution_import', { payload: invalid }, 'Bearer ca_mcp_importer')).isError, true);
+    assert.equal(received, undefined);
+    const outline = { kinds: [{ kindCode: 'article', displayLabel: 'Artikel', root: true, allowedChildKinds: [] }] };
+    assert.deepEqual(setupProposalSchema.parse({ isoCode: 'DE', countryName: 'Deutschland', constitutionSlug: 'archiv', constitutionTitle: 'Verfassung', outline, sampleRoots: [root] }).outline, outline);
+  } finally { globalThis.fetch = originalFetch; }
+});
 
 test('MCP outline choices match catalog authoring policies', () => {
   const proposal = {

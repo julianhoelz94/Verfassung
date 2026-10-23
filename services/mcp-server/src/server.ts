@@ -106,19 +106,20 @@ export function createServer(authorization?: string): McpServer {
     outputSchema: importSchemaOutput,
     annotations: readOnly,
   }, () => run('get_import_schema', async () => ({
-    schemaVersion: '1.0',
+    schemaVersion: '1.1',
     settingsGuidance,
     workflow: ['find_constitution', 'propose_constitution_setup if missing', 'editor confirms outline in the site', 'get_import_setup for constitutionId and settingsRevisionId', 'stage_constitution_import', 'editor prepares a draft in the site', 'reviewer approves', 'publisher publishes'],
     required: ['isoCode', 'countryName', 'constitutionSlug', 'constitutionTitle', 'constitutionId', 'settingsRevisionId', 'versionLabel', 'sourceUrl or gazetteReference', 'articles or roots'],
     uploadLimits: { directToolBytes: 2_097_152, chunkBytes: 524_288, chunkedItemBytes: 26_214_400, receivingBatchBytes: 104_857_600, maxItemsPerBatch: 100 },
     sourceFields: { languageCode: 'BCP 47 language tag', sourceUrl: 'HTTPS URL of the source', gazetteReference: 'Official citation or gazette reference', effectiveDate: 'YYYY-MM-DD or null' },
     structure: {
-      outline: { kinds: [{ kindCode: 'article', displayLabel: 'Article', presentation: 'section', showLabel: true, showTitle: true, showKind: false, allowTextAlongsideChildren: false, titlePolicy: 'optional', labelPolicy: 'optional', labelPlacement: 'before_title', segmentation: 'plain' }] },
+      outline: { kinds: [{ kindCode: 'article', displayLabel: 'Article', presentation: 'section', showLabel: true, showTitle: true, showKind: false, allowTextAlongsideChildren: false, titlePolicy: 'optional', labelPolicy: 'optional', labelPlacement: 'before_title', segmentation: 'plain', root: true, allowedChildKinds: [] }] },
+      richContent: { formats: ['plain', 'table', 'footnote'], fields: ['format', 'table', 'footnoteLabel', 'references'], table: { caption: 'Source table', rows: [{ logicalId: 'row UUID', cells: [{ logicalId: 'cell UUID', text: 'Exact cell wording', header: true, rowSpan: 1, colSpan: 2, headers: [] }] }] }, reference: { logicalId: 'reference UUID', start: 0, end: 4, target: { type: 'footnote', footnoteId: 'note entry UUID' } } },
       articles: [{ articleNumber: '1', title: 'Example', body: 'Text', sortOrder: 1, nodes: [] }],
       roots: [{ logicalId: 'stable UUID', kind: 'article', label: '1', title: 'Example', content: [{ type: 'text', text: 'Text' }] }],
       setupProposal: { isoCode: 'FR', countryName: 'France', constitutionSlug: 'constitution', constitutionTitle: 'Constitution', languageCode: 'fr', sourceUrl: 'https://example.org/source', outline: { kinds: [{ kindCode: 'article', displayLabel: 'Article' }] }, sampleRoots: [{ kind: 'article', label: '1', content: [{ type: 'text', text: 'Representative text' }] }] },
     },
-    notes: ['Call get_import_setup first. For an existing constitution copy its settingsRevisionId and omit outline.', 'A new constitution needs an outline proposal and a site review before content preparation.', 'Reuse an idempotencyKey when retrying a direct upload; without one, identical payloads reuse a content-derived key.', 'Use get_import_upload to resume missing chunks or cancel_import_upload to discard an unfinished upload.', 'Preserve source spelling, numbering and text order.', 'No MCP tool can approve or publish.'],
+    notes: ['Unknown fields are rejected. Preserve table geometry, explicit reference targets, footnote labels, and root/allowedChildKinds outline rules.', 'Call get_import_setup first. For an existing constitution copy its settingsRevisionId and omit outline.', 'A new constitution needs an outline proposal and a site review before content preparation.', 'Reuse an idempotencyKey when retrying a direct upload; without one, identical payloads reuse a content-derived key.', 'Use get_import_upload to resume missing chunks or cancel_import_upload to discard an unfinished upload.', 'Preserve source spelling, numbering and text order.', 'No MCP tool can approve or publish.'],
   })));
 
   server.registerTool('find_constitution', {

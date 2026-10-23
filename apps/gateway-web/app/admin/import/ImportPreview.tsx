@@ -1,6 +1,6 @@
 import { T } from '../../components/TranslationProvider';
 import { ui } from '../../../lib/messages';
-import type { ContentOutline, OrderedEntry, OrderedNode } from '../../../lib/api';
+import type { ContentOutline, OrderedEntry, OrderedNode, OrderedTable, OrderedInlineReference } from '../../../lib/api';
 import { OrderedContentTree } from '../../components/ConstitutionText';
 
 type Row = Record<string, unknown>;
@@ -14,7 +14,9 @@ function previewOutline(payload: Row): ContentOutline | undefined {
   if (!kinds.length) return undefined;
   return { kinds: kinds.map((kind, index) => ({
     kindCode: string(kind.kindCode), displayLabel: string(kind.displayLabel), sortOrder: index + 1,
-    mayHoldText: true, mayHoldChildren: true, allowedChildKinds: kinds.slice(index + 1).map(child => string(child.kindCode)),
+    mayHoldText: true, mayHoldChildren: true,
+    root: typeof kind.root === 'boolean' ? kind.root : index === 0,
+    allowedChildKinds: Array.isArray(kind.allowedChildKinds) ? kind.allowedChildKinds.map(string) : kinds.slice(index + 1, index + 2).map(child => string(child.kindCode)),
     presentation: string(kind.presentation) || 'section', showLabel: kind.showLabel !== false,
     showTitle: kind.showTitle === true, showKind: kind.showKind === true,
     allowTextAlongsideChildren: kind.allowTextAlongsideChildren === true,
@@ -23,16 +25,20 @@ function previewOutline(payload: Row): ContentOutline | undefined {
   })) };
 }
 
-export function previewNode(source: Row, path: string, depth = 0): OrderedNode {
-  const content = depth < 12 ? children(source.content) : [];
+export function previewNode(source: Row, path: string): OrderedNode {
+  const content = children(source.content);
   const entries: OrderedEntry[] = content.length ? content.map((part, index) => part.type === 'child' && part.node
-    ? { type: 'child', node: previewNode(row(part.node), `${path}-${index}`, depth + 1) }
-    : { type: 'text', text: string(part.text) }) : [
+    ? { type: 'child', node: previewNode(row(part.node), `${path}-${index}`) }
+    : {
+      type: 'text', text: string(part.text), logicalId: string(part.logicalId) || `${path}-entry-${index}`,
+      format: part.format as OrderedEntry['format'], table: part.table as OrderedTable | undefined,
+      footnoteLabel: part.footnoteLabel as string | undefined, references: part.references as OrderedInlineReference[] | undefined,
+    }) : [
       ...(string(source.body) ? [{ type: 'text' as const, text: string(source.body) }] : []),
-      ...(depth < 12 ? children(source.children).concat(children(source.nodes)).slice(0, 100).map((child, index) => ({ type: 'child' as const, node: previewNode(child, `${path}-${index}`, depth + 1) })) : []),
+      ...children(source.children).concat(children(source.nodes)).map((child, index) => ({ type: 'child' as const, node: previewNode(child, `${path}-${index}`) })),
     ];
   return {
-    logicalId: string(source.logicalId) || path, revisionId: path, occurrenceId: path,
+    logicalId: string(source.logicalId) || path, revisionId: string(source.revisionId) || path, occurrenceId: string(source.occurrenceId) || path,
     kind: string(source.kind) || 'article', label: string(source.label) || string(source.articleNumber),
     title: string(source.title), content: entries,
   };

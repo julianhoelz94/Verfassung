@@ -180,4 +180,6 @@ data class VersionDetail(
     val editorialPredecessorVersionId: UUID? = null,
     val countryCode: String? = null,
     val jurisdictionId: UUID? = null,
+    val sourceUrl: String? = null,
+    val gazetteReference: String? = null,
 )

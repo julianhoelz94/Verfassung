@@ -2,6 +2,7 @@ export type Version = {
   id: string;
   constitutionId: string;
   countryCode?: string | null;
+  jurisdictionId?: string | null;
   versionLabel: string;
   publicationStatus: string;
   effectiveDate?: string | null;
@@ -97,7 +98,7 @@ export async function authenticateMcpKey(authorization?: string): Promise<{ id?:
 }
 
 export function publicVersionUrl(version: Version): string | null {
-  if (!version.countryCode) return null;
+  if (!version.countryCode && !version.jurisdictionId) return null;
   const base = (process.env.PUBLIC_BASE_URL ?? 'http://localhost').replace(/\/$/, '');
-  return `${base}/countries/${encodeURIComponent(version.countryCode)}/versions/${encodeURIComponent(version.id)}`;
+  return version.countryCode ? `${base}/countries/${encodeURIComponent(version.countryCode)}/versions/${encodeURIComponent(version.id)}` : `${base}/jurisdictions/${encodeURIComponent(version.jurisdictionId!)}/versions/${encodeURIComponent(version.id)}`;
 }

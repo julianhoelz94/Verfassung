@@ -45,6 +45,33 @@ test('MCP outline choices match catalog authoring policies', () => {
   assert.equal(setupProposalSchema.safeParse({ ...proposal, outline: { kinds: [{ ...proposal.outline.kinds[0], kindCode: 'x'.repeat(33) }] } }).success, false);
 });
 
+test('jurisdiction discovery and import setup preserve historical identities without country codes', async () => {
+  const originalFetch = globalThis.fetch;
+  const jurisdictionId = randomUUID();
+  const constitutionId = randomUUID();
+  const settings = randomUUID();
+  const calls: string[] = [];
+  globalThis.fetch = async input => {
+    const path = new URL(String(input)).pathname;
+    calls.push(path);
+    if (path === '/me') return Response.json({ scopes: ['ingestion:import'] });
+    if (path === `/jurisdictions/${jurisdictionId}`) return Response.json({ jurisdiction: { id: jurisdictionId, name: 'Preußen', historical: true }, constitutions: [{ id: constitutionId, slug: '1850', title: 'Verfassung' }] });
+    if (path.endsWith('/settings')) return Response.json({ id: settings, outline: { kinds: [] } });
+    return Response.json({});
+  };
+  try {
+    const result = await callTool('get_import_setup', { jurisdictionId, constitutionSlug: '1850' }, 'Bearer ca_mcp_importer');
+    assert.equal(result.isError, undefined);
+    assert.equal(result.structuredContent?.jurisdictionId, jurisdictionId);
+    assert.equal(result.structuredContent?.constitutionId, constitutionId);
+    assert.equal(result.structuredContent?.countryCode, undefined);
+    assert.equal((await callTool('find_constitution', { jurisdictionId, countryCode: 'DE', constitutionSlug: '1850' }, 'Bearer ca_mcp_importer')).isError, true);
+    assert.equal(calls.some(path => path.startsWith('/countries')), false);
+    const exportResult = await callTool('export_import_job', { jobId: randomUUID(), view: 'submitted' }, 'Bearer ca_mcp_importer');
+    assert.equal(exportResult.isError, true); // Malformed upstream export cannot pass the declared output contract.
+  } finally { globalThis.fetch = originalFetch; }
+});
+
 test('MCP requests require a valid personal key with read scope', async () => {
   const originalFetch = globalThis.fetch;
   let calls = 0;

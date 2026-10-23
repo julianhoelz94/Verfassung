@@ -42,8 +42,8 @@ data class ImportOutline(
 ) : StrictOrderedWrite()
 
 data class ImportRequest(
-    val isoCode: String,
-    val countryName: String,
+    val isoCode: String = "",
+    val countryName: String = "",
     val constitutionSlug: String,
     val constitutionTitle: String,
     val versionLabel: String,
@@ -58,6 +58,7 @@ data class ImportRequest(
     val outline: ImportOutline? = null,
     val articles: List<ImportArticle> = emptyList(),
     val roots: List<OrderedNodeWrite> = emptyList(),
+    val jurisdictionId: UUID? = null,
 ) : StrictOrderedWrite()
 
 data class ImportErrorDto(
@@ -90,8 +91,8 @@ data class ReviewDecisionRequest(val reason: String)
 data class ReviewDecisionDto(val id: UUID, val decision: String, val reason: String, val decidedBy: UUID, val decidedAt: java.time.OffsetDateTime)
 
 data class SetupProposalRequest(
-    val isoCode: String,
-    val countryName: String,
+    val isoCode: String = "",
+    val countryName: String = "",
     val constitutionSlug: String,
     val constitutionTitle: String,
     val predecessorConstitutionId: UUID? = null,
@@ -101,6 +102,7 @@ data class SetupProposalRequest(
     val gazetteReference: String? = null,
     val outline: ImportOutline,
     val sampleRoots: List<OrderedNodeWrite> = emptyList(),
+    val jurisdictionId: UUID? = null,
 ) : StrictOrderedWrite()
 
 data class SetupProposalDto(

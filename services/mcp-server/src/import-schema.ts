@@ -69,8 +69,9 @@ export const orderedNode: z.ZodTypeAny = z.lazy(() => z.strictObject({
 }));
 
 const sourceFields = {
-  isoCode: z.string().regex(/^[A-Za-z]{2}$/),
-  countryName: shortText,
+  isoCode: z.string().regex(/^[A-Za-z]{2}$/).optional(),
+  jurisdictionId: uuid.optional(),
+  countryName: shortText.optional(),
   constitutionSlug: z.string().regex(/^[a-z0-9][a-z0-9-]{0,119}$/),
   constitutionTitle: shortText,
   languageCode: z.string().regex(/^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$/).optional(),

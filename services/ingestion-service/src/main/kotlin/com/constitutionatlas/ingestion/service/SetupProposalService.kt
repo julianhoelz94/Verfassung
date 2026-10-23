@@ -48,12 +48,12 @@ class SetupProposalService(
             DownstreamAuth.withAuthorization(authorization) {
                 val request = proposal.payload
                 val iso = request.isoCode.trim().uppercase()
-                val existing = catalog.findConstitution(iso, request.constitutionSlug)
+                val existing = findSelected(request)
                 if (existing != null && existing.id != proposal.constitutionId) {
                     throw ResponseStatusException(HttpStatus.CONFLICT, "Constitution slug is already in use")
                 }
-                if (catalog.getCountry(iso) == null) catalog.createCountry(iso, request.countryName.trim())
-                val constitution = existing ?: catalog.createConstitution(iso, request.constitutionSlug.trim(), request.constitutionTitle.trim(), request.predecessorConstitutionId, request.interim)
+                if (request.jurisdictionId == null && catalog.getCountry(iso) == null) catalog.createCountry(iso, request.countryName.trim())
+                val constitution = existing ?: (request.jurisdictionId?.let { catalog.createJurisdictionConstitution(it, request.constitutionSlug.trim(), request.constitutionTitle.trim(), request.predecessorConstitutionId, request.interim) } ?: catalog.createConstitution(iso, request.constitutionSlug.trim(), request.constitutionTitle.trim(), request.predecessorConstitutionId, request.interim))
                 proposals.setConstitution(id, constitution.id)
                 catalog.replaceOutline(constitution.id, request.outline.kinds)
                 proposals.confirm(id, catalog.currentSettingsRevisionId(constitution.id), actorId)
@@ -72,20 +72,26 @@ class SetupProposalService(
     }
 
     private fun requireMissing(request: SetupProposalRequest) {
-        if (catalog.findConstitution(request.isoCode.trim().uppercase(), request.constitutionSlug.trim()) != null) {
+        if (findSelected(request) != null) {
             throw ResponseStatusException(HttpStatus.CONFLICT, "Constitution already exists; use its settings revision")
         }
     }
 
+    private fun findSelected(request: SetupProposalRequest) = request.jurisdictionId?.let {
+        catalog.getJurisdiction(it)
+        catalog.findJurisdictionConstitution(it, request.constitutionSlug.trim())
+    } ?: if (request.jurisdictionId == null) catalog.findConstitution(request.isoCode.trim().uppercase(), request.constitutionSlug.trim()) else null
+
     private fun validate(request: SetupProposalRequest) {
         fun invalid(field: String, message: String): Nothing = throw ResponseStatusException(HttpStatus.BAD_REQUEST, "$field: $message")
-        if (!request.isoCode.matches(Regex("[A-Za-z]{2}"))) invalid("isoCode", "use a two-letter country code")
-        if (request.countryName.isBlank()) invalid("countryName", "required")
+        if (request.jurisdictionId == null && !request.isoCode.matches(Regex("[A-Za-z]{2}"))) invalid("isoCode", "use a two-letter country code")
+        if (request.jurisdictionId == null && request.countryName.isBlank()) invalid("countryName", "required")
         if (!request.constitutionSlug.matches(Regex("[a-z0-9][a-z0-9-]{0,119}"))) invalid("constitutionSlug", "use lowercase letters, digits and hyphens")
         if (request.constitutionTitle.isBlank()) invalid("constitutionTitle", "required")
         if (!request.languageCode.matches(Regex("[a-z]{2,3}(-[A-Za-z0-9]{2,8})*"))) invalid("languageCode", "invalid language tag")
         if (request.sourceUrl.isNullOrBlank() && request.gazetteReference.isNullOrBlank()) invalid("source", "sourceUrl or gazetteReference is required")
         if (request.sourceUrl != null && !request.sourceUrl.startsWith("https://")) invalid("sourceUrl", "use an HTTPS source")
+        if (request.jurisdictionId != null && request.isoCode.isNotBlank()) invalid("jurisdictionId", "use jurisdictionId or isoCode, not both")
         val kinds = request.outline.kinds
         if (kinds.size !in 1..8) invalid("outline.kinds", "provide 1 to 8 levels")
         if (kinds.any { !it.kindCode.matches(Regex("[a-z][a-z0-9_-]{0,31}")) || it.displayLabel.isBlank() }) invalid("outline.kinds", "each level needs a valid code and label")

@@ -10,6 +10,7 @@ import java.util.UUID
 class OrderedIndexSourceTest {
     @Test
     fun indexesCurrentEditorialOccurrencesIndependentlyWhenRevisionsAreShared() {
+        val jurisdiction = UUID.randomUUID()
         val firstLegal = UUID.randomUUID()
         val firstTip = UUID.randomUUID()
         val secondLegal = UUID.randomUUID()
@@ -25,8 +26,8 @@ class OrderedIndexSourceTest {
             synchronized(requests) { requests += path }
             fun unit(version: UUID, occurrence: UUID) = mapOf("id" to occurrence, "versionId" to version, "articleNumber" to "46a", "title" to "Rights", "body" to "Wrong projection", "content" to listOf(mapOf("type" to "text", "logicalId" to logical, "revisionId" to revision, "occurrenceId" to UUID.randomUUID(), "text" to "Exact  shared text.\n")))
             val response: Any = when (path) {
-                "/countries" -> listOf(mapOf("isoCode" to "DE", "name" to "Germany"))
-                "/countries/DE" -> mapOf("name" to "Germany", "constitutions" to listOf(mapOf("title" to "Constitution", "versions" to listOf(mapOf("id" to firstLegal, "currentVersionId" to firstTip, "versionLabel" to "1"), mapOf("id" to secondLegal, "versionLabel" to "2")))))
+                "/jurisdictions" -> listOf(mapOf("id" to jurisdiction, "code" to "DE", "name" to "Germany"))
+                "/jurisdictions/$jurisdiction" -> mapOf("name" to "Germany", "constitutions" to listOf(mapOf("title" to "Constitution", "versions" to listOf(mapOf("id" to firstLegal, "currentVersionId" to firstTip, "versionLabel" to "1"), mapOf("id" to secondLegal, "versionLabel" to "2")))))
                 "/versions/$firstTip/units" -> listOf(mapOf("id" to firstOccurrence))
                 "/versions/$secondLegal/units" -> listOf(mapOf("id" to secondOccurrence))
                 "/versions/$firstTip/units/$firstOccurrence" -> unit(firstTip, firstOccurrence)
@@ -44,6 +45,7 @@ class OrderedIndexSourceTest {
             val indexed = RestIndexSource(url, url).loadPublishedArticles()
             assertThat(indexed.map { it.versionId }).containsExactly(firstTip, secondLegal)
             assertThat(indexed.map { it.articleId }).containsExactly(firstOccurrence, secondOccurrence)
+            assertThat(indexed.map { it.jurisdictionId }).containsOnly(jurisdiction)
             assertThat(indexed.map { it.body }).containsExactly("Exact  shared text.\n", "Exact  shared text.\n")
             assertThat(requests).doesNotContain("/versions/$firstLegal/units")
         } finally {

@@ -20,10 +20,11 @@ object ImportValidator {
 
     fun validate(request: ImportRequest, pinnedOutline: ImportOutline? = null): List<Pair<String, String>> {
         val errors = mutableListOf<Pair<String, String>>()
-        if (request.isoCode.trim().length != 2) {
+        if (request.jurisdictionId != null && request.isoCode.isNotBlank()) errors += "AMBIGUOUS_JURISDICTION" to "Use jurisdictionId or isoCode, not both"
+        if (request.jurisdictionId == null && !request.isoCode.matches(Regex("[A-Za-z]{2}"))) {
             errors += "INVALID_ISO" to "isoCode must be two letters"
         }
-        if (request.countryName.isBlank()) {
+        if (request.jurisdictionId == null && request.countryName.isBlank()) {
             errors += "MISSING_COUNTRY" to "countryName is required"
         }
         if (request.constitutionSlug.isBlank()) {

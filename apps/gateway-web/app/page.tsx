@@ -28,6 +28,7 @@ import {
 import { Grid, Inline, Stack } from './components/layout/Layout';
 import headerStyles from './components/header.module.css';
 import surfaceStyles from './components/surfaces.module.css';
+import { migrationUi } from '../lib/migration-messages';
 
 export default async function Page() {
   const policy = await requestAnonymousBrowsingPolicy().catch(() => null);
@@ -115,6 +116,7 @@ export default async function Page() {
             <strong>{amendmentCount}</strong><T value={ui.page.amendmentsRecorded} />{" "}</div>
         </div>
       </section>
+      <p><a href="/jurisdictions"><T value={migrationUi.browse} /></a></p>
       <h2 className="section-title"><T value={ui.page.countries2} /></h2>
       {countries.length === 0 ? (
         <p><T value={ui.page.noCountriesArePublishedYet} /></p>

@@ -21,7 +21,7 @@ export type ImportJob = {
   versionLabel?: string | null;
 };
 
-const REQUIRED_STRINGS = ['isoCode', 'countryName', 'constitutionSlug', 'constitutionTitle', 'versionLabel'] as const;
+const REQUIRED_STRINGS = ['constitutionSlug', 'constitutionTitle', 'versionLabel'] as const;
 
 export function isImportRequest(value: unknown): value is Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
@@ -33,6 +33,7 @@ export function isImportRequest(value: unknown): value is Record<string, unknown
       return false;
     }
   }
+  if (typeof row.jurisdictionId !== 'string' && (typeof row.isoCode !== 'string' || typeof row.countryName !== 'string' || !row.isoCode || !row.countryName)) return false;
   const articles = Array.isArray(row.articles) && row.articles.length > 0;
   const roots = Array.isArray(row.roots) && row.roots.length > 0;
   return articles !== roots;

@@ -25,6 +25,7 @@ export type VersionDetail = Pick<VersionSummary, 'id' | 'versionLabel' | 'effect
   constitutionId: string;
   publicationStatus: string;
   countryCode?: string | null;
+  jurisdictionId?: string | null;
 };
 
 export type ContentNode = {
@@ -299,6 +300,9 @@ export type SearchHit = {
   articleId: string;
   versionId: string;
   countryCode: string;
+  jurisdictionId?: string | null;
+  jurisdictionName?: string | null;
+  historical?: boolean;
   constitutionTitle: string;
   versionLabel: string;
   effectiveDate: string | null;
@@ -317,6 +321,7 @@ export type SearchPage = {
 
 export type SearchFilters = {
   country?: string;
+  jurisdictionId?: string;
   versionId?: string;
   effectiveDate?: string;
   limit?: number;
@@ -346,6 +351,7 @@ export type SearchFacets = {
   countries: CountryFacet[];
   versions: VersionFacet[];
   dates: DateFacet[];
+  jurisdictions?: { id: string; name: string; historical: boolean; count: number }[];
 };
 
 export function searchArticles(query: string, filters: SearchFilters = {}): Promise<SearchPage | null> {
@@ -356,6 +362,7 @@ export function searchArticles(query: string, filters: SearchFilters = {}): Prom
   }
   const params = new URLSearchParams();
   params.set('q', query);
+  if (filters.jurisdictionId) params.set('jurisdictionId', filters.jurisdictionId);
   if (filters.country) {
     params.set('country', filters.country);
   }

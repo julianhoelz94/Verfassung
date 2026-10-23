@@ -100,6 +100,17 @@ export function createServer(authorization?: string): McpServer {
     }
   }
 
+  server.registerTool('export_import_job', {
+    description: 'Read your submitted request or the actual prepared persisted snapshot as paginated JSON-pointer leaf records. Concatenate @text chunks by index. Continue until complete=true; restart on changed-snapshot conflicts. Fidelity reports exact mismatches against the submission, never an echoed-request checksum.',
+    inputSchema: { jobId: uuid, view: z.enum(['submitted', 'prepared']).default('prepared'), cursor: z.string().max(1024).optional() },
+    outputSchema: z.object({ jobId: uuid, view: z.string(), snapshotId: z.string(), records: z.array(z.object({ path: z.string(), value: z.unknown() })), totalRecords: z.number().int(), complete: z.boolean(), nextCursor: z.string().nullable(), fidelity: z.array(z.object({ path: z.string(), reason: z.string() })), fidelityComplete: z.boolean() }).passthrough(),
+    annotations: readOnly, scopeChallenge: importScope,
+  }, ({ jobId, view, cursor }) => run('export_import_job', async () => {
+    await requireImportKey();
+    const query = new URLSearchParams({ view, ...(cursor ? { cursor } : {}) });
+    return await getJson<Record<string, unknown>>('ingestion', `/import-jobs/${jobId}/export?${query}`, authorization);
+  }));
+
   server.registerTool('get_import_schema', {
     description: 'Learn the structured constitution import format, hierarchy rules, and review workflow before staging content.',
     inputSchema: {},
@@ -109,7 +120,7 @@ export function createServer(authorization?: string): McpServer {
     schemaVersion: '1.1',
     settingsGuidance,
     workflow: ['find_constitution', 'propose_constitution_setup if missing', 'editor confirms outline in the site', 'get_import_setup for constitutionId and settingsRevisionId', 'stage_constitution_import', 'editor prepares a draft in the site', 'reviewer approves', 'publisher publishes'],
-    required: ['isoCode', 'countryName', 'constitutionSlug', 'constitutionTitle', 'constitutionId', 'settingsRevisionId', 'versionLabel', 'sourceUrl or gazetteReference', 'articles or roots'],
+    required: ['jurisdictionId or isoCode with countryName', 'constitutionSlug', 'constitutionTitle', 'constitutionId', 'settingsRevisionId', 'versionLabel', 'sourceUrl or gazetteReference', 'articles or roots'],
     uploadLimits: { directToolBytes: 2_097_152, chunkBytes: 524_288, chunkedItemBytes: 26_214_400, receivingBatchBytes: 104_857_600, maxItemsPerBatch: 100 },
     sourceFields: { languageCode: 'BCP 47 language tag', sourceUrl: 'HTTPS URL of the source', gazetteReference: 'Official citation or gazette reference', effectiveDate: 'YYYY-MM-DD or null' },
     structure: {
@@ -122,22 +133,24 @@ export function createServer(authorization?: string): McpServer {
     notes: ['Unknown fields are rejected. Preserve table geometry, explicit reference targets, footnote labels, and root/allowedChildKinds outline rules.', 'Call get_import_setup first. For an existing constitution copy its settingsRevisionId and omit outline.', 'A new constitution needs an outline proposal and a site review before content preparation.', 'Reuse an idempotencyKey when retrying a direct upload; without one, identical payloads reuse a content-derived key.', 'Use get_import_upload to resume missing chunks or cancel_import_upload to discard an unfinished upload.', 'Preserve source spelling, numbering and text order.', 'No MCP tool can approve or publish.'],
   })));
 
-  server.registerTool('find_constitution', {
-    description: 'Find a constitution by country and slug before proposing an import. Does not create records.',
-    inputSchema: { countryCode: z.string().regex(/^[A-Za-z]{2}$/), constitutionSlug: z.string().trim().min(1).max(120) },
-    outputSchema: findConstitutionOutput,
-    annotations: readOnly,
-    scopeChallenge: importScope,
-  }, ({ countryCode, constitutionSlug }) => run('find_constitution', async () => {
+  const jurisdictionSelector = { countryCode: z.string().regex(/^[A-Za-z]{2}$/).optional(), jurisdictionId: uuid.optional(), constitutionSlug: z.string().trim().min(1).max(120) };
+  async function importSetup(countryCode: string | undefined, jurisdictionId: string | undefined, constitutionSlug: string) {
     await requireImportKey();
-    let country: CountryDetail;
-    try { country = await getJson<CountryDetail>('catalog', `/countries/${countryCode.toUpperCase()}`, authorization); }
-    catch (error) { if (error instanceof UpstreamError && error.status === 404) return { exists: false, countryCode: countryCode.toUpperCase() }; throw error; }
-    const constitution = country.constitutions.find(item => item.slug === constitutionSlug);
-    if (!constitution) return { exists: false, countryCode: country.isoCode, countryName: country.name };
+    if (Boolean(countryCode) === Boolean(jurisdictionId)) throw new UpstreamError(400, 'catalog', 'Select exactly one countryCode or jurisdictionId.');
+    const selector = { countryCode: countryCode?.toUpperCase(), jurisdictionId };
+    let detail: { name?: string; jurisdiction?: { name: string }; constitutions: CountryDetail['constitutions'] };
+    try { detail = await getJson('catalog', jurisdictionId ? `/jurisdictions/${jurisdictionId}` : `/countries/${countryCode!.toUpperCase()}`, authorization); }
+    catch (error) { if (error instanceof UpstreamError && error.status === 404) return { exists: false, ...selector, outline: null }; throw error; }
+    const constitution = detail.constitutions.find(item => item.slug === constitutionSlug);
+    if (!constitution) return { exists: false, ...selector, countryName: detail.jurisdiction?.name ?? detail.name, outline: null };
     const settings = await getJson<{ id: string; outline: Record<string, unknown> }>('catalog', `/constitutions/${constitution.id}/settings`, authorization);
-    return { exists: true, countryCode: country.isoCode, countryName: country.name, constitutionId: constitution.id, title: constitution.title, slug: constitution.slug, settingsRevisionId: settings.id, outline: settings.outline, settingsGuidance };
-  }));
+    return { exists: true, ...selector, countryName: detail.jurisdiction?.name ?? detail.name, constitutionId: constitution.id, title: constitution.title, slug: constitution.slug, settingsRevisionId: settings.id, outline: settings.outline, settingsGuidance };
+  }
+
+  server.registerTool('find_constitution', {
+    description: 'Find a constitution by jurisdiction ID or compatible country code and slug. Does not create records.',
+    inputSchema: jurisdictionSelector, outputSchema: findConstitutionOutput, annotations: readOnly, scopeChallenge: importScope,
+  }, ({ countryCode, jurisdictionId, constitutionSlug }) => run('find_constitution', () => importSetup(countryCode, jurisdictionId, constitutionSlug)));
 
   server.registerTool('propose_constitution_setup', {
     description: 'Submit private metadata, an outline, and a small representative source sample for editor inspection before full upload.',
@@ -174,21 +187,9 @@ export function createServer(authorization?: string): McpServer {
   }));
 
   server.registerTool('get_import_setup', {
-    description: 'For an editor import key, find an existing constitution and its configured content outline before uploading. A missing constitution has no outline yet.',
-    inputSchema: { countryCode: z.string().regex(/^[A-Za-z]{2}$/), constitutionSlug: z.string().trim().min(1).max(120) },
-    outputSchema: importSetupOutput,
-    annotations: readOnly,
-    scopeChallenge: importScope,
-  }, ({ countryCode, constitutionSlug }) => run('get_import_setup', async () => {
-    await requireImportKey();
-    let country: CountryDetail;
-    try { country = await getJson<CountryDetail>('catalog', `/countries/${countryCode.toUpperCase()}`, authorization); }
-    catch (error) { if (error instanceof UpstreamError && error.status === 404) return { exists: false, countryCode: countryCode.toUpperCase(), outline: null }; throw error; }
-    const constitution = country.constitutions.find(item => item.slug === constitutionSlug);
-    if (!constitution) return { exists: false, countryCode: country.isoCode, outline: null };
-    const settings = await getJson<{ id: string; outline: Record<string, unknown> }>('catalog', `/constitutions/${constitution.id}/settings`, authorization);
-    return { exists: true, countryCode: country.isoCode, constitutionId: constitution.id, title: constitution.title, settingsRevisionId: settings.id, outline: settings.outline, settingsGuidance };
-  }));
+    description: 'Read the confirmed outline and settings pin for a jurisdiction or country before uploading.',
+    inputSchema: jurisdictionSelector, outputSchema: importSetupOutput, annotations: readOnly, scopeChallenge: importScope,
+  }, ({ countryCode, jurisdictionId, constitutionSlug }) => run('get_import_setup', () => importSetup(countryCode, jurisdictionId, constitutionSlug)));
 
   server.registerTool('stage_constitution_import', {
     description: 'Stage one constitution version for site review. This never publishes content.',
@@ -309,6 +310,21 @@ export function createServer(authorization?: string): McpServer {
     return await getJson<Record<string, unknown>>('ingestion', `/import-jobs/${jobId}`, authorization);
   }));
 
+  server.registerTool('list_jurisdictions', {
+    description: 'Browse current, regional, and historical jurisdictions. Omit parentId for roots; request child collections to explore the hierarchy.',
+    inputSchema: { parentId: uuid.optional(), ...page },
+    outputSchema: z.object({ jurisdictions: z.array(z.object({ id: uuid, name: z.string(), slug: z.string(), kind: z.string(), parentId: uuid.nullable(), historical: z.boolean().optional() }).passthrough()).max(50), total: z.number().int(), nextCursor: z.string().nullable(), complete: z.boolean() }),
+    annotations: readOnly,
+  }, ({ parentId, offset, limit, cursor }) => run('list_jurisdictions', async () => {
+    const all = await getJson<Array<{ id: string; name: string; slug: string; kind: string; parentId: string | null }>>('catalog', `/jurisdictions${parentId ? `?parentId=${parentId}` : ''}`);
+    const scope = `jurisdictions:${parentId ?? 'roots'}`;
+    const generation = fingerprint(all.map(item => JSON.stringify(item)));
+    const start = cursor ? decodeCursor(cursor, scope, generation) : offset;
+    const selected = all.slice(start, start + limit);
+    const next = start + selected.length;
+    return { jurisdictions: selected, total: all.length, nextCursor: next < all.length ? encodeCursor(scope, generation, next) : null, complete: next >= all.length };
+  }));
+
   server.registerTool('list_countries', {
     description: 'List countries with published constitutions.',
     inputSchema: page,
@@ -407,16 +423,17 @@ export function createServer(authorization?: string): McpServer {
 
   server.registerTool('search_constitutions', {
     description: 'Search published constitutional text with optional country or version filters.',
-    inputSchema: { query: z.string().trim().min(1).max(200), countryCode: z.string().regex(/^[A-Za-z]{2}$/).optional(), versionId: uuid.optional(), ...page },
+    inputSchema: { query: z.string().trim().min(1).max(200), countryCode: z.string().regex(/^[A-Za-z]{2}$/).optional(), jurisdictionId: uuid.optional(), versionId: uuid.optional(), ...page },
     outputSchema: searchOutput,
     annotations: readOnly,
-  }, ({ query, countryCode, versionId, offset, limit, cursor }) => run('search_constitutions', async () => {
+  }, ({ query, countryCode, jurisdictionId, versionId, offset, limit, cursor }) => run('search_constitutions', async () => {
     if (versionId) await requirePublishedVersion(versionId);
-    const scope = `search:${fingerprint([query, countryCode?.toUpperCase() ?? '', versionId ?? ''])}`;
+    const scope = `search:${fingerprint([query, countryCode?.toUpperCase() ?? '', jurisdictionId ?? '', versionId ?? ''])}`;
     const params = new URLSearchParams({ q: query, limit: String(limit), offset: String(offset) });
     if (countryCode) params.set('country', countryCode.toUpperCase());
+    if (jurisdictionId) params.set('jurisdictionId', jurisdictionId);
     if (versionId) params.set('versionId', versionId);
-    type SearchResults = { hits: Array<{ articleId: string; versionId: string; countryCode: string; [key: string]: unknown }>; total: number; limit: number; offset: number; indexGeneration: number };
+    type SearchResults = { hits: Array<{ articleId: string; versionId: string; countryCode: string; jurisdictionId?: string; [key: string]: unknown }>; total: number; limit: number; offset: number; indexGeneration: number };
     if (cursor) {
       params.set('offset', '0');
       params.set('limit', '1');
@@ -430,7 +447,7 @@ export function createServer(authorization?: string): McpServer {
     const nextOffset = offset + results.hits.length < results.total ? offset + results.hits.length : null;
     const nextCursor = nextOffset === null ? null : encodeCursor(scope, String(results.indexGeneration), nextOffset);
     const base = (process.env.PUBLIC_BASE_URL ?? 'http://localhost').replace(/\/$/, '');
-    return { query, results: { ...results, nextOffset, nextCursor, hits: results.hits.map(hit => ({ ...hit, url: `${base}/countries/${encodeURIComponent(hit.countryCode)}/versions/${encodeURIComponent(hit.versionId)}/articles/${encodeURIComponent(hit.articleId)}` })) } };
+    return { query, results: { ...results, nextOffset, nextCursor, hits: results.hits.map(hit => ({ ...hit, url: hit.countryCode ? `${base}/countries/${encodeURIComponent(hit.countryCode)}/versions/${encodeURIComponent(hit.versionId)}/articles/${encodeURIComponent(hit.articleId)}` : `${base}/jurisdictions/${hit.jurisdictionId}/versions/${hit.versionId}#${hit.articleId}` })) } };
   }));
 
   return server;

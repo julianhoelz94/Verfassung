@@ -15,6 +15,9 @@ data class IndexableArticle(
     val title: String,
     val body: String,
     val languageCode: String = "en",
+    val jurisdictionId: UUID? = null,
+    val jurisdictionName: String? = null,
+    val historical: Boolean = false,
 )
 
 fun interface IndexSource {

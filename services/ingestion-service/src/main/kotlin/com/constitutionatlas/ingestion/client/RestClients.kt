@@ -46,6 +46,18 @@ class RestCatalogClient(
 ) : CatalogClient {
     private val client: RestClient = restClient(catalogUrl)
 
+    override fun getJurisdiction(id: UUID): DownstreamJurisdiction =
+        client.get().uri("/jurisdictions/{id}", id).retrieve().body(JurisdictionWire::class.java)!!.jurisdiction
+
+    override fun findJurisdictionConstitution(id: UUID, slug: String): DownstreamConstitution? =
+        client.get().uri("/jurisdictions/{id}", id).retrieve().body(JurisdictionWire::class.java)!!.constitutions.firstOrNull { it.slug == slug }
+
+    override fun createJurisdictionConstitution(id: UUID, slug: String, title: String, predecessorConstitutionId: UUID?, interim: Boolean): DownstreamConstitution =
+        client.postJson("/jurisdictions/{id}/constitutions", mapOf("slug" to slug, "title" to title, "predecessorConstitutionId" to predecessorConstitutionId, "interim" to interim), DownstreamConstitution::class.java, id)
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    private data class JurisdictionWire(val jurisdiction: DownstreamJurisdiction, val constitutions: List<DownstreamConstitution> = emptyList())
+
     override fun getCountry(isoCode: String): DownstreamCountry? =
         try {
             client.get().uri("/countries/{iso}", isoCode).retrieve().body(DownstreamCountry::class.java)

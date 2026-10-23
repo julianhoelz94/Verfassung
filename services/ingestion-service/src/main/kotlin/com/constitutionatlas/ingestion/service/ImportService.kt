@@ -111,7 +111,7 @@ class ImportService(
         val request = importJobRepository.request(jobId) ?: throw com.constitutionatlas.platform.NotFoundException("Unknown import job")
         if (request.outline?.kinds.isNullOrEmpty()) throw ResponseStatusException(HttpStatus.CONFLICT, "Import has no proposed outline")
         DownstreamAuth.withAuthorization(authorization) {
-            if (catalogClient.findConstitution(request.isoCode.trim().uppercase(), request.constitutionSlug) != null) {
+            if (findSelectedConstitution(request) != null) {
                 throw ResponseStatusException(HttpStatus.CONFLICT, "Constitution already exists; discover and pin its settings revision")
             }
         }
@@ -122,7 +122,7 @@ class ImportService(
     fun prepare(authorization: String?, jobId: UUID, actorId: UUID): ImportJobDto {
         val request = importJobRepository.request(jobId) ?: throw com.constitutionatlas.platform.NotFoundException("Unknown import job")
         DownstreamAuth.withAuthorization(authorization) {
-            val existing = catalogClient.findConstitution(request.isoCode.trim().uppercase(), request.constitutionSlug)
+            val existing = findSelectedConstitution(request)
             if (existing == null && !importJobRepository.isOutlineConfirmed(jobId)) {
                 throw ResponseStatusException(HttpStatus.CONFLICT, "An editor must confirm the new constitution outline before preparation")
             }
@@ -204,12 +204,17 @@ class ImportService(
     private fun publishedVersionStatus(versionId: UUID): String? =
         DownstreamAuth.withAuthorization("Bearer $publishToken") { catalogClient.version(versionId)?.publicationStatus }
 
+    private fun findSelectedConstitution(request: ImportRequest) = request.jurisdictionId?.let {
+        catalogClient.getJurisdiction(it)
+        catalogClient.findJurisdictionConstitution(it, request.constitutionSlug)
+    } ?: if (request.jurisdictionId == null) catalogClient.findConstitution(request.isoCode.trim().uppercase(), request.constitutionSlug) else null
+
     private fun persistDraft(jobId: UUID, request: ImportRequest) {
         val iso = request.isoCode.trim().uppercase()
-        if (catalogClient.getCountry(iso) == null) {
+        if (request.jurisdictionId == null && catalogClient.getCountry(iso) == null) {
             catalogClient.createCountry(iso, request.countryName.trim())
         }
-        val existing = catalogClient.findConstitution(iso, request.constitutionSlug)
+        val existing = findSelectedConstitution(request)
         if (request.constitutionId != null && request.constitutionId != existing?.id) {
             throw ResponseStatusException(HttpStatus.CONFLICT, "Constitution ID does not match the selected country and slug")
         }
@@ -220,7 +225,7 @@ class ImportService(
         } else if (request.outline?.kinds.isNullOrEmpty()) {
             throw ResponseStatusException(HttpStatus.CONFLICT, "New constitution requires a confirmed outline proposal")
         }
-        val constitution = existing ?: catalogClient.createConstitution(iso, request.constitutionSlug, request.constitutionTitle)
+        val constitution = existing ?: (request.jurisdictionId?.let { catalogClient.createJurisdictionConstitution(it, request.constitutionSlug, request.constitutionTitle) } ?: catalogClient.createConstitution(iso, request.constitutionSlug, request.constitutionTitle))
         if (existing == null) request.outline?.let { catalogClient.replaceOutline(constitution.id, it.kinds) }
         val version = catalogClient.createDraftVersion(
             constitution.id,

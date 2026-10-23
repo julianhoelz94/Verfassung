@@ -18,11 +18,13 @@ import {
 import { FormattedDate } from '../../lib/format-date';
 import { atlasTitle, metaDescription, pageMetadata } from '../../lib/page-meta';
 import { SEARCH_PAGE_SIZE, parseSearchOffset, searchUrl } from '../../lib/search-url';
+import { migrationUi } from '../../lib/migration-messages';
 
 type SearchPageProps = {
   searchParams: Promise<{
     q?: string;
     country?: string;
+    jurisdictionId?: string;
     versionId?: string;
     effectiveDate?: string;
     offset?: string;
@@ -51,6 +53,7 @@ export default async function SearchPage(props: SearchPageProps) {
   const searchParams = await props.searchParams;
   const query = searchParams.q?.trim() ?? '';
   const country = searchParams.country?.trim() ?? '';
+  const jurisdictionId = searchParams.jurisdictionId?.trim() ?? '';
   const requestedVersion = searchParams.versionId?.trim() ?? '';
   let versionId = requestedVersion;
   const effectiveDate = searchParams.effectiveDate?.trim() ?? '';
@@ -71,6 +74,7 @@ export default async function SearchPage(props: SearchPageProps) {
     try {
       const page = await searchArticles(query, {
         country: country || undefined,
+        jurisdictionId: jurisdictionId || undefined,
         versionId: versionId || undefined,
         effectiveDate: effectiveDate || undefined,
         limit: SEARCH_PAGE_SIZE,
@@ -88,11 +92,13 @@ export default async function SearchPage(props: SearchPageProps) {
   const urlParams = {
     q: query,
     country: country || undefined,
+    jurisdictionId: jurisdictionId || undefined,
     versionId: versionId || undefined,
     effectiveDate: effectiveDate || undefined,
   };
 
   const activeFilters = [
+    ...(jurisdictionId ? [{ key: 'jurisdictionId' as const, label: facets.jurisdictions?.find(item => item.id === jurisdictionId)?.name ?? jurisdictionId }] : []),
     ...(country ? [{ key: 'country' as const, label: facets.countries.find(facet => facet.code === country)?.countryName || country }] : []),
     ...(versionId ? [{ key: 'versionId' as const, label: selectedVersion ? `${selectedVersion.constitutionTitle} · ${selectedVersion.label}` : versionId }] : []),
     ...(effectiveDate ? [{ key: 'effectiveDate' as const, label: effectiveDate }] : []),
@@ -118,6 +124,11 @@ export default async function SearchPage(props: SearchPageProps) {
           <T value={ui.search.page.search} />{" "}</button>
         <FilterLayout>
           <FiltersPanel count={activeFilters.length}>
+            <label htmlFor="filter-jurisdiction"><T value={migrationUi.jurisdiction} /></label>
+            <select id="filter-jurisdiction" name="jurisdictionId" defaultValue={jurisdictionId}>
+              <option value="">—</option>
+              {facets.jurisdictions?.map(item => <option key={item.id} value={item.id}>{item.name} ({item.count})</option>)}
+            </select>
             <SearchFilters
               key={`${country}:${versionId}:${effectiveDate}`}
               facets={facets}
@@ -149,7 +160,7 @@ export default async function SearchPage(props: SearchPageProps) {
                   <Card className="search-hit">
                     <h2 className="card-title">
                       <a
-                        href={`/countries/${hit.countryCode}/versions/${hit.versionId}/articles/${hit.articleId}`}
+                        href={hit.countryCode ? `/countries/${hit.countryCode}/versions/${hit.versionId}/articles/${hit.articleId}` : `/jurisdictions/${hit.jurisdictionId}/versions/${hit.versionId}#${hit.articleId}`}
                       >
                         <T value={ui.search.page.article} />{" "}{hit.articleNumber} — {hit.title}
                       </a>
@@ -162,7 +173,7 @@ export default async function SearchPage(props: SearchPageProps) {
                           <FormattedDate value={hit.effectiveDate} />
                         </>
                       ) : null}{' '}
-                      · {hit.countryCode}
+                      · {hit.jurisdictionName || hit.countryCode}{hit.historical ? <> · <T value={migrationUi.historical} /></> : null}
                     </p>
                     {hit.snippet ? <SearchSnippet snippet={hit.snippet} /> : null}
                   </Card>

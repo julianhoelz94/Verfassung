@@ -40,7 +40,7 @@ function initialRows(amendment: Amendment | null): ChangeRow[] {
     changeType: change.changeType,
     note: change.note ?? '',
     beforeRef: change.beforeRef ?? null,
-    afterRef: change.afterRef ?? null,
+    afterRef: change.afterRef ?? (change.pendingAfterLogicalId ? { logicalId: change.pendingAfterLogicalId } : null),
     linkReviewReason: change.linkReviewReason ?? '',
     legacyLinkUnresolved: change.legacyLinkUnresolved ?? false,
   }));
@@ -116,7 +116,7 @@ export function AmendmentForm({
         changeType: change.changeType,
         note: change.note ?? '',
         beforeRef: change.beforeRef ?? null,
-        afterRef: change.afterRef ?? null,
+        afterRef: change.afterRef ?? (change.pendingAfterLogicalId ? { logicalId: change.pendingAfterLogicalId } : null),
         linkReviewReason: '',
       }));
       setSourceVersionId(suggestSourceId);

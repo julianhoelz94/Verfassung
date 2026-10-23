@@ -234,14 +234,10 @@ class ImportService(
             jobId,
             request.settingsRevisionId,
         )
-        try {
-            if (request.roots.isNotEmpty()) {
-                contentClient.replaceRoots(version.id, request.roots, request.predecessorVersionId)
-            } else {
-                contentClient.replaceArticles(version.id, request.articles)
-            }
-        } catch (ex: RuntimeException) {
-            throw ex
+        if (request.roots.isNotEmpty()) {
+            contentClient.replaceRoots(version.id, request.roots, request.predecessorVersionId)
+        } else {
+            contentClient.replaceArticles(version.id, request.articles)
         }
         importJobRepository.prepared(jobId, version.id)
     }

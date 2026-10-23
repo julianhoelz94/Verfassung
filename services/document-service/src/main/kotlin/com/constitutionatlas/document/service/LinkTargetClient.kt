@@ -55,8 +55,8 @@ class RestLinkTargetClient(
                 }
                 "version" -> {
                     val version = catalog.get().uri("/versions/$targetId").retrieve().body(JsonNode::class.java)
-                    version?.path("publicationStatus")?.asText() == "published" &&
-                        version.path("listing").asText() == "public"
+                    // Published editorial corrections remain public by their immutable ID.
+                    version?.path("publicationStatus")?.asText() == "published"
                 }
                 "amendment" -> {
                     if (scopeRevisionId == null) {

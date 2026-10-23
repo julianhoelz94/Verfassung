@@ -40,9 +40,10 @@ class SetupProposalService(
     }
 
     fun confirm(authorization: String?, id: UUID, actorId: UUID, admin: Boolean): SetupProposalDto {
-        val proposal = get(id, actorId, admin)
-        if (proposal.status == "confirmed") return proposal
-        if (!proposals.claim(id)) throw ResponseStatusException(HttpStatus.CONFLICT, "Setup proposal is not ready to confirm")
+        val current = get(id, actorId, admin)
+        if (current.status == "confirmed") return current
+        val proposal = proposals.claim(id)
+            ?: throw ResponseStatusException(HttpStatus.CONFLICT, "Setup proposal is not ready to confirm")
         try {
             DownstreamAuth.withAuthorization(authorization) {
                 val request = proposal.payload

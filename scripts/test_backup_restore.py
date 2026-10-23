@@ -3,6 +3,7 @@ import os
 from pathlib import Path
 import subprocess
 import tempfile
+import time
 import unittest
 
 
@@ -45,6 +46,15 @@ class RestorePreflightTest(unittest.TestCase):
         self.assertNotEqual(self.run_restore().returncode, 0)
         self.assertFalse(self.events.exists())
 
+    def test_incomplete_nonempty_backup_does_not_touch_any_database(self):
+        for database in self.databases:
+            (self.backup / (database + ".sql")).write_text("SELECT 1;\n")
+        (self.backup / "INCOMPLETE").touch()
+        result = self.run_restore()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("incomplete", result.stderr)
+        self.assertFalse(self.events.exists())
+
     def test_complete_backup_restores_every_database(self):
         for database in self.databases:
             (self.backup / (database + ".sql")).write_text("SELECT 1;\n")
@@ -63,6 +73,69 @@ class RestorePreflightTest(unittest.TestCase):
         disguised.mkdir()
         self.assertNotEqual(self.run_restore().returncode, 0)
         self.assertFalse(self.events.exists())
+
+
+class BackupTest(unittest.TestCase):
+    def setUp(self):
+        self.directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.directory.cleanup)
+        self.root = Path(self.directory.name)
+        self.backups = self.root / "backups"
+        self.backups.mkdir()
+        self.bin = self.root / "bin"
+        self.bin.mkdir()
+        for command, source in {
+            "date": '#!/bin/sh\nprintf "20261023-120000\\n"\n',
+            "pg_isready": '#!/bin/sh\nexit 0\n',
+            "pg_dump": '#!/bin/sh\nprintf "SELECT 1;\\n"\n[ "$*" != "-h document-db -U postgres -d document_db" ] || [ "${FAIL_LAST_DUMP:-0}" != 1 ]\n',
+        }.items():
+            path = self.bin / command
+            path.write_text(source)
+            path.chmod(0o755)
+        self.script = Path(__file__).resolve().parents[1] / "infra/backup/backup.sh"
+
+    def run_backup(self, **env):
+        return subprocess.run(
+            ["sh", str(self.script)],
+            env={**os.environ, "PATH": str(self.bin) + os.pathsep + os.environ["PATH"],
+                 "BACKUP_ROOT": str(self.backups), "BACKUP_RETENTION_DAYS": "1", **env},
+            text=True, capture_output=True, timeout=10,
+        )
+
+    def test_last_dump_failure_keeps_incomplete_marker(self):
+        result = self.run_backup(FAIL_LAST_DUMP="1")
+        self.assertNotEqual(result.returncode, 0)
+        backup = self.backups / "20261023-120000"
+        self.assertEqual(len(list(backup.glob("*.sql"))), 9)
+        self.assertGreater((backup / "document.sql").stat().st_size, 0)
+        self.assertTrue((backup / "INCOMPLETE").exists())
+        self.assertNotIn("Backup completed", result.stdout)
+
+    def test_success_is_private_and_never_overwrites_an_existing_backup(self):
+        result = self.run_backup()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        backup = self.backups / "20261023-120000"
+        self.assertFalse((backup / "INCOMPLETE").exists())
+        self.assertEqual(len(list(backup.glob("*.sql"))), 9)
+        self.assertEqual(backup.stat().st_mode & 0o777, 0o700)
+        self.assertEqual((backup / "catalog.sql").stat().st_mode & 0o777, 0o600)
+        (backup / "catalog.sql").write_text("original")
+        self.assertNotEqual(self.run_backup().returncode, 0)
+        self.assertEqual((backup / "catalog.sql").read_text(), "original")
+
+    def test_retention_only_removes_completed_timestamp_directories(self):
+        old = time.time() - 5 * 24 * 60 * 60
+        for name in ("20260101-120000", "20260102-120000", "operator-notes"):
+            path = self.backups / name
+            path.mkdir()
+            if name == "20260102-120000":
+                (path / "INCOMPLETE").touch()
+            os.utime(path, (old, old))
+        result = self.run_backup()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertFalse((self.backups / "20260101-120000").exists())
+        self.assertTrue((self.backups / "20260102-120000/INCOMPLETE").exists())
+        self.assertTrue((self.backups / "operator-notes").is_dir())
 
 
 if __name__ == "__main__":

@@ -136,7 +136,7 @@ internal object AmendmentDiff {
             }
         }
         val added = addedTargets.map { NodeChange("added", it, ambiguous = it.id in ambiguousTargetIds) }
-        val removed = source.filter { it.id in unmatchedSource }.map { NodeChange("removed", it) }
+        val removed = source.filter { it.id in unmatchedSource }.map { NodeChange("removed", it, before = it) }
         val changed =
             pairs
                 .filter { (from, to) ->

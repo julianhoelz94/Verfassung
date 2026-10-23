@@ -34,7 +34,8 @@ remain in the same Document database transaction.
 Fresh content fixtures are generated and uploaded through real APIs, then read back.
 Do not restore historical seed writes or flatten mixed content to simplify a test.
 
-`infra/backup/backup.sh` dumps all nine databases. `restore.sh` validates all required
-nonempty readable dumps before its first schema replacement. Restoration is still a
+`infra/backup/backup.sh` dumps all nine databases and removes its `INCOMPLETE` marker
+only after every dump succeeds. `restore.sh` rejects marked backups and validates
+all required nonempty readable dumps before its first schema replacement. Restoration is still a
 sequence of per-database operations, not a distributed transaction. See the Wiki's
 Local Stack Reference for the explicit restore command.

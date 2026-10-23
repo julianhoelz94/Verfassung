@@ -77,12 +77,15 @@ class ContentApiTest {
     }
 
     @Test
-    fun onlyThePublishedEditorialTipIsPubliclyReadable() {
+    fun publishedEditorialPermalinksStayReadableAfterTheTipMoves() {
         val version = UUID.fromString("01900000-0000-4000-8000-000000000004")
-        Mockito.`when`(catalogClient.getVersion(version)).thenReturn(CatalogVersion(version, "published", listing = "staff"))
-        mockMvc.springGet("/versions/$version/units").andExpect { status { isNotFound() } }
+        Mockito.`when`(catalogClient.getVersion(version)).thenReturn(CatalogVersion(version, "published", listing = "staff", currentVersionId = UUID.randomUUID()))
+        mockMvc.springGet("/versions/$version/units").andExpect { status { isOk() } }
+        mockMvc.springGet("/versions/$version/content").andExpect { status { isOk() } }
         Mockito.`when`(catalogClient.getVersion(version)).thenReturn(CatalogVersion(version, "published", listing = "staff", currentVersionId = version))
         mockMvc.springGet("/versions/$version/units").andExpect { status { isOk() } }
+        Mockito.`when`(catalogClient.getVersion(version)).thenReturn(CatalogVersion(version, "draft", listing = "staff", currentVersionId = version))
+        mockMvc.springGet("/versions/$version/units").andExpect { status { isNotFound() } }
     }
 
     @Test

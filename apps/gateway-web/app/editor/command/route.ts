@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import type { ChangeRecordChange } from '../../../lib/editor-api';
 import { readWriteBody } from '../../../lib/amendment-form';
+import { readPublishChanges } from '../../../lib/publish-details';
 import { AmendmentApiError, appendRevision, confirmAmendmentQuotes, createAmendment, publishAmendment, withdrawAmendment } from '../../../lib/amendment-editor-api';
 import {
   EditorApiError,
@@ -111,22 +111,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           title: value(form, 'recordTitle'),
           comment: value(form, 'recordComment'),
           documents: [{ url: value(form, 'documentUrl'), label: value(form, 'documentLabel') || undefined }],
-          changes: (() => {
-            try {
-              const rows = JSON.parse(String(form.get('changesJson') ?? '[]'));
-              return Array.isArray(rows) ? rows.filter((row) => {
-                if (!row || typeof row.articleId !== 'string' || !row.articleId || typeof row.articleNumber !== 'string') return false;
-                if (!['added', 'changed', 'removed'].includes(row.changeType)) return false;
-                if (row.changeType === 'added') return Boolean(row.afterRef?.logicalId) && !row.beforeRef;
-                if (row.changeType === 'removed') return Boolean(row.beforeRef?.logicalId) && !row.afterRef && !row.pendingAfterLogicalId;
-                return Boolean(row.beforeRef?.logicalId && (row.afterRef?.logicalId || row.pendingAfterLogicalId));
-              }).map((row) => ({
-                ...row,
-                afterRef: row.afterRef?.versionId ? row.afterRef : null,
-                pendingAfterLogicalId: row.afterRef?.versionId ? null : row.afterRef?.logicalId ?? row.pendingAfterLogicalId ?? null,
-              })) as ChangeRecordChange[] : [];
-            } catch { return []; }
-          })(),
+          changes: readPublishChanges(String(form.get('changesJson') ?? '[]')),
         },
       } : { comment: value(form, 'comment') };
       await savePublishDetails(sessionId, details);
@@ -146,13 +131,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         return redirectTo(request, editorPath(form, { error: 'invalid' }));
       }
       const inlineTitle = value(form, 'recordTitle');
-      let submittedChanges: unknown;
-      try { submittedChanges = JSON.parse(String(form.get('changesJson') ?? '[]')); } catch { return redirectTo(request, editorPath(form, { error: 'invalid' })); }
-      const normalizedChanges = Array.isArray(submittedChanges) ? submittedChanges.map((row) => ({
-        ...row,
-        afterRef: row?.afterRef?.versionId ? row.afterRef : null,
-        pendingAfterLogicalId: row?.afterRef?.versionId ? null : row?.afterRef?.logicalId ?? row?.pendingAfterLogicalId ?? null,
-      })) as ChangeRecordChange[] : undefined;
+      const normalizedChanges = readPublishChanges(String(form.get('changesJson') ?? '[]'));
       const preview = await publishSession(sessionId, {
         hopKind,
         amendmentId: value(form, 'amendmentId') || undefined,

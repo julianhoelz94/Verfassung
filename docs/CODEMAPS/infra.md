@@ -61,7 +61,7 @@ Dependabot: `.github/dependabot.yml`.
 
 `npm run dev` (port 3000), `lint`, `typecheck`, `build`, `test`, `test:e2e`.
 
-Host tools for the local stack: OrbStack or Docker Desktop, Bash, curl. JDK 21 and Node 20 are optional for host checks. See `README.md`.
+Host tools for the local stack: OrbStack or Docker Desktop, Bash, curl. JDK 21 and Node 22 are optional for host checks. See `README.md`.
 
 ## Local host verification
 

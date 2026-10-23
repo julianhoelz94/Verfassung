@@ -5,6 +5,7 @@ import { toNodeHandler } from '@modelcontextprotocol/node';
 import { createServer } from './server.js';
 import { authenticateMcpKey, UpstreamError } from './catalog.js';
 import { enter, metrics } from './operations.js';
+import { createAuthenticationRateLimit } from './auth-rate-limit.js';
 
 const handler = toNodeHandler(createMcpHandler(ctx => createServer(ctx.requestInfo?.headers.get('authorization') ?? undefined), { maxRequestBodySize: 5 * 1024 * 1024 }), { maxRequestBodySize: 5 * 1024 * 1024 });
 const port = Number(process.env.PORT ?? '8080');
@@ -12,21 +13,7 @@ const allowedOrigin = new URL(process.env.PUBLIC_BASE_URL ?? 'http://localhost')
 const resource = `${(process.env.PUBLIC_BASE_URL ?? 'http://localhost').replace(/\/$/, '')}/mcp`;
 const resourceMetadataUrl = `${(process.env.PUBLIC_BASE_URL ?? 'http://localhost').replace(/\/$/, '')}/.well-known/oauth-protected-resource/mcp`;
 const challenge = `Bearer resource_metadata="${resourceMetadataUrl}"`;
-const windows = new Map<string, { expiresAt: number; count: number }>();
-
-function rateLimited(ip: string): boolean {
-  const now = Date.now();
-  if (windows.size > 10_000) {
-    for (const [key, value] of windows) if (value.expiresAt <= now) windows.delete(key);
-  }
-  const window = windows.get(ip);
-  if (!window || window.expiresAt <= now) {
-    windows.set(ip, { expiresAt: now + 60_000, count: 1 });
-    return false;
-  }
-  window.count += 1;
-  return window.count > 120;
-}
+const rateLimited = createAuthenticationRateLimit();
 
 createHttpServer((request, response) => {
   if (request.url === '/.well-known/oauth-protected-resource/mcp' && request.method === 'GET') {

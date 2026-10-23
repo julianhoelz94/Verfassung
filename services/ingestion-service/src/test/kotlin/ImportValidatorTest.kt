@@ -6,8 +6,34 @@ import com.constitutionatlas.platform.OrderedEntryWrite
 import com.constitutionatlas.platform.OrderedNodeWrite
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
+import java.util.UUID
 
 class ImportValidatorTest {
+    @Test
+    fun `exported node and text ancestry require a pin without permitting stored revision reuse`() {
+        val text = OrderedEntryWrite(type = "text", text = "Split text", lineage = listOf(UUID.randomUUID()))
+        val root = OrderedNodeWrite(kind = "article", lineage = listOf(UUID.randomUUID()), content = listOf(text))
+        val request = ImportRequest(
+            isoCode = "FR",
+            countryName = "France",
+            constitutionSlug = "1958",
+            constitutionTitle = "Constitution",
+            versionLabel = "2",
+            sourceUrl = "https://example.org/source",
+            predecessorVersionId = UUID.randomUUID(),
+            roots = listOf(root),
+        )
+        assertTrue(ImportValidator.validate(request).isEmpty())
+        val unpinned = ImportValidator.validate(request.copy(predecessorVersionId = null))
+        assertTrue(unpinned.count { it.first == "REVISION_REFERENCE" } == 2)
+        for (stored in listOf(
+            root.copy(revisionId = UUID.randomUUID()),
+            root.copy(content = listOf(text.copy(revisionId = UUID.randomUUID()))),
+        )) {
+            assertTrue(ImportValidator.validate(request.copy(roots = listOf(stored))).any { it.first == "REVISION_REFERENCE" })
+        }
+    }
+
     @Test
     fun `pinned outline permits its configured root kind`() {
         val request = ImportRequest(

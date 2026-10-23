@@ -8,6 +8,10 @@ updates:
     directory: /apps/gateway-web
     schedule:
       interval: weekly
+  - package-ecosystem: npm
+    directory: /services/mcp-server
+    schedule:
+      interval: weekly
   - package-ecosystem: docker
     directory: /infra/caddy
     schedule:
@@ -52,6 +56,14 @@ updates:
     directory: /services/search-service
     schedule:
       interval: weekly
+  - package-ecosystem: gradle
+    directory: /services/document-service
+    schedule:
+      interval: weekly
+  - package-ecosystem: gradle
+    directory: /services/platform
+    schedule:
+      interval: weekly
   - package-ecosystem: docker
     directories:
       - /services/catalog-service
@@ -62,5 +74,8 @@ updates:
       - /services/audit-service
       - /services/ingestion-service
       - /services/search-service
+      - /services/document-service
+      - /services/mcp-server
+      - /infra/local-stack
     schedule:
       interval: weekly

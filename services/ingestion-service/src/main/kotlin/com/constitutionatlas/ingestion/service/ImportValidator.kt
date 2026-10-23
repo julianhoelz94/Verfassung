@@ -60,13 +60,13 @@ object ImportValidator {
                 if (byCode[kind]?.allowTextAlongsideChildren == false && children(kind).isNotEmpty() && node.content.orEmpty().any { it.type == "text" }) {
                     errors += "TEXT_ALONGSIDE_CHILDREN" to "$path: text is not allowed in '$kind'"
                 }
-                if (node.revisionId != null || (node.predecessorRevisionId != null && request.predecessorVersionId == null)) errors += "REVISION_REFERENCE" to "$path: predecessor references require a pinned predecessor version"
+                if (node.revisionId != null || ((node.predecessorRevisionId != null || node.lineage.isNotEmpty()) && request.predecessorVersionId == null)) errors += "REVISION_REFERENCE" to "$path: ancestry requires a pinned predecessor version; stored revision reuse is not supported"
                 if (node.logicalId != null && !logicalIds.add(requireNotNull(node.logicalId))) errors += "DUPLICATE_LOGICAL_ID" to "Logical identities must be unique"
                 node.content.orEmpty().forEachIndexed { index, entry ->
                     val entryPath = "$path.content[$index]"
                     entry.node?.let { visit(it, kind, "$path.content[$index].node") }
                     if (entry.logicalId != null && !logicalIds.add(requireNotNull(entry.logicalId))) errors += "DUPLICATE_LOGICAL_ID" to "Logical identities must be unique"
-                    if (entry.revisionId != null || (entry.predecessorRevisionId != null && request.predecessorVersionId == null) || entry.lineage.isNotEmpty()) errors += "REVISION_REFERENCE" to "$path.content[$index]: revision references require a pinned predecessor version"
+                    if (entry.revisionId != null || ((entry.predecessorRevisionId != null || entry.lineage.isNotEmpty()) && request.predecessorVersionId == null)) errors += "REVISION_REFERENCE" to "$entryPath: ancestry requires a pinned predecessor version; stored revision reuse is not supported"
                     if (entry.type == "text") {
                         val format = entry.format ?: "plain"
                         if (format !in setOf("plain", "table", "footnote") || (format == "table") != (entry.table != null)) errors += "RICH_FORMAT" to "$entryPath: format and table payload must agree"

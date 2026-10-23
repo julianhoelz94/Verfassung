@@ -5,7 +5,7 @@ import { currentLocale } from '../../../../lib/server-locale';
 import { usability } from '../../../../lib/usability-messages';
 import { sortHistory, historyFilter } from '../../../../lib/history';
 import { HistoryTimeline } from '../../../components/HistoryTimeline';
-import { changeTypeMessage } from '../../../../lib/ui-labels';
+import { changeTypeMessage, changeTypeTone } from '../../../../lib/ui-labels';
 import { T } from '../../../components/TranslationProvider';
 import { message, ui } from '../../../../lib/messages';
 import { notFound } from 'next/navigation';
@@ -13,7 +13,7 @@ import { CollectionPage } from '../../../components/layout/templates';
 import { AmendmentUnitLinks } from '../../../components/AmendmentUnitLinks';
 import { ContentTranslationRegion } from '../../../components/ContentTranslationRegion';
 import { ServiceUnavailable } from '../../../components/StatusMessage';
-import { Alert, Badge, PageHeader, type BadgeTone } from '../../../components/ui';
+import { Alert, Badge, PageHeader } from '../../../components/ui';
 import {
   getVersion,
   getCountry,
@@ -27,19 +27,6 @@ import { listDocumentLinks } from '../../../../lib/document-api';
 import { Stack, Inline } from '../../../components/layout/Layout';
 import surfaceStyles from '../../../components/surfaces.module.css';
 import fieldStyles from '../../../components/fields.module.css';
-
-function changeTone(changeType: string): BadgeTone {
-  if (changeType === 'added') {
-    return 'added';
-  }
-  if (changeType === 'removed') {
-    return 'removed';
-  }
-  if (changeType === 'changed') {
-    return 'changed';
-  }
-  return 'neutral';
-}
 
 export const renderCountryHistory = cache(async (code: string, on?: string, events?: string) => {
   const query = { on, events };
@@ -114,7 +101,7 @@ export const renderCountryHistory = cache(async (code: string, on?: string, even
           <div className="chip-row">
             {amendment.changes.map((change) => (
               <Stack  key={change.id}>
-                <Badge tone={changeTone(change.changeType)}>
+                <Badge tone={changeTypeTone(change.changeType)}>
                   {<T value={changeTypeMessage(change.changeType)} />}
                   {change.articleNumber ? ` Art. ${change.articleNumber}` : ''}
                 </Badge>

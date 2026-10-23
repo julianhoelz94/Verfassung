@@ -25,7 +25,9 @@ class SettingsUsageClient(
         val draftIds = mutableListOf<UUID>()
         try {
             versions.forEach { version ->
-                val snapshot = content.get().uri("/versions/{id}/content", version).retrieve().body(JsonNode::class.java)
+                val request = content.get().uri("/versions/{id}/content", version)
+                authorization?.let { request.header("Authorization", it) }
+                val snapshot = request.retrieve().body(JsonNode::class.java)
                     ?: throw ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Content impact unavailable")
                 val byCode = proposed.associateBy { it.kindCode }
                 fun walk(node: JsonNode, parent: OutlineKindWrite?) {

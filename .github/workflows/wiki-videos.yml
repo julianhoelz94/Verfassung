@@ -15,7 +15,8 @@ concurrency:
 jobs:
   record:
     if: github.event.pull_request.merged == true
-    runs-on: ubuntu-latest
+    # Match the OS supported by the pinned Playwright browser installer.
+    runs-on: ubuntu-24.04
     timeout-minutes: 75
     env:
       COMPOSE_PROJECT_NAME: wiki-videos

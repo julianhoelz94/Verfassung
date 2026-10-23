@@ -139,7 +139,8 @@ jobs:
           npm run build
 
   e2e:
-    runs-on: ubuntu-latest
+    # Match the OS supported by the pinned Playwright browser installer.
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     defaults:
       run:
@@ -336,7 +337,7 @@ jobs:
 
   full-stack-e2e:
     needs: full-stack-service-artifacts
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 50
     env:
       COMPOSE_PROJECT_NAME: full-stack-e2e

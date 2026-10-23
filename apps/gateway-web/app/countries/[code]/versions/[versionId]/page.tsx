@@ -6,7 +6,6 @@ import { currentLocale } from '../../../../../lib/server-locale';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import { ReaderPage } from '../../../../components/layout/templates';
-import { PrintLink } from '../../../../components/PrintLink';
 import { SiteSearchForm } from '../../../../components/SiteSearchForm';
 import { ServiceUnavailable } from '../../../../components/StatusMessage';
 import { Alert, Badge, PageHeader, Pager } from '../../../../components/ui';
@@ -152,16 +151,15 @@ export default async function VersionPage(props: VersionPageProps) {
             ) : null}
           </>
         }
-        actions={
+        actions={canEdit || neighbors.previous ? (
           <>
             {canEdit ? <a className="btn btn-primary" href="#editor-entry"><T value={ui.countries.code.versions.versionid.page.editThisConstitution} /></a> : null}
             {neighbors.previous ? (
               <a className="btn" href={neighbors.previous.href}>
                 <T value={ui.countries.code.versions.versionid.page.compareWithPrevious} />{" "}</a>
             ) : null}
-            <PrintLink />
           </>
-        }
+        ) : null}
       />}>
 
       <CountryNavigation code={params.code} active="reading" />

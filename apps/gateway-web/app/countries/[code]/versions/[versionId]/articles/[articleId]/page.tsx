@@ -6,7 +6,6 @@ import type { Metadata } from 'next';
 import { ConstitutionText } from '../../../../../../components/ConstitutionText';
 import { ContentTranslationRegion } from '../../../../../../components/ContentTranslationRegion';
 import { ReaderPage } from '../../../../../../components/layout/templates';
-import { PrintLink } from '../../../../../../components/PrintLink';
 import { Provenance } from '../../../../../../components/Provenance';
 import { ServiceUnavailable } from '../../../../../../components/StatusMessage';
 import { Alert, PageHeader } from '../../../../../../components/ui';
@@ -106,7 +105,6 @@ export default async function ArticlePage(props: ArticlePageProps) {
             </a>
             <a className="btn" href={`${permalink}#article-${article.articleNumber}`}>
               <T value={ui.countries.code.versions.versionid.articles.articleid.page.permalink} />{" "}</a>
-            <PrintLink />
           </>
         }
       />}>

@@ -77,6 +77,8 @@ data class AmendmentDto(
     val reviewedSourceTipId: UUID? = null,
     @get:JsonInclude(JsonInclude.Include.NON_NULL)
     val reviewedTargetTipId: UUID? = null,
+    @get:JsonInclude(JsonInclude.Include.NON_NULL)
+    val revisionId: UUID? = null,
 )
 
 data class AmendmentChangeWriteRequest(

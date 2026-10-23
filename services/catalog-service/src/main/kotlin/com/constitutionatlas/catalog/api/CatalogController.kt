@@ -285,6 +285,13 @@ class CatalogController(
         return catalogWriteService.publishAttempt(attemptId)
     }
 
+    @GetMapping("/versions/{versionId}/import-reservation")
+    fun importReservation(@RequestHeader(value = "Authorization", required = false) authorization: String?, @PathVariable versionId: UUID, @RequestParam attemptId: UUID): Map<String, UUID> {
+        writeAccess.requireImportPublisher(authorization)
+        catalogWriteService.requireImportReservation(versionId, attemptId)
+        return mapOf("versionId" to versionId, "attemptId" to attemptId)
+    }
+
     @PostMapping("/versions/{versionId}/publish")
     fun publishVersion(
         @RequestHeader(value = "Authorization", required = false) authorization: String?,

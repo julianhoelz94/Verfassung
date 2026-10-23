@@ -2,6 +2,7 @@ export type Version = {
   id: string;
   constitutionId: string;
   countryCode?: string | null;
+  jurisdictionId?: string | null;
   versionLabel: string;
   publicationStatus: string;
   effectiveDate?: string | null;
@@ -78,8 +79,7 @@ export function deleteJson<T>(upstream: keyof typeof upstreams, path: string, au
 
 export async function requirePublishedVersion(versionId: string): Promise<Version> {
   const version = await getJson<Version>('catalog', `/versions/${encodeURIComponent(versionId)}`);
-  if (version.publicationStatus !== 'published' ||
-      (version.listing !== 'public' && version.currentVersionId !== version.id)) {
+  if (version.publicationStatus !== 'published') {
     // Do not disclose whether an unpublished version exists.
     throw new UpstreamError(404, 'catalog');
   }
@@ -97,7 +97,7 @@ export async function authenticateMcpKey(authorization?: string): Promise<{ id?:
 }
 
 export function publicVersionUrl(version: Version): string | null {
-  if (!version.countryCode) return null;
+  if (!version.countryCode && !version.jurisdictionId) return null;
   const base = (process.env.PUBLIC_BASE_URL ?? 'http://localhost').replace(/\/$/, '');
-  return `${base}/countries/${encodeURIComponent(version.countryCode)}/versions/${encodeURIComponent(version.id)}`;
+  return version.countryCode ? `${base}/countries/${encodeURIComponent(version.countryCode)}/versions/${encodeURIComponent(version.id)}` : `${base}/jurisdictions/${encodeURIComponent(version.jurisdictionId!)}/versions/${encodeURIComponent(version.id)}`;
 }

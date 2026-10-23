@@ -37,6 +37,14 @@ export function reviewFixtures(germany) {
   const document = { id: REVIEW_DOCUMENT, currentRevision: 1, status: 'active', createdAt: revision.createdAt, revision };
   let proposal = { id: REVIEW_PROPOSAL, ownerId: revision.createdBy, status: 'proposed', constitutionId: null, settingsRevisionId: null, confirmedBy: null, payload: { isoCode: 'DE', countryName: 'Germany', constitutionSlug: 'review-charter', constitutionTitle: 'UI review charter', languageCode: 'en', sourceUrl: 'https://example.org/source', outline: constitution.contentOutline, sampleRoots: [] } };
   const job = { id: REVIEW_JOB, status: 'pending_review', versionId: null, isoCode: 'DE', countryName: 'Germany', constitutionTitle: 'UI review charter', versionLabel: '2026', errors: [] };
+  const jurisdiction = { id: germany.id, slug: 'de', name: 'Germany', kind: 'country', code: 'DE', historical: false, parentId: null, existedFrom: null, existedUntil: null };
+  const archiveRoot = { logicalId: '01900000-0000-4000-8000-000000000852', revisionId: '01900000-0000-4000-8000-000000000853', occurrenceId: '01900000-0000-4000-8000-000000000854', kind: 'article', label: '1', title: 'Rights', content: [
+    { type: 'text', logicalId: '01900000-0000-4000-8000-000000000855', text: 'All people are equal.' },
+    { type: 'text', logicalId: '01900000-0000-4000-8000-000000000856', text: 'Synthetic editorial source note.', format: 'footnote', footnoteLabel: 'a', annotation: { kind: 'editorial', attribution: 'UI verification fixture' } },
+  ] };
+  const migration = { id: '01900000-0000-4000-8000-000000000850', ownerId: revision.createdBy, manifest: { runKey: 'ui-review', title: 'Source archive review', sources: [{ sourceKey: 'missing', url: 'https://example.org/archive', aliases: [], disposition: 'unavailable', reason: 'Source is explicitly unavailable in this review state.' }] }, items: [], coverage: { sources: 1, staged: 0, prepared: 0, unavailable: 1, excluded: 0 } };
+  const comparison = { id: '01900000-0000-4000-8000-000000000851', state: 'published', needsReview: false, definition: { title: 'Authored archive comparison', attribution: 'UI verification fixture', sourceUrl: 'https://example.org/comparison', sourceDocumentId: REVIEW_DOCUMENT, sourceDocumentRevision: 1,
+    columns: [{ constitutionId: constitution.id, versionId: REVIEW_CURRENT, label: 'First constitution' }, { constitutionId: '01900000-0000-4000-8000-000000000857', versionId: legal.id, label: 'Second constitution' }], topics: [{ title: 'Equality', passages: [{ column: 0, logicalId: archiveRoot.logicalId }], missingColumns: [1] }] } };
   return { country, corrections, async response(req, method, pathname, readBody) {
     if (method === 'POST' && pathname === '/__sprint59_setup') {
       const body = await readBody(req);
@@ -52,6 +60,14 @@ export function reviewFixtures(germany) {
       return { ok: true };
     }
     if (method === 'GET') {
+      if (pathname === '/api/catalog/jurisdictions') return [jurisdiction];
+      if (pathname === `/api/catalog/jurisdictions/${germany.id}`) return { jurisdiction, ancestors: [], children: [], constitutions: country.constitutions };
+      if (pathname === `/api/content/versions/${REVIEW_CURRENT}/content`) return { versionId: REVIEW_CURRENT, generation: 1, settingsRevisionId: null, roots: [archiveRoot] };
+      if (pathname === '/api/ingestion/migration-runs') return [{ id: migration.id, title: migration.manifest.title, coverage: migration.coverage }];
+      if (pathname === `/api/ingestion/migration-runs/${migration.id}`) return migration;
+      if (pathname === '/api/catalog/curated-comparisons') return [{ id: comparison.id, title: comparison.definition.title, state: comparison.state, needsReview: false }];
+      if (pathname === `/api/catalog/curated-comparisons/${comparison.id}`) return comparison;
+      if (pathname === `/api/amendment/constitutions/${constitution.id}/amendment-register`) return { constitutionId: constitution.id, items: [], total: 0, offset: 0, limit: 25 };
       if (pathname === '/api/identity/setup/status') return setup.status;
       if (pathname === '/api/identity/site/languages') return languages;
       if (pathname === '/api/identity/setup') return setup;

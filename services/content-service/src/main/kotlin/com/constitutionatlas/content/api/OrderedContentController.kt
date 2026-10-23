@@ -5,6 +5,7 @@ import com.constitutionatlas.content.client.WriteAccess
 import com.constitutionatlas.content.service.OrderedContentService
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
+import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestHeader
@@ -14,6 +15,12 @@ import java.util.UUID
 
 @RestController
 class OrderedContentController(private val content: OrderedContentService, private val access: WriteAccess, private val readAccess: ContentReadAccess) {
+    @PostMapping("/versions/{versionId}/seal-import")
+    fun sealImport(@PathVariable versionId: UUID, @RequestHeader(value = "Authorization", required = false) authorization: String?, @RequestBody request: SealImportSnapshot): OrderedSnapshot {
+        access.requireImportPublisher(authorization)
+        return content.sealImport(versionId, request.attemptId, request.expectedGeneration, request.settingsRevisionId)
+    }
+
     @GetMapping("/versions/{versionId}/content")
     fun get(@PathVariable versionId: UUID, @RequestHeader(value = "Authorization", required = false) authorization: String?): OrderedSnapshot {
         readAccess.requireVisible(versionId, authorization)
@@ -44,3 +51,5 @@ class OrderedContentController(private val content: OrderedContentService, priva
         return content.resolve(versionId, logicalId)
     }
 }
+
+data class SealImportSnapshot(val attemptId: UUID, val expectedGeneration: Long, val settingsRevisionId: UUID) : com.constitutionatlas.platform.StrictOrderedWrite()

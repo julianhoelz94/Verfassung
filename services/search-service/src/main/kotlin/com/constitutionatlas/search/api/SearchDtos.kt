@@ -14,6 +14,9 @@ data class SearchHit(
     val title: String,
     val snippet: String,
     val rank: Double,
+    val jurisdictionId: UUID? = null,
+    val jurisdictionName: String? = null,
+    val historical: Boolean = false,
 )
 
 data class SearchPage(
@@ -31,6 +34,7 @@ data class SearchQuery(
     val effectiveDate: LocalDate? = null,
     val limit: Int = 20,
     val offset: Int = 0,
+    val jurisdictionId: UUID? = null,
 )
 
 data class CountryFacet(
@@ -56,7 +60,10 @@ data class SearchFacets(
     val countries: List<CountryFacet>,
     val versions: List<VersionFacet>,
     val dates: List<DateFacet>,
+    val jurisdictions: List<JurisdictionFacet> = emptyList(),
 )
+
+data class JurisdictionFacet(val id: UUID, val name: String, val historical: Boolean, val count: Int)
 
 data class ReindexResult(
     val documentCount: Int,

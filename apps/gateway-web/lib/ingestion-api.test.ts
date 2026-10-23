@@ -21,6 +21,13 @@ describe('isImportRequest', () => {
     expect(isImportRequest({ ...valid, roots: [{ kind: 'part', content: [] }] })).toBe(false);
   });
 
+  it('accepts jurisdiction identity without a fake country code and rejects ambiguous selectors', () => {
+    const regional = { ...valid, isoCode: undefined, countryName: undefined, jurisdictionId: '01900000-0000-4000-8000-000000000009' };
+    expect(isImportRequest(regional)).toBe(true);
+    expect(isImportRequest({ ...regional, isoCode: 'DE' })).toBe(false);
+    expect(isImportRequest({ ...regional, jurisdictionId: '' })).toBe(false);
+  });
+
   it('rejects missing articles or blank required strings', () => {
     expect(isImportRequest({ ...valid, articles: [] })).toBe(false);
     expect(isImportRequest({ ...valid, isoCode: ' ' })).toBe(false);

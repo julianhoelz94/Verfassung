@@ -111,7 +111,7 @@ class ImportService(
         val request = importJobRepository.request(jobId) ?: throw com.constitutionatlas.platform.NotFoundException("Unknown import job")
         if (request.outline?.kinds.isNullOrEmpty()) throw ResponseStatusException(HttpStatus.CONFLICT, "Import has no proposed outline")
         DownstreamAuth.withAuthorization(authorization) {
-            if (catalogClient.findConstitution(request.isoCode.trim().uppercase(), request.constitutionSlug) != null) {
+            if (findSelectedConstitution(request) != null) {
                 throw ResponseStatusException(HttpStatus.CONFLICT, "Constitution already exists; discover and pin its settings revision")
             }
         }
@@ -122,7 +122,7 @@ class ImportService(
     fun prepare(authorization: String?, jobId: UUID, actorId: UUID): ImportJobDto {
         val request = importJobRepository.request(jobId) ?: throw com.constitutionatlas.platform.NotFoundException("Unknown import job")
         DownstreamAuth.withAuthorization(authorization) {
-            val existing = catalogClient.findConstitution(request.isoCode.trim().uppercase(), request.constitutionSlug)
+            val existing = findSelectedConstitution(request)
             if (existing == null && !importJobRepository.isOutlineConfirmed(jobId)) {
                 throw ResponseStatusException(HttpStatus.CONFLICT, "An editor must confirm the new constitution outline before preparation")
             }
@@ -133,11 +133,12 @@ class ImportService(
                 throw ResponseStatusException(HttpStatus.CONFLICT, "Constitution ID does not match the selected country and slug")
             }
         }
-        if (!importJobRepository.claimPreparation(jobId, actorId)) throw ResponseStatusException(HttpStatus.CONFLICT, "Import is not awaiting preparation")
+        if (importJobRepository.find(jobId)?.errors.orEmpty().any { it.code != "PREPARATION_FAILED" }) throw ResponseStatusException(HttpStatus.CONFLICT, "Invalid staged content requires a corrected item with a new source key")
+        val attempt = importJobRepository.claimPreparation(jobId, actorId) ?: throw ResponseStatusException(HttpStatus.CONFLICT, "Import is not awaiting preparation")
         try {
-            DownstreamAuth.withAuthorization(authorization) { persistDraft(jobId, request) }
+            DownstreamAuth.withAuthorization(authorization) { persistDraft(jobId, request, attempt) }
         } catch (ex: RuntimeException) {
-            importJobRepository.fail(jobId, listOf("PREPARATION_FAILED" to (ex.message ?: "draft preparation failed")))
+            importJobRepository.preparationFailed(jobId, attempt, ex.message ?: "draft preparation failed")
         }
         return importJobRepository.find(jobId)!!
     }
@@ -172,7 +173,10 @@ class ImportService(
                 throw ResponseStatusException(HttpStatus.CONFLICT, "Prepared content or layout changed after approval")
             }
             if (publishToken.isBlank()) throw ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Import publication token is not configured")
-            DownstreamAuth.withAuthorization("Bearer $publishToken") { catalogClient.publishVersion(versionId, jobId) }
+            DownstreamAuth.withAuthorization("Bearer $publishToken") {
+                contentClient.sealImport(versionId, jobId, approved.first, requireNotNull(approved.second))
+                catalogClient.publishVersion(versionId, jobId)
+            }
             importJobRepository.complete(jobId, versionId, actorId)
         } catch (ex: RuntimeException) {
             try {
@@ -204,12 +208,17 @@ class ImportService(
     private fun publishedVersionStatus(versionId: UUID): String? =
         DownstreamAuth.withAuthorization("Bearer $publishToken") { catalogClient.version(versionId)?.publicationStatus }
 
-    private fun persistDraft(jobId: UUID, request: ImportRequest) {
+    private fun findSelectedConstitution(request: ImportRequest) = request.jurisdictionId?.let {
+        catalogClient.getJurisdiction(it)
+        catalogClient.findJurisdictionConstitution(it, request.constitutionSlug)
+    } ?: if (request.jurisdictionId == null) catalogClient.findConstitution(request.isoCode.trim().uppercase(), request.constitutionSlug) else null
+
+    private fun persistDraft(jobId: UUID, request: ImportRequest, attempt: UUID) {
         val iso = request.isoCode.trim().uppercase()
-        if (catalogClient.getCountry(iso) == null) {
+        if (request.jurisdictionId == null && catalogClient.getCountry(iso) == null) {
             catalogClient.createCountry(iso, request.countryName.trim())
         }
-        val existing = catalogClient.findConstitution(iso, request.constitutionSlug)
+        val existing = findSelectedConstitution(request)
         if (request.constitutionId != null && request.constitutionId != existing?.id) {
             throw ResponseStatusException(HttpStatus.CONFLICT, "Constitution ID does not match the selected country and slug")
         }
@@ -220,9 +229,11 @@ class ImportService(
         } else if (request.outline?.kinds.isNullOrEmpty()) {
             throw ResponseStatusException(HttpStatus.CONFLICT, "New constitution requires a confirmed outline proposal")
         }
-        val constitution = existing ?: catalogClient.createConstitution(iso, request.constitutionSlug, request.constitutionTitle)
+        val constitution = existing ?: (request.jurisdictionId?.let { catalogClient.createJurisdictionConstitution(it, request.constitutionSlug, request.constitutionTitle) } ?: catalogClient.createConstitution(iso, request.constitutionSlug, request.constitutionTitle))
         if (existing == null) request.outline?.let { catalogClient.replaceOutline(constitution.id, it.kinds) }
-        val version = catalogClient.createDraftVersion(
+        val reserved = importJobRepository.find(jobId)?.versionId?.let { catalogClient.version(it) }
+        if (reserved != null && reserved.publicationStatus != "draft") throw ResponseStatusException(HttpStatus.CONFLICT, "Reserved import snapshot is no longer a draft")
+        val version = reserved ?: catalogClient.createDraftVersion(
             constitution.id,
             request.versionLabel.trim(),
             request.effectiveDate,
@@ -233,12 +244,14 @@ class ImportService(
             request.hopKind,
             jobId,
             request.settingsRevisionId,
+            request.sourceEvidence,
         )
+        importJobRepository.reserveVersion(jobId, version.id, attempt)
         if (request.roots.isNotEmpty()) {
             contentClient.replaceRoots(version.id, request.roots, request.predecessorVersionId)
         } else {
             contentClient.replaceArticles(version.id, request.articles)
         }
-        importJobRepository.prepared(jobId, version.id)
+        importJobRepository.prepared(jobId, version.id, attempt)
     }
 }

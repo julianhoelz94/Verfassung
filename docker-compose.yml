@@ -12,6 +12,7 @@ services:
       - CADDY_BIND_ADDRESS=${CADDY_BIND_ADDRESS:-127.0.0.1}
       - ACME_TEST_DIRECTORY=${ACME_TEST_DIRECTORY:-}
       - CADDY_EXPOSE_API_DOCS=${CADDY_EXPOSE_API_DOCS:-false}
+      - ATLAS_LEGACY_HOST=${ATLAS_LEGACY_HOST:-legacy.localhost}
     volumes:
       - caddy-data:/data
       - caddy-config:/config
@@ -56,8 +57,8 @@ services:
       - IDENTITY_SEED_MODE=${IDENTITY_SEED_MODE:-off}
       - CATALOG_API_URL=http://catalog-service:8080
       - CONTENT_API_URL=http://content-service:8080
-      - AMENDMENT_API_URL=http://amendment-service:8080
       - DOCUMENT_API_URL=http://document-service:8080
+      - AMENDMENT_API_URL=http://amendment-service:8080
       - DEPLOYMENT_SETUP_GATE_ENABLED=true
       - IDENTITY_API_URL=http://identity-service:8080
       - EDITOR_API_URL=http://editor-service:8080
@@ -91,6 +92,8 @@ services:
   catalog-service:
     build: ./services/catalog-service
     environment:
+      - ARCHIVE_LEGACY_HOSTS=${ARCHIVE_LEGACY_HOSTS:-www.verfassungen.de,verfassungen.de,legacy.localhost}
+      - DOCUMENT_API_URL=http://document-service:8080
       - SPRING_PROFILES_ACTIVE=${PROFILE:-local-stack}
       - SERVER_FORWARD_HEADERS_STRATEGY=framework
       - SPRING_DATASOURCE_URL=jdbc:postgresql://catalog-db:5432/catalog_db
@@ -274,6 +277,7 @@ services:
   document-service:
     build: ./services/document-service
     environment:
+      - INGESTION_API_URL=http://ingestion-service:8080
       - IMPRINT_NAME=${IMPRINT_NAME:-}
       - IMPRINT_STREET_ADDRESS=${IMPRINT_STREET_ADDRESS:-}
       - IMPRINT_POSTAL_CODE=${IMPRINT_POSTAL_CODE:-}
@@ -302,6 +306,8 @@ services:
   ingestion-service:
     build: ./services/ingestion-service
     environment:
+      - DOCUMENT_API_URL=http://document-service:8080
+      - AMENDMENT_API_URL=http://amendment-service:8080
       - SPRING_PROFILES_ACTIVE=${PROFILE:-local-stack}
       - SPRING_DATASOURCE_URL=jdbc:postgresql://ingestion-db:5432/ingestion_db
       - SPRING_DATASOURCE_USERNAME=postgres

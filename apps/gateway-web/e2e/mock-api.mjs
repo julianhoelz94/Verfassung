@@ -585,7 +585,7 @@ const server = createServer(async (req, res) => {
   if (method === 'GET' && versionDetail) {
     const version = [...germany.constitutions[0].versions, ...extraVersions].find((item) => item.id === versionDetail[1]);
     if (!version) { json(res, 404, { error: 'Not found' }); return; }
-    json(res, 200, { ...version, constitutionId: CONSTITUTION_ID, countryCode: 'DE', publicationStatus: 'published', legalVersionId: version.legalVersionId ?? (version.hopKind === 'editorial_correction' ? version.predecessorVersionId : version.id) });
+    json(res, 200, { ...version, jurisdictionId: germany.id, constitutionId: CONSTITUTION_ID, countryCode: 'DE', publicationStatus: 'published', legalVersionId: version.legalVersionId ?? (version.hopKind === 'editorial_correction' ? version.predecessorVersionId : version.id) });
     return;
   }
 

@@ -1,6 +1,7 @@
 package com.constitutionatlas.ingestion.api
 
 import com.constitutionatlas.platform.OrderedNodeWrite
+import com.constitutionatlas.platform.StrictOrderedWrite
 import java.time.LocalDate
 import java.util.UUID
 
@@ -10,7 +11,7 @@ data class ImportNode(
     val title: String? = null,
     val body: String? = null,
     val children: List<ImportNode> = emptyList(),
-)
+) : StrictOrderedWrite()
 
 data class ImportArticle(
     val articleNumber: String,
@@ -18,7 +19,7 @@ data class ImportArticle(
     val body: String = "",
     val sortOrder: Int,
     val nodes: List<ImportNode> = emptyList(),
-)
+) : StrictOrderedWrite()
 
 data class ImportOutlineKind(
     val kindCode: String,
@@ -34,15 +35,15 @@ data class ImportOutlineKind(
     val segmentation: String = "plain",
     val root: Boolean? = null,
     val allowedChildKinds: List<String>? = null,
-)
+) : StrictOrderedWrite()
 
 data class ImportOutline(
     val kinds: List<ImportOutlineKind> = emptyList(),
-)
+) : StrictOrderedWrite()
 
 data class ImportRequest(
-    val isoCode: String,
-    val countryName: String,
+    val isoCode: String = "",
+    val countryName: String = "",
     val constitutionSlug: String,
     val constitutionTitle: String,
     val versionLabel: String,
@@ -57,7 +58,13 @@ data class ImportRequest(
     val outline: ImportOutline? = null,
     val articles: List<ImportArticle> = emptyList(),
     val roots: List<OrderedNodeWrite> = emptyList(),
-)
+    @get:com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+    val jurisdictionId: UUID? = null,
+    @get:com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+    val sourceEvidence: com.constitutionatlas.platform.SourceEvidence? = null,
+    @get:com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+    val expectedCounts: Map<String, Int>? = null,
+) : StrictOrderedWrite()
 
 data class ImportErrorDto(
     val code: String,
@@ -89,8 +96,8 @@ data class ReviewDecisionRequest(val reason: String)
 data class ReviewDecisionDto(val id: UUID, val decision: String, val reason: String, val decidedBy: UUID, val decidedAt: java.time.OffsetDateTime)
 
 data class SetupProposalRequest(
-    val isoCode: String,
-    val countryName: String,
+    val isoCode: String = "",
+    val countryName: String = "",
     val constitutionSlug: String,
     val constitutionTitle: String,
     val predecessorConstitutionId: UUID? = null,
@@ -100,7 +107,9 @@ data class SetupProposalRequest(
     val gazetteReference: String? = null,
     val outline: ImportOutline,
     val sampleRoots: List<OrderedNodeWrite> = emptyList(),
-)
+    @get:com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+    val jurisdictionId: UUID? = null,
+) : StrictOrderedWrite()
 
 data class SetupProposalDto(
     val id: UUID,
@@ -114,4 +123,4 @@ data class SetupProposalDto(
 
 data class BeginUploadRequest(val idempotencyKey: String, val checksumSha256: String, val totalBytes: Int)
 data class UploadChunkRequest(val dataBase64: String, val checksumSha256: String)
-data class ImportUploadDto(val id: UUID, val batchId: UUID, val status: String, val totalBytes: Int, val chunkBytes: Int, val missingChunks: List<Int>, val itemId: UUID?)
+data class ImportUploadDto(val id: UUID, val batchId: UUID, val status: String, val totalBytes: Int, val chunkBytes: Int, val missingChunks: List<Int>, val itemId: UUID?, val migrationRunId: UUID? = null)

@@ -26,6 +26,23 @@ class OrderedContentService(
     private val catalog: CatalogClient,
     @Value("\${content.ordered-mixed-writes.enabled:true}") private val mixedWritesEnabled: Boolean,
 ) {
+    /** Seal only the already approved content; this operation cannot write or replace roots. */
+    @Transactional
+    fun sealImport(version: UUID, attempt: UUID, generation: Long, settings: UUID): OrderedSnapshot {
+        catalog.requireImportReservation(version, attempt)
+        val snapshot = get(version)
+        if (repository.lock(version) != generation || snapshot.generation != generation || snapshot.settingsRevisionId != settings || snapshot.roots.isEmpty()) stale("Approved import content or settings changed")
+        val hash = "import:$version:$generation:$settings"
+        receipts.find(attempt)?.let { existing ->
+            if (existing.versionId != version || existing.requestHash != hash || existing.generation != generation) stale("Import publication attempt changed")
+            return snapshot
+        }
+        if (receipts.forVersion(version) != null) stale("Snapshot is sealed for another publication")
+        if (catalog.getVersion(version)?.publicationStatus != "draft") stale("Import snapshot is no longer a draft")
+        receipts.insert(attempt, version, hash, generation)
+        return snapshot
+    }
+
     @Transactional
     fun get(version: UUID): OrderedSnapshot {
         if (!repository.exists(version) && catalog.getVersion(version) == null) throw NotFoundException("Unknown version '$version'")
@@ -69,6 +86,7 @@ class OrderedContentService(
         }
         if (receipts.forVersion(version) != null) stale("Successor roots are sealed for publication")
         if (repository.lock(version) != request.expectedGeneration) stale("Target roots changed")
+        if (receipts.forVersion(version) != null) stale("Successor roots are sealed for publication")
         val source = request.sourceVersionId?.let { sourceVersion ->
             val sourceMetadata = catalog.getVersion(sourceVersion) ?: throw NotFoundException("Unknown source version")
             if (request.publishAttemptId != null && sourceMetadata.publicationStatus != "published") stale("Successor source must be published")
@@ -108,20 +126,20 @@ class OrderedContentService(
             entries.forEachIndexed { position, entry ->
                 when (entry.type) {
                     "child" -> {
-                        require(entry.node != null && entry.text == null && entry.revisionId == null && entry.logicalId == null && entry.predecessorRevisionId == null && entry.lineage.isEmpty() && entry.format == null && entry.table == null && entry.footnoteLabel == null && entry.references.isEmpty()) { "Invalid child entry at $logical/content/$position" }
+                        require(entry.node != null && entry.text == null && entry.revisionId == null && entry.logicalId == null && entry.predecessorRevisionId == null && entry.lineage.isEmpty() && entry.format == null && entry.table == null && entry.footnoteLabel == null && entry.references.isEmpty() && entry.annotation == null) { "Invalid child entry at $logical/content/$position" }
                         repository.insertEntry(revision, position, null, store(requireNotNull(entry.node), depth + 1))
                     }
                     "text" -> {
                         require(entry.node == null) { "Text entry cannot contain a child" }
                         val textRevision = if (entry.revisionId != null) {
-                            require(entry.text == null && entry.logicalId == null && entry.predecessorRevisionId == null && entry.lineage.isEmpty() && entry.format == null && entry.table == null && entry.footnoteLabel == null && entry.references.isEmpty()) { "Text reference cannot contain changed fields" }
+                            require(entry.text == null && entry.logicalId == null && entry.predecessorRevisionId == null && entry.lineage.isEmpty() && entry.format == null && entry.table == null && entry.footnoteLabel == null && entry.references.isEmpty() && entry.annotation == null) { "Text reference cannot contain changed fields" }
                             require(entry.revisionId in allowedTexts) { "Text reference is not in the pinned snapshot" }
                             entry.revisionId
                         } else {
                             val format = entry.format ?: "plain"
                             require(format in setOf("plain", "table", "footnote")) { "Unknown rich content format at $logical/content/$position" }
                             require((format == "table") == (entry.table != null)) { "Table payload and format must agree at $logical/content/$position" }
-                            require(format == "footnote" || entry.footnoteLabel == null) { "Footnote label needs a footnote entry" }
+                            require(format == "footnote" || (entry.footnoteLabel == null && entry.annotation == null)) { "Footnote label needs a footnote entry" }
                             require(format == "plain" || entry.references.isEmpty()) { "Inline references need a plain text entry" }
                             val text = if (format == "table") entry.table!!.plainText() else entry.text ?: throw IllegalArgumentException("Text is required at $logical/content/$position")
                             if (format == "table" && entry.text != null) require(entry.text == text) { "Table text does not match cells at $logical/content/$position" }
@@ -130,7 +148,7 @@ class OrderedContentService(
                             if (allowedTexts.values.any { it.first == textLogical }) require(entry.predecessorRevisionId != null) { "Existing text identity requires its predecessor revision" }
                             require(entry.lineage.all { it in allowedTexts }) { "Unknown split/merge lineage" }
                             val id = UUID.randomUUID()
-                            repository.insertText(id, textLogical, version, entry.predecessorRevisionId, text, entry.lineage, format, OrderedRichContent(entry.table, entry.footnoteLabel, entry.references))
+                            repository.insertText(id, textLogical, version, entry.predecessorRevisionId, text, entry.lineage, format, OrderedRichContent(entry.table, entry.footnoteLabel, entry.references, entry.annotation))
                             id
                         }
                         repository.insertEntry(revision, position, textRevision, null)
@@ -165,7 +183,7 @@ class OrderedContentService(
             lineage = node.lineage,
             content = node.content.map { entry ->
                 entry.node?.let { com.constitutionatlas.platform.OrderedEntryWrite("child", node = nodeWrite(it)) }
-                    ?: com.constitutionatlas.platform.OrderedEntryWrite("text", logicalId = entry.logicalId, predecessorRevisionId = entry.revisionId?.let { repository.revisionPredecessor(it, true) }, text = entry.text, lineage = entry.lineage, format = entry.format, table = entry.table, footnoteLabel = entry.footnoteLabel, references = entry.references)
+                    ?: com.constitutionatlas.platform.OrderedEntryWrite("text", logicalId = entry.logicalId, predecessorRevisionId = entry.revisionId?.let { repository.revisionPredecessor(it, true) }, text = entry.text, lineage = entry.lineage, format = entry.format, table = entry.table, footnoteLabel = entry.footnoteLabel, references = entry.references, annotation = entry.annotation)
             },
         )
         return com.constitutionatlas.content.api.OrderedContentExport(version, snapshot.settingsRevisionId, snapshot.roots.map(::nodeWrite))
@@ -229,6 +247,11 @@ class OrderedContentService(
                             require(cell.headers.all { it in headerIds }) { "Unknown table header at '${node.logicalId}'" }
                         }
                     }
+                }
+                entry.annotation?.let { annotation ->
+                    annotation.validate()
+                    require(entry.format == "footnote") { "Annotations must be anchored notes" }
+                    require(annotation.anchorLogicalIds.all { it in identities }) { "Annotation has an unknown unit anchor" }
                 }
                 if (entry.format == "footnote") require(!entry.text.isNullOrBlank() && entry.table == null) { "Footnote text is required at '${node.logicalId}'" }
                 var end = 0

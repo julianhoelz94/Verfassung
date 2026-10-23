@@ -2,6 +2,7 @@ name: CI
 
 on:
   push:
+    branches: [main]
   pull_request:
 
 # Least privilege for the default GITHUB_TOKEN; no job needs write access.
@@ -14,7 +15,7 @@ concurrency:
 
 jobs:
   backend-services:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     outputs:
       services: ${{ steps.list.outputs.services }}
@@ -40,7 +41,7 @@ jobs:
 
   backend:
     needs: backend-services
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     strategy:
       fail-fast: false
@@ -73,7 +74,7 @@ jobs:
           retention-days: 7
 
   platform:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -101,7 +102,7 @@ jobs:
           retention-days: 7
 
   frontend:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -139,7 +140,8 @@ jobs:
           npm run build
 
   e2e:
-    runs-on: ubuntu-latest
+    # Match the OS supported by the pinned Playwright browser installer.
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     defaults:
       run:
@@ -168,7 +170,7 @@ jobs:
           retention-days: 7
 
   visual-e2e:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     container: mcr.microsoft.com/playwright:v1.55.1-jammy
     defaults:
@@ -193,7 +195,7 @@ jobs:
 
   images:
     needs: backend-services
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     strategy:
       fail-fast: false
@@ -215,7 +217,7 @@ jobs:
         run: docker build -f infra/local-stack/Dockerfile --build-arg SERVICE=identity-service -t constitution-atlas/identity-service:local-ci .
 
   gateway-image:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -231,7 +233,7 @@ jobs:
           python3 scripts/test-proxy-https.py --docs-enabled
 
   mcp-server:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -250,7 +252,7 @@ jobs:
       - run: docker build -t constitution-atlas/mcp-server:ci services/mcp-server
 
   publish-journey:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
     env:
       COMPOSE_PROJECT_NAME: publish-journey
@@ -309,7 +311,7 @@ jobs:
             down -v
 
   full-stack-service-artifacts:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -336,7 +338,7 @@ jobs:
 
   full-stack-e2e:
     needs: full-stack-service-artifacts
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 50
     env:
       COMPOSE_PROJECT_NAME: full-stack-e2e
@@ -464,7 +466,7 @@ jobs:
       - publish-journey
       - full-stack-service-artifacts
       - full-stack-e2e
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
       - name: Require every CI job to succeed

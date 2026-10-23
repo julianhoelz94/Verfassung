@@ -10,7 +10,7 @@
 4. The player is deployed to GitHub Pages. Only then are Wiki pages, inline screenshots and fresh clips published together.
 5. Verify the workflow, public Wiki images and browser playback before recording completion.
 
-Browser installation and Wiki recording use Ubuntu 24.04, supported by the pinned
+The Wiki workflow uses Ubuntu 24.04, supported by the pinned
 Playwright version. Keep this runner pin aligned with Playwright support when
 upgrading; an automatic `ubuntu-latest` change can prevent browser installation.
 

@@ -1429,6 +1429,36 @@ class CatalogApiTest {
                 jsonPath("$.constitutions[0].versions.length()") { value(2) }
                 jsonPath("$.constitutions[0].latestVersionId") { value(law2022) }
             }
+
+        val nextCorrection = writes.createDraftVersion(
+            UUID.fromString(constitutionId),
+            com.constitutionatlas.catalog.api.CreateVersionRequest(
+                versionLabel = "1949-second-correction",
+                predecessorVersionId = UUID.fromString(editorialId),
+                hopKind = "editorial_correction",
+            ),
+        )
+        mockMvc.get("/versions/${nextCorrection.id}").andExpect { status { isNotFound() } }
+        mockMvc.get("/versions/${nextCorrection.id}/reader-settings").andExpect { status { isNotFound() } }
+        mockMvc.post("/versions/${nextCorrection.id}/publish") {
+            header("Authorization", PUBLISHER_TOKEN)
+        }.andExpect { status { isOk() } }
+
+        // A newer correction must not break an older published snapshot or its pinned layout.
+        mockMvc.get("/versions/$editorialId").andExpect {
+            status { isOk() }
+            jsonPath("$.listing") { value("staff") }
+            jsonPath("$.currentVersionId") { value(nextCorrection.id.toString()) }
+        }
+        mockMvc.get("/versions/$editorialId/reader-settings").andExpect { status { isOk() } }
+        mockMvc.get("/versions/$editorialId/settings").andExpect { status { isOk() } }
+        mockMvc.get("/constitutions/$constitutionId/versions").andExpect {
+            status { isOk() }
+            jsonPath("$.length()") { value(2) }
+            jsonPath("$[?(@.versionLabel=='1949')].currentVersionId") {
+                value(org.hamcrest.Matchers.hasItem(nextCorrection.id.toString()))
+            }
+        }
     }
 
     companion object {

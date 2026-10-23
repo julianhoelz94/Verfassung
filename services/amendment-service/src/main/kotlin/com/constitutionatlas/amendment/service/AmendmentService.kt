@@ -578,11 +578,7 @@ class AmendmentService(
             val hasRefs = change.beforeRef != null || requestedAfter != null
             if (!hasRefs) return@map change
             val before = resolve(change.beforeRef, sourceVersionId, "Before")
-            val after = if (requestedAfter?.versionId == null && allowDraftTarget && targetVersionId == null) {
-                resolve(requestedAfter, targetVersionId, "After")
-            } else {
-                resolve(requestedAfter, targetVersionId, "After")
-            }
+            val after = resolve(requestedAfter, targetVersionId, "After")
             when (change.changeType) {
                 "changed" -> {
                     require(before != null && after != null) { "Changed units need both before and after references" }

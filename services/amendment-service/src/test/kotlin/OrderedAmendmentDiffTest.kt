@@ -8,6 +8,15 @@ import java.util.UUID
 
 class OrderedAmendmentDiffTest {
     @Test
+    fun removedUnitsKeepTheirSourceForExactAmendmentReferences() {
+        val source = FlatNode(UUID.randomUUID(), "article", "1", "1", "Repealed provision", "Old text", null, UUID.randomUUID(), "1", UUID.randomUUID(), UUID.randomUUID())
+        val removal = AmendmentDiff.diff(listOf(source), emptyList()).single()
+        assertThat(removal.type).isEqualTo("removed")
+        assertThat(removal.before).isEqualTo(source)
+        assertThat(removal.node).isEqualTo(source)
+    }
+
+    @Test
     fun sharedRevisionInDistinctVersionOccurrencesIsNotAChange() {
         val logical = UUID.randomUUID()
         val revision = UUID.randomUUID()

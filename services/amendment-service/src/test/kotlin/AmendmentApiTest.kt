@@ -296,6 +296,48 @@ class AmendmentApiTest {
     }
 
     @Test
+    fun suggestedRemovalKeepsItsExactSourceWhenLinkedAndPublished() {
+        val sourceVersion = UUID.randomUUID()
+        val targetVersion = UUID.randomUUID()
+        val occurrence = UUID.randomUUID()
+        val logical = UUID.randomUUID()
+        val revision = UUID.randomUUID()
+        val source = ContentTreeArticle(occurrence, sourceVersion, "7", "Repealed article", 1, body = "Old wording", logicalId = logical, revisionId = revision)
+        Mockito.`when`(contentClient.listArticles(sourceVersion)).thenReturn(listOf(source))
+        Mockito.`when`(contentClient.listArticles(targetVersion)).thenReturn(emptyList())
+        Mockito.`when`(contentClient.resolve(sourceVersion, logical)).thenReturn(
+            ResolvedContentUnit(sourceVersion, CONSTITUTION_ID, logical, revision, occurrence, occurrence, "article", "7", "Old wording", "/versions/$sourceVersion/units/$occurrence"),
+        )
+        mockMvc.post("/amendments/suggest") {
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = suggestJson(sourceVersion, targetVersion)
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.changes[0].changeType") { value("removed") }
+            jsonPath("$.changes[0].beforeRef.logicalId") { value(logical.toString()) }
+            jsonPath("$.changes[0].beforeRef.versionId") { value(sourceVersion.toString()) }
+            jsonPath("$.changes[0].afterRef") { doesNotExist() }
+        }
+        val draft = amendments.createAmendment(CONSTITUTION_ID, AmendmentWriteRequest(title = "Repeal", sourceVersionId = sourceVersion), editor)
+        mockMvc.post("/amendments/${draft.id}/link-target") {
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"targetVersionId":"$targetVersion"}"""
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.changes[0].beforeRef.occurrenceId") { value(occurrence.toString()) }
+        }
+        mockMvc.post("/amendments/${draft.id}/publish") {
+            header("Authorization", PUBLISHER_TOKEN)
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.changes[0].beforeRef.revisionId") { value(revision.toString()) }
+            jsonPath("$.changes[0].afterRef") { doesNotExist() }
+        }
+    }
+
+    @Test
     fun suggestRequiresBearer() {
         mockMvc.post("/amendments/suggest") {
             contentType = MediaType.APPLICATION_JSON

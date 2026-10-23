@@ -20,16 +20,16 @@ docker compose -p verfassung -f docker-compose.yml -f docker-compose.local.yml -
 
 ## Backup and restore
 
-`infra/backup/backup.sh` dumps all nine service databases (including `search` and `document`) into `./backups/<timestamp>/`. Compose runs it on the `backup-service` container.
+`infra/backup/backup.sh` dumps all nine service databases (including `search` and `document`) into `./backups/<timestamp>/`. Compose runs it on the `backup-service` container. Files and directories are owner-only. A run refuses to overwrite an existing timestamp and keeps an `INCOMPLETE` marker until every dump succeeds. Failed runs retain that marker and their diagnostic dumps; restore rejects them even if every SQL file is nonempty. Retention removes only completed timestamp directories, preserving failed runs and unrelated operator directories. Standalone use may set `BACKUP_ROOT` (default `/backups`); Compose mounts `./backups` there.
 
 Restore drill (destroys current rows in those databases):
 
 ```bash
 # after a dump exists, e.g. backups/20260828-120000/
-docker compose --env-file env/local-stack.env run --rm --entrypoint sh backup-service /backup/restore.sh /backups/20260828-120000
+docker compose -p verfassung -f docker-compose.yml -f docker-compose.local.yml --env-file env/local-stack.env run --rm --entrypoint sh backup-service /backup/restore.sh /backups/20260828-120000
 ```
 
-The restore preflight checks that all nine dumps are regular, readable and nonempty files before replacing any schema. This catches incomplete backup directories before they change data; it does not validate SQL contents or make a multi-database restore atomic.
+Stop application writers before the restore drill and use the same Compose project name as the running stack. The restore preflight rejects `INCOMPLETE` runs and checks that all nine dumps are regular, readable and nonempty files before replacing any schema. Older backups without a marker remain supported, but must be checked against their original successful backup logs. Preflight does not validate SQL contents or make a multi-database restore atomic. The nine dumps are separate database snapshots; stop writes during backup when a consistent cross-service recovery point is required.
 
 Then restart the app containers so they reconnect. Flyway history is part of each dump.
 

@@ -128,7 +128,12 @@ class ImportUploadService(
     }
 
     private fun status(upload: UploadRow): ImportUploadDto {
-        val missing = if (upload.status != "receiving") emptyList() else (0 until chunkCount(upload)).filterNot { it in uploads.chunkIndices(upload.id) }
+        val missing = if (upload.status != "receiving") {
+            emptyList()
+        } else {
+            val received = uploads.chunkIndices(upload.id)
+            (0 until chunkCount(upload)).filterNot { it in received }
+        }
         return ImportUploadDto(upload.id, upload.batchId, upload.status, upload.totalBytes, CHUNK_BYTES, missing, upload.itemId)
     }
 

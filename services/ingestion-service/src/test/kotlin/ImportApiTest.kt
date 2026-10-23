@@ -249,6 +249,40 @@ class ImportApiTest {
     }
 
     @Test
+    fun setupConfirmationUsesThePayloadThatWonTheClaim() {
+        val mapper = com.fasterxml.jackson.module.kotlin.jacksonObjectMapper()
+        val repository = Mockito.spy(com.constitutionatlas.ingestion.repo.SetupProposalRepository(jdbc, mapper))
+        val service = com.constitutionatlas.ingestion.service.SetupProposalService(repository, catalogClient, mapper)
+        val request = mapper.readValue(
+            """{"isoCode":"FR","countryName":"France","constitutionSlug":"claim-race","constitutionTitle":"Original title","languageCode":"fr","sourceUrl":"https://example.org/source","outline":{"kinds":[{"kindCode":"article","displayLabel":"Article"}]},"sampleRoots":[{"kind":"article","label":"1","content":[{"type":"text","text":"Sample"}]}]}""",
+            com.constitutionatlas.ingestion.api.SetupProposalRequest::class.java,
+        )
+        val created = service.create(TOKEN, admin.id, request)
+        val revised = request.copy(constitutionTitle = "Revised title")
+        val constitutionId = UUID.randomUUID()
+        Mockito.`when`(catalogClient.createConstitution("FR", "claim-race", "Revised title"))
+            .thenReturn(DownstreamConstitution(constitutionId, "claim-race", "Revised title"))
+        Mockito.`when`(catalogClient.currentSettingsRevisionId(constitutionId)).thenReturn(SETTINGS_REVISION)
+        var revisedBeforeClaim = false
+        Mockito.doAnswer { invocation ->
+            val snapshot = invocation.callRealMethod()
+            if (!revisedBeforeClaim) {
+                revisedBeforeClaim = true
+                assertEquals(true, repository.replace(created.id, revised))
+            }
+            snapshot
+        }.`when`(repository).find(created.id)
+
+        val confirmed = service.confirm(TOKEN, created.id, admin.id, true)
+
+        assertEquals("confirmed", confirmed.status)
+        assertEquals("Revised title", confirmed.payload.constitutionTitle)
+        assertEquals(constitutionId, confirmed.constitutionId)
+        Mockito.verify(catalogClient).createConstitution("FR", "claim-race", "Revised title")
+        Mockito.verify(catalogClient, Mockito.never()).createConstitution("FR", "claim-race", "Original title")
+    }
+
+    @Test
     fun scopedImportRequiresConfirmedConstitutionAndSettingsPin() {
         val base = """{"isoCode":"FR","countryName":"France","constitutionSlug":"1958","constitutionTitle":"Constitution","versionLabel":"1","sourceUrl":"https://example.org/test-import","articles":[{"articleNumber":"1","title":"A","sortOrder":1}]}"""
         mockMvc.post("/import-jobs") {

@@ -107,7 +107,7 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: '20'
+          node-version: '22'
       - name: Check repository hygiene, restore preflight and Wiki references
         run: |
           python3 scripts/check-repository-hygiene.py
@@ -116,6 +116,9 @@ jobs:
       - name: Install gateway dependencies
         working-directory: apps/gateway-web
         run: npm ci
+      - name: Audit gateway production dependencies
+        working-directory: apps/gateway-web
+        run: npm audit --omit=dev --audit-level=high
       - name: Reject generated fixture drift
         working-directory: apps/gateway-web
         run: |
@@ -145,7 +148,7 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: '20'
+          node-version: '22'
       - run: npm ci
       - run: npx playwright install --with-deps chromium
       - run: npm run build
@@ -167,7 +170,7 @@ jobs:
   visual-e2e:
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    container: mcr.microsoft.com/playwright:v1.51.1-jammy
+    container: mcr.microsoft.com/playwright:v1.55.1-jammy
     defaults:
       run:
         working-directory: apps/gateway-web
@@ -235,9 +238,15 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '22'
+      - name: Install MCP dependencies
+        working-directory: services/mcp-server
+        run: npm ci
+      - name: Audit MCP production dependencies
+        working-directory: services/mcp-server
+        run: npm audit --omit=dev --audit-level=high
       - name: Verify MCP tools
         working-directory: services/mcp-server
-        run: npm ci && npm test
+        run: npm test
       - run: docker build -t constitution-atlas/mcp-server:ci services/mcp-server
 
   publish-journey:
@@ -353,7 +362,7 @@ jobs:
           path: .
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: '20'
+          node-version: '22'
       - name: Install browser dependencies
         working-directory: apps/gateway-web
         run: |

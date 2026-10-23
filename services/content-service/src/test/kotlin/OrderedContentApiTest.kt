@@ -218,6 +218,7 @@ class OrderedContentApiTest {
         )
         assertThat(target.roots.single().content.map { it.lineage }).containsExactly(listOf(original.revisionId!!), listOf(original.revisionId!!))
         assertThat(content.get(targetId).roots.single().content.map { it.lineage }).containsExactly(listOf(original.revisionId!!), listOf(original.revisionId!!))
+        assertThat(content.export(targetId).roots.single().content!!.map { it.lineage }).containsExactly(listOf(original.revisionId!!), listOf(original.revisionId!!))
     }
 
     @Test
@@ -245,6 +246,54 @@ class OrderedContentApiTest {
         assertThat(target.roots.map { it.lineage }).containsExactly(listOf(original.revisionId), listOf(original.revisionId))
         assertThat(articles.listUnits(targetId, 0, 10, true).first.map { it.lineage }).containsExactly(listOf(original.revisionId), listOf(original.revisionId))
         assertThat(articles.getUnit(targetId, target.roots.first().occurrenceId).lineage).containsExactly(original.revisionId)
+        assertThat(content.export(targetId).roots.map { it.lineage }).containsExactly(listOf(original.revisionId), listOf(original.revisionId))
+    }
+
+    @Test
+    fun articleAliasesAndNestedCompatibilityNodesPreserveSiblingOrder() {
+        val versionId = UUID.randomUUID()
+        version(versionId, UUID.randomUUID())
+        val first = initial(versionId)
+        val snapshot = content.save(
+            versionId,
+            OrderedSnapshotWrite(
+                first.generation,
+                roots = listOf(
+                    OrderedNodeWrite(kind = "article", label = "0", content = emptyList()),
+                    OrderedNodeWrite(revisionId = first.roots.single().revisionId),
+                ),
+            ),
+        )
+        val root = snapshot.roots[1]
+        val detail = articles.getById(root.occurrenceId)
+        assertThat(detail).isEqualTo(articles.getUnit(versionId, root.occurrenceId))
+        assertThat(detail.sortOrder).isEqualTo(2)
+        assertThat(detail.children.map { it.sortOrder }).containsExactly(1, 2)
+        val articleList = articles.listByVersion(versionId, offset = 1, limit = 1, includeBody = true).single()
+        val unitList = articles.listUnits(versionId, 1, 1, true).first.single()
+        assertThat(articleList.sortOrder).isEqualTo(2)
+        assertThat(articleList.children).isEqualTo(detail.children)
+        assertThat(unitList.children).isEqualTo(detail.children)
+        assertThat(unitList.sortOrder).isEqualTo(2)
+    }
+
+    @Test
+    fun childEntriesRejectTextFormattingInsteadOfSilentlyDiscardingIt() {
+        val versionId = UUID.randomUUID()
+        version(versionId, UUID.randomUUID())
+        val child = OrderedEntryWrite("child", node = OrderedNodeWrite(kind = "sentence", content = emptyList()))
+        val invalid = listOf(
+            child.copy(format = "footnote"),
+            child.copy(footnoteLabel = "1"),
+            child.copy(table = OrderedTable(rows = emptyList())),
+            child.copy(references = listOf(OrderedInlineReference(UUID.randomUUID(), 0, 1, OrderedReferenceTarget("external", url = "https://example.com")))),
+        )
+        invalid.forEach { entry ->
+            assertThrows(IllegalArgumentException::class.java) {
+                content.save(versionId, OrderedSnapshotWrite(0, roots = listOf(OrderedNodeWrite(kind = "article", content = listOf(entry)))))
+            }
+        }
+        assertThat(content.get(versionId).generation).isZero()
     }
 
     private fun version(id: UUID, constitution: UUID, parentText: Boolean = true) {

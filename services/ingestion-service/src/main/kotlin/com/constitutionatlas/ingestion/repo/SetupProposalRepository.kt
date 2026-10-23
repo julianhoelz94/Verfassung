@@ -22,17 +22,7 @@ class SetupProposalRepository(private val jdbc: JdbcTemplate, private val mapper
 
     fun find(id: UUID): SetupProposalDto? = jdbc.query(
         "SELECT id, owner_id, status, payload, constitution_id, settings_revision_id, confirmed_by FROM import_setup_proposals WHERE id = ? AND (expires_at > now() OR status = 'confirmed')",
-        { rs, _ ->
-            SetupProposalDto(
-                rs.getObject("id", UUID::class.java),
-                rs.getObject("owner_id", UUID::class.java),
-                rs.getString("status"),
-                mapper.readValue(rs.getString("payload"), SetupProposalRequest::class.java),
-                rs.getObject("constitution_id", UUID::class.java),
-                rs.getObject("settings_revision_id", UUID::class.java),
-                rs.getObject("confirmed_by", UUID::class.java),
-            )
-        },
+        ::map,
         id,
     ).firstOrNull()
 
@@ -42,10 +32,14 @@ class SetupProposalRepository(private val jdbc: JdbcTemplate, private val mapper
         id,
     ) == 1
 
-    fun claim(id: UUID): Boolean = jdbc.update(
-        "UPDATE import_setup_proposals SET status = 'confirming', updated_at = now() WHERE id = ? AND status = 'proposed' AND expires_at > now()",
+    /** Return the exact payload frozen by this claim, including a revision that won the race. */
+    fun claim(id: UUID): SetupProposalDto? = jdbc.query(
+        """UPDATE import_setup_proposals SET status = 'confirming', updated_at = now()
+           WHERE id = ? AND status = 'proposed' AND expires_at > now()
+           RETURNING id, owner_id, status, payload, constitution_id, settings_revision_id, confirmed_by""",
+        ::map,
         id,
-    ) == 1
+    ).firstOrNull()
 
     fun setConstitution(id: UUID, constitutionId: UUID) {
         jdbc.update("UPDATE import_setup_proposals SET constitution_id = ?, updated_at = now() WHERE id = ? AND status = 'confirming'", constitutionId, id)
@@ -68,4 +62,14 @@ class SetupProposalRepository(private val jdbc: JdbcTemplate, private val mapper
         "UPDATE import_setup_proposals SET status = 'withdrawn', updated_at = now() WHERE id = ? AND status = 'proposed'",
         id,
     ) == 1
+
+    private fun map(rs: java.sql.ResultSet, @Suppress("UNUSED_PARAMETER") index: Int): SetupProposalDto = SetupProposalDto(
+        rs.getObject("id", UUID::class.java),
+        rs.getObject("owner_id", UUID::class.java),
+        rs.getString("status"),
+        mapper.readValue(rs.getString("payload"), SetupProposalRequest::class.java),
+        rs.getObject("constitution_id", UUID::class.java),
+        rs.getObject("settings_revision_id", UUID::class.java),
+        rs.getObject("confirmed_by", UUID::class.java),
+    )
 }

@@ -155,8 +155,8 @@ class CatalogController(
     @GetMapping("/versions/{versionId}")
     fun getVersion(@PathVariable versionId: UUID, @RequestHeader(value = "Authorization", required = false) authorization: String?): VersionDetail =
         catalogQueryService.getVersion(versionId).also { version ->
-            val publicSnapshot = version.publicationStatus == "published" &&
-                (version.listing == "public" || version.currentVersionId == version.id)
+            // Listing controls discovery, not immutable snapshot permalinks (ADR 0005).
+            val publicSnapshot = version.publicationStatus == "published"
             if (!writeAccess.mayViewPrivateCatalog(authorization) && !publicSnapshot) {
                 throw com.constitutionatlas.platform.NotFoundException("Unknown version '$versionId'")
             }

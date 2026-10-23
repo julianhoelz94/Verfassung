@@ -17,6 +17,7 @@ import com.constitutionatlas.platform.UnauthorizedException
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.mockito.ArgumentCaptor
@@ -37,6 +38,8 @@ import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
 import java.time.LocalDate
 import java.util.UUID
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
 @Testcontainers
 @AutoConfigureMockMvc
@@ -82,6 +85,71 @@ class EditorApiTest {
             UnauthorizedException("Missing session"),
         )
         stub(editor)
+    }
+
+    @Test
+    fun commandsRecheckSessionStateAfterWaitingForConcurrentTransition() {
+        stub(admin)
+        for ((command, initial, progressed) in listOf(
+            Triple("saves", "open", "reviewing"),
+            Triple("publish-details", "open", "reviewing"),
+            Triple("review", "open", "approved"),
+            Triple("approval", "reviewing", "published"),
+        )) {
+            val sessionId = UUID.fromString(openSession(UUID.randomUUID()))
+            jdbcTemplate.update("UPDATE edit_sessions SET status = ?, publish_comment = 'Reviewed comment' WHERE id = ?", initial, sessionId)
+            val executor = Executors.newSingleThreadExecutor()
+            try {
+                requireNotNull(jdbcTemplate.dataSource).connection.use { connection ->
+                    connection.autoCommit = false
+                    connection.prepareStatement("SELECT id FROM edit_sessions WHERE id = ? FOR UPDATE").use { statement ->
+                        statement.setObject(1, sessionId)
+                        statement.executeQuery().close()
+                    }
+                    val blocker = connection.createStatement().use { statement ->
+                        statement.executeQuery("SELECT pg_backend_pid()").use { result ->
+                            result.next()
+                            result.getInt(1)
+                        }
+                    }
+                    val response = executor.submit<Int> {
+                        mockMvc.post("/edit-sessions/$sessionId/$command") {
+                            header("Authorization", TOKEN)
+                            contentType = MediaType.APPLICATION_JSON
+                            content = when (command) {
+                                "saves" -> """{"articleId":"${UUID.randomUUID()}","body":"Late change"}"""
+                                "publish-details" -> """{"comment":"Late change"}"""
+                                else -> "{}"
+                            }
+                        }.andReturn().response.status
+                    }
+                    // Wait for the database lock, not an arbitrary scheduling delay.
+                    val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10)
+                    var blocked = false
+                    while (!blocked && System.nanoTime() < deadline && !response.isDone) {
+                        blocked = jdbcTemplate.queryForObject(
+                            "SELECT EXISTS (SELECT 1 FROM pg_stat_activity WHERE ? = ANY(pg_blocking_pids(pid)))",
+                            Boolean::class.java,
+                            blocker,
+                        ) == true
+                        if (!blocked) Thread.sleep(10)
+                    }
+                    assertTrue(blocked, "$command must wait for the session mutation")
+                    connection.prepareStatement("UPDATE edit_sessions SET status = ? WHERE id = ?").use { statement ->
+                        statement.setString(1, progressed)
+                        statement.setObject(2, sessionId)
+                        statement.executeUpdate()
+                    }
+                    connection.commit()
+                    assertEquals(409, response.get(10, TimeUnit.SECONDS), command)
+                }
+                assertEquals(progressed, jdbcTemplate.queryForObject("SELECT status FROM edit_sessions WHERE id = ?", String::class.java, sessionId))
+                assertEquals(0, jdbcTemplate.queryForObject("SELECT COUNT(*) FROM draft_changes WHERE session_id = ?", Int::class.java, sessionId))
+                assertEquals("Reviewed comment", jdbcTemplate.queryForObject("SELECT publish_comment FROM edit_sessions WHERE id = ?", String::class.java, sessionId))
+            } finally {
+                executor.shutdownNow()
+            }
+        }
     }
 
     @Test

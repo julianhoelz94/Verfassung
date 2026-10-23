@@ -1,6 +1,10 @@
 import { ui, type UiMessage } from './messages';
 import { reviewUi } from './ui-review-messages';
 
+export function changeTypeTone(changeType: string): 'added' | 'removed' | 'changed' | 'neutral' {
+  return changeType === 'added' || changeType === 'removed' || changeType === 'changed' ? changeType : 'neutral';
+}
+
 export function changeTypeMessage(changeType: string): UiMessage {
   switch (changeType) {
     case 'added': return ui.remainingStatus.added;

@@ -108,7 +108,7 @@ class OrderedContentService(
             entries.forEachIndexed { position, entry ->
                 when (entry.type) {
                     "child" -> {
-                        require(entry.node != null && entry.text == null && entry.revisionId == null && entry.logicalId == null && entry.predecessorRevisionId == null && entry.lineage.isEmpty()) { "Invalid child entry at $logical/content/$position" }
+                        require(entry.node != null && entry.text == null && entry.revisionId == null && entry.logicalId == null && entry.predecessorRevisionId == null && entry.lineage.isEmpty() && entry.format == null && entry.table == null && entry.footnoteLabel == null && entry.references.isEmpty()) { "Invalid child entry at $logical/content/$position" }
                         repository.insertEntry(revision, position, null, store(requireNotNull(entry.node), depth + 1))
                     }
                     "text" -> {
@@ -162,9 +162,10 @@ class OrderedContentService(
             kind = node.kind,
             label = node.label,
             title = node.title,
+            lineage = node.lineage,
             content = node.content.map { entry ->
                 entry.node?.let { com.constitutionatlas.platform.OrderedEntryWrite("child", node = nodeWrite(it)) }
-                    ?: com.constitutionatlas.platform.OrderedEntryWrite("text", logicalId = entry.logicalId, predecessorRevisionId = entry.revisionId?.let { repository.revisionPredecessor(it, true) }, text = entry.text, format = entry.format, table = entry.table, footnoteLabel = entry.footnoteLabel, references = entry.references)
+                    ?: com.constitutionatlas.platform.OrderedEntryWrite("text", logicalId = entry.logicalId, predecessorRevisionId = entry.revisionId?.let { repository.revisionPredecessor(it, true) }, text = entry.text, lineage = entry.lineage, format = entry.format, table = entry.table, footnoteLabel = entry.footnoteLabel, references = entry.references)
             },
         )
         return com.constitutionatlas.content.api.OrderedContentExport(version, snapshot.settingsRevisionId, snapshot.roots.map(::nodeWrite))

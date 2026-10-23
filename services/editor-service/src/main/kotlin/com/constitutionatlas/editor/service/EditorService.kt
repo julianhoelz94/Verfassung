@@ -112,6 +112,7 @@ class EditorService(
     fun save(authorization: String?, sessionId: UUID, request: SaveDraftRequest): DraftPreviewDto {
         val actor = actor(authorization)
         requireEdit(actor)
+        structuredPublication.lock(sessionId)
         val session = requireOwned(actor, sessionId)
         requireStatus(session, EditSessionStatus.OPEN)
         if (editorRepository.hasStructuredDraft(sessionId)) throw ConflictException("Use targeted structured saves for this session", "mixed_draft_formats")
@@ -135,6 +136,7 @@ class EditorService(
     fun submitReview(authorization: String?, sessionId: UUID): DraftPreviewDto {
         val actor = actor(authorization)
         requireEdit(actor)
+        structuredPublication.lock(sessionId)
         val session = requireOwned(actor, sessionId)
         requireStatus(session, EditSessionStatus.OPEN)
         if (session.hopKind == "legal" && editorRepository.changeRecord(session.id) == null) {
@@ -156,6 +158,7 @@ class EditorService(
     fun approve(authorization: String?, sessionId: UUID): DraftPreviewDto {
         val actor = actor(authorization)
         requireReview(actor)
+        structuredPublication.lock(sessionId)
         val session = requireVisible(actor, sessionId)
         requireStatus(session, EditSessionStatus.REVIEWING)
         if (session.actorId == actor.id && !actor.isAdmin()) {
@@ -174,6 +177,7 @@ class EditorService(
     fun savePublishDetails(authorization: String?, sessionId: UUID, request: PublishDetailsRequest): DraftPreviewDto {
         val actor = actor(authorization)
         requireEdit(actor)
+        structuredPublication.lock(sessionId)
         val session = requireOwned(actor, sessionId)
         requireStatus(session, EditSessionStatus.OPEN)
         when (session.hopKind) {

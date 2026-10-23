@@ -1,6 +1,6 @@
 'use client';
 
-import { changeTypeMessage } from '../../lib/ui-labels';
+import { changeTypeMessage, changeTypeTone } from '../../lib/ui-labels';
 
 import { T, useTranslation } from './TranslationProvider';
 import { ui } from '../../lib/messages';
@@ -8,7 +8,7 @@ import { useMemo, useState } from 'react';
 import type { ArticleSummary, ContentOutline } from '../../lib/api';
 import { orderedTargets } from '../../lib/ordered-content';
 import { articleHeading, clipOrderedEntries, clipNodes, depthStopCount, depthStopLabels, kindByCode } from '../../lib/outline';
-import { Badge, type BadgeTone, Toolbar } from './ui';
+import { Badge, Toolbar } from './ui';
 import { ConstitutionText } from './ConstitutionText';
 import { Segmented } from './Segmented';
 import { Toc } from './Toc';
@@ -24,19 +24,6 @@ type VersionReaderProps = {
   changeByArticle?: Record<string, string>;
   unchangedSinceLabel?: string;
 };
-
-function changeTone(changeType: string): BadgeTone {
-  if (changeType === 'added') {
-    return 'added';
-  }
-  if (changeType === 'removed') {
-    return 'removed';
-  }
-  if (changeType === 'changed') {
-    return 'changed';
-  }
-  return 'neutral';
-}
 
 export function VersionReader({
   code,
@@ -161,7 +148,7 @@ export function VersionReader({
                   <a href={permalink}><T value={ui.components.versionreader.permalink} /></a>
                   {article.kind === 'article' && article.articleNumber ? <a href={historyHref}><T value={ui.components.versionreader.historyOf} />{" "}{kindByCode(outline, article.kind)?.displayLabel ?? t(ui.remainingStatus.article)} {article.articleNumber}</a> : null}
                   {changeType ? (
-                    <Badge tone={changeTone(changeType)}>{<T value={changeTypeMessage(changeType)} />}</Badge>
+                    <Badge tone={changeTypeTone(changeType)}>{<T value={changeTypeMessage(changeType)} />}</Badge>
                   ) : (
                     <span className="muted">
                       {unchangedSinceLabel ? `${t(ui.readerDynamic.unchangedSince)} ${unchangedSinceLabel}` : t(ui.readerDynamic.unchanged)}

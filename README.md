@@ -37,7 +37,7 @@ Build behavior, fixtures, profiles and backup/restore drills: [local stack refer
 
 ## Develop and verify
 
-For host checks, use **JDK 21**, the repository's **Gradle wrapper**, and **Node 20**. See [dependency pins](docs/dependencies.md).
+For host checks, use **JDK 21**, the repository's **Gradle wrapper**, and **Node 22**. See [dependency pins](docs/dependencies.md).
 
 ```sh
 ./gradlew -p services/<name> check

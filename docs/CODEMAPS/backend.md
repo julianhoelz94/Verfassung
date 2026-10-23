@@ -109,7 +109,7 @@ Source: `client/RestIndexSource.kt`.
 ## ingestion — `services/ingestion-service`
 
 `ImportController` → `ImportService` + `ImportValidator` → `ImportJobRepository`  
-`POST /import-jobs`, `GET /import-jobs/{id}` and confirm-outline/prepare/approve/reject/publish commands. Batch, resumable upload and setup-proposal controllers are separate. Uploads stage content; preparation writes draft Catalog/Content data. Review and publication require separate roles, with a fresh publisher step-up. `ImportPublicationDelivery` retries audit/search side effects.
+`POST /import-jobs`, `GET /import-jobs/{id}` and confirm-outline/prepare/approve/reject/publish commands. Batch, resumable upload and setup-proposal controllers are separate. Uploads stage content; preparation writes draft Catalog/Content data. Approval and publication are separate actions with reviewer/admin and publisher/admin checks respectively, and publication requires fresh MFA. One account may perform all steps if it has the required roles. `ImportPublicationDelivery` retries audit/search side effects.
 
 ## audit — `services/audit-service`
 

@@ -23,6 +23,48 @@ describe('splitSentences', () => {
 });
 
 describe('diffText', () => {
+  it.each([
+    ['First\n\told\nLast', 'First\n\tnew\nLast'],
+    ['  A\r\nB\tC  ', '  A\r\nD\tC  '],
+    ['A\u00a0B\n', 'A\u00a0C\n'],
+  ])('reconstructs both source texts without inserting whitespace', (left, right) => {
+    const segs = diffText(left, right);
+    expect(segsForSide(segs, 'from').map(seg => seg.text).join('')).toBe(left);
+    expect(segsForSide(segs, 'to').map(seg => seg.text).join('')).toBe(right);
+  });
+
+  it('bounds large replacement work while keeping the unchanged context and complete texts', () => {
+    const before = Array.from({ length: 5_000 }, (_, i) => `old${i}`).join(' ');
+    const after = Array.from({ length: 5_000 }, (_, i) => `new${i}`).join(' ');
+    const left = `Preamble\n${before}\nFinal provision`;
+    const right = `Preamble\n${after}\nFinal provision`;
+    const segs = diffText(left, right);
+    expect(segs).toEqual([
+      { type: 'equal', text: 'Preamble\n' },
+      { type: 'remove', text: before },
+      { type: 'add', text: after },
+      { type: 'equal', text: '\nFinal provision' },
+    ]);
+    expect(segsForSide(segs, 'from').map(seg => seg.text).join('')).toBe(left);
+    expect(segsForSide(segs, 'to').map(seg => seg.text).join('')).toBe(right);
+  });
+
+  it('keeps fine-grained highlighting for a small edit in a long article', () => {
+    const context = 'Unchanged text. '.repeat(5_000);
+    expect(diffText(`${context}old${context}`, `${context}new${context}`)).toEqual([
+      { type: 'equal', text: context },
+      { type: 'remove', text: 'oldUnchanged' },
+      { type: 'add', text: 'newUnchanged' },
+      { type: 'equal', text: context.slice('Unchanged'.length) },
+    ]);
+  });
+
+  it('handles a large pure addition or removal without allocating a diff matrix', () => {
+    const text = 'Long provision.\n'.repeat(50_000);
+    expect(diffText('', text)).toEqual([{ type: 'add', text }]);
+    expect(diffText(text, '')).toEqual([{ type: 'remove', text }]);
+  });
+
   it('marks a changed sentence as a replacement', () => {
     const segs = diffText(
       'Human dignity shall be inviolable. Old second sentence.',

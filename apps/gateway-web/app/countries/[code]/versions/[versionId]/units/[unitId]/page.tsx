@@ -6,7 +6,6 @@ import { ConstitutionText } from '../../../../../../components/ConstitutionText'
 import { ContentTranslationRegion } from '../../../../../../components/ContentTranslationRegion';
 import { ReaderPage } from '../../../../../../components/layout/templates';
 import { PageHeader } from '../../../../../../components/ui';
-import { PrintLink } from '../../../../../../components/PrintLink';
 import { SnapshotNotice } from '../../../../../../components/SnapshotNotice';
 import { T } from '../../../../../../components/TranslationProvider';
 import { ui } from '../../../../../../../lib/messages';
@@ -25,7 +24,7 @@ export default async function UnitPage({ params }: { params: Promise<{ code: str
       { href: '/', label: <T value={ui.nav.countries} /> },
       { href: `/countries/${code}`, label: country!.name },
       { href: `/countries/${code}/versions/${versionId}`, label: context!.version.versionLabel },
-    ]} actions={<PrintLink />} />}>
+    ]} />}>
 
     <SnapshotNotice code={code} viewedId={versionId} currentId={context!.version.currentVersionId ?? context!.version.id} />
     <ContentTranslationRegion sourceLanguage={context!.version.languageCode}>

@@ -941,9 +941,6 @@ export const ui = {
     nodetitleform: {
       saveTitle: { en: "Save title", de: "Titel speichern" },
     },
-    printlink: {
-      print: { en: "Print", de: "Drucken" },
-    },
     provenance: {
       language: { en: "Language", de: "Sprache" },
       effective: { en: "Effective", de: "Wirksam" },

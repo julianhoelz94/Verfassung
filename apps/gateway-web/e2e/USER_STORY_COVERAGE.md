@@ -28,7 +28,7 @@ The fixture verifier checks 2 countries, 2 constitutions, 5 published versions, 
 
 | Stories | Playwright journey | Durable outcome or permission assertion |
 | --- | --- | --- |
-| Anonymous 1–8, 13 | `public-stories.spec.ts` — `visitor follows the country, legal version, article and history`; `visitor can reach provenance and a print action on narrow screens` | Opens a country, historical and current versions, permanent article URL, adjacent articles and article history; invokes the browser print action. |
+| Anonymous 1–8, 13 | `public-stories.spec.ts` — `visitor follows the country, legal version, article and history`; `visitor can reach provenance on narrow screens` | Opens a country, historical and current versions, permanent article URL, adjacent articles and article history; displays source and verification details on narrow screens. |
 | Anonymous 9–11 | `public-stories.spec.ts` — `visitor filters search and result retains its version` | Applies country, version, and effective-date filters, then verifies that the result opens the same historical snapshot. |
 | Anonymous 12 | `public-stories.spec.ts` — `visitor compares versions and changes the article scope` | Renders structured additions/removals and switches between all and changed articles. |
 | Anonymous 14–16 | `public-stories.spec.ts` — timeline, provenance, and site-scope journeys | Verifies the source document and version transition, source/trust panel, About, sources, verification, and accessibility content. |

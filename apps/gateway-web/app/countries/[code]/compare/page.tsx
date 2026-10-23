@@ -10,7 +10,6 @@ import { CopyLink } from '../../../components/CopyLink';
 import { DiffConstitutionText } from '../../../components/DiffConstitutionText';
 import { ReaderPage } from '../../../components/layout/templates';
 import { AmendmentUnitLinks } from '../../../components/AmendmentUnitLinks';
-import { PrintLink } from '../../../components/PrintLink';
 import { ServiceUnavailable } from '../../../components/StatusMessage';
 import { Badge, PageHeader } from '../../../components/ui';
 import {
@@ -264,12 +263,7 @@ export default async function ComparePage(props: ComparePageProps) {
         ]}
         eyebrow={`${country.name}${constitution?.title ? ` · ${constitution.title}` : ''}`}
         title={<T value={ui.attrs.countriesCodeComparePagePageHeaderTitle} />}
-        actions={
-          <>
-            <CopyLink />
-            <PrintLink />
-          </>
-        }
+        actions={<CopyLink />}
       />}>
 
       <CompareForm

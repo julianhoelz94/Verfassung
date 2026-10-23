@@ -102,7 +102,7 @@ class ImportJobRepository(
     }
 
     fun claimPreparation(jobId: UUID, actorId: UUID): Boolean = jdbc.update(
-        "UPDATE import_jobs SET status = 'preparing', prepared_by = ?, updated_at = NOW() WHERE id = ? AND status = 'pending_review' AND version_id IS NULL",
+        "UPDATE import_jobs SET status = 'preparing', prepared_by = ?, updated_at = NOW() WHERE id = ? AND (status IN ('pending_review', 'failed') OR (status = 'preparing' AND updated_at < NOW() - INTERVAL '2 minutes')) AND approved_by IS NULL",
         actorId,
         jobId,
     ) == 1
@@ -118,6 +118,10 @@ class ImportJobRepository(
         { rs, _ -> rs.getBoolean(1) },
         jobId,
     ).firstOrNull() ?: false
+
+    fun reserveVersion(jobId: UUID, versionId: UUID) {
+        check(jdbc.update("UPDATE import_jobs SET version_id = ? WHERE id = ? AND status = 'preparing' AND (version_id IS NULL OR version_id = ?)", versionId, jobId, versionId) == 1) { "Import draft reservation changed" }
+    }
 
     fun prepared(jobId: UUID, versionId: UUID) {
         jdbc.update("UPDATE import_jobs SET status = 'pending_review', version_id = ?, updated_at = NOW() WHERE id = ? AND status = 'preparing'", versionId, jobId)

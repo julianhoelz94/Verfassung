@@ -133,6 +133,7 @@ class ImportService(
                 throw ResponseStatusException(HttpStatus.CONFLICT, "Constitution ID does not match the selected country and slug")
             }
         }
+        if (importJobRepository.find(jobId)?.errors.orEmpty().any { it.code != "PREPARATION_FAILED" }) throw ResponseStatusException(HttpStatus.CONFLICT, "Invalid staged content requires a corrected item with a new source key")
         if (!importJobRepository.claimPreparation(jobId, actorId)) throw ResponseStatusException(HttpStatus.CONFLICT, "Import is not awaiting preparation")
         try {
             DownstreamAuth.withAuthorization(authorization) { persistDraft(jobId, request) }
@@ -227,7 +228,9 @@ class ImportService(
         }
         val constitution = existing ?: (request.jurisdictionId?.let { catalogClient.createJurisdictionConstitution(it, request.constitutionSlug, request.constitutionTitle) } ?: catalogClient.createConstitution(iso, request.constitutionSlug, request.constitutionTitle))
         if (existing == null) request.outline?.let { catalogClient.replaceOutline(constitution.id, it.kinds) }
-        val version = catalogClient.createDraftVersion(
+        val reserved = importJobRepository.find(jobId)?.versionId?.let { catalogClient.version(it) }
+        if (reserved != null && reserved.publicationStatus != "draft") throw ResponseStatusException(HttpStatus.CONFLICT, "Reserved import snapshot is no longer a draft")
+        val version = reserved ?: catalogClient.createDraftVersion(
             constitution.id,
             request.versionLabel.trim(),
             request.effectiveDate,
@@ -238,7 +241,9 @@ class ImportService(
             request.hopKind,
             jobId,
             request.settingsRevisionId,
+            request.sourceEvidence,
         )
+        importJobRepository.reserveVersion(jobId, version.id)
         if (request.roots.isNotEmpty()) {
             contentClient.replaceRoots(version.id, request.roots, request.predecessorVersionId)
         } else {

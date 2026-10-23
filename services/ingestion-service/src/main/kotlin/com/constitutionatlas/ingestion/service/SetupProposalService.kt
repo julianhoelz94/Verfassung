@@ -93,10 +93,10 @@ class SetupProposalService(
         if (request.sourceUrl != null && !request.sourceUrl.startsWith("https://")) invalid("sourceUrl", "use an HTTPS source")
         if (request.jurisdictionId != null && request.isoCode.isNotBlank()) invalid("jurisdictionId", "use jurisdictionId or isoCode, not both")
         val kinds = request.outline.kinds
-        if (kinds.size !in 1..8) invalid("outline.kinds", "provide 1 to 8 levels")
+        if (kinds.size !in 1..32) invalid("outline.kinds", "provide 1 to 32 kinds")
         if (kinds.any { !it.kindCode.matches(Regex("[a-z][a-z0-9_-]{0,31}")) || it.displayLabel.isBlank() }) invalid("outline.kinds", "each level needs a valid code and label")
         if (kinds.map { it.kindCode }.toSet().size != kinds.size) invalid("outline.kinds", "kind codes must be unique")
-        if (request.sampleRoots.size !in 1..5) invalid("sampleRoots", "provide 1 to 5 representative roots")
+        if (request.sampleRoots.size !in 1..20) invalid("sampleRoots", "provide 1 to 20 representative roots")
         if (mapper.writeValueAsBytes(request).size > 64 * 1024) invalid("sampleRoots", "proposal exceeds 64 KiB")
         val byCode = kinds.associateBy { it.kindCode }
         val roots = kinds.filter { it.root == true }.map { it.kindCode }.toSet().ifEmpty { setOfNotNull(kinds.firstOrNull()?.kindCode) }

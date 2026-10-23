@@ -56,6 +56,8 @@ services:
       - IDENTITY_SEED_MODE=${IDENTITY_SEED_MODE:-off}
       - CATALOG_API_URL=http://catalog-service:8080
       - CONTENT_API_URL=http://content-service:8080
+      - DOCUMENT_API_URL=http://document-service:8080
+      - AMENDMENT_API_URL=http://amendment-service:8080
       - AMENDMENT_API_URL=http://amendment-service:8080
       - DOCUMENT_API_URL=http://document-service:8080
       - DEPLOYMENT_SETUP_GATE_ENABLED=true

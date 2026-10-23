@@ -110,6 +110,7 @@ class RestCatalogClient(
         hopKind: String?,
         importJobId: UUID?,
         settingsRevisionId: UUID?,
+        sourceEvidence: com.constitutionatlas.platform.SourceEvidence?,
     ): DownstreamVersion =
         client.postJson(
             "/constitutions/{id}/versions",
@@ -122,7 +123,9 @@ class RestCatalogClient(
                 "predecessorVersionId" to predecessorVersionId,
                 "hopKind" to hopKind,
                 "importJobId" to importJobId,
+                "publishAttemptId" to importJobId,
                 "structuralSettingsRevisionId" to settingsRevisionId,
+                "sourceEvidence" to sourceEvidence,
             ),
             DownstreamVersion::class.java,
             constitutionId,
@@ -153,6 +156,11 @@ class RestContentClient(
     private val client: RestClient = restClient(contentUrl)
 
     override fun replaceRoots(versionId: UUID, roots: List<OrderedNodeWrite>, sourceVersionId: UUID?) {
+        val persisted = snapshot(versionId)
+        if (persisted.generation > 0) {
+            check(com.constitutionatlas.platform.OrderedContentFidelity.matches(roots, persisted.roots)) { "Reserved draft already contains different persisted content; reconcile before retrying" }
+            return
+        }
         val source = sourceVersionId?.let(::snapshot)
         client.putJson("/versions/{id}/content", OrderedSnapshotWrite(expectedGeneration = 0, sourceVersionId = sourceVersionId, sourceGeneration = source?.generation, roots = roots), versionId)
     }

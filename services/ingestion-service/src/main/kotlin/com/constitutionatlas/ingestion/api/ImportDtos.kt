@@ -58,7 +58,10 @@ data class ImportRequest(
     val outline: ImportOutline? = null,
     val articles: List<ImportArticle> = emptyList(),
     val roots: List<OrderedNodeWrite> = emptyList(),
+    @get:com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
     val jurisdictionId: UUID? = null,
+    @get:com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+    val sourceEvidence: com.constitutionatlas.platform.SourceEvidence? = null,
 ) : StrictOrderedWrite()
 
 data class ImportErrorDto(
@@ -102,6 +105,7 @@ data class SetupProposalRequest(
     val gazetteReference: String? = null,
     val outline: ImportOutline,
     val sampleRoots: List<OrderedNodeWrite> = emptyList(),
+    @get:com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
     val jurisdictionId: UUID? = null,
 ) : StrictOrderedWrite()
 
@@ -117,4 +121,4 @@ data class SetupProposalDto(
 
 data class BeginUploadRequest(val idempotencyKey: String, val checksumSha256: String, val totalBytes: Int)
 data class UploadChunkRequest(val dataBase64: String, val checksumSha256: String)
-data class ImportUploadDto(val id: UUID, val batchId: UUID, val status: String, val totalBytes: Int, val chunkBytes: Int, val missingChunks: List<Int>, val itemId: UUID?)
+data class ImportUploadDto(val id: UUID, val batchId: UUID, val status: String, val totalBytes: Int, val chunkBytes: Int, val missingChunks: List<Int>, val itemId: UUID?, val migrationRunId: UUID? = null)

@@ -30,9 +30,9 @@ export function previewNode(source: Row, path: string): OrderedNode {
   const entries: OrderedEntry[] = content.length ? content.map((part, index) => part.type === 'child' && part.node
     ? { type: 'child', node: previewNode(row(part.node), `${path}-${index}`) }
     : {
-      type: 'text', text: string(part.text), logicalId: string(part.logicalId) || `${path}-entry-${index}`,
+      type: 'text', text: string(part.text), logicalId: string(part.logicalId) || `${path}-entry-${index}`, occurrenceId: string(part.occurrenceId) || string(part.logicalId) || `${path}-entry-${index}`,
       format: part.format as OrderedEntry['format'], table: part.table as OrderedTable | undefined,
-      footnoteLabel: part.footnoteLabel as string | undefined, references: part.references as OrderedInlineReference[] | undefined,
+      footnoteLabel: part.footnoteLabel as string | undefined, references: part.references as OrderedInlineReference[] | undefined, annotation: part.annotation as OrderedEntry['annotation'],
     }) : [
       ...(string(source.body) ? [{ type: 'text' as const, text: string(source.body) }] : []),
       ...children(source.children).concat(children(source.nodes)).map((child, index) => ({ type: 'child' as const, node: previewNode(child, `${path}-${index}`) })),

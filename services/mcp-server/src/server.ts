@@ -59,7 +59,7 @@ async function runLogged<T extends Record<string, unknown>>(tool: string, action
   try {
     const value = await action();
     observeTool(tool, 'ok', Date.now() - started);
-    const resourceId = value.jobId ?? value.itemId ?? value.batchId ?? value.proposalId ?? value.constitutionId ?? value.uploadId;
+    const resourceId = value.jobId ?? value.itemId ?? value.batchId ?? value.proposalId ?? value.constitutionId ?? value.uploadId ?? value.id;
     console.info(JSON.stringify({ event: 'mcp_tool', tool, actorId: actorId(), resourceId, outcome: 'ok', elapsedMs: Date.now() - started }));
     return json(value);
   } catch (error) {
@@ -125,6 +125,7 @@ export function createServer(authorization?: string): McpServer {
     sourceFields: { languageCode: 'BCP 47 language tag', sourceUrl: 'HTTPS URL of the source', gazetteReference: 'Official citation or gazette reference', effectiveDate: 'YYYY-MM-DD or null' },
     structure: {
       outline: { kinds: [{ kindCode: 'article', displayLabel: 'Article', presentation: 'section', showLabel: true, showTitle: true, showKind: false, allowTextAlongsideChildren: false, titlePolicy: 'optional', labelPolicy: 'optional', labelPlacement: 'before_title', segmentation: 'plain', root: true, allowedChildKinds: [] }] },
+      migrationUpload: { migrationRunId: 'run UUID', item: { sourceKey: 'gg/source', kind: 'document', dependencies: [], payload: { title: 'Original source bytes', sourceUrl: 'https://example.org/source.htm', fileName: 'source.htm', fileBase64: 'base64 of original bytes', fileSha256: 'SHA-256 of original bytes' } } },
       richContent: { formats: ['plain', 'table', 'footnote'], fields: ['format', 'table', 'footnoteLabel', 'references'], table: { caption: 'Source table', rows: [{ logicalId: 'row UUID', cells: [{ logicalId: 'cell UUID', text: 'Exact cell wording', header: true, rowSpan: 1, colSpan: 2, headers: [] }] }] }, reference: { logicalId: 'reference UUID', start: 0, end: 4, target: { type: 'footnote', footnoteId: 'note entry UUID' } } },
       articles: [{ articleNumber: '1', title: 'Example', body: 'Text', sortOrder: 1, nodes: [] }],
       roots: [{ logicalId: 'stable UUID', kind: 'article', label: '1', title: 'Example', content: [{ type: 'text', text: 'Text' }] }],
@@ -132,6 +133,42 @@ export function createServer(authorization?: string): McpServer {
     },
     notes: ['Unknown fields are rejected. Preserve table geometry, explicit reference targets, footnote labels, and root/allowedChildKinds outline rules.', 'Call get_import_setup first. For an existing constitution copy its settingsRevisionId and omit outline.', 'A new constitution needs an outline proposal and a site review before content preparation.', 'Reuse an idempotencyKey when retrying a direct upload; without one, identical payloads reuse a content-derived key.', 'Use get_import_upload to resume missing chunks or cancel_import_upload to discard an unfinished upload.', 'Preserve source spelling, numbering and text order.', 'No MCP tool can approve or publish.'],
   })));
+
+  const migrationItem = z.strictObject({
+    sourceKey: z.string().min(1).max(200),
+    kind: z.enum(['snapshot', 'document', 'citation', 'amendment', 'document_link', 'legacy_mapping', 'comparison']),
+    dependencies: z.array(z.string().min(1).max(200)).max(100).optional(), payload: z.record(z.string(), z.unknown()),
+  });
+  server.registerTool('create_migration_run', {
+    description: 'Create or resume a private bounded migration package using a stable runKey and complete source inventory. Records excluded and unavailable sources with reasons; never prepares, approves or publishes.',
+    inputSchema: { runKey: z.string().min(1).max(200), title: z.string().min(1).max(512), sources: z.array(z.strictObject({
+      sourceKey: z.string().min(1).max(200), url: z.string().url().startsWith('https://').max(2048), sha256: z.string().regex(/^[a-f0-9]{64}$/).nullable().optional(),
+      encoding: z.string().max(100).nullable().optional(), attribution: z.string().max(10000).nullable().optional(), aliases: z.array(z.string().url().startsWith('https://').max(2048)).max(20).optional(),
+      disposition: z.enum(['included', 'unavailable', 'excluded']).optional(), reason: z.string().max(10000).nullable().optional(), captureKey: z.string().max(200).nullable().optional(),
+    })).min(1).max(100) },
+    outputSchema: z.object({ id: uuid, ownerId: uuid, manifest: z.record(z.string(), z.unknown()), items: z.array(z.unknown()).max(100), coverage: z.record(z.string(), z.number()) }),
+    annotations: stagedWrite, scopeChallenge: importScope,
+  }, args => run('create_migration_run', async () => {
+    await requireImportKey(); requireDirectUploadSize(args);
+    return await postJson<Record<string, unknown>>('ingestion', '/migration-runs', args, authorization!);
+  }));
+  server.registerTool('stage_migration_item', {
+    description: 'Stage one immutable source-keyed snapshot, captured document/citation, amendment record, document link, legacy mapping or curated comparison. Editors prepare resources in the review workspace; dependencies and failures stay explicit. For files over the direct limit upload a migration envelope through existing chunked batch tools.',
+    inputSchema: { runId: uuid, item: migrationItem },
+    outputSchema: z.object({ id: uuid, sourceKey: z.string(), kind: z.string(), sha256: z.string(), dependencies: z.array(z.string()), state: z.string(), result: z.record(z.string(), z.unknown()), attempts: z.number().int(), error: z.string().nullable() }),
+    annotations: stagedWrite, scopeChallenge: importScope,
+  }, ({ runId, item }) => run('stage_migration_item', async () => {
+    await requireImportKey(); requireDirectUploadSize(item);
+    if (item.kind === 'snapshot') { const parsed = importPayloadSchema.parse(item.payload); requireConfirmedUpload(parsed); item.payload = parsed; }
+    return await postJson<Record<string, unknown>>('ingestion', `/migration-runs/${runId}/items`, item, authorization!);
+  }));
+  server.registerTool('get_migration_run', {
+    description: 'Read your durable migration package manifest, resource handles, attempts, unresolved relationships and coverage. Upload expiration does not remove this record.',
+    inputSchema: { runId: uuid }, outputSchema: z.object({ id: uuid, ownerId: uuid, manifest: z.record(z.string(), z.unknown()), items: z.array(z.unknown()).max(100), coverage: z.record(z.string(), z.number()) }),
+    annotations: readOnly, scopeChallenge: importScope,
+  }, ({ runId }) => run('get_migration_run', async () => {
+    await requireImportKey(); return await getJson<Record<string, unknown>>('ingestion', `/migration-runs/${runId}`, authorization);
+  }));
 
   const jurisdictionSelector = { countryCode: z.string().regex(/^[A-Za-z]{2}$/).optional(), jurisdictionId: uuid.optional(), constitutionSlug: z.string().trim().min(1).max(120) };
   async function importSetup(countryCode: string | undefined, jurisdictionId: string | undefined, constitutionSlug: string) {
@@ -295,8 +332,8 @@ export function createServer(authorization?: string): McpServer {
     scopeChallenge: importScope,
   }, ({ uploadId }) => run('complete_import_upload', async () => {
     await requireImportKey();
-    const upload = await postJson<{ itemId?: string; status: string }>('ingestion', `/import-uploads/${uploadId}/complete`, {}, authorization!);
-    return { ...upload, reviewUrl: upload.itemId ? `${(process.env.PUBLIC_BASE_URL ?? 'http://localhost').replace(/\/$/, '')}/admin/import/${upload.itemId}` : null };
+    const upload = await postJson<{ itemId?: string; status: string; migrationRunId?: string }>('ingestion', `/import-uploads/${uploadId}/complete`, {}, authorization!);
+    return { ...upload, reviewUrl: upload.migrationRunId ? `${(process.env.PUBLIC_BASE_URL ?? 'http://localhost').replace(/\/$/, '')}/admin/migrations/${upload.migrationRunId}` : upload.itemId ? `${(process.env.PUBLIC_BASE_URL ?? 'http://localhost').replace(/\/$/, '')}/admin/import/${upload.itemId}` : null };
   }));
 
   server.registerTool('get_import_job', {

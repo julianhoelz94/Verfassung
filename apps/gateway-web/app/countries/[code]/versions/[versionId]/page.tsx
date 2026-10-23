@@ -30,6 +30,7 @@ import { listDocumentLinks } from '../../../../../lib/document-api';
 import { currentUser } from '../../../../../lib/session';
 import { EditorEntry } from './EditorEntry';
 import surfaceStyles from '../../../../components/surfaces.module.css';
+import { SourceEvidenceNotice } from '../../../../components/SourceEvidenceNotice';
 
 type VersionPageProps = {
   params: Promise<{ code: string; versionId: string }>;
@@ -163,6 +164,7 @@ export default async function VersionPage(props: VersionPageProps) {
       />}>
 
       <CountryNavigation code={params.code} active="reading" />
+      <SourceEvidenceNotice evidence={snapshot?.sourceEvidence} versionId={params.versionId} />
       <SnapshotNotice code={country.isoCode} viewedId={params.versionId} currentId={version.version.currentVersionId ?? version.version.id} />
       {canEdit ? <EditorEntry
         versions={version.constitution.versions}

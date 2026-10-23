@@ -77,6 +77,31 @@ class CatalogApiTest {
         .first { catalogRepository.findCountrySummary(it) == null }
 
     @Test
+    fun archivalEvidenceSurvivesPublicationAndEditorialCorrectionWithoutInventedDates() {
+        val evidence = com.constitutionatlas.platform.SourceEvidence("nach 1849", "uncertain", "Original with later notes", "aktuell (archived wording)", "Legacy archive")
+        val code = uniqueCountryCode()
+        mockMvc.post("/countries") {
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"isoCode":"$code","name":"Archive evidence test"}"""
+        }.andExpect { status { isCreated() } }
+        val country = catalogRepository.findCountrySummary(code)!!
+        val constitution = writes.createJurisdictionConstitution(country.id, com.constitutionatlas.catalog.api.CreateConstitutionRequest("archive-${UUID.randomUUID()}", "Archive"))
+        val first = writes.createDraftVersion(constitution.id, com.constitutionatlas.catalog.api.CreateVersionRequest("1849", sourceEvidence = evidence))
+        mockMvc.post("/versions/${first.id}/publish") { header("Authorization", PUBLISHER_TOKEN) }.andExpect { status { isOk() } }
+        mockMvc.get("/versions/${first.id}").andExpect {
+            status { isOk() }
+            jsonPath("$.effectiveDate") { value(org.hamcrest.Matchers.nullValue()) }
+            jsonPath("$.sourceEvidence.dateWording") { value("nach 1849") }
+            jsonPath("$.sourceEvidence.datePrecision") { value("uncertain") }
+            jsonPath("$.sourceEvidence.statusWording") { value("aktuell (archived wording)") }
+        }
+        val correction = writes.createDraftVersion(constitution.id, com.constitutionatlas.catalog.api.CreateVersionRequest("1849 r2", predecessorVersionId = first.id, hopKind = "editorial_correction"))
+        assertThat(catalogRepository.findVersion(correction.id)?.sourceEvidence).isEqualTo(evidence)
+        assertThat(catalogRepository.findVersion(first.id)?.sourceEvidence).isEqualTo(evidence)
+    }
+
+    @Test
     fun historicalCountriesAndRegionsPublishConstitutionsWithoutIsoCodes() {
         val countryResponse = mockMvc.post("/jurisdictions") {
             header("Authorization", TOKEN)

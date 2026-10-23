@@ -31,7 +31,7 @@ const table = z.strictObject({
     logicalId: uuid,
     cells: z.array(z.strictObject({
       logicalId: uuid, text: z.string().max(1_048_576), header: z.boolean().optional(),
-      rowSpan: z.number().int().min(1).optional(), colSpan: z.number().int().min(1).optional(),
+      rowSpan: z.number().int().min(1).max(100).optional(), colSpan: z.number().int().min(1).max(100).optional(),
       headers: z.array(uuid).optional(),
     })).max(10_000),
   })).max(10_000),
@@ -64,6 +64,7 @@ export const orderedNode: z.ZodTypeAny = z.lazy(() => z.strictObject({
     table: table.nullable().optional(),
     footnoteLabel: nullableText,
     references: z.array(reference).max(10_000).optional(),
+    annotation: z.strictObject({ kind: z.enum(['source', 'editorial', 'amendment']), attribution: nullableText, sourceUrl: z.string().url().startsWith('https://').nullable().optional(), anchorLogicalIds: z.array(uuid).max(100).optional() }).nullable().optional(),
   })).max(10_000).nullable().optional(),
   lineage: z.array(uuid).max(32).optional(),
 }));
@@ -89,6 +90,7 @@ export const setupProposalSchema = z.strictObject({
 
 export const importPayloadSchema = z.strictObject({
   ...sourceFields,
+  sourceEvidence: z.strictObject({ dateWording: nullableText, datePrecision: z.enum(['unknown', 'year', 'month', 'day', 'range', 'uncertain']).optional(), coverage: nullableText, statusWording: nullableText, attribution: nullableText }).nullable().optional(),
   versionLabel: shortText,
   effectiveDate: z.iso.date().nullable().optional(),
   predecessorVersionId: uuid.nullable().optional(),
@@ -100,7 +102,7 @@ export const importPayloadSchema = z.strictObject({
     articleNumber: shortText,
     title: z.string().max(1000),
     body: z.string().max(1_048_576).optional(),
-    sortOrder: z.number().int().min(0),
+    sortOrder: z.number().int().min(1),
     nodes: z.array(legacyNode).max(10_000).optional(),
   })).max(10_000).optional(),
   roots: z.array(orderedNode).max(10_000).optional(),

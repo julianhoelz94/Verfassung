@@ -1,4 +1,28 @@
 export const migrationUi = {
+  migrations: { en: 'Archive migrations', de: 'Archivmigrationen' },
+  importQueue: { en: 'Import queue', de: 'Importwarteschlange' },
+  noRuns: { en: 'No migration packages have been staged yet.', de: 'Noch keine Migrationspakete bereitgestellt.' },
+  prepareFailed: { en: 'The item could not be prepared. Check its source and dependencies, then retry.', de: 'Der Eintrag konnte nicht vorbereitet werden. Quelle und Abhängigkeiten prüfen und erneut versuchen.' },
+  coverage: { en: 'Prepared resources', de: 'Vorbereitete Ressourcen' },
+  sources: { en: 'Source inventory', de: 'Quellenverzeichnis' },
+  unavailable: { en: 'Unavailable sources', de: 'Nicht verfügbare Quellen' },
+  excluded: { en: 'Excluded sources', de: 'Ausgeschlossene Quellen' },
+  filter: { en: 'Filter', de: 'Filtern' },
+  attempts: { en: 'Attempts', de: 'Versuche' },
+  prepare: { en: 'Prepare for review', de: 'Zur Prüfung vorbereiten' },
+  openReview: { en: 'Open review', de: 'Prüfung öffnen' },
+  openDocument: { en: 'Open document', de: 'Dokument öffnen' },
+  fidelity: { en: 'Source fidelity', de: 'Quellentreue' },
+  fidelityPassed: { en: 'The prepared text and structure match the submitted content.', de: 'Vorbereiteter Text und Struktur entsprechen dem eingereichten Inhalt.' },
+  moreMismatches: { en: 'Additional differences remain. Resolve these differences and run verification again.', de: 'Weitere Abweichungen bestehen. Diese Abweichungen beheben und erneut prüfen.' },
+  decisions: { en: 'Review decisions', de: 'Prüfentscheidungen' },
+  downloadSource: { en: 'Open the original source file', de: 'Originalquelldatei öffnen' },
+  previous: { en: 'Previous', de: 'Zurück' },
+  next: { en: 'Next', de: 'Weiter' },
+  sourceInvalid: { en: 'The source could not be verified or decoded. Check the recorded checksum and encoding.', de: 'Die Quelle konnte nicht geprüft oder dekodiert werden. Prüfsumme und Zeichenkodierung prüfen.' },
+  missingSource: { en: 'Missing source capture', de: 'Quellaufnahme fehlt' },
+  preparedText: { en: 'Prepared text', de: 'Vorbereiteter Text' },
+  notPrepared: { en: 'This item has no prepared constitutional text yet.', de: 'Für diesen Eintrag liegt noch kein vorbereiteter Verfassungstext vor.' },
   jurisdictions: { en: 'Countries, regions and historical jurisdictions', de: 'Staaten, Regionen und historische Gebiete' },
   historical: { en: 'Historical jurisdiction', de: 'Historisches Gebiet' },
   children: { en: 'Regions and local jurisdictions', de: 'Regionen und lokale Gebiete' },
@@ -6,5 +30,24 @@ export const migrationUi = {
   noConstitutions: { en: 'No published constitutions yet.', de: 'Noch keine veröffentlichten Verfassungen.' },
   browse: { en: 'Browse regions and historical collections', de: 'Regionen und historische Sammlungen durchsuchen' },
   source: { en: 'Archival source', de: 'Archivquelle' },
+  annotations: { en: 'Read annotations', de: 'Anmerkungen lesen' },
+  fullText: { en: 'Read the source text', de: 'Quellentext lesen' },
+  sourceDate: { en: 'Date as described by the source', de: 'Datierung laut Quelle' },
+  sourceStatus: { en: 'Status as described by the source', de: 'Statusangabe der Quelle' },
+  archivalNotice: { en: 'This archival source description does not establish present legal validity.', de: 'Diese Archivbeschreibung stellt keine Aussage zur heutigen Rechtsgeltung dar.' },
+  editorial: { en: 'Editorial annotation', de: 'Redaktionelle Anmerkung' },
+  amendment: { en: 'Amendment annotation', de: 'Änderungsanmerkung' },
+  sourceAnnotation: { en: 'Source annotation', de: 'Quellenanmerkung' },
   jurisdiction: { en: 'Jurisdiction', de: 'Gebiet' },
 };
+
+export function migrationStateMessage(state: string) {
+  const labels: Record<string, { en: string; de: string }> = {
+    staged: { en: 'Awaiting preparation', de: 'Wartet auf Vorbereitung' },
+    blocked: { en: 'Unresolved dependency', de: 'Abhängigkeit ungeklärt' },
+    failed: { en: 'Needs attention', de: 'Klärung erforderlich' },
+    preparing: { en: 'Preparing', de: 'Wird vorbereitet' },
+    prepared: { en: 'Ready to review', de: 'Bereit zur Prüfung' },
+  };
+  return labels[state] ?? labels.staged!;
+}

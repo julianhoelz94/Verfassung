@@ -1,6 +1,8 @@
 package com.constitutionatlas.ingestion.service
 
-import com.constitutionatlas.ingestion.api.*
+import com.constitutionatlas.ingestion.api.ExportValue
+import com.constitutionatlas.ingestion.api.FidelityMismatch
+import com.constitutionatlas.ingestion.api.ImportExportPage
 import com.constitutionatlas.ingestion.client.CatalogClient
 import com.constitutionatlas.ingestion.client.ContentClient
 import com.constitutionatlas.ingestion.client.DownstreamAuth
@@ -31,6 +33,7 @@ class ImportExportService(
         if (actor.id != job.submittedBy && actor.roles.none { it in setOf("editor", "reviewer", "publisher", "admin") }) {
             throw ForbiddenException("Import job access requires ownership or staff role")
         }
+        if (actor.roles.none { it in setOf("editor", "reviewer", "publisher", "admin") } && "ingestion:import" !in actor.scopes) throw ForbiddenException("Import read-back requires an import scope or staff role")
         requireInput(view in setOf("submitted", "prepared"), "view must be submitted or prepared")
         val request = jobs.request(id) ?: throw NotFoundException("Import payload missing")
         val submitted = mapper.valueToTree<JsonNode>(request)
@@ -39,13 +42,17 @@ class ImportExportService(
             if (serviceToken.isBlank()) throw ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Import read-back service credential is not configured")
             // The version comes exclusively from the authorized job, never from caller input.
             DownstreamAuth.withAuthorization("Bearer $serviceToken") { content.snapshot(version) }
-        } else null
+        } else {
+            null
+        }
         val tree = snapshot?.let { mapper.valueToTree<JsonNode>(it) } ?: submitted
         val serialized = mapper.writeValueAsBytes(tree)
         val snapshotId = MessageDigest.getInstance("SHA-256").digest(serialized).joinToString("") { "%02x".format(it) }
         val records = mutableListOf<ExportValue>()
         flatten(tree, "", records)
-        val offset = if (cursor == null) 0 else {
+        val offset = if (cursor == null) {
+            0
+        } else {
             val decoded = runCatching { String(Base64.getUrlDecoder().decode(cursor)) }.getOrElse { bad("Invalid export cursor") }
             val parts = decoded.split(':')
             requireInput(parts.size == 4 && parts[0] == id.toString() && parts[1] == view, "Cursor belongs to another export")
@@ -68,14 +75,18 @@ class ImportExportService(
             if (persistedVersion == null) conflict("Prepared catalog version is unavailable")
             if (request.constitutionId != null && persistedVersion.constitutionId != request.constitutionId) mismatches += FidelityMismatch("/constitutionId", "Prepared constitution pin differs")
             if (persistedVersion.sourceUrl != request.sourceUrl || persistedVersion.gazetteReference != request.gazetteReference) mismatches += FidelityMismatch("/source", "Prepared source pins differ")
+            if (persistedVersion.sourceEvidence != request.sourceEvidence) mismatches += FidelityMismatch("/sourceEvidence", "Prepared source evidence differs")
             if (persistedVersion.effectiveDate != request.effectiveDate || persistedVersion.versionLabel != request.versionLabel) mismatches += FidelityMismatch("/version", "Prepared version metadata differs")
             if (request.settingsRevisionId != null && snapshot.settingsRevisionId != request.settingsRevisionId) mismatches += FidelityMismatch("/settingsRevisionId", "Prepared settings pin differs from submitted pin")
-            if (request.roots.isNotEmpty()) compare(submitted.path("roots"), tree.path("roots"), "/roots", mismatches)
-            else mismatches += FidelityMismatch("/articles", "Legacy article import requires structured roots for complete fidelity verification")
+            if (request.roots.isNotEmpty()) {
+                compare(submitted.path("roots"), tree.path("roots"), "/roots", mismatches)
+            } else {
+                mismatches += FidelityMismatch("/articles", "Legacy article import requires structured roots for complete fidelity verification")
+            }
         }
         return ImportExportPage(
             id, view, snapshotId, job.versionId, snapshot?.generation, snapshot?.settingsRevisionId ?: request.settingsRevisionId,
-            mapOf("sourceUrl" to (if (snapshot != null) persistedVersion?.sourceUrl else request.sourceUrl), "gazetteReference" to (if (snapshot != null) persistedVersion?.gazetteReference else request.gazetteReference), "predecessorVersionId" to request.predecessorVersionId),
+            mapOf("sourceEvidence" to (if (snapshot != null) persistedVersion?.sourceEvidence else request.sourceEvidence), "sourceUrl" to (if (snapshot != null) persistedVersion?.sourceUrl else request.sourceUrl), "gazetteReference" to (if (snapshot != null) persistedVersion?.gazetteReference else request.gazetteReference), "predecessorVersionId" to request.predecessorVersionId),
             page, records.size,
             if (next < records.size) Base64.getUrlEncoder().withoutPadding().encodeToString("$id:$view:$snapshotId:$next".toByteArray()) else null,
             next == records.size, mismatches.take(100), mismatches.size <= 100, job.errors,
@@ -101,6 +112,8 @@ class ImportExportService(
                     val found = actual.path(key)
                     val sameDefault = (value.isNull && (found.isMissingNode || found.isNull)) ||
                         (key == "format" && value.isNull && found.asText() == "plain") ||
+                        (key == "text" && value.isNull && expected.path("format").asText() == "table") ||
+                        (key == "kind" && value.isNull) ||
                         (value.isArray && value.isEmpty && found.isMissingNode)
                     if (!sameDefault) compare(value, found, "$path/$key", result)
                 }
@@ -108,10 +121,14 @@ class ImportExportService(
         } else if (expected.isArray) {
             if (!actual.isArray || expected.size() != actual.size()) result += FidelityMismatch(path, "Collection length differs: expected ${expected.size()}, persisted ${actual.size()}")
             expected.forEachIndexed { index, value -> compare(value, actual.path(index), "$path/$index", result) }
-        } else if (expected != actual) result += FidelityMismatch(path, "Persisted value differs from submitted value")
+        } else if (expected != actual) {
+            result += FidelityMismatch(path, "Persisted value differs from submitted value")
+        }
     }
 
-    private fun requireInput(condition: Boolean, message: String) { if (!condition) bad(message) }
+    private fun requireInput(condition: Boolean, message: String) {
+        if (!condition) bad(message)
+    }
     private fun bad(message: String): Nothing = throw ResponseStatusException(HttpStatus.BAD_REQUEST, message)
     private fun conflict(message: String): Nothing = throw ResponseStatusException(HttpStatus.CONFLICT, message)
 }

@@ -17,9 +17,15 @@ data class DownstreamConstitution(val id: UUID, val slug: String, val title: Str
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 data class DownstreamVersion(
-    val id: UUID, val constitutionId: UUID = UUID(0, 0), val publicationStatus: String = "draft",
-    val versionLabel: String? = null, val sourceUrl: String? = null, val gazetteReference: String? = null,
-    val effectiveDate: LocalDate? = null, val jurisdictionId: UUID? = null,
+    val id: UUID,
+    val constitutionId: UUID = UUID(0, 0),
+    val publicationStatus: String = "draft",
+    val versionLabel: String? = null,
+    val sourceUrl: String? = null,
+    val gazetteReference: String? = null,
+    val effectiveDate: LocalDate? = null,
+    val jurisdictionId: UUID? = null,
+    val sourceEvidence: com.constitutionatlas.platform.SourceEvidence? = null,
 )
 
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -47,6 +53,7 @@ interface CatalogClient {
         hopKind: String? = null,
         importJobId: UUID? = null,
         settingsRevisionId: UUID? = null,
+        sourceEvidence: com.constitutionatlas.platform.SourceEvidence? = null,
     ): DownstreamVersion
     fun publishVersion(versionId: UUID, importJobId: UUID? = null): DownstreamVersion
     fun replaceOutline(constitutionId: UUID, kinds: List<ImportOutlineKind>)

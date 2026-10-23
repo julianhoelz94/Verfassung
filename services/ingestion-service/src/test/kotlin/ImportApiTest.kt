@@ -61,6 +61,9 @@ class ImportApiTest {
     @MockBean
     lateinit var identityClient: IdentityClient
 
+    @MockBean
+    lateinit var migrationDomains: com.constitutionatlas.ingestion.client.MigrationDomainClient
+
     private val admin =
         Actor(UUID.fromString("01900000-0000-4000-8000-000000000413"), "local-admin@example.local", listOf("admin"))
     private val reviewer = Actor(UUID.randomUUID(), "reviewer@example.local", listOf("reviewer"))
@@ -112,6 +115,59 @@ class ImportApiTest {
 
     private fun anyUuid(): UUID = Mockito.any(UUID::class.java) ?: UUID(0, 0)
     private fun anyStr(): String = Mockito.anyString() ?: ""
+
+    @Test
+    fun migrationPackagesResumeDependenciesWithoutDuplicateWritesOrScopeEscalation() {
+        val manifest = """{"runKey":"pilot-${UUID.randomUUID()}","title":"Archive pilot","sources":[{"sourceKey":"source","url":"https://example.org/original"},{"sourceKey":"unavailable","url":"https://example.org/missing","disposition":"unavailable","reason":"Source is missing"}]}"""
+        fun create() = mockMvc.post("/migration-runs") {
+            header("Authorization", MCP_TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = manifest
+        }
+        val run = jobId(
+            create().andExpect {
+                status { isCreated() }
+                jsonPath("$.coverage.sources") { value(2) }
+            }.andReturn().response.contentAsString,
+        )
+        create().andExpect {
+            status { isCreated() }
+            jsonPath("$.id") { value(run) }
+        }
+        fun stage(key: String, dependencies: String = "[]") = mockMvc.post("/migration-runs/$run/items") {
+            header("Authorization", MCP_TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"sourceKey":"$key","kind":"document","dependencies":$dependencies,"payload":{"title":"Original archive","sourceUrl":"https://example.org/original"}}"""
+        }
+        val parent = jobId(stage("parent").andExpect { status { isCreated() } }.andReturn().response.contentAsString)
+        val child = jobId(stage("child", "[\"parent\"]").andExpect { status { isCreated() } }.andReturn().response.contentAsString)
+        stage("parent").andExpect {
+            status { isCreated() }
+            jsonPath("$.id") { value(parent) }
+        }
+        mockMvc.post("/migration-runs/$run/items/$parent/prepare") { header("Authorization", MCP_TOKEN) }.andExpect { status { isForbidden() } }
+        mockMvc.post("/migration-runs/$run/items/$child/prepare") { header("Authorization", EDITOR_TOKEN) }.andExpect {
+            status { isOk() }
+            jsonPath("$.state") { value("blocked") }
+        }
+        val captured = json.readTree("""{"id":"${UUID.randomUUID()}","revision":{"id":"${UUID.randomUUID()}","revision":2}}""")
+        Mockito.`when`(migrationDomains.capture(Mockito.any() ?: emptyMap<String, Any>(), Mockito.eq(EDITOR_TOKEN))).thenReturn(captured)
+        listOf(parent, parent, child).forEach { item ->
+            mockMvc.post("/migration-runs/$run/items/$item/prepare") { header("Authorization", EDITOR_TOKEN) }.andExpect {
+                status { isOk() }
+                jsonPath("$.state") { value("prepared") }
+            }
+        }
+        Mockito.verify(migrationDomains, Mockito.times(2)).capture(Mockito.any() ?: emptyMap<String, Any>(), Mockito.eq(EDITOR_TOKEN))
+        mockMvc.get("/migration-runs/$run") { header("Authorization", MCP_TOKEN) }.andExpect {
+            status { isOk() }
+            jsonPath("$.coverage.prepared") { value(2) }
+            jsonPath("$.coverage.unavailable") { value(1) }
+        }
+        val otherKey = "Bearer another-migration-importer"
+        Mockito.`when`(identityClient.authenticate(otherKey)).thenReturn(scopedImporter.copy(id = UUID.randomUUID()))
+        mockMvc.get("/migration-runs/$run") { header("Authorization", otherKey) }.andExpect { status { isForbidden() } }
+    }
 
     @Test
     fun chunkedImportResumesAndCompletesAsPendingReview() {
@@ -334,6 +390,7 @@ class ImportApiTest {
                 anyUuid(), anyStr(), Mockito.nullable(LocalDate::class.java), anyStr(),
                 Mockito.nullable(String::class.java), Mockito.nullable(String::class.java),
                 Mockito.nullable(UUID::class.java), Mockito.nullable(String::class.java), anyUuid(), Mockito.nullable(UUID::class.java),
+                Mockito.nullable(com.constitutionatlas.platform.SourceEvidence::class.java),
             ),
         ).thenReturn(DownstreamVersion(versionId, constitutionId, "draft"))
     }
@@ -709,6 +766,7 @@ class ImportApiTest {
             eqNonNull("legal"),
             anyUuid(),
             eqNonNull(SETTINGS_REVISION),
+            Mockito.nullable(com.constitutionatlas.platform.SourceEvidence::class.java),
         )
     }
 
@@ -731,6 +789,7 @@ class ImportApiTest {
             anyUuid(), anyStr(), Mockito.nullable(LocalDate::class.java), anyStr(),
             Mockito.nullable(String::class.java), Mockito.nullable(String::class.java),
             Mockito.nullable(UUID::class.java), Mockito.nullable(String::class.java), anyUuid(), Mockito.nullable(UUID::class.java),
+            Mockito.nullable(com.constitutionatlas.platform.SourceEvidence::class.java),
         )
         Mockito.verify(catalogClient, Mockito.never()).replaceOutline(anyUuid(), Mockito.anyList())
     }
@@ -780,6 +839,7 @@ class ImportApiTest {
             Mockito.isNull(),
             anyUuid(),
             Mockito.isNull(),
+            Mockito.nullable(com.constitutionatlas.platform.SourceEvidence::class.java),
         )
         Mockito.verify(contentClient).replaceArticles(
             eqNonNull(versionId),

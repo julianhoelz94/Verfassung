@@ -178,6 +178,7 @@ class CatalogWriteService(
                 legalVersionId,
                 legalPredecessorId,
                 editorialPredecessorId,
+                (request.sourceEvidence ?: if (hopKind == "editorial_correction") predecessorId?.let { catalogRepository.findVersion(it)?.sourceEvidence } else null)?.also { it.validate() },
             )
         } catch (ex: DataIntegrityViolationException) {
             if (hopKind == "editorial_correction") {

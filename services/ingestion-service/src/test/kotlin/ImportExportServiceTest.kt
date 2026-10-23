@@ -6,11 +6,25 @@ import com.constitutionatlas.ingestion.client.DownstreamAuth
 import com.constitutionatlas.ingestion.client.DownstreamVersion
 import com.constitutionatlas.ingestion.repo.ImportJobRepository
 import com.constitutionatlas.ingestion.service.ImportExportService
-import com.constitutionatlas.platform.*
+import com.constitutionatlas.platform.Actor
+import com.constitutionatlas.platform.ForbiddenException
+import com.constitutionatlas.platform.OrderedEntry
+import com.constitutionatlas.platform.OrderedEntryWrite
+import com.constitutionatlas.platform.OrderedNode
+import com.constitutionatlas.platform.OrderedNodeWrite
+import com.constitutionatlas.platform.OrderedSnapshot
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
-import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Assertions.assertThrows
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
-import org.mockito.Mockito.*
+import org.mockito.Mockito.clearInvocations
+import org.mockito.Mockito.doAnswer
+import org.mockito.Mockito.mock
+import org.mockito.Mockito.verifyNoInteractions
+import org.mockito.Mockito.`when`
 import org.springframework.web.server.ResponseStatusException
 import java.util.UUID
 
@@ -29,11 +43,13 @@ class ImportExportServiceTest {
 
     private fun setup(text: String = "Original wording", persisted: String = text, generation: Long = 1) {
         `when`(jobs.find(id)).thenReturn(ImportJobDto(id, "pending_review", version, emptyList(), submittedBy = owner.id))
-        `when`(jobs.request(id)).thenReturn(ImportRequest(
-            "DE", "Germany", "archive", "Constitution", "1849", sourceUrl = "https://example.org/original",
-            constitutionId = constitution, settingsRevisionId = settings,
-            roots = listOf(OrderedNodeWrite(logicalId = logical, kind = "article", label = "I", content = listOf(OrderedEntryWrite("text", text = text)))),
-        ))
+        `when`(jobs.request(id)).thenReturn(
+            ImportRequest(
+                "DE", "Germany", "archive", "Constitution", "1849", sourceUrl = "https://example.org/original",
+                constitutionId = constitution, settingsRevisionId = settings,
+                roots = listOf(OrderedNodeWrite(logicalId = logical, kind = "article", label = "I", content = listOf(OrderedEntryWrite("text", text = text)))),
+            ),
+        )
         val snapshot = OrderedSnapshot(version, generation, settings, listOf(OrderedNode(logical, UUID.randomUUID(), UUID.randomUUID(), "article", "I", null, listOf(OrderedEntry("text", text = persisted)))))
         doAnswer {
             assertEquals("Bearer internal-read-credential", DownstreamAuth.header())

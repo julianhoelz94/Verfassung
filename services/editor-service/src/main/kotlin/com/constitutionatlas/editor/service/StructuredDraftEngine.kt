@@ -65,6 +65,7 @@ object StructuredDraftEngine {
                             table = if (operation.format != null) operation.table else it.table,
                             footnoteLabel = if (operation.format != null) operation.footnoteLabel else it.footnoteLabel,
                             references = if (operation.format != null) operation.references else it.references,
+                            annotation = if (operation.format != null) operation.annotation else it.annotation,
                         ),
                     )
                 }
@@ -76,7 +77,7 @@ object StructuredDraftEngine {
                     require(foundNode != null) { "Insertion target must be a parent" }
                     val entry = if (operation.type == "insert_text") {
                         val part = operation.parts.singleOrNull() ?: throw IllegalArgumentException("insert_text requires one explicitly identified text part")
-                        DraftEntry("text", logicalId = part.logicalId, draftId = operation.id, text = part.text, format = part.format, table = part.table, footnoteLabel = part.footnoteLabel, references = part.references)
+                        DraftEntry("text", logicalId = part.logicalId, draftId = operation.id, text = part.text, format = part.format, table = part.table, footnoteLabel = part.footnoteLabel, references = part.references, annotation = part.annotation)
                     } else {
                         val child = operation.node ?: throw IllegalArgumentException("insert_child requires a node")
                         fun newNode(node: DraftNode) {

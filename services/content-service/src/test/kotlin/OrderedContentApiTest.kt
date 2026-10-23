@@ -59,6 +59,7 @@ class OrderedContentApiTest {
             ),
         )
         val articleId = UUID.randomUUID()
+        val annotation = com.constitutionatlas.platform.OrderedAnnotation("editorial", "Archive editor", "https://example.org/source", listOf(articleId))
         val noteId = UUID.randomUUID()
         val unavailableId = UUID.randomUUID()
         val appendixId = UUID.randomUUID()
@@ -83,7 +84,7 @@ class OrderedContentApiTest {
                             OrderedInlineReference(UUID.randomUUID(), 13, 17, OrderedReferenceTarget("unit", logicalId = unavailableId)),
                         ),
                     ),
-                    OrderedEntryWrite("text", logicalId = noteId, text = "Source note.", format = "footnote", footnoteLabel = "1"),
+                    OrderedEntryWrite("text", logicalId = noteId, text = "Source note.", format = "footnote", footnoteLabel = "1", annotation = annotation),
                 ),
             ),
             OrderedNodeWrite(logicalId = appendixId, kind = "appendix", content = listOf(OrderedEntryWrite("text", format = "table", table = table))),
@@ -92,6 +93,8 @@ class OrderedContentApiTest {
         assertThat(saved.roots[0].content[0].references.first().target.footnoteId).isEqualTo(noteId)
         assertThat(saved.roots[0].content[0].references.last().target.logicalId).isEqualTo(unavailableId)
         assertThat(saved.roots[1].content.single().text).isEqualTo("Duty\nReport")
+        assertThat(content.get(version).roots[0].content[1].annotation).isEqualTo(annotation)
+        assertThat(content.export(version).roots[0].content!![1].annotation).isEqualTo(annotation)
         assertThat(content.get(version).roots[1].content.single().table).isEqualTo(table)
         assertThat(content.export(version).roots[1].content!!.single().table).isEqualTo(table)
     }

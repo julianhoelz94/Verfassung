@@ -6,6 +6,7 @@ import { T } from '../../../../components/TranslationProvider';
 import { getJurisdiction, getStructuredSnapshot } from '../../../../../lib/migration-api';
 import { getReaderOutline, getVersion } from '../../../../../lib/api';
 import { migrationUi } from '../../../../../lib/migration-messages';
+import { SourceEvidenceNotice } from '../../../../components/SourceEvidenceNotice';
 
 export default async function JurisdictionVersionPage({ params }: { params: Promise<{ id: string; versionId: string }> }) {
   const { id, versionId } = await params;
@@ -19,6 +20,7 @@ export default async function JurisdictionVersionPage({ params }: { params: Prom
     { href: `/jurisdictions/${id}`, label: detail.jurisdiction.name }, { label: version.versionLabel },
   ]} />}>
     {detail.jurisdiction.historical ? <p><T value={migrationUi.historical} /></p> : null}
+    <SourceEvidenceNotice evidence={version.sourceEvidence} versionId={versionId} />
     <div lang={version.languageCode}><OrderedContentTree entries={snapshot.roots.map(node => ({ type: 'child', node }))} outline={outline ?? constitution.contentOutline} /></div>
   </ReaderPage>;
 }

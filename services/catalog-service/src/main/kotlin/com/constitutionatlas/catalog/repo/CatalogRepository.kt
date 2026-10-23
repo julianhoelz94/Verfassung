@@ -15,7 +15,7 @@ import org.springframework.stereotype.Repository
 import java.util.UUID
 
 @Repository
-class CatalogRepository(private val jdbc: JdbcTemplate) {
+class CatalogRepository(private val jdbc: JdbcTemplate, private val mapper: com.fasterxml.jackson.databind.ObjectMapper) {
     fun holdImportedVersion(versionId: UUID, jobId: UUID) {
         jdbc.update("INSERT INTO import_publication_holds (version_id, import_job_id) VALUES (?, ?)", versionId, jobId)
     }
@@ -137,7 +137,7 @@ class CatalogRepository(private val jdbc: JdbcTemplate) {
                 """
                 SELECT tip.id,
                        legal.version_label, legal.effective_date, legal.language_code, legal.source_url,
-                       legal.gazette_reference, legal.provenance, legal.verification_state,
+                       legal.gazette_reference, legal.source_evidence, legal.provenance, legal.verification_state,
                        legal.verified_by, legal.verified_at,
                        legal.legal_predecessor_version_id AS predecessor_version_id,
                        legal.hop_kind, 'public' AS listing,
@@ -181,7 +181,7 @@ class CatalogRepository(private val jdbc: JdbcTemplate) {
             jdbc.query(
                 """
                 SELECT cv.id, cv.version_label, cv.effective_date, cv.language_code, cv.source_url,
-                       cv.gazette_reference, cv.provenance, cv.verification_state, cv.verified_by,
+                       cv.gazette_reference, cv.source_evidence, cv.provenance, cv.verification_state, cv.verified_by,
                        cv.verified_at, cv.predecessor_version_id, cv.hop_kind, cv.listing, cv.publication_comment,
                        cv.legal_version_id,
                        tip.id AS current_version_id,
@@ -514,6 +514,7 @@ class CatalogRepository(private val jdbc: JdbcTemplate) {
         legalVersionId: UUID,
         legalPredecessorVersionId: UUID?,
         editorialPredecessorVersionId: UUID?,
+        sourceEvidence: com.constitutionatlas.platform.SourceEvidence? = null,
     ): UUID {
         jdbc.update(
             """
@@ -521,8 +522,8 @@ class CatalogRepository(private val jdbc: JdbcTemplate) {
               id, constitution_id, version_label, effective_date, publication_status,
               language_code, source_url, gazette_reference, provenance, verification_state,
               predecessor_version_id, hop_kind, listing, publication_comment,
-              legal_version_id, legal_predecessor_version_id, editorial_predecessor_version_id
-            ) VALUES (?, ?, ?, ?, 'draft', ?, ?, ?, 'imported', 'unverified', ?, ?, ?, ?, ?, ?, ?)
+              legal_version_id, legal_predecessor_version_id, editorial_predecessor_version_id, source_evidence
+            ) VALUES (?, ?, ?, ?, 'draft', ?, ?, ?, 'imported', 'unverified', ?, ?, ?, ?, ?, ?, ?, ?::jsonb)
             """.trimIndent(),
             id,
             constitutionId,
@@ -538,6 +539,7 @@ class CatalogRepository(private val jdbc: JdbcTemplate) {
             legalVersionId,
             legalPredecessorVersionId,
             editorialPredecessorVersionId,
+            sourceEvidence?.let(mapper::writeValueAsString),
         )
         if (!sourceUrl.isNullOrBlank() || !gazetteReference.isNullOrBlank()) {
             jdbc.update(
@@ -587,7 +589,7 @@ class CatalogRepository(private val jdbc: JdbcTemplate) {
                    tip.id AS current_version_id,
                    cv.legal_predecessor_version_id,
                    cv.editorial_predecessor_version_id, country.iso_code AS country_code, constitution.jurisdiction_id,
-                   cv.source_url, cv.gazette_reference
+                   cv.source_url, cv.gazette_reference, cv.source_evidence
             FROM constitution_versions cv
             JOIN constitutions constitution ON constitution.id = cv.constitution_id
             LEFT JOIN countries country ON country.id = constitution.country_id
@@ -638,6 +640,7 @@ class CatalogRepository(private val jdbc: JdbcTemplate) {
             versionLabel = rs.getString("version_label"),
             effectiveDate = rs.getDate("effective_date")?.toLocalDate(),
             languageCode = rs.getString("language_code"),
+            sourceEvidence = rs.getString("source_evidence")?.let { mapper.readValue(it, com.constitutionatlas.platform.SourceEvidence::class.java) },
             sourceUrl = rs.getString("source_url"),
             gazetteReference = rs.getString("gazette_reference"),
             provenance = rs.getString("provenance"),
@@ -657,6 +660,7 @@ class CatalogRepository(private val jdbc: JdbcTemplate) {
 
     private val versionDetailMapper = RowMapper { rs, _ ->
         VersionDetail(
+            sourceEvidence = rs.getString("source_evidence")?.let { mapper.readValue(it, com.constitutionatlas.platform.SourceEvidence::class.java) },
             sourceUrl = rs.getString("source_url"),
             gazetteReference = rs.getString("gazette_reference"),
             countryCode = rs.getString("country_code"),

@@ -20,6 +20,7 @@ object ImportValidator {
 
     fun validate(request: ImportRequest, pinnedOutline: ImportOutline? = null): List<Pair<String, String>> {
         val errors = mutableListOf<Pair<String, String>>()
+        runCatching { request.sourceEvidence?.validate() }.exceptionOrNull()?.let { errors += "SOURCE_EVIDENCE" to (it.message ?: "Invalid source evidence") }
         if (request.jurisdictionId != null && request.isoCode.isNotBlank()) errors += "AMBIGUOUS_JURISDICTION" to "Use jurisdictionId or isoCode, not both"
         if (request.jurisdictionId == null && !request.isoCode.matches(Regex("[A-Za-z]{2}"))) {
             errors += "INVALID_ISO" to "isoCode must be two letters"
@@ -68,6 +69,8 @@ object ImportValidator {
                     entry.node?.let { visit(it, kind, "$path.content[$index].node") }
                     if (entry.logicalId != null && !logicalIds.add(requireNotNull(entry.logicalId))) errors += "DUPLICATE_LOGICAL_ID" to "Logical identities must be unique"
                     if (entry.revisionId != null || ((entry.predecessorRevisionId != null || entry.lineage.isNotEmpty()) && request.predecessorVersionId == null)) errors += "REVISION_REFERENCE" to "$entryPath: ancestry requires a pinned predecessor version; stored revision reuse is not supported"
+                    runCatching { entry.annotation?.validate() }.exceptionOrNull()?.let { errors += "ANNOTATION" to (it.message ?: "Invalid annotation") }
+                    if (entry.annotation != null && entry.format != "footnote") errors += "ANNOTATION" to "$entryPath: annotations require a footnote entry"
                     if (entry.type == "text") {
                         val format = entry.format ?: "plain"
                         if (format !in setOf("plain", "table", "footnote") || (format == "table") != (entry.table != null)) errors += "RICH_FORMAT" to "$entryPath: format and table payload must agree"

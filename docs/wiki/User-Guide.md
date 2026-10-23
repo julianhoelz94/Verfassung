@@ -40,7 +40,7 @@ To cite a passage, save the opened provision's address and version ID. Older lin
 
 ## Text corrections and legal history
 
-Reading pages emphasize legal versions, effective dates and legal changes. Routine typo and transcription fixes do not add another legal version to the version choices or a legal-change event to the timeline. Editorial details are secondary: staff can open **Structure and editorial details → Text corrections**, or use **Editorial → Snapshot history**, to inspect them. Correction entries remain collapsed until requested.
+Reading pages emphasize legal versions, effective dates and legal changes. Routine typo and transcription fixes do not add another legal version to the version choices or a legal-change event to the timeline. Editorial details are secondary: staff can open **Structure and editorial details → Text corrections**, or use **Editorial → Text history**, to inspect them. Correction entries remain collapsed until requested.
 
 If you deliberately open a saved older text snapshot, a compact archive notice identifies it and offers **Read current text**. The older link continues to identify the same published text. Article history shows legal versions rather than a feed of typo corrections. On document pages, revision information is available under **Document details and revisions**.
 

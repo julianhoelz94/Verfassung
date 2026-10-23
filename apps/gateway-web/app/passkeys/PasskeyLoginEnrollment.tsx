@@ -1,6 +1,8 @@
 'use client';
 
+import { safeLoginReturnTo } from '../../lib/return-to';
 import { T, useTranslation } from '../components/TranslationProvider';
+import { canVisitEditor } from '../../lib/nav';
 import { ui } from '../../lib/messages';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -21,7 +23,7 @@ export function PasskeyLoginEnrollment({ next }: { next?: string } = {}) {
       const started = await startPasskeyLoginEnrollment();
       const credential = await createPasskey(started.options);
       const result = await finishPasskeyLoginEnrollment(started.challengeId, credential);
-      router.push(next?.startsWith('/oauth/authorize?') ? next : result.roles.some((role) => ['editor', 'reviewer', 'publisher', 'admin'].includes(role)) ? '/editor' : '/');
+      router.push(safeLoginReturnTo(next, canVisitEditor(result.roles) ? '/editor' : '/'));
       router.refresh();
     } catch {
       setError(t(ui.state.passkeyEnrollmentFailed));

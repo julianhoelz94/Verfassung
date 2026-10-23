@@ -1299,6 +1299,80 @@ class CatalogApiTest {
     }
 
     @Test
+    fun publishedEditorialPermalinksRemainReadableAfterFurtherCorrections() {
+        val countryCode = uniqueCountryCode()
+        writes.createCountry(com.constitutionatlas.catalog.api.CreateCountryRequest(countryCode, "Permalink country"))
+        val constitution = writes.createConstitution(countryCode, com.constitutionatlas.catalog.api.CreateConstitutionRequest("permalinks", "Published history"))
+        val initial = writes.createDraftVersion(constitution.id, com.constitutionatlas.catalog.api.CreateVersionRequest("2000"))
+        writes.publishVersion(initial.id)
+
+        fun correction(predecessorId: UUID, label: String) = writes.createDraftVersion(
+            constitution.id,
+            com.constitutionatlas.catalog.api.CreateVersionRequest(label, predecessorVersionId = predecessorId, hopKind = "editorial_correction"),
+        )
+
+        val first = correction(initial.id, "2000-r2")
+        mockMvc.post("/versions/${first.id}/publish") { header("Authorization", PUBLISHER_TOKEN) }
+            .andExpect { status { isOk() } }
+        mockMvc.get("/versions/${first.id}").andExpect {
+            status { isOk() }
+            jsonPath("$.currentVersionId") { value(first.id.toString()) }
+        }
+
+        val second = correction(first.id, "2000-r3")
+        mockMvc.post("/versions/${second.id}/publish") { header("Authorization", PUBLISHER_TOKEN) }
+            .andExpect { status { isOk() } }
+        val draft = correction(second.id, "2000-r4-draft")
+
+        listOf<String?>(null, VIEWER_TOKEN).forEach { authorization ->
+            listOf(initial, first, second).forEach { snapshot ->
+                mockMvc.get("/versions/${snapshot.id}") {
+                    authorization?.let { header("Authorization", it) }
+                }.andExpect {
+                    status { isOk() }
+                    jsonPath("$.id") { value(snapshot.id.toString()) }
+                    jsonPath("$.versionLabel") { value(snapshot.versionLabel) }
+                    jsonPath("$.publicationStatus") { value("published") }
+                    jsonPath("$.listing") { value(if (snapshot.id == initial.id) "public" else "staff") }
+                    jsonPath("$.currentVersionId") { value(second.id.toString()) }
+                }
+                listOf("settings", "reader-settings").forEach { resource ->
+                    mockMvc.get("/versions/${snapshot.id}/$resource") {
+                        authorization?.let { header("Authorization", it) }
+                    }.andExpect { status { isOk() } }
+                }
+            }
+            listOf("", "/settings", "/reader-settings").forEach { suffix ->
+                mockMvc.get("/versions/${draft.id}$suffix") {
+                    authorization?.let { header("Authorization", it) }
+                }.andExpect { status { isNotFound() } }
+            }
+        }
+        mockMvc.get("/versions/${draft.id}") { header("Authorization", TOKEN) }.andExpect {
+            status { isOk() }
+            jsonPath("$.publicationStatus") { value("draft") }
+        }
+
+        mockMvc.get("/constitutions/${constitution.id}/versions").andExpect {
+            status { isOk() }
+            jsonPath("$.length()") { value(1) }
+            jsonPath("$[0].id") { value(second.id.toString()) }
+            jsonPath("$[0].legalVersionId") { value(initial.id.toString()) }
+            jsonPath("$[0].versionLabel") { value("2000") }
+            jsonPath("$[0].currentVersionId") { value(second.id.toString()) }
+        }
+        mockMvc.get("/countries/$countryCode").andExpect {
+            status { isOk() }
+            jsonPath("$.constitutions[0].versions.length()") { value(1) }
+            jsonPath("$.constitutions[0].latestVersionId") { value(second.id.toString()) }
+        }
+        mockMvc.get("/constitutions/${constitution.id}/versions?listing=all")
+            .andExpect { status { isUnauthorized() } }
+        mockMvc.get("/constitutions/${constitution.id}/versions?listing=all") { header("Authorization", VIEWER_TOKEN) }
+            .andExpect { status { isForbidden() } }
+    }
+
+    @Test
     fun editorialHopOnOlderLawAfterLaterLegalExists() {
         val countryCode = uniqueCountryCode()
         mockMvc.post("/countries") {

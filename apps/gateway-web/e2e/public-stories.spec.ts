@@ -55,9 +55,9 @@ test('visitor compares versions and changes the article scope', async ({ page })
   await expect(page.getByRole('heading', { name: /side by side/ })).toBeVisible();
   await expect(page.locator('ins.diff-add, del.diff-remove').first()).toBeVisible();
   await page.getByRole('link', { name: /Show all/ }).click();
-  await expect(page.getByText('All articles are shown.')).toBeVisible();
+  await expect(page.getByText('All passages are shown.')).toBeVisible();
   await page.getByRole('link', { name: 'Only changed' }).click();
-  await expect(page.getByText('Only changed articles are shown.')).toBeVisible();
+  await expect(page.getByText('Only changed passages are shown.')).toBeVisible();
 });
 
 test('visitor reads the legal timeline and its source context', async ({ page }) => {

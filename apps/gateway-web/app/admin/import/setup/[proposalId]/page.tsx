@@ -1,7 +1,8 @@
+import { loginHref } from '../../../../../lib/return-to';
 import { statusMessage } from '../../../../../lib/ui-labels';
 import { T } from '../../../../components/TranslationProvider';
 import { ui } from '../../../../../lib/messages';
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import { AdminForbidden } from '../../../../components/AdminForbidden';
 import { Alert, Button, Card, PageHeader } from '../../../../components/ui';
 import { WorkspacePage } from '../../../../components/layout/templates';
@@ -16,9 +17,10 @@ import { Stack } from '../../../../components/layout/Layout';
 type Props = { params: Promise<{ proposalId: string }>; searchParams: Promise<{ error?: string }> };
 
 export default async function SetupProposalPage({ params, searchParams }: Props) {
-  const user = await currentUser();
-  if (!user || !user.roles.some(role => role === 'editor' || role === 'admin')) return <AdminForbidden title={ui.forbidden.constitutionSetup} />;
   const { proposalId } = await params;
+  const user = await currentUser();
+  if (!user) redirect(loginHref(`/admin/import/setup/${encodeURIComponent(proposalId)}`, await searchParams));
+  if (!user.roles.some(role => role === 'editor' || role === 'admin')) return <AdminForbidden title={ui.forbidden.constitutionSetup} />;
   const proposal = await getSetupProposal(proposalId, await requireSessionBearer()).catch(() => null);
   if (!proposal) notFound();
   const error = (await searchParams).error;

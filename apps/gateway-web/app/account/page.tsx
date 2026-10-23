@@ -1,9 +1,10 @@
+import { loginHref } from '../../lib/return-to';
 import { siteLanguages } from '../../lib/deployment-setup';
 import { SignedInSummary } from '../components/SignedInSummary';
 import { currentLocale } from '../../lib/server-locale';
 import { message } from '../../lib/messages';
 import { T } from '../components/TranslationProvider';
-import { ui } from '../../lib/messages';
+import { ui, type UiMessage } from '../../lib/messages';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { Alert, Button, Card, Input, PageHeader } from '../components/ui';
@@ -24,6 +25,17 @@ import { LanguagePreferenceForm } from './LanguagePreferenceForm';
 import { translationUserSettings } from '../../lib/content-translation';
 import { Stack } from '../components/layout/Layout';
 
+const passwordCopy = {
+  hint: {
+    en: 'Use at least 12 characters. Avoid common passwords and the part of your email address before @.',
+    de: 'Verwenden Sie mindestens 12 Zeichen. Vermeiden Sie häufige Passwörter und den Teil Ihrer E-Mail-Adresse vor dem @.',
+  },
+  failed: {
+    en: 'Password could not be changed. Check your current password and choose a new password with at least 12 characters.',
+    de: 'Das Passwort konnte nicht geändert werden. Prüfen Sie Ihr aktuelles Passwort und wählen Sie ein neues Passwort mit mindestens 12 Zeichen.',
+  },
+} satisfies Record<string, UiMessage>;
+
 type AccountPageProps = {
   searchParams: Promise<{
     error?: string;
@@ -40,7 +52,7 @@ export default async function AccountPage(props: AccountPageProps) {
   const searchParams = await props.searchParams;
   const user = await currentUser();
   if (!user) {
-    redirect('/login');
+    redirect(loginHref('/account', searchParams));
   }
   // The enrollment challenge lives in the httpOnly `ca_mfa_challenge` cookie set by
   // `startMfaEnrollAction`; `?enroll=1` only marks that enrollment was requested.
@@ -107,7 +119,7 @@ export default async function AccountPage(props: AccountPageProps) {
             </Alert>
           ) : searchParams.error ? (
             <Alert tone="error">
-              <T value={ui.account.page.passwordCouldNotBeChangedCheckThe} />
+              <T value={passwordCopy.failed} />
             </Alert>
           ) : null}
 
@@ -274,6 +286,7 @@ export default async function AccountPage(props: AccountPageProps) {
               name="newPassword"
               type="password"
               autoComplete="new-password"
+              help={<T value={passwordCopy.hint} />}
               required
               minLength={12}
             />

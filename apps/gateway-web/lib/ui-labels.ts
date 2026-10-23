@@ -1,5 +1,6 @@
 import { ui, type UiMessage } from './messages';
 import { reviewUi } from './ui-review-messages';
+import { workflowUi } from './workflow-messages';
 
 export function changeTypeMessage(changeType: string): UiMessage {
   switch (changeType) {
@@ -51,6 +52,8 @@ export function statusMessage(status: string | null | undefined): UiMessage {
     case 'cancelled': return ui.accountState.cancelled;
     case 'archived': return ui.remainingStatus.archived;
     case 'prepared': return ui.importState.prepared;
+    case 'preparing': return workflowUi.preparing;
+    case 'publishing': return workflowUi.publishing;
     case 'outline_confirmed': return ui.importState.outlineConfirmed;
     case 'proposed': return reviewUi.structureProposed;
     case 'confirming': return reviewUi.structureConfirming;

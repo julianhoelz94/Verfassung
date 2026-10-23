@@ -30,7 +30,7 @@ function statusTone(user: AdminUser): 'added' | 'removed' | 'info' | 'neutral' {
 
 export default async function AdminUsersPage(props: AdminUsersPageProps) {
   const searchParams = await props.searchParams;
-  if (!(await requireAdminPage())) {
+  if (!(await requireAdminPage('/admin/users', searchParams))) {
     return <AdminForbidden title={ui.forbidden.users} />;
   }
   const token = (await cookies()).get(SESSION_COOKIE)?.value;
@@ -76,7 +76,7 @@ export default async function AdminUsersPage(props: AdminUsersPageProps) {
             <option value=""><T value={ui.admin.users.page.all} /></option><option value="active"><T value={ui.admin.users.page.active} /></option><option value="pending_confirmation"><T value={ui.admin.users.page.pendingConfirmation} /></option><option value="invited"><T value={ui.admin.users.page.invited} /></option><option value="disabled"><T value={ui.admin.users.page.disabled} /></option>
           </select></label>
           <label><T value={ui.admin.users.page.role} />{" "}<select name="role" defaultValue={searchParams.role ?? ''}>
-            <option value=""><T value={ui.admin.users.page.all} /></option><option value="viewer"><T value={ui.admin.users.page.viewer} /></option><option value="editor"><T value={ui.admin.users.page.editor} /></option><option value="reviewer"><T value={ui.admin.users.page.reviewer} /></option><option value="publisher"><T value={ui.admin.users.page.publisher} /></option><option value="admin"><T value={ui.admin.users.page.admin} /></option>
+            <option value=""><T value={ui.admin.users.page.all} /></option>{['viewer', 'editor', 'reviewer', 'publisher', 'admin'].map(role => <option key={role} value={role}><T value={roleMessage(role)} /></option>)}
           </select></label>
           <Button><T value={ui.admin.users.page.search} /></Button>
         </Inline>

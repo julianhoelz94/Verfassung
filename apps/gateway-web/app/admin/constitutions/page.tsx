@@ -17,7 +17,7 @@ type AdminConstitutionsPageProps = {
 
 export default async function AdminConstitutionsPage(props: AdminConstitutionsPageProps) {
   const searchParams = await props.searchParams;
-  if (!(await requireAdminPage())) {
+  if (!(await requireAdminPage('/admin/constitutions', searchParams))) {
     return <AdminForbidden title={ui.forbidden.outlines} />;
   }
   const { countries, details } = await loadCountriesWithDetails(await requireSessionBearer());

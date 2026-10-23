@@ -68,12 +68,11 @@ describe('menuSections', () => {
     expect(sectionHrefs(viewer, 'editorial')).toEqual([]);
   });
 
-  it('shows Editorial My sessions and Review queue for an editor', () => {
+  it('shows own work but no review queue for an editor without review permission', () => {
     const editor = { email: 'editor@example.local', roles: ['editor'] };
     expect(sectionIds(editor)).toEqual(['identity', 'primary', 'editorial', 'account']);
     expect(sectionHrefs(editor, 'editorial')).toEqual([
       '/editor?mine=1',
-      '/editor?status=reviewing',
       '/editor/documents',
       '/editor/amendments',
       '/editor/history',
@@ -141,8 +140,13 @@ describe('isCurrentNavHref', () => {
     expect(isCurrentNavHref('/login', '/editor')).toBe(false);
   });
 
-  it('ignores query strings when matching', () => {
+  it('distinguishes own work, review, and publish queues', () => {
     expect(isCurrentNavHref('/editor', '/editor?mine=1')).toBe(true);
+    expect(isCurrentNavHref('/editor', '/editor?mine=1', 'status=reviewing')).toBe(false);
+    expect(isCurrentNavHref('/editor', '/editor?status=reviewing', 'status=reviewing')).toBe(true);
+    expect(isCurrentNavHref('/editor', '/editor?status=approved', 'status=reviewing')).toBe(false);
+    expect(isCurrentNavHref('/editor/documents', '/editor?mine=1')).toBe(false);
+    expect(isCurrentNavHref('/editor', '/editor?mine=1', 'sessionId=example')).toBe(false);
   });
 });
 

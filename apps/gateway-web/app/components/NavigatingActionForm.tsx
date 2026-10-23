@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { T } from './TranslationProvider';
 import { ui } from '../../lib/messages';
 import { Stack } from './layout/Layout';
@@ -11,15 +11,21 @@ export function NavigatingActionForm({ action, children, className }: {
   children: ReactNode;
   className?: string;
 }) {
+  const [ready, setReady] = useState(false);
   const [pending, setPending] = useState(false);
   const [failed, setFailed] = useState(false);
-  return <Stack as="form" method="post" className={className} aria-busy={pending} onSubmit={async (event: React.FormEvent<HTMLFormElement>) => {
+  useEffect(() => { setReady(true); }, []);
+  return <Stack as="form" method="post" className={className} aria-busy={!ready || pending} onSubmit={async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (pending) return;
+    if (!ready || pending) return;
     const data = new FormData(event.currentTarget);
     setPending(true);
     setFailed(false);
     try { window.location.assign(await action(data)); }
     catch { setPending(false); setFailed(true); }
-  }}>{children}{failed ? <p role="alert"><T value={ui.errors.actionFailed} /></p> : null}</Stack>;
+  }}>
+    {/* Prevent a native POST before the client action is ready, while retaining Stack's child layout rules. */}
+    <Stack as="fieldset" disabled={!ready || pending} style={{ display: 'contents' }}>{children}</Stack>
+    {failed ? <p role="alert"><T value={ui.errors.actionFailed} /></p> : null}
+  </Stack>;
 }

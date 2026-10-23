@@ -1,3 +1,4 @@
+import { loginHref } from '../../../lib/return-to';
 import { Disclosure } from '../../components/Disclosure';
 import { reviewUi } from '../../../lib/ui-review-messages';
 import { SignedInSummary } from '../../components/SignedInSummary';
@@ -54,7 +55,7 @@ export default async function SnapshotHistoryPage(props: HistoryPageProps) {
   const searchParams = await props.searchParams;
   const user = await currentUser();
   if (!user) {
-    redirect('/login');
+    redirect(loginHref('/editor/history', searchParams));
   }
   if (!canVisitEditor(user.roles)) {
     return (

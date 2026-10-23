@@ -1,6 +1,6 @@
 import { changeTypeMessage } from '../../../../lib/ui-labels';
 import { T } from '../../../components/TranslationProvider';
-import { ui, message } from '../../../../lib/messages';
+import { ui, message, type UiMessage } from '../../../../lib/messages';
 import { currentLocale } from '../../../../lib/server-locale';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
@@ -93,17 +93,17 @@ type LawHop = {
   target?: VersionSummary;
 };
 
-function columnBadge(kind: CompareKind, side: 'from' | 'to'): { tone: 'added' | 'removed' | 'changed' | 'neutral'; label: string } {
+function columnBadge(kind: CompareKind, side: 'from' | 'to'): { tone: 'added' | 'removed' | 'changed' | 'neutral'; label: UiMessage } {
   if (kind === 'added') {
-    return side === 'from' ? { tone: 'removed', label: 'not present' } : { tone: 'added', label: 'added' };
+    return side === 'from' ? { tone: 'removed', label: ui.countries.code.compare.page.notPresent } : { tone: 'added', label: COMPARE_KIND_LABEL.added };
   }
   if (kind === 'removed') {
-    return side === 'from' ? { tone: 'removed', label: 'removed' } : { tone: 'removed', label: 'not present' };
+    return side === 'from' ? { tone: 'removed', label: COMPARE_KIND_LABEL.removed } : { tone: 'removed', label: ui.countries.code.compare.page.notPresent };
   }
   if (kind === 'changed') {
-    return { tone: 'changed', label: 'changed' };
+    return { tone: 'changed', label: COMPARE_KIND_LABEL.changed };
   }
-  return { tone: 'neutral', label: 'unchanged' };
+  return { tone: 'neutral', label: COMPARE_KIND_LABEL.same };
 }
 
 function hopChangeTone(changeType: string): 'added' | 'removed' | 'changed' | 'neutral' {
@@ -287,16 +287,16 @@ export default async function ComparePage(props: ComparePageProps) {
             <Badge tone="added">{addedCount} <T value={ui.countries.code.compare.page.added} /></Badge>
             <Badge tone="removed">{removedCount} <T value={ui.countries.code.compare.page.removed} /></Badge>
             <Badge>
-              {lawHops.length} <T value={ui.countries.code.compare.page.amendingLaw} />{lawHops.length === 1 ? '' : 's'}
+              {lawHops.length} <T value={lawHops.length === 1 ? ui.countries.code.compare.page.amendingLaw : ui.countries.code.compare.page.amendingLaws} />
             </Badge>
             <span className="muted">
               {showAll ? (
                 <>
-                  <T value={ui.countries.code.compare.page.allArticlesAreShown} />{" "}<a href={hideUnchangedHref}><T value={ui.countries.code.compare.page.onlyChanged} /></a>
+                  <T value={ui.countries.code.compare.page.allPassagesAreShown} />{" "}<a href={hideUnchangedHref}><T value={ui.countries.code.compare.page.onlyChanged} /></a>
                 </>
               ) : (
                 <>
-                  <T value={ui.countries.code.compare.page.onlyChangedArticlesAreShown} />{' '}
+                  <T value={ui.countries.code.compare.page.onlyChangedPassagesAreShown} />{' '}
                   <a href={showAllHref}><T value={ui.countries.code.compare.page.showAll} />{" "}{rows.length}</a>
                 </>
               )}
@@ -381,7 +381,7 @@ export default async function ComparePage(props: ComparePageProps) {
                     <section className="compare-col compare-col-from" aria-label={fromVersion.versionLabel}>
                       <div className="compare-col-head">
                         {fromVersion.versionLabel}{' '}
-                        <Badge tone={fromBadge.tone}>{fromBadge.label}</Badge>
+                        <Badge tone={fromBadge.tone}><T value={fromBadge.label} /></Badge>
                       </div>
                       {row.kind === 'changed' && (row.left || row.right) ? (
                         <DiffConstitutionText
@@ -403,13 +403,13 @@ export default async function ComparePage(props: ComparePageProps) {
                           lang={fromVersion.languageCode}
                         />
                       ) : (
-                        <p className="muted"><T value={ui.countries.code.compare.page.thisArticleDidNotExistInThe} />{" "}{fromVersion.versionLabel} <T value={ui.countries.code.compare.page.text} /></p>
+                        <p className="muted">{message(locale, ui.countries.code.compare.page.passageNotPresentInVersion).replace('{version}', () => fromVersion.versionLabel)}</p>
                       )}
                     </section>
                     <section className="compare-col compare-col-to" aria-label={toVersion.versionLabel}>
                       <div className="compare-col-head">
                         {toVersion.versionLabel}{' '}
-                        <Badge tone={toBadge.tone}>{toBadge.label}</Badge>
+                        <Badge tone={toBadge.tone}><T value={toBadge.label} /></Badge>
                       </div>
                       {row.kind === 'changed' && (row.left || row.right) ? (
                         <DiffConstitutionText
@@ -431,7 +431,7 @@ export default async function ComparePage(props: ComparePageProps) {
                           lang={toVersion.languageCode}
                         />
                       ) : (
-                        <p className="muted"><T value={ui.countries.code.compare.page.thisArticleDidNotExistInThe} />{" "}{toVersion.versionLabel} <T value={ui.countries.code.compare.page.text} /></p>
+                        <p className="muted">{message(locale, ui.countries.code.compare.page.passageNotPresentInVersion).replace('{version}', () => toVersion.versionLabel)}</p>
                       )}
                     </section>
                   </div>

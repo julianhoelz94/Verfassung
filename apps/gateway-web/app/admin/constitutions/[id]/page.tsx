@@ -23,7 +23,7 @@ type AdminOutlinePageProps = {
 export default async function AdminOutlinePage(props: AdminOutlinePageProps) {
   const params = await props.params;
   const searchParams = await props.searchParams;
-  if (!(await requireAdminPage())) {
+  if (!(await requireAdminPage(`/admin/constitutions/${encodeURIComponent(params.id)}`, searchParams))) {
     return <AdminForbidden title={ui.forbidden.outline} />;
   }
   const authorization = await requireSessionBearer();

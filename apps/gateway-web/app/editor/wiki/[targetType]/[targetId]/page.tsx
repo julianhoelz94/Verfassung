@@ -1,3 +1,4 @@
+import { loginHref } from '../../../../../lib/return-to';
 import { reviewUi } from '../../../../../lib/ui-review-messages';
 import { NavigatingActionForm } from '../../../../components/NavigatingActionForm';
 import { currentLocale } from '../../../../../lib/server-locale';
@@ -28,7 +29,7 @@ export default async function WikiEditor({ params, searchParams }: Props) {
   const historyPage = Math.max(0, Math.min(1000, Number.parseInt(query.historyPage ?? '0', 10) || 0));
   if (targetType !== 'country' && targetType !== 'constitution') notFound();
   const user = await currentUser();
-  if (!user) redirect('/login');
+  if (!user) redirect(loginHref(`/editor/wiki/${targetType}/${encodeURIComponent(targetId)}`, query));
   const canEdit = user.roles.some((role) => role === 'editor' || role === 'admin');
   const canPublish = user.roles.some((role) => role === 'publisher' || role === 'admin');
   if (!canEdit && !canPublish) notFound();

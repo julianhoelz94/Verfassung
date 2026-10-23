@@ -56,6 +56,40 @@ describe('structured editor acceptance', () => {
   function payload(): { expectedGeneration: number; operations: DraftOperation[] } { return JSON.parse((host.querySelector('[name="structuredDraft"]') as HTMLInputElement).value); }
   function texts() { return [...host.querySelectorAll('textarea')]; }
 
+  it.each(['preamble', 'article', 'appendix'])('opens the selected %s root with its text immediately editable', async kind => {
+    const outline = { kinds: ['Preamble', 'Article', 'Appendix'].map((name, index) => level(name, index, undefined, { root: true })) };
+    const roots = outline.kinds.map(item => ({ ...node(item.kindCode, item.kindCode, `${item.displayLabel} wording.`), content: item.kindCode === kind ? node(item.kindCode, item.kindCode, `${item.displayLabel} wording.`).content : [] }));
+    await mount(outline, roots, undefined, { rootId: kind });
+    expect(host.querySelector('select')!.value).toBe(kind);
+    expect(texts()).toHaveLength(1);
+    expect(texts()[0].value).toBe(`${outline.kinds.find(item => item.kindCode === kind)!.displayLabel} wording.`);
+    expect(texts()[0].disabled).toBe(false);
+    expect(fetch).not.toHaveBeenCalled();
+    await change(texts()[0], 'Revised wording.');
+    expect(payload().operations).toEqual([expect.objectContaining({ type: 'replace_text', targetId: `text-${kind}`, text: 'Revised wording.' })]);
+    expect(button('Submit for review').disabled).toBe(true);
+    const leaving = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(leaving);
+    expect(leaving.defaultPrevented).toBe(true);
+  });
+
+  it.each([['preamble', 'article'], ['appendix', 'preamble'], ['article', 'appendix']])('replaces an irrelevant %s root scope inherited from %s navigation', async (selectedKind, inheritedScope) => {
+    const outline = { kinds: ['Preamble', 'Article', 'Appendix'].map((name, index) => level(name, index, undefined, { root: true })) };
+    const roots = outline.kinds.map(item => node(item.kindCode, item.kindCode));
+    await mount(outline, roots, inheritedScope, { rootId: selectedKind });
+    expect(host.querySelector('select')!.value).toBe(selectedKind);
+    expect(texts()).toHaveLength(1);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('keeps a requested child scope when it exists in the selected root', async () => {
+    const fixture = mixed();
+    await mount(fixture.outline, fixture.roots, 'sentence');
+    expect(host.querySelector('select')!.value).toBe('sentence');
+    expect(texts().map(text => text.value)).toEqual(['One. Two!']);
+    expect(field('Sentence title')).not.toBeNull();
+  });
+
   it('creates new draft metadata in the selected UI language', async () => {
     const outline = { kinds: [level('Artikel', 0, undefined, { titlePolicy: 'required', labelPolicy: 'required' })] };
     await mount(outline, [{ ...node('Artikel', 'article'), label: '1', title: 'Rechte' }], undefined, {}, 'de');

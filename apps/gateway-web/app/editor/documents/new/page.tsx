@@ -1,3 +1,4 @@
+import { loginHref } from '../../../../lib/return-to';
 import { NavigatingActionForm } from '../../../components/NavigatingActionForm';
 import { T } from '../../../components/TranslationProvider';
 import { ui } from '../../../../lib/messages';
@@ -10,10 +11,10 @@ import { currentUser } from '../../../../lib/session';
 import { createDocumentAction } from '../actions';
 
 export default async function NewDocumentPage(props: { searchParams: Promise<{ returnTo?: string; error?: string }> }) {
-  const user = await currentUser();
-  if (!user) redirect('/login');
-  if (!canVisitEditor(user.roles)) redirect('/editor');
   const params = await props.searchParams;
+  const user = await currentUser();
+  if (!user) redirect(loginHref('/editor/documents/new', params));
+  if (!canVisitEditor(user.roles)) redirect('/editor');
   return <CollectionPage width="reading" header={<PageHeader title={<T value={ui.attrs.editorDocumentsNewPagePageHeaderTitle} />} breadcrumbs={[{ href: '/editor/documents', label: <T value={ui.nav.documents} /> }, { label: <T value={ui.remainingStatus.new} /> }]} />}>
 
     {params.error ? <Alert tone="error"><T value={ui.editor.documents.new.page.documentCouldNotBeCreatedCheckThe} /></Alert> : null}

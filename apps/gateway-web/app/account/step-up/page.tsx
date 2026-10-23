@@ -1,3 +1,4 @@
+import { loginHref } from '../../../lib/return-to';
 import { T } from '../../components/TranslationProvider';
 import { ui } from '../../../lib/messages';
 import { redirect } from 'next/navigation';
@@ -16,7 +17,7 @@ export default async function StepUpPage(props: StepUpPageProps) {
   const searchParams = await props.searchParams;
   const user = await currentUser();
   if (!user) {
-    redirect('/login');
+    redirect(loginHref('/account/step-up', searchParams));
   }
   return (
     <FocusedPage width="reading" header={<PageHeader title={<T value={ui.attrs.accountStepUpPagePageHeaderTitleConfirm} />} meta={<T value={ui.attrs.accountStepUpPagePageHeaderMetaPublishing} />} />}>

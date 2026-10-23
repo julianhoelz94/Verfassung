@@ -1,3 +1,4 @@
+import { loginHref } from '../../../lib/return-to';
 import { currentLocale } from '../../../lib/server-locale';
 import { SignedInSummary } from '../../components/SignedInSummary';
 import { T } from '../../components/TranslationProvider';
@@ -52,7 +53,7 @@ export default async function AmendmentsPage(props: AmendmentsPageProps) {
   const searchParams = await props.searchParams;
   const user = await currentUser();
   if (!user) {
-    redirect('/login');
+    redirect(loginHref('/editor/amendments', searchParams));
   }
   if (!canVisitEditor(user.roles)) {
     return (

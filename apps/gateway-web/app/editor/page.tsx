@@ -9,7 +9,7 @@ import { ArticleFilterList } from '../components/ArticleFilterList';
 import { ConstitutionText } from '../components/ConstitutionText';
 import { WorkspacePage, WorkspaceLayout } from '../components/layout/templates';
 import { Alert, Badge, Button, PageHeader, WorkflowSteps } from '../components/ui';
-import { getCountry, listAllArticles, getArticle, listAllUnits, getUnit, getVersionSettings, listCountries, type ArticleSummary, type CountryDetail, type CountrySummary } from '../../lib/api';
+import { getCountry, getVersion, listAllArticles, getArticle, listAllUnits, getUnit, getVersionSettings, listCountries, type ArticleSummary, type CountryDetail, type CountrySummary } from '../../lib/api';
 import { editorErrorMessage, getDraftPreview, getEditorDiffReview, getStructuredDraft } from '../../lib/editor-api';
 import { decisionReadyForReview } from '../../lib/diff-review';
 import { currentUser, requireSessionBearer } from '../../lib/session';
@@ -24,6 +24,8 @@ import { EditorLanding } from './EditorLanding';
 import { ImportReview } from './ImportReview';
 import { reviewUi } from '../../lib/ui-review-messages';
 import { Stack } from '../components/layout/Layout';
+import { workflowUi } from '../../lib/workflow-messages';
+import { loginHref } from '../../lib/return-to';
 import surfaceStyles from '../components/surfaces.module.css';
 
 type EditorPageProps = {
@@ -60,7 +62,7 @@ export default async function EditorPage(props: EditorPageProps) {
   const searchParams = await props.searchParams;
   const user = await currentUser();
   if (!user) {
-    redirect('/login');
+    redirect(loginHref('/editor', searchParams));
   }
   const canEdit = hasRole(user.roles, 'editor');
   const canReview = hasRole(user.roles, 'reviewer');
@@ -93,14 +95,15 @@ export default async function EditorPage(props: EditorPageProps) {
     .filter((item): item is CountryDetail => item !== null);
   const versionId = session.versionId;
   const staffAuthorization = await requireSessionBearer();
+  const sourceVersion = await getVersion(versionId, staffAuthorization).catch(() => null);
   const selectedCountry = countryDetails.find((country) => country.constitutions.some((constitution) =>
-    constitution.versions.some((version) => version.id === versionId || version.currentVersionId === versionId),
+    constitution.id === sourceVersion?.constitutionId || constitution.versions.some((version) => version.id === versionId || version.currentVersionId === versionId),
   ));
   const selectedConstitution = selectedCountry?.constitutions.find((constitution) =>
-    constitution.versions.some((version) => version.id === versionId || version.currentVersionId === versionId),
+    constitution.id === sourceVersion?.constitutionId || constitution.versions.some((version) => version.id === versionId || version.currentVersionId === versionId),
   );
-  const selectedVersion = selectedConstitution?.versions.find((version) => version.id === versionId || version.currentVersionId === versionId);
-  const settings = session && versionId ? await getVersionSettings(versionId) : null;
+  const selectedVersion = selectedConstitution?.versions.find((version) => version.id === versionId || version.currentVersionId === versionId) ?? sourceVersion;
+  const settings = session && versionId ? await getVersionSettings(versionId, staffAuthorization) : null;
   const displayOutline = settings?.outline ?? selectedConstitution?.contentOutline;
   const kindLabel = (kind?: string) => kind ? displayOutline?.kinds.find((item) => item.kindCode === kind)?.displayLabel ?? kind : message(locale, ui.editorDynamic.unit);
   const units: ArticleSummary[] = versionId ? await listAllUnits(versionId, false, staffAuthorization) : [];
@@ -142,6 +145,15 @@ export default async function EditorPage(props: EditorPageProps) {
     .map((article) => `${kindLabel(article.kind)} ${article.articleNumber}`);
   if (structured) sourceArticles.filter(article => article.logicalId && changedRootIds.includes(article.logicalId) && !articles.some(target => target.logicalId === article.logicalId)).forEach(article => changedLabels.push(`${message(locale, ui.editor.publishform.removed)} ${kindLabel(article.kind)} ${article.articleNumber}`));
   const errorMessage = editorErrorMessage(searchParams.error, locale);
+  const publishedHref = selectedCountry && preview.newVersionId
+    ? `/countries/${selectedCountry.isoCode}/versions/${encodeURIComponent(preview.newVersionId)}` : undefined;
+  const submissionRequirements = session.hopKind === 'editorial_correction' && !preview.publishComment
+    ? [{ message: workflowUi.saveComment, href: '#comment' }]
+    : session.hopKind === 'legal' ? [
+      ...(!preview.changeRecord ? [{ message: workflowUi.saveChangeRecord, href: '#editor-change-record' }] : []),
+      ...(structured && preview.changeRecord && !preview.changeRecord.changes?.length ? [{ message: workflowUi.linkChanges, href: '#editor-change-record' }] : []),
+      ...(structured && !reviewComplete ? [{ message: workflowUi.reviewChanges, href: `#diff-review-${session.id}` }] : []),
+    ] : [];
   const alerts = (
     <>
       {errorMessage ? <Alert tone="error">{errorMessage}</Alert> : null}
@@ -154,6 +166,7 @@ export default async function EditorPage(props: EditorPageProps) {
           {searchParams.newVersionLabel
             ? <><T value={ui.editorDynamic.publishedAsVersion} /> {searchParams.newVersionLabel}{searchParams.amendmentTitle ? ` · ${searchParams.amendmentTitle}` : ''}.</>
             : <T value={ui.editorDynamic.publishedNewVersion} />}
+          {publishedHref ? <> <a href={publishedHref}><T value={workflowUi.publishedVersion} /></a></> : null}
         </Alert>
       ) : null}
       {searchParams.amendmentPending ? <Alert tone="error"><T value={ui.editor.page.theSnapshotWasPublishedButTheChange} /></Alert> : null}
@@ -162,7 +175,7 @@ export default async function EditorPage(props: EditorPageProps) {
 
   const title = `${selectedConstitution?.title ?? message(locale, ui.remainingStatus.constitution)} · ${selectedVersion?.versionLabel ?? ''}`.trim();
   const publicHref =
-    selectedCountry && versionId ? `/countries/${selectedCountry.isoCode}/versions/${encodeURIComponent(versionId)}` : undefined;
+    publishedHref ?? (selectedCountry && versionId ? `/countries/${selectedCountry.isoCode}/versions/${encodeURIComponent(versionId)}` : undefined);
   const canSave = Boolean(canEdit && session.status === 'open' && selected && versionId && searchParams.sessionId);
   const hiddenFields = (
     <>
@@ -181,7 +194,7 @@ export default async function EditorPage(props: EditorPageProps) {
         actions={
           publicHref ? (
             <a className="btn btn-ghost" href={publicHref}>
-              <T value={ui.editor.page.viewPublicPage} />{" "}</a>
+              <T value={publishedHref ? workflowUi.publishedVersion : workflowUi.sourceVersion} />{" "}</a>
           ) : null
         }
       />}>
@@ -190,14 +203,14 @@ export default async function EditorPage(props: EditorPageProps) {
       {searchParams.sessionId && articles.length > 0 ? (
         <EditorDraftState><WorkspaceLayout>
           <aside className={["panel", surfaceStyles.panel].join(' ')} aria-label={message(locale, ui.accessibility.topLevelUnits)}>
-            <h2 className="panel-title"><T value={(settings?.outline ?? selectedConstitution?.contentOutline)?.kinds[0]?.kindCode === 'article' ? ui.editorDynamic.articles : ui.editorDynamic.topLevelUnits} /></h2>
+            <h2 className="panel-title"><T value={articles.every(article => (article.kind ?? 'article') === 'article') ? ui.editorDynamic.articles : ui.editorDynamic.topLevelUnits} /></h2>
             <p className="muted">{draftIds.length} <T value={ui.editor.page.changed} /></p>
             <ArticleFilterList
               articles={articles}
               selectedId={selected?.id}
               hrefBase={articleHrefBase}
               draftIds={draftIds}
-              unitLabel={settings?.outline.kinds[0]?.kindCode === 'article' ? undefined : settings?.outline.kinds[0]?.displayLabel}
+              outline={displayOutline}
             />
           </aside>
           <section className={["panel", surfaceStyles.panel].join(' ')} aria-labelledby="edit-title">
@@ -206,7 +219,7 @@ export default async function EditorPage(props: EditorPageProps) {
             </p>
             {structured && selectedRoot && settings && versionId && selected && selectedConstitution ? <StructuredEditor
               key={`${session.id}:${structured.generation}:${selectedRoot.logicalId}`}
-              review={differences.map(difference => { const sourceRoot = structured.sourceRoots.find(root => nodes([root]).some(node => node.logicalId === difference.logicalId || node.content.some(entry => entry.logicalId === difference.logicalId))); const targetRoot = structured.roots.find(root => nodes([root]).some(node => node.logicalId === difference.logicalId || node.content.some(entry => entry.logicalId === difference.logicalId))); const targetOccurrence = targetRoot && preview.unitMapping?.[targetRoot.logicalId]; return { ...difference, sourceLink: sourceRoot?.occurrenceId ? `/versions/${structured.sourceVersionId}/units/${sourceRoot.occurrenceId}` : undefined, targetLink: preview.newVersionId && targetOccurrence ? `/versions/${preview.newVersionId}/units/${targetOccurrence}` : undefined }; })} preview={{ ...structured, roots: structured.roots.map(root => root.logicalId === selectedRoot.logicalId ? root : { ...root, content: [] }), sourceRoots: structured.sourceRoots.map(root => root.logicalId === selectedRoot.logicalId ? root : { ...root, content: [] }) }} outline={settings.outline} rootId={selectedRoot.logicalId} versionId={versionId} articleId={selected.id} constitutionId={selectedConstitution.id} publishedVersionId={preview.newVersionId} unitMapping={preview.unitMapping} editable={canSave && session.actorId === user.id} scope={searchParams.scope} selectedNode={searchParams.selectedNode}
+              review={differences.map(difference => { const sourceRoot = structured.sourceRoots.find(root => nodes([root]).some(node => node.logicalId === difference.logicalId || node.content.some(entry => entry.logicalId === difference.logicalId))); const targetRoot = structured.roots.find(root => nodes([root]).some(node => node.logicalId === difference.logicalId || node.content.some(entry => entry.logicalId === difference.logicalId))); const targetOccurrence = targetRoot && preview.unitMapping?.[targetRoot.logicalId]; return { ...difference, sourceLink: sourceRoot?.occurrenceId ? `/versions/${structured.sourceVersionId}/units/${sourceRoot.occurrenceId}` : undefined, targetLink: preview.newVersionId && targetOccurrence ? `/versions/${preview.newVersionId}/units/${targetOccurrence}` : undefined }; })} preview={{ ...structured, roots: structured.roots.map(root => root.logicalId === selectedRoot.logicalId ? root : { ...root, content: [] }), sourceRoots: structured.sourceRoots.map(root => root.logicalId === selectedRoot.logicalId ? root : { ...root, content: [] }) }} outline={settings.outline} rootId={selectedRoot.logicalId} versionId={versionId} articleId={selected.id} constitutionId={selectedConstitution.id} canManageStructure={user.roles.includes('admin')} publishedVersionId={preview.newVersionId} unitMapping={preview.unitMapping} editable={canSave && session.actorId === user.id} scope={searchParams.scope} selectedNode={searchParams.selectedNode}
             /> : canSave && selected && versionId && searchParams.sessionId ? (
               <ArticleEditor
                 sessionId={searchParams.sessionId}
@@ -251,7 +264,7 @@ export default async function EditorPage(props: EditorPageProps) {
                 <Stack as="form" action="/editor/command" method="post">
                   <input type="hidden" name="command" value="review" />
                   {hiddenFields}
-                  <SubmitReviewButton disabled={session.hopKind === 'legal' ? !preview.changeRecord || Boolean(structured && (!preview.changeRecord.changes?.length || !reviewComplete)) : session.hopKind === 'editorial_correction' ? !preview.publishComment : false} />
+                  <SubmitReviewButton disabled={submissionRequirements.length > 0} requirements={submissionRequirements} />
                 </Stack>
               ) : null}
               {canReview && session.status === 'reviewing' ? (
@@ -315,6 +328,7 @@ export default async function EditorPage(props: EditorPageProps) {
                 record={preview.changeRecord}
                 comment={preview.publishComment}
                 structuredDraft={structured}
+                outline={displayOutline}
                 diffReview={diffReview}
                 canReviewDiff={canReview}
               />

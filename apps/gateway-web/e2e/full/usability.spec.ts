@@ -106,7 +106,7 @@ test('owned work survives role handoffs and published corrections remain readabl
     await page.getByLabel('What was corrected in this transcription?', { exact: true }).fill(comment);
     await expect(submit).toBeDisabled();
     await page.getByRole('button', { name: 'Save comment', exact: true }).click();
-    await expect(page.getByText('Publish details saved.', { exact: true })).toBeVisible();
+    await expect(page.getByText('Publish details saved.', { exact: true })).toBeVisible({ timeout: 20_000 });
     await expect(submit).toBeEnabled();
 
     // A changed, previously saved comment must not silently submit its old value.

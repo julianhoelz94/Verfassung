@@ -63,7 +63,7 @@ export function reviewFixtures(germany) {
       if (pathname === '/api/catalog/jurisdictions') return [jurisdiction];
       if (pathname === `/api/catalog/jurisdictions/${germany.id}`) return { jurisdiction, ancestors: [], children: [], constitutions: country.constitutions };
       if (pathname === `/api/content/versions/${REVIEW_CURRENT}/content`) return { versionId: REVIEW_CURRENT, generation: 1, settingsRevisionId: null, roots: [archiveRoot] };
-      if (pathname === '/api/ingestion/migration-runs') return [migration];
+      if (pathname === '/api/ingestion/migration-runs') return [{ id: migration.id, title: migration.manifest.title, coverage: migration.coverage }];
       if (pathname === `/api/ingestion/migration-runs/${migration.id}`) return migration;
       if (pathname === '/api/catalog/curated-comparisons') return [{ id: comparison.id, title: comparison.definition.title, state: comparison.state, needsReview: false }];
       if (pathname === `/api/catalog/curated-comparisons/${comparison.id}`) return comparison;

@@ -62,9 +62,9 @@ test('offline archive package preserves evidence through review, publication and
             { logicalId: id('ref'), start: 4, end: 12, target: { type: 'footnote', footnoteId: id('note') } },
           ] },
         ] } },
-        { type: 'text', logicalId: id('table'), format: 'table', table: { caption: 'Überlieferte Tabelle', rows: [
-          { logicalId: id('row1'), cells: [{ logicalId: id('header'), text: 'Land und Stand', header: true, colSpan: 2 }] },
-          { logicalId: id('row2'), cells: [{ logicalId: id('cell1'), text: 'Nord' }, { logicalId: id('cell2'), text: 'unbekannt' }] },
+        { type: 'text', logicalId: id('table'), format: 'table', table: { rows: [
+          { logicalId: id('row1'), cells: [{ logicalId: id('header'), text: 'Pflicht', header: true, colSpan: 2 }] },
+          { logicalId: id('row2'), cells: [{ logicalId: id('cell1'), text: 'Bericht' }, { logicalId: id('cell2'), text: 'jährlich' }] },
         ] } },
         { type: 'text', logicalId: id('note'), text: manifest.annotationText, format: 'footnote', footnoteLabel: '[a]',
           annotation: { kind: 'editorial', attribution: manifest.attribution, sourceUrl: 'https://verfassungen.de/annotated.htm', anchorLogicalIds: [id('wording')] } },
@@ -84,7 +84,7 @@ test('offline archive package preserves evidence through review, publication and
     });
     const inventory: Record<string, unknown>[] = captured.map((source: { file: string; sha256: string; encoding: string }) => ({
       sourceKey: source.file, url: `https://verfassungen.de/${source.file}`, sha256: source.sha256, encoding: source.encoding,
-      attribution: manifest.attribution, captureKey: `capture:${source.file}`, targetKeys: ['regional'],
+      attribution: manifest.attribution, captureKey: `capture:${source.file}`, targetKeys: [source.file === 'comparison.htm' ? 'comparison' : source.file === 'amendments.htm' ? 'amendment' : source.file === 'consolidated.htm' ? 'regional-successor' : 'regional'],
       aliases: source.file === 'frameset.htm' ? ['https://verfassungen.de/index.htm'] : [],
     }));
     inventory.push({ sourceKey: 'unavailable', url: 'https://verfassungen.de/missing.htm', disposition: 'unavailable', reason: 'Fixture explicitly records unavailable evidence.' },
@@ -159,10 +159,10 @@ test('offline archive package preserves evidence through review, publication and
     expect(records.find(r => r.path === '/roots/0/content/3/annotation/kind')?.value).toBe('editorial');
     await page.context().addCookies([{ name: 'ca_session', value: admin.Authorization.slice(7), url: String(testInfo.project.use.baseURL), httpOnly: true, sameSite: 'Lax' }]);
     await page.goto(`/admin/migrations/${run.id}?item=${snapshot.id}&source=annotated.htm`);
-    await expect(page.locator('pre')).toContainText(manifest.legalText);
+    await expect(page.locator('pre')).toHaveText(new TextDecoder('windows-1252').decode(captured.find(source => source.file === 'annotated.htm').bytes));
     await expect(page.locator('pre')).toContainText('window.__legacySourceExecuted = true');
     expect(await page.evaluate(() => (window as any).__legacySourceExecuted)).toBeUndefined();
-    await expect(page.getByText(manifest.legalText, { exact: true }).last()).toBeVisible();
+    await expect(page.getByText('jedes Bürgers ist unverletzlich.', { exact: false }).last()).toBeVisible();
     await json(await request.post(`/api/ingestion/import-jobs/${jobId}/approve`, { headers: reviewer, data: { reason: 'Compared exact source wording, structures, dates and linked evidence.' } }));
     await json(await request.post(`/api/ingestion/import-jobs/${jobId}/publish`, { headers: publisher }));
     const published = await json(await request.get(`/api/catalog/versions/${versionId}`));

@@ -27,7 +27,7 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  if (path === '/search' || path === '/jurisdictions' || path.startsWith('/jurisdictions/') || path.startsWith('/countries/') || path.startsWith('/documents/') || path.startsWith('/versions/')) {
+  if (path.startsWith('/constitutions/') || path.startsWith('/comparisons') || path === '/legacy' || path === '/search' || path === '/jurisdictions' || path.startsWith('/jurisdictions/') || path.startsWith('/countries/') || path.startsWith('/documents/') || path.startsWith('/versions/')) {
     const policy = await requestAnonymousBrowsingPolicy().catch(() => null);
     if (!policy?.allowed) {
       const token = request.cookies.get('ca_session')?.value;

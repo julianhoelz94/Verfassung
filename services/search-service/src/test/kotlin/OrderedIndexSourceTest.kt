@@ -9,6 +9,38 @@ import java.util.UUID
 
 class OrderedIndexSourceTest {
     @Test
+    fun historicalAndRegionalCodesNeverBecomeCompatibleNationalRoutes() {
+        for ((kind, historical, expectedCode) in listOf(Triple("country", false, "DE"), Triple("country", true, ""), Triple("region", false, ""))) {
+            val jurisdiction = UUID.randomUUID()
+            val version = UUID.randomUUID()
+            val unit = UUID.randomUUID()
+            val mapper = jacksonObjectMapper()
+            val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
+            server.createContext("/") { exchange ->
+                val response: Any = when (exchange.requestURI.path) {
+                    "/jurisdictions" -> listOf(mapOf("id" to jurisdiction, "name" to "Recorded jurisdiction", "code" to "DE", "kind" to kind, "historical" to historical))
+                    "/jurisdictions/$jurisdiction" -> mapOf("children" to emptyList<Any>(), "constitutions" to listOf(mapOf("title" to "Source charter", "versions" to listOf(mapOf("id" to version, "versionLabel" to "Source")))))
+                    "/versions/$version/units" -> listOf(mapOf("id" to unit))
+                    else -> mapOf("id" to unit, "versionId" to version, "articleNumber" to "1", "title" to "Title", "body" to "Exact source text")
+                }
+                val bytes = mapper.writeValueAsBytes(response)
+                exchange.responseHeaders.set("Content-Type", "application/json")
+                exchange.sendResponseHeaders(200, bytes.size.toLong())
+                exchange.responseBody.use { it.write(bytes) }
+            }
+            server.start()
+            try {
+                val url = "http://127.0.0.1:${server.address.port}"
+                val article = RestIndexSource(url, url).loadPublishedArticles().single()
+                assertThat(article.jurisdictionId).isEqualTo(jurisdiction)
+                assertThat(article.countryCode).isEqualTo(expectedCode)
+            } finally {
+                server.stop(0)
+            }
+        }
+    }
+
+    @Test
     fun indexesCurrentEditorialOccurrencesIndependentlyWhenRevisionsAreShared() {
         val jurisdiction = UUID.randomUUID()
         val firstLegal = UUID.randomUUID()

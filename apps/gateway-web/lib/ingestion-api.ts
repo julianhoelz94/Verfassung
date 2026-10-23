@@ -33,7 +33,9 @@ export function isImportRequest(value: unknown): value is Record<string, unknown
       return false;
     }
   }
-  if (typeof row.jurisdictionId !== 'string' && (typeof row.isoCode !== 'string' || typeof row.countryName !== 'string' || !row.isoCode || !row.countryName)) return false;
+  if (row.jurisdictionId != null) {
+    if (typeof row.jurisdictionId !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(row.jurisdictionId) || (typeof row.isoCode === 'string' && row.isoCode.trim())) return false;
+  } else if (typeof row.isoCode !== 'string' || !/^[a-z]{2}$/i.test(row.isoCode) || typeof row.countryName !== 'string' || !row.countryName.trim()) return false;
   const articles = Array.isArray(row.articles) && row.articles.length > 0;
   const roots = Array.isArray(row.roots) && row.roots.length > 0;
   return articles !== roots;

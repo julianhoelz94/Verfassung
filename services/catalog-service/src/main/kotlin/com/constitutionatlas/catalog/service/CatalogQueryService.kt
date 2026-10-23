@@ -52,8 +52,10 @@ class CatalogQueryService(private val catalogRepository: CatalogRepository, priv
         return catalogRepository.listAllPublishedVersions(constitutionId)
     }
 
-    fun getVersion(versionId: UUID): VersionDetail =
+    // Listing controls discovery; every published snapshot retains its public permalink (ADR 0005).
+    fun getVersion(versionId: UUID, includeUnpublished: Boolean = false): VersionDetail =
         catalogRepository.findVersion(versionId)
+            ?.takeIf { includeUnpublished || it.publicationStatus == "published" }
             ?: throw NotFoundException("Unknown version '$versionId'")
 
     fun getOutline(constitutionId: UUID): ContentOutlineDto {

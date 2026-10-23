@@ -6,6 +6,7 @@ import { useFormState } from 'react-dom';
 import { Alert, Button, Input } from '../../components/ui';
 import { inviteUserAction, issueResetAction, createServiceTokenAction, rotateServiceTokenAction, type TokenRevealState } from '../../account/actions';
 import { Stack } from '../../components/layout/Layout';
+import { RoleFields } from './RoleFields';
 
 const initial: TokenRevealState = {};
 
@@ -22,7 +23,7 @@ export function InviteUserForm() {
       {state.error ? <Alert tone="error"><T value={ui.admin.users.tokenforms.thatAccountActionCouldNotBeCompleted} /></Alert> : null}
       <Stack as="form" action={action}>
         <Input label={<T value={ui.attrs.adminUsersTokenformsInputLabelEmail} />} id="email" name="email" type="email" required />
-        <Input label={<T value={ui.attrs.adminUsersTokenformsInputLabelRoles} />} id="roles" name="roles" defaultValue="viewer" />
+        <RoleFields roles={['viewer']} />
         <Button variant="primary"><T value={ui.admin.users.tokenforms.sendInvite} /></Button>
       </Stack>
     </>

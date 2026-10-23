@@ -1,3 +1,4 @@
+import { safeLoginReturnTo } from '../../lib/return-to';
 import { NavigatingActionForm } from '../components/NavigatingActionForm';
 import { T } from '../components/TranslationProvider';
 import { ui } from '../../lib/messages';
@@ -24,25 +25,19 @@ function seedHintEnabled(): boolean {
 
 export default async function LoginPage(props: LoginPageProps) {
   const searchParams = await props.searchParams;
+  const next = safeLoginReturnTo(searchParams.next);
   const user = await currentUser();
   const setup = await setupStatus();
-  const registrationEnabled = await requestRegistrationStatus();
   if (user) {
     if (!setup.completed) redirect('/setup');
-    redirect(searchParams.next?.startsWith('/oauth/authorize?') ? searchParams.next : canVisitEditor(user.roles) ? '/editor' : '/');
+    redirect(next || (canVisitEditor(user.roles) ? '/editor' : '/'));
   }
+  const registrationEnabled = await requestRegistrationStatus();
 
   return (
     <FocusedPage width="reading" header={<PageHeader
         title={<T value={ui.attrs.loginPagePageHeaderTitleLogIn} />}
-        meta={
-          seedHintEnabled() ? (
-            <>
-              <T value={ui.login.page.useASeededLocalAccountLocalEditor} />{" "}<code>IDENTITY_SEED_TOTP_SECRET</code><T value={ui.login.page.ifThatSettingIsAbsentUse} />{" "}<code>CAATLASMFASEED22</code> <T value={ui.login.page.asTheAuthenticatorSecretSeedingCreatesMissing} />{" "}</>
-          ) : (
-            <T value={reviewUi.signInHint} />
-          )
-        }
+        meta={<T value={reviewUi.signInHint} />}
       />}>
 
       {searchParams.error ? (
@@ -60,7 +55,7 @@ export default async function LoginPage(props: LoginPageProps) {
       {!setup.completed ? <Alert tone="info"><T value={m.adminOnly} /></Alert> : null}
       <Card>
         <NavigatingActionForm action={loginAction}>
-          {searchParams.next?.startsWith('/oauth/authorize?') ? <input type="hidden" name="next" value={searchParams.next} /> : null}
+          {next ? <input type="hidden" name="next" value={next} /> : null}
           <Input
             label={<T value={ui.attrs.loginPageInputLabelEmail} />}
             id="email"
@@ -84,11 +79,15 @@ export default async function LoginPage(props: LoginPageProps) {
           <Button variant="primary"><T value={ui.login.page.signIn} /></Button>
         </NavigatingActionForm>
       </Card>
-      {setup.completed ? <Card><PasskeyLogin next={searchParams.next} /></Card> : null}
+      {setup.completed ? <Card><PasskeyLogin next={next} /></Card> : null}
       {setup.completed ? <p>
         <a href="/reset"><T value={ui.login.page.forgotPassword} /></a>
       </p> : null}
       {setup.completed && registrationEnabled ? <p><a href="/register"><T value={ui.login.page.createAnAccount} /></a></p> : null}
+      {seedHintEnabled() ? <details>
+        <summary><T value={ui.login.page.localTestingAccounts} /></summary>
+        <p><T value={ui.login.page.useASeededLocalAccountLocalEditor} /> <code>IDENTITY_SEED_TOTP_SECRET</code><T value={ui.login.page.ifThatSettingIsAbsentUse} /> <code>CAATLASMFASEED22</code> <T value={ui.login.page.asTheAuthenticatorSecretSeedingCreatesMissing} /></p>
+      </details> : null}
     </FocusedPage>
   );
 }

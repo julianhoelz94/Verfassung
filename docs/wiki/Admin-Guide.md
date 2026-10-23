@@ -8,8 +8,8 @@
 | Configure email and registration | **Site settings** | Send a test email before enabling registration. |
 | Choose website languages | **Site settings** | Save available languages and the default. |
 | Change visitor access | **Anonymous browsing** | Save the policy and limits with fresh MFA. |
-| Define a constitution's structure | **Outlines** | Inspect the structure preview before text entry. |
-| Import content | **Import** | Choose existing/new structure, upload JSON, inspect the preview and job. |
+| Create a constitution or manage its structure | **Constitutions** | Inspect the structure preview before text entry. |
+| Import content | **Import** | Upload a prepared constitution file, review the content, then publish it in a separate step. |
 | Publish operator or privacy details | **Legal pages** | Save, inspect the saved preview, then publish. |
 
 ![Administration overview grouped by task](https://raw.githubusercontent.com/wiki/julianhoelz94/Verfassung/media/admin-overview-en.png)
@@ -20,11 +20,11 @@
 
 The account menu groups Browse, Editorial and Admin destinations. Open a group to see its links; the current workspace group starts expanded. Account and sign-out remain directly accessible.
 
-User rows show email, status and role badges. Choose **Edit roles** to reveal the role checkboxes, then **Update roles** to save or **Cancel** to discard the selection. Service-token controls appear in a separate section below the user list.
+User rows show email, status and role badges. Invitations and **Edit roles** offer labeled role checkboxes with short explanations. New invitations select **Reader** by default; choose the roles the person needs. Use **Update roles** to save an existing account's roles or **Cancel** to discard the selection. Service-token controls appear in a separate section below the user list.
 
 ## Constitution structure preview
 
-In **Outlines**, create a constitution through **Basics → Structure → Review & create**. The **Reader preview** shows how the configured units appear to readers. Hover over a unit, focus it with the keyboard, or tap it to inspect its structure, display settings, and editing permissions; press Escape or tap outside to dismiss the annotation.
+In **Constitutions**, create a constitution through **Basics → Structure → Review & create**. The **Reader preview** shows how the configured units appear to readers. Hover over a unit, focus it with the keyboard, or tap it to inspect its structure, display settings, and editing permissions; press Escape or tap outside to dismiss the annotation.
 
 Consecutive sentence units configured as running text flow together. Unnumbered parent text between units starts a separate paragraph. Supplied source samples retain their original order.
 
@@ -49,7 +49,7 @@ The wizard does not replace verification of actual production operator/hosting i
 
 
 
-Open **Admin** for **Users**, **Site settings**, **Outlines**, and **Import**. Search Users to find accounts, invite people, assign roles, and revoke sessions. In Site settings, configure outgoing mail, send a test email to a specified recipient, and enable or disable self-registration. New installations start with mail and self-registration disabled; configure and test mail before enabling registration. In Outlines, configure the constitution's structure and inspect its preview before authors enter text. In Import, choose an existing constitution or a new structure proposal, then select the JSON file. **Paste JSON instead** opens the advanced text input. Inspect the structure preview and resulting job; staged data is not public until the appropriate review and publication steps finish.
+Open **Admin** for **Users**, **Site settings**, **Constitutions**, and **Import**. Search Users to find accounts, invite people, assign roles, and revoke sessions. In Site settings, configure outgoing mail, send a test email to a specified recipient, and enable or disable self-registration. New installations start with mail and self-registration disabled; configure and test mail before enabling registration. In Constitutions, create a constitution or manage its structure and inspect its preview before authors enter text. In Import, choose an existing constitution or a new structure proposal, then select the JSON file. **Paste JSON instead** opens the advanced text input. Inspect the structure preview and imported content; the content becomes public only after review and a separate publication step.
 
 Admin also contains **Legal pages**. Save a private draft of the Impressum or Datenschutzerklärung, review its content and then publish it as a separate action. Confirm real operator details before public launch. Changes to legal pages do not publish constitutional text.
 

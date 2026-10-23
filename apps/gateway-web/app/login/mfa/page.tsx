@@ -1,3 +1,5 @@
+import { loginHref, safeLoginReturnTo } from '../../../lib/return-to';
+import { canVisitEditor } from '../../../lib/nav';
 import { setupStatus } from '../../../lib/deployment-setup';
 import { currentLocale } from '../../../lib/server-locale';
 import { message } from '../../../lib/messages';
@@ -23,14 +25,16 @@ export default async function MfaPage(props: MfaPageProps) {
   const locale = await currentLocale();
   const setup = await setupStatus();
   const searchParams = await props.searchParams;
+  const next = safeLoginReturnTo(searchParams.next);
   const user = await currentUser();
   const challenge = await mfaChallengeToken();
   const enroll = searchParams.enroll === '1';
   if (user && !enroll) {
-    redirect(searchParams.next?.startsWith('/oauth/authorize?') ? searchParams.next : '/');
+    if (!setup.completed) redirect('/setup');
+    redirect(next || (canVisitEditor(user.roles) ? '/editor' : '/'));
   }
   if (!challenge && !user) {
-    redirect('/login');
+    redirect(loginHref(next));
   }
 
   let secret: string | null = null;
@@ -61,14 +65,14 @@ export default async function MfaPage(props: MfaPageProps) {
           ) : (
             <Alert tone="error"><T value={ui.login.mfa.page.enrollmentCouldNotBeStartedSignIn} /></Alert>
           )}
-          <LoginEnrollForm next={searchParams.next?.startsWith('/oauth/authorize?') ? searchParams.next : undefined} />
-          {setup.completed && !user ? <PasskeyLoginEnrollment next={searchParams.next} /> : null}
-          {setup.completed && !user ? <PasskeyLogin next={searchParams.next} /> : null}
+          <LoginEnrollForm next={next} />
+          {setup.completed && !user ? <PasskeyLoginEnrollment next={next} /> : null}
+          {setup.completed && !user ? <PasskeyLogin next={next} /> : null}
         </Card>
       ) : (
         <Card>
-          <MfaLoginForm next={searchParams.next?.startsWith('/oauth/authorize?') ? searchParams.next : undefined} recovery={searchParams.method === 'recovery'} focus={['recovery', 'authenticator'].includes(searchParams.method ?? '')} />
-          {setup.completed && !user ? <PasskeyLogin next={searchParams.next} /> : null}
+          <MfaLoginForm next={next} recovery={searchParams.method === 'recovery'} focus={['recovery', 'authenticator'].includes(searchParams.method ?? '')} />
+          {setup.completed && !user ? <PasskeyLogin next={next} /> : null}
         </Card>
       )}
     </FocusedPage>

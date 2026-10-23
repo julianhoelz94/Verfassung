@@ -121,9 +121,8 @@ class PublicationGuard(private val catalogClient: CatalogClient) {
 class ContentReadAccess(private val catalogClient: CatalogClient, private val identityClient: IdentityClient) {
     fun requireVisible(versionId: UUID, authorization: String?) {
         val version = catalogClient.getVersion(versionId) ?: throw NotFoundException("Unknown version")
-        if (version.publicationStatus == "published" &&
-            (version.listing == "public" || version.currentVersionId == version.id)
-        ) {
+        // Listing controls discovery; published snapshot permalinks remain readable after the tip moves.
+        if (version.publicationStatus == "published") {
             return
         }
         val actor = runCatching { identityClient.authenticate(authorization) }.getOrNull()

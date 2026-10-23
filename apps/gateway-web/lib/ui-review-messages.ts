@@ -53,7 +53,7 @@ export const reviewUi = {
   chooseImportPath: { en: 'Choose an import path', de: 'Importweg wählen' },
   importDetails: { en: 'Import details', de: 'Importdetails' },
   backToConstitutions: { en: 'Back to constitutions', de: 'Zurück zu den Verfassungen' },
-  returnToSessions: { en: 'Back to my sessions', de: 'Zurück zu meinen Sitzungen' },
+  returnToSessions: { en: 'Back to my work', de: 'Zurück zu meinen Bearbeitungen' },
   documentDetails: { en: 'Document details and revisions', de: 'Dokumentdetails und Revisionen' },
   documentRevision: { en: 'Document revision', de: 'Dokumentrevision' },
   editCountry: { en: 'Edit country page', de: 'Länderseite bearbeiten' },

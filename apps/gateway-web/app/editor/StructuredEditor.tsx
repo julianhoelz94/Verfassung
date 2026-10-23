@@ -31,8 +31,8 @@ function differenceField(field: string): UiMessage {
 }
 
 type ReviewDifference = DraftDifference & { sourceLink?: string; targetLink?: string };
-type Props = { review?: ReviewDifference[]; preview: StructuredPreview; outline: ContentOutline; rootId: string; versionId: string; articleId: string; constitutionId: string; editable: boolean; scope?: string; selectedNode?: string; publishedVersionId?: string | null; unitMapping?: Record<string, string> | null };
-export function StructuredEditor({ review = [], preview, outline, rootId, versionId, articleId, constitutionId, editable, scope: initialScope, selectedNode, publishedVersionId, unitMapping }: Props) {
+type Props = { review?: ReviewDifference[]; preview: StructuredPreview; outline: ContentOutline; rootId: string; versionId: string; articleId: string; constitutionId: string; editable: boolean; canManageStructure?: boolean; scope?: string; selectedNode?: string; publishedVersionId?: string | null; unitMapping?: Record<string, string> | null };
+export function StructuredEditor({ review = [], preview, outline, rootId, versionId, articleId, constitutionId, editable, canManageStructure = false, scope: initialScope, selectedNode, publishedVersionId, unitMapping }: Props) {
   const t = useTranslation();
   const [sourceRoots, setSourceRoots] = useState(preview.sourceRoots);
   const [overviewRoots, setOverviewRoots] = useState<DraftNode[]>([]);
@@ -41,15 +41,20 @@ export function StructuredEditor({ review = [], preview, outline, rootId, versio
   const [roots, setRoots] = useState(preview.roots);
   const [operations, setOperations] = useState<DraftOperation[]>([]);
   const [history, setHistory] = useState<{ roots: DraftNode[]; operations: DraftOperation[] }[]>([]);
+  const saving = useRef(false);
   const [selection, setSelection] = useState(selectedNode ?? rootId);
-  const defaultScope = outline.kinds.find(kind => kind.kindCode === 'article')?.kindCode ?? outline.kinds[0].kindCode;
+  const initialRoot = findNode(preview.roots, rootId) ?? preview.roots[0];
+  const defaultScope = scopedNodes(preview.roots, rootId, selectedNode ?? rootId, 'article').length ? 'article' : initialRoot.kind;
   const kindName = (kindCode: string) => outline.kinds.find(kind => kind.kindCode === kindCode)?.displayLabel ?? kindCode;
-  const [scope, setScope] = useState(initialScope === 'constitution' || outline.kinds.some(kind => kind.kindCode === initialScope) ? initialScope! : defaultScope);
+  const [scope, setScope] = useState(initialScope === 'constitution' || (initialScope && scopedNodes(preview.roots, rootId, selectedNode ?? rootId, initialScope).length) ? initialScope! : defaultScope);
   const [message, setMessage] = useState('');
   const { setDirty } = useDraftState();
   useEffect(() => { setDirty(operations.length > 0); return () => setDirty(false); }, [operations.length, setDirty]);
   useEffect(() => {
-    function guard(event: BeforeUnloadEvent) { if (operations.length) { event.preventDefault(); event.returnValue = ''; } }
+    function guard(event: BeforeUnloadEvent) {
+      if (saving.current) { saving.current = false; return; }
+      if (operations.length) { event.preventDefault(); event.returnValue = ''; }
+    }
     window.addEventListener('beforeunload', guard); return () => window.removeEventListener('beforeunload', guard);
   }, [operations.length]);
   const caret = useRef<Record<string, number>>({});
@@ -86,14 +91,17 @@ export function StructuredEditor({ review = [], preview, outline, rootId, versio
     } catch (error) { setMessage(t(error instanceof LocalizedEditorError ? error.copy : ui.state.viewLoadFailed)); }
     finally { setLoading(false); }
   }
-  function changeScope(view: string) {
+  function isOverviewScope(view: string) {
     const index = outline.kinds.findIndex(kind => kind.kindCode === view);
     const article = outline.kinds.findIndex(kind => kind.kindCode === 'article');
-    if (view === 'constitution' || (article >= 0 && index < article)) void loadView(view);
+    return view === 'constitution' || (article >= 0 && index >= 0 && index < article && !outline.kinds[index].root);
+  }
+  function changeScope(view: string) {
+    if (isOverviewScope(view)) void loadView(view);
     else { setScope(view); remember(view, selection); }
   }
   useEffect(() => {
-    if (initialScope === 'constitution' || (initialScope && outline.kinds.findIndex(kind => kind.kindCode === initialScope) < outline.kinds.findIndex(kind => kind.kindCode === 'article'))) void loadView(initialScope);
+    if (isOverviewScope(scope)) void loadView(scope);
     // Only initial navigation; subsequent changes explicitly call loadView.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -243,8 +251,7 @@ export function StructuredEditor({ review = [], preview, outline, rootId, versio
     </div>;
   }
   const scopeIndex = outline.kinds.findIndex(kind => kind.kindCode === scope);
-  const articleIndex = outline.kinds.findIndex(kind => kind.kindCode === 'article');
-  const broad = scope === 'constitution' || (articleIndex >= 0 && scopeIndex < articleIndex && !outline.kinds[scopeIndex]?.root);
+  const broad = isOverviewScope(scope);
   const selectedUnit = findNode(roots, selection) ?? allNodes.find(node => node.content.some(entry => entry.logicalId === selection)) ?? root;
   const navigationRoots = overviewRoots.length ? [...overviewRoots.filter(root => roots.some(current => current.logicalId === root.logicalId)).map(root => loadedRootIds.includes(root.logicalId) ? roots.find(current => current.logicalId === root.logicalId)! : root), ...roots.filter(root => !overviewRoots.some(item => item.logicalId === root.logicalId))] : roots;
   const focusedNodes = scopedNodes(roots, root?.logicalId ?? rootId, selection, scope);
@@ -258,10 +265,10 @@ export function StructuredEditor({ review = [], preview, outline, rootId, versio
     const occurrence = target ? unitMapping?.[id] : sourceUnit?.occurrenceId;
     return version && rootOccurrence ? `/versions/${encodeURIComponent(version)}/units/${encodeURIComponent(rootOccurrence)}${occurrence ? `?occurrenceId=${encodeURIComponent(occurrence)}` : ''}` : undefined;
   }
-  return <Stack as="form" action="/editor/command" method="post" id="draft-form">
+  return <Stack as="form" action="/editor/command" method="post" id="draft-form" onSubmit={() => { saving.current = true; }}>
     <input type="hidden" name="command" value="structured-save" /><input type="hidden" name="sessionId" value={preview.sessionId} /><input type="hidden" name="versionId" value={versionId} /><input type="hidden" name="articleId" value={articleId} />
     <input type="hidden" name="scope" value={scope} /><input type="hidden" name="selectedNode" value={selection} /><input type="hidden" name="structuredDraft" value={JSON.stringify({ expectedGeneration: preview.generation, operations })} />
-    <div className="action-bar"><label><T value={ui.editor.structurededitor.editorView} /><select value={scope} disabled={loading} onChange={event => changeScope(event.target.value)}><option value="constitution"><T value={ui.editor.structurededitor.constitution} /></option>{outline.kinds.map(kind => <option key={kind.kindCode} value={kind.kindCode}>{kind.displayLabel}</option>)}</select></label><a href={`/admin/constitutions/${constitutionId}`}><T value={ui.editor.structurededitor.constitutionStructureSettings} /></a></div>
+    <div className="action-bar"><label><T value={ui.editor.structurededitor.editorView} /><select value={scope} disabled={loading} onChange={event => changeScope(event.target.value)}><option value="constitution"><T value={ui.editor.structurededitor.constitution} /></option>{outline.kinds.map(kind => <option key={kind.kindCode} value={kind.kindCode}>{kind.displayLabel}</option>)}</select></label>{canManageStructure ? <a href={`/admin/constitutions/${constitutionId}`}><T value={ui.editor.structurededitor.constitutionStructureSettings} /></a> : null}</div>
     <p role="status">{loading ? <T value={ui.editorDynamic.loadingEditor} /> : message || <T value={preview.operations.length ? ui.editor.structurededitor.savedDraft : ui.editor.structurededitor.sourceSnapshot} />}</p>
     {errors.length ? <div role="alert"><p><T value={ui.editor.structurededitor.resolveTheseIssuesBeforeSavingOrReview} /></p><ul>{errors.map(error => <li key={error}>{error}</li>)}</ul></div> : null}
     <aside aria-label={t(ui.accessibility.selectionInspector)}><p><T value={ui.editor.structurededitor.selected} />{" "}{selectedUnit?.kind ? kindName(selectedUnit.kind) : ''} {selectedUnit?.label} {selection !== selectedUnit?.logicalId ? <T value={ui.remainingStatus.unnumberedParentText} /> : ''}</p></aside>

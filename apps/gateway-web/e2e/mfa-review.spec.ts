@@ -86,7 +86,7 @@ test('legal versions stay prominent while text corrections require deliberate in
   await expect(page.getByRole('link', { name: 'Text corrections', exact: true })).not.toBeVisible();
   await page.getByText('Structure and editorial details', { exact: true }).click();
   await page.getByRole('link', { name: 'Text corrections', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Snapshot history' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Text history' })).toBeVisible();
   await expect(page.getByRole('link', { name: '2022-1', exact: true })).not.toBeVisible();
   await page.getByText('Text corrections', { exact: true }).first().click();
   await page.getByRole('link', { name: '2022-1', exact: true }).click();

@@ -62,7 +62,7 @@ test('editor landing lists every owned open session and keeps creation on the vi
   }));
   await request.post(`${MOCK_ORIGIN}/__editor_sessions`, { data: { sessions } });
   await signInEditor(page);
-  await expect(page.getByRole('heading', { name: 'My open sessions' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'My work' })).toBeVisible();
   await expect(page.locator('.editor-session-list li')).toHaveCount(101);
   await expect(page.getByRole('heading', { name: 'Germany', exact: true })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Basic Law for the Federal Republic of Germany' })).toBeVisible();
@@ -107,10 +107,10 @@ test('edit, review, and publish a draft', async ({ page }) => {
   await expect(page).toHaveURL(/sessionId=/);
   await expect(page.getByRole('heading', { name: 'Articles' })).toBeVisible();
   await page.getByLabel('Filter articles').fill('dignity');
-  await expect(page.getByRole('link', { name: /Art\. 1 Human dignity/ })).toBeVisible();
-  await expect(page.getByRole('link', { name: /Art\. 2/ })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: /Article 1 Human dignity/ })).toBeVisible();
+  await expect(page.getByRole('link', { name: /Article 2/ })).toHaveCount(0);
   await page.getByLabel('Filter articles').fill('');
-  await expect(page.getByRole('link', { name: 'Back to my sessions' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Back to my work' })).toBeVisible();
   await expect(page.getByText('Preview', { exact: true })).toBeVisible();
   await expect(page.getByText('Section titles', { exact: true })).toBeVisible();
   await page.getByLabel('Title', { exact: true }).fill('Human dignity (draft)');
@@ -136,12 +136,12 @@ test('edit, review, and publish a draft', async ({ page }) => {
   await expect(page).toHaveURL(/sessionId=/);
   await expect(page.getByText('Preview', { exact: true })).toBeVisible();
   await expect(page.getByLabel('Article 1').getByText('Draft body for the e2e journey.')).toBeVisible();
-  await expect(page.getByRole('link', { name: 'View public page' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'View original text' })).toBeVisible();
   const reviewerSessionUrl = page.url();
   await page.goto('/editor/amendments');
   await expect(page.getByRole('heading', { name: 'Legal changes' })).toBeVisible();
   await page.goto('/editor/history');
-  await expect(page.getByRole('heading', { name: 'Snapshot history' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Text history' })).toBeVisible();
   await page.goto(reviewerSessionUrl);
   await page.getByRole('button', { name: 'Approve review' }).click();
   await expect(page).toHaveURL(/approved=1/);
@@ -278,7 +278,7 @@ test('editorial correction hop stays off the public timeline', async ({ page }) 
   await expect(page.getByRole('heading', { name: 'Update to Article 1', exact: true })).toBeVisible();
   await signInEditor(page);
   await page.goto('/editor/history');
-  await expect(page.getByRole('heading', { name: 'Snapshot history' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Text history' })).toBeVisible();
   await expect(page.getByRole('link', { name: '2022-1' })).toBeVisible();
   await page.getByText('Text corrections', { exact: true }).first().click();
   await expect(page.getByText('Editorial correction', { exact: true })).toBeVisible();

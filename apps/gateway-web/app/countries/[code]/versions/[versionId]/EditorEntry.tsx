@@ -1,4 +1,5 @@
 import { T } from '../../../../components/TranslationProvider';
+import { workflowUi } from '../../../../../lib/workflow-messages';
 import { ui } from '../../../../../lib/messages';
 import { message } from '../../../../../lib/messages';
 import { currentLocale } from '../../../../../lib/server-locale';
@@ -75,7 +76,8 @@ export async function EditorEntry({ versions, viewedVersionId, viewedVersionLabe
             <input type="hidden" name="command" value="open" />
             <input type="hidden" name="versionId" value={viewedVersionId} />
             <input type="hidden" name="hopKind" value={kind} />
-            <button className="btn" type="submit"><T value={label} /></button>
+            <p className="muted" id={`start-${kind}-help`}><T value={kind === 'legal' ? workflowUi.legalStartHint : workflowUi.correctionStartHint} /></p>
+            <button className="btn" type="submit" aria-describedby={`start-${kind}-help`}><T value={label} /></button>
           </Stack>;
         })}
       </section>

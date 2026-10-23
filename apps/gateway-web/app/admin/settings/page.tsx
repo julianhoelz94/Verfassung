@@ -25,7 +25,7 @@ export default async function IdentitySettingsPage({
   searchParams: Promise<{ error?: string; saved?: string; tested?: string }>;
 }) {
   const params = await searchParams;
-  if (!(await requireAdminPage())) return <AdminForbidden title={ui.forbidden.accountSettings} />;
+  if (!(await requireAdminPage('/admin/settings', params))) return <AdminForbidden title={ui.forbidden.accountSettings} />;
   const token = (await cookies()).get(SESSION_COOKIE)?.value;
   const user = await currentUser();
   const settings = token ? await requestIdentitySettings(token).catch(() => null) : null;

@@ -8,8 +8,8 @@
 | Mail und Registrierung einrichten | **Website-Einstellungen** | Testmail senden, dann Registrierung aktivieren. |
 | Sprachen festlegen | **Website-Einstellungen** | Verfügbare Sprachen und Vorgabe speichern. |
 | Besucherzugriff ändern | **Anonymes Lesen** | Richtlinie und Limits mit frischer MFA speichern. |
-| Verfassungsstruktur festlegen | **Gliederungen** | Vorschau vor der Texteingabe prüfen. |
-| Inhalte importieren | **Import** | Bestehende/neue Struktur wählen, JSON hochladen und Auftrag prüfen. |
+| Verfassung erstellen oder ihre Gliederung verwalten | **Verfassungen** | Vorschau vor der Texteingabe prüfen. |
+| Inhalte importieren | **Import** | Vorbereitete Verfassungsdatei hochladen, Inhalte prüfen und anschließend getrennt veröffentlichen. |
 | Betreiber-/Datenschutztexte veröffentlichen | **Rechtliche Seiten** | Speichern, gespeicherte Vorschau prüfen, dann veröffentlichen. |
 
 ![Nach Aufgaben gruppierte Administrationsübersicht](https://raw.githubusercontent.com/wiki/julianhoelz94/Verfassung/media/admin-overview-de.png)
@@ -20,11 +20,11 @@
 
 Das Kontomenü gruppiert die Ziele zum Entdecken, zur Redaktion und zur Administration. Öffnen Sie eine Gruppe, um ihre Links zu sehen; die Gruppe des aktuellen Arbeitsbereichs ist bereits geöffnet. Konto und Abmeldung bleiben direkt erreichbar.
 
-Die Nutzerzeilen zeigen E-Mail-Adresse, Status und Rollenkennzeichnungen. **Rollen bearbeiten** öffnet die Rollenauswahl. Speichern Sie mit **Rollen aktualisieren** oder verwerfen Sie die Auswahl mit **Abbrechen**. Die Steuerelemente für Dienst-Tokens stehen in einem eigenen Abschnitt unter der Nutzerliste.
+Die Nutzerzeilen zeigen E-Mail-Adresse, Status und Rollenkennzeichnungen. Einladungen und **Rollen bearbeiten** bieten beschriftete Kontrollkästchen mit kurzen Erläuterungen zu jeder Rolle. Bei neuen Einladungen ist **Leser** vorausgewählt; wählen Sie die benötigten Rollen aus. Speichern Sie Rollenänderungen mit **Rollen aktualisieren** oder verwerfen Sie die Auswahl mit **Abbrechen**. Die Steuerelemente für Dienst-Tokens stehen in einem eigenen Abschnitt unter der Nutzerliste.
 
 ## Vorschau der Verfassungsstruktur
 
-Unter **Gliederungen** erstellen Sie eine Verfassung über **Grunddaten → Struktur → Prüfen und erstellen**. Die **Vorschau des Lesers** zeigt die Darstellung der konfigurierten Einheiten. Bewegen Sie den Zeiger über eine Einheit, fokussieren Sie sie mit der Tastatur oder tippen Sie darauf, um Struktur, Anzeigeeinstellungen und Bearbeitungsrechte zu prüfen. Mit Escape oder einem Tippen außerhalb schließen Sie die Erläuterung.
+Unter **Verfassungen** erstellen Sie eine Verfassung über **Grunddaten → Struktur → Prüfen und erstellen**. Die **Vorschau des Lesers** zeigt die Darstellung der konfigurierten Einheiten. Bewegen Sie den Zeiger über eine Einheit, fokussieren Sie sie mit der Tastatur oder tippen Sie darauf, um Struktur, Anzeigeeinstellungen und Bearbeitungsrechte zu prüfen. Mit Escape oder einem Tippen außerhalb schließen Sie die Erläuterung.
 
 Aufeinanderfolgende Satzeinheiten mit Fließtextdarstellung werden verbunden. Nicht nummerierter übergeordneter Text zwischen Einheiten beginnt einen eigenen Absatz. Mitgelieferte Quellenbeispiele behalten ihre ursprüngliche Reihenfolge.
 
@@ -48,7 +48,7 @@ Produktionsanleitungen bleiben [[ausstehend|Deployment-Information]], bis CD und
 
 
 
-Unter **Admin** finden Sie **Nutzer**, **Website-Einstellungen**, **Gliederungen** und **Import**. Suchen Sie unter Nutzer nach Konten, laden Sie Personen ein, vergeben Sie Rollen und widerrufen Sie Sitzungen. In den Website-Einstellungen konfigurieren Sie den Mailversand, senden eine Test-E-Mail an eine angegebene Adresse und aktivieren oder deaktivieren die Selbstregistrierung. Bei neuen Installationen sind Mailversand und Selbstregistrierung deaktiviert. Konfigurieren und prüfen Sie den Mailversand, bevor Sie die Registrierung einschalten. Unter Gliederungen konfigurieren Sie die Struktur einer Verfassung und prüfen die Vorschau, bevor Text erfasst wird. Unter Import laden Sie Inhalte in den überprüften Vorbereitungsablauf und prüfen den Auftrag. Vorbereitete Daten werden erst nach den nötigen Prüf- und Veröffentlichungsschritten öffentlich.
+Unter **Admin** finden Sie **Nutzer**, **Website-Einstellungen**, **Verfassungen** und **Import**. Suchen Sie unter Nutzer nach Konten, laden Sie Personen ein, vergeben Sie Rollen und widerrufen Sie Sitzungen. In den Website-Einstellungen konfigurieren Sie den Mailversand, senden eine Test-E-Mail an eine angegebene Adresse und aktivieren oder deaktivieren die Selbstregistrierung. Bei neuen Installationen sind Mailversand und Selbstregistrierung deaktiviert. Konfigurieren und prüfen Sie den Mailversand, bevor Sie die Registrierung einschalten. Unter Verfassungen erstellen Sie eine Verfassung oder verwalten ihre Gliederung und prüfen die Vorschau, bevor Text erfasst wird. Unter Import wählen Sie eine bestehende Verfassung oder einen neuen Strukturvorschlag und laden die vorbereitete JSON-Datei hoch. „Stattdessen JSON einfügen“ öffnet die erweiterte Texteingabe. Prüfen Sie die Vorschau und die importierten Inhalte. Die Inhalte werden erst nach der Prüfung und einem eigenen Veröffentlichungsschritt öffentlich.
 
 Unter Admin stehen auch die **Rechtlichen Seiten**. Speichern Sie einen privaten Entwurf von Impressum oder Datenschutzerklärung, prüfen Sie seinen Inhalt und veröffentlichen Sie ihn in einem eigenen Schritt. Bestätigen Sie vor dem öffentlichen Start die tatsächlichen Betreiberangaben. Änderungen an rechtlichen Seiten veröffentlichen keinen Verfassungstext.
 

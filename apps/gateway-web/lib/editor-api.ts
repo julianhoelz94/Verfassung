@@ -5,6 +5,8 @@ import { cookies } from 'next/headers';
 import { SESSION_COOKIE } from './session';
 import type { DiffReviewState, ReviewDecisionInput } from './diff-review';
 
+const PUBLISH_TIMEOUT_MS = 60_000;
+
 export function editorBaseUrl(): string {
   return process.env.EDITOR_API_URL ?? 'http://localhost/api/editor';
 }
@@ -94,6 +96,14 @@ export const EDITOR_ERROR_MESSAGES = {
   review_failed: ui.errors.submitReviewFailed,
   approve_failed: ui.errors.approveDraftFailed,
   publish_failed: ui.errors.publishFailed,
+  publish_unconfirmed: {
+    en: 'Publication could not be confirmed. It may still be in progress or already complete. Reload this session to check its status before publishing again.',
+    de: 'Die Veröffentlichung konnte nicht bestätigt werden. Sie kann noch laufen oder bereits abgeschlossen sein. Laden Sie diese Sitzung neu und prüfen Sie den Status, bevor Sie erneut veröffentlichen.',
+  },
+  request_unconfirmed: {
+    en: 'The result could not be confirmed. Reload this page and check the latest state before repeating the action.',
+    de: 'Das Ergebnis konnte nicht bestätigt werden. Laden Sie diese Seite neu und prüfen Sie den aktuellen Stand, bevor Sie die Aktion wiederholen.',
+  },
   session_id: ui.errors.sessionIdRequired,
   title: ui.errors.titleSaveFailed,
   failed: ui.errors.editorFailed,
@@ -126,7 +136,7 @@ async function authHeader(): Promise<string> {
   return `Bearer ${token}`;
 }
 
-async function editorFetch(path: string, init: RequestInit = {}): Promise<Response> {
+async function editorFetch(path: string, init: RequestInit = {}, timeoutMs?: number): Promise<Response> {
   return fetchWithTimeout(`${editorBaseUrl()}${path}`, {
     ...init,
     cache: 'no-store',
@@ -135,7 +145,19 @@ async function editorFetch(path: string, init: RequestInit = {}): Promise<Respon
       'Content-Type': 'application/json',
       ...(init.headers ?? {}),
     },
-  });
+  }, fetch, timeoutMs);
+}
+
+/** A lost write response cannot tell us whether the service committed the action. */
+async function editorWrite<T>(path: string, init: RequestInit, fallback: EditorErrorKey, timeoutMs?: number): Promise<T> {
+  try {
+    const response = await editorFetch(path, init, timeoutMs);
+    await throwIfNotOk(response, fallback);
+    return await response.json() as T;
+  } catch (error) {
+    if (error instanceof EditorApiError) throw error;
+    throw new EditorApiError(fallback === 'publish_failed' ? 'publish_unconfirmed' : 'request_unconfirmed');
+  }
 }
 
 async function throwIfNotOk(response: Response, fallback: EditorErrorKey): Promise<void> {
@@ -169,16 +191,17 @@ async function throwIfNotOk(response: Response, fallback: EditorErrorKey): Promi
   if (response.status === 400) {
     throw new EditorApiError('invalid', code);
   }
+  if (fallback === 'publish_failed' && [502, 503, 504].includes(response.status)) {
+    throw new EditorApiError('publish_unconfirmed', code);
+  }
   throw new EditorApiError(fallback, code);
 }
 
 export async function openSession(versionId: string, hopKind: 'legal' | 'editorial_correction'): Promise<EditSession> {
-  const response = await editorFetch('/edit-sessions', {
+  return editorWrite<EditSession>('/edit-sessions', {
     method: 'POST',
     body: JSON.stringify({ versionId, hopKind }),
-  });
-  await throwIfNotOk(response, 'open_failed');
-  return (await response.json()) as EditSession;
+  }, 'open_failed');
 }
 
 export async function listSessions(filters: {
@@ -230,53 +253,42 @@ export async function saveDraft(
   title: string,
   body: string,
 ): Promise<DraftPreview> {
-  const response = await editorFetch(`/edit-sessions/${encodeURIComponent(sessionId)}/saves`, {
+  return editorWrite<DraftPreview>(`/edit-sessions/${encodeURIComponent(sessionId)}/saves`, {
     method: 'POST',
     body: JSON.stringify({ articleId, title, body }),
-  });
-  await throwIfNotOk(response, 'save_failed');
-  return (await response.json()) as DraftPreview;
+  }, 'save_failed');
 }
 
 export async function submitReview(sessionId: string): Promise<DraftPreview> {
-  const response = await editorFetch(`/edit-sessions/${encodeURIComponent(sessionId)}/review`, {
+  return editorWrite<DraftPreview>(`/edit-sessions/${encodeURIComponent(sessionId)}/review`, {
     method: 'POST',
-  });
-  await throwIfNotOk(response, 'review_failed');
-  return (await response.json()) as DraftPreview;
+  }, 'review_failed');
 }
 
 export async function approveReview(sessionId: string): Promise<DraftPreview> {
-  const response = await editorFetch(`/edit-sessions/${encodeURIComponent(sessionId)}/approval`, {
+  return editorWrite<DraftPreview>(`/edit-sessions/${encodeURIComponent(sessionId)}/approval`, {
     method: 'POST',
-  });
-  await throwIfNotOk(response, 'approve_failed');
-  return (await response.json()) as DraftPreview;
+  }, 'approve_failed');
 }
 
 export async function savePublishDetails(
   sessionId: string,
   details: { comment?: string; changeRecord?: { title: string; comment: string; documents: { url: string; label?: string }[]; changes?: ChangeRecordChange[] } },
 ): Promise<DraftPreview> {
-  const response = await editorFetch(`/edit-sessions/${encodeURIComponent(sessionId)}/publish-details`, {
+  return editorWrite<DraftPreview>(`/edit-sessions/${encodeURIComponent(sessionId)}/publish-details`, {
     method: 'POST',
     body: JSON.stringify(details),
-  });
-  await throwIfNotOk(response, 'save_failed');
-  return (await response.json()) as DraftPreview;
+  }, 'save_failed');
 }
 
 export async function publishSession(
   sessionId: string,
   options: { hopKind: 'legal' | 'editorial_correction'; amendmentId?: string; comment?: string; changeRecord?: { title: string; comment: string; documents: { url: string; label?: string }[]; changes?: ChangeRecordChange[] } },
 ): Promise<DraftPreview> {
-  const body = options;
-  const response = await editorFetch(`/edit-sessions/${encodeURIComponent(sessionId)}/publish`, {
+  return editorWrite<DraftPreview>(`/edit-sessions/${encodeURIComponent(sessionId)}/publish`, {
     method: 'POST',
-    body: JSON.stringify(body),
-  });
-  await throwIfNotOk(response, 'publish_failed');
-  return (await response.json()) as DraftPreview;
+    body: JSON.stringify(options),
+  }, 'publish_failed', PUBLISH_TIMEOUT_MS);
 }
 
 export async function getStructuredDraft(sessionId: string): Promise<import('./structured-editor').StructuredPreview | null> {
@@ -286,9 +298,7 @@ export async function getStructuredDraft(sessionId: string): Promise<import('./s
   return response.json();
 }
 export async function saveStructuredDraft(sessionId: string, request: { expectedGeneration: number; operations: import('./structured-editor').DraftOperation[] }): Promise<import('./structured-editor').StructuredPreview> {
-  const response = await editorFetch(`/edit-sessions/${encodeURIComponent(sessionId)}/structured-saves`, { method: 'POST', body: JSON.stringify(request) });
-  await throwIfNotOk(response, 'save_failed');
-  return response.json();
+  return editorWrite<import('./structured-editor').StructuredPreview>(`/edit-sessions/${encodeURIComponent(sessionId)}/structured-saves`, { method: 'POST', body: JSON.stringify(request) }, 'save_failed');
 }
 
 export async function getEditorDiffReview(sessionId: string): Promise<DiffReviewState> {
@@ -298,7 +308,7 @@ export async function getEditorDiffReview(sessionId: string): Promise<DiffReview
 }
 
 export async function decideEditorDiff(sessionId: string, generation: number, decision: ReviewDecisionInput): Promise<DiffReviewState> {
-  const response = await editorFetch(`/edit-sessions/${encodeURIComponent(sessionId)}/diff-review/decisions`, {
+  return editorWrite<DiffReviewState>(`/edit-sessions/${encodeURIComponent(sessionId)}/diff-review/decisions`, {
     method: 'POST',
     body: JSON.stringify({
       expectedGeneration: generation,
@@ -309,7 +319,5 @@ export async function decideEditorDiff(sessionId: string, generation: number, de
       exclusionReason: decision.exclusionReason ?? null,
       reviewerAcknowledged: decision.reviewerAcknowledged ?? false,
     }),
-  });
-  await throwIfNotOk(response, 'save_failed');
-  return response.json();
+  }, 'save_failed');
 }

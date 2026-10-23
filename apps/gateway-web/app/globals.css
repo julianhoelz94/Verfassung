@@ -594,6 +594,17 @@ button.article-toggle[aria-expanded='false']::after {
   content: '▸';
 }
 
+/* Full-text headings remain readable even though there is nothing to expand. */
+button.article-toggle:disabled {
+  opacity: 1;
+  color: inherit;
+  cursor: default;
+}
+
+button.article-toggle:disabled::after {
+  content: none;
+}
+
 .article-permalink {
   margin: var(--space-2) 0 0;
   font-size: 0.9rem;
@@ -1290,6 +1301,15 @@ button.article-toggle[aria-expanded='false']::after {
 .editor-session-list li div {
   display: grid;
   gap: var(--space-1);
+}
+
+.editor-session-list .badge {
+  justify-self: start;
+}
+
+.article-list .badge {
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .chip-row {
@@ -2025,7 +2045,7 @@ form[aria-busy='true'] :where(button, .btn) { cursor: progress; }
 .review-action-form h3 { margin: 0; }
 .review-action-form .field { display: grid; gap: var(--space-2); margin: 0; }
 .review-action-form textarea { display: block; width: 100%; resize: vertical; }
-.review-action-form > .btn { justify-self: start; margin-top: 0; }
+.review-action-form > .btn, .review-action-form > fieldset > .btn { justify-self: start; margin-top: 0; }
 .technical-identifiers { display: grid; gap: var(--space-2); }
 .technical-identifiers dd { margin: 0 0 var(--space-3); overflow-wrap: anywhere; }
 .admin-users-page .data-row { align-items: start; }
@@ -2033,9 +2053,6 @@ form[aria-busy='true'] :where(button, .btn) { cursor: progress; }
 .user-role-editor { flex-basis: 100%; min-width: 0; }
 .user-role-editor > summary { cursor: pointer; color: var(--color-accent); min-height: var(--control-min); padding-block: var(--space-2); }
 .user-role-editor form { margin-top: var(--space-3); }
-.user-role-editor .role-options { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-4); padding: var(--space-3); margin-bottom: 0; }
-.user-role-editor .role-options legend { font-size: var(--text-sm); }
-.user-role-editor .role-options label { align-items: center; margin: 0; }
 .menu-section > summary { cursor: pointer; min-height: var(--control-min); padding: var(--space-3); font-weight: 650; }
 .menu-section > summary .badge { margin-inline-start: var(--space-2); }
 .menu-section > a { padding-inline-start: var(--space-5); }

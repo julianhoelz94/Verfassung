@@ -109,6 +109,7 @@ class MigrationService(private val repository: MigrationRepository, private val 
             require(source?.sha256 == null || capture.fileSha256 == source.sha256) { "Capture hash differs from the source inventory" }
         }
         if (request.kind == "document_link") mapper.treeToValue(request.payload, DocumentRelationshipPayload::class.java)
+        if (request.kind == "amendment") validateMigrationAmendment(request.payload)
         val id = repository.insert(run, request, hash)
         if (request.kind == "snapshot") {
             val job = imports.importVersion(authorization, actor.id, mapper.treeToValue(request.payload, ImportRequest::class.java), idempotencyKey = "migration-$id")

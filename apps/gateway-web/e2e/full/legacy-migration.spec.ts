@@ -1,6 +1,6 @@
 import { expect, test, type APIRequestContext } from '../fixtures/consent';
 import { createHash, randomUUID } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { adminHeaders, roleHeaders, createIsolatedConstitution } from './api-fixtures';
 
@@ -271,10 +271,12 @@ test('offline archive package preserves evidence through review, publication and
     await expect(page.locator(':target')).toContainText(manifest.annotationText);
     const finalRun = await mcp(request, importer, 'get_migration_run', { runId: run.id });
     expect(finalRun.coverage).toMatchObject({ sources: 9, unavailable: 1, excluded: 1, published: 2, blocked: 0 });
-    await testInfo.attach('legacy-migration-coverage.json', { body: JSON.stringify({ attribution: manifest.attribution, transformations: manifest.transformations,
+    const coveragePath = testInfo.outputPath('legacy-migration-coverage.json');
+    writeFileSync(coveragePath, JSON.stringify({ attribution: manifest.attribution, transformations: manifest.transformations,
       sources: inventory, counts: fidelity.counts, snapshotId: fidelity.snapshotId, records: records.length,
       stages: ['receipt', 'staging', 'preparation', 'review', 'publication'], coverage: finalRun.coverage, legacyTarget: resolved.targetUrl, comparisonId,
-    }, null, 2), contentType: 'application/json' });
+    }, null, 2));
+    await testInfo.attach('legacy-migration-coverage.json', { path: coveragePath, contentType: 'application/json' });
     const revoked = keys.shift()!;
     expect((await request.delete(`/api/identity/mcp-keys/${revoked.id}`, { headers: revoked.headers })).status()).toBe(204);
     expect((await request.get(`/api/ingestion/migration-runs/${run.id}`, { headers: { Authorization: `Bearer ${revoked.token}` } })).status()).toBe(401);

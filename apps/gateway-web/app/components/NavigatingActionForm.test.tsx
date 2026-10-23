@@ -6,8 +6,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { NavigatingActionForm } from './NavigatingActionForm';
 import { TranslationProvider } from './TranslationProvider';
 
-function Form({ action }: { action: (data: FormData) => Promise<string> }) {
-  return <TranslationProvider locale="en"><NavigatingActionForm action={action}>
+function Form({ action, autoFocusName }: { action: (data: FormData) => Promise<string>; autoFocusName?: string }) {
+  return <TranslationProvider locale="en"><NavigatingActionForm action={action} autoFocusName={autoFocusName}>
     <label>Authenticator code<input name="code" defaultValue="123456" /></label>
     <input type="hidden" name="next" value="/editor?status=approved" />
     <button>Continue</button>
@@ -55,5 +55,12 @@ describe('client action readiness', () => {
     expect(form.getAttribute('aria-busy')).toBe('false');
     expect(host.querySelector('[role="alert"]')?.textContent).toBeTruthy();
     expect(host.querySelector<HTMLInputElement>('input[name="code"]')?.value).toBe('123456');
+  });
+
+  it('focuses the requested field only after its controls become available', async () => {
+    root = createRoot(host);
+    await act(async () => root!.render(<Form action={vi.fn()} autoFocusName="code" />));
+    expect(host.querySelector('fieldset')?.disabled).toBe(false);
+    expect(document.activeElement).toBe(host.querySelector('input[name="code"]'));
   });
 });

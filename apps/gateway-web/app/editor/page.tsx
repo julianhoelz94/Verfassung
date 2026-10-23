@@ -209,7 +209,7 @@ export default async function EditorPage(props: EditorPageProps) {
               articles={articles}
               selectedId={selected?.id}
               hrefBase={articleHrefBase}
-              draftIds={draftIds}
+              draftIds={session.status === 'published' ? [] : draftIds}
               outline={displayOutline}
             />
           </aside>

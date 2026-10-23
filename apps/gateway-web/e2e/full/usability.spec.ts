@@ -179,6 +179,7 @@ test('owned work survives role handoffs and published corrections remain readabl
     await expect(resultLink).toHaveCount(1);
     await expect(resultLink).toHaveAttribute('href', href);
     await expect(page.getByRole('heading', { name: new RegExp(title) })).toBeVisible();
+    await expect(page.locator('.article-list').getByText('draft', { exact: true })).toHaveCount(0);
     await page.screenshot({ path: testInfo.outputPath(`published-work-${index + 1}.png`), fullPage: true });
     await resultLink.click();
     await page.locator('.version-articles .article-toggle').first().click();

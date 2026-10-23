@@ -250,7 +250,22 @@ test('offline archive package preserves evidence through review, publication and
       await expect(reader.getByRole('heading', { name: 'Freyheit', exact: true })).toBeVisible();
       await expect(reader.getByText(locale === 'de' ? 'In diesem Quellenvergleich ist keine Entsprechung verzeichnet.' : 'No counterpart recorded in this source comparison.', { exact: true })).toBeVisible();
       await reader.reload(); await expect(reader).toHaveURL(/topic=0&columns=0,1/);
-      expect(await reader.locator('html').evaluate(element => element.scrollWidth <= window.innerWidth)).toBe(true); await context.close();
+      expect(await reader.locator('html').evaluate(element => element.scrollWidth <= window.innerWidth)).toBe(true);
+      await reader.goto(`/constitutions/${setup.constitutionId}/amendments?q=Fixture%20law%201850&unit=Art.%20I%20a`);
+      await expect(reader.getByRole('heading', { name: 'Fixture law 1850', exact: true })).toBeVisible();
+      await expect(reader.locator(`a[href*="${versionId}"]`).first()).toBeVisible();
+      await expect(reader.locator(`a[href*="${successorId}"]`).first()).toBeVisible();
+      await expect(reader.locator('#register-q')).toHaveValue('Fixture law 1850');
+      await reader.reload();
+      await expect(reader.locator('#register-unit')).toHaveValue('Art. I a');
+      await expect(reader.locator('#register-q')).toHaveValue('Fixture law 1850');
+      await reader.locator('#register-date-kind').selectOption('effective');
+      await reader.locator('#register-from').fill('1850-01-01');
+      await reader.locator('main form button[type="submit"]').click();
+      await expect(reader.getByRole('heading', { name: 'Fixture law 1850', exact: true })).toHaveCount(0);
+      await expect(reader.locator('#register-from')).toHaveValue('1850-01-01');
+      expect(await reader.locator('html').evaluate(element => element.scrollWidth <= window.innerWidth)).toBe(true);
+      await context.close();
     }
     await page.goto(oldUrl); await expect(page).toHaveURL(new RegExp(versionId));
     await expect(page.locator(':target')).toContainText(manifest.annotationText);

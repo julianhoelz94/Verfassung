@@ -62,6 +62,8 @@ Bootstrap administrator credentials belong in Coolify; they are not required in 
 
 `docker-compose.coolify.yml` contains only image references and internal networking, with no host port publications or checkout bind mounts. Each database retains its named volume in the Coolify application's Compose project. No `backup-service` or backup image runs on this host: backup is provided at host level. CD does not create a pre-deployment backup, restore data or reverse migrations. Host backup and restore consistency are operator responsibilities.
 
+The manual deployment workflow generates three independent internal ingestion credentials for each deployment and supplies the same values to Identity and Ingestion. With demo seeding still disabled, Identity registers only `ingestion:publish`, `audit:append` and `search:reindex`, each on its own deployment-managed token. Values are not written to the release manifest or logs. A later deployment rotates these credentials; the same configured values remain valid across a container restart and renew their 90-day lifetime. Deploy at least every 90 days or renew the managed credentials before expiry. Do not replace these entries with an account MCP key or a general automation token. A standalone production deployment must supply three distinct random URL-safe secrets (at least 43 characters) as `INGESTION_PUBLISH_TOKEN`, `INGESTION_AUDIT_TOKEN`, and `INGESTION_SEARCH_TOKEN`, and enable `INGESTION_MANAGED_CREDENTIALS=true` on Identity.
+
 Keep runtime wiring in `docker-compose.yml`, then regenerate the deployment file with:
 
 ```bash

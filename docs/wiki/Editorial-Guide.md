@@ -41,6 +41,8 @@ The same account can upload, review and publish when it holds the required roles
 
 Import review places the constitution title, version and reader preview ahead of technical identifiers. Approval and rejection each have an aligned reason field and action button. Open **Technical details** when you need the import ID, draft version ID, content generation or settings revision.
 
+The current step is shown prominently above the content. After approval it reads **Approved – publication pending** and only publication is offered to an authorized Publisher/Admin. Approval/rejection controls disappear after review; completed and rejected imports have no publication action. **Check content and structure** links directly to the submitted hierarchy, using the confirmed layout. Publication errors distinguish server credential/configuration problems from a changed approved draft, permission problems, and temporary failures. A failed publication never by itself proves that nothing was published: reload and check the current status before retrying.
+
 ## 3. Publish
 
 **Requires: Publisher or Admin.**

@@ -192,6 +192,7 @@ const editorState = {
 let pendingMfaEmail = identityMe.email;
 let currentUser = { ...identityMe };
 let importJobs = new Map();
+let importPublicationError = null;
 let managedUsers = [];
 let serviceTokens = [];
 let credentials = new Map();
@@ -226,6 +227,7 @@ function resetMockState() {
   pendingMfaEmail = identityMe.email;
   currentUser = { ...identityMe };
   importJobs = new Map();
+  importPublicationError = null;
   managedUsers = [];
   serviceTokens = [];
   createdConstitutions = [];
@@ -369,6 +371,10 @@ const server = createServer(async (req, res) => {
       roles: ['viewer', 'editor', 'reviewer', 'publisher', 'admin'], enabled: true, status: 'active', createdAt: '2026-01-01T00:00:00Z',
     }));
     empty(res, 204); return;
+  }
+  if (method === 'POST' && pathname === '/__import_publication_error') {
+    importPublicationError = (await readBody(req)).code ?? null;
+    json(res, 200, {}); return;
   }
   if (method === 'POST' && pathname === '/__sprint59_content') {
     uiReview = reviewFixtures(germany);
@@ -1251,7 +1257,10 @@ const server = createServer(async (req, res) => {
         job.approvedBy = currentUser.id;
         job.decisions.push({ id: 'decision', decision: job.status, reason, decidedBy: currentUser.id, decidedAt: new Date().toISOString() });
       }
-      if (action === 'publish') { job.status = 'completed'; job.publishedBy = currentUser.id; }
+      if (action === 'publish') {
+        if (importPublicationError) { json(res, 503, { code: importPublicationError }); return; }
+        job.status = 'completed'; job.publishedBy = currentUser.id;
+      }
       json(res, 200, job); return;
     }
   }

@@ -719,6 +719,34 @@ class IdentityApiTest {
     }
 
     @Test
+    fun managedIngestionCredentialsAuthenticateWithOnlyTheirOwnScopeAndRotate() {
+        val users = com.constitutionatlas.identity.repo.IdentityRepository(jdbcTemplate)
+        val setup = com.constitutionatlas.identity.setup.SetupRepository(jdbcTemplate)
+        val originalUsers = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM users", Int::class.java)
+        val values = List(3) { UUID.randomUUID().toString().replace("-", "").repeat(2) }
+        fun register(publish: String) = com.constitutionatlas.identity.service.IngestionCredentialBootstrap(users, setup, publish, values[1], values[2]).run(DefaultApplicationArguments())
+        register(values[0])
+        register(values[0])
+        for ((index, scope) in listOf("ingestion:publish", "audit:append", "search:reindex").withIndex()) {
+            mockMvc.get("/me") { header("Authorization", "Bearer ${values[index]}") }.andExpect {
+                status { isOk() }
+                jsonPath("$.scopes.length()") { value(1) }
+                jsonPath("$.scopes[0]") { value(scope) }
+                jsonPath("$.roles.length()") { value(0) }
+            }
+        }
+        check(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM service_tokens WHERE name LIKE 'managed-ingestion-%' AND revoked_at IS NULL", Int::class.java) == 3)
+        val rotated = UUID.randomUUID().toString().replace("-", "").repeat(2)
+        register(rotated)
+        mockMvc.get("/me") { header("Authorization", "Bearer ${values[0]}") }.andExpect { status { isUnauthorized() } }
+        mockMvc.get("/me") { header("Authorization", "Bearer $rotated") }.andExpect {
+            status { isOk() }
+            jsonPath("$.scopes[0]") { value("ingestion:publish") }
+        }
+        check(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM users", Int::class.java) == originalUsers)
+    }
+
+    @Test
     fun personalMcpKeysAreScopedAndCanBeRotatedAndRevoked() {
         val viewer = login("local-viewer@example.local", "change-me")
         mockMvc.post("/mcp-keys") {

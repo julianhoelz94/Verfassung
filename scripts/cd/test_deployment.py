@@ -102,6 +102,16 @@ class AuthorizationTests(unittest.TestCase):
 
 
 class CoolifyTests(unittest.TestCase):
+    def test_production_credentials_are_independent_and_rotated_without_demo_seeding(self):
+        first = {item["key"]: item["value"] for item in deploy.env_payload(manifest())["data"]}
+        second = {item["key"]: item["value"] for item in deploy.env_payload(manifest())["data"]}
+        credentials = [first["INGESTION_" + purpose + "_TOKEN"] for purpose in ("PUBLISH", "AUDIT", "SEARCH")]
+        self.assertEqual(len(set(credentials)), 3)
+        self.assertTrue(all(deploy.re.fullmatch(r"[A-Za-z0-9_-]{64}", value) for value in credentials))
+        self.assertEqual(first["IDENTITY_SEED_MODE"], "off")
+        self.assertNotIn("IDENTITY_SEED_INGESTION_PUBLISH_TOKEN", first)
+        self.assertNotEqual(first["INGESTION_PUBLISH_TOKEN"], second["INGESTION_PUBLISH_TOKEN"])
+
     def test_private_origin_prevents_sending_credentials_to_public_hosts(self):
         for value in ["https://example.com", "http://100.64.0.1:8000/api/v1", "http://user@coolify:8000", "file://coolify"]:
             with self.assertRaises(ValueError):

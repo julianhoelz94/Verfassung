@@ -6,6 +6,12 @@ spring:
       connect-timeout: 2s
       read-timeout: 5s
 identity:
+  internal:
+    ingestion-credentials:
+      enabled: ${INGESTION_MANAGED_CREDENTIALS:false}
+      publish: ${INGESTION_PUBLISH_TOKEN:}
+      audit: ${INGESTION_AUDIT_TOKEN:}
+      search: ${INGESTION_SEARCH_TOKEN:}
   seed:
     mode: ${IDENTITY_SEED_MODE:off}
     editor-email: ${IDENTITY_EDITOR_EMAIL:${LOCAL_EDITOR_EMAIL:}}

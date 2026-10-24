@@ -266,10 +266,4 @@ Record the server architecture, Ubuntu/Coolify/Docker versions, public and Tails
 
 ## 13. Configure the applications and manual workflow
 
-Follow the [three-step manual deployment setup](manual-deployment.md#one-time-setup-three-steps). Save the five required environment-wide shared variables in Coolify, then dispatch CD manually. CD creates or reuses `constitution-atlas-test` / `constitution-atlas-prod`, assigns the HTTPS domain and `/docker-compose.coolify.yml`, and disables automatic/preview deployments. No manual application creation or domain assignment is required. Copy the project UUID from **Projects → Constitution Atlas**, after `/project/` in its URL; the project and server UUIDs are the same for both GitHub environments. The production domain is `verfassungen.julianhoelz.de`; test uses `tst.verfassungen.julianhoelz.de`.
-
-CD checks existing compilation results for the exact `main` commit and builds native AMD64 images on GitHub-hosted runners. It runs no unit, integration or E2E suite. Only an administrator's manual dispatch selects and starts rollout. Optional npm prepopulate defaults to false; the runbook describes its additional credentials and effects.
-
-After the first manual deployment, complete the site's setup wizard and verify state persists across a second deployment. Leave prepopulate disabled until setup is complete and its separate accounts exist. No backup container is deployed because this server has a host-level backup.
-
-Do not deploy the development Compose file unchanged. The CD files are prepared, but the first remote rollout and production procedure remain unverified.
+[Continue with the manual deployment guide](manual-deployment.md).

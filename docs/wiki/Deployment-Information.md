@@ -2,6 +2,13 @@
 
 **Status: pending.** The repository includes a manual GitHub Actions CD workflow for test and production, with automatic application creation/configuration on its first manual run, but its first remote rollout has not been verified. A reliable post-deployment procedure cannot yet be specified. Do not treat the local Compose quick start or a test fixture as a production rollout procedure.
 
+The complete preparation instructions are available here:
+
+- [[Coolify server setup|Coolify-Server-Setup]] — fresh Ubuntu, private Tailscale administration, public HTTPS, GitHub credentials and host backup.
+- [[Manual deployment|Manual-Deployment]] — required settings, manual test/prod selection, automatic application configuration, Let's Encrypt and optional prepopulate.
+
+These pages are generated from the repository's canonical guides so the Wiki and repository instructions stay aligned. Their availability does not establish that a remote deployment has succeeded.
+
 After a deployment has been exercised, this page must document, in order:
 
 1. The target environment, responsible operator, CD trigger, artifact/image identity, and required approvals.

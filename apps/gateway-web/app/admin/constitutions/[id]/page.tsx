@@ -52,7 +52,7 @@ export default async function AdminOutlinePage(props: AdminOutlinePageProps) {
       {searchParams.saved ? (
         <Alert tone="success"><T value={ui.admin.constitutions.id.page.settingsSavedHistoricalVersionsRetainTheirStructural} /></Alert>
       ) : null}
-      {(match.constitution.versions ?? []).length === 0 ? <Alert tone="info"><T value={ui.admin.constitutions.id.page.theStructureIsReady} />{" "}<Link href="/admin/import"><T value={ui.admin.constitutions.id.page.importTheFirstVersion} /></Link> <T value={ui.admin.constitutions.id.page.or} />{" "}<Link href="/editor"><T value={ui.admin.constitutions.id.page.openTheEditor} /></Link> <T value={ui.admin.constitutions.id.page.toContinue} /></Alert> : null}
+      {(match.constitution.versions ?? []).length === 0 ? <Alert tone="info"><T value={ui.admin.constitutions.id.page.theStructureIsReady} />{" "}<Link href="/admin/import"><T value={ui.admin.constitutions.id.page.importTheFirstVersion} /></Link> <T value={ui.admin.constitutions.id.page.or} />{" "}<Link href="/editor"><T value={ui.admin.constitutions.id.page.openTheEditor} /></Link><T value={ui.admin.constitutions.id.page.toContinue} /></Alert> : null}
       {searchParams.migration ? <Alert tone="error"><T value={ui.admin.constitutions.id.page.thisChangeRequiresAReviewedSuccessorMigration} /></Alert> : null}
       {searchParams.error ? <Alert tone="error"><T value={ui.admin.constitutions.id.page.theOutlineCouldNotBeSaved} /></Alert> : null}
       {searchParams.documentError ? <Alert tone="error"><T value={ui.admin.constitutions.id.page.theDocumentLinkCouldNotBeChanged} /></Alert> : null}

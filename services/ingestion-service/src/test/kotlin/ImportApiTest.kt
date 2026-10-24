@@ -309,16 +309,25 @@ class ImportApiTest {
         val id = jobId(response.response.contentAsString)
         mockMvc.get("/import-setup-proposals/$id") { header("Authorization", EDITOR_TOKEN) }
             .andExpect { status { isForbidden() } }
-        mockMvc.post("/import-setup-proposals/$id/confirm") { header("Authorization", EDITOR_TOKEN) }
+        mockMvc.post("/import-setup-proposals/$id/confirm") {
+            header("Authorization", EDITOR_TOKEN)
+            header("If-Match", "1")
+        }
             .andExpect { status { isForbidden() } }
-        mockMvc.post("/import-setup-proposals/$id/confirm") { header("Authorization", TOKEN) }
+        mockMvc.post("/import-setup-proposals/$id/confirm") {
+            header("Authorization", TOKEN)
+            header("If-Match", "1")
+        }
             .andExpect {
                 status { isOk() }
                 jsonPath("$.status") { value("confirmed") }
                 jsonPath("$.constitutionId") { value(constitutionId.toString()) }
                 jsonPath("$.settingsRevisionId") { value(SETTINGS_REVISION.toString()) }
             }
-        mockMvc.post("/import-setup-proposals/$id/confirm") { header("Authorization", TOKEN) }
+        mockMvc.post("/import-setup-proposals/$id/confirm") {
+            header("Authorization", TOKEN)
+            header("If-Match", "1")
+        }
             .andExpect {
                 status { isOk() }
                 jsonPath("$.status") { value("confirmed") }
@@ -327,7 +336,147 @@ class ImportApiTest {
     }
 
     @Test
-    fun setupConfirmationUsesThePayloadThatWonTheClaim() {
+    fun setupFeedbackAndDisplayPreferencesSurviveAChatRevisionWithoutAllowingStaleConfirmation() {
+        val body = """{"isoCode":"FR","countryName":"France","constitutionSlug":"feedback-review","constitutionTitle":"Review charter","languageCode":"fr","sourceUrl":"https://example.org/source","outline":{"kinds":[{"kindCode":"article","displayLabel":"Article"}]},"sampleRoots":[{"kind":"article","label":"1","content":[{"type":"text","text":"First sentence. Second sentence."}]}]}"""
+        val created = mockMvc.post("/import-setup-proposals") {
+            header("Authorization", MCP_TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = body
+        }.andExpect {
+            status { isCreated() }
+            jsonPath("$.revision") { value(1) }
+        }.andReturn()
+        val id = jobId(created.response.contentAsString)
+        mockMvc.post("/import-setup-proposals/$id/confirm") {
+            header("Authorization", MCP_TOKEN)
+            header("If-Match", "1")
+        }
+            .andExpect { status { isForbidden() } }
+        mockMvc.post("/import-setup-proposals/$id/display") {
+            header("Authorization", TOKEN)
+            header("If-Match", "1")
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"kinds":[{"kindCode":"article","displayLabel":"Article","allowedChildKinds":["sentence"]}]}"""
+        }.andExpect { status { isBadRequest() } }
+        mockMvc.post("/import-setup-proposals/$id/display") {
+            header("Authorization", TOKEN)
+            header("If-Match", "1")
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"kinds":[{"kindCode":"article","displayLabel":"Article","title":"Changed source title"}]}"""
+        }.andExpect { status { isBadRequest() } }
+        mockMvc.post("/import-setup-proposals/$id/request-changes") {
+            header("Authorization", REVIEWER_TOKEN)
+            header("If-Match", "1")
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"message":"Add a sentence layer, preserving the exact source wording."}"""
+        }.andExpect { status { isForbidden() } }
+        mockMvc.post("/import-setup-proposals/$id/request-changes") {
+            header("Authorization", TOKEN)
+            header("If-Match", "1")
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"message":"Add a sentence layer, preserving the exact source wording."}"""
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.revision") { value(2) }
+            jsonPath("$.changesRequested") { value(true) }
+        }
+        mockMvc.post("/import-setup-proposals/$id/confirm") {
+            header("Authorization", TOKEN)
+            header("If-Match", "2")
+        }
+            .andExpect { status { isConflict() } }
+        mockMvc.post("/import-setup-proposals/$id/display") {
+            header("Authorization", TOKEN)
+            header("If-Match", "2")
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"kinds":[{"kindCode":"article","displayLabel":"Art.","showKind":true}]}"""
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.revision") { value(3) }
+            jsonPath("$.payload.sampleRoots[0].kind") { value("article") }
+        }
+        val revised = body.replace("\"displayLabel\":\"Article\"", "\"displayLabel\":\"Article\",\"allowedChildKinds\":[\"sentence\"]")
+            .replace("\"Article\",\"allowedChildKinds\":[\"sentence\"]}]", "\"Article\",\"allowedChildKinds\":[\"sentence\"]},{\"kindCode\":\"sentence\",\"displayLabel\":\"Sentence\",\"allowedChildKinds\":[]}]")
+            .replace("{\"type\":\"text\",\"text\":\"First sentence. Second sentence.\"}", "{\"type\":\"child\",\"node\":{\"kind\":\"sentence\",\"content\":[{\"type\":\"text\",\"text\":\"First sentence.\"}]}},{\"type\":\"child\",\"node\":{\"kind\":\"sentence\",\"content\":[{\"type\":\"text\",\"text\":\"Second sentence.\"}]}}")
+        mockMvc.put("/import-setup-proposals/$id") {
+            header("Authorization", MCP_TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = revised
+        }.andExpect { status { isPreconditionRequired() } }
+        mockMvc.put("/import-setup-proposals/$id") {
+            header("Authorization", MCP_TOKEN)
+            header("If-Match", "2")
+            contentType = MediaType.APPLICATION_JSON
+            content = revised
+        }.andExpect { status { isConflict() } }
+        mockMvc.put("/import-setup-proposals/$id") {
+            header("Authorization", MCP_TOKEN)
+            header("If-Match", "3")
+            contentType = MediaType.APPLICATION_JSON
+            content = revised
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.revision") { value(4) }
+            jsonPath("$.changesRequested") { value(false) }
+            jsonPath("$.payload.outline.kinds[0].displayLabel") { value("Art.") }
+            jsonPath("$.payload.sampleRoots[0].content[0].node.kind") { value("sentence") }
+            jsonPath("$.previousPayload.sampleRoots[0].content[0].text") { value("First sentence. Second sentence.") }
+        }
+        mockMvc.get("/import-setup-proposals/$id") { header("Authorization", MCP_TOKEN) }.andExpect {
+            status { isOk() }
+            jsonPath("$.requestedChanges") { value("Add a sentence layer, preserving the exact source wording.") }
+        }
+        mockMvc.post("/import-setup-proposals/$id/confirm") {
+            header("Authorization", TOKEN)
+            header("If-Match", "3")
+        }
+            .andExpect { status { isConflict() } }
+        Mockito.verify(catalogClient, Mockito.never()).createConstitution("FR", "feedback-review", "Review charter")
+        val constitutionId = UUID.randomUUID()
+        Mockito.`when`(catalogClient.createConstitution("FR", "feedback-review", "Review charter")).thenReturn(DownstreamConstitution(constitutionId, "feedback-review", "Review charter"))
+        Mockito.`when`(catalogClient.currentSettingsRevisionId(constitutionId)).thenReturn(SETTINGS_REVISION)
+        mockMvc.post("/import-setup-proposals/$id/confirm") {
+            header("Authorization", TOKEN)
+            header("If-Match", "4")
+        }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.status") { value("confirmed") }
+            }
+    }
+
+    @Test
+    fun setupDisplayResponseDoesNotAdoptANewerChatRevisionForConfirmation() {
+        val mapper = com.fasterxml.jackson.module.kotlin.jacksonObjectMapper()
+        val repository = Mockito.spy(com.constitutionatlas.ingestion.repo.SetupProposalRepository(jdbc, mapper))
+        val service = com.constitutionatlas.ingestion.service.SetupProposalService(repository, catalogClient, mapper)
+        val request = mapper.readValue(
+            """{"isoCode":"FR","countryName":"France","constitutionSlug":"display-race","constitutionTitle":"Reviewed title","languageCode":"fr","sourceUrl":"https://example.org/source","outline":{"kinds":[{"kindCode":"article","displayLabel":"Article"}]},"sampleRoots":[{"kind":"article","label":"1","content":[{"type":"text","text":"Sample"}]}]}""",
+            com.constitutionatlas.ingestion.api.SetupProposalRequest::class.java,
+        )
+        val created = service.create(TOKEN, admin.id, request)
+        Mockito.doAnswer { invocation ->
+            val saved = invocation.callRealMethod() as com.constitutionatlas.ingestion.api.SetupProposalDto
+            repository.replace(created.id, saved.payload.copy(constitutionTitle = "Unseen chat revision"), saved.revision)
+            saved
+        }.`when`(repository).display(
+            anyUuid(),
+            Mockito.anyLong(),
+            Mockito.any(com.constitutionatlas.ingestion.api.SetupProposalRequest::class.java) ?: request,
+            Mockito.any(com.fasterxml.jackson.databind.JsonNode::class.java) ?: mapper.createObjectNode(),
+        )
+        val saved = service.display(created.id, admin.id, true, com.constitutionatlas.ingestion.api.SetupDisplayRequest(listOf(com.constitutionatlas.ingestion.api.SetupDisplayKind("article", "Art."))), created.revision)
+        assertEquals(2, saved.revision.toInt())
+        assertEquals("Reviewed title", saved.payload.constitutionTitle)
+        assertEquals(3, service.get(created.id, admin.id, true).revision.toInt())
+        org.junit.jupiter.api.Assertions.assertThrows(org.springframework.web.server.ResponseStatusException::class.java) {
+            service.confirm(TOKEN, created.id, admin.id, true, saved.revision)
+        }
+        Mockito.verify(catalogClient, Mockito.never()).createConstitution("FR", "display-race", "Unseen chat revision")
+    }
+
+    @Test
+    fun setupConfirmationRejectsARevisionThatChangedBeforeTheClaim() {
         val mapper = com.fasterxml.jackson.module.kotlin.jacksonObjectMapper()
         val repository = Mockito.spy(com.constitutionatlas.ingestion.repo.SetupProposalRepository(jdbc, mapper))
         val service = com.constitutionatlas.ingestion.service.SetupProposalService(repository, catalogClient, mapper)
@@ -346,18 +495,19 @@ class ImportApiTest {
             val snapshot = invocation.callRealMethod()
             if (!revisedBeforeClaim) {
                 revisedBeforeClaim = true
-                assertEquals(true, repository.replace(created.id, revised))
+                assertEquals(created.revision + 1, repository.replace(created.id, revised, created.revision)?.revision)
             }
             snapshot
         }.`when`(repository).find(created.id)
 
-        val confirmed = service.confirm(TOKEN, created.id, admin.id, true)
-
+        org.junit.jupiter.api.Assertions.assertThrows(org.springframework.web.server.ResponseStatusException::class.java) {
+            service.confirm(TOKEN, created.id, admin.id, true, created.revision)
+        }
+        Mockito.verify(catalogClient, Mockito.never()).createConstitution("FR", "claim-race", "Revised title")
+        Mockito.verify(catalogClient, Mockito.never()).createConstitution("FR", "claim-race", "Original title")
+        val confirmed = service.confirm(TOKEN, created.id, admin.id, true, created.revision + 1)
         assertEquals("confirmed", confirmed.status)
         assertEquals("Revised title", confirmed.payload.constitutionTitle)
-        assertEquals(constitutionId, confirmed.constitutionId)
-        Mockito.verify(catalogClient).createConstitution("FR", "claim-race", "Revised title")
-        Mockito.verify(catalogClient, Mockito.never()).createConstitution("FR", "claim-race", "Original title")
     }
 
     @Test

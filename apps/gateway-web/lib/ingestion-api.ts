@@ -81,7 +81,21 @@ export type SetupProposal = {
   id: string; ownerId: string; status: string; constitutionId: string | null; settingsRevisionId: string | null;
   confirmedBy: string | null;
   payload: Record<string, unknown> & { outline?: { kinds?: Record<string, unknown>[] }; sampleRoots?: unknown[] };
+  revision: number; previousPayload: SetupProposal['payload'] | null;
+  requestedChanges: string | null; changesRequested: boolean;
 };
+
+export class SetupActionError extends Error {
+  constructor(readonly code: 'stale' | 'invalid' | 'unavailable' | 'forbidden' | 'session_expired') { super(code); }
+}
+
+async function setupCommand(id: string, path: string, method: string, payload: unknown, authorization: string, revision: number): Promise<SetupProposal> {
+  const response = await fetchWithTimeout(`${ingestionBaseUrl()}/import-setup-proposals/${encodeURIComponent(id)}${path}`, {
+    method, cache: 'no-store', headers: { 'Content-Type': 'application/json', Authorization: authorization, 'If-Match': `"${revision}"` }, body: JSON.stringify(payload),
+  }).catch(() => { throw new SetupActionError('unavailable'); });
+  if (!response.ok) throw new SetupActionError(response.status === 409 || response.status === 428 ? 'stale' : response.status === 400 ? 'invalid' : response.status === 401 ? 'session_expired' : response.status === 403 ? 'forbidden' : 'unavailable');
+  return response.json();
+}
 
 export function getSetupProposal(id: string, authorization: string): Promise<SetupProposal | null> {
   return readJson<SetupProposal>(`${ingestionBaseUrl()}/import-setup-proposals/${encodeURIComponent(id)}`, 'ingestion', authorization);
@@ -91,12 +105,16 @@ export function createSetupProposal(payload: unknown, authorization: string): Pr
   return sendJson<SetupProposal>(`${ingestionBaseUrl()}/import-setup-proposals`, 'ingestion', 'POST', payload, authorization);
 }
 
-export function updateSetupProposal(id: string, payload: unknown, authorization: string): Promise<SetupProposal> {
-  return sendJson<SetupProposal>(`${ingestionBaseUrl()}/import-setup-proposals/${encodeURIComponent(id)}`, 'ingestion', 'PUT', payload, authorization);
+export function saveSetupDisplay(id: string, kinds: unknown[], authorization: string, revision: number): Promise<SetupProposal> {
+  return setupCommand(id, '/display', 'POST', { kinds }, authorization, revision);
 }
 
-export function transitionSetupProposal(id: string, action: 'confirm' | 'withdraw', authorization: string): Promise<SetupProposal> {
-  return sendJson<SetupProposal>(`${ingestionBaseUrl()}/import-setup-proposals/${encodeURIComponent(id)}/${action}`, 'ingestion', 'POST', {}, authorization);
+export function requestSetupChanges(id: string, message: string, authorization: string, revision: number): Promise<SetupProposal> {
+  return setupCommand(id, '/request-changes', 'POST', { message }, authorization, revision);
+}
+
+export function transitionSetupProposal(id: string, action: 'confirm' | 'withdraw', authorization: string, revision: number): Promise<SetupProposal> {
+  return setupCommand(id, `/${action}`, 'POST', {}, authorization, revision);
 }
 
 export function getImportReviewDecisions(jobId: string, authorization: string): Promise<ImportReviewDecision[]> {

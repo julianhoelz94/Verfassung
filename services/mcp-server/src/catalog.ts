@@ -45,6 +45,7 @@ async function requestJson<T>(
   authorization?: string,
   body?: unknown,
   idempotencyKey?: string,
+  revision?: number,
 ): Promise<T> {
   const response = await fetch(`${upstreams[upstream]}${path}`, {
     method,
@@ -54,6 +55,7 @@ async function requestJson<T>(
       ...(authorization ? { Authorization: authorization } : {}),
       ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
       ...(idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {}),
+      ...(revision !== undefined ? { 'If-Match': `"${revision}"` } : {}),
     },
     ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
   });
@@ -69,8 +71,8 @@ export function postJson<T>(upstream: keyof typeof upstreams, path: string, body
   return requestJson(upstream, path, 'POST', authorization, body, idempotencyKey);
 }
 
-export function putJson<T>(upstream: keyof typeof upstreams, path: string, body: unknown, authorization: string): Promise<T> {
-  return requestJson(upstream, path, 'PUT', authorization, body);
+export function putJson<T>(upstream: keyof typeof upstreams, path: string, body: unknown, authorization: string, revision?: number): Promise<T> {
+  return requestJson(upstream, path, 'PUT', authorization, body, undefined, revision);
 }
 
 export function deleteJson<T>(upstream: keyof typeof upstreams, path: string, authorization: string): Promise<T> {

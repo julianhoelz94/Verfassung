@@ -92,3 +92,59 @@ test('an admin reviews and publishes their MCP import in the editor journey', as
     expect((await request.delete(`/api/identity/mcp-keys/${created.key.id}`, { headers: admin })).status()).toBe(204);
   }
 });
+
+test('MCP waits while an administrator requests and confirms an exact setup revision on the website', async ({ page, request }, testInfo) => {
+  test.setTimeout(180_000);
+  const admin = await adminHeaders(request);
+  const keyResponse = await request.post('/api/identity/mcp-keys', { headers: admin, data: { name: `Setup handoff ${randomUUID()}`, scopes: ['mcp:read', 'ingestion:import'] } });
+  expect(keyResponse.status()).toBe(201);
+  const key = await keyResponse.json();
+  try {
+    const slug = `setup-handoff-${randomUUID()}`;
+    const initial = { isoCode: 'XA', countryName: 'Atlas Testland', constitutionSlug: slug, constitutionTitle: 'Setup handoff charter', languageCode: 'de', sourceUrl: 'https://example.org/atlas-e2e/setup', outline: { kinds: [{ kindCode: 'article', displayLabel: 'Article', root: true, allowedChildKinds: [], showKind: true }] }, sampleRoots: [{ kind: 'article', label: '1', content: [{ type: 'text', text: 'Alle Menschen sind frei. Alle Menschen sind gleich.' }] }] };
+    const proposed = await tool(request, 'propose_constitution_setup', { proposal: initial }, key.token);
+    expect(proposed.isError).toBeUndefined();
+    expect(proposed.structuredContent?.nextAction).toBe('wait_for_confirmation');
+    const proposalId = proposed.structuredContent?.proposalId as string;
+    const path = `/api/ingestion/import-setup-proposals/${proposalId}`;
+    expect((await request.post(`${path}/confirm`, { headers: { Authorization: `Bearer ${key.token}`, 'If-Match': '1' } })).status()).toBe(403);
+    await page.context().addCookies([{ name: 'ca_session', value: admin.Authorization.slice(7), url: String(testInfo.project.use.baseURL), httpOnly: true, sameSite: 'Lax' }]);
+    await page.goto(`/admin/import/setup/${proposalId}`);
+    await expect(page.getByRole('heading', { name: 'Your confirmation is required' })).toBeVisible();
+    await page.getByText('Display settings', { exact: true }).click();
+    await page.getByLabel('Displayed unit name', { exact: true }).fill('Art.');
+    await page.getByRole('button', { name: 'Save display settings' }).click();
+    await expect.poll(async () => (await (await request.get(path, { headers: admin })).json()).revision).toBe(2);
+    await page.reload();
+    await expect(page.locator('[data-preview-kind="article"]:visible')).toContainText('Art. 1');
+    await page.getByText('Request changes through your chat client', { exact: true }).click();
+    await page.getByLabel('Requested changes', { exact: true }).fill('Add sentence units without changing the original German wording.');
+    await page.getByRole('button', { name: 'Record requested changes' }).click();
+    await expect(page.getByRole('heading', { name: 'Waiting for a revised proposal' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Confirm structure and enable full upload' })).toBeDisabled();
+    const feedback = (await tool(request, 'get_setup_proposal', { proposalId }, key.token)).structuredContent!;
+    expect(feedback.nextAction).toBe('revise_proposal');
+    expect(feedback.requestedChanges).toContain('sentence units');
+    const roots = [{ kind: 'article', label: '1', content: ['Alle Menschen sind frei.', 'Alle Menschen sind gleich.'].map(text => ({ type: 'child', node: { kind: 'sentence', content: [{ type: 'text', text }] } })) }];
+    const revision = { ...initial, outline: { kinds: [{ ...initial.outline.kinds[0], allowedChildKinds: ['sentence'] }, { kindCode: 'sentence', displayLabel: 'Sentence', root: false, allowedChildKinds: [], showKind: false, presentation: 'concatenated', showLabel: false }] }, sampleRoots: roots };
+    const revised = await tool(request, 'revise_setup_proposal', { proposalId, expectedRevision: feedback.revision, proposal: revision }, key.token);
+    expect(revised.isError).toBeUndefined();
+    expect(revised.structuredContent?.nextAction).toBe('wait_for_confirmation');
+    expect((await request.post(`${path}/confirm`, { headers: { ...admin, 'If-Match': String(feedback.revision) } })).status()).toBe(409);
+    await page.reload();
+    await expect(page.getByRole('heading', { name: 'Revised proposal ready for review' })).toBeVisible();
+    await expect(page.getByText('Hierarchy or editing rules changed.')).toBeVisible();
+    await expect(page.locator('[data-preview-kind="sentence"]')).toHaveCount(2);
+    await expect(page.locator('[data-preview-kind="article"]:visible')).toContainText('Art. 1');
+    await page.getByText('Display settings', { exact: true }).click();
+    await page.getByLabel('Displayed unit name', { exact: true }).first().fill('Artikel');
+    await page.getByRole('button', { name: 'Confirm structure and enable full upload' }).click();
+    await expect(page.getByRole('heading', { name: 'Structure confirmed – full upload enabled' })).toBeVisible();
+    const confirmed = (await tool(request, 'get_setup_proposal', { proposalId }, key.token)).structuredContent!;
+    expect(confirmed.nextAction).toBe('upload_full_content');
+    expect((confirmed.payload as any).outline.kinds[0].displayLabel).toBe('Artikel');
+    const staged = await tool(request, 'stage_constitution_import', { payload: { isoCode: 'XA', countryName: 'Atlas Testland', constitutionSlug: slug, constitutionTitle: initial.constitutionTitle, constitutionId: confirmed.constitutionId, settingsRevisionId: confirmed.settingsRevisionId, versionLabel: 'Setup review fixture', languageCode: 'de', sourceUrl: initial.sourceUrl, roots } }, key.token);
+    expect(staged.isError).toBeUndefined();
+    expect(staged.structuredContent?.status).toBe('pending_review');
+  } finally { await request.delete(`/api/identity/mcp-keys/${key.key.id}`, { headers: admin }); }
+});

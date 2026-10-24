@@ -96,6 +96,8 @@ jobs:
       DEPLOYMENT_ENVIRONMENT: ${{ inputs.environment }}
       COOLIFY_URL: ${{ vars.COOLIFY_URL }}
       COOLIFY_PROJECT_UUID: ${{ vars.COOLIFY_PROJECT_UUID }}
+      COOLIFY_SERVER_UUID: ${{ vars.COOLIFY_SERVER_UUID }}
+      # Optional migration setting for an application created before CD bootstrap.
       COOLIFY_APP_UUID: ${{ vars.COOLIFY_APP_UUID }}
       PUBLIC_BASE_URL: ${{ vars.PUBLIC_BASE_URL }}
       COOLIFY_CONFIG_TOKEN: ${{ secrets.COOLIFY_CONFIG_TOKEN }}
@@ -121,7 +123,7 @@ jobs:
           PREPOPULATE_PUBLISHER_EMAIL: ${{ secrets.PREPOPULATE_PUBLISHER_EMAIL }}
           PREPOPULATE_PUBLISHER_PASSWORD: ${{ secrets.PREPOPULATE_PUBLISHER_PASSWORD }}
         run: |
-          for setting in COOLIFY_URL COOLIFY_PROJECT_UUID COOLIFY_APP_UUID PUBLIC_BASE_URL \
+          for setting in COOLIFY_URL COOLIFY_PROJECT_UUID COOLIFY_SERVER_UUID PUBLIC_BASE_URL \
             COOLIFY_CONFIG_TOKEN COOLIFY_DEPLOY_TOKEN TS_CLIENT_ID TS_AUDIENCE TS_TAGS; do
             if [ -z "${!setting}" ]; then
               echo "::error::Missing environment setting: $setting"

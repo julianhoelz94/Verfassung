@@ -12,7 +12,8 @@ The implementation and operator instructions are in [Manual deployment](manual-d
 - Test origin: `https://tst.verfassungen.julianhoelz.de`; production origin: `https://verfassungen.julianhoelz.de`.
 - Check existing CI compilation jobs for the exact dispatch SHA. Do not rerun unit, integration or E2E suites in CD; E2E outcomes are not a CD gate.
 - Compile and package twelve AMD64 images on GitHub-hosted runners, publish immutable GHCR digests and record a release manifest. No source compilation on the Coolify host.
-- Join Tailscale ephemerally with GitHub OIDC, validate the selected Coolify application, configure exact digests, request deployment and poll its UUID, then check public HTTPS readiness.
+- Join Tailscale ephemerally with GitHub OIDC; validate the project/environment/server and required shared-variable names; create or reuse its application, configure the HTTPS edge route and exact digests, request deployment and poll its UUID, then check public HTTPS readiness. The first manual run creates the application without requiring an application UUID.
+- Keep persistent credentials in Coolify environment-wide shared variables; CD installs references without needing sensitive-read access. Required Compose interpolation values are available during preparation and runtime.
 - Separate Coolify applications/Compose projects and persistent volumes for test and prod. Coolify owns TLS; the application's Caddy remains behind it in external-proxy mode.
 - Host-level backup is provided by the operator. No backup container runs in the Coolify deployment. CD does not back up or restore persistent state.
 - Optional `npm run prepopulate`, default false, after successful deployment. It publishes generated fixture data using separate accounts and requires completed site setup.

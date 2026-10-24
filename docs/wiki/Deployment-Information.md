@@ -1,6 +1,6 @@
 # Deployment information
 
-**Status: pending.** The repository includes a manual GitHub Actions CD workflow for test and production, but its first remote rollout has not been verified. A reliable post-deployment procedure cannot yet be specified. Do not treat the local Compose quick start or a test fixture as a production rollout procedure.
+**Status: pending.** The repository includes a manual GitHub Actions CD workflow for test and production, with automatic application creation/configuration on its first manual run, but its first remote rollout has not been verified. A reliable post-deployment procedure cannot yet be specified. Do not treat the local Compose quick start or a test fixture as a production rollout procedure.
 
 After a deployment has been exercised, this page must document, in order:
 

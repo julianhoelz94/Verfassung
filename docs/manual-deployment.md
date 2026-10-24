@@ -20,31 +20,41 @@ The source is the fixed `GITHUB_SHA` of the selected `main` dispatch. CD checks 
 
 CD compiles the service JARs using `bootJar -x test` and builds the gateway, MCP and Caddy images on GitHub-hosted `ubuntu-24.04` AMD64 runners. It runs no unit, integration or browser test suite. It publishes twelve images to GHCR and records immutable digests in the `release-candidate` artifact. The build argument for the gateway selects the correct public origin. These are newly compiled images of the CI-checked source, not a reuse of CI's image binaries.
 
-Only the deployment job joins Tailscale, using an ephemeral OIDC identity. It validates the Coolify project/environment/application and edge domain, sets the exact source commit and image digests, disables automatic deployment, starts rollout, polls its deployment UUID and checks public HTTPS setup status. Both environments share a concurrency group so rollouts do not overlap. Cancellation or a timeout does not undo an already submitted Coolify deployment; inspect its queue before retrying.
+Only the deployment job joins Tailscale, using an ephemeral OIDC identity. It validates the Coolify project/environment/server and required shared variables, creates or reuses the environment's application, configures its edge domain and exact source/image digests, disables automatic deployment, starts rollout, polls its deployment UUID and checks public HTTPS setup status. Both environments share a concurrency group so rollouts do not overlap. Cancellation or a timeout does not undo an already submitted Coolify deployment; inspect its queue before retrying.
 
-## One-time Coolify application setup
+## One-time setup: three steps
 
 The Ubuntu host is `coolify`, running **AMD64**, with 8 vCPUs, 16 GB RAM and 320 GB storage. Keep existing tailnet permissions. Only TCP 80 and 443 are public; dashboard/API and ordinary SSH use Tailscale. See the [server guide](coolify-server-setup.md).
 
-1. In one Coolify project, create environments named exactly `test` and `prod` and a separate Git-based **Docker Compose** application in each. Point each at `https://github.com/julianhoelz94/Verfassung`, branch `main`, Compose path `/docker-compose.coolify.yml`. A public repository does not need a source deploy key.
-2. Disable automatic deployments, preview deployments and incoming deployment webhooks. Do not enable raw Compose mode or preserve the source checkout. Do not select the development `docker-compose.yml`.
-3. Load the Compose definition. Assign the environment's HTTPS domain **only to `edge-proxy` on internal port 80**, following [HTTPS with Let's Encrypt](#https-with-lets-encrypt). Leave domains on other services empty. Coolify owns TLS and routes to Caddy; Caddy retains API authorization and routing.
-4. Create the persistent application environment values listed below. Use separate passwords, encryption keys and credentials in test and production. CD supplies the `ATLAS_IMAGE_*`, public-origin and transport values when a release is selected. Before the first run, ensure both applications have distinct UUIDs and belong to the intended environments.
-5. Ensure Coolify's host management user can pull the GHCR images. New packages can be private even when their source repository is public. For private packages, use a classic PAT with `read:packages` for the host's registry login as described in server-guide step 10. CD publishes with its job's `GITHUB_TOKEN`; no publish PAT is needed.
+1. **Prepare Coolify.** Keep project **Constitution Atlas** with environments named exactly `test` and `prod`, the running Traefik proxy and public DNS. Under **Shared Variables → Environment wide**, choose the project's `test` environment and save the five values below. Repeat with separate secrets for `prod` before its first deployment. Ensure the host management user can pull the GHCR packages; private packages need the registry login described in [server-guide step 10](coolify-server-setup.md#10-prepare-image-pulls-if-ghcr-images-are-private).
+2. **Prepare GitHub.** Add the [environment variables and secrets](#github-environments-and-tailscale-identity) to GitHub environments `test` and `prod`. Copy the project and server UUIDs from Coolify. No application UUID or manually created application is required.
+3. **Deploy manually after main's CI compilation succeeds.** Open **Actions → Deploy → Run workflow**, select `main`, `test`, and leave `prepopulate` unchecked. CD creates `constitution-atlas-test`, connects the shared values, sets `https://tst.verfassungen.julianhoelz.de:80` on `edge-proxy`, and deploys. Open the public HTTPS site and complete first-run setup. Use `prod` later for `constitution-atlas-prod` and its production domain.
 
-Required persistent Coolify application values:
+Required **Coolify environment-wide shared variables**:
 
-| Name | Purpose |
-| --- | --- |
-| `POSTGRES_PASSWORD` | Strong database password, kept stable across deployments |
-| `IDENTITY_MFA_ENCRYPTION_KEY` | Stable 32-byte Base64 encryption key for persisted MFA credentials; generate using `openssl rand -base64 32` |
-| `PROD_ADMIN_EMAIL`, `PROD_ADMIN_PASSWORD` | First administrator, with a unique password of at least 12 characters; both environments use these exact names |
-| `TLS_TRUSTED_PROXIES` | Actual Coolify proxy address/CIDRs that Caddy may trust; inspect the proxy's Docker network |
-| `PUBLIC_BASE_URL` | The environment's HTTPS origin from the table above |
+| Name | Example or generation command | Purpose |
+| --- | --- | --- |
+| `POSTGRES_PASSWORD` | `openssl rand -hex 32` | Strong database password; keep stable across deployments |
+| `IDENTITY_MFA_ENCRYPTION_KEY` | `openssl rand -base64 32` | Stable 32-byte Base64 key for persisted MFA credentials |
+| `PROD_ADMIN_EMAIL` | Your real administrator email address | First administrator; both environments use this exact name |
+| `PROD_ADMIN_PASSWORD` | Run `openssl rand -hex 32` again | Separate administrator password, at least 12 characters |
+| `TLS_TRUSTED_PROXIES` | Actual Docker address pools, separated by spaces | Trusted internal forwarding peers, including the application network Coolify creates later |
 
-The runtime definition preserves the canonical services' other configuration, including SMTP and internal service credentials. Configure those in Coolify when used. Complete site setup in the browser after the first deployment, including administrator security and real site settings. Demo account seeding stays off and API docs stay closed. Fixture accounts for optional prepopulate are created separately; deployment does not create them.
+Run generation commands locally and save their outputs directly in Coolify. Do not commit generated values. Use different database/admin passwords and encryption keys in test and production. Inspect the host's actual Docker address pools over private SSH:
 
-Store the bootstrap administrator credentials as runtime environment values in the Coolify application. They are not required in GitHub for an ordinary deployment. Changing `PROD_ADMIN_PASSWORD` after initial account creation does not reset the persisted user's password; change it through the site's account/recovery flow. The Coolify dashboard's own login password is separate and never needed by CD.
+```bash
+sudo docker info --format '{{range .DefaultAddressPools}}{{.Base}} {{end}}'
+```
+
+Copy the reported CIDRs into `TLS_TRUSTED_PROXIES`. If Docker reports no pools, inspect its daemon network configuration before choosing a value. Do not use `0.0.0.0/0`. Trusting these pools includes other containers in them; this matches the dedicated host's internal trust model. Inspecting only the existing `coolify` network is insufficient: Coolify connects Traefik to a new per-application network when it deploys. No service in this application publishes a host port. You can narrow the trust later to the actual proxy peer networks if you maintain it when those networks change.
+
+Defining a shared variable alone does not inject it into an application. CD adds references such as `{{environment.POSTGRES_PASSWORD}}` and marks the required Compose interpolation values available at both build time and runtime. Coolify parses Compose during its preparation/build phase even though these images have no source build directives. CD does not need sensitive-read permission to check the shared-variable names. [Coolify shared variables](https://coolify.io/docs/core/team/shared-variables)
+
+The first run creates the application with instant deployment, auto-deployment and preview deployment disabled. Later runs reuse the same application and its named volumes. Discovery rejects ambiguous or incompatible resources instead of silently creating a second stack. For an application created using the earlier guide, the optional GitHub variable `COOLIFY_APP_UUID` explicitly selects it; CD still validates its project, environment, repository and server. When adopting an existing application, copy its existing persistent password/key values into the environment-wide shared variables; generating replacements would not rotate existing database credentials and would make stored MFA data unreadable. Remove custom Compose commands or deployment hooks before adoption; CD rejects those settings. Do not rename/delete the generated application casually, since its identity anchors persistent storage.
+
+The runtime definition preserves the canonical services' other configuration, including SMTP and internal service credentials. Configure those on the application when used. Complete site setup in the browser after the first deployment, including administrator security and real site settings. Demo account seeding stays off and API docs stay closed. Fixture accounts for optional prepopulate are created separately; deployment does not create them.
+
+Bootstrap administrator credentials belong in Coolify; they are not required in GitHub for an ordinary deployment. Changing `PROD_ADMIN_PASSWORD` after initial account creation does not reset the persisted user's password; change it through the site's account/recovery flow. The Coolify dashboard's own login password is separate and never needed by CD.
 
 `docker-compose.coolify.yml` contains only image references and internal networking, with no host port publications or checkout bind mounts. Each database retains its named volume in the Coolify application's Compose project. No `backup-service` or backup image runs on this host: backup is provided at host level. CD does not create a pre-deployment backup, restore data or reverse migrations. Host backup and restore consistency are operator responsibilities.
 
@@ -96,20 +106,20 @@ Keep the generated configuration; no custom resolver is needed. Coolify manages 
 
 Allow inbound **TCP 80 and 443** through the provider firewall and any host firewall, on each advertised IP version. Port 80 must remain reachable for issuance and future HTTP-01 renewal, including `/.well-known/acme-challenge/`. Let Coolify's proxy handle that route. Keep SSH and Coolify management ports private through Tailscale. [Let's Encrypt HTTP-01](https://letsencrypt.org/docs/challenge-types/#http-01-challenge)
 
-### 3. Configure each application's HTTPS route
+### 3. Let CD configure the application's HTTPS route
 
-For each application's **Domains → Add domain** form, use:
+The first manual CD run creates/configures these routes automatically. No application or domain-form setup is required beforehand. To inspect the result afterward, open the generated application and its domain settings:
 
 | Application environment | Protocol | Domain | Port | Service | Path |
 | --- | --- | --- | --- | --- | --- |
 | `test` | `https` | `tst.verfassungen.julianhoelz.de` | `80` | `edge-proxy` | empty |
 | `prod` | `https` | `verfassungen.julianhoelz.de` | `80` | `edge-proxy` | empty |
 
-Save each route. If your Coolify version uses one URL field, the equivalent values are `https://tst.verfassungen.julianhoelz.de:80` and `https://verfassungen.julianhoelz.de:80`. Here `80` selects the **container target port**; browsers use the normal HTTPS URL on public port **443**, without `:80`. Keep `PUBLIC_BASE_URL` in Coolify and GitHub at the canonical HTTPS origin without `:80`. [Coolify domain and target-port settings](https://coolify.io/docs/core/networking/domains#route-to-a-port-or-path)
+The API route values are `https://tst.verfassungen.julianhoelz.de:80` and `https://verfassungen.julianhoelz.de:80`. Here `80` selects the **container target port**; browsers use the normal HTTPS URL on public port **443**, without `:80`. Keep `PUBLIC_BASE_URL` in Coolify and GitHub at the canonical HTTPS origin without `:80`. [Coolify domain and target-port settings](https://coolify.io/docs/core/networking/domains#route-to-a-port-or-path)
 
-Keep labels managed by Coolify, the default `letsencrypt` certificate resolver and the HTTP-to-HTTPS redirect. Leave all other services' domain fields empty and keep `TLS_TRUSTED_PROXIES` set to the actual Coolify proxy network. The runtime Compose file supplies `TLS_MODE=external-proxy` and secure cookies. The private Coolify dashboard/API retains its Tailscale URL.
+Keep labels managed by Coolify, the default `letsencrypt` certificate resolver and the HTTP-to-HTTPS redirect. Leave all other services' domain fields empty and keep `TLS_TRUSTED_PROXIES` set to the actual Docker address pools or maintained proxy peer CIDRs. The runtime Compose file supplies `TLS_MODE=external-proxy` and secure cookies. The private Coolify dashboard/API retains its Tailscale URL.
 
-Save the settings, then trigger **GitHub → Actions → Deploy → Run workflow** for the chosen environment. That manual rollout activates the route and certificate request. Configure the second environment in the same way; it receives a certificate covering its own hostname.
+Trigger **GitHub → Actions → Deploy → Run workflow** for the chosen environment after its shared variables and GitHub configuration are ready. That manual rollout activates the route and certificate request. The other environment receives its own application and hostname when you first select it.
 
 ### 4. Verify after deployment
 
@@ -142,12 +152,28 @@ Set these **environment variables** in each:
 
 | Name | Value |
 | --- | --- |
-| `COOLIFY_URL` | Private Tailscale origin, e.g. `http://100.x.y.z:8000`, with no `/api/v1` path |
+| `COOLIFY_URL` | `http://coolify:8000` with MagicDNS, or the actual Tailscale IP; no `/api/v1` path |
 | `COOLIFY_PROJECT_UUID` | Project UUID from Coolify |
-| `COOLIFY_APP_UUID` | Different application UUID for test/prod |
+| `COOLIFY_SERVER_UUID` | Server UUID from **Servers → coolify**; same for both environments |
 | `PUBLIC_BASE_URL` | Exact HTTPS origin for that environment |
 | `TS_CLIENT_ID`, `TS_AUDIENCE` | Existing Tailscale federated identity identifiers |
 | `TS_TAGS` | `tag:github-deploy` |
+
+Open **Projects → Constitution Atlas** in Coolify and copy the identifier immediately after `/project/` in the browser URL for `COOLIFY_PROJECT_UUID`. Open **Servers → coolify** and copy the identifier after `/server/` for `COOLIFY_SERVER_UUID`. For example, `/server/abc123xyz` means the server UUID is `abc123xyz`. These are identifiers, not passwords or Tailscale addresses. Both GitHub environments use the same project/server UUIDs; their environment names isolate the applications.
+
+Example GitHub environment variable values (replace the angle-bracket placeholders):
+
+```dotenv
+COOLIFY_URL=http://coolify:8000
+COOLIFY_PROJECT_UUID=<copy-project-uuid>
+COOLIFY_SERVER_UUID=<copy-server-uuid>
+PUBLIC_BASE_URL=https://tst.verfassungen.julianhoelz.de
+TS_CLIENT_ID=<copy-tailscale-client-id>
+TS_AUDIENCE=<copy-tailscale-audience>
+TS_TAGS=tag:github-deploy
+```
+
+For `prod`, change `PUBLIC_BASE_URL` to `https://verfassungen.julianhoelz.de`. The Tailscale identifiers can be shared if their trust credential covers both environments. `COOLIFY_APP_UUID` is optional only for adopting an existing application; leave it unset for automatic creation.
 
 Set these **environment secrets**:
 

@@ -169,7 +169,7 @@ The application resources use their respective HTTPS domains. DNS alone does not
 
 ### 6.1. Prepare SSL/TLS with Let's Encrypt
 
-Follow the deployment guide's [HTTPS with Let's Encrypt](manual-deployment.md#https-with-lets-encrypt) section when creating the applications. It covers the default Traefik HTTP-01 resolver, each `edge-proxy` HTTPS domain with internal target port `80`, public certificate checks and automatic renewal. Keep public TCP ports **80 and 443** open; the dashboard and API remain private through Tailscale. No Certbot installation or additional GitHub SSL secret is needed. Certificates are requested when the application route is deployed, then verified after the first manual GitHub deployment.
+Follow the deployment guide's [HTTPS with Let's Encrypt](manual-deployment.md#https-with-lets-encrypt) section before the first manual deployment; CD creates the applications and their domain routes. It covers the default Traefik HTTP-01 resolver, each `edge-proxy` HTTPS domain with internal target port `80`, public certificate checks and automatic renewal. Keep public TCP ports **80 and 443** open; the dashboard and API remain private through Tailscale. No Certbot installation or additional GitHub SSL secret is needed. Certificates are requested when the application route is deployed, then verified after the first manual GitHub deployment.
 
 ## 7. Configure the ephemeral runner's Tailscale identity
 
@@ -220,7 +220,7 @@ Add these environment variables:
 | `TS_TAGS` | Selected runner identity tag, for example `tag:github-deploy` |
 | `PUBLIC_BASE_URL` | Test: `https://tst.verfassungen.julianhoelz.de`; prod: `https://verfassungen.julianhoelz.de` |
 | `COOLIFY_PROJECT_UUID` | The Coolify project UUID |
-| `COOLIFY_APP_UUID` | The separate application UUID belonging to this environment |
+| `COOLIFY_SERVER_UUID` | Server UUID from **Servers → coolify**, copied from the URL after `/server/` |
 
 Add these environment secrets:
 
@@ -266,7 +266,7 @@ Record the server architecture, Ubuntu/Coolify/Docker versions, public and Tails
 
 ## 13. Configure the applications and manual workflow
 
-Follow [Manual deployment](manual-deployment.md) for the two Coolify applications, `/docker-compose.coolify.yml`, environment-specific UUIDs/secrets, GHCR pull access and the manual Actions form. Disable automatic deployments. The production domain is `verfassungen.julianhoelz.de`; test uses `tst.verfassungen.julianhoelz.de`.
+Follow the [three-step manual deployment setup](manual-deployment.md#one-time-setup-three-steps). Save the five required environment-wide shared variables in Coolify, then dispatch CD manually. CD creates or reuses `constitution-atlas-test` / `constitution-atlas-prod`, assigns the HTTPS domain and `/docker-compose.coolify.yml`, and disables automatic/preview deployments. No manual application creation or domain assignment is required. Copy the project UUID from **Projects → Constitution Atlas**, after `/project/` in its URL; the project and server UUIDs are the same for both GitHub environments. The production domain is `verfassungen.julianhoelz.de`; test uses `tst.verfassungen.julianhoelz.de`.
 
 CD checks existing compilation results for the exact `main` commit and builds native AMD64 images on GitHub-hosted runners. It runs no unit, integration or E2E suite. Only an administrator's manual dispatch selects and starts rollout. Optional npm prepopulate defaults to false; the runbook describes its additional credentials and effects.
 

@@ -28,6 +28,36 @@ def manifest(environment="test"):
                        for name in release.image_paths(ROOT)}}
 
 
+class FakeCoolify:
+    """Documented API shapes, with persistent application identity between runs."""
+
+    def __init__(self):
+        self.application = None
+        self.calls = []
+
+    def request(self, method, path, payload=None, deploy=False):
+        self.calls.append((method, path, payload, deploy))
+        if method == "GET" and path == "/projects/project/environments/test/envs":
+            return [{"key": key} for key in globals()["deploy"].SHARED_VARIABLES]
+        if method == "GET" and path == "/projects/project/test":
+            return {"applications": [self.application] if self.application else []}
+        if method == "POST" and path == "/applications/public":
+            if self.application is not None:
+                raise AssertionError("Duplicate application creation")
+            self.application = {**payload, "uuid": "app123", "git_repository": REPOSITORY,
+                                "docker_compose_domains": {"edge-proxy": {"domain": release.PUBLIC_URLS["test"]}}}
+            return {"uuid": "app123"}
+        if method == "GET" and path == "/applications/app123":
+            return self.application
+        if method == "GET" and path == "/applications/app123/destinations":
+            return [{"uuid": "destination", "server_uuid": "server", "is_primary": True}]
+        if method == "PATCH" and path in {"/applications/app123", "/applications/app123/envs/bulk"}:
+            return {}
+        if method == "POST" and path == "/deploy":
+            return {"deployments": [{"resource_uuid": "app123", "deployment_uuid": "job123"}]}
+        raise AssertionError((method, path))
+
+
 class ReleaseTests(unittest.TestCase):
     def test_cross_environment_revision_and_floating_image_rejected(self):
         valid = manifest()
@@ -110,23 +140,104 @@ class CoolifyTests(unittest.TestCase):
                 deploy.private_coolify_url(value)
         self.assertEqual(deploy.private_coolify_url("http://coolify:8000/"), "http://coolify:8000")
 
-    def test_wrong_application_environment_and_domain_rejected(self):
-        app = {"build_pack": "dockercompose", "git_repository": f"https://github.com/{REPOSITORY}.git",
-               "docker_compose_domains": json.dumps({"edge-proxy": {"domain": release.PUBLIC_URLS["test"] + ":80"}})}
-        api = Mock()
-        api.request.side_effect = [{"applications": [{"uuid": "test-app"}]}, app]
-        deploy.validate_application(api, "project", "test-app", "test", REPOSITORY)
-        api.request.side_effect = [{"applications": [{"uuid": "prod-app"}]}]
-        with self.assertRaises(ValueError):
-            deploy.validate_application(api, "project", "test-app", "test", REPOSITORY)
-        api.request.side_effect = [{"applications": [{"uuid": "test-app"}]}, app]
-        with self.assertRaises(ValueError):
-            deploy.validate_application(api, "project", "test-app", "prod", REPOSITORY)
-        app["docker_compose_domains"] = {"edge-proxy": {"domain": release.PUBLIC_URLS["test"]},
-                                        "identity-service": {"domain": "https://bypass.example.org"}}
-        api.request.side_effect = [{"applications": [{"uuid": "test-app"}]}, app]
-        with self.assertRaises(ValueError):
-            deploy.validate_application(api, "project", "test-app", "test", REPOSITORY)
+    def test_wrong_application_environment_server_repository_and_domain_rejected(self):
+        app = {"build_pack": "dockercompose", "git_repository": REPOSITORY,
+               "docker_compose_domains": json.dumps({"edge-proxy": {"domain": release.PUBLIC_URLS["test"]}})}
+        destination = [{"server_uuid": "server", "is_primary": True}]
+        project = {"applications": [{"uuid": "test-app"}]}
+        for repository in [REPOSITORY, f"https://github.com/{REPOSITORY}.git"]:
+            app["git_repository"] = repository
+            api = Mock(request=Mock(side_effect=[project, app, destination]))
+            deploy.validate_application(api, "project", "test-app", "server", "test", REPOSITORY)
+        cases = [
+            [{"applications": [{"uuid": "prod-app"}]}],
+            [project, {**app, "git_repository": "https://example.org/" + REPOSITORY}],
+            [project, {**app, "docker_compose_custom_build_command": "docker compose build"}],
+            [project, {**app, "pre_deployment_command": "npm run build"}],
+            [project, app, [{"server_uuid": "other", "is_primary": True}]],
+            [project, app, destination + [{"server_uuid": "server", "is_primary": False}]],
+            [project, {**app, "docker_compose_domains": {"edge-proxy": {"domain": release.PUBLIC_URLS["prod"]}}}, destination],
+            [project, {**app, "docker_compose_domains": {"identity-service": {"domain": "https://bypass.example.org"}}}, destination],
+        ]
+        for responses in cases:
+            with self.subTest(responses=responses), self.assertRaises(ValueError):
+                deploy.validate_application(Mock(request=Mock(side_effect=responses)), "project", "test-app", "server", "test", REPOSITORY)
+
+    def test_first_run_creates_once_and_repeated_runs_keep_the_application(self):
+        api = FakeCoolify()
+        for _ in range(2):
+            self.assertEqual(deploy.ensure_application(api, "project", "server", "test", REPOSITORY, manifest()), "app123")
+        creates = [call for call in api.calls if call[:2] == ("POST", "/applications/public")]
+        self.assertEqual(len(creates), 1)
+        payload = creates[0][2]
+        self.assertEqual(payload["name"], "constitution-atlas-test")
+        self.assertEqual(payload["server_uuid"], "server")
+        self.assertEqual(payload["environment_name"], "test")
+        self.assertEqual(payload["git_commit_sha"], SHA)
+        self.assertFalse(payload["instant_deploy"])
+        self.assertFalse(payload["is_auto_deploy_enabled"])
+        self.assertFalse(payload["is_preview_deployments_enabled"])
+        self.assertEqual(payload["docker_compose_domains"], [{"name": "edge-proxy", "domain": release.PUBLIC_URLS["test"] + ":80", "redirect": "both"}])
+        self.assertFalse(any(path == "/deploy" for _, path, _, _ in api.calls))
+
+    def test_existing_resources_are_not_duplicated_or_selected_ambiguously(self):
+        candidates = [
+            [{"uuid": "first", "name": "constitution-atlas-test"}, {"uuid": "second", "name": "constitution-atlas-test"}],
+            [{"uuid": "previous", "name": "legacy-name", "git_repository": REPOSITORY}],
+        ]
+        for applications in candidates:
+            api = Mock(request=Mock(return_value={"applications": applications}))
+            with self.subTest(applications=applications), self.assertRaises(ValueError):
+                deploy.ensure_application(api, "project", "server", "test", REPOSITORY, manifest())
+            self.assertEqual(api.request.call_count, 1)
+        api = Mock(request=Mock(return_value={"message": "Unexpected response"}))
+        with self.assertRaisesRegex(ValueError, "application list"):
+            deploy.ensure_application(api, "project", "server", "test", REPOSITORY, manifest())
+        self.assertEqual(api.request.call_count, 1)
+        api = FakeCoolify()
+        api.application = {"uuid": "app123", "name": "legacy-name", "build_pack": "dockercompose",
+                           "git_repository": REPOSITORY, "docker_compose_domains": {}}
+        self.assertEqual(deploy.ensure_application(api, "project", "server", "test", REPOSITORY, manifest(), "app123"), "app123")
+        self.assertTrue(all(method == "GET" for method, _, _, _ in api.calls))
+
+    def test_unknown_create_result_is_not_retried(self):
+        api = Mock(request=Mock(side_effect=[{"applications": []}, TimeoutError("lost response")]))
+        with self.assertRaises(TimeoutError):
+            deploy.ensure_application(api, "project", "server", "test", REPOSITORY, manifest())
+        self.assertEqual(api.request.call_count, 2)
+
+    def test_compose_loading_wait_retries_only_the_known_readiness_error(self):
+        api = Mock(request=Mock(side_effect=[deploy.ComposeNotLoaded("loading"), {}]))
+        sleep = Mock()
+        deploy.configure_application(api, "app123", manifest(), sleep=sleep)
+        self.assertEqual(api.request.call_count, 2)
+        sleep.assert_called_once_with(5)
+        api = Mock(request=Mock(side_effect=RuntimeError("validation failure")))
+        with self.assertRaises(RuntimeError):
+            deploy.configure_application(api, "app123", manifest(), sleep=sleep)
+        self.assertEqual(api.request.call_count, 1)
+        api = Mock(request=Mock(side_effect=deploy.ComposeNotLoaded("loading")))
+        with self.assertRaises(TimeoutError):
+            deploy.configure_application(api, "app123", manifest(), timeout=2, sleep=lambda _: None, now=Mock(side_effect=[0, 1, 3]))
+
+    def test_api_readiness_classification_never_exposes_response_secrets(self):
+        from io import BytesIO
+        from urllib.error import HTTPError
+        for message, exception in [(deploy.COMPOSE_NOT_LOADED, deploy.ComposeNotLoaded), ("private-secret", RuntimeError)]:
+            body = json.dumps({"errors": {"docker_compose_domains": message}, "secret": "private-secret"}).encode()
+            api = deploy.Api("http://coolify:8000", "config", "deploy")
+            api.opener = Mock(open=Mock(side_effect=HTTPError("private", 422, "private-secret", {}, BytesIO(body))))
+            with self.assertRaises(exception) as context:
+                api.request("PATCH", "/applications/app", {})
+            self.assertNotIn("private-secret", str(context.exception))
+
+    def test_shared_variable_presence_checked_without_reading_secret_values(self):
+        api = Mock(request=Mock(return_value=[{"key": key} for key in deploy.SHARED_VARIABLES]))
+        deploy.require_shared_variables(api, "project", "test")
+        api.request.assert_called_once_with("GET", "/projects/project/environments/test/envs")
+        api.request.return_value = [{"key": "POSTGRES_PASSWORD"}]
+        with self.assertRaisesRegex(ValueError, "IDENTITY_MFA_ENCRYPTION_KEY"):
+            deploy.require_shared_variables(api, "project", "test")
 
     def test_api_keeps_config_and_deploy_tokens_separate(self):
         api = deploy.Api("http://coolify:8000", "config-secret", "deploy-secret")
@@ -150,24 +261,42 @@ class CoolifyTests(unittest.TestCase):
         api.request.side_effect = [{"status": "in_progress"}, {"status": "finished", "commit": SHA}]
         deploy.wait_for_deployment(api, "deployment", SHA, sleep=lambda _: None)
 
-    def test_deploy_uses_immutable_images_and_deploy_only_token(self):
+    def test_deploy_bootstraps_configures_and_only_then_uses_deploy_token(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "manifest.json"
             path.write_text(json.dumps(manifest()))
-            args = argparse.Namespace(manifest=path, repository=REPOSITORY, environment="test",
-                                      source_sha=SHA)
-            api = Mock()
-            api.request.return_value = {"deployments": [{"resource_uuid": "test-app", "deployment_uuid": "job123"}]}
+            args = argparse.Namespace(manifest=path, repository=REPOSITORY, environment="test", source_sha=SHA)
+            api = FakeCoolify()
             settings = {"COOLIFY_URL": "http://coolify:8000", "COOLIFY_PROJECT_UUID": "project",
-                        "COOLIFY_APP_UUID": "test-app", "COOLIFY_CONFIG_TOKEN": "config", "COOLIFY_DEPLOY_TOKEN": "deploy"}
+                        "COOLIFY_SERVER_UUID": "server", "COOLIFY_CONFIG_TOKEN": "config", "COOLIFY_DEPLOY_TOKEN": "deploy"}
             with patch.dict(os.environ, settings, clear=True), patch.object(deploy, "Api", return_value=api), \
-                    patch.object(deploy, "validate_application"), patch.object(deploy, "wait_for_deployment"), \
-                    patch.object(deploy, "smoke_check"):
+                    patch.object(deploy, "wait_for_deployment"), patch.object(deploy, "smoke_check"):
                 deploy.deploy(args)
-                self.assertTrue(api.request.call_args.kwargs["deploy"])
-                payload = api.request.call_args_list[1].args[2]["data"]
-                images = [item["value"] for item in payload if item["key"].startswith("ATLAS_IMAGE_")]
-                self.assertEqual(set(images), set(manifest()["images"].values()))
+            self.assertEqual(api.calls[-1], ("POST", "/deploy", {"uuid": "app123"}, True))
+            self.assertTrue(all(not use_deploy for _, _, _, use_deploy in api.calls[:-1]))
+            payload = next(payload["data"] for method, route, payload, _ in api.calls if route.endswith("/envs/bulk"))
+            images = [item["value"] for item in payload if item["key"].startswith("ATLAS_IMAGE_")]
+            self.assertEqual(set(images), set(manifest()["images"].values()))
+            values = {item["key"]: item for item in payload}
+            for key in deploy.SHARED_VARIABLES:
+                self.assertEqual(values[key]["value"], "{{environment." + key + "}}")
+            self.assertTrue(all(item["is_buildtime"] and item["is_runtime"] and item["is_literal"] for item in payload))
+            required = set(deploy.re.findall(r"\$\{([A-Z_]+):\?", (ROOT / "docker-compose.coolify.yml").read_text()))
+            self.assertFalse(required - set(values))
+
+    def test_missing_shared_variables_prevents_creation_and_deployment(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "manifest.json"
+            path.write_text(json.dumps(manifest()))
+            args = argparse.Namespace(manifest=path, repository=REPOSITORY, environment="test", source_sha=SHA)
+            api = Mock(request=Mock(return_value=[]))
+            settings = {"COOLIFY_URL": "http://coolify:8000", "COOLIFY_PROJECT_UUID": "project",
+                        "COOLIFY_SERVER_UUID": "server", "COOLIFY_CONFIG_TOKEN": "config", "COOLIFY_DEPLOY_TOKEN": "deploy"}
+            with patch.dict(os.environ, settings, clear=True), patch.object(deploy, "Api", return_value=api):
+                with self.assertRaisesRegex(ValueError, "shared variables"):
+                    deploy.deploy(args)
+            self.assertEqual(api.request.call_count, 1)
+            self.assertEqual(api.request.call_args.args[0], "GET")
 
 
 

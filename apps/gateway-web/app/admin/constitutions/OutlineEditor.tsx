@@ -203,6 +203,7 @@ export function OutlineEditor({
       </section> : null}
       {guidedCreation && step === 3 ? <section className={["card", surfaceStyles.card].join(' ')} aria-label={t(ui.accessibility.reviewConstitution)}><h2><T value={ui.admin.constitutions.outlineeditor.reviewBeforeCreating} /></h2><p>{basicsSummary}</p><p>{layers.map((layer) => layer.displayLabel).join(' → ')}</p><p><T value={ui.admin.constitutions.outlineeditor.theNewConstitutionCanBeEditedAfter} /></p></section> : null}
       <div className="outline-config-layout" hidden={guidedCreation && step === 1}>
+      <Stack>
       {guidedCreation && step === 3 ? <Stack  aria-label={t(ui.accessibility.finalStructureSettings)}>
         {layers.map((layer, index) => {
           const effective = effectiveDisplayKind(exampleOutline.kinds[index])!;
@@ -339,6 +340,17 @@ export function OutlineEditor({
           </Stack>
         ))}
       </Stack>}
+      {(!guidedCreation || step === 2) ? <Stack gap="related" className="outline-structure-actions">
+        <Inline>
+          <Inline as="span" gap="related">
+            <Button type="button" onClick={addLayer}><T value={ui.admin.constitutions.outlineeditor.addDeeperLayer} /></Button>
+            <SettingInfo label={<T value={ui.admin.constitutions.outlineeditor.addDeeperLayer} />} description={<T value={ui.help.addDeeperLevelHelp} />} changeability="review" />
+          </Inline>
+          <Button type="button" onClick={addRootKind}><T value={ui.admin.constitutions.outlineeditor.addTopLevelKind} /></Button>
+        </Inline>
+        {layers[layers.length - 1]?.kindCode === 'sentence' ? <p className="muted"><T value={ui.admin.constitutions.outlineeditor.newLevelsAreAddedBeforeTheFinal} /></p> : null}
+      </Stack> : null}
+      </Stack>
       <aside className={["card outline-live-preview", surfaceStyles.card].join(' ')} aria-label={t(ui.admin.constitutions.outlineeditor.readerPreview)}>
         <h2><T value={ui.admin.constitutions.outlineeditor.readerPreview} /></h2>
         <p className="muted"><T value={ui.outlinePreview.inspectHelp} /></p>
@@ -355,12 +367,7 @@ export function OutlineEditor({
         <p>{impact.affectedVersionIds.length} <T value={ui.admin.constitutions.outlineeditor.versionsAnd} />{" "}{impact.affectedDraftSessionIds.length} <T value={ui.admin.constitutions.outlineeditor.draftsCheckedPublishedStructuralSettingsRemainPinned} /></p>
         <ul>{impact.reasons.map((reason) => <li key={reason}>{reason}</li>)}{impact.violations.map((violation, index) => <li key={index}>{violation.field}: {violation.message}</li>)}</ul>
       </section> : null}
-      <Inline align="end" className="form-row" hidden={guidedCreation && step === 1}>
-        {(!guidedCreation || step === 2) ? <Button type="button" onClick={addLayer}>
-          <T value={ui.admin.constitutions.outlineeditor.addDeeperLayer} />{" "}</Button> : null}
-        {(!guidedCreation || step === 2) ? <Button type="button" onClick={addRootKind}><T value={ui.admin.constitutions.outlineeditor.addTopLevelKind} /></Button> : null}
-        {(!guidedCreation || step === 2) ? <SettingInfo label={<T value={ui.admin.constitutions.outlineeditor.addDeeperLayer} />} description={<T value={ui.help.addDeeperLevelHelp} />} changeability="review" /> : null}
-        {(!guidedCreation || step === 2) && layers[layers.length - 1]?.kindCode === 'sentence' ? <p className="muted"><T value={ui.admin.constitutions.outlineeditor.newLevelsAreAddedBeforeTheFinal} /></p> : null}
+      <Inline className="form-row outline-submit-actions" hidden={guidedCreation && step === 1}>
         {constitutionId ? <Button type="button" onClick={checkImpact} disabled={checking}><T value={checking ? ui.outlineDynamic.checkingImpact : ui.outlineDynamic.previewImpact} /></Button> : null}
         {guidedCreation ? <>
           <Button type="button" onClick={() => { setStep(step === 3 ? 2 : 1); setShowErrors(false); }}><T value={ui.admin.constitutions.outlineeditor.back} /></Button>

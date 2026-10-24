@@ -1,8 +1,8 @@
 # Deployment information
 
-**Status: pending.** The repository has CI checks and local/testing/production configuration templates, but no CD workflow that defines a production deployment. A reliable post-deployment procedure cannot yet be specified. Do not treat the local Compose quick start or a test fixture as a production rollout procedure.
+**Status: pending.** The repository includes a manual GitHub Actions CD workflow for test and production, but its first remote rollout has not been verified. A reliable post-deployment procedure cannot yet be specified. Do not treat the local Compose quick start or a test fixture as a production rollout procedure.
 
-When CD is implemented and a deployment has been exercised, this page must document, in order:
+After a deployment has been exercised, this page must document, in order:
 
 1. The target environment, responsible operator, CD trigger, artifact/image identity, and required approvals.
 2. Required configuration and secret sources, domains, TLS, network routes, persistent Postgres volumes, and backup location, without recording secret values.

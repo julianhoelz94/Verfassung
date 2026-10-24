@@ -1,0 +1,191 @@
+name: Deploy
+run-name: Deploy ${{ inputs.environment }} by @${{ github.actor }}${{ inputs.prune_volumes && ' (prune unused volumes)' || '' }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Deployment environment
+        required: true
+        type: choice
+        default: test
+        options:
+          - test
+          - prod
+      prune_volumes:
+        description: Prune unused volumes belonging to this application/environment after successful deployment
+        type: boolean
+        required: false
+        default: false
+      prune_confirmation:
+        description: Only for pruning, type PRUNE test or PRUNE prod to confirm deletion of unused volumes
+        type: string
+        required: false
+        default: ''
+      prepopulate:
+        description: Upload and publish generated fixture content after deployment (requires completed site setup and fixture accounts)
+        type: boolean
+        required: false
+        default: false
+
+permissions:
+  contents: read
+
+# Both environments share a server. Do not interrupt a rollout or overlap maintenance.
+concurrency:
+  group: constitution-atlas-coolify-deployment
+  cancel-in-progress: false
+
+jobs:
+  authorize:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Require an administrator and an explicit main-branch request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DEPLOYMENT_ENVIRONMENT: ${{ inputs.environment }}
+          PRUNE_VOLUMES: ${{ inputs.prune_volumes }}
+          PRUNE_CONFIRMATION: ${{ inputs.prune_confirmation }}
+        run: python3 scripts/cd/check_request.py
+      - name: Check existing CI compilation for this exact commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/cd/check_ci.py
+
+  candidate-images:
+    needs: authorize
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4
+      - name: Authenticate this runner to GHCR
+        env:
+          GHCR_TOKEN: ${{ github.token }}
+        run: printf '%s' "$GHCR_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+      - name: Compile native AMD64 images without rerunning tests and capture immutable digests
+        env:
+          DEPLOYMENT_ENVIRONMENT: ${{ inputs.environment }}
+        run: |
+          python3 scripts/cd/build_images.py --repository "$GITHUB_REPOSITORY" \
+            --environment "$DEPLOYMENT_ENVIRONMENT" --source-sha "$GITHUB_SHA" \
+            --run-id "${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: release-candidate
+          path: .release/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 30
+
+  deploy:
+    needs: [authorize, candidate-images]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    environment:
+      name: ${{ inputs.environment }}
+      url: ${{ inputs.environment == 'prod' && 'https://verfassungen.julianhoelz.de' || 'https://tst.verfassungen.julianhoelz.de' }}
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      DEPLOYMENT_ENVIRONMENT: ${{ inputs.environment }}
+      COOLIFY_URL: ${{ vars.COOLIFY_URL }}
+      COOLIFY_PROJECT_UUID: ${{ vars.COOLIFY_PROJECT_UUID }}
+      COOLIFY_APP_UUID: ${{ vars.COOLIFY_APP_UUID }}
+      PUBLIC_BASE_URL: ${{ vars.PUBLIC_BASE_URL }}
+      COOLIFY_CONFIG_TOKEN: ${{ secrets.COOLIFY_CONFIG_TOKEN }}
+      COOLIFY_DEPLOY_TOKEN: ${{ secrets.COOLIFY_DEPLOY_TOKEN }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: release-candidate
+          path: .release
+      - name: Require deployment settings
+        env:
+          TS_CLIENT_ID: ${{ vars.TS_CLIENT_ID }}
+          TS_AUDIENCE: ${{ vars.TS_AUDIENCE }}
+          TS_TAGS: ${{ vars.TS_TAGS }}
+          PREPOPULATE: ${{ inputs.prepopulate }}
+          PREPOPULATE_ADMIN_EMAIL: ${{ secrets.PREPOPULATE_ADMIN_EMAIL }}
+          PREPOPULATE_ADMIN_PASSWORD: ${{ secrets.PREPOPULATE_ADMIN_PASSWORD }}
+          PREPOPULATE_REVIEWER_EMAIL: ${{ secrets.PREPOPULATE_REVIEWER_EMAIL }}
+          PREPOPULATE_REVIEWER_PASSWORD: ${{ secrets.PREPOPULATE_REVIEWER_PASSWORD }}
+          PREPOPULATE_PUBLISHER_EMAIL: ${{ secrets.PREPOPULATE_PUBLISHER_EMAIL }}
+          PREPOPULATE_PUBLISHER_PASSWORD: ${{ secrets.PREPOPULATE_PUBLISHER_PASSWORD }}
+        run: |
+          for setting in COOLIFY_URL COOLIFY_PROJECT_UUID COOLIFY_APP_UUID PUBLIC_BASE_URL \
+            COOLIFY_CONFIG_TOKEN COOLIFY_DEPLOY_TOKEN TS_CLIENT_ID TS_AUDIENCE TS_TAGS; do
+            if [ -z "${!setting}" ]; then
+              echo "::error::Missing environment setting: $setting"
+              exit 1
+            fi
+          done
+          if [ "$PREPOPULATE" = true ]; then
+            for setting in PREPOPULATE_ADMIN_EMAIL PREPOPULATE_ADMIN_PASSWORD \
+              PREPOPULATE_REVIEWER_EMAIL PREPOPULATE_REVIEWER_PASSWORD \
+              PREPOPULATE_PUBLISHER_EMAIL PREPOPULATE_PUBLISHER_PASSWORD; do
+              if [ -z "${!setting}" ]; then
+                echo "::error::Missing environment secret: $setting"
+                exit 1
+              fi
+            done
+          fi
+      - name: Join Tailscale with an ephemeral OIDC identity
+        uses: tailscale/github-action@99a8333667fff04fdd6cffb46dfd409f8329a7bf # v4
+        with:
+          oauth-client-id: ${{ vars.TS_CLIENT_ID }}
+          audience: ${{ vars.TS_AUDIENCE }}
+          tags: ${{ vars.TS_TAGS }}
+      - name: Deploy the verified release through the private Coolify API
+        env:
+          PRUNE_VOLUMES: ${{ inputs.prune_volumes }}
+          PRUNE_CONFIRMATION: ${{ inputs.prune_confirmation }}
+          COOLIFY_SSH_PRIVATE_KEY: ${{ secrets.COOLIFY_SSH_PRIVATE_KEY }}
+          COOLIFY_SSH_KNOWN_HOSTS: ${{ secrets.COOLIFY_SSH_KNOWN_HOSTS }}
+        run: |
+          options=()
+          if [ "$PRUNE_VOLUMES" = true ]; then
+            options+=(--prune-volumes --prune-confirmation "$PRUNE_CONFIRMATION")
+          fi
+          python3 scripts/cd/deploy.py --repository "$GITHUB_REPOSITORY" \
+            --environment "$DEPLOYMENT_ENVIRONMENT" --source-sha "$GITHUB_SHA" "${options[@]}"
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        if: inputs.prepopulate
+        with:
+          node-version: '22'
+      - name: Prepopulate the selected environment after successful deployment
+        if: inputs.prepopulate
+        working-directory: apps/gateway-web
+        env:
+          PREPOPULATE_DEPLOYMENT_ENVIRONMENT: ${{ inputs.environment }}
+          PREPOPULATE_BASE_URL: ${{ inputs.environment == 'prod' && 'https://verfassungen.julianhoelz.de' || 'https://tst.verfassungen.julianhoelz.de' }}
+          PREPOPULATE_ADMIN_EMAIL: ${{ secrets.PREPOPULATE_ADMIN_EMAIL }}
+          PREPOPULATE_ADMIN_PASSWORD: ${{ secrets.PREPOPULATE_ADMIN_PASSWORD }}
+          PREPOPULATE_TOTP_SECRET: ${{ secrets.PREPOPULATE_TOTP_SECRET }}
+          PREPOPULATE_REVIEWER_EMAIL: ${{ secrets.PREPOPULATE_REVIEWER_EMAIL }}
+          PREPOPULATE_REVIEWER_PASSWORD: ${{ secrets.PREPOPULATE_REVIEWER_PASSWORD }}
+          PREPOPULATE_REVIEWER_TOTP_SECRET: ${{ secrets.PREPOPULATE_REVIEWER_TOTP_SECRET }}
+          PREPOPULATE_PUBLISHER_EMAIL: ${{ secrets.PREPOPULATE_PUBLISHER_EMAIL }}
+          PREPOPULATE_PUBLISHER_PASSWORD: ${{ secrets.PREPOPULATE_PUBLISHER_PASSWORD }}
+          PREPOPULATE_PUBLISHER_TOTP_SECRET: ${{ secrets.PREPOPULATE_PUBLISHER_TOTP_SECRET }}
+        run: npm run prepopulate

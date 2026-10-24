@@ -15,7 +15,6 @@ The implementation and operator instructions are in [Manual deployment](manual-d
 - Join Tailscale ephemerally with GitHub OIDC, validate the selected Coolify application, configure exact digests, request deployment and poll its UUID, then check public HTTPS readiness.
 - Separate Coolify applications/Compose projects and persistent volumes for test and prod. Coolify owns TLS; the application's Caddy remains behind it in external-proxy mode.
 - Host-level backup is provided by the operator. No backup container runs in the Coolify deployment. CD does not back up or restore persistent state.
-- Optional unused-volume pruning, default false, requires a matching explicit confirmation and a restricted forced-command SSH key. Scope is one environment/application label.
 - Optional `npm run prepopulate`, default false, after successful deployment. It publishes generated fixture data using separate accounts and requires completed site setup.
 
 The [manual deployment runbook](manual-deployment.md) defines the required variables, secrets, trust credential, optional actions and recovery boundaries. Published production setup remains pending until the first remote procedure has been exercised and verified.

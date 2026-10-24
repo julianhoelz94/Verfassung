@@ -1,13 +1,11 @@
 #!/usr/bin/env python3
-"""Select one verified release in Coolify, await its result, and optionally prune."""
+"""Select one compiled release in Coolify and await its deployment result."""
 
 import argparse
 import ipaddress
 import json
 import os
 import re
-import subprocess
-import tempfile
 import time
 import urllib.error
 import urllib.parse
@@ -111,11 +109,9 @@ def validate_application(api, project, application, environment, repository):
     return app
 
 
-def env_payload(manifest, application):
+def env_payload(manifest):
     values = {image_variable(service): image for service, image in manifest["images"].items()}
     values.update({
-        "ATLAS_DEPLOYMENT_ENVIRONMENT": manifest["environment"],
-        "ATLAS_APPLICATION_UUID": application,
         "PUBLIC_BASE_URL": manifest["public_url"],
         "NEXT_PUBLIC_BASE_URL": manifest["public_url"],
         "PROFILE": "production", "TLS_MODE": "external-proxy",
@@ -156,23 +152,6 @@ def smoke_check(origin, sleep=time.sleep):
     raise RuntimeError("Public HTTPS/setup-status verification failed after deployment")
 
 
-def prune(origin, environment, application):
-    private_key = required("COOLIFY_SSH_PRIVATE_KEY")
-    known_hosts = required("COOLIFY_SSH_KNOWN_HOSTS")
-    host = urllib.parse.urlsplit(origin).hostname
-    with tempfile.TemporaryDirectory(prefix="atlas-maintenance-") as directory:
-        key_path = Path(directory) / "key"
-        hosts_path = Path(directory) / "known_hosts"
-        key_path.write_text(private_key + "\n")
-        hosts_path.write_text(known_hosts + "\n")
-        key_path.chmod(0o600)
-        hosts_path.chmod(0o600)
-        subprocess.run(["ssh", "-i", str(key_path), "-o", "IdentitiesOnly=yes", "-o", "BatchMode=yes",
-                        "-o", "StrictHostKeyChecking=yes", "-o", f"UserKnownHostsFile={hosts_path}",
-                        "-o", "ConnectTimeout=15", f"root@{host}",
-                        f"atlas-prune-volumes {environment} {application}"], check=True, timeout=180)
-
-
 def deploy(args):
     manifest = validate_manifest(json.loads(Path(args.manifest).read_text()), Path.cwd(),
                                  args.repository, args.environment, args.source_sha)
@@ -181,11 +160,6 @@ def deploy(args):
     application = identifier(required("COOLIFY_APP_UUID"), "Coolify application UUID")
     if os.environ.get("PUBLIC_BASE_URL", manifest["public_url"]) != manifest["public_url"]:
         raise ValueError("PUBLIC_BASE_URL does not match the selected deployment environment")
-    if args.prune_volumes:
-        if args.prune_confirmation != "PRUNE " + args.environment:
-            raise ValueError("Volume pruning requires the exact confirmation: PRUNE <environment>")
-        required("COOLIFY_SSH_PRIVATE_KEY")
-        required("COOLIFY_SSH_KNOWN_HOSTS")
     api = Api(origin, required("COOLIFY_CONFIG_TOKEN"), required("COOLIFY_DEPLOY_TOKEN"))
     validate_application(api, project, application, args.environment, args.repository)
     api.request("PATCH", f"/applications/{application}", {
@@ -194,7 +168,7 @@ def deploy(args):
         "is_auto_deploy_enabled": False, "is_preserve_repository_enabled": False,
         "is_raw_compose_deployment_enabled": False,
     })
-    api.request("PATCH", f"/applications/{application}/envs/bulk", env_payload(manifest, application))
+    api.request("PATCH", f"/applications/{application}/envs/bulk", env_payload(manifest))
     result = api.request("POST", "/deploy", {"uuid": application}, deploy=True)
     deployments = result.get("deployments", [])
     if len(deployments) != 1 or deployments[0].get("resource_uuid") != application:
@@ -207,11 +181,6 @@ def deploy(args):
     if summary:
         with open(summary, "a") as stream:
             stream.write(f"Deployed `{args.source_sha}` to {manifest['public_url']}\n\nCoolify deployment: `{deployment}`\n\n")
-    if args.prune_volumes:
-        try:
-            prune(origin, args.environment, application)
-        except Exception as error:
-            raise RuntimeError("Deployment succeeded, but optional volume maintenance failed") from error
 
 
 if __name__ == "__main__":
@@ -220,6 +189,4 @@ if __name__ == "__main__":
     parser.add_argument("--repository", required=True)
     parser.add_argument("--environment", choices=PUBLIC_URLS, required=True)
     parser.add_argument("--source-sha", required=True)
-    parser.add_argument("--prune-volumes", action="store_true")
-    parser.add_argument("--prune-confirmation", default="")
     deploy(parser.parse_args())

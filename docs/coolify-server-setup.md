@@ -261,7 +261,7 @@ Record the server architecture, Ubuntu/Coolify/Docker versions, public and Tails
 
 Follow [Manual deployment](manual-deployment.md) for the two Coolify applications, `/docker-compose.coolify.yml`, environment-specific UUIDs/secrets, GHCR pull access and the manual Actions form. Disable automatic deployments. The production domain is `verfassungen.julianhoelz.de`; test uses `tst.verfassungen.julianhoelz.de`.
 
-CD checks existing compilation results for the exact `main` commit and builds native AMD64 images on GitHub-hosted runners. It runs no unit, integration or E2E suite. Only an administrator's manual dispatch selects and starts rollout. Optional volume pruning and npm prepopulate both default to false; the runbook describes their additional credentials and effects.
+CD checks existing compilation results for the exact `main` commit and builds native AMD64 images on GitHub-hosted runners. It runs no unit, integration or E2E suite. Only an administrator's manual dispatch selects and starts rollout. Optional npm prepopulate defaults to false; the runbook describes its additional credentials and effects.
 
 After the first manual deployment, complete the site's setup wizard and verify state persists across a second deployment. Leave prepopulate disabled until setup is complete and its separate accounts exist. No backup container is deployed because this server has a host-level backup.
 

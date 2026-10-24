@@ -1,5 +1,5 @@
 name: Deploy
-run-name: Deploy ${{ inputs.environment }} by @${{ github.actor }}${{ inputs.prune_volumes && ' (prune unused volumes)' || '' }}
+run-name: Deploy ${{ inputs.environment }} by @${{ github.actor }}
 
 on:
   workflow_dispatch:
@@ -12,16 +12,6 @@ on:
         options:
           - test
           - prod
-      prune_volumes:
-        description: Prune unused volumes belonging to this application/environment after successful deployment
-        type: boolean
-        required: false
-        default: false
-      prune_confirmation:
-        description: Only for pruning, type PRUNE test or PRUNE prod to confirm deletion of unused volumes
-        type: string
-        required: false
-        default: ''
       prepopulate:
         description: Upload and publish generated fixture content after deployment (requires completed site setup and fixture accounts)
         type: boolean
@@ -31,7 +21,7 @@ on:
 permissions:
   contents: read
 
-# Both environments share a server. Do not interrupt a rollout or overlap maintenance.
+# Both environments share a server. Do not interrupt or overlap rollouts.
 concurrency:
   group: constitution-atlas-coolify-deployment
   cancel-in-progress: false
@@ -51,8 +41,6 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           DEPLOYMENT_ENVIRONMENT: ${{ inputs.environment }}
-          PRUNE_VOLUMES: ${{ inputs.prune_volumes }}
-          PRUNE_CONFIRMATION: ${{ inputs.prune_confirmation }}
         run: python3 scripts/cd/check_request.py
       - name: Check existing CI compilation for this exact commit
         env:
@@ -156,19 +144,10 @@ jobs:
           oauth-client-id: ${{ vars.TS_CLIENT_ID }}
           audience: ${{ vars.TS_AUDIENCE }}
           tags: ${{ vars.TS_TAGS }}
-      - name: Deploy the verified release through the private Coolify API
-        env:
-          PRUNE_VOLUMES: ${{ inputs.prune_volumes }}
-          PRUNE_CONFIRMATION: ${{ inputs.prune_confirmation }}
-          COOLIFY_SSH_PRIVATE_KEY: ${{ secrets.COOLIFY_SSH_PRIVATE_KEY }}
-          COOLIFY_SSH_KNOWN_HOSTS: ${{ secrets.COOLIFY_SSH_KNOWN_HOSTS }}
+      - name: Deploy the compiled release through the private Coolify API
         run: |
-          options=()
-          if [ "$PRUNE_VOLUMES" = true ]; then
-            options+=(--prune-volumes --prune-confirmation "$PRUNE_CONFIRMATION")
-          fi
           python3 scripts/cd/deploy.py --repository "$GITHUB_REPOSITORY" \
-            --environment "$DEPLOYMENT_ENVIRONMENT" --source-sha "$GITHUB_SHA" "${options[@]}"
+            --environment "$DEPLOYMENT_ENVIRONMENT" --source-sha "$GITHUB_SHA"
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         if: inputs.prepopulate
         with:

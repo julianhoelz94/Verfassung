@@ -560,69 +560,14 @@ services:
       start_period: 5s
     restart: unless-stopped
 volumes:
-  caddy-data:
-    labels:
-      io.constitution-atlas.environment: ${ATLAS_DEPLOYMENT_ENVIRONMENT:?Select test or prod}
-      io.constitution-atlas.application: ${ATLAS_APPLICATION_UUID:?Set the Coolify application UUID}
-      io.constitution-atlas.deployment: ${ATLAS_DEPLOYMENT_ENVIRONMENT:?Select test or prod}:${ATLAS_APPLICATION_UUID:?Set
-        the Coolify application UUID}
-  caddy-config:
-    labels:
-      io.constitution-atlas.environment: ${ATLAS_DEPLOYMENT_ENVIRONMENT:?Select test or prod}
-      io.constitution-atlas.application: ${ATLAS_APPLICATION_UUID:?Set the Coolify application UUID}
-      io.constitution-atlas.deployment: ${ATLAS_DEPLOYMENT_ENVIRONMENT:?Select test or prod}:${ATLAS_APPLICATION_UUID:?Set
-        the Coolify application UUID}
-  catalog-db-data:
-    labels:
-      io.constitution-atlas.environment: ${ATLAS_DEPLOYMENT_ENVIRONMENT:?Select test or prod}
-      io.constitution-atlas.application: ${ATLAS_APPLICATION_UUID:?Set the Coolify application UUID}
-      io.constitution-atlas.deployment: ${ATLAS_DEPLOYMENT_ENVIRONMENT:?Select test or prod}:${ATLAS_APPLICATION_UUID:?Set
-        the Coolify application UUID}
-  content-db-data:
-    labels:
-      io.constitution-atlas.environment: ${ATLAS_DEPLOYMENT_ENVIRONMENT:?Select test or prod}
-      io.constitution-atlas.application: ${ATLAS_APPLICATION_UUID:?Set the Coolify application UUID}
-      io.constitution-atlas.deployment: ${ATLAS_DEPLOYMENT_ENVIRONMENT:?Select test or prod}:${ATLAS_APPLICATION_UUID:?Set
-        the Coolify application UUID}
-  amendment-db-data:
-    labels:
-      io.constitution-atlas.environment: ${ATLAS_DEPLOYMENT_ENVIRONMENT:?Select test or prod}
-      io.constitution-atlas.application: ${ATLAS_APPLICATION_UUID:?Set the Coolify application UUID}
-      io.constitution-atlas.deployment: ${ATLAS_DEPLOYMENT_ENVIRONMENT:?Select test or prod}:${ATLAS_APPLICATION_UUID:?Set
-        the Coolify application UUID}
-  identity-db-data:
-    labels:
-      io.constitution-atlas.environment: ${ATLAS_DEPLOYMENT_ENVIRONMENT:?Select test or prod}
-      io.constitution-atlas.application: ${ATLAS_APPLICATION_UUID:?Set the Coolify application UUID}
-      io.constitution-atlas.deployment: ${ATLAS_DEPLOYMENT_ENVIRONMENT:?Select test or prod}:${ATLAS_APPLICATION_UUID:?Set
-        the Coolify application UUID}
-  editor-db-data:
-    labels:
-      io.constitution-atlas.environment: ${ATLAS_DEPLOYMENT_ENVIRONMENT:?Select test or prod}
-      io.constitution-atlas.application: ${ATLAS_APPLICATION_UUID:?Set the Coolify application UUID}
-      io.constitution-atlas.deployment: ${ATLAS_DEPLOYMENT_ENVIRONMENT:?Select test or prod}:${ATLAS_APPLICATION_UUID:?Set
-        the Coolify application UUID}
-  audit-db-data:
-    labels:
-      io.constitution-atlas.environment: ${ATLAS_DEPLOYMENT_ENVIRONMENT:?Select test or prod}
-      io.constitution-atlas.application: ${ATLAS_APPLICATION_UUID:?Set the Coolify application UUID}
-      io.constitution-atlas.deployment: ${ATLAS_DEPLOYMENT_ENVIRONMENT:?Select test or prod}:${ATLAS_APPLICATION_UUID:?Set
-        the Coolify application UUID}
-  document-db-data:
-    labels:
-      io.constitution-atlas.environment: ${ATLAS_DEPLOYMENT_ENVIRONMENT:?Select test or prod}
-      io.constitution-atlas.application: ${ATLAS_APPLICATION_UUID:?Set the Coolify application UUID}
-      io.constitution-atlas.deployment: ${ATLAS_DEPLOYMENT_ENVIRONMENT:?Select test or prod}:${ATLAS_APPLICATION_UUID:?Set
-        the Coolify application UUID}
-  ingestion-db-data:
-    labels:
-      io.constitution-atlas.environment: ${ATLAS_DEPLOYMENT_ENVIRONMENT:?Select test or prod}
-      io.constitution-atlas.application: ${ATLAS_APPLICATION_UUID:?Set the Coolify application UUID}
-      io.constitution-atlas.deployment: ${ATLAS_DEPLOYMENT_ENVIRONMENT:?Select test or prod}:${ATLAS_APPLICATION_UUID:?Set
-        the Coolify application UUID}
-  search-db-data:
-    labels:
-      io.constitution-atlas.environment: ${ATLAS_DEPLOYMENT_ENVIRONMENT:?Select test or prod}
-      io.constitution-atlas.application: ${ATLAS_APPLICATION_UUID:?Set the Coolify application UUID}
-      io.constitution-atlas.deployment: ${ATLAS_DEPLOYMENT_ENVIRONMENT:?Select test or prod}:${ATLAS_APPLICATION_UUID:?Set
-        the Coolify application UUID}
+  caddy-data: null
+  caddy-config: null
+  catalog-db-data: null
+  content-db-data: null
+  amendment-db-data: null
+  identity-db-data: null
+  editor-db-data: null
+  audit-db-data: null
+  document-db-data: null
+  ingestion-db-data: null
+  search-db-data: null

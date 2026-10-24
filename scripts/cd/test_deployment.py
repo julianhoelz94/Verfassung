@@ -13,7 +13,6 @@ import build_images
 import check_ci
 import check_request
 import deploy
-import prune_volumes
 import release
 import render_compose
 
@@ -65,15 +64,15 @@ class ReleaseTests(unittest.TestCase):
 
 
 class AuthorizationTests(unittest.TestCase):
-    def test_manual_main_and_matching_prune_confirmation_required(self):
-        check_request.validate_request("workflow_dispatch", "refs/heads/main", "prod", False, "")
-        for event, ref, environment, prune, confirmation in [
-            ("push", "refs/heads/main", "test", False, ""),
-            ("workflow_dispatch", "refs/heads/other", "test", False, ""),
-            ("workflow_dispatch", "refs/heads/main", "prod", True, "PRUNE test"),
+    def test_manual_main_and_known_environment_required(self):
+        check_request.validate_request("workflow_dispatch", "refs/heads/main", "prod")
+        for event, ref, environment in [
+            ("push", "refs/heads/main", "test"),
+            ("workflow_dispatch", "refs/heads/other", "test"),
+            ("workflow_dispatch", "refs/heads/main", "unknown"),
         ]:
             with self.assertRaises(ValueError):
-                check_request.validate_request(event, ref, environment, prune, confirmation)
+                check_request.validate_request(event, ref, environment)
 
     def test_write_permission_is_insufficient(self):
         response = Mock()
@@ -151,34 +150,28 @@ class CoolifyTests(unittest.TestCase):
         api.request.side_effect = [{"status": "in_progress"}, {"status": "finished", "commit": SHA}]
         deploy.wait_for_deployment(api, "deployment", SHA, sleep=lambda _: None)
 
-    def test_deploy_uses_immutable_images_and_does_not_prune_by_default(self):
+    def test_deploy_uses_immutable_images_and_deploy_only_token(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "manifest.json"
             path.write_text(json.dumps(manifest()))
             args = argparse.Namespace(manifest=path, repository=REPOSITORY, environment="test",
-                                      source_sha=SHA, prune_volumes=False, prune_confirmation="")
+                                      source_sha=SHA)
             api = Mock()
             api.request.return_value = {"deployments": [{"resource_uuid": "test-app", "deployment_uuid": "job123"}]}
             settings = {"COOLIFY_URL": "http://coolify:8000", "COOLIFY_PROJECT_UUID": "project",
                         "COOLIFY_APP_UUID": "test-app", "COOLIFY_CONFIG_TOKEN": "config", "COOLIFY_DEPLOY_TOKEN": "deploy"}
             with patch.dict(os.environ, settings, clear=True), patch.object(deploy, "Api", return_value=api), \
                     patch.object(deploy, "validate_application"), patch.object(deploy, "wait_for_deployment"), \
-                    patch.object(deploy, "smoke_check"), patch.object(deploy, "prune") as prune:
+                    patch.object(deploy, "smoke_check"):
                 deploy.deploy(args)
-                prune.assert_not_called()
                 self.assertTrue(api.request.call_args.kwargs["deploy"])
                 payload = api.request.call_args_list[1].args[2]["data"]
                 images = [item["value"] for item in payload if item["key"].startswith("ATLAS_IMAGE_")]
                 self.assertEqual(set(images), set(manifest()["images"].values()))
-                api.request.reset_mock()
-                args.prune_volumes = True
-                args.prune_confirmation = "PRUNE prod"
-                with self.assertRaises(ValueError):
-                    deploy.deploy(args)
-                api.request.assert_not_called()
 
 
-class RuntimeAndMaintenanceTests(unittest.TestCase):
+
+class RuntimeTests(unittest.TestCase):
     def test_runtime_has_no_host_ports_builds_or_checkout_mounts(self):
         document = yaml.safe_load(render_compose.render(ROOT))
         self.assertNotIn("backup-service", document["services"])
@@ -188,31 +181,17 @@ class RuntimeAndMaintenanceTests(unittest.TestCase):
                 self.assertNotIn("build", service)
                 for volume in service.get("volumes", []):
                     self.assertFalse(volume.startswith("."))
-        for definition in document["volumes"].values():
-            self.assertIn("io.constitution-atlas.deployment", definition["labels"])
         identity = document["services"]["identity-service"]["environment"]
         self.assertEqual(identity["IDENTITY_SEED_MODE"], "off")
         self.assertNotIn("LOCAL_ADMIN_PASSWORD", identity)
         self.assertIn(":?", identity["IDENTITY_MFA_ENCRYPTION_KEY"])
 
-    def test_prune_uses_single_composite_label_and_rejects_shell_commands(self):
-        with tempfile.TemporaryDirectory() as directory, patch.object(prune_volumes.os, "geteuid", return_value=0):
-            runner = Mock()
-            for command in ["atlas-prune-volumes test app; docker volume prune -af", "atlas-prune-volumes prod", "docker volume prune"]:
-                with self.assertRaises(ValueError):
-                    prune_volumes.prune(command, runner, str(Path(directory) / "lock"))
-            runner.assert_not_called()
-            prune_volumes.prune("atlas-prune-volumes test app", runner, str(Path(directory) / "lock"))
-            args = runner.call_args.args[0]
-            self.assertEqual(args.count("--filter"), 1)
-            self.assertEqual(args[-1], "label=io.constitution-atlas.deployment=test:app")
-
-    def test_workflow_is_manual_with_opt_in_maintenance_and_no_test_workflow(self):
+    def test_workflow_is_manual_with_opt_in_prepopulate_and_no_test_workflow(self):
         # BaseLoader preserves YAML's 'on' key instead of treating it as a YAML 1.1 boolean.
         workflow = yaml.load((ROOT / ".github/workflows/deploy.yml").read_text(), Loader=yaml.BaseLoader)
         self.assertEqual(set(workflow["on"]), {"workflow_dispatch"})
         inputs = workflow["on"]["workflow_dispatch"]["inputs"]
-        self.assertEqual(inputs["prune_volumes"]["default"], "false")
+        self.assertEqual(set(inputs), {"environment", "prepopulate"})
         self.assertEqual(inputs["prepopulate"]["default"], "false")
         self.assertEqual(set(workflow["jobs"]), {"authorize", "candidate-images", "deploy"})
         for job in workflow["jobs"].values():

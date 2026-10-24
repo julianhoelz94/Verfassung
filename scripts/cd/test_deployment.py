@@ -9,7 +9,6 @@ from unittest.mock import Mock, patch
 
 import yaml
 
-import build_images
 import check_request
 import deploy
 import release
@@ -36,6 +35,8 @@ class FakeCoolify:
 
     def request(self, method, path, payload=None, deploy=False):
         self.calls.append((method, path, payload, deploy))
+        if method == "GET" and path == "/version":
+            return "v4.5.0"
         if method == "GET" and path == "/projects/project/environments/test/envs":
             return [{"key": key} for key in globals()["deploy"].SHARED_VARIABLES]
         if method == "GET" and path == "/projects/project/test":
@@ -44,6 +45,7 @@ class FakeCoolify:
             if self.application is not None:
                 raise AssertionError("Duplicate application creation")
             self.application = {**payload, "uuid": "app123", "git_repository": REPOSITORY,
+                                "settings": {"is_container_label_readonly_enabled": True},
                                 "docker_compose_domains": {"edge-proxy": {"domain": release.PUBLIC_URLS["test"]}}}
             return {"uuid": "app123"}
         if method == "GET" and path == "/applications/app123":
@@ -75,21 +77,6 @@ class ReleaseTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             release.validate_manifest(valid, ROOT, REPOSITORY, "test", SHA)
 
-    def test_build_is_native_amd64_and_never_runs_tests(self):
-        def run(*args, **kwargs):
-            if args[:3] == ("docker", "image", "inspect"):
-                return Mock(stdout=json.dumps([args[3].split(":")[0] + "@sha256:" + "b" * 64]))
-            return Mock()
-        with patch.object(build_images.platform, "machine", return_value="x86_64"), \
-                patch.object(build_images, "command", side_effect=run) as command, \
-                patch.object(build_images, "write_manifest") as write:
-            build_images.build(ROOT, REPOSITORY, "prod", SHA, "123-1")
-        self.assertEqual(write.call_args.args[1]["architecture"], "amd64")
-        gradle_calls = [call.args for call in command.call_args_list if call.args[0].endswith("gradlew")]
-        self.assertEqual(len(gradle_calls), 9)
-        self.assertTrue(all(call[-3:] == ("bootJar", "-x", "test") for call in gradle_calls))
-        docker_calls = [call.args for call in command.call_args_list if call.args[:2] == ("docker", "build")]
-        self.assertTrue(all(call[3] == "linux/amd64" for call in docker_calls))
 
 
 class AuthorizationTests(unittest.TestCase):
@@ -123,6 +110,7 @@ class CoolifyTests(unittest.TestCase):
 
     def test_wrong_application_environment_server_repository_and_domain_rejected(self):
         app = {"build_pack": "dockercompose", "git_repository": REPOSITORY,
+               "settings": {"is_container_label_readonly_enabled": True},
                "docker_compose_domains": json.dumps({"edge-proxy": {"domain": release.PUBLIC_URLS["test"]}})}
         destination = [{"server_uuid": "server", "is_primary": True}]
         project = {"applications": [{"uuid": "test-app"}]}
@@ -135,6 +123,8 @@ class CoolifyTests(unittest.TestCase):
             [project, {**app, "git_repository": "https://example.org/" + REPOSITORY}],
             [project, {**app, "docker_compose_custom_build_command": "docker compose build"}],
             [project, {**app, "pre_deployment_command": "npm run build"}],
+            [project, {**app, "settings": {"is_container_label_readonly_enabled": False}}],
+            [project, {**app, "settings": {"is_container_label_readonly_enabled": True, "traefik_certificate_resolver": "none"}}],
             [project, app, [{"server_uuid": "other", "is_primary": True}]],
             [project, app, destination + [{"server_uuid": "server", "is_primary": False}]],
             [project, {**app, "docker_compose_domains": {"edge-proxy": {"domain": release.PUBLIC_URLS["prod"]}}}, destination],
@@ -177,7 +167,8 @@ class CoolifyTests(unittest.TestCase):
         self.assertEqual(api.request.call_count, 1)
         api = FakeCoolify()
         api.application = {"uuid": "app123", "name": "legacy-name", "build_pack": "dockercompose",
-                           "git_repository": REPOSITORY, "docker_compose_domains": {}}
+                           "git_repository": REPOSITORY, "docker_compose_domains": {},
+                           "settings": {"is_container_label_readonly_enabled": True}}
         self.assertEqual(deploy.ensure_application(api, "project", "server", "test", REPOSITORY, manifest(), "app123"), "app123")
         self.assertTrue(all(method == "GET" for method, _, _, _ in api.calls))
 
@@ -211,6 +202,39 @@ class CoolifyTests(unittest.TestCase):
             with self.assertRaises(exception) as context:
                 api.request("PATCH", "/applications/app", {})
             self.assertNotIn("private-secret", str(context.exception))
+
+    def test_released_api_payload_omits_unsupported_settings(self):
+        payload = deploy.application_settings(manifest())
+        self.assertNotIn("is_container_label_readonly_enabled", payload)
+        self.assertNotIn("traefik_certificate_resolver", payload)
+
+    def test_api_reports_only_known_validation_fields_and_static_reasons(self):
+        from io import BytesIO
+        from urllib.error import HTTPError
+        body = json.dumps({"errors": {
+            "is_container_label_readonly_enabled": ["This field is not allowed."],
+            "git_repository": ["private-secret is invalid"],
+            "private-secret": ["This field is not allowed."],
+        }}).encode()
+        api = deploy.Api("http://coolify:8000", "config", "deploy")
+        api.opener = Mock(open=Mock(side_effect=HTTPError("private", 422, "private-secret", {}, BytesIO(body))))
+        with self.assertRaises(RuntimeError) as context:
+            api.request("POST", "/applications/public", {
+                "is_container_label_readonly_enabled": True, "git_repository": "private-secret"})
+        self.assertIn("is_container_label_readonly_enabled: This field is not allowed.", str(context.exception))
+        self.assertIn("git_repository: Validation failed.", str(context.exception))
+        self.assertNotIn("private-secret", str(context.exception))
+
+    def test_version_accepts_text_or_json_string_but_never_prints_arbitrary_responses(self):
+        from io import BytesIO
+        for body in [b'v4.5.0', b'"v4.5.0"', b'4.0.0-beta.420.7']:
+            api = deploy.Api("http://coolify:8000", "config", "deploy")
+            api.opener = Mock(open=Mock(return_value=BytesIO(body)))
+            self.assertRegex(api.request("GET", "/version"), r"^v?4\.")
+        api.opener = Mock(open=Mock(return_value=BytesIO(b'private-secret')))
+        with self.assertRaises(ValueError) as context:
+            api.request("GET", "/version")
+        self.assertNotIn("private-secret", str(context.exception))
 
     def test_shared_variable_presence_checked_without_reading_secret_values(self):
         api = Mock(request=Mock(return_value=[{"key": key} for key in deploy.SHARED_VARIABLES]))
@@ -303,7 +327,7 @@ class RuntimeTests(unittest.TestCase):
         inputs = workflow["on"]["workflow_dispatch"]["inputs"]
         self.assertEqual(set(inputs), {"environment", "prepopulate"})
         self.assertEqual(inputs["prepopulate"]["default"], "false")
-        self.assertEqual(set(workflow["jobs"]), {"authorize", "candidate-images", "deploy"})
+        self.assertEqual(set(workflow["jobs"]), {"authorize", "build-image", "candidate-images", "deploy"})
         for job in workflow["jobs"].values():
             self.assertNotIn("uses", job)
         steps = workflow["jobs"]["deploy"]["steps"]

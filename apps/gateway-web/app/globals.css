@@ -1563,8 +1563,7 @@ button.article-toggle[aria-expanded='false']::after {
 }
 
 .alert {
-  display: flex;
-  gap: var(--space-2);
+  display: block;
   padding: var(--space-3) var(--space-4);
   border-radius: var(--radius-md);
   border: 1px solid transparent;

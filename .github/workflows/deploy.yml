@@ -29,7 +29,7 @@ concurrency:
 jobs:
   authorize:
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 50
     permissions:
       contents: read
       actions: read
@@ -42,10 +42,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           DEPLOYMENT_ENVIRONMENT: ${{ inputs.environment }}
         run: python3 scripts/cd/check_request.py
-      - name: Check existing CI compilation for this exact commit
+      - name: Wait for existing CI compilation for this exact commit
         env:
           GH_TOKEN: ${{ github.token }}
-        run: python3 scripts/cd/check_ci.py
+        run: python3 scripts/cd/check_ci.py --timeout-seconds 2700 --poll-seconds 30
 
   candidate-images:
     needs: authorize

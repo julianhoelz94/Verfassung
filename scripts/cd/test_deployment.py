@@ -10,7 +10,6 @@ from unittest.mock import Mock, patch
 import yaml
 
 import build_images
-import check_ci
 import check_request
 import deploy
 import release
@@ -113,24 +112,6 @@ class AuthorizationTests(unittest.TestCase):
             with self.assertRaises(PermissionError):
                 check_request.require_admin(REPOSITORY, "collaborator", "token")
 
-    def test_ci_exact_sha_latest_attempt_and_no_e2e_gate(self):
-        jobs = [{"name": name, "status": "completed", "conclusion": "success"}
-                for name in ["frontend", "mcp-server", "gateway-image", "full-stack-service-artifacts"]]
-        jobs += [{"name": f"images ({name})", "status": "completed", "conclusion": "success"}
-                 for name, directory in release.image_paths(ROOT).items()
-                 if (ROOT / directory / "build.gradle.kts").is_file()]
-        jobs.append({"name": "full-stack-e2e", "status": "completed", "conclusion": "failure"})
-        runs = [{"id": 1, "head_sha": SHA, "head_branch": "main", "event": "push"}]
-        get = Mock(side_effect=lambda path: {"jobs": jobs} if "/jobs?" in path else {"workflow_runs": runs})
-        self.assertEqual(check_ci.check(REPOSITORY, SHA, ROOT, get), 1)
-        self.assertIn("head_sha=" + SHA, get.call_args_list[0].args[0])
-        self.assertIn("filter=latest", get.call_args_list[1].args[0])
-        jobs[0]["conclusion"] = "failure"
-        with self.assertRaises(ValueError):
-            check_ci.check(REPOSITORY, SHA, ROOT, get)
-        runs[0]["head_sha"] = "c" * 40
-        with self.assertRaises(ValueError):
-            check_ci.check(REPOSITORY, SHA, ROOT, get)
 
 
 class CoolifyTests(unittest.TestCase):

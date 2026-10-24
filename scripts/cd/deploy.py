@@ -79,17 +79,30 @@ class Api:
         )
         try:
             with self.opener.open(request, timeout=30) as response:
+                if method == "GET" and path == "/version":
+                    version = response.read(256).decode().strip().strip('"')
+                    if not re.fullmatch(r"v?\d+\.\d+\.\d+(?:[-.][A-Za-z0-9]+)*", version):
+                        raise ValueError("Coolify returned an invalid version")
+                    return version
                 return json.load(response)
         except urllib.error.HTTPError as error:
-            # Responses/logs can contain credentials. Report the route/status only.
+            # Never print response values: validation messages can echo secrets.
+            details = []
             if error.code == 422:
                 try:
                     body = json.loads(error.read(65536))
                     if body.get("errors", {}).get("docker_compose_domains") == COMPOSE_NOT_LOADED:
                         raise ComposeNotLoaded("Coolify has not loaded the Compose file yet") from None
-                except (ValueError, AttributeError):
+                    for field, messages in body.get("errors", {}).items():
+                        if field not in (payload or {}) or not re.fullmatch(r"[a-z_]+", field):
+                            continue
+                        messages = messages if isinstance(messages, list) else [messages]
+                        reason = "This field is not allowed." if "This field is not allowed." in messages else "Validation failed."
+                        details.append(f"{field}: {reason}")
+                except (ValueError, AttributeError, TypeError):
                     pass
-            raise RuntimeError(f"Coolify {method} {path} returned HTTP {error.code}") from None
+            suffix = " (" + "; ".join(details) + ")" if details else ""
+            raise RuntimeError(f"Coolify {method} {path} returned HTTP {error.code}{suffix}") from None
 
 
 def canonical_domain(value):
@@ -135,6 +148,10 @@ def validate_application(api, project, application, server, environment, reposit
     app = api.request("GET", f"/applications/{application}")
     if app.get("build_pack") != "dockercompose" or repository_name(app.get("git_repository", "")) != repository.lower():
         raise ValueError("The selected Coolify application is not this repository's Git-based Compose application")
+    if app.get("settings", {}).get("is_container_label_readonly_enabled") is not True:
+        raise ValueError("Enable Readonly labels in the Coolify application's advanced configuration before deploying")
+    if app.get("settings", {}).get("traefik_certificate_resolver") not in {None, "", "letsencrypt"}:
+        raise ValueError("Use the default or letsencrypt certificate resolver in the Coolify application before deploying")
     if any(app.get(key) for key in ("docker_compose_custom_build_command", "docker_compose_custom_start_command",
                                     "pre_deployment_command", "post_deployment_command")):
         raise ValueError("Remove custom Compose commands and deployment hooks before using the image-only CD workflow")
@@ -160,8 +177,10 @@ def application_settings(manifest):
         "docker_compose_location": "/docker-compose.coolify.yml",
         "is_auto_deploy_enabled": False, "is_preview_deployments_enabled": False,
         "is_preserve_repository_enabled": False, "is_raw_compose_deployment_enabled": False,
-        "is_force_https_enabled": True, "is_container_label_readonly_enabled": True,
-        "traefik_certificate_resolver": "letsencrypt", "instant_deploy": False,
+        # Released Coolify APIs reject the read-only-label setting. New apps
+        # default to managed labels; validate_application verifies that default.
+        # The proxy's configured letsencrypt resolver is the application default.
+        "is_force_https_enabled": True, "instant_deploy": False,
         "manual_webhook_secret_github": None, "manual_webhook_secret_gitlab": None,
         "manual_webhook_secret_bitbucket": None, "manual_webhook_secret_gitea": None,
         "docker_compose_domains": [{"name": "edge-proxy", "domain": manifest["public_url"] + ":80", "redirect": "both"}],
@@ -265,6 +284,7 @@ def deploy(args):
         raise ValueError("PUBLIC_BASE_URL does not match the selected deployment environment")
     api = Api(origin, required("COOLIFY_CONFIG_TOKEN"), required("COOLIFY_DEPLOY_TOKEN"))
     require_shared_variables(api, project, args.environment)
+    print(f"Coolify version: {api.request('GET', '/version')}", flush=True)
     application = ensure_application(api, project, server, args.environment, args.repository, manifest,
                                      os.environ.get("COOLIFY_APP_UUID", "").strip())
     configure_application(api, application, manifest)

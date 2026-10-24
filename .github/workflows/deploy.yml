@@ -29,7 +29,9 @@ concurrency:
 jobs:
   authorize:
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 50
+    outputs:
+      image-matrix: ${{ steps.images.outputs.matrix }}
     permissions:
       contents: read
       actions: read
@@ -42,15 +44,23 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           DEPLOYMENT_ENVIRONMENT: ${{ inputs.environment }}
         run: python3 scripts/cd/check_request.py
-      - name: Check existing CI compilation for this exact commit
+      - name: Wait for existing CI compilation for this exact commit
         env:
           GH_TOKEN: ${{ github.token }}
-        run: python3 scripts/cd/check_ci.py
+        run: python3 scripts/cd/check_ci.py --timeout-seconds 2700 --poll-seconds 30
+      - name: Discover release image packages
+        id: images
+        run: echo "matrix=$(python3 scripts/cd/release.py --matrix)" >> "$GITHUB_OUTPUT"
 
-  candidate-images:
+  build-image:
+    name: Build ${{ matrix.service }}
     needs: authorize
     runs-on: ubuntu-24.04
-    timeout-minutes: 90
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      max-parallel: 6
+      matrix: ${{ fromJSON(needs.authorize.outputs.image-matrix) }}
     permissions:
       contents: read
       packages: write
@@ -59,27 +69,59 @@ jobs:
         with:
           persist-credentials: false
       - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
+        if: matrix.gradle
         with:
           distribution: temurin
           java-version: '21'
       - uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4
+        if: matrix.gradle
       - name: Authenticate this runner to GHCR
         env:
           GHCR_TOKEN: ${{ github.token }}
         run: printf '%s' "$GHCR_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
-      - name: Compile native AMD64 images without rerunning tests and capture immutable digests
+      - name: Compile one native AMD64 image without rerunning tests and capture its digest
         env:
           DEPLOYMENT_ENVIRONMENT: ${{ inputs.environment }}
+          IMAGE_SERVICE: ${{ matrix.service }}
         run: |
           python3 scripts/cd/build_images.py --repository "$GITHUB_REPOSITORY" \
             --environment "$DEPLOYMENT_ENVIRONMENT" --source-sha "$GITHUB_SHA" \
-            --run-id "${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+            --run-id "$GITHUB_RUN_ID" --run-attempt "$GITHUB_RUN_ATTEMPT" --service "$IMAGE_SERVICE"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: candidate-image-${{ matrix.service }}
+          path: .image/image.json
+          include-hidden-files: true
+          if-no-files-found: error
+          overwrite: true
+          retention-days: 30
+
+  candidate-images:
+    needs: [authorize, build-image]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: candidate-image-*
+          path: .image-artifacts
+          merge-multiple: false
+      - name: Require every image from this workflow run, source revision and environment
+        env:
+          DEPLOYMENT_ENVIRONMENT: ${{ inputs.environment }}
+        run: |
+          python3 scripts/cd/collect_images.py --repository "$GITHUB_REPOSITORY" \
+            --environment "$DEPLOYMENT_ENVIRONMENT" --source-sha "$GITHUB_SHA" --run-id "$GITHUB_RUN_ID"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: release-candidate
           path: .release/
           include-hidden-files: true
           if-no-files-found: error
+          overwrite: true
           retention-days: 30
 
   deploy:

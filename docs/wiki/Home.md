@@ -11,6 +11,7 @@ Choose a task and go straight to its instructions.
 | Run the project locally | [[Development and operations|Technical-Development]] |
 | Prepare an Ubuntu server with Coolify and Tailscale | [[Coolify server setup|Coolify-Server-Setup]] |
 | Configure and manually deploy through GitHub Actions | [[Manual deployment|Manual-Deployment]] |
+| Prepare fixture accounts and publish sample content after deployment | [[Prepopulate setup|Manual-Deployment#optional-npm-prepopulate]] |
 | Understand services and data ownership | [[Architecture|Technical-Architecture]] |
 
 **Deutsch:** [[Lesen|User-Guide-de]] · [[Konto|Account-Guide-de]] · [[Redaktion|Editorial-Guide-de]] · [[Administration|Admin-Guide-de]]

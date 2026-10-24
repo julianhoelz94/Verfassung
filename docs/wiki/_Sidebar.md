@@ -22,4 +22,5 @@
 - [[Architecture|Technical-Architecture]]
 - [[Coolify server setup|Coolify-Server-Setup]]
 - [[Manual deployment|Manual-Deployment]]
+- [[Prepopulate setup|Manual-Deployment#optional-npm-prepopulate]]
 - [[Rollout verification (pending)|Deployment-Information]]

@@ -4,6 +4,8 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 COPY . .
+ARG NEXT_PUBLIC_BASE_URL=http://localhost
+ENV NEXT_PUBLIC_BASE_URL=$NEXT_PUBLIC_BASE_URL
 # `public/` is empty in git; make sure it exists so the runtime COPY below never fails.
 RUN mkdir -p public && npm run build && rm -rf .next/cache && npm prune --omit=dev
 

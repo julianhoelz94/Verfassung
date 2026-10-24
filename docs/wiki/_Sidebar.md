@@ -20,4 +20,6 @@
 
 - [[Local development|Technical-Development]]
 - [[Architecture|Technical-Architecture]]
-- [[Deployment (pending)|Deployment-Information]]
+- [[Coolify server setup|Coolify-Server-Setup]]
+- [[Manual deployment|Manual-Deployment]]
+- [[Rollout verification (pending)|Deployment-Information]]

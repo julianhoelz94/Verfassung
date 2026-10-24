@@ -1,5 +1,5 @@
 import { fixtureVersion, publishFixture } from './prepopulate-import.mjs';
-import { createHmac } from 'node:crypto';
+import { authenticateFixtures, prepopulateTarget } from './prepopulate-access.mjs';
 import { readFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -7,10 +7,7 @@ import { fileURLToPath } from 'node:url';
 const fixtureDir = join(dirname(fileURLToPath(import.meta.url)), 'generated');
 const manifest = JSON.parse(readFileSync(join(fixtureDir, 'manifest.json'), 'utf8'));
 const verifyOnly = process.argv.includes('--verify-only');
-const baseUrl = new URL(process.env.PREPOPULATE_BASE_URL ?? 'http://127.0.0.1');
-if (!['127.0.0.1', 'localhost', '::1'].includes(baseUrl.hostname) || process.env.PREPOPULATE_TEST_STACK !== 'true') {
-  throw new Error('prepopulate requires PREPOPULATE_TEST_STACK=true and an explicit localhost test stack');
-}
+const baseUrl = prepopulateTarget(process.env);
 const endpoint = (path) => new URL(`/api/${path}`, baseUrl).toString();
 const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 let token;
@@ -31,52 +28,8 @@ async function api(method, path, body, authenticated = method === 'GET' && Boole
   return value;
 }
 
-function totp(secret) {
-  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
-  let bits = 0;
-  let value = 0;
-  const bytes = [];
-  for (const char of secret.toUpperCase().replace(/=|\s/g, '')) {
-    const digit = alphabet.indexOf(char);
-    if (digit < 0) throw new Error('Invalid TOTP secret');
-    value = (value << 5) | digit;
-    bits += 5;
-    if (bits >= 8) { bytes.push((value >> (bits - 8)) & 255); bits -= 8; }
-  }
-  const counter = Buffer.alloc(8);
-  counter.writeBigUInt64BE(BigInt(Math.floor(Date.now() / 30000)));
-  const digest = createHmac('sha1', Buffer.from(bytes)).update(counter).digest();
-  const offset = digest[19] & 15;
-  return String((digest.readUInt32BE(offset) & 0x7fffffff) % 1000000).padStart(6, '0');
-}
-
 async function authenticate() {
-  const email = process.env.PREPOPULATE_ADMIN_EMAIL ?? process.env.CI_ADMIN_EMAIL ?? process.env.LOCAL_ADMIN_EMAIL;
-  const password = process.env.PREPOPULATE_ADMIN_PASSWORD ?? process.env.CI_ADMIN_PASSWORD ?? process.env.LOCAL_ADMIN_PASSWORD;
-  const secret = process.env.PREPOPULATE_TOTP_SECRET ?? process.env.IDENTITY_SEED_TOTP_SECRET ?? (process.env.LOCAL_ADMIN_EMAIL ? 'CAATLASMFASEED22' : undefined);
-  if (!email || !password) throw new Error('Set PREPOPULATE_ADMIN_EMAIL/PASSWORD, CI_ADMIN_EMAIL/PASSWORD, or LOCAL_ADMIN_EMAIL/PASSWORD');
-  let login = await api('POST', 'identity/login', { email, password });
-  if (login.mfaRequired) {
-    if (!secret) throw new Error('Set PREPOPULATE_TOTP_SECRET for MFA');
-    login = await api('POST', 'identity/login/mfa', { challengeToken: login.challengeToken, code: totp(secret) });
-  }
-  if (!login.token) throw new Error('Admin login returned no session token');
-  token = login.token;
-  const reviewer = await api('POST', 'identity/login', {
-    email: process.env.CI_REVIEWER_EMAIL ?? process.env.LOCAL_REVIEWER_EMAIL ?? (process.env.CI_ADMIN_EMAIL ? 'ci-reviewer@example.local' : 'local-reviewer@example.local'),
-    password: process.env.CI_REVIEWER_PASSWORD ?? process.env.LOCAL_REVIEWER_PASSWORD ?? password,
-  });
-  if (!reviewer.token) throw new Error('Reviewer login returned no session token');
-  reviewerToken = reviewer.token;
-  const publisher = await api('POST', 'identity/login', {
-    email: process.env.CI_PUBLISHER_EMAIL ?? process.env.LOCAL_PUBLISHER_EMAIL ?? (process.env.CI_ADMIN_EMAIL ? 'ci-publisher@example.local' : 'local-publisher@example.local'),
-    password: process.env.CI_PUBLISHER_PASSWORD ?? process.env.LOCAL_PUBLISHER_PASSWORD ?? password,
-  });
-  const publisherSession = publisher.mfaRequired
-    ? await api('POST', 'identity/login/mfa', { challengeToken: publisher.challengeToken, code: totp(secret) })
-    : publisher;
-  if (!publisherSession.token) throw new Error('Publisher login returned no session token');
-  publisherToken = publisherSession.token;
+  ({ token, reviewerToken, publisherToken } = await authenticateFixtures(api, process.env));
 }
 
 async function waitForStack() {
@@ -320,6 +273,10 @@ async function verifyTotals(ids) {
 }
 
 await waitForStack();
+if (process.env.PREPOPULATE_DEPLOYMENT_ENVIRONMENT) {
+  const setup = await api('GET', 'identity/setup/status');
+  if (setup.completed !== true) throw new Error('Deployment succeeded. Complete the site setup wizard and create fixture accounts before running prepopulate.');
+}
 await authenticate();
 const ids = { constitutions: {}, versions: {}, amendments: {} };
 await ensureVersions(ids);

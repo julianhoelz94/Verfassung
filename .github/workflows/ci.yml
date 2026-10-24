@@ -25,6 +25,12 @@ jobs:
         run: |
           bash -n manageLocalStack.sh
           python3 scripts/test_local_stack.py
+      - name: Check manual deployment safeguards and runtime definition
+        run: |
+          python3 -m venv "$RUNNER_TEMP/cd-checks"
+          "$RUNNER_TEMP/cd-checks/bin/python" -m pip install PyYAML==6.0.2
+          "$RUNNER_TEMP/cd-checks/bin/python" -m unittest discover -s scripts/cd -p 'test_*.py'
+          "$RUNNER_TEMP/cd-checks/bin/python" scripts/cd/render_compose.py --check
       - id: list
         name: List microservices
         run: |

@@ -1,4 +1,10 @@
 import { contentBaseUrl, ingestionBaseUrl, readJson, sendJson, type OrderedNode } from './api';
+import { fetchWithTimeout } from './fetch-with-timeout';
+
+export type ImportAction = 'confirm-outline' | 'prepare' | 'approve' | 'reject' | 'publish';
+export class ImportTransitionError extends Error {
+  constructor(readonly code: string) { super(code); }
+}
 
 export type ImportJobError = {
   code: string;
@@ -50,8 +56,23 @@ export function getImportPayload(jobId: string, authorization: string): Promise<
   return readJson<Record<string, unknown>>(`${ingestionBaseUrl()}/import-jobs/${encodeURIComponent(jobId)}/payload`, 'ingestion', authorization);
 }
 
-export function transitionImportJob(jobId: string, action: 'confirm-outline' | 'prepare' | 'approve' | 'reject' | 'publish', authorization: string, reason?: string): Promise<ImportJob> {
-  return sendJson<ImportJob>(`${ingestionBaseUrl()}/import-jobs/${encodeURIComponent(jobId)}/${action}`, 'ingestion', 'POST', reason ? { reason } : {}, authorization);
+export async function transitionImportJob(jobId: string, action: ImportAction, authorization: string, reason?: string): Promise<ImportJob> {
+  const response = await fetchWithTimeout(`${ingestionBaseUrl()}/import-jobs/${encodeURIComponent(jobId)}/${action}`, {
+    method: 'POST', cache: 'no-store', headers: { 'Content-Type': 'application/json', Authorization: authorization },
+    body: JSON.stringify(reason ? { reason } : {}),
+  }).catch(() => { throw new ImportTransitionError('unavailable'); });
+  if (!response.ok) {
+    const raw = await response.json().catch(() => null);
+    const problem = raw && typeof raw === 'object' ? raw : {};
+    const known = ['publication_not_configured', 'publication_credentials_invalid', 'approved_snapshot_changed', 'publication_conflict', 'publication_unavailable'];
+    const code = known.includes(problem.code) ? problem.code
+      : response.status === 401 ? 'session_expired'
+      : response.status === 403 && problem.error === 'Fresh authenticator confirmation required' ? 'mfa'
+      : response.status === 403 ? 'forbidden'
+      : response.status === 409 ? 'conflict' : 'unavailable';
+    throw new ImportTransitionError(code);
+  }
+  return response.json();
 }
 
 export type ImportReviewDecision = { id: string; decision: string; reason: string; decidedBy: string; decidedAt: string };

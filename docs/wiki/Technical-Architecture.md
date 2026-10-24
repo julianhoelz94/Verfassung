@@ -53,6 +53,8 @@ The edge evaluates proxy source-address and forwarded-scheme guards before routi
 - **Publish:** an Editor session is saved, reviewed, and approved; a publisher with fresh MFA creates a successor version. Content and Catalog publish the new snapshot, and Search is asked to reindex. The former snapshot remains immutable.
 - **Import:** Ingestion stages proposed content. Imports join the editor review and publication queues. Review and publication are explicit separate actions; the same account may perform them with the required roles and fresh publication MFA. No upload by itself publishes content.
 
+Production deployments provision three independent, deployment-managed ingestion credentials after the real bootstrap administrator exists, without enabling demo seeding. Identity stores their hashes with the single scopes `ingestion:publish`, `audit:append`, and `search:reindex`. Manual CD supplies matching values to Identity/Ingestion and rotates them on deployment; restart with unchanged values renews their 90-day lifetime. Missing publication configuration is rejected before claiming the approved job. Safe publication error codes distinguish credential failures, changed approved content and dependency failures; raw downstream response bodies never reach the browser. Existing snapshot pins, role checks, MFA and reconciliation remain mandatory.
+
 Version history has two axes: legal changes and editorial corrections. The legal identity and its source revision must be kept separate; see [ADR 0005](https://github.com/julianhoelz94/Verfassung/blob/main/docs/adr/0005-two-axis-versions.md) and the [design](https://github.com/julianhoelz94/Verfassung/blob/main/docs/design/two-axis-versions.md).
 
 ## API addresses

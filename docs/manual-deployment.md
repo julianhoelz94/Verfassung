@@ -28,7 +28,7 @@ The Ubuntu host is `coolify`, running **AMD64**, with 8 vCPUs, 16 GB RAM and 320
 
 1. In one Coolify project, create environments named exactly `test` and `prod` and a separate Git-based **Docker Compose** application in each. Point each at `https://github.com/julianhoelz94/Verfassung`, branch `main`, Compose path `/docker-compose.coolify.yml`. A public repository does not need a source deploy key.
 2. Disable automatic deployments, preview deployments and incoming deployment webhooks. Do not enable raw Compose mode or preserve the source checkout. Do not select the development `docker-compose.yml`.
-3. Load the Compose definition. Assign the environment's HTTPS domain **only to `edge-proxy` on internal port 80**, for example `https://verfassungen.julianhoelz.de:80` for production. Leave domains on other services empty. Coolify owns TLS and routes to Caddy; Caddy retains API authorization and routing.
+3. Load the Compose definition. Assign the environment's HTTPS domain **only to `edge-proxy` on internal port 80**, following [HTTPS with Let's Encrypt](#https-with-lets-encrypt). Leave domains on other services empty. Coolify owns TLS and routes to Caddy; Caddy retains API authorization and routing.
 4. Create the persistent application environment values listed below. Use separate passwords, encryption keys and credentials in test and production. CD supplies the `ATLAS_IMAGE_*`, public-origin and transport values when a release is selected. Before the first run, ensure both applications have distinct UUIDs and belong to the intended environments.
 5. Ensure Coolify's host management user can pull the GHCR images. New packages can be private even when their source repository is public. For private packages, use a classic PAT with `read:packages` for the host's registry login as described in server-guide step 10. CD publishes with its job's `GITHUB_TOKEN`; no publish PAT is needed.
 
@@ -57,6 +57,82 @@ python3 -m venv /tmp/atlas-cd-tools
 ```
 
 Normal CI checks this generated file for drift.
+
+## HTTPS with Let's Encrypt
+
+Configure this before the first manual deployment; verify the issued certificates after that deployment. The public TLS endpoint is Coolify's integrated **Traefik** proxy on `coolify`. It obtains and renews Let's Encrypt certificates. The application Caddy container receives internal HTTP using `TLS_MODE=external-proxy`. This setup needs no Certbot installation, certificate upload, DNS API token or extra GitHub SSL secret. [Coolify proxy overview](https://coolify.io/docs/core/networking/proxy/traefik/overview)
+
+### 1. Point both public domains at the server
+
+Create these DNS records at your DNS provider:
+
+| Type | Hostname | Value |
+| --- | --- | --- |
+| A | `tst.verfassungen.julianhoelz.de` | Server's public IPv4 address |
+| A | `verfassungen.julianhoelz.de` | The same public IPv4 address |
+
+Use public addresses here. Add AAAA records only when IPv6 routes to this same proxy and the IPv6 firewall permits the same traffic. If using Cloudflare, set these records to **DNS only** for this direct HTTP-01 setup. Wait for DNS propagation before attempting issuance. [Coolify certificate troubleshooting](https://coolify.io/docs/troubleshoot/dns-and-domains/lets-encrypt-not-working)
+
+From your workstation, check the answers:
+
+```bash
+for domain in tst.verfassungen.julianhoelz.de verfassungen.julianhoelz.de; do
+  dig +short "$domain" A
+  dig +short "$domain" AAAA
+done
+```
+
+### 2. Keep the default ACME proxy configuration
+
+Open **Servers → coolify → Proxy → Configuration**. Confirm the selected proxy is **Traefik** and it is running. Its default `letsencrypt` resolver uses the HTTP-01 challenge; the existing configuration should include these flags:
+
+```text
+--certificatesresolvers.letsencrypt.acme.httpchallenge=true
+--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=http
+--certificatesresolvers.letsencrypt.acme.storage=/traefik/acme.json
+```
+
+Keep the generated configuration; no custom resolver is needed. Coolify manages its public HTTP/HTTPS listeners. [Traefik configuration](https://coolify.io/docs/core/networking/proxy/traefik/overview)
+
+Allow inbound **TCP 80 and 443** through the provider firewall and any host firewall, on each advertised IP version. Port 80 must remain reachable for issuance and future HTTP-01 renewal, including `/.well-known/acme-challenge/`. Let Coolify's proxy handle that route. Keep SSH and Coolify management ports private through Tailscale. [Let's Encrypt HTTP-01](https://letsencrypt.org/docs/challenge-types/#http-01-challenge)
+
+### 3. Configure each application's HTTPS route
+
+For each application's **Domains → Add domain** form, use:
+
+| Application environment | Protocol | Domain | Port | Service | Path |
+| --- | --- | --- | --- | --- | --- |
+| `test` | `https` | `tst.verfassungen.julianhoelz.de` | `80` | `edge-proxy` | empty |
+| `prod` | `https` | `verfassungen.julianhoelz.de` | `80` | `edge-proxy` | empty |
+
+Save each route. If your Coolify version uses one URL field, the equivalent values are `https://tst.verfassungen.julianhoelz.de:80` and `https://verfassungen.julianhoelz.de:80`. Here `80` selects the **container target port**; browsers use the normal HTTPS URL on public port **443**, without `:80`. Keep `PUBLIC_BASE_URL` in Coolify and GitHub at the canonical HTTPS origin without `:80`. [Coolify domain and target-port settings](https://coolify.io/docs/core/networking/domains#route-to-a-port-or-path)
+
+Keep labels managed by Coolify, the default `letsencrypt` certificate resolver and the HTTP-to-HTTPS redirect. Leave all other services' domain fields empty and keep `TLS_TRUSTED_PROXIES` set to the actual Coolify proxy network. The runtime Compose file supplies `TLS_MODE=external-proxy` and secure cookies. The private Coolify dashboard/API retains its Tailscale URL.
+
+Save the settings, then trigger **GitHub → Actions → Deploy → Run workflow** for the chosen environment. That manual rollout activates the route and certificate request. Configure the second environment in the same way; it receives a certificate covering its own hostname.
+
+### 4. Verify after deployment
+
+Open each deployed HTTPS URL in a browser and inspect its certificate: it must cover the requested hostname, chain to a trusted issuer and be within its validity period. From a workstation, run these checks for each environment you have deployed:
+
+```bash
+domain=tst.verfassungen.julianhoelz.de
+# For production instead: domain=verfassungen.julianhoelz.de
+curl --connect-timeout 10 --max-time 30 --fail --silent --show-error \
+  "https://$domain/api/identity/setup/status"
+curl --connect-timeout 10 --max-time 30 --silent --show-error \
+  --dump-header - --output /dev/null "http://$domain/"
+openssl s_client -connect "$domain:443" -servername "$domain" </dev/null 2>/dev/null \
+  | openssl x509 -noout -subject -issuer -dates
+```
+
+The HTTPS request must succeed with normal certificate verification; do not use `curl -k`. The HTTP response must redirect to the same hostname using `https://`. The OpenSSL command displays the certificate for inspection. CD also checks HTTPS setup status after Coolify reports a successful deployment.
+
+### 5. Renewal and troubleshooting
+
+Coolify's proxy renews certificates automatically; no GitHub schedule or renewal secret is needed. Keep DNS, public port 80 and proxy ACME storage available between deployments. Include `/data/coolify/proxy/` in your existing host backup so its ACME account/certificate state survives recovery. Inspect certificates under **Servers → coolify → Proxy → TLS Certificates**. [Coolify HTTPS and renewal](https://coolify.io/docs/core/networking/domains#configure-https-and-redirects), [certificate storage](https://coolify.io/docs/core/networking/proxy/traefik/tls-certificates)
+
+If a browser shows a self-signed/default certificate or issuance fails, inspect **Servers → coolify → Proxy → Logs** for ACME errors. Check the public A/AAAA answers, port 80 reachability, domain/service/target-port settings and any CDN proxy first. Resolve validation errors before retrying to avoid repeated issuance attempts and rate limits. ACME storage is shared by both environments; preserve it during troubleshooting. These instructions do not establish that a certificate has already been issued. [Coolify Let's Encrypt troubleshooting](https://coolify.io/docs/troubleshoot/dns-and-domains/lets-encrypt-not-working)
 
 ## GitHub environments and Tailscale identity
 

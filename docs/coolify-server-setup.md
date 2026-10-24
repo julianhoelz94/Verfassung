@@ -152,6 +152,7 @@ At your DNS provider, add an A record for the complete hostname:
 | Type | Hostname | Value |
 | --- | --- | --- |
 | A | `tst.verfassungen.julianhoelz.de` | Server's public IPv4 address |
+| A | `verfassungen.julianhoelz.de` | The same public IPv4 address |
 
 Some providers expect the name relative to your DNS zone. Add AAAA only if the server's IPv6 route and firewall work for the same application.
 
@@ -160,9 +161,15 @@ From your computer:
 ```bash
 dig +short tst.verfassungen.julianhoelz.de A
 dig +short tst.verfassungen.julianhoelz.de AAAA
+dig +short verfassungen.julianhoelz.de A
+dig +short verfassungen.julianhoelz.de AAAA
 ```
 
-Add the production DNS record for `verfassungen.julianhoelz.de` pointing to the same server as well. The application resources use their respective HTTPS domains; Coolify will manage its certificate. DNS alone does not create the application or certificate. [Coolify DNS](https://coolify.io/docs/core/networking/dns)
+The application resources use their respective HTTPS domains. DNS alone does not create the application or certificate. [Coolify DNS](https://coolify.io/docs/core/networking/dns)
+
+### 6.1. Prepare SSL/TLS with Let's Encrypt
+
+Follow the deployment guide's [HTTPS with Let's Encrypt](manual-deployment.md#https-with-lets-encrypt) section when creating the applications. It covers the default Traefik HTTP-01 resolver, each `edge-proxy` HTTPS domain with internal target port `80`, public certificate checks and automatic renewal. Keep public TCP ports **80 and 443** open; the dashboard and API remain private through Tailscale. No Certbot installation or additional GitHub SSL secret is needed. Certificates are requested when the application route is deployed, then verified after the first manual GitHub deployment.
 
 ## 7. Configure the ephemeral runner's Tailscale identity
 

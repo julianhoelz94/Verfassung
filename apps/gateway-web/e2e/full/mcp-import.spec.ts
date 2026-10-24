@@ -116,7 +116,7 @@ test('MCP waits while an administrator requests and confirms an exact setup revi
     await page.getByRole('button', { name: 'Save display settings' }).click();
     await expect.poll(async () => (await (await request.get(path, { headers: admin })).json()).revision).toBe(2);
     await page.reload();
-    await expect(page.locator('[data-preview-kind="article"]')).toContainText('Art. 1');
+    await expect(page.locator('[data-preview-kind="article"]:visible')).toContainText('Art. 1');
     await page.getByText('Request changes through your chat client', { exact: true }).click();
     await page.getByLabel('Requested changes', { exact: true }).fill('Add sentence units without changing the original German wording.');
     await page.getByRole('button', { name: 'Record requested changes' }).click();
@@ -135,7 +135,7 @@ test('MCP waits while an administrator requests and confirms an exact setup revi
     await expect(page.getByRole('heading', { name: 'Revised proposal ready for review' })).toBeVisible();
     await expect(page.getByText('Hierarchy or editing rules changed.')).toBeVisible();
     await expect(page.locator('[data-preview-kind="sentence"]')).toHaveCount(2);
-    await expect(page.locator('[data-preview-kind="article"]')).toContainText('Art. 1');
+    await expect(page.locator('[data-preview-kind="article"]:visible')).toContainText('Art. 1');
     await page.getByText('Display settings', { exact: true }).click();
     await page.getByLabel('Displayed unit name', { exact: true }).first().fill('Artikel');
     await page.getByRole('button', { name: 'Confirm structure and enable full upload' }).click();

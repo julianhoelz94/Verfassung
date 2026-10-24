@@ -1852,6 +1852,7 @@ button.article-toggle[aria-expanded='false']::after {
 .outline-config-layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.5rem; align-items: start; }
 .outline-config-layout[hidden], .form-row[hidden] { display: none; }
 .outline-config-layout > *, .outline-config-layout fieldset { min-width: 0; }
+.outline-layer-list { list-style: none; margin: 0; padding: 0; }
 .outline-config-layout input:not([type="checkbox"]), .outline-config-layout select { max-width: 100%; width: 100%; }
 .outline-live-preview { position: static; }
 .outline-preview-unit { cursor: help; border-radius: .15rem; }

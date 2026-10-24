@@ -213,7 +213,7 @@ export function OutlineEditor({
           <p>{layer.root ? <><T value={ui.outlineDynamic.topLevelKind} /> · </> : null}{layer.allowedChildKinds?.length ? <T value={layer.allowTextAlongsideChildren ? ui.outlineDynamic.parentTextAllowed : ui.outlineDynamic.textInChildren} /> : <><T value={ui.outlineDynamic.textLeafWith} /> <T value={layer.segmentation === 'sentence' ? ui.outlineDynamic.sentenceAssistance : ui.outlineDynamic.plainEditing} /></>}</p>
           </section>;
         })}
-      </Stack> : <Stack as="ol">
+      </Stack> : <Stack as="ol" className="outline-layer-list" role="list">
         {layers.map((layer, index) => (
           <Stack as="li" key={`${layer.kindCode}-${index}`} className={["card", surfaceStyles.card].join(' ')}>
             <p>

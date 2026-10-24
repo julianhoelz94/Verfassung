@@ -35,7 +35,8 @@ export function reviewFixtures(germany) {
   const corrections = [REVIEW_CORRECTION, REVIEW_CURRENT].map((id, index) => ({ ...legal, id, legalVersionId: legal.id, currentVersionId: REVIEW_CURRENT, predecessorVersionId: index ? REVIEW_CORRECTION : legal.id, versionLabel: `2022-${index + 1}`, hopKind: 'editorial_correction', listing: 'staff', latestPublished: index === 1, publicationComment: index ? 'Corrected spacing in the transcription.' : 'Corrected a transcription typo.' }));
   const revision = { id: '01900000-0000-4000-8000-000000000805', documentId: REVIEW_DOCUMENT, revision: 1, title: 'Constitution source document', description: 'Fictional source for UI verification.', sourceUrl: 'https://example.org/source', fileName: null, contentType: null, createdAt: '2026-01-01T00:00:00Z', createdBy: '01900000-0000-4000-8000-000000000410' };
   const document = { id: REVIEW_DOCUMENT, currentRevision: 1, status: 'active', createdAt: revision.createdAt, revision };
-  let proposal = { id: REVIEW_PROPOSAL, ownerId: revision.createdBy, status: 'proposed', constitutionId: null, settingsRevisionId: null, confirmedBy: null, payload: { isoCode: 'DE', countryName: 'Germany', constitutionSlug: 'review-charter', constitutionTitle: 'UI review charter', languageCode: 'en', sourceUrl: 'https://example.org/source', outline: constitution.contentOutline, sampleRoots: [] } };
+  let proposal = { id: REVIEW_PROPOSAL, ownerId: revision.createdBy, status: 'proposed', revision: 1, previousPayload: null, requestedChanges: null, changesRequested: false, constitutionId: null, settingsRevisionId: null, confirmedBy: null, payload: { isoCode: 'DE', countryName: 'Germany', constitutionSlug: 'review-charter', constitutionTitle: 'UI review charter', languageCode: 'en', sourceUrl: 'https://example.org/source', outline: { kinds: [{ kindCode: 'article', displayLabel: 'Article', root: true, allowedChildKinds: ['sentence'], showKind: true, showLabel: true }, { kindCode: 'sentence', displayLabel: 'Sentence', root: false, allowedChildKinds: [], presentation: 'concatenated', showLabel: false }] }, sampleRoots: [{ kind: 'article', label: '1', content: [{ type: 'child', node: { kind: 'sentence', content: [{ type: 'text', text: 'All people are equal.' }] } }] }] } };
+  let displayOverrides = {};
   const job = { id: REVIEW_JOB, status: 'pending_review', versionId: null, isoCode: 'DE', countryName: 'Germany', constitutionTitle: 'UI review charter', versionLabel: '2026', errors: [] };
   const jurisdiction = { id: germany.id, slug: 'de', name: 'Germany', kind: 'country', code: 'DE', historical: false, parentId: null, existedFrom: null, existedUntil: null };
   const archiveRoot = { logicalId: '01900000-0000-4000-8000-000000000852', revisionId: '01900000-0000-4000-8000-000000000853', occurrenceId: '01900000-0000-4000-8000-000000000854', kind: 'article', label: '1', title: 'Rights', content: [
@@ -86,7 +87,29 @@ export function reviewFixtures(germany) {
     }
     if (method === 'PUT' && pathname === '/api/identity/setup') { setup.preferences = await readBody(req); languages.enabled = setup.preferences.enabledLanguages; languages.defaultLanguage = setup.preferences.defaultLanguage; return setup; }
     if (method === 'PUT' && pathname === '/api/identity/admin/settings') { const { smtpPassword, ...values } = await readBody(req); settings = { ...settings, ...values, smtpPasswordSet: Boolean(smtpPassword) || settings.smtpPasswordSet }; if (managedRegistration) settings.selfRegistrationEnabled = true; if (settings.mailEnabled) setup.preferences.mailDeferred = false; return settings; }
-    if (method === 'POST' && pathname === '/api/ingestion/import-setup-proposals') { proposal = { ...proposal, payload: await readBody(req) }; return proposal; }
+    if (method === 'POST' && pathname === '/api/ingestion/import-setup-proposals') { proposal = { ...proposal, payload: await readBody(req), revision: 1, previousPayload: null, status: 'proposed', requestedChanges: null, changesRequested: false }; displayOverrides = {}; return proposal; }
+    const proposalPath = `/api/ingestion/import-setup-proposals/${REVIEW_PROPOSAL}`;
+    if ((method === 'PUT' && pathname === proposalPath) || (method === 'POST' && pathname.startsWith(`${proposalPath}/`))) {
+      const expected = Number(String(req.headers['if-match']).replaceAll('"', ''));
+      if (expected !== proposal.revision || proposal.status !== 'proposed') return Response.json({ error: 'Proposal changed' }, { status: 409 });
+      const body = await readBody(req);
+      if (method === 'PUT') {
+        proposal.previousPayload = structuredClone(proposal.payload);
+        proposal.payload = { ...body, outline: { kinds: body.outline.kinds.map(kind => ({ ...kind, ...displayOverrides[kind.kindCode] })) } };
+        proposal.changesRequested = false;
+        proposal.revision++;
+      } else if (pathname.endsWith('/display')) {
+        for (const kind of body.kinds) displayOverrides[kind.kindCode] = kind;
+        proposal.payload.outline.kinds = proposal.payload.outline.kinds.map(kind => ({ ...kind, ...displayOverrides[kind.kindCode] }));
+        proposal.revision++;
+      } else if (pathname.endsWith('/request-changes')) {
+        proposal.requestedChanges = body.message; proposal.changesRequested = true; proposal.revision++;
+      } else if (pathname.endsWith('/confirm')) {
+        if (proposal.changesRequested) return Response.json({ error: 'Changes requested' }, { status: 409 });
+        proposal.status = 'confirmed'; proposal.constitutionId = constitution.id; proposal.settingsRevisionId = '01900000-0000-4000-8000-000000000901'; proposal.confirmedBy = revision.createdBy;
+      } else if (pathname.endsWith('/withdraw')) proposal.status = 'withdrawn';
+      return proposal;
+    }
     return undefined;
   } };
 }

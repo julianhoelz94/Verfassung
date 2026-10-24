@@ -74,7 +74,7 @@ test('offline archive package preserves evidence through review, publication and
     const proposal = await mcp(request, importer, 'propose_constitution_setup', { proposal: {
       jurisdictionId: jurisdiction.id, constitutionSlug: 'archive', constitutionTitle: 'Synthetic regional constitution', languageCode: 'de', sourceUrl: 'https://verfassungen.de/annotated.htm', outline, sampleRoots: roots,
     } });
-    const setup = await json(await request.post(`/api/ingestion/import-setup-proposals/${proposal.proposalId}/confirm`, { headers: admin }));
+    const setup = await json(await request.post(`/api/ingestion/import-setup-proposals/${proposal.proposalId}/confirm`, { headers: { ...admin, 'If-Match': String(proposal.revision) } }));
     const captured = manifest.sources.map((source: { file: string; sha256: string; encoding: string }) => {
       const bytes = readFileSync(join(directory, source.file));
       expect(sha(bytes)).toBe(source.sha256);

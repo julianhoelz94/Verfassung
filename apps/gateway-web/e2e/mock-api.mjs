@@ -388,6 +388,7 @@ const server = createServer(async (req, res) => {
   }
   if (uiReview) {
     const response = await uiReview.response(req, method, pathname, readBody);
+    if (response instanceof Response) { json(res, response.status, await response.json()); return; }
     if (response !== undefined) { json(res, 200, response); return; }
   }
   if (method === 'POST' && pathname === '/__editor_sessions') {

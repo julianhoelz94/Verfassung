@@ -90,3 +90,11 @@ The editorial path is **open → save → submit for review → approve → publ
 The silent clips use fictional content and separate editorial roles. The written steps above describe the same workflow.
 
 [[Documentation home|Home]] · [[Deutsch|Editorial-Guide-de]]
+
+### Review a new constitution proposed by a chat client
+
+The private proposal page shows its source, read-only hierarchy, actual representative sample and display settings. Ask the connected chat client to change the hierarchy; manual constitution creation still has full hierarchy controls. You can change names such as **Art.** versus **Artikel** and preview display changes without changing internal structure codes. Saved display preferences carry forward when the chat revises matching kinds.
+
+Use **Request changes through your chat client** to record feedback, then ask the client to read the proposal again through MCP. The site does not send a message automatically. A revised proposal shows what changed and retains the previous sample for comparison. Load the latest proposal after the chat updates it; stale saves and confirmation are rejected. Confirmation is blocked while a requested revision is outstanding.
+
+Choose **Confirm structure and enable full upload** after reviewing the current sample. The chat client must wait for this website confirmation before uploading the full text. Then continue in the chat; it retrieves the confirmed settings itself. This confirms the setup only. The uploaded text still requires review, approval and explicit publication.

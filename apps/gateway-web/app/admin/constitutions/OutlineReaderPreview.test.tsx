@@ -68,6 +68,24 @@ describe('annotated reader preview', () => {
     expect(host.querySelector('[role="tooltip"]')).toBeNull();
   });
 
+  it('distinguishes unnumbered units and old versus current samples for assistive technology', async () => {
+    const settings = outline();
+    const roots = outlineExample(settings, value => message('en', value));
+    function unnumber(node: OrderedNode) {
+      node.label = null;
+      node.content.forEach(entry => { if (entry.node) unnumber(entry.node); });
+    }
+    roots.forEach(unnumber);
+    await act(async () => root.render(<TranslationProvider locale="en">
+      <OutlineReaderPreview roots={roots} outline={settings} label="Previous proposal" />
+      <OutlineReaderPreview roots={roots} outline={settings} label="Current proposal" />
+    </TranslationProvider>));
+    const labels = [...host.querySelectorAll('[data-preview-kind]')].map(unit => unit.getAttribute('aria-label'));
+    expect(new Set(labels).size).toBe(labels.length);
+    const result = await axeRun(host, { rules: { 'color-contrast': { enabled: false } } });
+    expect(result.violations.map(item => item.id)).toEqual([]);
+  });
+
   it('supports keyboard focus and tapping, and keeps nested annotations separate', async () => {
     await mount();
     const article = host.querySelector<HTMLElement>('[data-preview-kind="article"]')!;

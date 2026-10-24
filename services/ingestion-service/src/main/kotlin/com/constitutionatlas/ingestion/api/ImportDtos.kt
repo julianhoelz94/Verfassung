@@ -119,7 +119,25 @@ data class SetupProposalDto(
     val constitutionId: UUID?,
     val settingsRevisionId: UUID?,
     val confirmedBy: UUID?,
+    val revision: Long = 1,
+    val previousPayload: SetupProposalRequest? = null,
+    val requestedChanges: String? = null,
+    val changesRequested: Boolean = false,
 )
+
+data class SetupFeedbackRequest(val message: String) : StrictOrderedWrite()
+
+data class SetupDisplayKind(
+    val kindCode: String,
+    val displayLabel: String,
+    val presentation: String = "section",
+    val showKind: Boolean = false,
+    val showLabel: Boolean = true,
+    val showTitle: Boolean = false,
+    val labelPlacement: String = "before_title",
+) : StrictOrderedWrite()
+
+data class SetupDisplayRequest(val kinds: List<SetupDisplayKind>) : StrictOrderedWrite()
 
 data class BeginUploadRequest(val idempotencyKey: String, val checksumSha256: String, val totalBytes: Int)
 data class UploadChunkRequest(val dataBase64: String, val checksumSha256: String)

@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestHeader
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
+import org.springframework.web.server.ResponseStatusException
 import java.util.UUID
 
 @RestController
@@ -29,20 +30,35 @@ class SetupProposalController(private val service: SetupProposalService, private
     }
 
     @PutMapping("/import-setup-proposals/{id}")
-    fun revise(@RequestHeader(value = "Authorization", required = false) authorization: String?, @PathVariable id: UUID, @RequestBody request: SetupProposalRequest): SetupProposalDto {
+    fun revise(@RequestHeader(value = "Authorization", required = false) authorization: String?, @PathVariable id: UUID, @RequestBody request: SetupProposalRequest, @RequestHeader(value = "If-Match", required = false) revision: String?): SetupProposalDto {
         val actor = access.requireImporter(authorization)
-        return service.revise(authorization, id, actor.id, "admin" in actor.roles, request)
+        return service.revise(authorization, id, actor.id, "admin" in actor.roles, request, expected(revision))
+    }
+
+    @PostMapping("/import-setup-proposals/{id}/display")
+    fun display(@RequestHeader(value = "Authorization", required = false) authorization: String?, @PathVariable id: UUID, @RequestBody request: SetupDisplayRequest, @RequestHeader(value = "If-Match", required = false) revision: String?): SetupProposalDto {
+        val actor = access.requireEditor(authorization)
+        return service.display(id, actor.id, "admin" in actor.roles, request, expected(revision))
+    }
+
+    @PostMapping("/import-setup-proposals/{id}/request-changes")
+    fun requestChanges(@RequestHeader(value = "Authorization", required = false) authorization: String?, @PathVariable id: UUID, @RequestBody request: SetupFeedbackRequest, @RequestHeader(value = "If-Match", required = false) revision: String?): SetupProposalDto {
+        val actor = access.requireEditor(authorization)
+        return service.requestChanges(id, actor.id, "admin" in actor.roles, request.message, expected(revision))
     }
 
     @PostMapping("/import-setup-proposals/{id}/confirm")
-    fun confirm(@RequestHeader(value = "Authorization", required = false) authorization: String?, @PathVariable id: UUID): SetupProposalDto {
+    fun confirm(@RequestHeader(value = "Authorization", required = false) authorization: String?, @PathVariable id: UUID, @RequestHeader(value = "If-Match", required = false) revision: String?): SetupProposalDto {
         val actor = access.requireEditor(authorization)
-        return service.confirm(authorization, id, actor.id, "admin" in actor.roles)
+        return service.confirm(authorization, id, actor.id, "admin" in actor.roles, expected(revision))
     }
 
     @PostMapping("/import-setup-proposals/{id}/withdraw")
-    fun withdraw(@RequestHeader(value = "Authorization", required = false) authorization: String?, @PathVariable id: UUID): SetupProposalDto {
+    fun withdraw(@RequestHeader(value = "Authorization", required = false) authorization: String?, @PathVariable id: UUID, @RequestHeader(value = "If-Match", required = false) revision: String?): SetupProposalDto {
         val actor = access.requireImporter(authorization)
-        return service.withdraw(id, actor.id, "admin" in actor.roles)
+        return service.withdraw(id, actor.id, "admin" in actor.roles, expected(revision))
     }
+
+    private fun expected(value: String?): Long = value?.removeSurrounding("\"")?.toLongOrNull()?.takeIf { it > 0 }
+        ?: throw ResponseStatusException(HttpStatus.PRECONDITION_REQUIRED, "Read the proposal and supply its revision in If-Match")
 }

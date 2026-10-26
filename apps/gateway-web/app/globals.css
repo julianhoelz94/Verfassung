@@ -1563,8 +1563,7 @@ button.article-toggle[aria-expanded='false']::after {
 }
 
 .alert {
-  display: flex;
-  gap: var(--space-2);
+  display: block;
   padding: var(--space-3) var(--space-4);
   border-radius: var(--radius-md);
   border: 1px solid transparent;
@@ -1853,6 +1852,11 @@ button.article-toggle[aria-expanded='false']::after {
 .outline-config-layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.5rem; align-items: start; }
 .outline-config-layout[hidden], .form-row[hidden] { display: none; }
 .outline-config-layout > *, .outline-config-layout fieldset { min-width: 0; }
+.outline-layer-list { list-style: none; margin: 0; padding: 0; }
+.outline-submit-actions { justify-content: flex-end; border-top: 1px solid var(--color-line); padding-top: var(--space-4); }
+@media (max-width: 639px) {
+  .outline-submit-actions > .btn { width: 100%; }
+}
 .outline-config-layout input:not([type="checkbox"]), .outline-config-layout select { max-width: 100%; width: 100%; }
 .outline-live-preview { position: static; }
 .outline-preview-unit { cursor: help; border-radius: .15rem; }
@@ -1978,6 +1982,12 @@ form[aria-busy='true'] :where(button, .btn) { cursor: progress; }
 
 .settings-form fieldset { padding: 0; border: 0; }
 .settings-form legend { padding: 0; margin-bottom: var(--space-3); }
+.imprint-contact-fields > p { max-width: 72ch; color: var(--color-ink-2); }
+.imprint-contact-field { display: grid; grid-template-columns: minmax(10rem, 13rem) minmax(0, 1fr); align-items: center; gap: var(--space-2) var(--space-4); }
+.imprint-contact-field > input { width: 100%; }
+@media (max-width: 639px) {
+  .imprint-contact-field { grid-template-columns: minmax(0, 1fr); gap: var(--space-1); }
+}
 .section-nav { display: flex; flex-wrap: wrap; gap: var(--space-2); padding-bottom: var(--space-3); border-bottom: 1px solid var(--color-line); }
 .section-nav a { display: inline-flex; align-items: center; min-height: var(--control-min); padding: var(--space-2) var(--space-3); color: var(--color-ink-2); text-decoration: none; border-radius: var(--radius-sm); }
 .section-nav a:hover { background: var(--color-accent-soft); color: var(--color-accent-strong); }
@@ -1999,7 +2009,7 @@ form[aria-busy='true'] :where(button, .btn) { cursor: progress; }
 .task-choices { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-3); margin-bottom: var(--space-5); }
 .task-choices a { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-4); background: var(--color-surface); border: 1px solid var(--color-line-strong); border-radius: var(--radius-md); text-decoration: none; font-weight: 600; }
 .task-choices a[aria-current='page'] { border-color: var(--color-accent); background: var(--color-accent-soft); color: var(--color-accent-strong); }
-.task-number { color: var(--color-ink-3); font-size: var(--text-sm); }
+.task-number { flex: 0 0 1.5rem; color: var(--color-ink-3); font-size: var(--text-sm); white-space: nowrap; text-align: center; }
 .import-layout { display: grid; gap: var(--space-5); align-items: start; }
 .task-guidance { padding: var(--space-4) 0 var(--space-5); color: var(--color-ink-2); }
 .task-guidance h2 { font-size: var(--text-lg); color: var(--color-ink); }

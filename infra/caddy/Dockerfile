@@ -1,4 +1,4 @@
-FROM caddy:2.9
+FROM caddy:2.10
 RUN apk add --no-cache python3
 COPY Caddyfile /etc/caddy/Caddyfile
 COPY transport.py /usr/local/bin/atlas-transport.py

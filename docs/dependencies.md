@@ -5,7 +5,7 @@ Pinned versions we actually use. Upgrade one service (or the gateway) then CI, n
 | Area | Component | Version / pin | Where |
 | --- | --- | --- | --- |
 | JDK | Eclipse Temurin | 21 | Host, CI `setup-java`, Kotlin Dockerfiles (`eclipse-temurin:21-jre`) |
-| Gradle | Gradle | 9.7.1 | Repo wrapper (`gradle/wrapper`), CI `setup-gradle`, host `bootJar` for Kotlin images |
+| Gradle | Gradle | 9.8.2 | Repo wrapper (`gradle/wrapper`), CI `setup-gradle`, host `bootJar` for Kotlin images |
 | Lint | Spotless + ktlint | Spotless 6.25.0 / ktlint 1.3.1 | `gradle/service-conventions.gradle`, `./gradlew check` |
 | Logs | logstash-logback-encoder | 7.4 | JSON console logs + MDC `correlationId` |
 | Kotlin | `kotlin("jvm")` / Spring plugin | 1.9.24 | `services/*/build.gradle.kts` |
@@ -24,8 +24,8 @@ Pinned versions we actually use. Upgrade one service (or the gateway) then CI, n
 | Unit tests | Vitest / Vite | 4.1.12 / 7.3.7 | Gateway dev dependencies; Vite is pinned to the compatible supported major |
 | Browser tests | Playwright | 1.55.1 | Gateway package and matching `mcr.microsoft.com/playwright:v1.55.1-jammy` visual CI image |
 | CI | Ubuntu | 24.04 | All GitHub-hosted jobs; update after verifying the build tools and Playwright OS support |
-| Edge | Caddy | 2.9 | `infra/caddy/Dockerfile` |
-| CI | GitHub Actions | SHA-pinned `actions/*@v4`, `gradle/actions/setup-gradle@v4` | `.github/workflows/ci.yml` |
+| Edge | Caddy | 2.10 | `infra/caddy/Dockerfile` |
+| CI | GitHub Actions | SHA-pinned checkout v4, setup-java v6.1.0, setup-node v7.1.0, upload-artifact v7.0.2, setup-gradle v6.4.0 | `.github/workflows/ci.yml` |
 | Alerts | Dependabot | weekly | `.github/dependabot.yml` |
 
 Kotlin runtime libraries (Jackson, Actuator, Validation, JDBC, Testcontainers) follow the Spring Boot 3.5.16 BOM unless overridden.

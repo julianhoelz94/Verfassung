@@ -3,7 +3,7 @@ import com.constitutionatlas.editor.EditorServiceApplication
 import com.constitutionatlas.editor.api.ChangeRecordRequest
 import com.constitutionatlas.editor.client.AmendmentClient
 import com.constitutionatlas.editor.client.ArticleWritePayload
-import com.constitutionatlas.editor.client.AuditClient
+import com.constitutionatlas.editor.client.AuditDeliveryClient
 import com.constitutionatlas.editor.client.CatalogClient
 import com.constitutionatlas.editor.client.CatalogVersion
 import com.constitutionatlas.editor.client.ContentClient
@@ -52,13 +52,16 @@ class EditorApiTest {
     lateinit var outboxPublisher: OutboxPublisher
 
     @Autowired
+    lateinit var auditPublisher: com.constitutionatlas.editor.service.AuditOutboxPublisher
+
+    @Autowired
     lateinit var jdbcTemplate: JdbcTemplate
 
     @MockBean
     lateinit var identityClient: IdentityClient
 
     @MockBean
-    lateinit var auditClient: AuditClient
+    lateinit var auditDelivery: AuditDeliveryClient
 
     @MockBean
     lateinit var contentClient: ContentClient
@@ -80,7 +83,7 @@ class EditorApiTest {
 
     @BeforeEach
     fun resetStubs() {
-        Mockito.reset(identityClient, auditClient, contentClient, catalogClient, amendmentClient, searchIndexClient)
+        Mockito.reset(identityClient, auditDelivery, contentClient, catalogClient, amendmentClient, searchIndexClient)
         Mockito.`when`(identityClient.authenticate(null)).thenThrow(
             UnauthorizedException("Missing session"),
         )
@@ -224,7 +227,7 @@ class EditorApiTest {
             sessionId,
         )
         assertEquals(
-            listOf("amendment.review-refresh-requested", "search.reindex-requested", "version.published"),
+            listOf("amendment.review-refresh-requested") + List(5) { "audit.append-requested" } + listOf("search.reindex-requested", "version.published"),
             eventNames,
         )
         outboxPublisher.processDue()
@@ -451,12 +454,8 @@ class EditorApiTest {
         stub(reviewer)
         postCommand(sessionId, "approval", "approved")
         stub(publisher)
-        Mockito.doThrow(DownstreamException("audit denied")).`when`(auditClient).record(
-            Mockito.any(Actor::class.java) ?: publisher,
-            Mockito.anyString(),
-            Mockito.anyString(),
-            Mockito.any(UUID::class.java) ?: UUID(0, 0),
-            Mockito.anyMap(),
+        Mockito.doAnswer { throw DownstreamException("audit denied") }.`when`(auditDelivery).deliver(
+            Mockito.any(com.constitutionatlas.editor.repo.PendingAudit::class.java) ?: com.constitutionatlas.editor.repo.PendingAudit(UUID(0, 0), java.time.OffsetDateTime.now(), com.fasterxml.jackson.databind.ObjectMapper().createObjectNode()),
         )
         mockMvc.post("/edit-sessions/$sessionId/publish") {
             header("Authorization", TOKEN)
@@ -466,6 +465,13 @@ class EditorApiTest {
             status { isOk() }
             jsonPath("$.session.status") { value("published") }
         }
+        val queued = jdbcTemplate.queryForObject("SELECT id FROM outbox_events WHERE session_id = ?::uuid AND event_name = 'audit.append-requested' AND payload->>'action' = 'version_published'", UUID::class.java, sessionId)!!
+        repeat(10) { auditPublisher.processDue() }
+        check(jdbcTemplate.queryForObject("SELECT published_at IS NULL AND attempt_count = 1 FROM outbox_events WHERE id = ?", Boolean::class.java, queued) == true)
+        Mockito.reset(auditDelivery)
+        jdbcTemplate.update("UPDATE outbox_events SET next_attempt_at = clock_timestamp() WHERE id = ?", queued)
+        auditPublisher.processDue()
+        check(jdbcTemplate.queryForObject("SELECT published_at IS NOT NULL FROM outbox_events WHERE id = ?", Boolean::class.java, queued) == true)
         mockMvc.post("/edit-sessions/$sessionId/publish") {
             header("Authorization", TOKEN)
             contentType = MediaType.APPLICATION_JSON
@@ -667,7 +673,7 @@ class EditorApiTest {
             sessionId,
         )
         assertEquals(
-            listOf("amendment.link-requested", "amendment.recorded", "search.reindex-requested", "version.published"),
+            listOf("amendment.link-requested", "amendment.recorded") + List(5) { "audit.append-requested" } + listOf("search.reindex-requested", "version.published"),
             eventNames,
         )
     }
@@ -1053,6 +1059,7 @@ class EditorApiTest {
             registry.add("spring.datasource.username", postgres::getUsername)
             registry.add("spring.datasource.password", postgres::getPassword)
             registry.add("spring.task.scheduling.enabled") { "false" }
+            registry.add("editor.audit.poll-ms") { "3600000" }
         }
     }
 }

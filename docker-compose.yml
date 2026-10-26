@@ -266,8 +266,11 @@ services:
       - SPRING_PROFILES_ACTIVE=${PROFILE:-local-stack}
       - SERVER_FORWARD_HEADERS_STRATEGY=framework
       - SPRING_DATASOURCE_URL=jdbc:postgresql://audit-db:5432/audit_db
-      - SPRING_DATASOURCE_USERNAME=postgres
-      - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - SPRING_DATASOURCE_USERNAME=audit_runtime
+      - SPRING_DATASOURCE_PASSWORD=${AUDIT_RUNTIME_PASSWORD:-local-audit-runtime-change-me}
+      - SPRING_FLYWAY_USER=postgres
+      - SPRING_FLYWAY_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - AUDIT_RUNTIME_PASSWORD=${AUDIT_RUNTIME_PASSWORD:-local-audit-runtime-change-me}
       - DEPLOYMENT_SETUP_GATE_ENABLED=true
       - IDENTITY_API_URL=http://identity-service:8080
     depends_on:
@@ -361,6 +364,7 @@ services:
       - PGPASSWORD=${POSTGRES_PASSWORD:-postgres}
       # Days of dump directories to keep under ./backups (0 keeps everything).
       - BACKUP_RETENTION_DAYS=${BACKUP_RETENTION_DAYS:-30}
+      - BACKUP_WRITER_POLICY=${BACKUP_WRITER_POLICY:-online}
     depends_on:
       catalog-db:
         condition: service_healthy

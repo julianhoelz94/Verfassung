@@ -49,15 +49,15 @@ def inventory(root):
             group = 'jvm-' + path.split('/')[1]
         elif re.fullmatch(r'apps/gateway-web/(app/.+|lib/.+|middleware)\.(ts|tsx|jsx)', path):
             group = 'gateway-typescript'
-        elif re.fullmatch(r'apps/gateway-web/(app|lib)/.+\.(js|mjs|cjs)', path):
+        elif re.fullmatch(r'apps/gateway-web/(app/.+|lib/.+|middleware)\.(js|mjs|cjs)', path):
             group = 'gateway-javascript'
         elif re.fullmatch(r'services/mcp-server/src/.+\.ts', path):
             group = 'mcp'
         elif re.fullmatch(r'(scripts|infra)/.+\.py', path):
             group = 'python'
         elif (re.fullmatch(r'services/[^/]+/src/main/.+\.(java|kts)', path)
-              or re.fullmatch(r'apps/gateway-web/(app|lib)/.+\.(mts|cts)', path)
-              or re.fullmatch(r'services/mcp-server/src/.+\.(mts|cts|js|mjs|cjs|jsx)', path)):
+              or re.fullmatch(r'apps/gateway-web/(app/.+|lib/.+|middleware)\.(mts|cts)', path)
+              or re.fullmatch(r'services/mcp-server/src/.+\.(mts|cts|js|mjs|cjs|jsx|tsx)', path)):
             raise ValueError('Unsupported production source; configure its collector: ' + path)
         if group:
             if group not in groups:

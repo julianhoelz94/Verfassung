@@ -127,6 +127,17 @@ class CoverageTests(unittest.TestCase):
             (self.root / name).unlink()
             self.commit()
 
+    def test_javascript_middleware_remains_in_inventory_and_changed_code_gate(self):
+        name = 'apps/gateway-web/middleware.js'
+        self.write(name, 'export function middleware() { return null; }\n')
+        self.commit()
+        self.assertIn(name, cr.inventory(self.root)['gateway-javascript'])
+        changed = cr.changed_lines(self.root, self.base, cr.git(self.root, 'rev-parse', 'HEAD'), {name})
+        self.assertEqual(changed[name], {1})
+        raw = self.write('raw.json', json.dumps(self.istanbul('apps/gateway-web/lib/example.js', (1,))))
+        with self.assertRaisesRegex(ValueError, 'omitted production sources.*middleware.js'):
+            cr.pack(self.root, 'gateway-javascript', 'istanbul', raw)
+
     def test_overlapping_observations_count_each_line_and_branch_once(self):
         target = {}
         first = {'original.ts': {'lines': {'1': True, '2': False}, 'branches': {'a': False, 'b': True}}}

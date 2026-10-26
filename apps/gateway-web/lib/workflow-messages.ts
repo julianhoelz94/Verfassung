@@ -1,0 +1,23 @@
+import type { UiMessage } from './messages';
+
+export const workflowUi = {
+  myWork: { en: 'My work', de: 'Meine Bearbeitungen' },
+  myWorkHint: { en: 'Follow your work from draft to publication. Submitted drafts stay here while they are reviewed.', de: 'Verfolgen Sie Ihre Bearbeitungen vom Entwurf bis zur Veröffentlichung. Eingereichte Entwürfe bleiben während der Prüfung hier sichtbar.' },
+  noWork: { en: 'You have not started any work yet.', de: 'Sie haben noch keine Bearbeitung begonnen.' },
+  viewWork: { en: 'View progress', de: 'Bearbeitungsstand ansehen' },
+  publishedVersion: { en: 'Open published version', de: 'Veröffentlichte Fassung öffnen' },
+  sourceVersion: { en: 'View original text', de: 'Ursprünglichen Text ansehen' },
+  beforeSubmitting: { en: 'Before submitting for review:', de: 'Vor dem Einreichen zur Prüfung:' },
+  saveComment: { en: 'Describe what you corrected and save the comment.', de: 'Beschreiben Sie Ihre Korrektur und speichern Sie den Kommentar.' },
+  saveDetails: { en: 'Save your changes to the comment or change record.', de: 'Speichern Sie Ihre Änderungen am Kommentar oder Änderungseintrag.' },
+  saveChangeRecord: { en: 'Add the legal change and its source, then save the change record.', de: 'Tragen Sie die Rechtsänderung und ihre Quelle ein und speichern Sie den Änderungseintrag.' },
+  linkChanges: { en: 'Select the affected passages and save the change record.', de: 'Wählen Sie die betroffenen Textstellen aus und speichern Sie den Änderungseintrag.' },
+  reviewChanges: { en: 'Check each difference and save your decisions.', de: 'Prüfen Sie alle Unterschiede und speichern Sie Ihre Entscheidungen.' },
+  textHistory: { en: 'Text history', de: 'Textstände' },
+  workspaceTools: { en: 'Editorial tools', de: 'Redaktionswerkzeuge' },
+  preparing: { en: 'Preparing draft', de: 'Entwurf wird vorbereitet' },
+  publishing: { en: 'Publishing', de: 'Wird veröffentlicht' },
+  legalStartHint: { en: 'Use this when a law changed the constitution. You will record the legal change and its source.', de: 'Wählen Sie dies, wenn ein Gesetz die Verfassung geändert hat. Sie erfassen die Rechtsänderung und ihre Quelle.' },
+  correctionStartHint: { en: 'Use this to fix a typing or transcription error in the existing text. This does not record a new law.', de: 'Wählen Sie dies für Tipp- oder Übertragungsfehler im vorhandenen Text. Dabei wird keine neue Rechtsänderung erfasst.' },
+  changeLocations: { en: 'Match each change to the affected passage in the original text and in the draft.', de: 'Ordnen Sie jeder Änderung die betroffene Stelle im bisherigen Text und im Entwurf zu.' },
+} satisfies Record<string, UiMessage>;

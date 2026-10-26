@@ -1,3 +1,4 @@
+import { loginHref } from '../../../../lib/return-to';
 import { reviewUi } from '../../../../lib/ui-review-messages';
 import { T } from '../../../components/TranslationProvider';
 import { ui, type UiMessage } from '../../../../lib/messages';
@@ -43,7 +44,7 @@ export default async function LifecycleEditor({ params, searchParams }: Props) {
   const query = await searchParams;
   const code = query.code?.toUpperCase() ?? '';
   const user = await currentUser();
-  if (!user) redirect('/login');
+  if (!user) redirect(loginHref(`/editor/lifecycle/${encodeURIComponent(constitutionId)}`, query));
   if (!user.roles.some((role) => role === 'publisher' || role === 'admin')) notFound();
   const country = await getCountry(code);
   const constitution = country?.constitutions.find((item) => item.id === constitutionId);

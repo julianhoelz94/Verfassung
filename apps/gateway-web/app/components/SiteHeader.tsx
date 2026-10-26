@@ -6,8 +6,7 @@ import { T, useTranslation } from './TranslationProvider';
 import { ui } from '../../lib/messages';
 import { reviewUi } from '../../lib/ui-review-messages';
 import { usability } from '../../lib/usability-messages';
-import { usePathname } from 'next/navigation';
-import Link from 'next/link';
+import { usePathname, useSearchParams } from 'next/navigation';
 import { logoutAction } from '../login/actions';
 import {
   avatarInitial,
@@ -41,11 +40,12 @@ function MenuSectionList({
   user: NavUser | null;
 }) {
   const t = useTranslation();
+  const query = useSearchParams().toString();
   return (
     <>
       {sections.map(section => {
         const links = <>{section.links.map(link => (
-          <a key={link.href} href={link.href} aria-current={isCurrentNavHref(pathname, link.href) ? 'page' : undefined}>
+          <a key={link.href} href={link.href} aria-current={isCurrentNavHref(pathname, link.href, query) ? 'page' : undefined}>
             {link.message ? t(link.message) : link.label}{link.badgeCount ? <Badge tone="changed">{link.badgeCount}</Badge> : null}
           </a>
         ))}</>;
@@ -84,12 +84,12 @@ export function SiteHeader({ user, identityUnavailable = false, needsReviewCount
   return (
     <header className="topbar">
       <div className="topbar-inner">
-        <Link className="brand" href={setupInProgress && user ? '/setup' : '/'}>
+        <a className="brand" href={setupInProgress && user ? '/setup' : '/'}>
           <span className="brand-mark" aria-hidden="true">
             §
           </span>
           <span className="brand-name"><T value={ui.components.siteheader.constitutionAtlas} /></span>
-        </Link>
+        </a>
         <nav className="nav-primary" aria-label={t(ui.accessibility.primaryNavigation)}>
           {links.map((link) => (
             <a

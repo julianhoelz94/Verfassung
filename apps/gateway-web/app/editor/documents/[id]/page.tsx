@@ -1,3 +1,4 @@
+import { loginHref } from '../../../../lib/return-to';
 import { reviewUi } from '../../../../lib/ui-review-messages';
 import { Disclosure } from '../../../components/Disclosure';
 import { NavigatingActionForm } from '../../../components/NavigatingActionForm';
@@ -15,11 +16,11 @@ import { Inline } from '../../../components/layout/Layout';
 import surfaceStyles from '../../../components/surfaces.module.css';
 
 export default async function DocumentDetailPage(props: { params: Promise<{ id: string }>; searchParams: Promise<{ created?: string; saved?: string; error?: string; returnTo?: string }> }) {
-  const user = await currentUser();
-  if (!user) redirect('/login');
-  if (!canVisitEditor(user.roles)) redirect('/editor');
-  const { id } = await props.params;
   const params = await props.searchParams;
+  const { id } = await props.params;
+  const user = await currentUser();
+  if (!user) redirect(loginHref(`/editor/documents/${encodeURIComponent(id)}`, params));
+  if (!canVisitEditor(user.roles)) redirect('/editor');
   const authorization = await requireSessionBearer();
   const [document, revisions, events] = await Promise.all([
     getDocument(id, undefined, authorization), listDocumentRevisions(id, authorization), listDocumentEvents(id, authorization),

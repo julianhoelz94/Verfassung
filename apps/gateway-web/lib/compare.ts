@@ -1,4 +1,4 @@
-import type { Amendment, ArticleSummary, ConstitutionSummary, VersionSummary } from './api';
+import type { Amendment, ArticleSummary, ConstitutionSummary, OrderedEntry, VersionSummary } from './api';
 import { ui, type UiMessage } from './messages';
 
 import { orderedText } from './ordered-content';
@@ -138,6 +138,49 @@ export function neighborCompareLinks(
   };
 }
 
+/** Compare authored structure, excluding storage identity and revision provenance. */
+function comparableEntries(entries: OrderedEntry[]): unknown[] {
+  return entries.map((entry) => entry.type === 'child' && entry.node ? {
+    type: 'child',
+    kind: entry.node.kind,
+    label: entry.node.label ?? '',
+    title: entry.node.title ?? '',
+    content: comparableEntries(entry.node.content),
+  } : {
+    type: entry.type,
+    text: entry.text ?? entry.table?.rows.map((row) => row.cells.map((cell) => cell.text).join(' ')).join('\n') ?? '',
+    format: entry.format ?? 'plain',
+    table: entry.table ? {
+      caption: entry.table.caption ?? '',
+      rows: entry.table.rows.map((row) => row.cells.map((cell) => ({
+        text: cell.text,
+        header: cell.header ?? false,
+        rowSpan: cell.rowSpan ?? 1,
+        colSpan: cell.colSpan ?? 1,
+        // Target identities carry meaning even though a cell's own ID does not.
+        headers: cell.headers ?? [],
+      }))),
+    } : null,
+    footnoteLabel: entry.footnoteLabel ?? null,
+    annotation: entry.annotation ? {
+      kind: entry.annotation.kind,
+      attribution: entry.annotation.attribution ?? null,
+      sourceUrl: entry.annotation.sourceUrl ?? null,
+      anchorLogicalIds: [...(entry.annotation.anchorLogicalIds ?? [])].sort(),
+    } : null,
+    references: [...(entry.references ?? [])].sort((left, right) => left.start - right.start || left.end - right.end).map((reference) => ({
+      start: reference.start,
+      end: reference.end,
+      target: {
+        type: reference.target.type,
+        logicalId: reference.target.logicalId ?? null,
+        url: reference.target.url ?? null,
+        footnoteId: reference.target.footnoteId ?? null,
+      },
+    })),
+  });
+}
+
 export function netArticleKind(
   left: ArticleSummary | undefined,
   right: ArticleSummary | undefined,
@@ -152,9 +195,16 @@ export function netArticleKind(
   if (!left && !right) {
     return 'same';
   }
+  if ((left?.kind ?? 'article') !== (right?.kind ?? 'article') || left?.articleNumber !== right?.articleNumber || left?.title !== right?.title) {
+    return 'changed';
+  }
+  if (left?.content != null && right?.content != null) {
+    // Complete endpoint snapshots determine the net difference, even after a
+    // recorded amendment was reverted or an unchanged unit was republished.
+    return JSON.stringify(comparableEntries(left.content)) === JSON.stringify(comparableEntries(right.content)) ? 'same' : 'changed';
+  }
   if (left?.logicalId && left.logicalId === right?.logicalId && left.revisionId && left.revisionId === right.revisionId) return 'same';
-  if (left?.logicalId && left.logicalId === right?.logicalId && left.revisionId && right.revisionId && left.revisionId !== right.revisionId) return 'changed';
-  if ((left?.content ? orderedText(left.content) : left?.body ?? '') !== (right?.content ? orderedText(right.content) : right?.body ?? '') || left?.title !== right?.title) {
+  if ((left?.content ? orderedText(left.content) : left?.body ?? '') !== (right?.content ? orderedText(right.content) : right?.body ?? '')) {
     return 'changed';
   }
   if (recordedTypes.some((type) => type === 'added' || type === 'changed' || type === 'removed')) {

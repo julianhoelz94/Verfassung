@@ -1,3 +1,5 @@
+import { loginHref } from '../../../lib/return-to';
+import { redirect } from 'next/navigation';
 import { NavigatingActionForm } from '../../components/NavigatingActionForm';
 import { Disclosure } from '../../components/Disclosure';
 import { LocalizedRegion } from '../../components/LocalizedRegion';
@@ -19,7 +21,8 @@ type AdminImportPageProps = { searchParams: Promise<{ error?: string; mode?: str
 export default async function AdminImportPage({ searchParams }: AdminImportPageProps) {
   const params = await searchParams;
   const user = await currentUser();
-  if (!user || !user.roles.some(role => ['editor', 'reviewer', 'publisher', 'admin'].includes(role))) return <AdminForbidden title={ui.forbidden.import} />;
+  if (!user) redirect(loginHref('/admin/import', params));
+  if (!user.roles.some(role => ['editor', 'reviewer', 'publisher', 'admin'].includes(role))) return <AdminForbidden title={ui.forbidden.import} />;
   const canImport = user.roles.includes('editor') || user.roles.includes('admin');
   const jobs = await listImportJobs(await requireSessionBearer()).catch(() => null);
   const newStructure = params.mode === 'new';

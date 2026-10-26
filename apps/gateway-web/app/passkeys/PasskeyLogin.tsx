@@ -1,12 +1,13 @@
 'use client';
 
 import { T, useTranslation } from '../components/TranslationProvider';
+import { canVisitEditor } from '../../lib/nav';
 import { ui } from '../../lib/messages';
 import { useState } from 'react';
 import { Button } from '../components/ui';
 import { getPasskey } from '../../lib/webauthn';
 import { finishPasskeyLogin, startPasskeyLogin, startPasskeyStepUp, finishPasskeyStepUp } from './actions';
-import { safeReturnTo } from '../../lib/return-to';
+import { safeLoginReturnTo, safeReturnTo } from '../../lib/return-to';
 
 export function PasskeyLogin({ next, stepUp = false }: { next?: string; stepUp?: boolean } = {}) {
   const t = useTranslation();
@@ -24,7 +25,7 @@ export function PasskeyLogin({ next, stepUp = false }: { next?: string; stepUp?:
         destination = safeReturnTo(next ?? '/account', '/account');
       } else {
         const result = await finishPasskeyLogin(started.challengeId, credential);
-        destination = next?.startsWith('/oauth/authorize?') ? next : result.roles.some((role) => ['editor', 'reviewer', 'publisher', 'admin'].includes(role)) ? '/editor' : '/';
+        destination = safeLoginReturnTo(next, canVisitEditor(result.roles) ? '/editor' : '/');
       }
       // Read the confirmed session on arrival; refreshing the old route can cancel a queued push.
       window.location.assign(destination);

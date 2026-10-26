@@ -11,7 +11,10 @@ test('administrator manages a user and its access lifecycle', async ({ page }) =
   await signInAdmin(page);
   await page.goto('/admin/users');
   await page.getByRole('textbox', { name: 'Email', exact: true }).fill('new-editor@example.local');
-  await page.getByLabel('Roles (comma-separated)').first().fill('editor, reviewer');
+  const invite = page.locator('form').filter({ has: page.getByRole('button', { name: 'Send invite' }) });
+  await invite.getByRole('checkbox', { name: 'Reader', exact: true }).uncheck();
+  await invite.getByRole('checkbox', { name: 'Editor', exact: true }).check();
+  await invite.getByRole('checkbox', { name: 'Reviewer', exact: true }).check();
   await page.getByRole('button', { name: 'Send invite' }).click();
   await expect(page.getByText('E2E-INVITE-ADMIN')).toBeVisible();
 

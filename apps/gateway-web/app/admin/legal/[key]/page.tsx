@@ -26,7 +26,7 @@ export default async function AdminLegalPage({
 }) {
   const { key } = await params;
   if (!['impressum', 'datenschutz', 'impressum_en', 'datenschutz_en'].includes(key)) notFound();
-  if (!(await requireAdminPage())) return <AdminForbidden title={ui.forbidden.legalPages} />;
+  if (!(await requireAdminPage(`/admin/legal/${key}`, await searchParams))) return <AdminForbidden title={ui.forbidden.legalPages} />;
   const bearer = await requireSessionBearer();
   const state = await adminLegalPage(key as LegalPageKey, bearer);
   const revisions = await adminLegalPageRevisions(key as LegalPageKey, bearer);

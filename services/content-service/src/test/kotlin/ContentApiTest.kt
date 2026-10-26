@@ -57,11 +57,34 @@ class ContentApiTest {
 
     private fun anyUuid(): UUID = Mockito.any(UUID::class.java) ?: UUID(0, 0)
 
+    private fun contentReadPaths(versionId: UUID): List<String> {
+        val unit = objectMapper.readTree(
+            mockMvc.get("/versions/$versionId/units").andExpect { status { isOk() } }
+                .andReturn().response.contentAsString,
+        )[0]
+        val article = objectMapper.readTree(
+            mockMvc.get("/versions/$versionId/articles").andExpect { status { isOk() } }
+                .andReturn().response.contentAsString,
+        )[0]
+        return listOf(
+            "/versions/$versionId/units?includeBody=true",
+            "/versions/$versionId/articles?includeBody=true",
+            "/versions/$versionId/content",
+            "/versions/$versionId/export",
+            "/versions/$versionId/units/${unit["id"].asText()}",
+            "/versions/$versionId/resolve?logicalId=${unit["logicalId"].asText()}",
+            "/articles/${article["id"].asText()}",
+        )
+    }
+
     @BeforeEach
     fun stubIdentity() {
         Mockito.reset(identityClient, catalogClient)
         Mockito.`when`(identityClient.authenticate(null)).thenThrow(UnauthorizedException("Missing session"))
         Mockito.`when`(identityClient.authenticate(TOKEN)).thenReturn(editor)
+        Mockito.`when`(identityClient.authenticate(VIEWER_TOKEN)).thenReturn(
+            Actor(UUID.fromString("01900000-0000-4000-8000-000000000414"), "local-viewer@example.local", listOf("viewer")),
+        )
         Mockito.`when`(catalogClient.getVersion(anyUuid())).thenAnswer { invocation ->
             CatalogVersion(invocation.getArgument(0), "draft")
         }
@@ -70,10 +93,36 @@ class ContentApiTest {
     @Test
     fun draftContentRequiresStaffEvenWhenVersionIdIsKnown() {
         val version = UUID.fromString("01900000-0000-4000-8000-000000000004")
-        mockMvc.springGet("/versions/$version/units").andExpect { status { isNotFound() } }
-        mockMvc.springGet("/versions/$version/content").andExpect { status { isNotFound() } }
-        Mockito.`when`(catalogClient.getVersion(version)).thenReturn(CatalogVersion(version, "published"))
-        mockMvc.springGet("/versions/$version/units").andExpect { status { isOk() } }
+        Mockito.`when`(catalogClient.getVersion(version)).thenReturn(
+            CatalogVersion(version, "draft", constitutionId = UUID.fromString("01900000-0000-4000-8000-000000000002")),
+        )
+        contentReadPaths(version).forEach { path ->
+            listOf<String?>(null, VIEWER_TOKEN).forEach { authorization ->
+                mockMvc.springGet(path) {
+                    authorization?.let { header("Authorization", it) }
+                }.andExpect { status { isNotFound() } }
+            }
+            mockMvc.get(path).andExpect { status { isOk() } }
+        }
+    }
+
+    @Test
+    fun publishedEditorialSnapshotContentStaysPublicAndUnchangedAfterTheTipMoves() {
+        val version = UUID.fromString("01900000-0000-4000-8000-000000000004")
+        val published = CatalogVersion(version, "published", constitutionId = UUID.fromString("01900000-0000-4000-8000-000000000002"), listing = "staff", currentVersionId = version)
+        Mockito.`when`(catalogClient.getVersion(version)).thenReturn(published)
+        val publishedBodies = contentReadPaths(version).associateWith { path ->
+            mockMvc.springGet(path).andExpect { status { isOk() } }.andReturn().response.contentAsString
+        }
+        Mockito.`when`(catalogClient.getVersion(version)).thenReturn(published.copy(currentVersionId = UUID.randomUUID()))
+        publishedBodies.forEach { (path, body) ->
+            listOf<String?>(null, VIEWER_TOKEN).forEach { authorization ->
+                val historical = mockMvc.springGet(path) {
+                    authorization?.let { header("Authorization", it) }
+                }.andExpect { status { isOk() } }.andReturn().response.contentAsString
+                assertThat(historical).describedAs("Published snapshot response for %s", path).isEqualTo(body)
+            }
+        }
     }
 
     @Test
@@ -87,18 +136,6 @@ class ContentApiTest {
                 content = """{"attemptId":"${UUID.randomUUID()}","expectedGeneration":1,"settingsRevisionId":"${UUID.randomUUID()}"}"""
             }.andExpect { status { isForbidden() } }
         }
-    }
-
-    @Test
-    fun publishedEditorialPermalinksStayReadableAfterTheTipMoves() {
-        val version = UUID.fromString("01900000-0000-4000-8000-000000000004")
-        Mockito.`when`(catalogClient.getVersion(version)).thenReturn(CatalogVersion(version, "published", listing = "staff", currentVersionId = UUID.randomUUID()))
-        mockMvc.springGet("/versions/$version/units").andExpect { status { isOk() } }
-        mockMvc.springGet("/versions/$version/content").andExpect { status { isOk() } }
-        Mockito.`when`(catalogClient.getVersion(version)).thenReturn(CatalogVersion(version, "published", listing = "staff", currentVersionId = version))
-        mockMvc.springGet("/versions/$version/units").andExpect { status { isOk() } }
-        Mockito.`when`(catalogClient.getVersion(version)).thenReturn(CatalogVersion(version, "draft", listing = "staff", currentVersionId = version))
-        mockMvc.springGet("/versions/$version/units").andExpect { status { isNotFound() } }
     }
 
     @Test
@@ -398,7 +435,7 @@ class ContentApiTest {
     fun publishedVersionRejectsWritesWith409() {
         val versionId = UUID.fromString("01900000-0000-4000-8000-000000000004")
         Mockito.`when`(catalogClient.getVersion(versionId)).thenReturn(
-            CatalogVersion(versionId, "published"),
+            CatalogVersion(versionId, "published", listing = "staff", currentVersionId = UUID.randomUUID()),
         )
         val original = objectMapper.readTree(
             mockMvc.get("/articles/01900000-0000-4000-8000-000000000201")
@@ -521,6 +558,7 @@ class ContentApiTest {
 
     companion object {
         private const val TOKEN = "Bearer test-token"
+        private const val VIEWER_TOKEN = "Bearer viewer-token"
         private val objectMapper = ObjectMapper()
 
         private fun nestedJson(depth: Int): String = (1..depth).fold("1") { acc, _ -> """{"x":$acc}""" }

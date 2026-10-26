@@ -152,7 +152,7 @@ export default async function Page() {
                       <Badge tone="accent"><T value={ui.page.latest} />{" "}{summary.latestVersionLabel}</Badge>
                     ) : null}
                     <span>
-                      {summary.versionCount} <T value={ui.page.version} />{summary.versionCount === 1 ? '' : 's'}
+                      {summary.versionCount} <T value={summary.versionCount === 1 ? ui.page.version : ui.page.versions} />
                     </span>
                     {summary.latestEffectiveDate ? (
                       <span>
@@ -161,7 +161,7 @@ export default async function Page() {
                     ) : null}
                     {countryArticles != null ? (
                       <span>
-                        {countryArticles} <T value={ui.page.article} />{countryArticles === 1 ? '' : 's'}
+                        {countryArticles} <T value={countryArticles === 1 ? ui.page.article : ui.page.articles} />
                       </span>
                     ) : null}
                     {tipVersion ? <span>{tipVersion.languageCode}</span> : null}

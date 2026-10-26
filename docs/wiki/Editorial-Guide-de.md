@@ -11,7 +11,7 @@
 3. Wählen Sie die Inhaltseinheit, bearbeiten und speichern Sie den Entwurf. Prüfen Sie Vorschau und Änderungen.
 4. Beschreiben und speichern Sie die Änderung, dann reichen Sie den Entwurf zur Prüfung ein.
 
-**Ergebnis:** Der Entwurf wartet in der Prüfwarteschlange. Gespeicherte Arbeit bleibt bei der Rückkehr zur Sitzungsübersicht erhalten.
+**Ergebnis:** Der Entwurf wartet in der Prüfwarteschlange. Unter **Meine Bearbeitungen** finden Sie Entwürfe, eingereichte und freigegebene Bearbeitungen sowie veröffentlichte Ergebnisse mit ihrem jeweiligen Status. Gespeicherte Arbeit bleibt bei der Rückkehr zu dieser Liste erhalten. Ist das Einreichen noch nicht möglich, führen die Hinweise neben der Schaltfläche zu den fehlenden Angaben.
 
 ![Entwurfsbearbeitung mit Text und Arbeitsablauf](https://raw.githubusercontent.com/wiki/julianhoelz94/Verfassung/media/editor-draft-de.png)
 *Vor dem Einreichen speichern und kontrollieren.*
@@ -24,7 +24,7 @@
 
 1. Öffnen Sie **Prüfliste** und die eingereichte Sitzung.
 2. Vergleichen Sie Entwurf und Quelle. Prüfen Sie Kommentar, betroffene Einheiten und Änderungsart.
-3. Geben Sie die Prüfung frei oder geben Sie die Arbeit über die angebotenen Aktionen zurück.
+3. Geben Sie den Entwurf nur frei, wenn der Text bereit ist. Bearbeitungssitzungen haben derzeit keine Aktion zum Zurückgeben; lassen Sie fehlerhafte Entwürfe ungeprüft. Für importierte Verfassungen gibt es eine eigene Ablehnungsaktion.
 
 **Ergebnis:** Die Sitzung ist bereit zur Veröffentlichung. Die Freigabe veröffentlicht noch nichts.
 
@@ -49,7 +49,7 @@ Der aktuelle Schritt steht deutlich über dem Inhalt. Nach der Freigabe lautet e
 
 1. Öffnen Sie **Bereit zur Veröffentlichung** und die freigegebene Sitzung.
 2. Bestätigen Sie Text und Änderungsart; führen Sie bei Aufforderung die frische MFA-Prüfung durch.
-3. Veröffentlichen Sie und prüfen Sie Text sowie Suchindexstatus der neuen Fassung.
+3. Veröffentlichen Sie, wählen Sie **Veröffentlichte Fassung öffnen** und prüfen Sie den neuen Text. Dieser Link bleibt beim erneuten Öffnen der veröffentlichten Bearbeitung verfügbar.
 
 **Ergebnis:** Ein neuer Textstand ist öffentlich. Der vorherige bleibt erreichbar. Eine Textberichtigung ist kein neues Gesetz.
 
@@ -59,6 +59,8 @@ Der aktuelle Schritt steht deutlich über dem Inhalt. Nach der Freigabe lautet e
 [▶ Veröffentlichung ansehen](https://julianhoelz94.github.io/Verfassung/#publishing-a-revision-de)
 
 ## Weitere redaktionelle Aufgaben
+
+Der Arbeitsbereich bietet direkte Links zu **Dokumente**, **Rechtsänderungen** und **Textstände**. Prüf- und Veröffentlichungslisten erscheinen für Personen mit den entsprechenden Berechtigungen.
 
 
 - Unter **Rechtsänderungen** entwerfen Sie eine Änderung und verknüpfen sie mit den genau betroffenen Bestimmungen. Prüfen Sie vor der Veröffentlichung die Links zum Ausgangs- und Zieltext.

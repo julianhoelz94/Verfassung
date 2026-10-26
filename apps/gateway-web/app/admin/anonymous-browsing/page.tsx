@@ -11,7 +11,7 @@ import { AnonymousBrowsingForm } from './AnonymousBrowsingForm';
 import { setupMessages as m } from '../../../lib/setup-messages';
 
 export default async function AnonymousBrowsingPage({ searchParams }: { searchParams: Promise<{ error?: string; saved?: string; returnTo?: string }> }) {
-  if (!(await requireAdminPage())) return <AdminForbidden title={ui.forbidden.anonymousBrowsing} />;
+  if (!(await requireAdminPage('/admin/anonymous-browsing', await searchParams))) return <AdminForbidden title={ui.forbidden.anonymousBrowsing} />;
   const token = (await cookies()).get(SESSION_COOKIE)?.value;
   const policy = token ? await requestAdminAnonymousBrowsingPolicy(token).catch(() => null) : null;
   const params = await searchParams;

@@ -1,3 +1,4 @@
+import { loginHref } from '../../../lib/return-to';
 import { statusMessage } from '../../../lib/ui-labels';
 import { T } from '../../components/TranslationProvider';
 import { ui } from '../../../lib/messages';
@@ -11,10 +12,10 @@ import { currentUser, requireSessionBearer } from '../../../lib/session';
 import { Inline } from '../../components/layout/Layout';
 
 export default async function DocumentsPage(props: { searchParams: Promise<{ q?: string; error?: string }> }) {
-  const user = await currentUser();
-  if (!user) redirect('/login');
-  if (!canVisitEditor(user.roles)) redirect('/editor');
   const params = await props.searchParams;
+  const user = await currentUser();
+  if (!user) redirect(loginHref('/editor/documents', params));
+  if (!canVisitEditor(user.roles)) redirect('/editor');
   const documents = await listDocuments(params.q, await requireSessionBearer());
   return <CollectionPage width="content" header={<PageHeader title={<T value={ui.attrs.editorDocumentsPagePageHeaderTitleDocuments} />} meta={<T value={ui.attrs.editorDocumentsPagePageHeaderMetaSources} />} actions={<Link className="btn" href="/editor/documents/new"><T value={ui.editor.documents.page.newDocument} /></Link>} />}>
 

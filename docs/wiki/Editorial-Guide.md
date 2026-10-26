@@ -11,7 +11,7 @@
 3. Select a content unit, edit and **Save draft**. Inspect the preview and changes.
 4. Describe the change, save the comment, then **Submit for review**.
 
-**Result:** the saved draft waits in the review queue. Resume unfinished work through **My open sessions**; returning to the session list keeps saved work.
+**Result:** the saved draft waits in the review queue. Open **My work** to find drafts, submitted work, approved work and published results. Each entry shows its current status. Returning to this list keeps saved work. If submission is unavailable, follow the links beside the button to complete the missing information.
 
 ![Draft editor with text and workflow controls](https://raw.githubusercontent.com/wiki/julianhoelz94/Verfassung/media/editor-draft-en.png)
 *Save and inspect the draft before submitting it.*
@@ -24,7 +24,7 @@
 
 1. Open **Review queue**, then the submitted session.
 2. Compare draft and source; inspect the comment, affected units and change type.
-3. Approve the review or return the work using the available controls.
+3. Approve only when the text is ready. Editing sessions currently have no return action; leave work unapproved if it needs changes. Imported constitutions have a separate rejection action.
 
 **Result:** approved work appears under **Ready to publish**. Approval does not publish it.
 
@@ -49,7 +49,7 @@ The current step is shown prominently above the content. After approval it reads
 
 1. Open **Ready to publish**, then the approved session.
 2. Confirm the text and change type. Complete fresh MFA if requested.
-3. Publish, then open the resulting version and check its text and indexing status.
+3. Publish, choose **Open published version**, and check the new text. The same link remains available when you reopen the published work.
 
 **Result:** a successor snapshot is public. The previous snapshot remains available. A transcription correction does not itself record a new law.
 
@@ -59,6 +59,8 @@ The current step is shown prominently above the content. After approval it reads
 [▶ Watch publication](https://julianhoelz94.github.io/Verfassung/#publishing-a-revision-en)
 
 ## Other editorial tasks
+
+The workspace provides direct links to **Documents**, **Legal changes** and **Text history**. Review and publication queues appear for people with the corresponding permissions.
 
 
 - Use **Legal changes** to draft and link an amendment or other legal change to exact affected provisions. Review the source and target links before publication.
@@ -76,14 +78,14 @@ The current step is shown prominently above the content. After approval it reads
 | --- | --- |
 | Viewer | Read published material. |
 | Editor | Open and save draft sessions, submit them for review, and draft legal change records. |
-| Reviewer | Inspect submitted work and approve or reject it; review alone does not permit editing. |
+| Reviewer | Inspect and approve submitted work; imported constitutions can also be rejected. Review alone does not permit editing. |
 | Publisher | Publish approved work after fresh MFA; publication rights alone do not permit editing or approval. |
 | Admin | Manage users and content setup, and perform editorial actions. |
 
 The editorial path is **open → save → submit for review → approve → publish**. Publication creates a successor snapshot. The previous published snapshot remains available. Check the chosen **legal change** or **transcription correction** path before starting a session, since those represent different histories.
 
 
-**Legal changes** describe changes in law; **Snapshot history** shows published text revisions. Exact permissions: [editorial roles](https://github.com/julianhoelz94/Verfassung/blob/main/docs/editorial-roles.md).
+**Legal changes** describe changes in law; **Text history** shows published text revisions. Exact permissions: [editorial roles](https://github.com/julianhoelz94/Verfassung/blob/main/docs/editorial-roles.md).
 
 </details>
 

@@ -1,5 +1,6 @@
 import { ui, type UiMessage } from './messages';
 import { reviewUi } from './ui-review-messages';
+import { workflowUi } from './workflow-messages';
 
 export type NavUser = {
   email: string;
@@ -64,9 +65,9 @@ export function editorialLinks(roles: string[], needsReviewCount = 0): NavLink[]
   const isReviewer = isAdmin || roles.includes('reviewer');
   const isPublisher = isAdmin || roles.includes('publisher');
   if (isEditor) {
-    links.push({ href: '/editor?mine=1', label: 'My sessions', message: ui.nav.mySessions });
+    links.push({ href: '/editor?mine=1', label: 'My work', message: workflowUi.myWork });
   }
-  if (isEditor || isReviewer) {
+  if (isReviewer) {
     links.push({ href: '/editor?status=reviewing', label: 'Review queue', message: ui.nav.reviewQueue });
   }
   if (isPublisher) {
@@ -75,7 +76,7 @@ export function editorialLinks(roles: string[], needsReviewCount = 0): NavLink[]
   if (isEditor || isReviewer || isPublisher) {
     links.push({ href: '/editor/documents', label: 'Documents', message: ui.nav.documents });
     links.push({ href: '/editor/amendments', label: 'Legal changes', message: ui.nav.legalChanges, badgeCount: needsReviewCount || undefined });
-    links.push({ href: '/editor/history', label: 'Snapshot history', message: ui.nav.snapshotHistory });
+    links.push({ href: '/editor/history', label: 'Text history', message: workflowUi.textHistory });
   }
   return links;
 }
@@ -85,7 +86,7 @@ export function adminLinks(): NavLink[] {
     { href: '/admin/users', label: 'Users', message: ui.nav.users },
     { href: '/admin/settings', label: 'Site settings', message: reviewUi.siteSettings },
     { href: '/admin/anonymous-browsing', label: 'Anonymous browsing', message: ui.nav.anonymousBrowsing },
-    { href: '/admin/constitutions', label: 'Outlines', message: ui.nav.outlines },
+    { href: '/admin/constitutions', label: 'Constitutions', message: ui.nav.outlines },
     { href: '/admin/import', label: 'Import', message: ui.nav.import },
     { href: '/admin/legal/impressum', label: 'Legal pages', message: reviewUi.legalPages },
   ];
@@ -140,8 +141,16 @@ export function menuSections(user: NavUser | null, apiDocsAvailable = false, nee
   return sections.filter((section) => section.identity || section.links.length > 0);
 }
 
-export function isCurrentNavHref(pathname: string, href: string): boolean {
+export function isCurrentNavHref(pathname: string, href: string, query = ''): boolean {
   const path = href.split('?')[0] ?? href;
+  if (href.includes('#')) return false;
+  if (href.includes('?')) {
+    if (pathname !== path) return false;
+    const expected = new URLSearchParams(href.slice(href.indexOf('?') + 1));
+    const current = new URLSearchParams(query);
+    if (expected.has('mine')) return !current.has('status') && !current.has('sessionId') && !current.has('importJobId');
+    return [...expected].every(([key, value]) => current.get(key) === value);
+  }
   if (path === '/') {
     return pathname === '/';
   }

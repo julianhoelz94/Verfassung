@@ -1,5 +1,6 @@
 """Check restore preflight with fake database commands; never connect to a database."""
 import os
+import hashlib
 from pathlib import Path
 import subprocess
 import tempfile
@@ -32,6 +33,47 @@ class RestorePreflightTest(unittest.TestCase):
             text=True, capture_output=True, timeout=10,
         )
 
+    def write_verified_backup(self):
+        checksums = []
+        for database in self.databases:
+            data = b"SELECT 1;\n"
+            (self.backup / (database + ".sql")).write_bytes(data)
+            checksums.append(hashlib.sha256(data).hexdigest() + "  " + database + ".sql")
+        (self.backup / "SHA256SUMS").write_text("\n".join(checksums) + "\n")
+        (self.backup / "backup.meta").write_text("format=1\ncreated_at=2026-10-26T12:00:00Z\nwriter_policy=quiesced\n")
+
+    def test_verified_backup_checks_all_files_before_restoring(self):
+        self.write_verified_backup()
+        result = self.run_restore()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(len(self.events.read_text().splitlines()), 28)
+
+    def test_corrupted_last_dump_never_touches_a_database(self):
+        self.write_verified_backup()
+        (self.backup / "document.sql").write_text("SELECT 'tampered';\n")
+        result = self.run_restore()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("checksum mismatch", result.stderr)
+        self.assertFalse(self.events.exists())
+
+    def test_missing_duplicate_and_outside_manifest_entries_fail_before_restore(self):
+        self.write_verified_backup()
+        manifest = self.backup / "SHA256SUMS"
+        original = manifest.read_text()
+        for malformed in ("\n".join(original.splitlines()[:-1]) + "\n",
+                          original.replace("document.sql", "../document.sql"),
+                          original.replace("document.sql", "catalog.sql")):
+            with self.subTest(manifest=malformed):
+                manifest.write_text(malformed)
+                self.assertNotEqual(self.run_restore().returncode, 0)
+                self.assertFalse(self.events.exists())
+
+    def test_partial_manifest_does_not_become_a_legacy_backup(self):
+        self.write_verified_backup()
+        (self.backup / "SHA256SUMS").unlink()
+        self.assertNotEqual(self.run_restore().returncode, 0)
+        self.assertFalse(self.events.exists())
+
     def test_missing_last_dump_does_not_touch_any_database(self):
         for database in self.databases[:-1]:
             (self.backup / (database + ".sql")).write_text("SELECT 1;\n")
@@ -61,9 +103,9 @@ class RestorePreflightTest(unittest.TestCase):
         result = self.run_restore()
         self.assertEqual(result.returncode, 0, result.stderr)
         events = self.events.read_text().splitlines()
-        self.assertEqual(len(events), 27)
+        self.assertEqual(len(events), 28)
         for database in self.databases:
-            self.assertEqual(sum("psql " in event and (database + "_db ") in event for event in events), 2)
+            self.assertEqual(sum("psql " in event and (database + "_db ") in event for event in events), 3 if database == "audit" else 2)
 
     def test_directory_disguised_as_dump_does_not_touch_any_database(self):
         for database in self.databases:
@@ -85,7 +127,7 @@ class BackupTest(unittest.TestCase):
         self.bin = self.root / "bin"
         self.bin.mkdir()
         for command, source in {
-            "date": '#!/bin/sh\nprintf "20261023-120000\\n"\n',
+            "date": '#!/bin/sh\ncase "$*" in *%Y-%m-%d*) printf "2026-10-23T12:00:00Z\\n";; *) printf "20261023-120000\\n";; esac\n',
             "pg_isready": '#!/bin/sh\nexit 0\n',
             "pg_dump": '#!/bin/sh\nprintf "SELECT 1;\\n"\n[ "$*" != "-h document-db -U postgres -d document_db" ] || [ "${FAIL_LAST_DUMP:-0}" != 1 ]\n',
         }.items():
@@ -119,6 +161,9 @@ class BackupTest(unittest.TestCase):
         self.assertEqual(len(list(backup.glob("*.sql"))), 9)
         self.assertEqual(backup.stat().st_mode & 0o777, 0o700)
         self.assertEqual((backup / "catalog.sql").stat().st_mode & 0o777, 0o600)
+        self.assertEqual(len((backup / "SHA256SUMS").read_text().splitlines()), 9)
+        self.assertIn("created_at=2026-10-23T12:00:00Z", (backup / "backup.meta").read_text())
+        self.assertIn("writer_policy=online", (backup / "backup.meta").read_text())
         (backup / "catalog.sql").write_text("original")
         self.assertNotEqual(self.run_backup().returncode, 0)
         self.assertEqual((backup / "catalog.sql").read_text(), "original")

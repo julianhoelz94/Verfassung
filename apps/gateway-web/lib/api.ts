@@ -768,8 +768,8 @@ export function saveSettings(id: string, expectedRevisionId: string, kinds: Outl
   return sendJson<SettingsRevision>(`${catalogBaseUrl()}/constitutions/${encodeURIComponent(id)}/settings`, 'catalog', 'PUT', { expectedRevisionId, kinds }, authorization);
 }
 
-export function getReaderOutline(versionId: string): Promise<ContentOutline | null> {
-  return readJson<ContentOutline>(`${catalogBaseUrl()}/versions/${encodeURIComponent(versionId)}/reader-settings`, 'catalog');
+export function getReaderOutline(versionId: string, authorization?: string): Promise<ContentOutline | null> {
+  return readJson<ContentOutline>(`${catalogBaseUrl()}/versions/${encodeURIComponent(versionId)}/reader-settings`, 'catalog', authorization);
 }
 export function restoreSettings(id: string, revisionId: string, expectedRevisionId: string, authorization: string): Promise<SettingsRevision> {
   return sendJson<SettingsRevision>(`${catalogBaseUrl()}/constitutions/${encodeURIComponent(id)}/settings/${encodeURIComponent(revisionId)}/restore`, 'catalog', 'POST', { expectedRevisionId }, authorization);

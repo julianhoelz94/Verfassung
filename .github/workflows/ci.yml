@@ -196,6 +196,7 @@ jobs:
           path: |
             apps/gateway-web/test-results/**/*.png
             apps/gateway-web/test-results/**/error-context.md
+            !apps/gateway-web/test-results/*-retry*/**
           if-no-files-found: ignore
           retention-days: 7
 

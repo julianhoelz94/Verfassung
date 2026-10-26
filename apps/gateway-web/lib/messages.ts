@@ -715,10 +715,10 @@ export const ui = {
         page: {
           settingsSavedHistoricalVersionsRetainTheirStructural: { en: "Settings saved. Historical versions retain their structural settings.", de: "Einstellungen gespeichert. Historische Versionen behalten ihre Struktureinstellungen." },
           theStructureIsReady: { en: "The structure is ready.", de: "Die Struktur ist bereit." },
-          importTheFirstVersion: { en: "Import the first version", de: "Erste Version importieren" },
+          importTheFirstVersion: { en: "Import the first version", de: "Importieren Sie die erste Version" },
           or: { en: "or", de: "oder" },
           openTheEditor: { en: "open the editor", de: "öffnen Sie den Editor" },
-          toContinue: { en: "to continue.", de: "um fortzufahren." },
+          toContinue: { en: " to continue.", de: ", um fortzufahren." },
           thisChangeRequiresAReviewedSuccessorMigration: { en: "This change requires a reviewed successor migration. Existing versions have been preserved.", de: "Diese Änderung erfordert eine geprüfte Migration auf eine Nachfolgeversion. Bestehende Versionen bleiben erhalten." },
           theOutlineCouldNotBeSaved: { en: "The outline could not be saved.", de: "Die Gliederung konnte nicht gespeichert werden." },
           theDocumentLinkCouldNotBeChanged: { en: "The document link could not be changed. Reload and try again.", de: "Die Dokumentverknüpfung konnte nicht geändert werden. Laden Sie die Seite neu und versuchen Sie es erneut." },

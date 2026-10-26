@@ -58,11 +58,11 @@ export default async function AdminLegalPage({
         <NavigatingActionForm action={saveLegalDraftAction}>
           <input type="hidden" name="key" value={key} />
           <input type="hidden" name="expectedRevision" value={state?.draft?.revision ?? 0} />
-          {imprintDetails ? <Stack as="fieldset">
+          {imprintDetails ? <Stack as="fieldset" className="imprint-contact-fields">
             <legend><T value={ui.legal.imprintDetails} /></legend>
             <p><T value={ui.legal.sharedContactHelp} /></p>
             <input type="hidden" name="expectedContactRevision" value={imprintDetails.draft?.revision ?? 0} />
-            {(['name', 'streetAddress', 'postalCode', 'city', 'country', 'email'] as const).map((field) => <label key={field}>
+            {(['name', 'streetAddress', 'postalCode', 'city', 'country', 'email'] as const).map((field) => <label className="imprint-contact-field" key={field}>
               <T value={ui.legal[field]} />
               <input name={field} type={field === 'email' ? 'email' : 'text'} readOnly={imprintDetails.managedFields?.includes(field)} required maxLength={255} defaultValue={imprintDetails.draft?.[field] ?? ''} />
             </label>)}

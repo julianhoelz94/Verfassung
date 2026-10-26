@@ -98,6 +98,35 @@ class CoverageTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'outside checkout'):
                 cr.canonical(self.root, name)
 
+    def test_python_dunder_modules_remain_in_production_inventory(self):
+        for name in ('scripts/cd/__init__.py', 'scripts/cd/__main__.py'):
+            self.write(name, 'print("production module")\n')
+        self.write('scripts/__pycache__/generated.py', 'cache only\n')
+        self.commit()
+        names = cr.inventory(self.root)['python']
+        self.assertIn('scripts/cd/__init__.py', names)
+        self.assertIn('scripts/cd/__main__.py', names)
+        self.assertNotIn('scripts/__pycache__/generated.py', names)
+
+    def test_jsx_cannot_escape_inventory_or_collector_completeness(self):
+        name = 'apps/gateway-web/app/components/Untested.jsx'
+        self.write(name, 'export default function Untested() { return <p>Untested</p>; }\n')
+        self.commit()
+        self.assertIn(name, cr.inventory(self.root)['gateway-typescript'])
+        raw = self.write('raw.json', json.dumps(self.istanbul('apps/gateway-web/lib/example.ts')))
+        with self.assertRaisesRegex(ValueError, 'omitted production sources.*Untested.jsx'):
+            cr.pack(self.root, 'gateway-typescript', 'istanbul', raw)
+
+    def test_unsupported_application_source_extensions_fail_closed(self):
+        for name in ('services/example/src/main/java/demo/Example.java',
+                     'apps/gateway-web/lib/example.mts', 'services/mcp-server/src/extra.mjs'):
+            self.write(name, 'new source\n')
+            self.commit()
+            with self.assertRaisesRegex(ValueError, 'Unsupported production source'):
+                cr.inventory(self.root)
+            (self.root / name).unlink()
+            self.commit()
+
     def test_overlapping_observations_count_each_line_and_branch_once(self):
         target = {}
         first = {'original.ts': {'lines': {'1': True, '2': False}, 'branches': {'a': False, 'b': True}}}
@@ -144,14 +173,33 @@ class CoverageTests(unittest.TestCase):
     def test_jvm_rejects_unknown_and_ambiguous_source_identity(self):
         groups = self.inputs()
         path = self.root / 'coverage/jvm.xml'
-        path.write_text('<report><package name="unknown"><sourcefile name="X.kt"/></package></report>')
+        path.write_text('<report><package name="unknown"><sourcefile name="X.kt"><line nr="1" ci="1" mi="0" cb="0" mb="0"/></sourcefile></package></report>')
         with self.assertRaisesRegex(ValueError, 'Unknown JVM source'):
             cr.jacoco(self.root, path, groups)
+
         name = 'services/other/src/main/kotlin/demo/Example.kt'
         self.write(name, self.source['services/example/src/main/kotlin/demo/Example.kt'])
         groups['jvm-other'] = {name: 'hash'}
         with self.assertRaisesRegex(ValueError, 'Ambiguous JVM'):
             cr.jacoco(self.root, path, groups)
+
+    def test_jvm_missing_file_cannot_disappear_from_new_code_denominator(self):
+        groups = self.inputs()
+        name = 'services/example/src/main/kotlin/demo/Uncovered.kt'
+        self.write(name, 'package demo\nfun untested() = 42\n')
+        groups['jvm-example'][name] = cr.digest(self.root / name)
+        with self.assertRaisesRegex(ValueError, 'omitted production sources.*Uncovered.kt'):
+            cr.jacoco(self.root, self.root / 'coverage/jvm.xml', groups)
+        path = self.root / 'coverage/jvm.xml'
+        path.write_text(path.read_text().replace('</package>', '<sourcefile name="Uncovered.kt"/></package>'))
+        self.assertEqual(cr.jacoco(self.root, path, groups)[name]['lines'], {})
+
+    def test_empty_kotlin_inline_library_placeholders_do_not_enter_denominator(self):
+        groups = self.inputs()
+        path = self.root / 'coverage/jvm.xml'
+        expected = cr.jacoco(self.root, path, groups)
+        path.write_text(path.read_text().replace('</package>', '<sourcefile name="Comparisons.kt"/></package>'))
+        self.assertEqual(cr.jacoco(self.root, path, groups), expected)
 
     def test_pack_normalizes_istanbul_and_rejects_missing_sources(self):
         source = 'apps/gateway-web/lib/example.ts'

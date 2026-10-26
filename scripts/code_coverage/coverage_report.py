@@ -30,7 +30,7 @@ def digest(path):
 
 
 def production(path):
-    return (not re.search(r'(^|/)(test[-_]|__)', path)
+    return (not re.search(r'(^|/)(test[-_]|__pycache__/)', path)
             and not re.search(r'\.(test|spec)\.', path)
             and not path.endswith('.d.ts'))
 
@@ -47,7 +47,7 @@ def inventory(root):
         group = None
         if re.fullmatch(r'services/[^/]+/src/main/kotlin/.+\.kt', path):
             group = 'jvm-' + path.split('/')[1]
-        elif re.fullmatch(r'apps/gateway-web/(app/.+|lib/.+|middleware)\.(ts|tsx)', path):
+        elif re.fullmatch(r'apps/gateway-web/(app/.+|lib/.+|middleware)\.(ts|tsx|jsx)', path):
             group = 'gateway-typescript'
         elif re.fullmatch(r'apps/gateway-web/(app|lib)/.+\.(js|mjs|cjs)', path):
             group = 'gateway-javascript'
@@ -55,6 +55,10 @@ def inventory(root):
             group = 'mcp'
         elif re.fullmatch(r'(scripts|infra)/.+\.py', path):
             group = 'python'
+        elif (re.fullmatch(r'services/[^/]+/src/main/.+\.(java|kts)', path)
+              or re.fullmatch(r'apps/gateway-web/(app|lib)/.+\.(mts|cts)', path)
+              or re.fullmatch(r'services/mcp-server/src/.+\.(mts|cts|js|mjs|cjs|jsx)', path)):
+            raise ValueError('Unsupported production source; configure its collector: ' + path)
         if group:
             if group not in groups:
                 raise ValueError('Source has no coverage component: ' + path)
@@ -125,6 +129,11 @@ def jacoco(root, path, groups):
         for source in package.findall('sourcefile'):
             key = package.attrib['name'] + '/' + source.attrib['name']
             if key not in sources:
+                # Kotlin SMAPs can emit empty sourcefile placeholders for inlined
+                # stdlib sources (Comparisons.kt/_Collections.kt). They have no
+                # executable entries. Unknown sources with any data still fail.
+                if not list(source):
+                    continue
                 raise ValueError('Unknown JVM source: ' + key)
             data = result.setdefault(sources[key], empty_file())
             for line in source.findall('line'):
@@ -138,9 +147,9 @@ def jacoco(root, path, groups):
     for component, members in groups.items():
         if component.startswith('jvm-') and not any(result.get(name, {}).get('lines') for name in members):
             raise ValueError('JVM report omitted executable component: ' + component)
-    # Compiler-only declarations may have no executable bytecode or sourcefile entry.
-    for name in sources.values():
-        result.setdefault(name, empty_file())
+    missing = set(sources.values()) - result.keys()
+    if missing:
+        raise ValueError('JVM report omitted production sources: ' + ', '.join(sorted(missing)))
     return result
 
 

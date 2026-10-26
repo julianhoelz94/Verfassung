@@ -66,6 +66,18 @@ jobs:
           set -euo pipefail
           mkdir -p build
           ./gradlew check 2>&1 | tee build/ci-check.log
+      - name: Bundle JVM coverage
+        if: always()
+        run: python3 scripts/code_coverage/coverage_report.py pack jvm-${{ matrix.service }} --format jvm
+      - name: Upload JVM coverage input
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          overwrite: true
+          name: coverage-input-${{ matrix.service }}
+          path: coverage/inputs/
+          if-no-files-found: error
+          retention-days: 14
       - name: Upload failed ${{ matrix.service }} reports
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -94,6 +106,18 @@ jobs:
           set -euo pipefail
           mkdir -p services/platform/build
           ./gradlew -p services/platform check 2>&1 | tee services/platform/build/ci-check.log
+      - name: Bundle platform coverage
+        if: always()
+        run: python3 scripts/code_coverage/coverage_report.py pack jvm-platform --format jvm
+      - name: Upload platform coverage input
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          overwrite: true
+          name: coverage-input-platform
+          path: coverage/inputs/
+          if-no-files-found: error
+          retention-days: 14
       - name: Upload failed platform reports
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -140,10 +164,25 @@ jobs:
       - name: Test, lint, and build gateway
         working-directory: apps/gateway-web
         run: |
-          npm test
+          npm run test:coverage
           npm run typecheck
           npm run lint
           npm run build
+
+      - name: Bundle gateway coverage
+        if: always()
+        run: |
+          python3 scripts/code_coverage/coverage_report.py pack gateway-typescript --format istanbul --report apps/gateway-web/coverage/vitest/coverage-final.json
+          python3 scripts/code_coverage/coverage_report.py pack gateway-javascript --format istanbul --report apps/gateway-web/coverage/node/coverage-final.json
+      - name: Upload gateway coverage input
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          overwrite: true
+          name: coverage-input-gateway
+          path: coverage/inputs/
+          if-no-files-found: error
+          retention-days: 14
 
   e2e:
     # Match the OS supported by the pinned Playwright browser installer.
@@ -255,7 +294,19 @@ jobs:
         run: npm audit --omit=dev --audit-level=high
       - name: Verify MCP tools
         working-directory: services/mcp-server
-        run: npm test
+        run: npm run test:coverage
+      - name: Bundle MCP coverage
+        if: always()
+        run: python3 scripts/code_coverage/coverage_report.py pack mcp --format istanbul --report services/mcp-server/coverage/coverage-final.json
+      - name: Upload MCP coverage input
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          overwrite: true
+          name: coverage-input-mcp
+          path: coverage/inputs/
+          if-no-files-found: error
+          retention-days: 14
       - run: docker build -t constitution-atlas/mcp-server:ci services/mcp-server
 
   publish-journey:
@@ -466,9 +517,86 @@ jobs:
         if: always()
         run: docker compose --env-file env/ci.env.example down -v
 
+  python-coverage:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Install Python coverage tools
+        run: |
+          python3 -m venv "$RUNNER_TEMP/python-coverage"
+          echo "$RUNNER_TEMP/python-coverage/bin" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/python-coverage/bin/pip" install coverage==7.17.0 PyYAML==6.0.2
+      - name: Exercise Python tooling with coverage
+        run: python -m coverage run --parallel-mode scripts/code_coverage/run_python.py
+      - name: Combine and bundle Python coverage
+        if: always()
+        run: |
+          python -m coverage combine
+          python -m coverage json
+          python scripts/code_coverage/coverage_report.py pack python --format python --report coverage/python.json
+      - name: Upload Python coverage input
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          overwrite: true
+          name: coverage-input-python
+          path: coverage/inputs/
+          if-no-files-found: error
+          retention-days: 14
+
+  coverage:
+    if: always()
+    needs: [backend-services, backend, platform, frontend, mcp-server, python-coverage]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+      - name: Download this run's coverage inputs
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: coverage-input-*
+          path: coverage/inputs
+          merge-multiple: true
+      - name: Validate complete, commit-bound coverage inputs
+        run: python3 scripts/code_coverage/coverage_report.py validate
+      - name: Merge JVM probes and report every production class once
+        run: |
+          set -euo pipefail
+          ./gradlew repositoryCoverage 2>&1 | tee coverage/jvm-report.log
+          if grep -E 'does not match|do not match' coverage/jvm-report.log; then exit 1; fi
+      - name: Report whole repository and enforce 80 percent new-code coverage
+        if: always()
+        run: python3 scripts/code_coverage/coverage_report.py report --event "$GITHUB_EVENT_PATH" --minimum 80
+      - name: Upload code coverage statistics and browsable reports
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          overwrite: true
+          name: code-coverage
+          path: |
+            coverage/summary.json
+            coverage/summary.md
+            coverage/source-lines.json
+            coverage/index.html
+            coverage/jvm.xml
+            coverage/jvm-html/
+            coverage/jvm-report.log
+          if-no-files-found: error
+          retention-days: 30
+
   ci-status:
     if: always()
     needs:
+      - coverage
+      - python-coverage
       - backend-services
       - backend
       - platform

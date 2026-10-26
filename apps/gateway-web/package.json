@@ -11,7 +11,8 @@
     "test:e2e:full": "playwright test --config=playwright.full.config.js",
     "fixtures:generate": "node e2e/fixtures/generate.mjs",
     "prepopulate": "npm run fixtures:generate && node e2e/fixtures/prepopulate.mjs",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:coverage": "c8 --all --include=\"lib/**/*.js\" --reporter=json --reporter=html --reports-dir=coverage/node node --test lib/interpret-me.test.cjs e2e/fixtures/prepopulate-import.test.mjs e2e/fixtures/prepopulate-access.test.mjs && vitest run --coverage"
   },
   "dependencies": {
     "next": "15.5.28",
@@ -23,7 +24,9 @@
     "@types/node": "22.20.5",
     "@types/react": "18.3.3",
     "@types/react-dom": "18.3.0",
+    "@vitest/coverage-v8": "4.1.12",
     "axe-core": "4.10.2",
+    "c8": "10.1.3",
     "eslint": "8.57.0",
     "eslint-config-next": "15.5.28",
     "jsdom": "25.0.1",

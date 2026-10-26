@@ -72,3 +72,61 @@ Edit [docs/wiki](https://github.com/julianhoelz94/Verfassung/tree/main/docs/wiki
 **Illustrations and videos refresh only in merged-PR CI.** Ordinary PR checks validate guide links and capture code without updating published media. The merge workflow captures both languages, verifies media and browser playback, deploys the player, then publishes pages and embedded images to the Wiki. See [[Media maintenance|Media-Maintenance]] for sources, verification and recovery.
 
 Production deployment remains [[pending|Deployment-Information]] until a site CD workflow and verified production procedure exist. The static video player does not deploy the application.
+
+## Code coverage in CI
+
+Every CI run publishes **whole-repository line coverage** and **new-code line
+coverage** in the `coverage` job summary and the downloadable `code-coverage`
+artifact. Open `index.html` for original source lines, `summary.json` for machine
+readable statistics, and `jvm-html/index.html` for the detailed JVM report. Component
+line and branch coverage, the exact tested revision/comparison base, and uncovered
+changed lines are included. Migration inventory coverage is a separate artifact.
+
+The required `ci-status` check includes the coverage gate. Added or changed executable
+production lines must reach **at least 80% line coverage**, using the unrounded
+ratio. The total repository figure establishes the baseline and has no minimum.
+A change with no executable production lines reports **N/A**, with a passing gate.
+Missing, incomplete or stale inputs fail the coverage job and cannot produce a
+passing percentage.
+
+PRs compare with the merge base of the target revision from the event. Main pushes
+compare with the previous pushed `main` revision, verifying the actual merged
+result; the PR gate is what prevents a merge below the minimum. Renamed source
+paths count as newly introduced files. Successful inputs from an earlier attempt
+of the same run/revision may be reused when rerunning failed jobs; inputs from
+another run or source revision are rejected.
+
+The denominator includes Kotlin service/platform production sources, gateway
+`app`, `lib` and `middleware` TypeScript/JavaScript, MCP TypeScript, and Python
+operational tooling. It excludes tests, fixtures, generated output, declaration
+files, dependencies, CSS, SQL migrations, shell scripts and build configuration.
+Coverage reflects instrumented service/unit tests; browser, publication, visual
+and full-stack acceptance checks remain separate required checks. Execution does
+not establish that every behavior is asserted correctly.
+
+JVM probes from all services and platform tests are merged before JaCoCo analyzes
+each production class once. Platform coverage therefore includes service-test
+observations without multiplying its denominator. JavaScript source maps resolve
+to original tracked files. Python observations combine before reporting. The
+aggregate merges repeated source-line observations with covered-if-any semantics
+and includes files that no test imports.
+
+Local collection:
+
+```sh
+./gradlew -p services/<name> check jacocoTestReport
+# In apps/gateway-web or services/mcp-server:
+npm run test:coverage
+# Python checks (Python 3.10+, in a temporary virtual environment):
+python -m pip install coverage==7.17.0 PyYAML==6.0.2
+python -m coverage run --parallel-mode scripts/code_coverage/run_python.py
+python -m coverage combine
+python -m coverage json
+```
+
+The CI workflow packages commit-bound collector inputs, validates the complete
+source inventory, runs `./gradlew repositoryCoverage`, and executes
+`python3 scripts/code_coverage/coverage_report.py report --event "$GITHUB_EVENT_PATH" --minimum 80`.
+Use `--base <revision>` in place of `--event` for a local aggregate. See the
+[Sprint 67 measurement policy](https://github.com/julianhoelz94/Verfassung/blob/main/docs/design/sprint-67-ci-code-coverage.md)
+for scope and acceptance.

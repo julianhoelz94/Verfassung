@@ -5,6 +5,8 @@ plugins {
   id("com.diffplug.spotless") version "6.25.0"
 }
 
+apply(from = rootDir.resolve("../../gradle/coverage-conventions.gradle"))
+
 group = "com.constitutionatlas"
 version = "0.1.0"
 

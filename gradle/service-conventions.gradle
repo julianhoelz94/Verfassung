@@ -1,3 +1,5 @@
+apply from: file('../../gradle/coverage-conventions.gradle')
+
 springBoot {
     buildInfo()
 }

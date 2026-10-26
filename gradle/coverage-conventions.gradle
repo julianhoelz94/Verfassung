@@ -1,0 +1,21 @@
+// Applied to every independent JVM build. No service/database ownership changes.
+apply plugin: 'jacoco'
+
+jacoco {
+    toolVersion = '0.8.16'
+}
+
+tasks.withType(Test).configureEach {
+    jacoco {
+        // Keep instrumentation limited to first-party classes.
+        includes = ['com.constitutionatlas.*']
+    }
+}
+
+tasks.named('jacocoTestReport') {
+    dependsOn tasks.named('test')
+    reports {
+        xml.required = true
+        html.required = true
+    }
+}

@@ -19,12 +19,17 @@ export type VersionSummary = {
   listing?: string;
   latestPublished: boolean;
   publicationComment?: string | null;
+  sourceEvidence?: SourceEvidence | null;
 };
+
+export type SourceEvidence = { dateWording?: string | null; datePrecision: 'unknown' | 'year' | 'month' | 'day' | 'range' | 'uncertain'; coverage?: string | null; statusWording?: string | null; attribution?: string | null };
 
 export type VersionDetail = Pick<VersionSummary, 'id' | 'versionLabel' | 'effectiveDate' | 'languageCode' | 'predecessorVersionId' | 'legalVersionId' | 'currentVersionId' | 'hopKind' | 'listing'> & {
   constitutionId: string;
   publicationStatus: string;
   countryCode?: string | null;
+  jurisdictionId?: string | null;
+  sourceEvidence?: SourceEvidence | null;
 };
 
 export type ContentNode = {
@@ -299,6 +304,9 @@ export type SearchHit = {
   articleId: string;
   versionId: string;
   countryCode: string;
+  jurisdictionId?: string | null;
+  jurisdictionName?: string | null;
+  historical?: boolean;
   constitutionTitle: string;
   versionLabel: string;
   effectiveDate: string | null;
@@ -317,6 +325,7 @@ export type SearchPage = {
 
 export type SearchFilters = {
   country?: string;
+  jurisdictionId?: string;
   versionId?: string;
   effectiveDate?: string;
   limit?: number;
@@ -346,6 +355,7 @@ export type SearchFacets = {
   countries: CountryFacet[];
   versions: VersionFacet[];
   dates: DateFacet[];
+  jurisdictions?: { id: string; name: string; historical: boolean; count: number }[];
 };
 
 export function searchArticles(query: string, filters: SearchFilters = {}): Promise<SearchPage | null> {
@@ -356,6 +366,7 @@ export function searchArticles(query: string, filters: SearchFilters = {}): Prom
   }
   const params = new URLSearchParams();
   params.set('q', query);
+  if (filters.jurisdictionId) params.set('jurisdictionId', filters.jurisdictionId);
   if (filters.country) {
     params.set('country', filters.country);
   }
@@ -768,7 +779,7 @@ export type OrderedNode = { logicalId: string; revisionId: string; occurrenceId:
 export type OrderedTableCell = { logicalId: string; text: string; header?: boolean; rowSpan?: number; colSpan?: number; headers?: string[] };
 export type OrderedTable = { caption?: string | null; rows: { logicalId: string; cells: OrderedTableCell[] }[] };
 export type OrderedInlineReference = { logicalId: string; start: number; end: number; target: { type: 'unit' | 'external' | 'footnote'; logicalId?: string | null; url?: string | null; footnoteId?: string | null } };
-export type OrderedEntry = { type: 'text' | 'child'; node?: OrderedNode | null; logicalId?: string | null; revisionId?: string | null; occurrenceId?: string | null; text?: string | null; format?: 'plain' | 'table' | 'footnote' | null; table?: OrderedTable | null; footnoteLabel?: string | null; references?: OrderedInlineReference[] };
+export type OrderedEntry = { type: 'text' | 'child'; node?: OrderedNode | null; logicalId?: string | null; revisionId?: string | null; occurrenceId?: string | null; text?: string | null; format?: 'plain' | 'table' | 'footnote' | null; table?: OrderedTable | null; footnoteLabel?: string | null; references?: OrderedInlineReference[]; annotation?: { kind: 'source' | 'editorial' | 'amendment'; attribution?: string | null; sourceUrl?: string | null; anchorLogicalIds?: string[] } | null };
 
 export function getVersionSettings(versionId: string, authorization?: string): Promise<SettingsRevision | null> {
   return readJson<SettingsRevision>(`${catalogBaseUrl()}/versions/${encodeURIComponent(versionId)}/settings`, 'catalog', authorization);

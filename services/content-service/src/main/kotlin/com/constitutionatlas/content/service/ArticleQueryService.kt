@@ -24,6 +24,7 @@ class ArticleQueryService(
     private val publicationGuard: PublicationGuard,
     private val ordered: OrderedContentService,
     private val orderedRepository: OrderedContentRepository,
+    private val receipts: com.constitutionatlas.content.repo.OrderedPublishReceiptRepository,
 ) {
     fun listByVersion(
         versionId: UUID,
@@ -184,6 +185,8 @@ class ArticleQueryService(
     }
 
     private fun requireLegacy(version: UUID) {
+        orderedRepository.lock(version)
+        if (receipts.forVersion(version) != null) throw ResponseStatusException(HttpStatus.CONFLICT, "Approved snapshot is sealed for publication")
         if (orderedRepository.canonical(version)) throw ResponseStatusException(HttpStatus.CONFLICT, "Use ordered content writes; legacy writes cannot preserve revision identity and mixed order")
     }
 

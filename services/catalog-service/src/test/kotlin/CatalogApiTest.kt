@@ -46,6 +46,9 @@ class CatalogApiTest {
     lateinit var catalogRepository: com.constitutionatlas.catalog.repo.CatalogRepository
 
     @MockBean
+    lateinit var archiveTargets: com.constitutionatlas.catalog.client.ArchiveTargetClient
+
+    @MockBean
     lateinit var settingsUsage: com.constitutionatlas.catalog.client.SettingsUsageClient
 
     @Autowired lateinit var writes: com.constitutionatlas.catalog.service.CatalogWriteService
@@ -75,6 +78,168 @@ class CatalogApiTest {
     // Keep generated countries separate from fixed fixtures and independent of randomness.
     private fun uniqueCountryCode(): String = ('A'..'Z').asSequence().map { "Q$it" }
         .first { catalogRepository.findCountrySummary(it) == null }
+
+    @Test
+    fun curatedComparisonsPinDistinctConstitutionsAndRequireReviewAndFreshPublication() {
+        val code = uniqueCountryCode()
+        mockMvc.post("/countries") {
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"isoCode":"$code","name":"Comparison test"}"""
+        }.andExpect { status { isCreated() } }
+        val country = catalogRepository.findCountrySummary(code)!!
+        val constitutions = (1..2).map { writes.createJurisdictionConstitution(country.id, com.constitutionatlas.catalog.api.CreateConstitutionRequest("charter-$it", "Charter $it")) }
+        val versions = constitutions.map { constitution -> writes.createDraftVersion(constitution.id, com.constitutionatlas.catalog.api.CreateVersionRequest("1849")) }
+        versions.forEach { version -> mockMvc.post("/versions/${version.id}/publish") { header("Authorization", PUBLISHER_TOKEN) }.andExpect { status { isOk() } } }
+        val logical = listOf(UUID.randomUUID(), UUID.randomUUID())
+        versions.forEachIndexed { index, version ->
+            val snapshot = com.constitutionatlas.platform.OrderedSnapshot(version.id, 1, UUID.randomUUID(), listOf(com.constitutionatlas.platform.OrderedNode(logical[index], UUID.randomUUID(), UUID.randomUUID(), "article", "1", null, listOf(com.constitutionatlas.platform.OrderedEntry("text", logicalId = UUID.randomUUID(), text = "Exact historic wording $index")))))
+            Mockito.`when`(archiveTargets.snapshot(Mockito.eq(version.id) ?: version.id, Mockito.nullable(String::class.java))).thenReturn(snapshot)
+        }
+        val documentId = UUID.randomUUID()
+        Mockito.`when`(archiveTargets.document(Mockito.eq(documentId) ?: documentId, Mockito.eq(1), Mockito.nullable(String::class.java))).thenReturn(objectMapper.readTree("""{"id":"$documentId","revision":{"revision":1,"fileName":"comparison.htm"}}"""))
+        val body = objectMapper.writeValueAsString(
+            mapOf(
+                "attemptId" to UUID.randomUUID(),
+                "title" to "Historic rights",
+                "attribution" to "Archive editor",
+                "sourceUrl" to "https://www.verfassungen.de/vergleiche1849-1990.htm",
+                "sourceDocumentId" to documentId,
+                "sourceDocumentRevision" to 1,
+                "columns" to constitutions.mapIndexed { index, constitution -> mapOf("constitutionId" to constitution.id, "versionId" to versions[index].id, "label" to "Text $index") },
+                "topics" to listOf(mapOf("title" to "Rights", "passages" to listOf(mapOf("column" to 0, "logicalId" to logical[0])), "missingColumns" to listOf(1))),
+            ),
+        )
+        fun create() = mockMvc.post("/curated-comparisons") {
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = body
+        }
+        val id = objectMapper.readTree(create().andExpect { status { isCreated() } }.andReturn().response.contentAsString).path("id").asText()
+        create().andExpect {
+            status { isCreated() }
+            jsonPath("$.id") { value(id) }
+        }
+        mockMvc.get("/curated-comparisons/$id").andExpect { status { isNotFound() } }
+        val importerToken = "Bearer comparison-importer"
+        Mockito.`when`(identityClient.authenticate(importerToken)).thenReturn(Actor(UUID.randomUUID(), "importer@example.local", emptyList(), listOf("ingestion:import")))
+        mockMvc.get("/curated-comparisons/$id") { header("Authorization", importerToken) }.andExpect { status { isNotFound() } }
+        mockMvc.post("/curated-comparisons/$id/review") {
+            header("Authorization", importerToken)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"reason":"Source comparison checked."}"""
+        }.andExpect { status { isForbidden() } }
+        val reviewerToken = "Bearer comparison-reviewer"
+        Mockito.`when`(identityClient.authenticate(reviewerToken)).thenReturn(editor.copy(roles = listOf("reviewer")))
+        mockMvc.post("/curated-comparisons/$id/review") {
+            header("Authorization", reviewerToken)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"reason":"Checked all source correspondences and missing counterparts."}"""
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.state") { value("reviewed") }
+        }
+        mockMvc.post("/curated-comparisons/$id/publish") { header("Authorization", PUBLISHER_TOKEN) }.andExpect { status { isForbidden() } }
+        val fresh = "Bearer comparison-fresh-publisher"
+        Mockito.`when`(identityClient.authenticate(fresh)).thenReturn(publisher.copy(stepUpFresh = true))
+        mockMvc.post("/curated-comparisons/$id/publish") { header("Authorization", fresh) }.andExpect {
+            status { isOk() }
+            jsonPath("$.state") { value("published") }
+        }
+        mockMvc.get("/curated-comparisons/$id").andExpect {
+            status { isOk() }
+            jsonPath("$.definition.topics[0].missingColumns[0]") { value(1) }
+            jsonPath("$.needsReview") { value(false) }
+        }
+        val correction = writes.createDraftVersion(constitutions[0].id, com.constitutionatlas.catalog.api.CreateVersionRequest("1849 r2", predecessorVersionId = versions[0].id, hopKind = "editorial_correction"))
+        mockMvc.post("/versions/${correction.id}/publish") { header("Authorization", PUBLISHER_TOKEN) }.andExpect { status { isOk() } }
+        mockMvc.get("/curated-comparisons/$id").andExpect {
+            status { isOk() }
+            jsonPath("$.needsReview") { value(true) }
+            jsonPath("$.definition.columns[0].versionId") { value(versions[0].id.toString()) }
+        }
+        mockMvc.post("/curated-comparisons/$id/review") {
+            header("Authorization", reviewerToken)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"reason":"Cannot rewrite a published mapping."}"""
+        }.andExpect { status { isConflict() } }
+    }
+
+    @Test
+    fun legacyMappingsKeepExactHistoricalTargetsAndRejectAmbiguousOrExternalRedirects() {
+        val historical = "01900000-0000-4000-8000-000000000003"
+        val later = "01900000-0000-4000-8000-000000000004"
+        val source = "https://www.verfassungen.de/gg.htm#old-${UUID.randomUUID()}"
+        val body = """{"sourceUrl":"$source","kind":"version","versionId":"$historical"}"""
+        mockMvc.post("/legacy-mappings") {
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = body
+        }.andExpect { status { isCreated() } }
+        mockMvc.get("/legacy-resolve") { param("url", source) }.andExpect {
+            status { isOk() }
+            jsonPath("$.targetUrl") { value("/countries/DE/versions/$historical") }
+        }
+        mockMvc.post("/legacy-mappings") {
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = body.replace(historical, later)
+        }.andExpect { status { isConflict() } }
+        mockMvc.get("/legacy-resolve") { param("url", "$source-missing") }.andExpect { status { isNotFound() } }
+        mockMvc.post("/legacy-mappings") {
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = body.replace("www.verfassungen.de", "attacker.example")
+        }.andExpect { status { isBadRequest() } }
+        mockMvc.post("/legacy-mappings") {
+            contentType = MediaType.APPLICATION_JSON
+            content = body
+        }.andExpect { status { isUnauthorized() } }
+        val version = UUID.fromString(historical)
+        val logical = UUID.randomUUID()
+        val occurrence = UUID.randomUUID()
+        val note = UUID.randomUUID()
+        val noteOccurrence = UUID.randomUUID()
+        val snapshot = com.constitutionatlas.platform.OrderedSnapshot(version, 1, UUID.randomUUID(), listOf(com.constitutionatlas.platform.OrderedNode(logical, UUID.randomUUID(), occurrence, "article", "1", null, listOf(com.constitutionatlas.platform.OrderedEntry("text", logicalId = note, occurrenceId = noteOccurrence, text = "Editorial note", format = "footnote")))))
+        Mockito.`when`(archiveTargets.snapshot(Mockito.eq(version) ?: version, Mockito.nullable(String::class.java))).thenReturn(snapshot)
+        for ((kind, target, fragment) in listOf(Triple("unit", logical, occurrence.toString()), Triple("note", note, "fn-$noteOccurrence"))) {
+            val url = "https://www.verfassungen.de/gg.htm#$target"
+            mockMvc.post("/legacy-mappings") {
+                header("Authorization", TOKEN)
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"sourceUrl":"$url","kind":"$kind","versionId":"$version","logicalId":"$target"}"""
+            }.andExpect { status { isCreated() } }
+            mockMvc.get("/legacy-resolve") { param("url", url) }.andExpect {
+                status { isOk() }
+                jsonPath("$.targetUrl") { value("/countries/DE/versions/$version#$fragment") }
+            }
+        }
+    }
+
+    @Test
+    fun archivalEvidenceSurvivesPublicationAndEditorialCorrectionWithoutInventedDates() {
+        val evidence = com.constitutionatlas.platform.SourceEvidence("nach 1849", "uncertain", "Original with later notes", "aktuell (archived wording)", "Legacy archive")
+        val code = uniqueCountryCode()
+        mockMvc.post("/countries") {
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"isoCode":"$code","name":"Archive evidence test"}"""
+        }.andExpect { status { isCreated() } }
+        val country = catalogRepository.findCountrySummary(code)!!
+        val constitution = writes.createJurisdictionConstitution(country.id, com.constitutionatlas.catalog.api.CreateConstitutionRequest("archive-${UUID.randomUUID()}", "Archive"))
+        val first = writes.createDraftVersion(constitution.id, com.constitutionatlas.catalog.api.CreateVersionRequest("1849", sourceEvidence = evidence))
+        mockMvc.post("/versions/${first.id}/publish") { header("Authorization", PUBLISHER_TOKEN) }.andExpect { status { isOk() } }
+        mockMvc.get("/versions/${first.id}").andExpect {
+            status { isOk() }
+            jsonPath("$.effectiveDate") { value(org.hamcrest.Matchers.nullValue()) }
+            jsonPath("$.sourceEvidence.dateWording") { value("nach 1849") }
+            jsonPath("$.sourceEvidence.datePrecision") { value("uncertain") }
+            jsonPath("$.sourceEvidence.statusWording") { value("aktuell (archived wording)") }
+        }
+        val correction = writes.createDraftVersion(constitution.id, com.constitutionatlas.catalog.api.CreateVersionRequest("1849 r2", predecessorVersionId = first.id, hopKind = "editorial_correction"))
+        assertThat(catalogRepository.findVersion(correction.id)?.sourceEvidence).isEqualTo(evidence)
+        assertThat(catalogRepository.findVersion(first.id)?.sourceEvidence).isEqualTo(evidence)
+    }
 
     @Test
     fun historicalCountriesAndRegionsPublishConstitutionsWithoutIsoCodes() {
@@ -395,6 +560,23 @@ class CatalogApiTest {
             .andExpect { status { isForbidden() } }
         mockMvc.post("/versions/${version.id}/publish?importJobId=$jobId") { header("Authorization", importToken) }
             .andExpect { status { isOk() } }
+    }
+
+    @Test
+    fun importSealingReservationRequiresTheHeldVersionAndExactAttempt() {
+        val code = uniqueCountryCode()
+        writes.createCountry(com.constitutionatlas.catalog.api.CreateCountryRequest(code, "Reservation fixture"))
+        val constitution = writes.createConstitution(code, com.constitutionatlas.catalog.api.CreateConstitutionRequest("held", "Held import"))
+        val attempt = UUID.randomUUID()
+        val version = writes.createDraftVersion(constitution.id, com.constitutionatlas.catalog.api.CreateVersionRequest("1", importJobId = attempt, publishAttemptId = attempt))
+        val token = "Bearer reservation-publisher"
+        Mockito.`when`(identityClient.authenticate(token)).thenReturn(Actor(UUID.randomUUID(), "ingestion", emptyList(), listOf("ingestion:publish")))
+        mockMvc.get("/versions/${version.id}/import-reservation?attemptId=$attempt") { header("Authorization", token) }.andExpect { status { isOk() } }
+        mockMvc.get("/versions/${version.id}/import-reservation?attemptId=${UUID.randomUUID()}") { header("Authorization", token) }.andExpect { status { isForbidden() } }
+        mockMvc.get("/versions/${version.id}/import-reservation?attemptId=$attempt") { header("Authorization", TOKEN) }.andExpect { status { isForbidden() } }
+        val ordinaryConstitution = writes.createConstitution(code, com.constitutionatlas.catalog.api.CreateConstitutionRequest("ordinary", "Ordinary draft"))
+        val ordinary = writes.createDraftVersion(ordinaryConstitution.id, com.constitutionatlas.catalog.api.CreateVersionRequest("ordinary"))
+        mockMvc.get("/versions/${ordinary.id}/import-reservation?attemptId=$attempt") { header("Authorization", token) }.andExpect { status { isForbidden() } }
     }
 
     @Test

@@ -28,3 +28,7 @@ content:
 editor:
   api:
     url: ${EDITOR_API_URL:http://localhost/api/editor}
+
+document:
+  api:
+    url: ${DOCUMENT_API_URL:http://localhost/api/document}

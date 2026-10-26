@@ -6,7 +6,6 @@ import { currentLocale } from '../../../../../lib/server-locale';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import { ReaderPage } from '../../../../components/layout/templates';
-import { PrintLink } from '../../../../components/PrintLink';
 import { SiteSearchForm } from '../../../../components/SiteSearchForm';
 import { ServiceUnavailable } from '../../../../components/StatusMessage';
 import { Alert, Badge, PageHeader, Pager } from '../../../../components/ui';
@@ -31,6 +30,8 @@ import { listDocumentLinks } from '../../../../../lib/document-api';
 import { currentUser } from '../../../../../lib/session';
 import { EditorEntry } from './EditorEntry';
 import surfaceStyles from '../../../../components/surfaces.module.css';
+import { migrationUi } from '../../../../../lib/migration-messages';
+import { SourceEvidenceNotice } from '../../../../components/SourceEvidenceNotice';
 
 type VersionPageProps = {
   params: Promise<{ code: string; versionId: string }>;
@@ -152,19 +153,20 @@ export default async function VersionPage(props: VersionPageProps) {
             ) : null}
           </>
         }
-        actions={
+        actions={canEdit || neighbors.previous ? (
           <>
             {canEdit ? <a className="btn btn-primary" href="#editor-entry"><T value={ui.countries.code.versions.versionid.page.editThisConstitution} /></a> : null}
             {neighbors.previous ? (
               <a className="btn" href={neighbors.previous.href}>
                 <T value={ui.countries.code.versions.versionid.page.compareWithPrevious} />{" "}</a>
             ) : null}
-            <PrintLink />
           </>
-        }
+        ) : null}
       />}>
 
       <CountryNavigation code={params.code} active="reading" />
+      <SourceEvidenceNotice evidence={snapshot?.sourceEvidence} versionId={params.versionId} />
+      <p><a href={`/constitutions/${version.constitution.id}/amendments`}><T value={migrationUi.amendmentRegister} /></a></p>
       <SnapshotNotice code={country.isoCode} viewedId={params.versionId} currentId={version.version.currentVersionId ?? version.version.id} />
       {canEdit ? <EditorEntry
         versions={version.constitution.versions}

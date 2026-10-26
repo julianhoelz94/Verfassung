@@ -33,6 +33,10 @@ Die Suchfilter bieten kompakte Auswahlfelder für Land, Fassung und Gültigkeits
 
 Zum Zitieren speichern Sie die Adresse der geöffneten Vorschrift und die Fassungs-ID. Alte Links bleiben erreichbar. Eine Textkorrektur ist keine neue Rechtsänderung.
 
+## Regionale und historische Archive
+
+Die Startseite verlinkt Regionen und historische Sammlungen. Die Navigation zeigt den belegten Gebietskontext. Datumsformulierungen und alte Statusangaben bleiben Quellenbelege. Gekennzeichnete Anmerkungen stehen getrennt vom Rechtstext und sind auch gesondert lesbar. Das **Änderungsregister** durchsucht Instrumente, Fundstellen und wörtliche Einheitenbezeichnungen; Instrument- und Wirksamkeitsdaten sind getrennte Filter. **Kuratierte Vergleiche** verbinden belegte Passagen eigenständiger Verfassungen, kennzeichnen fehlende Entsprechungen und speichern Auswahl und Thema in der URL. Alt-Links behalten ihr genaues historisches Ziel.
+
 ## Quellen, Sprachen und Sonderfälle
 
 <details>

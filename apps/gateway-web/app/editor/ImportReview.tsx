@@ -1,5 +1,4 @@
 import { NavigatingActionForm } from '../components/NavigatingActionForm';
-import { statusMessage } from '../../lib/ui-labels';
 import { T } from '../components/TranslationProvider';
 import { ui } from '../../lib/messages';
 import { notFound } from 'next/navigation';
@@ -15,6 +14,7 @@ import { Disclosure } from '../components/Disclosure';
 import { reviewUi } from '../../lib/ui-review-messages';
 import { ImportPreview } from '../admin/import/ImportPreview';
 import fieldStyles from '../components/fields.module.css';
+import { importActions, importPhase } from '../../lib/import-workflow';
 
 export async function ImportReview({ jobId, error }: { jobId: string; error?: string }) {
   const user = await currentUser();
@@ -42,9 +42,15 @@ export async function ImportReview({ jobId, error }: { jobId: string; error?: st
     job.versionId ? getPreparedImportContent(job.versionId, authorization).catch(() => null) : null,
     job.versionId ? getVersionSettings(job.versionId, authorization).catch(() => null) : null,
   ]);
-  const editor = user.roles.includes('editor') || user.roles.includes('admin');
-  const reviewer = user.roles.includes('reviewer') || user.roles.includes('admin');
   const publisher = user.roles.includes('publisher') || user.roles.includes('admin');
+  const phase = importPhase(job);
+  const actions = importActions(job, user.roles, Boolean(payload?.outline)).filter(action => action !== 'approve' || prepared);
+  const actionHeading = phase === 'prepare' ? ui.importWorkflow.preparation : phase === 'approved' ? ui.importWorkflow.publication : ui.importWorkflow.review;
+  const labels = { 'confirm-outline': ui.importActions.confirmOutline, prepare: ui.importActions.prepareDraft, approve: ui.importActions.approveDraft, reject: ui.importActions.rejectImport, publish: ui.importActions.publishVersion };
+  const workflowErrors = ui.importWorkflow.errors;
+  const errorMessage = error === 'reason' ? ui.importActions.reasonRequired
+    : error && Object.hasOwn(workflowErrors, error) ? workflowErrors[error as keyof typeof workflowErrors]
+    : ui.importActions.actionFailed;
   const versionHref =
     job.status === 'completed' && job.versionId && job.isoCode
       ? `/countries/${encodeURIComponent(job.isoCode)}/versions/${encodeURIComponent(job.versionId)}`
@@ -56,8 +62,20 @@ export async function ImportReview({ jobId, error }: { jobId: string; error?: st
         {publisher ? <a href="/editor?status=approved"><T value={ui.nav.readyToPublish} /></a> : null}
       </nav>
 
-      <p><T value={ui.importActions.status} /> <T value={statusMessage(job.status)} /></p>
-      {error ? <Alert tone="error"><T value={error === 'reason' ? ui.importActions.reasonRequired : ui.importActions.actionFailed} /></Alert> : null}
+      <Card className="import-workflow">
+        <div role="status" aria-live="polite">
+          <h2><T value={ui.importWorkflow.phases[phase]} /></h2>
+          {phase === 'approved' ? <p><T value={ui.importWorkflow.approvedHelp} /></p> : null}
+          {phase === 'publishing' ? <p><T value={ui.importWorkflow.publishingHelp} /></p> : null}
+        </div>
+        {error ? <Alert tone="error"><T value={errorMessage} /></Alert> : null}
+        {actions.length ? <section aria-labelledby="import-actions-heading">
+          <h2 id="import-actions-heading"><T value={actionHeading} /></h2>
+          <div className="review-action-grid">
+            {actions.map(action => <ActionForm key={action} action={action} jobId={job.id} label={labels[action]} />)}
+          </div>
+        </section> : phase === 'prepare' || phase === 'review' || phase === 'approved' ? <p><T value={ui.importWorkflow.waiting} /></p> : null}
+      </Card>
       {job.status === 'pending_review' ? <Alert><T value={ui.admin.import.jobid.page.thisImportIsPendingReviewItIs} /></Alert> : null}
       {job.versionId && !prepared ? <Alert tone="error"><T value={ui.importReview.previewUnavailable} /></Alert> : null}
       {job.status === 'failed' ? <Alert tone="error"><T value={ui.admin.import.jobid.page.theImportFailed} /></Alert> : null}
@@ -72,19 +90,9 @@ export async function ImportReview({ jobId, error }: { jobId: string; error?: st
         <p>{String(payload.countryName ?? job.isoCode ?? '')}</p>
         {typeof payload.sourceUrl === 'string' && payload.sourceUrl.startsWith('https://') ? <p><a href={payload.sourceUrl} target="_blank" rel="noreferrer"><T value={ui.importReview.source} /></a></p> : null}
         {typeof payload.gazetteReference === 'string' ? <p>{payload.gazetteReference}</p> : null}
+        {settings?.outline?.kinds.length ? <p><strong><T value={ui.importWorkflow.structure} />:</strong> {settings.outline.kinds.map(kind => kind.displayLabel).join(' → ')}</p> : null}
+        <p><a href="#import-structure"><T value={ui.importWorkflow.checkStructure} /></a></p>
       </Card> : null}
-      <Card>
-        <h2><T value={ui.admin.import.jobid.page.reviewActions} /></h2>
-        <div className="review-action-grid">
-        {!job.versionId && job.status === 'pending_review' && editor && payload?.outline && !job.outlineConfirmedBy ? <ActionForm action="confirm-outline" jobId={job.id} label={ui.importActions.confirmOutline} /> : null}
-        {!job.versionId && job.status === 'pending_review' && editor && (!payload?.outline || job.outlineConfirmedBy) ? <ActionForm action="prepare" jobId={job.id} label={ui.importActions.prepareDraft} /> : null}
-        {job.versionId && job.status === 'pending_review' && reviewer ? <>
-          {prepared ? <ActionForm action="approve" jobId={job.id} label={ui.importActions.approveDraft} /> : null}
-          <ActionForm action="reject" jobId={job.id} label={ui.importActions.rejectImport} />
-        </> : null}
-        {job.status === 'approved' && publisher ? <ActionForm action="publish" jobId={job.id} label={ui.importActions.publishVersion} /> : null}
-        </div>
-      </Card>
       {prepared ? <Card>
         <h2><T value={ui.admin.import.jobid.page.preparedDraftAsReadersWillSeeIt} /></h2>
         <OrderedContentTree entries={prepared.roots.map(node => ({ type: 'child' as const, node }))} outline={settings?.outline} />
@@ -99,7 +107,7 @@ export async function ImportReview({ jobId, error }: { jobId: string; error?: st
           </> : null}
         </dl>
       </Disclosure>
-      {payload ? <details><summary><T value={ui.importReview.submittedContent} /></summary><ImportPreview payload={payload} /></details> : null}
+      {payload ? <details id="import-structure"><summary><T value={ui.importReview.submittedContent} /></summary><ImportPreview payload={payload} outline={settings?.outline} /></details> : null}
       {decisions.length ? <Card><h2><T value={ui.admin.import.jobid.page.reviewDecisions} /></h2><ol>{decisions.map(decision => <li key={decision.id}>
         <strong>{decision.decision}</strong> · {new Date(decision.decidedAt).toLocaleString()}<p>{decision.reason}</p>
       </li>)}</ol></Card> : null}

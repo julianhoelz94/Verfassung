@@ -101,11 +101,18 @@ class ImportJobRepository(
         publicationOutbox.enqueue(jobId, "search_reindex", mapOf("versionId" to versionId))
     }
 
-    fun claimPreparation(jobId: UUID, actorId: UUID): Boolean = jdbc.update(
-        "UPDATE import_jobs SET status = 'preparing', prepared_by = ?, updated_at = NOW() WHERE id = ? AND status = 'pending_review' AND version_id IS NULL",
-        actorId,
-        jobId,
-    ) == 1
+    @Transactional
+    fun claimPreparation(jobId: UUID, actorId: UUID): UUID? {
+        val attempt = UUID.randomUUID()
+        val changed = jdbc.update(
+            "UPDATE import_jobs SET status = 'preparing', prepared_by = ?, preparation_attempt = ?, updated_at = NOW() WHERE id = ? AND (status IN ('pending_review', 'failed') OR (status = 'preparing' AND updated_at < NOW() - INTERVAL '2 minutes')) AND approved_by IS NULL",
+            actorId,
+            attempt,
+            jobId,
+        ) == 1
+        if (changed) jdbc.update("DELETE FROM import_errors WHERE import_job_id = ? AND code = 'PREPARATION_FAILED'", jobId)
+        return attempt.takeIf { changed }
+    }
 
     fun confirmOutline(jobId: UUID, actorId: UUID): Boolean = jdbc.update(
         "UPDATE import_jobs SET outline_confirmed_by = ?, outline_confirmed_at = NOW(), updated_at = NOW() WHERE id = ? AND status = 'pending_review' AND version_id IS NULL",
@@ -119,8 +126,19 @@ class ImportJobRepository(
         jobId,
     ).firstOrNull() ?: false
 
-    fun prepared(jobId: UUID, versionId: UUID) {
-        jdbc.update("UPDATE import_jobs SET status = 'pending_review', version_id = ?, updated_at = NOW() WHERE id = ? AND status = 'preparing'", versionId, jobId)
+    fun reserveVersion(jobId: UUID, versionId: UUID, attempt: UUID) {
+        check(jdbc.update("UPDATE import_jobs SET version_id = ? WHERE id = ? AND status = 'preparing' AND preparation_attempt = ? AND (version_id IS NULL OR version_id = ?)", versionId, jobId, attempt, versionId) == 1) { "Import draft reservation changed" }
+    }
+
+    fun prepared(jobId: UUID, versionId: UUID, attempt: UUID) {
+        jdbc.update("UPDATE import_jobs SET status = 'pending_review', version_id = ?, updated_at = NOW() WHERE id = ? AND status = 'preparing' AND preparation_attempt = ?", versionId, jobId, attempt)
+    }
+
+    @Transactional
+    fun preparationFailed(jobId: UUID, attempt: UUID, message: String) {
+        if (jdbc.update("UPDATE import_jobs SET status = 'failed', updated_at = NOW() WHERE id = ? AND status = 'preparing' AND preparation_attempt = ?", jobId, attempt) == 1) {
+            jdbc.update("INSERT INTO import_errors (id, import_job_id, code, message) VALUES (?, ?, 'PREPARATION_FAILED', ?)", UUID.randomUUID(), jobId, message)
+        }
     }
 
     @Transactional

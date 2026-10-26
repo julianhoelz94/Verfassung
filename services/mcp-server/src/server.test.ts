@@ -5,6 +5,80 @@ import { orderedText } from './server.js';
 import { createServer } from './server.js';
 import { authenticateMcpKey, requirePublishedVersion, UpstreamError } from './catalog.js';
 import { setupProposalSchema } from './import-schema.js';
+import { randomUUID } from 'node:crypto';
+
+test('setup handoff exposes feedback, pins revisions and tells the client to wait for website confirmation', async () => {
+  const originalFetch = globalThis.fetch;
+  const id = randomUUID();
+  const ownerId = randomUUID();
+  const payload = { isoCode: 'DE', countryName: 'Deutschland', constitutionSlug: 'handoff', constitutionTitle: 'Grundgesetz', languageCode: 'de', sourceUrl: 'https://example.org/gg', outline: { kinds: [{ kindCode: 'article', displayLabel: 'Artikel' }] }, sampleRoots: [{ kind: 'article', content: [{ type: 'text', text: 'Unveränderter Quelltext.' }] }] };
+  let proposal = { id, ownerId, payload, status: 'proposed', revision: 1, constitutionId: null as string | null, settingsRevisionId: null as string | null, confirmedBy: null as string | null, requestedChanges: null as string | null, changesRequested: false };
+  let writes = 0;
+  globalThis.fetch = async (input, init) => {
+    if (String(input).endsWith('/me')) return Response.json({ id: ownerId, scopes: ['ingestion:import'] });
+    if (init?.method === 'PUT') {
+      assert.equal(new Headers(init.headers).get('If-Match'), '"2"');
+      proposal = { ...proposal, revision: 3, changesRequested: false };
+      writes++;
+    } else if (init?.method === 'POST') writes++;
+    return Response.json(proposal);
+  };
+  try {
+    const created = await callTool('propose_constitution_setup', { proposal: payload }, 'Bearer ca_mcp_importer');
+    assert.equal(created.isError, undefined);
+    assert.equal(created.structuredContent?.nextAction, 'wait_for_confirmation');
+    assert.match(String(created.structuredContent?.instructions), /Stop.*Wait.*explicit website confirmation/s);
+    assert.match(String(created.structuredContent?.previewUrl), new RegExp(id));
+    proposal = { ...proposal, revision: 2, changesRequested: true, requestedChanges: 'Bitte eine Satzebene einfügen.' };
+    const feedback = await callTool('get_setup_proposal', { proposalId: id }, 'Bearer ca_mcp_importer');
+    assert.equal(feedback.structuredContent?.nextAction, 'revise_proposal');
+    assert.equal(feedback.structuredContent?.requestedChanges, proposal.requestedChanges);
+    assert.equal(feedback.structuredContent?.revision, 2);
+    const revised = await callTool('revise_setup_proposal', { proposalId: id, expectedRevision: 2, proposal: payload }, 'Bearer ca_mcp_importer');
+    assert.equal(revised.isError, undefined);
+    assert.equal(revised.structuredContent?.nextAction, 'wait_for_confirmation');
+    assert.equal(revised.structuredContent?.revision, 3);
+    const before = writes;
+    const invalid = await callTool('stage_constitution_import', { payload: { ...payload, versionLabel: '2026', roots: payload.sampleRoots } }, 'Bearer ca_mcp_importer');
+    assert.equal(invalid.isError, true);
+    assert.equal(writes, before);
+    proposal = { ...proposal, status: 'confirmed', constitutionId: randomUUID(), settingsRevisionId: randomUUID(), confirmedBy: ownerId };
+    const confirmed = await callTool('get_setup_proposal', { proposalId: id }, 'Bearer ca_mcp_importer');
+    assert.equal(confirmed.structuredContent?.nextAction, 'upload_full_content');
+    assert.equal(confirmed.structuredContent?.settingsRevisionId, proposal.settingsRevisionId);
+    proposal = { ...proposal, status: 'withdrawn' };
+    assert.equal((await callTool('get_setup_proposal', { proposalId: id }, 'Bearer ca_mcp_importer')).structuredContent?.nextAction, 'stop');
+  } finally { globalThis.fetch = originalFetch; }
+});
+
+test('rich imports survive the actual MCP parser for direct and batch staging', async () => {
+  const originalFetch = globalThis.fetch;
+  const noteId = randomUUID();
+  const root = { logicalId: randomUUID(), kind: 'article', label: 'I a', title: null, content: [
+    { type: 'text', text: 'Wort', references: [{ logicalId: randomUUID(), start: 0, end: 4, target: { type: 'footnote', footnoteId: noteId } }] },
+    { type: 'text', logicalId: noteId, text: 'Anmerkung: spätere Redaktion.', format: 'footnote', footnoteLabel: '*' },
+    { type: 'text', format: 'table', table: { caption: 'Übersicht', rows: [{ logicalId: randomUUID(), cells: [{ logicalId: randomUUID(), text: 'unverändert', header: true, rowSpan: 2, colSpan: 1, headers: [] }] }] } },
+  ] };
+  const payload = { isoCode: 'DE', countryName: 'Deutschland', constitutionSlug: 'archiv', constitutionTitle: 'Verfassung', versionLabel: '1849', constitutionId: randomUUID(), settingsRevisionId: randomUUID(), roots: [root] };
+  let received: unknown;
+  globalThis.fetch = async (input, init) => {
+    if (String(input).endsWith('/me')) return Response.json({ scopes: ['ingestion:import'] });
+    received = JSON.parse(String(init?.body));
+    return Response.json({ id: randomUUID(), status: 'pending_review', errors: [] });
+  };
+  try {
+    assert.equal((await callTool('stage_constitution_import', { payload }, 'Bearer ca_mcp_importer')).isError, undefined);
+    assert.deepEqual(received, payload);
+    assert.equal((await callTool('stage_batch_item', { batchId: randomUUID(), idempotencyKey: 'source-item-1849', payload }, 'Bearer ca_mcp_importer')).isError, undefined);
+    assert.deepEqual((received as unknown as { payload: unknown }).payload, payload);
+    received = undefined;
+    const invalid = { ...payload, roots: [{ ...root, accidentalField: 'must not disappear' }] };
+    assert.equal((await callTool('stage_constitution_import', { payload: invalid }, 'Bearer ca_mcp_importer')).isError, true);
+    assert.equal(received, undefined);
+    const outline = { kinds: [{ kindCode: 'article', displayLabel: 'Artikel', root: true, allowedChildKinds: [] }] };
+    assert.deepEqual(setupProposalSchema.parse({ isoCode: 'DE', countryName: 'Deutschland', constitutionSlug: 'archiv', constitutionTitle: 'Verfassung', outline, sampleRoots: [root] }).outline, outline);
+  } finally { globalThis.fetch = originalFetch; }
+});
 
 test('MCP outline choices match catalog authoring policies', () => {
   const proposal = {
@@ -13,6 +87,33 @@ test('MCP outline choices match catalog authoring policies', () => {
   };
   assert.equal(setupProposalSchema.safeParse(proposal).success, true);
   assert.equal(setupProposalSchema.safeParse({ ...proposal, outline: { kinds: [{ ...proposal.outline.kinds[0], kindCode: 'x'.repeat(33) }] } }).success, false);
+});
+
+test('jurisdiction discovery and import setup preserve historical identities without country codes', async () => {
+  const originalFetch = globalThis.fetch;
+  const jurisdictionId = randomUUID();
+  const constitutionId = randomUUID();
+  const settings = randomUUID();
+  const calls: string[] = [];
+  globalThis.fetch = async input => {
+    const path = new URL(String(input)).pathname;
+    calls.push(path);
+    if (path === '/me') return Response.json({ scopes: ['ingestion:import'] });
+    if (path === `/jurisdictions/${jurisdictionId}`) return Response.json({ jurisdiction: { id: jurisdictionId, name: 'Preußen', historical: true }, constitutions: [{ id: constitutionId, slug: '1850', title: 'Verfassung' }] });
+    if (path.endsWith('/settings')) return Response.json({ id: settings, outline: { kinds: [] } });
+    return Response.json({});
+  };
+  try {
+    const result = await callTool('get_import_setup', { jurisdictionId, constitutionSlug: '1850' }, 'Bearer ca_mcp_importer');
+    assert.equal(result.isError, undefined);
+    assert.equal(result.structuredContent?.jurisdictionId, jurisdictionId);
+    assert.equal(result.structuredContent?.constitutionId, constitutionId);
+    assert.equal(result.structuredContent?.countryCode, undefined);
+    assert.equal((await callTool('find_constitution', { jurisdictionId, countryCode: 'DE', constitutionSlug: '1850' }, 'Bearer ca_mcp_importer')).isError, true);
+    assert.equal(calls.some(path => path.startsWith('/countries')), false);
+    const exportResult = await callTool('export_import_job', { jobId: randomUUID(), view: 'submitted' }, 'Bearer ca_mcp_importer');
+    assert.equal(exportResult.isError, true); // Malformed upstream export cannot pass the declared output contract.
+  } finally { globalThis.fetch = originalFetch; }
 });
 
 test('MCP requests require a valid personal key with read scope', async () => {
@@ -83,11 +184,11 @@ test('direct reads reject an unpublished version without disclosing its status',
   }
 });
 
-test('direct reads reject a superseded published staff version', async () => {
+test('known published snapshot permalinks survive later editorial corrections', async () => {
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async () => Response.json({ id: 'staff', publicationStatus: 'published', listing: 'staff', currentVersionId: 'newer-tip' });
   try {
-    await assert.rejects(requirePublishedVersion('staff'), (error) => error instanceof UpstreamError && error.status === 404);
+    assert.equal((await requirePublishedVersion('staff')).id, 'staff');
   } finally {
     globalThis.fetch = originalFetch;
   }

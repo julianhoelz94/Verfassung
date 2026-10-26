@@ -54,6 +54,45 @@ class DocumentApiTest {
     }
 
     @Test
+    fun migrationCapturesAreIdempotentPinnedPrivateAndDownloadOriginalBytes() {
+        val bytes = "<html><script>doNotExecute()</script>ä</html>".toByteArray()
+        val hash = java.security.MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
+        val request = mapper.writeValueAsString(mapOf("attemptId" to UUID.randomUUID(), "title" to "Archive", "sourceUrl" to "https://example.org/original.htm", "fileName" to "original.htm", "fileBase64" to java.util.Base64.getEncoder().encodeToString(bytes), "fileSha256" to hash))
+        fun capture() = mvc.post("/migration-captures") {
+            header("Authorization", EDITOR)
+            contentType = MediaType.APPLICATION_JSON
+            content = request
+        }
+        val first = mapper.readTree(capture().andExpect { status { isCreated() } }.andReturn().response.contentAsString)
+        val id = first.path("id").asText()
+        val revision = first.path("revision").path("revision").asInt()
+        val file = mvc.get("/documents/$id/revisions/$revision/file") { header("Authorization", EDITOR) }.andExpect { status { isOk() } }.andReturn().response
+        org.junit.jupiter.api.Assertions.assertArrayEquals(bytes, file.contentAsByteArray)
+        org.junit.jupiter.api.Assertions.assertTrue(file.getHeader("Content-Disposition")!!.startsWith("attachment"))
+        mvc.get("/documents/$id/revisions/$revision/file").andExpect { status { isNotFound() } }
+        mvc.put("/documents/$id") {
+            header("Authorization", EDITOR)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"title":"Later metadata","expectedRevision":$revision}"""
+        }.andExpect { status { isOk() } }
+        capture().andExpect {
+            status { isCreated() }
+            jsonPath("$.id") { value(id) }
+            jsonPath("$.revision.revision") { value(revision) }
+        }
+        mvc.post("/migration-captures") {
+            header("Authorization", EDITOR)
+            contentType = MediaType.APPLICATION_JSON
+            content = request.replace("Archive", "Changed")
+        }.andExpect { status { isConflict() } }
+        mvc.post("/migration-captures") {
+            header("Authorization", VIEWER)
+            contentType = MediaType.APPLICATION_JSON
+            content = request
+        }.andExpect { status { isForbidden() } }
+    }
+
+    @Test
     fun legalPagesKeepDraftPrivateAndRequireAdminForPublication() {
         val key = "impressum"
         mvc.get("/legal-pages/$key").andExpect { status { isNotFound() } }

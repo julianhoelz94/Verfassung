@@ -55,7 +55,7 @@ for (const locale of ['en', 'de']) for (const width of sizes) {
         expect(heading).not.toMatch(/Something went wrong|Etwas ist schief|not found|nicht gefunden/i);
         await expect(page.getByRole('alert').filter({ hasText: /could not be loaded|could not be retrieved|temporarily unavailable|konnte[n]? nicht geladen|vorübergehend nicht verfügbar/i })).toHaveCount(0);
         if (route.entry === '/admin/settings') await expect(page.locator('#smtpHost')).toBeVisible();
-        if (route.entry === '/admin/import/setup/[proposalId]') await expect(page.locator('.page-meta')).toContainText(locale === 'en' ? 'Awaiting structure review' : 'Struktur wartet auf Prüfung');
+        if (route.entry === '/admin/import/setup/[proposalId]') await expect(page.getByRole('heading', { name: locale === 'en' ? 'Your confirmation is required' : 'Ihre Bestätigung ist erforderlich' })).toBeVisible();
         if (route.entry === '/editor/lifecycle/[constitutionId]') await expect(page.locator('input[name="logicalUnitIds"]').first()).toBeVisible();
         if (route.entry === '/setup') {
           await expect(page.getByRole('button', { name: locale === 'en' ? 'Finish setup and open the site' : 'Einrichtung abschließen und Website öffnen' })).toBeDisabled();
@@ -73,9 +73,9 @@ for (const locale of ['en', 'de']) for (const width of sizes) {
           });
           expect(violations, `${locale} ${route.path}`).toEqual([]);
         }
-        if ('snapshot' in route && route.snapshot && process.platform === 'linux' && process.env.E2E_SKIP_VISUAL !== 'true') {
+        if ('snapshot' in route && route.snapshot && process.platform === 'linux' && process.env.E2E_SKIP_VISUAL !== 'true' && (!process.env.E2E_SNAPSHOT_ENTRY || process.env.E2E_SNAPSHOT_ENTRY === route.entry)) {
           const name = route.entry.replace(/\//g, '-').replace(/[\[\]]/g, '').replace(/^-/, '');
-          await expect(page).toHaveScreenshot(`review-${name}-${locale}-${width}.png`, { fullPage: true, timeout: 15_000 });
+          await expect.soft(page).toHaveScreenshot(`review-${name}-${locale}-${width}.png`, { fullPage: true, timeout: 15_000 });
         }
         evidence.push({ route: route.entry, status: response?.status(), heading });
         if ('setup' in route && route.setup) await request.post(`${mock}/__sprint59_setup`, { data: { completed: true } });

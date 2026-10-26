@@ -20,10 +20,13 @@ object ImportValidator {
 
     fun validate(request: ImportRequest, pinnedOutline: ImportOutline? = null): List<Pair<String, String>> {
         val errors = mutableListOf<Pair<String, String>>()
-        if (request.isoCode.trim().length != 2) {
+        if (request.expectedCounts?.any { (key, value) -> key !in setOf("units", "textEntries", "tables", "cells", "footnotes", "references", "documents") || value < 0 } == true) errors += "MANIFEST_COUNTS" to "Manifest counts must name supported nonnegative resource counts"
+        runCatching { request.sourceEvidence?.validate() }.exceptionOrNull()?.let { errors += "SOURCE_EVIDENCE" to (it.message ?: "Invalid source evidence") }
+        if (request.jurisdictionId != null && request.isoCode.isNotBlank()) errors += "AMBIGUOUS_JURISDICTION" to "Use jurisdictionId or isoCode, not both"
+        if (request.jurisdictionId == null && !request.isoCode.matches(Regex("[A-Za-z]{2}"))) {
             errors += "INVALID_ISO" to "isoCode must be two letters"
         }
-        if (request.countryName.isBlank()) {
+        if (request.jurisdictionId == null && request.countryName.isBlank()) {
             errors += "MISSING_COUNTRY" to "countryName is required"
         }
         if (request.constitutionSlug.isBlank()) {
@@ -67,6 +70,8 @@ object ImportValidator {
                     entry.node?.let { visit(it, kind, "$path.content[$index].node") }
                     if (entry.logicalId != null && !logicalIds.add(requireNotNull(entry.logicalId))) errors += "DUPLICATE_LOGICAL_ID" to "Logical identities must be unique"
                     if (entry.revisionId != null || ((entry.predecessorRevisionId != null || entry.lineage.isNotEmpty()) && request.predecessorVersionId == null)) errors += "REVISION_REFERENCE" to "$entryPath: ancestry requires a pinned predecessor version; stored revision reuse is not supported"
+                    runCatching { entry.annotation?.validate() }.exceptionOrNull()?.let { errors += "ANNOTATION" to (it.message ?: "Invalid annotation") }
+                    if (entry.annotation != null && entry.format != "footnote") errors += "ANNOTATION" to "$entryPath: annotations require a footnote entry"
                     if (entry.type == "text") {
                         val format = entry.format ?: "plain"
                         if (format !in setOf("plain", "table", "footnote") || (format == "table") != (entry.table != null)) errors += "RICH_FORMAT" to "$entryPath: format and table payload must agree"
@@ -90,6 +95,9 @@ object ImportValidator {
             }
             request.roots.forEachIndexed { index, root -> visit(root, null, "roots[$index]") }
         }
+        fun legacyText(node: ImportNode): String = if (node.children.isEmpty()) node.body.orEmpty() else node.children.joinToString(" ", transform = ::legacyText)
+        fun legacyMixed(node: ImportNode): Boolean = (!node.body.isNullOrEmpty() && node.children.isNotEmpty() && node.body != node.children.joinToString(" ", transform = ::legacyText)) || node.children.any(::legacyMixed)
+        if (request.articles.any { (it.body.isNotEmpty() && it.nodes.isNotEmpty() && it.body != it.nodes.joinToString(" ", transform = ::legacyText)) || it.nodes.any(::legacyMixed) }) errors += "MIXED_LEGACY_CONTENT" to "Use ordered roots to preserve distinct text alongside child units; legacy body may only repeat the child projection"
         val numbers = request.articles.map { it.articleNumber.trim() }
         if (numbers.any { it.isBlank() }) {
             errors += "BLANK_NUMBER" to "articleNumber must not be blank"

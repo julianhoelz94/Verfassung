@@ -52,6 +52,9 @@ class ImportApiTest {
     @Autowired
     lateinit var importService: ImportService
 
+    @Autowired
+    lateinit var jobs: com.constitutionatlas.ingestion.repo.ImportJobRepository
+
     @MockBean
     lateinit var catalogClient: CatalogClient
 
@@ -60,6 +63,9 @@ class ImportApiTest {
 
     @MockBean
     lateinit var identityClient: IdentityClient
+
+    @MockBean
+    lateinit var migrationDomains: com.constitutionatlas.ingestion.client.MigrationDomainClient
 
     private val admin =
         Actor(UUID.fromString("01900000-0000-4000-8000-000000000413"), "local-admin@example.local", listOf("admin"))
@@ -112,6 +118,78 @@ class ImportApiTest {
 
     private fun anyUuid(): UUID = Mockito.any(UUID::class.java) ?: UUID(0, 0)
     private fun anyStr(): String = Mockito.anyString() ?: ""
+
+    @Test
+    fun stalePreparationCannotFailOrReplaceARecoveredPublishedReceipt() {
+        val job = jobs.insertPending(mapOf("isoCode" to "DE", "versionLabel" to "Fixture"), admin.id)!!
+        val old = jobs.claimPreparation(job, admin.id)!!
+        jobs.preparationFailed(job, old, "Lost response")
+        assertEquals("failed", jobs.find(job)!!.status)
+        val recovered = jobs.claimPreparation(job, admin.id)!!
+        assertEquals(emptyList<com.constitutionatlas.ingestion.api.ImportErrorDto>(), jobs.find(job)!!.errors)
+        val version = UUID.randomUUID()
+        jobs.reserveVersion(job, version, recovered)
+        jobs.prepared(job, version, recovered)
+        jdbc.update("UPDATE import_jobs SET status = 'completed' WHERE id = ?", job)
+        jobs.preparationFailed(job, old, "Late obsolete failure")
+        jobs.prepared(job, version, old)
+        assertEquals("completed", jobs.find(job)!!.status)
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException::class.java) { jobs.reserveVersion(job, UUID.randomUUID(), old) }
+        assertEquals(version, jobs.find(job)!!.versionId)
+    }
+
+    @Test
+    fun migrationPackagesResumeDependenciesWithoutDuplicateWritesOrScopeEscalation() {
+        val manifest = """{"runKey":"pilot-${UUID.randomUUID()}","title":"Archive pilot","sources":[{"sourceKey":"source","url":"https://example.org/original"},{"sourceKey":"unavailable","url":"https://example.org/missing","disposition":"unavailable","reason":"Source is missing"}]}"""
+        fun create() = mockMvc.post("/migration-runs") {
+            header("Authorization", MCP_TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = manifest
+        }
+        val run = jobId(
+            create().andExpect {
+                status { isCreated() }
+                jsonPath("$.coverage.sources") { value(2) }
+            }.andReturn().response.contentAsString,
+        )
+        create().andExpect {
+            status { isCreated() }
+            jsonPath("$.id") { value(run) }
+        }
+        fun stage(key: String, dependencies: String = "[]") = mockMvc.post("/migration-runs/$run/items") {
+            header("Authorization", MCP_TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"sourceKey":"$key","kind":"document","dependencies":$dependencies,"payload":{"title":"Original archive","sourceUrl":"https://example.org/original"}}"""
+        }
+        val parent = jobId(stage("parent").andExpect { status { isCreated() } }.andReturn().response.contentAsString)
+        val child = jobId(stage("child", "[\"parent\"]").andExpect { status { isCreated() } }.andReturn().response.contentAsString)
+        stage("parent").andExpect {
+            status { isCreated() }
+            jsonPath("$.id") { value(parent) }
+        }
+        mockMvc.post("/migration-runs/$run/items/$parent/prepare") { header("Authorization", MCP_TOKEN) }.andExpect { status { isForbidden() } }
+        mockMvc.post("/migration-runs/$run/items/$child/prepare") { header("Authorization", EDITOR_TOKEN) }.andExpect {
+            status { isOk() }
+            jsonPath("$.state") { value("blocked") }
+        }
+        val captured = json.readTree("""{"id":"${UUID.randomUUID()}","revision":{"id":"${UUID.randomUUID()}","revision":2}}""")
+        Mockito.`when`(migrationDomains.capture(Mockito.any() ?: emptyMap<String, Any>(), Mockito.eq(EDITOR_TOKEN))).thenReturn(captured)
+        listOf(parent, parent, child).forEach { item ->
+            mockMvc.post("/migration-runs/$run/items/$item/prepare") { header("Authorization", EDITOR_TOKEN) }.andExpect {
+                status { isOk() }
+                jsonPath("$.state") { value("prepared") }
+            }
+        }
+        Mockito.verify(migrationDomains, Mockito.times(2)).capture(Mockito.any() ?: emptyMap<String, Any>(), Mockito.eq(EDITOR_TOKEN))
+        mockMvc.get("/migration-runs/$run") { header("Authorization", MCP_TOKEN) }.andExpect {
+            status { isOk() }
+            jsonPath("$.coverage.prepared") { value(2) }
+            jsonPath("$.coverage.unavailable") { value(1) }
+        }
+        val otherKey = "Bearer another-migration-importer"
+        Mockito.`when`(identityClient.authenticate(otherKey)).thenReturn(scopedImporter.copy(id = UUID.randomUUID()))
+        mockMvc.get("/migration-runs/$run") { header("Authorization", otherKey) }.andExpect { status { isForbidden() } }
+    }
 
     @Test
     fun chunkedImportResumesAndCompletesAsPendingReview() {
@@ -231,16 +309,25 @@ class ImportApiTest {
         val id = jobId(response.response.contentAsString)
         mockMvc.get("/import-setup-proposals/$id") { header("Authorization", EDITOR_TOKEN) }
             .andExpect { status { isForbidden() } }
-        mockMvc.post("/import-setup-proposals/$id/confirm") { header("Authorization", EDITOR_TOKEN) }
+        mockMvc.post("/import-setup-proposals/$id/confirm") {
+            header("Authorization", EDITOR_TOKEN)
+            header("If-Match", "1")
+        }
             .andExpect { status { isForbidden() } }
-        mockMvc.post("/import-setup-proposals/$id/confirm") { header("Authorization", TOKEN) }
+        mockMvc.post("/import-setup-proposals/$id/confirm") {
+            header("Authorization", TOKEN)
+            header("If-Match", "1")
+        }
             .andExpect {
                 status { isOk() }
                 jsonPath("$.status") { value("confirmed") }
                 jsonPath("$.constitutionId") { value(constitutionId.toString()) }
                 jsonPath("$.settingsRevisionId") { value(SETTINGS_REVISION.toString()) }
             }
-        mockMvc.post("/import-setup-proposals/$id/confirm") { header("Authorization", TOKEN) }
+        mockMvc.post("/import-setup-proposals/$id/confirm") {
+            header("Authorization", TOKEN)
+            header("If-Match", "1")
+        }
             .andExpect {
                 status { isOk() }
                 jsonPath("$.status") { value("confirmed") }
@@ -249,7 +336,147 @@ class ImportApiTest {
     }
 
     @Test
-    fun setupConfirmationUsesThePayloadThatWonTheClaim() {
+    fun setupFeedbackAndDisplayPreferencesSurviveAChatRevisionWithoutAllowingStaleConfirmation() {
+        val body = """{"isoCode":"FR","countryName":"France","constitutionSlug":"feedback-review","constitutionTitle":"Review charter","languageCode":"fr","sourceUrl":"https://example.org/source","outline":{"kinds":[{"kindCode":"article","displayLabel":"Article"}]},"sampleRoots":[{"kind":"article","label":"1","content":[{"type":"text","text":"First sentence. Second sentence."}]}]}"""
+        val created = mockMvc.post("/import-setup-proposals") {
+            header("Authorization", MCP_TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = body
+        }.andExpect {
+            status { isCreated() }
+            jsonPath("$.revision") { value(1) }
+        }.andReturn()
+        val id = jobId(created.response.contentAsString)
+        mockMvc.post("/import-setup-proposals/$id/confirm") {
+            header("Authorization", MCP_TOKEN)
+            header("If-Match", "1")
+        }
+            .andExpect { status { isForbidden() } }
+        mockMvc.post("/import-setup-proposals/$id/display") {
+            header("Authorization", TOKEN)
+            header("If-Match", "1")
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"kinds":[{"kindCode":"article","displayLabel":"Article","allowedChildKinds":["sentence"]}]}"""
+        }.andExpect { status { isBadRequest() } }
+        mockMvc.post("/import-setup-proposals/$id/display") {
+            header("Authorization", TOKEN)
+            header("If-Match", "1")
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"kinds":[{"kindCode":"article","displayLabel":"Article","title":"Changed source title"}]}"""
+        }.andExpect { status { isBadRequest() } }
+        mockMvc.post("/import-setup-proposals/$id/request-changes") {
+            header("Authorization", REVIEWER_TOKEN)
+            header("If-Match", "1")
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"message":"Add a sentence layer, preserving the exact source wording."}"""
+        }.andExpect { status { isForbidden() } }
+        mockMvc.post("/import-setup-proposals/$id/request-changes") {
+            header("Authorization", TOKEN)
+            header("If-Match", "1")
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"message":"Add a sentence layer, preserving the exact source wording."}"""
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.revision") { value(2) }
+            jsonPath("$.changesRequested") { value(true) }
+        }
+        mockMvc.post("/import-setup-proposals/$id/confirm") {
+            header("Authorization", TOKEN)
+            header("If-Match", "2")
+        }
+            .andExpect { status { isConflict() } }
+        mockMvc.post("/import-setup-proposals/$id/display") {
+            header("Authorization", TOKEN)
+            header("If-Match", "2")
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"kinds":[{"kindCode":"article","displayLabel":"Art.","showKind":true}]}"""
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.revision") { value(3) }
+            jsonPath("$.payload.sampleRoots[0].kind") { value("article") }
+        }
+        val revised = body.replace("\"displayLabel\":\"Article\"", "\"displayLabel\":\"Article\",\"allowedChildKinds\":[\"sentence\"]")
+            .replace("\"Article\",\"allowedChildKinds\":[\"sentence\"]}]", "\"Article\",\"allowedChildKinds\":[\"sentence\"]},{\"kindCode\":\"sentence\",\"displayLabel\":\"Sentence\",\"allowedChildKinds\":[]}]")
+            .replace("{\"type\":\"text\",\"text\":\"First sentence. Second sentence.\"}", "{\"type\":\"child\",\"node\":{\"kind\":\"sentence\",\"content\":[{\"type\":\"text\",\"text\":\"First sentence.\"}]}},{\"type\":\"child\",\"node\":{\"kind\":\"sentence\",\"content\":[{\"type\":\"text\",\"text\":\"Second sentence.\"}]}}")
+        mockMvc.put("/import-setup-proposals/$id") {
+            header("Authorization", MCP_TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = revised
+        }.andExpect { status { isPreconditionRequired() } }
+        mockMvc.put("/import-setup-proposals/$id") {
+            header("Authorization", MCP_TOKEN)
+            header("If-Match", "2")
+            contentType = MediaType.APPLICATION_JSON
+            content = revised
+        }.andExpect { status { isConflict() } }
+        mockMvc.put("/import-setup-proposals/$id") {
+            header("Authorization", MCP_TOKEN)
+            header("If-Match", "3")
+            contentType = MediaType.APPLICATION_JSON
+            content = revised
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.revision") { value(4) }
+            jsonPath("$.changesRequested") { value(false) }
+            jsonPath("$.payload.outline.kinds[0].displayLabel") { value("Art.") }
+            jsonPath("$.payload.sampleRoots[0].content[0].node.kind") { value("sentence") }
+            jsonPath("$.previousPayload.sampleRoots[0].content[0].text") { value("First sentence. Second sentence.") }
+        }
+        mockMvc.get("/import-setup-proposals/$id") { header("Authorization", MCP_TOKEN) }.andExpect {
+            status { isOk() }
+            jsonPath("$.requestedChanges") { value("Add a sentence layer, preserving the exact source wording.") }
+        }
+        mockMvc.post("/import-setup-proposals/$id/confirm") {
+            header("Authorization", TOKEN)
+            header("If-Match", "3")
+        }
+            .andExpect { status { isConflict() } }
+        Mockito.verify(catalogClient, Mockito.never()).createConstitution("FR", "feedback-review", "Review charter")
+        val constitutionId = UUID.randomUUID()
+        Mockito.`when`(catalogClient.createConstitution("FR", "feedback-review", "Review charter")).thenReturn(DownstreamConstitution(constitutionId, "feedback-review", "Review charter"))
+        Mockito.`when`(catalogClient.currentSettingsRevisionId(constitutionId)).thenReturn(SETTINGS_REVISION)
+        mockMvc.post("/import-setup-proposals/$id/confirm") {
+            header("Authorization", TOKEN)
+            header("If-Match", "4")
+        }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.status") { value("confirmed") }
+            }
+    }
+
+    @Test
+    fun setupDisplayResponseDoesNotAdoptANewerChatRevisionForConfirmation() {
+        val mapper = com.fasterxml.jackson.module.kotlin.jacksonObjectMapper()
+        val repository = Mockito.spy(com.constitutionatlas.ingestion.repo.SetupProposalRepository(jdbc, mapper))
+        val service = com.constitutionatlas.ingestion.service.SetupProposalService(repository, catalogClient, mapper)
+        val request = mapper.readValue(
+            """{"isoCode":"FR","countryName":"France","constitutionSlug":"display-race","constitutionTitle":"Reviewed title","languageCode":"fr","sourceUrl":"https://example.org/source","outline":{"kinds":[{"kindCode":"article","displayLabel":"Article"}]},"sampleRoots":[{"kind":"article","label":"1","content":[{"type":"text","text":"Sample"}]}]}""",
+            com.constitutionatlas.ingestion.api.SetupProposalRequest::class.java,
+        )
+        val created = service.create(TOKEN, admin.id, request)
+        Mockito.doAnswer { invocation ->
+            val saved = invocation.callRealMethod() as com.constitutionatlas.ingestion.api.SetupProposalDto
+            repository.replace(created.id, saved.payload.copy(constitutionTitle = "Unseen chat revision"), saved.revision)
+            saved
+        }.`when`(repository).display(
+            anyUuid(),
+            Mockito.anyLong(),
+            Mockito.any(com.constitutionatlas.ingestion.api.SetupProposalRequest::class.java) ?: request,
+            Mockito.any(com.fasterxml.jackson.databind.JsonNode::class.java) ?: mapper.createObjectNode(),
+        )
+        val saved = service.display(created.id, admin.id, true, com.constitutionatlas.ingestion.api.SetupDisplayRequest(listOf(com.constitutionatlas.ingestion.api.SetupDisplayKind("article", "Art."))), created.revision)
+        assertEquals(2, saved.revision.toInt())
+        assertEquals("Reviewed title", saved.payload.constitutionTitle)
+        assertEquals(3, service.get(created.id, admin.id, true).revision.toInt())
+        org.junit.jupiter.api.Assertions.assertThrows(org.springframework.web.server.ResponseStatusException::class.java) {
+            service.confirm(TOKEN, created.id, admin.id, true, saved.revision)
+        }
+        Mockito.verify(catalogClient, Mockito.never()).createConstitution("FR", "display-race", "Unseen chat revision")
+    }
+
+    @Test
+    fun setupConfirmationRejectsARevisionThatChangedBeforeTheClaim() {
         val mapper = com.fasterxml.jackson.module.kotlin.jacksonObjectMapper()
         val repository = Mockito.spy(com.constitutionatlas.ingestion.repo.SetupProposalRepository(jdbc, mapper))
         val service = com.constitutionatlas.ingestion.service.SetupProposalService(repository, catalogClient, mapper)
@@ -268,18 +495,19 @@ class ImportApiTest {
             val snapshot = invocation.callRealMethod()
             if (!revisedBeforeClaim) {
                 revisedBeforeClaim = true
-                assertEquals(true, repository.replace(created.id, revised))
+                assertEquals(created.revision + 1, repository.replace(created.id, revised, created.revision)?.revision)
             }
             snapshot
         }.`when`(repository).find(created.id)
 
-        val confirmed = service.confirm(TOKEN, created.id, admin.id, true)
-
+        org.junit.jupiter.api.Assertions.assertThrows(org.springframework.web.server.ResponseStatusException::class.java) {
+            service.confirm(TOKEN, created.id, admin.id, true, created.revision)
+        }
+        Mockito.verify(catalogClient, Mockito.never()).createConstitution("FR", "claim-race", "Revised title")
+        Mockito.verify(catalogClient, Mockito.never()).createConstitution("FR", "claim-race", "Original title")
+        val confirmed = service.confirm(TOKEN, created.id, admin.id, true, created.revision + 1)
         assertEquals("confirmed", confirmed.status)
         assertEquals("Revised title", confirmed.payload.constitutionTitle)
-        assertEquals(constitutionId, confirmed.constitutionId)
-        Mockito.verify(catalogClient).createConstitution("FR", "claim-race", "Revised title")
-        Mockito.verify(catalogClient, Mockito.never()).createConstitution("FR", "claim-race", "Original title")
     }
 
     @Test
@@ -334,6 +562,7 @@ class ImportApiTest {
                 anyUuid(), anyStr(), Mockito.nullable(LocalDate::class.java), anyStr(),
                 Mockito.nullable(String::class.java), Mockito.nullable(String::class.java),
                 Mockito.nullable(UUID::class.java), Mockito.nullable(String::class.java), anyUuid(), Mockito.nullable(UUID::class.java),
+                Mockito.nullable(com.constitutionatlas.platform.SourceEvidence::class.java),
             ),
         ).thenReturn(DownstreamVersion(versionId, constitutionId, "draft"))
     }
@@ -421,7 +650,7 @@ class ImportApiTest {
         val constitutionId = UUID.fromString("01900000-0000-4000-8000-000000000501")
         val versionId = UUID.fromString("01900000-0000-4000-8000-000000000502")
         stubCatalog("FR", "France", "1958", "Constitution of 1958", "1958", constitutionId, versionId)
-        Mockito.`when`(contentClient.snapshot(versionId)).thenReturn(OrderedSnapshot(versionId, 1, null, emptyList()))
+        Mockito.`when`(contentClient.snapshot(versionId)).thenReturn(OrderedSnapshot(versionId, 1, SETTINGS_REVISION, emptyList()))
 
         val staged = mockMvc.post("/import-jobs") {
             header("Authorization", TOKEN)
@@ -484,7 +713,7 @@ class ImportApiTest {
         val constitutionId = UUID.randomUUID()
         val versionId = UUID.randomUUID()
         stubCatalog("FR", "France", "1958", "Constitution of 1958", "1958", constitutionId, versionId)
-        Mockito.`when`(contentClient.snapshot(versionId)).thenReturn(OrderedSnapshot(versionId, 1, null, emptyList()))
+        Mockito.`when`(contentClient.snapshot(versionId)).thenReturn(OrderedSnapshot(versionId, 1, SETTINGS_REVISION, emptyList()))
         val staged = mockMvc.post("/import-jobs") {
             header("Authorization", TOKEN)
             contentType = MediaType.APPLICATION_JSON
@@ -551,7 +780,7 @@ class ImportApiTest {
         val constitutionId = UUID.randomUUID()
         val versionId = UUID.randomUUID()
         stubCatalog("FR", "France", "1958", "Constitution of 1958", "1958", constitutionId, versionId)
-        Mockito.`when`(contentClient.snapshot(versionId)).thenReturn(OrderedSnapshot(versionId, 1, null, emptyList()))
+        Mockito.`when`(contentClient.snapshot(versionId)).thenReturn(OrderedSnapshot(versionId, 1, SETTINGS_REVISION, emptyList()))
         val staged = mockMvc.post("/import-jobs") {
             header("Authorization", TOKEN)
             contentType = MediaType.APPLICATION_JSON
@@ -709,6 +938,7 @@ class ImportApiTest {
             eqNonNull("legal"),
             anyUuid(),
             eqNonNull(SETTINGS_REVISION),
+            Mockito.nullable(com.constitutionatlas.platform.SourceEvidence::class.java),
         )
     }
 
@@ -731,6 +961,7 @@ class ImportApiTest {
             anyUuid(), anyStr(), Mockito.nullable(LocalDate::class.java), anyStr(),
             Mockito.nullable(String::class.java), Mockito.nullable(String::class.java),
             Mockito.nullable(UUID::class.java), Mockito.nullable(String::class.java), anyUuid(), Mockito.nullable(UUID::class.java),
+            Mockito.nullable(com.constitutionatlas.platform.SourceEvidence::class.java),
         )
         Mockito.verify(catalogClient, Mockito.never()).replaceOutline(anyUuid(), Mockito.anyList())
     }
@@ -780,6 +1011,7 @@ class ImportApiTest {
             Mockito.isNull(),
             anyUuid(),
             Mockito.isNull(),
+            Mockito.nullable(com.constitutionatlas.platform.SourceEvidence::class.java),
         )
         Mockito.verify(contentClient).replaceArticles(
             eqNonNull(versionId),

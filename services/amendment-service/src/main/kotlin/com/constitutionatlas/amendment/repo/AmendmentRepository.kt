@@ -553,6 +553,7 @@ class AmendmentRepository(
                 sourceVersionId = rs.getObject("source_version_id", UUID::class.java),
                 targetVersionId = rs.getObject("target_version_id", UUID::class.java),
                 publishedRevisionId = rs.getObject("published_revision_id", UUID::class.java),
+                revisionId = if (includeStaff) rs.getObject("revision_id", UUID::class.java) else null,
                 changes = emptyList(),
                 reviewStatus = if (includeStaff) rs.getString("review_status") else null,
                 reviewedSourceTipId =

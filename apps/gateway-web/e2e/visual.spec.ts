@@ -9,7 +9,8 @@ const MOCK_ORIGIN = `http://127.0.0.1:${process.env.E2E_MOCK_PORT ?? 4010}`;
 
 async function snapshot(page: Page, name: string, maxDiffPixelRatio = 0.02): Promise<void> {
   await expect(page.locator('h1').first()).toBeVisible();
-  await expect(page).toHaveScreenshot(name, { fullPage: true, maxDiffPixelRatio });
+  // Collect every changed layout in one report while keeping any mismatch a test failure.
+  await expect.soft(page).toHaveScreenshot(name, { fullPage: true, maxDiffPixelRatio });
 }
 
 test.beforeEach(async ({ request }) => {

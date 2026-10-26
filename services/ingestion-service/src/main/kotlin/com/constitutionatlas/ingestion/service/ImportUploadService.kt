@@ -27,6 +27,7 @@ class ImportUploadService(
     private val uploads: ImportUploadRepository,
     private val imports: ImportService,
     private val mapper: ObjectMapper,
+    private val migrations: MigrationService? = null,
 ) {
     private val uploadMapper = mapper.copy().apply {
         factory.setStreamReadConstraints(
@@ -105,6 +106,22 @@ class ImportUploadService(
         uploads.chunks(id).forEach(payload::write)
         val bytes = payload.toByteArray()
         if (bytes.size != upload.totalBytes || sha256(bytes) != upload.checksumSha256) bad("Full upload checksum mismatch")
+        val tree = try {
+            uploadMapper.readTree(bytes)
+        } catch (ex: Exception) {
+            bad("Uploaded JSON is invalid")
+        }
+        if (tree.has("migrationRunId")) {
+            val envelope = try {
+                uploadMapper.treeToValue(tree, com.constitutionatlas.ingestion.api.MigrationUploadEnvelope::class.java)
+            } catch (ex: Exception) {
+                bad("Uploaded migration envelope is invalid")
+            }
+            val migration = migrations ?: throw ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Migration staging is unavailable")
+            val item = migration.stage(envelope.migrationRunId, actor, envelope.item, authorization)
+            uploads.completeMigration(id, envelope.migrationRunId, item.id)
+            return status(uploads.find(id)!!)
+        }
         val request = try {
             uploadMapper.readValue(bytes, ImportRequest::class.java)
         } catch (ex: Exception) {
@@ -134,7 +151,7 @@ class ImportUploadService(
             val received = uploads.chunkIndices(upload.id)
             (0 until chunkCount(upload)).filterNot { it in received }
         }
-        return ImportUploadDto(upload.id, upload.batchId, upload.status, upload.totalBytes, CHUNK_BYTES, missing, upload.itemId)
+        return ImportUploadDto(upload.id, upload.batchId, upload.status, upload.totalBytes, CHUNK_BYTES, missing, upload.itemId, upload.migrationRunId)
     }
 
     private fun chunkCount(upload: UploadRow): Int = (upload.totalBytes + CHUNK_BYTES - 1) / CHUNK_BYTES

@@ -46,6 +46,7 @@ data class StructuralOutline(val kinds: List<StructuralLevel>)
 data class StructuralSettings(val id: UUID, val outline: StructuralOutline)
 
 interface CatalogClient {
+    fun requireImportReservation(versionId: UUID, attemptId: UUID): Unit = throw UnsupportedOperationException("Import reservation lookup is unavailable")
     fun getVersion(versionId: UUID): CatalogVersion?
 
     fun getSettings(versionId: UUID): StructuralSettings? = null
@@ -82,6 +83,10 @@ class RestCatalogClient(
         ContentDownstreamAuth.header()?.let { request.headers.set(HttpHeaders.AUTHORIZATION, it) }
         execution.execute(request, body)
     }.build()
+
+    override fun requireImportReservation(versionId: UUID, attemptId: UUID) {
+        client.get().uri("/versions/{id}/import-reservation?attemptId={attempt}", versionId, attemptId).retrieve().toBodilessEntity()
+    }
 
     override fun getSettings(versionId: UUID): StructuralSettings? =
         try {

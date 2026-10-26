@@ -173,6 +173,24 @@
 		}
 	}
 
+	# A configured legacy host keeps its browser URL and fragment until the exact
+	# mapping resolves. APIs and Next assets keep their normal routes.
+	@legacy_page {
+		host {$ATLAS_LEGACY_HOST:legacy.localhost}
+		not path /api/* /_next/* /legacy*
+	}
+	route @legacy_page {
+		rewrite * /legacy
+		reverse_proxy gateway-web:3000 {
+			header_up Host {$ATLAS_CANONICAL_HOST}
+			header_up X-Forwarded-Host {$ATLAS_CANONICAL_HOST}
+			header_up -X-Atlas-Edge-Check
+			header_up X-Atlas-Client-IP {client_ip}
+			header_up X-Forwarded-For {client_ip}
+			header_up -X-Atlas-Original-URI
+		}
+	}
+
 	route {
 		# Pin Host so Next.js server actions cannot follow a client-controlled Host (GHSA-89xv-2m56-2m9x).
 		reverse_proxy gateway-web:3000 {

@@ -1,9 +1,9 @@
 import type { ContentOutline } from './api';
 import { ui, type UiMessage } from './messages';
 
-export type DraftEntry = { occurrenceId?: string | null; type: 'text' | 'child'; node?: DraftNode | null; logicalId?: string | null; revisionId?: string | null; draftId?: string | null; text?: string | null; format?: 'plain' | 'table' | 'footnote' | null; table?: import('./api').OrderedTable | null; footnoteLabel?: string | null; references?: import('./api').OrderedInlineReference[] };
+export type DraftEntry = { occurrenceId?: string | null; type: 'text' | 'child'; node?: DraftNode | null; logicalId?: string | null; revisionId?: string | null; draftId?: string | null; text?: string | null; format?: 'plain' | 'table' | 'footnote' | null; table?: import('./api').OrderedTable | null; footnoteLabel?: string | null; references?: import('./api').OrderedInlineReference[]; annotation?: import('./api').OrderedEntry['annotation'] };
 export type DraftNode = { occurrenceId?: string | null; logicalId: string; revisionId?: string | null; draftId?: string | null; kind: string; label?: string | null; title?: string | null; content: DraftEntry[] };
-export type DraftOperation = { id: string; type: string; targetId: string; expectedRevisionId: string; text?: string; title?: string | null; label?: string | null; position?: number; destinationParentId?: string; destinationRevisionId?: string; parts?: { logicalId: string; text: string; format?: DraftEntry['format']; table?: DraftEntry['table']; footnoteLabel?: string | null; references?: DraftEntry['references'] }[]; mergeIds?: string[]; node?: DraftNode; format?: DraftEntry['format']; table?: DraftEntry['table']; footnoteLabel?: string | null; references?: DraftEntry['references'] };
+export type DraftOperation = { id: string; type: string; targetId: string; expectedRevisionId: string; text?: string; title?: string | null; label?: string | null; position?: number; destinationParentId?: string; destinationRevisionId?: string; parts?: { logicalId: string; text: string; format?: DraftEntry['format']; table?: DraftEntry['table']; footnoteLabel?: string | null; annotation?: DraftEntry['annotation']; references?: DraftEntry['references'] }[]; mergeIds?: string[]; node?: DraftNode; format?: DraftEntry['format']; table?: DraftEntry['table']; footnoteLabel?: string | null; annotation?: DraftEntry['annotation']; references?: DraftEntry['references'] };
 export type StructuredPreview = { sessionId: string; sourceVersionId: string; sourceGeneration: number; settingsRevisionId: string; generation: number; roots: DraftNode[]; sourceRoots: DraftNode[]; operations: DraftOperation[] };
 export function token(unit: DraftNode | DraftEntry): string { return unit.draftId ?? unit.revisionId ?? ''; }
 export function nodes(roots: DraftNode[]): DraftNode[] { return roots.flatMap(node => [node, ...nodes(node.content.flatMap(entry => entry.node ? [entry.node] : []))]); }
@@ -42,7 +42,7 @@ export function applyOperation(roots: DraftNode[], op: DraftOperation): DraftNod
     const index = content.findIndex(entry => entry.logicalId === op.targetId || entry.node?.logicalId === op.targetId);
     if (index >= 0) {
       const entry = content[index];
-      if (op.type === 'replace_text') content = content.map((item, i) => i === index ? { ...item, text: op.text, draftId: op.id, ...(op.format === undefined ? {} : { format: op.format, table: op.table, footnoteLabel: op.footnoteLabel, references: op.references ?? [] }) } : item);
+      if (op.type === 'replace_text') content = content.map((item, i) => i === index ? { ...item, text: op.text, draftId: op.id, ...(op.format === undefined ? {} : { format: op.format, table: op.table, footnoteLabel: op.footnoteLabel, references: op.references ?? [], annotation: op.annotation }) } : item);
       if (op.type === 'remove') content = content.filter((_, i) => i !== index);
       if (op.type === 'split_text') {
         if (entry.type !== 'text' || (entry.format && entry.format !== 'plain') || entry.table || entry.references?.length || op.parts!.map(part => part.text).join('') !== entry.text) throw new Error('Split must preserve plain text exactly.');
@@ -109,7 +109,7 @@ export function draftDifferences(source: DraftNode[], target: DraftNode[]): Draf
     const result = new Map<string, Unit>();
     function walk(node: DraftNode, parent: string, position: number) {
       result.set(node.logicalId, { id: node.logicalId, revision: token(node), fields: { title: node.title ?? '', label: node.label ?? '', parent, position: String(position) } });
-      node.content.forEach((entry, index) => entry.node ? walk(entry.node, node.logicalId, index) : result.set(entry.logicalId!, { id: entry.logicalId!, revision: token(entry), fields: { text: entry.text ?? '', rich: JSON.stringify({ format: entry.format ?? 'plain', table: entry.table ?? null, footnoteLabel: entry.footnoteLabel ?? null, references: entry.references ?? [] }), parent: node.logicalId, position: String(index) } }));
+      node.content.forEach((entry, index) => entry.node ? walk(entry.node, node.logicalId, index) : result.set(entry.logicalId!, { id: entry.logicalId!, revision: token(entry), fields: { text: entry.text ?? '', rich: JSON.stringify({ format: entry.format ?? 'plain', table: entry.table ?? null, footnoteLabel: entry.footnoteLabel ?? null, references: entry.references ?? [], annotation: entry.annotation ?? null }), parent: node.logicalId, position: String(index) } }));
     }
     roots.forEach((root, i) => walk(root, '', i)); return result;
   }
@@ -124,5 +124,5 @@ export function draftDifferences(source: DraftNode[], target: DraftNode[]): Draf
 
 /** Draft preview IDs are local anchors; historical public IDs remain version scoped. */
 export function readerNode(node: DraftNode): import('./api').OrderedNode {
-  return { ...node, label: node.label ?? null, title: node.title ?? null, revisionId: token(node), occurrenceId: `draft-${node.logicalId}`, content: node.content.map(entry => entry.node ? { type: 'child', node: readerNode(entry.node) } : { type: 'text', logicalId: entry.logicalId, revisionId: token(entry), text: entry.text, format: entry.format, table: entry.table, footnoteLabel: entry.footnoteLabel, references: entry.references, occurrenceId: `draft-${entry.logicalId}` }) };
+  return { ...node, label: node.label ?? null, title: node.title ?? null, revisionId: token(node), occurrenceId: `draft-${node.logicalId}`, content: node.content.map(entry => entry.node ? { type: 'child', node: readerNode(entry.node) } : { type: 'text', logicalId: entry.logicalId, revisionId: token(entry), text: entry.text, format: entry.format, table: entry.table, footnoteLabel: entry.footnoteLabel, references: entry.references, annotation: entry.annotation, occurrenceId: `draft-${entry.logicalId}` }) };
 }

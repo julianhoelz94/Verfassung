@@ -47,6 +47,10 @@ Shared: `gradle/service-conventions.gradle`. New service: copy sibling (`.agents
 
 ## CI (`.github/workflows/ci.yml`)
 
+Runs on pull requests and pushes to `main`. Feature-branch pushes are checked by
+their pull request run, avoiding duplicate full-stack builds for the same commit.
+All host jobs use Ubuntu 24.04; the visual suite also pins its Playwright container.
+
 1. Discover `services/*/build.gradle.kts` → matrix `./gradlew check`
 2. `apps/gateway-web`: `npm test`, `typecheck`, `lint`, `build`
 3. Playwright e2e (mock API)

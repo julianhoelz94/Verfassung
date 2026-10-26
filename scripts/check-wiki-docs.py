@@ -5,6 +5,10 @@ import re
 from importlib.util import spec_from_file_location, module_from_spec
 root = Path(__file__).resolve().parents[1]
 wiki = root / 'docs/wiki'
+deployment_spec = spec_from_file_location('deployment_wiki', root / 'scripts/sync-deployment-wiki.py')
+deployment_wiki = module_from_spec(deployment_spec)
+deployment_spec.loader.exec_module(deployment_wiki)
+deployment_wiki.sync(check=True)
 spec = spec_from_file_location('media', root / 'scripts/prepare-wiki-media.py')
 media = module_from_spec(spec)
 spec.loader.exec_module(media)

@@ -154,17 +154,27 @@ test('constitution configuration governs MCP imports, review previews and the pu
     expect(invalidChild.status).toBe('failed');
     expect(invalidChild.errors).toEqual(expect.arrayContaining([expect.objectContaining({ code: 'HIERARCHY_KIND' })]));
 
-    // Authoring policies are enforced when Content prepares the stored draft.
-    for (const [versionLabel, invalidArticle] of [
-      ['Required title', { ...roots[1], title: null }],
-      ['Required label', { ...roots[1], label: null }],
-      ['Forbidden child title', { ...roots[1], content: [{ type: 'child', node: { ...firstParagraph, title: 'Not permitted' } }] }],
+    // Failed preparation reserves a draft chain, so policy failures need their own constitutions.
+    const policyKinds = settings.outline.kinds.map(({ kindCode, displayLabel, presentation, showKind, showLabel, showTitle, root, allowedChildKinds, allowTextAlongsideChildren, titlePolicy, labelPolicy, labelPlacement, segmentation }: Record<string, unknown>) => ({
+      kindCode, displayLabel, presentation, showKind, showLabel, showTitle, root, allowedChildKinds, allowTextAlongsideChildren, titlePolicy, labelPolicy, labelPlacement, segmentation,
+    }));
+    for (const [versionLabel, invalidArticle, field] of [
+      ['Required title', { ...roots[1], title: null }, 'title'],
+      ['Required label', { ...roots[1], label: null }, 'label'],
+      ['Forbidden child title', { ...roots[1], content: [{ type: 'child', node: { ...firstParagraph, title: 'Not permitted' } }] }, 'title'],
     ] as const) {
-      const invalid = await stage({ roots: [invalidArticle], versionLabel });
+      const policySlug = `policy-${randomUUID()}`;
+      const policyConstitution = await json(await request.post('/api/catalog/countries/XA/constitutions', { headers: admin, data: {
+        slug: policySlug, title: versionLabel, outline: policyKinds,
+      } }));
+      const policySetup = await mcp(request, key.token, 'get_import_setup', { countryCode: 'XA', constitutionSlug: policySlug });
+      const invalid = await stage({ constitutionId: policyConstitution.id, constitutionSlug: policySlug,
+        constitutionTitle: versionLabel, settingsRevisionId: policySetup.settingsRevisionId, roots: [invalidArticle], versionLabel });
       expect(invalid.status).toBe('pending_review');
       const rejected = await json(await request.post(`/api/ingestion/import-jobs/${invalid.jobId}/prepare`, { headers: admin }));
       expect(rejected.status).toBe('failed');
       expect(rejected.errors).toEqual(expect.arrayContaining([expect.objectContaining({ code: 'PREPARATION_FAILED' })]));
+      expect(rejected.errors.find((error: { code: string }) => error.code === 'PREPARATION_FAILED').message.toLowerCase()).toContain(field);
       expect((await request.post(`/api/ingestion/import-jobs/${invalid.jobId}/approve`, { headers: admin, data: { reason: 'Invalid settings must block approval.' } })).status()).toBe(409);
     }
 

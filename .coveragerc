@@ -1,0 +1,21 @@
+[run]
+branch = true
+parallel = true
+relative_files = true
+source = scripts, scripts/cd, scripts/code_coverage, infra/caddy
+omit =
+    */test_*.py
+    */test-*.py
+    */__pycache__/*
+    */node_modules/*
+    */.venv/*
+
+[report]
+exclude_lines =
+    ^\s*TYPE_CHECKING:
+
+[json]
+output = coverage/python.json
+
+[html]
+directory = coverage/python-html

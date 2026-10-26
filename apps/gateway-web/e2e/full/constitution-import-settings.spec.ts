@@ -143,7 +143,9 @@ test('constitution configuration governs MCP imports, review previews and the pu
     expect(stale.status).toBe('pending_review');
     const stalePreparation = await request.post(`/api/ingestion/import-jobs/${stale.jobId}/prepare`, { headers: admin });
     expect(stalePreparation.status()).toBe(409);
-    expect(await stalePreparation.text()).toContain('Settings revision changed');
+    const staleJob = await json(await request.get(`/api/ingestion/import-jobs/${stale.jobId}`, { headers: admin }));
+    expect(staleJob.status).toBe('pending_review');
+    expect(staleJob.versionId).toBeNull();
 
     const invalidRoot = await stage({ roots: [firstParagraph], versionLabel: 'Invalid root' });
     expect(invalidRoot.status).toBe('failed');

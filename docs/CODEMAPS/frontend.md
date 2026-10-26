@@ -1,68 +1,59 @@
-<!-- Generated: 2026-09-06 | Files scanned: ~250 | Token estimate: ~800 -->
+<!-- Reviewed: 2026-10-19 -->
 # Frontend (`apps/gateway-web`)
 
-Next.js 15 App Router, React 18, TypeScript. **No DB** — HTTP clients only. Prefer server components; client components for editor widgets.
+Next.js 15 App Router, React 18, strict TypeScript. No database: compose service APIs
+over HTTP. Rules: `apps/gateway-web/AGENTS.md`. Current UI decisions and route/state
+coverage: `docs/design/sprint-59-ui-review.md`. Earlier prototypes are historical
+references; ADR 0005 and `docs/design/two-axis-versions.md` define version semantics.
 
-**Rules:** `apps/gateway-web/AGENTS.md`
-**Design:** `docs/design/ui-concept.md`, tokens in `app/globals.css` (from `docs/design/tokens.css`). **Sprints 34–39 two-axis UI:** [`docs/design/two-axis-versions.md`](../design/two-axis-versions.md) § Sprint UI reference — configured mocks in `docs/design/prototype/editor-constitution.html` (`#timeline`, `#correct-1949`, `#legal`, `#hop-1956`, `#hop-2022`, `#hop-1994`). Do not copy `prototype/home.html` / `version.html` / `compare.html` / `editor.html` for versioning behaviour.  
-**Nav by role:** `docs/design/role-link-trees.md` + `lib/nav.ts`
+## Routes and shared UI
 
-## Page tree (`app/`)
+Page composition: `app/components/layout/templates.tsx`; spacing primitives:
+`app/components/layout/Layout.tsx`; runtime tokens: `app/styles/tokens.css`.
+Scoped CSS Modules own page, header, surface, field and template styles. See
+`docs/design/ui-templates.md` for spacing ownership and template selection.
 
-| Route | File |
+| Area | Entry points |
 | --- | --- |
-| `/` | `page.tsx` (home: hero, country cards, recently changed) |
-| `/search` | `search/page.tsx` |
-| `/countries/[code]` | `countries/[code]/page.tsx` |
-| `/countries/[code]/compare` | `…/compare/page.tsx` + `CompareForm.tsx` + `CompareView` / `Tabs` |
-| `/countries/[code]/timeline` | `…/timeline/page.tsx` |
-| `/countries/[code]/versions/[versionId]` | `…/versions/[versionId]/page.tsx` |
-| `…/articles/[articleId]` | article permalink |
-| `/about` | static sources / verification / accessibility |
-| `/login`, `/login/mfa` | login + MFA |
-| `/reset`, `/invite` | password reset, invite accept |
-| `/account`, `/account/step-up` | self-service + MFA step-up |
-| `/editor` | drafts (`ArticleEditor.tsx`, `ArticleFilterList`, `WorkflowSteps`, `actions.ts`, `PublishForm.tsx`) |
-| `/editor/amendments` | staff Legal changes inbox (`page.tsx`; was “Amending laws”) |
-| `/editor/amendments/[id]` | create (`new`) or edit form with revision panel (`AmendmentEditorLayout.tsx`, `AmendmentRevisionPanel.tsx`, `AmendmentForm.tsx`, `AmendmentChangesTable.tsx`, `actions.ts`); quote review (UI-56) |
-| `/editor/history` | staff snapshot history (`page.tsx`; `listing=all` version chain) |
-| `/admin` | admin index (Users, Outlines, Import) |
-| `/admin/users` | identity admin |
-| `/admin/constitutions`, `/admin/constitutions/[id]` | outlines |
-| `/admin/import`, `/admin/import/[jobId]` | ingestion |
+| Public discovery/reading | `app/page.tsx`, `search/`, `countries/[code]/`, `versions/[versionId]/units/[unitId]/` |
+| Reader/compare/history | `countries/[code]/versions/`, `compare/`, `timeline/`; shared `components/ConstitutionText`, `VersionReader`, ordered content/diff components |
+| Context/documents/legal | `countries/[code]/` and `countries/[code]/constitutions/[constitutionId]/` context, `documents/`, `impressum/`, `datenschutz/`, `about/` |
+| Authentication/account | `login/`, `register/`, `reset/`, `invite/`, `account/`, `logout/` |
+| Editing/review/publication | `editor/`, `editor/amendments/`, `editor/documents/`, `editor/history/`, command routes |
+| Administration | `admin/` users, settings, browsing policy, legal pages, outlines, constitutions and imports |
+| First deployment | `setup/`, `lib/deployment-setup.ts`, `app/api/setup-gate/route.ts` |
 
-Shell: `layout.tsx` → skip link + `SiteHeader` + `SiteFooter`. Shared UI: `app/components/` (`ConstitutionText`, `DiffConstitutionText`, `VersionReader`, `ui.tsx`, `MenuDisclosure`, `Segmented`, `Tabs`, `Toc`, `FiltersPanel`, `ArticleFilterList`). Nav: `lib/nav.ts` (`primaryNavLinks`, `menuSections`, `editorialLinks` includes Legal changes — still labelled “Amending laws” in the gateway until UI-57 — and Snapshot history). Amendment detail: revision panel (read-only browse, restore as new draft); **Fill from two versions** calls `POST /amendments/suggest`. Home/country helpers: `lib/reading.ts` (`publicVersions`, `chainTipId`). Timeline lists constitution-level published laws via `listConstitutionAmendments`. Editor publish uses `PublishForm` (hop kind + linked law until UI-52 / ED-7: session job is P2 vs P3, not a two-choice dialog).
+List actual pages with `rg --files apps/gateway-web/app -g page.tsx`; route, query,
+role and persisted state variants matter. Layout owns the shared shell, translation
+provider and accessibility landmarks. Reuse existing UI primitives and reader
+rendering for previews; keep authored legal text separate from translated chrome.
 
-Admin gates: `lib/admin.ts` (`requireAdminPage`). Editor/admin links: `lib/nav.ts` (UI only).
+## Clients and contracts
 
-## Clients (`lib/`)
-
-| Module | Talks to |
+| Module | Responsibility |
 | --- | --- |
-| `api.ts` | catalog, content, amendment, search (`CATALOG_API_URL` …) |
-| `identity-client.ts` + `session.ts` | identity; cookies `ca_session`, `ca_mfa_challenge` |
-| `editor-api.ts` | editor-service (`searchIndexStatus` on preview after publish) |
-| `amendment-editor-api.ts` | amendment-service staff writes (create/revisions/publish/withdraw), `listRevisions`, `suggestChanges` |
-| `ingestion-api.ts` | ingestion |
-| `outline.ts` | render groups from catalog outline + content nodes |
-| `compare.ts`, `text-diff.ts` | compare page |
-| `timeline.ts`, `provenance.ts` | timeline + source badges |
-| `create-constitution.ts` | admin create flow |
-| `contracts/` | CAT-2 / CNT-2 / identity JSON fixtures (QLT-3) |
+| `lib/api.ts` | Catalog, Content, Amendment and Search reads/common writes |
+| `lib/identity-client.ts`, `session.ts` | Identity operations, session/MFA cookies and user state |
+| `lib/editor-api.ts`, `amendment-editor-api.ts` | Protected editorial operations and fixed localized error keys |
+| `lib/document-api.ts`, `legal-pages.ts` | Document revisions/links and legal/contact publication |
+| `lib/ingestion-api.ts` | Staged jobs, proposals and review/publication commands |
+| `lib/fetch-with-timeout.ts` | Shared request deadline and caller cancellation; no automatic write retries |
+| `lib/ordered-content.ts`, `outline.ts`, `compare.ts`, `reading.ts` | Authored order, configured labels, stable identity and two-axis reading/compare |
+| `lib/messages.ts`, `locale.ts`, `server-locale.ts` | Bilingual chrome and locale policy |
+| `lib/contracts/` | Public wire fixtures used by contract tests |
 
-Server actions live next to pages (`login/actions.ts`, `editor/actions.ts`, `admin/*/actions.ts`, `account/actions.ts`).
+Actions live beside pages. Native POST command routes validate trusted origins and
+redirect to persisted outcomes. Do not remove framework exports based on import
+counts. Optional-service failures must not erase required reading content.
 
-Env in Compose: `CATALOG_API_URL=http://catalog-service:8080` (service root, not `/api/catalog`). Local fallback in `api.ts` uses `http://localhost/api/…`.
+Middleware checks deployment setup and anonymous browsing, then supplies the CSP
+nonce. Caddy's setup/rate checks have separate API routes and credentials. Public
+navigation visibility does not replace service authorization.
 
-## Tests
+## Verification
 
-| Kind | Command / location |
-| --- | --- |
-| Unit | `npm test` — vitest on `lib/*.test.ts` + `lib/interpret-me.test.cjs` |
-| Lint/build | `npm run lint`, `npm run build` |
-| E2E | `npm run test:e2e` — `e2e/journeys.spec.ts`, `a11y.spec.ts`, `visual.spec.ts` |
-| Snapshots | `e2e/snapshots/` Linux Chromium `mcr.microsoft.com/playwright:v1.51.1-jammy` |
-
-Journeys: browse DE article, search “dignity”, compare, MFA login, edit→review→publish.
-
-`middleware.ts` sets a per-request CSP nonce (`script-src 'self' 'nonce-…' 'strict-dynamic'`, `frame-ancestors 'none'`). Styles still allow `'unsafe-inline'` until App Router emits style nonces. Swagger is Caddy `/api/docs/<service>/swagger-ui/index.html`, not a Next route (`nav.ts` may link `/api-docs` for admins).
+`npm test`, `npm run typecheck`, `npm run lint`, `npm run build`. TypeScript rejects
+unused locals/parameters. `npm run test:e2e` covers mocked journeys, accessibility
+and visual checks; `npm run test:e2e:full` uses real APIs and uploaded fixtures.
+Linux screenshots are pinned to the Playwright image/version in CI. Wiki recording
+is verified in PR CI; actual media capture/publication runs after merge.

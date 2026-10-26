@@ -1,6 +1,5 @@
 import com.constitutionatlas.identity.config.IdentityMailProperties
 import com.constitutionatlas.identity.mail.MailLinks
-import com.constitutionatlas.identity.mail.SmtpOutboundMailer
 import org.junit.jupiter.api.Test
 
 class IdentityMailTest {
@@ -40,11 +39,9 @@ class IdentityMailTest {
             MailLinks.invite("https://verfassungen.de", "token") ==
                 "https://verfassungen.de/invite?token=token",
         )
-    }
-
-    @Test
-    fun smtpMailerSkipsSendWhenNotConfigured() {
-        SmtpOutboundMailer(IdentityMailProperties()).sendPasswordReset("user@example.local", "token")
-        SmtpOutboundMailer(IdentityMailProperties()).sendInvite("user@example.local", "token")
+        check(
+            MailLinks.registration("https://verfassungen.de", "token") ==
+                "https://verfassungen.de/register/confirm?token=token",
+        )
     }
 }

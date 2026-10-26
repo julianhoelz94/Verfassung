@@ -1,5 +1,6 @@
 package com.constitutionatlas.catalog.service
 
+import com.constitutionatlas.catalog.api.ConstitutionSummary
 import com.constitutionatlas.catalog.api.ContentOutlineDto
 import com.constitutionatlas.catalog.api.CountryDetail
 import com.constitutionatlas.catalog.api.CountrySummary
@@ -11,12 +12,31 @@ import org.springframework.stereotype.Service
 import java.util.UUID
 
 @Service
-class CatalogQueryService(private val catalogRepository: CatalogRepository) {
+class CatalogQueryService(private val catalogRepository: CatalogRepository, private val settingsService: SettingsService) {
     fun listCountries(): List<CountrySummary> = catalogRepository.listCountries()
 
-    fun getCountry(isoCode: String): CountryDetail =
-        catalogRepository.findCountryDetail(isoCode)
+    fun getCountry(isoCode: String, includeUnpublished: Boolean = false): CountryDetail {
+        val detail = catalogRepository.findCountryDetail(isoCode)
             ?: throw NotFoundException("Unknown country '$isoCode'")
+        return detail.copy(constitutions = visibleConstitutions(detail.constitutions, includeUnpublished))
+    }
+
+    fun constitutions(jurisdictionId: UUID, includeUnpublished: Boolean = false): List<ConstitutionSummary> =
+        visibleConstitutions(catalogRepository.listConstitutions(jurisdictionId), includeUnpublished)
+
+    private fun visibleConstitutions(
+        constitutions: List<ConstitutionSummary>,
+        includeUnpublished: Boolean,
+    ): List<ConstitutionSummary> {
+        if (includeUnpublished) return constitutions
+        return constitutions.filter { it.versions.isNotEmpty() }.map { constitution ->
+            constitution.copy(contentOutline = settingsService.forVersion(constitution.versions.firstOrNull { it.latestPublished }?.id ?: constitution.versions.last().id).outline)
+        }
+    }
+
+    fun publicVersionId(constitutionId: UUID): UUID? = catalogRepository.listPublishedPublicVersions(constitutionId).let { versions ->
+        versions.firstOrNull { it.latestPublished }?.id ?: versions.lastOrNull()?.id
+    }
 
     fun listVersions(constitutionId: UUID): List<VersionSummary> {
         if (!catalogRepository.constitutionExists(constitutionId)) {

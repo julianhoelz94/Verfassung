@@ -24,6 +24,11 @@ function sectionHrefs(user: NavUser | null, id: string, apiDocsAvailable = false
 }
 
 describe('primaryNavLinks', () => {
+  it('hides browse and search links when anonymous browsing is disabled', () => {
+    expect(primaryNavLinks(null, false, false).map((link) => link.href)).toEqual(['/about']);
+    expect(menuSections(null, false, 0, false).find((section) => section.id === 'primary')?.links.map((link) => link.href)).toEqual(['/about']);
+    expect(primaryNavLinks({ email: 'viewer@example.local', roles: ['viewer'] }, false, false).map((link) => link.href)).toContain('/search');
+  });
   it('shows public destinations without login for anonymous visitors', () => {
     expect(hrefs(null)).toEqual(['/', '/search', '/about']);
     expect(hrefs(null).includes('/editor')).toBe(false);
@@ -59,7 +64,7 @@ describe('menuSections', () => {
     const viewer = { email: 'viewer@example.local', roles: ['viewer'] };
     expect(sectionIds(viewer)).toEqual(['identity', 'primary', 'account']);
     expect(menuSections(viewer)[0]?.identity).toEqual({ email: viewer.email, roles: viewer.roles });
-    expect(sectionHrefs(viewer, 'account')).toEqual(['/account']);
+    expect(sectionHrefs(viewer, 'account')).toEqual(['/account', '/account#mcp-keys']);
     expect(sectionHrefs(viewer, 'editorial')).toEqual([]);
   });
 
@@ -69,6 +74,7 @@ describe('menuSections', () => {
     expect(sectionHrefs(editor, 'editorial')).toEqual([
       '/editor?mine=1',
       '/editor?status=reviewing',
+      '/editor/documents',
       '/editor/amendments',
       '/editor/history',
     ]);
@@ -76,12 +82,12 @@ describe('menuSections', () => {
 
   it('shows Review queue and Amending laws for a reviewer', () => {
     const reviewer = { email: 'reviewer@example.local', roles: ['reviewer'] };
-    expect(sectionHrefs(reviewer, 'editorial')).toEqual(['/editor?status=reviewing', '/editor/amendments', '/editor/history']);
+    expect(sectionHrefs(reviewer, 'editorial')).toEqual(['/editor?status=reviewing', '/editor/documents', '/editor/amendments', '/editor/history']);
   });
 
   it('shows Ready to publish and Amending laws for a publisher', () => {
     const publisher = { email: 'publisher@example.local', roles: ['publisher'] };
-    expect(sectionHrefs(publisher, 'editorial')).toEqual(['/editor?status=approved', '/editor/amendments', '/editor/history']);
+    expect(sectionHrefs(publisher, 'editorial')).toEqual(['/editor?status=approved', '/editor/documents', '/editor/amendments', '/editor/history']);
   });
 
   it('unions editorial destinations for combined roles', () => {
@@ -93,6 +99,7 @@ describe('menuSections', () => {
       '/editor?mine=1',
       '/editor?status=reviewing',
       '/editor?status=approved',
+      '/editor/documents',
       '/editor/amendments',
       '/editor/history',
     ]);
@@ -105,13 +112,17 @@ describe('menuSections', () => {
       '/editor?mine=1',
       '/editor?status=reviewing',
       '/editor?status=approved',
+      '/editor/documents',
       '/editor/amendments',
       '/editor/history',
     ]);
     expect(sectionHrefs(admin, 'admin', true)).toEqual([
       '/admin/users',
+      '/admin/settings',
+      '/admin/anonymous-browsing',
       '/admin/constitutions',
       '/admin/import',
+      '/admin/legal/impressum',
       '/api-docs',
     ]);
     expect(sectionHrefs(admin, 'primary', true)).toEqual(['/', '/search', '/about', '/editor', '/admin']);

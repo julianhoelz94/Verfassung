@@ -1,7 +1,11 @@
 'use client';
 
+import { T } from './components/TranslationProvider';
+import { ui } from '../lib/messages';
+import { Disclosure } from './components/Disclosure';
+import { reviewUi } from '../lib/ui-review-messages';
 import Link from 'next/link';
-import { PageMain } from './components/PageMain';
+import { FocusedPage } from './components/layout/templates';
 
 type ErrorPageProps = {
   error: Error & { digest?: string };
@@ -10,16 +14,15 @@ type ErrorPageProps = {
 
 export default function ErrorPage({ error, reset }: ErrorPageProps) {
   return (
-    <PageMain>
+    <FocusedPage width="reading">
       <section className="status-panel" role="alert">
-        <h1>Something went wrong</h1>
-        <p>This page could not be shown. Other pages on the site still work.</p>
-        <p className="muted">{error.message}</p>
+        <h1><T value={ui.error.somethingWentWrong} /></h1>
+        <p><T value={ui.error.thisPageCouldNotBeShownOther} /></p>
+        <Disclosure summary={<T value={reviewUi.technicalDetails} />}><p className="muted">{error.message}</p></Disclosure>
         <button type="button" onClick={() => reset()}>
-          Try again
-        </button>{' '}
-        <Link href="/">Countries</Link>
+          <T value={ui.error.tryAgain} />{" "}</button>{' '}
+        <Link href="/"><T value={ui.error.countries} /></Link>
       </section>
-    </PageMain>
+    </FocusedPage>
   );
 }

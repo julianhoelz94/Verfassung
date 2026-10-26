@@ -1,5 +1,6 @@
 package com.constitutionatlas.amendment.api
 
+import com.constitutionatlas.platform.DiffItem
 import com.fasterxml.jackson.annotation.JsonInclude
 import java.time.Instant
 import java.time.LocalDate
@@ -9,8 +10,10 @@ import java.util.UUID
 // Unique DTO set for amendment-service. Public JSON drops kind; adds comment, documents, reviewStatus.
 // User instruction: "Work on Sprint 36"
 
+@JsonInclude(JsonInclude.Include.NON_NULL)
 data class AmendmentChangeDto(
     val id: UUID,
+    val sourceChangeId: UUID? = null,
     val articleId: UUID?,
     val articleNumber: String?,
     val changeType: String,
@@ -23,6 +26,28 @@ data class AmendmentChangeDto(
     val amendingLawTitle: String? = null,
     @get:JsonInclude(JsonInclude.Include.NON_NULL)
     val amendingLawCitation: String? = null,
+    val beforeRef: AmendmentUnitRefDto? = null,
+    val afterRef: AmendmentUnitRefDto? = null,
+    val linkReviewReason: String? = null,
+    val legacyLinkUnresolved: Boolean = false,
+    val pendingAfterLogicalId: UUID? = null,
+)
+
+@JsonInclude(JsonInclude.Include.NON_NULL)
+data class AmendmentUnitRefDto(
+    val versionId: UUID? = null,
+    val logicalId: UUID? = null,
+    val occurrenceId: UUID? = null,
+    val rootOccurrenceId: UUID? = null,
+    val revisionId: UUID? = null,
+    val unitKind: String? = null,
+    val articleNumber: String? = null,
+    val constitutionId: UUID? = null,
+    val kind: String? = null,
+    val label: String? = null,
+    val breadcrumbs: List<String> = emptyList(),
+    val text: String? = null,
+    val deepLink: String? = null,
 )
 
 data class AmendmentDocumentDto(
@@ -52,6 +77,8 @@ data class AmendmentDto(
     val reviewedSourceTipId: UUID? = null,
     @get:JsonInclude(JsonInclude.Include.NON_NULL)
     val reviewedTargetTipId: UUID? = null,
+    @get:JsonInclude(JsonInclude.Include.NON_NULL)
+    val revisionId: UUID? = null,
 )
 
 data class AmendmentChangeWriteRequest(
@@ -64,6 +91,12 @@ data class AmendmentChangeWriteRequest(
     val effectiveOn: LocalDate? = null,
     val amendingLawTitle: String? = null,
     val amendingLawCitation: String? = null,
+    val beforeRef: AmendmentUnitRefDto? = null,
+    val afterRef: AmendmentUnitRefDto? = null,
+    val linkReviewReason: String? = null,
+    val pendingAfterLogicalId: UUID? = null,
+    val id: UUID? = null,
+    val sourceChangeId: UUID? = null,
 )
 
 data class AmendmentWriteRequest(
@@ -76,6 +109,7 @@ data class AmendmentWriteRequest(
     val sourceVersionId: UUID? = null,
     val targetVersionId: UUID? = null,
     val changes: List<AmendmentChangeWriteRequest> = emptyList(),
+    val publishAttemptId: UUID? = null,
 )
 
 data class LinkTargetRequest(
@@ -94,10 +128,16 @@ data class SuggestedChangeDto(
     val note: String?,
     val nodeId: UUID?,
     val articleId: UUID?,
+    val beforeRef: AmendmentUnitRefDto? = null,
+    val afterRef: AmendmentUnitRefDto? = null,
+    val ambiguous: Boolean = false,
 )
 
 data class SuggestResponse(
     val changes: List<SuggestedChangeDto>,
+    val diffItems: List<DiffItem> = emptyList(),
+    val algorithmVersion: String? = null,
+    val settingsImpact: Boolean = false,
 )
 
 data class AmendmentRevisionDto(

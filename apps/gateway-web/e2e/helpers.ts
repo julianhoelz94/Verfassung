@@ -3,8 +3,11 @@ import { type Page, expect } from '@playwright/test';
 
 export const EDITOR_EMAIL = 'local-editor@example.local';
 export const ADMIN_EMAIL = 'local-admin@example.local';
+export const PUBLISHER_EMAIL = 'local-publisher@example.local';
+export const REVIEWER_EMAIL = 'local-reviewer@example.local';
 export const EDITOR_PASSWORD = 'change-me';
 export const MFA_CODE = '123456';
+export const VERSION_1949 = '01900000-0000-4000-8000-000000000003';
 export const VERSION_2022 = '01900000-0000-4000-8000-000000000004';
 export const ARTICLE_1 = '01900000-0000-4000-8000-000000000201';
 
@@ -23,8 +26,28 @@ export async function signInEditor(page: Page): Promise<void> {
   await signIn(page, EDITOR_EMAIL);
 }
 
+export async function startEditorSession(page: Page, versionId: string, workType: 'legal' | 'editorial_correction'): Promise<void> {
+  await page.goto(`/countries/DE/versions/${versionId}`);
+  await page.getByRole('link', { name: 'Edit this constitution' }).click();
+  const label = workType === 'legal' ? 'Record the next legal change' : 'Correct this text';
+  await page.locator('#editor-entry').getByRole('button', { name: label }).click();
+  await expect(page).toHaveURL(/sessionId=/);
+}
+
 export async function signInAdmin(page: Page): Promise<void> {
   await signIn(page, ADMIN_EMAIL);
+}
+
+export async function signInPublisher(page: Page): Promise<void> {
+  await signIn(page, PUBLISHER_EMAIL);
+}
+
+export async function signInReviewer(page: Page): Promise<void> {
+  await page.goto('/login');
+  await page.getByLabel('Email').fill(REVIEWER_EMAIL);
+  await page.getByLabel('Password').fill(EDITOR_PASSWORD);
+  await page.getByRole('button', { name: 'Sign in' }).click();
+  await expect(page.getByRole('heading', { name: 'Editor' })).toBeVisible();
 }
 
 export async function signOut(page: Page): Promise<void> {

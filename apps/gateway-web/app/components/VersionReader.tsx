@@ -1,14 +1,18 @@
 'use client';
 
+import { changeTypeMessage, changeTypeTone } from '../../lib/ui-labels';
+
+import { T, useTranslation } from './TranslationProvider';
+import { ui } from '../../lib/messages';
 import { useMemo, useState } from 'react';
 import type { ArticleSummary, ContentOutline } from '../../lib/api';
-import { clipNodes, depthStopCount, depthStopLabels } from '../../lib/outline';
-import { neighborsOf } from '../../lib/article-nav';
-import { Badge, type BadgeTone, Toolbar } from './ui';
-import { ArticleNav } from './ArticleNav';
+import { orderedTargets } from '../../lib/ordered-content';
+import { articleHeading, clipOrderedEntries, clipNodes, depthStopCount, depthStopLabels, kindByCode } from '../../lib/outline';
+import { Badge, Toolbar } from './ui';
 import { ConstitutionText } from './ConstitutionText';
 import { Segmented } from './Segmented';
 import { Toc } from './Toc';
+import { ReaderLayout } from './layout/templates';
 
 type VersionReaderProps = {
   code: string;
@@ -21,19 +25,6 @@ type VersionReaderProps = {
   unchangedSinceLabel?: string;
 };
 
-function changeTone(changeType: string): BadgeTone {
-  if (changeType === 'added') {
-    return 'added';
-  }
-  if (changeType === 'removed') {
-    return 'removed';
-  }
-  if (changeType === 'changed') {
-    return 'changed';
-  }
-  return 'neutral';
-}
-
 export function VersionReader({
   code,
   versionId,
@@ -44,6 +35,7 @@ export function VersionReader({
   changeByArticle = {},
   unchangedSinceLabel,
 }: VersionReaderProps) {
+  const t = useTranslation();
   const max = depthStopCount(outline);
   const labels = depthStopLabels(outline);
   const [depth, setDepth] = useState(1);
@@ -51,16 +43,17 @@ export function VersionReader({
   const tocItems = useMemo(
     () =>
       articles.map((article) => ({
-        id: `article-${article.articleNumber}`,
-        href: `#article-${article.articleNumber}`,
-        label: `Art. ${article.articleNumber} ${article.title}`,
+        id: `unit-${article.id}`,
+        href: `#unit-${article.id}`,
+        label: articleHeading(outline, article) || t(ui.editorDynamic.unit),
       })),
-    [articles],
+    [articles, outline, t],
   );
   const articlesByNumber = useMemo(
     () => Object.fromEntries(articles.map((article) => [article.articleNumber, article.id])),
     [articles],
   );
+  const unitsByLogicalId = useMemo(() => orderedTargets(articles), [articles]);
 
   function shownDepth(articleId: string): number {
     return expanded.has(articleId) ? max : depth;
@@ -84,20 +77,17 @@ export function VersionReader({
   const toc = <Toc items={tocItems} />;
 
   return (
-    <div className="reader">
-      <aside className="reader-aside">
-        <Toc items={tocItems} landmarkId="toc" />
-      </aside>
+    <ReaderLayout navigation={<Toc items={tocItems} landmarkId="toc" />}>
       <section>
-        <Toolbar label="Reading options">
+        <Toolbar label={t(ui.accessibility.readingOptions)}>
           <details className="toc-mobile">
-            <summary className="btn btn-sm toc-button">Contents</summary>
+            <summary className="btn btn-sm toc-button"><T value={ui.components.versionreader.contents} /></summary>
             {toc}
           </details>
           <Segmented
             labels={labels}
             value={depth}
-            ariaLabel="Detail level"
+            ariaLabel={t(ui.accessibility.detailLevel)}
             onChange={(next) => {
               setDepth(next);
               setExpanded(new Set());
@@ -105,7 +95,7 @@ export function VersionReader({
           />
           <span className="toolbar-spacer" />
           <span className="muted">
-            {articles.length} article{articles.length === 1 ? '' : 's'}
+            {articles.length} <T value={articles.length === 1 ? ui.remainingStatus.unitSingular : ui.remainingStatus.unitPlural} />
           </span>
         </Toolbar>
         <ol className="version-articles text-column" lang={language}>
@@ -118,8 +108,7 @@ export function VersionReader({
             const fullyOpen = depth >= max || expanded.has(article.id);
             const regionId = `article-panel-${article.id}`;
             const changeType = changeByArticle[article.articleNumber];
-            const permalink = `/countries/${code}/versions/${versionId}/articles/${article.id}#article-${article.articleNumber}`;
-            const neighbors = neighborsOf(articles, article.id);
+            const permalink = `/countries/${code}/versions/${versionId}/${article.kind && article.kind !== 'article' ? 'units' : 'articles'}/${article.id}#article-${article.articleNumber}`;
             const historyHref = `/countries/${code}/articles/${encodeURIComponent(article.articleNumber)}`;
             return (
               <li key={article.id} className="version-article article">
@@ -127,19 +116,20 @@ export function VersionReader({
                   <button
                     type="button"
                     className="article-toggle"
-                    id={`article-${article.articleNumber}`}
+                    id={`unit-${article.id}`}
                     aria-expanded={fullyOpen}
                     aria-controls={regionId}
                     disabled={depth >= max}
                     onClick={() => toggleArticle(article.id)}
                   >
-                    <span className="num">Art. {article.articleNumber}</span>
-                    <span>{article.title}</span>
+                    <span data-translate-content>{articleHeading(outline, article) || t(ui.editorDynamic.unit)}</span>
                   </button>
                 </h2>
                 {open ? (
                   <div id={regionId}>
                     <ConstitutionText
+                      article={article}
+                      entries={article.content == null ? undefined : clipOrderedEntries(article.content, outline, shown)}
                       nodes={nodes}
                       body={body}
                       showHeading={false}
@@ -148,49 +138,28 @@ export function VersionReader({
                       canEditTitles={canEditTitles}
                       returnTo={`/countries/${code}/versions/${versionId}`}
                       lang={language}
-                      crossRefs={{ code, versionId, articlesByNumber }}
+                      crossRefs={{ code, versionId, articlesByNumber, unitsByLogicalId }}
                     />
                   </div>
                 ) : (
                   <div id={regionId} hidden />
                 )}
                 <p className="article-foot print-hide">
-                  <a href={permalink}>Permalink</a>
-                  <a href={historyHref}>History of Art. {article.articleNumber}</a>
+                  <a href={permalink}><T value={ui.components.versionreader.permalink} /></a>
+                  {article.kind === 'article' && article.articleNumber ? <a href={historyHref}><T value={ui.components.versionreader.historyOf} />{" "}{kindByCode(outline, article.kind)?.displayLabel ?? t(ui.remainingStatus.article)} {article.articleNumber}</a> : null}
                   {changeType ? (
-                    <Badge tone={changeTone(changeType)}>{changeType}</Badge>
+                    <Badge tone={changeTypeTone(changeType)}>{<T value={changeTypeMessage(changeType)} />}</Badge>
                   ) : (
                     <span className="muted">
-                      {unchangedSinceLabel ? `Unchanged since ${unchangedSinceLabel}` : 'Unchanged'}
+                      {unchangedSinceLabel ? `${t(ui.readerDynamic.unchangedSince)} ${unchangedSinceLabel}` : t(ui.readerDynamic.unchanged)}
                     </span>
                   )}
                 </p>
-                {fullyOpen ? (
-                  <ArticleNav
-                    previous={
-                      neighbors.previous
-                        ? {
-                            href: `#article-${neighbors.previous.articleNumber}`,
-                            label: `Article ${neighbors.previous.articleNumber}`,
-                          }
-                        : undefined
-                    }
-                    next={
-                      neighbors.next
-                        ? {
-                            href: `#article-${neighbors.next.articleNumber}`,
-                            label: `Article ${neighbors.next.articleNumber}`,
-                          }
-                        : undefined
-                    }
-                    tocHref="#toc"
-                  />
-                ) : null}
               </li>
             );
           })}
         </ol>
       </section>
-    </div>
+    </ReaderLayout>
   );
 }

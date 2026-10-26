@@ -1,6 +1,8 @@
 package com.constitutionatlas.search.client
 
-import com.constitutionatlas.search.timedRestClient
+import com.constitutionatlas.platform.OrderedContentText
+import com.constitutionatlas.platform.OrderedEntry
+import com.constitutionatlas.platform.timedRestClient
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
@@ -19,22 +21,19 @@ class RestIndexSource(
     private val content: RestClient = timedRestClient(contentUrl)
 
     override fun loadPublishedArticles(): List<IndexableArticle> {
-        val countries = catalog.get()
-            .uri("/countries")
-            .retrieve()
-            .body(object : ParameterizedTypeReference<List<CountrySummaryWire>>() {})
-            .orEmpty()
+        val roots = catalog.get().uri("/jurisdictions").retrieve()
+            .body(object : ParameterizedTypeReference<List<JurisdictionWire>>() {}).orEmpty()
+        val queue = ArrayDeque(roots)
+        val seen = mutableSetOf<UUID>()
         val out = mutableListOf<IndexableArticle>()
-        for (country in countries) {
-            val detail = catalog.get()
-                .uri("/countries/{code}", country.isoCode)
-                .retrieve()
-                .body(CountryDetailWire::class.java)
-                ?: continue
-            val countryName = detail.name.ifBlank { country.name }.ifBlank { country.isoCode }
+        while (queue.isNotEmpty()) {
+            val jurisdiction = queue.removeFirst()
+            if (!seen.add(jurisdiction.id)) continue
+            val detail = catalog.get().uri("/jurisdictions/{id}", jurisdiction.id).retrieve().body(JurisdictionDetailWire::class.java) ?: continue
+            queue.addAll(detail.children)
             for (constitution in detail.constitutions) {
                 for (version in constitution.versions) {
-                    out += loadArticles(country.isoCode, countryName, constitution.title, version)
+                    out += loadArticles(jurisdiction.code?.takeIf { jurisdiction.kind == "country" && !jurisdiction.historical && it.matches(Regex("[A-Z]{2}")) }.orEmpty(), jurisdiction.name, constitution.title, version, jurisdiction)
                 }
             }
         }
@@ -46,13 +45,14 @@ class RestIndexSource(
         countryName: String,
         constitutionTitle: String,
         version: VersionWire,
+        jurisdiction: JurisdictionWire,
     ): List<IndexableArticle> {
         val pageSize = 200
         var offset = 0
         val articles = mutableListOf<IndexableArticle>()
         while (true) {
             val summaries = content.get()
-                .uri("/versions/{id}/articles?offset={offset}&limit={limit}", version.id, offset, pageSize)
+                .uri("/versions/{id}/units?offset={offset}&limit={limit}", version.currentVersionId ?: version.id, offset, pageSize)
                 .retrieve()
                 .body(object : ParameterizedTypeReference<List<ArticleSummaryWire>>() {})
                 .orEmpty()
@@ -61,7 +61,7 @@ class RestIndexSource(
             }
             for (summary in summaries) {
                 val detail = content.get()
-                    .uri("/articles/{id}", summary.id)
+                    .uri("/versions/{version}/units/{id}", version.currentVersionId ?: version.id, summary.id)
                     .retrieve()
                     .body(ArticleDetailWire::class.java)
                     ?: continue
@@ -75,8 +75,11 @@ class RestIndexSource(
                     effectiveDate = version.effectiveDate,
                     articleNumber = detail.articleNumber,
                     title = detail.title,
-                    body = detail.body,
+                    body = detail.content?.let(OrderedContentText::entries) ?: detail.body,
                     languageCode = version.languageCode.ifBlank { "en" },
+                    jurisdictionId = jurisdiction.id,
+                    jurisdictionName = jurisdiction.name,
+                    historical = jurisdiction.historical,
                 )
             }
             if (summaries.size < pageSize) {
@@ -88,16 +91,10 @@ class RestIndexSource(
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    private data class CountrySummaryWire(
-        val isoCode: String,
-        val name: String = "",
-    )
+    private data class JurisdictionWire(val id: UUID, val name: String, val code: String? = null, val historical: Boolean = false, val kind: String = "country")
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    private data class CountryDetailWire(
-        val name: String = "",
-        val constitutions: List<ConstitutionWire> = emptyList(),
-    )
+    private data class JurisdictionDetailWire(val children: List<JurisdictionWire> = emptyList(), val constitutions: List<ConstitutionWire> = emptyList())
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     private data class ConstitutionWire(
@@ -108,6 +105,7 @@ class RestIndexSource(
     @JsonIgnoreProperties(ignoreUnknown = true)
     private data class VersionWire(
         val id: UUID,
+        val currentVersionId: UUID? = null,
         val versionLabel: String = "",
         val effectiveDate: LocalDate? = null,
         val languageCode: String = "en",
@@ -125,6 +123,7 @@ class RestIndexSource(
         val articleNumber: String,
         val title: String,
         val body: String,
+        val content: List<OrderedEntry>? = null,
     )
 }
 

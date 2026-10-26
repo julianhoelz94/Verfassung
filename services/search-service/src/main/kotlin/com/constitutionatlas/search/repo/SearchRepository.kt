@@ -10,12 +10,20 @@ import com.constitutionatlas.search.api.VersionFacet
 import com.constitutionatlas.search.client.IndexableArticle
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Repository
+import org.springframework.transaction.annotation.Isolation
+import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
 import java.sql.Date
 import java.util.UUID
 
 @Repository
 class SearchRepository(private val jdbcTemplate: JdbcTemplate) {
+    /** Readers retain the committed index while one rebuild fetches and replaces its snapshot. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    fun lockForRebuild() {
+        jdbcTemplate.execute("LOCK TABLE search_documents IN SHARE ROW EXCLUSIVE MODE")
+    }
+
     @Transactional
     fun replaceAll(documents: List<IndexableArticle>) {
         jdbcTemplate.update("DELETE FROM search_documents")
@@ -24,9 +32,9 @@ class SearchRepository(private val jdbcTemplate: JdbcTemplate) {
                 """
                 INSERT INTO search_documents (
                   document_id, version_id, country_code, country_name, constitution_title, version_label,
-                  effective_date, article_number, title, body, language_code
+                  effective_date, article_number, title, body, language_code, jurisdiction_id, jurisdiction_name, historical
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """.trimIndent(),
                 doc.articleId,
                 doc.versionId,
@@ -39,6 +47,9 @@ class SearchRepository(private val jdbcTemplate: JdbcTemplate) {
                 doc.title,
                 doc.body,
                 doc.languageCode,
+                doc.jurisdictionId,
+                doc.jurisdictionName,
+                doc.historical,
             )
         }
         jdbcTemplate.update(
@@ -48,15 +59,18 @@ class SearchRepository(private val jdbcTemplate: JdbcTemplate) {
             ON CONFLICT (source) DO UPDATE SET
               last_synced_at = EXCLUDED.last_synced_at,
               document_count = EXCLUDED.document_count,
-              status = EXCLUDED.status
+              status = EXCLUDED.status,
+              generation = index_sync_state.generation + 1
             """.trimIndent(),
             documents.size,
         )
     }
 
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     fun search(query: SearchQuery): SearchPage {
+        val generation = jdbcTemplate.queryForObject("SELECT COALESCE(MAX(generation), 0) FROM index_sync_state WHERE source = 'content'", Long::class.java) ?: 0L
         if (query.text.isBlank()) {
-            return SearchPage(hits = emptyList(), total = 0, limit = query.limit, offset = query.offset)
+            return SearchPage(hits = emptyList(), total = 0, limit = query.limit, offset = query.offset, indexGeneration = generation)
         }
         val tsQuery = "plainto_tsquery('simple', ?) || plainto_tsquery('german', ?)"
         val filterSql =
@@ -65,6 +79,7 @@ class SearchRepository(private val jdbcTemplate: JdbcTemplate) {
             WHERE tsv @@ ($tsQuery)
               AND (?::text IS NULL OR country_code = ?)
               AND (?::uuid IS NULL OR version_id = ?)
+              AND (?::uuid IS NULL OR jurisdiction_id = ?)
               AND (?::date IS NULL OR effective_date = ?)
             """.trimIndent()
         val filterArgs =
@@ -75,6 +90,8 @@ class SearchRepository(private val jdbcTemplate: JdbcTemplate) {
                 query.countryCode,
                 query.versionId,
                 query.versionId,
+                query.jurisdictionId,
+                query.jurisdictionId,
                 query.effectiveDate?.let { Date.valueOf(it) },
                 query.effectiveDate?.let { Date.valueOf(it) },
             )
@@ -87,7 +104,7 @@ class SearchRepository(private val jdbcTemplate: JdbcTemplate) {
         val hits =
             jdbcTemplate.query(
                 """
-                SELECT document_id, version_id, country_code, constitution_title, version_label,
+                SELECT document_id, version_id, country_code, constitution_title, version_label, jurisdiction_id, jurisdiction_name, historical,
                        effective_date, article_number, title,
                        ts_headline(
                          'simple',
@@ -97,7 +114,7 @@ class SearchRepository(private val jdbcTemplate: JdbcTemplate) {
                        ) AS snippet,
                        ts_rank(tsv, plainto_tsquery('simple', ?) || plainto_tsquery('german', ?)) AS rank
                 $filterSql
-                ORDER BY rank DESC, article_number
+                ORDER BY rank DESC, article_number, version_id, document_id
                 LIMIT ?
                 OFFSET ?
                 """.trimIndent(),
@@ -113,6 +130,9 @@ class SearchRepository(private val jdbcTemplate: JdbcTemplate) {
                         title = rs.getString("title"),
                         snippet = rs.getString("snippet") ?: "",
                         rank = rs.getDouble("rank"),
+                        jurisdictionId = rs.getObject("jurisdiction_id", UUID::class.java),
+                        jurisdictionName = rs.getString("jurisdiction_name"),
+                        historical = rs.getBoolean("historical"),
                     )
                 },
                 query.text,
@@ -123,7 +143,7 @@ class SearchRepository(private val jdbcTemplate: JdbcTemplate) {
                 query.limit,
                 query.offset,
             )
-        return SearchPage(hits = hits, total = total, limit = query.limit, offset = query.offset)
+        return SearchPage(hits = hits, total = total, limit = query.limit, offset = query.offset, indexGeneration = generation)
     }
 
     fun facets(): SearchFacets {
@@ -132,6 +152,7 @@ class SearchRepository(private val jdbcTemplate: JdbcTemplate) {
                 """
                 SELECT country_code AS code, MAX(country_name) AS country_name, COUNT(*)::int AS count
                 FROM search_documents
+                WHERE country_code <> ''
                 GROUP BY country_code
                 ORDER BY country_code
                 """.trimIndent(),
@@ -175,6 +196,9 @@ class SearchRepository(private val jdbcTemplate: JdbcTemplate) {
                     count = rs.getInt("count"),
                 )
             }
-        return SearchFacets(countries = countries, versions = versions, dates = dates)
+        val jurisdictions = jdbcTemplate.query(
+            "SELECT jurisdiction_id, MAX(jurisdiction_name) AS name, BOOL_OR(historical) AS historical, COUNT(*)::int AS count FROM search_documents WHERE jurisdiction_id IS NOT NULL GROUP BY jurisdiction_id ORDER BY name",
+        ) { rs, _ -> com.constitutionatlas.search.api.JurisdictionFacet(rs.getObject("jurisdiction_id", UUID::class.java), rs.getString("name"), rs.getBoolean("historical"), rs.getInt("count")) }
+        return SearchFacets(countries = countries, versions = versions, dates = dates, jurisdictions = jurisdictions)
     }
 }

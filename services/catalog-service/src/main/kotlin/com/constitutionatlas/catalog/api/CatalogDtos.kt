@@ -1,5 +1,6 @@
 package com.constitutionatlas.catalog.api
 
+import com.fasterxml.jackson.annotation.JsonInclude
 import java.time.LocalDate
 import java.util.UUID
 
@@ -32,6 +33,10 @@ data class VersionSummary(
     val currentVersionId: UUID? = null,
     val legalPredecessorVersionId: UUID? = null,
     val editorialPredecessorVersionId: UUID? = null,
+    @get:JsonInclude(JsonInclude.Include.NON_NULL)
+    val publicationComment: String? = null,
+    @get:JsonInclude(JsonInclude.Include.NON_NULL)
+    val sourceEvidence: com.constitutionatlas.platform.SourceEvidence? = null,
 )
 
 data class NodeKindDto(
@@ -45,11 +50,36 @@ data class NodeKindDto(
     val showLabel: Boolean = true,
     val showTitle: Boolean = false,
     val showKind: Boolean = false,
+    val allowTextAlongsideChildren: Boolean = false,
+    val titlePolicy: String = "optional",
+    val labelPolicy: String = "optional",
+    val labelPlacement: String = "before_title",
+    val segmentation: String = "plain",
+    val root: Boolean = false,
 )
 
 data class ContentOutlineDto(
     val kinds: List<NodeKindDto>,
 )
+
+data class SettingsRevision(val id: UUID, val predecessorId: UUID?, val outline: ContentOutlineDto)
+
+data class SettingsImpact(
+    val currentRevisionId: UUID?,
+    val classification: String,
+    val affectedVersionIds: List<UUID>,
+    val reasons: List<String>,
+    val affectedDraftSessionIds: List<UUID> = emptyList(),
+    val violations: List<SettingsViolation> = emptyList(),
+)
+
+data class SettingsViolation(val versionId: UUID, val logicalId: UUID?, val field: String, val message: String)
+
+data class SettingsUsage(val draftSessionIds: List<UUID> = emptyList(), val violations: List<SettingsViolation> = emptyList())
+
+data class SettingsWrite(val expectedRevisionId: UUID, val kinds: List<OutlineKindWrite>)
+
+data class SettingsRestore(val expectedRevisionId: UUID)
 
 data class ConstitutionSummary(
     val id: UUID,
@@ -58,6 +88,9 @@ data class ConstitutionSummary(
     val latestVersionId: UUID? = null,
     val versions: List<VersionSummary>,
     val contentOutline: ContentOutlineDto,
+    val predecessorConstitutionId: UUID? = null,
+    val interim: Boolean = false,
+    val lifecycleStatus: String = "unknown",
 )
 
 data class CountryDetail(
@@ -76,6 +109,8 @@ data class CreateConstitutionRequest(
     val slug: String,
     val title: String,
     val outline: List<OutlineKindWrite>? = null,
+    val predecessorConstitutionId: UUID? = null,
+    val interim: Boolean = false,
 )
 
 data class OutlineKindWrite(
@@ -85,6 +120,13 @@ data class OutlineKindWrite(
     val showLabel: Boolean = true,
     val showTitle: Boolean = false,
     val showKind: Boolean = false,
+    val allowTextAlongsideChildren: Boolean = false,
+    val titlePolicy: String = "optional",
+    val labelPolicy: String = "optional",
+    val labelPlacement: String = "before_title",
+    val segmentation: String = "plain",
+    val root: Boolean? = null,
+    val allowedChildKinds: List<String>? = null,
 )
 
 data class ContentOutlineWrite(
@@ -104,6 +146,12 @@ data class CreateVersionRequest(
     val gazetteReference: String? = null,
     val predecessorVersionId: UUID? = null,
     val hopKind: String? = null,
+    val publicationComment: String? = null,
+    val structuralSettingsRevisionId: UUID? = null,
+    val publishAttemptId: UUID? = null,
+    val importJobId: UUID? = null,
+    @get:JsonInclude(JsonInclude.Include.NON_NULL)
+    val sourceEvidence: com.constitutionatlas.platform.SourceEvidence? = null,
 )
 
 data class VersionCreated(
@@ -134,4 +182,10 @@ data class VersionDetail(
     val currentVersionId: UUID? = null,
     val legalPredecessorVersionId: UUID? = null,
     val editorialPredecessorVersionId: UUID? = null,
+    val countryCode: String? = null,
+    val jurisdictionId: UUID? = null,
+    val sourceUrl: String? = null,
+    val gazetteReference: String? = null,
+    @get:JsonInclude(JsonInclude.Include.NON_NULL)
+    val sourceEvidence: com.constitutionatlas.platform.SourceEvidence? = null,
 )

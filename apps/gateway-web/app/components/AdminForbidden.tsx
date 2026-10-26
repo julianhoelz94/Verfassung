@@ -1,11 +1,14 @@
+import { T } from './TranslationProvider';
+import { ui } from '../../lib/messages';
 import { Alert } from './ui';
-import { PageMain } from './PageMain';
+import { FocusedPage } from './layout/templates';
+import type { UiMessage } from '../../lib/messages';
 
-export function AdminForbidden({ title }: { title: string }) {
+export function AdminForbidden({ title }: { title: UiMessage }) {
   return (
-    <PageMain>
-      <h1>{title}</h1>
-      <Alert tone="error">Administrator role required.</Alert>
-    </PageMain>
+    <FocusedPage width="reading">
+      <h1><T value={title} /></h1>
+      <Alert tone="error"><T value={ui.components.adminforbidden.administratorRoleRequired} /></Alert>
+    </FocusedPage>
   );
 }

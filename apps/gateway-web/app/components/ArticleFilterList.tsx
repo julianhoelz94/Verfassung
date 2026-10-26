@@ -1,7 +1,10 @@
 'use client';
 
+import { T, useTranslation } from './TranslationProvider';
+import { ui } from '../../lib/messages';
 import { useMemo, useState } from 'react';
 import { Badge } from './ui';
+import fieldStyles from './fields.module.css';
 
 type FilterArticle = {
   id: string;
@@ -14,9 +17,11 @@ type ArticleFilterListProps = {
   selectedId?: string;
   hrefBase: string;
   draftIds: string[];
+  unitLabel?: string;
 };
 
-export function ArticleFilterList({ articles, selectedId, hrefBase, draftIds }: ArticleFilterListProps) {
+export function ArticleFilterList({ articles, selectedId, hrefBase, draftIds, unitLabel }: ArticleFilterListProps) {
+  const t = useTranslation();
   const [query, setQuery] = useState('');
   const draftSet = useMemo(() => new Set(draftIds), [draftIds]);
   const filtered = useMemo(() => {
@@ -25,20 +30,20 @@ export function ArticleFilterList({ articles, selectedId, hrefBase, draftIds }: 
       return articles;
     }
     return articles.filter((article) => {
-      const haystack = `art. ${article.articleNumber} ${article.title}`.toLowerCase();
+      const haystack = `${unitLabel ?? 'Art.'} ${article.articleNumber} ${article.title}`.toLowerCase();
       return haystack.includes(needle);
     });
-  }, [articles, query]);
+  }, [articles, query, unitLabel]);
 
   return (
     <>
       <input
-        className="field-control"
+        className={["field-control", fieldStyles.control].join(' ')}
         type="search"
         value={query}
         onChange={(event) => setQuery(event.target.value)}
-        placeholder="Filter articles"
-        aria-label="Filter articles"
+        placeholder={t(unitLabel ? ui.readerDynamic.filterUnits : ui.readerDynamic.filterArticles)}
+        aria-label={t(unitLabel ? ui.readerDynamic.filterUnits : ui.readerDynamic.filterArticles)}
       />
       <ul className="article-list">
         {filtered.map((article) => {
@@ -48,9 +53,9 @@ export function ArticleFilterList({ articles, selectedId, hrefBase, draftIds }: 
             <li key={article.id}>
               <a href={href} aria-current={current ? 'true' : undefined}>
                 <span>
-                  Art. {article.articleNumber} {article.title}
+                  {unitLabel ?? 'Art.'} {article.articleNumber} {article.title}
                 </span>
-                {draftSet.has(article.id) ? <Badge tone="changed">draft</Badge> : null}
+                {draftSet.has(article.id) ? <Badge tone="changed"><T value={ui.components.articlefilterlist.draft} /></Badge> : null}
               </a>
             </li>
           );

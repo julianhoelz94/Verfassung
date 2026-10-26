@@ -3,6 +3,7 @@ package com.constitutionatlas.editor.client
 import com.constitutionatlas.editor.ConflictException
 import com.constitutionatlas.editor.DownstreamException
 import com.constitutionatlas.platform.NotFoundException
+import com.constitutionatlas.platform.timedRestClient
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.springframework.beans.factory.annotation.Value
@@ -35,6 +36,37 @@ data class CatalogVersion(
     val editorialPredecessorVersionId: UUID? = null,
 )
 
+@JsonIgnoreProperties(ignoreUnknown = true)
+private data class CatalogVersionListItem(
+    val id: UUID,
+    val versionLabel: String,
+    val effectiveDate: LocalDate? = null,
+    val languageCode: String = "en",
+    val predecessorVersionId: UUID? = null,
+    val hopKind: String = "initial",
+    val listing: String = "public",
+    val legalVersionId: UUID? = null,
+    val currentVersionId: UUID? = null,
+    val legalPredecessorVersionId: UUID? = null,
+    val editorialPredecessorVersionId: UUID? = null,
+) {
+    fun toVersion(constitutionId: UUID) = CatalogVersion(
+        id = id,
+        constitutionId = constitutionId,
+        versionLabel = versionLabel,
+        publicationStatus = "published",
+        effectiveDate = effectiveDate,
+        languageCode = languageCode,
+        predecessorVersionId = predecessorVersionId,
+        hopKind = hopKind,
+        listing = listing,
+        legalVersionId = legalVersionId,
+        currentVersionId = currentVersionId,
+        legalPredecessorVersionId = legalPredecessorVersionId,
+        editorialPredecessorVersionId = editorialPredecessorVersionId,
+    )
+}
+
 interface CatalogClient {
     fun getVersion(versionId: UUID): CatalogVersion
 
@@ -45,6 +77,7 @@ interface CatalogClient {
         languageCode: String,
         predecessorVersionId: UUID,
         hopKind: String,
+        publicationComment: String? = null,
     ): CatalogVersion
 
     fun listVersions(constitutionId: UUID, listing: String = "all"): List<CatalogVersion>
@@ -82,6 +115,7 @@ class RestCatalogClient(
         languageCode: String,
         predecessorVersionId: UUID,
         hopKind: String,
+        publicationComment: String?,
     ): CatalogVersion {
         try {
             val request = client.post()
@@ -96,6 +130,7 @@ class RestCatalogClient(
                         "languageCode" to languageCode,
                         "predecessorVersionId" to predecessorVersionId,
                         "hopKind" to hopKind,
+                        "publicationComment" to publicationComment,
                     ),
                 )
                 .retrieve()
@@ -123,6 +158,7 @@ class RestCatalogClient(
             request
                 .retrieve()
                 .body(VERSION_LIST)
+                ?.map { it.toVersion(constitutionId) }
                 ?: emptyList()
         } catch (ex: RestClientException) {
             throw DownstreamException("catalog list versions failed", ex)
@@ -148,13 +184,12 @@ class RestCatalogClient(
     }
 
     companion object {
-        private val VERSION_LIST = object : ParameterizedTypeReference<List<CatalogVersion>>() {}
+        private val VERSION_LIST = object : ParameterizedTypeReference<List<CatalogVersionListItem>>() {}
         private val objectMapper = ObjectMapper()
 
         private fun parseConflictCode(body: String): String? =
             try {
-                @Suppress("UNCHECKED_CAST")
-                objectMapper.readValue(body, Map::class.java)["code"] as? String
+                objectMapper.readTree(body)?.get("code")?.takeIf { it.isTextual }?.textValue()
             } catch (_: Exception) {
                 null
             }

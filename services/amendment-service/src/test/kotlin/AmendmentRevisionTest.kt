@@ -9,6 +9,7 @@ import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
+import org.springframework.test.context.jdbc.Sql
 import org.testcontainers.containers.PostgreSQLContainer
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
@@ -16,6 +17,7 @@ import java.time.LocalDate
 import java.util.UUID
 
 @Testcontainers
+@Sql(scripts = ["/fixtures/demo_amendments.sql"], executionPhase = Sql.ExecutionPhase.BEFORE_TEST_CLASS)
 @SpringBootTest(classes = [AmendmentServiceApplication::class])
 class AmendmentRevisionTest {
     @Autowired

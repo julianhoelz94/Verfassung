@@ -10,8 +10,8 @@ import com.constitutionatlas.identity.crypto.Tokens
 import com.constitutionatlas.identity.repo.IdentityRepository
 import com.constitutionatlas.identity.repo.StoredUser
 import com.constitutionatlas.identity.repo.toDto
-import com.constitutionatlas.platform.ForbiddenException
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
 import java.security.SecureRandom
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
@@ -28,7 +28,9 @@ class ServiceTokenService(
         return identityRepository.listServiceTokens().map { it.toDto() }
     }
 
+    @Transactional
     fun create(authorization: String?, request: CreateServiceTokenRequest): ServiceTokenCreatedDto {
+        authService.requireLockedSession(authorization)
         val admin = requireAdmin(authorization)
         authService.requireFreshStepUp(authorization)
         val name = request.name.trim()
@@ -55,7 +57,9 @@ class ServiceTokenService(
         )
     }
 
+    @Transactional
     fun rotate(authorization: String?, tokenId: UUID, request: RotateServiceTokenRequest?): ServiceTokenCreatedDto {
+        authService.requireLockedSession(authorization)
         requireAdmin(authorization)
         authService.requireFreshStepUp(authorization)
         val stored =
@@ -82,7 +86,9 @@ class ServiceTokenService(
         )
     }
 
+    @Transactional
     fun revoke(authorization: String?, tokenId: UUID) {
+        authService.requireLockedSession(authorization)
         requireAdmin(authorization)
         authService.requireFreshStepUp(authorization)
         if (!identityRepository.revokeServiceToken(tokenId)) {
@@ -90,13 +96,7 @@ class ServiceTokenService(
         }
     }
 
-    private fun requireAdmin(authorization: String?): StoredUser {
-        val user = authService.requireSession(authorization)
-        if ("admin" !in identityRepository.rolesForUser(user.id)) {
-            throw ForbiddenException("Administrator role required")
-        }
-        return user
-    }
+    private fun requireAdmin(authorization: String?): StoredUser = authService.requireAdminSession(authorization)
 
     companion object {
         val ALLOWED_SCOPES =
@@ -110,6 +110,7 @@ class ServiceTokenService(
                 "audit:append",
                 "audit:read",
                 "ingestion:import",
+                "ingestion:publish",
             )
 
         fun parseScopes(raw: List<String>): List<String> {

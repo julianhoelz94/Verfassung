@@ -1,7 +1,12 @@
+import { publicVersions, snapshotVersionId } from '../../../../../lib/reading';
+import { changeTypeMessage, changeTypeTone } from '../../../../../lib/ui-labels';
+import { T } from '../../../../components/TranslationProvider';
+import { ui, type UiMessage } from '../../../../../lib/messages';
 import { notFound } from 'next/navigation';
 import { ConstitutionText } from '../../../../components/ConstitutionText';
-import { PageMain } from '../../../../components/PageMain';
+import { ReaderPage } from '../../../../components/layout/templates';
 import { Provenance } from '../../../../components/Provenance';
+import { AmendmentUnitLinks } from '../../../../components/AmendmentUnitLinks';
 import { ServiceUnavailable } from '../../../../components/StatusMessage';
 import { Badge, PageHeader } from '../../../../components/ui';
 import {
@@ -16,6 +21,7 @@ import {
 } from '../../../../../lib/api';
 import { orderVersions } from '../../../../../lib/compare';
 import { FormattedDate } from '../../../../../lib/format-date';
+import { Stack } from '../../../../components/layout/Layout';
 
 type HistoryPageProps = {
   params: Promise<{ code: string; articleNumber: string }>;
@@ -23,16 +29,10 @@ type HistoryPageProps = {
 
 type ArticleSnapshot = {
   version: VersionSummary;
+  snapshotId: string;
   article: ArticleSummary;
   articles: ArticleSummary[];
 };
-
-function changeTone(changeType: string): 'added' | 'removed' | 'changed' | 'neutral' {
-  if (changeType === 'added' || changeType === 'removed' || changeType === 'changed') {
-    return changeType;
-  }
-  return 'neutral';
-}
 
 export default async function ArticleHistoryPage(props: HistoryPageProps) {
   const params = await props.params;
@@ -47,12 +47,12 @@ export default async function ArticleHistoryPage(props: HistoryPageProps) {
 
   if (error) {
     return (
-      <PageMain>
+      <ReaderPage width="reading">
         <ServiceUnavailable
-          service="Catalog"
+          service={ui.services.catalog}
           retryHref={`/countries/${params.code}/articles/${encodeURIComponent(articleNumber)}`}
         />
-      </PageMain>
+      </ReaderPage>
     );
   }
 
@@ -68,19 +68,19 @@ export default async function ArticleHistoryPage(props: HistoryPageProps) {
     notFound();
   }
 
-  const versions = orderVersions(constitution.versions);
+  const versions = orderVersions(publicVersions(constitution.versions));
   let snapshots: ArticleSnapshot[] = [];
   let amendments: Amendment[] = [];
-  let loadError: string | null = null;
+  let loadError: UiMessage | null = null;
   try {
-    const versionArticles = await Promise.all(versions.map((version) => listAllArticles(version.id, true)));
+    const versionArticles = await Promise.all(versions.map((version) => listAllArticles(snapshotVersionId(version), true)));
     snapshots = versions.flatMap((version, index) => {
       const articles = versionArticles[index] ?? [];
       const article = articles.find((item) => item.articleNumber === articleNumber);
-      return article ? [{ version, article, articles }] : [];
+      return article ? [{ version, snapshotId: snapshotVersionId(version), article, articles }] : [];
     });
   } catch (e) {
-    loadError = e instanceof ApiUnavailableError ? e.message : 'A backend service is unavailable';
+    loadError = ui.errors.servicesUnavailable;
   }
   try {
     amendments = (await listAmendmentsByArticle(constitution.id, articleNumber)) ?? [];
@@ -93,18 +93,18 @@ export default async function ArticleHistoryPage(props: HistoryPageProps) {
   }
 
   return (
-    <PageMain>
-      <PageHeader
+    <ReaderPage width="reading" header={<PageHeader
         breadcrumbs={[
-          { href: '/', label: 'Countries' },
+          { href: '/', label: <T value={ui.nav.countries} /> },
           { href: `/countries/${country.isoCode}`, label: country.name },
-          { label: `History of Article ${articleNumber}` },
+          { label: <><T value={ui.countries.code.versions.versionid.articles.articleid.page.historyOfArticle} /> {articleNumber}</> },
         ]}
         eyebrow={`${country.name} · ${constitution.title}`}
-        title={`History of Article ${articleNumber}`}
-      />
-      {loadError ? <p role="alert">{loadError.endsWith('.') ? loadError : `${loadError}.`}</p> : null}
-      <div className="stack">
+        title={<><T value={ui.countries.code.versions.versionid.articles.articleid.page.historyOfArticle} /> {articleNumber}</>}
+      />}>
+
+      {loadError ? <p role="alert"><T value={loadError} /></p> : null}
+      <Stack>
         {snapshots.map((snapshot, index) => {
           const previous = snapshots[index - 1];
           const incoming = amendments.filter(
@@ -116,21 +116,21 @@ export default async function ArticleHistoryPage(props: HistoryPageProps) {
           return (
             <section key={snapshot.version.id} className="history-version">
               {previous ? (
-                <div className="stack">
+                <Stack>
                   {incoming.map((amendment) =>
                     amendment.changes.map((change) => (
                       <div key={change.id} className="change-row">
-                        <Badge tone={changeTone(change.changeType)}>{change.changeType}</Badge>
+                        <Badge tone={changeTypeTone(change.changeType)}>{<T value={changeTypeMessage(change.changeType)} />}</Badge>
                         <span className="muted">
                           {change.changedOn ? (
                             <>
-                              changed <FormattedDate value={change.changedOn} />
+                              <T value={ui.countries.code.articles.articlenumber.page.changed} />{" "}<FormattedDate value={change.changedOn} />
                             </>
                           ) : null}
                           {change.effectiveOn ? (
                             <>
                               {change.changedOn ? ' · ' : ''}
-                              effective <FormattedDate value={change.effectiveOn} />
+                              <T value={ui.countries.code.articles.articlenumber.page.effective} />{" "}<FormattedDate value={change.effectiveOn} />
                             </>
                           ) : null}
                           {amendment.sourceReference ? ` · ${amendment.sourceReference}` : ''}
@@ -143,6 +143,7 @@ export default async function ArticleHistoryPage(props: HistoryPageProps) {
                             : ''}
                           {change.note ? ` · ${change.note}` : ''}
                         </span>
+                        <AmendmentUnitLinks change={change} />
                       </div>
                     )),
                   )}
@@ -150,9 +151,8 @@ export default async function ArticleHistoryPage(props: HistoryPageProps) {
                     className="btn"
                     href={`/countries/${country.isoCode}/compare?from=${encodeURIComponent(previous.version.id)}&to=${encodeURIComponent(snapshot.version.id)}`}
                   >
-                    Compare with previous
-                  </a>
-                </div>
+                    <T value={ui.countries.code.articles.articlenumber.page.compareWithPrevious} />{" "}</a>
+                </Stack>
               ) : null}
               <h2>
                 {snapshot.version.versionLabel}
@@ -165,22 +165,23 @@ export default async function ArticleHistoryPage(props: HistoryPageProps) {
               </h2>
               <Provenance
                 version={snapshot.version}
-                label={`Source and trust · ${snapshot.version.versionLabel}`}
+                labelSuffix={snapshot.version.versionLabel}
               />
               <ConstitutionText
                 article={snapshot.article}
+                headingLevel="h3"
                 outline={constitution.contentOutline}
                 lang={snapshot.version.languageCode}
                 crossRefs={{
                   code: country.isoCode,
-                  versionId: snapshot.version.id,
+                  versionId: snapshot.snapshotId,
                   articlesByNumber,
                 }}
               />
             </section>
           );
         })}
-      </div>
-    </PageMain>
+      </Stack>
+    </ReaderPage>
   );
 }

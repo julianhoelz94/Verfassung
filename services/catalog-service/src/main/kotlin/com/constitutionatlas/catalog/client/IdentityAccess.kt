@@ -16,6 +16,30 @@ fun Actor.canViewStaffCatalog(): Boolean =
 
 @Component
 class WriteAccess(private val identityClient: IdentityClient) {
+    fun requireImportPublisher(authorization: String?): Actor = identityClient.authenticate(authorization).also {
+        if ("ingestion:publish" !in it.scopes) throw ForbiddenException("Import reservation access requires ingestion:publish")
+    }
+    fun mayViewArchiveComparisons(authorization: String?): Boolean =
+        !authorization.isNullOrBlank() && runCatching { identityClient.authenticate(authorization).canViewStaffCatalog() }.getOrDefault(false)
+    fun requireArchiveReviewer(authorization: String?): Actor {
+        val actor = identityClient.authenticate(authorization)
+        if (actor.roles.none { it == "reviewer" || it == "admin" }) throw ForbiddenException("Comparison review requires reviewer or admin")
+        return actor
+    }
+    fun requireArchivePublisher(authorization: String?): Actor {
+        val actor = identityClient.authenticate(authorization)
+        if (actor.roles.none { it == "publisher" || it == "admin" } || !actor.stepUpFresh) throw ForbiddenException("Comparison publication requires publisher and fresh authenticator confirmation")
+        return actor
+    }
+    fun mayViewPrivateCatalog(authorization: String?): Boolean {
+        if (authorization.isNullOrBlank()) return false
+        return try {
+            val actor = identityClient.authenticate(authorization)
+            actor.canViewStaffCatalog() || actor.scopes.any { it == "ingestion:import" || it == "ingestion:publish" || it == "content:write" }
+        } catch (_: RuntimeException) {
+            false
+        }
+    }
     fun requireCatalogWriter(authorization: String?): Actor {
         val actor = identityClient.authenticate(authorization)
         if (!actor.canWriteCatalog()) {
@@ -28,6 +52,14 @@ class WriteAccess(private val identityClient: IdentityClient) {
         val actor = identityClient.authenticate(authorization)
         if (!actor.canPublishCatalog()) {
             throw ForbiddenException("catalog publish requires publisher, admin, or catalog:publish")
+        }
+        return actor
+    }
+
+    fun requireVersionPublisher(authorization: String?): Actor {
+        val actor = identityClient.authenticate(authorization)
+        if (!actor.canPublishCatalog() && "ingestion:publish" !in actor.scopes) {
+            throw ForbiddenException("version publication requires publisher or ingestion:publish")
         }
         return actor
     }

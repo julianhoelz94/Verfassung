@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX migration_capture_attempt_identity_uq ON migration_capture_attempts(attempt_id);

@@ -2,6 +2,7 @@ package com.constitutionatlas.identity.api
 
 import com.constitutionatlas.identity.BadRequestException
 import com.constitutionatlas.identity.ConflictException
+import com.constitutionatlas.identity.MailDeliveryException
 import com.constitutionatlas.identity.StepUpRequiredException
 import com.constitutionatlas.identity.TooManyRequestsException
 import org.springframework.http.HttpStatus
@@ -11,6 +12,10 @@ import org.springframework.web.bind.annotation.RestControllerAdvice
 
 @RestControllerAdvice
 class AuthAdvice {
+    @ExceptionHandler(MailDeliveryException::class)
+    fun mailUnavailable(ex: MailDeliveryException): ResponseEntity<Map<String, String>> =
+        ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(mapOf("error" to (ex.message ?: "Mail delivery is unavailable")))
+
     @ExceptionHandler(TooManyRequestsException::class)
     fun tooManyRequests(ex: TooManyRequestsException): ResponseEntity<Map<String, String>> =
         ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(mapOf("error" to (ex.message ?: "Invalid credentials")))

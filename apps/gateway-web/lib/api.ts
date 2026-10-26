@@ -1,3 +1,4 @@
+import { fetchWithTimeout } from './fetch-with-timeout';
 import './contracts';
 
 export type VersionSummary = {
@@ -17,11 +18,18 @@ export type VersionSummary = {
   hopKind?: string;
   listing?: string;
   latestPublished: boolean;
+  publicationComment?: string | null;
+  sourceEvidence?: SourceEvidence | null;
 };
+
+export type SourceEvidence = { dateWording?: string | null; datePrecision: 'unknown' | 'year' | 'month' | 'day' | 'range' | 'uncertain'; coverage?: string | null; statusWording?: string | null; attribution?: string | null };
 
 export type VersionDetail = Pick<VersionSummary, 'id' | 'versionLabel' | 'effectiveDate' | 'languageCode' | 'predecessorVersionId' | 'legalVersionId' | 'currentVersionId' | 'hopKind' | 'listing'> & {
   constitutionId: string;
   publicationStatus: string;
+  countryCode?: string | null;
+  jurisdictionId?: string | null;
+  sourceEvidence?: SourceEvidence | null;
 };
 
 export type ContentNode = {
@@ -33,6 +41,10 @@ export type ContentNode = {
   body: string | null;
   sortOrder: number;
   children: ContentNode[];
+  content?: OrderedEntry[];
+  logicalId?: string;
+  revisionId?: string;
+  legacyIdentity?: boolean;
 };
 
 export type ArticleDetail = {
@@ -44,6 +56,10 @@ export type ArticleDetail = {
   sortOrder: number;
   kind?: string;
   children?: ContentNode[];
+  content?: OrderedEntry[];
+  logicalId?: string;
+  revisionId?: string;
+  legacyIdentity?: boolean;
 };
 
 export type ContentOutline = {
@@ -58,6 +74,12 @@ export type ContentOutline = {
     showLabel: boolean;
     showTitle: boolean;
     showKind: boolean;
+    allowTextAlongsideChildren?: boolean;
+    titlePolicy?: string;
+    labelPolicy?: string;
+    labelPlacement?: string;
+    segmentation?: string;
+    root?: boolean;
   }[];
 };
 
@@ -68,6 +90,69 @@ export type ConstitutionSummary = {
   latestVersionId?: string | null;
   versions: VersionSummary[];
   contentOutline?: ContentOutline;
+  predecessorConstitutionId?: string | null;
+  interim?: boolean;
+  lifecycleStatus?: string;
+};
+
+export type ConstitutionLifecycleEvent = {
+  id: string;
+  constitutionId: string;
+  eventType: 'adopted' | 'commenced' | 'suspended' | 'restored' | 'repealed';
+  eventDate: string;
+  sourceUrl: string | null;
+  note: string | null;
+  dateCertainty: 'exact' | 'approximate';
+};
+
+export type ProvisionLifecycleEvent = {
+  id: string;
+  constitutionId: string;
+  sourceVersionId: string;
+  eventType: 'deferred' | 'commenced' | 'suspended' | 'restored';
+  eventDate: string;
+  logicalUnitIds: string[];
+  sourceUrl: string | null;
+  note: string | null;
+};
+
+export type ResolvedUnit = {
+  logicalId: string;
+  pathLabels: string[];
+  deepLink: string;
+};
+
+export type ExportedUnit = {
+  logicalId?: string | null;
+  kind?: string | null;
+  label?: string | null;
+  title?: string | null;
+  content?: Array<{ type: string; node?: ExportedUnit | null }>;
+};
+
+export type WikiImage = {
+  documentId: string;
+  revision: number;
+  alt: string;
+  caption?: string | null;
+  credit?: string | null;
+  sourceUrl?: string | null;
+  rights?: string | null;
+  placement?: 'before_body' | 'after_body';
+};
+
+export type WikiPageRevision = {
+  id: string;
+  targetType: 'country' | 'constitution';
+  targetId: string;
+  predecessorId: string | null;
+  summary: string;
+  body: string;
+  images: WikiImage[];
+  sourceUrls: string[];
+  createdAt?: string | null;
+  createdBy?: string | null;
+  publishedAt?: string | null;
 };
 
 export type CountrySummary = {
@@ -93,8 +178,13 @@ export type ArticleSummary = {
   articleNumber: string;
   title: string;
   sortOrder: number;
+  kind?: string;
   body?: string | null;
   children?: ContentNode[];
+  content?: OrderedEntry[];
+  logicalId?: string;
+  revisionId?: string;
+  legacyIdentity?: boolean;
 };
 
 export type AmendmentChange = {
@@ -109,6 +199,27 @@ export type AmendmentChange = {
   amendingLawCitationId?: string | null;
   amendingLawTitle?: string | null;
   amendingLawCitation?: string | null;
+  beforeRef?: AmendmentUnitRef | null;
+  afterRef?: AmendmentUnitRef | null;
+  linkReviewReason?: string | null;
+  legacyLinkUnresolved?: boolean;
+  pendingAfterLogicalId?: string | null;
+};
+
+export type AmendmentUnitRef = {
+  versionId?: string | null;
+  logicalId?: string | null;
+  occurrenceId?: string | null;
+  rootOccurrenceId?: string | null;
+  revisionId?: string | null;
+  unitKind?: 'node' | 'text_entry' | null;
+  articleNumber?: string | null;
+  constitutionId?: string | null;
+  kind?: string | null;
+  label?: string | null;
+  breadcrumbs?: string[];
+  text?: string | null;
+  deepLink?: string | null;
 };
 
 export type Amendment = {
@@ -146,7 +257,7 @@ export class ApiUnavailableError extends Error {
 export async function readJson<T>(url: string, service: string, authorization?: string): Promise<T | null> {
   let response: Response;
   try {
-    response = await fetch(url, {
+    response = await fetchWithTimeout(url, {
       cache: 'no-store',
       headers: authorization ? { Authorization: authorization } : undefined,
     });
@@ -159,7 +270,14 @@ export async function readJson<T>(url: string, service: string, authorization?: 
   if (!response.ok) {
     throw new ApiUnavailableError(service);
   }
-  return (await response.json()) as T;
+  // Spring nullable endpoints return an empty 200 before a resource exists.
+  try {
+    const body = await response.text();
+    return body.trim() ? JSON.parse(body) as T : null;
+  } catch {
+    // Invalid/truncated upstream JSON uses the same recoverable page state as an outage.
+    throw new ApiUnavailableError(service);
+  }
 }
 
 export function catalogBaseUrl(): string {
@@ -186,6 +304,9 @@ export type SearchHit = {
   articleId: string;
   versionId: string;
   countryCode: string;
+  jurisdictionId?: string | null;
+  jurisdictionName?: string | null;
+  historical?: boolean;
   constitutionTitle: string;
   versionLabel: string;
   effectiveDate: string | null;
@@ -204,6 +325,7 @@ export type SearchPage = {
 
 export type SearchFilters = {
   country?: string;
+  jurisdictionId?: string;
   versionId?: string;
   effectiveDate?: string;
   limit?: number;
@@ -233,6 +355,7 @@ export type SearchFacets = {
   countries: CountryFacet[];
   versions: VersionFacet[];
   dates: DateFacet[];
+  jurisdictions?: { id: string; name: string; historical: boolean; count: number }[];
 };
 
 export function searchArticles(query: string, filters: SearchFilters = {}): Promise<SearchPage | null> {
@@ -243,6 +366,7 @@ export function searchArticles(query: string, filters: SearchFilters = {}): Prom
   }
   const params = new URLSearchParams();
   params.set('q', query);
+  if (filters.jurisdictionId) params.set('jurisdictionId', filters.jurisdictionId);
   if (filters.country) {
     params.set('country', filters.country);
   }
@@ -265,14 +389,104 @@ export function listCountries(): Promise<CountrySummary[] | null> {
   return readJson<CountrySummary[]>(`${catalogBaseUrl()}/countries`, 'catalog');
 }
 
-export function getCountry(isoCode: string): Promise<CountryDetail | null> {
+export function getCountry(isoCode: string, authorization?: string): Promise<CountryDetail | null> {
   return readJson<CountryDetail>(
     `${catalogBaseUrl()}/countries/${encodeURIComponent(isoCode)}`,
+    'catalog',
+    authorization,
+  );
+}
+
+export function getConstitutionLifecycle(isoCode: string): Promise<ConstitutionLifecycleEvent[] | null> {
+  return readJson<ConstitutionLifecycleEvent[]>(
+    `${catalogBaseUrl()}/countries/${encodeURIComponent(isoCode)}/constitution-lifecycle`,
     'catalog',
   );
 }
 
-export async function loadCountriesWithDetails(): Promise<{
+export function appendConstitutionLifecycle(
+  constitutionId: string,
+  payload: { eventType: ConstitutionLifecycleEvent['eventType']; eventDate: string; dateCertainty?: ConstitutionLifecycleEvent['dateCertainty']; sourceUrl?: string; note?: string },
+  authorization: string,
+): Promise<ConstitutionLifecycleEvent> {
+  return sendJson<ConstitutionLifecycleEvent>(
+    `${catalogBaseUrl()}/constitutions/${encodeURIComponent(constitutionId)}/lifecycle-events`,
+    'catalog',
+    'POST',
+    payload,
+    authorization,
+  );
+}
+
+export function getProvisionLifecycle(isoCode: string): Promise<ProvisionLifecycleEvent[] | null> {
+  return readJson<ProvisionLifecycleEvent[]>(
+    `${catalogBaseUrl()}/countries/${encodeURIComponent(isoCode)}/provision-lifecycle`,
+    'catalog',
+  );
+}
+
+export function resolveUnit(versionId: string, logicalId: string): Promise<ResolvedUnit | null> {
+  return readJson<ResolvedUnit>(
+    `${contentBaseUrl()}/versions/${encodeURIComponent(versionId)}/resolve?logicalId=${encodeURIComponent(logicalId)}`,
+    'content',
+  );
+}
+
+export function getExportedUnits(versionId: string): Promise<{ roots: ExportedUnit[] } | null> {
+  return readJson<{ roots: ExportedUnit[] }>(
+    `${contentBaseUrl()}/versions/${encodeURIComponent(versionId)}/export`,
+    'content',
+  );
+}
+
+export function appendProvisionLifecycle(
+  constitutionId: string,
+  payload: {
+    sourceVersionId: string;
+    eventType: ProvisionLifecycleEvent['eventType'];
+    eventDate: string;
+    logicalUnitIds: string[];
+    sourceUrl?: string;
+    note?: string;
+  },
+  authorization: string,
+): Promise<ProvisionLifecycleEvent> {
+  return sendJson<ProvisionLifecycleEvent>(
+    `${catalogBaseUrl()}/constitutions/${encodeURIComponent(constitutionId)}/provision-events`,
+    'catalog',
+    'POST',
+    payload,
+    authorization,
+  );
+}
+
+export function getWikiPage(targetType: 'country' | 'constitution', targetId: string): Promise<WikiPageRevision | null> {
+  return readJson<WikiPageRevision>(`${catalogBaseUrl()}/wiki/${targetType}/${encodeURIComponent(targetId)}`, 'catalog');
+}
+
+export function getWikiDraft(targetType: 'country' | 'constitution', targetId: string, authorization: string): Promise<WikiPageRevision | null> {
+  return readJson<WikiPageRevision>(`${catalogBaseUrl()}/wiki/${targetType}/${encodeURIComponent(targetId)}/draft`, 'catalog', authorization);
+}
+
+export async function getWikiHistory(targetType: 'country' | 'constitution', targetId: string, authorization: string, page = 0): Promise<WikiPageRevision[]> {
+  return (await readJson<WikiPageRevision[]>(`${catalogBaseUrl()}/wiki/${targetType}/${encodeURIComponent(targetId)}/history?limit=26&offset=${page * 25}`, 'catalog', authorization)) ?? [];
+}
+
+export function saveWikiDraft(targetType: 'country' | 'constitution', targetId: string, payload: {
+  expectedRevisionId: string | null;
+  summary: string;
+  body: string;
+  images: WikiImage[];
+  sourceUrls: string[];
+}, authorization: string): Promise<WikiPageRevision> {
+  return sendJson<WikiPageRevision>(`${catalogBaseUrl()}/wiki/${targetType}/${encodeURIComponent(targetId)}/draft`, 'catalog', 'PUT', payload, authorization);
+}
+
+export function publishWikiPage(targetType: 'country' | 'constitution', targetId: string, revisionId: string, authorization: string): Promise<WikiPageRevision> {
+  return sendJson<WikiPageRevision>(`${catalogBaseUrl()}/wiki/${targetType}/${encodeURIComponent(targetId)}/publish`, 'catalog', 'POST', { revisionId }, authorization);
+}
+
+export async function loadCountriesWithDetails(authorization?: string): Promise<{
   countries: CountrySummary[];
   details: Array<CountryDetail | null>;
 }> {
@@ -284,7 +498,7 @@ export async function loadCountriesWithDetails(): Promise<{
       throw error;
     }
   }
-  const details = await Promise.all(countries.map((country) => getCountry(country.isoCode).catch(() => null)));
+  const details = await Promise.all(countries.map((country) => getCountry(country.isoCode, authorization).catch(() => null)));
   return { countries, details };
 }
 
@@ -295,21 +509,11 @@ export type ArticlePage = {
   limit: number | null;
 };
 
-export async function listArticles(
-  versionId: string,
-  offset?: number,
-  limit?: number,
-): Promise<ArticleSummary[] | null> {
-  const page = await listArticlePage(versionId, offset, limit);
-  return page?.items ?? null;
+export function listArticlePage(versionId: string, offset?: number, limit?: number, includeBody?: boolean): Promise<ArticlePage | null> {
+  return listContentPage('articles', versionId, offset, limit, includeBody);
 }
 
-export async function listArticlePage(
-  versionId: string,
-  offset?: number,
-  limit?: number,
-  includeBody?: boolean,
-): Promise<ArticlePage | null> {
+async function listContentPage(resource: 'articles' | 'units', versionId: string, offset?: number, limit?: number, includeBody?: boolean, authorization?: string): Promise<ArticlePage | null> {
   const params = new URLSearchParams();
   if (offset !== undefined) {
     params.set('offset', String(offset));
@@ -321,10 +525,10 @@ export async function listArticlePage(
     params.set('includeBody', 'true');
   }
   const query = params.toString();
-  const url = `${contentBaseUrl()}/versions/${encodeURIComponent(versionId)}/articles${query ? `?${query}` : ''}`;
+  const url = `${contentBaseUrl()}/versions/${encodeURIComponent(versionId)}/${resource}${query ? `?${query}` : ''}`;
   let response: Response;
   try {
-    response = await fetch(url, { cache: 'no-store' });
+    response = await fetchWithTimeout(url, { cache: 'no-store', headers: authorization ? { Authorization: authorization } : undefined });
   } catch {
     throw new ApiUnavailableError('content');
   }
@@ -334,37 +538,52 @@ export async function listArticlePage(
   if (!response.ok) {
     throw new ApiUnavailableError('content');
   }
-  const items = (await response.json()) as ArticleSummary[];
+  let items: ArticleSummary[];
+  try {
+    items = (await response.json()) as ArticleSummary[];
+    if (!Array.isArray(items)) throw new Error('Invalid content page');
+  } catch {
+    throw new ApiUnavailableError('content');
+  }
   const total = Number(response.headers.get('X-Total-Count') ?? items.length);
   return { items, total, offset: offset ?? 0, limit: limit ?? null };
 }
 
 const ARTICLE_PAGE_SIZE = 200;
 
-export async function listAllArticles(versionId: string, includeBody?: boolean): Promise<ArticleSummary[]> {
+export function listAllArticles(versionId: string, includeBody?: boolean, authorization?: string): Promise<ArticleSummary[]> {
+  return listAllContent('articles', versionId, includeBody, authorization);
+}
+
+export function listAllUnits(versionId: string, includeBody?: boolean, authorization?: string): Promise<ArticleSummary[]> {
+  return listAllContent('units', versionId, includeBody, authorization);
+}
+
+async function listAllContent(resource: 'articles' | 'units', versionId: string, includeBody?: boolean, authorization?: string): Promise<ArticleSummary[]> {
   const all: ArticleSummary[] = [];
   let offset = 0;
   let total = Number.POSITIVE_INFINITY;
   while (offset < total) {
-    const page = await listArticlePage(versionId, offset, ARTICLE_PAGE_SIZE, includeBody);
-    if (!page) {
-      return all;
-    }
+    const page = await listContentPage(resource, versionId, offset, ARTICLE_PAGE_SIZE, includeBody, authorization);
+    if (!page) return all;
     all.push(...page.items);
     total = page.total;
-    if (page.items.length === 0) {
-      break;
-    }
+    if (page.items.length === 0) break;
     offset += ARTICLE_PAGE_SIZE;
   }
   return all;
 }
 
-export function getArticle(articleId: string): Promise<ArticleDetail | null> {
+export function getArticle(articleId: string, authorization?: string): Promise<ArticleDetail | null> {
   return readJson<ArticleDetail>(
     `${contentBaseUrl()}/articles/${encodeURIComponent(articleId)}`,
     'content',
+    authorization,
   );
+}
+
+export function getUnit(versionId: string, unitId: string, authorization?: string): Promise<ArticleDetail | null> {
+  return readJson<ArticleDetail>(`${contentBaseUrl()}/versions/${encodeURIComponent(versionId)}/units/${encodeURIComponent(unitId)}`, 'content', authorization);
 }
 
 export function patchContentNode(
@@ -388,11 +607,13 @@ export type OutlineKindWrite = {
   showLabel: boolean;
   showTitle: boolean;
   showKind: boolean;
-};
-
-export type OutlineUpdateResult = {
-  outline: ContentOutline;
-  versionIds: string[];
+  allowTextAlongsideChildren?: boolean;
+  titlePolicy?: 'none' | 'optional' | 'required';
+  labelPolicy?: 'none' | 'optional' | 'required';
+  labelPlacement?: 'before_title' | 'after_title' | 'inline' | 'superscript';
+  segmentation?: 'plain' | 'sentence';
+  root?: boolean;
+  allowedChildKinds?: string[];
 };
 
 export async function sendJson<T>(
@@ -408,7 +629,7 @@ export async function sendJson<T>(
   }
   let response: Response;
   try {
-    response = await fetch(url, {
+    response = await fetchWithTimeout(url, {
       method,
       cache: 'no-store',
       headers,
@@ -420,35 +641,11 @@ export async function sendJson<T>(
   if (!response.ok) {
     throw new ApiUnavailableError(service);
   }
-  return (await response.json()) as T;
-}
-
-export function putContentOutline(
-  constitutionId: string,
-  kinds: OutlineKindWrite[],
-  authorization?: string,
-): Promise<OutlineUpdateResult> {
-  return sendJson<OutlineUpdateResult>(
-    `${catalogBaseUrl()}/constitutions/${encodeURIComponent(constitutionId)}/content-outline`,
-    'catalog',
-    'PUT',
-    { kinds },
-    authorization,
-  );
-}
-
-export async function restructureVersion(
-  versionId: string,
-  keepKinds: string[],
-  authorization?: string,
-): Promise<void> {
-  await sendJson<{ absorbed: number }>(
-    `${contentBaseUrl()}/versions/${encodeURIComponent(versionId)}/restructure`,
-    'content',
-    'POST',
-    { keepKinds },
-    authorization,
-  );
+  try {
+    return (await response.json()) as T;
+  } catch {
+    throw new ApiUnavailableError(service);
+  }
 }
 
 export async function createCountry(
@@ -463,7 +660,7 @@ export async function createCountry(
 }
 
 export async function ensureCountry(isoCode: string, name: string, authorization?: string): Promise<void> {
-  const existing = await getCountry(isoCode);
+  const existing = await getCountry(isoCode, authorization);
   if (existing) {
     return;
   }
@@ -476,12 +673,14 @@ export async function createConstitution(
   title: string,
   outline?: OutlineKindWrite[],
   authorization?: string,
+  predecessorConstitutionId?: string | null,
+  interim = false,
 ): Promise<ConstitutionSummary> {
   return sendJson<ConstitutionSummary>(
     `${catalogBaseUrl()}/countries/${encodeURIComponent(isoCode)}/constitutions`,
     'catalog',
     'POST',
-    { slug, title, outline },
+    { slug, title, outline, predecessorConstitutionId, interim },
     authorization,
   );
 }
@@ -514,11 +713,14 @@ export function listAmendmentsByArticle(
 
 export function listConstitutionAmendments(
   constitutionId: string,
-  options?: { status?: 'all'; authorization?: string },
+  options?: { status?: 'all'; reviewStatus?: 'needs_review' | 'ok'; authorization?: string },
 ): Promise<Amendment[] | null> {
   const params = new URLSearchParams();
   if (options?.status) {
     params.set('status', options.status);
+  }
+  if (options?.reviewStatus) {
+    params.set('reviewStatus', options.reviewStatus);
   }
   const query = params.toString();
   return readJson<Amendment[]>(
@@ -550,4 +752,35 @@ export function getVersion(versionId: string, authorization?: string): Promise<V
     'catalog',
     authorization,
   );
+}
+
+export type SettingsRevision = { id: string; predecessorId: string | null; outline: ContentOutline };
+export type SettingsImpact = { currentRevisionId: string; classification: string; affectedVersionIds: string[]; reasons: string[]; affectedDraftSessionIds: string[]; violations: { versionId: string; logicalId: string | null; field: string; message: string }[] };
+export async function getConstitutionSettings(id: string, authorization?: string): Promise<SettingsRevision> {
+  const settings = await readJson<SettingsRevision>(`${catalogBaseUrl()}/constitutions/${encodeURIComponent(id)}/settings`, 'catalog', authorization);
+  if (!settings) throw new ApiUnavailableError('catalog');
+  return settings;
+}
+export function preflightSettings(id: string, kinds: OutlineKindWrite[], authorization: string): Promise<SettingsImpact> {
+  return sendJson<SettingsImpact>(`${catalogBaseUrl()}/constitutions/${encodeURIComponent(id)}/settings/preflight`, 'catalog', 'POST', { kinds }, authorization);
+}
+export function saveSettings(id: string, expectedRevisionId: string, kinds: OutlineKindWrite[], authorization: string): Promise<SettingsRevision> {
+  return sendJson<SettingsRevision>(`${catalogBaseUrl()}/constitutions/${encodeURIComponent(id)}/settings`, 'catalog', 'PUT', { expectedRevisionId, kinds }, authorization);
+}
+
+export function getReaderOutline(versionId: string): Promise<ContentOutline | null> {
+  return readJson<ContentOutline>(`${catalogBaseUrl()}/versions/${encodeURIComponent(versionId)}/reader-settings`, 'catalog');
+}
+export function restoreSettings(id: string, revisionId: string, expectedRevisionId: string, authorization: string): Promise<SettingsRevision> {
+  return sendJson<SettingsRevision>(`${catalogBaseUrl()}/constitutions/${encodeURIComponent(id)}/settings/${encodeURIComponent(revisionId)}/restore`, 'catalog', 'POST', { expectedRevisionId }, authorization);
+}
+
+export type OrderedNode = { logicalId: string; revisionId: string; occurrenceId: string; kind: string; label: string | null; title: string | null; content: OrderedEntry[] };
+export type OrderedTableCell = { logicalId: string; text: string; header?: boolean; rowSpan?: number; colSpan?: number; headers?: string[] };
+export type OrderedTable = { caption?: string | null; rows: { logicalId: string; cells: OrderedTableCell[] }[] };
+export type OrderedInlineReference = { logicalId: string; start: number; end: number; target: { type: 'unit' | 'external' | 'footnote'; logicalId?: string | null; url?: string | null; footnoteId?: string | null } };
+export type OrderedEntry = { type: 'text' | 'child'; node?: OrderedNode | null; logicalId?: string | null; revisionId?: string | null; occurrenceId?: string | null; text?: string | null; format?: 'plain' | 'table' | 'footnote' | null; table?: OrderedTable | null; footnoteLabel?: string | null; references?: OrderedInlineReference[]; annotation?: { kind: 'source' | 'editorial' | 'amendment'; attribution?: string | null; sourceUrl?: string | null; anchorLogicalIds?: string[] } | null };
+
+export function getVersionSettings(versionId: string, authorization?: string): Promise<SettingsRevision | null> {
+  return readJson<SettingsRevision>(`${catalogBaseUrl()}/versions/${encodeURIComponent(versionId)}/settings`, 'catalog', authorization);
 }

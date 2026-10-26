@@ -1,27 +1,32 @@
+import type { ReactNode } from 'react';
+import { T } from './TranslationProvider';
+import { ui, type UiMessage } from '../../lib/messages';
+import surfaceStyles from './surfaces.module.css';
+
 type StatusMessageProps = {
-  title: string;
-  message: string;
+  title: ReactNode;
+  message: ReactNode;
   actionHref?: string;
-  actionLabel?: string;
+  actionLabel?: ReactNode;
 };
 
 export function StatusMessage({ title, message, actionHref, actionLabel }: StatusMessageProps) {
   return (
-    <section className="status-panel" role="status" aria-live="polite">
+    <section className={["status-panel card", surfaceStyles.card].join(' ')} role="status" aria-live="polite">
       <h1>{title}</h1>
       <p>{message}</p>
-      {actionHref && actionLabel ? <a href={actionHref}>{actionLabel}</a> : null}
+      {actionHref && actionLabel ? <a className="btn" href={actionHref}>{actionLabel}</a> : null}
     </section>
   );
 }
 
-export function ServiceUnavailable({ service, retryHref = '/' }: { service: string; retryHref?: string }) {
+export function ServiceUnavailable({ service, retryHref = '/' }: { service: UiMessage; retryHref?: string }) {
   return (
     <StatusMessage
-      title={`${service} is unavailable`}
-      message="This page could not load data from that service. The rest of the site is still available."
+      title={<><T value={service} /> <T value={ui.extraComponents.statusMessage.isUnavailable} /></>}
+      message={<T value={ui.extraComponents.statusMessage.thisPageCouldNotLoad} />}
       actionHref={retryHref}
-      actionLabel="Try again"
+      actionLabel={<T value={ui.extraComponents.statusMessage.tryAgain} />}
     />
   );
 }

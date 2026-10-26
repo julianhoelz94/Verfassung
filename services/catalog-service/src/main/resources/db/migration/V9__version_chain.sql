@@ -13,12 +13,3 @@ ALTER TABLE constitution_versions
 
 CREATE UNIQUE INDEX constitution_versions_predecessor_version_id_uniq
   ON constitution_versions (predecessor_version_id);
-
-UPDATE constitution_versions
-SET hop_kind = 'initial', listing = 'public', predecessor_version_id = NULL
-WHERE id = '01900000-0000-4000-8000-000000000003';
-
-UPDATE constitution_versions
-SET hop_kind = 'legal_amendment', listing = 'public',
-    predecessor_version_id = '01900000-0000-4000-8000-000000000003'
-WHERE id = '01900000-0000-4000-8000-000000000004';

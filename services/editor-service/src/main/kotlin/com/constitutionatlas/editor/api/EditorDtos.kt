@@ -62,12 +62,30 @@ data class ChangeRecordRequest(
     val comment: String,
     val documents: List<ChangeRecordDocument> = emptyList(),
     val changes: List<ChangeRecordChange> = emptyList(),
+    val publishAttemptId: UUID? = null,
+    val sourceVersionId: UUID? = null,
 )
 
 data class ChangeRecordChange(
     val articleId: UUID,
     val articleNumber: String,
     val changeType: String = "changed",
+    val note: String? = null,
+    val beforeRef: ChangeRecordUnitRef? = null,
+    val afterRef: ChangeRecordUnitRef? = null,
+    val linkReviewReason: String? = null,
+    val pendingAfterLogicalId: UUID? = null,
+    val id: UUID? = null,
+    val amendmentChangeId: UUID? = null,
+)
+
+data class ChangeRecordUnitRef(
+    val logicalId: UUID,
+    val versionId: UUID? = null,
+    val occurrenceId: UUID? = null,
+    val rootOccurrenceId: UUID? = null,
+    val revisionId: UUID? = null,
+    val unitKind: String? = null,
 )
 
 data class ChangeRecordDocument(
@@ -129,4 +147,7 @@ data class DraftPreviewDto(
     val publishComment: String? = null,
     val changeRecord: ChangeRecordRequest? = null,
     val amendmentStatus: SearchIndexStatus? = null,
+    val unitMapping: Map<String, String>? = null,
+    val sourceGeneration: Long? = null,
+    val settingsRevisionId: UUID? = null,
 )

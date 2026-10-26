@@ -1,0 +1,119 @@
+{
+  "isoCode": "XA",
+  "countryName": "Atlas Testland",
+  "constitutionSlug": "atlas-charter",
+  "constitutionTitle": "Atlas Test Charter",
+  "versionLabel": "2024",
+  "effectiveDate": "2024-03-03",
+  "languageCode": "en",
+  "sourceUrl": "https://example.org/atlas-e2e/xa-2024",
+  "gazetteReference": "Atlas fixture 2024",
+  "outline": {
+    "kinds": [
+      {
+        "kindCode": "article",
+        "displayLabel": "Article",
+        "showTitle": true,
+        "showKind": true
+      },
+      {
+        "kindCode": "paragraph",
+        "displayLabel": "Paragraph",
+        "showLabel": true
+      },
+      {
+        "kindCode": "sentence",
+        "displayLabel": "Sentence",
+        "presentation": "concatenated",
+        "showLabel": false
+      }
+    ]
+  },
+  "articles": [
+    {
+      "articleNumber": "1",
+      "title": "Human dignity",
+      "body": "Atlas Testland article 1 in 2024. Dignity and civic equality protect every person.",
+      "sortOrder": 1,
+      "nodes": [
+        {
+          "kind": "paragraph",
+          "label": "(1)",
+          "children": [
+            {
+              "kind": "sentence",
+              "label": "1",
+              "body": "Atlas Testland article 1 in 2024. Dignity and civic equality protect every person."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "articleNumber": "2",
+      "title": "Civic provision 2",
+      "body": "Atlas Testland article 2 in 2024. Public institutions serve the people.",
+      "sortOrder": 2
+    },
+    {
+      "articleNumber": "3",
+      "title": "Civic provision 3",
+      "body": "Atlas Testland article 3 in 2024. Public institutions serve the people.",
+      "sortOrder": 3
+    },
+    {
+      "articleNumber": "4",
+      "title": "Civic provision 4",
+      "body": "Atlas Testland article 4 in 2024. Public institutions serve the people.",
+      "sortOrder": 4
+    },
+    {
+      "articleNumber": "5",
+      "title": "Civic provision 5",
+      "body": "Atlas Testland article 5 in 2024. Public institutions serve the people.",
+      "sortOrder": 5
+    },
+    {
+      "articleNumber": "6",
+      "title": "Civic provision 6",
+      "body": "Atlas Testland article 6 in 2024. Public institutions serve the people.",
+      "sortOrder": 6
+    },
+    {
+      "articleNumber": "7",
+      "title": "Civic provision 7",
+      "body": "Atlas Testland article 7 in 2024. Public institutions serve the people.",
+      "sortOrder": 7
+    },
+    {
+      "articleNumber": "8",
+      "title": "Civic provision 8",
+      "body": "Atlas Testland article 8 in 2024. Public institutions serve the people.",
+      "sortOrder": 8
+    },
+    {
+      "articleNumber": "9",
+      "title": "Civic provision 9",
+      "body": "Atlas Testland article 9 in 2024. Public institutions serve the people.",
+      "sortOrder": 9
+    },
+    {
+      "articleNumber": "10",
+      "title": "Civic provision 10",
+      "body": "Atlas Testland article 10 in 2024. Public institutions serve the people.",
+      "sortOrder": 10
+    },
+    {
+      "articleNumber": "13",
+      "title": "Civic provision 13",
+      "body": "Atlas Testland article 13 in 2024. Public institutions serve the people.",
+      "sortOrder": 11
+    },
+    {
+      "articleNumber": "14",
+      "title": "Civic provision 14",
+      "body": "Atlas Testland article 14 in 2024. Public institutions serve the people.",
+      "sortOrder": 12
+    }
+  ]
+}

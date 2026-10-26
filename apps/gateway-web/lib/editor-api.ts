@@ -1,5 +1,9 @@
+import { fetchWithTimeout } from './fetch-with-timeout';
+import { ui } from './messages';
+import type { Locale } from './locale';
 import { cookies } from 'next/headers';
 import { SESSION_COOKIE } from './session';
+import type { DiffReviewState, ReviewDecisionInput } from './diff-review';
 
 export function editorBaseUrl(): string {
   return process.env.EDITOR_API_URL ?? 'http://localhost/api/editor';
@@ -39,10 +43,35 @@ export type DraftPreview = {
   sourceVersionId?: string | null;
   newVersionId?: string | null;
   newVersionLabel?: string | null;
+  unitMapping?: Record<string, string> | null;
+  sourceGeneration?: number | null;
+  settingsRevisionId?: string | null;
   searchIndexStatus?: 'pending' | 'ready' | 'failed' | null;
   amendmentStatus?: 'pending' | 'ready' | 'failed' | null;
   publishComment?: string | null;
-  changeRecord?: { title: string; comment: string; documents: { url?: string; fileId?: string; label?: string }[] } | null;
+  changeRecord?: { title: string; comment: string; documents: { url?: string; fileId?: string; label?: string }[]; changes?: ChangeRecordChange[] } | null;
+};
+
+export type ChangeRecordUnitRef = {
+  logicalId: string;
+  versionId?: string | null;
+  occurrenceId?: string | null;
+  rootOccurrenceId?: string | null;
+  revisionId?: string | null;
+  unitKind?: 'node' | 'text_entry' | null;
+};
+
+export type ChangeRecordChange = {
+  id?: string | null;
+  amendmentChangeId?: string | null;
+  articleId: string;
+  articleNumber: string;
+  changeType: 'added' | 'changed' | 'removed';
+  note?: string | null;
+  beforeRef?: ChangeRecordUnitRef | null;
+  afterRef?: ChangeRecordUnitRef | null;
+  linkReviewReason?: string | null;
+  pendingAfterLogicalId?: string | null;
 };
 
 /**
@@ -51,32 +80,32 @@ export type DraftPreview = {
  * put arbitrary text into the trusted error banner.
  */
 export const EDITOR_ERROR_MESSAGES = {
-  sign_in: 'Sign in required.',
-  step_up: 'Recent authenticator confirmation is required.',
-  forbidden: 'You do not have permission for that action.',
-  not_ready: 'This draft is not ready for that action.',
-  not_tip: 'Publish only from the latest snapshot in the chain.',
-  not_editorial_tip: 'This text has a newer transcription. Open a session on its current snapshot.',
-  not_legal_tip: 'A newer law exists. Record the next legal change from the current law.',
-  invalid: 'The draft could not be published.',
-  open_failed: 'Could not open an edit session.',
-  list_failed: 'Could not list edit sessions.',
-  save_failed: 'Could not save draft.',
-  review_failed: 'Could not submit for review.',
-  approve_failed: 'Could not approve this draft.',
-  publish_failed: 'Could not publish.',
-  session_id: 'Enter a session id.',
-  title: 'The section title could not be saved.',
-  failed: 'The editor action could not be completed.',
+  sign_in: ui.errors.signIn,
+  step_up: ui.errors.stepUp,
+  forbidden: ui.errors.forbidden,
+  not_ready: ui.errors.draftNotReady,
+  not_tip: ui.errors.notTip,
+  not_editorial_tip: ui.errors.notEditorialTip,
+  not_legal_tip: ui.errors.notLegalTip,
+  invalid: ui.errors.publishDraftFailed,
+  open_failed: ui.errors.openSessionFailed,
+  list_failed: ui.errors.listSessionsFailed,
+  save_failed: ui.errors.saveDraftFailed,
+  review_failed: ui.errors.submitReviewFailed,
+  approve_failed: ui.errors.approveDraftFailed,
+  publish_failed: ui.errors.publishFailed,
+  session_id: ui.errors.sessionIdRequired,
+  title: ui.errors.titleSaveFailed,
+  failed: ui.errors.editorFailed,
 } as const;
 
 export type EditorErrorKey = keyof typeof EDITOR_ERROR_MESSAGES;
 
-export function editorErrorMessage(key: string | undefined): string | null {
+export function editorErrorMessage(key: string | undefined, locale: Locale = 'en'): string | null {
   if (!key) {
     return null;
   }
-  return key in EDITOR_ERROR_MESSAGES ? EDITOR_ERROR_MESSAGES[key as EditorErrorKey] : EDITOR_ERROR_MESSAGES.failed;
+  return (Object.hasOwn(EDITOR_ERROR_MESSAGES, key) ? EDITOR_ERROR_MESSAGES[key as EditorErrorKey] : EDITOR_ERROR_MESSAGES.failed)[locale];
 }
 
 export class EditorApiError extends Error {
@@ -84,7 +113,7 @@ export class EditorApiError extends Error {
     readonly key: EditorErrorKey,
     readonly code?: string,
   ) {
-    super(EDITOR_ERROR_MESSAGES[key]);
+    super(EDITOR_ERROR_MESSAGES[key].en);
     this.name = 'EditorApiError';
   }
 }
@@ -98,7 +127,7 @@ async function authHeader(): Promise<string> {
 }
 
 async function editorFetch(path: string, init: RequestInit = {}): Promise<Response> {
-  return fetch(`${editorBaseUrl()}${path}`, {
+  return fetchWithTimeout(`${editorBaseUrl()}${path}`, {
     ...init,
     cache: 'no-store',
     headers: {
@@ -114,11 +143,16 @@ async function throwIfNotOk(response: Response, fallback: EditorErrorKey): Promi
     return;
   }
   let code: string | undefined;
+  let detail: string | undefined;
   try {
     const body = (await response.json()) as { error?: string; code?: string };
     code = body.code;
+    detail = body.error;
   } catch {
     // Keep status-based messages when the body is not JSON.
+  }
+  if (fallback === 'publish_failed') {
+    console.error('Editor publish API failed', { status: response.status, code, detail });
   }
   if (response.status === 401) {
     throw new EditorApiError('sign_in', code);
@@ -151,6 +185,8 @@ export async function listSessions(filters: {
   status?: string;
   openedBy?: string;
   versionId?: string;
+  limit?: number;
+  offset?: number;
 } = {}): Promise<EditSessionSummary[]> {
   const params = new URLSearchParams();
   if (filters.status) {
@@ -162,10 +198,22 @@ export async function listSessions(filters: {
   if (filters.versionId) {
     params.set('versionId', filters.versionId);
   }
+  if (filters.limit != null) params.set('limit', String(filters.limit));
+  if (filters.offset != null) params.set('offset', String(filters.offset));
   const query = params.toString();
   const response = await editorFetch(query ? `/edit-sessions?${query}` : '/edit-sessions');
   await throwIfNotOk(response, 'list_failed');
   return (await response.json()) as EditSessionSummary[];
+}
+
+export async function listAllSessions(filters: { status?: string; openedBy?: string; versionId?: string } = {}): Promise<EditSessionSummary[]> {
+  const sessions: EditSessionSummary[] = [];
+  const limit = 100;
+  for (let offset = 0; ; offset += limit) {
+    const page = await listSessions({ ...filters, limit, offset });
+    sessions.push(...page);
+    if (page.length < limit) return sessions;
+  }
 }
 
 export async function getDraftPreview(sessionId: string): Promise<DraftPreview | null> {
@@ -208,7 +256,7 @@ export async function approveReview(sessionId: string): Promise<DraftPreview> {
 
 export async function savePublishDetails(
   sessionId: string,
-  details: { comment?: string; changeRecord?: { title: string; comment: string; documents: { url: string; label?: string }[] } },
+  details: { comment?: string; changeRecord?: { title: string; comment: string; documents: { url: string; label?: string }[]; changes?: ChangeRecordChange[] } },
 ): Promise<DraftPreview> {
   const response = await editorFetch(`/edit-sessions/${encodeURIComponent(sessionId)}/publish-details`, {
     method: 'POST',
@@ -220,7 +268,7 @@ export async function savePublishDetails(
 
 export async function publishSession(
   sessionId: string,
-  options: { hopKind: 'legal' | 'editorial_correction'; amendmentId?: string; comment?: string; changeRecord?: { title: string; comment: string; documents: { url: string; label?: string }[] } },
+  options: { hopKind: 'legal' | 'editorial_correction'; amendmentId?: string; comment?: string; changeRecord?: { title: string; comment: string; documents: { url: string; label?: string }[]; changes?: ChangeRecordChange[] } },
 ): Promise<DraftPreview> {
   const body = options;
   const response = await editorFetch(`/edit-sessions/${encodeURIComponent(sessionId)}/publish`, {
@@ -229,4 +277,39 @@ export async function publishSession(
   });
   await throwIfNotOk(response, 'publish_failed');
   return (await response.json()) as DraftPreview;
+}
+
+export async function getStructuredDraft(sessionId: string): Promise<import('./structured-editor').StructuredPreview | null> {
+  const response = await editorFetch(`/edit-sessions/${encodeURIComponent(sessionId)}/structured-draft`);
+  if (response.status === 404) return null;
+  await throwIfNotOk(response, 'save_failed');
+  return response.json();
+}
+export async function saveStructuredDraft(sessionId: string, request: { expectedGeneration: number; operations: import('./structured-editor').DraftOperation[] }): Promise<import('./structured-editor').StructuredPreview> {
+  const response = await editorFetch(`/edit-sessions/${encodeURIComponent(sessionId)}/structured-saves`, { method: 'POST', body: JSON.stringify(request) });
+  await throwIfNotOk(response, 'save_failed');
+  return response.json();
+}
+
+export async function getEditorDiffReview(sessionId: string): Promise<DiffReviewState> {
+  const response = await editorFetch(`/edit-sessions/${encodeURIComponent(sessionId)}/diff-review`);
+  await throwIfNotOk(response, 'review_failed');
+  return response.json();
+}
+
+export async function decideEditorDiff(sessionId: string, generation: number, decision: ReviewDecisionInput): Promise<DiffReviewState> {
+  const response = await editorFetch(`/edit-sessions/${encodeURIComponent(sessionId)}/diff-review/decisions`, {
+    method: 'POST',
+    body: JSON.stringify({
+      expectedGeneration: generation,
+      key: decision.key,
+      fingerprint: decision.fingerprint,
+      status: decision.status,
+      linkedRowIds: decision.linkedIds ?? [],
+      exclusionReason: decision.exclusionReason ?? null,
+      reviewerAcknowledged: decision.reviewerAcknowledged ?? false,
+    }),
+  });
+  await throwIfNotOk(response, 'save_failed');
+  return response.json();
 }

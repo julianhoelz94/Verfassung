@@ -1,45 +1,32 @@
-import { PageMain } from '../components/PageMain';
+import { T } from '../components/TranslationProvider';
+import { ui } from '../../lib/messages';
+import { ReaderPage } from '../components/layout/templates';
 import { PageHeader } from '../components/ui';
+import { Stack, Section } from '../components/layout/Layout';
 
 export default function AboutPage() {
   return (
-    <PageMain>
-      <PageHeader
-        title="About"
-        meta="How Constitution Atlas presents texts, sources, and verification."
-      />
-      <div className="stack">
+    <ReaderPage width="reading" header={<PageHeader
+        title={<T value={ui.attrs.aboutPagePageHeaderTitleAbout} />}
+        meta={<T value={ui.attrs.aboutPagePageHeaderMetaHowConstitution} />}
+      />}>
+
+      <Stack>
         <p className="lede">
-          Constitution Atlas is a public reading site for versioned constitutions. Each country
-          page lists published versions; each version shows the articles as they stood on that
-          date, with amendment history and search.
-        </p>
-        <section id="sources">
-          <h2>Sources</h2>
+          <T value={ui.about.page.constitutionAtlasIsAPublicReadingSite} />{" "}</p>
+        <Section id="sources" title={<T value={ui.about.page.sources} />}>
           <p>
-            Every published version records where the text came from: an official gazette, a
-            government publication, or an imported corpus. Provenance on version and article pages
-            names that source so you can check it against the original.
-          </p>
-        </section>
-        <section id="verification">
-          <h2>Verification labels</h2>
+            <T value={ui.about.page.everyPublishedVersionRecordsWhereTheText} />{" "}</p>
+        </Section>
+        <Section id="verification" title={<T value={ui.about.page.verificationLabels} />}>
           <p>
-            Labels such as official, imported, or demo describe how the text was checked, not a
-            legal opinion. Official means an editor verified the text against a cited source.
-            Imported means the text was loaded from a corpus and has not been fully checked.
-            Demo is sample data for local development.
-          </p>
-        </section>
-        <section id="accessibility">
-          <h2>Accessibility</h2>
+            <T value={ui.about.page.labelsSuchAsOfficialImportedOrDemo} />{" "}</p>
+        </Section>
+        <Section id="accessibility" title={<T value={ui.about.page.accessibility} />}>
           <p>
-            The site aims to meet WCAG 2.2 Level AA: skip links, keyboard-complete navigation,
-            visible focus, and text that does not rely on colour alone. If something is hard to
-            use, that is a defect we want to fix.
-          </p>
-        </section>
-      </div>
-    </PageMain>
+            <T value={ui.about.page.theSiteAimsToMeetWcag2} />{" "}</p>
+        </Section>
+      </Stack>
+    </ReaderPage>
   );
 }

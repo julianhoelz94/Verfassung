@@ -1,25 +1,28 @@
+import { SnapshotNotice } from '../../../../../../components/SnapshotNotice';
+import { T } from '../../../../../../components/TranslationProvider';
+import { ui } from '../../../../../../../lib/messages';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
-import { ArticleNav } from '../../../../../../components/ArticleNav';
 import { ConstitutionText } from '../../../../../../components/ConstitutionText';
-import { PageMain } from '../../../../../../components/PageMain';
-import { PrintLink } from '../../../../../../components/PrintLink';
+import { ContentTranslationRegion } from '../../../../../../components/ContentTranslationRegion';
+import { ReaderPage } from '../../../../../../components/layout/templates';
 import { Provenance } from '../../../../../../components/Provenance';
 import { ServiceUnavailable } from '../../../../../../components/StatusMessage';
 import { Alert, PageHeader } from '../../../../../../components/ui';
 import {
   ApiUnavailableError,
-  getArticle,
+  getUnit,
   getCountry,
-  listAllArticles,
+  getReaderOutline,
+  getVersion,
+  listAllUnits,
   type ArticleDetail,
   type ArticleSummary,
   type CountryDetail,
 } from '../../../../../../../lib/api';
-import { neighborsOf } from '../../../../../../../lib/article-nav';
-import { canVisitEditor } from '../../../../../../../lib/nav';
 import { atlasTitle, metaDescription, pageMetadata } from '../../../../../../../lib/page-meta';
-import { currentUser } from '../../../../../../../lib/session';
+import { orderedTargets } from '../../../../../../../lib/ordered-content';
+import { publicSnapshotContext } from '../../../../../../../lib/reading';
 
 type ArticlePageProps = {
   params: Promise<{ code: string; versionId: string; articleId: string }>;
@@ -29,11 +32,8 @@ type ArticlePageProps = {
 export async function generateMetadata(props: ArticlePageProps): Promise<Metadata> {
   const params = await props.params;
   try {
-    const [country, article] = await Promise.all([getCountry(params.code), getArticle(params.articleId)]);
-    const constitution = country?.constitutions.find((item) =>
-      item.versions.some((itemVersion) => itemVersion.id === params.versionId),
-    );
-    const version = constitution?.versions.find((item) => item.id === params.versionId);
+    const [country, article, snapshot] = await Promise.all([getCountry(params.code), getUnit(params.versionId, params.articleId), getVersion(params.versionId)]);
+    const version = publicSnapshotContext(country, snapshot)?.version;
     if (!country || !article || article.versionId !== params.versionId || !version) {
       return { title: atlasTitle('Article') };
     }
@@ -47,14 +47,6 @@ export async function generateMetadata(props: ArticlePageProps): Promise<Metadat
   }
 }
 
-function articleHref(
-  code: string,
-  versionId: string,
-  articleId: string,
-): string {
-  return `/countries/${code}/versions/${versionId}/articles/${articleId}`;
-}
-
 export default async function ArticlePage(props: ArticlePageProps) {
   const params = await props.params;
   const searchParams = await props.searchParams;
@@ -62,10 +54,11 @@ export default async function ArticlePage(props: ArticlePageProps) {
   let article: ArticleDetail | null = null;
   let siblings: ArticleSummary[] = [];
   let error: string | null = null;
+  let snapshot: Awaited<ReturnType<typeof getVersion>> = null;
   try {
-    country = await getCountry(params.code);
-    article = await getArticle(params.articleId);
-    siblings = await listAllArticles(params.versionId, false);
+    [country, snapshot] = await Promise.all([getCountry(params.code), getVersion(params.versionId)]);
+    article = await getUnit(params.versionId, params.articleId);
+    siblings = await listAllUnits(params.versionId, true);
   } catch (e) {
     error = e instanceof ApiUnavailableError ? e.message : 'A backend service is unavailable';
     country = null;
@@ -74,12 +67,12 @@ export default async function ArticlePage(props: ArticlePageProps) {
 
   if (error) {
     return (
-      <PageMain>
+      <ReaderPage width="reading">
         <ServiceUnavailable
-          service="Content"
+          service={ui.services.content}
           retryHref={`/countries/${params.code}/versions/${params.versionId}/articles/${params.articleId}`}
         />
-      </PageMain>
+      </ReaderPage>
     );
   }
 
@@ -88,53 +81,45 @@ export default async function ArticlePage(props: ArticlePageProps) {
   }
 
   const permalink = `/countries/${country.isoCode}/versions/${params.versionId}/articles/${article.id}`;
-  const constitution = country.constitutions.find((item) =>
-    item.versions.some((itemVersion) => itemVersion.id === params.versionId),
-  );
-  const version = constitution?.versions.find((item) => item.id === params.versionId);
-  const user = await currentUser();
-  const canEditTitles = Boolean(user && canVisitEditor(user.roles));
+  const context = publicSnapshotContext(country, snapshot);
+  if (!context) notFound();
+  const { constitution, version } = context;
   const returnTo = permalink;
-  const neighbors = neighborsOf(siblings, article.id);
   const articlesByNumber = Object.fromEntries(siblings.map((item) => [item.articleNumber, item.id]));
-  const toLink = (item: ArticleSummary) => ({
-    href: articleHref(country.isoCode, params.versionId, item.id),
-    label: `Article ${item.articleNumber}`,
-  });
 
+  const readerOutline = await getReaderOutline(params.versionId);
   return (
-    <PageMain>
-      <PageHeader
+    <ReaderPage width="reading" header={<PageHeader
         breadcrumbs={[
-          { href: '/', label: 'Countries' },
+          { href: '/', label: <T value={ui.nav.countries} /> },
           { href: `/countries/${country.isoCode}`, label: country.name },
-          { href: `/countries/${country.isoCode}/versions/${params.versionId}`, label: 'Articles' },
-          { label: `Article ${article.articleNumber}` },
+          { href: `/countries/${country.isoCode}/versions/${params.versionId}`, label: <T value={ui.remainingStatus.articles} /> },
+          { label: <><T value={ui.contentKinds.article} /> {article.articleNumber}</> },
         ]}
         eyebrow={constitution ? `${country.name} · ${constitution.title}` : country.name}
-        title={`Article ${article.articleNumber} — ${article.title}`}
+        title={<><T value={ui.contentKinds.article} /> {article.articleNumber} — {article.title}</>}
         actions={
           <>
             <a className="btn" href={`/countries/${country.isoCode}/articles/${encodeURIComponent(article.articleNumber)}`}>
-              History of Article {article.articleNumber}
+              <T value={ui.countries.code.versions.versionid.articles.articleid.page.historyOfArticle} />{" "}{article.articleNumber}
             </a>
             <a className="btn" href={`${permalink}#article-${article.articleNumber}`}>
-              Permalink
-            </a>
-            <PrintLink />
+              <T value={ui.countries.code.versions.versionid.articles.articleid.page.permalink} />{" "}</a>
           </>
         }
-      />
+      />}>
+
+      <SnapshotNotice code={country.isoCode} viewedId={params.versionId} currentId={version.currentVersionId ?? version.id} />
       <article id={`article-${article.articleNumber}`}>
         {searchParams.error === 'title' ? (
-          <Alert tone="error">The section title could not be saved.</Alert>
+          <Alert tone="error"><T value={ui.countries.code.versions.versionid.articles.articleid.page.theSectionTitleCouldNotBeSaved} /></Alert>
         ) : null}
         {version ? <Provenance version={version} /> : null}
+        <ContentTranslationRegion sourceLanguage={version?.languageCode ?? 'en'}>
         <ConstitutionText
           article={article}
           nodes={article.children}
-          outline={constitution?.contentOutline}
-          canEditTitles={canEditTitles}
+          outline={readerOutline ?? constitution?.contentOutline}
           returnTo={returnTo}
           lang={version?.languageCode}
           showHeading={false}
@@ -142,14 +127,11 @@ export default async function ArticlePage(props: ArticlePageProps) {
             code: country.isoCode,
             versionId: params.versionId,
             articlesByNumber,
+            unitsByLogicalId: orderedTargets(siblings),
           }}
         />
-        <ArticleNav
-          previous={neighbors.previous ? toLink(neighbors.previous) : undefined}
-          next={neighbors.next ? toLink(neighbors.next) : undefined}
-          tocHref={`/countries/${country.isoCode}/versions/${params.versionId}#toc`}
-        />
+        </ContentTranslationRegion>
       </article>
-    </PageMain>
+    </ReaderPage>
   );
 }

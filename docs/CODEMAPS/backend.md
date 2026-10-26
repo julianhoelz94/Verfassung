@@ -1,4 +1,4 @@
-<!-- Generated: 2026-09-06 | Files scanned: ~250 | Token estimate: ~950 -->
+<!-- Reviewed: 2026-10-19 -->
 # Backend
 
 Package `com.constitutionatlas.<short>`. Layers: Controller → Service → `JdbcTemplate` repo. Public JSON = DTOs. Each service: `GET /ping`, actuator `/actuator/health` + `/info`, `X-Correlation-Id`.
@@ -12,12 +12,14 @@ Paths below are **service paths**. Public: prefix `/api/<short>`.
 | Method | Path |
 | --- | --- |
 | GET | `/countries`, `/countries/{isoCode}` |
+| GET | `/jurisdictions` (roots, or `?parentId` children), `/jurisdictions/{id}` (ancestors, children, direct constitutions) |
+| POST | `/jurisdictions`, `/jurisdictions/{id}/constitutions` (catalog writer) |
 | GET | `/constitutions/{id}/versions` (`?listing=all` staff), `/versions/{id}`, `/constitutions/{id}/content-outline` |
 | PUT | `/constitutions/{id}/content-outline` |
 | POST | `/countries`, `/countries/{iso}/constitutions`, `/constitutions/{id}/versions` |
 | POST | `/versions/{id}/publish` |
 
-Tests: `CatalogApiTest.kt`. Seed DE: `V3__seed_germany.sql`. Versions: two axes (`legalVersionId`, `currentVersionId`, legal vs editorial predecessors). Public list is one row per legal identity with `currentVersionId` = editorial tip; `latestVersionId` is the editorial tip of the legal tip. `409` is `not_legal_tip` / `not_editorial_tip`. `hopKind` `initial`/`legal`/`editorial_correction` (`legal_amendment`/`official_errata` accepted as `legal` aliases until ED-7).
+Tests: `CatalogApiTest.kt`. Fresh databases are populated through API fixtures; historical seed migrations remain unchanged. Versions: two axes (`legalVersionId`, `currentVersionId`, legal vs editorial predecessors). Public list is one row per legal identity with `currentVersionId` = editorial tip; `latestVersionId` is the editorial tip of the legal tip. `409` is `not_legal_tip` / `not_editorial_tip`. `hopKind` `initial`/`legal`/`editorial_correction` (`legal_amendment`/`official_errata` accepted as `legal` aliases until ED-7).
 
 ## content — `services/content-service`
 
@@ -31,7 +33,22 @@ Tests: `CatalogApiTest.kt`. Seed DE: `V3__seed_germany.sql`. Versions: two axes 
 | PATCH | `/articles/{id}`, `/nodes/{id}` |
 | POST | `/versions/{id}/restructure` |
 
-Tree in `content_nodes` is the only write model; `articles` is a view of roots. Latest Flyway: V7.
+Ordered immutable revisions and version roots are the current write model. Legacy `content_nodes` and the `articles` view are maintained by compatibility/migration code; see ADR 0006 and the data map.
+
+## document — `services/document-service`
+
+`DocumentController` → `DocumentService` → `DocumentRepository`. Writes require an identity role (`editor`, `publisher`, or `admin`); lifecycle and link events are append-only. `LinkTargetClient` verifies constitution, version, and amendment IDs through the owning services. Document lists and revision history require editorial access. Public metadata and file reads require an active link to a public target and expose only its pinned revision. Amendment links inherit through draft revision ancestry; the published revision determines the public link set and cannot be edited.
+
+| Method | Path |
+| --- | --- |
+| GET | `/documents?q`, `/documents/{id}?revision`, `/documents/{id}/revisions`, `/documents/{id}/revisions/{number}/file` |
+| POST/PUT | `/documents`, `/documents/{id}` (expected revision), `/documents/{id}/file` (multipart) |
+| GET | `/links/{constitution\|version\|amendment}/{id}` (amendment: `scopeRevisionId`) |
+| POST/DELETE | `/links/{constitution\|version\|amendment}/{id}` and `/{documentId}` |
+
+Legal pages use `LegalPageController` → `LegalPageService` → legal-page and shared-contact repositories in the same database. `PUT /legal-pages/{key}/draft` accepts optional `contact` details with their expected revision; `POST /legal-pages/{key}/publish` accepts `expectedContactRevision`. For imprint keys, these combined writes are transactional: either text and contact both advance, or neither does. German and English text remain separate; public contact details are shared. Existing separate contact endpoints remain compatible.
+
+Tests: `DocumentApiTest.kt`, `ImprintWorkflowTest.kt`. Migration: `scripts/migrate_document_references.py`.
 
 ## amendment — `services/amendment-service`
 
@@ -75,7 +92,7 @@ Bearer `Authorization`. Tests: `IdentityApiTest.kt`.
 Clients: identity, catalog, content, amendment, search, audit. Publish copies onto a new catalog version (ADR 0002), writes editor `outbox_events` (ADR 0003), and a scheduler delivers `search.reindex-requested`.
 
 Flow: `POST /edit-sessions` → `/saves` → `/review` → `/approval` → `/publish` (body: `hopKind`, optional `amendmentId`; ED-7 adds Wikipedia `comment` and change-record payload).  
-Publish today (ED-6): session `versionId` must be the catalog chain tip; `editorial_correction` forbids `amendmentId`; `legal_amendment` / `official_errata` require a matching amendment and call amendment `link-target` + `publish`. **ADR 0005 / ED-7:** `hopKind` `legal` \| `editorial_correction` only; session must be the editorial tip of its legal identity; legal publish only from the legal tip; after `editorial_correction`, `refresh-review-status`.  
+Publication uses `hopKind` `legal` | `editorial_correction`. A session is pinned to its source generation and settings. Legal successors require the legal tip; corrections require the editorial tip of their legal identity. Structured publication reserves an idempotent successor and writes new immutable revisions. Review-status refresh and search delivery use durable retry paths.
 Session `status` is `EditSessionStatus` (`open`/`reviewing`/`approved`/`published`).  
 Preview JSON includes `searchIndexStatus` (`pending`/`ready`/`failed`) after publish.  
 `GET /edit-sessions` = list (status, openedBy, versionId; `openedBy=me`)  
@@ -92,8 +109,7 @@ Source: `client/RestIndexSource.kt`.
 ## ingestion — `services/ingestion-service`
 
 `ImportController` → `ImportService` + `ImportValidator` → `ImportJobRepository`  
-`POST /import-jobs`, `GET /import-jobs/{id}`  
-Writes catalog then content (`ImportService.persist`).
+`POST /import-jobs`, `GET /import-jobs/{id}` and confirm-outline/prepare/approve/reject/publish commands. Batch, resumable upload and setup-proposal controllers are separate. Uploads stage content; preparation writes draft Catalog/Content data. Approval and publication are separate actions with reviewer/admin and publisher/admin checks respectively, and publication requires fresh MFA. One account may perform all steps if it has the required roles. `ImportPublicationDelivery` retries audit/search side effects.
 
 ## audit — `services/audit-service`
 
@@ -102,8 +118,20 @@ PUT/PATCH/DELETE → 405; DB rules block update/delete.
 
 ## Shared conventions
 
+- HTTP clients use platform `timedRestClient` / `timedRestClientBuilder` (2 s connect, 5 s read by default; publication delivery explicitly allows 60 s). Authentication interceptors remain owned by each service.
+- Structured-content JSON limits are opted into by Content, Editor and Ingestion via platform `JsonReadLimits`; multipart streaming keeps its separate constraints.
 - Shared Kotlin module: `services/platform` (`com.constitutionatlas:platform:0.1.0`). Each service `includeBuild("../platform")`. It owns `CorrelationIdFilter` (SEC-9 allow-list), `NotFoundException` / `UnauthorizedException` / `ForbiddenException` + `ProblemAdvice`, and the identity Bearer `IdentityClient`. Do not copy those into a service.
 - New service: copy a sibling for Gradle/Docker layout (`.agents/skills/new-kotlin-service`), then depend on platform.
 - Gradle: `gradle/service-conventions.gradle` (Spotless/ktlint, `bootJar` → `app.jar`).
 - Tests: Testcontainers `postgres:16-alpine`; extend `SmokeTest` unless isolation is required.
 - Run: `cd services/<name> && ./gradlew test` (wrapper **9.7.1**).
+
+## Sprint 40 ordered content and settings
+
+See [implementation notes](../design/sprint-40-implementation.md) and [ADR 0006](../adr/0006-shared-immutable-content.md). Catalog `SettingsService`/`SettingsRepository` own settings revisions, preflight, restore and version/reader settings; `ConstitutionMetadataService` owns metadata history and permanent slug aliases. Content `OrderedContentService`/`OrderedContentRepository` own revision sharing, ordered roots, resolver and compatibility projections. Editor `StructuredDraftService`/`StructuredDraftEngine` replay targeted deltas against pinned roots. Mixed writes remain gated for the Sprint 41 consumer rollout.
+
+## Sprint 41 ordered consumers and publishing
+
+Shared HTTP DTOs and flattening rules: `services/platform/.../OrderedContent.kt`, [traversal contract](../design/ordered-content-traversal.md). Content serves version-scoped `/units`, ordered `/content`, and lossless `/export`; legacy article URLs remain aliases. Reader/setup use `OrderedContentTree`; comparison, search, and amendment quotations traverse canonical entries.
+
+Structured publication: `OrderedSuccessorPlan` reuses unchanged revisions and copies changed ancestor paths. `StructuredPublicationService` verifies draft/source/settings pins. Catalog successor reservations, content publish receipts, and amendment creation attempts make retries reuse their resources. Completed successor roots are sealed before catalog publication; publish responses retain logical-unit to occurrence mappings and source pins.

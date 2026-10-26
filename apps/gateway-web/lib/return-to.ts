@@ -10,7 +10,9 @@ export function safeReturnTo(raw: string, fallback = '/'): string {
   }
   try {
     const url = new URL(raw, 'http://atlas.local');
-    if (url.username || url.password || url.host !== 'atlas.local') {
+    // Dot segments (including encoded ones) can normalize a path into `//host`.
+    // Re-check the value we return because redirect() interprets that as a host.
+    if (url.username || url.password || url.host !== 'atlas.local' || url.pathname.startsWith('//')) {
       return fallback;
     }
     return `${url.pathname}${url.search}`;

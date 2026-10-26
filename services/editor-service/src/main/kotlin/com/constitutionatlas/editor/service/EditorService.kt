@@ -47,6 +47,9 @@ class EditorService(
     private val amendmentClient: AmendmentClient,
     private val amendmentActions: AmendmentActions,
     private val editorRepository: EditorRepository,
+    private val structuredPublication: StructuredPublicationService,
+    private val structuredPublishJobs: com.constitutionatlas.editor.repo.StructuredPublishJobRepository,
+    private val structuredDiffReview: StructuredDiffReviewService,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
@@ -77,7 +80,11 @@ class EditorService(
         status: String?,
         openedBy: String?,
         versionId: UUID?,
+        limit: Int,
+        offset: Int,
     ): List<EditSessionSummaryDto> {
+        require(limit in 1..100) { "limit must be between 1 and 100" }
+        require(offset >= 0) { "offset must be non-negative" }
         val actor = actor(authorization)
         val owner =
             when {
@@ -92,7 +99,7 @@ class EditorService(
             }
         val statusFilter =
             status?.ifBlank { null }?.let { EditSessionStatus.fromJson(it) }
-        return editorRepository.listSessions(statusFilter, owner, versionId)
+        return editorRepository.listSessions(statusFilter, owner, versionId, limit, offset)
     }
 
     fun preview(authorization: String?, sessionId: UUID): DraftPreviewDto {
@@ -105,8 +112,14 @@ class EditorService(
     fun save(authorization: String?, sessionId: UUID, request: SaveDraftRequest): DraftPreviewDto {
         val actor = actor(authorization)
         requireEdit(actor)
+        structuredPublication.lock(sessionId)
         val session = requireOwned(actor, sessionId)
         requireStatus(session, EditSessionStatus.OPEN)
+        if (editorRepository.hasStructuredDraft(sessionId)) throw ConflictException("Use targeted structured saves for this session", "mixed_draft_formats")
+        val original = contentClient.listArticles(session.versionId).find { it.id == request.articleId }
+        if (original != null && (mixedContent(original.content) || (original.children.isNotEmpty() && request.body != null && request.body != original.body))) {
+            throw ConflictException("Use targeted structured changes to preserve child units and parent text", "structured_draft_required")
+        }
         val payload = mapOf(
             "articleId" to request.articleId,
             "title" to request.title,
@@ -123,6 +136,7 @@ class EditorService(
     fun submitReview(authorization: String?, sessionId: UUID): DraftPreviewDto {
         val actor = actor(authorization)
         requireEdit(actor)
+        structuredPublication.lock(sessionId)
         val session = requireOwned(actor, sessionId)
         requireStatus(session, EditSessionStatus.OPEN)
         if (session.hopKind == "legal" && editorRepository.changeRecord(session.id) == null) {
@@ -130,6 +144,10 @@ class EditorService(
         }
         if (session.hopKind == "editorial_correction" && editorRepository.publishComment(session.id).isNullOrBlank()) {
             throw IllegalArgumentException("Save the transcription comment before review")
+        }
+        if (editorRepository.hasStructuredDraft(sessionId)) {
+            val prepared = structuredPublication.prepare(sessionId, session.versionId)
+            if (session.hopKind == "legal") structuredDiffReview.requireReadyForReview(prepared)
         }
         editorRepository.updateStatus(session.id, EditSessionStatus.REVIEWING)
         auditClient.record(actor, "review_submitted", "edit_session", session.id)
@@ -140,10 +158,15 @@ class EditorService(
     fun approve(authorization: String?, sessionId: UUID): DraftPreviewDto {
         val actor = actor(authorization)
         requireReview(actor)
+        structuredPublication.lock(sessionId)
         val session = requireVisible(actor, sessionId)
         requireStatus(session, EditSessionStatus.REVIEWING)
         if (session.actorId == actor.id && !actor.isAdmin()) {
             throw ForbiddenException("A different reviewer must approve this draft")
+        }
+        if (editorRepository.hasStructuredDraft(sessionId)) {
+            val prepared = structuredPublication.prepare(sessionId, session.versionId)
+            if (session.hopKind == "legal") structuredDiffReview.requireComplete(prepared)
         }
         editorRepository.updateStatus(session.id, EditSessionStatus.APPROVED)
         auditClient.record(actor, "review_approved", "edit_session", session.id)
@@ -154,13 +177,16 @@ class EditorService(
     fun savePublishDetails(authorization: String?, sessionId: UUID, request: PublishDetailsRequest): DraftPreviewDto {
         val actor = actor(authorization)
         requireEdit(actor)
+        structuredPublication.lock(sessionId)
         val session = requireOwned(actor, sessionId)
         requireStatus(session, EditSessionStatus.OPEN)
         when (session.hopKind) {
             "legal" -> {
                 val record = request.changeRecord ?: throw IllegalArgumentException("changeRecord is required")
                 validateChangeRecord(record)
+                require(record.changes.mapNotNull { it.id }.distinct().size == record.changes.mapNotNull { it.id }.size) { "Change row IDs must be unique" }
                 editorRepository.recordChangeRecord(sessionId, record)
+                if (editorRepository.hasStructuredDraft(sessionId)) structuredDiffReview.recheckInvalidLinks(sessionId)
             }
             "editorial_correction" -> {
                 val comment = request.comment?.trim()?.takeIf { it.isNotEmpty() }
@@ -176,10 +202,19 @@ class EditorService(
     fun publish(authorization: String?, sessionId: UUID, request: PublishRequest): DraftPreviewDto {
         val actor = actor(authorization)
         requirePublish(actor)
+        structuredPublication.lock(sessionId)
         val session = requireVisible(actor, sessionId)
+        val structured = editorRepository.hasStructuredDraft(sessionId)
+        if (structured && session.status == EditSessionStatus.PUBLISHED) {
+            structuredPublishJobs.pin(session.id, request.toString())
+            return previewDto(session.id)
+        }
         requireStatus(session, EditSessionStatus.APPROVED)
+        val structuredPreview = if (structured) structuredPublication.prepare(sessionId, session.versionId) else null
+        if (structuredPreview != null && session.hopKind == "legal") structuredDiffReview.requireComplete(structuredPreview)
+        val reservation = if (structured) structuredPublication.reservation(sessionId, authorization) else null
         val drafts = editorRepository.listLatestDrafts(session.id)
-        if (drafts.isEmpty()) {
+        if (drafts.isEmpty() && !structured) {
             throw IllegalArgumentException("No draft article changes to publish")
         }
         val hopKind = normalizeHopKind(request.hopKind)
@@ -188,6 +223,9 @@ class EditorService(
         }
         val comment = request.comment ?: editorRepository.publishComment(session.id)
         val changeRecord = if (request.amendmentId != null) request.changeRecord else request.changeRecord ?: editorRepository.changeRecord(session.id)
+        if (structured && hopKind == "legal" && request.amendmentId == null && request.changeRecord != null && request.changeRecord != editorRepository.changeRecord(session.id)) {
+            throw ConflictException("Save and review the change record before publishing", "stale_diff_review")
+        }
         if (hopKind == "editorial_correction") {
             if (request.amendmentId != null || request.changeRecord != null) {
                 throw IllegalArgumentException("editorial_correction must not include a change record")
@@ -199,7 +237,26 @@ class EditorService(
             throw IllegalArgumentException("legal publish requires one change record payload or amendmentId")
         }
         changeRecord?.let(::validateChangeRecord)
+        if (structured && hopKind == "legal" && request.amendmentId == null && changeRecord?.changes.isNullOrEmpty()) {
+            throw IllegalArgumentException("Structured legal publish needs exact before/after unit selections")
+        }
+        if (structured && hopKind == "legal" && request.amendmentId == null) {
+            val changes = requireNotNull(changeRecord).changes
+            changes.forEach { change ->
+                val validSides = when (change.changeType) {
+                    "added" -> change.beforeRef == null && (change.afterRef?.logicalId != null || change.pendingAfterLogicalId != null)
+                    "removed" -> change.beforeRef?.logicalId != null && change.afterRef == null && change.pendingAfterLogicalId == null
+                    "changed" -> change.beforeRef?.logicalId != null && (change.afterRef?.logicalId != null || change.pendingAfterLogicalId != null)
+                    else -> false
+                }
+                if (!validSides) {
+                    throw IllegalArgumentException("Structured legal publish needs exact unit selections for every change")
+                }
+            }
+        }
+        if (structured) structuredPublishJobs.pin(session.id, request.toString())
         val source = catalogClient.getVersion(session.versionId)
+        if (structured && source.publicationStatus != "published") throw ConflictException("Structured successors require a published source", "stale_source")
         val versions = if (hopKind == "editorial_correction" && source.currentVersionId != null) {
             emptyList()
         } else {
@@ -209,12 +266,15 @@ class EditorService(
             )
         }
         val legalId = source.legalVersionId ?: source.id
-        if (versions.any { it.editorialPredecessorVersionId == session.versionId } ||
-            (source.currentVersionId != null && source.currentVersionId != session.versionId)
+        if (reservation == null &&
+            (
+                versions.any { it.editorialPredecessorVersionId == session.versionId } ||
+                    (source.currentVersionId != null && source.currentVersionId != session.versionId)
+                )
         ) {
             throw ConflictException("session version is not this law's editorial tip", "not_editorial_tip")
         }
-        if (hopKind == "legal") {
+        if (hopKind == "legal" && reservation == null) {
             val legalPredecessors = versions.mapNotNull { it.legalPredecessorVersionId }
                 .map { predecessor -> versions.find { it.id == predecessor }?.legalVersionId ?: predecessor }.toSet()
             val legalTipIds = versions.filter { it.hopKind == "initial" || it.hopKind == "legal" }
@@ -224,20 +284,53 @@ class EditorService(
             }
         }
         val sourceTree = contentClient.listArticles(session.versionId)
+        if (!structured && sourceTree.any { mixedContent(it.content) }) throw ConflictException("Ordered successor publishing is required for mixed content", "ordered_publish_required")
         if (sourceTree.isEmpty()) {
             throw ConflictException("Source version ${session.versionId} has no articles to copy")
         }
-        val changedArticles = drafts.map { draft ->
-            sourceTree.find { it.id == draft.articleId }
-                ?: throw ConflictException("Article ${draft.articleId} is not on this version")
+        val changedArticles = if (structuredPreview != null) {
+            val changedIndexes = structuredPublication.changedSourceRootIndexes(structuredPreview)
+            sourceTree.filterIndexed { index, _ -> index in changedIndexes }
+        } else {
+            drafts.map { draft ->
+                sourceTree.find { it.id == draft.articleId } ?: throw ConflictException("Article ${draft.articleId} is not on this version")
+            }
         }
+        val recordedAmendment = if (structured) structuredPublishJobs.amendment(session.id) else null
         val amendment = if (hopKind == "legal") {
-            request.amendmentId?.let { requireAmendmentForHop(it, source.constitutionId, session.versionId, authorization) }
+            recordedAmendment?.let { amendmentClient.getAmendment(it, authorization) ?: throw ConflictException("Reserved change record missing") }
+                ?: request.amendmentId?.let {
+                    requireAmendmentForHop(it, source.constitutionId, session.versionId, authorization).also { existing ->
+                        if (structured) {
+                            editorRepository.changeRecord(session.id)?.changes?.let { reviewedRows ->
+                                require(reviewedRows.all { row -> row.amendmentChangeId != null && existing.changes.any { it.id == row.amendmentChangeId } }) {
+                                    "Reviewed rows need exact amendmentChangeId links for an existing change record"
+                                }
+                            }
+                            require(existing.changes.isNotEmpty()) { "Structured legal publish needs exact unit selections on the linked change record" }
+                            existing.changes.forEach { change ->
+                                val validSides = when (change.changeType) {
+                                    "added" -> change.beforeRef == null && (change.afterRef != null || change.pendingAfterLogicalId != null)
+                                    "removed" -> change.beforeRef != null && change.afterRef == null && change.pendingAfterLogicalId == null
+                                    "changed" -> change.beforeRef != null && (change.afterRef != null || change.pendingAfterLogicalId != null)
+                                    else -> false
+                                }
+                                require(validSides) { "Structured legal publish needs exact unit selections on the linked change record" }
+                            }
+                        }
+                    }
+                }
                 ?: amendmentClient.createAmendment(
                     source.constitutionId,
                     changeRecord!!.copy(
-                        changes = changedArticles.map {
-                            ChangeRecordChange(it.id, it.articleNumber)
+                        publishAttemptId = if (structured) session.id else null,
+                        sourceVersionId = session.versionId,
+                        changes = if (structured) {
+                            changeRecord.changes
+                        } else {
+                            changeRecord.changes.ifEmpty {
+                                changedArticles.map { ChangeRecordChange(it.id, it.articleNumber) }
+                            }
                         },
                     ),
                     authorization,
@@ -245,14 +338,28 @@ class EditorService(
         } else {
             null
         }
-        val successor = createSuccessor(source, hopKind, session.versionId)
-        contentClient.replaceArticles(successor.id, sourceTree.map { toWrite(it) })
-        val copies = contentClient.listArticles(successor.id).associateBy { it.articleNumber }
-        drafts.forEachIndexed { index, draft ->
-            val sourceArticle = changedArticles[index]
-            val copy = copies[sourceArticle.articleNumber]
-                ?: throw ConflictException("Copied article ${sourceArticle.articleNumber} is missing")
-            contentClient.updateArticle(copy.id, draft.title, draft.body)
+        if (structured && amendment != null && recordedAmendment == null) structuredPublishJobs.recordAmendment(session.id, amendment.id)
+        var orderedMapping: Map<String, String> = emptyMap()
+        val successor = if (structuredPreview != null) {
+            val (reserved, snapshot) = structuredPublication.write(structuredPreview, source, hopKind, comment, authorization)
+            val mapping = linkedMapOf<String, String>()
+            fun mapNode(node: com.constitutionatlas.platform.OrderedNode) {
+                mapping[node.logicalId.toString()] = node.occurrenceId.toString()
+                node.content.forEach { entry -> entry.node?.let(::mapNode) ?: run { mapping[entry.logicalId.toString()] = entry.occurrenceId.toString() } }
+            }
+            snapshot.roots.forEach(::mapNode)
+            orderedMapping = mapping
+            reserved
+        } else {
+            val copied = createSuccessor(source, hopKind, session.versionId, comment)
+            contentClient.replaceArticles(copied.id, sourceTree.map { toWrite(it) })
+            val copies = contentClient.listArticles(copied.id).associateBy { it.articleNumber }
+            drafts.forEachIndexed { index, draft ->
+                val sourceArticle = changedArticles[index]
+                val copy = copies[sourceArticle.articleNumber] ?: throw ConflictException("Copied article ${sourceArticle.articleNumber} is missing")
+                contentClient.updateArticle(copy.id, draft.title, draft.body)
+            }
+            copied
         }
         val published = catalogClient.publishVersion(successor.id)
         if (amendment != null) {
@@ -263,7 +370,7 @@ class EditorService(
             )
             val eventId = editorRepository.insertOutboxEvent(session.id, DomainEvents.AMENDMENT_LINK_REQUESTED, payload)
             try {
-                amendmentActions.completeLink(amendment.id, session.versionId, published.id, authorization)
+                amendmentActions.completeLink(amendment.id, session.versionId, published.id, authorization, if (structured) session.id else null)
                 editorRepository.markOutboxPublished(eventId)
                 editorRepository.insertOutboxEvent(
                     session.id,
@@ -299,6 +406,9 @@ class EditorService(
             mapOf(
                 "sourceVersionId" to session.versionId,
                 "newVersionId" to published.id,
+                "unitMapping" to orderedMapping,
+                "sourceGeneration" to structuredPreview?.sourceGeneration,
+                "settingsRevisionId" to structuredPreview?.settingsRevisionId,
                 "constitutionId" to source.constitutionId,
                 "actorId" to actor.id,
                 "versionLabel" to published.versionLabel,
@@ -328,6 +438,13 @@ class EditorService(
             log.warn("audit append failed after successor {} was published: {}", published.id, ex.message)
         }
         return previewDto(session.id)
+    }
+
+    private fun mixedContent(content: com.fasterxml.jackson.databind.JsonNode?): Boolean {
+        if (content == null || !content.isArray) return false
+        val hasText = content.any { it.path("type").asText() == "text" }
+        val hasChild = content.any { it.path("type").asText() == "child" }
+        return (hasText && hasChild) || content.any { mixedContent(it.path("node").get("content")) }
     }
 
     private fun requireEdit(actor: Actor) {
@@ -391,6 +508,9 @@ class EditorService(
             publishComment = editorRepository.publishComment(sessionId),
             changeRecord = editorRepository.changeRecord(sessionId),
             amendmentStatus = editorRepository.amendmentActionStatus(sessionId),
+            unitMapping = published?.unitMapping,
+            sourceGeneration = published?.sourceGeneration,
+            settingsRevisionId = published?.settingsRevisionId,
         )
     }
 
@@ -448,6 +568,7 @@ class EditorService(
         source: CatalogVersion,
         hopKind: String,
         predecessorVersionId: UUID,
+        publicationComment: String?,
     ): CatalogVersion {
         for (n in 1..50) {
             val label = "${source.versionLabel}-$n"
@@ -459,6 +580,7 @@ class EditorService(
                     source.languageCode,
                     predecessorVersionId,
                     hopKind,
+                    publicationComment,
                 )
             } catch (ex: ConflictException) {
                 if (ex.code == "not_legal_tip" || ex.code == "not_editorial_tip") {

@@ -1,25 +1,37 @@
+import { CountryNavigation } from '../../../../components/CountryNavigation';
+import { SnapshotNotice } from '../../../../components/SnapshotNotice';
+import { T } from '../../../../components/TranslationProvider';
+import { ui } from '../../../../../lib/messages';
+import { currentLocale } from '../../../../../lib/server-locale';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
-import { PageMain } from '../../../../components/PageMain';
-import { PrintLink } from '../../../../components/PrintLink';
+import { ReaderPage } from '../../../../components/layout/templates';
 import { SiteSearchForm } from '../../../../components/SiteSearchForm';
 import { ServiceUnavailable } from '../../../../components/StatusMessage';
 import { Alert, Badge, PageHeader, Pager } from '../../../../components/ui';
 import { VersionReader } from '../../../../components/VersionReader';
+import { ContentTranslationRegion } from '../../../../components/ContentTranslationRegion';
 import {
   ApiUnavailableError,
-  listAllArticles,
+  listAllUnits,
   listAmendments,
   getCountry,
+  getReaderOutline,
+  getVersion,
   type ArticleSummary,
   type CountryDetail,
 } from '../../../../../lib/api';
 import { neighborCompareLinks, orderVersions } from '../../../../../lib/compare';
 import { FormattedDate } from '../../../../../lib/format-date';
-import { canVisitEditor } from '../../../../../lib/nav';
 import { atlasTitle, metaDescription, pageMetadata } from '../../../../../lib/page-meta';
 import { httpUrl, provenanceLabel, verificationLabel } from '../../../../../lib/provenance';
+import { publicSnapshotContext, snapshotVersionId, publicVersions } from '../../../../../lib/reading';
+import { listDocumentLinks } from '../../../../../lib/document-api';
 import { currentUser } from '../../../../../lib/session';
+import { EditorEntry } from './EditorEntry';
+import surfaceStyles from '../../../../components/surfaces.module.css';
+import { migrationUi } from '../../../../../lib/migration-messages';
+import { SourceEvidenceNotice } from '../../../../components/SourceEvidenceNotice';
 
 type VersionPageProps = {
   params: Promise<{ code: string; versionId: string }>;
@@ -29,10 +41,8 @@ type VersionPageProps = {
 export async function generateMetadata(props: VersionPageProps): Promise<Metadata> {
   const params = await props.params;
   try {
-    const country = await getCountry(params.code);
-    const version = country?.constitutions
-      .flatMap((c) => c.versions.map((v) => ({ constitution: c, version: v })))
-      .find((row) => row.version.id === params.versionId);
+    const [country, snapshot] = await Promise.all([getCountry(params.code), getVersion(params.versionId)]);
+    const version = publicSnapshotContext(country, snapshot);
     if (!country || !version) {
       return { title: atlasTitle('Version') };
     }
@@ -49,14 +59,16 @@ export async function generateMetadata(props: VersionPageProps): Promise<Metadat
 }
 
 export default async function VersionPage(props: VersionPageProps) {
+  const locale = await currentLocale();
   const params = await props.params;
   const searchParams = await props.searchParams;
   let country: CountryDetail | null = null;
   let articles: ArticleSummary[] = [];
   let error: string | null = null;
+  let snapshot: Awaited<ReturnType<typeof getVersion>> = null;
   try {
-    country = await getCountry(params.code);
-    articles = await listAllArticles(params.versionId, true);
+    [country, snapshot] = await Promise.all([getCountry(params.code), getVersion(params.versionId)]);
+    articles = await listAllUnits(params.versionId, true);
   } catch (e) {
     error = e instanceof ApiUnavailableError ? e.message : 'A backend service is unavailable';
     country = null;
@@ -65,27 +77,23 @@ export default async function VersionPage(props: VersionPageProps) {
 
   if (error) {
     return (
-      <PageMain className="wide">
-        <ServiceUnavailable service="Content" retryHref={`/countries/${params.code}/versions/${params.versionId}`} />
-      </PageMain>
+      <ReaderPage width="content">
+        <ServiceUnavailable service={ui.services.content} retryHref={`/countries/${params.code}/versions/${params.versionId}`} />
+      </ReaderPage>
     );
   }
 
-  const version = country?.constitutions
-    .flatMap((c) => c.versions.map((v) => ({ constitution: c, version: v })))
-    .find((row) => row.version.id === params.versionId);
+  const version = publicSnapshotContext(country, snapshot);
 
   if (!country || !version) {
     notFound();
   }
 
-  const line = orderVersions(version.constitution.versions);
-  const currentIndex = line.findIndex((item) => item.id === params.versionId);
+  const line = orderVersions(publicVersions(version.constitution.versions));
+  const currentIndex = line.findIndex((item) => item.id === version.version.id);
   const previousPublished = currentIndex > 0 ? line[currentIndex - 1] : undefined;
   const nextPublished = currentIndex >= 0 ? line[currentIndex + 1] : undefined;
-  const neighbors = neighborCompareLinks(country.isoCode, line, params.versionId);
-  const user = await currentUser();
-  const canEditTitles = Boolean(user && canVisitEditor(user.roles));
+  const neighbors = neighborCompareLinks(country.isoCode, line, version.version.id);
   const changeByArticle: Record<string, string> = {};
   try {
     for (const amendment of (await listAmendments(params.versionId)) ?? []) {
@@ -100,19 +108,29 @@ export default async function VersionPage(props: VersionPageProps) {
   }
 
   const sourceHref = httpUrl(version.version.sourceUrl);
+  const documentLinks = [
+    ...await listDocumentLinks('constitution', version.constitution.id).catch(() => []),
+    ...await listDocumentLinks('version', version.version.id).catch(() => []),
+  ];
   const title = version.version.effectiveDate ? (
     <>
-      Version in force since <FormattedDate value={version.version.effectiveDate} />
+      <T value={ui.countries.code.versions.versionid.page.versionInForceSince} />{" "}<FormattedDate value={version.version.effectiveDate} />
     </>
   ) : (
     `Version ${version.version.versionLabel}`
   );
 
+  const readerOutline = await getReaderOutline(params.versionId);
+  const user = await currentUser();
+  const canEdit = Boolean(user?.roles.some((role) => role === 'editor' || role === 'admin'));
+  const canReview = Boolean(user?.roles.some((role) => role === 'reviewer' || role === 'admin'));
+  const canPublish = Boolean(user?.roles.some((role) => role === 'publisher' || role === 'admin'));
+  const allowLegalStart = Boolean(version.version.latestPublished &&
+    (version.version.currentVersionId ?? version.version.id) === params.versionId);
   return (
-    <PageMain className="wide">
-      <PageHeader
+    <ReaderPage width="content" header={<PageHeader
         breadcrumbs={[
-          { href: '/', label: 'Countries' },
+          { href: '/', label: <T value={ui.nav.countries} /> },
           { href: `/countries/${country.isoCode}`, label: country.name },
           { label: version.version.versionLabel },
         ]}
@@ -123,33 +141,48 @@ export default async function VersionPage(props: VersionPageProps) {
             {(version.constitution.latestVersionId
               ? params.versionId === version.constitution.latestVersionId
               : version.version.latestPublished) ? (
-              <Badge tone="accent">Latest</Badge>
+              <Badge tone="accent"><T value={ui.countries.code.versions.versionid.page.latest} /></Badge>
             ) : null}
-            <Badge tone="info">{verificationLabel(version.version)}</Badge>
+            <Badge tone="info">{verificationLabel(version.version, locale)}</Badge>
             <span>{version.version.languageCode}</span>
             {version.version.gazetteReference ? <span>{version.version.gazetteReference}</span> : null}
-            <span>{provenanceLabel(version.version.provenance)}</span>
+            <span>{provenanceLabel(version.version.provenance, locale)}</span>
             {sourceHref ? (
               <a href={sourceHref} rel="noreferrer">
-                Source
-              </a>
+                <T value={ui.countries.code.versions.versionid.page.source} />{" "}</a>
             ) : null}
           </>
         }
-        actions={
+        actions={canEdit || neighbors.previous ? (
           <>
-            <a className="btn" href={`/countries/${country.isoCode}/timeline`}>
-              Timeline
-            </a>
+            {canEdit ? <a className="btn btn-primary" href="#editor-entry"><T value={ui.countries.code.versions.versionid.page.editThisConstitution} /></a> : null}
             {neighbors.previous ? (
               <a className="btn" href={neighbors.previous.href}>
-                Compare with previous
-              </a>
+                <T value={ui.countries.code.versions.versionid.page.compareWithPrevious} />{" "}</a>
             ) : null}
-            <PrintLink />
           </>
-        }
-      />
+        ) : null}
+      />}>
+
+      <CountryNavigation code={params.code} active="reading" />
+      <SourceEvidenceNotice evidence={snapshot?.sourceEvidence} versionId={params.versionId} />
+      <p><a href={`/constitutions/${version.constitution.id}/amendments`}><T value={migrationUi.amendmentRegister} /></a></p>
+      <SnapshotNotice code={country.isoCode} viewedId={params.versionId} currentId={version.version.currentVersionId ?? version.version.id} />
+      {canEdit ? <EditorEntry
+        versions={version.constitution.versions}
+        viewedVersionId={params.versionId}
+        viewedVersionLabel={version.version.versionLabel}
+        allowLegalStart={allowLegalStart}
+        canReview={canReview}
+        canPublish={canPublish}
+      /> : null}
+      {documentLinks.length ? <section className={["card", surfaceStyles.card].join(' ')}>
+        <h2><T value={ui.countries.code.versions.versionid.page.constitutionDocuments} /></h2>
+        <ul className="link-list">{documentLinks.map((link) => <li key={link.documentId}>
+          <a href={`/documents/${link.documentId}${link.revisionId ? `?revision=${link.document.revision.revision}` : ''}`}>{link.document.revision.title}</a>
+          {link.revisionId ? ` · revision ${link.document.revision.revision}` : null}
+        </li>)}</ul>
+      </section> : null}
       <SiteSearchForm
         id="version-search"
         className="version-search"
@@ -159,27 +192,28 @@ export default async function VersionPage(props: VersionPageProps) {
         submitClassName="btn"
       />
       {searchParams.error === 'title' ? (
-        <Alert tone="error">The section title could not be saved.</Alert>
+        <Alert tone="error"><T value={ui.countries.code.versions.versionid.page.theSectionTitleCouldNotBeSaved} /></Alert>
       ) : null}
       {articles.length === 0 ? (
-        <p>No articles are published in this version.</p>
+        <p><T value={ui.countries.code.versions.versionid.page.noArticlesArePublishedInThisVersion} /></p>
       ) : (
+        <ContentTranslationRegion sourceLanguage={version.version.languageCode}>
         <VersionReader
           code={country.isoCode}
           versionId={params.versionId}
           articles={articles}
-          outline={version.constitution.contentOutline}
-          canEditTitles={canEditTitles}
+          outline={readerOutline ?? version.constitution.contentOutline}
           language={version.version.languageCode}
           changeByArticle={changeByArticle}
           unchangedSinceLabel={previousPublished?.versionLabel}
         />
+        </ContentTranslationRegion>
       )}
       <Pager
         previous={
           previousPublished
             ? {
-                href: `/countries/${country.isoCode}/versions/${previousPublished.id}`,
+                href: `/countries/${country.isoCode}/versions/${snapshotVersionId(previousPublished)}`,
                 label: `← ${previousPublished.versionLabel}`,
               }
             : undefined
@@ -187,12 +221,12 @@ export default async function VersionPage(props: VersionPageProps) {
         next={
           nextPublished
             ? {
-                href: `/countries/${country.isoCode}/versions/${nextPublished.id}`,
+                href: `/countries/${country.isoCode}/versions/${snapshotVersionId(nextPublished)}`,
                 label: `${nextPublished.versionLabel} →`,
               }
             : undefined
         }
       />
-    </PageMain>
+    </ReaderPage>
   );
 }

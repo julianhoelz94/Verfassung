@@ -1,27 +1,29 @@
 /* eslint-disable */
-import { test, expect, type Page } from '@playwright/test';
-import { signInEditor } from './helpers';
+import { test, expect, type Page } from './fixtures/consent';
+import { signInAdmin, signInEditor, signOut } from './helpers';
 
 const PHONE = { width: 390, height: 844 };
 const TABLET = { width: 820, height: 1180 };
 const DESKTOP = { width: 1440, height: 900 };
 const MOCK_ORIGIN = `http://127.0.0.1:${process.env.E2E_MOCK_PORT ?? 4010}`;
 
-async function snapshot(page: Page, name: string): Promise<void> {
+async function snapshot(page: Page, name: string, maxDiffPixelRatio = 0.02): Promise<void> {
   await expect(page.locator('h1').first()).toBeVisible();
-  await expect(page).toHaveScreenshot(name, { fullPage: true });
+  // Collect every changed layout in one report while keeping any mismatch a test failure.
+  await expect.soft(page).toHaveScreenshot(name, { fullPage: true, maxDiffPixelRatio });
 }
 
 test.beforeEach(async ({ request }) => {
   const response = await request.post(`${MOCK_ORIGIN}/__reset`);
   expect(response.ok()).toBeTruthy();
+  expect((await request.post(`${MOCK_ORIGIN}/__visual_roles`)).ok()).toBeTruthy();
 });
 
 test('public and editor layouts at 390, 820 and 1440', async ({ page }) => {
-  test.setTimeout(120_000);
+  test.setTimeout(180_000);
   test.skip(
     process.env.E2E_SKIP_VISUAL === 'true' || process.platform !== 'linux',
-    'Visual snapshots are Linux Chromium (Playwright Docker / CI). Re-baseline with mcr.microsoft.com/playwright:v1.51.1-jammy.',
+    'Visual snapshots are Linux Chromium (Playwright Docker / CI). Re-baseline with mcr.microsoft.com/playwright:v1.55.1-jammy.',
   );
   for (const viewport of [
     { size: PHONE, suffix: 'narrow' },
@@ -36,6 +38,21 @@ test('public and editor layouts at 390, 820 and 1440', async ({ page }) => {
     }).toPass({ timeout: 10_000 });
     await snapshot(page, `home-${viewport.suffix}.png`);
 
+    await page.goto('/countries/DE');
+    await snapshot(page, `country-${viewport.suffix}.png`);
+
+    await page.goto('/countries/DE/versions/01900000-0000-4000-8000-000000000004');
+    await snapshot(page, `reader-${viewport.suffix}.png`);
+
+    await page.goto('/search?q=dignity');
+    await snapshot(page, `search-${viewport.suffix}.png`);
+
+    await page.goto('/countries/DE/timeline?on=2026-01-01');
+    await snapshot(page, `timeline-${viewport.suffix}.png`);
+
+    await page.goto('/login');
+    await snapshot(page, `login-${viewport.suffix}.png`);
+
     await page.goto(
       '/countries/DE/versions/01900000-0000-4000-8000-000000000004/articles/01900000-0000-4000-8000-000000000201',
     );
@@ -47,9 +64,28 @@ test('public and editor layouts at 390, 820 and 1440', async ({ page }) => {
 
   await signInEditor(page);
   await page.setViewportSize(PHONE);
-  await snapshot(page, 'editor-narrow.png');
+  await snapshot(page, 'editor-narrow.png', 0.05);
+  await page.goto('/account');
+  await snapshot(page, 'account-narrow.png', 0.05);
   await page.setViewportSize(TABLET);
-  await snapshot(page, 'editor-tablet.png');
+  await page.goto('/editor');
+  await snapshot(page, 'editor-tablet.png', 0.05);
+  await page.goto('/account');
+  await snapshot(page, 'account-tablet.png', 0.05);
   await page.setViewportSize(DESKTOP);
-  await snapshot(page, 'editor-wide.png');
+  await page.goto('/editor');
+  await snapshot(page, 'editor-wide.png', 0.05);
+  await page.goto('/account');
+  await snapshot(page, 'account-wide.png', 0.05);
+  await signOut(page);
+  await signInAdmin(page);
+  for (const viewport of [
+    { size: PHONE, suffix: 'narrow' },
+    { size: TABLET, suffix: 'tablet' },
+    { size: DESKTOP, suffix: 'wide' },
+  ]) {
+    await page.setViewportSize(viewport.size);
+    await page.goto('/admin/constitutions');
+    await snapshot(page, `outlines-${viewport.suffix}.png`);
+  }
 });

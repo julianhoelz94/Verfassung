@@ -1,0 +1,234 @@
+{
+  "isoCode": "XC",
+  "countryName": "Atlas Structure Republic",
+  "constitutionSlug": "structure-charter",
+  "constitutionTitle": "Structure Test Charter",
+  "versionLabel": "2020",
+  "effectiveDate": "2020-06-01",
+  "languageCode": "en",
+  "sourceUrl": "https://example.org/atlas-e2e/xc-2020",
+  "gazetteReference": "Atlas fixture 2020",
+  "outline": {
+    "kinds": [
+      {
+        "kindCode": "preamble",
+        "displayLabel": "Preamble",
+        "root": true,
+        "allowedChildKinds": [],
+        "showTitle": true,
+        "showKind": true
+      },
+      {
+        "kindCode": "article",
+        "displayLabel": "Article",
+        "root": true,
+        "allowedChildKinds": [
+          "paragraph"
+        ],
+        "showTitle": true,
+        "showKind": true,
+        "allowTextAlongsideChildren": true
+      },
+      {
+        "kindCode": "paragraph",
+        "displayLabel": "Paragraph",
+        "root": false,
+        "allowedChildKinds": [],
+        "showLabel": true
+      },
+      {
+        "kindCode": "appendix",
+        "displayLabel": "Appendix",
+        "root": true,
+        "allowedChildKinds": [
+          "clause"
+        ],
+        "showTitle": true,
+        "showKind": true,
+        "allowTextAlongsideChildren": true
+      },
+      {
+        "kindCode": "clause",
+        "displayLabel": "Clause",
+        "root": false,
+        "allowedChildKinds": [],
+        "showLabel": false
+      }
+    ]
+  },
+  "articles": [],
+  "roots": [
+    {
+      "logicalId": "ba7f020f-f7ff-4a94-833f-6e15d3d9981e",
+      "kind": "preamble",
+      "label": null,
+      "title": "Purpose",
+      "content": [
+        {
+          "type": "text",
+          "logicalId": "d4befded-605b-411b-8d65-939f7f9f1161",
+          "text": "We establish this charter."
+        }
+      ]
+    },
+    {
+      "logicalId": "387799ce-4db4-4c49-8a89-020b863d7efb",
+      "kind": "article",
+      "label": "1",
+      "title": "Civic rights",
+      "content": [
+        {
+          "type": "text",
+          "logicalId": "031f6b26-2a44-449c-824c-7550e8973ab1",
+          "text": "Dignity applies to every person; see note 1 and Appendix A.",
+          "references": [
+            {
+              "logicalId": "621fa1df-bdd6-4e03-8e04-18c0898014a3",
+              "start": 37,
+              "end": 43,
+              "target": {
+                "type": "footnote",
+                "footnoteId": "6ab1acd6-c79a-47dd-8bef-72251725b0ce"
+              }
+            },
+            {
+              "logicalId": "50807491-88cf-4258-8933-1ce0ea179f70",
+              "start": 48,
+              "end": 58,
+              "target": {
+                "type": "unit",
+                "logicalId": "e932269e-24a8-4b0e-8f58-6513337ee3a5"
+              }
+            }
+          ]
+        },
+        {
+          "type": "child",
+          "node": {
+            "logicalId": "02f8449a-64a5-4a14-8b0e-2d4dd5563d22",
+            "kind": "paragraph",
+            "label": "(1)",
+            "title": null,
+            "content": [
+              {
+                "type": "text",
+                "logicalId": "3aa72252-ef00-46a4-80f2-dcb14f2eac25",
+                "text": "Every person has equal standing."
+              }
+            ]
+          }
+        },
+        {
+          "type": "text",
+          "logicalId": "295045e5-238e-4166-8f06-66087557792f",
+          "text": "Source",
+          "references": [
+            {
+              "logicalId": "c5969c54-a35b-4569-8110-48c1ec2a3794",
+              "start": 0,
+              "end": 6,
+              "target": {
+                "type": "external",
+                "url": "https://example.org/atlas-e2e/original-source"
+              }
+            }
+          ]
+        },
+        {
+          "type": "text",
+          "logicalId": "6ab1acd6-c79a-47dd-8bef-72251725b0ce",
+          "text": "The original source note.",
+          "format": "footnote",
+          "footnoteLabel": "1"
+        }
+      ]
+    },
+    {
+      "logicalId": "e932269e-24a8-4b0e-8f58-6513337ee3a5",
+      "kind": "appendix",
+      "label": "A",
+      "title": null,
+      "content": [
+        {
+          "type": "text",
+          "logicalId": "faee44a6-1239-4b2b-88b1-81b97ce5c741",
+          "text": "Schedule of civic duties."
+        },
+        {
+          "type": "text",
+          "logicalId": "07dcf516-8d86-4ef3-8f7c-ce8aecba0ba6",
+          "format": "table",
+          "table": {
+            "caption": "Civic duties",
+            "rows": [
+              {
+                "logicalId": "017f38c7-7c0c-4a00-86b8-3174b53b7744",
+                "cells": [
+                  {
+                    "logicalId": "04807bd6-a22c-4249-8307-9a7ceefbb798",
+                    "text": "Duty",
+                    "header": true
+                  },
+                  {
+                    "logicalId": "581a01f2-4b2a-4589-8927-40e289dc9411",
+                    "text": "Period",
+                    "header": true
+                  }
+                ]
+              },
+              {
+                "logicalId": "202c7ff4-7953-4c30-88fb-64a13dffd28c",
+                "cells": [
+                  {
+                    "logicalId": "407d6f49-cf26-46d4-849b-510e280ca148",
+                    "text": "Report",
+                    "headers": [
+                      "04807bd6-a22c-4249-8307-9a7ceefbb798"
+                    ]
+                  },
+                  {
+                    "logicalId": "652e309b-9a70-4829-810a-46c406abb61e",
+                    "text": "Annual",
+                    "headers": [
+                      "581a01f2-4b2a-4589-8927-40e289dc9411"
+                    ]
+                  }
+                ]
+              },
+              {
+                "logicalId": "fc33b3cb-89eb-46c1-80ee-128d0f7a5766",
+                "cells": [
+                  {
+                    "logicalId": "d1055ba3-e59e-4268-8953-0bc15a73e2f3",
+                    "text": "Applies nationally",
+                    "colSpan": 2,
+                    "headers": [
+                      "04807bd6-a22c-4249-8307-9a7ceefbb798",
+                      "581a01f2-4b2a-4589-8927-40e289dc9411"
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "type": "child",
+          "node": {
+            "logicalId": "71bcdfa0-b0d9-4775-867b-6a1492af1733",
+            "kind": "clause",
+            "label": null,
+            "title": null,
+            "content": [
+              {
+                "type": "text",
+                "logicalId": "e4d54005-1a73-42c2-84eb-8e3b23f2c1a3",
+                "text": "This clause has no title or number."
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,16 +1,24 @@
+import { fetchWithTimeout } from './fetch-with-timeout';
+import { ui } from './messages';
+import type { Locale } from './locale';
 import { cookies } from 'next/headers';
-import type { Amendment } from './api';
+import type { Amendment, AmendmentUnitRef } from './api';
 import { amendmentBaseUrl } from './api';
 import { SESSION_COOKIE } from './session';
+import type { DiffReviewState, ReviewDecisionInput } from './diff-review';
 
 export type AmendmentChangeWrite = {
   articleNumber?: string | null;
   changeType: string;
   note?: string | null;
+  beforeRef?: AmendmentUnitRef | null;
+  afterRef?: AmendmentUnitRef | null;
+  pendingAfterLogicalId?: string | null;
+  linkReviewReason?: string | null;
+  legacyLinkUnresolved?: boolean;
 };
 
 export type AmendmentWriteBody = {
-  kind?: string;
   title: string;
   summary?: string | null;
   enactedOn?: string | null;
@@ -19,9 +27,12 @@ export type AmendmentWriteBody = {
   sourceVersionId?: string | null;
   targetVersionId?: string | null;
   changes: AmendmentChangeWrite[];
+  comment?: string | null;
+  documents?: { url?: string | null; fileId?: string | null; label?: string | null }[];
 };
 
 export type AmendmentRevision = AmendmentWriteBody & {
+  kind?: string;
   id: string;
   predecessorRevisionId?: string | null;
   createdBy?: string | null;
@@ -31,6 +42,7 @@ export type AmendmentRevision = AmendmentWriteBody & {
 export type SuggestedChange = AmendmentChangeWrite & {
   nodeId?: string | null;
   articleId?: string | null;
+  ambiguous?: boolean;
 };
 
 export type SuggestChangesBody = {
@@ -39,27 +51,27 @@ export type SuggestChangesBody = {
 };
 
 export const AMENDMENT_ERROR_MESSAGES = {
-  sign_in: 'Sign in required.',
-  forbidden: 'You do not have permission for that action.',
-  not_found: 'This amending law could not be found.',
-  invalid: 'The amending law could not be saved.',
-  create_failed: 'Could not create amending law.',
-  save_failed: 'Could not save draft.',
-  publish_failed: 'Could not publish amending law.',
-  withdraw_failed: 'Could not withdraw amending law.',
-  title: 'Title is required.',
-  failed: 'The amending law action could not be completed.',
+  sign_in: ui.errors.signIn,
+  forbidden: ui.errors.forbidden,
+  not_found: ui.errors.amendmentNotFound,
+  invalid: ui.errors.amendmentSaveFailed,
+  create_failed: ui.errors.createAmendmentFailed,
+  save_failed: ui.errors.saveDraftFailed,
+  publish_failed: ui.errors.publishAmendmentFailed,
+  withdraw_failed: ui.errors.withdrawAmendmentFailed,
+  title: ui.errors.titleRequired,
+  failed: ui.errors.amendmentFailed,
 } as const;
 
 export type AmendmentErrorKey = keyof typeof AMENDMENT_ERROR_MESSAGES;
 
-export function amendmentErrorMessage(key: string | undefined): string | null {
+export function amendmentErrorMessage(key: string | undefined, locale: Locale = 'en'): string | null {
   if (!key) {
     return null;
   }
-  return key in AMENDMENT_ERROR_MESSAGES
+  return (Object.hasOwn(AMENDMENT_ERROR_MESSAGES, key)
     ? AMENDMENT_ERROR_MESSAGES[key as AmendmentErrorKey]
-    : AMENDMENT_ERROR_MESSAGES.failed;
+    : AMENDMENT_ERROR_MESSAGES.failed)[locale];
 }
 
 export class AmendmentApiError extends Error {
@@ -67,7 +79,7 @@ export class AmendmentApiError extends Error {
     readonly key: AmendmentErrorKey,
     readonly code?: string,
   ) {
-    super(AMENDMENT_ERROR_MESSAGES[key]);
+    super(AMENDMENT_ERROR_MESSAGES[key].en);
     this.name = 'AmendmentApiError';
   }
 }
@@ -81,7 +93,7 @@ async function authHeader(): Promise<string> {
 }
 
 async function amendmentFetch(path: string, init: RequestInit = {}): Promise<Response> {
-  return fetch(`${amendmentBaseUrl()}${path}`, {
+  return fetchWithTimeout(`${amendmentBaseUrl()}${path}`, {
     ...init,
     cache: 'no-store',
     headers: {
@@ -153,6 +165,14 @@ export async function publishAmendment(amendmentId: string): Promise<Amendment> 
   return (await response.json()) as Amendment;
 }
 
+export async function confirmAmendmentQuotes(amendmentId: string): Promise<Amendment> {
+  const response = await amendmentFetch(`/amendments/${encodeURIComponent(amendmentId)}/confirm-quotes`, {
+    method: 'POST',
+  });
+  await throwIfNotOk(response, 'publish_failed');
+  return (await response.json()) as Amendment;
+}
+
 export async function withdrawAmendment(amendmentId: string): Promise<Amendment> {
   const response = await amendmentFetch(`/amendments/${encodeURIComponent(amendmentId)}/withdraw`, {
     method: 'POST',
@@ -185,4 +205,27 @@ export async function suggestChanges(body: SuggestChangesBody): Promise<{ change
   });
   await throwIfNotOk(response, 'failed');
   return (await response.json()) as { changes: SuggestedChange[] };
+}
+
+export async function getAmendmentDiffReview(amendmentId: string): Promise<DiffReviewState> {
+  const response = await amendmentFetch(`/amendments/${encodeURIComponent(amendmentId)}/diff-review`);
+  await throwIfNotOk(response, 'failed');
+  return response.json();
+}
+
+export async function decideAmendmentDiff(amendmentId: string, revisionId: string, decision: ReviewDecisionInput): Promise<DiffReviewState> {
+  const response = await amendmentFetch(`/amendments/${encodeURIComponent(amendmentId)}/diff-review/decisions`, {
+    method: 'POST',
+    body: JSON.stringify({
+      expectedRevisionId: revisionId,
+      key: decision.key,
+      fingerprint: decision.fingerprint,
+      status: decision.status,
+      linkedChangeIds: decision.linkedIds ?? [],
+      exclusionReason: decision.exclusionReason ?? null,
+      reviewerAcknowledged: decision.reviewerAcknowledged ?? false,
+    }),
+  });
+  await throwIfNotOk(response, 'save_failed');
+  return response.json();
 }

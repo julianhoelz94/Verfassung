@@ -20,6 +20,8 @@ class EditorRepository(
     private val jdbc: JdbcTemplate,
     private val objectMapper: ObjectMapper,
 ) {
+    fun hasStructuredDraft(sessionId: UUID): Boolean = (jdbc.queryForObject("SELECT COUNT(*) FROM structured_draft_sources WHERE session_id = ?", Int::class.java, sessionId) ?: 0) > 0
+
     fun insertSession(actorId: UUID, versionId: UUID, hopKind: String?): UUID {
         val id = UUID.randomUUID()
         jdbc.update(
@@ -60,7 +62,7 @@ class EditorRepository(
         return session.copy(revisionCount = revisionCount)
     }
 
-    fun listSessions(status: EditSessionStatus?, openedBy: UUID?, versionId: UUID?): List<EditSessionSummaryDto> {
+    fun listSessions(status: EditSessionStatus?, openedBy: UUID?, versionId: UUID?, limit: Int, offset: Int): List<EditSessionSummaryDto> {
         val sql = StringBuilder(
             """
             SELECT s.id, s.actor_id, s.version_id, s.status, s.hop_kind, s.created_at, s.updated_at,
@@ -86,7 +88,9 @@ class EditorRepository(
             sql.append(" AND s.version_id = ?")
             args.add(versionId)
         }
-        sql.append(" ORDER BY s.updated_at DESC LIMIT 100")
+        sql.append(" ORDER BY s.updated_at DESC, s.id DESC LIMIT ? OFFSET ?")
+        args.add(limit)
+        args.add(offset)
         return jdbc.query(sql.toString(), { rs, _ ->
             EditSessionSummaryDto(
                 id = rs.getObject("id", UUID::class.java),
@@ -162,7 +166,7 @@ class EditorRepository(
     }
 
     fun recordPublishComment(sessionId: UUID, comment: String) {
-        jdbc.update("UPDATE edit_sessions SET publish_comment = ? WHERE id = ?", comment.trim(), sessionId)
+        jdbc.update("UPDATE edit_sessions SET publish_comment = ?, updated_at = NOW() WHERE id = ?", comment.trim(), sessionId)
     }
 
     fun publishComment(sessionId: UUID): String? = jdbc.query(
@@ -172,9 +176,10 @@ class EditorRepository(
     ).firstOrNull()
 
     fun recordChangeRecord(sessionId: UUID, record: ChangeRecordRequest) {
+        val stable = record.copy(changes = record.changes.map { change -> change.copy(id = change.id ?: UUID.randomUUID()) })
         jdbc.update(
-            "UPDATE edit_sessions SET change_record = ?::jsonb WHERE id = ?",
-            objectMapper.writeValueAsString(record),
+            "UPDATE edit_sessions SET change_record = ?::jsonb, updated_at = NOW() WHERE id = ?",
+            objectMapper.writeValueAsString(stable),
             sessionId,
         )
     }
@@ -260,6 +265,9 @@ class EditorRepository(
                         sourceVersionId = UUID.fromString(source),
                         newVersionId = UUID.fromString(next),
                         versionLabel = if (labelNode == null || labelNode.isNull) null else labelNode.asText(),
+                        unitMapping = node.get("unitMapping")?.takeIf { it.isObject }?.fields()?.asSequence()?.associate { it.key to it.value.asText() },
+                        sourceGeneration = node.get("sourceGeneration")?.takeUnless { it.isNull }?.asLong(),
+                        settingsRevisionId = node.get("settingsRevisionId")?.takeUnless { it.isNull }?.asText()?.let(UUID::fromString),
                     )
                 }
             },
@@ -376,6 +384,9 @@ data class PublishedPreview(
     val sourceVersionId: UUID,
     val newVersionId: UUID,
     val versionLabel: String?,
+    val unitMapping: Map<String, String>? = null,
+    val sourceGeneration: Long? = null,
+    val settingsRevisionId: UUID? = null,
 )
 
 data class PendingAmendmentAction(

@@ -1,6 +1,11 @@
+import { currentLocale } from '../../../lib/server-locale';
+import { SignedInSummary } from '../../components/SignedInSummary';
+import { T } from '../../components/TranslationProvider';
+import { ui } from '../../../lib/messages';
+import { statusMessage } from '../../../lib/ui-labels';
 import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
-import { PageMain } from '../../components/PageMain';
+import { CollectionPage } from '../../components/layout/templates';
 import { Alert, Badge, Button, DataList, DataRow, PageHeader, Select } from '../../components/ui';
 import { FormattedDate } from '../../../lib/format-date';
 import { getCountry, listConstitutionAmendments, listCountries, type Amendment, type ConstitutionSummary } from '../../../lib/api';
@@ -15,22 +20,12 @@ type AmendmentsPageProps = {
     published?: string;
     withdrawn?: string;
     error?: string;
+    review?: string;
   }>;
 };
 
 function hasRole(roles: string[], role: string): boolean {
   return roles.includes(role) || roles.includes('admin');
-}
-
-function kindLabel(kind: string | undefined): string {
-  switch (kind) {
-    case 'legal_amendment':
-      return 'Legal amendment';
-    case 'official_errata':
-      return 'Official errata';
-    default:
-      return kind ?? 'Unknown';
-  }
 }
 
 function statusTone(status: string | undefined): 'added' | 'removed' | 'changed' {
@@ -61,9 +56,9 @@ export default async function AmendmentsPage(props: AmendmentsPageProps) {
   }
   if (!canVisitEditor(user.roles)) {
     return (
-      <PageMain className="wide">
-        <PageHeader title="Amending laws" meta={`Signed in as ${user.email}, but this account has no editorial role.`} />
-      </PageMain>
+      <CollectionPage width="content" header={<PageHeader title={<T value={ui.attrs.editorAmendmentsPagePageHeaderTitleLegal} />} meta={<SignedInSummary email={user.email} noEditorialRole />} />}>
+
+      </CollectionPage>
     );
   }
 
@@ -85,66 +80,72 @@ export default async function AmendmentsPage(props: AmendmentsPageProps) {
     }
   }
 
-  const errorMessage = amendmentErrorMessage(searchParams.error);
+  const errorMessage = amendmentErrorMessage(searchParams.error, await currentLocale());
+  const visibleAmendments = searchParams.review === 'needs_review'
+    ? amendments.filter((amendment) => amendment.reviewStatus === 'needs_review')
+    : amendments;
   const newHref = selectedConstitution
     ? `/editor/amendments/new?constitutionId=${encodeURIComponent(selectedConstitution.id)}`
     : '/editor/amendments/new';
 
   return (
-    <PageMain className="wide">
-      <PageHeader
-        title="Amending laws"
-        eyebrow="Editorial workspace"
-        meta={`Signed in as ${user.email}. Roles: ${user.roles.join(', ')}.`}
+    <CollectionPage width="content" header={<PageHeader
+        title={<T value={ui.attrs.editorAmendmentsPagePageHeaderTitleLegal} />}
+        eyebrow={<T value={ui.attrs.editorAmendmentsPagePageHeaderEyebrowEditorial} />}
+        meta={<SignedInSummary email={user.email} roles={user.roles} />}
         actions={
           canEdit && selectedConstitution ? (
             <a className="btn btn-primary" href={newHref}>
-              Add amending law
-            </a>
+              <T value={ui.editor.amendments.page.addLegalChange} />{" "}</a>
           ) : null
         }
-      />
+      />}>
+
       {errorMessage ? <Alert tone="error">{errorMessage}</Alert> : null}
-      {searchParams.saved ? <Alert tone="success">Draft saved.</Alert> : null}
-      {searchParams.published ? <Alert tone="success">Amending law published.</Alert> : null}
-      {searchParams.withdrawn ? <Alert tone="success">Amending law withdrawn.</Alert> : null}
+      {searchParams.saved ? <Alert tone="success"><T value={ui.editor.amendments.page.draftSaved} /></Alert> : null}
+      {searchParams.published ? <Alert tone="success"><T value={ui.editor.amendments.page.amendingLawPublished} /></Alert> : null}
+      {searchParams.withdrawn ? <Alert tone="success"><T value={ui.editor.amendments.page.amendingLawWithdrawn} /></Alert> : null}
       {constitutions.length > 0 && selectedConstitution ? (
         <form method="get" className="toolbar">
-          <Select id="constitutionId" name="constitutionId" label="Constitution" defaultValue={selectedConstitution.id}>
+          <Select id="constitutionId" name="constitutionId" label={<T value={ui.attrs.editorAmendmentsPageSelectLabelConstitution} />} defaultValue={selectedConstitution.id}>
             {constitutions.map((constitution) => (
               <option key={constitution.id} value={constitution.id}>
                 {constitution.title}
               </option>
             ))}
           </Select>
-          <Button type="submit">Show laws</Button>
+          <Select id="review" name="review" label={<T value={ui.attrs.editorAmendmentsPageSelectLabelReview} />} defaultValue={searchParams.review ?? ''}>
+            <option value=""><T value={ui.editor.amendments.page.allLegalChanges} /></option>
+            <option value="needs_review"><T value={ui.editor.amendments.page.needsReview} /></option>
+          </Select>
+          <Button type="submit"><T value={ui.editor.amendments.page.showLaws} /></Button>
         </form>
       ) : (
-        <p className="muted">No constitutions are available yet.</p>
+        <p className="muted"><T value={ui.editor.amendments.page.noConstitutionsAreAvailableYet} /></p>
       )}
       {selectedConstitution ? (
         <section>
           <h2 className="section-title">{selectedConstitution.title}</h2>
-          {amendments.length === 0 ? (
-            <p className="muted">No amending laws recorded for this constitution yet.</p>
+          {visibleAmendments.length === 0 ? (
+            <p className="muted"><T value={ui.editor.amendments.page.noLegalChangesMatchThisView} /></p>
           ) : (
             <DataList columns={4}>
-              {amendments.map((amendment) => (
+              {visibleAmendments.map((amendment) => (
                 <DataRow
                   key={amendment.id}
                   cells={[
                     {
-                      label: 'Title',
+                      label: <T value={ui.remainingStatus.title} />,
                       value: <a href={`/editor/amendments/${encodeURIComponent(amendment.id)}`}>{amendment.title}</a>,
                     },
-                    { label: 'Kind', value: kindLabel(amendment.kind) },
+                    { label: <T value={ui.remainingStatus.commentLabel} />, value: amendment.comment ?? amendment.summary },
                     {
-                      label: 'Enacted',
+                      label: <T value={ui.remainingStatus.enacted} />,
                       value: <FormattedDate value={amendment.enactedOn} />,
                     },
                     {
-                      label: 'Status',
-                      value: <Badge tone={statusTone(amendment.status)}>{amendment.status ?? 'draft'}</Badge>,
+                      label: <T value={ui.remainingStatus.status} />,
+                      value: <span className="chip-row"><Badge tone={statusTone(amendment.status)}><T value={statusMessage(amendment.status ?? 'draft')} /></Badge>{amendment.reviewStatus === 'needs_review' ? <Badge tone="changed"><T value={ui.editor.amendments.page.needsReview} /></Badge> : null}</span>,
                     },
                   ]}
                 />
@@ -153,6 +154,6 @@ export default async function AmendmentsPage(props: AmendmentsPageProps) {
           )}
         </section>
       ) : null}
-    </PageMain>
+    </CollectionPage>
   );
 }

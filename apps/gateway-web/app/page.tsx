@@ -1,3 +1,7 @@
+import Link from 'next/link';
+import { changeTypeMessage } from '../lib/ui-labels';
+import { T } from './components/TranslationProvider';
+import { ui } from '../lib/messages';
 import {
   ApiUnavailableError,
   getCountry,
@@ -9,10 +13,12 @@ import {
 } from '../lib/api';
 import { orderVersions } from '../lib/compare';
 import { FormattedDate } from '../lib/format-date';
-import { PageMain } from './components/PageMain';
+import { CollectionPage } from './components/layout/templates';
 import { SiteSearchForm } from './components/SiteSearchForm';
 import { ServiceUnavailable } from './components/StatusMessage';
 import { Badge } from './components/ui';
+import { requestAnonymousBrowsingPolicy } from '../lib/anonymous-browsing-policy';
+import { currentUser } from '../lib/session';
 import {
   chainTipId,
   newestChanges,
@@ -20,8 +26,22 @@ import {
   recentChangesFromAmendments,
   type RecentChange,
 } from '../lib/reading';
+import { Grid, Inline, Stack } from './components/layout/Layout';
+import headerStyles from './components/header.module.css';
+import surfaceStyles from './components/surfaces.module.css';
+import { migrationUi } from '../lib/migration-messages';
 
 export default async function Page() {
+  const policy = await requestAnonymousBrowsingPolicy().catch(() => null);
+  if (!policy?.allowed && !(await currentUser())) {
+    return <CollectionPage width="content">
+      <section className="hero">
+        <h1 className={["page-title", headerStyles.title].join(' ')}><T value={ui.page.constitutionAtlas} /></h1>
+        <p className="lede"><T value={policy ? ui.homeDynamic.signInToBrowse : ui.homeDynamic.browsingUnavailable} /></p>
+        <a className="btn btn-primary" href="/login"><T value={ui.page.logIn} /></a>
+      </section>
+    </CollectionPage>;
+  }
   let error: string | null = null;
   let countries: CountrySummary[] = [];
   let details: CountryDetail[] = [];
@@ -35,9 +55,9 @@ export default async function Page() {
 
   if (error) {
     return (
-      <PageMain className="wide">
-        <ServiceUnavailable service="Catalog" retryHref="/" />
-      </PageMain>
+      <CollectionPage width="content">
+        <ServiceUnavailable service={ui.services.catalog} retryHref="/" />
+      </CollectionPage>
     );
   }
 
@@ -73,41 +93,36 @@ export default async function Page() {
   const recentTop = newestChanges(recent, 5);
 
   return (
-    <PageMain className="wide">
+    <CollectionPage width="content">
       <section className="hero">
-        <p className="eyebrow">Versioned constitutions</p>
-        <h1 className="page-title">Read a constitution as it stood on any date.</h1>
+        <p className={["eyebrow", headerStyles.eyebrow].join(' ')}><T value={ui.page.versionedConstitutions} /></p>
+        <h1 className={["page-title", headerStyles.title].join(' ')}><T value={ui.page.readAConstitutionAsItStoodOn} /></h1>
         <p className="lede">
-          Browse official texts by country and version, follow every amendment, and compare how a
-          constitution changed over time.
-        </p>
+          <T value={ui.page.browseOfficialTextsByCountryAndVersion} />{" "}</p>
         <SiteSearchForm
           id="home-search"
           className="hero-search"
-          placeholder="Try “human dignity” or “Art. 20”"
+          placeholder={ui.searchForm.homePlaceholder}
           submitClassName="btn btn-primary"
-          ariaLabel="Search published articles"
+          ariaLabel={ui.searchForm.searchPublishedArticles}
         />
         <div className="stats">
           <div>
-            <strong>{details.length}</strong>countries
-          </div>
+            <strong>{details.length}</strong><T value={ui.page.countries} />{" "}</div>
           <div>
-            <strong>{versionCount}</strong>published versions
-          </div>
+            <strong>{versionCount}</strong><T value={ui.page.publishedVersions} />{" "}</div>
           <div>
-            <strong>{articleCount}</strong>articles
-          </div>
+            <strong>{articleCount}</strong><T value={ui.page.articles} />{" "}</div>
           <div>
-            <strong>{amendmentCount}</strong>amendments recorded
-          </div>
+            <strong>{amendmentCount}</strong><T value={ui.page.amendmentsRecorded} />{" "}</div>
         </div>
       </section>
-      <h2 className="section-title">Countries</h2>
+      <p><Link href="/jurisdictions"><T value={migrationUi.browse} /></Link> · <Link href="/comparisons"><T value={migrationUi.curatedComparisons} /></Link></p>
+      <h2 className="section-title"><T value={ui.page.countries2} /></h2>
       {countries.length === 0 ? (
-        <p>No countries are published yet.</p>
+        <p><T value={ui.page.noCountriesArePublishedYet} /></p>
       ) : (
-        <div className="card-grid">
+        <Grid >
           {countries.map((summary) => {
             const country = details.find((item) => item.isoCode === summary.isoCode);
             const constitution = country?.constitutions[0];
@@ -119,11 +134,11 @@ export default async function Page() {
             const previous = publicLine.length >= 2 ? publicLine[publicLine.length - 2] : undefined;
             const countryArticles = country ? articlesByCountry.get(country.isoCode) : undefined;
             return (
-              <article key={summary.id} className="card country-card">
+              <article key={summary.id} className={["card country-card", surfaceStyles.card].join(' ')}>
                 <div className="iso" aria-hidden="true">
                   {summary.isoCode}
                 </div>
-                <div>
+                <Stack>
                   <h3 className="card-title">
                     <a href={`/countries/${summary.isoCode}`}>{summary.name}</a>
                   </h3>
@@ -132,54 +147,53 @@ export default async function Page() {
                   ) : null}
                   <div className="card-meta">
                     {tipVersion ? (
-                      <Badge tone="accent">Latest: {tipVersion.versionLabel}</Badge>
+                      <Badge tone="accent"><T value={ui.page.latest} />{" "}{tipVersion.versionLabel}</Badge>
                     ) : summary.latestVersionLabel ? (
-                      <Badge tone="accent">Latest: {summary.latestVersionLabel}</Badge>
+                      <Badge tone="accent"><T value={ui.page.latest} />{" "}{summary.latestVersionLabel}</Badge>
                     ) : null}
                     <span>
-                      {summary.versionCount} version{summary.versionCount === 1 ? '' : 's'}
+                      {summary.versionCount} <T value={ui.page.version} />{summary.versionCount === 1 ? '' : 's'}
                     </span>
                     {summary.latestEffectiveDate ? (
                       <span>
-                        In force since <FormattedDate value={summary.latestEffectiveDate} />
+                        <T value={ui.page.inForceSince} />{" "}<FormattedDate value={summary.latestEffectiveDate} />
                       </span>
                     ) : null}
                     {countryArticles != null ? (
                       <span>
-                        {countryArticles} article{countryArticles === 1 ? '' : 's'}
+                        {countryArticles} <T value={ui.page.article} />{countryArticles === 1 ? '' : 's'}
                       </span>
                     ) : null}
                     {tipVersion ? <span>{tipVersion.languageCode}</span> : null}
                   </div>
-                  <div className="card-actions">
+                  <Inline className="card-actions">
                     {tipId ? (
                       <a className="btn btn-sm" href={`/countries/${summary.isoCode}/versions/${tipId}`}>
-                        Read latest
-                      </a>
+                        <T value={ui.page.readLatest} />{" "}</a>
                     ) : null}
                     {publicLine.length >= 2 && previous && tipId ? (
                       <a
                         className="btn btn-sm btn-ghost"
                         href={`/countries/${summary.isoCode}/compare?from=${previous.id}&to=${publicLine[publicLine.length - 1]?.id}`}
                       >
-                        Compare {previous.versionLabel} → {publicLine[publicLine.length - 1]?.versionLabel}
+                        <T value={ui.page.compare} />{" "}{previous.versionLabel} → {publicLine[publicLine.length - 1]?.versionLabel}
                       </a>
                     ) : null}
-                  </div>
-                </div>
+                  </Inline>
+                </Stack>
               </article>
             );
           })}
-        </div>
+        </Grid>
       )}
       {recentTop.length > 0 ? (
         <>
-          <h2 className="section-title">Recently changed</h2>
-          <ul className="stack">
+          <h2 className="section-title"><T value={ui.page.recentlyChanged} /></h2>
+          <ul className="recent-list">
             {recentTop.map((row, index) => (
               <li key={`${row.versionId}-${row.articleNumber}-${index}`}>
-                <Badge>{row.changeType}</Badge>{' '}
-                {row.articleNumber ? `Article ${row.articleNumber}` : 'An article'}{' '}
+                <Badge>{<T value={changeTypeMessage(row.changeType)} />}</Badge>
+                <span>{row.articleNumber ? <><T value={ui.homeDynamic.article} /> {row.articleNumber}</> : <T value={ui.homeDynamic.anArticle} />}</span>
                 <span className="muted">
                   {row.countryName}
                   {row.date ? ` · ${row.date}` : ''}
@@ -189,6 +203,6 @@ export default async function Page() {
           </ul>
         </>
       ) : null}
-    </PageMain>
+    </CollectionPage>
   );
 }

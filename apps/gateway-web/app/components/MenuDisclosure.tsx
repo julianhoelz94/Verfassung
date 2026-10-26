@@ -1,15 +1,18 @@
 'use client';
 
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import { useTranslation } from './TranslationProvider';
+import type { UiMessage } from '../../lib/messages';
 
 type MenuDisclosureProps = {
-  label: string;
+  label: string | UiMessage;
   trigger: ReactNode;
   children: ReactNode;
   className?: string;
 };
 
 export function MenuDisclosure({ label, trigger, children, className }: MenuDisclosureProps) {
+  const t = useTranslation();
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -53,7 +56,7 @@ export function MenuDisclosure({ label, trigger, children, className }: MenuDisc
         ref={triggerRef}
         type="button"
         className="icon-btn"
-        aria-label={label}
+        aria-label={typeof label === 'string' ? label : t(label)}
         aria-expanded={open}
         aria-haspopup="true"
         aria-controls={panelId}

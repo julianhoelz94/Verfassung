@@ -1,0 +1,138 @@
+import { NavigatingActionForm } from '../components/NavigatingActionForm';
+import { T } from '../components/TranslationProvider';
+import { ui } from '../../lib/messages';
+import { notFound } from 'next/navigation';
+import { AdminForbidden } from '../components/AdminForbidden';
+import { Alert, Button, Card, PageHeader, WorkflowSteps } from '../components/ui';
+import { WorkspacePage } from '../components/layout/templates';
+import { getImportJob, getImportPayload, getPreparedImportContent, getImportReviewDecisions } from '../../lib/ingestion-api';
+import { getVersionSettings } from '../../lib/api';
+import { OrderedContentTree } from '../components/ConstitutionText';
+import { currentUser, requireSessionBearer } from '../../lib/session';
+import { transitionImportAction } from '../admin/import/actions';
+import { Disclosure } from '../components/Disclosure';
+import { reviewUi } from '../../lib/ui-review-messages';
+import { ImportPreview } from '../admin/import/ImportPreview';
+import fieldStyles from '../components/fields.module.css';
+import { importActions, importPhase } from '../../lib/import-workflow';
+
+export async function ImportReview({ jobId, error }: { jobId: string; error?: string }) {
+  const user = await currentUser();
+  if (!user || !user.roles.some(role => ['editor', 'reviewer', 'publisher', 'admin'].includes(role))) {
+    return <AdminForbidden title={ui.forbidden.import} />;
+  }
+  const authorization = await requireSessionBearer();
+  let job;
+  try {
+    job = await getImportJob(jobId, authorization);
+  } catch {
+    return (
+      <WorkspacePage width="reading" header={<PageHeader title={<T value={ui.importReview.title} />} />}>
+
+        <Alert tone="error"><T value={ui.admin.import.jobid.page.theImportServiceIsUnavailable} /></Alert>
+      </WorkspacePage>
+    );
+  }
+  if (!job) {
+    notFound();
+  }
+  const [payload, decisions, prepared, settings] = await Promise.all([
+    getImportPayload(jobId, authorization).catch(() => null),
+    getImportReviewDecisions(jobId, authorization).catch(() => []),
+    job.versionId ? getPreparedImportContent(job.versionId, authorization).catch(() => null) : null,
+    job.versionId ? getVersionSettings(job.versionId, authorization).catch(() => null) : null,
+  ]);
+  const publisher = user.roles.includes('publisher') || user.roles.includes('admin');
+  const phase = importPhase(job);
+  const actions = importActions(job, user.roles, Boolean(payload?.outline)).filter(action => action !== 'approve' || prepared);
+  const actionHeading = phase === 'prepare' ? ui.importWorkflow.preparation : phase === 'approved' ? ui.importWorkflow.publication : ui.importWorkflow.review;
+  const labels = { 'confirm-outline': ui.importActions.confirmOutline, prepare: ui.importActions.prepareDraft, approve: ui.importActions.approveDraft, reject: ui.importActions.rejectImport, publish: ui.importActions.publishVersion };
+  const workflowErrors = ui.importWorkflow.errors;
+  const errorMessage = error === 'reason' ? ui.importActions.reasonRequired
+    : error && Object.hasOwn(workflowErrors, error) ? workflowErrors[error as keyof typeof workflowErrors]
+    : ui.importActions.actionFailed;
+  const versionHref =
+    job.status === 'completed' && job.versionId && job.isoCode
+      ? `/countries/${encodeURIComponent(job.isoCode)}/versions/${encodeURIComponent(job.versionId)}`
+      : null;
+  return (
+    <WorkspacePage width="content" className="import-review" header={<PageHeader title={<T value={ui.importReview.title} />} eyebrow={<T value={ui.attrs.editorEditorlandingPageHeaderTitleEditor} />} meta={<WorkflowSteps status={job.status === 'pending_review' ? 'reviewing' : job.status === 'completed' ? 'published' : job.status} />} />}>
+      <nav className="section-nav">
+        <a href="/editor?status=reviewing"><T value={ui.nav.reviewQueue} /></a>
+        {publisher ? <a href="/editor?status=approved"><T value={ui.nav.readyToPublish} /></a> : null}
+      </nav>
+
+      <Card className="import-workflow">
+        <div role="status" aria-live="polite">
+          <h2><T value={ui.importWorkflow.phases[phase]} /></h2>
+          {phase === 'approved' ? <p><T value={ui.importWorkflow.approvedHelp} /></p> : null}
+          {phase === 'publishing' ? <p><T value={ui.importWorkflow.publishingHelp} /></p> : null}
+        </div>
+        {error ? <Alert tone="error"><T value={errorMessage} /></Alert> : null}
+        {actions.length ? <section aria-labelledby="import-actions-heading">
+          <h2 id="import-actions-heading"><T value={actionHeading} /></h2>
+          <div className="review-action-grid">
+            {actions.map(action => <ActionForm key={action} action={action} jobId={job.id} label={labels[action]} />)}
+          </div>
+        </section> : phase === 'prepare' || phase === 'review' || phase === 'approved' ? <p><T value={ui.importWorkflow.waiting} /></p> : null}
+      </Card>
+      {job.status === 'pending_review' ? <Alert><T value={ui.admin.import.jobid.page.thisImportIsPendingReviewItIs} /></Alert> : null}
+      {job.versionId && !prepared ? <Alert tone="error"><T value={ui.importReview.previewUnavailable} /></Alert> : null}
+      {job.status === 'failed' ? <Alert tone="error"><T value={ui.admin.import.jobid.page.theImportFailed} /></Alert> : null}
+      {job.status === 'completed' && versionHref ? (
+        <Alert tone="success">
+          <T value={ui.admin.import.jobid.page.importCompleted} />{' '}
+          <a href={versionHref}><T value={ui.admin.import.jobid.page.openThePublishedVersion} /></a>
+        </Alert>
+      ) : null}
+      {payload ? <Card>
+        <h2>{String(payload.constitutionTitle ?? '')} · {String(payload.versionLabel ?? '')}</h2>
+        <p>{String(payload.countryName ?? job.isoCode ?? '')}</p>
+        {typeof payload.sourceUrl === 'string' && payload.sourceUrl.startsWith('https://') ? <p><a href={payload.sourceUrl} target="_blank" rel="noreferrer"><T value={ui.importReview.source} /></a></p> : null}
+        {typeof payload.gazetteReference === 'string' ? <p>{payload.gazetteReference}</p> : null}
+        {settings?.outline?.kinds.length ? <p><strong><T value={ui.importWorkflow.structure} />:</strong> {settings.outline.kinds.map(kind => kind.displayLabel).join(' → ')}</p> : null}
+        <p><a href="#import-structure"><T value={ui.importWorkflow.checkStructure} /></a></p>
+      </Card> : null}
+      {prepared ? <Card>
+        <h2><T value={ui.admin.import.jobid.page.preparedDraftAsReadersWillSeeIt} /></h2>
+        <OrderedContentTree entries={prepared.roots.map(node => ({ type: 'child' as const, node }))} outline={settings?.outline} />
+      </Card> : null}
+      <Disclosure summary={<T value={reviewUi.technicalDetails} />}>
+        <dl className="technical-identifiers">
+          <dt>Import</dt><dd><code>{job.id}</code></dd>
+          {job.versionId ? <><dt><T value={ui.admin.import.jobid.page.draftVersion} /></dt><dd><code>{job.versionId}</code></dd></> : null}
+          {prepared ? <>
+            <dt><T value={ui.admin.import.jobid.page.contentGeneration} /></dt><dd>{prepared.generation}</dd>
+            <dt><T value={ui.admin.import.jobid.page.settingsRevision} /></dt><dd><code>{prepared.settingsRevisionId ?? 'unbound'}</code></dd>
+          </> : null}
+        </dl>
+      </Disclosure>
+      {payload ? <details id="import-structure"><summary><T value={ui.importReview.submittedContent} /></summary><ImportPreview payload={payload} outline={settings?.outline} /></details> : null}
+      {decisions.length ? <Card><h2><T value={ui.admin.import.jobid.page.reviewDecisions} /></h2><ol>{decisions.map(decision => <li key={decision.id}>
+        <strong>{decision.decision}</strong> · {new Date(decision.decidedAt).toLocaleString()}<p>{decision.reason}</p>
+      </li>)}</ol></Card> : null}
+      {job.errors.length > 0 ? (
+        <Card>
+          <h2><T value={ui.admin.import.jobid.page.errors} /></h2>
+          <ul>
+            {job.errors.map((error) => (
+              <li key={`${error.code}-${error.message}`}>
+                <code>{error.code}</code> — {error.message}
+              </li>
+            ))}
+          </ul>
+        </Card>
+      ) : null}
+    </WorkspacePage>
+  );
+}
+
+function ActionForm({ action, jobId, label }: { action: 'confirm-outline' | 'prepare' | 'approve' | 'reject' | 'publish'; jobId: string; label: import('../../lib/messages').UiMessage }) {
+  return <NavigatingActionForm action={transitionImportAction} className="review-action-form">
+    <h3><T value={label} /></h3>
+    <input type="hidden" name="jobId" value={jobId} />
+    <input type="hidden" name="action" value={action} />
+    {action === 'approve' || action === 'reject' ? <label className={["field", fieldStyles.field].join(' ')} htmlFor={`reason-${action}`}><T value={ui.admin.import.jobid.page.reviewReason} /><textarea id={`reason-${action}`} name="reason" minLength={10} maxLength={2000} required rows={3} /></label> : null}
+    <Button variant={action === 'publish' ? 'primary' : undefined}><T value={label} /></Button>
+  </NavigatingActionForm>;
+}

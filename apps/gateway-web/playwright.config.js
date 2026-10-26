@@ -6,7 +6,7 @@ const { join } = require('node:path');
 const mockPort = Number(process.env.E2E_MOCK_PORT ?? 4010);
 const webPort = Number(process.env.E2E_WEB_PORT ?? 3100);
 const mockOrigin = `http://127.0.0.1:${mockPort}`;
-const built = existsSync(join(__dirname, '.next'));
+const built = existsSync(join(__dirname, '.next', 'BUILD_ID'));
 
 const apiEnv = {
   CATALOG_API_URL: `${mockOrigin}/api/catalog`,
@@ -16,11 +16,14 @@ const apiEnv = {
   IDENTITY_API_URL: `${mockOrigin}/api/identity`,
   EDITOR_API_URL: `${mockOrigin}/api/editor`,
   INGESTION_API_URL: `${mockOrigin}/api/ingestion`,
+  DOCUMENT_API_URL: `${mockOrigin}/api/document`,
   SESSION_COOKIE_SECURE: 'false',
 };
 
 module.exports = defineConfig({
   testDir: './e2e',
+  testMatch: '**/*.spec.ts',
+  testIgnore: /e2e\/full\//,
   fullyParallel: false,
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 2 : 0,
@@ -46,12 +49,14 @@ module.exports = defineConfig({
           command: 'node e2e/mock-api.mjs',
           url: `${mockOrigin}/health`,
           reuseExistingServer: !process.env.CI,
+          timeout: 180_000,
           env: { ...process.env, E2E_MOCK_PORT: String(mockPort) },
         },
         {
           command: built ? `npx next start -p ${webPort}` : `npx next dev -p ${webPort}`,
           url: `http://127.0.0.1:${webPort}/about`,
           reuseExistingServer: !process.env.CI,
+          timeout: 180_000,
           env: { ...process.env, ...apiEnv },
         },
       ],

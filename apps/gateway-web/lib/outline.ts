@@ -1,4 +1,4 @@
-import type { ArticleDetail, ArticleSummary, ContentNode, ContentOutline, OutlineKindWrite } from './api';
+import type { ArticleDetail, ContentNode, ContentOutline, OrderedEntry, OutlineKindWrite } from './api';
 
 export function asOutlinePresentation(value: string | undefined): OutlineKindWrite['presentation'] {
   return value === 'concatenated' ? 'concatenated' : 'section';
@@ -11,16 +11,29 @@ export function toOutlineKindWrite(kind: {
   showLabel?: boolean;
   showTitle?: boolean;
   showKind?: boolean;
+  allowTextAlongsideChildren?: boolean;
+  titlePolicy?: string;
+  labelPolicy?: string;
+  labelPlacement?: string;
+  segmentation?: string;
+  root?: boolean;
+  allowedChildKinds?: string[];
 }): OutlineKindWrite {
   const presentation = asOutlinePresentation(kind.presentation);
-  const concatenated = presentation === 'concatenated';
   return {
     kindCode: kind.kindCode,
     displayLabel: kind.displayLabel,
     presentation,
-    showLabel: concatenated ? false : Boolean(kind.showLabel),
-    showTitle: concatenated ? false : Boolean(kind.showTitle),
-    showKind: concatenated ? false : Boolean(kind.showKind),
+    showLabel: Boolean(kind.showLabel),
+    showTitle: Boolean(kind.showTitle),
+    showKind: Boolean(kind.showKind),
+    allowTextAlongsideChildren: Boolean(kind.allowTextAlongsideChildren),
+    titlePolicy: (kind.titlePolicy ?? 'optional') as OutlineKindWrite['titlePolicy'],
+    labelPolicy: (kind.labelPolicy ?? 'optional') as OutlineKindWrite['labelPolicy'],
+    labelPlacement: (kind.labelPlacement ?? 'before_title') as OutlineKindWrite['labelPlacement'],
+    segmentation: (kind.segmentation ?? 'plain') as OutlineKindWrite['segmentation'],
+    ...(kind.root === undefined ? {} : { root: kind.root }),
+    ...(kind.allowedChildKinds === undefined ? {} : { allowedChildKinds: kind.allowedChildKinds }),
   };
 }
 
@@ -44,6 +57,7 @@ export const DEFAULT_NEW_OUTLINE: OutlineKindWrite[] = [
   {
     kindCode: 'sentence',
     displayLabel: 'Sentence',
+    segmentation: 'sentence',
     presentation: 'concatenated',
     showLabel: false,
     showTitle: false,
@@ -57,6 +71,18 @@ export function kindByCode(outline: ContentOutline | undefined, kindCode: string
   return outline?.kinds.find((kind) => kind.kindCode === kindCode);
 }
 
+export function effectiveDisplayKind(kind: OutlineKind | undefined): OutlineKind | undefined {
+  if (!kind) return undefined;
+  const runningText = asOutlinePresentation(kind.presentation) === 'concatenated';
+  const placement = kind.labelPlacement ?? 'before_title';
+  const showTitle = !runningText && kind.titlePolicy !== 'none' && kind.showTitle;
+  const labelPlacement = placement === 'after_title' && !showTitle ||
+    placement === 'inline' && !kind.mayHoldText ? 'before_title' : placement;
+  const showLabel = kind.labelPolicy !== 'none' && kind.showLabel &&
+    (!runningText || labelPlacement === 'inline' || labelPlacement === 'superscript');
+  return { ...kind, showKind: !runningText && kind.showKind, showTitle, showLabel, labelPlacement };
+}
+
 export function nodeHeading(
   kind: OutlineKind | undefined,
   node: Pick<ContentNode, 'kind' | 'label' | 'number' | 'title'>,
@@ -65,11 +91,13 @@ export function nodeHeading(
     const fallback = [node.kind, node.label ?? node.number, node.title].filter(Boolean).join(' ');
     return fallback || null;
   }
+  kind = effectiveDisplayKind(kind);
+  if (!kind) return null;
   const parts: string[] = [];
   if (kind.showKind) {
     parts.push(kind.displayLabel);
   }
-  if (kind.showLabel) {
+  if (kind.showLabel && kind.labelPlacement !== 'inline' && kind.labelPlacement !== 'superscript') {
     const label = node.label ?? node.number;
     if (label) {
       parts.push(label);
@@ -77,6 +105,9 @@ export function nodeHeading(
   }
   if (kind.showTitle && node.title) {
     parts.push(node.title);
+  }
+  if (kind.labelPlacement === 'after_title' && kind.showLabel && kind.showTitle && node.title) {
+    return [kind.showKind ? kind.displayLabel : null, node.title, node.label ?? node.number].filter(Boolean).join(' ');
   }
   if (parts.length === 0) {
     return null;
@@ -99,7 +130,7 @@ export function articleHeading(
     number: article.articleNumber,
     title: article.title,
   });
-  return heading ?? `Article ${article.articleNumber} — ${article.title}`;
+  return heading ?? (kind ? '' : `Article ${article.articleNumber} — ${article.title}`);
 }
 
 export type RenderGroup =
@@ -109,9 +140,10 @@ export type RenderGroup =
 export function groupNodes(nodes: ContentNode[], outline?: ContentOutline): RenderGroup[] {
   const groups: RenderGroup[] = [];
   for (const node of nodes) {
-    const presentation = asOutlinePresentation(kindByCode(outline, node.kind)?.presentation);
+    const kind = effectiveDisplayKind(kindByCode(outline, node.kind));
+    const presentation = asOutlinePresentation(kind?.presentation);
     const last = groups[groups.length - 1];
-    if (presentation === 'concatenated') {
+    if (presentation === 'concatenated' && node.children.length === 0 && !kind?.showTitle && !kind?.showKind) {
       if (last && last.type === 'concatenated') {
         last.nodes.push(node);
       } else {
@@ -138,7 +170,7 @@ export type DepthStop = {
 };
 
 function isTitledSectionKind(kind: OutlineKind): boolean {
-  return asOutlinePresentation(kind.presentation) !== 'concatenated' && Boolean(kind.showTitle);
+  return Boolean(effectiveDisplayKind(kind)?.showTitle);
 }
 
 export function depthStops(outline?: ContentOutline): DepthStop[] {
@@ -221,4 +253,19 @@ function clipNode(
     body: stop.includeText ? node.body : null,
     children: clipVisible(node.children, outline, stop),
   };
+}
+
+/** Clip the ordered sequence without converting it into body plus children. */
+export function clipOrderedEntries(entries: OrderedEntry[], outline: ContentOutline | undefined, depth: number): OrderedEntry[] {
+  const stop = stopAt(outline, depth);
+  function clip(content: OrderedEntry[]): OrderedEntry[] {
+    return content.flatMap((entry): OrderedEntry[] => {
+      if (entry.type === 'text') return stop.includeText ? [entry] : [];
+      const node = entry.node;
+      if (!node || (!stop.includeText && nodeKindIndex(outline, node.kind) > stop.throughKindIndex)) return [];
+      if (!stop.includeText && asOutlinePresentation(kindByCode(outline, node.kind)?.presentation) === 'concatenated') return [];
+      return [{ ...entry, node: { ...node, content: clip(node.content) } }];
+    });
+  }
+  return clip(entries);
 }

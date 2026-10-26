@@ -16,9 +16,14 @@ data class UserDto(
     val mfaEnabled: Boolean = false,
     val mfaRequired: Boolean = false,
     val stepUpFresh: Boolean = false,
+    val languagePreference: String = "auto",
     @get:JsonInclude(JsonInclude.Include.NON_EMPTY)
     val scopes: List<String> = emptyList(),
+    @get:JsonInclude(JsonInclude.Include.NON_NULL)
+    val resource: String? = null,
 )
+
+data class LanguagePreferenceRequest(val languagePreference: String)
 
 data class SessionDto(
     val token: String,
@@ -44,11 +49,13 @@ data class MfaLoginRequest(
 
 data class MfaEnrollStartRequest(
     val challengeToken: String? = null,
+    val password: String? = null,
 )
 
 data class MfaEnrollStartDto(
     val secret: String,
     val otpauthUrl: String,
+    val qrDataUrl: String,
     val challengeToken: String,
 )
 
@@ -89,6 +96,43 @@ data class InviteAcceptedRequest(
     val token: String,
     val password: String,
 )
+
+data class RegistrationRequest(val email: String)
+
+data class RegistrationConfirmRequest(val token: String, val password: String)
+
+data class IdentitySettingsDto(
+    val selfRegistrationEnabled: Boolean,
+    val mailEnabled: Boolean,
+    val mailFrom: String,
+    val mailFromName: String,
+    val mailPublicBaseUrl: String,
+    val smtpHost: String,
+    val smtpPort: Int,
+    val smtpUsername: String,
+    val smtpPasswordSet: Boolean,
+    val smtpAuth: Boolean,
+    val smtpStarttls: Boolean,
+    val smtpSsl: Boolean,
+)
+
+data class UpdateIdentitySettingsRequest(
+    val selfRegistrationEnabled: Boolean,
+    val mailEnabled: Boolean,
+    val mailFrom: String,
+    val mailFromName: String = "Constitution Atlas",
+    val mailPublicBaseUrl: String,
+    val smtpHost: String,
+    val smtpPort: Int = 587,
+    val smtpUsername: String = "",
+    val smtpPassword: String? = null,
+    val clearSmtpPassword: Boolean = false,
+    val smtpAuth: Boolean = true,
+    val smtpStarttls: Boolean = true,
+    val smtpSsl: Boolean = false,
+)
+
+data class TestMailRequest(val to: String)
 
 data class InviteCreatedDto(
     val user: UserAdminDto,
@@ -157,3 +201,21 @@ data class ServiceTokenDto(
     val lastUsedAt: OffsetDateTime? = null,
     val revokedAt: OffsetDateTime? = null,
 )
+
+data class CreateMcpKeyRequest(
+    val name: String,
+    val scopes: List<String> = listOf("mcp:read"),
+    val expiresAt: OffsetDateTime? = null,
+)
+
+data class McpKeyDto(
+    val id: UUID,
+    val name: String,
+    val scopes: List<String>,
+    val createdAt: OffsetDateTime,
+    val expiresAt: OffsetDateTime,
+    val lastUsedAt: OffsetDateTime?,
+    val revokedAt: OffsetDateTime?,
+)
+
+data class McpKeyCreatedDto(val key: McpKeyDto, val token: String)

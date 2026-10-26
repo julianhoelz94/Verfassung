@@ -1,3 +1,6 @@
+import QRCode from 'qrcode';
+import { reviewFixtures, testTotp, MFA_TEST_SECRET } from './fixtures/ui-review.mjs';
+import { createHash } from 'node:crypto';
 import { createServer } from 'node:http';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -65,7 +68,7 @@ const articlesById = new Map([
 ]);
 
 function articlesFor(versionId, includeBody) {
-  const source = versionId === VERSION_1949 ? articles2022.map(to1949) : articles2022;
+  const source = (versionId === VERSION_1949 ? articles2022.map(to1949) : articles2022).map(article => ({ ...article, versionId }));
   return source.map((article) => {
     const detail = articlesById.get(article.id);
     if (!includeBody) {
@@ -76,6 +79,21 @@ function articlesFor(versionId, includeBody) {
     }
     return { ...article, body: `${article.title}.`, children: [] };
   });
+}
+
+function mockUnit(article) {
+  function uuid(value) {
+    const hex = createHash('sha256').update(value).digest('hex').slice(0, 32);
+    return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+  }
+  function node(source, identity) {
+    const children = source.children ?? [];
+    const content = children.length ? children.map((child, index) => ({ type: 'child', node: node(child, `${identity}/${child.kind}/${child.label ?? child.number ?? index}`) })) : [{ type: 'text', logicalId: uuid(`${identity}:text`), revisionId: uuid(`text:${source.body ?? ''}`), occurrenceId: uuid(`${article.versionId}:${identity}:text`), text: source.body ?? '' }];
+    const title = nodeTitleOverrides.get(source.id) ?? source.title;
+    return { logicalId: uuid(identity), revisionId: uuid(JSON.stringify([source.kind ?? 'article', source.label ?? source.articleNumber, title, content.map((entry) => entry.node?.revisionId ?? entry.revisionId)])), occurrenceId: source.id, kind: source.kind ?? 'article', label: source.label ?? source.number ?? source.articleNumber ?? null, title: title ?? null, content };
+  }
+  const ordered = node(article, `article:${article.articleNumber}`);
+  return { ...article, kind: ordered.kind, logicalId: ordered.logicalId, revisionId: ordered.revisionId, content: ordered.content };
 }
 
 function to1949(article) {
@@ -101,11 +119,14 @@ const amendment = {
   id: '01900000-0000-4000-8000-000000000301',
   title: 'Update to Article 1',
   summary: 'Expanded the dignity clause.',
+  comment: 'The published legal-change comment.',
+  documents: [{ url: 'https://example.gov/update-article-1.pdf', label: 'Official change document' }],
   enactedOn: '2022-12-19',
   sourceReference: 'BGBl. I 2022',
   constitutionId: CONSTITUTION_ID,
   kind: 'legal_amendment',
   status: 'published',
+  reviewStatus: 'ok',
   publishedRevisionId: '01900000-0000-4000-8000-000000000321',
   sourceVersionId: VERSION_1949,
   targetVersionId: VERSION_2022,
@@ -128,6 +149,7 @@ const amendmentDraft = {
   id: '01900000-0000-4000-8000-000000000302',
   title: 'Draft amending law',
   status: 'draft',
+  reviewStatus: 'ok',
   publishedRevisionId: null,
 };
 
@@ -144,6 +166,7 @@ const amendmentRevision = {
   sourceReference: amendment.sourceReference,
   sourceVersionId: amendment.sourceVersionId,
   targetVersionId: amendment.targetVersionId,
+  comment: amendment.comment,
   kind: amendment.kind,
   changes: amendment.changes.map(({ articleNumber, changeType, note }) => ({
     articleNumber,
@@ -162,10 +185,36 @@ const EDITORIAL_VERSION_ID = '01900000-0000-4000-8000-000000000501';
 
 const editorState = {
   session: null,
+  seededSessions: [],
+  sessionsUnavailable: false,
 };
 
 let pendingMfaEmail = identityMe.email;
 let currentUser = { ...identityMe };
+let importJobs = new Map();
+let importPublicationError = null;
+let managedUsers = [];
+let serviceTokens = [];
+let credentials = new Map();
+let createdConstitutions = [];
+const settingsRevisions = new Map();
+let nodeTitleOverrides = new Map();
+let enrolledMfaEmails = new Set();
+let recoveryCodes = new Map();
+let uiReview;
+let forceEnrollment = false;
+let stepUpFresh = true;
+let visualRoles = false;
+let sprint50Content = false;
+let denseUi = false;
+let historyUnavailable = { lifecycle: false, amendments: false };
+let legalPages = {};
+let imprintDetailsState;
+let translationSite = { provider: 'google', sharedKeyConfigured: true, sharedGoogleCharactersUsed: 0, sharedGoogleCharacterLimit: 500000 };
+let translationUser = { alwaysTranslate: false, personalGoogleKeyConfigured: false };
+let anonymousBrowsing = { allowed: true, perIp: { requests: 600, windowValue: 1, windowUnit: 'minutes' }, total: { requests: 6000, windowValue: 1, windowUnit: 'minutes' }, revision: 0 };
+const WIKI_IMAGE_ID = '01900000-0000-4000-8000-000000000736';
+const WIKI_IMAGE = { documentId: WIKI_IMAGE_ID, revision: 2, alt: 'A historic flag', caption: 'Historic flag', credit: 'Archive', sourceUrl: 'https://example.org/flag', rights: 'Public domain', placement: 'before_body' };
 
 function resetMockState() {
   mockAmendments.clear();
@@ -173,16 +222,64 @@ function resetMockState() {
   mockAmendments.set(amendmentDraft.id, amendmentDraft);
   extraVersions.splice(0);
   editorState.session = null;
+  editorState.seededSessions = [];
+  editorState.sessionsUnavailable = false;
   pendingMfaEmail = identityMe.email;
   currentUser = { ...identityMe };
+  importJobs = new Map();
+  importPublicationError = null;
+  managedUsers = [];
+  serviceTokens = [];
+  createdConstitutions = [];
+  settingsRevisions.clear();
+  nodeTitleOverrides = new Map();
+  enrolledMfaEmails = new Set();
+  recoveryCodes = new Map();
+  uiReview = undefined;
+  forceEnrollment = false;
+  stepUpFresh = true;
+  visualRoles = false;
+  sprint50Content = false;
+  denseUi = false;
+  historyUnavailable = { lifecycle: false, amendments: false };
+  translationSite = { provider: 'google', sharedKeyConfigured: true, sharedGoogleCharactersUsed: 0, sharedGoogleCharacterLimit: 500000 };
+  translationUser = { alwaysTranslate: false, personalGoogleKeyConfigured: false };
+  anonymousBrowsing = { allowed: true, perIp: { requests: 600, windowValue: 1, windowUnit: 'minutes' }, total: { requests: 6000, windowValue: 1, windowUnit: 'minutes' }, revision: 0 };
+  const impressum = { revision: 1, content: 'Example publisher information', separateContact: true, createdAt: '2026-01-01T00:00:00Z', createdBy: identityMe.id };
+  const impressumEn = { revision: 1, content: 'English publisher information', separateContact: true, createdAt: '2026-01-01T00:00:00Z', createdBy: identityMe.id };
+  const datenschutz = { revision: 1, content: 'Example privacy notice for browser tests.', createdAt: '2026-01-01T00:00:00Z', createdBy: identityMe.id };
+  legalPages = {
+    impressum: { key: 'impressum', draft: impressum, published: impressum, revisions: [impressum] },
+    impressum_en: { key: 'impressum_en', draft: impressumEn, published: impressumEn, revisions: [impressumEn] },
+    datenschutz: { key: 'datenschutz', draft: datenschutz, published: datenschutz, revisions: [datenschutz] },
+  };
+  const contact = { revision: 1, name: 'Atlas Foundation', streetAddress: 'Main Street 1', postalCode: '10000', city: 'Berlin', country: 'Germany', email: 'contact@atlas.example' };
+  imprintDetailsState = { draft: contact, published: contact };
+  credentials = new Map([
+    ['local-editor@example.local', 'change-me'], ['local-reviewer@example.local', 'change-me'],
+    ['local-publisher@example.local', 'change-me'], ['local-admin@example.local', 'change-me'],
+    ['local-viewer@example.local', 'change-me'],
+  ]);
 }
 
 function userForEmail(email) {
+  if (email === 'local-editor@example.local') {
+    return { ...identityMe, email, roles: visualRoles ? identityMe.roles : ['editor'] };
+  }
   if (email === 'local-admin@example.local') {
     return { ...identityMe, email, roles: ['admin'] };
   }
   if (email === 'local-publisher@example.local') {
     return { ...identityMe, email, roles: ['publisher'] };
+  }
+  if (email === 'local-reviewer@example.local') {
+    return { ...identityMe, email, roles: ['reviewer'], mfaEnabled: false, mfaRequired: false };
+  }
+  if (email === 'local-viewer@example.local') {
+    return { ...identityMe, email, roles: ['viewer'], mfaEnabled: enrolledMfaEmails.has(email), mfaRequired: false };
+  }
+  if (email === 'invited@example.local') {
+    return { ...identityMe, email, roles: ['viewer'], mfaEnabled: false, mfaRequired: false };
   }
   return { ...identityMe, email };
 }
@@ -234,11 +331,14 @@ function preview() {
     publishComment: editorState.session?.publishComment ?? null,
     changeRecord: editorState.session?.changeRecord ?? null,
     amendmentStatus: editorState.session?.status === 'published' ? 'ready' : null,
+    searchIndexStatus: editorState.session?.status === 'published' ? 'ready' : null,
     publicContentUpdated: editorState.session?.status === 'published' ? true : null,
-    newVersionId: editorState.session?.status === 'published' ? '01900000-0000-4000-8000-000000000501' : null,
-    newVersionLabel: editorState.session?.status === 'published' ? '2022-1' : null,
+    newVersionId: editorState.session?.status === 'published' ? (editorState.session.newVersionId ?? '01900000-0000-4000-8000-000000000501') : null,
+    newVersionLabel: editorState.session?.status === 'published' ? (editorState.session.newVersionLabel ?? '2022-1') : null,
   };
 }
+
+resetMockState();
 
 const server = createServer(async (req, res) => {
   const url = new URL(req.url ?? '/', `http://127.0.0.1:${port}`);
@@ -255,20 +355,230 @@ const server = createServer(async (req, res) => {
     empty(res, 204);
     return;
   }
+  if (method === 'POST' && pathname === '/__history_unavailable') {
+    historyUnavailable = { ...historyUnavailable, ...await readBody(req) };
+    empty(res, 204); return;
+  }
+  if (method === 'GET' && (
+    (historyUnavailable.lifecycle && /\/countries\/DE\/(constitution|provision)-lifecycle$/.test(pathname)) ||
+    (historyUnavailable.amendments && pathname.startsWith('/api/amendment/constitutions/') && pathname.endsWith('/amendments'))
+  )) { json(res, 503, { error: 'History source unavailable' }); return; }
+  if (method === 'POST' && pathname === '/__usability_content') {
+    denseUi = true;
+    sprint50Content = true;
+    managedUsers = Array.from({ length: 30 }, (_, index) => ({
+      id: `dense-user-${index}`, email: `long.editorial.account.${index}@constitution-atlas.example.local`,
+      roles: ['viewer', 'editor', 'reviewer', 'publisher', 'admin'], enabled: true, status: 'active', createdAt: '2026-01-01T00:00:00Z',
+    }));
+    empty(res, 204); return;
+  }
+  if (method === 'POST' && pathname === '/__import_publication_error') {
+    importPublicationError = (await readBody(req)).code ?? null;
+    json(res, 200, {}); return;
+  }
+  if (method === 'POST' && pathname === '/__sprint59_content') {
+    uiReview = reviewFixtures(germany);
+    sprint50Content = true;
+    extraVersions.push(...uiReview.corrections);
+    json(res, 200, { ok: true }); return;
+  }
+  if (method === 'POST' && pathname === '/__mfa_enrollment') {
+    forceEnrollment = true;
+    json(res, 200, { ok: true }); return;
+  }
+  if (uiReview) {
+    const response = await uiReview.response(req, method, pathname, readBody);
+    if (response instanceof Response) { json(res, response.status, await response.json()); return; }
+    if (response !== undefined) { json(res, 200, response); return; }
+  }
+  if (method === 'POST' && pathname === '/__editor_sessions') {
+    const body = await readBody(req);
+    editorState.seededSessions = body.sessions ?? [];
+    editorState.sessionsUnavailable = body.unavailable ?? false;
+    empty(res, 204);
+    return;
+  }
+  if (method === 'POST' && pathname === '/__step_up_stale') {
+    stepUpFresh = false;
+    currentUser = { ...currentUser, stepUpFresh: false };
+    empty(res, 204);
+    return;
+  }
+  if (method === 'POST' && pathname === '/__visual_roles') {
+    visualRoles = true;
+    empty(res, 204);
+    return;
+  }
+  if (method === 'POST' && pathname === '/__sprint50_content') {
+    sprint50Content = true;
+    empty(res, 204);
+    return;
+  }
+
+  if (method === 'POST' && pathname === '/__unpublished_imprint_contact') {
+    imprintDetailsState.published = null;
+    imprintDetailsState.draft = null;
+    empty(res, 204);
+    return;
+  }
+
+  if (pathname.startsWith('/api/document/legal-pages/imprint-details')) {
+    const action = pathname.slice('/api/document/legal-pages/imprint-details'.length);
+    if (method === 'GET' && !action) { json(res, 200, imprintDetailsState.published); return; }
+    if (bearer(req) !== SESSION_TOKEN) { json(res, 401, { error: 'Login required' }); return; }
+    if (method === 'GET' && action === '/editor') { json(res, 200, imprintDetailsState); return; }
+    const body = await readBody(req);
+    if (body.expectedRevision !== (imprintDetailsState.draft?.revision ?? 0)) { json(res, 409, { error: 'Conflict' }); return; }
+    if (method === 'PUT' && action === '/draft') {
+      imprintDetailsState.draft = { ...body, revision: body.expectedRevision + 1 };
+      json(res, 200, imprintDetailsState); return;
+    }
+    if (method === 'POST' && action === '/publish') {
+      imprintDetailsState.published = imprintDetailsState.draft;
+      json(res, 200, imprintDetailsState); return;
+    }
+    json(res, 404, { error: 'Not found' });
+    return;
+  }
+  const legalMatch = pathname.match(/^\/api\/document\/legal-pages\/(impressum(?:_en)?|datenschutz(?:_en)?)(?:\/(editor(?:\/revisions)?|draft|publish))?$/);
+  if (legalMatch) {
+    const state = legalPages[legalMatch[1]];
+    if (!state) { json(res, 404, { error: 'Not published' }); return; }
+    const action = legalMatch[2];
+    if (method === 'GET' && !action) { json(res, state.published ? 200 : 404, state.published ?? { error: 'Not published' }); return; }
+    if (method === 'GET' && action === 'editor') { json(res, 200, { key: state.key, draft: state.draft, published: state.published }); return; }
+    if (method === 'GET' && action === 'editor/revisions') { json(res, 200, [...state.revisions].reverse()); return; }
+    if (method === 'PUT' && action === 'draft') {
+      const body = await readBody(req);
+      if (body.expectedRevision !== (state.draft?.revision ?? 0)) { json(res, 409, { error: 'Conflict' }); return; }
+      if (body.contact) {
+        if (body.contact.expectedRevision !== (imprintDetailsState.draft?.revision ?? 0)) { json(res, 409, { error: 'Contact changed' }); return; }
+        imprintDetailsState.draft = { ...body.contact, revision: body.contact.expectedRevision + 1 };
+      }
+      const draft = { revision: body.expectedRevision + 1, content: String(body.content).trim(), separateContact: legalMatch[1].startsWith('impressum'), createdAt: new Date().toISOString(), createdBy: identityMe.id };
+      state.draft = draft;
+      state.revisions.push(draft);
+      json(res, 200, { key: state.key, draft, published: state.published });
+      return;
+    }
+    if (method === 'POST' && action === 'publish') {
+      const body = await readBody(req);
+      if (body.expectedRevision !== state.draft?.revision) { json(res, 409, { error: 'Conflict' }); return; }
+      if (body.expectedContactRevision !== undefined) {
+        if (body.expectedContactRevision !== imprintDetailsState.draft?.revision) { json(res, 409, { error: 'Contact changed' }); return; }
+        imprintDetailsState.published = imprintDetailsState.draft;
+      }
+      state.published = state.draft;
+      json(res, 200, { key: state.key, draft: state.draft, published: state.published });
+      return;
+    }
+  }
+
+  if (sprint50Content && method === 'GET' && pathname === '/api/catalog/countries/DE/constitution-lifecycle') {
+    json(res, 200, [
+      { id: '01900000-0000-4000-8000-000000000731', constitutionId: CONSTITUTION_ID, eventType: 'adopted', eventDate: '1949-05-08', dateCertainty: 'approximate', sourceUrl: 'https://example.org/adoption', note: 'Postwar drafting' },
+      { id: '01900000-0000-4000-8000-000000000732', constitutionId: CONSTITUTION_ID, eventType: 'commenced', eventDate: '1949-05-23', dateCertainty: 'exact', sourceUrl: null, note: null },
+    ]);
+    return;
+  }
+  if (sprint50Content && method === 'GET' && pathname === '/api/catalog/countries/DE/provision-lifecycle') {
+    json(res, 200, []);
+    return;
+  }
+  if (method === 'GET' && /\/api\/catalog\/countries\/DE\/(constitution|provision)-lifecycle$/.test(pathname)) {
+    json(res, 200, []); return;
+  }
+  if (sprint50Content && method === 'GET' && pathname === `/api/catalog/wiki/country/${germany.id}`) {
+    json(res, 200, { id: '01900000-0000-4000-8000-000000000733', targetType: 'country', targetId: germany.id, predecessorId: null, summary: 'A federal republic', body: '# History\n\nHistorical context', images: [WIKI_IMAGE], sourceUrls: ['https://example.org/country-history'], createdAt: '2022-01-01T00:00:00Z', createdBy: identityMe.id, publishedAt: '2022-01-02T00:00:00Z' });
+    return;
+  }
+  if (sprint50Content && method === 'GET' && pathname === `/api/catalog/wiki/country/${germany.id}/draft`) {
+    json(res, 200, { id: '01900000-0000-4000-8000-000000000735', targetType: 'country', targetId: germany.id, predecessorId: '01900000-0000-4000-8000-000000000733', summary: 'Updated country context', body: '# History\n\n- First era\n- Second era', images: [WIKI_IMAGE], sourceUrls: ['https://example.org/country-history'], createdAt: '2022-02-01T00:00:00Z', createdBy: identityMe.id, publishedAt: null });
+    return;
+  }
+  if (sprint50Content && method === 'GET' && pathname === `/api/catalog/wiki/country/${germany.id}/history`) {
+    json(res, 200, [
+      { id: '01900000-0000-4000-8000-000000000735', targetType: 'country', targetId: germany.id, predecessorId: '01900000-0000-4000-8000-000000000733', summary: 'Updated country context', body: '# History\n\n- First era\n- Second era', images: [WIKI_IMAGE], sourceUrls: ['https://example.org/country-history'], createdAt: '2022-02-01T00:00:00Z', createdBy: identityMe.id, publishedAt: null },
+      { id: '01900000-0000-4000-8000-000000000733', targetType: 'country', targetId: germany.id, predecessorId: null, summary: 'A federal republic', body: '# History\n\nHistorical context', images: [WIKI_IMAGE], sourceUrls: ['https://example.org/country-history'], createdAt: '2022-01-01T00:00:00Z', createdBy: identityMe.id, publishedAt: '2022-01-02T00:00:00Z' },
+    ]);
+    return;
+  }
+  if (sprint50Content && method === 'GET' && pathname === `/api/document/documents/${WIKI_IMAGE_ID}/revisions/2/file`) {
+    const bytes = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/GZkAAAAASUVORK5CYII=', 'base64');
+    res.writeHead(200, { 'Content-Type': 'image/png', 'Content-Length': bytes.length });
+    res.end(bytes);
+    return;
+  }
+  if (sprint50Content && method === 'GET' && pathname === `/api/catalog/wiki/constitution/${CONSTITUTION_ID}`) {
+    json(res, 200, { id: '01900000-0000-4000-8000-000000000734', targetType: 'constitution', targetId: CONSTITUTION_ID, predecessorId: null, summary: 'The Basic Law', body: 'Constitutional context', images: [], sourceUrls: ['https://example.org/basic-law'] });
+    return;
+  }
+
+  if (method === 'GET' && (pathname === '/api/document/documents' || /^\/api\/document\/links\/(constitution|version|amendment)\/[^/]+(?:\/events)?$/.test(pathname))) {
+    json(res, 200, []);
+    return;
+  }
 
   if (method === 'GET' && pathname === '/api/catalog/countries') {
     json(res, 200, countries);
     return;
   }
   if (method === 'GET' && pathname === '/api/catalog/countries/DE') {
-    json(res, 200, germany);
+    const baseConstitutions = (uiReview?.country ?? germany).constitutions.map((item) => item.id === CONSTITUTION_ID
+      ? { ...item, versions: [...item.versions, ...extraVersions] }
+      : item);
+    json(res, 200, { ...germany, constitutions: [...baseConstitutions, ...createdConstitutions] });
+    return;
+  }
+  if (method === 'POST' && pathname === '/api/catalog/countries/DE/constitutions') {
+    const body = await readBody(req);
+    const created = {
+      id: '01900000-0000-4000-8000-000000000099', slug: body.slug, title: body.title,
+      latestVersionId: null, versions: [], contentOutline: { kinds: body.outline },
+    };
+    createdConstitutions.push(created);
+    json(res, 201, created);
+    return;
+  }
+  const settingsMatch = pathname.match(/^\/api\/catalog\/constitutions\/([^/]+)\/settings(\/preflight)?$/);
+  if (settingsMatch) {
+    const constitution = [...createdConstitutions, ...germany.constitutions].find((item) => item.id === settingsMatch[1]);
+    if (!constitution) { json(res, 404, { error: 'Not found' }); return; }
+    let current = settingsRevisions.get(constitution.id);
+    if (!current) {
+      current = { id: '01900000-0000-4000-8000-000000000901', predecessorId: null, outline: constitution.contentOutline };
+      settingsRevisions.set(constitution.id, current);
+    }
+    if (method === 'GET') { json(res, 200, current); return; }
+    const body = await readBody(req);
+    if (settingsMatch[2]) {
+      json(res, 200, { currentRevisionId: current.id, classification: 'safely_reversible', affectedVersionIds: (constitution.versions ?? []).map((version) => version.id), affectedDraftSessionIds: [], violations: [], reasons: [] });
+      return;
+    }
+    if (body.expectedRevisionId !== current.id) { json(res, 409, { error: 'stale_settings' }); return; }
+    const next = { id: '01900000-0000-4000-8000-000000000902', predecessorId: current.id, outline: { kinds: body.kinds } };
+    constitution.contentOutline = next.outline;
+    settingsRevisions.set(constitution.id, next);
+    json(res, 200, next);
+    return;
+  }
+  if (method === 'GET' && /^\/api\/catalog\/versions\/[^/]+\/reader-settings$/.test(pathname)) {
+    json(res, 200, germany.constitutions[0].contentOutline);
+    return;
+  }
+  const outlineMatch = pathname.match(/^\/api\/catalog\/constitutions\/([^/]+)\/content-outline$/);
+  if (method === 'PUT' && outlineMatch) {
+    const body = await readBody(req);
+    const created = createdConstitutions.find((item) => item.id === outlineMatch[1]);
+    if (created) created.contentOutline = { kinds: body.kinds };
+    json(res, 200, { versionIds: [] });
     return;
   }
 
   const constitutionVersionsMatch = pathname.match(/^\/api\/catalog\/constitutions\/([^/]+)\/versions$/);
   if (method === 'GET' && constitutionVersionsMatch) {
     const constitution = germany.constitutions.find((item) => item.id === constitutionVersionsMatch[1]);
-    const versions = [...(constitution?.versions ?? []), ...extraVersions];
+    const versions = [...(uiReview?.country.constitutions[0].versions ?? constitution?.versions ?? []), ...extraVersions];
     const listing = searchParams.get('listing');
     const filtered =
       listing === 'all'
@@ -278,6 +588,28 @@ const server = createServer(async (req, res) => {
     return;
   }
 
+  const versionDetail = pathname.match(/^\/api\/catalog\/versions\/([^/]+)$/);
+  if (method === 'GET' && versionDetail) {
+    const version = [...germany.constitutions[0].versions, ...extraVersions].find((item) => item.id === versionDetail[1]);
+    if (!version) { json(res, 404, { error: 'Not found' }); return; }
+    json(res, 200, { ...version, jurisdictionId: germany.id, constitutionId: CONSTITUTION_ID, countryCode: 'DE', publicationStatus: 'published', legalVersionId: version.legalVersionId ?? (version.hopKind === 'editorial_correction' ? version.predecessorVersionId : version.id) });
+    return;
+  }
+
+  const exported = pathname.match(/^\/api\/content\/versions\/([^/]+)\/export$/);
+  if (uiReview && method === 'GET' && exported) {
+    json(res, 200, { roots: articlesFor(exported[1], true).map(mockUnit).map(unit => ({ ...unit, label: unit.articleNumber })) });
+    return;
+  }
+  const units = pathname.match(/^\/api\/content\/versions\/([^/]+)\/units(?:\/([^/]+))?$/);
+  if (method === 'GET' && units) {
+    const items = articlesFor(units[1], true).map(mockUnit);
+    if (units[2]) {
+      const item = items.find((unit) => unit.id === units[2]);
+      json(res, item ? 200 : 404, item ?? { error: 'Not found' });
+    } else json(res, 200, items, { 'X-Total-Count': String(items.length) });
+    return;
+  }
   const versionArticles = pathname.match(/^\/api\/content\/versions\/([^/]+)\/articles$/);
   if (method === 'GET' && versionArticles) {
     const items = articlesFor(versionArticles[1], searchParams.get('includeBody') === 'true');
@@ -286,12 +618,25 @@ const server = createServer(async (req, res) => {
   }
   const articleMatch = pathname.match(/^\/api\/content\/articles\/([^/]+)$/);
   if (method === 'GET' && articleMatch) {
-    const article = articlesById.get(articleMatch[1]);
+    const summary = articles2022.find((item) => item.id === articleMatch[1]);
+    const article = articlesById.get(articleMatch[1]) ?? (summary ? { ...summary, body: `${summary.title}.`, children: [] } : null);
     if (!article) {
       json(res, 404, { error: 'Not found' });
       return;
     }
-    json(res, 200, article);
+    const applyTitles = (node) => ({
+      ...node,
+      title: nodeTitleOverrides.has(node.id) ? nodeTitleOverrides.get(node.id) : node.title,
+      children: (node.children ?? []).map(applyTitles),
+    });
+    json(res, 200, applyTitles(article));
+    return;
+  }
+  const contentNodeMatch = pathname.match(/^\/api\/content\/nodes\/([^/]+)$/);
+  if (method === 'PATCH' && contentNodeMatch) {
+    const body = await readBody(req);
+    nodeTitleOverrides.set(contentNodeMatch[1], body.title);
+    json(res, 200, { id: contentNodeMatch[1], title: body.title, children: [] });
     return;
   }
 
@@ -309,7 +654,8 @@ const server = createServer(async (req, res) => {
     }
     const items = [...mockAmendments.values()];
     const staff = searchParams.get('status') === 'all';
-    json(res, 200, staff ? items : items.filter((item) => item.status === 'published'));
+    const reviewStatus = searchParams.get('reviewStatus');
+    json(res, 200, (staff ? items : items.filter((item) => item.status === 'published')).filter((item) => !reviewStatus || item.reviewStatus === reviewStatus));
     return;
   }
 
@@ -331,6 +677,8 @@ const server = createServer(async (req, res) => {
       id: '01900000-0000-4000-8000-000000000303',
       title: body.title ?? amendmentDraft.title,
       summary: body.summary ?? amendmentDraft.summary,
+      comment: body.comment ?? amendmentDraft.comment,
+      documents: body.documents ?? amendmentDraft.documents ?? [],
       kind: body.kind ?? amendmentDraft.kind,
       status: 'draft',
       constitutionId: constitutionAmendmentsMatch[1],
@@ -354,7 +702,21 @@ const server = createServer(async (req, res) => {
       json(res, 404, { error: 'Not found' });
       return;
     }
-    json(res, 200, [{ ...amendmentRevision, title: existing.title, summary: existing.summary, changes: existing.changes.map(({ articleNumber, changeType, note }) => ({ articleNumber, changeType, note })) }]);
+    const currentRevision = { ...amendmentRevision, id: '01900000-0000-4000-8000-000000000322', predecessorRevisionId: amendmentRevision.id, createdAt: '2022-12-20T12:00:00Z', title: existing.title, summary: existing.summary, changes: existing.changes.map(({ articleNumber, changeType, note }) => ({ articleNumber, changeType, note })) };
+    json(res, 200, [amendmentRevision, currentRevision]);
+    return;
+  }
+
+  const amendmentDiffReviewMatch = pathname.match(/^\/api\/amendment\/amendments\/([^/]+)\/diff-review$/);
+  if (method === 'GET' && amendmentDiffReviewMatch) {
+    const existing = mockAmendments.get(amendmentDiffReviewMatch[1]);
+    if (!existing) { json(res, 404, { error: 'Not found' }); return; }
+    json(res, 200, {
+      revisionId: amendmentRevision.id,
+      sourceVersionId: existing.sourceVersionId,
+      targetVersionId: existing.targetVersionId,
+      candidates: [], decisions: [], totals: { total: 0, resolved: 0 }, currentPosition: null,
+    });
     return;
   }
 
@@ -408,6 +770,19 @@ const server = createServer(async (req, res) => {
     return;
   }
 
+  const confirmQuotesMatch = pathname.match(/^\/api\/amendment\/amendments\/([^/]+)\/confirm-quotes$/);
+  if (method === 'POST' && confirmQuotesMatch) {
+    const existing = mockAmendments.get(confirmQuotesMatch[1]);
+    if (!existing) {
+      json(res, 404, { error: 'Not found' });
+      return;
+    }
+    const updated = { ...existing, reviewStatus: 'ok', status: 'published' };
+    mockAmendments.set(updated.id, updated);
+    json(res, 200, updated);
+    return;
+  }
+
   const amendmentWithdrawMatch = pathname.match(/^\/api\/amendment\/amendments\/([^/]+)\/withdraw$/);
   if (method === 'POST' && amendmentWithdrawMatch) {
     const existing = mockAmendments.get(amendmentWithdrawMatch[1]);
@@ -434,7 +809,14 @@ const server = createServer(async (req, res) => {
   }
 
   if (method === 'GET' && pathname === '/api/search/search/facets') {
-    json(res, 200, searchFacets);
+    json(res, 200, denseUi ? {
+      ...searchFacets,
+      countries: [...searchFacets.countries, { code: 'FR', countryName: 'France', count: 60 }],
+      versions: [...searchFacets.versions, ...Array.from({ length: 60 }, (_, index) => ({
+        id: `01900000-0000-4000-8000-${String(1000 + index).padStart(12, '0')}`,
+        label: String(1900 + index), constitutionTitle: 'A constitution with a long descriptive title', countryCode: 'FR', count: 10,
+      }))],
+    } : searchFacets);
     return;
   }
   if (method === 'GET' && pathname === '/api/search/search') {
@@ -454,11 +836,17 @@ const server = createServer(async (req, res) => {
 
   if (method === 'POST' && pathname === '/api/identity/login') {
     const body = await readBody(req);
-    if (body.password !== 'change-me' || typeof body.email !== 'string') {
+    if (credentials.get(body.email) !== body.password) {
       json(res, 401, { error: 'Invalid credentials' });
       return;
     }
-    if (MFA_EMAILS.has(body.email)) {
+    if (forceEnrollment) {
+      pendingMfaEmail = body.email;
+      currentUser = { ...userForEmail(body.email), mfaEnabled: false };
+      forceEnrollment = false;
+      json(res, 200, { user: currentUser, mfaEnrollmentRequired: true, challengeToken: MFA_CHALLENGE }); return;
+    }
+    if (MFA_EMAILS.has(body.email) || enrolledMfaEmails.has(body.email)) {
       pendingMfaEmail = body.email;
       json(res, 200, {
         user: userForEmail(body.email),
@@ -467,16 +855,18 @@ const server = createServer(async (req, res) => {
       });
       return;
     }
+    currentUser = userForEmail(body.email);
     json(res, 200, {
       token: SESSION_TOKEN,
       expiresInSeconds: 86400,
-      user: { ...identityMe, email: body.email, roles: ['viewer'], mfaEnabled: false, mfaRequired: false },
+      user: currentUser,
     });
     return;
   }
   if (method === 'POST' && pathname === '/api/identity/login/mfa') {
     const body = await readBody(req);
-    if (body.challengeToken !== MFA_CHALLENGE || body.code !== MFA_CODE) {
+    const valid = body.challengeToken === MFA_CHALLENGE && (body.recoveryCode ? recoveryCodes.get(pendingMfaEmail)?.delete(body.recoveryCode) : [MFA_CODE, testTotp()].includes(body.code));
+    if (body.challengeToken !== MFA_CHALLENGE || !valid) {
       json(res, 401, { error: 'Invalid authenticator or recovery code' });
       return;
     }
@@ -488,6 +878,64 @@ const server = createServer(async (req, res) => {
     });
     return;
   }
+  if (method === 'POST' && pathname === '/api/identity/password/reset') {
+    empty(res, 204);
+    return;
+  }
+  if (method === 'POST' && pathname === '/api/identity/password/reset/confirm') {
+    const body = await readBody(req);
+    if (body.token !== 'e2e-reset-token') {
+      json(res, 400, { error: 'Invalid reset token' });
+      return;
+    }
+    credentials.set('local-viewer@example.local', body.newPassword);
+    empty(res, 204);
+    return;
+  }
+  if (method === 'POST' && pathname === '/api/identity/invites/accept') {
+    const body = await readBody(req);
+    if (body.token !== 'e2e-invite-token') {
+      json(res, 400, { error: 'Invalid invite token' });
+      return;
+    }
+    credentials.set('invited@example.local', body.password);
+    json(res, 200, { ...userForEmail('invited@example.local'), roles: ['viewer'] });
+    return;
+  }
+  if (method === 'POST' && pathname === '/api/identity/password/change') {
+    const body = await readBody(req);
+    if (credentials.get(currentUser.email) !== body.currentPassword) {
+      json(res, 400, { error: 'Invalid current password' });
+      return;
+    }
+    credentials.set(currentUser.email, body.newPassword);
+    empty(res, 204);
+    return;
+  }
+  if (method === 'POST' && pathname === '/api/identity/mfa/enroll/start') {
+    const otpauthUrl = `otpauth://totp/Constitution%20Atlas:e2e?secret=${MFA_TEST_SECRET}&issuer=Constitution%20Atlas`;
+    json(res, 200, { secret: MFA_TEST_SECRET, otpauthUrl, qrDataUrl: await QRCode.toDataURL(otpauthUrl), challengeToken: 'e2e-enroll-challenge' });
+    return;
+  }
+  if (method === 'POST' && pathname === '/api/identity/mfa/enroll/confirm') {
+    const body = await readBody(req);
+    if (![MFA_CODE, testTotp()].includes(body.code)) {
+      json(res, 400, { error: 'Invalid code' });
+      return;
+    }
+    enrolledMfaEmails.add(currentUser.email);
+    currentUser = { ...currentUser, mfaEnabled: true };
+    recoveryCodes.set(currentUser.email, new Set(['RECOVERY-ONE', 'RECOVERY-TWO']));
+    json(res, 200, { recoveryCodes: ['RECOVERY-ONE', 'RECOVERY-TWO'], token: SESSION_TOKEN, expiresInSeconds: 86400, user: currentUser });
+    return;
+  }
+  if (method === 'POST' && pathname === '/api/identity/mfa/recovery/regenerate') {
+    recoveryCodes.set(currentUser.email, new Set(['RECOVERY-NEW']));
+    json(res, 200, { recoveryCodes: ['RECOVERY-NEW'] });
+    return;
+  }
+  if (method === 'GET' && pathname === '/api/identity/setup/status') return json(res, 200, { completed: true, tlsMode: 'local-http', publicUrl: 'http://localhost' });
+  if (method === 'GET' && pathname === '/api/identity/site/languages') return json(res, 200, { supported: ['en', 'de'], enabled: ['en', 'de'], defaultLanguage: 'en', managed: false });
   if (method === 'GET' && pathname === '/api/identity/me') {
     if (bearer(req) !== SESSION_TOKEN) {
       json(res, 401, { error: 'Unauthorized' });
@@ -495,6 +943,74 @@ const server = createServer(async (req, res) => {
     }
     json(res, 200, currentUser);
     return;
+  }
+  if (method === 'PUT' && pathname === '/api/identity/me/language') {
+    if (bearer(req) !== SESSION_TOKEN) {
+      json(res, 401, { error: 'Unauthorized' });
+      return;
+    }
+    const { languagePreference } = await readBody(req);
+    if (!['auto', 'en', 'de'].includes(languagePreference)) {
+      json(res, 400, { error: 'Unsupported language preference' });
+      return;
+    }
+    currentUser = { ...currentUser, languagePreference };
+    json(res, 200, currentUser);
+    return;
+  }
+  if (method === 'GET' && pathname === '/api/identity/content-translation/availability') {
+    json(res, 200, { enabled: translationSite.provider !== 'off' });
+    return;
+  }
+  if (pathname === '/api/identity/content-translation/me' && bearer(req) === SESSION_TOKEN) {
+    if (method === 'GET') { json(res, 200, translationUser); return; }
+    if (method === 'PUT') {
+      const body = await readBody(req);
+      translationUser = {
+        alwaysTranslate: Boolean(body.alwaysTranslate),
+        personalGoogleKeyConfigured: body.clearPersonalGoogleKey ? false : Boolean(body.personalGoogleKey) || translationUser.personalGoogleKeyConfigured,
+      };
+      json(res, 200, translationUser);
+      return;
+    }
+  }
+  if (pathname === '/api/identity/content-translation/admin' && bearer(req) === SESSION_TOKEN) {
+    if (method === 'GET') { json(res, 200, translationSite); return; }
+    if (method === 'PUT') {
+      const body = await readBody(req);
+      translationSite = { ...translationSite, provider: body.provider, sharedKeyConfigured: body.clearSharedApiKey ? false : Boolean(body.sharedApiKey) || translationSite.sharedKeyConfigured };
+      json(res, 200, translationSite);
+      return;
+    }
+  }
+  if (method === 'POST' && ['/api/identity/content-translation/translate', '/api/identity/content-translation/translate-batch'].includes(pathname)) {
+    if (bearer(req) !== SESSION_TOKEN) { json(res, 401, { error: 'Login required' }); return; }
+    if (translationSite.provider === 'off') { json(res, 403, { error: 'Translation disabled' }); return; }
+    const body = await readBody(req);
+    const texts = body.texts ?? [body.text];
+    translationSite.sharedGoogleCharactersUsed += texts.reduce((sum, text) => sum + String(text ?? '').length, 0);
+    const translated = texts.map((text) => `[${body.targetLanguage}] ${text}`);
+    json(res, 200, body.texts ? { texts: translated, provider: translationUser.personalGoogleKeyConfigured ? 'google' : translationSite.provider } : { text: translated[0], provider: translationUser.personalGoogleKeyConfigured ? 'google' : translationSite.provider });
+    return;
+  }
+  if (method === 'GET' && pathname === '/api/identity/anonymous-browsing') {
+    json(res, 200, anonymousBrowsing.allowed ? anonymousBrowsing : { ...anonymousBrowsing, perIp: { ...anonymousBrowsing.perIp, requests: 0 }, total: { ...anonymousBrowsing.total, requests: 0 } });
+    return;
+  }
+  if (pathname === '/api/identity/admin/anonymous-browsing' && bearer(req) === SESSION_TOKEN) {
+    if (method === 'GET') {
+      json(res, 200, anonymousBrowsing);
+      return;
+    }
+    if (method === 'PUT') {
+      if (!stepUpFresh) {
+        json(res, 403, { error: 'Fresh authentication required', code: 'step_up_required' });
+        return;
+      }
+      anonymousBrowsing = { ...(await readBody(req)), revision: anonymousBrowsing.revision + 1 };
+      json(res, 200, anonymousBrowsing);
+      return;
+    }
   }
   if (method === 'GET' && pathname === '/api/identity/users') {
     if (bearer(req) !== SESSION_TOKEN) {
@@ -506,11 +1022,71 @@ const server = createServer(async (req, res) => {
         id: currentUser.id,
         email: currentUser.email,
         roles: currentUser.roles,
-        enabled: true,
-        status: 'active',
+        enabled: currentUser.enabled !== false,
+        status: currentUser.status ?? (currentUser.enabled === false ? 'disabled' : 'active'),
         createdAt: '2026-01-01T00:00:00Z',
       },
+      ...managedUsers,
     ]);
+    return;
+  }
+  if (method === 'POST' && pathname === '/api/identity/users/invites') {
+    const body = await readBody(req);
+    const user = {
+      id: `managed-${managedUsers.length + 1}`,
+      email: body.email,
+      roles: body.roles,
+      enabled: true,
+      status: 'invited',
+      createdAt: '2026-01-02T00:00:00Z',
+    };
+    managedUsers.push(user);
+    json(res, 201, { user, inviteToken: 'E2E-INVITE-ADMIN' });
+    return;
+  }
+  const managedUserMatch = pathname.match(/^\/api\/identity\/users\/([^/]+)\/(disable|enable|roles|password-resets)$/);
+  if (managedUserMatch && (method === 'POST' || method === 'PUT')) {
+    const isCurrentUser = managedUserMatch[1] === currentUser.id;
+    const user = (isCurrentUser ? currentUser : managedUsers.find((item) => item.id === managedUserMatch[1])) ?? {
+      id: managedUserMatch[1], email: 'managed@example.local', roles: ['viewer'], enabled: true,
+      status: 'active', createdAt: '2026-01-02T00:00:00Z',
+    };
+    if (!isCurrentUser && !managedUsers.includes(user)) managedUsers.push(user);
+    if (managedUserMatch[2] === 'disable') { user.enabled = false; user.status = 'disabled'; }
+    if (managedUserMatch[2] === 'enable') { user.enabled = true; user.status = 'active'; }
+    if (managedUserMatch[2] === 'roles') user.roles = (await readBody(req)).roles;
+    if (isCurrentUser) currentUser = { ...currentUser, roles: user.roles };
+    if (managedUserMatch[2] === 'password-resets') {
+      json(res, 201, { resetToken: 'E2E-RESET-ADMIN' });
+      return;
+    }
+    json(res, 200, user);
+    return;
+  }
+  if (method === 'GET' && pathname === '/api/identity/service-tokens') {
+    json(res, 200, serviceTokens);
+    return;
+  }
+  if (method === 'POST' && pathname === '/api/identity/service-tokens') {
+    const body = await readBody(req);
+    const created = {
+      id: `service-token-${serviceTokens.length + 1}`, name: body.name, scopes: body.scopes,
+      createdAt: '2026-01-02T00:00:00Z', expiresAt: '2026-04-02T00:00:00Z', revokedAt: null,
+    };
+    serviceTokens.push(created);
+    json(res, 201, { ...created, token: 'E2E-SERVICE-TOKEN' });
+    return;
+  }
+  const serviceTokenMatch = pathname.match(/^\/api\/identity\/service-tokens\/([^/]+)(\/rotate)?$/);
+  if (serviceTokenMatch && method === 'POST' && serviceTokenMatch[2]) {
+    const token = serviceTokens.find((item) => item.id === serviceTokenMatch[1]);
+    json(res, 200, { ...token, token: 'E2E-ROTATED-TOKEN' });
+    return;
+  }
+  if (serviceTokenMatch && method === 'DELETE') {
+    const token = serviceTokens.find((item) => item.id === serviceTokenMatch[1]);
+    if (token) token.revokedAt = '2026-01-03T00:00:00Z';
+    empty(res, 204);
     return;
   }
   if (method === 'POST' && pathname === '/api/identity/logout') {
@@ -523,12 +1099,18 @@ const server = createServer(async (req, res) => {
       json(res, 401, { error: 'Unable to confirm step-up authentication' });
       return;
     }
+    stepUpFresh = true;
+    currentUser = { ...currentUser, stepUpFresh: true };
     empty(res, 204);
     return;
   }
 
   if (method === 'GET' && pathname === '/api/editor/edit-sessions') {
-    let sessions = editorState.session
+    if (editorState.sessionsUnavailable) {
+      json(res, 503, { error: 'Sessions unavailable' });
+      return;
+    }
+    let sessions = [...editorState.seededSessions, ...(editorState.session
       ? [
           {
             id: editorState.session.id,
@@ -536,16 +1118,23 @@ const server = createServer(async (req, res) => {
             status: editorState.session.status,
             openedBy: editorState.session.actorId,
             openedAt: '2026-01-01T00:00:00Z',
-            updatedAt: '2026-01-01T00:00:00Z',
+            updatedAt: editorState.session.updatedAt ?? '2026-01-01T00:00:00Z',
             changedArticleCount: editorState.session.drafts.length,
+            hopKind: editorState.session.hopKind,
           },
         ]
-      : [];
+      : [])];
     const status = searchParams.get('status');
     if (status) {
       sessions = sessions.filter((session) => session.status === status);
     }
-    json(res, 200, sessions);
+    const openedBy = searchParams.get('openedBy');
+    if (openedBy) sessions = sessions.filter((session) => session.openedBy === (openedBy === 'me' ? currentUser?.id : openedBy));
+    const versionId = searchParams.get('versionId');
+    if (versionId) sessions = sessions.filter((session) => session.versionId === versionId);
+    const limit = Math.min(100, Math.max(1, Number(searchParams.get('limit') ?? 100)));
+    const offset = Math.max(0, Number(searchParams.get('offset') ?? 0));
+    json(res, 200, sessions.slice(offset, offset + limit));
     return;
   }
   if (method === 'POST' && pathname === '/api/editor/edit-sessions') {
@@ -593,12 +1182,18 @@ const server = createServer(async (req, res) => {
     } else if (command === 'approval') {
       editorState.session.status = 'approved';
     } else if (command === 'publish') {
+      if (!stepUpFresh) {
+        json(res, 403, { error: 'Fresh authentication required', code: 'step_up_required' });
+        return;
+      }
       const body = await readBody(req);
       editorState.session.status = 'published';
       if (body.hopKind === 'editorial_correction' && !extraVersions.some((version) => version.id === EDITORIAL_VERSION_ID)) {
+        const correctedVersionId = editorState.session.versionId;
+        const correctedVersionLabel = correctedVersionId === VERSION_1949 ? '1949-1' : '2022-1';
         extraVersions.push({
           id: EDITORIAL_VERSION_ID,
-          versionLabel: '2022-1',
+          versionLabel: correctedVersionLabel,
           effectiveDate: '2022-12-20',
           languageCode: 'en',
           sourceUrl: null,
@@ -607,36 +1202,75 @@ const server = createServer(async (req, res) => {
           verificationState: 'unverified',
           verifiedBy: null,
           verifiedAt: null,
-          predecessorVersionId: VERSION_2022,
+          predecessorVersionId: correctedVersionId,
           hopKind: 'editorial_correction',
           listing: 'staff',
           latestPublished: true,
         });
+        editorState.session.newVersionLabel = correctedVersionLabel;
+        for (const [id, record] of mockAmendments) {
+          if (record.status === 'published' && (record.sourceVersionId === correctedVersionId || record.targetVersionId === correctedVersionId)) {
+            mockAmendments.set(id, { ...record, reviewStatus: 'needs_review' });
+          }
+        }
+      } else if (body.hopKind === 'legal') {
+        const legalVersionId = '01900000-0000-4000-8000-000000000502';
+        if (!extraVersions.some((version) => version.id === legalVersionId)) {
+          extraVersions.push({
+            id: legalVersionId, versionLabel: '2027', effectiveDate: '2027-01-01', languageCode: 'en',
+            sourceUrl: null, gazetteReference: null, provenance: 'editorial', verificationState: 'unverified',
+            verifiedBy: null, verifiedAt: null, predecessorVersionId: editorState.session.versionId,
+            hopKind: 'legal', listing: 'public', latestPublished: true,
+          });
+        }
+        editorState.session.newVersionId = legalVersionId;
+        editorState.session.newVersionLabel = '2027';
       }
     }
     json(res, 200, preview());
     return;
   }
 
-  if (method === 'POST' && pathname === '/api/ingestion/import-jobs') {
-    json(res, 201, {
-      id: '01900000-0000-4000-8000-000000000701',
-      status: 'completed',
-      versionId: VERSION_2022,
-      isoCode: 'US',
-      errors: [],
-    });
-    return;
+  if (method === 'GET' && pathname === '/api/ingestion/import-jobs') {
+    const status = new URL(req.url, 'http://mock').searchParams.get('status');
+    json(res, 200, [...importJobs.values()].filter(job => !status || job.status === status)); return;
   }
-  if (method === 'GET' && pathname.startsWith('/api/ingestion/import-jobs/')) {
-    json(res, 200, {
-      id: pathname.split('/').pop(),
-      status: 'completed',
-      versionId: VERSION_2022,
-      isoCode: 'US',
-      errors: [],
-    });
-    return;
+  if (method === 'POST' && pathname === '/api/ingestion/import-jobs') {
+    const payload = await readBody(req);
+    const job = { id: '01900000-0000-4000-8000-000000000701', status: 'pending_review', versionId: null,
+      isoCode: payload.isoCode, countryName: payload.countryName, constitutionTitle: payload.constitutionTitle,
+      versionLabel: payload.versionLabel, submittedBy: currentUser.id, errors: [], payload, decisions: [] };
+    importJobs.set(job.id, job);
+    json(res, 201, job); return;
+  }
+  const importMatch = pathname.match(/^\/api\/ingestion\/import-jobs\/([^/]+)(?:\/(payload|decisions|confirm-outline|prepare|approve|reject|publish))?$/);
+  if (importMatch) {
+    const [, id, action] = importMatch;
+    const job = importJobs.get(id);
+    if (!job) { json(res, 404, {}); return; }
+    if (method === 'GET') { json(res, 200, action === 'payload' ? job.payload : action === 'decisions' ? job.decisions : job); return; }
+    if (method === 'POST') {
+      if (action === 'confirm-outline') job.outlineConfirmedBy = currentUser.id;
+      if (action === 'prepare') job.versionId = '01900000-0000-4000-8000-000000000705';
+      if (action === 'approve' || action === 'reject') {
+        const { reason } = await readBody(req);
+        job.status = action === 'approve' ? 'approved' : 'rejected';
+        job.approvedBy = currentUser.id;
+        job.decisions.push({ id: 'decision', decision: job.status, reason, decidedBy: currentUser.id, decidedAt: new Date().toISOString() });
+      }
+      if (action === 'publish') {
+        if (importPublicationError) { json(res, 503, { code: importPublicationError }); return; }
+        job.status = 'completed'; job.publishedBy = currentUser.id;
+      }
+      json(res, 200, job); return;
+    }
+  }
+  if (method === 'GET' && pathname === '/api/content/versions/01900000-0000-4000-8000-000000000705/content') {
+    const job = [...importJobs.values()].find(item => item.versionId);
+    json(res, 200, { generation: 1, settingsRevisionId: null, roots: (job?.payload.articles ?? []).map((article, index) => ({
+      logicalId: `import-${index}`, revisionId: `revision-${index}`, occurrenceId: `occurrence-${index}`, kind: 'article',
+      label: article.articleNumber, title: article.title, content: [{ type: 'text', text: article.body ?? '' }],
+    })) }); return;
   }
 
   json(res, 404, { error: `unhandled ${method} ${pathname}` });

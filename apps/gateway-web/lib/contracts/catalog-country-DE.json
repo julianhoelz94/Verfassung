@@ -58,11 +58,19 @@
             "sortOrder": 1,
             "mayHoldText": true,
             "mayHoldChildren": true,
-            "allowedChildKinds": ["paragraph"],
+            "allowedChildKinds": [
+              "paragraph"
+            ],
             "presentation": "section",
             "showLabel": true,
             "showTitle": true,
-            "showKind": true
+            "showKind": true,
+            "allowTextAlongsideChildren": true,
+            "titlePolicy": "optional",
+            "labelPolicy": "optional",
+            "labelPlacement": "before_title",
+            "segmentation": "plain",
+            "root": true
           },
           {
             "kindCode": "paragraph",
@@ -70,11 +78,19 @@
             "sortOrder": 2,
             "mayHoldText": true,
             "mayHoldChildren": true,
-            "allowedChildKinds": ["sentence"],
+            "allowedChildKinds": [
+              "sentence"
+            ],
             "presentation": "section",
             "showLabel": true,
             "showTitle": false,
-            "showKind": false
+            "showKind": false,
+            "allowTextAlongsideChildren": true,
+            "titlePolicy": "optional",
+            "labelPolicy": "optional",
+            "labelPlacement": "before_title",
+            "segmentation": "plain",
+            "root": false
           },
           {
             "kindCode": "sentence",
@@ -86,10 +102,19 @@
             "presentation": "concatenated",
             "showLabel": false,
             "showTitle": false,
-            "showKind": false
+            "showKind": false,
+            "allowTextAlongsideChildren": false,
+            "titlePolicy": "optional",
+            "labelPolicy": "optional",
+            "labelPlacement": "before_title",
+            "segmentation": "sentence",
+            "root": false
           }
         ]
-      }
+      },
+      "predecessorConstitutionId": null,
+      "interim": false,
+      "lifecycleStatus": "unknown"
     }
   ]
 }

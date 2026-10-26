@@ -29,6 +29,7 @@ describe('provenance labels', () => {
         verifiedBy: 'catalog-editor@example.local',
         verifiedAt: '2022-12-19T00:00:00Z',
       }),
-    ).toBe('Verified by catalog-editor@example.local on 2022-12-19');
+    ).toBe('Verified by catalog-editor@example.local on December 19, 2022');
+    expect(verificationLabel({ verificationState: 'verified', verifiedBy: null, verifiedAt: '2022-12-19T00:00:00Z' }, 'de')).toBe('Geprüft am 19. Dezember 2022');
   });
 });

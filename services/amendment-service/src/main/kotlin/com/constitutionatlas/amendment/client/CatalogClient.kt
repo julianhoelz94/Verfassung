@@ -1,6 +1,7 @@
 package com.constitutionatlas.amendment.client
 
 import com.constitutionatlas.amendment.CatalogUnavailableException
+import com.constitutionatlas.platform.timedRestClient
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
@@ -21,6 +22,7 @@ data class CatalogVersionRef(
     val constitutionId: UUID? = null,
     val legalVersionId: UUID? = null,
     val currentVersionId: UUID? = null,
+    val publicationStatus: String? = null,
 )
 
 interface CatalogClient {

@@ -1,3 +1,4 @@
+import { fetchWithTimeout } from './fetch-with-timeout';
 export function identityBaseUrl(): string {
   return process.env.IDENTITY_API_URL ?? 'http://localhost/api/identity';
 }
@@ -9,6 +10,7 @@ export type SessionUser = {
   mfaEnabled?: boolean;
   mfaRequired?: boolean;
   stepUpFresh?: boolean;
+  languagePreference?: 'auto' | 'en' | 'de';
 };
 
 export type LoginResult = {
@@ -40,12 +42,12 @@ export async function requestLogin(
   baseUrl: string = identityBaseUrl(),
   extraHeaders: Record<string, string> = {},
 ): Promise<LoginResult> {
-  const response = await fetchImpl(`${baseUrl}/login`, {
+  const response = await fetchWithTimeout(`${baseUrl}/login`, {
     method: 'POST',
     headers: { ...extraHeaders, 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, password }),
     cache: 'no-store',
-  });
+  }, fetchImpl);
   if (!response.ok) {
     throw new IdentityApiError('Invalid credentials', response.status);
   }
@@ -57,13 +59,29 @@ export async function requestMe(
   fetchImpl: FetchLike = fetch,
   baseUrl: string = identityBaseUrl(),
 ): Promise<SessionUser | null> {
-  const response = await fetchImpl(`${baseUrl}/me`, {
+  const response = await fetchWithTimeout(`${baseUrl}/me`, {
     headers: { Authorization: `Bearer ${token}` },
     cache: 'no-store',
-  });
+  }, fetchImpl);
   if (!response.ok) {
     return null;
   }
+  return (await response.json()) as SessionUser;
+}
+
+export async function requestUpdateLanguagePreference(
+  token: string,
+  languagePreference: 'auto' | 'en' | 'de',
+  fetchImpl: FetchLike = fetch,
+  baseUrl: string = identityBaseUrl(),
+): Promise<SessionUser> {
+  const response = await fetchWithTimeout(`${baseUrl}/me/language`, {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ languagePreference }),
+    cache: 'no-store',
+  }, fetchImpl);
+  if (!response.ok) throw new IdentityApiError('Language preference could not be saved', response.status);
   return (await response.json()) as SessionUser;
 }
 
@@ -72,11 +90,11 @@ export async function requestLogout(
   fetchImpl: FetchLike = fetch,
   baseUrl: string = identityBaseUrl(),
 ): Promise<void> {
-  await fetchImpl(`${baseUrl}/logout`, {
+  await fetchWithTimeout(`${baseUrl}/logout`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}` },
     cache: 'no-store',
-  });
+  }, fetchImpl);
 }
 
 export type AdminUser = {
@@ -87,6 +105,126 @@ export type AdminUser = {
   status: string;
   createdAt: string;
 };
+
+export type IdentitySettings = {
+  selfRegistrationEnabled: boolean;
+  mailEnabled: boolean;
+  mailFrom: string;
+  mailFromName: string;
+  mailPublicBaseUrl: string;
+  smtpHost: string;
+  smtpPort: number;
+  smtpUsername: string;
+  smtpPasswordSet: boolean;
+  smtpAuth: boolean;
+  smtpStarttls: boolean;
+  smtpSsl: boolean;
+};
+
+export type PasskeyStart = { challengeId: string; options: Record<string, unknown> };
+export type PasskeyInfo = { id: string; label: string; createdAt: string; lastUsedAt?: string | null };
+
+export async function requestPasskeyStartLogin(fetchImpl: FetchLike = fetch, baseUrl = identityBaseUrl()): Promise<PasskeyStart> {
+  return readOk(await fetchWithTimeout(`${baseUrl}/passkeys/login/start`, { method: 'POST', cache: 'no-store' }, fetchImpl), 'Unable to start passkey sign-in');
+}
+
+export async function requestPasskeyFinishLogin(challengeId: string, credential: unknown, fetchImpl: FetchLike = fetch, baseUrl = identityBaseUrl()): Promise<LoginResult> {
+  return readOk(await fetchWithTimeout(`${baseUrl}/passkeys/login/finish`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ challengeId, credential }), cache: 'no-store',
+  }, fetchImpl), 'Unable to sign in with passkey');
+}
+
+export async function requestPasskeyStartStepUp(token: string, fetchImpl: FetchLike = fetch): Promise<PasskeyStart> {
+  return readOk(await fetchWithTimeout(`${identityBaseUrl()}/passkeys/step-up/start`, { method: 'POST', headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' }, fetchImpl), 'Unable to start passkey verification');
+}
+
+export async function requestPasskeyFinishStepUp(token: string, challengeId: string, credential: unknown, fetchImpl: FetchLike = fetch): Promise<void> {
+  return readOk(await fetchWithTimeout(`${identityBaseUrl()}/passkeys/step-up/finish`, {
+    method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ challengeId, credential }), cache: 'no-store',
+  }, fetchImpl), 'Unable to verify passkey');
+}
+
+export async function requestPasskeyStartEnrollment(token: string, password: string, fetchImpl: FetchLike = fetch, baseUrl = identityBaseUrl()): Promise<PasskeyStart> {
+  return readOk(await fetchWithTimeout(`${baseUrl}/passkeys/enroll/start`, {
+    method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ password }), cache: 'no-store',
+  }, fetchImpl), 'Unable to start passkey setup');
+}
+
+export async function requestPasskeyStartLoginEnrollment(challengeToken: string, fetchImpl: FetchLike = fetch, baseUrl = identityBaseUrl()): Promise<PasskeyStart> {
+  return readOk(await fetchWithTimeout(`${baseUrl}/passkeys/enroll/login/start`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ challengeToken }), cache: 'no-store',
+  }, fetchImpl), 'Unable to start passkey setup');
+}
+
+export async function requestPasskeyFinishLoginEnrollment(challengeToken: string, challengeId: string, credential: unknown, label: string, fetchImpl: FetchLike = fetch, baseUrl = identityBaseUrl()): Promise<LoginResult> {
+  return readOk(await fetchWithTimeout(`${baseUrl}/passkeys/enroll/login/finish`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ challengeToken, challengeId, credential, label }), cache: 'no-store',
+  }, fetchImpl), 'Unable to save passkey');
+}
+
+export async function requestPasskeyFinishEnrollment(token: string, challengeId: string, credential: unknown, label: string, fetchImpl: FetchLike = fetch, baseUrl = identityBaseUrl()): Promise<void> {
+  return readOk(await fetchWithTimeout(`${baseUrl}/passkeys/enroll/finish`, {
+    method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ challengeId, credential, label }), cache: 'no-store',
+  }, fetchImpl), 'Unable to save passkey');
+}
+
+export async function requestPasskeys(token: string, fetchImpl: FetchLike = fetch, baseUrl = identityBaseUrl()): Promise<PasskeyInfo[]> {
+  return readOk(await fetchWithTimeout(`${baseUrl}/passkeys`, { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' }, fetchImpl), 'Unable to load passkeys');
+}
+
+export async function requestRevokePasskey(token: string, id: string, password: string, fetchImpl: FetchLike = fetch, baseUrl = identityBaseUrl()): Promise<void> {
+  return readOk(await fetchWithTimeout(`${baseUrl}/passkeys/${encodeURIComponent(id)}`, {
+    method: 'DELETE', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ password }), cache: 'no-store',
+  }, fetchImpl), 'Unable to revoke passkey');
+}
+
+export async function requestRegistrationStatus(fetchImpl: FetchLike = fetch, baseUrl = identityBaseUrl()): Promise<boolean> {
+  const response = await fetchWithTimeout(`${baseUrl}/registration/status`, { cache: 'no-store' }, fetchImpl);
+  if (!response.ok) return false;
+  return ((await response.json()) as { enabled: boolean }).enabled;
+}
+
+export async function requestRegistration(email: string, fetchImpl: FetchLike = fetch, baseUrl = identityBaseUrl()): Promise<void> {
+  const response = await fetchWithTimeout(`${baseUrl}/registration`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email }), cache: 'no-store',
+  }, fetchImpl);
+  return readOk(response, 'Unable to request registration');
+}
+
+export async function requestConfirmRegistration(token: string, password: string, fetchImpl: FetchLike = fetch, baseUrl = identityBaseUrl()): Promise<void> {
+  const response = await fetchWithTimeout(`${baseUrl}/registration/confirm`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token, password }), cache: 'no-store',
+  }, fetchImpl);
+  return readOk(response, 'Unable to confirm registration');
+}
+
+export async function requestIdentitySettings(token: string, fetchImpl: FetchLike = fetch, baseUrl = identityBaseUrl()): Promise<IdentitySettings> {
+  const response = await fetchWithTimeout(`${baseUrl}/admin/settings`, { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' }, fetchImpl);
+  return readOk(response, 'Unable to load identity settings');
+}
+
+export async function updateIdentitySettings(token: string, settings: Omit<IdentitySettings, 'smtpPasswordSet'> & { smtpPassword?: string }, fetchImpl: FetchLike = fetch, baseUrl = identityBaseUrl()): Promise<IdentitySettings> {
+  const response = await fetchWithTimeout(`${baseUrl}/admin/settings`, {
+    method: 'PUT', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(settings), cache: 'no-store',
+  }, fetchImpl);
+  return readOk(response, 'Unable to save identity settings');
+}
+
+export async function sendTestMail(token: string, to: string, fetchImpl: FetchLike = fetch, baseUrl = identityBaseUrl()): Promise<void> {
+  const response = await fetchWithTimeout(`${baseUrl}/admin/settings/test-mail`, {
+    method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ to }), cache: 'no-store',
+  }, fetchImpl);
+  return readOk(response, 'Unable to send test mail');
+}
 
 async function readOk<T>(response: Response, fallback: string): Promise<T> {
   if (!response.ok) {
@@ -110,10 +248,10 @@ async function readOk<T>(response: Response, fallback: string): Promise<T> {
 }
 
 export async function requestUsers(token: string, fetchImpl: FetchLike = fetch, baseUrl = identityBaseUrl()): Promise<AdminUser[]> {
-  const response = await fetchImpl(`${baseUrl}/users`, {
+  const response = await fetchWithTimeout(`${baseUrl}/users`, {
     headers: { Authorization: `Bearer ${token}` },
     cache: 'no-store',
-  });
+  }, fetchImpl);
   return readOk(response, 'Unable to list users');
 }
 
@@ -124,30 +262,30 @@ export async function requestInvite(
   fetchImpl: FetchLike = fetch,
   baseUrl = identityBaseUrl(),
 ): Promise<{ user: AdminUser; inviteToken: string }> {
-  const response = await fetchImpl(`${baseUrl}/users/invites`, {
+  const response = await fetchWithTimeout(`${baseUrl}/users/invites`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, roles }),
     cache: 'no-store',
-  });
+  }, fetchImpl);
   return readOk(response, 'Unable to invite user');
 }
 
 export async function requestDisableUser(token: string, userId: string, fetchImpl: FetchLike = fetch, baseUrl = identityBaseUrl()): Promise<AdminUser> {
-  const response = await fetchImpl(`${baseUrl}/users/${userId}/disable`, {
+  const response = await fetchWithTimeout(`${baseUrl}/users/${userId}/disable`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}` },
     cache: 'no-store',
-  });
+  }, fetchImpl);
   return readOk(response, 'Unable to disable user');
 }
 
 export async function requestEnableUser(token: string, userId: string, fetchImpl: FetchLike = fetch, baseUrl = identityBaseUrl()): Promise<AdminUser> {
-  const response = await fetchImpl(`${baseUrl}/users/${userId}/enable`, {
+  const response = await fetchWithTimeout(`${baseUrl}/users/${userId}/enable`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}` },
     cache: 'no-store',
-  });
+  }, fetchImpl);
   return readOk(response, 'Unable to enable user');
 }
 
@@ -158,22 +296,22 @@ export async function requestChangePassword(
   fetchImpl: FetchLike = fetch,
   baseUrl = identityBaseUrl(),
 ): Promise<void> {
-  const response = await fetchImpl(`${baseUrl}/password/change`, {
+  const response = await fetchWithTimeout(`${baseUrl}/password/change`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ currentPassword, newPassword }),
     cache: 'no-store',
-  });
+  }, fetchImpl);
   await readOk(response, 'Unable to change password');
 }
 
 export async function requestPasswordReset(email: string, fetchImpl: FetchLike = fetch, baseUrl = identityBaseUrl()): Promise<void> {
-  const response = await fetchImpl(`${baseUrl}/password/reset`, {
+  const response = await fetchWithTimeout(`${baseUrl}/password/reset`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email }),
     cache: 'no-store',
-  });
+  }, fetchImpl);
   await readOk(response, 'Unable to request reset');
 }
 
@@ -183,12 +321,12 @@ export async function requestConfirmReset(
   fetchImpl: FetchLike = fetch,
   baseUrl = identityBaseUrl(),
 ): Promise<void> {
-  const response = await fetchImpl(`${baseUrl}/password/reset/confirm`, {
+  const response = await fetchWithTimeout(`${baseUrl}/password/reset/confirm`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ token, newPassword }),
     cache: 'no-store',
-  });
+  }, fetchImpl);
   await readOk(response, 'Unable to reset password');
 }
 
@@ -198,11 +336,11 @@ export async function requestIssueReset(
   fetchImpl: FetchLike = fetch,
   baseUrl = identityBaseUrl(),
 ): Promise<{ resetToken: string }> {
-  const response = await fetchImpl(`${baseUrl}/users/${userId}/password-resets`, {
+  const response = await fetchWithTimeout(`${baseUrl}/users/${userId}/password-resets`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}` },
     cache: 'no-store',
-  });
+  }, fetchImpl);
   return readOk(response, 'Unable to issue reset');
 }
 
@@ -212,12 +350,12 @@ export async function requestAcceptInvite(
   fetchImpl: FetchLike = fetch,
   baseUrl = identityBaseUrl(),
 ): Promise<AdminUser> {
-  const response = await fetchImpl(`${baseUrl}/invites/accept`, {
+  const response = await fetchWithTimeout(`${baseUrl}/invites/accept`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ token, password }),
     cache: 'no-store',
-  });
+  }, fetchImpl);
   return readOk(response, 'Unable to accept invite');
 }
 
@@ -238,12 +376,12 @@ async function postJson<T>(
   if (options.token) {
     headers.Authorization = `Bearer ${options.token}`;
   }
-  const response = await fetchImpl(`${baseUrl}${path}`, {
+  const response = await fetchWithTimeout(`${baseUrl}${path}`, {
     method: options.method ?? 'POST',
     headers,
     body: JSON.stringify(body),
     cache: 'no-store',
-  });
+  }, fetchImpl);
   return readOk(response, fallback);
 }
 
@@ -265,16 +403,18 @@ export async function requestCompleteMfaLogin(
 export type MfaEnrollStart = {
   secret: string;
   otpauthUrl: string;
+  qrDataUrl: string;
   challengeToken: string;
 };
 
 export async function requestStartMfaEnroll(
   challengeToken?: string,
   sessionToken?: string,
+  password?: string,
   fetchImpl: FetchLike = fetch,
   baseUrl = identityBaseUrl(),
 ): Promise<MfaEnrollStart> {
-  return postJson('/mfa/enroll/start', 'Unable to start MFA enrollment', { challengeToken }, {
+  return postJson('/mfa/enroll/start', 'Unable to start MFA enrollment', { challengeToken, password }, {
     token: sessionToken,
     fetchImpl,
     baseUrl,
@@ -350,12 +490,12 @@ export async function requestUpdateRoles(
   fetchImpl: FetchLike = fetch,
   baseUrl = identityBaseUrl(),
 ): Promise<AdminUser> {
-  const response = await fetchImpl(`${baseUrl}/users/${userId}/roles`, {
+  const response = await fetchWithTimeout(`${baseUrl}/users/${userId}/roles`, {
     method: 'PUT',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ roles }),
     cache: 'no-store',
-  });
+  }, fetchImpl);
   return readOk(response, 'Unable to update roles');
 }
 
@@ -376,10 +516,10 @@ export async function requestServiceTokens(
   fetchImpl: FetchLike = fetch,
   baseUrl = identityBaseUrl(),
 ): Promise<ServiceToken[]> {
-  const response = await fetchImpl(`${baseUrl}/service-tokens`, {
+  const response = await fetchWithTimeout(`${baseUrl}/service-tokens`, {
     headers: { Authorization: `Bearer ${token}` },
     cache: 'no-store',
-  });
+  }, fetchImpl);
   return readOk(response, 'Unable to list service tokens');
 }
 
@@ -390,12 +530,12 @@ export async function requestCreateServiceToken(
   fetchImpl: FetchLike = fetch,
   baseUrl = identityBaseUrl(),
 ): Promise<ServiceTokenCreated> {
-  const response = await fetchImpl(`${baseUrl}/service-tokens`, {
+  const response = await fetchWithTimeout(`${baseUrl}/service-tokens`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ name, scopes }),
     cache: 'no-store',
-  });
+  }, fetchImpl);
   return readOk(response, 'Unable to create service token');
 }
 
@@ -405,12 +545,12 @@ export async function requestRotateServiceToken(
   fetchImpl: FetchLike = fetch,
   baseUrl = identityBaseUrl(),
 ): Promise<ServiceTokenCreated> {
-  const response = await fetchImpl(`${baseUrl}/service-tokens/${tokenId}/rotate`, {
+  const response = await fetchWithTimeout(`${baseUrl}/service-tokens/${tokenId}/rotate`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     body: '{}',
     cache: 'no-store',
-  });
+  }, fetchImpl);
   return readOk(response, 'Unable to rotate service token');
 }
 
@@ -420,10 +560,67 @@ export async function requestRevokeServiceToken(
   fetchImpl: FetchLike = fetch,
   baseUrl = identityBaseUrl(),
 ): Promise<void> {
-  const response = await fetchImpl(`${baseUrl}/service-tokens/${tokenId}`, {
+  const response = await fetchWithTimeout(`${baseUrl}/service-tokens/${tokenId}`, {
     method: 'DELETE',
     headers: { Authorization: `Bearer ${token}` },
     cache: 'no-store',
-  });
+  }, fetchImpl);
   await readOk(response, 'Unable to revoke service token');
+}
+
+export type McpKey = {
+  id: string;
+  name: string;
+  scopes: string[];
+  createdAt: string;
+  expiresAt: string;
+  lastUsedAt: string | null;
+  revokedAt: string | null;
+};
+
+export async function requestMcpKeys(token: string): Promise<McpKey[]> {
+  const response = await fetchWithTimeout(`${identityBaseUrl()}/mcp-keys`, {
+    headers: { Authorization: `Bearer ${token}` }, cache: 'no-store',
+  });
+  return readOk(response, 'Unable to list MCP keys');
+}
+
+export async function requestCreateMcpKey(token: string, name: string, importEnabled: boolean): Promise<{ key: McpKey; token: string }> {
+  const response = await fetchWithTimeout(`${identityBaseUrl()}/mcp-keys`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, scopes: importEnabled ? ['mcp:read', 'ingestion:import'] : ['mcp:read'] }),
+    cache: 'no-store',
+  });
+  return readOk(response, 'Unable to create MCP key');
+}
+
+export async function requestRotateMcpKey(token: string, id: string): Promise<{ key: McpKey; token: string }> {
+  const response = await fetchWithTimeout(`${identityBaseUrl()}/mcp-keys/${encodeURIComponent(id)}/rotate`, {
+    method: 'POST', headers: { Authorization: `Bearer ${token}` }, cache: 'no-store',
+  });
+  return readOk(response, 'Unable to rotate MCP key');
+}
+
+export async function requestRevokeMcpKey(token: string, id: string): Promise<void> {
+  const response = await fetchWithTimeout(`${identityBaseUrl()}/mcp-keys/${encodeURIComponent(id)}`, {
+    method: 'DELETE', headers: { Authorization: `Bearer ${token}` }, cache: 'no-store',
+  });
+  return readOk(response, 'Unable to revoke MCP key');
+}
+
+export type OAuthGrant = { clientId: string; clientName: string; redirectUris: string[]; expiresAt: string };
+
+export async function requestOAuthGrants(token: string): Promise<OAuthGrant[]> {
+  const response = await fetchWithTimeout(`${identityBaseUrl()}/oauth/grants`, {
+    headers: { Authorization: `Bearer ${token}` }, cache: 'no-store',
+  });
+  return readOk(response, 'Unable to list chat client connections');
+}
+
+export async function requestRevokeOAuthGrant(token: string, clientId: string): Promise<void> {
+  const response = await fetchWithTimeout(`${identityBaseUrl()}/oauth/grants/${encodeURIComponent(clientId)}`, {
+    method: 'DELETE', headers: { Authorization: `Bearer ${token}` }, cache: 'no-store',
+  });
+  return readOk(response, 'Unable to revoke chat client connection');
 }

@@ -1,13 +1,20 @@
+import { SignedInSummary } from '../../../components/SignedInSummary';
+import { T } from '../../../components/TranslationProvider';
+import { ui } from '../../../../lib/messages';
+import { message } from '../../../../lib/messages';
+import { currentLocale } from '../../../../lib/server-locale';
 import { notFound, redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
-import { PageMain } from '../../../components/PageMain';
+import { WorkspacePage } from '../../../components/layout/templates';
 import { Alert, PageHeader } from '../../../components/ui';
-import { getCountry, listAllArticles, listConstitutionVersions, listCountries, type VersionSummary } from '../../../../lib/api';
-import { amendmentErrorMessage, getAmendment, listRevisions } from '../../../../lib/amendment-editor-api';
+import { getCountry, getVersion, listAllArticles, listAllUnits, listConstitutionVersions, listCountries, type ArticleSummary, type VersionSummary } from '../../../../lib/api';
+import { amendmentErrorMessage, getAmendment, getAmendmentDiffReview, listRevisions } from '../../../../lib/amendment-editor-api';
 import { canVisitEditor } from '../../../../lib/nav';
 import { SESSION_COOKIE, currentUser } from '../../../../lib/session';
 import { AmendmentEditorLayout } from '../AmendmentEditorLayout';
 import { AmendmentForm } from '../AmendmentForm';
+import { QuoteReviewPanel } from '../QuoteReviewPanel';
+import { DocumentLinks } from '../../documents/DocumentLinks';
 
 type AmendmentDetailPageProps = {
   params: Promise<{ id: string }>;
@@ -17,6 +24,8 @@ type AmendmentDetailPageProps = {
     published?: string;
     withdrawn?: string;
     error?: string;
+    confirmed?: string;
+    documentError?: string;
   }>;
 };
 
@@ -43,21 +52,26 @@ async function resolveConstitutionId(
   }
 }
 
-async function loadArticlesByVersion(versions: VersionSummary[]): Promise<Record<string, string[]>> {
+async function loadContentByVersion(versions: VersionSummary[]): Promise<{ articlesByVersion: Record<string, string[]>; unitTreesByVersion: Record<string, ArticleSummary[]> }> {
   const entries = await Promise.all(
     versions.map(async (version) => {
       try {
-        const articles = await listAllArticles(version.id);
-        return [version.id, articles.map((article) => article.articleNumber)] as const;
+        const articles = await listAllUnits(version.id, true);
+        return [version.id, articles] as const;
       } catch {
-        return [version.id, []] as const;
+        return [version.id, [] as ArticleSummary[]] as const;
       }
     }),
   );
-  return Object.fromEntries(entries);
+  const content = Object.fromEntries(entries);
+  return {
+    articlesByVersion: Object.fromEntries(Object.entries(content).map(([versionId, articles]) => [versionId, articles.map((article) => article.articleNumber)])),
+    unitTreesByVersion: content,
+  };
 }
 
 export default async function AmendmentDetailPage(props: AmendmentDetailPageProps) {
+  const locale = await currentLocale();
   const { id } = await props.params;
   const searchParams = await props.searchParams;
   const user = await currentUser();
@@ -66,9 +80,9 @@ export default async function AmendmentDetailPage(props: AmendmentDetailPageProp
   }
   if (!canVisitEditor(user.roles)) {
     return (
-      <PageMain className="wide">
-        <PageHeader title="Amending law" meta={`Signed in as ${user.email}, but this account has no editorial role.`} />
-      </PageMain>
+      <WorkspacePage width="content" header={<PageHeader title={<T value={ui.attrs.editorAmendmentsIdPagePageHeaderTitle} />} meta={<SignedInSummary email={user.email} noEditorialRole />} />}>
+
+      </WorkspacePage>
     );
   }
 
@@ -86,10 +100,10 @@ export default async function AmendmentDetailPage(props: AmendmentDetailPageProp
   const constitutionId = await resolveConstitutionId(amendment?.constitutionId, searchParams.constitutionId);
   if (!constitutionId) {
     return (
-      <PageMain className="wide">
-        <PageHeader title="Amending law" />
-        <Alert tone="error">No constitution is available for this form.</Alert>
-      </PageMain>
+      <WorkspacePage width="content" header={<PageHeader title={<T value={ui.attrs.editorAmendmentsIdPagePageHeaderTitle2} />} />}>
+
+        <Alert tone="error"><T value={ui.editor.amendments.id.page.noConstitutionIsAvailableForThisForm} /></Alert>
+      </WorkspacePage>
     );
   }
 
@@ -100,34 +114,67 @@ export default async function AmendmentDetailPage(props: AmendmentDetailPageProp
           authorization: `Bearer ${sessionToken}`,
         })) ?? []
       : [];
-  const articlesByVersion = await loadArticlesByVersion(versions);
+  const { articlesByVersion, unitTreesByVersion } = await loadContentByVersion(versions);
   const contentAvailable = Object.values(articlesByVersion).some((articles) => articles.length > 0);
   const latestVersionId = versions.find((version) => version.latestPublished)?.id ?? versions.at(-1)?.id ?? null;
 
   const revisions = !isNew && sessionToken ? await listRevisions(id) : null;
+  const tipRevision = revisions?.at(-1);
+  const hasDraftTip = amendment?.status === 'draft' || Boolean(tipRevision && tipRevision.id !== amendment?.publishedRevisionId);
+  const pairToReview = !isNew && hasDraftTip && amendment?.sourceVersionId && amendment.targetVersionId;
+  const pairDetails = pairToReview ? await Promise.all([
+    getVersion(amendment.sourceVersionId!, `Bearer ${sessionToken}`),
+    getVersion(amendment.targetVersionId!, `Bearer ${sessionToken}`),
+  ]) : null;
+  const pairPublished = pairDetails?.every((version) => version?.publicationStatus === 'published') ?? false;
+  const diffReview = pairToReview && pairPublished ? await getAmendmentDiffReview(id) : null;
+  const diffReviewUnavailable = pairToReview && !pairPublished;
+  const publishedRevision = revisions?.find((revision) => revision.id === amendment?.publishedRevisionId) ?? null;
+  const quotedVersionIds = publishedRevision
+    ? [publishedRevision.sourceVersionId, publishedRevision.targetVersionId].filter((versionId): versionId is string => Boolean(versionId))
+    : [];
+  const reviewVersionIds = [...new Set(quotedVersionIds.flatMap((versionId) => [versionId, versions.find((version) => version.id === versionId)?.currentVersionId].filter((id): id is string => Boolean(id))))];
+  const reviewContentEntries = await Promise.all(reviewVersionIds.map(async (versionId) => {
+    const articles = await listAllArticles(versionId, true).catch(() => []);
+    return [versionId, articles.map((article) => `Article ${article.articleNumber}: ${article.body ?? article.title}`)] as const;
+  }));
+  const reviewContentByVersion = Object.fromEntries(reviewContentEntries);
 
   const canSave = canEdit;
   const canPublishLaw = canPublish && amendment?.status !== 'withdrawn' && !isNew;
   const canWithdraw = canPublish && amendment?.status === 'published';
   const canRestore = canEdit;
 
-  const errorMessage = amendmentErrorMessage(searchParams.error);
-  const title = isNew ? 'New amending law' : (amendment?.title ?? 'Amending law');
+  const errorMessage = amendmentErrorMessage(searchParams.error, locale);
+  const title = isNew ? message(locale, ui.remainingStatus.newAmendingLaw) : (amendment?.title ?? message(locale, ui.remainingStatus.amendingLaw));
 
   return (
-    <PageMain className="wide">
-      <PageHeader
-        breadcrumbs={[
-          { href: '/editor/amendments', label: 'Amending laws' },
-          { label: isNew ? 'New' : amendment?.title ?? id.slice(0, 8) },
+    <WorkspacePage width="content" header={<PageHeader
+          breadcrumbs={[
+          { href: '/editor/amendments', label: <T value={ui.nav.legalChanges} /> },
+          { label: isNew ? <T value={ui.remainingStatus.new} /> : amendment?.title ?? id.slice(0, 8) },
         ]}
         title={title}
-        meta={`Signed in as ${user.email}. Roles: ${user.roles.join(', ')}.`}
-      />
+        meta={<SignedInSummary email={user.email} roles={user.roles} />}
+      />}>
+
+      {amendment?.reviewStatus === 'needs_review' ? <Alert tone="info"><T value={ui.editor.amendments.id.page.needsReviewQuotesOrDocumentPinsAre} /></Alert> : null}
       {errorMessage ? <Alert tone="error">{errorMessage}</Alert> : null}
-      {searchParams.saved ? <Alert tone="success">Draft saved.</Alert> : null}
-      {searchParams.published ? <Alert tone="success">Amending law published.</Alert> : null}
-      {searchParams.withdrawn ? <Alert tone="success">Amending law withdrawn.</Alert> : null}
+      {searchParams.documentError ? <Alert tone="error"><T value={ui.editor.amendments.id.page.theDocumentLinkCouldNotBeChanged} /></Alert> : null}
+      {searchParams.saved ? <Alert tone="success"><T value={ui.editor.amendments.id.page.draftSaved} /></Alert> : null}
+      {searchParams.published ? <Alert tone="success"><T value={ui.editor.amendments.id.page.amendingLawPublished} /></Alert> : null}
+      {searchParams.confirmed ? <Alert tone="success"><T value={ui.editor.amendments.id.page.quotesConfirmedAndTheLegalChangeRepublished} /></Alert> : null}
+      {searchParams.withdrawn ? <Alert tone="success"><T value={ui.editor.amendments.id.page.amendingLawWithdrawn} /></Alert> : null}
+      {diffReviewUnavailable ? <Alert tone="info"><T value={ui.editor.amendments.id.page.differenceReviewRequiresTwoPublishedSnapshotsPublish} /></Alert> : null}
+      {amendment?.reviewStatus === 'needs_review' ? (
+        <QuoteReviewPanel
+          amendment={amendment}
+          publishedRevision={publishedRevision}
+          versions={versions}
+          canConfirm={canPublishLaw}
+          contentByVersion={reviewContentByVersion}
+        />
+      ) : null}
       {isNew || !amendment ? (
         <AmendmentForm
           amendmentId="new"
@@ -135,12 +182,15 @@ export default async function AmendmentDetailPage(props: AmendmentDetailPageProp
           amendment={amendment}
           versions={versions}
           articlesByVersion={articlesByVersion}
+          unitTreesByVersion={unitTreesByVersion}
           latestVersionId={latestVersionId}
           canSave={canSave}
-          canPublish={false}
           canWithdraw={false}
           readOnly={readOnly}
           contentAvailable={contentAvailable}
+          diffReview={diffReview}
+          canReviewDiff={canEdit || hasRole(user.roles, 'reviewer') || canPublish}
+          canAcknowledgeDiff={hasRole(user.roles, 'reviewer') || canPublish}
         />
       ) : (
         <AmendmentEditorLayout
@@ -150,6 +200,7 @@ export default async function AmendmentDetailPage(props: AmendmentDetailPageProp
           revisions={revisions}
           versions={versions}
           articlesByVersion={articlesByVersion}
+          unitTreesByVersion={unitTreesByVersion}
           latestVersionId={latestVersionId}
           canSave={canSave}
           canPublish={canPublishLaw}
@@ -157,8 +208,12 @@ export default async function AmendmentDetailPage(props: AmendmentDetailPageProp
           readOnly={readOnly}
           canRestore={canRestore}
           contentAvailable={contentAvailable}
+          diffReview={diffReview}
+          canReviewDiff={canEdit || hasRole(user.roles, 'reviewer') || canPublish}
+          canAcknowledgeDiff={hasRole(user.roles, 'reviewer') || canPublish}
         />
       )}
-    </PageMain>
+      {!isNew && tipRevision ? <DocumentLinks targetType="amendment" targetId={id} scopeRevisionId={tipRevision.id} returnTo={`/editor/amendments/${id}`} canEdit={canEdit && amendment?.status !== 'withdrawn' && tipRevision.id !== amendment?.publishedRevisionId} /> : null}
+    </WorkspacePage>
   );
 }

@@ -18,6 +18,7 @@ data class StoredUser(
     val passwordHash: String,
     val enabled: Boolean = true,
     val createdAt: OffsetDateTime = OffsetDateTime.now(ZoneOffset.UTC),
+    val languagePreference: String = "auto",
 )
 
 data class StoredThrottle(
@@ -33,6 +34,13 @@ data class StoredInvite(
 )
 
 data class StoredPasswordReset(
+    val id: UUID,
+    val userId: UUID,
+    val expiresAt: Instant,
+    val usedAt: Instant?,
+)
+
+data class StoredRegistrationVerification(
     val id: UUID,
     val userId: UUID,
     val expiresAt: Instant,
@@ -93,21 +101,29 @@ class IdentityRepository(private val jdbc: JdbcTemplate) {
 
     fun findUserByEmail(email: String): StoredUser? =
         jdbc.query(
-            "SELECT id, email, password_hash, enabled, created_at FROM users WHERE lower(email) = lower(?)",
+            "SELECT id, email, password_hash, enabled, created_at, language_preference FROM users WHERE lower(email) = lower(?)",
             userMapper,
             email,
         ).firstOrNull()
 
     fun findUserById(id: UUID): StoredUser? =
         jdbc.query(
-            "SELECT id, email, password_hash, enabled, created_at FROM users WHERE id = ?",
+            "SELECT id, email, password_hash, enabled, created_at, language_preference FROM users WHERE id = ?",
+            userMapper,
+            id,
+        ).firstOrNull()
+
+    /** Serialize credential issuance and account revocation for this owner within a transaction. */
+    fun lockUser(id: UUID): StoredUser? =
+        jdbc.query(
+            "SELECT id, email, password_hash, enabled, created_at, language_preference FROM users WHERE id = ? FOR UPDATE",
             userMapper,
             id,
         ).firstOrNull()
 
     fun listUsers(): List<StoredUser> =
         jdbc.query(
-            "SELECT id, email, password_hash, enabled, created_at FROM users ORDER BY email",
+            "SELECT id, email, password_hash, enabled, created_at, language_preference FROM users ORDER BY email",
             userMapper,
         )
 
@@ -125,6 +141,10 @@ class IdentityRepository(private val jdbc: JdbcTemplate) {
 
     fun updatePasswordHash(userId: UUID, passwordHash: String) {
         jdbc.update("UPDATE users SET password_hash = ? WHERE id = ?", passwordHash, userId)
+    }
+
+    fun updateLanguagePreference(userId: UUID, preference: String) {
+        jdbc.update("UPDATE users SET language_preference = ? WHERE id = ?", preference, userId)
     }
 
     fun assignRole(userId: UUID, roleId: UUID) {
@@ -159,13 +179,8 @@ class IdentityRepository(private val jdbc: JdbcTemplate) {
         val roles = rolesForUser(user.id)
         val enabled = mfaEnabled(user.id)
         val required = roles.any { it == "admin" || it == "publisher" }
-        val stepUpFresh =
-            if (!required) {
-                true
-            } else {
-                val stepUpAt = tokenHash?.let { stepUpAt(it) }
-                stepUpAt != null && stepUpAt.isAfter(Instant.now().minus(stepUpTtl))
-            }
+        val stepUpAt = tokenHash?.let { stepUpAt(it) }
+        val stepUpFresh = stepUpAt != null && stepUpAt.isAfter(Instant.now().minus(stepUpTtl))
         return UserDto(
             id = user.id,
             email = user.email,
@@ -173,6 +188,7 @@ class IdentityRepository(private val jdbc: JdbcTemplate) {
             mfaEnabled = enabled,
             mfaRequired = required,
             stepUpFresh = stepUpFresh,
+            languagePreference = user.languagePreference,
         )
     }
 
@@ -204,7 +220,7 @@ class IdentityRepository(private val jdbc: JdbcTemplate) {
     fun findUserByValidTokenHash(tokenHash: String): StoredUser? =
         jdbc.query(
             """
-            SELECT u.id, u.email, u.password_hash, u.enabled, u.created_at
+            SELECT u.id, u.email, u.password_hash, u.enabled, u.created_at, u.language_preference
             FROM sessions s
             JOIN users u ON u.id = s.user_id
             WHERE s.token_hash = ?
@@ -415,19 +431,26 @@ class IdentityRepository(private val jdbc: JdbcTemplate) {
             key,
         ).firstOrNull()
 
-    fun upsertThrottle(key: String, failureCount: Int, lockedUntil: Instant?) {
+    fun recordThrottleFailure(key: String, threshold: Int, lockoutSeconds: List<Long>) {
         jdbc.update(
             """
             INSERT INTO login_throttle (throttle_key, failure_count, locked_until, updated_at)
-            VALUES (?, ?, ?, NOW())
+            VALUES (?, 1, CASE WHEN 1 >= ? THEN NOW() + ? * INTERVAL '1 second' ELSE NULL END, NOW())
             ON CONFLICT (throttle_key) DO UPDATE SET
-              failure_count = EXCLUDED.failure_count,
-              locked_until = EXCLUDED.locked_until,
+              failure_count = login_throttle.failure_count + 1,
+              locked_until = CASE WHEN login_throttle.failure_count + 1 >= ?
+                THEN NOW() + (?::bigint[])[LEAST((login_throttle.failure_count + 1 - ?) / ? + 1, ?)] * INTERVAL '1 second'
+                ELSE NULL END,
               updated_at = NOW()
             """.trimIndent(),
             key,
-            failureCount,
-            lockedUntil?.let { Timestamp.from(it) },
+            threshold,
+            lockoutSeconds.first(),
+            threshold,
+            "{${lockoutSeconds.joinToString(",")}}",
+            threshold,
+            threshold,
+            lockoutSeconds.size,
         )
     }
 
@@ -481,9 +504,50 @@ class IdentityRepository(private val jdbc: JdbcTemplate) {
         jdbc.update("DELETE FROM invites WHERE user_id = ? AND used_at IS NULL", userId)
     }
 
-    fun markInviteUsed(id: UUID) {
-        jdbc.update("UPDATE invites SET used_at = NOW() WHERE id = ?", id)
+    fun consumeInvite(id: UUID): Boolean =
+        jdbc.update("UPDATE invites SET used_at = NOW() WHERE id = ? AND used_at IS NULL AND expires_at > NOW()", id) == 1
+
+    fun insertRegistrationVerification(userId: UUID, tokenHash: String, expiresAt: Instant) {
+        jdbc.update("DELETE FROM registration_verifications WHERE user_id = ? AND used_at IS NULL", userId)
+        jdbc.update(
+            "INSERT INTO registration_verifications (id, user_id, token_hash, expires_at) VALUES (?, ?, ?, ?)",
+            UUID.randomUUID(),
+            userId,
+            tokenHash,
+            Timestamp.from(expiresAt),
+        )
     }
+
+    fun findRegistrationVerification(tokenHash: String): StoredRegistrationVerification? =
+        jdbc.query(
+            "SELECT id, user_id, expires_at, used_at FROM registration_verifications WHERE token_hash = ?",
+            { rs, _ ->
+                StoredRegistrationVerification(
+                    rs.getObject("id", UUID::class.java),
+                    rs.getObject("user_id", UUID::class.java),
+                    rs.getTimestamp("expires_at").toInstant(),
+                    rs.getTimestamp("used_at")?.toInstant(),
+                )
+            },
+            tokenHash,
+        ).firstOrNull()
+
+    fun hasPendingRegistration(userId: UUID): Boolean =
+        jdbc.queryForObject(
+            "SELECT EXISTS (SELECT 1 FROM registration_verifications WHERE user_id = ? AND used_at IS NULL)",
+            Boolean::class.java,
+            userId,
+        ) ?: false
+
+    fun deletePendingRegistrations(userId: UUID) {
+        jdbc.update("DELETE FROM registration_verifications WHERE user_id = ? AND used_at IS NULL", userId)
+    }
+
+    fun consumeRegistrationVerification(id: UUID): Boolean =
+        jdbc.update(
+            "UPDATE registration_verifications SET used_at = NOW() WHERE id = ? AND used_at IS NULL AND expires_at > NOW()",
+            id,
+        ) == 1
 
     fun insertPasswordReset(userId: UUID, tokenHash: String, expiresAt: Instant): UUID {
         val id = UUID.randomUUID()
@@ -511,9 +575,16 @@ class IdentityRepository(private val jdbc: JdbcTemplate) {
         jdbc.update("DELETE FROM password_resets WHERE user_id = ? AND used_at IS NULL", userId)
     }
 
-    fun markPasswordResetUsed(id: UUID) {
-        jdbc.update("UPDATE password_resets SET used_at = NOW() WHERE id = ?", id)
-    }
+    fun consumePasswordReset(id: UUID): Boolean =
+        jdbc.update("UPDATE password_resets SET used_at = NOW() WHERE id = ? AND used_at IS NULL AND expires_at > NOW()", id) == 1
+
+    fun hasPasskeys(userId: UUID): Boolean =
+        jdbc.queryForObject("SELECT EXISTS (SELECT 1 FROM passkey_credentials WHERE user_id = ?)", Boolean::class.java, userId) == true
+
+    fun hasSecondFactor(userId: UUID): Boolean = mfaEnabled(userId) || hasPasskeys(userId)
+
+    fun sessionMfaVerified(tokenHash: String): Boolean =
+        jdbc.queryForObject("SELECT EXISTS (SELECT 1 FROM sessions WHERE token_hash = ? AND mfa_verified_at IS NOT NULL)", Boolean::class.java, tokenHash) == true
 
     fun mfaEnabled(userId: UUID): Boolean {
         val count =
@@ -569,30 +640,13 @@ class IdentityRepository(private val jdbc: JdbcTemplate) {
         jdbc.update("DELETE FROM mfa_recovery_codes WHERE user_id = ?", userId)
     }
 
-    fun findUnusedRecovery(codeHash: String): UUID? =
-        jdbc.query(
-            """
-            SELECT id FROM mfa_recovery_codes
-            WHERE code_hash = ? AND used_at IS NULL
-            """.trimIndent(),
-            { rs, _ -> rs.getObject("id", UUID::class.java) },
+    /** The conditional update claims a code once, including concurrent login/step-up requests. */
+    fun consumeRecoveryCode(userId: UUID, codeHash: String): Boolean =
+        jdbc.update(
+            "UPDATE mfa_recovery_codes SET used_at = NOW() WHERE user_id = ? AND code_hash = ? AND used_at IS NULL",
+            userId,
             codeHash,
-        ).firstOrNull()
-
-    fun recoveryBelongsToUser(id: UUID, userId: UUID): Boolean {
-        val count =
-            jdbc.queryForObject(
-                "SELECT COUNT(*) FROM mfa_recovery_codes WHERE id = ? AND user_id = ?",
-                Int::class.java,
-                id,
-                userId,
-            )
-        return (count ?: 0) > 0
-    }
-
-    fun markRecoveryUsed(id: UUID) {
-        jdbc.update("UPDATE mfa_recovery_codes SET used_at = NOW() WHERE id = ?", id)
-    }
+        ) == 1
 
     fun insertChallenge(
         userId: UUID,
@@ -639,6 +693,9 @@ class IdentityRepository(private val jdbc: JdbcTemplate) {
     fun deleteChallenge(id: UUID) {
         jdbc.update("DELETE FROM mfa_challenges WHERE id = ?", id)
     }
+
+    fun consumeChallenge(id: UUID): Boolean =
+        jdbc.update("DELETE FROM mfa_challenges WHERE id = ? AND expires_at > NOW()", id) == 1
 
     fun deleteChallengesForUser(userId: UUID, purpose: String? = null) {
         if (purpose == null) {
@@ -710,6 +767,7 @@ class IdentityRepository(private val jdbc: JdbcTemplate) {
             passwordHash = rs.getString("password_hash"),
             enabled = rs.getBoolean("enabled"),
             createdAt = rs.getTimestamp("created_at").toInstant().atOffset(ZoneOffset.UTC),
+            languagePreference = rs.getString("language_preference"),
         )
     }
 

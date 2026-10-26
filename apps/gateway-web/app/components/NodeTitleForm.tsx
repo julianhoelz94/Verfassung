@@ -1,5 +1,7 @@
 'use client';
 
+import { T } from './TranslationProvider';
+import { ui } from '../../lib/messages';
 import { Button, Input } from './ui';
 import { saveNodeTitleAction } from './node-actions';
 
@@ -21,7 +23,7 @@ export function NodeTitleForm({ nodeId, title, label, returnTo }: NodeTitleFormP
         label={`Title for ${label}`}
         defaultValue={title ?? ''}
       />
-      <Button>Save title</Button>
+      <Button><T value={ui.components.nodetitleform.saveTitle} /></Button>
     </form>
   );
 }

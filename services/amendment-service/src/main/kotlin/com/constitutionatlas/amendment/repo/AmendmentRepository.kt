@@ -5,6 +5,7 @@ import com.constitutionatlas.amendment.api.AmendmentChangeWriteRequest
 import com.constitutionatlas.amendment.api.AmendmentDocumentDto
 import com.constitutionatlas.amendment.api.AmendmentDto
 import com.constitutionatlas.amendment.api.AmendmentRevisionDto
+import com.constitutionatlas.amendment.api.AmendmentUnitRefDto
 import com.fasterxml.jackson.core.type.TypeReference
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.springframework.jdbc.core.JdbcTemplate
@@ -38,6 +39,7 @@ data class RevisionInsert(
 
 data class AmendmentChangeInsert(
     val id: UUID,
+    val sourceChangeId: UUID? = null,
     val revisionId: UUID,
     val articleId: UUID?,
     val articleNumber: String?,
@@ -48,6 +50,11 @@ data class AmendmentChangeInsert(
     val effectiveOn: LocalDate?,
     val amendingLawTitle: String?,
     val amendingLawCitation: String?,
+    val beforeRef: AmendmentUnitRefDto? = null,
+    val afterRef: AmendmentUnitRefDto? = null,
+    val linkReviewReason: String? = null,
+    val legacyLinkUnresolved: Boolean = false,
+    val pendingAfterLogicalId: UUID? = null,
 )
 
 data class PublishedPinRow(
@@ -66,6 +73,19 @@ class AmendmentRepository(
     private val jdbc: JdbcTemplate,
     private val objectMapper: ObjectMapper,
 ) {
+    fun initialRevisionUsesSnapshotReview(amendmentId: UUID): Boolean = jdbc.query(
+        """SELECT r.target_version_id IS NOT NULL OR EXISTS (
+             SELECT 1 FROM amendment_changes c WHERE c.revision_id = r.id
+               AND (c.before_logical_id IS NOT NULL OR c.after_logical_id IS NOT NULL OR c.draft_after_logical_id IS NOT NULL)
+           ) FROM amendment_revisions r WHERE r.amendment_id = ? AND r.predecessor_revision_id IS NULL""",
+        { rs, _ -> rs.getBoolean(1) },
+        amendmentId,
+    ).firstOrNull() ?: false
+
+    fun lockAmendment(id: UUID) {
+        jdbc.query("SELECT id FROM amendments WHERE id = ? FOR UPDATE", { rs, _ -> rs.getObject(1, UUID::class.java) }, id)
+    }
+
     fun listForTargetVersion(targetVersionId: UUID, sourceVersionId: UUID? = null): List<AmendmentDto> {
         val sql = StringBuilder(
             """
@@ -366,7 +386,8 @@ class AmendmentRepository(
         changes.forEach { change ->
             insertChange(
                 AmendmentChangeInsert(
-                    id = UUID.randomUUID(),
+                    id = change.id ?: UUID.randomUUID(),
+                    sourceChangeId = change.sourceChangeId,
                     revisionId = revisionId,
                     articleId = change.articleId,
                     articleNumber = change.articleNumber,
@@ -377,6 +398,11 @@ class AmendmentRepository(
                     effectiveOn = change.effectiveOn,
                     amendingLawTitle = change.amendingLawTitle,
                     amendingLawCitation = change.amendingLawCitation,
+                    beforeRef = change.beforeRef,
+                    afterRef = change.afterRef,
+                    linkReviewReason = change.linkReviewReason,
+                    legacyLinkUnresolved = change.nodeId != null && change.beforeRef == null && change.afterRef == null && change.pendingAfterLogicalId == null,
+                    pendingAfterLogicalId = change.pendingAfterLogicalId ?: change.afterRef?.takeIf { it.versionId == null }?.logicalId,
                 ),
             )
         }
@@ -386,12 +412,18 @@ class AmendmentRepository(
         jdbc.update(
             """
             INSERT INTO amendment_changes (
-              id, revision_id, article_id, article_number, change_type, note,
-              node_id, changed_on, effective_on, amending_law_title, amending_law_citation
+              id, source_change_id, revision_id, article_id, article_number, change_type, note,
+              node_id, changed_on, effective_on, amending_law_title, amending_law_citation,
+              link_review_reason,
+              legacy_link_unresolved,
+              draft_after_logical_id,
+              before_version_id, before_logical_id, before_occurrence_id, before_root_occurrence_id, before_revision_id, before_unit_kind,
+              after_version_id, after_logical_id, after_occurrence_id, after_root_occurrence_id, after_revision_id, after_unit_kind
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """.trimIndent(),
             row.id,
+            row.sourceChangeId,
             row.revisionId,
             row.articleId,
             row.articleNumber,
@@ -402,6 +434,21 @@ class AmendmentRepository(
             row.effectiveOn,
             row.amendingLawTitle,
             row.amendingLawCitation,
+            row.linkReviewReason,
+            row.legacyLinkUnresolved,
+            row.pendingAfterLogicalId,
+            row.beforeRef?.versionId,
+            row.beforeRef?.logicalId,
+            row.beforeRef?.occurrenceId,
+            row.beforeRef?.rootOccurrenceId,
+            row.beforeRef?.revisionId,
+            row.beforeRef?.unitKind,
+            row.afterRef?.versionId,
+            row.afterRef?.logicalId,
+            row.afterRef?.occurrenceId,
+            row.afterRef?.rootOccurrenceId,
+            row.afterRef?.revisionId,
+            row.afterRef?.unitKind,
         )
     }
 
@@ -506,6 +553,7 @@ class AmendmentRepository(
                 sourceVersionId = rs.getObject("source_version_id", UUID::class.java),
                 targetVersionId = rs.getObject("target_version_id", UUID::class.java),
                 publishedRevisionId = rs.getObject("published_revision_id", UUID::class.java),
+                revisionId = if (includeStaff) rs.getObject("revision_id", UUID::class.java) else null,
                 changes = emptyList(),
                 reviewStatus = if (includeStaff) rs.getString("review_status") else null,
                 reviewedSourceTipId =
@@ -527,9 +575,14 @@ class AmendmentRepository(
     private fun listChanges(revisionId: UUID): List<AmendmentChangeDto> =
         jdbc.query(
             """
-            SELECT id, article_id, article_number, change_type, note,
+            SELECT id, source_change_id, article_id, article_number, change_type, note,
                    node_id, changed_on, effective_on, amending_law_citation_id,
-                   amending_law_title, amending_law_citation
+                   amending_law_title, amending_law_citation,
+                   link_review_reason,
+                   legacy_link_unresolved,
+                   draft_after_logical_id,
+                   before_version_id, before_logical_id, before_occurrence_id, before_root_occurrence_id, before_revision_id, before_unit_kind,
+                   after_version_id, after_logical_id, after_occurrence_id, after_root_occurrence_id, after_revision_id, after_unit_kind
             FROM amendment_changes
             WHERE revision_id = ?
             ORDER BY article_number NULLS LAST, change_type
@@ -537,6 +590,7 @@ class AmendmentRepository(
             { rs, _ ->
                 AmendmentChangeDto(
                     id = rs.getObject("id", UUID::class.java),
+                    sourceChangeId = rs.getObject("source_change_id", UUID::class.java),
                     articleId = rs.getObject("article_id", UUID::class.java),
                     articleNumber = rs.getString("article_number"),
                     changeType = rs.getString("change_type"),
@@ -547,10 +601,31 @@ class AmendmentRepository(
                     amendingLawCitationId = rs.getObject("amending_law_citation_id", UUID::class.java),
                     amendingLawTitle = rs.getString("amending_law_title"),
                     amendingLawCitation = rs.getString("amending_law_citation"),
+                    beforeRef = readUnitRef(rs, "before"),
+                    afterRef = readUnitRef(rs, "after"),
+                    linkReviewReason = rs.getString("link_review_reason"),
+                    legacyLinkUnresolved = rs.getBoolean("legacy_link_unresolved"),
+                    pendingAfterLogicalId = rs.getObject("draft_after_logical_id", UUID::class.java),
                 )
             },
             revisionId,
         )
+
+    private fun readUnitRef(rs: java.sql.ResultSet, side: String): AmendmentUnitRefDto? {
+        val versionId = rs.getObject("${side}_version_id", UUID::class.java) ?: return null
+        val occurrenceId = rs.getObject("${side}_occurrence_id", UUID::class.java) ?: return null
+        val rootOccurrenceId = rs.getObject("${side}_root_occurrence_id", UUID::class.java) ?: return null
+        return AmendmentUnitRefDto(
+            versionId = versionId,
+            logicalId = rs.getObject("${side}_logical_id", UUID::class.java),
+            occurrenceId = occurrenceId,
+            rootOccurrenceId = rootOccurrenceId,
+            revisionId = rs.getObject("${side}_revision_id", UUID::class.java),
+            unitKind = rs.getString("${side}_unit_kind"),
+            articleNumber = rs.getString("article_number"),
+            deepLink = "/versions/$versionId/units/$rootOccurrenceId?occurrenceId=$occurrenceId",
+        )
+    }
 
     companion object {
         private val DOCUMENT_LIST = object : TypeReference<List<AmendmentDocumentDto>>() {}

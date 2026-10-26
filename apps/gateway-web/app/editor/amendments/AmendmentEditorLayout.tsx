@@ -1,11 +1,16 @@
 'use client';
 
+import { T } from '../../components/TranslationProvider';
+import { ui } from '../../../lib/messages';
 import { useMemo, useState } from 'react';
-import type { Amendment, VersionSummary } from '../../../lib/api';
+import type { Amendment, ArticleSummary, VersionSummary } from '../../../lib/api';
 import type { AmendmentRevision } from '../../../lib/amendment-editor-api';
-import { Alert } from '../../components/ui';
+import type { DiffReviewState } from '../../../lib/diff-review';
+import { Alert, Button } from '../../components/ui';
 import { AmendmentForm } from './AmendmentForm';
 import { AmendmentRevisionPanel } from './AmendmentRevisionPanel';
+import { WorkspaceLayout } from '../../components/layout/templates';
+import surfaceStyles from '../../components/surfaces.module.css';
 
 type AmendmentEditorLayoutProps = {
   amendmentId: string;
@@ -14,6 +19,7 @@ type AmendmentEditorLayoutProps = {
   revisions: AmendmentRevision[] | null;
   versions: VersionSummary[];
   articlesByVersion: Record<string, string[]>;
+  unitTreesByVersion: Record<string, ArticleSummary[]>;
   latestVersionId?: string | null;
   canSave: boolean;
   canPublish: boolean;
@@ -21,6 +27,9 @@ type AmendmentEditorLayoutProps = {
   readOnly: boolean;
   canRestore: boolean;
   contentAvailable: boolean;
+  diffReview?: DiffReviewState | null;
+  canReviewDiff?: boolean;
+  canAcknowledgeDiff?: boolean;
 };
 
 function revisionToAmendment(revision: AmendmentRevision, base: Amendment): Amendment {
@@ -33,13 +42,18 @@ function revisionToAmendment(revision: AmendmentRevision, base: Amendment): Amen
     sourceReference: revision.sourceReference ?? null,
     sourceVersionId: revision.sourceVersionId ?? null,
     targetVersionId: revision.targetVersionId ?? null,
-    kind: revision.kind ?? base.kind,
+    comment: revision.comment ?? base.comment ?? null,
+    documents: revision.documents ?? base.documents ?? [],
     changes: revision.changes.map((change, index) => ({
       id: `revision-${index}`,
       articleId: null,
       articleNumber: change.articleNumber ?? null,
       changeType: change.changeType,
       note: change.note ?? null,
+      beforeRef: change.beforeRef ?? null,
+      afterRef: change.afterRef ?? null,
+      linkReviewReason: change.linkReviewReason ?? null,
+      legacyLinkUnresolved: change.legacyLinkUnresolved ?? false,
     })),
   };
 }
@@ -51,6 +65,7 @@ export function AmendmentEditorLayout({
   revisions,
   versions,
   articlesByVersion,
+  unitTreesByVersion,
   latestVersionId,
   canSave,
   canPublish,
@@ -58,6 +73,9 @@ export function AmendmentEditorLayout({
   readOnly,
   canRestore,
   contentAvailable,
+  diffReview,
+  canReviewDiff,
+  canAcknowledgeDiff,
 }: AmendmentEditorLayoutProps) {
   const [selectedRevisionId, setSelectedRevisionId] = useState<string | null>(null);
 
@@ -84,10 +102,10 @@ export function AmendmentEditorLayout({
     selectedRevision !== null ? revisionToAmendment(selectedRevision, amendment) : amendment;
 
   return (
-    <div className="workspace amendment-workspace">
-      <section className="panel amendment-main">
+    <WorkspaceLayout variant="amendment">
+      <section className={["panel amendment-main", surfaceStyles.panel].join(' ')}>
         {viewingPast ? (
-          <Alert tone="info">Viewing a past revision read-only. Restore to edit, or return to the current draft.</Alert>
+          <Alert tone="info"><T value={ui.editor.amendments.amendmenteditorlayout.viewingAPastRevisionReadOnlyRestore} /></Alert>
         ) : null}
         <AmendmentForm
           key={selectedRevision?.id ?? 'current'}
@@ -96,13 +114,22 @@ export function AmendmentEditorLayout({
           amendment={displayAmendment}
           versions={versions}
           articlesByVersion={articlesByVersion}
+          unitTreesByVersion={unitTreesByVersion}
           latestVersionId={latestVersionId}
           canSave={canSave && !viewingPast}
-          canPublish={canPublish && !viewingPast}
           canWithdraw={canWithdraw && !viewingPast}
           readOnly={readOnly || viewingPast}
           contentAvailable={contentAvailable}
+          diffReview={!viewingPast ? diffReview : null}
+          canReviewDiff={canReviewDiff}
+          canAcknowledgeDiff={canAcknowledgeDiff}
         />
+        {canPublish && !viewingPast ? (
+          <form action="/editor/command" method="post" className="action-bar"><input type="hidden" name="command" value="amendment-publish" />
+            <input type="hidden" name="amendmentId" value={amendmentId} />
+            <Button><T value={ui.editor.amendments.amendmenteditorlayout.publishLaw} /></Button>
+          </form>
+        ) : null}
       </section>
       {revisions && revisions.length > 0 ? (
         <AmendmentRevisionPanel
@@ -114,6 +141,6 @@ export function AmendmentEditorLayout({
           canRestore={canRestore}
         />
       ) : null}
-    </div>
+    </WorkspaceLayout>
   );
 }

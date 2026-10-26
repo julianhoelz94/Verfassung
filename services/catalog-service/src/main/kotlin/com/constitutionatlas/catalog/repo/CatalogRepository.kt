@@ -15,7 +15,17 @@ import org.springframework.stereotype.Repository
 import java.util.UUID
 
 @Repository
-class CatalogRepository(private val jdbc: JdbcTemplate) {
+class CatalogRepository(private val jdbc: JdbcTemplate, private val mapper: com.fasterxml.jackson.databind.ObjectMapper) {
+    fun holdImportedVersion(versionId: UUID, jobId: UUID) {
+        jdbc.update("INSERT INTO import_publication_holds (version_id, import_job_id) VALUES (?, ?)", versionId, jobId)
+    }
+
+    fun importHold(versionId: UUID): UUID? = jdbc.query(
+        "SELECT import_job_id FROM import_publication_holds WHERE version_id = ?",
+        { rs, _ -> rs.getObject("import_job_id", UUID::class.java) },
+        versionId,
+    ).firstOrNull()
+
     fun listCountries(): List<CountrySummary> =
         jdbc.query(
             """
@@ -85,33 +95,39 @@ class CatalogRepository(private val jdbc: JdbcTemplate) {
             isoCode.uppercase(),
         ).firstOrNull() ?: return null
 
-        val constitutions = jdbc.query(
-            """
-            SELECT id, slug, title
-            FROM constitutions
-            WHERE country_id = ?
-            ORDER BY title
-            """.trimIndent(),
-            { rs, _ ->
-                Triple(
-                    rs.getObject("id", UUID::class.java),
-                    rs.getString("slug"),
-                    rs.getString("title"),
-                )
-            },
-            country.id,
-        ).map { (id, slug, title) ->
-            ConstitutionSummary(
-                id,
-                slug,
-                title,
-                findLegalTipEditorialTipId(id, publishedOnly = true),
-                listPublishedPublicVersions(id),
-                findOutline(id),
-            )
-        }
+        return CountryDetail(country.id, country.isoCode, country.name, listConstitutions(country.id))
+    }
 
-        return CountryDetail(country.id, country.isoCode, country.name, constitutions)
+    fun listConstitutions(jurisdictionId: UUID): List<ConstitutionSummary> = jdbc.query(
+        """
+        SELECT id, slug, title, predecessor_constitution_id, interim
+        FROM constitutions
+        WHERE jurisdiction_id = ?
+        ORDER BY title
+        """.trimIndent(),
+        { rs, _ ->
+            arrayOf(
+                rs.getObject("id", UUID::class.java),
+                rs.getString("slug"),
+                rs.getString("title"),
+                rs.getObject("predecessor_constitution_id", UUID::class.java),
+                rs.getBoolean("interim"),
+            )
+        },
+        jurisdictionId,
+    ).map { row ->
+        val id = row[0] as UUID
+        ConstitutionSummary(
+            id,
+            row[1] as String,
+            row[2] as String,
+            findLegalTipEditorialTipId(id, publishedOnly = true),
+            listPublishedPublicVersions(id),
+            findOutline(id),
+            row[3] as UUID?,
+            row[4] as Boolean,
+            lifecycleStatus(id),
+        )
     }
 
     fun listPublishedPublicVersions(constitutionId: UUID): List<VersionSummary> {
@@ -121,14 +137,15 @@ class CatalogRepository(private val jdbc: JdbcTemplate) {
                 """
                 SELECT tip.id,
                        legal.version_label, legal.effective_date, legal.language_code, legal.source_url,
-                       legal.gazette_reference, legal.provenance, legal.verification_state,
+                       legal.gazette_reference, legal.source_evidence, legal.provenance, legal.verification_state,
                        legal.verified_by, legal.verified_at,
                        legal.legal_predecessor_version_id AS predecessor_version_id,
                        legal.hop_kind, 'public' AS listing,
                        legal.id AS legal_version_id,
                        tip.id AS current_version_id,
                        legal.legal_predecessor_version_id,
-                       NULL::uuid AS editorial_predecessor_version_id
+                       NULL::uuid AS editorial_predecessor_version_id,
+                       NULL::text AS publication_comment
                 FROM constitution_versions legal
                 JOIN LATERAL (
                   SELECT cv.id
@@ -164,8 +181,8 @@ class CatalogRepository(private val jdbc: JdbcTemplate) {
             jdbc.query(
                 """
                 SELECT cv.id, cv.version_label, cv.effective_date, cv.language_code, cv.source_url,
-                       cv.gazette_reference, cv.provenance, cv.verification_state, cv.verified_by,
-                       cv.verified_at, cv.predecessor_version_id, cv.hop_kind, cv.listing,
+                       cv.gazette_reference, cv.source_evidence, cv.provenance, cv.verification_state, cv.verified_by,
+                       cv.verified_at, cv.predecessor_version_id, cv.hop_kind, cv.listing, cv.publication_comment,
                        cv.legal_version_id,
                        tip.id AS current_version_id,
                        cv.legal_predecessor_version_id,
@@ -272,6 +289,13 @@ class CatalogRepository(private val jdbc: JdbcTemplate) {
         return (count ?: 0) > 0
     }
 
+    fun lockConstitution(constitutionId: UUID): Boolean =
+        jdbc.query(
+            "SELECT id FROM constitutions WHERE id = ? FOR UPDATE",
+            { rs, _ -> rs.getObject("id", UUID::class.java) },
+            constitutionId,
+        ).isNotEmpty()
+
     fun findCountrySummary(isoCode: String): CountrySummary? =
         jdbc.query(
             "SELECT id, iso_code, name FROM countries WHERE iso_code = ?",
@@ -290,22 +314,62 @@ class CatalogRepository(private val jdbc: JdbcTemplate) {
         return CountrySummary(id, isoCode.uppercase(), name)
     }
 
-    fun findConstitutionId(countryId: UUID, slug: String): UUID? =
+    fun findConstitutionId(jurisdictionId: UUID, slug: String): UUID? =
         jdbc.query(
-            "SELECT id FROM constitutions WHERE country_id = ? AND slug = ?",
+            "SELECT constitution_id AS id FROM constitution_slug_aliases WHERE jurisdiction_id = ? AND slug = ? UNION SELECT id FROM constitutions WHERE jurisdiction_id = ? AND slug = ?",
             { rs, _ -> rs.getObject("id", UUID::class.java) },
-            countryId,
+            jurisdictionId,
+            slug,
+            jurisdictionId,
             slug,
         ).firstOrNull()
 
-    fun insertConstitution(countryId: UUID, slug: String, title: String): UUID {
+    fun constitutionJurisdictionId(constitutionId: UUID): UUID? =
+        jdbc.query(
+            "SELECT jurisdiction_id FROM constitutions WHERE id = ?",
+            { rs, _ -> rs.getObject("jurisdiction_id", UUID::class.java) },
+            constitutionId,
+        ).firstOrNull()
+
+    fun lifecycleStatus(constitutionId: UUID, on: java.time.LocalDate = java.time.LocalDate.now()): String =
+        lifecycleState(constitutionId, on, showApproximateAsUncertain = true)
+
+    fun lifecycleLegalStatus(constitutionId: UUID, on: java.time.LocalDate): String =
+        lifecycleState(constitutionId, on, showApproximateAsUncertain = false)
+
+    private fun lifecycleState(constitutionId: UUID, on: java.time.LocalDate, showApproximateAsUncertain: Boolean): String =
+        jdbc.query(
+            """
+            SELECT event_type, date_certainty
+            FROM constitution_lifecycle_events
+            WHERE constitution_id = ? AND event_date <= ?
+            ORDER BY event_date DESC, created_at DESC
+            LIMIT 1
+            """.trimIndent(),
+            { rs, _ -> rs.getString("event_type") to rs.getString("date_certainty") },
+            constitutionId,
+            java.sql.Date.valueOf(on),
+        ).firstOrNull()?.let { (eventType, certainty) ->
+            if (showApproximateAsUncertain && certainty == "approximate") return@let "uncertain"
+            when (eventType) {
+                "adopted" -> "awaiting_commencement"
+                "commenced", "restored" -> "in_force"
+                "suspended" -> "suspended"
+                "repealed" -> "repealed"
+                else -> "unknown"
+            }
+        } ?: "unknown"
+
+    fun insertConstitution(jurisdictionId: UUID, slug: String, title: String, predecessorId: UUID?, interim: Boolean): UUID {
         val id = UUID.randomUUID()
         jdbc.update(
-            "INSERT INTO constitutions (id, country_id, slug, title) VALUES (?, ?, ?, ?)",
+            "INSERT INTO constitutions (id, jurisdiction_id, slug, title, predecessor_constitution_id, interim) VALUES (?, ?, ?, ?, ?, ?)",
             id,
-            countryId,
+            jurisdictionId,
             slug,
             title,
+            predecessorId,
+            interim,
         )
         insertDefaultOutline(id)
         return id
@@ -316,8 +380,8 @@ class CatalogRepository(private val jdbc: JdbcTemplate) {
             """
             INSERT INTO constitution_node_kinds (
               id, constitution_id, kind_code, display_label, sort_order, may_hold_text, may_hold_children,
-              presentation, show_label, show_title, show_kind
-            ) VALUES (?, ?, 'article', 'Article', 1, TRUE, FALSE, 'section', TRUE, TRUE, TRUE)
+              presentation, show_label, show_title, show_kind, is_root
+            ) VALUES (?, ?, 'article', 'Article', 1, TRUE, FALSE, 'section', TRUE, TRUE, TRUE, TRUE)
             """.trimIndent(),
             UUID.randomUUID(),
             constitutionId,
@@ -327,9 +391,11 @@ class CatalogRepository(private val jdbc: JdbcTemplate) {
     fun findOutline(constitutionId: UUID): ContentOutlineDto {
         val edges = jdbc.query(
             """
-            SELECT parent_kind_code, child_kind_code
-            FROM constitution_node_kind_edges
-            WHERE constitution_id = ?
+            SELECT e.parent_kind_code, e.child_kind_code
+            FROM constitution_node_kind_edges e
+            JOIN constitution_node_kinds child ON child.constitution_id = e.constitution_id AND child.kind_code = e.child_kind_code
+            WHERE e.constitution_id = ?
+            ORDER BY child.sort_order
             """.trimIndent(),
             { rs, _ -> rs.getString("parent_kind_code") to rs.getString("child_kind_code") },
             constitutionId,
@@ -337,7 +403,8 @@ class CatalogRepository(private val jdbc: JdbcTemplate) {
         val kinds = jdbc.query(
             """
             SELECT kind_code, display_label, sort_order, may_hold_text, may_hold_children,
-                   presentation, show_label, show_title, show_kind
+                   presentation, show_label, show_title, show_kind, allow_text_alongside_children,
+                   title_policy, label_policy, label_placement, segmentation, is_root
             FROM constitution_node_kinds
             WHERE constitution_id = ?
             ORDER BY sort_order
@@ -355,6 +422,12 @@ class CatalogRepository(private val jdbc: JdbcTemplate) {
                     showLabel = rs.getBoolean("show_label"),
                     showTitle = rs.getBoolean("show_title"),
                     showKind = rs.getBoolean("show_kind"),
+                    allowTextAlongsideChildren = rs.getBoolean("allow_text_alongside_children"),
+                    titlePolicy = rs.getString("title_policy"),
+                    labelPolicy = rs.getString("label_policy"),
+                    labelPlacement = rs.getString("label_placement"),
+                    segmentation = rs.getString("segmentation"),
+                    root = rs.getBoolean("is_root"),
                 )
             },
             constitutionId,
@@ -373,36 +446,46 @@ class CatalogRepository(private val jdbc: JdbcTemplate) {
         jdbc.update("DELETE FROM constitution_node_kind_edges WHERE constitution_id = ?", constitutionId)
         jdbc.update("DELETE FROM constitution_node_kinds WHERE constitution_id = ?", constitutionId)
         kinds.forEachIndexed { index, kind ->
-            val last = index == kinds.lastIndex
+            val children = kind.allowedChildKinds.orEmpty()
             jdbc.update(
                 """
                 INSERT INTO constitution_node_kinds (
                   id, constitution_id, kind_code, display_label, sort_order, may_hold_text, may_hold_children,
-                  presentation, show_label, show_title, show_kind
-                ) VALUES (?, ?, ?, ?, ?, TRUE, ?, ?, ?, ?, ?)
+                  presentation, show_label, show_title, show_kind, allow_text_alongside_children,
+                  title_policy, label_policy, label_placement, segmentation, is_root
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """.trimIndent(),
                 UUID.randomUUID(),
                 constitutionId,
                 kind.kindCode,
                 kind.displayLabel,
                 index + 1,
-                !last,
+                children.isEmpty() || kind.allowTextAlongsideChildren,
+                children.isNotEmpty(),
                 kind.presentation,
                 kind.showLabel,
                 kind.showTitle,
                 kind.showKind,
+                kind.allowTextAlongsideChildren,
+                kind.titlePolicy,
+                kind.labelPolicy,
+                kind.labelPlacement,
+                kind.segmentation,
+                kind.root == true,
             )
         }
-        kinds.zipWithNext().forEach { (parent, child) ->
-            jdbc.update(
-                """
+        kinds.forEach { parent ->
+            parent.allowedChildKinds.orEmpty().forEach { child ->
+                jdbc.update(
+                    """
                 INSERT INTO constitution_node_kind_edges (constitution_id, parent_kind_code, child_kind_code)
                 VALUES (?, ?, ?)
-                """.trimIndent(),
-                constitutionId,
-                parent.kindCode,
-                child.kindCode,
-            )
+                    """.trimIndent(),
+                    constitutionId,
+                    parent.kindCode,
+                    child,
+                )
+            }
         }
     }
 
@@ -424,21 +507,23 @@ class CatalogRepository(private val jdbc: JdbcTemplate) {
         languageCode: String,
         sourceUrl: String?,
         gazetteReference: String?,
+        publicationComment: String?,
         predecessorVersionId: UUID?,
         hopKind: String,
         listing: String,
         legalVersionId: UUID,
         legalPredecessorVersionId: UUID?,
         editorialPredecessorVersionId: UUID?,
+        sourceEvidence: com.constitutionatlas.platform.SourceEvidence? = null,
     ): UUID {
         jdbc.update(
             """
             INSERT INTO constitution_versions (
               id, constitution_id, version_label, effective_date, publication_status,
               language_code, source_url, gazette_reference, provenance, verification_state,
-              predecessor_version_id, hop_kind, listing,
-              legal_version_id, legal_predecessor_version_id, editorial_predecessor_version_id
-            ) VALUES (?, ?, ?, ?, 'draft', ?, ?, ?, 'imported', 'unverified', ?, ?, ?, ?, ?, ?)
+              predecessor_version_id, hop_kind, listing, publication_comment,
+              legal_version_id, legal_predecessor_version_id, editorial_predecessor_version_id, source_evidence
+            ) VALUES (?, ?, ?, ?, 'draft', ?, ?, ?, 'imported', 'unverified', ?, ?, ?, ?, ?, ?, ?, ?::jsonb)
             """.trimIndent(),
             id,
             constitutionId,
@@ -450,9 +535,11 @@ class CatalogRepository(private val jdbc: JdbcTemplate) {
             predecessorVersionId,
             hopKind,
             listing,
+            publicationComment,
             legalVersionId,
             legalPredecessorVersionId,
             editorialPredecessorVersionId,
+            sourceEvidence?.let(mapper::writeValueAsString),
         )
         if (!sourceUrl.isNullOrBlank() || !gazetteReference.isNullOrBlank()) {
             jdbc.update(
@@ -501,8 +588,11 @@ class CatalogRepository(private val jdbc: JdbcTemplate) {
                    cv.legal_version_id,
                    tip.id AS current_version_id,
                    cv.legal_predecessor_version_id,
-                   cv.editorial_predecessor_version_id
+                   cv.editorial_predecessor_version_id, country.iso_code AS country_code, constitution.jurisdiction_id,
+                   cv.source_url, cv.gazette_reference, cv.source_evidence
             FROM constitution_versions cv
+            JOIN constitutions constitution ON constitution.id = cv.constitution_id
+            LEFT JOIN countries country ON country.id = constitution.country_id
             LEFT JOIN LATERAL (
               SELECT t.id
               FROM constitution_versions t
@@ -550,6 +640,7 @@ class CatalogRepository(private val jdbc: JdbcTemplate) {
             versionLabel = rs.getString("version_label"),
             effectiveDate = rs.getDate("effective_date")?.toLocalDate(),
             languageCode = rs.getString("language_code"),
+            sourceEvidence = rs.getString("source_evidence")?.let { mapper.readValue(it, com.constitutionatlas.platform.SourceEvidence::class.java) },
             sourceUrl = rs.getString("source_url"),
             gazetteReference = rs.getString("gazette_reference"),
             provenance = rs.getString("provenance"),
@@ -563,11 +654,17 @@ class CatalogRepository(private val jdbc: JdbcTemplate) {
             currentVersionId = rs.getObject("current_version_id", UUID::class.java),
             legalPredecessorVersionId = rs.getObject("legal_predecessor_version_id", UUID::class.java),
             editorialPredecessorVersionId = rs.getObject("editorial_predecessor_version_id", UUID::class.java),
+            publicationComment = rs.getString("publication_comment"),
         )
     }
 
     private val versionDetailMapper = RowMapper { rs, _ ->
         VersionDetail(
+            sourceEvidence = rs.getString("source_evidence")?.let { mapper.readValue(it, com.constitutionatlas.platform.SourceEvidence::class.java) },
+            sourceUrl = rs.getString("source_url"),
+            gazetteReference = rs.getString("gazette_reference"),
+            countryCode = rs.getString("country_code"),
+            jurisdictionId = rs.getObject("jurisdiction_id", UUID::class.java),
             id = rs.getObject("id", UUID::class.java),
             constitutionId = rs.getObject("constitution_id", UUID::class.java),
             versionLabel = rs.getString("version_label"),

@@ -7,3 +7,5 @@ class StepUpRequiredException : ForbiddenException("Recent step-up authenticatio
 class ConflictException(message: String) : RuntimeException(message)
 
 class BadRequestException(message: String) : RuntimeException(message)
+
+class MailDeliveryException : RuntimeException("Mail delivery is unavailable")

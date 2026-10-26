@@ -6,10 +6,12 @@
 	uri strip_prefix /api/docs/{args[0]}
 	reverse_proxy {args[1]}:8080 {
 		header_up X-Forwarded-Prefix /api/docs/{args[0]}
+		header_up X-Atlas-Client-IP {client_ip}
+		header_up X-Forwarded-For {client_ip}
 	}
 }
 
-:80 {
+(atlas_routes) {
 	encode gzip
 
 	# Baseline browser hardening for every response (UI and API). A Content-Security-Policy
@@ -23,23 +25,62 @@
 		defer
 	}
 
-	# Mutating catalog/content/amendment/audit/search/ingestion routes need an
-	# Authorization header. Caddy does not validate the token; identity /me (GOV-6) does.
-	@missing_write_auth {
-		method POST PUT PATCH DELETE
-		header !Authorization
-		path /api/catalog* /api/content* /api/amendment* /api/audit* /api/search* /api/ingestion*
-	}
-	route @missing_write_auth {
-		respond 401
-	}
-
 	# OpenAPI/Swagger is local-only unless CADDY_EXPOSE_API_DOCS=true (SEC-3).
 	@docs_closed {
 		path /api/docs/*
 		expression `{env.CADDY_EXPOSE_API_DOCS} != "true"`
 	}
 	respond @docs_closed 404
+
+
+	# Anonymous API requests share one edge quota across services. Validated account
+	# sessions and bearer credentials are exempt. The gateway also gates public pages
+	# when anonymous browsing is disabled.
+	@api_request {
+		path /api/catalog* /api/content* /api/amendment* /api/audit* /api/search* /api/ingestion* /api/document* /api/identity* /api/editor* /api/docs/* /oauth/token* /oauth/register* /oauth/revoke*
+	}
+	route @api_request {
+		forward_auth gateway-web:3000 {
+			uri /api/edge-rate-limit
+			header_up X-Atlas-Client-IP {client_ip}
+			header_up X-Forwarded-For {client_ip}
+			header_up X-Atlas-Edge-Check 1
+			header_up X-Atlas-Original-URI {uri}
+		}
+	}
+
+	# Mutating catalog/content/amendment/audit/search/ingestion routes need an
+	# Authorization header. Caddy does not validate the token; identity /me (GOV-6) does.
+	@missing_write_auth {
+		method POST PUT PATCH DELETE
+		header !Authorization
+		path /api/catalog* /api/content* /api/amendment* /api/audit* /api/search* /api/ingestion* /api/document* /api/docs/catalog* /api/docs/content* /api/docs/amendment* /api/docs/audit* /api/docs/search* /api/docs/ingestion* /api/docs/document*
+	}
+	route @missing_write_auth {
+		respond 401
+	}
+
+
+	route /.well-known/oauth-protected-resource/mcp {
+		reverse_proxy mcp-server:8080
+	}
+
+	route /.well-known/oauth-authorization-server {
+		reverse_proxy identity-service:8080
+	}
+
+	route /oauth/token* {
+		reverse_proxy identity-service:8080
+	}
+	route /oauth/register* {
+		reverse_proxy identity-service:8080 {
+			header_up X-Atlas-Client-IP {client_ip}
+			header_up X-Forwarded-For {client_ip}
+		}
+	}
+	route /oauth/revoke* {
+		reverse_proxy identity-service:8080
+	}
 
 	route /api/docs/catalog* {
 		import docs_upstream catalog catalog-service
@@ -73,6 +114,10 @@
 		import docs_upstream audit audit-service
 	}
 
+	route /api/docs/document* {
+		import docs_upstream document document-service
+	}
+
 	route /api/catalog* {
 		uri strip_prefix /api/catalog
 		reverse_proxy catalog-service:8080
@@ -95,7 +140,10 @@
 
 	route /api/identity* {
 		uri strip_prefix /api/identity
-		reverse_proxy identity-service:8080
+		reverse_proxy identity-service:8080 {
+			header_up X-Atlas-Client-IP {client_ip}
+			header_up X-Forwarded-For {client_ip}
+		}
 	}
 
 	route /api/editor* {
@@ -108,15 +156,52 @@
 		reverse_proxy audit-service:8080
 	}
 
+	route /api/document* {
+		uri strip_prefix /api/document
+		reverse_proxy document-service:8080
+	}
+
 	route /api/search* {
 		uri strip_prefix /api/search
 		reverse_proxy search-service:8080
 	}
 
+	route /mcp* {
+		reverse_proxy mcp-server:8080 {
+			header_up X-Atlas-Client-IP {client_ip}
+			header_up X-Forwarded-For {client_ip}
+		}
+	}
+
+	# A configured legacy host keeps its browser URL and fragment until the exact
+	# mapping resolves. APIs and Next assets keep their normal routes.
+	@legacy_page {
+		host {$ATLAS_LEGACY_HOST:legacy.localhost}
+		not path /api/* /_next/* /legacy*
+	}
+	route @legacy_page {
+		rewrite * /legacy
+		reverse_proxy gateway-web:3000 {
+			header_up Host {$ATLAS_CANONICAL_HOST}
+			header_up X-Forwarded-Host {$ATLAS_CANONICAL_HOST}
+			header_up -X-Atlas-Edge-Check
+			header_up X-Atlas-Client-IP {client_ip}
+			header_up X-Forwarded-For {client_ip}
+			header_up -X-Atlas-Original-URI
+		}
+	}
+
 	route {
 		# Pin Host so Next.js server actions cannot follow a client-controlled Host (GHSA-89xv-2m56-2m9x).
 		reverse_proxy gateway-web:3000 {
-			header_up Host {upstream_hostport}
+			header_up Host {$ATLAS_CANONICAL_HOST}
+			header_up X-Forwarded-Host {$ATLAS_CANONICAL_HOST}
+			# Only the internal forward_auth request may carry the edge-check marker.
+			# Pin the peer separately for gateway Identity requests.
+			header_up -X-Atlas-Edge-Check
+			header_up X-Atlas-Client-IP {client_ip}
+			header_up X-Forwarded-For {client_ip}
+			header_up -X-Atlas-Original-URI
 		}
 	}
 }

@@ -1,11 +1,15 @@
 'use client';
 
-import { useMemo } from 'react';
+import { T, useTranslation } from '../../components/TranslationProvider';
+import { ui } from '../../../lib/messages';
+import { useMemo, useState } from 'react';
 import type { Amendment } from '../../../lib/api';
 import type { AmendmentRevision } from '../../../lib/amendment-editor-api';
 import { Badge, Button } from '../../components/ui';
 import { FormattedDate } from '../../../lib/format-date';
 import { restoreRevisionAction } from './actions';
+import { Stack } from '../../components/layout/Layout';
+import surfaceStyles from '../../components/surfaces.module.css';
 
 type AmendmentRevisionPanelProps = {
   amendmentId: string;
@@ -18,7 +22,7 @@ type AmendmentRevisionPanelProps = {
 
 function actorLabel(createdBy: string | null | undefined): string {
   if (!createdBy) {
-    return 'Unknown';
+    return '';
   }
   return createdBy.slice(0, 8);
 }
@@ -31,6 +35,8 @@ export function AmendmentRevisionPanel({
   onSelectRevision,
   canRestore,
 }: AmendmentRevisionPanelProps) {
+  const t = useTranslation();
+  const [restoring, setRestoring] = useState(false);
   const ordered = useMemo(
     () =>
       [...revisions].sort((a, b) => {
@@ -48,7 +54,7 @@ export function AmendmentRevisionPanel({
   const viewingPast = selectedRevisionId !== null;
 
   const list = (
-    <ol className="stack revision-list">
+    <Stack as="ol" className="revision-list">
       {ordered.map((revision) => {
         const isNewest = revision.id === newestId;
         const isActive = selectedRevisionId === null ? isNewest : selectedRevisionId === revision.id;
@@ -63,35 +69,43 @@ export function AmendmentRevisionPanel({
               <span className="revision-date">
                 <FormattedDate value={revision.createdAt} />
               </span>
-              <span className="revision-actor">{actorLabel(revision.createdBy)}</span>
-              <Badge tone={isPublic ? 'added' : 'changed'}>{isPublic ? 'This is public' : 'Draft'}</Badge>
+              <span className="revision-actor">{actorLabel(revision.createdBy) || <T value={ui.remainingStatus.unknown} />}</span>
+              <Badge tone={isPublic ? 'added' : 'changed'}><T value={isPublic ? ui.remainingStatus.thisIsPublic : ui.remainingStatus.draft} /></Badge>
             </button>
           </li>
         );
       })}
-    </ol>
+    </Stack>
   );
 
   const restoreForm =
     canRestore && viewingPast && selectedRevision ? (
-      <form action={restoreRevisionAction} className="stack">
+      <Stack as="form" onSubmit={async (event: React.FormEvent<HTMLFormElement>) => {
+        event.preventDefault();
+        if (restoring) return;
+        setRestoring(true);
+        try {
+          window.location.assign(await restoreRevisionAction(new FormData(event.currentTarget)));
+        } catch {
+          window.location.assign(`/editor/amendments/${encodeURIComponent(amendmentId)}?error=save_failed`);
+        }
+      }}>
         <input type="hidden" name="amendmentId" value={amendmentId} />
         <input type="hidden" name="revisionBody" value={JSON.stringify(selectedRevision)} />
-        <Button type="submit" size="sm">
-          Restore as new draft
-        </Button>
-      </form>
+        <Button type="submit" size="sm" disabled={restoring}>
+          <T value={ui.editor.amendments.amendmentrevisionpanel.restoreAsNewDraft} />{" "}</Button>
+      </Stack>
     ) : null;
 
   return (
     <>
-      <details className="panel panel-side revision-panel-phone">
-        <summary className="panel-title">Revision history</summary>
+      <details className={["panel panel-side revision-panel-phone", surfaceStyles.panel].join(' ')}>
+        <summary className="panel-title"><T value={ui.editor.amendments.amendmentrevisionpanel.revisionHistory} /></summary>
         {list}
         {restoreForm}
       </details>
-      <aside className="panel panel-side revision-panel-desktop" aria-label="Revision history">
-        <p className="panel-title">Revision history</p>
+      <aside className={["panel panel-side revision-panel-desktop", surfaceStyles.panel].join(' ')} aria-label={t(ui.accessibility.revisionHistory)}>
+        <p className="panel-title"><T value={ui.editor.amendments.amendmentrevisionpanel.revisionHistory} /></p>
         {list}
         {restoreForm}
       </aside>

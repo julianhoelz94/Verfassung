@@ -13,6 +13,18 @@ data class ArticleSummary(
     val body: String? = null,
     val children: List<ContentNodeDto>? = null,
     val predecessorId: UUID? = null,
+    @get:JsonInclude(JsonInclude.Include.NON_NULL)
+    val content: List<OrderedEntry>? = null,
+    @get:JsonInclude(JsonInclude.Include.NON_NULL)
+    val logicalId: UUID? = null,
+    @get:JsonInclude(JsonInclude.Include.NON_NULL)
+    val revisionId: UUID? = null,
+    @get:JsonInclude(JsonInclude.Include.NON_NULL)
+    val kind: String? = null,
+    @get:JsonInclude(JsonInclude.Include.NON_NULL)
+    val legacyIdentity: Boolean? = null,
+    @get:JsonInclude(JsonInclude.Include.NON_EMPTY)
+    val lineage: List<UUID> = emptyList(),
 )
 
 data class ContentNodeDto(
@@ -26,6 +38,14 @@ data class ContentNodeDto(
     val children: List<ContentNodeDto>,
     @get:JsonInclude(JsonInclude.Include.NON_NULL)
     val predecessorId: UUID? = null,
+    @get:JsonInclude(JsonInclude.Include.NON_NULL)
+    val content: List<OrderedEntry>? = null,
+    @get:JsonInclude(JsonInclude.Include.NON_NULL)
+    val logicalId: UUID? = null,
+    @get:JsonInclude(JsonInclude.Include.NON_NULL)
+    val revisionId: UUID? = null,
+    @get:JsonInclude(JsonInclude.Include.NON_EMPTY)
+    val lineage: List<UUID> = emptyList(),
 )
 
 data class ArticleDetail(
@@ -39,6 +59,16 @@ data class ArticleDetail(
     val children: List<ContentNodeDto> = emptyList(),
     @get:JsonInclude(JsonInclude.Include.NON_NULL)
     val predecessorId: UUID? = null,
+    @get:JsonInclude(JsonInclude.Include.NON_NULL)
+    val content: List<OrderedEntry>? = null,
+    @get:JsonInclude(JsonInclude.Include.NON_NULL)
+    val logicalId: UUID? = null,
+    @get:JsonInclude(JsonInclude.Include.NON_NULL)
+    val revisionId: UUID? = null,
+    @get:JsonInclude(JsonInclude.Include.NON_NULL)
+    val legacyIdentity: Boolean? = null,
+    @get:JsonInclude(JsonInclude.Include.NON_EMPTY)
+    val lineage: List<UUID> = emptyList(),
 )
 
 data class NodeWrite(
@@ -49,7 +79,7 @@ data class NodeWrite(
     val children: List<NodeWrite> = emptyList(),
     val id: UUID? = null,
     val predecessorId: UUID? = null,
-)
+) : StrictContentWrite()
 
 data class ArticleWrite(
     val articleNumber: String,
@@ -59,7 +89,7 @@ data class ArticleWrite(
     val nodes: List<NodeWrite> = emptyList(),
     val id: UUID? = null,
     val predecessorId: UUID? = null,
-)
+) : StrictContentWrite()
 
 data class ArticlePatch(
     val title: String,

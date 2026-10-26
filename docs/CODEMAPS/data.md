@@ -1,71 +1,41 @@
-<!-- Generated: 2026-09-06 | Files scanned: ~250 | Token estimate: ~850 -->
-# Data
+<!-- Reviewed: 2026-10-19 -->
+# Data ownership
 
-One Postgres per service (`docker-compose.yml` `*-db`). **No cross-service FKs.** Same UUID may appear in two DBs as a copied id.
+Nine Postgres databases, one per stateful service. Other services copy opaque IDs
+and use owner APIs; there are no cross-service foreign keys. Gateway and MCP are
+stateless. Add a new Flyway migration under the owner rather than editing an applied
+migration. The migration directory and repository SQL are authoritative for current
+columns and indexes; historical seed/compatibility migrations must remain available.
 
-Flyway: `services/<name>/src/main/resources/db/migration/`. Forward-only `V{n}__….sql`. Every service has `V1__init.sql` (`service_bootstrap_marker`).
-
-## catalog_db
-
-| Table | Role |
+| Database | Current table families and invariants |
 | --- | --- |
-| `countries` | iso_code PK-unique |
-| `constitutions` | per country, slug unique |
-| `constitution_versions` | label, dates, `publication_status`, chain (V9: `predecessor_version_id`, `hop_kind`, `listing`). ADR 0005 / CAT-6: `legal_version_id`, legal vs editorial predecessors; `hop_kind` `initial`/`legal`/`editorial_correction` |
-| `constitution_sources` | citations + verification |
-| `constitution_node_kinds` | outline: kind_code, flags, presentation `section\|concatenated` (V6) |
-| `constitution_node_kind_edges` | allowed parent→child kinds |
+| Catalog | Current/historical jurisdiction hierarchy, countries/constitutions/sources; two-axis `constitution_versions`; outline kinds/edges; settings and metadata revisions/slug aliases; constitution and provision lifecycle events; contextual wiki pages/revisions; successor reservations and import publication holds |
+| Content | `content_snapshots`, immutable `content_node_revisions` / `content_text_revisions`, ordered `content_revision_entries`, snapshot roots/occurrences and publication receipts; legacy `content_nodes` and the `articles` compatibility view remain supported |
+| Amendment | Legal change identity/revisions/changes, published version pins, diff runs/decisions and publication-attempt receipts; legacy transitions remain for compatibility |
+| Document | Documents, immutable metadata/files/revisions and append-only lifecycle/link events; legal-page revisions/publication and shared imprint-contact revisions |
+| Identity | Users/roles/sessions, throttles, invites/reset/registration verification, MFA/recovery/challenges, passkeys, service/MCP/OAuth credentials, saved mail/access/translation policies and durable `deployment_setup` |
+| Editor | Sessions, draft changes/revisions, pinned structured sources/operations, publication jobs, diff runs/decisions and delivery outbox |
+| Ingestion | Jobs/errors/staging records, batches/review decisions, setup proposals, resumable uploads/chunks and publication outbox |
+| Search | Rebuildable `search_documents` and `index_sync_state`; generation-pinned reads use one consistent index transaction |
+| Audit | Append-only `audit_events`; event attribution and payload are recorded without changing authored content |
 
-Latest: V10 two-axis chains. Seed: `V3__seed_germany.sql` (demo provenance, not official); V9 sets 1949 `initial` and 2022 `legal_amendment`; V10 migrates that hop to `legal` and fills `legal_version_id`.
+Catalog V25/V26 add `jurisdictions` with stable IDs, sibling-unique slugs, optional codes, historical status and optional existence dates. Existing countries retain their UUIDs as root jurisdictions. Constitutions, slug aliases and succession are scoped to `jurisdiction_id`; nullable `country_id` preserves legacy national-owner reads. Historical codes may be reused without merging identities.
 
-## content_db
+A logical content ID identifies a unit across revisions; a revision ID identifies
+immutable content; an occurrence ID pins its position in a version. Authored labels
+are display text and cannot replace those identities. Reusing a revision during
+publication is limited to the pinned source/target snapshots. Legal changes,
+editorial corrections and constitution lifecycle are separate concepts.
 
-| Table | Role |
-| --- | --- |
-| `articles` | View over root `content_nodes` (`parent_id IS NULL`); V7 dropped the table |
-| `content_nodes` | Tree (`parent_id`, kind, body, `predecessor_id` V7). Display and write SoT |
+Document citation links pin an immutable document revision and, for amendments or
+wiki content, the owning revision scope. Legal prose and shared contact publication
+remain in the same Document database transaction.
 
-Seed: `V3__seed_germany_articles.sql`, `V5__seed_article1_tree.sql`.
+Fresh content fixtures are generated and uploaded through real APIs, then read back.
+Do not restore historical seed writes or flatten mixed content to simplify a test.
 
-## amendment_db
-
-`version_transitions` (source→target UUIDs, `constitution_id`), `amendments` (`constitution_id`, `status`, `review_status` `ok`/`needs_review`, nullable `version_transition_id`, `published_revision_id`; `kind` dropped in V8), `amendment_revisions` (linear chain; `comment`, `documents` JSONB, published pins `reviewed_source_tip_id`/`reviewed_target_tip_id`, `is_published_tip`), `amendment_changes` (hang off `revision_id`; V6 amending-law text). Seed: `V3__seed_basic_law_transition.sql` (V8 migrates summary→comment and `source_reference`→a document URL). Latest: V8.
-
-## identity_db
-
-`roles`, `users` (+ `enabled` V5), `user_roles`, `sessions` (+ `last_seen_at` V4), `login_throttle`, `invites`, `password_resets`, `user_mfa`, `mfa_recovery_codes`, `mfa_challenges`, `service_tokens` (V8, `expires_at` V9).
-
-Roles seeded: `admin`, `editor`, `viewer`, then `reviewer`, `publisher` (V3).
-
-## editor_db
-
-`edit_sessions` (status enum `open→reviewing→approved→published`, CHECK V3), `draft_changes` (JSONB), `edit_revisions` (snapshot JSONB), `outbox_events` (V4: `event_name`, `payload` JSONB, `created_at`, `published_at`; scheduler publishes `search.reindex-requested`). Latest: V4.
-
-## search_db
-
-`search_documents` (GIN `tsv`; V5 `language_code`, german vs simple + article-number simple vector), `index_sync_state`. Rebuilt; not authoritative. Latest: V5.
-
-## ingestion_db
-
-`import_jobs` (payload JSONB), `import_errors`, `import_staging_records`.
-
-## audit_db
-
-`audit_events` (JSONB payload). `actor_id`/`actor_email` nullable (V3). UPDATE/DELETE rules no-op.
-
-## Where to add schema
-
-| Change | Service / next migration |
-| --- | --- |
-| Country / version / outline | catalog |
-| Article text / tree | content |
-| Amendment metadata | amendment |
-| User / session / token | identity |
-| Draft workflow | editor |
-| Search document fields | search (and reindex) |
-| Import job fields | ingestion |
-| Audit event shape | audit (append-only — extra columns only if needed) |
-
-JSONB is used for drafts, import staging, audit payloads, and the editor outbox. Other services may add their own outbox later (ADR 0001 / 0003).
-
-Backup: `infra/backup/backup.sh` dumps all eight DBs into `./backups/<timestamp>/`.
+`infra/backup/backup.sh` dumps all nine databases and removes its `INCOMPLETE` marker
+only after every dump succeeds. `restore.sh` rejects marked backups and validates
+all required nonempty readable dumps before its first schema replacement. Restoration is still a
+sequence of per-database operations, not a distributed transaction. See the Wiki's
+Local Stack Reference for the explicit restore command.

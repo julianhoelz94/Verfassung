@@ -1,0 +1,512 @@
+import { McpServer, requireScopes } from '@modelcontextprotocol/server';
+import { createHash } from 'node:crypto';
+import { z } from 'zod';
+import { deleteJson, getJson, postJson, putJson, publicVersionUrl, requirePublishedVersion, UpstreamError } from './catalog.js';
+import { CursorError, decodeCursor, encodeCursor, fingerprint } from './cursor.js';
+import { importPayloadSchema, setupProposalSchema } from './import-schema.js';
+import { observeTool } from './operations.js';
+import { batchCreatedOutput, batchItemOutput, batchOutput, completedUploadOutput, constitutionListOutput, countryListOutput, findConstitutionOutput, importSchemaOutput, importSetupOutput, importStagedOutput, jobOutput, outlineOutput, readUnitOutput, resolveUnitOutput, searchOutput, setupProposalCreatedOutput, setupProposalOutput, unitListOutput, uploadOutput, versionListOutput } from './output-schema.js';
+
+const uuid = z.string().uuid();
+const page = { offset: z.number().int().min(0).default(0), limit: z.number().int().min(1).max(50).default(20), cursor: z.string().max(1024).optional() };
+const readOnly = { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false };
+const stagedWrite = { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false };
+const newStagedWrite = { ...stagedWrite, idempotentHint: false };
+const importScope = requireScopes('ingestion:import');
+const json = (value: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(value) }], structuredContent: value as Record<string, unknown> });
+
+type Country = { isoCode: string; name: string; versionCount: number };
+type CountryDetail = { isoCode: string; name: string; constitutions: Array<{ id: string; slug: string; title: string; versions: unknown[] }> };
+type OrderedEntry = { type: string; text?: string | null; node?: { logicalId?: string; content?: OrderedEntry[] } | null };
+type Unit = { id: string; versionId: string; articleNumber: string; title: string; body?: string; kind?: string; children?: Array<{ id: string }>; content?: OrderedEntry[] };
+
+const settingsGuidance = [
+  { id: 'country.isoCode', field: 'isoCode', description: 'Two-letter country code used in public links.', allowed: 'Two letters', changeability: 'set_once' },
+  { id: 'country.name', field: 'countryName', description: 'Public name shown on the country page and in selectors.', allowed: 'Non-empty text', changeability: 'set_once' },
+  { id: 'constitution.predecessor', field: 'predecessorConstitutionId', description: 'Earlier constitution replaced by this one; used in the timeline.', allowed: 'Existing constitution UUID in this country, or null', changeability: 'set_once' },
+  { id: 'constitution.interim', field: 'interim', description: 'Marks a transitional constitution; legal status and end date are separate lifecycle events.', allowed: [true, false], changeability: 'set_once' },
+  { id: 'constitution.title', field: 'constitutionTitle', description: 'Public name shown on country pages and timelines.', allowed: 'Non-empty text', changeability: 'later' },
+  { id: 'constitution.slug', field: 'constitutionSlug', description: 'Readable catalog identifier; an old slug remains an alias after change.', allowed: 'Lowercase letters, digits and hyphens', changeability: 'later' },
+  { id: 'outline.kindCode', field: 'outline.kinds[].kindCode', description: 'Stable internal identifier of a structural level.', allowed: 'Unique lowercase code up to 32 characters', changeability: 'set_once' },
+  { id: 'outline.displayLabel', field: 'outline.kinds[].displayLabel', description: 'Reader-facing name of a structural level.', allowed: 'Non-empty text', changeability: 'impact_review' },
+  { id: 'outline.allowTextAlongsideChildren', field: 'outline.kinds[].allowTextAlongsideChildren', description: 'Allows unnumbered parent text before, between or after child units.', allowed: [true, false], changeability: 'impact_review' },
+  { id: 'outline.titlePolicy', field: 'outline.kinds[].titlePolicy', description: 'Whether units may or must have an editorial title.', allowed: ['none', 'optional', 'required'], changeability: 'impact_review' },
+  { id: 'outline.labelPolicy', field: 'outline.kinds[].labelPolicy', description: 'Whether exact source labels such as 46a or (2a) may or must be entered.', allowed: ['none', 'optional', 'required'], changeability: 'impact_review' },
+  { id: 'outline.segmentation', field: 'outline.kinds[].segmentation', description: 'Plain editing or guided sentence boundaries on the final text level.', allowed: ['plain', 'sentence'], changeability: 'impact_review' },
+  { id: 'outline.presentation', field: 'outline.kinds[].presentation', description: 'Separate block or running text in the public reader.', allowed: ['section', 'concatenated'], changeability: 'impact_review' },
+  { id: 'outline.showKind', field: 'outline.kinds[].showKind', description: 'Displays the kind name before each unit.', allowed: [true, false], changeability: 'impact_review' },
+  { id: 'outline.showLabel', field: 'outline.kinds[].showLabel', description: 'Displays the exact source label beside each unit.', allowed: [true, false], changeability: 'impact_review' },
+  { id: 'outline.showTitle', field: 'outline.kinds[].showTitle', description: 'Displays editorial titles when titles are allowed.', allowed: [true, false], changeability: 'impact_review' },
+  { id: 'outline.labelPlacement', field: 'outline.kinds[].labelPlacement', description: 'Places labels before or after a title, inline, or as superscript.', allowed: ['before_title', 'after_title', 'inline', 'superscript'], changeability: 'impact_review' },
+] as const;
+
+export function orderedText(entries: OrderedEntry[]): string {
+  let text = '';
+  let previousChild = false;
+  for (const entry of entries) {
+    const child = entry.type === 'child';
+    const part = child ? orderedText(entry.node?.content ?? []) : entry.text ?? '';
+    if (!part) continue;
+    if (text && (child || previousChild) && !/\s$/.test(text) && /^[\p{L}\p{N}]/u.test(part)) text += ' ';
+    text += part;
+    previousChild = child;
+  }
+  return text;
+}
+
+export function setupHandoff(proposal: { id: string; status: string; revision: number; changesRequested?: boolean }) {
+  const previewUrl = `${(process.env.PUBLIC_BASE_URL ?? 'http://localhost').replace(/\/$/, '')}/admin/import/setup/${proposal.id}`;
+  const nextAction = proposal.status === 'confirmed' ? 'upload_full_content' : proposal.status === 'withdrawn' ? 'stop' : proposal.changesRequested ? 'revise_proposal' : 'wait_for_confirmation';
+  const instructions = nextAction === 'upload_full_content'
+    ? 'The editor explicitly confirmed this revision on the website. Read the confirmed settings pin and upload the full content. Approval and publication remain separate website actions.'
+    : nextAction === 'revise_proposal'
+      ? 'Read requestedChanges and the latest payload. Revise the hierarchy and representative sample together using this revision. Website display preferences are preserved. After revision, stop and wait for explicit website confirmation.'
+      : nextAction === 'stop' ? 'This proposal was withdrawn. Stop this upload workflow.'
+        : 'Stop and show the preview URL to the user. Wait for explicit website confirmation before full upload. Do not confirm on the user’s behalf or repeatedly poll. Resume when the user asks, then read get_setup_proposal; only confirmed permits full upload.';
+  return { revision: proposal.revision, previewUrl, nextAction, instructions };
+}
+
+async function runLogged<T extends Record<string, unknown>>(tool: string, action: () => Promise<T>, actorId: () => string | undefined) {
+  const started = Date.now();
+  try {
+    const value = await action();
+    observeTool(tool, 'ok', Date.now() - started);
+    const resourceId = value.jobId ?? value.itemId ?? value.batchId ?? value.proposalId ?? value.constitutionId ?? value.uploadId ?? value.id;
+    console.info(JSON.stringify({ event: 'mcp_tool', tool, actorId: actorId(), resourceId, outcome: 'ok', elapsedMs: Date.now() - started }));
+    return json(value);
+  } catch (error) {
+    observeTool(tool, 'error', Date.now() - started);
+    const status = error instanceof UpstreamError ? error.status : error instanceof CursorError ? 400 : 503;
+    console.warn(JSON.stringify({ event: 'mcp_tool', tool, actorId: actorId(), outcome: 'error', status, elapsedMs: Date.now() - started }));
+    const message = error instanceof UpstreamError || error instanceof CursorError ? error.message : 'The requested data could not be loaded.';
+    const code = error instanceof CursorError ? 'invalid_cursor' : status === 401 ? 'unauthenticated' : status === 403 ? 'forbidden' : status === 404 ? 'not_found' : status === 409 ? 'conflict' : status === 413 ? 'payload_too_large' : status === 400 ? 'invalid_input' : 'upstream_unavailable';
+    return { content: [{ type: 'text' as const, text: message }], structuredContent: { code, status, message, retryable: status === 429 || status >= 500 }, isError: true };
+  }
+}
+
+export function createServer(authorization?: string): McpServer {
+  const server = new McpServer(
+    { name: 'constitution-atlas', version: '0.1.0' },
+    { capabilities: { tools: {} }, cacheHints: { 'tools/list': { ttlMs: 60_000, cacheScope: 'private' }, 'server/discover': { ttlMs: 60_000, cacheScope: 'private' } } },
+  );
+  let auditActorId: string | undefined;
+  const run = <T extends Record<string, unknown>>(tool: string, action: () => Promise<T>) => runLogged(tool, action, () => auditActorId);
+
+  async function requireImportKey() {
+    if (!authorization || !/^Bearer ca_(?:mcp|oauth)_/.test(authorization)) throw new UpstreamError(403, 'identity');
+    const actor = await getJson<{ id?: string; scopes: string[]; resource?: string }>('identity', '/me', authorization);
+    if (authorization.startsWith('Bearer ca_oauth_') && actor.resource !== `${(process.env.PUBLIC_BASE_URL ?? 'http://localhost').replace(/\/$/, '')}/mcp`) throw new UpstreamError(403, 'identity');
+    if (!actor.scopes.includes('ingestion:import')) throw new UpstreamError(403, 'identity');
+    auditActorId = actor.id;
+  }
+
+  function requireConfirmedUpload(payload: Record<string, unknown>) {
+    if (!uuid.safeParse(payload.constitutionId).success || !uuid.safeParse(payload.settingsRevisionId).success || payload.outline != null) {
+      throw new UpstreamError(409, 'ingestion', 'Full upload requires the confirmed constitutionId and settingsRevisionId; omit outline.');
+    }
+  }
+
+  function requireDirectUploadSize(payload: Record<string, unknown>) {
+    if (Buffer.byteLength(JSON.stringify(payload), 'utf8') > 2_097_152) {
+      throw new UpstreamError(413, 'mcp', 'Direct upload exceeds 2 MiB; use a chunked batch upload.');
+    }
+  }
+
+  server.registerTool('export_import_job', {
+    description: 'Read your submitted request or the actual prepared persisted snapshot as paginated JSON-pointer leaf records. Concatenate @text chunks by index. Continue until complete=true; restart on changed-snapshot conflicts. Fidelity reports exact mismatches against the submission, never an echoed-request checksum.',
+    inputSchema: { jobId: uuid, view: z.enum(['submitted', 'prepared']).default('prepared'), cursor: z.string().max(1024).optional() },
+    outputSchema: z.object({ jobId: uuid, view: z.string(), snapshotId: z.string(), records: z.array(z.object({ path: z.string(), value: z.unknown() })), totalRecords: z.number().int(), complete: z.boolean(), nextCursor: z.string().nullable(), fidelity: z.array(z.object({ path: z.string(), reason: z.string() })), fidelityComplete: z.boolean(), resourcesComplete: z.boolean(), counts: z.record(z.string(), z.number().int()) }).passthrough(),
+    annotations: readOnly, scopeChallenge: importScope,
+  }, ({ jobId, view, cursor }) => run('export_import_job', async () => {
+    await requireImportKey();
+    const query = new URLSearchParams({ view, ...(cursor ? { cursor } : {}) });
+    return await getJson<Record<string, unknown>>('ingestion', `/import-jobs/${jobId}/export?${query}`, authorization);
+  }));
+
+  server.registerTool('get_import_schema', {
+    description: 'Learn the structured constitution import format, hierarchy rules, and review workflow before staging content.',
+    inputSchema: {},
+    outputSchema: importSchemaOutput,
+    annotations: readOnly,
+  }, () => run('get_import_schema', async () => ({
+    schemaVersion: '1.1',
+    settingsGuidance,
+    workflow: ['find_constitution', 'propose_constitution_setup if missing', 'STOP and wait for explicit website confirmation; show the preview URL', 'when the user resumes, get_setup_proposal; requested changes require a revision and another wait', 'editor confirms outline in the site', 'get_import_setup for constitutionId and settingsRevisionId', 'stage_constitution_import', 'editor prepares a draft in the site', 'reviewer approves', 'publisher publishes'],
+    required: ['jurisdictionId or isoCode with countryName', 'constitutionSlug', 'constitutionTitle', 'constitutionId', 'settingsRevisionId', 'versionLabel', 'sourceUrl or gazetteReference', 'articles or roots'],
+    uploadLimits: { directToolBytes: 2_097_152, chunkBytes: 524_288, chunkedItemBytes: 26_214_400, receivingBatchBytes: 104_857_600, maxItemsPerBatch: 100 },
+    sourceFields: { languageCode: 'BCP 47 language tag', sourceUrl: 'HTTPS URL of the source', gazetteReference: 'Official citation or gazette reference', effectiveDate: 'YYYY-MM-DD or null' },
+    structure: {
+      outline: { kinds: [{ kindCode: 'article', displayLabel: 'Article', presentation: 'section', showLabel: true, showTitle: true, showKind: false, allowTextAlongsideChildren: false, titlePolicy: 'optional', labelPolicy: 'optional', labelPlacement: 'before_title', segmentation: 'plain', root: true, allowedChildKinds: [] }] },
+      migrationUpload: { migrationRunId: 'run UUID', item: { sourceKey: 'gg/source', kind: 'document', dependencies: [], payload: { title: 'Original source bytes', sourceUrl: 'https://example.org/source.htm', fileName: 'source.htm', fileBase64: 'base64 of original bytes', fileSha256: 'SHA-256 of original bytes' } } },
+      richContent: { formats: ['plain', 'table', 'footnote'], fields: ['format', 'table', 'footnoteLabel', 'references'], table: { caption: 'Source table', rows: [{ logicalId: 'row UUID', cells: [{ logicalId: 'cell UUID', text: 'Exact cell wording', header: true, rowSpan: 1, colSpan: 2, headers: [] }] }] }, reference: { logicalId: 'reference UUID', start: 0, end: 4, target: { type: 'footnote', footnoteId: 'note entry UUID' } } },
+      articles: [{ articleNumber: '1', title: 'Example', body: 'Text', sortOrder: 1, nodes: [] }],
+      roots: [{ logicalId: 'stable UUID', kind: 'article', label: '1', title: 'Example', content: [{ type: 'text', text: 'Text' }] }],
+      setupProposal: { isoCode: 'FR', countryName: 'France', constitutionSlug: 'constitution', constitutionTitle: 'Constitution', languageCode: 'fr', sourceUrl: 'https://example.org/source', outline: { kinds: [{ kindCode: 'article', displayLabel: 'Article' }] }, sampleRoots: [{ kind: 'article', label: '1', content: [{ type: 'text', text: 'Representative text' }] }] },
+    },
+    notes: ['Unknown fields are rejected. Preserve table geometry, explicit reference targets, footnote labels, and root/allowedChildKinds outline rules.', 'Call get_import_setup first. For an existing constitution copy its settingsRevisionId and omit outline.', 'A new constitution needs an outline proposal and a site review before content preparation.', 'Reuse an idempotencyKey when retrying a direct upload; without one, identical payloads reuse a content-derived key.', 'Use get_import_upload to resume missing chunks or cancel_import_upload to discard an unfinished upload.', 'Preserve source spelling, numbering and text order.', 'No MCP tool can approve or publish.'],
+  })));
+
+  const migrationItem = z.strictObject({
+    sourceKey: z.string().min(1).max(200),
+    kind: z.enum(['snapshot', 'document', 'citation', 'amendment', 'document_link', 'legacy_mapping', 'comparison']),
+    dependencies: z.array(z.string().min(1).max(200)).max(100).optional(), payload: z.record(z.string(), z.unknown()),
+  });
+  server.registerTool('create_migration_run', {
+    description: 'Create or resume a private bounded migration package using a stable runKey and complete source inventory. Records excluded and unavailable sources with reasons; never prepares, approves or publishes.',
+    inputSchema: { runKey: z.string().min(1).max(200), title: z.string().min(1).max(512), sources: z.array(z.strictObject({
+      sourceKey: z.string().min(1).max(200), url: z.string().url().startsWith('https://').max(2048), sha256: z.string().regex(/^[a-f0-9]{64}$/).nullable().optional(),
+      encoding: z.string().max(100).nullable().optional(), attribution: z.string().max(10000).nullable().optional(), aliases: z.array(z.string().url().startsWith('https://').max(2048)).max(20).optional(),
+      disposition: z.enum(['included', 'unavailable', 'excluded']).optional(), reason: z.string().max(10000).nullable().optional(), captureKey: z.string().max(200).nullable().optional(), targetKeys: z.array(z.string().min(1).max(200)).max(100).optional(),
+    })).min(1).max(100) },
+    outputSchema: z.object({ id: uuid, ownerId: uuid, manifest: z.record(z.string(), z.unknown()), items: z.array(z.unknown()).max(100), coverage: z.record(z.string(), z.number()) }),
+    annotations: stagedWrite, scopeChallenge: importScope,
+  }, args => run('create_migration_run', async () => {
+    await requireImportKey(); requireDirectUploadSize(args);
+    return await postJson<Record<string, unknown>>('ingestion', '/migration-runs', args, authorization!);
+  }));
+  server.registerTool('stage_migration_item', {
+    description: 'Stage one immutable source-keyed snapshot, captured document/citation, amendment record, document link, legacy mapping or curated comparison. Editors prepare resources in the review workspace; dependencies and failures stay explicit. For files over the direct limit upload a migration envelope through existing chunked batch tools.',
+    inputSchema: { runId: uuid, item: migrationItem },
+    outputSchema: z.object({ id: uuid, sourceKey: z.string(), kind: z.string(), sha256: z.string(), dependencies: z.array(z.string()), state: z.string(), result: z.record(z.string(), z.unknown()), attempts: z.number().int(), error: z.string().nullable() }),
+    annotations: stagedWrite, scopeChallenge: importScope,
+  }, ({ runId, item }) => run('stage_migration_item', async () => {
+    await requireImportKey(); requireDirectUploadSize(item);
+    if (item.kind === 'snapshot') { const parsed = importPayloadSchema.parse(item.payload); requireConfirmedUpload(parsed); item.payload = parsed; }
+    return await postJson<Record<string, unknown>>('ingestion', `/migration-runs/${runId}/items`, item, authorization!);
+  }));
+  server.registerTool('get_migration_attempts', {
+    description: 'Read paginated durable preparation attempts for an item in your migration package, including retry outcomes.',
+    inputSchema: { runId: uuid, itemId: uuid, offset: z.number().int().min(0).default(0), limit: z.number().int().min(1).max(50).default(20) },
+    outputSchema: z.object({ items: z.array(z.record(z.string(), z.unknown())).max(50), nextOffset: z.number().int().nullable() }), annotations: readOnly, scopeChallenge: importScope,
+  }, ({ runId, itemId, offset, limit }) => run('get_migration_attempts', async () => {
+    await requireImportKey(); return await getJson<Record<string, unknown>>('ingestion', `/migration-runs/${runId}/items/${itemId}/attempts?offset=${offset}&limit=${limit}`, authorization);
+  }));
+  server.registerTool('get_migration_run', {
+    description: 'Read your durable migration package manifest, resource handles, attempts, unresolved relationships and coverage. Upload expiration does not remove this record.',
+    inputSchema: { runId: uuid }, outputSchema: z.object({ id: uuid, ownerId: uuid, manifest: z.record(z.string(), z.unknown()), items: z.array(z.unknown()).max(100), coverage: z.record(z.string(), z.number()) }),
+    annotations: readOnly, scopeChallenge: importScope,
+  }, ({ runId }) => run('get_migration_run', async () => {
+    await requireImportKey(); return await getJson<Record<string, unknown>>('ingestion', `/migration-runs/${runId}`, authorization);
+  }));
+
+  const jurisdictionSelector = { countryCode: z.string().regex(/^[A-Za-z]{2}$/).optional(), jurisdictionId: uuid.optional(), constitutionSlug: z.string().trim().min(1).max(120) };
+  async function importSetup(countryCode: string | undefined, jurisdictionId: string | undefined, constitutionSlug: string) {
+    await requireImportKey();
+    if (Boolean(countryCode) === Boolean(jurisdictionId)) throw new UpstreamError(400, 'catalog', 'Select exactly one countryCode or jurisdictionId.');
+    const selector = { countryCode: countryCode?.toUpperCase(), jurisdictionId };
+    let detail: { name?: string; jurisdiction?: { name: string }; constitutions: CountryDetail['constitutions'] };
+    try { detail = await getJson('catalog', jurisdictionId ? `/jurisdictions/${jurisdictionId}` : `/countries/${countryCode!.toUpperCase()}`, authorization); }
+    catch (error) { if (error instanceof UpstreamError && error.status === 404) return { exists: false, ...selector, outline: null }; throw error; }
+    const constitution = detail.constitutions.find(item => item.slug === constitutionSlug);
+    if (!constitution) return { exists: false, ...selector, countryName: detail.jurisdiction?.name ?? detail.name, outline: null };
+    const settings = await getJson<{ id: string; outline: Record<string, unknown> }>('catalog', `/constitutions/${constitution.id}/settings`, authorization);
+    return { exists: true, ...selector, countryName: detail.jurisdiction?.name ?? detail.name, constitutionId: constitution.id, title: constitution.title, slug: constitution.slug, settingsRevisionId: settings.id, outline: settings.outline, settingsGuidance };
+  }
+
+  server.registerTool('find_constitution', {
+    description: 'Find a constitution by jurisdiction ID or compatible country code and slug. Does not create records.',
+    inputSchema: jurisdictionSelector, outputSchema: findConstitutionOutput, annotations: readOnly, scopeChallenge: importScope,
+  }, ({ countryCode, jurisdictionId, constitutionSlug }) => run('find_constitution', () => importSetup(countryCode, jurisdictionId, constitutionSlug)));
+
+  server.registerTool('propose_constitution_setup', {
+    description: 'Submit private metadata, hierarchy and a representative sample. Then STOP and wait for explicit editor confirmation on the website before full upload.',
+    inputSchema: { proposal: setupProposalSchema },
+    outputSchema: setupProposalCreatedOutput,
+    annotations: newStagedWrite,
+    scopeChallenge: importScope,
+  }, ({ proposal }) => run('propose_constitution_setup', async () => {
+    await requireImportKey();
+    const result = await postJson<{ id: string; status: string; revision: number }>('ingestion', '/import-setup-proposals', proposal, authorization!);
+    return { proposalId: result.id, status: result.status, settingsGuidance, ...setupHandoff(result) };
+  }));
+
+  server.registerTool('get_setup_proposal', {
+    description: 'Read the current revision, website requested changes, and confirmation status. Only confirmed permits full upload. Read before revising; preserve website display preferences.',
+    inputSchema: { proposalId: uuid },
+    outputSchema: setupProposalOutput,
+    annotations: readOnly,
+    scopeChallenge: importScope,
+  }, ({ proposalId }) => run('get_setup_proposal', async () => {
+    await requireImportKey();
+    const result = await getJson<Record<string, unknown> & { id: string; status: string; revision: number; changesRequested: boolean }>('ingestion', `/import-setup-proposals/${proposalId}`, authorization);
+    return { ...result, ...setupHandoff(result) };
+  }));
+
+  server.registerTool('revise_setup_proposal', {
+    description: 'Revise hierarchy and sample together after reading the latest proposal and requested changes. Supply its exact revision. After revision STOP and wait for explicit website confirmation.',
+    inputSchema: { proposalId: uuid, expectedRevision: z.number().int().positive(), proposal: setupProposalSchema },
+    outputSchema: setupProposalOutput,
+    annotations: stagedWrite,
+    scopeChallenge: importScope,
+  }, ({ proposalId, expectedRevision, proposal }) => run('revise_setup_proposal', async () => {
+    await requireImportKey();
+    const result = await putJson<Record<string, unknown> & { id: string; status: string; revision: number; changesRequested: boolean }>('ingestion', `/import-setup-proposals/${proposalId}`, proposal, authorization!, expectedRevision);
+    return { ...result, ...setupHandoff(result) };
+  }));
+
+  server.registerTool('get_import_setup', {
+    description: 'Read the confirmed outline and settings pin for a jurisdiction or country before uploading.',
+    inputSchema: jurisdictionSelector, outputSchema: importSetupOutput, annotations: readOnly, scopeChallenge: importScope,
+  }, ({ countryCode, jurisdictionId, constitutionSlug }) => run('get_import_setup', () => importSetup(countryCode, jurisdictionId, constitutionSlug)));
+
+  server.registerTool('stage_constitution_import', {
+    description: 'Stage one constitution version for site review. This never publishes content.',
+    inputSchema: { payload: importPayloadSchema, idempotencyKey: z.string().min(8).max(128).optional() },
+    outputSchema: importStagedOutput,
+    annotations: stagedWrite,
+    scopeChallenge: importScope,
+  }, ({ payload, idempotencyKey }) => run('stage_constitution_import', async () => {
+    await requireImportKey();
+    requireDirectUploadSize(payload);
+    requireConfirmedUpload(payload);
+    const retryKey = idempotencyKey ?? `ca-mcp-${createHash('sha256').update(JSON.stringify(payload)).digest('hex')}`;
+    const job = await postJson<{ id: string; status: string; errors: unknown[] }>('ingestion', '/import-jobs', payload, authorization!, retryKey);
+    return { jobId: job.id, status: job.status, errors: job.errors, reviewUrl: `${(process.env.PUBLIC_BASE_URL ?? 'http://localhost').replace(/\/$/, '')}/admin/import/${job.id}` };
+  }));
+
+  server.registerTool('create_import_batch', {
+    description: 'Create a private batch handle for up to 100 constitution items. Each item has its own review status.',
+    inputSchema: {},
+    outputSchema: batchCreatedOutput,
+    annotations: newStagedWrite,
+    scopeChallenge: importScope,
+  }, () => run('create_import_batch', async () => {
+    await requireImportKey();
+    const batch = await postJson<{ id: string; status: string }>('ingestion', '/import-batches', {}, authorization!);
+    return { batchId: batch.id, status: batch.status, reviewUrl: `${(process.env.PUBLIC_BASE_URL ?? 'http://localhost').replace(/\/$/, '')}/admin/import?batch=${batch.id}` };
+  }));
+
+  server.registerTool('stage_batch_item', {
+    description: 'Stage one item in a batch with a stable idempotency key. Retry the same key and payload safely.',
+    inputSchema: { batchId: uuid, idempotencyKey: z.string().min(8).max(128), payload: importPayloadSchema, checksumSha256: z.string().regex(/^[a-fA-F0-9]{64}$/).optional() },
+    outputSchema: batchItemOutput,
+    annotations: stagedWrite,
+    scopeChallenge: importScope,
+  }, ({ batchId, idempotencyKey, payload, checksumSha256 }) => run('stage_batch_item', async () => {
+    await requireImportKey();
+    requireDirectUploadSize(payload);
+    requireConfirmedUpload(payload);
+    const item = await postJson<{ id: string; status: string; errors: unknown[] }>('ingestion', `/import-batches/${batchId}/items`, { idempotencyKey, payload, checksumSha256 }, authorization!);
+    return { batchId, itemId: item.id, status: item.status, errors: item.errors, reviewUrl: `${(process.env.PUBLIC_BASE_URL ?? 'http://localhost').replace(/\/$/, '')}/admin/import/${item.id}` };
+  }));
+
+  server.registerTool('get_import_batch', {
+    description: 'Read independent item statuses for a batch owned by this key principal.',
+    inputSchema: { batchId: uuid },
+    outputSchema: batchOutput,
+    annotations: readOnly,
+    scopeChallenge: importScope,
+  }, ({ batchId }) => run('get_import_batch', async () => {
+    await requireImportKey();
+    return await getJson<Record<string, unknown>>('ingestion', `/import-batches/${batchId}`, authorization);
+  }));
+
+  server.registerTool('begin_import_upload', {
+    description: 'Start or resume a bounded chunked item upload in a private batch. Compute SHA-256 over the complete UTF-8 JSON bytes.',
+    inputSchema: { batchId: uuid, idempotencyKey: z.string().min(8).max(128), checksumSha256: z.string().regex(/^[a-fA-F0-9]{64}$/), totalBytes: z.number().int().min(1).max(25 * 1024 * 1024) },
+    outputSchema: uploadOutput,
+    annotations: stagedWrite,
+    scopeChallenge: importScope,
+  }, ({ batchId, idempotencyKey, checksumSha256, totalBytes }) => run('begin_import_upload', async () => {
+    await requireImportKey();
+    return await postJson<Record<string, unknown>>('ingestion', `/import-batches/${batchId}/uploads`, { idempotencyKey, checksumSha256, totalBytes }, authorization!);
+  }));
+
+  server.registerTool('put_import_chunk', {
+    description: 'Send one base64 chunk by index. Repeating the same index and checksum is safe; get_import_upload reports missing chunks.',
+    inputSchema: { uploadId: uuid, index: z.number().int().min(0).max(49), dataBase64: z.string().min(1).max(700_000), checksumSha256: z.string().regex(/^[a-fA-F0-9]{64}$/) },
+    outputSchema: uploadOutput,
+    annotations: stagedWrite,
+    scopeChallenge: importScope,
+  }, ({ uploadId, index, dataBase64, checksumSha256 }) => run('put_import_chunk', async () => {
+    await requireImportKey();
+    return await putJson<Record<string, unknown>>('ingestion', `/import-uploads/${uploadId}/chunks/${index}`, { dataBase64, checksumSha256 }, authorization!);
+  }));
+
+  server.registerTool('get_import_upload', {
+    description: 'Inspect a private upload and find the chunk indices still missing.',
+    inputSchema: { uploadId: uuid },
+    outputSchema: uploadOutput,
+    annotations: readOnly,
+    scopeChallenge: importScope,
+  }, ({ uploadId }) => run('get_import_upload', async () => {
+    await requireImportKey();
+    return await getJson<Record<string, unknown>>('ingestion', `/import-uploads/${uploadId}`, authorization);
+  }));
+
+  server.registerTool('cancel_import_upload', {
+    description: 'Discard an unfinished private upload and its chunks. A completed upload has already staged an item and cannot be canceled here.',
+    inputSchema: { uploadId: uuid },
+    outputSchema: uploadOutput,
+    annotations: { ...stagedWrite, destructiveHint: true },
+    scopeChallenge: importScope,
+  }, ({ uploadId }) => run('cancel_import_upload', async () => {
+    await requireImportKey();
+    return await deleteJson<Record<string, unknown>>('ingestion', `/import-uploads/${uploadId}`, authorization!);
+  }));
+
+  server.registerTool('complete_import_upload', {
+    description: 'Verify the assembled checksum and stage the completed item for site review. This never publishes.',
+    inputSchema: { uploadId: uuid },
+    outputSchema: completedUploadOutput,
+    annotations: stagedWrite,
+    scopeChallenge: importScope,
+  }, ({ uploadId }) => run('complete_import_upload', async () => {
+    await requireImportKey();
+    const upload = await postJson<{ itemId?: string; status: string; migrationRunId?: string }>('ingestion', `/import-uploads/${uploadId}/complete`, {}, authorization!);
+    return { ...upload, reviewUrl: upload.migrationRunId ? `${(process.env.PUBLIC_BASE_URL ?? 'http://localhost').replace(/\/$/, '')}/admin/migrations/${upload.migrationRunId}` : upload.itemId ? `${(process.env.PUBLIC_BASE_URL ?? 'http://localhost').replace(/\/$/, '')}/admin/import/${upload.itemId}` : null };
+  }));
+
+  server.registerTool('get_import_job', {
+    description: 'Check the review status of an import you staged.',
+    inputSchema: { jobId: uuid },
+    outputSchema: jobOutput,
+    annotations: readOnly,
+    scopeChallenge: importScope,
+  }, ({ jobId }) => run('get_import_job', async () => {
+    await requireImportKey();
+    return await getJson<Record<string, unknown>>('ingestion', `/import-jobs/${jobId}`, authorization);
+  }));
+
+  server.registerTool('list_jurisdictions', {
+    description: 'Browse current, regional, and historical jurisdictions. Omit parentId for roots; request child collections to explore the hierarchy.',
+    inputSchema: { parentId: uuid.optional(), ...page },
+    outputSchema: z.object({ jurisdictions: z.array(z.object({ id: uuid, name: z.string(), slug: z.string(), kind: z.string(), parentId: uuid.nullable(), historical: z.boolean().optional() }).passthrough()).max(50), total: z.number().int(), nextCursor: z.string().nullable(), complete: z.boolean() }),
+    annotations: readOnly,
+  }, ({ parentId, offset, limit, cursor }) => run('list_jurisdictions', async () => {
+    const all = await getJson<Array<{ id: string; name: string; slug: string; kind: string; parentId: string | null }>>('catalog', `/jurisdictions${parentId ? `?parentId=${parentId}` : ''}`);
+    const scope = `jurisdictions:${parentId ?? 'roots'}`;
+    const generation = fingerprint(all.map(item => JSON.stringify(item)));
+    const start = cursor ? decodeCursor(cursor, scope, generation) : offset;
+    const selected = all.slice(start, start + limit);
+    const next = start + selected.length;
+    return { jurisdictions: selected, total: all.length, nextCursor: next < all.length ? encodeCursor(scope, generation, next) : null, complete: next >= all.length };
+  }));
+
+  server.registerTool('list_countries', {
+    description: 'List countries with published constitutions.',
+    inputSchema: page,
+    outputSchema: countryListOutput,
+    annotations: readOnly,
+  }, ({ offset, limit, cursor }) => run('list_countries', async () => {
+    const countries = (await getJson<Country[]>('catalog', '/countries')).filter(country => country.versionCount > 0).sort((a, b) => a.isoCode.localeCompare(b.isoCode));
+    const source = fingerprint(countries.map(country => country.isoCode));
+    const start = cursor ? decodeCursor(cursor, 'countries', source) : offset;
+    const next = start + limit < countries.length ? start + limit : null;
+    return { countries: countries.slice(start, start + limit), total: countries.length, nextOffset: next, nextCursor: next === null ? null : encodeCursor('countries', source, next) };
+  }));
+
+  server.registerTool('list_constitutions', {
+    description: 'List published constitutions for a country by its two-letter ISO code.',
+    inputSchema: { countryCode: z.string().regex(/^[A-Za-z]{2}$/), ...page },
+    outputSchema: constitutionListOutput,
+    annotations: readOnly,
+  }, ({ countryCode, offset, limit, cursor }) => run('list_constitutions', async () => {
+    const country = await getJson<CountryDetail>('catalog', `/countries/${countryCode.toUpperCase()}`);
+    const constitutions = country.constitutions.filter(item => item.versions.length > 0).map(({ id, slug, title }) => ({ id, slug, title })).sort((a, b) => a.slug.localeCompare(b.slug) || a.id.localeCompare(b.id));
+    const scope = `constitutions:${country.isoCode}`;
+    const source = fingerprint(constitutions.map(item => item.id));
+    const start = cursor ? decodeCursor(cursor, scope, source) : offset;
+    const next = start + limit < constitutions.length ? start + limit : null;
+    return { countryCode: country.isoCode, countryName: country.name, constitutions: constitutions.slice(start, start + limit), total: constitutions.length, nextOffset: next, nextCursor: next === null ? null : encodeCursor(scope, source, next) };
+  }));
+
+  server.registerTool('list_versions', {
+    description: 'List public published versions of one constitution.',
+    inputSchema: { constitutionId: uuid, ...page },
+    outputSchema: versionListOutput,
+    annotations: readOnly,
+  }, ({ constitutionId, offset, limit, cursor }) => run('list_versions', async () => {
+    const versions = (await getJson<Array<{ id: string; versionLabel: string; effectiveDate?: string; languageCode: string; sourceUrl?: string; gazetteReference?: string }>>('catalog', `/constitutions/${constitutionId}/versions?listing=public`))
+      .sort((a, b) => (a.effectiveDate ?? '').localeCompare(b.effectiveDate ?? '') || a.id.localeCompare(b.id));
+    const scope = `versions:${constitutionId}`;
+    const source = fingerprint(versions.map(version => version.id));
+    const start = cursor ? decodeCursor(cursor, scope, source) : offset;
+    const next = start + limit < versions.length ? start + limit : null;
+    return { constitutionId, versions: versions.slice(start, start + limit), total: versions.length, nextOffset: next, nextCursor: next === null ? null : encodeCursor(scope, source, next) };
+  }));
+
+  server.registerTool('get_constitution_outline', {
+    description: 'Read the content hierarchy and display labels of a public constitution version.',
+    inputSchema: { versionId: uuid },
+    outputSchema: outlineOutput,
+    annotations: readOnly,
+  }, ({ versionId }) => run('get_constitution_outline', async () => {
+    const version = await requirePublishedVersion(versionId);
+    const outline = await getJson<{ kinds: unknown[] }>('catalog', `/versions/${version.id}/reader-settings`);
+    return { versionId, constitutionId: version.constitutionId, versionLabel: version.versionLabel, outline, url: publicVersionUrl(version) };
+  }));
+
+  server.registerTool('list_units', {
+    description: 'List top-level units of a public constitution version, without their full text.',
+    inputSchema: { versionId: uuid, ...page },
+    outputSchema: unitListOutput,
+    annotations: readOnly,
+  }, ({ versionId, offset, limit, cursor }) => run('list_units', async () => {
+    const version = await requirePublishedVersion(versionId);
+    const scope = `units:${versionId}`;
+    const start = cursor ? decodeCursor(cursor, scope, versionId) : offset;
+    const units = await getJson<Unit[]>('content', `/versions/${versionId}/units?offset=${start}&limit=${limit}&includeBody=false`);
+    const next = units.length === limit ? start + limit : null;
+    return { versionId, versionLabel: version.versionLabel, units: units.map(({ id, articleNumber, title, kind }) => ({ id, label: articleNumber, title, kind })), nextOffset: next, nextCursor: next === null ? null : encodeCursor(scope, versionId, next), url: publicVersionUrl(version) };
+  }));
+
+  server.registerTool('read_unit', {
+    description: 'Read a bounded excerpt from one unit in a public version. Use offset to continue long text.',
+    inputSchema: { versionId: uuid, unitId: uuid, offset: z.number().int().min(0).default(0), maxCharacters: z.number().int().min(100).max(20_000).default(8_000) },
+    outputSchema: readUnitOutput,
+    annotations: readOnly,
+  }, ({ versionId, unitId, offset, maxCharacters }) => run('read_unit', async () => {
+    const version = await requirePublishedVersion(versionId);
+    const unit = await getJson<Unit>('content', `/versions/${versionId}/units/${unitId}`);
+    if (unit.versionId !== versionId) throw new UpstreamError(404, 'content');
+    const text = unit.content ? orderedText(unit.content) : unit.body ?? '';
+    const excerpt = text.slice(offset, offset + maxCharacters);
+    const childLogicalIds = unit.content?.filter(entry => entry.type === 'child' && entry.node?.logicalId).map(entry => entry.node!.logicalId!) ?? [];
+    return { versionId, unitId, kind: unit.kind ?? 'article', label: unit.articleNumber, title: unit.title, text: excerpt, offset, nextOffset: offset + excerpt.length < text.length ? offset + excerpt.length : null, childLogicalIds, url: publicVersionUrl(version) };
+  }));
+
+  server.registerTool('resolve_unit', {
+    description: 'Read one nested unit by its logical ID in a published version.',
+    inputSchema: { versionId: uuid, logicalId: uuid, offset: z.number().int().min(0).default(0), maxCharacters: z.number().int().min(100).max(20_000).default(8_000) },
+    outputSchema: resolveUnitOutput,
+    annotations: readOnly,
+  }, ({ versionId, logicalId, offset, maxCharacters }) => run('resolve_unit', async () => {
+    const version = await requirePublishedVersion(versionId);
+    const resolved = await getJson<{ versionId: string; logicalId: string; kind: string; pathLabels: string[]; text: string; deepLink: string }>('content', `/versions/${versionId}/resolve?logicalId=${logicalId}`);
+    if (resolved.versionId !== versionId) throw new UpstreamError(404, 'content');
+    const text = resolved.text.slice(offset, offset + maxCharacters);
+    return { ...resolved, text, offset, nextOffset: offset + text.length < resolved.text.length ? offset + text.length : null, url: publicVersionUrl(version) };
+  }));
+
+  server.registerTool('search_constitutions', {
+    description: 'Search published constitutional text with optional country or version filters.',
+    inputSchema: { query: z.string().trim().min(1).max(200), countryCode: z.string().regex(/^[A-Za-z]{2}$/).optional(), jurisdictionId: uuid.optional(), versionId: uuid.optional(), ...page },
+    outputSchema: searchOutput,
+    annotations: readOnly,
+  }, ({ query, countryCode, jurisdictionId, versionId, offset, limit, cursor }) => run('search_constitutions', async () => {
+    if (versionId) await requirePublishedVersion(versionId);
+    const scope = `search:${fingerprint([query, countryCode?.toUpperCase() ?? '', jurisdictionId ?? '', versionId ?? ''])}`;
+    const params = new URLSearchParams({ q: query, limit: String(limit), offset: String(offset) });
+    if (countryCode) params.set('country', countryCode.toUpperCase());
+    if (jurisdictionId) params.set('jurisdictionId', jurisdictionId);
+    if (versionId) params.set('versionId', versionId);
+    type SearchResults = { hits: Array<{ articleId: string; versionId: string; countryCode: string; jurisdictionId?: string; [key: string]: unknown }>; total: number; limit: number; offset: number; indexGeneration: number };
+    if (cursor) {
+      params.set('offset', '0');
+      params.set('limit', '1');
+      const current = await getJson<SearchResults>('search', `/search?${params}`);
+      offset = decodeCursor(cursor, scope, String(current.indexGeneration));
+      params.set('offset', String(offset));
+      params.set('limit', String(limit));
+    }
+    const results = await getJson<SearchResults>('search', `/search?${params}`);
+    if (cursor) decodeCursor(cursor, scope, String(results.indexGeneration));
+    const nextOffset = offset + results.hits.length < results.total ? offset + results.hits.length : null;
+    const nextCursor = nextOffset === null ? null : encodeCursor(scope, String(results.indexGeneration), nextOffset);
+    const base = (process.env.PUBLIC_BASE_URL ?? 'http://localhost').replace(/\/$/, '');
+    return { query, results: { ...results, nextOffset, nextCursor, hits: results.hits.map(hit => ({ ...hit, url: hit.countryCode ? `${base}/countries/${encodeURIComponent(hit.countryCode)}/versions/${encodeURIComponent(hit.versionId)}/articles/${encodeURIComponent(hit.articleId)}` : `${base}/jurisdictions/${hit.jurisdictionId}/versions/${hit.versionId}#${hit.articleId}` })) } };
+  }));
+
+  return server;
+}

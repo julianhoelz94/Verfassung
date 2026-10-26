@@ -1,0 +1,66 @@
+import { expect, test } from '../fixtures/consent';
+import { signIn } from './auth';
+import { adminHeaders } from './api-fixtures';
+
+test('admin saves and publishes an imprint in two steps with atomic contact updates and separate languages', async ({ page, request, browser }) => {
+  test.setTimeout(120_000);
+  const headers = await adminHeaders(request);
+  const existing = await (await request.get('/api/document/legal-pages/impressum/editor', { headers })).json();
+  const existingEnglish = await (await request.get('/api/document/legal-pages/impressum_en/editor', { headers })).json();
+  const contact = await (await request.get('/api/document/legal-pages/imprint-details/editor', { headers })).json();
+  test.skip(!process.env.CI && (!!existing.draft || !!existingEnglish.draft || !!contact.draft), 'Preserve existing operator legal content when running against a developer stack.');
+  const initialContact = await request.get('/api/document/legal-pages/imprint-details');
+  const initialContactBody = await initialContact.text();
+  const initialEnglish = await request.get('/api/document/legal-pages/impressum_en');
+  const initialEnglishBody = await initialEnglish.text();
+  await signIn(page, 'admin');
+  await page.goto('/admin/legal/impressum');
+  await page.getByLabel('Imprint text').fill('EXAMPLE — REPLACE BEFORE PUBLICATION');
+  await page.getByLabel('Name or organization', { exact: true }).fill('Atlas Browser Test Operator');
+  await page.getByLabel('Street address', { exact: true }).fill('1 Test Lane');
+  await page.getByLabel('Postal code', { exact: true }).fill('12345');
+  await page.getByLabel('City', { exact: true }).fill('Test City');
+  await page.getByLabel('Country', { exact: true }).fill('Test Country');
+  await page.getByLabel('Email', { exact: true }).fill('operator@example.test');
+  await page.getByRole('button', { name: 'Save draft', exact: true }).click();
+  await expect(page.getByText('Draft saved. The public page has not changed.')).toBeVisible();
+  await page.getByRole('button', { name: 'Publish reviewed imprint' }).click();
+  await expect(page.getByText('Replace the example legal text before publishing.')).toBeVisible();
+  const unchangedContact = await request.get('/api/document/legal-pages/imprint-details');
+  expect(unchangedContact.status()).toBe(initialContact.status());
+  expect(await unchangedContact.text()).toBe(initialContactBody);
+  await page.getByLabel('Imprint text').fill('Reviewed German imprint prose for the test stack.');
+  await page.getByRole('button', { name: 'Save draft', exact: true }).click();
+  await expect(page.getByText('Draft saved. The public page has not changed.')).toBeVisible();
+  await page.getByRole('button', { name: 'Publish reviewed imprint' }).click();
+  await expect(page.getByText('Published revision updated.')).toBeVisible();
+  const germanPage = await browser.newPage({ locale: 'de-DE' });
+  try {
+    await germanPage.addInitScript(() => {
+      try { localStorage.setItem('ca_cookie_notice_v1', 'dismissed'); }
+      catch { /* Keep the site usable when storage is disabled. */ }
+    });
+    await germanPage.goto(new URL('/impressum', page.url()).href);
+    await expect(germanPage.getByText('Reviewed German imprint prose for the test stack.')).toBeVisible();
+    await expect(germanPage.getByText('Atlas Browser Test Operator')).toBeVisible();
+  } finally {
+    await germanPage.close();
+  }
+  await page.goto('/admin/legal/impressum_en');
+  await page.getByLabel('Imprint text').fill('Reviewed English imprint prose for the test stack.');
+  await page.getByLabel('Street address', { exact: true }).fill('2 Test Lane');
+  await page.getByRole('button', { name: 'Save draft', exact: true }).click();
+  await expect(page.getByText('Draft saved. The public page has not changed.')).toBeVisible();
+  const stillGerman = await request.get('/api/document/legal-pages/impressum');
+  expect((await stillGerman.json()).content).toContain('Reviewed German');
+  const unchangedEnglish = await request.get('/api/document/legal-pages/impressum_en');
+  expect(unchangedEnglish.status()).toBe(initialEnglish.status());
+  expect(await unchangedEnglish.text()).toBe(initialEnglishBody);
+  expect((await (await request.get('/api/document/legal-pages/imprint-details')).json()).streetAddress).toBe('1 Test Lane');
+  await page.getByRole('button', { name: 'Publish reviewed imprint' }).click();
+  await expect(page.getByText('Published revision updated.')).toBeVisible();
+  await page.goto('/impressum');
+  await expect(page.getByText('Reviewed English imprint prose for the test stack.')).toBeVisible();
+  await expect(page.getByText('2 Test Lane')).toBeVisible();
+  await expect(page.getByText('Atlas Browser Test Operator')).toBeVisible();
+});

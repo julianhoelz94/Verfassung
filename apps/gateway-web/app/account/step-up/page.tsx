@@ -1,8 +1,12 @@
+import { T } from '../../components/TranslationProvider';
+import { ui } from '../../../lib/messages';
 import { redirect } from 'next/navigation';
 import { Alert, Button, Card, Input, PageHeader } from '../../components/ui';
-import { PageMain } from '../../components/PageMain';
+import { FocusedPage } from '../../components/layout/templates';
 import { currentUser } from '../../../lib/session';
 import { stepUpAction } from '../actions';
+import { PasskeyLogin } from '../../passkeys/PasskeyLogin';
+import { Stack } from '../../components/layout/Layout';
 
 type StepUpPageProps = {
   searchParams: Promise<{ error?: string; returnTo?: string }>;
@@ -15,23 +19,24 @@ export default async function StepUpPage(props: StepUpPageProps) {
     redirect('/login');
   }
   return (
-    <PageMain>
-      <PageHeader title="Confirm it is you" meta="Publishing and role changes need a recent authenticator code." />
-      {searchParams.error ? <Alert tone="error">That authenticator code could not be verified.</Alert> : null}
+    <FocusedPage width="reading" header={<PageHeader title={<T value={ui.attrs.accountStepUpPagePageHeaderTitleConfirm} />} meta={<T value={ui.attrs.accountStepUpPagePageHeaderMetaPublishing} />} />}>
+
+      {searchParams.error ? <Alert tone="error"><T value={ui.account.stepUp.page.thatAuthenticatorCodeCouldNotBeVerified} /></Alert> : null}
       <Card>
-        <form action={stepUpAction}>
+        <Stack as="form" action={stepUpAction}>
           <input type="hidden" name="returnTo" value={searchParams.returnTo ?? '/account'} />
           <Input
-            label="Authenticator code"
+            label={<T value={ui.attrs.accountStepUpPageInputLabelAuthenticator} />}
             id="code"
             name="code"
             inputMode="numeric"
             autoComplete="one-time-code"
             required
           />
-          <Button variant="primary">Continue</Button>
-        </form>
+          <Button variant="primary"><T value={ui.account.stepUp.page.continue} /></Button>
+        </Stack>
       </Card>
-    </PageMain>
+      <Card><PasskeyLogin stepUp next={searchParams.returnTo} /></Card>
+    </FocusedPage>
   );
 }

@@ -1,6 +1,9 @@
 package com.constitutionatlas.identity.api
 
+import com.constitutionatlas.identity.MailDeliveryException
+import com.constitutionatlas.identity.mail.OutboundMailer
 import com.constitutionatlas.identity.service.AccountService
+import com.constitutionatlas.identity.service.IdentitySettingsService
 import com.constitutionatlas.identity.service.ServiceTokenService
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.security.SecurityRequirement
@@ -23,7 +26,47 @@ import java.util.UUID
 class AccountController(
     private val accountService: AccountService,
     private val serviceTokenService: ServiceTokenService,
+    private val settingsService: IdentitySettingsService,
+    private val outboundMailer: OutboundMailer,
 ) {
+    @GetMapping("/registration/status")
+    fun registrationStatus(): Map<String, Boolean> = settingsService.publicRegistrationStatus()
+
+    @PostMapping("/registration")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    fun register(@RequestBody request: RegistrationRequest, httpRequest: HttpServletRequest) {
+        try {
+            accountService.register(request.email, clientIp(httpRequest), userAgent(httpRequest))
+        } catch (_: MailDeliveryException) {
+            // Keep the same response for existing and new addresses, including a delivery outage.
+        }
+    }
+
+    @PostMapping("/registration/confirm")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    fun confirmRegistration(@RequestBody request: RegistrationConfirmRequest, httpRequest: HttpServletRequest) {
+        accountService.confirmRegistration(request.token, request.password, clientIp(httpRequest), userAgent(httpRequest))
+    }
+
+    @GetMapping("/admin/settings")
+    fun settings(@RequestHeader(value = "Authorization", required = false) authorization: String?): IdentitySettingsDto =
+        settingsService.read(authorization)
+
+    @PutMapping("/admin/settings")
+    fun updateSettings(
+        @RequestBody request: UpdateIdentitySettingsRequest,
+        @RequestHeader(value = "Authorization", required = false) authorization: String?,
+    ): IdentitySettingsDto = settingsService.update(authorization, request)
+
+    @PostMapping("/admin/settings/test-mail")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    fun testMail(
+        @RequestBody request: TestMailRequest,
+        @RequestHeader(value = "Authorization", required = false) authorization: String?,
+    ) {
+        settingsService.testMail(authorization, request.to, outboundMailer)
+    }
+
     @GetMapping("/users")
     @SecurityRequirement(name = "bearer-session")
     @Operation(summary = "List users (admin)")
@@ -175,11 +218,6 @@ class AccountController(
             clientIp(httpRequest),
             userAgent(httpRequest),
         )
-    }
-
-    private fun clientIp(request: HttpServletRequest): String {
-        val forwarded = request.getHeader("X-Forwarded-For")?.split(",")?.firstOrNull()?.trim()
-        return forwarded?.ifBlank { null } ?: request.remoteAddr ?: "unknown"
     }
 
     private fun userAgent(request: HttpServletRequest): String? = request.getHeader("User-Agent")

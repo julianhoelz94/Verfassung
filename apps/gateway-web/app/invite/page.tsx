@@ -1,6 +1,9 @@
+import { T } from '../components/TranslationProvider';
+import { ui } from '../../lib/messages';
 import { Alert, Button, Card, Input, PageHeader } from '../components/ui';
-import { PageMain } from '../components/PageMain';
+import { FocusedPage } from '../components/layout/templates';
 import { acceptInviteAction } from '../account/actions';
+import { Stack } from '../components/layout/Layout';
 
 type InvitePageProps = {
   searchParams: Promise<{ token?: string; error?: string }>;
@@ -9,17 +12,17 @@ type InvitePageProps = {
 export default async function InvitePage(props: InvitePageProps) {
   const searchParams = await props.searchParams;
   return (
-    <PageMain>
-      <PageHeader
-        title="Accept invite"
-        meta="Set a password to activate the invited account. There is no public self-registration."
-      />
-      {searchParams.error ? <Alert tone="error">That invite is invalid or the password does not meet policy.</Alert> : null}
+    <FocusedPage width="reading" header={<PageHeader
+        title={<T value={ui.attrs.invitePagePageHeaderTitleAcceptInvite} />}
+        meta={<T value={ui.attrs.invitePagePageHeaderMetaSetA} />}
+      />}>
+
+      {searchParams.error ? <Alert tone="error"><T value={ui.invite.page.thatInviteIsInvalidOrThePassword} /></Alert> : null}
       <Card>
-        <form action={acceptInviteAction}>
-          <Input label="Invite token" id="token" name="token" defaultValue={searchParams.token ?? ''} required />
+        <Stack as="form" action={acceptInviteAction}>
+          <Input label={<T value={ui.attrs.invitePageInputLabelInviteToken} />} id="token" name="token" defaultValue={searchParams.token ?? ''} required />
           <Input
-            label="Password"
+            label={<T value={ui.attrs.invitePageInputLabelPassword} />}
             id="password"
             name="password"
             type="password"
@@ -27,9 +30,9 @@ export default async function InvitePage(props: InvitePageProps) {
             required
             minLength={12}
           />
-          <Button variant="primary">Activate account</Button>
-        </form>
+          <Button variant="primary"><T value={ui.invite.page.activateAccount} /></Button>
+        </Stack>
       </Card>
-    </PageMain>
+    </FocusedPage>
   );
 }

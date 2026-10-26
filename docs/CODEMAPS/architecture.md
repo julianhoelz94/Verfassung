@@ -1,73 +1,68 @@
-<!-- Generated: 2026-09-06 | Files scanned: ~250 | Token estimate: ~850 -->
+<!-- Reviewed: 2026-10-19 -->
 # Architecture
 
-**Entry:** `docker-compose.yml`, `infra/caddy/Caddyfile`, `apps/gateway-web`, `services/*`  
-**Decision:** `docs/adr/0001-platform-boundaries.md`
+**Entry:** `docker-compose.yml`, `infra/caddy/`, `apps/gateway-web`, `services/`.
+**Decisions:** ADRs 0001 (ownership), 0002 (immutable publication), 0005 (two version
+axes), 0006 (shared immutable content).
 
-```
-Browser ──► Caddy :80
-              ├─ /api/docs/<svc>*  ► <svc>:8080  (springdoc, X-Forwarded-Prefix)
-              ├─ /api/<svc>*       ► <svc>:8080  (strip /api/<svc>)
-              └─ *                 ► gateway-web:3000
-                                      │  SSR / server actions
-                                      ▼
-                    catalog  content  amendment  identity
-                    editor   search   ingestion  (audit via identity/editor)
-```
+Browser → Caddy → gateway server components/actions or `/api/<service>` routes.
+Nine Spring Boot services each own a Postgres database. The existing TypeScript
+MCP server exposes published browsing and scoped staging through those APIs.
+Gateway and MCP have no database. Search and Audit are derived.
 
-Eight Spring Boot apps, each with its own Postgres. Gateway has **no database**. Search and audit are derived.
-
-## Ownership
-
-| Service | Writes (only here) | Derived? |
-| --- | --- | --- |
-| catalog | countries, constitutions, versions, sources, outlines | no |
-| content | articles, `content_nodes` tree | no |
-| amendment | transitions, amendments, revisions, changes | no |
-| identity | users, roles, sessions, MFA, invites, service tokens | no |
-| editor | edit sessions, draft changes, revisions; **commands** publish | no |
-| search | `search_documents` index | yes — rebuilt from catalog+content |
-| ingestion | import jobs / staging; then HTTP writes to catalog+content | job rows only |
-| audit | `audit_events` append | yes — not article text |
-
-`version_id` / `article_id` are **opaque UUIDs copied across services**, not FKs.
-
-## Two URL shapes (easy to mix up)
-
-| Who | Catalog list countries |
+| Owner | Authoritative writes |
 | --- | --- |
-| Browser via Caddy | `http://localhost/api/catalog/countries` |
-| Compose / gateway env | `http://catalog-service:8080/countries` (no `/api/catalog` prefix) |
-| Host without Compose | `http://localhost/api/catalog` is the gateway default in `lib/api.ts` |
+| Catalog | Countries, constitution identity/lifecycle and provision events, metadata/wiki/settings revisions, version chains and publication metadata |
+| Content | Immutable ordered node/text revisions, version roots, rich content |
+| Amendment | Legal change records, revision chains, exact before/after pins and review decisions |
+| Identity | Accounts, sessions, MFA/passkeys, credentials/OAuth, browsing policy, mail/settings and durable deployment setup |
+| Editor | Owned edit sessions, pinned drafts, review/approval and publication orchestration/outbox |
+| Document | Document identity, immutable files/revisions, citation links and legal-page/contact publication |
+| Ingestion | Staged jobs, batches, uploads, setup proposals and publication delivery outbox |
+| Search | Rebuildable published-content index and generation-pinned search results |
+| Audit | Append-only attributed events |
 
-Controllers map paths at the **service root** (`GET /countries`), not under `/api/…`.
+External IDs are copied opaque UUIDs. Never join databases or add cross-service FKs.
+Shared transport, identity contracts and ordered content/diff types live in
+`services/platform`; domain decisions remain in their owning service.
 
-## Request traces
+## API addresses
 
-**Public read (home → article)**  
-Caddy → `gateway-web` page → `lib/api.ts` → catalog `GET /countries/{code}` → content `GET /versions/{id}/articles` → render `ConstitutionText`.
+Browser: `/api/catalog/countries`. Compose caller:
+`http://catalog-service:8080/countries`. Caddy strips `/api/catalog`; controllers
+map paths at the service root. API docs are explicitly enabled for development/CI.
 
-**Login**  
-`app/login/actions.ts` → `lib/session.ts` → identity `POST /login` → cookie `ca_session` (Bearer token). MFA uses `ca_mfa_challenge`.
+## Request flows
 
-**Publish draft**  
-Editor UI → editor `POST /edit-sessions/{id}/publish` → identity `/me` (role + step-up) → content copy onto a new catalog version (CAT-5 predecessor + hop kind today; CAT-6 / ED-7 two-axis tips) → catalog `POST /versions/{id}/publish` → editor `outbox_events` (`version.published`, `search.reindex-requested`) → scheduler `POST` search `/reindex`. Audit `POST /events` is still best-effort HTTP. Editor names the hop and never auto-records a law (ADR 0004 point 6 / ADR 0005).
+- Reading: gateway `lib/api.ts` composes Catalog/Content plus optional Amendment,
+  Document and Search reads. Public results follow published legal identities and
+  their current editorial snapshots; known historical snapshot links remain valid.
+- Sign-in: Identity validates password/MFA/passkey and the gateway stores the
+  HTTP-only `ca_session` cookie. A separate `ca_mfa_challenge` cookie pins MFA login.
+- Editing: Editor owns an open session and pins source content/settings generations.
+  Review and approval precede a fresh-MFA publisher action. Publication creates a
+  successor; it never rewrites a published source. Outboxes retry side effects.
+- Importing: Ingestion stages and validates proposals. Preparation writes drafts;
+  explicit approval and publication precede any public visibility. Each action
+  checks its role; an account holding all required roles may perform both actions.
+- Setup: Identity persists bootstrap completion independently of deployments.
+  Caddy/gateway and backend filters fail closed before setup, while allowing health,
+  required login/enrollment and administrator/legal setup paths. Application
+  exceptions after admission remain the downstream handler's responsibility.
 
-**Import**  
-Admin → ingestion `POST /import-jobs` → catalog create country/constitution/version → content `PUT /versions/{id}/articles` → catalog `POST /versions/{id}/publish`.
+## Access and transport
 
-## Cross-service HTTP (no SQL)
+Services authenticate protected operations through Identity and enforce their own
+roles/scopes. Gateway navigation is presentation, never an authorization boundary.
+Identity owns saved anonymous policy; gateway and Caddy enforce browsing/rate policy.
+Gateway counters are process-local and require a shared store before scaling.
 
-| From | Calls |
-| --- | --- |
-| gateway-web | all public APIs (server-side) |
-| editor | identity `/me`, catalog create+publish, content replace/patch, amendment `/transitions`, audit `/events`; search `/reindex` via outbox scheduler |
-| identity | audit `/events` |
-| ingestion | catalog + content writes |
-| search | catalog + content reads (reindex on startup if `SEARCH_REINDEX_ON_STARTUP`) |
+Caddy owns direct TLS and certificate renewal; `infra/caddy/transport.py` supervises
+readiness. External proxy mode checks explicit trusted CIDRs and forwarded HTTPS.
+Local HTTP is loopback-only. Backend ports must remain private.
 
-## Auth model
-
-No Spring Security filter chain. Identity hashes session tokens. Editor enforces roles in `EditorService` after `IdentityClient.authenticate`. Gateway **hides** buttons (`lib/nav.ts`); that is not authorization. Catalog/content/amendment/search/ingestion HTTP APIs are reachable on `/api/…` without a session today.
-
-Roles: `docs/editorial-roles.md`. Publish requires publisher/admin **and** fresh MFA step-up.
+Kotlin service requests use the platform HTTP builder with 2 s connect / 5 s read
+limits; import publication delivery preserves its explicit 60 s read limit.
+Gateway requests use `lib/fetch-with-timeout.ts` with a 10 s default and retain
+shorter caller deadlines/cancellation. Translation batches explicitly allow 30 s;
+document streaming allows 60 s. Transports do not retry write commands.

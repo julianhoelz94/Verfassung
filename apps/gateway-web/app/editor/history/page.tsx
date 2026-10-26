@@ -1,9 +1,14 @@
+import { Disclosure } from '../../components/Disclosure';
+import { reviewUi } from '../../../lib/ui-review-messages';
+import { SignedInSummary } from '../../components/SignedInSummary';
+import { T } from '../../components/TranslationProvider';
+import { ui, type UiMessage } from '../../../lib/messages';
 import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
-import { PageMain } from '../../components/PageMain';
+import { CollectionPage } from '../../components/layout/templates';
 import { Alert, Badge, Button, DataList, DataRow, PageHeader, Select } from '../../components/ui';
 import { FormattedDate } from '../../../lib/format-date';
-import { getCountry, listConstitutionVersions, listCountries, type ConstitutionSummary, type VersionSummary } from '../../../lib/api';
+import { getCountry, listConstitutionAmendments, listConstitutionVersions, listCountries, type Amendment, type ConstitutionSummary, type VersionSummary } from '../../../lib/api';
 import { orderVersions } from '../../../lib/compare';
 import { canVisitEditor } from '../../../lib/nav';
 import { SESSION_COOKIE, currentUser } from '../../../lib/session';
@@ -12,22 +17,21 @@ type HistoryPageProps = {
   searchParams: Promise<{ constitutionId?: string }>;
 };
 
-const HOP_KIND_LABELS: Record<string, string> = {
-  initial: 'Initial',
-  legal_amendment: 'Amending law',
-  official_errata: 'Official errata',
-  editorial_correction: 'Editorial correction',
+const HOP_KIND_LABELS: Record<string, UiMessage> = {
+  initial: ui.remainingStatus.initial,
+  legal: ui.remainingStatus.legalChange,
+  editorial_correction: ui.remainingStatus.editorialCorrection,
 };
 
-function hopKindLabel(hopKind: string | undefined): string {
+function hopKindLabel(hopKind: string | undefined): UiMessage {
   if (!hopKind) {
-    return 'Unknown';
+    return ui.remainingStatus.unknown;
   }
-  return HOP_KIND_LABELS[hopKind] ?? hopKind;
+  return HOP_KIND_LABELS[hopKind] ?? ui.remainingStatus.unknown;
 }
 
-function isStaffOnly(version: VersionSummary): boolean {
-  return version.hopKind === 'editorial_correction' || version.listing === 'staff';
+function legalIdentity(version: VersionSummary): string {
+  return version.legalVersionId ?? version.id;
 }
 
 async function loadConstitutions(): Promise<{ constitutions: ConstitutionSummary[]; isoByConstitutionId: Record<string, string> }> {
@@ -54,9 +58,9 @@ export default async function SnapshotHistoryPage(props: HistoryPageProps) {
   }
   if (!canVisitEditor(user.roles)) {
     return (
-      <PageMain className="wide">
-        <PageHeader title="Snapshot history" meta={`Signed in as ${user.email}, but this account has no editorial role.`} />
-      </PageMain>
+      <CollectionPage width="content" header={<PageHeader title={<T value={ui.attrs.editorHistoryPagePageHeaderTitleSnapshot} />} meta={<SignedInSummary email={user.email} noEditorialRole />} />}>
+
+      </CollectionPage>
     );
   }
 
@@ -76,68 +80,108 @@ export default async function SnapshotHistoryPage(props: HistoryPageProps) {
     }
   }
   const orderedVersions = orderVersions(versions);
+  const snapshotGroups = new Map<string, VersionSummary[]>();
+  for (const version of orderedVersions) {
+    const key = legalIdentity(version);
+    snapshotGroups.set(key, [...(snapshotGroups.get(key) ?? []), version]);
+  }
+  const legalGroups = [...snapshotGroups.entries()].map(([legalId, snapshots]) => ({
+    legalId,
+    legal: snapshots.find((version) => version.hopKind !== 'editorial_correction') ?? snapshots[0]!,
+    editorial: snapshots.filter((version) => version.hopKind === 'editorial_correction').reverse(),
+  }));
+  let amendments: Amendment[] = [];
+  if (selectedConstitution && sessionToken) {
+    amendments = (await listConstitutionAmendments(selectedConstitution.id, { status: 'all', authorization: `Bearer ${sessionToken}` }).catch(() => null)) ?? [];
+  }
+  const legalIdBySnapshotId = new Map(versions.map((version) => [version.id, legalIdentity(version)]));
+  const recordsForLegal = (legalId: string) =>
+    amendments.filter((amendment) =>
+      legalIdBySnapshotId.get(amendment.sourceVersionId ?? '') === legalId,
+    );
   const countryCode = selectedConstitution ? isoByConstitutionId[selectedConstitution.id] : undefined;
 
   return (
-    <PageMain className="wide">
-      <PageHeader
-        title="Snapshot history"
-        eyebrow="Editorial workspace"
-        meta={`Signed in as ${user.email}. Roles: ${user.roles.join(', ')}.`}
-      />
+    <CollectionPage width="content" header={<PageHeader
+        title={<T value={ui.attrs.editorHistoryPagePageHeaderTitleSnapshot} />}
+        eyebrow={<T value={ui.attrs.editorHistoryPagePageHeaderEyebrowEditorial} />}
+        meta={<SignedInSummary email={user.email} roles={user.roles} />}
+      />}>
+
       {constitutions.length > 0 && selectedConstitution ? (
         <form method="get" className="toolbar">
-          <Select id="constitutionId" name="constitutionId" label="Constitution" defaultValue={selectedConstitution.id}>
+          <Select id="constitutionId" name="constitutionId" label={<T value={ui.attrs.editorHistoryPageSelectLabelConstitution} />} defaultValue={selectedConstitution.id}>
             {constitutions.map((constitution) => (
               <option key={constitution.id} value={constitution.id}>
                 {constitution.title}
               </option>
             ))}
           </Select>
-          <Button type="submit">Show history</Button>
+          <Button type="submit"><T value={ui.editor.history.page.showHistory} /></Button>
         </form>
       ) : (
-        <Alert tone="error">No constitutions are available yet.</Alert>
+        <Alert tone="error"><T value={ui.editor.history.page.noConstitutionsAreAvailableYet} /></Alert>
       )}
       {selectedConstitution ? (
         <section>
           <h2 className="section-title">{selectedConstitution.title}</h2>
           {orderedVersions.length === 0 ? (
-            <p className="muted">No version snapshots recorded for this constitution yet.</p>
+            <p className="muted"><T value={ui.editor.history.page.noVersionSnapshotsRecordedForThisConstitution} /></p>
           ) : (
             <DataList columns={5}>
-              {orderedVersions.map((version) => (
+              {legalGroups.map(({ legalId, legal, editorial }) => (
                 <DataRow
-                  key={version.id}
+                  key={legalId}
                   cells={[
                     {
-                      label: 'Label',
+                      label: <T value={ui.remainingStatus.label} />,
                       value: countryCode ? (
-                        <a href={`/countries/${countryCode}/versions/${version.id}`}>{version.versionLabel}</a>
+                        <a href={`/countries/${countryCode}/versions/${legal.currentVersionId ?? legal.id}`}>{legal.versionLabel}</a>
                       ) : (
-                        version.versionLabel
+                        legal.versionLabel
                       ),
                     },
                     {
-                      label: 'Hop kind',
+                      label: <T value={ui.remainingStatus.hopKind} />,
                       value: (
                         <span className="chip-row">
-                          <Badge tone="info">{hopKindLabel(version.hopKind)}</Badge>
-                          {isStaffOnly(version) ? <Badge tone="changed">Staff only</Badge> : null}
+                          <Badge tone="info"><T value={hopKindLabel(legal.hopKind)} /></Badge>
+                          {editorial.length ? <Badge tone="changed">{editorial.length} <T value={ui.editor.history.page.editorialRevision} />{editorial.length === 1 ? '' : 's'}</Badge> : null}
                         </span>
                       ),
                     },
                     {
-                      label: 'Listing',
-                      value: version.listing ?? 'public',
+                      label: <T value={ui.remainingStatus.editorialRevisions} />,
+                      value: editorial.length ? (
+                        <Disclosure summary={<T value={reviewUi.textCorrections} />}>
+                        <p className="muted"><T value={reviewUi.correctionHint} /></p>
+                        <ol>
+                          {editorial.map((version) => (
+                            <li key={version.id}>
+                              {countryCode ? <a href={`/countries/${countryCode}/versions/${version.id}`}>{version.versionLabel}</a> : version.versionLabel} <T value={ui.editor.history.page.editorialCorrection} />{" "}{version.publicationComment ?? <T value={ui.remainingStatus.noPublicationComment} />}
+                            </li>
+                          ))}
+                        </ol>
+                        </Disclosure>
+                      ) : <T value={ui.editorDefaults.noEditorialRevisions} />,
                     },
                     {
-                      label: 'Effective',
-                      value: <FormattedDate value={version.effectiveDate} />,
+                      label: <T value={ui.remainingStatus.effective} />,
+                      value: <FormattedDate value={legal.effectiveDate} />,
                     },
                     {
-                      label: 'Latest published',
-                      value: version.latestPublished ? 'Yes' : 'No',
+                      label: <T value={ui.remainingStatus.outgoingChangeRecordEdges} />,
+                      value: recordsForLegal(legalId).length ? (
+                        <ul>
+                          {recordsForLegal(legalId).map((amendment) => (
+                            <li key={amendment.id}>
+                              <a href={`/editor/amendments/${amendment.id}`}>{amendment.title}</a>
+                              {amendment.comment ? ` — ${amendment.comment}` : ''}
+                              {amendment.reviewStatus === 'needs_review' ? <Badge tone="changed"><T value={ui.editor.history.page.needsReview} /></Badge> : null}
+                            </li>
+                          ))}
+                        </ul>
+                      ) : <span className="chip-row"><T value={ui.editor.history.page.noChangeRecord} />{" "}<Badge tone={legal.latestPublished ? 'added' : 'changed'}><T value={legal.latestPublished ? ui.remainingStatus.latestPublished : ui.remainingStatus.historical} /></Badge></span>,
                     },
                   ]}
                 />
@@ -146,6 +190,6 @@ export default async function SnapshotHistoryPage(props: HistoryPageProps) {
           )}
         </section>
       ) : null}
-    </PageMain>
+    </CollectionPage>
   );
 }

@@ -1,15 +1,30 @@
+import { CountryNavigation } from '../../components/CountryNavigation';
+import { Disclosure } from '../../components/Disclosure';
+import { reviewUi } from '../../../lib/ui-review-messages';
+import { T } from '../../components/TranslationProvider';
+import { ui } from '../../../lib/messages';
+import { message } from '../../../lib/messages';
+import { currentLocale } from '../../../lib/server-locale';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
-import { PageMain } from '../../components/PageMain';
+import { CollectionPage } from '../../components/layout/templates';
 import { ServiceUnavailable } from '../../components/StatusMessage';
-import { Badge, Chip, PageHeader } from '../../components/ui';
-import { ApiUnavailableError, getCountry, type CountryDetail } from '../../../lib/api';
+import { WikiImages } from '../../components/WikiImages';
+import { WikiBody } from '../../components/WikiBody';
+import { ContentTranslationRegion } from '../../components/ContentTranslationRegion';
+import { lifecycleStatusMessage } from '../../../lib/lifecycle-label';
+import { WikiSources } from '../../components/WikiSources';
+import { Chip, PageHeader } from '../../components/ui';
+import { ApiUnavailableError, getCountry, getWikiPage, type CountryDetail } from '../../../lib/api';
 import { canVisitEditor } from '../../../lib/nav';
 import { currentUser } from '../../../lib/session';
 import { orderVersions } from '../../../lib/compare';
 import { atlasTitle, metaDescription, pageMetadata } from '../../../lib/page-meta';
-import { chainTipId, publicVersions } from '../../../lib/reading';
+import { chainTipId, publicVersions, snapshotVersionId } from '../../../lib/reading';
 import { CompareForm } from './CompareForm';
+import { listDocumentLinks } from '../../../lib/document-api';
+import { Inline, Stack } from '../../components/layout/Layout';
+import surfaceStyles from '../../components/surfaces.module.css';
 
 type CountryPageProps = {
   params: Promise<{ code: string }>;
@@ -47,9 +62,9 @@ export default async function CountryPage(props: CountryPageProps) {
 
   if (error) {
     return (
-      <PageMain className="wide">
-        <ServiceUnavailable service="Catalog" retryHref={`/countries/${code}`} />
-      </PageMain>
+      <CollectionPage width="content">
+        <ServiceUnavailable service={ui.services.catalog} retryHref={`/countries/${code}`} />
+      </CollectionPage>
     );
   }
 
@@ -59,95 +74,127 @@ export default async function CountryPage(props: CountryPageProps) {
 
   const user = await currentUser();
   const showEditorialLinks = user ? canVisitEditor(user.roles) : false;
+  const canRecordLifecycle = user?.roles.some((role) => role === 'publisher' || role === 'admin') ?? false;
+  const countryWiki = await getWikiPage('country', country.id).catch(() => null);
+  const locale = await currentLocale();
+  const constitutionWikis = new Map(
+    await Promise.all(country.constitutions.map(async (constitution) => [
+      constitution.id,
+      await getWikiPage('constitution', constitution.id).catch(() => null),
+    ] as const)),
+  );
 
   const versionTotal = country.constitutions.reduce(
     (sum, item) => sum + publicVersions(item.versions).length,
     0,
   );
+  const documentsByConstitution = new Map(await Promise.all(country.constitutions.map(async (constitution) =>
+    [constitution.id, await listDocumentLinks('constitution', constitution.id).catch(() => [])] as const,
+  )));
 
   return (
-    <PageMain className="wide">
-      <PageHeader
-        breadcrumbs={[{ href: '/', label: 'Countries' }, { label: country.name }]}
-        title={country.name}
+    <CollectionPage width="content" header={<PageHeader
+        breadcrumbs={[{ href: '/', label: message(locale, ui.nav.countries) }, { label: country.name }]}
+        title={<>{country.name}<span className="country-title-code" aria-hidden="true">{country.isoCode}</span></>}
         meta={
           <>
-            <span className="iso" aria-hidden="true">
-              {country.isoCode}
+            <span>
+              {country.constitutions.length} <T value={country.constitutions.length === 1 ? ui.remainingStatus.constitutionSingular : ui.remainingStatus.constitutionPlural} />
             </span>
             <span>
-              {country.constitutions.length} constitution
-              {country.constitutions.length === 1 ? '' : 's'}
-            </span>
-            <span>
-              {versionTotal} version{versionTotal === 1 ? '' : 's'}
+              {versionTotal} <T value={versionTotal === 1 ? ui.remainingStatus.versionSingular : ui.remainingStatus.versionPlural} />
             </span>
           </>
         }
-        actions={
-          <a className="btn btn-sm" href={`/countries/${country.isoCode}/timeline`}>
-            Timeline
-          </a>
-        }
-      />
+      />}>
+
+      <CountryNavigation code={country.isoCode} active="overview" />
+      {countryWiki ? (
+        <section className={["card", surfaceStyles.card].join(' ')}>
+          <h2><T value={ui.countries.code.page.about} />{" "}{country.name}</h2>
+          <ContentTranslationRegion sourceLanguage="auto"><p data-translate-content>{countryWiki.summary}</p><WikiImages images={countryWiki.images.filter((image) => image.placement === 'before_body')} /><WikiBody body={countryWiki.body} /></ContentTranslationRegion>
+          <WikiImages images={countryWiki.images.filter((image) => image.placement !== 'before_body')} />
+          <WikiSources sourceUrls={countryWiki.sourceUrls ?? []} />
+        </section>
+      ) : null}
+      {showEditorialLinks ? (
+        <p><a href={`/editor/wiki/country/${country.id}?code=${country.isoCode}`}><T value={ui.countries.code.page.editCountryPage} /></a></p>
+      ) : null}
       {country.constitutions.map((constitution) => {
         const publicLine = orderVersions(publicVersions(constitution.versions));
         const tipId = chainTipId(constitution);
-        const tipVersion = constitution.versions.find((version) => version.id === tipId);
         const newestPublic = publicLine[publicLine.length - 1];
         const previousPublic = publicLine.length >= 2 ? publicLine[publicLine.length - 2] : undefined;
         return (
-          <section key={constitution.id} className="card">
-            <h2 className="card-title">{constitution.title}</h2>
-            {constitution.contentOutline && constitution.contentOutline.kinds.length > 0 ? (
-              <p className="muted">
-                Structure:{' '}
-                {constitution.contentOutline.kinds.map((kind) => kind.displayLabel).join(' → ')}
-              </p>
+          <Stack as="section" key={constitution.id} className={["card", surfaceStyles.card].join(' ')}>
+            <h2 className="card-title">
+              <a href={`/countries/${country.isoCode}/constitutions/${constitution.id}`}>{constitution.title}</a>
+            </h2>
+            {constitutionWikis.get(constitution.id) ? (
+              <p>{constitutionWikis.get(constitution.id)?.summary}</p>
             ) : null}
+            <p className="muted">
+              {constitution.interim ? <><T value={ui.lifecycle.interimConstitution} /> · </> : null}
+              <T value={lifecycleStatusMessage(constitution.lifecycleStatus)} />
+            </p>
             <div className="chip-row">
               {publicLine.map((version) => (
                 <Chip
                   key={version.id}
-                  href={`/countries/${country.isoCode}/versions/${version.id}`}
+                  href={`/countries/${country.isoCode}/versions/${snapshotVersionId(version)}`}
                   active={version.id === newestPublic?.id}
                 >
                   {version.versionLabel}
                 </Chip>
               ))}
             </div>
-            <div className="card-actions">
-              <a className="btn btn-sm" href={`/countries/${country.isoCode}/timeline`}>
-                Timeline
-              </a>
-              {showEditorialLinks ? (
-                <a
-                  className="btn btn-sm btn-ghost"
-                  href={`/editor/history?constitutionId=${encodeURIComponent(constitution.id)}`}
-                >
-                  Version history
-                </a>
-              ) : null}
+            <Inline className="card-actions">
               {tipId ? (
-                <a className="btn btn-sm btn-ghost" href={`/countries/${country.isoCode}/versions/${tipId}`}>
-                  Read latest
-                </a>
+                <a className="btn btn-sm btn-primary" href={`/countries/${country.isoCode}/versions/${tipId}`}>
+                  <T value={ui.countries.code.page.readLatest} />{" "}</a>
               ) : null}
               {previousPublic && newestPublic ? (
                 <a
                   className="btn btn-sm btn-ghost"
                   href={`/countries/${country.isoCode}/compare?from=${previousPublic.id}&to=${newestPublic.id}`}
                 >
-                  Compare
-                </a>
+                  <T value={ui.countries.code.page.compare} />{" "}</a>
               ) : null}
-            </div>
-            {tipVersion ? <Badge tone="accent">Latest: {tipVersion.versionLabel}</Badge> : null}
-            <h3>Compare versions</h3>
-            <CompareForm code={country.isoCode} versions={publicLine} variant="inline" />
-          </section>
+            </Inline>
+            {(documentsByConstitution.get(constitution.id) ?? []).length ? <div>
+              <h3><T value={ui.countries.code.page.documents} /></h3>
+              <ul className="link-list">{(documentsByConstitution.get(constitution.id) ?? []).map((link) => <li key={link.documentId}>
+                <a href={`/documents/${link.documentId}${link.revisionId ? `?revision=${link.document.revision.revision}` : ''}`}>{link.document.revision.title}</a>
+              </li>)}</ul>
+            </div> : null}
+            <Disclosure summary={<T value={ui.countries.code.page.compareVersions} />}>
+              <CompareForm code={country.isoCode} versions={publicLine} variant="inline" />
+            </Disclosure>
+            <Disclosure summary={<T value={reviewUi.constitutionDetails} />}>
+            {showEditorialLinks ? (
+              <p><a href={`/editor/wiki/constitution/${constitution.id}?code=${country.isoCode}`}><T value={ui.countries.code.page.editConstitutionPage} /></a></p>
+            ) : null}
+            {canRecordLifecycle ? (
+              <p><a href={`/editor/lifecycle/${constitution.id}?code=${country.isoCode}`}><T value={ui.countries.code.page.recordLifecycleEvent} /></a></p>
+            ) : null}
+
+            {constitution.contentOutline && constitution.contentOutline.kinds.length > 0 ? (
+              <p className="muted">
+                <T value={ui.countries.code.page.structure} />{' '}
+                {constitution.contentOutline.kinds.map((kind) => kind.displayLabel).join(' → ')}
+              </p>
+            ) : null}
+              {showEditorialLinks ? (
+                <a
+
+                  href={`/editor/history?constitutionId=${encodeURIComponent(constitution.id)}`}
+                >
+                  <T value={reviewUi.textCorrections} />{" "}</a>
+              ) : null}
+            </Disclosure>
+          </Stack>
         );
       })}
-    </PageMain>
+    </CollectionPage>
   );
 }

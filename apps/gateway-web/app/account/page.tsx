@@ -1,11 +1,28 @@
+import { siteLanguages } from '../../lib/deployment-setup';
+import { SignedInSummary } from '../components/SignedInSummary';
+import { currentLocale } from '../../lib/server-locale';
+import { message } from '../../lib/messages';
+import { T } from '../components/TranslationProvider';
+import { ui } from '../../lib/messages';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { Alert, Button, Card, Input, PageHeader } from '../components/ui';
-import { PageMain } from '../components/PageMain';
-import { requestStartMfaEnroll } from '../../lib/identity-client';
+import { SettingsPage } from '../components/layout/templates';
+import { requestMcpKeys, requestOAuthGrants, requestPasskeys, requestStartMfaEnroll } from '../../lib/identity-client';
+import { PasskeyManager } from '../passkeys/PasskeyManager';
+import { identityRequestFetch } from '../../lib/identity-request';
 import { SESSION_COOKIE, currentUser, mfaChallengeToken } from '../../lib/session';
-import { ConfirmEnrollForm, RegenerateRecoveryForm } from './MfaForms';
-import { changePasswordAction, revokeMfaAction, startMfaEnrollAction } from './actions';
+import { ConfirmEnrollForm, RegenerateRecoveryForm, StartMfaEnrollForm } from './MfaForms';
+import { changePasswordAction, revokeMfaAction, updateContentTranslationPreferenceAction } from './actions';
+import { revokeMcpKeyAction, revokeOAuthGrantAction } from './actions';
+import { MfaSetup } from '../components/MfaSetup';
+import { Disclosure } from '../components/Disclosure';
+import { reviewUi } from '../../lib/ui-review-messages';
+import { NavigatingActionForm } from '../components/NavigatingActionForm';
+import { CreateMcpKeyForm, RotateMcpKeyForm } from './McpKeyForms';
+import { LanguagePreferenceForm } from './LanguagePreferenceForm';
+import { translationUserSettings } from '../../lib/content-translation';
+import { Stack } from '../components/layout/Layout';
 
 type AccountPageProps = {
   searchParams: Promise<{
@@ -13,10 +30,13 @@ type AccountPageProps = {
     saved?: string;
     enroll?: string;
     mfaRevoked?: string;
+    languageSaved?: string;
+    translationSaved?: string;
   }>;
 };
 
 export default async function AccountPage(props: AccountPageProps) {
+  const locale = await currentLocale();
   const searchParams = await props.searchParams;
   const user = await currentUser();
   if (!user) {
@@ -26,84 +46,347 @@ export default async function AccountPage(props: AccountPageProps) {
   // `startMfaEnrollAction`; `?enroll=1` only marks that enrollment was requested.
   const enrollRequested = searchParams.enroll === '1';
   let enrollSecret: string | null = null;
-  let enrollChallenge: string | null = enrollRequested ? (await mfaChallengeToken()) ?? null : null;
+  let enrollQr: string | null = null;
+  let enrollChallenge: string | null = enrollRequested ? ((await mfaChallengeToken()) ?? null) : null;
   if (!user.mfaEnabled && enrollChallenge) {
     const token = (await cookies()).get(SESSION_COOKIE)?.value;
     try {
-      const started = await requestStartMfaEnroll(enrollChallenge, token);
+      const started = await requestStartMfaEnroll(enrollChallenge, token, undefined, await identityRequestFetch());
       enrollSecret = started.secret;
+      enrollQr = started.qrDataUrl;
       enrollChallenge = started.challengeToken;
     } catch {
       enrollSecret = null;
     }
   }
+  const sessionToken = (await cookies()).get(SESSION_COOKIE)?.value;
+  const mcpKeys = sessionToken ? await requestMcpKeys(sessionToken).catch(() => []) : [];
+  const oauthGrants = sessionToken ? await requestOAuthGrants(sessionToken).catch(() => []) : [];
+  const passkeys = sessionToken ? await requestPasskeys(sessionToken).catch(() => []) : [];
+  const translationSettings = sessionToken ? await translationUserSettings(sessionToken).catch(() => null) : null;
+  const canImport = user.roles.includes('editor') || user.roles.includes('admin');
+  const mcpUrl = new URL('/mcp', process.env.PUBLIC_BASE_URL || 'http://localhost').toString();
   return (
-    <PageMain>
-      <PageHeader title="Account" meta={`Signed in as ${user.email}.`} />
-      {searchParams.error === 'mfa' ? (
-        <Alert tone="error">Authenticator action failed. Check the code and try again.</Alert>
-      ) : searchParams.error ? (
-        <Alert tone="error">Password could not be changed. Check the current password and policy.</Alert>
-      ) : null}
-      {searchParams.saved ? <Alert tone="success">Password updated.</Alert> : null}
-      {searchParams.mfaRevoked ? <Alert tone="success">Authenticator enrollment was revoked.</Alert> : null}
-      <Card>
-        <h2>Authenticator</h2>
-        {user.mfaRequired && !user.mfaEnabled ? (
-          <p>Admin and publisher accounts must enroll an authenticator.</p>
-        ) : null}
-        {user.mfaEnabled ? (
-          <>
-            <p>Authenticator app is enrolled{user.stepUpFresh ? ' and recently confirmed.' : '.'}</p>
-            {user.mfaRequired ? (
-              <p className="muted">Authenticator enrollment is required for this account and cannot be revoked.</p>
-            ) : (
-              <form action={revokeMfaAction}>
-                <Input label="Authenticator code" id="revokeCode" name="code" inputMode="numeric" required />
-                <Button>Revoke authenticator</Button>
-              </form>
-            )}
-            <RegenerateRecoveryForm />
-          </>
-        ) : enrollSecret && enrollChallenge ? (
-          <>
-            <p>
-              Authenticator secret: <code>{enrollSecret}</code>
-            </p>
-            <ConfirmEnrollForm challengeToken={enrollChallenge} />
-          </>
-        ) : (
-          <>
-            {enrollRequested ? (
-              <Alert tone="error">Enrollment could not be started. Try again.</Alert>
-            ) : null}
-            <form action={startMfaEnrollAction}>
-              <Button variant="primary">Enroll authenticator</Button>
-            </form>
-          </>
-        )}
-        <h2>Change password</h2>
-        <form action={changePasswordAction}>
-          <Input
-            label="Current password"
-            id="currentPassword"
-            name="currentPassword"
-            type="password"
-            autoComplete="current-password"
-            required
+    <SettingsPage
+      header={
+        <PageHeader
+          title={<T value={ui.attrs.accountPagePageHeaderTitleAccount} />}
+          meta={<SignedInSummary email={user.email} />}
+        />
+      }
+      navigation={
+        <nav className="section-nav" aria-label={message(locale, reviewUi.onThisPage)}>
+          <a href="#preferences">
+            <T value={reviewUi.preferences} />
+          </a>
+          <a href="#security">
+            <T value={reviewUi.security} />
+          </a>
+          <a href="#mcp-keys">
+            <T value={reviewUi.connections} />
+          </a>
+        </nav>
+      }
+      notices={
+        <>
+          {searchParams.error === 'mfa' ? (
+            <Alert tone="error">
+              <T value={ui.account.page.authenticatorActionFailedCheckTheCodeAnd} />
+            </Alert>
+          ) : searchParams.error === 'oauth' ? (
+            <Alert tone="error">
+              <T value={ui.account.page.theChatClientConnectionCouldNotBe} />
+            </Alert>
+          ) : searchParams.error === 'key' ? (
+            <Alert tone="error">
+              <T value={ui.account.page.theMcpKeyCouldNotBeChanged} />
+            </Alert>
+          ) : searchParams.error === 'language' ? (
+            <Alert tone="error">
+              <T value={ui.account.page.languagePreferenceCouldNotBeSaved} />
+            </Alert>
+          ) : searchParams.error ? (
+            <Alert tone="error">
+              <T value={ui.account.page.passwordCouldNotBeChangedCheckThe} />
+            </Alert>
+          ) : null}
+
+          {searchParams.saved ? (
+            <Alert tone="success">
+              <T value={ui.account.page.passwordUpdated} />
+            </Alert>
+          ) : null}
+
+          {searchParams.mfaRevoked ? (
+            <Alert tone="success">
+              <T value={ui.account.page.authenticatorEnrollmentWasRevoked} />
+            </Alert>
+          ) : null}
+
+          {searchParams.languageSaved ? (
+            <Alert tone="success">
+              <T value={ui.account.page.languagePreferenceSaved} />
+            </Alert>
+          ) : null}
+
+          {searchParams.translationSaved ? (
+            <Alert tone="success">
+              <T value={ui.admin.settings.page.settingsSaved} />
+            </Alert>
+          ) : null}
+        </>
+      }
+    >
+      <Card id="preferences">
+        <section className="account-section" aria-labelledby="language-title">
+          <h2 id="language-title">
+            <T value={ui.account.page.language} />
+          </h2>
+          <p>
+            <T value={ui.account.page.chooseTheWebsiteLanguageAutomaticFollowsYour} />
+          </p>
+          <LanguagePreferenceForm
+            enabled={(await siteLanguages()).enabled}
+            preference={user.languagePreference ?? 'auto'}
           />
-          <Input
-            label="New password"
-            id="newPassword"
-            name="newPassword"
-            type="password"
-            autoComplete="new-password"
-            required
-            minLength={12}
-          />
-          <Button variant="primary">Update password</Button>
-        </form>
+        </section>
       </Card>
-    </PageMain>
+
+      {translationSettings ? (
+        <Card>
+          <h2>
+            <T value={ui.contentTranslation.title} />
+          </h2>
+          <Stack as="form" action={updateContentTranslationPreferenceAction}>
+            <label>
+              <input type="checkbox" name="alwaysTranslate" defaultChecked={translationSettings.alwaysTranslate} />{' '}
+              <T value={ui.contentTranslation.alwaysTranslate} />
+            </label>
+            <Input
+              label={<T value={ui.contentTranslation.personalGoogleKey} />}
+              id="personalGoogleKey"
+              name="personalGoogleKey"
+              type="password"
+              autoComplete="off"
+              help={<T value={ui.contentTranslation.personalKeyHint} />}
+            />
+            {translationSettings.personalGoogleKeyConfigured ? (
+              <p>
+                <T value={ui.contentTranslation.keyConfigured} />
+              </p>
+            ) : null}
+            {translationSettings.personalGoogleKeyConfigured ? (
+              <label>
+                <input type="checkbox" name="clearPersonalGoogleKey" />{' '}
+                <T value={ui.contentTranslation.clearPersonalKey} />
+              </label>
+            ) : null}
+            <Button variant="primary">
+              <T value={ui.contentTranslation.save} />
+            </Button>
+          </Stack>
+        </Card>
+      ) : null}
+
+      <Card id="security">
+        <h2>
+          <T value={reviewUi.security} />
+        </h2>
+        <p className="muted">
+          <T value={reviewUi.securityHint} />
+        </p>
+        <section className="account-section" aria-labelledby="authenticator-title">
+          <h3 id="authenticator-title">
+            <T value={ui.account.page.authenticator} />
+          </h3>
+          {user.mfaRequired && !user.mfaEnabled && passkeys.length === 0 ? (
+            <p>
+              <T value={ui.account.page.adminAndPublisherAccountsMustEnrollAn} />
+            </p>
+          ) : null}
+          {enrollRequested && enrollChallenge && enrollSecret ? (
+            <>
+              <MfaSetup
+                secret={enrollSecret}
+                qrDataUrl={enrollQr}
+                qrLabel={message(locale, ui.accessibility.authenticatorQr)}
+              />
+              <ConfirmEnrollForm challengeToken={enrollChallenge} />
+            </>
+          ) : user.mfaEnabled ? (
+            <>
+              <p>
+                <T
+                  value={
+                    user.stepUpFresh ? reviewUi.authenticatorConfirmed : ui.account.page.authenticatorAppIsEnrolled
+                  }
+                />
+              </p>
+              {user.mfaRequired ? (
+                <p className="muted">
+                  <T value={ui.account.page.authenticatorEnrollmentIsRequiredForThisAccount} />
+                </p>
+              ) : (
+                <Disclosure summary={<T value={reviewUi.removeAuthenticator} />}>
+                  <Stack as="form" action={revokeMfaAction}>
+                    <Input
+                      label={<T value={ui.attrs.accountPageInputLabelAuthenticatorCode} />}
+                      id="revokeCode"
+                      name="code"
+                      inputMode="numeric"
+                      required
+                    />
+                    <Button>
+                      <T value={reviewUi.removeAuthenticator} />
+                    </Button>
+                  </Stack>
+                </Disclosure>
+              )}
+              <RegenerateRecoveryForm />
+            </>
+          ) : (
+            <>
+              {enrollRequested ? (
+                <Alert tone="error">
+                  <T value={ui.account.page.enrollmentCouldNotBeStartedTryAgain} />
+                </Alert>
+              ) : null}
+              <StartMfaEnrollForm />
+            </>
+          )}
+        </section>
+        <section className="account-section" aria-labelledby="password-title">
+          <h3 id="password-title">
+            <T value={ui.account.page.changePassword} />
+          </h3>
+          <NavigatingActionForm action={changePasswordAction}>
+            <Input
+              label={<T value={ui.attrs.accountPageInputLabelCurrentPassword} />}
+              id="currentPassword"
+              name="currentPassword"
+              type="password"
+              autoComplete="current-password"
+              required
+            />
+            <Input
+              label={<T value={ui.attrs.accountPageInputLabelNewPassword} />}
+              id="newPassword"
+              name="newPassword"
+              type="password"
+              autoComplete="new-password"
+              required
+              minLength={12}
+            />
+            <Button variant="primary">
+              <T value={ui.account.page.updatePassword} />
+            </Button>
+          </NavigatingActionForm>
+        </section>
+      </Card>
+
+      <Card>
+        <PasskeyManager passkeys={passkeys} />
+      </Card>
+
+      <Card>
+        <section className="account-section" id="mcp-keys" aria-labelledby="mcp-keys-title">
+          <h2 id="mcp-keys-title">
+            <T value={ui.account.page.connectAChatClient} />
+          </h2>
+          <p>
+            <T value={reviewUi.connectionHint} />
+          </p>
+          <Disclosure summary={<T value={reviewUi.connectionHelp} />}>
+            <p>
+              <T value={ui.account.page.connectAnOauthCapableClientTo} /> <code>{mcpUrl}</code>{' '}
+              <T value={ui.account.page.andSignInWhenPromptedApproveRead} />
+            </p>
+            <h3>
+              <T value={ui.account.page.claudeCodeExample} />
+            </h3>
+            <p>
+              <T value={ui.account.page.afterCopyingAKeyRunThisOn} />
+            </p>
+            <pre tabIndex={0}>
+              <code>{`claude mcp add --transport http constitution-atlas ${mcpUrl} --header "Authorization: Bearer <your-MCP-key>"`}</code>
+            </pre>
+            <p>
+              <a href="https://code.claude.com/docs/en/mcp">
+                <T value={ui.account.page.claudeCodeMcpSetupInstructions} />
+              </a>
+              <T value={ui.account.page.useAClientThatSupportsACustom} />
+            </p>
+          </Disclosure>
+          <CreateMcpKeyForm canImport={canImport} />
+          <h3>
+            <T value={ui.account.page.connectedOauthClients} />
+          </h3>
+          {oauthGrants.length === 0 ? (
+            <p>
+              <T value={ui.account.page.noActiveOauthConnections} />
+            </p>
+          ) : (
+            oauthGrants.map((grant) => (
+              <div key={grant.clientId}>
+                <strong>{grant.clientName}</strong> <T value={ui.account.page.accessExpires} />{' '}
+                {new Date(grant.expiresAt).toLocaleString()}
+                <br />
+                <Disclosure summary={<T value={reviewUi.connectionDetails} />}>
+                  <T value={ui.account.page.clientId} /> <code>{grant.clientId}</code>
+                  <br />
+                  <T value={ui.account.page.registeredDestinations} />{' '}
+                  {grant.redirectUris
+                    .map((uri) => {
+                      try {
+                        return new URL(uri).origin;
+                      } catch {
+                        return uri;
+                      }
+                    })
+                    .join(', ')}
+                </Disclosure>
+                <Stack as="form" action={revokeOAuthGrantAction}>
+                  <input type="hidden" name="clientId" value={grant.clientId} />
+                  <Button>
+                    <T value={ui.account.page.revokeAccess} />
+                  </Button>
+                </Stack>
+              </div>
+            ))
+          )}
+          <h3>
+            <T value={ui.account.page.yourMcpKeys} />
+          </h3>
+          {mcpKeys.length === 0 ? (
+            <p>
+              <T value={ui.account.page.noKeysYet} />
+            </p>
+          ) : (
+            mcpKeys.map((key) => (
+              <div key={key.id}>
+                <strong>{key.name}</strong> · {key.scopes.join(', ')} <T value={ui.account.page.expires} />{' '}
+                {new Date(key.expiresAt).toLocaleDateString()}
+                {key.revokedAt ? (
+                  <span>
+                    {' '}
+                    <T value={ui.account.page.revoked} />
+                  </span>
+                ) : (
+                  <>
+                    <RotateMcpKeyForm keyId={key.id} />
+                    <Stack as="form" action={revokeMcpKeyAction}>
+                      <input type="hidden" name="keyId" value={key.id} />
+                      <Button>
+                        <T value={ui.account.page.revoke} />
+                      </Button>
+                    </Stack>
+                  </>
+                )}
+              </div>
+            ))
+          )}
+        </section>
+      </Card>
+    </SettingsPage>
   );
 }

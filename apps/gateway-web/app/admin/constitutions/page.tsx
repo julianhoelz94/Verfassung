@@ -1,12 +1,15 @@
+import { T } from '../../components/TranslationProvider';
+import { ui } from '../../../lib/messages';
 import { AdminForbidden } from '../../components/AdminForbidden';
-import { Alert, Card, DataList, DataRow, Input, PageHeader } from '../../components/ui';
-import { PageMain } from '../../components/PageMain';
-import { loadCountriesWithDetails } from '../../../lib/api';
+import { Alert, Card, DataList, DataRow, PageHeader } from '../../components/ui';
+import { WorkspacePage } from '../../components/layout/templates';
+import { loadCountriesWithDetails, type CountryDetail } from '../../../lib/api';
 import { requireAdminPage } from '../../../lib/admin';
 import { DEFAULT_NEW_OUTLINE } from '../../../lib/outline';
 import { createConstitutionAction } from './actions';
-import { ConstitutionCountryFields } from './ConstitutionCountryFields';
+import { ConstitutionBasicsFields } from './ConstitutionBasicsFields';
 import { OutlineEditor } from './OutlineEditor';
+import { requireSessionBearer } from '../../../lib/session';
 
 type AdminConstitutionsPageProps = {
   searchParams: Promise<{ error?: string }>;
@@ -15,9 +18,9 @@ type AdminConstitutionsPageProps = {
 export default async function AdminConstitutionsPage(props: AdminConstitutionsPageProps) {
   const searchParams = await props.searchParams;
   if (!(await requireAdminPage())) {
-    return <AdminForbidden title="Outlines" />;
+    return <AdminForbidden title={ui.forbidden.outlines} />;
   }
-  const { countries, details } = await loadCountriesWithDetails();
+  const { countries, details } = await loadCountriesWithDetails(await requireSessionBearer());
   const rows = details.flatMap((country) =>
     country
       ? country.constitutions.map((constitution) => ({
@@ -27,26 +30,20 @@ export default async function AdminConstitutionsPage(props: AdminConstitutionsPa
       : [],
   );
   return (
-    <PageMain className="wide">
-      <PageHeader
-        title="Constitution outlines"
-        meta="Each constitution has an ordered tree of layers. The public reader uses these labels and presentation rules."
-      />
+    <WorkspacePage width="content" header={<PageHeader
+        title={<T value={ui.attrs.adminConstitutionsPagePageHeaderTitleConstitutions} />}
+        meta={<T value={ui.attrs.adminConstitutionsPagePageHeaderMetaCreate} />}
+      />}>
+
       {searchParams.error === 'forbidden' ? (
-        <Alert tone="error">Administrator role required.</Alert>
+        <Alert tone="error"><T value={ui.admin.constitutions.page.administratorRoleRequired} /></Alert>
       ) : searchParams.error ? (
-        <Alert tone="error">That outline change could not be saved.</Alert>
+        <Alert tone="error"><T value={ui.admin.constitutions.page.thatOutlineChangeCouldNotBeSaved} /></Alert>
       ) : null}
       <Card>
-        <h2 className="card-title">New constitution</h2>
-        <p>
-          Choose an existing country or add a new one in this form. Then set the tree: the constitution is the parent,
-          then each layer below it. Concatenated layers have no heading and are joined in the reader.
-        </p>
-        <OutlineEditor action={createConstitutionAction} initial={DEFAULT_NEW_OUTLINE} submitLabel="Create">
-          <ConstitutionCountryFields countries={countries} />
-          <Input label="Slug" name="slug" required placeholder="basic-law" />
-          <Input label="Title" name="title" required />
+        <h2 className="card-title"><T value={ui.admin.constitutions.page.newConstitution} /></h2>
+        <OutlineEditor action={createConstitutionAction} initial={DEFAULT_NEW_OUTLINE} guidedCreation>
+          <ConstitutionBasicsFields countries={countries} details={details.filter((country): country is CountryDetail => country != null)} />
         </OutlineEditor>
       </Card>
       <DataList columns={3}>
@@ -54,13 +51,13 @@ export default async function AdminConstitutionsPage(props: AdminConstitutionsPa
           <DataRow
             key={row.constitution.id}
             cells={[
-              { label: 'Country', value: row.countryName },
+              { label: <T value={ui.remainingStatus.country} />, value: row.countryName },
               {
-                label: 'Title',
+                label: <T value={ui.remainingStatus.title} />,
                 value: <a href={`/admin/constitutions/${row.constitution.id}`}>{row.constitution.title}</a>,
               },
               {
-                label: 'Layers',
+                label: <T value={ui.remainingStatus.layers} />,
                 value:
                   (row.constitution.contentOutline?.kinds ?? []).map((kind) => kind.displayLabel).join(' → ') ||
                   'No layers',
@@ -69,6 +66,6 @@ export default async function AdminConstitutionsPage(props: AdminConstitutionsPa
           />
         ))}
       </DataList>
-    </PageMain>
+    </WorkspacePage>
   );
 }

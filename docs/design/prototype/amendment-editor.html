@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Legal change editor · Constitution Atlas mock</title>
+<style>
+:root{color-scheme:light;--paper:#f7f7f3;--white:#fff;--ink:#192927;--muted:#60716d;--line:#dce4df;--teal:#176c61;--teal-dark:#0c5148;--soft:#e9f4f0;--blue:#28638b;--blue-soft:#eff6fa;--green:#23734d;--green-soft:#eaf6ee;--red:#ab514c;--red-soft:#fbf0ee}
+*{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.5 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}button,input,textarea,select{font:inherit}button{cursor:pointer}a{color:var(--teal-dark);text-underline-offset:3px}:focus-visible{outline:3px solid #de9b2b;outline-offset:3px}[hidden]{display:none!important}
+.skip{position:absolute;top:-70px;left:14px;padding:8px;background:white;z-index:10}.skip:focus{top:8px}.mock{padding:5px 16px;background:#173f3b;color:white;text-align:center;font-size:12px}
+.topbar{background:white;border-bottom:1px solid var(--line)}.topbar-inner{max-width:1300px;min-height:60px;margin:auto;padding:0 25px;display:flex;align-items:center;justify-content:space-between}.brand{display:flex;align-items:center;gap:10px;color:var(--ink);text-decoration:none;font-weight:750}.brand-mark{display:grid;place-items:center;width:29px;height:29px;border-radius:7px;background:var(--teal);color:white;font:18px Georgia,serif}.topbar-side{color:var(--muted);font-size:13px}
+.page{max-width:1300px;margin:auto;padding:24px 25px 95px}.crumbs{color:var(--muted);font-size:13px}.crumbs a{color:inherit}.crumbs span:before{content:"/";margin:0 9px;color:#a7b5af}
+.header{display:flex;justify-content:space-between;align-items:end;gap:15px;margin:23px 0 7px}.eyebrow{margin:0 0 4px;color:var(--teal-dark);font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase}h1{margin:0;font-size:clamp(25px,2.8vw,32px);line-height:1.15;letter-spacing:-.025em}.meta{margin:8px 0 0;color:var(--muted);font-size:13px}.status{display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border:1px solid #cbe6d9;border-radius:50px;background:var(--soft);color:var(--teal-dark);font-size:12px;font-weight:700}.status:before{content:"";width:7px;height:7px;border-radius:50%;background:var(--teal)}
+.instrument{margin:14px 0 19px;background:white;border:1px solid var(--line);border-radius:8px}.instrument summary{padding:11px 15px;color:var(--teal-dark);font-size:13px;font-weight:700;cursor:pointer}.instrument[open] summary{border-bottom:1px solid var(--line)}.instrument-fields{display:grid;grid-template-columns:1fr 2fr;gap:12px;padding:15px}
+.layout{display:grid;grid-template-columns:260px minmax(0,1fr);gap:17px;align-items:start}.panel{background:white;border:1px solid var(--line);border-radius:10px;box-shadow:0 6px 24px rgba(29,50,42,.045)}
+.sidebar{padding:17px;position:sticky;top:16px}.side-head{display:flex;align-items:center;justify-content:space-between;gap:8px}.side-head h2{margin:0;font-size:17px}.side-help{margin:6px 0 14px;color:var(--muted);font-size:12px}.change-list{display:grid;gap:7px}.change-item{display:grid;grid-template-columns:5px minmax(0,1fr);gap:10px;width:100%;padding:10px;border:1px solid var(--line);border-radius:7px;background:white;text-align:left}.change-item:hover{background:#f7fbf9}.change-item[aria-current=true]{border-color:var(--teal);box-shadow:0 0 0 2px #d7ebe3}.stripe{border-radius:3px;background:var(--blue)}.change-item[data-row=added] .stripe{background:var(--green)}.change-item[data-row=removed] .stripe{background:var(--red)}.change-item b{display:block;font-size:13px}.change-item small{display:block;margin-top:2px;color:var(--muted);font-size:11px}.tag{display:inline-block;padding:2px 7px;border-radius:50px;font-size:10px;font-weight:800}.tag.changed{background:var(--blue-soft);color:var(--blue)}.tag.added{background:var(--green-soft);color:var(--green)}.tag.removed{background:var(--red-soft);color:var(--red)}.add-change{width:100%;margin-top:11px;padding:8px;border:1px dashed #afc6ba;border-radius:7px;background:#fafdfb;color:var(--teal-dark);font-size:12px;font-weight:700}
+.editor{min-width:0;padding:22px}.editor-top{display:flex;align-items:start;justify-content:space-between;gap:16px;padding-bottom:16px;border-bottom:1px solid var(--line)}.editor-top h2{margin:7px 0 4px;font-size:20px}.editor-top p{margin:0;color:var(--muted);font-size:13px}.type-picker{min-width:150px}.field-label{display:block;margin-bottom:5px;color:var(--ink);font-size:12px;font-weight:700}.field{display:block;width:100%;min-height:39px;padding:8px 10px;border:1px solid #c5d3cb;border-radius:6px;background:white;color:var(--ink)}
+.section-title{margin:19px 0 5px;font-size:15px}.section-desc{margin:0 0 12px;color:var(--muted);font-size:12px}.refs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.refs.one{grid-template-columns:minmax(0,1fr)}.ref{min-width:0;padding:15px;border:1px solid var(--line);border-radius:8px;background:#fcfdfb}.ref-head{display:flex;justify-content:space-between;gap:9px;align-items:center}.ref-head strong{font-size:13px}.version{font-size:11px;color:var(--muted)}.ref-path{margin:10px 0 4px;color:var(--teal-dark);font-size:12px;font-weight:750}.excerpt{min-height:58px;margin:0 0 13px;font:16px/1.46 Georgia,"Times New Roman",serif}.ref .pick{padding:7px 10px;border:1px solid #bdcec4;border-radius:6px;background:white;color:var(--teal-dark);font-size:12px;font-weight:700}.ref .pick:hover{background:var(--soft)}.empty-prompt{color:var(--muted);font:13px/1.4 system-ui,sans-serif}
+.diff-summary{margin:17px 0 0;padding:11px 13px;border:1px solid #d9e6e1;border-radius:7px;background:#f3f9f6}.diff-summary strong{display:block;color:var(--teal-dark);font-size:12px}.diff-summary p{margin:2px 0 0;font-size:14px}.diff-legend{margin:0 0 11px;color:var(--muted);font-size:12px}.diff-legend ins,.diff-legend del{font:inherit}.excerpt ins,.diff-legend ins{background:#d7efdf;color:#185c39;text-decoration:none;border-radius:2px}.excerpt del,.diff-legend del{background:#f9deda;color:#8a3530;text-decoration:line-through;border-radius:2px}
+.comment-block{margin-top:20px}.comment-block textarea{min-height:110px;resize:vertical}.comment-help{margin:6px 0 0;color:var(--muted);font-size:12px}.advanced{margin-top:17px;padding-top:15px;border-top:1px solid var(--line)}.advanced summary{color:var(--teal-dark);font-size:12px;font-weight:700;cursor:pointer}.advanced p{margin:7px 0;color:var(--muted);font-size:12px}
+.warning{margin-top:12px;padding:11px 12px;border:1px solid #e9d09b;border-radius:7px;background:#fff8e9;color:#5c4820;font-size:12px}.warning p{margin:0 0 7px}
+.footer{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:16px;padding:12px 16px;background:white;border:1px solid var(--line);border-radius:8px}.save-status{color:var(--muted);font-size:12px}.footer-actions{display:flex;gap:8px}.btn{min-height:39px;padding:8px 13px;border:1px solid #b9cbc1;border-radius:6px;background:white;color:var(--ink);font-weight:700;white-space:nowrap}.btn:hover{background:#f5faf7}.btn.primary{background:var(--teal);border-color:var(--teal);color:white}.btn.primary:hover{background:var(--teal-dark)}.btn:disabled{opacity:.5;cursor:not-allowed}
+dialog{width:min(650px,calc(100vw - 28px));max-height:min(750px,calc(100vh - 28px));padding:0;border:1px solid var(--line);border-radius:12px;box-shadow:0 22px 70px rgba(13,40,34,.25)}dialog::backdrop{background:rgba(11,39,34,.43)}.dialog-head{display:flex;justify-content:space-between;align-items:start;gap:12px;padding:18px 20px;border-bottom:1px solid var(--line)}.dialog-head h2{margin:0;font-size:20px}.dialog-head p{margin:4px 0 0;color:var(--muted);font-size:12px}.dialog-search{padding:14px 20px;border-bottom:1px solid var(--line)}.dialog-list{max-height:500px;overflow:auto;padding:12px 20px 20px}.group-label{margin:13px 0 6px;color:var(--muted);font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase}.unit-choice{display:block;width:100%;margin:4px 0;padding:9px 11px;border:1px solid var(--line);border-radius:7px;background:white;text-align:left}.unit-choice:hover{border-color:var(--teal);background:#f7fbf9}.unit-choice strong{display:block;font-size:12px}.unit-choice span{display:block;margin-top:2px;color:var(--muted);font:14px/1.4 Georgia,serif}.dialog-foot{display:flex;justify-content:end;padding:12px 20px;border-top:1px solid var(--line)}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}
+.topbar-inner{min-height:52px}.page{padding-top:14px}.header{margin-top:12px}.instrument{margin-top:8px;margin-bottom:12px}.instrument summary{padding-top:9px;padding-bottom:9px}.editor{padding:18px}.editor-top{padding-bottom:12px}.diff-summary{margin-top:12px;padding:9px 12px}.section-title{margin-top:13px}.section-desc{margin-bottom:8px}.diff-legend{margin-bottom:8px}.ref{padding:13px}.ref-path{margin-top:8px}.excerpt{min-height:48px;margin-bottom:10px}.comment-block{margin-top:13px}.comment-block textarea{min-height:95px}
+.review-progress{margin:12px 0 14px;padding:11px 12px;border:1px solid #cfe2d9;border-radius:7px;background:#f3f9f6}.progress-top{display:flex;justify-content:space-between;gap:8px;align-items:baseline}.progress-top strong{font-size:13px}.progress-top span{color:var(--teal-dark);font-size:12px;font-weight:750}.review-progress progress{display:block;width:100%;height:8px;margin:8px 0 5px;accent-color:var(--teal)}.progress-help{margin:0;color:var(--muted);font-size:11px}.tree-group+.tree-group{margin-top:14px;padding-top:10px;border-top:1px solid var(--line)}.tree-level{display:flex;justify-content:space-between;gap:5px;margin:7px 0 4px;color:var(--ink);font-size:12px;font-weight:750}.tree-level.child{padding-left:13px;color:var(--teal-dark)}.tree-level span:last-child{color:var(--muted);font-weight:600}.change-list{padding-left:13px}.change-item em{display:block;margin-top:4px;color:var(--blue);font-size:10px;font-style:normal;font-weight:750}.change-item[data-status=linked] em{color:var(--green)}.change-item[data-status=excluded] em{color:var(--muted)}.change-item[data-status=needs_recheck] em{color:var(--red)}.review-step{margin:0 0 4px!important;color:var(--teal-dark)!important;font-size:11px!important;font-weight:800;letter-spacing:.04em;text-transform:uppercase}.editor-controls{display:grid;gap:9px;justify-items:end}.step-nav{display:flex;gap:6px}.step-nav .btn{min-height:31px;padding:5px 8px;font-size:11px}.location{margin:10px 0 0;color:var(--muted);font-size:12px}.location strong{color:var(--teal-dark)}.decision-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}.decision-row .btn{font-size:12px}.exclusion-panel{margin-top:10px}.exclusion-panel textarea{min-height:70px;resize:vertical}.exclusion-panel .btn{margin-top:8px}.footer{position:sticky;bottom:10px;z-index:3;box-shadow:0 5px 25px rgba(22,52,39,.09)}
+@media(max-width:800px){.layout{grid-template-columns:minmax(0,1fr)}.sidebar{position:static;min-width:0}.change-list{grid-template-columns:repeat(3,minmax(0,1fr))}.header{align-items:start;flex-direction:column}}
+@media(max-width:590px){.topbar-inner,.page{padding-left:16px;padding-right:16px}.topbar-side{display:none}.instrument-fields{grid-template-columns:1fr}.sidebar{padding:13px}.change-list{display:flex;overflow-x:auto;padding:2px 2px 5px}.change-item{flex:0 0 195px}.editor{padding:17px}.editor-top{flex-direction:column}.editor-controls{width:100%;grid-template-columns:1fr auto;align-items:end}.type-picker{width:100%;min-width:0}.refs{grid-template-columns:1fr}.footer{bottom:0;z-index:3;margin-left:-16px;margin-right:-16px;margin-bottom:-95px;border-radius:0;box-shadow:0 -6px 22px rgba(28,50,42,.07)}.footer-actions{flex:1}.footer-actions .btn{flex:1}}
+.footer{position:static;box-shadow:none}@media(max-width:590px){.footer{margin-bottom:0}.editor-controls{grid-template-columns:1fr}.step-nav{justify-content:space-between}}
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to main content</a>
+<div class="mock">Interactive design mock · illustrative constitutional text · no data is saved</div>
+<header class="topbar"><div class="topbar-inner"><a class="brand" href="#main"><span class="brand-mark" aria-hidden="true">§</span>Constitution Atlas</a><span class="topbar-side">Editor / Legal changes</span></div></header>
+<main id="main" class="page">
+  <nav class="crumbs" aria-label="Breadcrumb"><a href="#main">Editor</a><span><a href="#main">Sample Constitution</a></span><span>Next legal change</span></nav>
+  <div class="header"><div><p class="eyebrow">Legal change · review differences</p><h1>Public information amendment</h1><p class="meta">Sample Constitution · 2022 r3 → draft next version</p></div><span class="status" id="draft-status">Draft · 4 differences found</span></div>
+  <details class="instrument"><summary>Instrument details and overall comment</summary><div class="instrument-fields"><label><span class="field-label">Instrument title</span><input class="field" value="Public Information Amendment"></label><label><span class="field-label">Overall comment about the law</span><textarea class="field" rows="3">This amendment expands access to public information and allows electronic requests.</textarea></label></div></details>
+  <div class="layout">
+    <aside class="panel sidebar" aria-label="Difference review"><div class="side-head"><h2>Differences</h2><span class="tag changed" id="open-count">4 to review</span></div><div class="review-progress"><div class="progress-top"><strong>Review progress</strong><span id="progress-count">0 of 4 reviewed</span></div><progress id="review-progress" value="0" max="4">0 of 4</progress><p class="progress-help" id="progress-help">Review each difference before submitting.</p></div><p class="side-help">Changes are grouped by their place in the tree. Choose one to inspect it.</p>
+      <div class="tree-group" data-group="article8"><div class="tree-level"><span>Article 8</span><span id="article8-count">3 open</span></div><div class="tree-level child"><span>↳ Paragraph 2</span><span id="paragraph2-count">3 open</span></div><div class="change-list">
+        <button class="change-item" type="button" data-row="changed" data-status="open" aria-current="true"><span class="stripe" aria-hidden="true"></span><span><b>Sentence 1</b><small>Added “to every person”</small><em>To review</em></span></button>
+        <button class="change-item" type="button" data-row="added" data-status="open" aria-current="false"><span class="stripe" aria-hidden="true"></span><span><b>Parent text</b><small>Added electronic requests</small><em>To review</em></span></button>
+        <button class="change-item" type="button" data-row="removed" data-status="open" aria-current="false"><span class="stripe" aria-hidden="true"></span><span><b>Sentence 2</b><small>Removed in-person rule</small><em>To review</em></span></button>
+      </div></div>
+      <div class="tree-group" data-group="article12"><div class="tree-level"><span>Article 12</span><span id="article12-count">1 open</span></div><div class="tree-level child"><span>↳ Paragraph 1</span><span id="paragraph1-count">1 open</span></div><div class="change-list">
+        <button class="change-item" type="button" data-row="article12" data-status="open" aria-current="false"><span class="stripe" aria-hidden="true"></span><span><b>Paragraph 1</b><small>Added live broadcasts</small><em>To review</em></span></button>
+      </div></div>
+      <button class="add-change" type="button" id="add">+ Add a missed difference</button></aside>
+    <section class="panel editor" aria-labelledby="change-heading">
+      <div class="editor-top"><div><p class="review-step" id="review-step">Difference 1 of 3 · To review</p><span class="tag changed" id="change-tag">Changed</span><h2 id="change-heading">Sentence 1</h2><p id="summary">This wording changed. Check the suggested old and new units.</p></div><div class="editor-controls"><label class="type-picker"><span class="field-label">Change type</span><select class="field" id="change-type"><option value="changed">Changed</option><option value="added">Added</option><option value="removed">Removed</option></select></label><div class="step-nav"><button class="btn" type="button" id="previous">← Previous</button><button class="btn" type="button" id="next">Next →</button></div></div></div>
+      <p class="location">Matched path: <strong id="matched-path">Article 8 → Paragraph 2 → Sentence 1</strong></p>
+      <div class="diff-summary" role="status"><strong>What changed</strong><p id="diff-summary-text">Added “to every person” to Sentence 1.</p></div>
+      <h3 class="section-title">Exact text</h3><p class="section-desc">These links point to the selected units in the pinned versions. Use “Choose unit” only if a link needs changing.</p><p class="diff-legend"><ins>Green: added wording</ins> · <del>Red: removed wording</del></p>
+      <div class="refs" id="refs">
+        <div class="ref" id="before-ref"><div class="ref-head"><strong>Before</strong><span class="version">2022 · r3</span></div><p class="ref-path" id="before-path">Article 8 › Paragraph 2 › Sentence 1</p><p class="excerpt" id="before-excerpt">Public records shall be accessible in accordance with the law.</p><button class="pick" type="button" data-pick="before">Choose old unit</button></div>
+        <div class="ref" id="after-ref"><div class="ref-head"><strong>After</strong><span class="version">Draft · next</span></div><p class="ref-path" id="after-path">Article 8 › Paragraph 2 › Sentence 1</p><p class="excerpt" id="after-excerpt">Public records shall be accessible to every person in accordance with the law.</p><button class="pick" type="button" data-pick="after">Choose new unit</button></div>
+      </div>
+      <div class="warning" id="mismatch" hidden><p>These units do not share the suggested lineage. Explain the pairing before review.</p><label><span class="field-label">Pairing explanation</span><input class="field" id="reason" placeholder="For example, the text moved"></label></div>
+      <div class="comment-block"><label for="change-comment" class="field-label">Comment on this change</label><textarea class="field" id="change-comment" placeholder="Explain what changed and why"></textarea><p class="comment-help">This comment belongs to this change. The overall comment about the law is in Instrument details.</p></div>
+      <div class="decision-row"><button class="btn primary" type="button" id="confirm">Confirm link &amp; next</button><button class="btn" type="button" id="exclude">Exclude with reason</button></div>
+      <div class="warning exclusion-panel" id="exclusion-panel" hidden><label for="exclude-reason" class="field-label">Why should this difference be excluded from this amendment?</label><textarea class="field" id="exclude-reason" placeholder="Explain this decision for the reviewer"></textarea><button class="btn" type="button" id="confirm-exclusion">Save exclusion &amp; next</button></div>
+      <details class="advanced"><summary>How the links will work after publication</summary><p>The old link stays on the 2022 snapshot. The new link resolves to the published successor. A removed unit has only an old link; an added unit has only a new link.</p></details>
+    </section>
+  </div>
+  <div class="footer"><span class="save-status" id="save-status">Review all 4 differences to submit.</span><div class="footer-actions"><button class="btn" type="button" id="save">Save draft</button><button class="btn primary" type="button" id="review" disabled>Submit for review</button></div></div>
+  <div class="sr-only" id="announcement" role="status" aria-live="polite"></div>
+</main>
+<dialog id="picker" aria-labelledby="picker-title"><div class="dialog-head"><div><h2 id="picker-title">Choose a unit</h2><p id="picker-subtitle">Select the exact unit in this version.</p></div><button class="btn" id="picker-close" type="button" aria-label="Close unit picker">Close</button></div><div class="dialog-search"><input class="field" id="picker-search" type="search" aria-label="Search units" placeholder="Find an article, sentence, or parent text"></div><div class="dialog-list" id="picker-list"></div><div class="dialog-foot"><button class="btn" type="button" id="picker-cancel">Cancel</button></div></dialog>
+<script>
+(() => {
+  const unitData={
+    before:[
+      {id:"article-before",logical:"article8",label:"Article 8 · Public information",text:"Article heading"},
+      {id:"intro-before",logical:"intro",label:"Article 8 › Opening text",text:"Access to public information is guaranteed."},
+      {id:"paragraph-before",logical:"paragraph2",label:"Article 8 › Paragraph 2",text:"Paragraph containing the access rules"},
+      {id:"sentence1-before",logical:"sentence1",label:"Article 8 › Paragraph 2 › Sentence 1",text:"Public records shall be accessible in accordance with the law."},
+      {id:"sentence2-before",logical:"sentence2",label:"Article 8 › Paragraph 2 › Sentence 2",text:"Requests may be made only in person."},
+      {id:"sentence3-before",logical:"sentence3",label:"Article 8 › Paragraph 2 › Sentence 3",text:"Restrictions shall be prescribed by law."},
+      {id:"article12-before",logical:"article12",label:"Article 12 · Public meetings",text:"Article heading"},
+      {id:"article12-paragraph1-before",logical:"article12-paragraph1",label:"Article 12 › Paragraph 1",text:"Meetings of public bodies shall be open to the public."}
+    ],
+    after:[
+      {id:"article-after",logical:"article8",label:"Article 8 · Public information",text:"Article heading"},
+      {id:"intro-after",logical:"intro",label:"Article 8 › Opening text",text:"Access to public information is guaranteed."},
+      {id:"paragraph-after",logical:"paragraph2",label:"Article 8 › Paragraph 2",text:"Paragraph containing the access rules"},
+      {id:"sentence1-after",logical:"sentence1",label:"Article 8 › Paragraph 2 › Sentence 1",text:"Public records shall be accessible to every person in accordance with the law."},
+      {id:"parent-added",logical:"parent-added",label:"Article 8 › Paragraph 2 › Parent text between sentences",text:"A request may also be submitted electronically."},
+      {id:"sentence3-after",logical:"sentence3",label:"Article 8 › Paragraph 2 › Sentence 3",text:"Restrictions shall be prescribed by law."},
+      {id:"article12-after",logical:"article12",label:"Article 12 · Public meetings",text:"Article heading"},
+      {id:"article12-paragraph1-after",logical:"article12-paragraph1",label:"Article 12 › Paragraph 1",text:"Meetings of public bodies shall be open to the public. Such meetings must also be broadcast live."}
+    ]
+  };
+  const rows=[
+    {key:"changed",group:"article8",title:"Sentence 1",type:"changed",before:"sentence1-before",after:"sentence1-after",comment:"Access now expressly extends to every person.",reason:"",exclusionReason:"",status:"open"},
+    {key:"added",group:"article8",title:"Parent text",type:"added",before:null,after:"parent-added",comment:"Electronic requests are now permitted.",reason:"",exclusionReason:"",status:"open"},
+    {key:"removed",group:"article8",title:"Sentence 2",type:"removed",before:"sentence2-before",after:null,comment:"The in-person-only rule is removed.",reason:"",exclusionReason:"",status:"open"},
+    {key:"article12",group:"article12",title:"Paragraph 1",type:"changed",before:"article12-paragraph1-before",after:"article12-paragraph1-after",comment:"Public meetings must also be broadcast live.",reason:"",exclusionReason:"",status:"open"}
+  ];
+  const $=id=>document.getElementById(id);
+  const getUnit=(side,id)=>unitData[side].find(unit=>unit.id===id);
+  let selected=0;let picking=null;
+  function announce(text){$("announcement").textContent=text}
+  function readForm(){rows[selected].comment=$("change-comment").value;rows[selected].reason=$("reason").value;rows[selected].exclusionReason=$("exclude-reason").value}
+  function diffParts(before,after){
+    const oldWords=before.match(/\s+|\S+/g)||[];
+    const newWords=after.match(/\s+|\S+/g)||[];
+    let prefix=0,suffix=0;
+    while(prefix<oldWords.length&&prefix<newWords.length&&oldWords[prefix]===newWords[prefix])prefix++;
+    while(suffix<oldWords.length-prefix&&suffix<newWords.length-prefix&&oldWords[oldWords.length-1-suffix]===newWords[newWords.length-1-suffix])suffix++;
+    return {prefix:oldWords.slice(0,prefix).join(""),old:oldWords.slice(prefix,oldWords.length-suffix).join(""),new:newWords.slice(prefix,newWords.length-suffix).join(""),suffix:oldWords.slice(oldWords.length-suffix).join("")};
+  }
+  function markedText(text,tag){const mark=document.createElement(tag);mark.textContent=text;return mark}
+  function renderExcerpt(side,row,unit,parts){
+    const excerpt=$(side+"-excerpt");excerpt.replaceChildren();
+    if(!unit){excerpt.textContent="Choose a unit from the constitutional tree.";excerpt.classList.add("empty-prompt");return}
+    excerpt.classList.remove("empty-prompt");
+    if(row.type==="added"||row.type==="removed"){
+      excerpt.append(markedText(unit.text,row.type==="added"?"ins":"del"));return;
+    }
+    if(!parts){excerpt.textContent=unit.text;return}
+    excerpt.append(document.createTextNode(parts.prefix));
+    const changed=side==="before"?parts.old:parts.new;
+    if(changed)excerpt.append(markedText(changed,side==="before"?"del":"ins"));
+    excerpt.append(document.createTextNode(parts.suffix));
+  }
+  function changeSummary(row,before,after,parts){
+    if(row.type==="added")return after?"Added: “"+after.text+"”":"Choose the new unit to show the addition.";
+    if(row.type==="removed")return before?"Removed: “"+before.text+"”":"Choose the old unit to show the removal.";
+    if(!before||!after)return "Choose both units to see the wording change.";
+    const removed=parts.old.trim(),added=parts.new.trim();
+    if(!removed&&!added)return "The linked wording is identical. Check the selected units.";
+    if(!removed)return "Added “"+added+"” to "+row.title+".";
+    if(!added)return "Removed “"+removed+"” from "+row.title+".";
+    return "Replaced “"+removed+"” with “"+added+"” in "+row.title+".";
+  }
+  const statusLabel=status=>({open:"To review",linked:"Linked",excluded:"Excluded",needs_recheck:"Needs recheck"})[status];
+  const needsReview=row=>row.status==="open"||row.status==="needs_recheck";
+  function markNeedsRecheck(row){if(!needsReview(row))row.status="needs_recheck"}
+  function nextUnreviewed(from){
+    for(let step=1;step<=rows.length;step++){
+      const index=(from+step)%rows.length;
+      if(needsReview(rows[index]))return index;
+    }
+    return -1;
+  }
+  function renderProgress(){
+    const total=rows.length,reviewed=rows.filter(row=>!needsReview(row)).length;
+    const linked=rows.filter(row=>row.status==="linked").length;
+    const excluded=rows.filter(row=>row.status==="excluded").length;
+    const recheck=rows.filter(row=>row.status==="needs_recheck").length;
+    const remaining=total-reviewed;
+    $("progress-count").textContent=reviewed+" of "+total+" reviewed";
+    $("review-progress").max=total||1;$("review-progress").value=reviewed;
+    $("review-progress").textContent=reviewed+" of "+total;
+    $("progress-help").textContent=remaining?linked+" linked · "+excluded+" excluded · "+recheck+" need recheck":"All differences reviewed. Ready to submit.";
+    $("open-count").textContent=remaining?remaining+" to review":"All reviewed";
+    const setGroupCount=(id,group)=>{const open=rows.filter(row=>row.group===group&&needsReview(row)).length;$(id).textContent=open?open+" open":"Done"};
+    setGroupCount("article8-count","article8");setGroupCount("paragraph2-count","article8");
+    setGroupCount("article12-count","article12");setGroupCount("paragraph1-count","article12");
+    $("draft-status").textContent="Draft · "+total+" difference"+(total===1?"":"s")+" found";
+    $("save-status").textContent=remaining?"Review "+remaining+" more difference"+(remaining===1?"":"s")+" to submit.":"All differences reviewed. Ready to submit.";
+    document.querySelectorAll("[data-row]").forEach(button=>{
+      const item=rows.find(candidate=>candidate.key===button.dataset.row);
+      button.dataset.status=item.status;
+      button.querySelector("em").textContent=statusLabel(item.status);
+    });
+    $("review").disabled=remaining!==0;
+    $("review-step").textContent="Difference "+(selected+1)+" of "+total+" · "+statusLabel(rows[selected].status);
+  }
+  function render(){
+    const row=rows[selected];
+    document.querySelectorAll("[data-row]").forEach(button=>button.setAttribute("aria-current",String(button.dataset.row===row.key)));
+    $("change-tag").textContent=row.type[0].toUpperCase()+row.type.slice(1);
+    $("change-tag").className="tag "+row.type;
+    $("change-heading").textContent=row.title;
+    $("change-type").value=row.type;
+    $("summary").textContent=row.type==="changed"?"This wording changed. Check the suggested old and new units.":row.type==="added"?"This text was added. Check its new unit link.":"This text was removed. Check its old unit link.";
+    const showBefore=row.type!=="added",showAfter=row.type!=="removed";
+    $("before-ref").hidden=!showBefore;$("after-ref").hidden=!showAfter;
+    $("refs").classList.toggle("one",!showBefore||!showAfter);
+    const before=getUnit("before",row.before),after=getUnit("after",row.after);
+    const parts=row.type==="changed"&&before&&after?diffParts(before.text,after.text):null;
+    $("diff-summary-text").textContent=changeSummary(row,before,after,parts);
+    $("matched-path").textContent=(before?.label||after?.label||"Choose a unit").replaceAll(" › "," → ");
+    for(const side of ["before","after"]){
+      const unit=getUnit(side,row[side]);
+      $(side+"-path").textContent=unit?unit.label:"No unit selected";
+      renderExcerpt(side,row,unit,parts);
+    }
+    $("change-comment").value=row.comment;
+    $("reason").value=row.reason;
+    $("exclude-reason").value=row.exclusionReason;
+    $("exclusion-panel").hidden=true;
+    const mismatch=row.type==="changed"&&row.before&&row.after&&getUnit("before",row.before).logical!==getUnit("after",row.after).logical;
+    $("mismatch").hidden=!mismatch;
+    $("confirm").disabled=!(showBefore?!!row.before:true)||!(showAfter?!!row.after:true)||(mismatch&&!row.reason.trim());
+    $("previous").disabled=selected===0;$("next").disabled=selected===rows.length-1;
+    renderProgress();
+  }
+  function chooseRow(index){readForm();selected=index;render();announce(rows[selected].title+" selected")}
+  function openPicker(side){
+    picking=side;const row=rows[selected];
+    const article=row.group==="article12"?"Article 12":"Article 8";
+    $("picker-title").textContent="Choose "+(side==="before"?"old":"new")+" unit";
+    $("picker-subtitle").textContent=(side==="before"?"Published source · 2022 r3":"Draft target · next version")+" · "+article;
+    $("picker-search").value="";
+    renderChoices();
+    $("picker").showModal();
+  }
+  function renderChoices(){
+    const list=$("picker-list");list.replaceChildren();
+    const query=$("picker-search").value.trim().toLowerCase();
+    const article=rows[selected].group==="article12"?"Article 12":"Article 8";
+    const title=document.createElement("p");title.className="group-label";title.textContent=article+(article==="Article 12"?" · Public meetings":" · Public information");list.append(title);
+    unitData[picking].filter(unit=>unit.label.startsWith(article)&&(unit.label+" "+unit.text).toLowerCase().includes(query)).forEach(unit=>{
+      const button=document.createElement("button");button.type="button";button.className="unit-choice";
+      const label=document.createElement("strong");label.textContent=unit.label;
+      const excerpt=document.createElement("span");excerpt.textContent=unit.text;
+      button.append(label,excerpt);
+      button.addEventListener("click",()=>{rows[selected][picking]=unit.id;markNeedsRecheck(rows[selected]);$("picker").close();render();announce(unit.label+" linked as "+(picking==="before"?"old":"new")+" unit")});
+      list.append(button);
+    });
+    if(list.childElementCount===1){const empty=document.createElement("p");empty.textContent="No units match that search.";list.append(empty)}
+  }
+  document.querySelectorAll("[data-row]").forEach(button=>button.addEventListener("click",()=>chooseRow(rows.findIndex(row=>row.key===button.dataset.row))));
+  $("previous").addEventListener("click",()=>{if(selected>0)chooseRow(selected-1)});
+  $("next").addEventListener("click",()=>{if(selected<rows.length-1)chooseRow(selected+1)});
+  document.querySelectorAll("[data-pick]").forEach(button=>button.addEventListener("click",()=>openPicker(button.dataset.pick)));
+  $("picker-search").addEventListener("input",renderChoices);
+  $("picker-close").addEventListener("click",()=>$("picker").close());
+  $("picker-cancel").addEventListener("click",()=>$("picker").close());
+  $("change-comment").addEventListener("input",()=>{rows[selected].comment=$("change-comment").value;markNeedsRecheck(rows[selected]);renderProgress()});
+  $("reason").addEventListener("input",()=>{rows[selected].reason=$("reason").value;markNeedsRecheck(rows[selected]);render()});
+  $("change-type").addEventListener("change",()=>{readForm();rows[selected].type=$("change-type").value;markNeedsRecheck(rows[selected]);render()});
+  $("confirm").addEventListener("click",()=>{
+    readForm();rows[selected].status="linked";
+    const next=nextUnreviewed(selected);
+    if(next>=0)selected=next;
+    render();announce(next>=0?"Difference linked. Next difference selected.":"All differences reviewed. Ready to submit.");
+  });
+  $("exclude").addEventListener("click",()=>{$("exclusion-panel").hidden=!$("exclusion-panel").hidden;if(!$("exclusion-panel").hidden)$("exclude-reason").focus()});
+  $("exclude-reason").addEventListener("input",()=>{$("exclude-reason").setCustomValidity("")});
+  $("confirm-exclusion").addEventListener("click",()=>{
+    readForm();
+    if(!rows[selected].exclusionReason.trim()){$("exclude-reason").setCustomValidity("Explain this exclusion for the reviewer.");$("exclude-reason").reportValidity();return}
+    rows[selected].status="excluded";
+    const next=nextUnreviewed(selected);
+    if(next>=0)selected=next;
+    render();announce(next>=0?"Difference excluded with a reason. Next difference selected.":"All differences reviewed. Ready to submit.");
+  });
+  $("add").addEventListener("click",()=>{
+    readForm();const key="new-"+rows.length;const group=rows[selected].group;
+    rows.push({key,group,title:"New difference",type:"changed",before:null,after:null,comment:"",reason:"",exclusionReason:"",status:"open"});
+    const button=document.createElement("button");button.className="change-item";button.type="button";button.dataset.row=key;
+    const stripe=document.createElement("span");stripe.className="stripe";stripe.setAttribute("aria-hidden","true");
+    const copy=document.createElement("span");const name=document.createElement("b");name.textContent="New difference";const detail=document.createElement("small");detail.textContent="Choose old and new units";const state=document.createElement("em");state.textContent="To review";copy.append(name,detail,state);button.append(stripe,copy);
+    button.addEventListener("click",()=>chooseRow(rows.findIndex(row=>row.key===key)));
+    document.querySelector('[data-group="'+group+'"] .change-list').append(button);selected=rows.length-1;render();announce("New difference added. Choose the old and new units.")
+  });
+  $("save").addEventListener("click",()=>{readForm();$("save-status").textContent="Mock preview only. A real draft would save this progress.";announce("Mock draft previewed")});
+  $("review").addEventListener("click",()=>{readForm();$("save-status").textContent="All differences reviewed. Mock ready for submission.";announce("All differences reviewed")});
+  render();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,20 @@
+.card,
+.panel {
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+  padding: var(--surface-padding);
+  min-width: 0;
+}
+
+.card {
+  box-shadow: var(--shadow-1);
+}
+.card > :first-child,
+.panel > :first-child {
+  margin-top: 0;
+}
+.card > :last-child,
+.panel > :last-child {
+  margin-bottom: 0;
+}

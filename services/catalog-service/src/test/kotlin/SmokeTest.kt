@@ -19,6 +19,7 @@ class SmokeTest {
     fun serviceStartsAndDatabaseIsReachable() {
         val one = jdbcTemplate.queryForObject("SELECT 1", Int::class.java)
         check(one == 1)
+        check(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM countries", Int::class.java) == 0)
     }
 
     companion object {

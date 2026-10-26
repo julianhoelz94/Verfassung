@@ -1,0 +1,88 @@
+import { createServer as createHttpServer } from 'node:http';
+import { isIP } from 'node:net';
+import { createMcpHandler } from '@modelcontextprotocol/server';
+import { toNodeHandler } from '@modelcontextprotocol/node';
+import { createServer } from './server.js';
+import { authenticateMcpKey, UpstreamError } from './catalog.js';
+import { enter, metrics } from './operations.js';
+import { createAuthenticationRateLimit } from './auth-rate-limit.js';
+
+const handler = toNodeHandler(createMcpHandler(ctx => createServer(ctx.requestInfo?.headers.get('authorization') ?? undefined), { maxRequestBodySize: 5 * 1024 * 1024 }), { maxRequestBodySize: 5 * 1024 * 1024 });
+const port = Number(process.env.PORT ?? '8080');
+const allowedOrigin = new URL(process.env.PUBLIC_BASE_URL ?? 'http://localhost').origin;
+const resource = `${(process.env.PUBLIC_BASE_URL ?? 'http://localhost').replace(/\/$/, '')}/mcp`;
+const resourceMetadataUrl = `${(process.env.PUBLIC_BASE_URL ?? 'http://localhost').replace(/\/$/, '')}/.well-known/oauth-protected-resource/mcp`;
+const challenge = `Bearer resource_metadata="${resourceMetadataUrl}"`;
+const rateLimited = createAuthenticationRateLimit();
+
+createHttpServer((request, response) => {
+  if (request.url === '/.well-known/oauth-protected-resource/mcp' && request.method === 'GET') {
+    response.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=300', 'Access-Control-Allow-Origin': '*' });
+    response.end(JSON.stringify({ resource, authorization_servers: [allowedOrigin], scopes_supported: ['mcp:read', 'ingestion:import'], bearer_methods_supported: ['header'] }));
+    return;
+  }
+  if (request.url === '/mcp/ping' && request.method === 'GET') {
+    response.writeHead(200, { 'Content-Type': 'text/plain' });
+    response.end('ok');
+    return;
+  }
+  if (request.url === '/internal/metrics' && request.method === 'GET') {
+    response.writeHead(200, { 'Content-Type': 'text/plain; version=0.0.4' });
+    response.end(metrics());
+    return;
+  }
+  if (request.url !== '/mcp') {
+    response.writeHead(404).end();
+    return;
+  }
+  if (request.headers.origin && request.headers.origin !== allowedOrigin) {
+    response.writeHead(403).end();
+    return;
+  }
+  const forwarded = request.headers['x-atlas-client-ip'];
+  const candidate = typeof forwarded === 'string' ? forwarded : '';
+  const ip = isIP(candidate) ? candidate : request.socket.remoteAddress ?? 'unknown';
+  const authorization = request.headers.authorization;
+  if (!authorization) {
+    if (rateLimited(ip)) {
+      response.writeHead(429, { 'Retry-After': '60' }).end();
+      return;
+    }
+    response.writeHead(401, { 'Content-Type': 'application/json', 'WWW-Authenticate': challenge });
+    response.end(JSON.stringify({ error: 'MCP key required' }));
+    return;
+  }
+  const leaveAuthentication = enter(`auth:${ip}`);
+  if (!leaveAuthentication) {
+    response.writeHead(429, { 'Retry-After': '1', 'Content-Type': 'application/json' });
+    response.end(JSON.stringify({ error: 'MCP authentication concurrency limit reached' }));
+    return;
+  }
+  void authenticateMcpKey(authorization).then(actor => {
+    leaveAuthentication();
+    const leave = enter(actor.id ?? 'unknown');
+    if (!leave) {
+      response.writeHead(429, { 'Retry-After': '1', 'Content-Type': 'application/json' });
+      response.end(JSON.stringify({ error: 'MCP concurrency limit reached' }));
+      return;
+    }
+    response.once('close', leave);
+    (request as typeof request & { auth?: { token: string; clientId: string; scopes: string[]; resource?: URL; resourceMetadataUrl: string } }).auth = {
+      token: authorization.slice('Bearer '.length), clientId: actor.id ?? 'unknown', scopes: actor.scopes,
+      ...(actor.resource ? { resource: new URL(actor.resource) } : {}), resourceMetadataUrl,
+    };
+    void handler(request, response).catch(() => {
+      if (!response.headersSent) response.writeHead(503).end();
+      else response.end();
+    }).finally(leave);
+  }, (error: unknown) => {
+    leaveAuthentication();
+    const status = error instanceof UpstreamError && (error.status === 401 || error.status === 403) ? error.status : 503;
+    if (status !== 503 && rateLimited(ip)) {
+      response.writeHead(429, { 'Retry-After': '60' }).end();
+      return;
+    }
+    response.writeHead(status, { 'Content-Type': 'application/json', ...(status === 401 ? { 'WWW-Authenticate': challenge } : {}) });
+    response.end(JSON.stringify({ error: status === 503 ? 'Authentication service unavailable' : 'MCP key required' }));
+  });
+}).listen(port, '0.0.0.0');

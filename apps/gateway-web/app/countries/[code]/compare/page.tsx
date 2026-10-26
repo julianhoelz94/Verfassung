@@ -1,17 +1,23 @@
+import { changeTypeMessage, changeTypeTone } from '../../../../lib/ui-labels';
+import { T } from '../../../components/TranslationProvider';
+import { ui, message } from '../../../../lib/messages';
+import { currentLocale } from '../../../../lib/server-locale';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import { CompareView } from '../../../components/CompareView';
 import { ConstitutionText } from '../../../components/ConstitutionText';
 import { CopyLink } from '../../../components/CopyLink';
 import { DiffConstitutionText } from '../../../components/DiffConstitutionText';
-import { PageMain } from '../../../components/PageMain';
-import { PrintLink } from '../../../components/PrintLink';
+import { ReaderPage } from '../../../components/layout/templates';
+import { AmendmentUnitLinks } from '../../../components/AmendmentUnitLinks';
 import { ServiceUnavailable } from '../../../components/StatusMessage';
 import { Badge, PageHeader } from '../../../components/ui';
 import {
   ApiUnavailableError,
   getVersion,
-  listAllArticles,
+  getReaderOutline,
+  type ContentOutline,
+  listAllUnits,
   listConstitutionAmendments,
   getCountry,
   type Amendment,
@@ -23,7 +29,7 @@ import {
   COMPARE_KIND_LABEL,
   amendmentsBetween,
   canonicalCompareQuery,
-  compareArticleNumbers,
+  alignArticles,
   compareRequestError,
   compareRowId,
   netArticleKind,
@@ -31,12 +37,14 @@ import {
   versionPath,
   type CompareKind,
 } from '../../../../lib/compare';
+import { articleHeading } from '../../../../lib/outline';
 import { FormattedDate } from '../../../../lib/format-date';
 import { atlasTitle, metaDescription, pageMetadata } from '../../../../lib/page-meta';
 import { publicVersions, publicVersionForSnapshot, snapshotVersionId } from '../../../../lib/reading';
 import { currentUser, requireSessionBearer } from '../../../../lib/session';
 import { canVisitEditor } from '../../../../lib/nav';
 import { CompareForm } from '../CompareForm';
+import { Stack } from '../../../components/layout/Layout';
 
 type ComparePageProps = {
   params: Promise<{ code: string }>;
@@ -97,14 +105,8 @@ function columnBadge(kind: CompareKind, side: 'from' | 'to'): { tone: 'added' | 
   return { tone: 'neutral', label: 'unchanged' };
 }
 
-function hopChangeTone(changeType: string): 'added' | 'removed' | 'changed' | 'neutral' {
-  if (changeType === 'added' || changeType === 'removed' || changeType === 'changed') {
-    return changeType;
-  }
-  return 'neutral';
-}
-
 export default async function ComparePage(props: ComparePageProps) {
+  const locale = await currentLocale();
   const params = await props.params;
   const searchParams = await props.searchParams;
   let country: CountryDetail | null = null;
@@ -117,9 +119,9 @@ export default async function ComparePage(props: ComparePageProps) {
 
   if (error) {
     return (
-      <PageMain className="wide">
-        <ServiceUnavailable service="Catalog" retryHref={`/countries/${params.code}/compare`} />
-      </PageMain>
+      <ReaderPage width="content">
+        <ServiceUnavailable service={ui.services.catalog} retryHref={`/countries/${params.code}/compare`} />
+      </ReaderPage>
     );
   }
 
@@ -148,24 +150,29 @@ export default async function ComparePage(props: ComparePageProps) {
   const showAll = searchParams.all === '1';
   const user = await currentUser();
   const showReviewWarnings = Boolean(user && canVisitEditor(user.roles));
-  const selectedError = compareRequestError(country.constitutions, fromId, toId);
+  const selectedError = compareRequestError(country.constitutions, fromId, toId, locale);
   const path = fromId && toId && constitution && !selectedError ? versionPath(versions, fromId, toId) : null;
 
   let fromArticles: ArticleSummary[] = [];
   let toArticles: ArticleSummary[] = [];
   let lawHops: LawHop[] = [];
+  let fromOutline: ContentOutline | undefined;
+  let toOutline: ContentOutline | undefined;
   let loadError: string | null = selectedError;
 
   if (path && path.length >= 2 && !selectedError && constitution) {
     try {
+      const fromSnapshot = fromDetail?.constitutionId === constitution.id ? fromDetail.id : snapshotVersionId(path[0]);
+      const toSnapshot = toDetail?.constitutionId === constitution.id ? toDetail.id : snapshotVersionId(path[path.length - 1]);
+      [fromOutline, toOutline] = await Promise.all([getReaderOutline(fromSnapshot), getReaderOutline(toSnapshot)]).then((outlines) => outlines.map((outline) => outline ?? undefined));
       const [fromList, toList, constitutionAmendments] = await Promise.all([
-        listAllArticles(
+        listAllUnits(
           fromDetail?.constitutionId === constitution.id
             ? fromDetail.id
             : snapshotVersionId(path[0]),
           true,
         ),
-        listAllArticles(
+        listAllUnits(
           toDetail?.constitutionId === constitution.id
             ? toDetail.id
             : snapshotVersionId(path[path.length - 1]),
@@ -207,13 +214,10 @@ export default async function ComparePage(props: ComparePageProps) {
       toArticles = toList;
       loadError = null;
     } catch (e) {
-      loadError = e instanceof ApiUnavailableError ? e.message : 'A backend service is unavailable';
+      loadError = message(locale, ui.errors.servicesUnavailable);
     }
   }
 
-  const fromMap = new Map(fromArticles.map((article) => [article.articleNumber, article]));
-  const toMap = new Map(toArticles.map((article) => [article.articleNumber, article]));
-  const numbers = [...new Set([...fromMap.keys(), ...toMap.keys()])].sort(compareArticleNumbers);
   const recorded = new Map<string, string[]>();
   for (const hop of lawHops) {
     for (const change of hop.amendment.changes) {
@@ -227,11 +231,10 @@ export default async function ComparePage(props: ComparePageProps) {
 
   const fromVersion = path?.[0];
   const toVersion = path?.[path.length - 1];
-  const rows = numbers.map((number) => {
-    const left = fromMap.get(number);
-    const right = toMap.get(number);
+  const rows = alignArticles(fromArticles, toArticles).map(({ key, left, right }) => {
+    const number = right?.articleNumber ?? left?.articleNumber ?? '';
     const kind = netArticleKind(left, right, recorded.get(number) ?? []);
-    return { number, left, right, kind, rowId: compareRowId(number) };
+    return { key, number, left, right, kind, rowId: compareRowId(right?.logicalId ?? left?.logicalId ?? number) };
   });
   const visible = showAll ? rows : rows.filter((row) => row.kind !== 'same');
   const changedCount = rows.filter((row) => row.kind === 'changed').length;
@@ -245,22 +248,17 @@ export default async function ComparePage(props: ComparePageProps) {
   const hideUnchangedHref = `/countries/${country.isoCode}/compare?${compareQuery}`;
 
   return (
-    <PageMain className="wide">
-      <PageHeader
+    <ReaderPage width="content" header={<PageHeader
         breadcrumbs={[
-          { href: '/', label: 'Countries' },
+          { href: '/', label: <T value={ui.nav.countries} /> },
           { href: `/countries/${country.isoCode}`, label: country.name },
-          { label: 'Compare' },
+          { label: <T value={ui.remainingStatus.compare} /> },
         ]}
         eyebrow={`${country.name}${constitution?.title ? ` · ${constitution.title}` : ''}`}
-        title="Compare versions"
-        actions={
-          <>
-            <CopyLink />
-            <PrintLink />
-          </>
-        }
-      />
+        title={<T value={ui.attrs.countriesCodeComparePagePageHeaderTitle} />}
+        actions={<CopyLink />}
+      />}>
+
       <CompareForm
         code={country.isoCode}
         versions={versions}
@@ -272,21 +270,21 @@ export default async function ComparePage(props: ComparePageProps) {
       {path && fromVersion && toVersion && !loadError ? (
         <>
           <div className="compare-summary">
-            <Badge tone="changed">{changedCount} changed</Badge>
-            <Badge tone="added">{addedCount} added</Badge>
-            <Badge tone="removed">{removedCount} removed</Badge>
+            <Badge tone="changed">{changedCount} <T value={ui.countries.code.compare.page.changed} /></Badge>
+            <Badge tone="added">{addedCount} <T value={ui.countries.code.compare.page.added} /></Badge>
+            <Badge tone="removed">{removedCount} <T value={ui.countries.code.compare.page.removed} /></Badge>
             <Badge>
-              {lawHops.length} amending law{lawHops.length === 1 ? '' : 's'}
+              {lawHops.length} <T value={ui.countries.code.compare.page.amendingLaw} />{lawHops.length === 1 ? '' : 's'}
             </Badge>
             <span className="muted">
               {showAll ? (
                 <>
-                  All articles are shown. <a href={hideUnchangedHref}>Only changed</a>
+                  <T value={ui.countries.code.compare.page.allArticlesAreShown} />{" "}<a href={hideUnchangedHref}><T value={ui.countries.code.compare.page.onlyChanged} /></a>
                 </>
               ) : (
                 <>
-                  Only changed articles are shown.{' '}
-                  <a href={showAllHref}>Show all {rows.length}</a>
+                  <T value={ui.countries.code.compare.page.onlyChangedArticlesAreShown} />{' '}
+                  <a href={showAllHref}><T value={ui.countries.code.compare.page.showAll} />{" "}{rows.length}</a>
                 </>
               )}
             </span>
@@ -295,8 +293,7 @@ export default async function ComparePage(props: ComparePageProps) {
           <CompareView fromLabel={fromVersion.versionLabel} toLabel={toVersion.versionLabel}>
             {lawHops.length === 0 ? (
               <p>
-                No legal changes are recorded between these versions. The side-by-side text below still compares the snapshots.
-              </p>
+                <T value={ui.countries.code.compare.page.noLegalChangesAreRecordedBetweenThese} />{" "}</p>
             ) : null}
             {lawHops.map((hop, hopIndex) => {
               const amendment = hop.amendment;
@@ -304,8 +301,8 @@ export default async function ComparePage(props: ComparePageProps) {
               return (
                 <details key={amendment.id} className="hop">
                   <summary>
-                    <Badge tone="accent">Legal change {hopIndex + 1}</Badge>
-                    {showReviewWarnings && needsReview ? <Badge tone="changed">Needs review</Badge> : null}
+                    <Badge tone="accent"><T value={ui.countries.code.compare.page.legalChange} />{" "}{hopIndex + 1}</Badge>
+                    {showReviewWarnings && needsReview ? <Badge tone="changed"><T value={ui.countries.code.compare.page.needsReview} /></Badge> : null}
                     <span>{amendment.title}</span>
                     <span className="muted">
                       {hop.source && hop.target ? (
@@ -329,13 +326,13 @@ export default async function ComparePage(props: ComparePageProps) {
                       ) : null}
                     </span>
                   </summary>
-                  <div className="stack">
+                  <Stack>
                     {amendment.changes.map((change) => (
                       <div key={change.id} className="change-row">
-                        <Badge tone={hopChangeTone(change.changeType)}>{change.changeType}</Badge>
+                        <Badge tone={changeTypeTone(change.changeType)}>{<T value={changeTypeMessage(change.changeType)} />}</Badge>
                         {change.articleNumber ? (
                           <a href={`/countries/${country.isoCode}/articles/${encodeURIComponent(change.articleNumber)}`}>
-                            Art. {change.articleNumber}
+                            <T value={ui.countries.code.compare.page.art} />{" "}{change.articleNumber}
                           </a>
                         ) : null}
                         <span className="muted">
@@ -347,26 +344,25 @@ export default async function ComparePage(props: ComparePageProps) {
                             </>
                           ) : null}
                         </span>
+                        <AmendmentUnitLinks change={change} />
                       </div>
                     ))}
-                  </div>
+                  </Stack>
                 </details>
               );
             })}
 
             <h2>
-              {fromVersion.versionLabel} and {toVersion.versionLabel} side by side
-            </h2>
+              {fromVersion.versionLabel} <T value={ui.countries.code.compare.page.and} />{" "}{toVersion.versionLabel} <T value={ui.countries.code.compare.page.sideBySide} />{" "}</h2>
             {visible.map((row) => {
-              const title = row.right?.title ?? row.left?.title ?? '';
+              const heading = articleHeading(row.right ? toOutline : fromOutline, (row.right ?? row.left)!);
               const fromBadge = columnBadge(row.kind, 'from');
               const toBadge = columnBadge(row.kind, 'to');
               return (
-                <section key={row.number} className={`compare-article kind-${row.kind}`}>
+                <section key={row.key} className={`compare-article kind-${row.kind}`}>
                   <h2 className="section-title" id={row.rowId}>
-                    Art. {row.number}
-                    {title ? ` · ${title}` : ''}{' '}
-                    <a href={`#${row.rowId}`}>{COMPARE_KIND_LABEL[row.kind]}</a>
+                    {heading}{' '}
+                    <Badge tone={row.kind === 'same' ? 'neutral' : row.kind}><T value={COMPARE_KIND_LABEL[row.kind]} /></Badge>
                   </h2>
                   <div className="compare-grid">
                     <section className="compare-col compare-col-from" aria-label={fromVersion.versionLabel}>
@@ -379,8 +375,9 @@ export default async function ComparePage(props: ComparePageProps) {
                           left={row.left}
                           right={row.right}
                           side="from"
-                          showHeading={false}
-                          outline={constitution?.contentOutline}
+                          oppositeOutline={toOutline}
+                          showHeading={true}
+                          outline={fromOutline}
                           lang={fromVersion.languageCode}
                         />
                       ) : row.left ? (
@@ -389,11 +386,11 @@ export default async function ComparePage(props: ComparePageProps) {
                           headingLevel="h3"
                           showHeading={false}
                           headingIdPrefix="article-from"
-                          outline={constitution?.contentOutline}
+                          outline={fromOutline}
                           lang={fromVersion.languageCode}
                         />
                       ) : (
-                        <p className="muted">This article did not exist in the {fromVersion.versionLabel} text.</p>
+                        <p className="muted"><T value={ui.countries.code.compare.page.thisArticleDidNotExistInThe} />{" "}{fromVersion.versionLabel} <T value={ui.countries.code.compare.page.text} /></p>
                       )}
                     </section>
                     <section className="compare-col compare-col-to" aria-label={toVersion.versionLabel}>
@@ -406,8 +403,9 @@ export default async function ComparePage(props: ComparePageProps) {
                           left={row.left}
                           right={row.right}
                           side="to"
-                          showHeading={false}
-                          outline={constitution?.contentOutline}
+                          oppositeOutline={fromOutline}
+                          showHeading={true}
+                          outline={toOutline}
                           lang={toVersion.languageCode}
                         />
                       ) : row.right ? (
@@ -416,11 +414,11 @@ export default async function ComparePage(props: ComparePageProps) {
                           headingLevel="h3"
                           showHeading={false}
                           headingIdPrefix="article-to"
-                          outline={constitution?.contentOutline}
+                          outline={toOutline}
                           lang={toVersion.languageCode}
                         />
                       ) : (
-                        <p className="muted">This article did not exist in the {toVersion.versionLabel} text.</p>
+                        <p className="muted"><T value={ui.countries.code.compare.page.thisArticleDidNotExistInThe} />{" "}{toVersion.versionLabel} <T value={ui.countries.code.compare.page.text} /></p>
                       )}
                     </section>
                   </div>
@@ -430,6 +428,6 @@ export default async function ComparePage(props: ComparePageProps) {
           </CompareView>
         </>
       ) : null}
-    </PageMain>
+    </ReaderPage>
   );
 }

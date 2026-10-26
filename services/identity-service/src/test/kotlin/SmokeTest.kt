@@ -10,7 +10,8 @@ import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
 
 @Testcontainers
-@SpringBootTest(classes = [IdentityServiceApplication::class])
+@org.springframework.test.context.ActiveProfiles("ci")
+@SpringBootTest(classes = [IdentityServiceApplication::class], properties = ["SETUP_FIXTURE_COMPLETE=true"])
 class SmokeTest {
     @Autowired
     lateinit var jdbcTemplate: JdbcTemplate

@@ -37,6 +37,8 @@ dependencies {
   implementation("org.springframework.boot:spring-boot-starter-data-jdbc")
   implementation("org.springframework.security:spring-security-crypto")
   implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
+  implementation("com.yubico:webauthn-server-core:2.10.1")
+  implementation("com.google.zxing:core:3.5.4")
   implementation("org.jetbrains.kotlin:kotlin-reflect")
   runtimeOnly("org.postgresql:postgresql")
   implementation("org.flywaydb:flyway-core")
@@ -49,4 +51,9 @@ dependencies {
 
 tasks.withType<Test> {
   useJUnitPlatform()
+}
+
+// One supported-language registry shared with the gateway.
+tasks.processResources {
+  from("../../apps/gateway-web/lib/supported-languages.json")
 }

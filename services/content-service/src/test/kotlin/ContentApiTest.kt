@@ -19,8 +19,9 @@ import org.springframework.boot.test.mock.mockito.MockBean
 import org.springframework.http.MediaType
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
+import org.springframework.test.context.jdbc.Sql
+import org.springframework.test.web.servlet.MockHttpServletRequestDsl
 import org.springframework.test.web.servlet.MockMvc
-import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.patch
 import org.springframework.test.web.servlet.post
 import org.springframework.test.web.servlet.put
@@ -29,8 +30,10 @@ import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
 import java.io.File
 import java.util.UUID
+import org.springframework.test.web.servlet.get as springGet
 
 @Testcontainers
+@Sql(scripts = ["/fixtures/demo_content.sql"], executionPhase = Sql.ExecutionPhase.BEFORE_TEST_CLASS)
 @AutoConfigureMockMvc
 @SpringBootTest(classes = [ContentServiceApplication::class])
 class ContentApiTest {
@@ -46,11 +49,71 @@ class ContentApiTest {
     private val editor =
         Actor(UUID.fromString("01900000-0000-4000-8000-000000000410"), "local-editor@example.local", listOf("editor"))
 
+    private fun MockMvc.get(path: String, dsl: MockHttpServletRequestDsl.() -> Unit = {}) =
+        this.springGet(path) {
+            header("Authorization", TOKEN)
+            dsl()
+        }
+
+    private fun anyUuid(): UUID = Mockito.any(UUID::class.java) ?: UUID(0, 0)
+
     @BeforeEach
     fun stubIdentity() {
         Mockito.reset(identityClient, catalogClient)
         Mockito.`when`(identityClient.authenticate(null)).thenThrow(UnauthorizedException("Missing session"))
         Mockito.`when`(identityClient.authenticate(TOKEN)).thenReturn(editor)
+        Mockito.`when`(catalogClient.getVersion(anyUuid())).thenAnswer { invocation ->
+            CatalogVersion(invocation.getArgument(0), "draft")
+        }
+    }
+
+    @Test
+    fun draftContentRequiresStaffEvenWhenVersionIdIsKnown() {
+        val version = UUID.fromString("01900000-0000-4000-8000-000000000004")
+        mockMvc.springGet("/versions/$version/units").andExpect { status { isNotFound() } }
+        mockMvc.springGet("/versions/$version/content").andExpect { status { isNotFound() } }
+        Mockito.`when`(catalogClient.getVersion(version)).thenReturn(CatalogVersion(version, "published"))
+        mockMvc.springGet("/versions/$version/units").andExpect { status { isOk() } }
+    }
+
+    @Test
+    fun importSealingDoesNotGrantEditorsOrImporterKeysAContentPublicationOperation() {
+        val importer = "Bearer import-only"
+        Mockito.`when`(identityClient.authenticate(importer)).thenReturn(Actor(UUID.randomUUID(), "importer", emptyList(), listOf("ingestion:import")))
+        for (authorization in listOf(TOKEN, importer)) {
+            mockMvc.post("/versions/${UUID.randomUUID()}/seal-import") {
+                header("Authorization", authorization)
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"attemptId":"${UUID.randomUUID()}","expectedGeneration":1,"settingsRevisionId":"${UUID.randomUUID()}"}"""
+            }.andExpect { status { isForbidden() } }
+        }
+    }
+
+    @Test
+    fun publishedEditorialPermalinksStayReadableAfterTheTipMoves() {
+        val version = UUID.fromString("01900000-0000-4000-8000-000000000004")
+        Mockito.`when`(catalogClient.getVersion(version)).thenReturn(CatalogVersion(version, "published", listing = "staff", currentVersionId = UUID.randomUUID()))
+        mockMvc.springGet("/versions/$version/units").andExpect { status { isOk() } }
+        mockMvc.springGet("/versions/$version/content").andExpect { status { isOk() } }
+        Mockito.`when`(catalogClient.getVersion(version)).thenReturn(CatalogVersion(version, "published", listing = "staff", currentVersionId = version))
+        mockMvc.springGet("/versions/$version/units").andExpect { status { isOk() } }
+        Mockito.`when`(catalogClient.getVersion(version)).thenReturn(CatalogVersion(version, "draft", listing = "staff", currentVersionId = version))
+        mockMvc.springGet("/versions/$version/units").andExpect { status { isNotFound() } }
+    }
+
+    @Test
+    fun genericUnitsMarkLegacyIdentityWithoutChangingLegacyArticleContract() {
+        val version = UUID.fromString("01900000-0000-4000-8000-000000000004")
+        Mockito.`when`(catalogClient.getVersion(version)).thenReturn(CatalogVersion(version, "published"))
+        mockMvc.get("/versions/01900000-0000-4000-8000-000000000004/units")
+            .andExpect {
+                status { isOk() }
+                jsonPath("$[0].legacyIdentity") { value(true) }
+                jsonPath("$[0].logicalId") { isNotEmpty() }
+                jsonPath("$[0].revisionId") { isNotEmpty() }
+            }
+        mockMvc.get("/versions/01900000-0000-4000-8000-000000000004/articles")
+            .andExpect { jsonPath("$[0].legacyIdentity") { doesNotExist() } }
     }
 
     @Test
@@ -360,18 +423,19 @@ class ContentApiTest {
     @Test
     fun catalogDownRejectsWritesWith503() {
         val versionId = UUID.fromString("01900000-0000-4000-8000-000000000004")
-        Mockito.`when`(catalogClient.getVersion(versionId)).thenThrow(
-            CatalogUnavailableException("catalog version lookup failed"),
-        )
         val original = objectMapper.readTree(
             mockMvc.get("/articles/01900000-0000-4000-8000-000000000201")
                 .andReturn().response.contentAsString,
+        )
+        Mockito.`when`(catalogClient.getVersion(versionId)).thenThrow(
+            CatalogUnavailableException("catalog version lookup failed"),
         )
         mockMvc.patch("/articles/01900000-0000-4000-8000-000000000201") {
             header("Authorization", TOKEN)
             contentType = MediaType.APPLICATION_JSON
             content = """{"title":"Mutated","body":"should not persist"}"""
         }.andExpect { status { isServiceUnavailable() } }
+        Mockito.doReturn(CatalogVersion(versionId, "draft")).`when`(catalogClient).getVersion(versionId)
         mockMvc.get("/articles/01900000-0000-4000-8000-000000000201")
             .andExpect {
                 status { isOk() }

@@ -2,6 +2,7 @@
 
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
+import { revalidatePath } from 'next/cache';
 import {
   IdentityApiError,
   requestAcceptInvite,
@@ -21,10 +22,17 @@ import {
   requestCreateServiceToken,
   requestRotateServiceToken,
   requestRevokeServiceToken,
+  requestCreateMcpKey,
+  requestRotateMcpKey,
+  requestRevokeMcpKey,
+  requestRevokeOAuthGrant,
+  requestUpdateLanguagePreference,
 } from '../../lib/identity-client';
 import { requireAdminUser } from '../../lib/admin';
 import { safeReturnTo } from '../../lib/return-to';
-import { SESSION_COOKIE, clearChallengeCookie, setChallengeCookie } from '../../lib/session';
+import { identityRequestFetch } from '../../lib/identity-request';
+import { SESSION_COOKIE, setChallengeCookie } from '../../lib/session';
+import { updateTranslationUserSettings } from '../../lib/content-translation';
 
 async function tokenOrRedirect(): Promise<string> {
   const token = (await cookies()).get(SESSION_COOKIE)?.value;
@@ -39,28 +47,60 @@ async function requireAdminToken(): Promise<string> {
   return tokenOrRedirect();
 }
 
-export async function changePasswordAction(formData: FormData): Promise<void> {
-  const token = await tokenOrRedirect();
+export async function changePasswordAction(formData: FormData): Promise<string> {
+  const token = (await cookies()).get(SESSION_COOKIE)?.value;
+  if (!token) return '/login';
   try {
     await requestChangePassword(
       token,
       String(formData.get('currentPassword') ?? ''),
       String(formData.get('newPassword') ?? ''),
+      await identityRequestFetch(),
     );
   } catch {
-    redirect('/account?error=1');
+    return '/account?error=1';
   }
-  redirect('/account?saved=1');
+  return '/account?saved=1';
+}
+
+export async function updateLanguagePreferenceAction(formData: FormData): Promise<boolean> {
+  const token = await tokenOrRedirect();
+  const preference = String(formData.get('languagePreference') ?? '');
+  if (preference !== 'auto' && preference !== 'en' && preference !== 'de') {
+    return false;
+  }
+  try {
+    await requestUpdateLanguagePreference(token, preference);
+  } catch {
+    return false;
+  }
+  revalidatePath('/', 'layout');
+  return true;
+}
+
+export async function updateContentTranslationPreferenceAction(formData: FormData): Promise<void> {
+  const token = await tokenOrRedirect();
+  try {
+    await updateTranslationUserSettings(token, {
+      alwaysTranslate: formData.get('alwaysTranslate') === 'on',
+      personalGoogleKey: String(formData.get('personalGoogleKey') ?? ''),
+      clearPersonalGoogleKey: formData.get('clearPersonalGoogleKey') === 'on',
+    });
+  } catch {
+    redirect('/account?error=translation');
+  }
+  revalidatePath('/account');
+  redirect('/account?translationSaved=1');
 }
 
 export async function requestResetAction(formData: FormData): Promise<void> {
-  await requestPasswordReset(String(formData.get('email') ?? '')).catch(() => undefined);
+  await requestPasswordReset(String(formData.get('email') ?? ''), await identityRequestFetch()).catch(() => undefined);
   redirect('/reset?sent=1');
 }
 
 export async function confirmResetAction(formData: FormData): Promise<void> {
   try {
-    await requestConfirmReset(String(formData.get('token') ?? ''), String(formData.get('newPassword') ?? ''));
+    await requestConfirmReset(String(formData.get('token') ?? ''), String(formData.get('newPassword') ?? ''), await identityRequestFetch());
   } catch {
     redirect('/reset?error=1');
   }
@@ -70,7 +110,7 @@ export async function confirmResetAction(formData: FormData): Promise<void> {
 export async function acceptInviteAction(formData: FormData): Promise<void> {
   const inviteToken = String(formData.get('token') ?? '');
   try {
-    await requestAcceptInvite(inviteToken, String(formData.get('password') ?? ''));
+    await requestAcceptInvite(inviteToken, String(formData.get('password') ?? ''), await identityRequestFetch());
   } catch {
     redirect(`/invite?token=${encodeURIComponent(inviteToken)}&error=1`);
   }
@@ -78,6 +118,8 @@ export async function acceptInviteAction(formData: FormData): Promise<void> {
 }
 
 function parseRoles(formData: FormData, fallback = ''): string[] {
+  const selected = formData.getAll('role').map(String).filter(Boolean);
+  if (selected.length) return selected;
   return String(formData.get('roles') ?? fallback)
     .split(',')
     .map((role) => role.trim())
@@ -145,18 +187,18 @@ export type RecoveryRevealState = {
   error?: boolean;
 };
 
-export async function startMfaEnrollAction(): Promise<void> {
+export async function startMfaEnrollAction(password: string): Promise<boolean> {
   const token = await tokenOrRedirect();
   let challengeToken: string;
   try {
-    const started = await requestStartMfaEnroll(undefined, token);
+    const started = await requestStartMfaEnroll(undefined, token, password, await identityRequestFetch());
     challengeToken = started.challengeToken;
   } catch {
-    redirect('/account?error=mfa');
+    return false;
   }
   // Same httpOnly cookie the login enrollment flow uses; keeps the challenge out of the URL.
   await setChallengeCookie(challengeToken);
-  redirect('/account?enroll=1');
+  return true;
 }
 
 export async function confirmAccountMfaAction(
@@ -169,8 +211,8 @@ export async function confirmAccountMfaAction(
       String(formData.get('code') ?? ''),
       String(formData.get('challengeToken') ?? ''),
       token,
+      await identityRequestFetch(),
     );
-    await clearChallengeCookie();
     return { recoveryCodes: confirmed.recoveryCodes };
   } catch {
     return { error: true };
@@ -180,7 +222,7 @@ export async function confirmAccountMfaAction(
 export async function revokeMfaAction(formData: FormData): Promise<void> {
   const token = await tokenOrRedirect();
   try {
-    await requestRevokeMfa(token, String(formData.get('code') ?? ''));
+    await requestRevokeMfa(token, String(formData.get('code') ?? ''), await identityRequestFetch());
   } catch {
     redirect('/account?error=mfa');
   }
@@ -193,7 +235,7 @@ export async function regenerateRecoveryAction(
 ): Promise<RecoveryRevealState> {
   const token = await tokenOrRedirect();
   try {
-    const result = await requestRegenerateRecovery(token, String(formData.get('code') ?? ''));
+    const result = await requestRegenerateRecovery(token, String(formData.get('code') ?? ''), await identityRequestFetch());
     return { recoveryCodes: result.recoveryCodes };
   } catch {
     return { error: true };
@@ -204,7 +246,7 @@ export async function stepUpAction(formData: FormData): Promise<void> {
   const token = await tokenOrRedirect();
   const returnTo = safeReturnTo(String(formData.get('returnTo') ?? '/account'), '/account');
   try {
-    await requestStepUp(token, String(formData.get('code') ?? ''));
+    await requestStepUp(token, String(formData.get('code') ?? ''), await identityRequestFetch());
   } catch {
     redirect(`/account/step-up?error=1&returnTo=${encodeURIComponent(returnTo)}`);
   }
@@ -274,4 +316,50 @@ export async function revokeServiceTokenAction(formData: FormData): Promise<void
     redirect('/admin/users?error=1');
   }
   redirect('/admin/users');
+}
+
+export async function createMcpKeyAction(_prev: TokenRevealState, formData: FormData): Promise<TokenRevealState> {
+  const token = await tokenOrRedirect();
+  try {
+    const created = await requestCreateMcpKey(token, String(formData.get('name') ?? ''), formData.get('importEnabled') === 'on');
+    return { token: created.token };
+  } catch (error) {
+    if (error instanceof IdentityApiError && error.code === 'step_up_required') {
+      redirect('/account/step-up?returnTo=%2Faccount');
+    }
+    return { error: true };
+  }
+}
+
+export async function rotateMcpKeyAction(_prev: TokenRevealState, formData: FormData): Promise<TokenRevealState> {
+  const token = await tokenOrRedirect();
+  try {
+    const rotated = await requestRotateMcpKey(token, String(formData.get('keyId') ?? ''));
+    return { token: rotated.token };
+  } catch (error) {
+    if (error instanceof IdentityApiError && error.code === 'step_up_required') {
+      redirect('/account/step-up?returnTo=%2Faccount');
+    }
+    return { error: true };
+  }
+}
+
+export async function revokeMcpKeyAction(formData: FormData): Promise<void> {
+  const token = await tokenOrRedirect();
+  try {
+    await requestRevokeMcpKey(token, String(formData.get('keyId') ?? ''));
+  } catch {
+    redirect('/account?error=key');
+  }
+  redirect('/account');
+}
+
+export async function revokeOAuthGrantAction(formData: FormData): Promise<void> {
+  const token = await tokenOrRedirect();
+  try {
+    await requestRevokeOAuthGrant(token, String(formData.get('clientId') ?? ''));
+  } catch {
+    redirect('/account?error=oauth');
+  }
+  redirect('/account');
 }

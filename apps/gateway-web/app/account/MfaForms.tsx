@@ -1,24 +1,44 @@
 'use client';
 
+import { T } from '../components/TranslationProvider';
+import { ui } from '../../lib/messages';
 import { useFormState } from 'react-dom';
+import { useState } from 'react';
 import { Alert, Button, Input } from '../components/ui';
 import { confirmEnrollAction, type EnrollConfirmState } from '../login/actions';
-import { confirmAccountMfaAction, regenerateRecoveryAction, type RecoveryRevealState } from './actions';
+import { confirmAccountMfaAction, regenerateRecoveryAction, startMfaEnrollAction, type RecoveryRevealState } from './actions';
+import { Disclosure } from '../components/Disclosure';
+import { reviewUi } from '../../lib/ui-review-messages';
+import { Stack } from '../components/layout/Layout';
+
+export function StartMfaEnrollForm() {
+  const [pending, setPending] = useState(false);
+  return <Stack as="form" onSubmit={async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (pending) return;
+    const password = String(new FormData(event.currentTarget).get('password') ?? '');
+    setPending(true);
+    try {
+      const started = await startMfaEnrollAction(password);
+      window.location.assign(started ? '/account?enroll=1' : '/account?error=mfa');
+    } catch {
+      window.location.assign('/account?error=mfa');
+    }
+  }}><Input label={<T value={ui.attrs.loginPageInputLabelPassword} />} id="mfaPassword" name="password" type="password" autoComplete="current-password" required /><Button variant="primary" disabled={pending}><T value={ui.account.page.enrollAuthenticator} /></Button></Stack>;
+}
 
 const initial: RecoveryRevealState = {};
 
 function RecoveryCodes({ codes }: { codes: string[] }) {
   return (
-    <Alert tone="success">
-      Store these recovery codes now; they are shown only once.{' '}
-      {codes.map((code) => (
-        <code key={code}>{code} </code>
-      ))}
-    </Alert>
+    <div className="recovery-codes" role="status">
+      <p><T value={ui.account.mfaforms.storeTheseRecoveryCodesNowTheyAre} /></p>
+      <ul>{codes.map((code) => <li key={code}><code>{code}</code></li>)}</ul>
+    </div>
   );
 }
 
-const failed = <Alert tone="error">Authenticator action failed. Check the code and try again.</Alert>;
+const failed = <Alert tone="error"><T value={ui.account.mfaforms.authenticatorActionFailedCheckTheCodeAnd} /></Alert>;
 
 export function ConfirmEnrollForm({ challengeToken }: { challengeToken: string }) {
   const [state, action] = useFormState(confirmAccountMfaAction, initial);
@@ -27,7 +47,7 @@ export function ConfirmEnrollForm({ challengeToken }: { challengeToken: string }
       <>
         <RecoveryCodes codes={state.recoveryCodes} />
         <p>
-          <a href="/account">Back to account</a>
+          <a href="/account"><T value={ui.account.mfaforms.backToAccount} /></a>
         </p>
       </>
     );
@@ -35,11 +55,11 @@ export function ConfirmEnrollForm({ challengeToken }: { challengeToken: string }
   return (
     <>
       {state.error ? failed : null}
-      <form action={action}>
+      <Stack as="form" action={action}>
         <input type="hidden" name="challengeToken" value={challengeToken} />
-        <Input label="Authenticator code" id="enrollCode" name="code" inputMode="numeric" required />
-        <Button variant="primary">Confirm enrollment</Button>
-      </form>
+        <Input label={<T value={ui.attrs.accountMfaformsInputLabelAuthenticatorCode} />} id="enrollCode" name="code" inputMode="numeric" required />
+        <Button variant="primary"><T value={ui.account.mfaforms.confirmEnrollment} /></Button>
+      </Stack>
     </>
   );
 }
@@ -49,43 +69,56 @@ export function RegenerateRecoveryForm() {
   return (
     <>
       {state.recoveryCodes ? <RecoveryCodes codes={state.recoveryCodes} /> : null}
+      <Disclosure summary={<T value={reviewUi.recoveryManage} />} open={Boolean(state.error)}>
+      <p><T value={reviewUi.recoveryReplaceHint} /></p>
       {state.error ? failed : null}
-      <form action={action}>
-        <Input label="Authenticator code" id="recoveryRotateCode" name="code" inputMode="numeric" required />
-        <Button>Replace recovery codes</Button>
-      </form>
+      <Stack as="form" action={action}>
+        <Input label={<T value={ui.attrs.accountMfaformsInputLabelAuthenticatorCode} />} id="recoveryRotateCode" name="code" inputMode="numeric" required />
+        <Button><T value={ui.account.mfaforms.replaceRecoveryCodes} /></Button>
+      </Stack>
+      </Disclosure>
     </>
   );
 }
 
 const initialEnroll: EnrollConfirmState = {};
 
-export function LoginEnrollForm() {
-  const [state, action] = useFormState(confirmEnrollAction, initialEnroll);
+export function LoginEnrollForm({ next }: { next?: string } = {}) {
+  const [state, setState] = useState<EnrollConfirmState>(initialEnroll);
+  const [pending, setPending] = useState(false);
   if (state.recoveryCodes) {
     return (
       <>
         <RecoveryCodes codes={state.recoveryCodes} />
         <p>
-          <a href={state.continueTo ?? '/'}>Continue</a>
+          <a href={state.continueTo ?? '/'}><T value={ui.account.mfaforms.continue} /></a>
         </p>
       </>
     );
   }
   return (
     <>
-      {state.error ? <Alert tone="error">That code could not be verified.</Alert> : null}
-      <form action={action}>
+      {state.error ? <Alert tone="error"><T value={ui.account.mfaforms.thatCodeCouldNotBeVerified} /></Alert> : null}
+      <Stack as="form" aria-busy={pending} onSubmit={async (event: React.FormEvent<HTMLFormElement>) => {
+        event.preventDefault();
+        if (pending) return;
+        const data = new FormData(event.currentTarget);
+        setPending(true);
+        try { setState(await confirmEnrollAction(initialEnroll, data)); }
+        catch { setState({ error: true }); }
+        finally { setPending(false); }
+      }}>
+        {next ? <input type="hidden" name="next" value={next} /> : null}
         <Input
-          label="Authenticator code"
+          label={<T value={ui.attrs.accountMfaformsInputLabelAuthenticatorCode} />}
           id="code"
           name="code"
           inputMode="numeric"
           autoComplete="one-time-code"
           required
         />
-        <Button variant="primary">Confirm enrollment</Button>
-      </form>
+        <Button variant="primary" disabled={pending}><T value={ui.account.mfaforms.confirmEnrollment} /></Button>
+      </Stack>
     </>
   );
 }

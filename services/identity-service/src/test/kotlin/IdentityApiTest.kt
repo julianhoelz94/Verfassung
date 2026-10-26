@@ -1,12 +1,15 @@
 import com.constitutionatlas.identity.IdentityServiceApplication
 import com.constitutionatlas.identity.client.AuditClient
 import com.constitutionatlas.identity.client.AuthAudit
+import com.constitutionatlas.identity.crypto.Tokens
 import com.constitutionatlas.identity.crypto.Totp
 import com.constitutionatlas.identity.mail.OutboundMailer
+import com.constitutionatlas.identity.repo.ContentTranslationRepository
 import com.constitutionatlas.identity.service.AccountService
 import com.constitutionatlas.identity.service.IdentitySeedRunner
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.junit.jupiter.api.Test
+import org.mockito.ArgumentCaptor
 import org.mockito.Mockito
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.DefaultApplicationArguments
@@ -27,6 +30,12 @@ import org.testcontainers.containers.PostgreSQLContainer
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
 import java.io.File
+import java.security.MessageDigest
+import java.util.Base64
+import java.util.UUID
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
 @Testcontainers
 @AutoConfigureMockMvc
@@ -40,10 +49,16 @@ class IdentityApiTest {
     lateinit var jdbcTemplate: JdbcTemplate
 
     @Autowired
+    lateinit var contentTranslationRepository: ContentTranslationRepository
+
+    @Autowired
     lateinit var identitySeedRunner: IdentitySeedRunner
 
     @Autowired
     lateinit var accountService: AccountService
+
+    @Autowired
+    lateinit var mfaService: com.constitutionatlas.identity.service.MfaService
 
     @Autowired
     lateinit var authAudit: AuthAudit
@@ -55,6 +70,392 @@ class IdentityApiTest {
     lateinit var outboundMailer: OutboundMailer
 
     private val objectMapper = ObjectMapper()
+
+    @Test
+    fun recoveryCodeHasExactlyOneWinnerUnderConcurrentUse() {
+        val userId = jdbcTemplate.queryForObject("SELECT id FROM users WHERE email = ?", UUID::class.java, "local-viewer@example.local")!!
+        val code = "RACE" + UUID.randomUUID().toString().replace("-", "").uppercase()
+        val hash = Tokens.sha256Hex(code.lowercase())
+        jdbcTemplate.update("INSERT INTO mfa_recovery_codes (id, user_id, code_hash) VALUES (?, ?, ?)", UUID.randomUUID(), userId, hash)
+        val pool = Executors.newFixedThreadPool(8)
+        val start = CountDownLatch(1)
+        try {
+            val attempts = (1..8).map {
+                pool.submit<Boolean> {
+                    check(start.await(5, TimeUnit.SECONDS))
+                    mfaService.useRecoveryCode(userId, code, "127.0.0.1", "concurrent-test", "local-viewer@example.local")
+                }
+            }
+            start.countDown()
+            check(attempts.count { it.get(10, TimeUnit.SECONDS) } == 1)
+            check(!mfaService.useRecoveryCode(userId, code, "127.0.0.1", "replay-test", "local-viewer@example.local"))
+        } finally {
+            pool.shutdownNow()
+            check(pool.awaitTermination(5, TimeUnit.SECONDS))
+            jdbcTemplate.update("DELETE FROM mfa_recovery_codes WHERE code_hash = ?", hash)
+        }
+    }
+
+    @Test
+    fun personalGoogleKeyIsStoredEncryptedAndSharedQuotaHasAHardCap() {
+        val viewer = login("local-viewer@example.local", "change-me")
+        try {
+            mockMvc.put("/content-translation/me") {
+                header("Authorization", "Bearer $viewer")
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"alwaysTranslate":true,"personalGoogleKey":"personal-test-key-123456"}"""
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.alwaysTranslate") { value(true) }
+                jsonPath("$.personalGoogleKeyConfigured") { value(true) }
+            }
+            val cipher = jdbcTemplate.queryForObject(
+                "SELECT google_key_cipher FROM user_content_translation_settings WHERE user_id = (SELECT id FROM users WHERE email = ?)",
+                String::class.java,
+                "local-viewer@example.local",
+            )
+            check(cipher != null && !cipher.contains("personal-test-key-123456"))
+            check(contentTranslationRepository.reserveSharedGoogle("2099-12", 499_999))
+            check(!contentTranslationRepository.reserveSharedGoogle("2099-12", 2))
+        } finally {
+            jdbcTemplate.update("DELETE FROM content_translation_google_reservations")
+            jdbcTemplate.update("DELETE FROM content_translation_google_usage WHERE billing_month = '2099-12'")
+            jdbcTemplate.update("DELETE FROM user_content_translation_settings WHERE user_id = (SELECT id FROM users WHERE email = ?)", "local-viewer@example.local")
+        }
+    }
+
+    @Test
+    fun anonymousBrowsingSettingsKeepSavedPositiveLimitsWhenDisabled() {
+        val admin = login("local-admin@example.local", "change-me")
+        val viewer = login("local-viewer@example.local", "change-me")
+        val enabled = """{"allowed":true,"perIp":{"requests":3,"windowValue":2,"windowUnit":"hours"},"total":{"requests":5,"windowValue":1,"windowUnit":"days"}}"""
+        val disabled = enabled.replace("\"allowed\":true", "\"allowed\":false")
+        try {
+            mockMvc.put("/admin/anonymous-browsing") {
+                header("Authorization", "Bearer $viewer")
+                contentType = MediaType.APPLICATION_JSON
+                content = enabled
+            }.andExpect { status { isForbidden() } }
+            mockMvc.put("/admin/anonymous-browsing") {
+                header("Authorization", "Bearer $admin")
+                contentType = MediaType.APPLICATION_JSON
+                content = enabled.replace("\"requests\":3", "\"requests\":0")
+            }.andExpect { status { isBadRequest() } }
+            mockMvc.put("/admin/anonymous-browsing") {
+                header("Authorization", "Bearer $admin")
+                contentType = MediaType.APPLICATION_JSON
+                content = disabled
+            }.andExpect { status { isOk() } }
+            mockMvc.get("/anonymous-browsing").andExpect {
+                status { isOk() }
+                jsonPath("$.allowed") { value(false) }
+                jsonPath("$.perIp.requests") { value(0) }
+                jsonPath("$.total.requests") { value(0) }
+            }
+            mockMvc.get("/admin/anonymous-browsing") { header("Authorization", "Bearer $admin") }.andExpect {
+                status { isOk() }
+                jsonPath("$.perIp.requests") { value(3) }
+                jsonPath("$.total.requests") { value(5) }
+            }
+            mockMvc.put("/admin/anonymous-browsing") {
+                header("Authorization", "Bearer $admin")
+                contentType = MediaType.APPLICATION_JSON
+                content = enabled
+            }.andExpect { status { isOk() } }
+        } finally {
+            jdbcTemplate.update("UPDATE anonymous_browsing_settings SET allowed = TRUE, per_ip_requests = 600, per_ip_window_value = 1, per_ip_window_unit = 'minutes', total_requests = 6000, total_window_value = 1, total_window_unit = 'minutes' WHERE id = TRUE")
+        }
+    }
+
+    @Test
+    fun registrationIsClosedByDefaultAndConfirmedAccountsRemainViewers() {
+        val email = "new-registration-${System.nanoTime()}@example.test"
+        mockMvc.get("/registration/status").andExpect {
+            status { isOk() }
+            jsonPath("$.enabled") { value(false) }
+        }
+        mockMvc.post("/registration") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"email":"$email"}"""
+        }.andExpect { status { isForbidden() } }
+        val admin = login("local-admin@example.local", "change-me")
+        val settings = """{"selfRegistrationEnabled":true,"mailEnabled":true,"mailFrom":"no-reply@example.test","mailFromName":"Test","mailPublicBaseUrl":"http://localhost","smtpHost":"smtp.example.test","smtpPort":587,"smtpUsername":"","smtpAuth":false,"smtpStarttls":true,"smtpSsl":false}"""
+        try {
+            mockMvc.put("/admin/settings") {
+                header("Authorization", "Bearer $admin")
+                contentType = MediaType.APPLICATION_JSON
+                content = settings
+            }.andExpect { status { isOk() } }
+            mockMvc.get("/admin/settings") { header("Authorization", "Bearer $admin") }.andExpect {
+                status { isOk() }
+                jsonPath("$.selfRegistrationEnabled") { value(true) }
+                jsonPath("$.smtpPasswordSet") { value(false) }
+            }
+            mockMvc.put("/admin/settings") {
+                header("Authorization", "Bearer $admin")
+                contentType = MediaType.APPLICATION_JSON
+                content = settings.dropLast(1) + ",\"smtpPassword\":\"smtp-secret\"}"
+            }.andExpect { status { isOk() } }
+            mockMvc.get("/admin/settings") { header("Authorization", "Bearer $admin") }.andExpect {
+                status { isOk() }
+                jsonPath("$.smtpPasswordSet") { value(true) }
+                jsonPath("$.smtpPassword") { doesNotExist() }
+            }
+            check(jdbcTemplate.queryForObject("SELECT smtp_password_cipher FROM identity_settings WHERE id = TRUE", String::class.java) != "smtp-secret")
+            Mockito.`when`(outboundMailer.enabled).thenReturn(true)
+            mockMvc.post("/registration") {
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"email":"$email"}"""
+            }.andExpect { status { isNoContent() } }
+            val token = ArgumentCaptor.forClass(String::class.java)
+            Mockito.verify(outboundMailer).sendRegistration(eqValue(email), token.capture() ?: "")
+            mockMvc.post("/registration/confirm") {
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"token":"${token.value}","password":"Long unique registration password 2026"}"""
+            }.andExpect { status { isNoContent() } }
+            mockMvc.post("/registration/confirm") {
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"token":"${token.value}","password":"Long unique registration password 2026"}"""
+            }.andExpect { status { isBadRequest() } }
+            check(rolesFor(email) == listOf("viewer"))
+            val viewer = login(email, "Long unique registration password 2026")
+            mockMvc.put("/admin/settings") {
+                header("Authorization", "Bearer $viewer")
+                contentType = MediaType.APPLICATION_JSON
+                content = settings
+            }.andExpect { status { isForbidden() } }
+            mockMvc.post("/admin/settings/test-mail") {
+                header("Authorization", "Bearer $admin")
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"to":"arbitrary@example.test"}"""
+            }.andExpect { status { isNoContent() } }
+            Mockito.verify(outboundMailer).sendTest("arbitrary@example.test")
+            Mockito.doThrow(com.constitutionatlas.identity.MailDeliveryException()).`when`(outboundMailer).sendTest("bad@example.test")
+            mockMvc.post("/admin/settings/test-mail") {
+                header("Authorization", "Bearer $admin")
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"to":"bad@example.test"}"""
+            }.andExpect { status { isServiceUnavailable() } }
+        } finally {
+            jdbcTemplate.update("UPDATE identity_settings SET self_registration_enabled = FALSE WHERE id = TRUE")
+        }
+    }
+
+    @Test
+    fun passkeyChallengesRequireAuthenticationAndRejectInvalidResponses() {
+        mockMvc.post("/passkeys/enroll/start") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"password":"change-me"}"""
+        }.andExpect { status { isUnauthorized() } }
+        val viewer = login("local-viewer@example.local", "change-me")
+        val started = mockMvc.post("/passkeys/enroll/start") {
+            header("Authorization", "Bearer $viewer")
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"password":"change-me"}"""
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.options.publicKey.challenge") { exists() }
+        }.andReturn().response.contentAsString
+        val challengeId = objectMapper.readTree(started).get("challengeId").asText()
+        val badResponse = """{"challengeId":"$challengeId","credential":{},"label":"Laptop"}"""
+        mockMvc.post("/passkeys/enroll/finish") {
+            header("Authorization", "Bearer $viewer")
+            contentType = MediaType.APPLICATION_JSON
+            content = badResponse
+        }.andExpect { status { isBadRequest() } }
+        mockMvc.post("/passkeys/enroll/finish") {
+            header("Authorization", "Bearer $viewer")
+            contentType = MediaType.APPLICATION_JSON
+            content = badResponse
+        }.andExpect { status { isBadRequest() } }
+    }
+
+    @Test
+    fun passkeyLoginStartsAreRateLimitedAndExpiredChallengesArePurged() {
+        val ip = "198.51.100.55"
+        repeat(5) {
+            mockMvc.post("/passkeys/login/start") {
+                header("X-Atlas-Client-IP", ip)
+                header("X-Forwarded-For", "203.0.113.$it, $ip")
+            }.andExpect { status { isOk() } }
+        }
+        mockMvc.post("/passkeys/login/start") {
+            header("X-Atlas-Client-IP", ip)
+            header("X-Forwarded-For", "203.0.113.99, $ip")
+        }
+            .andExpect { status { isTooManyRequests() } }
+        jdbcTemplate.update("UPDATE passkey_challenges SET expires_at = NOW() - INTERVAL '1 second'")
+        mockMvc.post("/passkeys/login/start") { header("X-Atlas-Client-IP", "198.51.100.56") }
+            .andExpect { status { isOk() } }
+        val expired = jdbcTemplate.queryForObject("SELECT count(*) FROM passkey_challenges WHERE expires_at < NOW()", Int::class.java)
+        check(expired == 0)
+    }
+
+    @Test
+    fun privilegedPasswordChallengeCanStartPasskeyEnrollmentAndRejectBadResponse() {
+        val admin = login("local-admin@example.local", "change-me")
+        val email = "passkey-publisher-${System.nanoTime()}@example.local"
+        val invite = mockMvc.post("/users/invites") {
+            header("Authorization", "Bearer $admin")
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"email":"$email","roles":["publisher"]}"""
+        }.andExpect { status { isCreated() } }.andReturn().response.contentAsString
+        val inviteToken = objectMapper.readTree(invite).get("inviteToken").asText()
+        mockMvc.post("/invites/accept") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"token":"$inviteToken","password":"not-a-common-pass"}"""
+        }.andExpect { status { isOk() } }
+        val login = mockMvc.post("/login") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"email":"$email","password":"not-a-common-pass"}"""
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.mfaEnrollmentRequired") { value(true) }
+        }.andReturn().response.contentAsString
+        val loginChallenge = objectMapper.readTree(login).get("challengeToken").asText()
+        val started = mockMvc.post("/passkeys/enroll/login/start") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"challengeToken":"$loginChallenge"}"""
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.options.publicKey.challenge") { exists() }
+        }.andReturn().response.contentAsString
+        val challengeId = objectMapper.readTree(started).get("challengeId").asText()
+        mockMvc.post("/passkeys/enroll/login/finish") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"challengeToken":"$loginChallenge","challengeId":"$challengeId","credential":{},"label":"Laptop"}"""
+        }.andExpect { status { isBadRequest() } }
+        mockMvc.post("/passkeys/enroll/login/finish") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"challengeToken":"$loginChallenge","challengeId":"$challengeId","credential":{},"label":"Laptop"}"""
+        }.andExpect { status { isBadRequest() } }
+    }
+
+    @Test
+    fun oauthCodeIsPkceBoundSingleUseAndRevocable() {
+        val registered = mockMvc.post("/oauth/register") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"client_name":"Test client","redirect_uris":["http://127.0.0.1:45001/callback"]}"""
+        }.andExpect { status { isCreated() } }.andReturn().response.contentAsString
+        val clientId = objectMapper.readTree(registered).get("client_id").asText()
+        val session = login("local-reviewer@example.local", "change-me")
+        val verifier = "valid-verifier-for-mcp-oauth-that-is-long-enough-0001"
+        val challenge = Base64.getUrlEncoder().withoutPadding().encodeToString(MessageDigest.getInstance("SHA-256").digest(verifier.toByteArray()))
+        val approved = mockMvc.post("/oauth/approve") {
+            contentType = MediaType.APPLICATION_JSON
+            header("Authorization", "Bearer $session")
+            content = """{"client_id":"$clientId","redirect_uri":"http://127.0.0.1:45001/callback","resource":"http://localhost/mcp","response_type":"code","code_challenge":"$challenge","code_challenge_method":"S256","scope":"mcp:read","state":"test-state"}"""
+        }.andExpect { status { isOk() } }.andReturn().response.contentAsString
+        val redirect = java.net.URI(objectMapper.readTree(approved).get("redirect_uri").asText())
+        check(redirect.rawQuery.contains("state=test-state"))
+        val code = redirect.rawQuery.split('&').first { it.startsWith("code=") }.substringAfter('=')
+        mockMvc.post("/oauth/token") {
+            contentType = MediaType.APPLICATION_FORM_URLENCODED
+            param("grant_type", "authorization_code")
+            param("code", code)
+            param("client_id", clientId)
+            param("redirect_uri", "http://127.0.0.1:45001/callback")
+            param("resource", "http://localhost/mcp")
+            param("code_verifier", "wrong-verifier-for-mcp-oauth-that-is-long-enough-0001")
+        }.andExpect {
+            status { isBadRequest() }
+            jsonPath("$.error") { value("invalid_grant") }
+        }
+        val exchanged = mockMvc.post("/oauth/token") {
+            contentType = MediaType.APPLICATION_FORM_URLENCODED
+            param("grant_type", "authorization_code")
+            param("code", code)
+            param("client_id", clientId)
+            param("redirect_uri", "http://127.0.0.1:45001/callback")
+            param("resource", "http://localhost/mcp")
+            param("code_verifier", verifier)
+        }.andExpect { status { isOk() } }.andReturn().response.contentAsString
+        val access = objectMapper.readTree(exchanged).get("access_token").asText()
+        mockMvc.post("/oauth/token") {
+            contentType = MediaType.APPLICATION_FORM_URLENCODED
+            param("grant_type", "authorization_code")
+            param("code", code)
+            param("client_id", clientId)
+            param("redirect_uri", "http://127.0.0.1:45001/callback")
+            param("resource", "http://localhost/mcp")
+            param("code_verifier", verifier)
+        }.andExpect {
+            status { isBadRequest() }
+            jsonPath("$.error") { value("invalid_grant") }
+        }
+        mockMvc.get("/me") { header("Authorization", "Bearer $access") }.andExpect {
+            status { isOk() }
+            jsonPath("$.resource") { value("http://localhost/mcp") }
+            jsonPath("$.scopes[0]") { value("mcp:read") }
+        }
+        mockMvc.get("/oauth/grants") { header("Authorization", "Bearer $session") }.andExpect {
+            status { isOk() }
+            jsonPath("$[0].clientId") { value(clientId) }
+            jsonPath("$[0].redirectUris[0]") { value("http://127.0.0.1:45001/callback") }
+        }
+        val pendingApproval = mockMvc.post("/oauth/approve") {
+            contentType = MediaType.APPLICATION_JSON
+            header("Authorization", "Bearer $session")
+            content = """{"client_id":"$clientId","redirect_uri":"http://127.0.0.1:45001/callback","resource":"http://localhost/mcp","response_type":"code","code_challenge":"$challenge","code_challenge_method":"S256","scope":"mcp:read"}"""
+        }.andExpect { status { isOk() } }.andReturn().response.contentAsString
+        val pendingCode = java.net.URI(objectMapper.readTree(pendingApproval).get("redirect_uri").asText()).rawQuery.substringAfter("code=").substringBefore('&')
+        mockMvc.delete("/oauth/grants/$clientId") { header("Authorization", "Bearer $session") }.andExpect { status { isNoContent() } }
+        mockMvc.get("/me") { header("Authorization", "Bearer $access") }.andExpect { status { isUnauthorized() } }
+        mockMvc.post("/oauth/token") {
+            contentType = MediaType.APPLICATION_FORM_URLENCODED
+            param("grant_type", "authorization_code")
+            param("code", pendingCode)
+            param("client_id", clientId)
+            param("redirect_uri", "http://127.0.0.1:45001/callback")
+            param("resource", "http://localhost/mcp")
+            param("code_verifier", verifier)
+        }.andExpect { status { isBadRequest() } }
+        mockMvc.post("/oauth/revoke") {
+            contentType = MediaType.APPLICATION_FORM_URLENCODED
+            param("token", access)
+        }.andExpect { status { isOk() } }
+    }
+
+    @Test
+    fun oauthRegistrationIsLimitedPerPeer() {
+        repeat(20) { index ->
+            mockMvc.post("/oauth/register") {
+                header("X-Atlas-Client-IP", "192.0.2.101")
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"client_name":"Quota client $index","redirect_uris":["http://127.0.0.1:45001/callback"]}"""
+            }.andExpect { status { isCreated() } }
+        }
+        mockMvc.post("/oauth/register") {
+            header("X-Atlas-Client-IP", "192.0.2.101")
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"client_name":"Over quota","redirect_uris":["http://127.0.0.1:45001/callback"]}"""
+        }.andExpect { status { isTooManyRequests() } }
+    }
+
+    @Test
+    fun oauthRejectsUnregisteredRedirectAndReviewerImportScope() {
+        mockMvc.post("/oauth/register") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"client_name":"Bad redirect","redirect_uris":["http://evil.example/callback"]}"""
+        }.andExpect { status { isBadRequest() } }
+        val registered = mockMvc.post("/oauth/register") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"client_name":"Scoped client","redirect_uris":["http://127.0.0.1:45002/callback"]}"""
+        }.andExpect { status { isCreated() } }.andReturn().response.contentAsString
+        val clientId = objectMapper.readTree(registered).get("client_id").asText()
+        val session = login("local-reviewer@example.local", "change-me")
+        val payload = """{"client_id":"$clientId","redirect_uri":"http://127.0.0.1:45002/callback","resource":"http://localhost/mcp","response_type":"code","code_challenge":"${"a".repeat(43)}","code_challenge_method":"S256","scope":"mcp:read ingestion:import"}"""
+        mockMvc.post("/oauth/approve") {
+            contentType = MediaType.APPLICATION_JSON
+            header("Authorization", "Bearer $session")
+            content = payload
+        }.andExpect { status { isForbidden() } }
+        mockMvc.post("/oauth/approve") {
+            contentType = MediaType.APPLICATION_JSON
+            header("Authorization", "Bearer $session")
+            content = payload.replace("45002", "45003").replace("ingestion:import", "")
+        }.andExpect { status { isBadRequest() } }
+    }
 
     @Test
     fun seedStoresSeparableEditorialRoles() {
@@ -75,6 +476,32 @@ class IdentityApiTest {
             status { isOk() }
             jsonPath("$.roles.length()") { value(3) }
             jsonPath("$.roles[0]") { value("editor") }
+        }
+    }
+
+    @Test
+    fun languagePreferencePersistsAcrossSessionsAndRejectsUnsupportedValues() {
+        val first = login("local-viewer@example.local", "change-me")
+        try {
+            mockMvc.put("/me/language") {
+                header("Authorization", "Bearer $first")
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"languagePreference":"de"}"""
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.languagePreference") { value("de") }
+            }
+            mockMvc.put("/me/language") {
+                header("Authorization", "Bearer $first")
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"languagePreference":"fr"}"""
+            }.andExpect { status { isBadRequest() } }
+            val second = login("local-viewer@example.local", "change-me")
+            mockMvc.get("/me") { header("Authorization", "Bearer $second") }.andExpect {
+                jsonPath("$.languagePreference") { value("de") }
+            }
+        } finally {
+            jdbcTemplate.update("UPDATE users SET language_preference = 'auto' WHERE email = ?", "local-viewer@example.local")
         }
     }
 
@@ -131,13 +558,13 @@ class IdentityApiTest {
         val unknown =
             mockMvc.post("/login") {
                 contentType = MediaType.APPLICATION_JSON
-                header("X-Forwarded-For", "198.51.100.10")
+                header("X-Atlas-Client-IP", "198.51.100.10")
                 content = """{"email":"missing@example.local","password":"wrong"}"""
             }.andExpect { status { isUnauthorized() } }.andReturn().response.contentAsString
         val bad =
             mockMvc.post("/login") {
                 contentType = MediaType.APPLICATION_JSON
-                header("X-Forwarded-For", "198.51.100.11")
+                header("X-Atlas-Client-IP", "198.51.100.11")
                 content = """{"email":"local-editor@example.local","password":"wrong"}"""
             }.andExpect { status { isUnauthorized() } }.andReturn().response.contentAsString
         check(unknown == bad)
@@ -149,13 +576,13 @@ class IdentityApiTest {
         repeat(5) {
             mockMvc.post("/login") {
                 contentType = MediaType.APPLICATION_JSON
-                header("X-Forwarded-For", "203.0.113.50")
+                header("X-Atlas-Client-IP", "203.0.113.50")
                 content = """{"email":"locked-user@example.local","password":"wrong"}"""
             }.andExpect { status { isUnauthorized() } }
         }
         mockMvc.post("/login") {
             contentType = MediaType.APPLICATION_JSON
-            header("X-Forwarded-For", "203.0.113.50")
+            header("X-Atlas-Client-IP", "203.0.113.50")
             content = """{"email":"locked-user@example.local","password":"change-me"}"""
         }.andExpect { status { isTooManyRequests() } }
         login("local-editor@example.local", "change-me")
@@ -292,6 +719,90 @@ class IdentityApiTest {
     }
 
     @Test
+    fun managedIngestionCredentialsAuthenticateWithOnlyTheirOwnScopeAndRotate() {
+        val users = com.constitutionatlas.identity.repo.IdentityRepository(jdbcTemplate)
+        val setup = com.constitutionatlas.identity.setup.SetupRepository(jdbcTemplate)
+        val originalUsers = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM users", Int::class.java)
+        val values = List(3) { UUID.randomUUID().toString().replace("-", "").repeat(2) }
+        fun register(publish: String) = com.constitutionatlas.identity.service.IngestionCredentialBootstrap(users, setup, publish, values[1], values[2]).run(DefaultApplicationArguments())
+        register(values[0])
+        register(values[0])
+        for ((index, scope) in listOf("ingestion:publish", "audit:append", "search:reindex").withIndex()) {
+            mockMvc.get("/me") { header("Authorization", "Bearer ${values[index]}") }.andExpect {
+                status { isOk() }
+                jsonPath("$.scopes.length()") { value(1) }
+                jsonPath("$.scopes[0]") { value(scope) }
+                jsonPath("$.roles.length()") { value(0) }
+            }
+        }
+        check(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM service_tokens WHERE name LIKE 'managed-ingestion-%' AND revoked_at IS NULL", Int::class.java) == 3)
+        val rotated = UUID.randomUUID().toString().replace("-", "").repeat(2)
+        register(rotated)
+        mockMvc.get("/me") { header("Authorization", "Bearer ${values[0]}") }.andExpect { status { isUnauthorized() } }
+        mockMvc.get("/me") { header("Authorization", "Bearer $rotated") }.andExpect {
+            status { isOk() }
+            jsonPath("$.scopes[0]") { value("ingestion:publish") }
+        }
+        check(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM users", Int::class.java) == originalUsers)
+    }
+
+    @Test
+    fun personalMcpKeysAreScopedAndCanBeRotatedAndRevoked() {
+        val viewer = login("local-viewer@example.local", "change-me")
+        mockMvc.post("/mcp-keys") {
+            header("Authorization", "Bearer $viewer")
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"name":"unusable-import-only","scopes":["ingestion:import"]}"""
+        }.andExpect { status { isBadRequest() } }
+        mockMvc.post("/mcp-keys") {
+            header("Authorization", "Bearer $viewer")
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"name":"viewer-import","scopes":["mcp:read","ingestion:import"]}"""
+        }.andExpect { status { isForbidden() } }
+        val created = objectMapper.readTree(
+            mockMvc.post("/mcp-keys") {
+                header("Authorization", "Bearer $viewer")
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"name":"viewer-read","scopes":["mcp:read"]}"""
+            }.andExpect { status { isCreated() } }.andReturn().response.contentAsString,
+        )
+        val id = created.path("key").path("id").asText()
+        val first = created.path("token").asText()
+        check(first.startsWith("ca_mcp_"))
+        mockMvc.get("/me") { header("Authorization", "Bearer $first") }.andExpect {
+            status { isOk() }
+            jsonPath("$.roles.length()") { value(0) }
+            jsonPath("$.scopes[0]") { value("mcp:read") }
+        }
+        val second = objectMapper.readTree(
+            mockMvc.post("/mcp-keys/$id/rotate") {
+                header("Authorization", "Bearer $viewer")
+            }.andExpect { status { isOk() } }.andReturn().response.contentAsString,
+        ).path("token").asText()
+        mockMvc.get("/me") { header("Authorization", "Bearer $first") }.andExpect { status { isUnauthorized() } }
+        mockMvc.delete("/mcp-keys/$id") { header("Authorization", "Bearer $viewer") }.andExpect { status { isNoContent() } }
+        mockMvc.get("/me") { header("Authorization", "Bearer $second") }.andExpect { status { isUnauthorized() } }
+    }
+
+    @Test
+    fun editorImportMcpKeyDoesNotInheritEditorRole() {
+        val editor = login("local-editor@example.local", "change-me")
+        val created = objectMapper.readTree(
+            mockMvc.post("/mcp-keys") {
+                header("Authorization", "Bearer $editor")
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"name":"editor-import-${java.util.UUID.randomUUID()}","scopes":["mcp:read","ingestion:import"]}"""
+            }.andExpect { status { isCreated() } }.andReturn().response.contentAsString,
+        )
+        val token = created.path("token").asText()
+        mockMvc.get("/me") { header("Authorization", "Bearer $token") }.andExpect {
+            status { isOk() }
+            jsonPath("$.roles.length()") { value(0) }
+            jsonPath("$.scopes[1]") { value("ingestion:import") }
+        }
+    }
+
+    @Test
     fun expiredServiceTokenCannotCallMe() {
         val admin = login("local-admin@example.local", "change-me")
         val createdJson =
@@ -361,7 +872,7 @@ class IdentityApiTest {
     fun badPasswordIsUnauthorized() {
         mockMvc.post("/login") {
             contentType = MediaType.APPLICATION_JSON
-            header("X-Forwarded-For", "198.51.100.12")
+            header("X-Atlas-Client-IP", "198.51.100.12")
             content = """{"email":"local-editor@example.local","password":"wrong"}"""
         }.andExpect { status { isUnauthorized() } }
     }
@@ -703,7 +1214,7 @@ class IdentityApiTest {
             mockMvc.post("/mfa/enroll/start") {
                 header("Authorization", "Bearer $viewer")
                 contentType = MediaType.APPLICATION_JSON
-                content = "{}"
+                content = """{"password":"change-me"}"""
             }.andExpect {
                 status { isOk() }
                 jsonPath("$.secret") { exists() }
@@ -734,7 +1245,7 @@ class IdentityApiTest {
         mockMvc.post("/mfa/enroll/start") {
             header("Authorization", "Bearer $viewer")
             contentType = MediaType.APPLICATION_JSON
-            content = "{}"
+            content = """{"password":"change-me"}"""
         }.andExpect { status { isConflict() } }
         val recoveryCode = objectMapper.readTree(confirmed).get("recoveryCodes").get(0).asText()
         mockMvc.post("/logout") {
@@ -830,6 +1341,7 @@ class IdentityApiTest {
         @JvmStatic
         @DynamicPropertySource
         fun databaseProperties(registry: DynamicPropertyRegistry) {
+            registry.add("SETUP_FIXTURE_COMPLETE") { "true" }
             registry.add("spring.datasource.url", postgres::getJdbcUrl)
             registry.add("spring.datasource.username", postgres::getUsername)
             registry.add("spring.datasource.password", postgres::getPassword)

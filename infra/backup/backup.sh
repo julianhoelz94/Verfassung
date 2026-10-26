@@ -5,37 +5,40 @@ set -eu
 umask 077
 
 TS="$(date +%Y%m%d-%H%M%S)"
-OUT_DIR="/backups/$TS"
+BACKUP_ROOT="${BACKUP_ROOT:-/backups}"
+OUT_DIR="${BACKUP_ROOT}/$TS"
 RETENTION_DAYS="${BACKUP_RETENTION_DAYS:-30}"
-mkdir -p "$OUT_DIR"
+mkdir -p "$BACKUP_ROOT"
+# Never overwrite a previous run, including another invocation in this second.
+mkdir "$OUT_DIR"
+touch "$OUT_DIR/INCOMPLETE"
+# A failed pg_dump may leave a nonempty SQL file. Keep the marker on failure so
+# restore cannot mistake nine partially written files for a complete backup.
 
-wait_for_postgres() {
-  host="$1"
-  db="$2"
-  i=0
-  until pg_isready -h "$host" -U postgres -d "$db" >/dev/null 2>&1; do
-    i=$((i + 1))
-    if [ "$i" -ge 60 ]; then
-      echo "Postgres at ${host}/${db} was not ready after 60s" >&2
-      exit 1
-    fi
-    echo "Waiting for ${host} (${i}/60)..."
-    sleep 1
-  done
-}
+. "$(dirname "$0")/postgres.sh"
 
-for name in catalog content amendment identity editor audit ingestion search; do
+for name in $BACKUP_DATABASES; do
   host="${name}-db"
   db="${name}_db"
   wait_for_postgres "$host" "$db"
   echo "Dumping ${db} from ${host}..."
   pg_dump -h "$host" -U postgres -d "$db" > "${OUT_DIR}/${name}.sql"
+  test -s "${OUT_DIR}/${name}.sql"
 done
 
+rm "$OUT_DIR/INCOMPLETE"
 echo "Backup completed at $OUT_DIR"
 
 # Rotate: drop timestamped dump directories older than the retention window.
 if [ "$RETENTION_DAYS" -gt 0 ] 2>/dev/null; then
-  find /backups -mindepth 1 -maxdepth 1 -type d -mtime "+${RETENTION_DAYS}" -exec rm -rf {} +
+  # Only completed directories using our exact timestamp format are backups.
+  # Leave operator directories and failed runs available for investigation.
+  find "$BACKUP_ROOT" -mindepth 1 -maxdepth 1 -type d \
+    -name '[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]-[0-9][0-9][0-9][0-9][0-9][0-9]' \
+    -mtime "+${RETENTION_DAYS}" -exec sh -c '
+      for directory do
+        if [ ! -e "$directory/INCOMPLETE" ]; then rm -rf -- "$directory"; fi
+      done
+    ' sh {} +
   echo "Pruned backups older than ${RETENTION_DAYS} days"
 fi

@@ -1,0 +1,15 @@
+---
+description: Compose, Caddy, and env profile conventions
+globs: "{docker-compose.yml,manageLocalStack.sh,infra/**,env/**,.github/**}"
+alwaysApply: false
+---
+
+# Infra
+
+- Single public entry: Caddy `:80` → `gateway-web:3000`; docs routes under `/api/docs/<service>*`.
+- `--reset` is `docker compose down -v --remove-orphans`. Full `docker system prune` is `--reset --prune` only (destructive, machine-wide).
+- Public catalog/content APIs are proxied at `/api/catalog*` and `/api/content*` (docs stay under `/api/docs/<service>*`).
+- Env profiles live in `env/*.env.example`. Do not commit real `env/local-stack.env`.
+- Image builds: Kotlin services `bootJar` on the host then `COPY` onto `eclipse-temurin:21-jre`. Gateway and Caddy still build in Docker.
+- CI: `.github/workflows/ci.yml` — per-service `./gradlew check` (tests + Spotless), frontend `lint` + `build`, images via host `bootJar` then `docker build`.
+- Compose/Caddy map: `docs/CODEMAPS/infra.md`.

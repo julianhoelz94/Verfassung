@@ -5,19 +5,26 @@ import com.constitutionatlas.content.api.ArticleSummary
 import com.constitutionatlas.content.api.ArticleWrite
 import com.constitutionatlas.content.api.ContentNodeDto
 import com.constitutionatlas.content.api.NodeWrite
+import com.constitutionatlas.content.api.OrderedNode
 import com.constitutionatlas.content.client.PublicationGuard
 import com.constitutionatlas.content.repo.ArticleRepository
 import com.constitutionatlas.content.repo.ContentNodeInsert
 import com.constitutionatlas.content.repo.ContentNodeRecord
+import com.constitutionatlas.content.repo.OrderedContentRepository
 import com.constitutionatlas.platform.NotFoundException
+import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import org.springframework.web.server.ResponseStatusException
 import java.util.UUID
 
 @Service
 class ArticleQueryService(
     private val articleRepository: ArticleRepository,
     private val publicationGuard: PublicationGuard,
+    private val ordered: OrderedContentService,
+    private val orderedRepository: OrderedContentRepository,
+    private val receipts: com.constitutionatlas.content.repo.OrderedPublishReceiptRepository,
 ) {
     fun listByVersion(
         versionId: UUID,
@@ -25,6 +32,11 @@ class ArticleQueryService(
         limit: Int? = null,
         includeBody: Boolean = false,
     ): List<ArticleSummary> {
+        if (orderedRepository.canonical(versionId)) {
+            return ordered.get(versionId).roots.drop(offset).let { if (limit == null) it else it.take(limit) }.mapIndexed { index, root ->
+                summary(root, versionId, offset + index + 1, includeBody)
+            }
+        }
         val items = articleRepository.listByVersion(versionId, offset, limit, includeBody)
         if (!includeBody) {
             return items
@@ -32,9 +44,33 @@ class ArticleQueryService(
         return items.map { attachChildren(it) }
     }
 
-    fun countByVersion(versionId: UUID): Int = articleRepository.countByVersion(versionId)
+    fun listUnits(version: UUID, offset: Int, limit: Int, includeBody: Boolean): Pair<List<ArticleSummary>, Int> {
+        val roots = ordered.get(version).roots
+        val legacyIdentity = !orderedRepository.canonical(version)
+        return roots.drop(offset).take(limit).mapIndexed { index, root ->
+            summary(root, version, offset + index + 1, includeBody, legacyIdentity)
+        } to roots.size
+    }
+
+    fun getUnit(version: UUID, id: UUID): ArticleDetail {
+        val roots = ordered.get(version).roots
+        val index = roots.indexOfFirst { it.occurrenceId == id }
+        if (index < 0) throw NotFoundException("Unit is not on this version")
+        val root = roots[index]
+        return ArticleDetail(
+            root.occurrenceId, version, root.label.orEmpty(), root.title.orEmpty(), ordered.plainText(root), index + 1, root.kind,
+            children = compatibilityChildren(root), predecessorId = orderedRepository.occurrencePredecessor(id), content = root.content, logicalId = root.logicalId, revisionId = root.revisionId, legacyIdentity = !orderedRepository.canonical(version), lineage = root.lineage,
+        )
+    }
+
+    fun countByVersion(versionId: UUID): Int = if (orderedRepository.canonical(versionId)) ordered.get(versionId).roots.size else articleRepository.countByVersion(versionId)
 
     fun getById(id: UUID): ArticleDetail {
+        orderedRepository.occurrenceVersion(id)?.let { version ->
+            if (orderedRepository.canonical(version)) {
+                return getUnit(version, id)
+            }
+        }
         val article = articleRepository.findById(id) ?: throw NotFoundException("Unknown article '$id'")
         return attachChildren(article)
     }
@@ -42,6 +78,8 @@ class ArticleQueryService(
     @Transactional
     fun replaceForVersion(versionId: UUID, articles: List<ArticleWrite>): List<ArticleSummary> {
         publicationGuard.requireWritable(versionId)
+        requireLegacy(versionId)
+        orderedRepository.invalidateLegacy(versionId)
         val numbers = articles.map { it.articleNumber.trim() }
         if (numbers.toSet().size != numbers.size) {
             throw IllegalArgumentException("articleNumber values must be unique")
@@ -86,6 +124,8 @@ class ArticleQueryService(
         }
         val current = articleRepository.findById(id) ?: throw NotFoundException("Unknown article '$id'")
         publicationGuard.requireWritable(current.versionId)
+        requireLegacy(current.versionId)
+        orderedRepository.invalidateLegacy(current.versionId)
         val children = articleRepository.listChildren(id)
         val flattened = projectedBody(null, children).orEmpty()
         val keepTree = children.isNotEmpty() && body.trim() == flattened.trim()
@@ -110,6 +150,8 @@ class ArticleQueryService(
         val versionId = articleRepository.versionIdOfNode(id)
             ?: throw NotFoundException("Unknown node '$id'")
         publicationGuard.requireWritable(versionId)
+        requireLegacy(versionId)
+        orderedRepository.invalidateLegacy(versionId)
         val parentId = articleRepository.parentIdOf(id)
         val stored = title?.trim()?.takeIf { it.isNotEmpty() }
         if (parentId == null) {
@@ -128,6 +170,8 @@ class ArticleQueryService(
             throw IllegalArgumentException("keepKinds must not be empty")
         }
         publicationGuard.requireWritable(versionId)
+        requireLegacy(versionId)
+        orderedRepository.invalidateLegacy(versionId)
         var absorbed = 0
         while (true) {
             val removed = articleRepository.listNodesOutsideKinds(versionId, kinds)
@@ -139,6 +183,32 @@ class ArticleQueryService(
         }
         return absorbed
     }
+
+    private fun requireLegacy(version: UUID) {
+        orderedRepository.lock(version)
+        if (receipts.forVersion(version) != null) throw ResponseStatusException(HttpStatus.CONFLICT, "Approved snapshot is sealed for publication")
+        if (orderedRepository.canonical(version)) throw ResponseStatusException(HttpStatus.CONFLICT, "Use ordered content writes; legacy writes cannot preserve revision identity and mixed order")
+    }
+
+    private fun summary(root: OrderedNode, version: UUID, sortOrder: Int, includeBody: Boolean, legacyIdentity: Boolean? = null): ArticleSummary =
+        ArticleSummary(
+            root.occurrenceId, version, root.label.orEmpty(), root.title.orEmpty(), sortOrder,
+            body = if (includeBody) ordered.plainText(root) else null,
+            children = if (includeBody) compatibilityChildren(root) else null,
+            predecessorId = orderedRepository.occurrencePredecessor(root.occurrenceId),
+            content = if (includeBody) root.content else null, logicalId = root.logicalId, revisionId = root.revisionId,
+            kind = root.kind, legacyIdentity = legacyIdentity, lineage = root.lineage,
+        )
+
+    private fun compatibilityChildren(node: OrderedNode): List<ContentNodeDto> =
+        node.content.mapNotNull { it.node }.mapIndexed { index, child -> compatibilityNode(child, index + 1) }
+
+    private fun compatibilityNode(node: OrderedNode, sortOrder: Int): ContentNodeDto =
+        ContentNodeDto(
+            node.occurrenceId, node.kind, node.label, node.label, node.title,
+            com.constitutionatlas.platform.OrderedContentText.entries(node.content.filter { it.type == "text" }), sortOrder,
+            compatibilityChildren(node), predecessorId = orderedRepository.occurrencePredecessor(node.occurrenceId), content = node.content, logicalId = node.logicalId, revisionId = node.revisionId, lineage = node.lineage,
+        )
 
     private fun insertWriteNode(versionId: UUID, parentId: UUID, node: NodeWrite, sortOrder: Int) {
         val id = node.id ?: UUID.randomUUID()

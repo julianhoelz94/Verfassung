@@ -1,5 +1,5 @@
 /* eslint-disable */
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Page } from './fixtures/consent';
 import path from 'node:path';
 import { signInAdmin, signInEditor, signOut } from './helpers';
 
@@ -48,12 +48,25 @@ test('axe passes on public and editor routes', async ({ page }) => {
   await signInEditor(page);
   await expectNoAxeViolations(page);
 
+  await page.goto('/countries/DE/versions/01900000-0000-4000-8000-000000000004');
+  await expectNoAxeViolations(page);
+
+  await page.goto('/account');
+  await expectNoAxeViolations(page);
+
   await page.goto('/editor/amendments');
-  await expect(page.getByRole('heading', { name: 'Amending laws' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Legal changes' })).toBeVisible();
+  await expectNoAxeViolations(page);
+
+  await page.goto('/editor/history');
+  await expect(page.getByRole('heading', { name: 'Snapshot history' })).toBeVisible();
   await expectNoAxeViolations(page);
 
   await signOut(page);
   await signInAdmin(page);
   await page.goto('/admin/users');
+  await expectNoAxeViolations(page);
+
+  await page.goto('/admin/constitutions');
   await expectNoAxeViolations(page);
 });

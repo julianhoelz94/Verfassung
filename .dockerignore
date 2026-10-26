@@ -1,0 +1,22 @@
+# Kotlin build inputs and the shared language registry enter the root context.
+**
+!gradlew
+!gradle/
+!gradle/**
+!apps/
+apps/*
+!apps/gateway-web/
+apps/gateway-web/*
+!apps/gateway-web/lib/
+apps/gateway-web/lib/*
+!apps/gateway-web/lib/supported-languages.json
+!services/
+!services/platform/
+!services/platform/**
+!services/*-service/
+!services/*-service/**
+**/build
+**/.gradle
+**/.kotlin
+**/*.env
+**/*.log

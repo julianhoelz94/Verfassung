@@ -17,6 +17,7 @@ import com.constitutionatlas.platform.UnauthorizedException
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.mockito.ArgumentCaptor
@@ -37,6 +38,8 @@ import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
 import java.time.LocalDate
 import java.util.UUID
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
 @Testcontainers
 @AutoConfigureMockMvc
@@ -82,6 +85,71 @@ class EditorApiTest {
             UnauthorizedException("Missing session"),
         )
         stub(editor)
+    }
+
+    @Test
+    fun commandsRecheckSessionStateAfterWaitingForConcurrentTransition() {
+        stub(admin)
+        for ((command, initial, progressed) in listOf(
+            Triple("saves", "open", "reviewing"),
+            Triple("publish-details", "open", "reviewing"),
+            Triple("review", "open", "approved"),
+            Triple("approval", "reviewing", "published"),
+        )) {
+            val sessionId = UUID.fromString(openSession(UUID.randomUUID()))
+            jdbcTemplate.update("UPDATE edit_sessions SET status = ?, publish_comment = 'Reviewed comment' WHERE id = ?", initial, sessionId)
+            val executor = Executors.newSingleThreadExecutor()
+            try {
+                requireNotNull(jdbcTemplate.dataSource).connection.use { connection ->
+                    connection.autoCommit = false
+                    connection.prepareStatement("SELECT id FROM edit_sessions WHERE id = ? FOR UPDATE").use { statement ->
+                        statement.setObject(1, sessionId)
+                        statement.executeQuery().close()
+                    }
+                    val blocker = connection.createStatement().use { statement ->
+                        statement.executeQuery("SELECT pg_backend_pid()").use { result ->
+                            result.next()
+                            result.getInt(1)
+                        }
+                    }
+                    val response = executor.submit<Int> {
+                        mockMvc.post("/edit-sessions/$sessionId/$command") {
+                            header("Authorization", TOKEN)
+                            contentType = MediaType.APPLICATION_JSON
+                            content = when (command) {
+                                "saves" -> """{"articleId":"${UUID.randomUUID()}","body":"Late change"}"""
+                                "publish-details" -> """{"comment":"Late change"}"""
+                                else -> "{}"
+                            }
+                        }.andReturn().response.status
+                    }
+                    // Wait for the database lock, not an arbitrary scheduling delay.
+                    val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10)
+                    var blocked = false
+                    while (!blocked && System.nanoTime() < deadline && !response.isDone) {
+                        blocked = jdbcTemplate.queryForObject(
+                            "SELECT EXISTS (SELECT 1 FROM pg_stat_activity WHERE ? = ANY(pg_blocking_pids(pid)))",
+                            Boolean::class.java,
+                            blocker,
+                        ) == true
+                        if (!blocked) Thread.sleep(10)
+                    }
+                    assertTrue(blocked, "$command must wait for the session mutation")
+                    connection.prepareStatement("UPDATE edit_sessions SET status = ? WHERE id = ?").use { statement ->
+                        statement.setString(1, progressed)
+                        statement.setObject(2, sessionId)
+                        statement.executeUpdate()
+                    }
+                    connection.commit()
+                    assertEquals(409, response.get(10, TimeUnit.SECONDS), command)
+                }
+                assertEquals(progressed, jdbcTemplate.queryForObject("SELECT status FROM edit_sessions WHERE id = ?", String::class.java, sessionId))
+                assertEquals(0, jdbcTemplate.queryForObject("SELECT COUNT(*) FROM draft_changes WHERE session_id = ?", Int::class.java, sessionId))
+                assertEquals("Reviewed comment", jdbcTemplate.queryForObject("SELECT publish_comment FROM edit_sessions WHERE id = ?", String::class.java, sessionId))
+            } finally {
+                executor.shutdownNow()
+            }
+        }
     }
 
     @Test
@@ -148,6 +216,7 @@ class EditorApiTest {
             Mockito.anyString() ?: "en",
             eqNonNull(versionId),
             eqNonNull("editorial_correction"),
+            eqNonNull("Correct transcription"),
         )
         val eventNames = jdbcTemplate.queryForList(
             "SELECT event_name FROM outbox_events WHERE session_id = ?::uuid ORDER BY event_name",
@@ -167,6 +236,25 @@ class EditorApiTest {
             jsonPath("$.newVersionId") { value(NEW_VERSION_ID.toString()) }
         }
         Mockito.verify(searchIndexClient).reindex()
+    }
+
+    @Test
+    fun legacyBodySaveCannotDiscardStructuredChildren() {
+        val version = UUID.randomUUID()
+        val article = UUID.randomUUID()
+        val child = com.constitutionatlas.editor.client.ContentTreeNode(UUID.randomUUID(), "sentence", body = "Original text.")
+        Mockito.`when`(contentClient.listArticles(version)).thenReturn(listOf(ContentTreeArticle(article, version, "46a", "Rights", 1, "Original text.", listOf(child))))
+        val session = openSession(version)
+        mockMvc.post("/edit-sessions/$session/saves") {
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"articleId":"$article","title":"Rights","body":"Flattened replacement."}"""
+        }.andExpect {
+            status { isConflict() }
+            jsonPath("$.code") { value("structured_draft_required") }
+        }
+        assertEquals(0, jdbcTemplate.queryForObject("SELECT COUNT(*) FROM draft_changes WHERE session_id = ?::uuid", Int::class.java, session))
+        saveDraft(session, article, "Edited title", "Original text.")
     }
 
     @Test
@@ -499,6 +587,43 @@ class EditorApiTest {
     }
 
     @Test
+    fun listSessionsPagesBeyondOneHundredOwnedOpenSessions() {
+        val owner = actor(UUID.randomUUID().toString(), "editor")
+        stub(owner)
+        repeat(101) {
+            jdbcTemplate.update(
+                "INSERT INTO edit_sessions (id, actor_id, version_id, status, hop_kind) VALUES (?, ?, ?, 'open', 'editorial_correction')",
+                UUID.randomUUID(),
+                owner.id,
+                UUID.randomUUID(),
+            )
+        }
+        mockMvc.get("/edit-sessions") {
+            header("Authorization", TOKEN)
+            param("openedBy", "me")
+            param("status", "open")
+            param("limit", "100")
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.length()") { value(100) }
+        }
+        mockMvc.get("/edit-sessions") {
+            header("Authorization", TOKEN)
+            param("openedBy", "me")
+            param("status", "open")
+            param("limit", "100")
+            param("offset", "100")
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.length()") { value(1) }
+        }
+        mockMvc.get("/edit-sessions") {
+            header("Authorization", TOKEN)
+            param("limit", "101")
+        }.andExpect { status { isBadRequest() } }
+    }
+
+    @Test
     fun legalPublishLinksAndPublishesAmendment() {
         val versionId = UUID.randomUUID()
         val articleId = UUID.fromString("01900000-0000-4000-8000-000000000201")
@@ -738,6 +863,7 @@ class EditorApiTest {
             Mockito.anyString() ?: "",
             Mockito.any(UUID::class.java) ?: UUID(0, 0),
             Mockito.anyString() ?: "",
+            Mockito.nullable(String::class.java),
         )
     }
 
@@ -774,6 +900,7 @@ class EditorApiTest {
             Mockito.anyString() ?: "",
             Mockito.any(UUID::class.java) ?: UUID(0, 0),
             Mockito.anyString() ?: "",
+            Mockito.nullable(String::class.java),
         )
     }
 
@@ -800,6 +927,7 @@ class EditorApiTest {
                 Mockito.anyString() ?: "en",
                 eqNonNull(sourceVersionId),
                 Mockito.anyString() ?: "editorial_correction",
+                Mockito.nullable(String::class.java),
             ),
         ).thenReturn(draft)
         Mockito.`when`(catalogClient.listVersions(eqNonNull(constitutionId), Mockito.anyString() ?: "all"))

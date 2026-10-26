@@ -46,6 +46,28 @@ class RestCatalogClient(
 ) : CatalogClient {
     private val client: RestClient = restClient(catalogUrl)
 
+    override fun createSetupConstitution(operationId: UUID, request: com.constitutionatlas.ingestion.api.SetupProposalRequest): DownstreamSetupConstitution {
+        val body = mapOf(
+            "creationAttemptId" to operationId,
+            "slug" to request.constitutionSlug.trim(),
+            "title" to request.constitutionTitle.trim(),
+            "predecessorConstitutionId" to request.predecessorConstitutionId,
+            "interim" to request.interim,
+            "outline" to request.outline.kinds,
+        )
+        return try {
+            if (request.jurisdictionId != null) {
+                client.postJson("/jurisdictions/{id}/constitutions", body, DownstreamSetupConstitution::class.java, request.jurisdictionId)
+            } else {
+                client.postJson("/countries/{iso}/constitutions", body, DownstreamSetupConstitution::class.java, request.isoCode.trim().uppercase())
+            }
+        } catch (ex: RestClientResponseException) {
+            val code = runCatching { ex.getResponseBodyAs(Map::class.java)?.get("code") }.getOrNull()
+            if (ex.statusCode == HttpStatus.CONFLICT && code == "constitution_creation_rejected") throw SetupCreationRejectedException()
+            throw ex
+        }
+    }
+
     override fun getJurisdiction(id: UUID): DownstreamJurisdiction =
         client.get().uri("/jurisdictions/{id}", id).retrieve().body(JurisdictionWire::class.java)!!.jurisdiction
 

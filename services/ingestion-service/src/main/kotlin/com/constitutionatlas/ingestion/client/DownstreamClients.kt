@@ -16,6 +16,12 @@ data class DownstreamCountry(val id: UUID, val isoCode: String, val name: String
 data class DownstreamConstitution(val id: UUID, val slug: String, val title: String)
 
 @JsonIgnoreProperties(ignoreUnknown = true)
+data class DownstreamSetupConstitution(val id: UUID, val settingsRevisionId: UUID)
+
+/** Catalog guarantees that this atomic creation attempt has no persisted receipt or resource. */
+class SetupCreationRejectedException : RuntimeException("Setup creation was rejected without saving changes")
+
+@JsonIgnoreProperties(ignoreUnknown = true)
 data class DownstreamVersion(
     val id: UUID,
     val constitutionId: UUID = UUID(0, 0),
@@ -34,6 +40,7 @@ data class DownstreamVersion(
 data class DownstreamJurisdiction(val id: UUID, val name: String, val code: String? = null)
 
 interface CatalogClient {
+    fun createSetupConstitution(operationId: UUID, request: com.constitutionatlas.ingestion.api.SetupProposalRequest): DownstreamSetupConstitution = throw UnsupportedOperationException("Recoverable setup is unavailable")
     fun getJurisdiction(id: UUID): DownstreamJurisdiction = throw UnsupportedOperationException("Jurisdiction lookup unavailable")
     fun findJurisdictionConstitution(id: UUID, slug: String): DownstreamConstitution? = throw UnsupportedOperationException("Jurisdiction lookup unavailable")
     fun createJurisdictionConstitution(id: UUID, slug: String, title: String, predecessorConstitutionId: UUID? = null, interim: Boolean = false): DownstreamConstitution = throw UnsupportedOperationException("Jurisdiction creation unavailable")

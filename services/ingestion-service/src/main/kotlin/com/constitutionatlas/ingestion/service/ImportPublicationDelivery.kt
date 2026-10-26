@@ -34,9 +34,12 @@ class ImportPublicationDelivery(
                 when (event.type) {
                     "audit_publish" -> {
                         if (auditToken.isBlank()) continue
+                        val payload = mapper.readTree(event.payload) as com.fasterxml.jackson.databind.node.ObjectNode
+                        payload.put("eventId", event.id.toString())
+                        payload.put("occurredAt", event.createdAt.toString())
                         audit.post().uri("/events").header("Authorization", bearer(auditToken))
                             .contentType(MediaType.APPLICATION_JSON)
-                            .body(mapper.readTree(event.payload))
+                            .body(payload)
                             .retrieve().toBodilessEntity()
                     }
                     "search_reindex" -> {

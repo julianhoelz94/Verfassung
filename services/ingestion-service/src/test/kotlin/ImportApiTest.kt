@@ -2,11 +2,13 @@ import com.constitutionatlas.ingestion.IngestionServiceApplication
 import com.constitutionatlas.ingestion.api.ImportArticle
 import com.constitutionatlas.ingestion.api.ImportOutline
 import com.constitutionatlas.ingestion.api.ImportOutlineKind
+import com.constitutionatlas.ingestion.api.SetupProposalRequest
 import com.constitutionatlas.ingestion.client.CatalogClient
 import com.constitutionatlas.ingestion.client.ContentClient
 import com.constitutionatlas.ingestion.client.DownstreamAuth
 import com.constitutionatlas.ingestion.client.DownstreamConstitution
 import com.constitutionatlas.ingestion.client.DownstreamCountry
+import com.constitutionatlas.ingestion.client.DownstreamSetupConstitution
 import com.constitutionatlas.ingestion.client.DownstreamVersion
 import com.constitutionatlas.ingestion.service.ImportService
 import com.constitutionatlas.platform.Actor
@@ -118,6 +120,216 @@ class ImportApiTest {
 
     private fun anyUuid(): UUID = Mockito.any(UUID::class.java) ?: UUID(0, 0)
     private fun anyStr(): String = Mockito.anyString() ?: ""
+
+    private fun setupOperation(id: UUID): UUID = jdbc.queryForObject("SELECT confirmation_operation FROM import_setup_proposals WHERE id = ?", UUID::class.java, id)!!
+
+    private fun reviewedSetup(slug: String): SetupProposalRequest = com.fasterxml.jackson.module.kotlin.jacksonObjectMapper().readValue(
+        """{"isoCode":"FR","countryName":"France","constitutionSlug":"$slug","constitutionTitle":"Reviewed charter","sourceUrl":"https://example.org/source","outline":{"kinds":[{"kindCode":"article","displayLabel":"Article"}]},"sampleRoots":[{"kind":"article","label":"1","content":[{"type":"text","text":"Exact reviewed words."}]}]}""",
+        SetupProposalRequest::class.java,
+    )
+
+    @Test
+    fun setupLostResponseResumesTheSameReviewedOperationAfterRestart() {
+        val mapper = com.fasterxml.jackson.module.kotlin.jacksonObjectMapper()
+        val repository = com.constitutionatlas.ingestion.repo.SetupProposalRepository(jdbc, mapper)
+        val service = com.constitutionatlas.ingestion.service.SetupProposalService(repository, catalogClient, mapper)
+        val request = reviewedSetup("lost-response-${UUID.randomUUID()}")
+        val proposal = service.create(TOKEN, admin.id, request)
+        val receipt = DownstreamSetupConstitution(UUID.randomUUID(), UUID.randomUUID())
+        Mockito.`when`(catalogClient.createSetupConstitution(anyUuid(), Mockito.eq(request) ?: request))
+            .thenThrow(IllegalStateException("Catalog committed but its response was lost"))
+            .thenReturn(receipt)
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException::class.java) {
+            service.confirm(TOKEN, proposal.id, admin.id, true, proposal.revision)
+        }
+        assertEquals("confirming", repository.find(proposal.id)!!.status)
+        assertEquals(null, repository.replace(proposal.id, request.copy(constitutionTitle = "Unreviewed"), proposal.revision))
+        assertEquals(false, repository.withdraw(proposal.id, proposal.revision))
+        Mockito.`when`(catalogClient.findConstitution("FR", request.constitutionSlug))
+            .thenReturn(DownstreamConstitution(receipt.id, request.constitutionSlug, request.constitutionTitle))
+        val restarted = com.constitutionatlas.ingestion.service.SetupProposalService(repository, catalogClient, mapper)
+        val confirmed = restarted.confirm(TOKEN, proposal.id, admin.id, true, proposal.revision)
+        assertEquals("confirmed", confirmed.status)
+        assertEquals(receipt.id, confirmed.constitutionId)
+        assertEquals(receipt.settingsRevisionId, confirmed.settingsRevisionId)
+        assertEquals(request, confirmed.payload)
+        Mockito.verify(catalogClient, Mockito.times(2)).createSetupConstitution(setupOperation(proposal.id), request)
+        Mockito.verify(catalogClient, Mockito.never()).replaceOutline(receipt.id, request.outline.kinds)
+    }
+
+    @Test
+    fun setupResumesAfterCountryCreationLosesItsResponse() {
+        val mapper = com.fasterxml.jackson.module.kotlin.jacksonObjectMapper()
+        val repository = com.constitutionatlas.ingestion.repo.SetupProposalRepository(jdbc, mapper)
+        val service = com.constitutionatlas.ingestion.service.SetupProposalService(repository, catalogClient, mapper)
+        val request = reviewedSetup("country-response-${UUID.randomUUID()}").copy(isoCode = "ZX", countryName = "Setup country")
+        val proposal = service.create(TOKEN, admin.id, request)
+        Mockito.`when`(catalogClient.getCountry("ZX")).thenReturn(null, DownstreamCountry(UUID.randomUUID(), "ZX", "Setup country"))
+        Mockito.`when`(catalogClient.createCountry("ZX", "Setup country")).thenThrow(IllegalStateException("Country committed but response lost"))
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException::class.java) {
+            service.confirm(TOKEN, proposal.id, admin.id, true, proposal.revision)
+        }
+        val receipt = DownstreamSetupConstitution(UUID.randomUUID(), UUID.randomUUID())
+        Mockito.`when`(catalogClient.createSetupConstitution(anyUuid(), Mockito.eq(request) ?: request)).thenReturn(receipt)
+        val restarted = com.constitutionatlas.ingestion.service.SetupProposalService(repository, catalogClient, mapper)
+        assertEquals(receipt.id, restarted.confirm(TOKEN, proposal.id, admin.id, true, proposal.revision).constitutionId)
+        Mockito.verify(catalogClient, Mockito.times(1)).createCountry("ZX", "Setup country")
+        Mockito.verify(catalogClient, Mockito.times(1)).createSetupConstitution(setupOperation(proposal.id), request)
+    }
+
+    @Test
+    fun legacyInterruptedSetupOnlyReconcilesItsRecordedConstitutionIdentity() {
+        val mapper = com.fasterxml.jackson.module.kotlin.jacksonObjectMapper()
+        val repository = com.constitutionatlas.ingestion.repo.SetupProposalRepository(jdbc, mapper)
+        val request = reviewedSetup("legacy-confirmation-${UUID.randomUUID()}")
+        val proposal = repository.insert(admin.id, request)
+        val recorded = UUID.randomUUID()
+        jdbc.update("UPDATE import_setup_proposals SET status = 'confirming', constitution_id = ? WHERE id = ?", recorded, proposal.id)
+        Mockito.`when`(catalogClient.findConstitution("FR", request.constitutionSlug)).thenReturn(DownstreamConstitution(UUID.randomUUID(), request.constitutionSlug, request.constitutionTitle))
+        val service = com.constitutionatlas.ingestion.service.SetupProposalService(repository, catalogClient, mapper)
+        org.junit.jupiter.api.Assertions.assertThrows(org.springframework.web.server.ResponseStatusException::class.java) {
+            service.confirm(TOKEN, proposal.id, admin.id, true, proposal.revision)
+        }
+        Mockito.verify(catalogClient, Mockito.never()).replaceOutline(recorded, request.outline.kinds)
+        Mockito.`when`(catalogClient.findConstitution("FR", request.constitutionSlug)).thenReturn(DownstreamConstitution(recorded, request.constitutionSlug, request.constitutionTitle))
+        Mockito.`when`(catalogClient.currentSettingsRevisionId(recorded)).thenReturn(SETTINGS_REVISION)
+        assertEquals("confirmed", service.confirm(TOKEN, proposal.id, admin.id, true, proposal.revision).status)
+        Mockito.verify(catalogClient).replaceOutline(recorded, request.outline.kinds)
+        Mockito.verify(catalogClient, Mockito.never()).createSetupConstitution(anyUuid(), Mockito.eq(request) ?: request)
+    }
+
+    @Test
+    fun setupProcessDeathCanBeReclaimedWithoutChangingTheReviewedRevision() {
+        val mapper = com.fasterxml.jackson.module.kotlin.jacksonObjectMapper()
+        val repository = com.constitutionatlas.ingestion.repo.SetupProposalRepository(jdbc, mapper)
+        val service = com.constitutionatlas.ingestion.service.SetupProposalService(repository, catalogClient, mapper)
+        val request = reviewedSetup("process-death-${UUID.randomUUID()}")
+        val proposal = service.create(TOKEN, admin.id, request)
+        val receipt = DownstreamSetupConstitution(UUID.randomUUID(), UUID.randomUUID())
+        Mockito.`when`(catalogClient.createSetupConstitution(anyUuid(), Mockito.eq(request) ?: request)).thenAnswer { throw AssertionError("Simulated process termination") }
+        org.junit.jupiter.api.Assertions.assertThrows(AssertionError::class.java) {
+            service.confirm(TOKEN, proposal.id, admin.id, true, proposal.revision)
+        }
+        mockMvc.post("/import-setup-proposals/${proposal.id}/confirm") {
+            header("Authorization", TOKEN)
+            header("If-Match", proposal.revision.toString())
+        }.andExpect {
+            status { isConflict() }
+            jsonPath("$.code") { value("setup_confirmation_running") }
+        }
+        // The claim survived the terminated process. An interrupted operation stays recoverable
+        // even after the proposal's original review expiry; its reviewed bytes remain frozen.
+        jdbc.update("UPDATE import_setup_proposals SET confirmation_started_at = now() - interval '3 minutes', expires_at = now() - interval '1 day' WHERE id = ?", proposal.id)
+        Mockito.doReturn(receipt).`when`(catalogClient).createSetupConstitution(anyUuid(), Mockito.eq(request) ?: request)
+        val restarted = com.constitutionatlas.ingestion.service.SetupProposalService(repository, catalogClient, mapper)
+        val confirmed = restarted.confirm(TOKEN, proposal.id, admin.id, true, proposal.revision)
+        assertEquals(receipt.id, confirmed.constitutionId)
+        assertEquals(request, confirmed.payload)
+        org.junit.jupiter.api.Assertions.assertThrows(org.springframework.web.server.ResponseStatusException::class.java) {
+            restarted.confirm(TOKEN, proposal.id, admin.id, true, proposal.revision + 1)
+        }
+    }
+
+    @Test
+    fun obsoleteSetupCallbacksCannotReleaseOrFinishARecoveryClaim() {
+        val mapper = com.fasterxml.jackson.module.kotlin.jacksonObjectMapper()
+        val repository = com.constitutionatlas.ingestion.repo.SetupProposalRepository(jdbc, mapper)
+        val proposal = repository.insert(admin.id, reviewedSetup("fenced-setup-${UUID.randomUUID()}"))
+        val old = repository.claim(proposal.id, proposal.revision)!!
+        assertEquals(null, repository.claim(proposal.id, proposal.revision))
+        jdbc.update("UPDATE import_setup_proposals SET confirmation_started_at = now() - interval '3 minutes' WHERE id = ?", proposal.id)
+        val recovered = repository.claim(proposal.id, proposal.revision)!!
+        repository.retry(proposal.id, old.attempt)
+        assertEquals(null, repository.claim(proposal.id, proposal.revision))
+        assertEquals(false, repository.confirm(proposal.id, old.attempt, UUID.randomUUID(), UUID.randomUUID(), admin.id))
+        val constitution = UUID.randomUUID()
+        assertEquals(true, repository.confirm(proposal.id, recovered.attempt, constitution, SETTINGS_REVISION, admin.id))
+        repository.retry(proposal.id, old.attempt)
+        assertEquals("confirmed", repository.find(proposal.id)!!.status)
+        assertEquals(constitution, repository.find(proposal.id)!!.constitutionId)
+    }
+
+    @Test
+    fun guaranteedNoWriteRejectionAllowsAnExplicitlyReviewedCorrectionWithANewOperation() {
+        val mapper = com.fasterxml.jackson.module.kotlin.jacksonObjectMapper()
+        val repository = com.constitutionatlas.ingestion.repo.SetupProposalRepository(jdbc, mapper)
+        val service = com.constitutionatlas.ingestion.service.SetupProposalService(repository, catalogClient, mapper)
+        val request = reviewedSetup("rejected-${UUID.randomUUID()}")
+        val proposal = service.create(TOKEN, admin.id, request)
+        Mockito.`when`(catalogClient.createSetupConstitution(anyUuid(), Mockito.eq(request) ?: request))
+            .thenThrow(com.constitutionatlas.ingestion.client.SetupCreationRejectedException())
+        val rejected = org.junit.jupiter.api.Assertions.assertThrows(com.constitutionatlas.ingestion.api.ImportPublicationException::class.java) {
+            service.confirm(TOKEN, proposal.id, admin.id, true, proposal.revision)
+        }
+        assertEquals("setup_creation_rejected", rejected.code)
+        assertEquals("proposed", repository.find(proposal.id)!!.status)
+        val firstOperation = setupOperation(proposal.id)
+        val revised = request.copy(constitutionSlug = "corrected-${UUID.randomUUID()}")
+        val reviewed = service.revise(TOKEN, proposal.id, admin.id, true, revised, proposal.revision)
+        val receipt = DownstreamSetupConstitution(UUID.randomUUID(), UUID.randomUUID())
+        Mockito.`when`(catalogClient.createSetupConstitution(anyUuid(), Mockito.eq(revised) ?: revised)).thenReturn(receipt)
+        org.junit.jupiter.api.Assertions.assertThrows(org.springframework.web.server.ResponseStatusException::class.java) {
+            service.confirm(TOKEN, proposal.id, admin.id, true, proposal.revision)
+        }
+        assertEquals(receipt.id, service.confirm(TOKEN, proposal.id, admin.id, true, reviewed.revision).constitutionId)
+        org.junit.jupiter.api.Assertions.assertNotEquals(firstOperation, setupOperation(proposal.id))
+    }
+
+    @Test
+    fun receiptConflictAndLegacyUncertaintyNeverUnfreezeTheReviewedProposal() {
+        val mapper = com.fasterxml.jackson.module.kotlin.jacksonObjectMapper()
+        val repository = com.constitutionatlas.ingestion.repo.SetupProposalRepository(jdbc, mapper)
+        val service = com.constitutionatlas.ingestion.service.SetupProposalService(repository, catalogClient, mapper)
+        val request = reviewedSetup("receipt-conflict-${UUID.randomUUID()}")
+        val proposal = service.create(TOKEN, admin.id, request)
+        Mockito.`when`(catalogClient.createSetupConstitution(anyUuid(), Mockito.eq(request) ?: request))
+            .thenThrow(org.springframework.web.client.HttpClientErrorException.create(org.springframework.http.HttpStatus.CONFLICT, "Conflict", null, "{\"code\":\"creation_attempt_mismatch\"}".toByteArray(), null))
+        org.junit.jupiter.api.Assertions.assertThrows(org.springframework.web.client.HttpClientErrorException::class.java) {
+            service.confirm(TOKEN, proposal.id, admin.id, true, proposal.revision)
+        }
+        assertEquals("confirming", repository.find(proposal.id)!!.status)
+        assertEquals(null, repository.replace(proposal.id, request.copy(constitutionTitle = "Changed"), proposal.revision))
+        jdbc.update("UPDATE import_setup_proposals SET confirmation_legacy = true WHERE id = ?", proposal.id)
+        Mockito.doThrow(com.constitutionatlas.ingestion.client.SetupCreationRejectedException()).`when`(catalogClient)
+            .createSetupConstitution(anyUuid(), Mockito.eq(request) ?: request)
+        val failure = org.junit.jupiter.api.Assertions.assertThrows(com.constitutionatlas.ingestion.api.ImportPublicationException::class.java) {
+            service.confirm(TOKEN, proposal.id, admin.id, true, proposal.revision)
+        }
+        assertEquals("setup_recovery_conflict", failure.code)
+        assertEquals("confirming", repository.find(proposal.id)!!.status)
+    }
+
+    @Test
+    fun operationsStatusRequiresItsScopeAndContainsOnlyAggregateQueueData() {
+        mockMvc.get("/operations/status").andExpect { status { isUnauthorized() } }
+        mockMvc.get("/operations/status") { header("Authorization", EDITOR_TOKEN) }.andExpect { status { isForbidden() } }
+        val monitorToken = "Bearer aggregate-monitor"
+        Mockito.`when`(identityClient.authenticate(monitorToken)).thenReturn(Actor(UUID.randomUUID(), "monitor", emptyList(), listOf("operations:read")))
+        val job = jobs.insertPending(mapOf("private-source" to "Never return this payload"), admin.id)!!
+        jdbc.update("UPDATE import_jobs SET status = 'preparing', updated_at = now() - interval '10 minutes' WHERE id = ?", job)
+        val event = UUID.randomUUID()
+        jdbc.update("INSERT INTO import_publication_outbox(id, import_job_id, event_type, payload, attempts, created_at) VALUES (?, ?, 'audit_publish', '{}'::jsonb, 2, now() - interval '10 minutes')", event, job)
+        val setups = com.constitutionatlas.ingestion.repo.SetupProposalRepository(jdbc, com.fasterxml.jackson.module.kotlin.jacksonObjectMapper())
+        val setup = setups.insert(admin.id, reviewedSetup("monitored-${UUID.randomUUID()}"))
+        val claim = setups.claim(setup.id, setup.revision)!!
+        setups.retry(setup.id, claim.attempt)
+        jdbc.update("UPDATE import_setup_proposals SET confirmation_requested_at = now() - interval '10 minutes' WHERE id = ?", setup.id)
+        val response = mockMvc.get("/operations/status") { header("Authorization", monitorToken) }.andExpect {
+            status { isOk() }
+            jsonPath("$.service") { value("ingestion") }
+        }.andReturn().response.contentAsString
+        val queues = json.readTree(response).path("queues").associateBy { it.path("name").asText() }
+        for (name in listOf("publication", "preparing", "confirming")) {
+            org.junit.jupiter.api.Assertions.assertTrue(queues.getValue(name).path("pendingCount").asLong() >= 1)
+            org.junit.jupiter.api.Assertions.assertTrue(queues.getValue(name).path("failedCount").asLong() >= 1)
+            org.junit.jupiter.api.Assertions.assertTrue(queues.getValue(name).path("oldestAgeSeconds").asLong() >= 600)
+        }
+        org.junit.jupiter.api.Assertions.assertFalse(response.contains(job.toString()) || response.contains(event.toString()) || response.contains("private-source"))
+        jdbc.update("UPDATE import_jobs SET status = 'pending_review' WHERE id = ?", job)
+        jdbc.update("UPDATE import_publication_outbox SET delivered_at = now() WHERE id = ?", event)
+        val recovered = setups.claim(setup.id, setup.revision)!!
+        assertEquals(true, setups.confirm(setup.id, recovered.attempt, UUID.randomUUID(), SETTINGS_REVISION, admin.id))
+    }
 
     @Test
     fun stalePreparationCannotFailOrReplaceARecoveredPublishedReceipt() {
@@ -295,9 +507,6 @@ class ImportApiTest {
     fun setupProposalIsPrivateUntilAnEditorConfirmsItsOutline() {
         val constitutionId = UUID.randomUUID()
         val body = """{"isoCode":"FR","countryName":"France","constitutionSlug":"new-constitution","constitutionTitle":"New constitution","languageCode":"fr","sourceUrl":"https://example.org/source","outline":{"kinds":[{"kindCode":"article","displayLabel":"Article"}]},"sampleRoots":[{"kind":"article","label":"1","title":"Opening","content":[{"type":"text","text":"Sample text"}]}]}"""
-        Mockito.`when`(catalogClient.createConstitution("FR", "new-constitution", "New constitution"))
-            .thenReturn(DownstreamConstitution(constitutionId, "new-constitution", "New constitution"))
-        Mockito.`when`(catalogClient.currentSettingsRevisionId(constitutionId)).thenReturn(SETTINGS_REVISION)
         val response = mockMvc.post("/import-setup-proposals") {
             header("Authorization", TOKEN)
             contentType = MediaType.APPLICATION_JSON
@@ -307,6 +516,8 @@ class ImportApiTest {
             jsonPath("$.status") { value("proposed") }
         }.andReturn()
         val id = jobId(response.response.contentAsString)
+        val reviewed = com.fasterxml.jackson.module.kotlin.jacksonObjectMapper().readValue(body, SetupProposalRequest::class.java)
+        Mockito.`when`(catalogClient.createSetupConstitution(anyUuid(), Mockito.eq(reviewed) ?: reviewed)).thenReturn(DownstreamSetupConstitution(constitutionId, SETTINGS_REVISION))
         mockMvc.get("/import-setup-proposals/$id") { header("Authorization", EDITOR_TOKEN) }
             .andExpect { status { isForbidden() } }
         mockMvc.post("/import-setup-proposals/$id/confirm") {
@@ -332,7 +543,7 @@ class ImportApiTest {
                 status { isOk() }
                 jsonPath("$.status") { value("confirmed") }
             }
-        Mockito.verify(catalogClient, Mockito.times(1)).createConstitution("FR", "new-constitution", "New constitution")
+        Mockito.verify(catalogClient, Mockito.times(1)).createSetupConstitution(setupOperation(UUID.fromString(id)), reviewed)
     }
 
     @Test
@@ -431,10 +642,10 @@ class ImportApiTest {
             header("If-Match", "3")
         }
             .andExpect { status { isConflict() } }
-        Mockito.verify(catalogClient, Mockito.never()).createConstitution("FR", "feedback-review", "Review charter")
+        val reviewed = com.fasterxml.jackson.module.kotlin.jacksonObjectMapper().readValue(jdbc.queryForObject("SELECT payload::text FROM import_setup_proposals WHERE id = ?", String::class.java, UUID.fromString(id)), SetupProposalRequest::class.java)
+        Mockito.verify(catalogClient, Mockito.never()).createSetupConstitution(anyUuid(), Mockito.eq(reviewed) ?: reviewed)
         val constitutionId = UUID.randomUUID()
-        Mockito.`when`(catalogClient.createConstitution("FR", "feedback-review", "Review charter")).thenReturn(DownstreamConstitution(constitutionId, "feedback-review", "Review charter"))
-        Mockito.`when`(catalogClient.currentSettingsRevisionId(constitutionId)).thenReturn(SETTINGS_REVISION)
+        Mockito.`when`(catalogClient.createSetupConstitution(anyUuid(), Mockito.eq(reviewed) ?: reviewed)).thenReturn(DownstreamSetupConstitution(constitutionId, SETTINGS_REVISION))
         mockMvc.post("/import-setup-proposals/$id/confirm") {
             header("Authorization", TOKEN)
             header("If-Match", "4")
@@ -487,9 +698,8 @@ class ImportApiTest {
         val created = service.create(TOKEN, admin.id, request)
         val revised = request.copy(constitutionTitle = "Revised title")
         val constitutionId = UUID.randomUUID()
-        Mockito.`when`(catalogClient.createConstitution("FR", "claim-race", "Revised title"))
-            .thenReturn(DownstreamConstitution(constitutionId, "claim-race", "Revised title"))
-        Mockito.`when`(catalogClient.currentSettingsRevisionId(constitutionId)).thenReturn(SETTINGS_REVISION)
+        Mockito.`when`(catalogClient.createSetupConstitution(anyUuid(), Mockito.eq(revised) ?: revised))
+            .thenReturn(DownstreamSetupConstitution(constitutionId, SETTINGS_REVISION))
         var revisedBeforeClaim = false
         Mockito.doAnswer { invocation ->
             val snapshot = invocation.callRealMethod()
@@ -503,8 +713,8 @@ class ImportApiTest {
         org.junit.jupiter.api.Assertions.assertThrows(org.springframework.web.server.ResponseStatusException::class.java) {
             service.confirm(TOKEN, created.id, admin.id, true, created.revision)
         }
-        Mockito.verify(catalogClient, Mockito.never()).createConstitution("FR", "claim-race", "Revised title")
-        Mockito.verify(catalogClient, Mockito.never()).createConstitution("FR", "claim-race", "Original title")
+        Mockito.verify(catalogClient, Mockito.never()).createSetupConstitution(anyUuid(), Mockito.eq(revised) ?: revised)
+        Mockito.verify(catalogClient, Mockito.never()).createSetupConstitution(anyUuid(), Mockito.eq(request) ?: request)
         val confirmed = service.confirm(TOKEN, created.id, admin.id, true, created.revision + 1)
         assertEquals("confirmed", confirmed.status)
         assertEquals("Revised title", confirmed.payload.constitutionTitle)

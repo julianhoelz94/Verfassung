@@ -2,6 +2,7 @@ package com.constitutionatlas.ingestion.service
 
 import com.constitutionatlas.ingestion.api.ImportBatchDto
 import com.constitutionatlas.ingestion.api.ImportJobDto
+import com.constitutionatlas.ingestion.api.ImportPublicationException
 import com.constitutionatlas.ingestion.api.ImportRequest
 import com.constitutionatlas.ingestion.api.StageBatchItemRequest
 import com.constitutionatlas.ingestion.client.CatalogClient
@@ -15,6 +16,7 @@ import org.springframework.http.HttpStatus
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import org.springframework.web.client.RestClientResponseException
 import org.springframework.web.server.ResponseStatusException
 import java.security.MessageDigest
 import java.util.UUID
@@ -164,27 +166,43 @@ class ImportService(
     fun reviewDecisions(jobId: UUID): List<com.constitutionatlas.ingestion.api.ReviewDecisionDto> = importJobRepository.reviewDecisions(jobId)
 
     fun publish(authorization: String?, jobId: UUID, actorId: UUID): ImportJobDto {
+        if (publishToken.isBlank()) throw ImportPublicationException(HttpStatus.SERVICE_UNAVAILABLE, "publication_not_configured")
         if (!importJobRepository.claimPublication(jobId, actorId)) throw ResponseStatusException(HttpStatus.CONFLICT, "Import is not approved for publication")
         val versionId = importJobRepository.find(jobId)?.versionId ?: error("Prepared version missing")
+        var stage = "verify"
         try {
             val approved = importJobRepository.approvedFingerprint(jobId) ?: error("Approved revision missing")
             val current = DownstreamAuth.withAuthorization(authorization) { contentClient.snapshot(versionId) }
             if (current.generation != approved.first || current.settingsRevisionId != approved.second) {
-                throw ResponseStatusException(HttpStatus.CONFLICT, "Prepared content or layout changed after approval")
+                throw ImportPublicationException(HttpStatus.CONFLICT, "approved_snapshot_changed")
             }
-            if (publishToken.isBlank()) throw ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Import publication token is not configured")
             DownstreamAuth.withAuthorization("Bearer $publishToken") {
+                stage = "seal"
                 contentClient.sealImport(versionId, jobId, approved.first, requireNotNull(approved.second))
+                stage = "publish"
                 catalogClient.publishVersion(versionId, jobId)
             }
+            stage = "complete"
             importJobRepository.complete(jobId, versionId, actorId)
         } catch (ex: RuntimeException) {
             try {
-                if (publishedVersionStatus(versionId) != "published") importJobRepository.publishFailed(jobId)
+                // Before the catalog publication call, no public state could have
+                // changed. Restore approval even when the machine credential is
+                // invalid and therefore cannot perform a catalog status lookup.
+                if (stage in setOf("verify", "seal") || publishedVersionStatus(versionId) != "published") importJobRepository.publishFailed(jobId)
             } catch (lookupError: RuntimeException) {
                 log.warn("Publication state lookup failed for import {}; scheduled reconciliation will retry", jobId, lookupError)
             }
-            throw ex
+            val failure = when {
+                ex is ImportPublicationException -> ex
+                ex is RestClientResponseException && stage in setOf("seal", "publish") && ex.statusCode.value() in setOf(401, 403) ->
+                    ImportPublicationException(HttpStatus.SERVICE_UNAVAILABLE, "publication_credentials_invalid")
+                ex is RestClientResponseException && ex.statusCode.value() == 409 ->
+                    ImportPublicationException(HttpStatus.CONFLICT, "publication_conflict")
+                else -> ImportPublicationException(HttpStatus.SERVICE_UNAVAILABLE, "publication_unavailable")
+            }
+            log.warn("Import publication {} failed at {} ({})", jobId, stage, failure.code)
+            throw failure
         }
         return importJobRepository.find(jobId)!!
     }

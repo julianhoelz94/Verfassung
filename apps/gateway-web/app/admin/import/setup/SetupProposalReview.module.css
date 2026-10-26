@@ -1,0 +1,12 @@
+.grid { grid-template-areas: "hierarchy" "sample" "controls"; display: grid; gap: var(--space-6, 1.5rem); align-items: start; }
+.hierarchyCard { grid-area: hierarchy; }
+.grid > .controls { grid-area: controls; }
+.controls { display: grid; gap: 1rem; }
+.hierarchy { padding-inline-start: 1.25rem; }
+.hierarchy li { margin-block: .5rem; overflow-wrap: anywhere; }
+.actions { display: flex; flex-wrap: wrap; gap: .75rem; margin-block: 1rem; }
+.feedback { white-space: pre-wrap; overflow-wrap: anywhere; }
+.comparison { display: grid; gap: .75rem; margin-block: 1rem; }
+.comparison dd { margin-inline-start: 0; overflow-wrap: anywhere; }
+.sample { grid-area: sample; min-width: 0; overflow-wrap: anywhere; }
+@media (min-width: 64rem) { .grid { grid-template-areas: "hierarchy sample" "controls sample"; grid-template-columns: minmax(18rem, 2fr) minmax(0, 3fr); } }

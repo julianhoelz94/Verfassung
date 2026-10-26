@@ -54,6 +54,18 @@ export function orderedText(entries: OrderedEntry[]): string {
   return text;
 }
 
+export function setupHandoff(proposal: { id: string; status: string; revision: number; changesRequested?: boolean }) {
+  const previewUrl = `${(process.env.PUBLIC_BASE_URL ?? 'http://localhost').replace(/\/$/, '')}/admin/import/setup/${proposal.id}`;
+  const nextAction = proposal.status === 'confirmed' ? 'upload_full_content' : proposal.status === 'withdrawn' ? 'stop' : proposal.changesRequested ? 'revise_proposal' : 'wait_for_confirmation';
+  const instructions = nextAction === 'upload_full_content'
+    ? 'The editor explicitly confirmed this revision on the website. Read the confirmed settings pin and upload the full content. Approval and publication remain separate website actions.'
+    : nextAction === 'revise_proposal'
+      ? 'Read requestedChanges and the latest payload. Revise the hierarchy and representative sample together using this revision. Website display preferences are preserved. After revision, stop and wait for explicit website confirmation.'
+      : nextAction === 'stop' ? 'This proposal was withdrawn. Stop this upload workflow.'
+        : 'Stop and show the preview URL to the user. Wait for explicit website confirmation before full upload. Do not confirm on the user’s behalf or repeatedly poll. Resume when the user asks, then read get_setup_proposal; only confirmed permits full upload.';
+  return { revision: proposal.revision, previewUrl, nextAction, instructions };
+}
+
 async function runLogged<T extends Record<string, unknown>>(tool: string, action: () => Promise<T>, actorId: () => string | undefined) {
   const started = Date.now();
   try {
@@ -119,7 +131,7 @@ export function createServer(authorization?: string): McpServer {
   }, () => run('get_import_schema', async () => ({
     schemaVersion: '1.1',
     settingsGuidance,
-    workflow: ['find_constitution', 'propose_constitution_setup if missing', 'editor confirms outline in the site', 'get_import_setup for constitutionId and settingsRevisionId', 'stage_constitution_import', 'editor prepares a draft in the site', 'reviewer approves', 'publisher publishes'],
+    workflow: ['find_constitution', 'propose_constitution_setup if missing', 'STOP and wait for explicit website confirmation; show the preview URL', 'when the user resumes, get_setup_proposal; requested changes require a revision and another wait', 'editor confirms outline in the site', 'get_import_setup for constitutionId and settingsRevisionId', 'stage_constitution_import', 'editor prepares a draft in the site', 'reviewer approves', 'publisher publishes'],
     required: ['jurisdictionId or isoCode with countryName', 'constitutionSlug', 'constitutionTitle', 'constitutionId', 'settingsRevisionId', 'versionLabel', 'sourceUrl or gazetteReference', 'articles or roots'],
     uploadLimits: { directToolBytes: 2_097_152, chunkBytes: 524_288, chunkedItemBytes: 26_214_400, receivingBatchBytes: 104_857_600, maxItemsPerBatch: 100 },
     sourceFields: { languageCode: 'BCP 47 language tag', sourceUrl: 'HTTPS URL of the source', gazetteReference: 'Official citation or gazette reference', effectiveDate: 'YYYY-MM-DD or null' },
@@ -197,37 +209,39 @@ export function createServer(authorization?: string): McpServer {
   }, ({ countryCode, jurisdictionId, constitutionSlug }) => run('find_constitution', () => importSetup(countryCode, jurisdictionId, constitutionSlug)));
 
   server.registerTool('propose_constitution_setup', {
-    description: 'Submit private metadata, an outline, and a small representative source sample for editor inspection before full upload.',
+    description: 'Submit private metadata, hierarchy and a representative sample. Then STOP and wait for explicit editor confirmation on the website before full upload.',
     inputSchema: { proposal: setupProposalSchema },
     outputSchema: setupProposalCreatedOutput,
     annotations: newStagedWrite,
     scopeChallenge: importScope,
   }, ({ proposal }) => run('propose_constitution_setup', async () => {
     await requireImportKey();
-    const result = await postJson<{ id: string; status: string }>('ingestion', '/import-setup-proposals', proposal, authorization!);
-    return { proposalId: result.id, status: result.status, settingsGuidance, previewUrl: `${(process.env.PUBLIC_BASE_URL ?? 'http://localhost').replace(/\/$/, '')}/admin/import/setup/${result.id}` };
+    const result = await postJson<{ id: string; status: string; revision: number }>('ingestion', '/import-setup-proposals', proposal, authorization!);
+    return { proposalId: result.id, status: result.status, settingsGuidance, ...setupHandoff(result) };
   }));
 
   server.registerTool('get_setup_proposal', {
-    description: 'Read the status of your private constitution setup proposal and the confirmed settings pin.',
+    description: 'Read the current revision, website requested changes, and confirmation status. Only confirmed permits full upload. Read before revising; preserve website display preferences.',
     inputSchema: { proposalId: uuid },
     outputSchema: setupProposalOutput,
     annotations: readOnly,
     scopeChallenge: importScope,
   }, ({ proposalId }) => run('get_setup_proposal', async () => {
     await requireImportKey();
-    return await getJson<Record<string, unknown>>('ingestion', `/import-setup-proposals/${proposalId}`, authorization);
+    const result = await getJson<Record<string, unknown> & { id: string; status: string; revision: number; changesRequested: boolean }>('ingestion', `/import-setup-proposals/${proposalId}`, authorization);
+    return { ...result, ...setupHandoff(result) };
   }));
 
   server.registerTool('revise_setup_proposal', {
-    description: 'Replace your unconfirmed structure proposal after inspecting validation feedback.',
-    inputSchema: { proposalId: uuid, proposal: setupProposalSchema },
+    description: 'Revise hierarchy and sample together after reading the latest proposal and requested changes. Supply its exact revision. After revision STOP and wait for explicit website confirmation.',
+    inputSchema: { proposalId: uuid, expectedRevision: z.number().int().positive(), proposal: setupProposalSchema },
     outputSchema: setupProposalOutput,
     annotations: stagedWrite,
     scopeChallenge: importScope,
-  }, ({ proposalId, proposal }) => run('revise_setup_proposal', async () => {
+  }, ({ proposalId, expectedRevision, proposal }) => run('revise_setup_proposal', async () => {
     await requireImportKey();
-    return await putJson<Record<string, unknown>>('ingestion', `/import-setup-proposals/${proposalId}`, proposal, authorization!);
+    const result = await putJson<Record<string, unknown> & { id: string; status: string; revision: number; changesRequested: boolean }>('ingestion', `/import-setup-proposals/${proposalId}`, proposal, authorization!, expectedRevision);
+    return { ...result, ...setupHandoff(result) };
   }));
 
   server.registerTool('get_import_setup', {

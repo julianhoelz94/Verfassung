@@ -27,7 +27,7 @@ whose resource is this deployment's `/mcp` URL. For an existing constitution, ca
 `outline`. For a new constitution, submit a private setup proposal with a small
 source sample. An editor checks its sample and confirms the outline in the site;
 the proposal then returns a constitution ID and settings revision for upload.
-Every staged item stays pending review. A separate reviewer records a reasoned
+Every staged item stays pending review. A reviewer records a reasoned
 decision in the site; a publisher with fresh MFA publishes the approved draft.
 The MCP server has no review or publish tool.
 
@@ -67,3 +67,24 @@ Ingestion uses separate service tokens for Catalog publication, Audit append,
 and Search reindex. The local stack seeds all three. Production operators must
 provision the three scopes separately. Published import events are queued in
 Ingestion's database and delivered with retries.
+
+## Website confirmation and revisions
+
+After `propose_constitution_setup` or `revise_setup_proposal`, follow the returned
+`nextAction` and `instructions`. `wait_for_confirmation` means stop, show the
+`previewUrl`, and wait for the editor to confirm on the website. Do not confirm
+on the user's behalf or repeatedly poll. When the user resumes, read
+`get_setup_proposal` again. Only `confirmed` enables full upload; use its
+constitution/settings pin. Structure confirmation is separate from content
+approval and publication.
+
+The website displays the submitted hierarchy read-only, the actual sample, and
+editable display settings. Manual constitution creation retains its full outline
+editor. Website change requests are available as `requestedChanges` with
+`changesRequested=true`; read them and revise hierarchy and sample together.
+`revise_setup_proposal` requires `expectedRevision` from the latest read. A stale
+revision is rejected, including stale website saves and confirmation. Website
+saved display preferences are preserved for matching kind codes. The previous
+chat payload remains available for comparison. A revision clears the pending
+change-request flag, retains its text for review, and requires fresh website
+confirmation. No feedback is sent to the external chat automatically.

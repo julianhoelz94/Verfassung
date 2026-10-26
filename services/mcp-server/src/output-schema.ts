@@ -48,8 +48,13 @@ export const importSchemaOutput = z.object({
   sourceFields: z.record(z.string(), z.string()), structure: z.record(z.string(), z.unknown()), notes: z.array(z.string()),
 });
 export const findConstitutionOutput = z.object({ exists: z.boolean(), countryCode: z.string().length(2).optional(), jurisdictionId: uuid.optional(), countryName: z.string().optional(), constitutionId: uuid.optional(), title: z.string().optional(), slug: z.string().optional(), settingsRevisionId: uuid.optional(), outline: z.record(z.string(), z.unknown()).nullable().optional(), settingsGuidance: z.array(z.unknown()).optional() });
-export const setupProposalCreatedOutput = z.object({ proposalId: uuid, status: z.string(), settingsGuidance: z.array(z.unknown()), previewUrl: url });
-export const setupProposalOutput = proposal;
+const proposalHandoff = {
+  revision: z.number().int().positive(),
+  nextAction: z.enum(['wait_for_confirmation', 'revise_proposal', 'upload_full_content', 'stop']),
+  instructions: z.string(), previewUrl: url,
+};
+export const setupProposalCreatedOutput = z.object({ proposalId: uuid, status: z.string(), settingsGuidance: z.array(z.unknown()), ...proposalHandoff });
+export const setupProposalOutput = proposal.extend({ ...proposalHandoff, requestedChanges: z.string().nullable(), changesRequested: z.boolean() });
 export const importSetupOutput = z.object({ exists: z.boolean(), countryCode: z.string().length(2).optional(), jurisdictionId: uuid.optional(), constitutionId: uuid.optional(), title: z.string().optional(), settingsRevisionId: uuid.optional(), outline: z.record(z.string(), z.unknown()).nullable(), settingsGuidance: z.array(z.unknown()).optional() });
 export const importStagedOutput = z.object({ jobId: uuid, status: z.string(), errors: z.array(error), reviewUrl: url });
 export const batchCreatedOutput = z.object({ batchId: uuid, status: z.string(), reviewUrl: url });

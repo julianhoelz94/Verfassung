@@ -8,18 +8,21 @@ import { OrderedContentTree } from '../../components/ConstitutionText';
 import { useTranslation } from '../../components/TranslationProvider';
 import { ui } from '../../../lib/messages';
 
-export function OutlineReaderPreview({ roots, outline }: { roots: OrderedNode[]; outline: ContentOutline }) {
+export function OutlineReaderPreview({ roots, outline, label }: { roots: OrderedNode[]; outline: ContentOutline; label?: string }) {
   const [inspected, setInspected] = useState<string | null>(null);
   const id = useId();
+  let ordinal = 0;
   return <OrderedContentTree entries={roots.map(node => ({ type: 'child', node }))} outline={outline} idPrefix={`outline-preview-${id}-`}
     renderNode={(node, element) => {
       const kind = kindByCode(outline, node.kind);
-      return kind ? <PreviewUnit node={node} kind={kind} outline={outline} element={element} inspected={inspected} setInspected={setInspected} /> : element;
+      const position = ++ordinal;
+      const unitLabel = `${label ? `${label}: ` : ''}${kind?.displayLabel ?? node.kind} ${node.label || position}`;
+      return kind ? <PreviewUnit node={node} kind={kind} unitLabel={unitLabel} outline={outline} element={element} inspected={inspected} setInspected={setInspected} /> : element;
     }} />;
 }
 
-function PreviewUnit({ node, kind, outline, element, inspected, setInspected }: {
-  node: OrderedNode; kind: OutlineKind; outline: ContentOutline; element: ReactElement;
+function PreviewUnit({ node, kind, unitLabel, outline, element, inspected, setInspected }: {
+  node: OrderedNode; kind: OutlineKind; unitLabel: string; outline: ContentOutline; element: ReactElement;
   inspected: string | null; setInspected: Dispatch<SetStateAction<string | null>>;
 }) {
   const id = useId();
@@ -72,7 +75,7 @@ function PreviewUnit({ node, kind, outline, element, inspected, setInspected }: 
     role: 'group',
     tabIndex: 0,
     'data-preview-kind': kind.kindCode,
-    'aria-label': t(ui.outlinePreview.configuration).replace('{unit}', `${kind.displayLabel}${node.label ? ` ${node.label}` : ''}`),
+    'aria-label': t(ui.outlinePreview.configuration).replace('{unit}', unitLabel),
     'aria-describedby': open ? id : undefined,
     onPointerOver: inspect,
     onPointerLeave: () => { if (!root.current?.contains(document.activeElement)) close(); },

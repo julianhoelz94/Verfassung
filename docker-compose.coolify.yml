@@ -210,6 +210,10 @@ services:
       DOCUMENT_API_URL: http://document-service:8080
       SETUP_TRANSPORT_STATUS_URL: http://edge-proxy:8082
       IDENTITY_SEED_MODE: 'off'
+      INGESTION_MANAGED_CREDENTIALS: 'true'
+      INGESTION_PUBLISH_TOKEN: ${INGESTION_PUBLISH_TOKEN:?Deploy using the manual deployment workflow}
+      INGESTION_AUDIT_TOKEN: ${INGESTION_AUDIT_TOKEN:?Deploy using the manual deployment workflow}
+      INGESTION_SEARCH_TOKEN: ${INGESTION_SEARCH_TOKEN:?Deploy using the manual deployment workflow}
     depends_on:
       identity-db:
         condition: service_healthy
@@ -349,9 +353,9 @@ services:
       CONTENT_API_URL: http://content-service:8080
       DEPLOYMENT_SETUP_GATE_ENABLED: 'true'
       IDENTITY_API_URL: http://identity-service:8080
-      INGESTION_PUBLISH_TOKEN: ${INGESTION_PUBLISH_TOKEN:-}
-      INGESTION_AUDIT_TOKEN: ${INGESTION_AUDIT_TOKEN:-}
-      INGESTION_SEARCH_TOKEN: ${INGESTION_SEARCH_TOKEN:-}
+      INGESTION_PUBLISH_TOKEN: ${INGESTION_PUBLISH_TOKEN:?Deploy using the manual deployment workflow}
+      INGESTION_AUDIT_TOKEN: ${INGESTION_AUDIT_TOKEN:?Deploy using the manual deployment workflow}
+      INGESTION_SEARCH_TOKEN: ${INGESTION_SEARCH_TOKEN:?Deploy using the manual deployment workflow}
       AUDIT_API_URL: http://audit-service:8080
       SEARCH_API_URL: http://search-service:8080
     depends_on:

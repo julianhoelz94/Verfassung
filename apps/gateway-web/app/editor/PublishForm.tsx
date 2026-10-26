@@ -128,7 +128,11 @@ export function PublishForm({ sessionId, versionId, articleId, hopKind, status, 
       if (rowIndex !== index) return row;
       const next = { ...row, ...patch };
       if (patch.changeType === 'added') next.beforeRef = null;
-      if (patch.changeType === 'removed') next.afterRef = null;
+      if (patch.changeType === 'removed') {
+        next.afterRef = null;
+        next.pendingAfterLogicalId = null;
+      }
+      if ('afterRef' in patch) next.pendingAfterLogicalId = patch.afterRef?.versionId ? null : patch.afterRef?.logicalId ?? null;
       return next;
     }));
   }
@@ -152,15 +156,17 @@ export function PublishForm({ sessionId, versionId, articleId, hopKind, status, 
     const list = side === 'before' ? beforeUnits : afterUnits;
     const queryKey = `${index}-${side}`;
     const query = search[queryKey] ?? '';
-    const visible = list.filter((unit) => unit.display.toLocaleLowerCase().includes(query.toLocaleLowerCase())).slice(0, 100);
     const field = side === 'before' ? 'beforeRef' : 'afterRef';
-    const selected = list.find((unit) => unit.logicalId === row[field]?.logicalId);
+    const selectedId = row[field]?.logicalId ?? (side === 'after' ? row.pendingAfterLogicalId : null) ?? '';
+    const selected = list.find((unit) => unit.logicalId === selectedId);
+    const visible = list.filter((unit) => unit.display.toLocaleLowerCase().includes(query.toLocaleLowerCase())).slice(0, 100);
+    if (selected && !visible.includes(selected)) visible.unshift(selected);
     return <Stack>
       <Input id={`publish-${index}-${side}-search`} label={t(side === 'before' ? ui.editorDynamic.findSourceUnit : ui.editorDynamic.findDraftUnit)} type="search" value={query} onChange={(event) => setSearch((current) => ({ ...current, [queryKey]: event.target.value }))} />
       <label htmlFor={`publish-${index}-${side}-unit`}><T value={side === 'before' ? ui.editorDynamic.beforeUnit : ui.editorDynamic.draftAfterUnit} /></label>
-      <select id={`publish-${index}-${side}-unit`} value={row[field]?.logicalId ?? ''} required onChange={(event) => {
+      <select id={`publish-${index}-${side}-unit`} value={selectedId} required onChange={(event) => {
         const unit = list.find((candidate) => candidate.logicalId === event.target.value);
-        if (!unit) return;
+        if (!unit) { updateChange(index, { [field]: null }); return; }
         updateChange(index, { [field]: unit.ref, articleId: unit.articleId, articleNumber: unit.articleNumber });
       }}>
         <option value=""><T value={ui.editor.publishform.selectExactUnit} /></option>

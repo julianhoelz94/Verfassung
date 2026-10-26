@@ -1,6 +1,25 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { treeUnits } from './AmendmentChangesTable';
+import { AmendmentForm } from './AmendmentForm';
 import type { ArticleSummary } from '../../../lib/api';
+
+vi.mock('./actions', () => ({ suggestChangesAction: vi.fn() }));
+
+it('preserves a pending unit target when an amendment draft is reopened and saved', () => {
+  const host = document.createElement('div');
+  host.innerHTML = renderToStaticMarkup(createElement(AmendmentForm, {
+    amendmentId: 'amendment', constitutionId: 'constitution', versions: [], articlesByVersion: {}, unitTreesByVersion: {},
+    canSave: true, canWithdraw: false, readOnly: false,
+    amendment: {
+      id: 'amendment', title: 'Law', summary: '', enactedOn: null, sourceReference: null,
+      changes: [{ id: 'change', articleId: 'article', articleNumber: '1', changeType: 'added', note: null, pendingAfterLogicalId: 'draft-unit' }],
+    },
+  }));
+  const changes = JSON.parse(host.querySelector<HTMLInputElement>('[name="changesJson"]')!.value);
+  expect(changes[0]).toMatchObject({ afterRef: null, pendingAfterLogicalId: 'draft-unit' });
+});
 
 describe('treeUnits', () => {
   it('exposes exact node and parent-text identities with snapshot permalinks', () => {

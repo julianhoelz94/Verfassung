@@ -1,7 +1,7 @@
 'use server';
 
 import { currentUser, requireSessionBearer } from '../../../lib/session';
-import { createImportJob, createSetupProposal, isImportRequest, parseImportJson, transitionImportJob } from '../../../lib/ingestion-api';
+import { createImportJob, createSetupProposal, ImportTransitionError, isImportRequest, parseImportJson, transitionImportJob } from '../../../lib/ingestion-api';
 
 function hasRole(roles: string[], role: string) { return roles.includes(role) || roles.includes('admin'); }
 
@@ -62,7 +62,12 @@ export async function transitionImportAction(formData: FormData): Promise<string
   if (action === 'publish' && !user.stepUpFresh) return `/account/step-up?returnTo=${encodeURIComponent(returnTo)}`;
   try {
     await transitionImportJob(jobId, action as 'confirm-outline' | 'prepare' | 'approve' | 'reject' | 'publish', await requireSessionBearer(), reason);
-  } catch {
+  } catch (error) {
+    if (error instanceof ImportTransitionError) {
+      if (error.code === 'mfa') return `/account/step-up?returnTo=${encodeURIComponent(returnTo)}`;
+      if (error.code === 'session_expired') return `/login?returnTo=${encodeURIComponent(returnTo)}`;
+      return `${returnTo}&error=${encodeURIComponent(error.code)}`;
+    }
     return `${returnTo}&error=transition`;
   }
   return `/editor?importJobId=${encodeURIComponent(jobId)}`;

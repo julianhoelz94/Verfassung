@@ -151,6 +151,8 @@ export function AmendmentChangesTable({
     const queryKey = `${index}-${side}`;
     const query = search[queryKey] ?? '';
     const filtered = units.filter((unit) => `${unit.display} ${unit.logicalId}`.toLocaleLowerCase().includes(query.toLocaleLowerCase())).slice(0, 100);
+    const selected = units.find(unit => unit.logicalId === row[key]?.logicalId);
+    if (selected && !filtered.includes(selected)) filtered.unshift(selected);
     return (
       <Stack>
         <Input id={`change-${index}-${side}-search`} label={t(side === 'before' ? ui.remainingStatus.findSourceUnit : ui.remainingStatus.findTargetUnit)} type="search" value={query} disabled={readOnly} onChange={(event) => setSearch((current) => ({ ...current, [queryKey]: event.target.value }))} />

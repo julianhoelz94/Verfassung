@@ -1,4 +1,4 @@
-import { changeTypeMessage } from '../../../../lib/ui-labels';
+import { changeTypeMessage, changeTypeTone } from '../../../../lib/ui-labels';
 import { T } from '../../../components/TranslationProvider';
 import { ui, message, type UiMessage } from '../../../../lib/messages';
 import { currentLocale } from '../../../../lib/server-locale';
@@ -103,13 +103,6 @@ function columnBadge(kind: CompareKind, side: 'from' | 'to'): { tone: 'added' | 
     return { tone: 'changed', label: COMPARE_KIND_LABEL.changed };
   }
   return { tone: 'neutral', label: COMPARE_KIND_LABEL.same };
-}
-
-function hopChangeTone(changeType: string): 'added' | 'removed' | 'changed' | 'neutral' {
-  if (changeType === 'added' || changeType === 'removed' || changeType === 'changed') {
-    return changeType;
-  }
-  return 'neutral';
 }
 
 export default async function ComparePage(props: ComparePageProps) {
@@ -336,7 +329,7 @@ export default async function ComparePage(props: ComparePageProps) {
                   <Stack>
                     {amendment.changes.map((change) => (
                       <div key={change.id} className="change-row">
-                        <Badge tone={hopChangeTone(change.changeType)}>{<T value={changeTypeMessage(change.changeType)} />}</Badge>
+                        <Badge tone={changeTypeTone(change.changeType)}>{<T value={changeTypeMessage(change.changeType)} />}</Badge>
                         {change.articleNumber ? (
                           <a href={`/countries/${country.isoCode}/articles/${encodeURIComponent(change.articleNumber)}`}>
                             <T value={ui.countries.code.compare.page.art} />{" "}{change.articleNumber}

@@ -166,7 +166,7 @@ export function StructuredEditor({ review = [], preview, outline, rootId, versio
     const id = entry.logicalId!;
     const next = parent.content[position + 1];
     const format = entry.format ?? 'plain';
-    const updateRich = (nextEntry: { text: string; format: DraftEntry['format']; table?: DraftEntry['table']; footnoteLabel?: string | null; references?: DraftEntry['references'] }) => change({ type: 'replace_text', targetId: id, expectedRevisionId: token(entry), ...nextEntry });
+    const updateRich = (nextEntry: { text: string; format: DraftEntry['format']; table?: DraftEntry['table']; footnoteLabel?: string | null; references?: DraftEntry['references'] }) => change({ type: 'replace_text', targetId: id, expectedRevisionId: token(entry), annotation: nextEntry.format === 'footnote' ? entry.annotation : null, ...nextEntry });
     const updateTable = (table: NonNullable<DraftEntry['table']>) => updateRich({ text: table.rows.map(row => row.cells.map(cell => cell.text).join(' ')).join('\n'), format: 'table', table });
     const updateCell = (cellId: string, patch: Partial<NonNullable<DraftEntry['table']>['rows'][number]['cells'][number]>) => {
       if (!entry.table) return;

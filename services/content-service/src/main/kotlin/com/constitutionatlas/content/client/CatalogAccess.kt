@@ -46,6 +46,7 @@ data class StructuralOutline(val kinds: List<StructuralLevel>)
 data class StructuralSettings(val id: UUID, val outline: StructuralOutline)
 
 interface CatalogClient {
+    fun requireImportReservation(versionId: UUID, attemptId: UUID): Unit = throw UnsupportedOperationException("Import reservation lookup is unavailable")
     fun getVersion(versionId: UUID): CatalogVersion?
 
     fun getSettings(versionId: UUID): StructuralSettings? = null
@@ -82,6 +83,10 @@ class RestCatalogClient(
         ContentDownstreamAuth.header()?.let { request.headers.set(HttpHeaders.AUTHORIZATION, it) }
         execution.execute(request, body)
     }.build()
+
+    override fun requireImportReservation(versionId: UUID, attemptId: UUID) {
+        client.get().uri("/versions/{id}/import-reservation?attemptId={attempt}", versionId, attemptId).retrieve().toBodilessEntity()
+    }
 
     override fun getSettings(versionId: UUID): StructuralSettings? =
         try {
@@ -121,7 +126,8 @@ class PublicationGuard(private val catalogClient: CatalogClient) {
 class ContentReadAccess(private val catalogClient: CatalogClient, private val identityClient: IdentityClient) {
     fun requireVisible(versionId: UUID, authorization: String?) {
         val version = catalogClient.getVersion(versionId) ?: throw NotFoundException("Unknown version")
-        // Listing controls discovery; published snapshot permalinks remain readable after the tip moves.
+        // Public listings show current legal editions, but published snapshot permalinks
+        // remain readable after a later editorial correction (ADR 0005).
         if (version.publicationStatus == "published") {
             return
         }

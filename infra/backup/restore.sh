@@ -13,6 +13,11 @@ fi
 
 . "$(dirname "$0")/postgres.sh"
 
+if [ -e "$SRC_DIR/INCOMPLETE" ]; then
+  echo "Backup is incomplete or still running: $SRC_DIR" >&2
+  exit 1
+fi
+
 # Validate the complete backup before the first destructive database operation.
 for name in $BACKUP_DATABASES; do
   dump="${SRC_DIR}/${name}.sql"

@@ -162,6 +162,12 @@ function comparableEntries(entries: OrderedEntry[]): unknown[] {
       }))),
     } : null,
     footnoteLabel: entry.footnoteLabel ?? null,
+    annotation: entry.annotation ? {
+      kind: entry.annotation.kind,
+      attribution: entry.annotation.attribution ?? null,
+      sourceUrl: entry.annotation.sourceUrl ?? null,
+      anchorLogicalIds: [...(entry.annotation.anchorLogicalIds ?? [])].sort(),
+    } : null,
     references: [...(entry.references ?? [])].sort((left, right) => left.start - right.start || left.end - right.end).map((reference) => ({
       start: reference.start,
       end: reference.end,

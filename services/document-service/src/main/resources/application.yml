@@ -23,3 +23,7 @@ catalog:
 amendment:
   api:
     url: ${AMENDMENT_API_URL:http://localhost/api/amendment}
+
+ingestion:
+  api:
+    url: ${INGESTION_API_URL:http://localhost/api/ingestion}

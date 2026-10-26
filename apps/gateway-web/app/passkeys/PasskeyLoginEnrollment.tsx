@@ -5,7 +5,6 @@ import { T, useTranslation } from '../components/TranslationProvider';
 import { canVisitEditor } from '../../lib/nav';
 import { ui } from '../../lib/messages';
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { Button } from '../components/ui';
 import { createPasskey } from '../../lib/webauthn';
 import { finishPasskeyLoginEnrollment, startPasskeyLoginEnrollment } from './actions';
@@ -14,7 +13,6 @@ export function PasskeyLoginEnrollment({ next }: { next?: string } = {}) {
   const t = useTranslation();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const router = useRouter();
 
   async function enroll() {
     setBusy(true);
@@ -23,11 +21,9 @@ export function PasskeyLoginEnrollment({ next }: { next?: string } = {}) {
       const started = await startPasskeyLoginEnrollment();
       const credential = await createPasskey(started.options);
       const result = await finishPasskeyLoginEnrollment(started.challengeId, credential);
-      router.push(safeLoginReturnTo(next, canVisitEditor(result.roles) ? '/editor' : '/'));
-      router.refresh();
+      window.location.assign(safeLoginReturnTo(next, canVisitEditor(result.roles) ? '/editor' : '/'));
     } catch {
       setError(t(ui.state.passkeyEnrollmentFailed));
-    } finally {
       setBusy(false);
     }
   }

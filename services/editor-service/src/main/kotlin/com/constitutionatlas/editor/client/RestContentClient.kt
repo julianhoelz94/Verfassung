@@ -21,14 +21,35 @@ class RestContentClient(
 ) : ContentClient {
     private val client: RestClient = timedRestClient(contentUrl)
 
-    override fun listArticles(versionId: UUID): List<ContentTreeArticle> =
+    override fun listArticles(versionId: UUID): List<ContentTreeArticle> {
+        val articles = mutableListOf<ContentTreeArticle>()
         try {
-            val request = client.get().uri("/versions/{id}/articles?includeBody=true", versionId)
-            authorize(request)
-            request.retrieve().body(ARTICLE_LIST) ?: emptyList()
+            // The same complete source is used for review and successor copying.
+            // Content caps a single response at 200 roots, even without a limit parameter.
+            while (true) {
+                val request = client.get().uri(
+                    "/versions/{id}/articles?includeBody=true&offset={offset}&limit={limit}",
+                    versionId,
+                    articles.size,
+                    PAGE_SIZE,
+                )
+                authorize(request)
+                val response = request.retrieve().toEntity(ARTICLE_LIST)
+                val page = response.body.orEmpty()
+                articles.addAll(page)
+                val total = response.headers.getFirst("X-Total-Count")?.toIntOrNull()
+                if (total != null) {
+                    if (articles.size >= total) break
+                    if (page.isEmpty()) throw DownstreamException("content list ended before all articles were read")
+                } else if (page.size < PAGE_SIZE) {
+                    break
+                }
+            }
         } catch (ex: RestClientException) {
             throw DownstreamException("content list failed", ex)
         }
+        return articles
+    }
 
     override fun replaceArticles(versionId: UUID, articles: List<ArticleWritePayload>) {
         try {
@@ -69,6 +90,7 @@ class RestContentClient(
     }
 
     companion object {
+        private const val PAGE_SIZE = 200
         private val ARTICLE_LIST = object : ParameterizedTypeReference<List<ContentTreeArticle>>() {}
     }
 }

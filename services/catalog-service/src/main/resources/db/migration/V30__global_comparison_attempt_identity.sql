@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX curated_comparison_attempt_identity_uq ON curated_archive_comparisons(attempt_id);

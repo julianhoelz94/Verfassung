@@ -41,6 +41,8 @@ Dasselbe Konto darf importieren, prüfen und veröffentlichen, sofern es die erf
 
 Bei der Importprüfung stehen Verfassungstitel, Fassung und Lesevorschau im Vordergrund. Freigabe und Ablehnung besitzen jeweils ein ausgerichtetes Begründungsfeld und eine Aktionsschaltfläche. Unter **Technische Details** finden Sie bei Bedarf Import-ID, Entwurfsfassungs-ID, Inhaltsgeneration und Einstellungsrevision.
 
+Der aktuelle Schritt steht deutlich über dem Inhalt. Nach der Freigabe lautet er **Freigegeben – Veröffentlichung steht aus**. Berechtigte Herausgeber/Administratoren sehen dann ausschließlich die Veröffentlichungsaktion. Prüfaktionen verschwinden nach der Freigabe; abgeschlossene und abgelehnte Importe bieten keine Veröffentlichungsaktion. **Inhalt und Gliederung prüfen** führt direkt zur eingereichten Hierarchie mit der bestätigten Darstellung. Fehlermeldungen unterscheiden serverseitige Konfigurations- und Dienstzugangsprobleme von einem geänderten Entwurf, fehlenden Benutzerrechten und vorübergehenden Fehlern. Eine fehlgeschlagene Bestätigung beweist nicht, dass nichts veröffentlicht wurde: Laden Sie vor einem erneuten Versuch den aktuellen Status neu.
+
 ## 3. Veröffentlichen
 
 **Erforderlich: Herausgeber oder Administrator.**
@@ -72,3 +74,11 @@ Prüf- oder Veröffentlichungsrechte allein erlauben keine Bearbeitung. Rollen l
 Die Clips sind ohne Ton, zeigen fiktive Daten und getrennte Rollen. Die Schritte oben beschreiben denselben Ablauf.
 
 [[Dokumentationsstart|Home]] · [[English|Editorial-Guide]]
+
+### Einen Verfassungsvorschlag aus dem Chat prüfen
+
+Die private Vorschlagsseite zeigt Quelle, schreibgeschützte Gliederung, das tatsächlich eingereichte Quellenbeispiel und Darstellungseinstellungen. Bitten Sie den verbundenen Chat-Client um Änderungen an der Gliederung. Bei der manuellen Verfassungserstellung bleiben alle Gliederungswerkzeuge erhalten. Bezeichnungen wie **Art.** oder **Artikel** lassen sich hier mit direkter Vorschau ändern, ohne interne Strukturkennungen umzubenennen. Gespeicherte Darstellungswünsche bleiben bei einer Chat-Überarbeitung für gleichbleibende Einheitsarten erhalten.
+
+Unter **Änderungen über den Chat-Client anfordern** können Sie Hinweise speichern. Bitten Sie anschließend den Chat-Client, den Vorschlag erneut über MCP abzurufen. Die Website versendet keine Nachricht automatisch. Eine Überarbeitung zeigt die Änderungen und das vorherige Beispiel zum Vergleich. Laden Sie nach einer Chat-Änderung den aktuellen Vorschlag. Veraltete Speicher- und Bestätigungsversuche werden abgewiesen. Solange eine angeforderte Überarbeitung aussteht, ist die Bestätigung gesperrt.
+
+Wählen Sie nach der Prüfung **Struktur bestätigen und vollständigen Upload ermöglichen**. Der Chat-Client muss auf diese Bestätigung auf der Website warten, bevor er den vollständigen Text hochlädt. Setzen Sie danach die Arbeit im Chat fort; der Client ruft die bestätigten Einstellungen selbst ab. Damit wird nur die Einrichtung bestätigt. Der hochgeladene Text benötigt weiterhin Prüfung, Freigabe und eine ausdrückliche Veröffentlichung.

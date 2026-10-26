@@ -1,33 +1,36 @@
 'use server';
 
-import { redirect } from 'next/navigation';
 import { currentUser, requireSessionBearer } from '../../../../lib/session';
-import { getSetupProposal, transitionSetupProposal, updateSetupProposal } from '../../../../lib/ingestion-api';
+import { getSetupProposal, requestSetupChanges, saveSetupDisplay, SetupActionError, transitionSetupProposal } from '../../../../lib/ingestion-api';
+import { displayKinds, setupKinds } from '../../../../lib/setup-review';
 
-function isEditor(roles: string[]) { return roles.includes('editor') || roles.includes('admin'); }
-
-export async function saveSetupOutlineAction(formData: FormData): Promise<string> {
-  const user = await currentUser();
+export async function reviewSetupAction(formData: FormData): Promise<string> {
   const id = String(formData.get('proposalId') ?? '');
-  if (!user || !isEditor(user.roles)) throw new Error('Editor role required');
-  const authorization = await requireSessionBearer();
-  const proposal = await getSetupProposal(id, authorization);
-  if (!proposal || proposal.status !== 'proposed') throw new Error('Proposal is not editable');
-  const kinds = JSON.parse(String(formData.get('outline') ?? '[]')) as unknown;
-  if (!Array.isArray(kinds)) throw new Error('Invalid outline');
-  await updateSetupProposal(id, { ...proposal.payload, outline: { kinds } }, authorization);
-  return `/admin/import/setup/${encodeURIComponent(id)}`;
-}
-
-export async function transitionSetupAction(formData: FormData): Promise<void> {
+  const destination = `/admin/import/setup/${encodeURIComponent(id)}`;
   const user = await currentUser();
-  const id = String(formData.get('proposalId') ?? '');
-  const action = String(formData.get('action') ?? '');
-  if (!user || !isEditor(user.roles) || !['confirm', 'withdraw'].includes(action)) redirect('/admin/import?error=forbidden');
+  if (!user?.roles.some(role => role === 'editor' || role === 'admin')) return `${destination}?error=forbidden`;
   try {
-    await transitionSetupProposal(id, action as 'confirm' | 'withdraw', await requireSessionBearer());
-  } catch {
-    redirect(`/admin/import/setup/${encodeURIComponent(id)}?error=transition`);
+    const authorization = await requireSessionBearer();
+    let proposal = await getSetupProposal(id, authorization);
+    const revision = Number(formData.get('revision'));
+    if (!proposal || !Number.isSafeInteger(revision) || revision !== proposal.revision) throw new SetupActionError('stale');
+    const intent = String(formData.get('intent'));
+    if (!['display', 'confirm', 'request-changes', 'withdraw'].includes(intent)) throw new SetupActionError('invalid');
+    const message = String(formData.get('message') ?? '').trim();
+    if (intent === 'request-changes' && (message.length < 10 || message.length > 4000)) throw new SetupActionError('invalid');
+    if (intent !== 'withdraw') {
+      const kinds = JSON.parse(String(formData.get('display') ?? 'null')) as unknown;
+      if (!Array.isArray(kinds)) throw new SetupActionError('invalid');
+      if (JSON.stringify(kinds) !== JSON.stringify(displayKinds(setupKinds(proposal.payload)))) {
+        const savedRevision = proposal.revision + 1;
+        proposal = await saveSetupDisplay(id, kinds, authorization, proposal.revision);
+        if (proposal.revision !== savedRevision) throw new SetupActionError('stale');
+      }
+    }
+    if (intent === 'request-changes') await requestSetupChanges(id, message, authorization, proposal.revision);
+    if (intent === 'confirm' || intent === 'withdraw') await transitionSetupProposal(id, intent, authorization, proposal.revision);
+    return destination;
+  } catch (error) {
+    return `${destination}?error=${error instanceof SetupActionError ? error.code : 'unavailable'}`;
   }
-  redirect(`/admin/import/setup/${encodeURIComponent(id)}`);
 }

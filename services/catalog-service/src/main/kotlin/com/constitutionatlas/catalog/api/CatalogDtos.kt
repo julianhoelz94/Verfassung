@@ -35,6 +35,8 @@ data class VersionSummary(
     val editorialPredecessorVersionId: UUID? = null,
     @get:JsonInclude(JsonInclude.Include.NON_NULL)
     val publicationComment: String? = null,
+    @get:JsonInclude(JsonInclude.Include.NON_NULL)
+    val sourceEvidence: com.constitutionatlas.platform.SourceEvidence? = null,
 )
 
 data class NodeKindDto(
@@ -148,6 +150,8 @@ data class CreateVersionRequest(
     val structuralSettingsRevisionId: UUID? = null,
     val publishAttemptId: UUID? = null,
     val importJobId: UUID? = null,
+    @get:JsonInclude(JsonInclude.Include.NON_NULL)
+    val sourceEvidence: com.constitutionatlas.platform.SourceEvidence? = null,
 )
 
 data class VersionCreated(
@@ -180,4 +184,8 @@ data class VersionDetail(
     val editorialPredecessorVersionId: UUID? = null,
     val countryCode: String? = null,
     val jurisdictionId: UUID? = null,
+    val sourceUrl: String? = null,
+    val gazetteReference: String? = null,
+    @get:JsonInclude(JsonInclude.Include.NON_NULL)
+    val sourceEvidence: com.constitutionatlas.platform.SourceEvidence? = null,
 )

@@ -126,6 +126,19 @@ class ContentApiTest {
     }
 
     @Test
+    fun importSealingDoesNotGrantEditorsOrImporterKeysAContentPublicationOperation() {
+        val importer = "Bearer import-only"
+        Mockito.`when`(identityClient.authenticate(importer)).thenReturn(Actor(UUID.randomUUID(), "importer", emptyList(), listOf("ingestion:import")))
+        for (authorization in listOf(TOKEN, importer)) {
+            mockMvc.post("/versions/${UUID.randomUUID()}/seal-import") {
+                header("Authorization", authorization)
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"attemptId":"${UUID.randomUUID()}","expectedGeneration":1,"settingsRevisionId":"${UUID.randomUUID()}"}"""
+            }.andExpect { status { isForbidden() } }
+        }
+    }
+
+    @Test
     fun genericUnitsMarkLegacyIdentityWithoutChangingLegacyArticleContract() {
         val version = UUID.fromString("01900000-0000-4000-8000-000000000004")
         Mockito.`when`(catalogClient.getVersion(version)).thenReturn(CatalogVersion(version, "published"))

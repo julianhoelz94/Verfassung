@@ -13,6 +13,7 @@ data class UploadRow(
     val totalBytes: Int,
     val status: String,
     val itemId: UUID?,
+    val migrationRunId: UUID? = null,
 )
 
 @Repository
@@ -84,6 +85,11 @@ class ImportUploadRepository(private val jdbc: JdbcTemplate) {
         jdbc.update("DELETE FROM import_upload_chunks WHERE upload_id = ?", id)
     }
 
+    fun completeMigration(id: UUID, runId: UUID, itemId: UUID) {
+        jdbc.update("UPDATE import_uploads SET status = 'completed', migration_run_id = ?, migration_item_id = ? WHERE id = ? AND status = 'receiving'", runId, itemId, id)
+        jdbc.update("DELETE FROM import_upload_chunks WHERE upload_id = ?", id)
+    }
+
     fun cancel(id: UUID) {
         jdbc.update("UPDATE import_uploads SET status = 'canceled' WHERE id = ? AND status = 'receiving'", id)
         jdbc.update("DELETE FROM import_upload_chunks WHERE upload_id = ?", id)
@@ -99,6 +105,7 @@ class ImportUploadRepository(private val jdbc: JdbcTemplate) {
         rs.getString("checksum_sha256").trim(),
         rs.getInt("total_bytes"),
         rs.getString("status"),
-        rs.getObject("import_job_id", UUID::class.java),
+        rs.getObject("import_job_id", UUID::class.java) ?: rs.getObject("migration_item_id", UUID::class.java),
+        rs.getObject("migration_run_id", UUID::class.java),
     )
 }

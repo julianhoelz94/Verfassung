@@ -30,12 +30,13 @@ data class DraftEntry(
     val table: OrderedTable? = null,
     val footnoteLabel: String? = null,
     val references: List<OrderedInlineReference> = emptyList(),
+    val annotation: com.constitutionatlas.platform.OrderedAnnotation? = null,
 )
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 data class DraftSource(val versionId: UUID, val generation: Long, val settingsRevisionId: UUID?, val roots: List<DraftNode>)
 
-data class TextPart(val logicalId: UUID, val text: String, val format: String? = null, val table: OrderedTable? = null, val footnoteLabel: String? = null, val references: List<OrderedInlineReference> = emptyList())
+data class TextPart(val logicalId: UUID, val text: String, val format: String? = null, val table: OrderedTable? = null, val footnoteLabel: String? = null, val references: List<OrderedInlineReference> = emptyList(), val annotation: com.constitutionatlas.platform.OrderedAnnotation? = null)
 
 data class DraftOperation(
     val id: UUID,
@@ -55,6 +56,7 @@ data class DraftOperation(
     val table: OrderedTable? = null,
     val footnoteLabel: String? = null,
     val references: List<OrderedInlineReference> = emptyList(),
+    val annotation: com.constitutionatlas.platform.OrderedAnnotation? = null,
 )
 
 data class StructuredDraftSave(val expectedGeneration: Long, val operations: List<DraftOperation>)

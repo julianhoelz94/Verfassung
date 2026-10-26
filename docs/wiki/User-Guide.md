@@ -33,6 +33,10 @@ Search filters use compact country, version and effective-date controls. Long co
 
 To cite a passage, save the opened provision's address and version ID. Older links stay available. A transcription correction does not itself create a new law.
 
+## Regional and historical archives
+
+The home page links to regions and historical collections. Their breadcrumbs show the recorded jurisdiction context; source-date wording and old status labels remain archival evidence. Typed annotations are distinct from the enacted wording and can be read separately. A constitution's **Amendment register** searches instruments, citations and literal unit labels, with separate instrument/effective date filters. **Curated comparisons** align authored passages across distinct constitutions, identify missing counterparts and preserve topic/text selection in the URL. Saved legacy links keep their exact historical targets.
+
 ## Sources, languages and exceptions
 
 <details>

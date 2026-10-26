@@ -46,6 +46,18 @@ class RestCatalogClient(
 ) : CatalogClient {
     private val client: RestClient = restClient(catalogUrl)
 
+    override fun getJurisdiction(id: UUID): DownstreamJurisdiction =
+        client.get().uri("/jurisdictions/{id}", id).retrieve().body(JurisdictionWire::class.java)!!.jurisdiction
+
+    override fun findJurisdictionConstitution(id: UUID, slug: String): DownstreamConstitution? =
+        client.get().uri("/jurisdictions/{id}", id).retrieve().body(JurisdictionWire::class.java)!!.constitutions.firstOrNull { it.slug == slug }
+
+    override fun createJurisdictionConstitution(id: UUID, slug: String, title: String, predecessorConstitutionId: UUID?, interim: Boolean): DownstreamConstitution =
+        client.postJson("/jurisdictions/{id}/constitutions", mapOf("slug" to slug, "title" to title, "predecessorConstitutionId" to predecessorConstitutionId, "interim" to interim), DownstreamConstitution::class.java, id)
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    private data class JurisdictionWire(val jurisdiction: DownstreamJurisdiction, val constitutions: List<DownstreamConstitution> = emptyList())
+
     override fun getCountry(isoCode: String): DownstreamCountry? =
         try {
             client.get().uri("/countries/{iso}", isoCode).retrieve().body(DownstreamCountry::class.java)
@@ -77,7 +89,7 @@ class RestCatalogClient(
 
     override fun settingsOutline(constitutionId: UUID, revisionId: UUID): ImportOutline =
         client.get().uri("/constitutions/{id}/settings/{revisionId}", constitutionId, revisionId)
-            .retrieve().body(SettingsRevisionWire::class.java)!!.outline
+            .retrieve().body(SettingsRevisionWire::class.java)!!.outline.importOutline()
 
     override fun createConstitution(isoCode: String, slug: String, title: String, predecessorConstitutionId: UUID?, interim: Boolean): DownstreamConstitution =
         client.postJson(
@@ -98,6 +110,7 @@ class RestCatalogClient(
         hopKind: String?,
         importJobId: UUID?,
         settingsRevisionId: UUID?,
+        sourceEvidence: com.constitutionatlas.platform.SourceEvidence?,
     ): DownstreamVersion =
         client.postJson(
             "/constitutions/{id}/versions",
@@ -110,7 +123,9 @@ class RestCatalogClient(
                 "predecessorVersionId" to predecessorVersionId,
                 "hopKind" to hopKind,
                 "importJobId" to importJobId,
+                "publishAttemptId" to importJobId,
                 "structuralSettingsRevisionId" to settingsRevisionId,
+                "sourceEvidence" to sourceEvidence,
             ),
             DownstreamVersion::class.java,
             constitutionId,
@@ -132,7 +147,32 @@ class RestCatalogClient(
     )
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    private data class SettingsRevisionWire(val id: UUID, val outline: ImportOutline = ImportOutline())
+    private data class SettingsRevisionWire(val id: UUID, val outline: ReadOutline = ReadOutline())
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    private data class ReadOutline(val kinds: List<ReadKind> = emptyList()) {
+        fun importOutline() = ImportOutline(kinds.map { it.importKind() })
+    }
+
+    /** Catalog adds derived read metadata; input DTOs deliberately reject unknown write fields. */
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    private data class ReadKind(
+        val kindCode: String,
+        val displayLabel: String,
+        val presentation: String = "section",
+        val showLabel: Boolean = true,
+        val showTitle: Boolean = false,
+        val showKind: Boolean = false,
+        val allowTextAlongsideChildren: Boolean = false,
+        val titlePolicy: String = "optional",
+        val labelPolicy: String = "optional",
+        val labelPlacement: String = "before_title",
+        val segmentation: String = "plain",
+        val root: Boolean? = null,
+        val allowedChildKinds: List<String>? = null,
+    ) {
+        fun importKind() = ImportOutlineKind(kindCode, displayLabel, presentation, showLabel, showTitle, showKind, allowTextAlongsideChildren, titlePolicy, labelPolicy, labelPlacement, segmentation, root, allowedChildKinds)
+    }
 }
 
 class RestContentClient(
@@ -140,12 +180,26 @@ class RestContentClient(
 ) : ContentClient {
     private val client: RestClient = restClient(contentUrl)
 
+    override fun sealImport(versionId: UUID, attemptId: UUID, generation: Long, settingsRevisionId: UUID) {
+        client.postJson("/versions/{id}/seal-import", mapOf("attemptId" to attemptId, "expectedGeneration" to generation, "settingsRevisionId" to settingsRevisionId), OrderedSnapshot::class.java, versionId)
+    }
+
     override fun replaceRoots(versionId: UUID, roots: List<OrderedNodeWrite>, sourceVersionId: UUID?) {
+        val persisted = snapshot(versionId)
+        if (persisted.generation > 0) {
+            check(com.constitutionatlas.platform.OrderedContentFidelity.matches(roots, persisted.roots)) { "Reserved draft already contains different persisted content; reconcile before retrying" }
+            return
+        }
         val source = sourceVersionId?.let(::snapshot)
         client.putJson("/versions/{id}/content", OrderedSnapshotWrite(expectedGeneration = 0, sourceVersionId = sourceVersionId, sourceGeneration = source?.generation, roots = roots), versionId)
     }
 
     override fun replaceArticles(versionId: UUID, articles: List<ImportArticle>) {
+        val persisted = snapshot(versionId)
+        if (persisted.generation > 0) {
+            check(com.constitutionatlas.platform.OrderedContentFidelity.matches(com.constitutionatlas.ingestion.service.legacyImportRoots(articles), persisted.roots)) { "Reserved legacy draft already contains different persisted content; reconcile before retrying" }
+            return
+        }
         client.putJson("/versions/{id}/articles", articles, versionId)
     }
 

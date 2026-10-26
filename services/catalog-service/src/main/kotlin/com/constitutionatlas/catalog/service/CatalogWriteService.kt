@@ -178,6 +178,7 @@ class CatalogWriteService(
                 legalVersionId,
                 legalPredecessorId,
                 editorialPredecessorId,
+                (request.sourceEvidence ?: if (hopKind == "editorial_correction") predecessorId?.let { catalogRepository.findVersion(it)?.sourceEvidence } else null)?.also { it.validate() },
             )
         } catch (ex: DataIntegrityViolationException) {
             if (hopKind == "editorial_correction") {
@@ -206,6 +207,12 @@ class CatalogWriteService(
     fun publishAttempt(id: UUID): VersionCreated {
         val reservation = publishAttempts.find(id) ?: throw NotFoundException("Unknown publish attempt")
         return catalogRepository.findVersionCreated(reservation.versionId) ?: throw NotFoundException("Reserved version missing")
+    }
+
+    fun requireImportReservation(version: UUID, attempt: UUID) {
+        if (catalogRepository.importHold(version) != attempt || publishAttempts.forVersion(version) != attempt) {
+            throw ForbiddenException("Publication attempt does not identify this held import snapshot")
+        }
     }
 
     @Transactional

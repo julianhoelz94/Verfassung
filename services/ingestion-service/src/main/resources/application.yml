@@ -11,6 +11,12 @@ catalog:
 content:
   api:
     url: ${CONTENT_API_URL:http://localhost/api/content}
+document:
+  api:
+    url: ${DOCUMENT_API_URL:http://localhost/api/document}
+amendment:
+  api:
+    url: ${AMENDMENT_API_URL:http://localhost/api/amendment}
 identity:
   api:
     url: ${IDENTITY_API_URL:http://localhost/api/identity}

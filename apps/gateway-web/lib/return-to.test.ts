@@ -27,6 +27,15 @@ describe('safeReturnTo', () => {
     expect(safeReturnTo('', '/account')).toBe('/account');
     expect(safeReturnTo('relative/path')).toBe('/');
   });
+
+  it.each(['/.//evil.example/path', '/safe/..//evil.example/path', '/%2e//evil.example/path', '/safe/%2e%2e//evil.example/path'])(
+    'rejects paths that normalize to a protocol-relative redirect: %s',
+    (path) => expect(safeReturnTo(path, '/account')).toBe('/account'),
+  );
+
+  it('still normalizes ordinary same-site dot segments', () => {
+    expect(safeReturnTo('/editor/../account?tab=security')).toBe('/account?tab=security');
+  });
 });
 
 describe('login return navigation', () => {

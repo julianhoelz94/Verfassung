@@ -168,6 +168,16 @@ describe('structured endpoint comparison', () => {
     expect(right.references.map(reference => reference.logicalId)).toEqual(['second', 'first']);
   });
 
+  it('detects annotation meaning changes while ignoring anchor storage order', () => {
+    const annotation: NonNullable<OrderedEntry['annotation']> = { kind: 'editorial', attribution: 'Archive editor', sourceUrl: 'https://example.org/source', anchorLogicalIds: ['unit-a', 'unit-b'] };
+    const left: OrderedEntry = { type: 'text', text: 'Archive note.', format: 'footnote', annotation };
+    const right = { ...left, annotation: { ...annotation, anchorLogicalIds: ['unit-b', 'unit-a'] } };
+    expect(netArticleKind(root('from', [left]), root('to', [right]), [])).toBe('same');
+    for (const update of [{ kind: 'source' as const }, { attribution: 'Another editor' }, { sourceUrl: 'https://example.org/revised' }, { anchorLogicalIds: ['unit-c'] }]) {
+      expect(netArticleKind(root('from', [left]), root('to', [{ ...right, annotation: { ...right.annotation, ...update } }]), [])).toBe('changed');
+    }
+  });
+
   const table = (): OrderedEntry => ({
     type: 'text',
     format: 'table',

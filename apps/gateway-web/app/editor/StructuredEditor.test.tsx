@@ -90,6 +90,19 @@ describe('structured editor acceptance', () => {
     expect(field('Sentence title')).not.toBeNull();
   });
 
+  it('preserves an imported annotation classification and anchors when editing its wording or label', async () => {
+    const outline = { kinds: [level('Article', 0)] };
+    const annotation = { kind: 'editorial' as const, attribution: 'Archive editor', sourceUrl: 'https://example.org/source', anchorLogicalIds: ['article'] };
+    const article = node('Article', 'article');
+    article.content = [{ type: 'text', logicalId: 'note', revisionId: 'revision-note', text: 'Original note', format: 'footnote', footnoteLabel: 'a', annotation }];
+    await mount(outline, [article]);
+    await change(texts()[0], 'Revised note');
+    expect(payload().operations.at(-1)).toEqual(expect.objectContaining({ type: 'replace_text', text: 'Revised note', annotation }));
+    const label = [...host.querySelectorAll('label')].find(item => item.textContent?.includes('Footnote label'))!.querySelector('input')!;
+    await change(label, 'b');
+    expect(payload().operations.at(-1)).toEqual(expect.objectContaining({ footnoteLabel: 'b', annotation }));
+  });
+
   it('creates new draft metadata in the selected UI language', async () => {
     const outline = { kinds: [level('Artikel', 0, undefined, { titlePolicy: 'required', labelPolicy: 'required' })] };
     await mount(outline, [{ ...node('Artikel', 'article'), label: '1', title: 'Rechte' }], undefined, {}, 'de');

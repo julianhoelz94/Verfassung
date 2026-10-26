@@ -47,6 +47,10 @@ Shared: `gradle/service-conventions.gradle`. New service: copy sibling (`.agents
 
 ## CI (`.github/workflows/ci.yml`)
 
+Runs on pull requests and pushes to `main`. Feature-branch pushes are checked by
+their pull request run, avoiding duplicate full-stack builds for the same commit.
+All host jobs use Ubuntu 24.04; the visual suite also pins its Playwright container.
+
 1. Discover `services/*/build.gradle.kts` → matrix `./gradlew check`
 2. `apps/gateway-web`: `npm test`, `typecheck`, `lint`, `build`
 3. Playwright e2e (mock API)
@@ -61,7 +65,7 @@ Dependabot: `.github/dependabot.yml`.
 
 `npm run dev` (port 3000), `lint`, `typecheck`, `build`, `test`, `test:e2e`.
 
-Host tools for the local stack: OrbStack or Docker Desktop, Bash, curl. JDK 21 and Node 20 are optional for host checks. See `README.md`.
+Host tools for the local stack: OrbStack or Docker Desktop, Bash, curl. JDK 21 and Node 22 are optional for host checks. See `README.md`.
 
 ## Local host verification
 

@@ -1,0 +1,61 @@
+{
+  "attribution": "Synthetic deterministic fixtures inspired by legacy archive presentation; these are test data, not transcriptions of enacted law. No network fetch or legal reconstruction is performed.",
+  "legalText": "Die Freyheit jedes Bürgers ist unverletzlich.",
+  "annexText": "Der Anhang gehört zur überlieferten Quelle.",
+  "annotationText": "Redaktionelle Anmerkung: später ergänzt.",
+  "expectedCounts": {
+    "units": 3,
+    "textEntries": 5,
+    "tables": 1,
+    "cells": 3,
+    "footnotes": 1,
+    "references": 1,
+    "documents": 7
+  },
+  "transformations": [
+    "Frames are inventory aliases; each referenced source remains distinct evidence.",
+    "Decode original and annotated bytes as Windows-1252, preserving exact spelling and punctuation.",
+    "Store the opening text, child paragraph, table and editorial note in source order.",
+    "Preserve the note reference and merged header cell; classify the note as editorial, not enacted wording.",
+    "Keep year-only and uncertain source dates as wording/precision with no invented effective day.",
+    "The original comparison authors explicit missing counterparts; matching article labels imply no correspondence.",
+    "The chunk-resume test appends a deterministic non-legal HTML comment to the captured frameset and records its resulting hash separately from the fixture hash."
+  ],
+  "sources": [
+    {
+      "file": "frameset.htm",
+      "encoding": "utf-8",
+      "sha256": "e2e311b4610dfb621b0df6a084b74cc15a2a6847b6d674f1b0a6cf44f674e796"
+    },
+    {
+      "file": "original.htm",
+      "encoding": "windows-1252",
+      "sha256": "99f9a7e4619612617f6841acd6a1535921eca46271815513979f68df1c92d0b9"
+    },
+    {
+      "file": "annotated.htm",
+      "encoding": "windows-1252",
+      "sha256": "40f1c00b317ff7c432efe7c8074257b60c14f436e36ec404b8fc4e188f40e54a"
+    },
+    {
+      "file": "consolidated.htm",
+      "encoding": "utf-8",
+      "sha256": "72bbfc2664706bf2890f3226a1834f1ade542e531f0160da3147566761f2afb7"
+    },
+    {
+      "file": "amendments.htm",
+      "encoding": "utf-8",
+      "sha256": "ca3d3f0dab440c1c8b5248129304358ccd53452d5a6c93b2d2a95a61ed4cfc39"
+    },
+    {
+      "file": "regional-annex.htm",
+      "encoding": "utf-8",
+      "sha256": "2fa655c6cd8bcd2a78ff31bdc225caa6a938c2a2ddd5d3f75168f00218ef35b5"
+    },
+    {
+      "file": "comparison.htm",
+      "encoding": "utf-8",
+      "sha256": "aaaa150d54689d4dfbdf074cf593d12d741510f324d290f8d871701a718dc87a"
+    }
+  ]
+}

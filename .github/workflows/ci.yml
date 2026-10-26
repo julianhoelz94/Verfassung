@@ -2,6 +2,7 @@ name: CI
 
 on:
   push:
+    branches: [main]
   pull_request:
 
 # Least privilege for the default GITHUB_TOKEN; no job needs write access.
@@ -14,7 +15,7 @@ concurrency:
 
 jobs:
   backend-services:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     outputs:
       services: ${{ steps.list.outputs.services }}
@@ -24,6 +25,12 @@ jobs:
         run: |
           bash -n manageLocalStack.sh
           python3 scripts/test_local_stack.py
+      - name: Check manual deployment safeguards and runtime definition
+        run: |
+          python3 -m venv "$RUNNER_TEMP/cd-checks"
+          "$RUNNER_TEMP/cd-checks/bin/python" -m pip install PyYAML==6.0.2
+          "$RUNNER_TEMP/cd-checks/bin/python" -m unittest discover -s scripts/cd -p 'test_*.py'
+          "$RUNNER_TEMP/cd-checks/bin/python" scripts/cd/render_compose.py --check
       - id: list
         name: List microservices
         run: |
@@ -40,7 +47,7 @@ jobs:
 
   backend:
     needs: backend-services
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     strategy:
       fail-fast: false
@@ -73,7 +80,7 @@ jobs:
           retention-days: 7
 
   platform:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -101,13 +108,13 @@ jobs:
           retention-days: 7
 
   frontend:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: '20'
+          node-version: '22'
       - name: Check repository hygiene, restore preflight and Wiki references
         run: |
           python3 scripts/check-repository-hygiene.py
@@ -116,6 +123,9 @@ jobs:
       - name: Install gateway dependencies
         working-directory: apps/gateway-web
         run: npm ci
+      - name: Audit gateway production dependencies
+        working-directory: apps/gateway-web
+        run: npm audit --omit=dev --audit-level=high
       - name: Reject generated fixture drift
         working-directory: apps/gateway-web
         run: |
@@ -136,7 +146,8 @@ jobs:
           npm run build
 
   e2e:
-    runs-on: ubuntu-latest
+    # Match the OS supported by the pinned Playwright browser installer.
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     defaults:
       run:
@@ -145,7 +156,7 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: '20'
+          node-version: '22'
       - run: npm ci
       - run: npx playwright install --with-deps chromium
       - run: npm run build
@@ -165,9 +176,9 @@ jobs:
           retention-days: 7
 
   visual-e2e:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
-    container: mcr.microsoft.com/playwright:v1.51.1-jammy
+    container: mcr.microsoft.com/playwright:v1.55.1-jammy
     defaults:
       run:
         working-directory: apps/gateway-web
@@ -190,7 +201,7 @@ jobs:
 
   images:
     needs: backend-services
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     strategy:
       fail-fast: false
@@ -212,7 +223,7 @@ jobs:
         run: docker build -f infra/local-stack/Dockerfile --build-arg SERVICE=identity-service -t constitution-atlas/identity-service:local-ci .
 
   gateway-image:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -228,20 +239,26 @@ jobs:
           python3 scripts/test-proxy-https.py --docs-enabled
 
   mcp-server:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '22'
+      - name: Install MCP dependencies
+        working-directory: services/mcp-server
+        run: npm ci
+      - name: Audit MCP production dependencies
+        working-directory: services/mcp-server
+        run: npm audit --omit=dev --audit-level=high
       - name: Verify MCP tools
         working-directory: services/mcp-server
-        run: npm ci && npm test
+        run: npm test
       - run: docker build -t constitution-atlas/mcp-server:ci services/mcp-server
 
   publish-journey:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
     env:
       COMPOSE_PROJECT_NAME: publish-journey
@@ -300,7 +317,7 @@ jobs:
             down -v
 
   full-stack-service-artifacts:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -327,7 +344,7 @@ jobs:
 
   full-stack-e2e:
     needs: full-stack-service-artifacts
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 50
     env:
       COMPOSE_PROJECT_NAME: full-stack-e2e
@@ -353,7 +370,7 @@ jobs:
           path: .
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: '20'
+          node-version: '22'
       - name: Install browser dependencies
         working-directory: apps/gateway-web
         run: |
@@ -396,6 +413,14 @@ jobs:
       - name: Full-stack browser journeys
         working-directory: apps/gateway-web
         run: npm run test:e2e:full
+      - name: Upload migration coverage
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: legacy-migration-coverage
+          path: apps/gateway-web/test-results/**/legacy-migration-coverage.json
+          if-no-files-found: warn
+          retention-days: 7
       - name: Verify documentation journeys without capturing media
         working-directory: apps/gateway-web
         env:
@@ -455,7 +480,7 @@ jobs:
       - publish-journey
       - full-stack-service-artifacts
       - full-stack-e2e
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
       - name: Require every CI job to succeed

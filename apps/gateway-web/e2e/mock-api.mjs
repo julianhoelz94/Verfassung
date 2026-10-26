@@ -192,6 +192,7 @@ const editorState = {
 let pendingMfaEmail = identityMe.email;
 let currentUser = { ...identityMe };
 let importJobs = new Map();
+let importPublicationError = null;
 let managedUsers = [];
 let serviceTokens = [];
 let credentials = new Map();
@@ -226,6 +227,7 @@ function resetMockState() {
   pendingMfaEmail = identityMe.email;
   currentUser = { ...identityMe };
   importJobs = new Map();
+  importPublicationError = null;
   managedUsers = [];
   serviceTokens = [];
   createdConstitutions = [];
@@ -370,6 +372,10 @@ const server = createServer(async (req, res) => {
     }));
     empty(res, 204); return;
   }
+  if (method === 'POST' && pathname === '/__import_publication_error') {
+    importPublicationError = (await readBody(req)).code ?? null;
+    json(res, 200, {}); return;
+  }
   if (method === 'POST' && pathname === '/__sprint59_content') {
     uiReview = reviewFixtures(germany);
     sprint50Content = true;
@@ -382,6 +388,7 @@ const server = createServer(async (req, res) => {
   }
   if (uiReview) {
     const response = await uiReview.response(req, method, pathname, readBody);
+    if (response instanceof Response) { json(res, response.status, await response.json()); return; }
     if (response !== undefined) { json(res, 200, response); return; }
   }
   if (method === 'POST' && pathname === '/__editor_sessions') {
@@ -585,7 +592,7 @@ const server = createServer(async (req, res) => {
   if (method === 'GET' && versionDetail) {
     const version = [...germany.constitutions[0].versions, ...extraVersions].find((item) => item.id === versionDetail[1]);
     if (!version) { json(res, 404, { error: 'Not found' }); return; }
-    json(res, 200, { ...version, constitutionId: CONSTITUTION_ID, countryCode: 'DE', publicationStatus: 'published', legalVersionId: version.legalVersionId ?? (version.hopKind === 'editorial_correction' ? version.predecessorVersionId : version.id) });
+    json(res, 200, { ...version, jurisdictionId: germany.id, constitutionId: CONSTITUTION_ID, countryCode: 'DE', publicationStatus: 'published', legalVersionId: version.legalVersionId ?? (version.hopKind === 'editorial_correction' ? version.predecessorVersionId : version.id) });
     return;
   }
 
@@ -1251,7 +1258,10 @@ const server = createServer(async (req, res) => {
         job.approvedBy = currentUser.id;
         job.decisions.push({ id: 'decision', decision: job.status, reason, decidedBy: currentUser.id, decidedAt: new Date().toISOString() });
       }
-      if (action === 'publish') { job.status = 'completed'; job.publishedBy = currentUser.id; }
+      if (action === 'publish') {
+        if (importPublicationError) { json(res, 503, { code: importPublicationError }); return; }
+        job.status = 'completed'; job.publishedBy = currentUser.id;
+      }
       json(res, 200, job); return;
     }
   }

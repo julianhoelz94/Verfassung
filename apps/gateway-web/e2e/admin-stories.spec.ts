@@ -59,7 +59,7 @@ test('administrator creates, rotates and revokes a service token', async ({ page
   await expect(page.locator('.data-row').filter({ hasText: 'CI integration' })).toContainText('Revoked');
 });
 
-test('administrator stages constitution JSON for review without publishing it', async ({ page }) => {
+test('administrator stages constitution JSON for review without publishing it', async ({ page }, testInfo) => {
   await signInAdmin(page);
   await page.goto('/admin/import');
   await page.getByText('Paste JSON instead', { exact: true }).click();
@@ -74,7 +74,7 @@ test('administrator stages constitution JSON for review without publishing it', 
   }));
   await page.getByRole('button', { name: 'Stage for review' }).click();
   await expect(page.getByRole('heading', { name: 'Review import' })).toBeVisible();
-  await expect(page.getByText('Status: In review')).toBeVisible();
+  await expect(page.locator('.import-workflow').getByRole('status')).toContainText('Draft preparation required');
   await expect(page.getByRole('link', { name: 'Open the published version' })).toHaveCount(0);
   await page.goto('/editor?status=reviewing');
   const item = page.locator('.editor-session-list li').filter({ hasText: '1789' });
@@ -84,13 +84,38 @@ test('administrator stages constitution JSON for review without publishing it', 
   await expect(page.getByRole('heading', { name: 'Prepared draft as readers will see it' })).toBeVisible();
   await page.getByLabel('Review reason').first().fill('Checked my imported text against the original source.');
   await page.getByRole('button', { name: 'Approve prepared draft' }).click();
+  await expect(page.getByRole('heading', { name: 'Approved – publication pending' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Publication', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Approve prepared draft' })).toHaveCount(0);
+  const viewport = page.viewportSize();
+  for (const width of [390, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    const status = page.getByRole('heading', { name: 'Approved – publication pending' });
+    expect((await status.boundingBox())!.y).toBeLessThan(900);
+    expect(await status.evaluate(element => parseFloat(getComputedStyle(element).fontSize))).toBeGreaterThanOrEqual(20);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBeTruthy();
+    const path = testInfo.outputPath(`import-approved-${width}.png`);
+    await page.screenshot({ path, fullPage: true });
+    await testInfo.attach(`import-approved-${width}`, { path, contentType: 'image/png' });
+  }
+  if (viewport) await page.setViewportSize(viewport);
   await expect(page.getByRole('button', { name: 'Publish approved version' })).toBeVisible();
   await page.reload();
   await expect(page.getByRole('button', { name: 'Publish approved version' })).toBeVisible();
   await page.goto('/editor?status=approved');
   await page.locator('.editor-session-list li').filter({ hasText: '1789' }).getByRole('link', { name: 'Open publish view' }).click();
+  await page.request.post(`${mockOrigin}/__import_publication_error`, { data: { code: 'publication_credentials_invalid' } });
+  await page.getByRole('button', { name: 'Publish approved version' }).click();
+  await expect(page.locator('.import-workflow').getByRole('alert')).toContainText('internal publication credential is invalid');
+  await expect(page.getByRole('heading', { name: 'Approved – publication pending' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Approve prepared draft' })).toHaveCount(0);
+  await page.reload();
+  await expect(page.getByRole('heading', { name: 'Approved – publication pending' })).toBeVisible();
+  await page.request.post(`${mockOrigin}/__import_publication_error`, { data: { code: null } });
   await page.getByRole('button', { name: 'Publish approved version' }).click();
   await expect(page.getByRole('link', { name: 'Open the published version' })).toBeVisible();
+  await expect(page.locator('.import-workflow').getByRole('status')).toContainText('Published');
+  await expect(page.getByRole('button', { name: 'Publish approved version' })).toHaveCount(0);
   await page.reload();
   await expect(page.getByRole('link', { name: 'Open the published version' })).toBeVisible();
 });

@@ -3,6 +3,7 @@ export const SEARCH_PAGE_SIZE = 20;
 export type SearchUrlParams = {
   q?: string;
   country?: string;
+  jurisdictionId?: string;
   versionId?: string;
   effectiveDate?: string;
   offset?: number;
@@ -10,6 +11,7 @@ export type SearchUrlParams = {
 
 export function searchUrl(params: SearchUrlParams): string {
   const query = new URLSearchParams();
+  if (params.jurisdictionId) query.set('jurisdictionId', params.jurisdictionId);
   const q = params.q?.trim();
   if (q) {
     query.set('q', q);

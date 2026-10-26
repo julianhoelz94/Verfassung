@@ -12,6 +12,7 @@ export type AlignedNode = {
 
 const SENTENCE_SPLIT = /(?<=[.!?])(?:\s+|$)/;
 const WORD_SPLIT = /(\s+)/;
+const MAX_DIFF_CELLS = 1_000_000;
 
 export function splitSentences(text: string): string[] {
   const trimmed = text.trim();
@@ -23,15 +24,39 @@ export function splitSentences(text: string): string[] {
 }
 
 export function diffTokens(left: string[], right: string[]): DiffSeg[] {
+  let start = 0;
+  while (start < left.length && start < right.length && left[start] === right[start]) start += 1;
+  let leftEnd = left.length;
+  let rightEnd = right.length;
+  while (leftEnd > start && rightEnd > start && left[leftEnd - 1] === right[rightEnd - 1]) {
+    leftEnd -= 1;
+    rightEnd -= 1;
+  }
+  const segs: DiffSeg[] = [];
+  pushSeg(segs, 'equal', left.slice(0, start).join(''));
+  const before = left.slice(start, leftEnd);
+  const after = right.slice(start, rightEnd);
+  // A long replacement must not allocate a quadratic matrix large enough to
+  // exhaust the gateway. Coarser highlighting still preserves both texts exactly.
+  if (!before.length || !after.length || (before.length + 1) * (after.length + 1) > MAX_DIFF_CELLS) {
+    pushSeg(segs, 'remove', before.join(''));
+    pushSeg(segs, 'add', after.join(''));
+  } else {
+    appendTokenDiff(segs, before, after);
+  }
+  pushSeg(segs, 'equal', left.slice(leftEnd).join(''));
+  return segs;
+}
+
+function appendTokenDiff(segs: DiffSeg[], left: string[], right: string[]): void {
   const n = left.length;
   const m = right.length;
-  const table: number[][] = Array.from({ length: n + 1 }, () => Array(m + 1).fill(0));
+  const table = Array.from({ length: n + 1 }, () => new Uint32Array(m + 1));
   for (let i = n - 1; i >= 0; i -= 1) {
     for (let j = m - 1; j >= 0; j -= 1) {
       table[i][j] = left[i] === right[j] ? table[i + 1][j + 1] + 1 : Math.max(table[i + 1][j], table[i][j + 1]);
     }
   }
-  const segs: DiffSeg[] = [];
   let i = 0;
   let j = 0;
   while (i < n && j < m) {
@@ -55,7 +80,6 @@ export function diffTokens(left: string[], right: string[]): DiffSeg[] {
     pushSeg(segs, 'add', right[j]);
     j += 1;
   }
-  return segs;
 }
 
 export function diffText(left: string, right: string): DiffSeg[] {
@@ -121,7 +145,7 @@ function pushSeg(segs: DiffSeg[], type: DiffSeg['type'], text: string) {
   }
   const last = segs[segs.length - 1];
   if (last && last.type === type) {
-    last.text += type === 'equal' && !last.text.endsWith(' ') && !text.startsWith(' ') ? ` ${text}` : text;
+    last.text += text;
     return;
   }
   segs.push({ type, text });

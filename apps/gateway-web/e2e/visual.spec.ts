@@ -9,7 +9,8 @@ const MOCK_ORIGIN = `http://127.0.0.1:${process.env.E2E_MOCK_PORT ?? 4010}`;
 
 async function snapshot(page: Page, name: string, maxDiffPixelRatio = 0.02): Promise<void> {
   await expect(page.locator('h1').first()).toBeVisible();
-  await expect(page).toHaveScreenshot(name, { fullPage: true, maxDiffPixelRatio });
+  // Collect every changed layout in one report while keeping any mismatch a test failure.
+  await expect.soft(page).toHaveScreenshot(name, { fullPage: true, maxDiffPixelRatio });
 }
 
 test.beforeEach(async ({ request }) => {
@@ -22,7 +23,7 @@ test('public and editor layouts at 390, 820 and 1440', async ({ page }) => {
   test.setTimeout(180_000);
   test.skip(
     process.env.E2E_SKIP_VISUAL === 'true' || process.platform !== 'linux',
-    'Visual snapshots are Linux Chromium (Playwright Docker / CI). Re-baseline with mcr.microsoft.com/playwright:v1.51.1-jammy.',
+    'Visual snapshots are Linux Chromium (Playwright Docker / CI). Re-baseline with mcr.microsoft.com/playwright:v1.55.1-jammy.',
   );
   for (const viewport of [
     { size: PHONE, suffix: 'narrow' },

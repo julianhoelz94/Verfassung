@@ -43,6 +43,40 @@ class OrderedContentApiTest {
     @MockBean lateinit var catalog: CatalogClient
 
     @Test
+    fun importPublicationSealsOnlyTheApprovedGenerationAndReservationWithoutRewritingRoots() {
+        val version = UUID.randomUUID()
+        val attempt = UUID.randomUUID()
+        val constitution = UUID.randomUUID()
+        val settings = UUID.randomUUID()
+        Mockito.`when`(catalog.getVersion(version)).thenReturn(CatalogVersion(version, "draft", constitution))
+        Mockito.`when`(catalog.getSettings(version)).thenReturn(StructuralSettings(settings, StructuralOutline(listOf(StructuralLevel("article", true, false, emptyList(), root = true)))))
+        val prepared = content.save(version, OrderedSnapshotWrite(0, roots = listOf(OrderedNodeWrite(kind = "article", label = "1", content = listOf(OrderedEntryWrite("text", text = "Exact approved text"))))))
+        assertThrows(ResponseStatusException::class.java) { content.sealImport(version, attempt, prepared.generation + 1, settings) }
+        assertThrows(ResponseStatusException::class.java) { content.sealImport(version, attempt, prepared.generation, UUID.randomUUID()) }
+        assertThat(content.sealImport(version, attempt, prepared.generation, settings)).isEqualTo(prepared)
+        assertThat(content.sealImport(version, attempt, prepared.generation, settings)).isEqualTo(prepared)
+        assertThat(content.publishReceipt(version, attempt)).isEqualTo(prepared)
+        assertThrows(ResponseStatusException::class.java) { content.save(version, OrderedSnapshotWrite(prepared.generation, roots = emptyList())) }
+        Mockito.doThrow(com.constitutionatlas.platform.ForbiddenException("Not the held import")).`when`(catalog).requireImportReservation(version, attempt)
+        assertThrows(com.constitutionatlas.platform.ForbiddenException::class.java) { content.sealImport(version, attempt, prepared.generation, settings) }
+    }
+
+    @Test
+    fun sealingLegacyContentRejectsEveryLaterLegacyRewriteWithoutChangingTheReceipt() {
+        val version = UUID.randomUUID()
+        val settings = UUID.randomUUID()
+        Mockito.`when`(catalog.getVersion(version)).thenReturn(CatalogVersion(version, "draft", UUID.randomUUID()))
+        Mockito.`when`(catalog.getSettings(version)).thenReturn(StructuralSettings(settings, StructuralOutline(listOf(StructuralLevel("article", true, false, emptyList(), root = true)))))
+        articles.replaceForVersion(version, listOf(com.constitutionatlas.content.api.ArticleWrite(articleNumber = "1", title = "Title", body = "Approved legacy wording", sortOrder = 1)))
+        val original = content.get(version)
+        val attempt = UUID.randomUUID()
+        content.sealImport(version, attempt, original.generation, settings)
+        assertThrows(ResponseStatusException::class.java) { articles.replaceForVersion(version, emptyList()) }
+        assertThrows(ResponseStatusException::class.java) { articles.updateText(original.roots.single().occurrenceId, "Title", "Changed") }
+        assertThat(content.publishReceipt(version, attempt)).isEqualTo(original)
+    }
+
+    @Test
     fun richEntriesPersistAndExportWithExplicitTargets() {
         val version = UUID.randomUUID()
         val constitution = UUID.randomUUID()
@@ -59,6 +93,7 @@ class OrderedContentApiTest {
             ),
         )
         val articleId = UUID.randomUUID()
+        val annotation = com.constitutionatlas.platform.OrderedAnnotation("editorial", "Archive editor", "https://example.org/source", listOf(articleId))
         val noteId = UUID.randomUUID()
         val unavailableId = UUID.randomUUID()
         val appendixId = UUID.randomUUID()
@@ -83,7 +118,7 @@ class OrderedContentApiTest {
                             OrderedInlineReference(UUID.randomUUID(), 13, 17, OrderedReferenceTarget("unit", logicalId = unavailableId)),
                         ),
                     ),
-                    OrderedEntryWrite("text", logicalId = noteId, text = "Source note.", format = "footnote", footnoteLabel = "1"),
+                    OrderedEntryWrite("text", logicalId = noteId, text = "Source note.", format = "footnote", footnoteLabel = "1", annotation = annotation),
                 ),
             ),
             OrderedNodeWrite(logicalId = appendixId, kind = "appendix", content = listOf(OrderedEntryWrite("text", format = "table", table = table))),
@@ -92,6 +127,8 @@ class OrderedContentApiTest {
         assertThat(saved.roots[0].content[0].references.first().target.footnoteId).isEqualTo(noteId)
         assertThat(saved.roots[0].content[0].references.last().target.logicalId).isEqualTo(unavailableId)
         assertThat(saved.roots[1].content.single().text).isEqualTo("Duty\nReport")
+        assertThat(content.get(version).roots[0].content[1].annotation).isEqualTo(annotation)
+        assertThat(content.export(version).roots[0].content!![1].annotation).isEqualTo(annotation)
         assertThat(content.get(version).roots[1].content.single().table).isEqualTo(table)
         assertThat(content.export(version).roots[1].content!!.single().table).isEqualTo(table)
     }
@@ -218,6 +255,7 @@ class OrderedContentApiTest {
         )
         assertThat(target.roots.single().content.map { it.lineage }).containsExactly(listOf(original.revisionId!!), listOf(original.revisionId!!))
         assertThat(content.get(targetId).roots.single().content.map { it.lineage }).containsExactly(listOf(original.revisionId!!), listOf(original.revisionId!!))
+        assertThat(content.export(targetId).roots.single().content!!.map { it.lineage }).containsExactly(listOf(original.revisionId!!), listOf(original.revisionId!!))
     }
 
     @Test
@@ -245,6 +283,54 @@ class OrderedContentApiTest {
         assertThat(target.roots.map { it.lineage }).containsExactly(listOf(original.revisionId), listOf(original.revisionId))
         assertThat(articles.listUnits(targetId, 0, 10, true).first.map { it.lineage }).containsExactly(listOf(original.revisionId), listOf(original.revisionId))
         assertThat(articles.getUnit(targetId, target.roots.first().occurrenceId).lineage).containsExactly(original.revisionId)
+        assertThat(content.export(targetId).roots.map { it.lineage }).containsExactly(listOf(original.revisionId), listOf(original.revisionId))
+    }
+
+    @Test
+    fun articleAliasesAndNestedCompatibilityNodesPreserveSiblingOrder() {
+        val versionId = UUID.randomUUID()
+        version(versionId, UUID.randomUUID())
+        val first = initial(versionId)
+        val snapshot = content.save(
+            versionId,
+            OrderedSnapshotWrite(
+                first.generation,
+                roots = listOf(
+                    OrderedNodeWrite(kind = "article", label = "0", content = emptyList()),
+                    OrderedNodeWrite(revisionId = first.roots.single().revisionId),
+                ),
+            ),
+        )
+        val root = snapshot.roots[1]
+        val detail = articles.getById(root.occurrenceId)
+        assertThat(detail).isEqualTo(articles.getUnit(versionId, root.occurrenceId))
+        assertThat(detail.sortOrder).isEqualTo(2)
+        assertThat(detail.children.map { it.sortOrder }).containsExactly(1, 2)
+        val articleList = articles.listByVersion(versionId, offset = 1, limit = 1, includeBody = true).single()
+        val unitList = articles.listUnits(versionId, 1, 1, true).first.single()
+        assertThat(articleList.sortOrder).isEqualTo(2)
+        assertThat(articleList.children).isEqualTo(detail.children)
+        assertThat(unitList.children).isEqualTo(detail.children)
+        assertThat(unitList.sortOrder).isEqualTo(2)
+    }
+
+    @Test
+    fun childEntriesRejectTextFormattingInsteadOfSilentlyDiscardingIt() {
+        val versionId = UUID.randomUUID()
+        version(versionId, UUID.randomUUID())
+        val child = OrderedEntryWrite("child", node = OrderedNodeWrite(kind = "sentence", content = emptyList()))
+        val invalid = listOf(
+            child.copy(format = "footnote"),
+            child.copy(footnoteLabel = "1"),
+            child.copy(table = OrderedTable(rows = emptyList())),
+            child.copy(references = listOf(OrderedInlineReference(UUID.randomUUID(), 0, 1, OrderedReferenceTarget("external", url = "https://example.com")))),
+        )
+        invalid.forEach { entry ->
+            assertThrows(IllegalArgumentException::class.java) {
+                content.save(versionId, OrderedSnapshotWrite(0, roots = listOf(OrderedNodeWrite(kind = "article", content = listOf(entry)))))
+            }
+        }
+        assertThat(content.get(versionId).generation).isZero()
     }
 
     private fun version(id: UUID, constitution: UUID, parentText: Boolean = true) {

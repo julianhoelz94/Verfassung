@@ -43,7 +43,8 @@ map paths at the service root. API docs are explicitly enabled for development/C
   Review and approval precede a fresh-MFA publisher action. Publication creates a
   successor; it never rewrites a published source. Outboxes retry side effects.
 - Importing: Ingestion stages and validates proposals. Preparation writes drafts;
-  independent review and explicit publication precede any public visibility.
+  explicit approval and publication precede any public visibility. Each action
+  checks its role; an account holding all required roles may perform both actions.
 - Setup: Identity persists bootstrap completion independently of deployments.
   Caddy/gateway and backend filters fail closed before setup, while allowing health,
   required login/enrollment and administrator/legal setup paths. Application

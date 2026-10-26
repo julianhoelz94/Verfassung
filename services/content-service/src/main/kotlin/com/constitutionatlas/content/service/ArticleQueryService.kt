@@ -5,6 +5,7 @@ import com.constitutionatlas.content.api.ArticleSummary
 import com.constitutionatlas.content.api.ArticleWrite
 import com.constitutionatlas.content.api.ContentNodeDto
 import com.constitutionatlas.content.api.NodeWrite
+import com.constitutionatlas.content.api.OrderedNode
 import com.constitutionatlas.content.client.PublicationGuard
 import com.constitutionatlas.content.repo.ArticleRepository
 import com.constitutionatlas.content.repo.ContentNodeInsert
@@ -23,6 +24,7 @@ class ArticleQueryService(
     private val publicationGuard: PublicationGuard,
     private val ordered: OrderedContentService,
     private val orderedRepository: OrderedContentRepository,
+    private val receipts: com.constitutionatlas.content.repo.OrderedPublishReceiptRepository,
 ) {
     fun listByVersion(
         versionId: UUID,
@@ -32,19 +34,7 @@ class ArticleQueryService(
     ): List<ArticleSummary> {
         if (orderedRepository.canonical(versionId)) {
             return ordered.get(versionId).roots.drop(offset).let { if (limit == null) it else it.take(limit) }.mapIndexed { index, root ->
-                ArticleSummary(
-                    root.occurrenceId,
-                    versionId,
-                    root.label.orEmpty(),
-                    root.title.orEmpty(),
-                    offset + index + 1,
-                    kind = root.kind, logicalId = root.logicalId, revisionId = root.revisionId,
-                    predecessorId = orderedRepository.occurrencePredecessor(root.occurrenceId),
-                    body = if (includeBody) ordered.plainText(root) else null,
-                    children = if (includeBody) root.content.mapNotNull { it.node?.let(::compatibilityNode) } else null,
-                    content = if (includeBody) root.content else null,
-                    lineage = root.lineage,
-                )
+                summary(root, versionId, offset + index + 1, includeBody)
             }
         }
         val items = articleRepository.listByVersion(versionId, offset, limit, includeBody)
@@ -58,13 +48,7 @@ class ArticleQueryService(
         val roots = ordered.get(version).roots
         val legacyIdentity = !orderedRepository.canonical(version)
         return roots.drop(offset).take(limit).mapIndexed { index, root ->
-            ArticleSummary(
-                root.occurrenceId, version, root.label.orEmpty(), root.title.orEmpty(), offset + index + 1,
-                body = if (includeBody) ordered.plainText(root) else null,
-                children = if (includeBody) root.content.mapNotNull { it.node?.let(::compatibilityNode) } else null,
-                predecessorId = orderedRepository.occurrencePredecessor(root.occurrenceId),
-                content = if (includeBody) root.content else null, logicalId = root.logicalId, revisionId = root.revisionId, kind = root.kind, legacyIdentity = legacyIdentity, lineage = root.lineage,
-            )
+            summary(root, version, offset + index + 1, includeBody, legacyIdentity)
         } to roots.size
     }
 
@@ -75,7 +59,7 @@ class ArticleQueryService(
         val root = roots[index]
         return ArticleDetail(
             root.occurrenceId, version, root.label.orEmpty(), root.title.orEmpty(), ordered.plainText(root), index + 1, root.kind,
-            children = root.content.mapNotNull { it.node?.let(::compatibilityNode) }, predecessorId = orderedRepository.occurrencePredecessor(id), content = root.content, logicalId = root.logicalId, revisionId = root.revisionId, legacyIdentity = !orderedRepository.canonical(version), lineage = root.lineage,
+            children = compatibilityChildren(root), predecessorId = orderedRepository.occurrencePredecessor(id), content = root.content, logicalId = root.logicalId, revisionId = root.revisionId, legacyIdentity = !orderedRepository.canonical(version), lineage = root.lineage,
         )
     }
 
@@ -84,12 +68,7 @@ class ArticleQueryService(
     fun getById(id: UUID): ArticleDetail {
         orderedRepository.occurrenceVersion(id)?.let { version ->
             if (orderedRepository.canonical(version)) {
-                val root = ordered.get(version).roots.find { it.occurrenceId == id } ?: throw NotFoundException("Unknown article '$id'")
-                return ArticleDetail(
-                    id, version, root.label.orEmpty(), root.title.orEmpty(), ordered.plainText(root), 1,
-                    predecessorId = orderedRepository.occurrencePredecessor(id),
-                    kind = root.kind, children = root.content.mapNotNull { it.node?.let(::compatibilityNode) }, content = root.content, logicalId = root.logicalId, revisionId = root.revisionId, legacyIdentity = !orderedRepository.canonical(version), lineage = root.lineage,
-                )
+                return getUnit(version, id)
             }
         }
         val article = articleRepository.findById(id) ?: throw NotFoundException("Unknown article '$id'")
@@ -206,14 +185,29 @@ class ArticleQueryService(
     }
 
     private fun requireLegacy(version: UUID) {
+        orderedRepository.lock(version)
+        if (receipts.forVersion(version) != null) throw ResponseStatusException(HttpStatus.CONFLICT, "Approved snapshot is sealed for publication")
         if (orderedRepository.canonical(version)) throw ResponseStatusException(HttpStatus.CONFLICT, "Use ordered content writes; legacy writes cannot preserve revision identity and mixed order")
     }
 
-    private fun compatibilityNode(node: com.constitutionatlas.content.api.OrderedNode): ContentNodeDto =
+    private fun summary(root: OrderedNode, version: UUID, sortOrder: Int, includeBody: Boolean, legacyIdentity: Boolean? = null): ArticleSummary =
+        ArticleSummary(
+            root.occurrenceId, version, root.label.orEmpty(), root.title.orEmpty(), sortOrder,
+            body = if (includeBody) ordered.plainText(root) else null,
+            children = if (includeBody) compatibilityChildren(root) else null,
+            predecessorId = orderedRepository.occurrencePredecessor(root.occurrenceId),
+            content = if (includeBody) root.content else null, logicalId = root.logicalId, revisionId = root.revisionId,
+            kind = root.kind, legacyIdentity = legacyIdentity, lineage = root.lineage,
+        )
+
+    private fun compatibilityChildren(node: OrderedNode): List<ContentNodeDto> =
+        node.content.mapNotNull { it.node }.mapIndexed { index, child -> compatibilityNode(child, index + 1) }
+
+    private fun compatibilityNode(node: OrderedNode, sortOrder: Int): ContentNodeDto =
         ContentNodeDto(
             node.occurrenceId, node.kind, node.label, node.label, node.title,
-            com.constitutionatlas.platform.OrderedContentText.entries(node.content.filter { it.type == "text" }), 1,
-            node.content.mapNotNull { it.node?.let(::compatibilityNode) }, predecessorId = orderedRepository.occurrencePredecessor(node.occurrenceId), content = node.content, logicalId = node.logicalId, revisionId = node.revisionId, lineage = node.lineage,
+            com.constitutionatlas.platform.OrderedContentText.entries(node.content.filter { it.type == "text" }), sortOrder,
+            compatibilityChildren(node), predecessorId = orderedRepository.occurrencePredecessor(node.occurrenceId), content = node.content, logicalId = node.logicalId, revisionId = node.revisionId, lineage = node.lineage,
         )
 
     private fun insertWriteNode(versionId: UUID, parentId: UUID, node: NodeWrite, sortOrder: Int) {

@@ -43,6 +43,8 @@ data class OrderedEntry(
     val footnoteLabel: String? = null,
     @get:JsonInclude(JsonInclude.Include.NON_EMPTY)
     val references: List<OrderedInlineReference> = emptyList(),
+    @get:com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+    val annotation: OrderedAnnotation? = null,
 )
 
 data class OrderedTableCell(
@@ -52,11 +54,11 @@ data class OrderedTableCell(
     val rowSpan: Int = 1,
     val colSpan: Int = 1,
     val headers: List<UUID> = emptyList(),
-)
+) : StrictOrderedWrite()
 
-data class OrderedTableRow(val logicalId: UUID, val cells: List<OrderedTableCell>)
+data class OrderedTableRow(val logicalId: UUID, val cells: List<OrderedTableCell>) : StrictOrderedWrite()
 
-data class OrderedTable(val caption: String? = null, val rows: List<OrderedTableRow>) {
+data class OrderedTable(val caption: String? = null, val rows: List<OrderedTableRow>) : StrictOrderedWrite() {
     fun plainText(): String = rows.joinToString("\n") { row -> row.cells.joinToString(" ") { it.text } }
 }
 
@@ -65,14 +67,16 @@ data class OrderedReferenceTarget(
     val logicalId: UUID? = null,
     val url: String? = null,
     val footnoteId: UUID? = null,
-)
+) : StrictOrderedWrite()
 
-data class OrderedInlineReference(val logicalId: UUID, val start: Int, val end: Int, val target: OrderedReferenceTarget)
+data class OrderedInlineReference(val logicalId: UUID, val start: Int, val end: Int, val target: OrderedReferenceTarget) : StrictOrderedWrite()
 
 data class OrderedRichContent(
     val table: OrderedTable? = null,
     val footnoteLabel: String? = null,
     val references: List<OrderedInlineReference> = emptyList(),
+    @get:com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+    val annotation: OrderedAnnotation? = null,
 )
 
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -125,6 +129,8 @@ data class OrderedEntryWrite(
     val table: OrderedTable? = null,
     val footnoteLabel: String? = null,
     val references: List<OrderedInlineReference> = emptyList(),
+    @get:com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+    val annotation: OrderedAnnotation? = null,
 ) : StrictOrderedWrite()
 
 data class OrderedSnapshotWrite(

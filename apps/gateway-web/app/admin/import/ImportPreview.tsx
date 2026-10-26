@@ -48,9 +48,9 @@ export function previewRoots(roots: unknown): OrderedNode[] {
   return children(roots).slice(0, 100).map((root, index) => previewNode(root, `import-preview-${index}`));
 }
 
-export function ImportPreview({ payload }: { payload: Row }) {
+export function ImportPreview({ payload, outline: confirmedOutline }: { payload: Row; outline?: ContentOutline | null }) {
   const roots = children(payload.roots).length ? children(payload.roots) : children(payload.articles);
-  const outline = previewOutline(payload);
+  const outline = confirmedOutline ?? previewOutline(payload);
   return <>
     <h2><T value={ui.admin.import.importpreview.proposedStructureAndSample} /></h2>
     <p>{string(payload.countryName)} · {string(payload.constitutionTitle)} · {string(payload.versionLabel)}</p>

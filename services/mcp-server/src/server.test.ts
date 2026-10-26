@@ -7,6 +7,50 @@ import { authenticateMcpKey, requirePublishedVersion, UpstreamError } from './ca
 import { setupProposalSchema } from './import-schema.js';
 import { randomUUID } from 'node:crypto';
 
+test('setup handoff exposes feedback, pins revisions and tells the client to wait for website confirmation', async () => {
+  const originalFetch = globalThis.fetch;
+  const id = randomUUID();
+  const ownerId = randomUUID();
+  const payload = { isoCode: 'DE', countryName: 'Deutschland', constitutionSlug: 'handoff', constitutionTitle: 'Grundgesetz', languageCode: 'de', sourceUrl: 'https://example.org/gg', outline: { kinds: [{ kindCode: 'article', displayLabel: 'Artikel' }] }, sampleRoots: [{ kind: 'article', content: [{ type: 'text', text: 'Unveränderter Quelltext.' }] }] };
+  let proposal = { id, ownerId, payload, status: 'proposed', revision: 1, constitutionId: null as string | null, settingsRevisionId: null as string | null, confirmedBy: null as string | null, requestedChanges: null as string | null, changesRequested: false };
+  let writes = 0;
+  globalThis.fetch = async (input, init) => {
+    if (String(input).endsWith('/me')) return Response.json({ id: ownerId, scopes: ['ingestion:import'] });
+    if (init?.method === 'PUT') {
+      assert.equal(new Headers(init.headers).get('If-Match'), '"2"');
+      proposal = { ...proposal, revision: 3, changesRequested: false };
+      writes++;
+    } else if (init?.method === 'POST') writes++;
+    return Response.json(proposal);
+  };
+  try {
+    const created = await callTool('propose_constitution_setup', { proposal: payload }, 'Bearer ca_mcp_importer');
+    assert.equal(created.isError, undefined);
+    assert.equal(created.structuredContent?.nextAction, 'wait_for_confirmation');
+    assert.match(String(created.structuredContent?.instructions), /Stop.*Wait.*explicit website confirmation/s);
+    assert.match(String(created.structuredContent?.previewUrl), new RegExp(id));
+    proposal = { ...proposal, revision: 2, changesRequested: true, requestedChanges: 'Bitte eine Satzebene einfügen.' };
+    const feedback = await callTool('get_setup_proposal', { proposalId: id }, 'Bearer ca_mcp_importer');
+    assert.equal(feedback.structuredContent?.nextAction, 'revise_proposal');
+    assert.equal(feedback.structuredContent?.requestedChanges, proposal.requestedChanges);
+    assert.equal(feedback.structuredContent?.revision, 2);
+    const revised = await callTool('revise_setup_proposal', { proposalId: id, expectedRevision: 2, proposal: payload }, 'Bearer ca_mcp_importer');
+    assert.equal(revised.isError, undefined);
+    assert.equal(revised.structuredContent?.nextAction, 'wait_for_confirmation');
+    assert.equal(revised.structuredContent?.revision, 3);
+    const before = writes;
+    const invalid = await callTool('stage_constitution_import', { payload: { ...payload, versionLabel: '2026', roots: payload.sampleRoots } }, 'Bearer ca_mcp_importer');
+    assert.equal(invalid.isError, true);
+    assert.equal(writes, before);
+    proposal = { ...proposal, status: 'confirmed', constitutionId: randomUUID(), settingsRevisionId: randomUUID(), confirmedBy: ownerId };
+    const confirmed = await callTool('get_setup_proposal', { proposalId: id }, 'Bearer ca_mcp_importer');
+    assert.equal(confirmed.structuredContent?.nextAction, 'upload_full_content');
+    assert.equal(confirmed.structuredContent?.settingsRevisionId, proposal.settingsRevisionId);
+    proposal = { ...proposal, status: 'withdrawn' };
+    assert.equal((await callTool('get_setup_proposal', { proposalId: id }, 'Bearer ca_mcp_importer')).structuredContent?.nextAction, 'stop');
+  } finally { globalThis.fetch = originalFetch; }
+});
+
 test('rich imports survive the actual MCP parser for direct and batch staging', async () => {
   const originalFetch = globalThis.fetch;
   const noteId = randomUUID();

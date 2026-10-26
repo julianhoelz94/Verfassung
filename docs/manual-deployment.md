@@ -62,6 +62,8 @@ Bootstrap administrator credentials belong in Coolify; they are not required in 
 
 `docker-compose.coolify.yml` contains only image references and internal networking, with no host port publications or checkout bind mounts. Each database retains its named volume in the Coolify application's Compose project. No `backup-service` or backup image runs on this host: backup is provided at host level. CD does not create a pre-deployment backup, restore data or reverse migrations. Host backup and restore consistency are operator responsibilities.
 
+The manual deployment workflow generates three independent internal ingestion credentials for each deployment and supplies the same values to Identity and Ingestion. With demo seeding still disabled, Identity registers only `ingestion:publish`, `audit:append` and `search:reindex`, each on its own deployment-managed token. Values are not written to the release manifest or logs. A later deployment rotates these credentials; the same configured values remain valid across a container restart and renew their 90-day lifetime. Deploy at least every 90 days or renew the managed credentials before expiry. Do not replace these entries with an account MCP key or a general automation token. A standalone production deployment must supply three distinct random URL-safe secrets (at least 43 characters) as `INGESTION_PUBLISH_TOKEN`, `INGESTION_AUDIT_TOKEN`, and `INGESTION_SEARCH_TOKEN`, and enable `INGESTION_MANAGED_CREDENTIALS=true` on Identity.
+
 Keep runtime wiring in `docker-compose.yml`, then regenerate the deployment file with:
 
 ```bash
@@ -192,25 +194,99 @@ One Tailscale trust credential can cover both environments with subject `repo:ju
 
 ## Optional npm prepopulate
 
-The `prepopulate` checkbox invokes the existing fixture generation/import/publish/read-back script. This writes **generated sample constitutional content**, can create countries/versions and rebuilds the search index. It is available for either selected environment, defaults off, and is not an E2E test run.
+The deployment's `prepopulate` checkbox runs `npm run prepopulate` after a successful rollout. It imports, reviews, publishes and reads back **generated sample constitutional content**, then rebuilds and checks the search index. The current fixtures contain three fictional countries, three constitutions, seven versions, 66 article snapshots and three amendments. Choosing this option for `prod` publishes that same sample content on the production site. The option defaults off and does not run E2E tests.
 
-Complete the site's setup wizard and create three distinct accounts with administrator/import, reviewer and publisher capabilities before choosing it. Existing review/publication boundaries remain enforced. Store these **environment secrets** for the selected site:
+Complete the following setup once for each site where you want to use it. A normal deployment with the checkbox clear needs none of the `PREPOPULATE_*` secrets.
 
-```text
-PREPOPULATE_ADMIN_EMAIL
-PREPOPULATE_ADMIN_PASSWORD
-PREPOPULATE_TOTP_SECRET
-PREPOPULATE_REVIEWER_EMAIL
-PREPOPULATE_REVIEWER_PASSWORD
-PREPOPULATE_REVIEWER_TOTP_SECRET
-PREPOPULATE_PUBLISHER_EMAIL
-PREPOPULATE_PUBLISHER_PASSWORD
-PREPOPULATE_PUBLISHER_TOTP_SECRET
-```
+### 1. Deploy the site and finish its setup
 
-TOTP secrets are needed for accounts with TOTP MFA; they are the enrollment secrets, not the current six-digit codes. WebAuthn-only accounts cannot authenticate this script; use accounts supporting its password/TOTP path. Password credentials are required before a selected run can deploy. Missing MFA credentials or incomplete site setup fail the optional post-deployment step; the successful rollout is retained. Create these credentials through normal site administration rather than enabling demo seed accounts.
+1. Run **Actions → Deploy → Run workflow**, select `main` and the intended environment, and leave the prepopulate checkbox clear. If the site is already deployed, continue with its setup instead.
+2. Open the corresponding website: [test](https://tst.verfassungen.julianhoelz.de) or [production](https://verfassungen.julianhoelz.de). Sign in with the initial administrator email and password configured through `PROD_ADMIN_EMAIL` and `PROD_ADMIN_PASSWORD` in that Coolify environment. Those variable names also apply to the test installation.
+3. Finish authenticator enrollment and the site setup wizard, including the required settings and legal-page publications. Finish the final review so that setup is marked complete. See the [administrator guide](https://github.com/julianhoelz94/Verfassung/wiki/Admin-Guide#first-installation) for the wizard. **Configure email later** is supported; the invitation flow below also works without outgoing mail.
 
-CD sets the explicit target environment and canonical HTTPS origin. The script rejects arbitrary remote origins and a test/prod mismatch; its existing localhost path remains available for development/CI. It uses the same source checkout as the release and needs only Node/npm for this command, without downloading browsers or running `npm install`.
+Prepopulate does not complete this wizard or create its own login accounts. If setup is unfinished, its post-deployment step stops with `Deployment succeeded. Complete the site setup wizard and create fixture accounts before running prepopulate.`
+
+### 2. Create three separate fixture accounts
+
+Use three distinct accounts on the selected website. These are website users, separate from GitHub, Coolify and Tailscale accounts. The script uses each account at the corresponding import/review/publication stage and rejects duplicate email addresses, even if one account has all three roles.
+
+| Account | Example email to replace with an address you control | Website role | Used for |
+| --- | --- | --- | --- |
+| Fixture administrator | `atlas-fixture-admin@example.com` | `admin` | Prepare imports, create and publish fixture amendments, and rebuild the search index |
+| Fixture reviewer | `atlas-fixture-reviewer@example.com` | `reviewer` | Approve the staged imports |
+| Fixture publisher | `atlas-fixture-publisher@example.com` | `publisher` | Publish the approved imports |
+
+1. As the site administrator, open **Admin → Users** (`/admin/users`). Use a recent sign-in with MFA; creating invitations requires fresh verification.
+2. In **Invite**, enter the fixture administrator's email. In **Roles (comma-separated)**, replace the default `viewer` with `admin`, then choose **Send invite**. Copy the displayed one-time invitation token. An email is also sent if outgoing mail is configured.
+3. In a separate browser profile or a signed-out window on the same site, open `/invite`. Paste that value into **Invite token**, set a unique password, and choose **Activate account**. Use at least 12 characters, at most 72 UTF-8 bytes, and avoid common passwords or including the email's name before `@` in the password. Save the password in your password manager.
+4. Repeat the invitation and activation for the reviewer with role `reviewer`, and the publisher with role `publisher`. Keep each account's email and password clearly labeled for `test` or `prod`.
+5. Back in **Admin → Users**, confirm all three accounts are `active` and have the intended roles. For an existing active account, use **Edit roles → Update roles**, then sign in again because role changes revoke sessions.
+
+There is no separate `import` role or group to create. Use the exact role names above. The administrator can also be an existing administrator account if you know its password and TOTP setup key; dedicated fixture accounts make these credentials easier to manage. Use normal invitations rather than enabling local/demo seed accounts. The **Service tokens** section is not used by this script.
+
+### 3. Enroll an authenticator and save each setup key
+
+The script signs in with a password and, when requested, a TOTP authenticator code it generates itself. It cannot complete a passkey/WebAuthn prompt or enroll MFA. Administrators and publishers must have a second factor before they can sign in; enroll TOTP for all three fixture accounts using these steps.
+
+1. Sign in as the fixture administrator. For a new account, the login flow opens **Set up authenticator**. For an already signed-in account without an authenticator, open **Account → Account security** (`/account#security`), enter its current password and choose **Set up authenticator app**.
+2. Scan the QR code with your authenticator app. Open **Can't scan the QR code?** — **QR-Code lässt sich nicht scannen?** in German — and copy the displayed manual setup key into your password manager. Label it with this account and environment. **Copy it now: the website only displays it during enrollment.**
+3. Enter a current six-digit code from the authenticator app into **Authenticator code**, then choose **Confirm enrollment**. Save the recovery codes separately and continue.
+4. Repeat for the publisher. For the reviewer, sign in and start enrollment from **Account → Account security** if login does not ask for it.
+5. Confirm that each account can sign out and sign back in using its password and authenticator code.
+
+The GitHub secret needs the **manual Base32 setup key** from step 2, not a six-digit code, recovery code, QR image or complete `otpauth://` URL. GitHub Actions uses that key to generate a fresh code on every run. A passkey-only account needs TOTP enrolled before this script can use it. If you already enrolled an authenticator but did not retain its setup key, the site cannot show it again; creating a fresh dedicated fixture account and recording its key during enrollment is the simplest setup path.
+
+### 4. Add the credentials to the matching GitHub environment
+
+In the repository, open **Settings → Environments → test** (or **prod**), then under **Environment secrets** choose **Add secret** for each row below. Enter the name exactly and paste only the value, without quotation marks. These are secrets within the existing environment, not environment variables or new environments. [GitHub's environment-secret instructions](https://docs.github.com/en/actions/how-tos/write-workflows/choose-what-workflows-do/use-secrets#creating-secrets-for-an-environment)
+
+| Environment secret | Value |
+| --- | --- |
+| `PREPOPULATE_ADMIN_EMAIL` | The activated fixture administrator's email, for example `atlas-fixture-admin@example.com` with your own domain |
+| `PREPOPULATE_ADMIN_PASSWORD` | The password set when activating that administrator account |
+| `PREPOPULATE_TOTP_SECRET` | That administrator's manual authenticator setup key; this name intentionally has no `ADMIN` segment |
+| `PREPOPULATE_REVIEWER_EMAIL` | The activated fixture reviewer's email |
+| `PREPOPULATE_REVIEWER_PASSWORD` | That reviewer's password |
+| `PREPOPULATE_REVIEWER_TOTP_SECRET` | That reviewer's manual authenticator setup key |
+| `PREPOPULATE_PUBLISHER_EMAIL` | The activated fixture publisher's email |
+| `PREPOPULATE_PUBLISHER_PASSWORD` | That publisher's password |
+| `PREPOPULATE_PUBLISHER_TOTP_SECRET` | That publisher's manual authenticator setup key |
+
+Store the credentials of the **test website** in GitHub's `test` environment, and those of the **production website** in `prod`. Each site has its own accounts and enrollment keys. If you intentionally leave the reviewer's optional MFA disabled, its TOTP secret is not needed; the instructions above enroll all three accounts so that all nine secrets can be configured consistently. Update the matching GitHub secret whenever a password or TOTP key changes.
+
+No additional Coolify variables, service tokens or GitHub access tokens are required for prepopulate. CD supplies `PREPOPULATE_BASE_URL` and `PREPOPULATE_DEPLOYMENT_ENVIRONMENT` from the environment selection, so do not configure them yourself or set the local-only `PREPOPULATE_TEST_STACK` flag.
+
+### 5. Run the deployment with prepopulate enabled
+
+1. Open **Actions → Deploy → Run workflow** as a repository administrator. Select branch `main` and the environment whose accounts and secrets you just prepared.
+2. Select **Upload and publish generated fixture content after deployment (requires completed site setup and fixture accounts)**, then choose **Run workflow**. This opt-in applies only to this run; later runs still default to leaving it off.
+3. Complete any required environment approval. CD waits for successful CI compilation checks for the selected source, compiles/publishes its images, deploys through Coolify and checks the public HTTPS endpoint. Then it runs **Prepopulate the selected environment after successful deployment** using the same source checkout.
+4. Open that step's log. A successful run finishes with:
+
+   ```text
+   Prepopulation uploaded and verified: {"countries":3,"constitutions":3,"versions":7,"articles":66,"amendments":3}
+   ```
+
+The count describes these fixtures, not every record on the site. The script checks the published versions, article content, amendments and search results before emitting this message. It needs only Node/npm on the runner and does not install browser dependencies or run `npm install`.
+
+### 6. Verify the site and handle a retry
+
+Open the selected website and look for **Atlas Testland**, **Atlas Sample Republic** and **Atlas Structure Republic** in the country list. Open a constitution and its versions, follow an article, and search for `dignity`. Reload the page to check the published content. If anonymous browsing is disabled, sign in first.
+
+Matching fixtures are reusable: a later run verifies existing versions and amendments, resumes matching unfinished import jobs, and rebuilds the search index. It does not approve unrelated staff drafts. A failed run may already have published some content; it does not roll back those writes or the completed application deployment. Correct the cause, then start another manual deployment with prepopulate selected. This also performs a deployment; the workflow has no separate prepopulate-only input.
+
+| Symptom in the workflow | What to check |
+| --- | --- |
+| `Missing environment secret: PREPOPULATE_…` in **Require deployment settings** | Add the named email/password secret to the selected GitHub environment. This check stops before the Coolify rollout. |
+| `Complete the site setup wizard and create fixture accounts…` | Finish the selected site's setup and account activation, then retry. |
+| `Prepopulate requires separate administrator, reviewer and publisher accounts` | Use three distinct activated accounts, not the same email with different roles. |
+| `Set the prepopulate admin TOTP secret` (or `reviewer` / `publisher`) | Add the corresponding manual setup key. For admin, the name is `PREPOPULATE_TOTP_SECRET`. |
+| `Invalid TOTP secret`, an MFA verification error, or `login returned no session token` | Check for a copied six-digit code/URL instead of the key, an unfinished enrollment, a passkey-only account, or a key belonging to another account/site. Verify password-and-authenticator login in the browser; check the server clock if correct codes are rejected. |
+| Login fails, or import/review/publication returns an authorization error | Check the account is active, its stored password is current, and its role matches the table. Do not substitute invitation tokens for passwords. |
+| An import remains incomplete, or a content/outline assertion reports a mismatch | Inspect the named import in **Admin → Import** and the step log. Existing fixture content differs from what this source expects, or a service operation failed. Resolve the specific mismatch/failure before retrying; repeated runs are not a general data repair or database reset. |
+| Deployment step succeeded but the prepopulate step failed | The application rollout remains in place. Check the failing post-deployment step and any content already published rather than treating the whole site as rolled back. |
+
+Email/password presence is checked before deployment; account validity, setup completion and MFA are checked by the optional script afterward. Keep passwords and setup keys in secrets/password storage, not in screenshots or copied diagnostic logs.
 
 ## Release recovery and first-rollout evidence
 

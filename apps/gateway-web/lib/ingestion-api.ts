@@ -1,4 +1,10 @@
 import { contentBaseUrl, ingestionBaseUrl, readJson, sendJson, type OrderedNode } from './api';
+import { fetchWithTimeout } from './fetch-with-timeout';
+
+export type ImportAction = 'confirm-outline' | 'prepare' | 'approve' | 'reject' | 'publish';
+export class ImportTransitionError extends Error {
+  constructor(readonly code: string) { super(code); }
+}
 
 export type ImportJobError = {
   code: string;
@@ -50,8 +56,23 @@ export function getImportPayload(jobId: string, authorization: string): Promise<
   return readJson<Record<string, unknown>>(`${ingestionBaseUrl()}/import-jobs/${encodeURIComponent(jobId)}/payload`, 'ingestion', authorization);
 }
 
-export function transitionImportJob(jobId: string, action: 'confirm-outline' | 'prepare' | 'approve' | 'reject' | 'publish', authorization: string, reason?: string): Promise<ImportJob> {
-  return sendJson<ImportJob>(`${ingestionBaseUrl()}/import-jobs/${encodeURIComponent(jobId)}/${action}`, 'ingestion', 'POST', reason ? { reason } : {}, authorization);
+export async function transitionImportJob(jobId: string, action: ImportAction, authorization: string, reason?: string): Promise<ImportJob> {
+  const response = await fetchWithTimeout(`${ingestionBaseUrl()}/import-jobs/${encodeURIComponent(jobId)}/${action}`, {
+    method: 'POST', cache: 'no-store', headers: { 'Content-Type': 'application/json', Authorization: authorization },
+    body: JSON.stringify(reason ? { reason } : {}),
+  }).catch(() => { throw new ImportTransitionError('unavailable'); });
+  if (!response.ok) {
+    const raw = await response.json().catch(() => null);
+    const problem = raw && typeof raw === 'object' ? raw : {};
+    const known = ['publication_not_configured', 'publication_credentials_invalid', 'approved_snapshot_changed', 'publication_conflict', 'publication_unavailable'];
+    const code = known.includes(problem.code) ? problem.code
+      : response.status === 401 ? 'session_expired'
+      : response.status === 403 && problem.error === 'Fresh authenticator confirmation required' ? 'mfa'
+      : response.status === 403 ? 'forbidden'
+      : response.status === 409 ? 'conflict' : 'unavailable';
+    throw new ImportTransitionError(code);
+  }
+  return response.json();
 }
 
 export type ImportReviewDecision = { id: string; decision: string; reason: string; decidedBy: string; decidedAt: string };
@@ -60,7 +81,21 @@ export type SetupProposal = {
   id: string; ownerId: string; status: string; constitutionId: string | null; settingsRevisionId: string | null;
   confirmedBy: string | null;
   payload: Record<string, unknown> & { outline?: { kinds?: Record<string, unknown>[] }; sampleRoots?: unknown[] };
+  revision: number; previousPayload: SetupProposal['payload'] | null;
+  requestedChanges: string | null; changesRequested: boolean;
 };
+
+export class SetupActionError extends Error {
+  constructor(readonly code: 'stale' | 'invalid' | 'unavailable' | 'forbidden' | 'session_expired') { super(code); }
+}
+
+async function setupCommand(id: string, path: string, method: string, payload: unknown, authorization: string, revision: number): Promise<SetupProposal> {
+  const response = await fetchWithTimeout(`${ingestionBaseUrl()}/import-setup-proposals/${encodeURIComponent(id)}${path}`, {
+    method, cache: 'no-store', headers: { 'Content-Type': 'application/json', Authorization: authorization, 'If-Match': `"${revision}"` }, body: JSON.stringify(payload),
+  }).catch(() => { throw new SetupActionError('unavailable'); });
+  if (!response.ok) throw new SetupActionError(response.status === 409 || response.status === 428 ? 'stale' : response.status === 400 ? 'invalid' : response.status === 401 ? 'session_expired' : response.status === 403 ? 'forbidden' : 'unavailable');
+  return response.json();
+}
 
 export function getSetupProposal(id: string, authorization: string): Promise<SetupProposal | null> {
   return readJson<SetupProposal>(`${ingestionBaseUrl()}/import-setup-proposals/${encodeURIComponent(id)}`, 'ingestion', authorization);
@@ -70,12 +105,16 @@ export function createSetupProposal(payload: unknown, authorization: string): Pr
   return sendJson<SetupProposal>(`${ingestionBaseUrl()}/import-setup-proposals`, 'ingestion', 'POST', payload, authorization);
 }
 
-export function updateSetupProposal(id: string, payload: unknown, authorization: string): Promise<SetupProposal> {
-  return sendJson<SetupProposal>(`${ingestionBaseUrl()}/import-setup-proposals/${encodeURIComponent(id)}`, 'ingestion', 'PUT', payload, authorization);
+export function saveSetupDisplay(id: string, kinds: unknown[], authorization: string, revision: number): Promise<SetupProposal> {
+  return setupCommand(id, '/display', 'POST', { kinds }, authorization, revision);
 }
 
-export function transitionSetupProposal(id: string, action: 'confirm' | 'withdraw', authorization: string): Promise<SetupProposal> {
-  return sendJson<SetupProposal>(`${ingestionBaseUrl()}/import-setup-proposals/${encodeURIComponent(id)}/${action}`, 'ingestion', 'POST', {}, authorization);
+export function requestSetupChanges(id: string, message: string, authorization: string, revision: number): Promise<SetupProposal> {
+  return setupCommand(id, '/request-changes', 'POST', { message }, authorization, revision);
+}
+
+export function transitionSetupProposal(id: string, action: 'confirm' | 'withdraw', authorization: string, revision: number): Promise<SetupProposal> {
+  return setupCommand(id, `/${action}`, 'POST', {}, authorization, revision);
 }
 
 export function getImportReviewDecisions(jobId: string, authorization: string): Promise<ImportReviewDecision[]> {

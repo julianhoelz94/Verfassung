@@ -49,7 +49,12 @@ def render(root):
                 "IDENTITY_MFA_ENCRYPTION_KEY": "${IDENTITY_MFA_ENCRYPTION_KEY:?Set the persistent encryption key}",
                 "PROD_ADMIN_EMAIL": "${PROD_ADMIN_EMAIL:?Set the bootstrap admin email}",
                 "PROD_ADMIN_PASSWORD": "${PROD_ADMIN_PASSWORD:?Set the bootstrap admin password}",
+                "INGESTION_MANAGED_CREDENTIALS": "true",
             })
+        if name in {"identity-service", "ingestion-service"}:
+            for purpose in ("PUBLISH", "AUDIT", "SEARCH"):
+                key = "INGESTION_" + purpose + "_TOKEN"
+                environment[key] = "${" + key + ":?Deploy using the manual deployment workflow}"
         if name in {"gateway-web", "mcp-server", "identity-service", "edge-proxy"}:
             environment["PUBLIC_BASE_URL"] = "${PUBLIC_BASE_URL:?Set the public HTTPS origin}"
         if name in {"gateway-web", "edge-proxy", "identity-service"}:

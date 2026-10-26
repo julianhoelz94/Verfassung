@@ -4,7 +4,7 @@
 
 ## How publication works
 
-1. The [merged-PR workflow](https://github.com/julianhoelz94/Verfassung/blob/main/.github/workflows/wiki-videos.yml) checks out the merge commit and starts a disposable full stack in CI.
+1. The [merged-PR workflow](https://github.com/julianhoelz94/Verfassung/blob/main/.github/workflows/wiki-videos.yml) checks out trusted `main`, verifies the requested merge commit is in its history, selects that exact commit and starts a disposable full stack in CI.
 2. Real API fixtures are uploaded and read back. The documentation journey captures 18 illustrations and six clips in English/German.
 3. Media validation checks PNG dimensions, clip duration/resolution and full MP4 decoding. A Chrome check plays all six clips and verifies the player fits desktop and phone widths without downloads.
 4. The player is deployed to GitHub Pages. Only then are Wiki pages, inline screenshots and fresh clips published together.

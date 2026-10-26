@@ -25,4 +25,8 @@ Java 21, Node 22, Gradle 9.8.2 and Ubuntu 24.04 remain the baseline. Gateway Typ
 
 ## Evidence
 
-Pending. Record exact commits, commands, CI links and limitations here as each gate completes.
+- Initial checkout/workflow commit: `b4d7adf`; draft PR [#205](https://github.com/julianhoelz94/Verfassung/pull/205).
+- Kotlin 2.4.21 / Spotless 8.10.4 platform check passed under Gradle 9.8.2 before Boot migration. ktlint remains 1.3.1.
+- MCP: `npm test` passed 33 tests under Node 22.23.4 with TypeScript 7.0.2 and Node types 22.20.5. Production npm audit reports zero vulnerabilities. The unchanged Node 22 Alpine Dockerfile builds with the native compiler; the resulting image serves `/mcp/ping` with 200 and rejects unauthenticated `/mcp` with 401 plus the discovery challenge. Disposable smoke container removed.
+- Preliminary independent infrastructure/MCP review reported no blockers. This does not replace final combined sprint review.
+- Final backend/frontend checks, complete CI and published Wiki/media verification remain pending.

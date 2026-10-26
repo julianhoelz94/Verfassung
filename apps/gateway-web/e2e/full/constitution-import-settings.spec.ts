@@ -4,6 +4,8 @@ import { randomUUID } from 'node:crypto';
 import { adminHeaders, roleHeaders } from './api-fixtures';
 import { startFromViewer } from './auth';
 
+test.use({ actionTimeout: 20_000 });
+
 async function json(response: Awaited<ReturnType<APIRequestContext['post']>>) {
   const body = await response.json();
   expect(response.ok(), `${response.status()} ${JSON.stringify(body)}`).toBeTruthy();
@@ -77,6 +79,7 @@ test('constitution configuration governs MCP imports, review previews and the pu
     await paragraph.getByRole('checkbox', { name: 'May appear at the top level', exact: true }).uncheck();
     await select(article, 'title-policy').selectOption('required');
     await select(article, 'label-policy').selectOption('required');
+    await article.getByRole('checkbox', { name: 'Show editorial title', exact: true }).check();
     await select(article, 'label-placement').selectOption('after_title');
     await select(paragraph, 'title-policy').selectOption('none');
     await select(paragraph, 'label-policy').selectOption('required');

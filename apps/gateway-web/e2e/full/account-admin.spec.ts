@@ -15,7 +15,8 @@ test('administrator invite, visitor activation, password change, and reset persi
   await signIn(page, 'admin');
   await page.goto('/admin/users');
   await page.getByRole('textbox', { name: 'Email', exact: true }).fill(email);
-  await page.getByLabel('Roles (comma-separated)').first().fill('viewer');
+  const invite = page.locator('form').filter({ has: page.getByRole('button', { name: 'Send invite', exact: true }) });
+  await invite.getByRole('checkbox', { name: 'Reader', exact: true }).check();
   await page.getByRole('button', { name: 'Send invite' }).click();
   const inviteToken = await page.getByText('Invite created.', { exact: false }).locator('code').textContent();
   expect(inviteToken).toBeTruthy();
@@ -150,7 +151,9 @@ test('publisher enrolls with the rendered QR and uses a recovery code once', asy
   await signIn(page, 'admin');
   await page.goto('/admin/users');
   await page.getByRole('textbox', { name: 'Email', exact: true }).fill(email);
-  await page.getByLabel('Roles (comma-separated)').first().fill('publisher');
+  const invite = page.locator('form').filter({ has: page.getByRole('button', { name: 'Send invite', exact: true }) });
+  await invite.getByRole('checkbox', { name: 'Reader', exact: true }).uncheck();
+  await invite.getByRole('checkbox', { name: 'Publisher', exact: true }).check();
   await page.getByRole('button', { name: 'Send invite', exact: true }).click();
   const token = await page.getByText('Invite created.', { exact: false }).locator('code').textContent();
   expect(token).toBeTruthy();

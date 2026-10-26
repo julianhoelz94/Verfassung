@@ -1,4 +1,4 @@
-import { Fragment, type ReactElement, type ReactNode } from 'react';
+import { Fragment, type HTMLAttributes, type ReactElement, type ReactNode, type RefAttributes } from 'react';
 import type { ArticleDetail, ArticleSummary, ContentNode, ContentOutline, OrderedEntry, OrderedInlineReference, OrderedNode, OrderedTableCell } from '../../lib/api';
 import { linkifyReferences, type CrossRefContext } from '../../lib/crossrefs';
 import { articleHeading, effectiveDisplayKind, groupNodes, kindByCode, nodeHeading } from '../../lib/outline';
@@ -168,6 +168,8 @@ function SectionNode({
   );
 }
 
+export type OrderedNodeElement = ReactElement<HTMLAttributes<HTMLElement> & RefAttributes<HTMLElement>>;
+
 /** Ordered reader rendering shares heading and sibling presentation rules with NodeTree. */
 export function OrderedContentTree({ entries, outline, withRefs = (text) => text, renderText, renderTableCell, renderTableCaption, renderReference, renderHeading, renderLabel, renderNode, idPrefix = '', canEditTitles = false, returnTo, indexedTargets, indexedNotes, indexedBacklinks, crossRefs }: {
   entries: OrderedEntry[]; outline?: ContentOutline; withRefs?: (text: string) => ReactNode;
@@ -177,7 +179,7 @@ export function OrderedContentTree({ entries, outline, withRefs = (text) => text
   renderReference?: (reference: OrderedInlineReference, label: string, href: string | undefined, entry: OrderedEntry) => ReactNode;
   renderHeading?: (node: OrderedNode, heading: string) => ReactNode;
   renderLabel?: (node: OrderedNode, label: string) => ReactNode;
-  renderNode?: (node: OrderedNode, element: ReactElement) => ReactNode;
+  renderNode?: (node: OrderedNode, element: OrderedNodeElement) => ReactNode;
   idPrefix?: string;
   canEditTitles?: boolean;
   returnTo?: string;

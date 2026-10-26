@@ -1,6 +1,6 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { Simulate } from 'react-dom/test-utils';
+import { fireEvent } from '@testing-library/dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as axeCore from 'axe-core';
 import type { DiffReviewState, ReviewCandidate } from '../../lib/diff-review';
@@ -65,8 +65,7 @@ describe('guided difference review', () => {
     await mount(initial, false);
     await act(async () => {
       const reason = host.querySelector('textarea')!;
-      reason.value = 'Separate legal record';
-      Simulate.change(reason);
+      fireEvent.change(reason, { target: { value: 'Separate legal record' } });
     });
     await act(async () => button('Exclude with reason and next').click());
     expect(host.textContent).toContain('Difference 2 of 2');
@@ -81,8 +80,7 @@ describe('guided difference review', () => {
     await mount(initial);
     await act(async () => {
       const reason = host.querySelector('textarea')!;
-      reason.value = 'Separate legal record';
-      Simulate.change(reason);
+      fireEvent.change(reason, { target: { value: 'Separate legal record' } });
     });
     await act(async () => button('Exclude with reason and next').click());
     expect(host.textContent).toContain('Difference 2 of 2');
@@ -95,8 +93,7 @@ describe('guided difference review', () => {
     await mount(initial);
     await act(async () => {
       const reason = host.querySelector('textarea')!;
-      reason.value = 'Editorial correction';
-      Simulate.change(reason);
+      fireEvent.change(reason, { target: { value: 'Editorial correction' } });
     });
     await act(async () => { (host.querySelector('input[type="checkbox"]') as HTMLInputElement).click(); });
     await act(async () => button('Exclude with reason and next').click());

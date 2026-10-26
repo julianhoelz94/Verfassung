@@ -29,4 +29,7 @@ Java 21, Node 22, Gradle 9.8.2 and Ubuntu 24.04 remain the baseline. Gateway Typ
 - Kotlin 2.4.21 / Spotless 8.10.4 platform check passed under Gradle 9.8.2 before Boot migration. ktlint remains 1.3.1.
 - MCP: `npm test` passed 33 tests under Node 22.23.4 with TypeScript 7.0.2 and Node types 22.20.5. Production npm audit reports zero vulnerabilities. The unchanged Node 22 Alpine Dockerfile builds with the native compiler; the resulting image serves `/mcp/ping` with 200 and rejects unauthenticated `/mcp` with 401 plus the discovery challenge. Disposable smoke container removed.
 - Preliminary independent infrastructure/MCP review reported no blockers. This does not replace final combined sprint review.
-- Final backend/frontend checks, complete CI and published Wiki/media verification remain pending.
+- React 19 on Next 15 checkpoint: 423 Vitest + 13 Node tests, lint, typecheck and build passed. Next 16 implementation: 429 Vitest + 13 Node tests, lint/typecheck/build and 23 focused Chromium journeys passed. Final clean install and production build passed. Both npm audit scopes are clear with the normal Next dependency tree; legacy overrides removed.
+- Boot 4 platform, Catalog and Ingestion checks passed before the final all-service run. Added JSON constraint, scalar coercion, wire-format and upload-isolation regression checks. Final all-service run is pending.
+- Existing deployment safeguard suite: 42 tests passed; rendered Compose matches its checked-in definition. Workflow/Dependabot YAML parses and Wiki source checks pass.
+- Final combined reviewer/verifier clearance, complete CI and published Wiki/media verification remain pending.

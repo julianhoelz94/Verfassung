@@ -30,7 +30,7 @@ export function HistoryTimeline({ items }: { items: HistoryMilestone[] }) {
   const rail = useRef<HTMLDivElement>(null);
   const [preview, setPreview] = useState<{ index: number; x: number; top: number; below: boolean; maxHeight: number } | null>(null);
   const previewAnchor = useRef<HTMLButtonElement | null>(null);
-  const dismissTimer = useRef<ReturnType<typeof setTimeout>>();
+  const dismissTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   function cancelDismiss() { clearTimeout(dismissTimer.current); }
   function dismissPreview() {
     cancelDismiss();

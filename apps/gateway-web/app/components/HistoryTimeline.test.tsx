@@ -1,6 +1,6 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { Simulate } from 'react-dom/test-utils';
+import { fireEvent } from '@testing-library/dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { HistoryTimeline } from './HistoryTimeline';
 
@@ -39,7 +39,7 @@ describe('keyboard history previews during scrolling', () => {
   function preview() { return host.querySelector<HTMLElement>('[role="tooltip"]'); }
   async function navigate(key: string) {
     await act(async () => marker(key === 'End' ? 0 : 1).focus());
-    await act(async () => Simulate.keyDown(rail(), { key }));
+    await act(async () => fireEvent.keyDown(rail(), { key }));
   }
   async function scroll() { await act(async () => rail().dispatchEvent(new Event('scroll'))); }
 
@@ -57,7 +57,7 @@ describe('keyboard history previews during scrolling', () => {
 
   it('keeps an escaped preview closed when the queued scroll arrives', async () => {
     await navigate('End');
-    await act(async () => Simulate.keyDown(rail(), { key: 'Escape' }));
+    await act(async () => fireEvent.keyDown(rail(), { key: 'Escape' }));
     await scroll();
     expect(document.activeElement).toBe(marker(1));
     expect(preview()).toBeNull();
@@ -72,7 +72,7 @@ describe('keyboard history previews during scrolling', () => {
   });
 
   it('dismisses pointer-only previews on scroll', async () => {
-    await act(async () => Simulate.pointerEnter(marker(0), { pointerType: 'mouse' }));
+    await act(async () => fireEvent.pointerOver(marker(0), { pointerType: 'mouse' }));
     expect(preview()).not.toBeNull();
     await scroll();
     expect(preview()).toBeNull();

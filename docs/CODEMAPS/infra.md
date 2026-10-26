@@ -36,7 +36,7 @@ Docs: `http://localhost/api/docs/<svc>/swagger-ui/index.html` when `CADDY_EXPOSE
 
 ## Gradle
 
-Root `settings.gradle.kts` is **not** a multi-module build (wrapper only). Each `services/<name>/` is its own project; `gradlew` delegates to repo wrapper **9.7.1**.
+Root `settings.gradle.kts` is **not** a multi-module build (wrapper only). Each `services/<name>/` is its own project; `gradlew` delegates to repo wrapper **9.8.2**.
 
 ```
 cd services/<name> && ./gradlew test

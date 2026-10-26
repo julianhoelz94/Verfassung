@@ -1,6 +1,6 @@
 # Constitution Atlas
 
-Public constitution site: countries → versions → articles, amendments, search, and authenticated editing. Kotlin 1.9 / Java 21 / Spring Boot 3.5 services; Next.js 15 gateway; Docker Compose + Caddy. Each stateful service owns its Postgres database. Add Flyway migrations; never edit applied ones.
+Public constitution site: countries → versions → articles, amendments, search, and authenticated editing. Kotlin 2.4 / Java 21 / Spring Boot 4.1 services; Next.js 16 gateway; Docker Compose + Caddy. Each stateful service owns its Postgres database. Add Flyway migrations; never edit applied ones.
 
 ## Navigate and scope
 

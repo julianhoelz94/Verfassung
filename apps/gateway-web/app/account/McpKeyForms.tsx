@@ -2,7 +2,7 @@
 
 import { T } from '../components/TranslationProvider';
 import { ui } from '../../lib/messages';
-import { useFormState } from 'react-dom';
+import { useActionState } from 'react';
 import { Alert, Button, Input } from '../components/ui';
 import { createMcpKeyAction, rotateMcpKeyAction, type TokenRevealState } from './actions';
 import { Stack } from '../components/layout/Layout';
@@ -17,7 +17,7 @@ function Reveal({ state }: { state: TokenRevealState }) {
 }
 
 export function CreateMcpKeyForm({ canImport }: { canImport: boolean }) {
-  const [state, action] = useFormState(createMcpKeyAction, initial);
+  const [state, action] = useActionState(createMcpKeyAction, initial);
   return <>
     <Reveal state={state} />
     <Stack as="form" action={action}>
@@ -29,7 +29,7 @@ export function CreateMcpKeyForm({ canImport }: { canImport: boolean }) {
 }
 
 export function RotateMcpKeyForm({ keyId }: { keyId: string }) {
-  const [state, action] = useFormState(rotateMcpKeyAction, initial);
+  const [state, action] = useActionState(rotateMcpKeyAction, initial);
   return <>
     <Reveal state={state} />
     <Stack as="form" action={action}><input type="hidden" name="keyId" value={keyId} /><Button><T value={ui.account.mcpkeyforms.rotate} /></Button></Stack>

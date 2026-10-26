@@ -100,6 +100,8 @@ function ContentTranslationBody({ children, sourceLanguage, authenticated, enabl
   }, [authenticated, enabled, busy, sourceLanguage, locale]);
 
   useEffect(() => {
+    // Start the requested translation after the authored DOM is mounted; busy state belongs to that external request.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (alwaysTranslate && authenticated && enabled && sourceLanguage.toLowerCase().split('-')[0] !== locale && !translated && !busy && !failed && !showingOriginal) void translate();
   }, [alwaysTranslate, authenticated, enabled, sourceLanguage, locale, translated, busy, failed, showingOriginal, translate]);
 

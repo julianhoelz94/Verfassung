@@ -15,7 +15,7 @@
 	encode gzip
 
 	# Baseline browser hardening for every response (UI and API). A Content-Security-Policy
-	# for the Next.js UI is set in gateway middleware (SEC-2). Swagger stays exempt below.
+	# for the Next.js UI is set in gateway proxy (SEC-2). Swagger stays exempt below.
 	header {
 		X-Content-Type-Options nosniff
 		X-Frame-Options DENY

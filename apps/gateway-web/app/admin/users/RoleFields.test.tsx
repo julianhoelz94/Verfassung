@@ -14,10 +14,10 @@ vi.mock('../../../lib/admin', () => ({ requireAdminUser: vi.fn() }));
 vi.mock('../../../lib/identity-client', async (original) => ({
   ...await original<typeof import('../../../lib/identity-client')>(), requestInvite: vi.fn(), requestUpdateRoles: vi.fn(),
 }));
-vi.mock('react-dom', async (original) => ({
-  ...await original<typeof import('react-dom')>(),
+vi.mock('react', async (original) => ({
+  ...await original<typeof import('react')>(),
   // Server actions are exercised below using the actual browser FormData.
-  useFormState: (_action: unknown, initial: unknown) => [initial, '/__test-action'],
+  useActionState: (_action: unknown, initial: unknown) => [initial, '/__test-action'],
 }));
 
 describe('role checkbox forms preserve submitted permissions', () => {

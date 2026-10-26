@@ -101,6 +101,8 @@ export function StructuredEditor({ review = [], preview, outline, rootId, versio
     else { setScope(view); remember(view, selection); }
   }
   useEffect(() => {
+    // Initial overview navigation fetches a remote view and owns its loading state.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (isOverviewScope(scope)) void loadView(scope);
     // Only initial navigation; subsequent changes explicitly call loadView.
     // eslint-disable-next-line react-hooks/exhaustive-deps

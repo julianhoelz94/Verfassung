@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
-import { Simulate } from 'react-dom/test-utils';
+import { fireEvent } from '@testing-library/dom';
 import { describe, expect, it } from 'vitest';
 import type { DraftNode, StructuredPreview } from '../../lib/structured-editor';
 import { PublishForm } from './PublishForm';
@@ -110,7 +110,7 @@ describe('structured legal publish readiness', () => {
         }] }}
       />));
       const select = host.querySelector<HTMLSelectElement>('#publish-0-type')!;
-      await act(async () => { select.value = 'removed'; Simulate.change(select); });
+      await act(async () => { fireEvent.change(select, { target: { value: 'removed' } }); });
       const changes = JSON.parse(host.querySelector<HTMLInputElement>('[name="changesJson"]')!.value);
       expect(changes[0]).toMatchObject({ changeType: 'removed', afterRef: null, pendingAfterLogicalId: null, beforeRef: { logicalId: 'source-unit' } });
     } finally {

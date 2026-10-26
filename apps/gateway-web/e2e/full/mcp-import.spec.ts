@@ -272,6 +272,7 @@ test('MCP waits while an administrator requests and confirms an exact setup revi
     await page.getByLabel('Displayed unit name', { exact: true }).fill('Art.');
     await page.getByRole('button', { name: 'Save display settings' }).click();
     await expect.poll(async () => (await (await request.get(path, { headers: admin })).json()).revision).toBe(2);
+    await expect(page.locator('input[name="revision"]')).toHaveValue('2');
     await page.reload();
     await expect(page.locator('[data-preview-kind="article"]:visible')).toContainText('Art. 1');
     await page.getByText('Request changes through your chat client', { exact: true }).click();

@@ -142,6 +142,40 @@ class AuditApiTest {
     }
 
     @Test
+    fun identicalNumericPayloadRetriesSurviveJsonbNormalization() {
+        val eventId = UUID.randomUUID()
+        val entityId = UUID.randomUUID()
+        val body = """
+            {
+              "eventId":"$eventId",
+              "occurredAt":"2026-10-25T10:15:30.123456789Z",
+              "action":"numeric_event",
+              "entityType":"user",
+              "entityId":"$entityId",
+              "payload":{"exponent":1e7,"negativeZero":-0.0,"nested":{"values":[-0.0,1e-7,{"amount":1e7}]}}
+            }
+        """.trimIndent()
+        repeat(2) {
+            mockMvc.post("/events") {
+                header("Authorization", MACHINE)
+                contentType = MediaType.APPLICATION_JSON
+                content = body
+            }.andExpect {
+                status { isCreated() }
+                jsonPath("$.id") { value(eventId.toString()) }
+                jsonPath("$.occurredAt") { value("2026-10-25T10:15:30.123456Z") }
+            }
+        }
+        check(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM audit_events WHERE id = ?", Int::class.java, eventId) == 1)
+        mockMvc.post("/events") {
+            header("Authorization", MACHINE)
+            contentType = MediaType.APPLICATION_JSON
+            content = body.replace("1e7", "2e7")
+        }.andExpect { status { isConflict() } }
+        check(jdbcTemplate.queryForObject("SELECT payload->>'exponent' FROM audit_events WHERE id = ?", String::class.java, eventId) == "10000000")
+    }
+
+    @Test
     fun concurrentDeliveryRetriesReturnOneImmutableEvent() {
         val eventId = UUID.randomUUID()
         val entityId = UUID.randomUUID()

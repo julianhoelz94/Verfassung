@@ -22,16 +22,29 @@ class AuditRepository(
     @Transactional
     fun insert(request: AppendEventRequest): UUID {
         val id = request.eventId ?: UUID.randomUUID()
+        val payload = request.payload?.let { objectMapper.writeValueAsString(it) }
         if (request.eventId != null) {
             // Serialize a delivery's retries without UPDATE/ON CONFLICT against the
             // append-only table. A new statement sees the preceding writer's commit.
             jdbc.query("SELECT pg_advisory_xact_lock(hashtextextended(?::text, 0))", org.springframework.jdbc.core.RowCallbackHandler { }, id.toString())
             val existing = findById(id)
             if (existing != null) {
-                val samePayload = objectMapper.readTree(existing.payload ?: "null") == objectMapper.valueToTree<com.fasterxml.jackson.databind.JsonNode>(request.payload)
+                // Compare using the same JSONB semantics as storage, including
+                // normalized numbers and SQL NULL for an omitted payload.
+                val samePayload = jdbc.queryForObject(
+                    "SELECT payload IS NOT DISTINCT FROM ?::jsonb FROM audit_events WHERE id = ?",
+                    Boolean::class.java,
+                    payload,
+                    id,
+                ) == true
                 val sameTime = request.occurredAt == null || existing.occurredAt.toInstant() == request.occurredAt.toInstant().truncatedTo(ChronoUnit.MICROS)
-                if (existing.actorId != request.actorId || existing.actorEmail != request.actorEmail || existing.action != request.action ||
-                    existing.entityType != request.entityType || existing.entityId != request.entityId || !samePayload || !sameTime
+                if (existing.actorId != request.actorId ||
+                    existing.actorEmail != request.actorEmail ||
+                    existing.action != request.action ||
+                    existing.entityType != request.entityType ||
+                    existing.entityId != request.entityId ||
+                    !samePayload ||
+                    !sameTime
                 ) {
                     throw ResponseStatusException(HttpStatus.CONFLICT, "Audit event ID already belongs to a different event")
                 }
@@ -50,7 +63,7 @@ class AuditRepository(
             request.action,
             request.entityType,
             request.entityId,
-            request.payload?.let { objectMapper.writeValueAsString(it) },
+            payload,
         )
         return id
     }

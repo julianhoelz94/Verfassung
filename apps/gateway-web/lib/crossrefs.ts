@@ -1,7 +1,7 @@
 import { createElement, Fragment, type ReactNode } from 'react';
 
 export type CrossRefContext = {
-  code: string;
+  code?: string;
   versionId: string;
   articlesByNumber: Record<string, string>;
   kindLabel: string;
@@ -37,7 +37,7 @@ export function linkifyReferences(text: string, context: CrossRefContext): React
           {
             key: `${match.index}-${number}`,
             className: 'xref',
-            href: `/countries/${context.code}/versions/${context.versionId}/articles/${articleId}`,
+            href: context.code ? `/countries/${context.code}/versions/${context.versionId}/articles/${articleId}` : `/versions/${context.versionId}/units/${articleId}`,
           },
           match[0],
         ),

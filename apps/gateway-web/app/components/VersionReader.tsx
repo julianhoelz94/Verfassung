@@ -4,7 +4,7 @@ import { changeTypeMessage, changeTypeTone } from '../../lib/ui-labels';
 
 import { T, useTranslation } from './TranslationProvider';
 import { ui } from '../../lib/messages';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { ArticleSummary, ContentOutline } from '../../lib/api';
 import { orderedTargets } from '../../lib/ordered-content';
 import { articleHeading, clipOrderedEntries, clipNodes, depthStopCount, depthStopLabels, kindByCode } from '../../lib/outline';
@@ -15,7 +15,8 @@ import { Toc } from './Toc';
 import { ReaderLayout } from './layout/templates';
 
 type VersionReaderProps = {
-  code: string;
+  code?: string;
+  jurisdictionId?: string;
   versionId: string;
   articles: ArticleSummary[];
   outline?: ContentOutline;
@@ -23,10 +24,12 @@ type VersionReaderProps = {
   language?: string;
   changeByArticle?: Record<string, string>;
   unchangedSinceLabel?: string;
+  initialDepth?: 'summary' | 'full';
 };
 
 export function VersionReader({
   code,
+  jurisdictionId,
   versionId,
   articles,
   outline,
@@ -34,11 +37,13 @@ export function VersionReader({
   language,
   changeByArticle = {},
   unchangedSinceLabel,
+  initialDepth = 'summary',
 }: VersionReaderProps) {
   const t = useTranslation();
+  const readerHref = jurisdictionId ? `/jurisdictions/${jurisdictionId}/versions/${versionId}` : `/countries/${code}/versions/${versionId}`;
   const max = depthStopCount(outline);
   const labels = depthStopLabels(outline);
-  const [depth, setDepth] = useState(1);
+  const [depth, setDepth] = useState(initialDepth === 'full' ? max : 1);
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => new Set());
   const tocItems = useMemo(
     () =>
@@ -54,6 +59,29 @@ export function VersionReader({
     [articles],
   );
   const unitsByLogicalId = useMemo(() => orderedTargets(articles), [articles]);
+
+  useEffect(() => {
+    function revealTarget() {
+      let target: string;
+      try { target = decodeURIComponent(window.location.hash.slice(1)); } catch { return; }
+      if (!target) return;
+      const root = articles.find(article => target === article.id || target === `unit-${article.id}`)?.id ??
+        Object.values(unitsByLogicalId).find(unit => unit.occurrenceId === target)?.rootId ??
+        articles.find(article => containsOccurrence(article.content ?? [], target))?.id;
+      if (root) setExpanded(current => current.has(root) ? current : new Set([...current, root]));
+    }
+    revealTarget();
+    window.addEventListener('hashchange', revealTarget);
+    return () => window.removeEventListener('hashchange', revealTarget);
+  }, [articles, unitsByLogicalId]);
+
+  useEffect(() => {
+    if (!window.location.hash) return;
+    const frame = requestAnimationFrame(() => {
+      try { document.getElementById(decodeURIComponent(window.location.hash.slice(1)))?.scrollIntoView?.(); } catch { /* invalid fragment */ }
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [expanded]);
 
   function shownDepth(articleId: string): number {
     return expanded.has(articleId) ? max : depth;
@@ -108,10 +136,10 @@ export function VersionReader({
             const fullyOpen = depth >= max || expanded.has(article.id);
             const regionId = `article-panel-${article.id}`;
             const changeType = changeByArticle[article.articleNumber];
-            const permalink = `/countries/${code}/versions/${versionId}/${article.kind && article.kind !== 'article' ? 'units' : 'articles'}/${article.id}#article-${article.articleNumber}`;
+            const permalink = code ? `/countries/${code}/versions/${versionId}/${article.kind && article.kind !== 'article' ? 'units' : 'articles'}/${article.id}#article-${article.articleNumber}` : `/versions/${versionId}/units/${article.id}`;
             const historyHref = `/countries/${code}/articles/${encodeURIComponent(article.articleNumber)}`;
             return (
-              <li key={article.id} className="version-article article">
+              <li key={article.id} id={article.id} className="version-article article">
                 <h2 className="article-head">
                   <button
                     type="button"
@@ -133,10 +161,11 @@ export function VersionReader({
                       nodes={nodes}
                       body={body}
                       showHeading={false}
+                      rootAnchor={false}
                       outline={outline}
                       headingLevel="h2"
                       canEditTitles={canEditTitles}
-                      returnTo={`/countries/${code}/versions/${versionId}`}
+                      returnTo={readerHref}
                       lang={language}
                       crossRefs={{ code, versionId, articlesByNumber, unitsByLogicalId }}
                     />
@@ -146,7 +175,7 @@ export function VersionReader({
                 )}
                 <p className="article-foot print-hide">
                   <a href={permalink}><T value={ui.components.versionreader.permalink} /></a>
-                  {article.kind === 'article' && article.articleNumber ? <a href={historyHref}><T value={ui.components.versionreader.historyOf} />{" "}{kindByCode(outline, article.kind)?.displayLabel ?? t(ui.remainingStatus.article)} {article.articleNumber}</a> : null}
+                  {code && article.kind === 'article' && article.articleNumber ? <a href={historyHref}><T value={ui.components.versionreader.historyOf} />{" "}{kindByCode(outline, article.kind)?.displayLabel ?? t(ui.remainingStatus.article)} {article.articleNumber}</a> : null}
                   {changeType ? (
                     <Badge tone={changeTypeTone(changeType)}>{<T value={changeTypeMessage(changeType)} />}</Badge>
                   ) : (
@@ -162,4 +191,9 @@ export function VersionReader({
       </section>
     </ReaderLayout>
   );
+}
+
+function containsOccurrence(entries: import('../../lib/api').OrderedEntry[], target: string): boolean {
+  return entries.some(entry => entry.occurrenceId === target || `fn-${entry.occurrenceId}` === target ||
+    Boolean(entry.node && (entry.node.occurrenceId === target || containsOccurrence(entry.node.content, target))));
 }

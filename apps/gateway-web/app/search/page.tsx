@@ -19,6 +19,7 @@ import { FormattedDate } from '../../lib/format-date';
 import { atlasTitle, metaDescription, pageMetadata } from '../../lib/page-meta';
 import { SEARCH_PAGE_SIZE, parseSearchOffset, searchUrl } from '../../lib/search-url';
 import { migrationUi } from '../../lib/migration-messages';
+import { normalizeSearchSelection } from '../../lib/search-filters';
 
 type SearchPageProps = {
   searchParams: Promise<{
@@ -52,12 +53,11 @@ export default async function SearchPage(props: SearchPageProps) {
   const locale = await currentLocale();
   const searchParams = await props.searchParams;
   const query = searchParams.q?.trim() ?? '';
-  const country = searchParams.country?.trim() ?? '';
-  const jurisdictionId = searchParams.jurisdictionId?.trim() ?? '';
+  const requestedCountry = searchParams.country?.trim() ?? '';
+  const requestedJurisdiction = searchParams.jurisdictionId?.trim() ?? '';
   const requestedVersion = searchParams.versionId?.trim() ?? '';
-  let versionId = requestedVersion;
   const effectiveDate = searchParams.effectiveDate?.trim() ?? '';
-  const offset = parseSearchOffset(searchParams.offset);
+  let offset = parseSearchOffset(searchParams.offset);
   let hits: SearchHit[] = [];
   let total = 0;
   let limit = SEARCH_PAGE_SIZE;
@@ -68,8 +68,10 @@ export default async function SearchPage(props: SearchPageProps) {
   } catch {
     facets = EMPTY_FACETS;
   }
-  const selectedVersion = facets.versions.find(version => version.id === requestedVersion);
-  if (country && selectedVersion && selectedVersion.countryCode !== country) versionId = '';
+  const { country, jurisdictionId, versionId } = normalizeSearchSelection(facets, { country: requestedCountry, jurisdictionId: requestedJurisdiction, versionId: requestedVersion });
+  const adjusted = country !== requestedCountry || jurisdictionId !== requestedJurisdiction || versionId !== requestedVersion;
+  if (adjusted) offset = 0;
+  const selectedVersion = facets.versions.find(version => version.id === versionId);
   if (query) {
     try {
       const page = await searchArticles(query, {
@@ -100,7 +102,7 @@ export default async function SearchPage(props: SearchPageProps) {
   const activeFilters = [
     ...(jurisdictionId ? [{ key: 'jurisdictionId' as const, label: facets.jurisdictions?.find(item => item.id === jurisdictionId)?.name ?? jurisdictionId }] : []),
     ...(country ? [{ key: 'country' as const, label: facets.countries.find(facet => facet.code === country)?.countryName || country }] : []),
-    ...(versionId ? [{ key: 'versionId' as const, label: selectedVersion ? `${selectedVersion.constitutionTitle} · ${selectedVersion.label}` : versionId }] : []),
+    ...(versionId ? [{ key: 'versionId' as const, label: selectedVersion ? `${selectedVersion.constitutionTitle} · ${selectedVersion.label}` : message(locale, usability.unlistedVersion) }] : []),
     ...(effectiveDate ? [{ key: 'effectiveDate' as const, label: effectiveDate }] : []),
   ];
 
@@ -124,15 +126,11 @@ export default async function SearchPage(props: SearchPageProps) {
           <T value={ui.search.page.search} />{" "}</button>
         <FilterLayout>
           <FiltersPanel count={activeFilters.length}>
-            <label htmlFor="filter-jurisdiction"><T value={migrationUi.jurisdiction} /></label>
-            <select id="filter-jurisdiction" name="jurisdictionId" defaultValue={jurisdictionId}>
-              <option value="">—</option>
-              {facets.jurisdictions?.map(item => <option key={item.id} value={item.id}>{item.name} ({item.count})</option>)}
-            </select>
             <SearchFilters
-              key={`${country}:${versionId}:${effectiveDate}`}
+              key={`${country}:${jurisdictionId}:${versionId}:${effectiveDate}`}
               facets={facets}
               country={country}
+              jurisdictionId={jurisdictionId}
               versionId={versionId}
               effectiveDate={effectiveDate}
             />
@@ -146,7 +144,7 @@ export default async function SearchPage(props: SearchPageProps) {
               </a>)}
               <a href={searchUrl({ q: query })}><T value={usability.clearFilters} /></a>
             </nav> : null}
-            {requestedVersion && !versionId ? <p role="status"><T value={usability.countryChanged} /></p> : null}
+            {adjusted ? <p role="status"><T value={usability.filtersAdjusted} /></p> : null}
             {error ? (
               <p role="alert">
                 {error}<T value={ui.search.page.browseCountriesInsteadWhileTheIndexIs} />{" "}<Link href="/"><T value={ui.search.page.countries} /></Link>

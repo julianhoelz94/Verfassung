@@ -20,6 +20,7 @@ type ConstitutionTextProps = {
   body?: string | null;
   headingLevel?: 'h1' | 'h2' | 'h3';
   showHeading?: boolean;
+  rootAnchor?: boolean;
   outline?: ContentOutline;
   canEditTitles?: boolean;
   returnTo?: string;
@@ -35,6 +36,7 @@ export function ConstitutionText({
   body,
   headingLevel = 'h1',
   showHeading = true,
+  rootAnchor = true,
   outline,
   canEditTitles = false,
   returnTo,
@@ -56,7 +58,7 @@ export function ConstitutionText({
   const rootKind = effectiveDisplayKind(kindByCode(outline, article && 'kind' in article ? article.kind ?? 'article' : outline?.kinds[0]?.kindCode ?? 'article'));
   const rootHeading = article ? articleHeading(outline, { ...article, kind: article && 'kind' in article ? article.kind : undefined }) : '';
   return (
-    <div className="constitution-text text-column" lang={lang} id={article && 'id' in article && typeof article.id === 'string' ? article.id : undefined}>
+    <div className="constitution-text text-column" lang={lang} id={rootAnchor && article && 'id' in article && typeof article.id === 'string' ? article.id : undefined}>
       {showHeading && article && rootHeading ? (
         <Heading id={`${headingIdPrefix}-${article.articleNumber}`}>
           {rootHeading}
@@ -211,7 +213,7 @@ export function OrderedContentTree({ entries, outline, withRefs = (text) => text
       if (ref.start > previous) result.push(withRefs(value.slice(previous, ref.start)));
       const target = ref.target;
       const unit = target.logicalId ? targets.get(target.logicalId) ?? crossRefs?.unitsByLogicalId?.[target.logicalId] : undefined;
-      const href = target.type === 'external' ? target.url ?? undefined : target.type === 'footnote' && target.footnoteId && notes.get(target.footnoteId) ? `#${idPrefix}fn-${notes.get(target.footnoteId)}` : unit && crossRefs ? `/countries/${crossRefs.code}/versions/${crossRefs.versionId}/units/${unit.rootId}#${unit.occurrenceId}` : unit ? `#${idPrefix}${unit.occurrenceId}` : undefined;
+      const href = target.type === 'external' ? target.url ?? undefined : target.type === 'footnote' && target.footnoteId && notes.get(target.footnoteId) ? `#${idPrefix}fn-${notes.get(target.footnoteId)}` : unit && crossRefs ? crossRefs.code ? `/countries/${crossRefs.code}/versions/${crossRefs.versionId}/units/${unit.rootId}#${unit.occurrenceId}` : `/versions/${crossRefs.versionId}/units/${unit.rootId}?occurrenceId=${unit.occurrenceId}` : unit ? `#${idPrefix}${unit.occurrenceId}` : undefined;
       const label = value.slice(ref.start, ref.end);
       result.push(renderReference ? <span key={ref.logicalId} id={`${idPrefix}ref-${ref.logicalId}`}>{renderReference(ref, label, href, entry)}</span> : href ? <a key={ref.logicalId} id={`${idPrefix}ref-${ref.logicalId}`} className="xref" href={href}>{label}</a> : <LocalizedTitle key={ref.logicalId} className="xref-unavailable" label={ui.accessibilityDynamic.referenceUnavailable}>{label}</LocalizedTitle>);
       previous = ref.end;

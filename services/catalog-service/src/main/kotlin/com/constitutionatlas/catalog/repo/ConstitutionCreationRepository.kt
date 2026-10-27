@@ -3,9 +3,9 @@ package com.constitutionatlas.catalog.repo
 import com.constitutionatlas.catalog.ConflictException
 import com.constitutionatlas.catalog.api.ConstitutionSummary
 import com.constitutionatlas.catalog.api.CreateConstitutionRequest
-import tools.jackson.databind.ObjectMapper
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Repository
+import tools.jackson.databind.ObjectMapper
 import java.security.MessageDigest
 import java.util.UUID
 

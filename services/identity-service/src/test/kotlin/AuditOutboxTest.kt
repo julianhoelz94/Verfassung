@@ -1,3 +1,4 @@
+import tools.jackson.databind.json.JsonMapper
 import com.constitutionatlas.identity.IdentityServiceApplication
 import com.constitutionatlas.identity.client.AuditClient
 import com.constitutionatlas.identity.client.AuditDeliveryClient
@@ -109,7 +110,7 @@ class AuditOutboxTest {
 
     private fun anyAudit(): PendingAudit {
         Mockito.any(PendingAudit::class.java)
-        return PendingAudit(UUID(0, 0), java.time.OffsetDateTime.now(), tools.jackson.databind.ObjectMapper().createObjectNode())
+        return PendingAudit(UUID(0, 0), java.time.OffsetDateTime.now(), JsonMapper().createObjectNode())
     }
 
     companion object {

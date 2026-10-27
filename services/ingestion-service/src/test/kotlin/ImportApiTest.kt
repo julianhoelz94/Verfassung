@@ -316,7 +316,7 @@ class ImportApiTest {
         val request = reviewedSetup("receipt-conflict-${UUID.randomUUID()}")
         val proposal = service.create(TOKEN, admin.id, request)
         Mockito.`when`(catalogClient.createSetupConstitution(anyUuid(), Mockito.eq(request) ?: request))
-            .thenThrow(org.springframework.web.client.HttpClientErrorException.create(org.springframework.http.HttpStatus.CONFLICT, "Conflict", null, "{\"code\":\"creation_attempt_mismatch\"}".toByteArray(), null))
+            .thenThrow(org.springframework.web.client.HttpClientErrorException.create(org.springframework.http.HttpStatus.CONFLICT, "Conflict", org.springframework.http.HttpHeaders.EMPTY, "{\"code\":\"creation_attempt_mismatch\"}".toByteArray(), null))
         org.junit.jupiter.api.Assertions.assertThrows(org.springframework.web.client.HttpClientErrorException::class.java) {
             service.confirm(TOKEN, proposal.id, admin.id, true, proposal.revision)
         }

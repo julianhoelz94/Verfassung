@@ -36,6 +36,7 @@ import org.springframework.test.web.servlet.post
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
 import org.testcontainers.postgresql.PostgreSQLContainer
+import tools.jackson.databind.json.JsonMapper
 import java.time.LocalDate
 import java.util.UUID
 import java.util.concurrent.Executors
@@ -455,7 +456,7 @@ class EditorApiTest {
         postCommand(sessionId, "approval", "approved")
         stub(publisher)
         Mockito.doAnswer { throw DownstreamException("audit denied") }.`when`(auditDelivery).deliver(
-            Mockito.any(com.constitutionatlas.editor.repo.PendingAudit::class.java) ?: com.constitutionatlas.editor.repo.PendingAudit(UUID(0, 0), java.time.OffsetDateTime.now(), tools.jackson.databind.ObjectMapper().createObjectNode()),
+            Mockito.any(com.constitutionatlas.editor.repo.PendingAudit::class.java) ?: com.constitutionatlas.editor.repo.PendingAudit(UUID(0, 0), java.time.OffsetDateTime.now(), JsonMapper().createObjectNode()),
         )
         mockMvc.post("/edit-sessions/$sessionId/publish") {
             header("Authorization", TOKEN)

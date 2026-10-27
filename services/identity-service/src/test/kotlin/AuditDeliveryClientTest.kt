@@ -1,6 +1,6 @@
 import com.constitutionatlas.identity.client.RestAuditDeliveryClient
 import com.constitutionatlas.identity.repo.PendingAudit
-import tools.jackson.databind.ObjectMapper
+import tools.jackson.databind.json.JsonMapper
 import com.sun.net.httpserver.HttpServer
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Test
@@ -12,7 +12,7 @@ import java.util.UUID
 class AuditDeliveryClientTest {
     @Test
     fun httpRetriesSendTheOriginalEventIdentityAndTime() {
-        val mapper = ObjectMapper()
+        val mapper = JsonMapper()
         val received = mutableListOf<String>()
         val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
         server.createContext("/events") { exchange ->

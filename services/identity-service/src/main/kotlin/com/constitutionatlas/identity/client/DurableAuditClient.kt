@@ -30,7 +30,7 @@ fun interface AuditDeliveryClient {
 class RestAuditDeliveryClient(auditUrl: String, private val bearerToken: String?) : AuditDeliveryClient {
     private val client = timedRestClient(auditUrl)
     override fun deliver(event: PendingAudit) {
-        val body = event.body.deepCopy<ObjectNode>().put("eventId", event.eventId.toString()).put("occurredAt", event.occurredAt.toString())
+        val body = (event.body as ObjectNode).deepCopy().put("eventId", event.eventId.toString()).put("occurredAt", event.occurredAt.toString())
         val request = client.post().uri("/events").contentType(MediaType.APPLICATION_JSON)
         if (!bearerToken.isNullOrBlank()) request.header("Authorization", if (bearerToken.startsWith("Bearer ")) bearerToken else "Bearer $bearerToken")
         request.body(body).retrieve().toBodilessEntity()

@@ -29,9 +29,11 @@ Restore drill (destroys current rows in those databases):
 docker compose -p verfassung -f docker-compose.yml -f docker-compose.local.yml --env-file env/local-stack.env run --rm --entrypoint sh backup-service /backup/restore.sh /backups/20260828-120000
 ```
 
-Stop application writers before the restore drill and use the same Compose project name as the running stack. The restore preflight rejects `INCOMPLETE` runs and checks that all nine dumps are regular, readable and nonempty files before replacing any schema. Older backups without a marker remain supported, but must be checked against their original successful backup logs. Preflight does not validate SQL contents or make a multi-database restore atomic. The nine dumps are separate database snapshots; stop writes during backup when a consistent cross-service recovery point is required.
+Stop application writers before the restore drill and use the same Compose project name as the running stack. New backups include UTC metadata and SHA-256 checksums. Restore rejects `INCOMPLETE` runs and verifies all nine dumps and checksums before replacing any schema. Older backups without manifests remain supported with a warning and require their original completion evidence. Checksums do not validate SQL or make the restore atomic. Stop all writers during backup for a consistent cross-service recovery point and record `BACKUP_WRITER_POLICY=quiesced`.
 
 Then restart the app containers so they reconnect. Flyway history is part of each dump.
+
+Preserve `IDENTITY_MFA_ENCRYPTION_KEY` separately alongside deployment configuration. The [recovery and monitoring guide](https://github.com/julianhoelz94/Verfassung/blob/main/docs/operations/recovery-and-monitoring.md) covers interrupted restores, the restricted Audit runtime role, the disposable full-stack drill and read-only usability checks. CI's drill verifies database contents, real authentication/API fixtures and Search recovery; it is not a production-host certification.
 
 
 [[Development and operations|Technical-Development]]

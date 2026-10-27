@@ -26,7 +26,7 @@
 
 Country, constitution and reading pages share **Overview** and **History** navigation. History combines constitution events and amendments in date order. Event labels identify each type; **Show events** optionally filters the same timeline. The centered horizontal line uses small markers for milestones. Hover over a marker or focus it with the keyboard to reveal its label; select it to show the details. On a touch screen, tap a marker. Escape closes the label. Events are grouped by year, with **Jump to year**, previous/next controls and a chronological list. Arrow keys move between milestones; Home/End select the first/last. Approximate dates stay marked and undated records appear separately.
 
-Search filters use compact country, version and effective-date controls. Long country/version lists offer an option search. Choosing another country clears an incompatible version filter. **Apply filters** updates the address; remove an applied filter chip or choose **Clear filters** to broaden the search. On smaller screens, open **Filters** above the results.
+Search filters use jurisdiction, country, version and effective-date controls. Long lists offer an option search. Changing jurisdiction or country clears incompatible filters and explains the adjustment. **Apply filters** updates the address; remove an applied filter chip or choose **Clear filters** to broaden the search. On smaller screens, open **Filters** above the results. A jurisdiction selection searches that jurisdiction's own constitutions; choose descendants separately. Saved unknown or retired version filters remain visible rather than silently broadening the search.
 
 ![Comparison page with version selectors and changed text](https://raw.githubusercontent.com/wiki/julianhoelz94/Verfassung/media/reading-compare-en.png)
 *Check both selected versions before reading the changes.*
@@ -34,6 +34,8 @@ Search filters use compact country, version and effective-date controls. Long co
 To cite a passage, save the opened provision's address and version ID. Older links stay available. A transcription correction does not itself create a new law.
 
 ## Regional and historical archives
+
+Regional and historical version pages offer the same contents/depth controls, source documents, search within the version and neighboring legal versions as national readers. A saved older editorial snapshot keeps its exact text and displays a notice linking to the current text. A unit link opens the containing section so the passage remains visible; the original text is also readable without JavaScript.
 
 The home page links to regions and historical collections. Their breadcrumbs show the recorded jurisdiction context; source-date wording and old status labels remain archival evidence. Typed annotations are distinct from the enacted wording and can be read separately. A constitution's **Amendment register** searches instruments, citations and literal unit labels, with separate instrument/effective date filters. **Curated comparisons** align authored passages across distinct constitutions, identify missing counterparts and preserve topic/text selection in the URL. Saved legacy links keep their exact historical targets.
 

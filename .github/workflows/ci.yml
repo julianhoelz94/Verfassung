@@ -119,6 +119,7 @@ jobs:
         run: |
           python3 scripts/check-repository-hygiene.py
           python3 scripts/test_backup_restore.py
+          python3 -m unittest discover -s scripts/operations -p 'test_*.py'
           python3 scripts/check-wiki-docs.py
       - name: Install gateway dependencies
         working-directory: apps/gateway-web
@@ -419,7 +420,9 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: legacy-migration-coverage
-          path: apps/gateway-web/test-results/**/legacy-migration-coverage.json
+          path: |
+            apps/gateway-web/test-results/**/legacy-migration-coverage.json
+            apps/gateway-web/test-results/**/regional-reader-*.png
           if-no-files-found: warn
           retention-days: 7
       - name: Verify documentation journeys without capturing media
@@ -427,6 +430,19 @@ jobs:
         env:
           WIKI_MEDIA_CAPTURE: verify
         run: ./node_modules/.bin/playwright test --config=playwright.wiki-recording.config.js
+      - name: Verify disposable full-stack backup recovery
+        run: |
+          python3 scripts/operations/recovery_drill.py \
+            --project full-stack-e2e --confirm-disposable full-stack-e2e \
+            --base-url http://127.0.0.1:18080 --report test-results/recovery-report.json
+      - name: Upload recovery evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: recovery-report
+          path: test-results/recovery-report.json
+          if-no-files-found: warn
+          retention-days: 7
       - name: Verify local HTTPS authentication and deployment persistence
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         shell: bash

@@ -36,7 +36,7 @@ Docs: `http://localhost/api/docs/<svc>/swagger-ui/index.html` when `CADDY_EXPOSE
 
 ## Gradle
 
-Root `settings.gradle.kts` is **not** a multi-module build (wrapper only). Each `services/<name>/` is its own project; `gradlew` delegates to repo wrapper **9.7.1**.
+Root `settings.gradle.kts` is **not** a multi-module build (wrapper only). Each `services/<name>/` is its own project; `gradlew` delegates to repo wrapper **9.8.2**.
 
 ```
 cd services/<name> && ./gradlew test
@@ -60,6 +60,12 @@ All host jobs use Ubuntu 24.04; the visual suite also pins its Playwright contai
 7. `ci-status` requires every job to succeed; failed jobs upload short-lived diagnostics where available
 
 Dependabot: `.github/dependabot.yml`.
+
+Full-stack CI also runs `scripts/operations/recovery_drill.py` against only its
+disposable seeded project, including checksum/SQL-failure recovery and Search
+outage detection. `scripts/operations/check.py` supplies read-only operational
+checks; see `docs/operations/recovery-and-monitoring.md`. Audit runtime credentials
+are separate from Flyway owner credentials in canonical and generated Compose.
 
 ## Gateway scripts (`apps/gateway-web/package.json`)
 

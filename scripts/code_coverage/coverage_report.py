@@ -15,7 +15,7 @@ import xml.etree.ElementTree as ET
 
 
 SCHEMA = 1
-SCOPE = ('Kotlin production sources; gateway app/lib/middleware TypeScript and JavaScript; '
+SCOPE = ('Kotlin production sources; gateway app/lib/proxy (and legacy middleware) TypeScript and JavaScript; '
          'MCP TypeScript; Python operational tooling. Excludes tests, fixtures, generated '
          'output, declaration files, dependencies, CSS, SQL, shell and build configuration. '
          'Measures service/unit tests; browser acceptance checks run separately.')
@@ -47,16 +47,16 @@ def inventory(root):
         group = None
         if re.fullmatch(r'services/[^/]+/src/main/kotlin/.+\.kt', path):
             group = 'jvm-' + path.split('/')[1]
-        elif re.fullmatch(r'apps/gateway-web/(app/.+|lib/.+|middleware)\.(ts|tsx|jsx)', path):
+        elif re.fullmatch(r'apps/gateway-web/(app/.+|lib/.+|proxy|middleware)\.(ts|tsx|jsx)', path):
             group = 'gateway-typescript'
-        elif re.fullmatch(r'apps/gateway-web/(app/.+|lib/.+|middleware)\.(js|mjs|cjs)', path):
+        elif re.fullmatch(r'apps/gateway-web/(app/.+|lib/.+|proxy|middleware)\.(js|mjs|cjs)', path):
             group = 'gateway-javascript'
         elif re.fullmatch(r'services/mcp-server/src/.+\.ts', path):
             group = 'mcp'
         elif re.fullmatch(r'(scripts|infra)/.+\.py', path):
             group = 'python'
         elif (re.fullmatch(r'services/[^/]+/src/main/.+\.(java|kts)', path)
-              or re.fullmatch(r'apps/gateway-web/(app/.+|lib/.+|middleware)\.(mts|cts)', path)
+              or re.fullmatch(r'apps/gateway-web/(app/.+|lib/.+|proxy|middleware)\.(mts|cts)', path)
               or re.fullmatch(r'services/mcp-server/src/.+\.(mts|cts|js|mjs|cjs|jsx|tsx)', path)):
             raise ValueError('Unsupported production source; configure its collector: ' + path)
         if group:

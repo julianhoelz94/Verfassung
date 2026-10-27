@@ -26,10 +26,9 @@ import { FormattedDate } from '../../../../../lib/format-date';
 import { atlasTitle, metaDescription, pageMetadata } from '../../../../../lib/page-meta';
 import { httpUrl, provenanceLabel, verificationLabel } from '../../../../../lib/provenance';
 import { publicSnapshotContext, snapshotVersionId, publicVersions } from '../../../../../lib/reading';
-import { listDocumentLinks } from '../../../../../lib/document-api';
+import { VersionDocuments } from '../../../../components/VersionDocuments';
 import { currentUser } from '../../../../../lib/session';
 import { EditorEntry } from './EditorEntry';
-import surfaceStyles from '../../../../components/surfaces.module.css';
 import { migrationUi } from '../../../../../lib/migration-messages';
 import { SourceEvidenceNotice } from '../../../../components/SourceEvidenceNotice';
 
@@ -108,10 +107,6 @@ export default async function VersionPage(props: VersionPageProps) {
   }
 
   const sourceHref = httpUrl(version.version.sourceUrl);
-  const documentLinks = [
-    ...await listDocumentLinks('constitution', version.constitution.id).catch(() => []),
-    ...await listDocumentLinks('version', version.version.id).catch(() => []),
-  ];
   const title = version.version.effectiveDate ? (
     <>
       <T value={ui.countries.code.versions.versionid.page.versionInForceSince} />{" "}<FormattedDate value={version.version.effectiveDate} />
@@ -176,13 +171,7 @@ export default async function VersionPage(props: VersionPageProps) {
         canReview={canReview}
         canPublish={canPublish}
       /> : null}
-      {documentLinks.length ? <section className={["card", surfaceStyles.card].join(' ')}>
-        <h2><T value={ui.countries.code.versions.versionid.page.constitutionDocuments} /></h2>
-        <ul className="link-list">{documentLinks.map((link) => <li key={link.documentId}>
-          <a href={`/documents/${link.documentId}${link.revisionId ? `?revision=${link.document.revision.revision}` : ''}`}>{link.document.revision.title}</a>
-          {link.revisionId ? ` · revision ${link.document.revision.revision}` : null}
-        </li>)}</ul>
-      </section> : null}
+      <VersionDocuments constitutionId={version.constitution.id} versionId={params.versionId} legalVersionId={snapshot?.legalVersionId ?? snapshot?.id} />
       <SiteSearchForm
         id="version-search"
         className="version-search"

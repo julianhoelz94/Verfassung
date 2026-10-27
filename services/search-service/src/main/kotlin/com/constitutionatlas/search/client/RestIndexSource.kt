@@ -33,7 +33,12 @@ class RestIndexSource(
             queue.addAll(detail.children)
             for (constitution in detail.constitutions) {
                 for (version in constitution.versions) {
-                    out += loadArticles(jurisdiction.code?.takeIf { jurisdiction.kind == "country" && !jurisdiction.historical && it.matches(Regex("[A-Z]{2}")) }.orEmpty(), jurisdiction.name, constitution.title, version, jurisdiction)
+                    // Catalog owns the compatibility country relationship. A two-letter
+                    // jurisdiction code alone does not establish a /countries route.
+                    val ownership = catalog.get().uri("/versions/{id}", version.currentVersionId ?: version.id)
+                        .retrieve().body(VersionOwnershipWire::class.java) ?: error("Missing published version ownership")
+                    check(ownership.jurisdictionId == jurisdiction.id) { "Published version jurisdiction changed during indexing" }
+                    out += loadArticles(ownership.countryCode.orEmpty(), jurisdiction.name, constitution.title, version, jurisdiction)
                 }
             }
         }
@@ -91,7 +96,7 @@ class RestIndexSource(
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    private data class JurisdictionWire(val id: UUID, val name: String, val code: String? = null, val historical: Boolean = false, val kind: String = "country")
+    private data class JurisdictionWire(val id: UUID, val name: String, val historical: Boolean = false)
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     private data class JurisdictionDetailWire(val children: List<JurisdictionWire> = emptyList(), val constitutions: List<ConstitutionWire> = emptyList())
@@ -110,6 +115,9 @@ class RestIndexSource(
         val effectiveDate: LocalDate? = null,
         val languageCode: String = "en",
     )
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    private data class VersionOwnershipWire(val jurisdictionId: UUID, val countryCode: String? = null)
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     private data class ArticleSummaryWire(

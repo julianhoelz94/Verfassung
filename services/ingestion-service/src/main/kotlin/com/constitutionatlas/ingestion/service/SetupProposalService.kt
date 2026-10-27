@@ -70,24 +70,43 @@ class SetupProposalService(
         val current = get(id, actorId, admin)
         requireRevision(current, revision)
         if (current.status == "confirmed") return current
-        val proposal = proposals.claim(id, revision)
-            ?: throw ResponseStatusException(HttpStatus.CONFLICT, "Setup proposal is not ready to confirm")
+        val claim = proposals.claim(id, revision) ?: run {
+            val latest = get(id, actorId, admin)
+            requireRevision(latest, revision)
+            if (latest.status == "confirmed") return latest
+            if (latest.status == "confirming") throw com.constitutionatlas.ingestion.api.ImportPublicationException(HttpStatus.CONFLICT, "setup_confirmation_running")
+            throw ResponseStatusException(HttpStatus.CONFLICT, "Setup proposal is not ready to confirm")
+        }
+        val proposal = claim.proposal
         try {
             DownstreamAuth.withAuthorization(authorization) {
                 val request = proposal.payload
                 val iso = request.isoCode.trim().uppercase()
-                val existing = findSelected(request)
-                if (existing != null && existing.id != proposal.constitutionId) {
-                    throw ResponseStatusException(HttpStatus.CONFLICT, "Constitution slug is already in use")
-                }
                 if (request.jurisdictionId == null && catalog.getCountry(iso) == null) catalog.createCountry(iso, request.countryName.trim())
-                val constitution = existing ?: (request.jurisdictionId?.let { catalog.createJurisdictionConstitution(it, request.constitutionSlug.trim(), request.constitutionTitle.trim(), request.predecessorConstitutionId, request.interim) } ?: catalog.createConstitution(iso, request.constitutionSlug.trim(), request.constitutionTitle.trim(), request.predecessorConstitutionId, request.interim))
-                proposals.setConstitution(id, constitution.id)
-                catalog.replaceOutline(constitution.id, request.outline.kinds)
-                proposals.confirm(id, catalog.currentSettingsRevisionId(constitution.id), actorId)
+                val result = if (proposal.constitutionId == null) {
+                    // Catalog commits constitution, reviewed outline and the creation receipt together.
+                    // A lost response can replay only this operation and cannot adopt an unrelated slug.
+                    catalog.createSetupConstitution(claim.operationId, request)
+                } else {
+                    // Before recoverable setup, a successful remote create was recorded separately.
+                    // Only that persisted identity permits reconciliation of an older partial setup.
+                    val existing = findSelected(request) ?: throw ResponseStatusException(HttpStatus.CONFLICT, "Recorded setup constitution is missing")
+                    if (existing.id != proposal.constitutionId || existing.title != request.constitutionTitle.trim()) {
+                        throw ResponseStatusException(HttpStatus.CONFLICT, "Recorded setup constitution no longer matches the reviewed resource")
+                    }
+                    catalog.replaceOutline(existing.id, request.outline.kinds)
+                    com.constitutionatlas.ingestion.client.DownstreamSetupConstitution(existing.id, catalog.currentSettingsRevisionId(existing.id))
+                }
+                if (!proposals.confirm(id, claim.attempt, result.id, result.settingsRevisionId, actorId)) stale()
             }
+        } catch (ex: com.constitutionatlas.ingestion.client.SetupCreationRejectedException) {
+            if (proposals.rejectWithoutWrites(id, claim.attempt)) {
+                throw com.constitutionatlas.ingestion.api.ImportPublicationException(HttpStatus.CONFLICT, "setup_creation_rejected")
+            }
+            proposals.retry(id, claim.attempt)
+            throw com.constitutionatlas.ingestion.api.ImportPublicationException(HttpStatus.CONFLICT, "setup_recovery_conflict")
         } catch (ex: RuntimeException) {
-            proposals.retry(id)
+            proposals.retry(id, claim.attempt)
             throw ex
         }
         return get(id, actorId, admin)

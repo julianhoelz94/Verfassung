@@ -12,6 +12,7 @@ CHECKS = [
     ['scripts/check-repository-hygiene.py'],
     ['scripts/check-wiki-docs.py'],
     ['-m', 'unittest', 'discover', '-s', 'scripts/cd', '-p', 'test_*.py'],
+    ['-m', 'unittest', 'discover', '-s', 'scripts/operations', '-p', 'test_*.py'],
     ['-m', 'unittest', 'discover', '-s', 'scripts/code_coverage', '-p', 'test_*.py'],
     ['-m', 'unittest', 'discover', '-s', 'infra/caddy', '-p', 'test_*.py'],
 ]

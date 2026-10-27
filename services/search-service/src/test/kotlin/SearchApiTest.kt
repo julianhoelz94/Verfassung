@@ -135,6 +135,36 @@ class SearchApiTest {
     }
 
     @Test
+    fun facetsKeepExactJurisdictionOwnershipForCountryAndRegionalVersions() {
+        val country = UUID.randomUUID()
+        val region = UUID.randomUUID()
+        val regionalVersion = UUID.randomUUID()
+        Mockito.`when`(indexSource.loadPublishedArticles()).thenReturn(
+            listOf(
+                IndexableArticle(UUID.randomUUID(), DE_2022, "DE", "Germany", "Basic Law", "2022", null, "1", "Rights", "dignity", jurisdictionId = country, jurisdictionName = "Germany"),
+                IndexableArticle(UUID.randomUUID(), regionalVersion, "", "Historical region", "Charter", "1849", null, "I", "Rights", "dignity", jurisdictionId = region, jurisdictionName = "Historical region", historical = true),
+            ),
+        )
+        index.reindex()
+        mockMvc.get("/search/facets").andExpect {
+            status { isOk() }
+            jsonPath("$.versions[?(@.id == '$regionalVersion')].jurisdictionId") { value(org.hamcrest.Matchers.contains(region.toString())) }
+            jsonPath("$.versions[?(@.id == '$DE_2022')].jurisdictionId") { value(org.hamcrest.Matchers.contains(country.toString())) }
+            jsonPath("$.jurisdictions[?(@.id == '$region')].countryCode") { value(org.hamcrest.Matchers.contains("")) }
+            jsonPath("$.jurisdictions[?(@.id == '$country')].countryCode") { value(org.hamcrest.Matchers.contains("DE")) }
+        }
+        mockMvc.get("/search") {
+            param("q", "dignity")
+            param("jurisdictionId", region.toString())
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.total") { value(1) }
+            jsonPath("$.hits[0].versionId") { value(regionalVersion.toString()) }
+            jsonPath("$.hits[0].countryCode") { value("") }
+        }
+    }
+
+    @Test
     fun facetFiltersRestrictHitsByCountryVersionAndDate() {
         reindexFixture()
 

@@ -32,5 +32,10 @@ export const usability = {
   appliedFilters: { en: 'Applied filters', de: 'Aktive Filter' },
   removeFilter: { en: 'Remove filter', de: 'Filter entfernen' },
   clearFilters: { en: 'Clear filters', de: 'Filter zurücksetzen' },
+  selectedJurisdiction: { en: 'Selected jurisdiction', de: 'Ausgewählte Gebietskörperschaft' },
+  unlistedVersion: { en: 'Selected snapshot (not listed in the search index)', de: 'Ausgewählte Fassung (nicht im Suchindex aufgeführt)' },
+  anyJurisdiction: { en: 'Any jurisdiction', de: 'Alle Gebietskörperschaften' },
+  jurisdictionScope: { en: 'Search this jurisdiction only; subordinate regions are separate choices.', de: 'Die Suche gilt nur für diese Gebietskörperschaft; untergeordnete Regionen wählen Sie gesondert aus.' },
+  filtersAdjusted: { en: 'Filters belonging to another jurisdiction were cleared.', de: 'Filter für eine andere Gebietskörperschaft wurden zurückgesetzt.' },
   countryChanged: { en: 'The version filter was cleared because it belongs to another country.', de: 'Der Fassungsfilter wurde zurückgesetzt, weil er zu einem anderen Land gehört.' },
 } satisfies Record<string, UiMessage>;

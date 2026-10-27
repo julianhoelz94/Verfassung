@@ -86,13 +86,18 @@ export type SetupProposal = {
 };
 
 export class SetupActionError extends Error {
-  constructor(readonly code: 'stale' | 'invalid' | 'unavailable' | 'forbidden' | 'session_expired') { super(code); }
+  constructor(readonly code: 'stale' | 'creation_rejected' | 'running' | 'invalid' | 'unavailable' | 'forbidden' | 'session_expired') { super(code); }
 }
 
 async function setupCommand(id: string, path: string, method: string, payload: unknown, authorization: string, revision: number): Promise<SetupProposal> {
   const response = await fetchWithTimeout(`${ingestionBaseUrl()}/import-setup-proposals/${encodeURIComponent(id)}${path}`, {
     method, cache: 'no-store', headers: { 'Content-Type': 'application/json', Authorization: authorization, 'If-Match': `"${revision}"` }, body: JSON.stringify(payload),
   }).catch(() => { throw new SetupActionError('unavailable'); });
+  if (response.status === 409) {
+    const problem = await response.clone().json().catch(() => null) as { code?: string } | null;
+    if (problem?.code === 'setup_confirmation_running') throw new SetupActionError('running');
+    if (problem?.code === 'setup_creation_rejected') throw new SetupActionError('creation_rejected');
+  }
   if (!response.ok) throw new SetupActionError(response.status === 409 || response.status === 428 ? 'stale' : response.status === 400 ? 'invalid' : response.status === 401 ? 'session_expired' : response.status === 403 ? 'forbidden' : 'unavailable');
   return response.json();
 }

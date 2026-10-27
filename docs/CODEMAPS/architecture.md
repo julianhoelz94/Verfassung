@@ -15,7 +15,7 @@ Gateway and MCP have no database. Search and Audit are derived.
 | Catalog | Countries, constitution identity/lifecycle and provision events, metadata/wiki/settings revisions, version chains and publication metadata |
 | Content | Immutable ordered node/text revisions, version roots, rich content |
 | Amendment | Legal change records, revision chains, exact before/after pins and review decisions |
-| Identity | Accounts, sessions, MFA/passkeys, credentials/OAuth, browsing policy, mail/settings and durable deployment setup |
+| Identity | Accounts, sessions, MFA/passkeys, credentials/OAuth, browsing policy, mail/settings, durable deployment setup and security audit outbox |
 | Editor | Owned edit sessions, pinned drafts, review/approval and publication orchestration/outbox |
 | Document | Document identity, immutable files/revisions, citation links and legal-page/contact publication |
 | Ingestion | Staged jobs, batches, uploads, setup proposals and publication delivery outbox |

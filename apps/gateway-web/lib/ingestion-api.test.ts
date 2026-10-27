@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { isImportRequest, parseImportJson, ImportTransitionError, transitionImportJob } from './ingestion-api';
+import { isImportRequest, parseImportJson, ImportTransitionError, transitionImportJob, transitionSetupProposal } from './ingestion-api';
 
 const valid = {
   isoCode: 'US',
@@ -54,5 +54,19 @@ describe('import transition errors', () => {
     vi.stubGlobal('fetch', fetch);
     await expect(transitionImportJob('job', 'publish', 'Bearer session')).rejects.toBeInstanceOf(ImportTransitionError);
     expect(fetch).toHaveBeenCalledTimes(1);
+  });
+});
+
+
+describe('setup confirmation recovery', () => {
+  it('preserves a safe creation rejection so a correctable proposal is not described as stale', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ code: 'setup_creation_rejected' }, { status: 409 })));
+    await expect(transitionSetupProposal('proposal', 'confirm', 'Bearer editor', 4)).rejects.toMatchObject({ code: 'creation_rejected' });
+  });
+  it('distinguishes an active confirmation from a stale reviewed revision', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ code: 'setup_confirmation_running' }, { status: 409 })));
+    await expect(transitionSetupProposal('proposal', 'confirm', 'Bearer editor', 4)).rejects.toMatchObject({ code: 'running' });
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ code: 'unrelated' }, { status: 409 })));
+    await expect(transitionSetupProposal('proposal', 'confirm', 'Bearer editor', 4)).rejects.toMatchObject({ code: 'stale' });
   });
 });

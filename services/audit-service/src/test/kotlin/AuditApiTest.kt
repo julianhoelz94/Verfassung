@@ -117,6 +117,88 @@ class AuditApiTest {
     }
 
     @Test
+    fun deliveryRetryPreservesOneEventAndRejectsChangedContent() {
+        val eventId = UUID.randomUUID()
+        val entityId = UUID.randomUUID()
+        val body = """{"eventId":"$eventId","occurredAt":"2026-10-25T10:15:30.123456Z","action":"roles_changed","entityType":"user","entityId":"$entityId","payload":{"roles":["editor"]}}"""
+        repeat(2) {
+            mockMvc.post("/events") {
+                header("Authorization", MACHINE)
+                contentType = MediaType.APPLICATION_JSON
+                content = body
+            }.andExpect {
+                status { isCreated() }
+                jsonPath("$.id") { value(eventId.toString()) }
+                jsonPath("$.occurredAt") { value("2026-10-25T10:15:30.123456Z") }
+            }
+        }
+        check(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM audit_events WHERE id = ?", Int::class.java, eventId) == 1)
+        mockMvc.post("/events") {
+            header("Authorization", MACHINE)
+            contentType = MediaType.APPLICATION_JSON
+            content = body.replace("roles_changed", "account_disabled")
+        }.andExpect { status { isConflict() } }
+        check(jdbcTemplate.queryForObject("SELECT action FROM audit_events WHERE id = ?", String::class.java, eventId) == "roles_changed")
+    }
+
+    @Test
+    fun identicalNumericPayloadRetriesSurviveJsonbNormalization() {
+        val eventId = UUID.randomUUID()
+        val entityId = UUID.randomUUID()
+        val body = """
+            {
+              "eventId":"$eventId",
+              "occurredAt":"2026-10-25T10:15:30.123456789Z",
+              "action":"numeric_event",
+              "entityType":"user",
+              "entityId":"$entityId",
+              "payload":{"exponent":1e7,"negativeZero":-0.0,"nested":{"values":[-0.0,1e-7,{"amount":1e7}]}}
+            }
+        """.trimIndent()
+        repeat(2) {
+            mockMvc.post("/events") {
+                header("Authorization", MACHINE)
+                contentType = MediaType.APPLICATION_JSON
+                content = body
+            }.andExpect {
+                status { isCreated() }
+                jsonPath("$.id") { value(eventId.toString()) }
+                jsonPath("$.occurredAt") { value("2026-10-25T10:15:30.123456Z") }
+            }
+        }
+        check(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM audit_events WHERE id = ?", Int::class.java, eventId) == 1)
+        mockMvc.post("/events") {
+            header("Authorization", MACHINE)
+            contentType = MediaType.APPLICATION_JSON
+            content = body.replace("1e7", "2e7")
+        }.andExpect { status { isConflict() } }
+        check(jdbcTemplate.queryForObject("SELECT payload->>'exponent' FROM audit_events WHERE id = ?", String::class.java, eventId) == "10000000")
+    }
+
+    @Test
+    fun concurrentDeliveryRetriesReturnOneImmutableEvent() {
+        val eventId = UUID.randomUUID()
+        val entityId = UUID.randomUUID()
+        val body = """{"eventId":"$eventId","action":"login_failed","entityType":"user","entityId":"$entityId"}"""
+        val executor = java.util.concurrent.Executors.newFixedThreadPool(4)
+        try {
+            val replies = (1..4).map {
+                executor.submit<Int> {
+                    mockMvc.post("/events") {
+                        header("Authorization", MACHINE)
+                        contentType = MediaType.APPLICATION_JSON
+                        content = body
+                    }.andReturn().response.status
+                }
+            }.map { it.get(10, java.util.concurrent.TimeUnit.SECONDS) }
+            check(replies.all { it == 201 })
+            check(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM audit_events WHERE id = ?", Int::class.java, eventId) == 1)
+        } finally {
+            executor.shutdownNow()
+        }
+    }
+
+    @Test
     fun updatesAndDeletesAreRejected() {
         mockMvc.put("/events/01900000-0000-4000-8000-000000000501") {
             header("Authorization", TOKEN)

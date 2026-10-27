@@ -9,6 +9,7 @@ type SiteSearchFormProps = {
   className?: string;
   versionId?: string;
   country?: string;
+  jurisdictionId?: string;
   submitVisible?: boolean;
   label?: UiMessage;
   placeholder?: UiMessage;
@@ -22,6 +23,7 @@ export function SiteSearchForm({
   className,
   versionId,
   country,
+  jurisdictionId,
   submitVisible = true,
   label,
   placeholder,
@@ -40,6 +42,7 @@ export function SiteSearchForm({
       role="search"
       aria-label={ariaLabel ? t(ariaLabel) : fieldLabel}
     >
+      {jurisdictionId ? <input type="hidden" name="jurisdictionId" value={jurisdictionId} /> : null}
       {country ? <input type="hidden" name="country" value={country} /> : null}
       {versionId ? <input type="hidden" name="versionId" value={versionId} /> : null}
       <label htmlFor={inputId} className={visibleLabel ? undefined : 'visually-hidden'}>

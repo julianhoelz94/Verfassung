@@ -10,6 +10,8 @@ data class AppendEventRequest(
     val entityType: String,
     val entityId: UUID,
     val payload: Map<String, Any?>? = null,
+    val eventId: UUID? = null,
+    val occurredAt: OffsetDateTime? = null,
 )
 
 data class AuditEventDto(

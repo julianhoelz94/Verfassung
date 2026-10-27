@@ -166,9 +166,9 @@ class SearchRepository(private val jdbcTemplate: JdbcTemplate) {
         val versions =
             jdbcTemplate.query(
                 """
-                SELECT version_id, version_label, constitution_title, country_code, COUNT(*)::int AS count
+                SELECT version_id, version_label, constitution_title, country_code, jurisdiction_id, COUNT(*)::int AS count
                 FROM search_documents
-                GROUP BY version_id, version_label, constitution_title, country_code
+                GROUP BY version_id, version_label, constitution_title, country_code, jurisdiction_id
                 ORDER BY country_code, constitution_title, version_label
                 """.trimIndent(),
             ) { rs, _ ->
@@ -177,6 +177,7 @@ class SearchRepository(private val jdbcTemplate: JdbcTemplate) {
                     label = rs.getString("version_label"),
                     constitutionTitle = rs.getString("constitution_title"),
                     countryCode = rs.getString("country_code"),
+                    jurisdictionId = rs.getObject("jurisdiction_id", UUID::class.java),
                     count = rs.getInt("count"),
                 )
             }
@@ -197,8 +198,8 @@ class SearchRepository(private val jdbcTemplate: JdbcTemplate) {
                 )
             }
         val jurisdictions = jdbcTemplate.query(
-            "SELECT jurisdiction_id, MAX(jurisdiction_name) AS name, BOOL_OR(historical) AS historical, COUNT(*)::int AS count FROM search_documents WHERE jurisdiction_id IS NOT NULL GROUP BY jurisdiction_id ORDER BY name",
-        ) { rs, _ -> com.constitutionatlas.search.api.JurisdictionFacet(rs.getObject("jurisdiction_id", UUID::class.java), rs.getString("name"), rs.getBoolean("historical"), rs.getInt("count")) }
+            "SELECT jurisdiction_id, MAX(jurisdiction_name) AS name, MAX(country_code) AS country_code, BOOL_OR(historical) AS historical, COUNT(*)::int AS count FROM search_documents WHERE jurisdiction_id IS NOT NULL GROUP BY jurisdiction_id ORDER BY name",
+        ) { rs, _ -> com.constitutionatlas.search.api.JurisdictionFacet(rs.getObject("jurisdiction_id", UUID::class.java), rs.getString("name"), rs.getBoolean("historical"), rs.getInt("count"), rs.getString("country_code")) }
         return SearchFacets(countries = countries, versions = versions, dates = dates, jurisdictions = jurisdictions)
     }
 }

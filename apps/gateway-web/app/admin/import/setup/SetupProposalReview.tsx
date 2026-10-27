@@ -27,6 +27,7 @@ export function SetupProposalReview({ proposal, error }: { proposal: SetupPropos
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
   const editable = proposal.status === 'proposed';
+  const recoverable = proposal.status === 'confirming';
   const previous = proposal.previousPayload;
   const status = proposal.status === 'confirmed' ? ui.setupReview.confirmed : proposal.status === 'confirming' ? ui.setupReview.confirming
     : !editable ? ui.setupReview.closed : proposal.changesRequested ? ui.setupReview.changesRequested : previous ? ui.setupReview.revised : ui.setupReview.waiting;
@@ -54,8 +55,8 @@ export function SetupProposalReview({ proposal, error }: { proposal: SetupPropos
     <Card className="import-workflow">
       <h2>{t(status)}</h2>
       <p>{t(ui.setupReview.revision)} {proposal.revision}</p>
-      {editable ? <p>{t(ui.setupReview.waitHelp)}</p> : proposal.status === 'confirmed' ? <p>{t(ui.setupReview.resume)}</p> : null}
-      {error || failed ? <Alert tone="error">{t(error === 'stale' ? ui.setupReview.stale : ui.setupReview.error)}</Alert> : null}
+      {editable ? <p>{t(ui.setupReview.waitHelp)}</p> : proposal.status === 'confirmed' ? <p>{t(ui.setupReview.resume)}</p> : recoverable ? <p>{t(ui.setupReview.recoveryHelp)}</p> : null}
+      {error || failed ? <Alert tone="error">{t(error === 'creation_rejected' ? ui.setupReview.creationRejected : error === 'running' ? ui.setupReview.confirmationRunning : error === 'stale' ? ui.setupReview.stale : ui.setupReview.error)}</Alert> : null}
       <a href={`/admin/import/setup/${proposal.id}`}>{t(ui.setupReview.reload)}</a>
       {editable ? <p><a href="#setup-final-review">{t(ui.admin.import.setup.proposalid.page.finalReview)}</a></p> : null}
     </Card>
@@ -99,6 +100,7 @@ export function SetupProposalReview({ proposal, error }: { proposal: SetupPropos
       </div>
 
     </div>
+    {recoverable ? <Card><Button variant="primary" name="intent" value="confirm" disabled={busy}>{t(busy ? ui.setupReview.saving : ui.setupReview.resumeConfirmation)}</Button></Card> : null}
     {editable ? <Card id="setup-final-review">
       <h2>{t(ui.admin.import.setup.proposalid.page.finalReview)}</h2>
       <div className={styles.actions}><Button variant="primary" name="intent" value="confirm" disabled={busy || proposal.changesRequested}>{t(busy ? ui.setupReview.saving : ui.setupReview.confirm)}</Button></div>

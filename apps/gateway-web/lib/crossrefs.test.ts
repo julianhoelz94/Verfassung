@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { createElement } from 'react';
 import { describe, expect, it } from 'vitest';
-import { linkifyReferences } from './crossrefs';
+import { linkifyReferences, type CrossRefContext } from './crossrefs';
 
 const en = {
   code: 'DE',
@@ -10,7 +10,7 @@ const en = {
   kindLabel: 'Article',
 };
 
-function html(text: string, context = en): string {
+function html(text: string, context: CrossRefContext = en): string {
   return renderToStaticMarkup(createElement('p', null, linkifyReferences(text, context)));
 }
 
@@ -19,6 +19,12 @@ describe('linkifyReferences', () => {
     const markup = html('See Article 1 for dignity.');
     expect(markup).toContain('href="/countries/DE/versions/v1/articles/id-1"');
     expect(markup).toContain('Article 1');
+  });
+
+  it('keeps historical jurisdiction references pinned without inventing a country route', () => {
+    const markup = html('See Article 1.', { ...en, code: undefined });
+    expect(markup).toContain('href="/versions/v1/units/id-1"');
+    expect(markup).not.toContain('/countries/');
   });
 
   it('links two English references in one string', () => {

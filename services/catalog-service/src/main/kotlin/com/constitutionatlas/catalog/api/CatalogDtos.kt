@@ -91,6 +91,8 @@ data class ConstitutionSummary(
     val predecessorConstitutionId: UUID? = null,
     val interim: Boolean = false,
     val lifecycleStatus: String = "unknown",
+    @get:JsonInclude(JsonInclude.Include.NON_NULL)
+    val settingsRevisionId: UUID? = null,
 )
 
 data class CountryDetail(
@@ -111,6 +113,7 @@ data class CreateConstitutionRequest(
     val outline: List<OutlineKindWrite>? = null,
     val predecessorConstitutionId: UUID? = null,
     val interim: Boolean = false,
+    val creationAttemptId: UUID? = null,
 )
 
 data class OutlineKindWrite(

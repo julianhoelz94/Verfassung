@@ -280,8 +280,11 @@ services:
       SPRING_PROFILES_ACTIVE: production
       SERVER_FORWARD_HEADERS_STRATEGY: framework
       SPRING_DATASOURCE_URL: jdbc:postgresql://audit-db:5432/audit_db
-      SPRING_DATASOURCE_USERNAME: postgres
-      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:?Set a database password}
+      SPRING_DATASOURCE_USERNAME: audit_runtime
+      SPRING_DATASOURCE_PASSWORD: ${AUDIT_RUNTIME_PASSWORD:?Set a separate Audit runtime password}
+      SPRING_FLYWAY_USER: postgres
+      SPRING_FLYWAY_PASSWORD: ${POSTGRES_PASSWORD:?Set a database password}
+      AUDIT_RUNTIME_PASSWORD: ${AUDIT_RUNTIME_PASSWORD:?Set a separate Audit runtime password}
       DEPLOYMENT_SETUP_GATE_ENABLED: 'true'
       IDENTITY_API_URL: http://identity-service:8080
     depends_on:

@@ -1,11 +1,12 @@
 package com.constitutionatlas.ingestion.client
 
+import com.constitutionatlas.platform.scalarText
 import com.constitutionatlas.platform.timedRestClient
-import com.fasterxml.jackson.databind.JsonNode
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.HttpHeaders
 import org.springframework.http.MediaType
 import org.springframework.stereotype.Component
+import tools.jackson.databind.JsonNode
 
 /** Only the resource operations supported by migration packages are exposed. */
 @Component
@@ -34,7 +35,7 @@ class MigrationDomainClient(
 
 /** A lost response must not turn a committed exact relationship into a permanently failed item. */
 internal fun reconcileDocumentLink(document: String, revision: String, read: () -> JsonNode, attach: () -> JsonNode): JsonNode {
-    fun matches(links: JsonNode): Boolean = links.any { it.path("documentId").asText() == document && it.path("revisionId").asText() == revision }
+    fun matches(links: JsonNode): Boolean = links.any { it.path("documentId").scalarText() == document && it.path("revisionId").scalarText() == revision }
     val existing = read()
     if (matches(existing)) return existing
     return try {

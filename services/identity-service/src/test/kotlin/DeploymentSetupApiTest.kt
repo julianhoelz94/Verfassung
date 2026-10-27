@@ -2,29 +2,30 @@ import com.constitutionatlas.identity.IdentityServiceApplication
 import com.constitutionatlas.identity.client.AuditClient
 import com.constitutionatlas.identity.crypto.Tokens
 import com.constitutionatlas.identity.crypto.Totp
+import com.constitutionatlas.identity.crypto.encodeRequired
 import com.constitutionatlas.identity.repo.IdentityRepository
 import com.constitutionatlas.identity.setup.SetupBootstrap
 import com.constitutionatlas.identity.setup.SetupRepository
-import com.fasterxml.jackson.databind.ObjectMapper
 import com.sun.net.httpserver.HttpServer
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.DefaultApplicationArguments
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
 import org.springframework.boot.test.context.SpringBootTest
-import org.springframework.boot.test.mock.mockito.MockBean
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.http.MediaType
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
+import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.post
 import org.springframework.test.web.servlet.put
-import org.testcontainers.containers.PostgreSQLContainer
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
+import org.testcontainers.postgresql.PostgreSQLContainer
+import tools.jackson.databind.json.JsonMapper
 import java.net.InetSocketAddress
 import java.time.OffsetDateTime
 import java.util.concurrent.atomic.AtomicBoolean
@@ -46,8 +47,8 @@ class DeploymentSetupApiTest {
 
     @Autowired lateinit var environment: org.springframework.core.env.ConfigurableEnvironment
 
-    @MockBean lateinit var auditClient: AuditClient
-    private val mapper = ObjectMapper()
+    @MockitoBean lateinit var auditClient: AuditClient
+    private val mapper = JsonMapper()
 
     @Test
     fun freshInstallationStaysClosedUntilReviewedLegalPublicationAndPersistsAcrossStartup() {
@@ -56,7 +57,7 @@ class DeploymentSetupApiTest {
             jsonPath("$.completed") { value(false) }
             jsonPath("$.bootstrapAdminId") { doesNotExist() }
         }
-        val viewer = users.insertUser("viewer@test.example", encoder.encode("viewer-password"))
+        val viewer = users.insertUser("viewer@test.example", encoder.encodeRequired("viewer-password"))
         users.assignRole(viewer, users.findRoleId("viewer")!!)
         users.insertSession(viewer, Tokens.sha256Hex("old-viewer-session"), OffsetDateTime.now().plusHours(1), OffsetDateTime.now(), null, null)
         mvc.post("/login") {
@@ -172,7 +173,7 @@ class DeploymentSetupApiTest {
         }
 
         @Container @JvmStatic
-        val postgres: PostgreSQLContainer<*> = PostgreSQLContainer("postgres:16-alpine")
+        val postgres: PostgreSQLContainer = PostgreSQLContainer("postgres:16-alpine")
 
         @DynamicPropertySource @JvmStatic
         fun properties(registry: DynamicPropertyRegistry) {

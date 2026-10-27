@@ -32,6 +32,7 @@ import com.constitutionatlas.platform.Actor
 import com.constitutionatlas.platform.ForbiddenException
 import com.constitutionatlas.platform.IdentityClient
 import com.constitutionatlas.platform.NotFoundException
+import com.constitutionatlas.platform.scalarText
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -440,10 +441,10 @@ class EditorService(
         return previewDto(session.id)
     }
 
-    private fun mixedContent(content: com.fasterxml.jackson.databind.JsonNode?): Boolean {
+    private fun mixedContent(content: tools.jackson.databind.JsonNode?): Boolean {
         if (content == null || !content.isArray) return false
-        val hasText = content.any { it.path("type").asText() == "text" }
-        val hasChild = content.any { it.path("type").asText() == "child" }
+        val hasText = content.any { it.path("type").scalarText() == "text" }
+        val hasChild = content.any { it.path("type").scalarText() == "child" }
         return (hasText && hasChild) || content.any { mixedContent(it.path("node").get("content")) }
     }
 

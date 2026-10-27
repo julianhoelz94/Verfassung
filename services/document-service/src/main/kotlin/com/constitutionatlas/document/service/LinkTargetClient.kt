@@ -1,12 +1,13 @@
 package com.constitutionatlas.document.service
 
 import com.constitutionatlas.platform.NotFoundException
+import com.constitutionatlas.platform.scalarText
 import com.constitutionatlas.platform.timedRestClient
-import com.fasterxml.jackson.databind.JsonNode
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Component
 import org.springframework.web.client.RestClientResponseException
+import tools.jackson.databind.JsonNode
 import java.util.UUID
 
 interface LinkTargetClient {
@@ -56,20 +57,20 @@ class RestLinkTargetClient(
                 "version" -> {
                     val version = catalog.get().uri("/versions/$targetId").retrieve().body(JsonNode::class.java)
                     // Published editorial corrections remain public by their immutable ID.
-                    version?.path("publicationStatus")?.asText() == "published"
+                    version?.path("publicationStatus")?.scalarText() == "published"
                 }
                 "amendment" -> {
                     if (scopeRevisionId == null) {
                         false
                     } else {
                         val owner = amendment.get().uri("/amendments/$targetId").retrieve().body(JsonNode::class.java)
-                        owner?.path("publishedRevisionId")?.asText() == scopeRevisionId.toString()
+                        owner?.path("publishedRevisionId")?.scalarText() == scopeRevisionId.toString()
                     }
                 }
                 "country_wiki", "constitution_wiki" -> {
                     val kind = if (targetType == "country_wiki") "country" else "constitution"
                     val page = catalog.get().uri("/wiki/$kind/$targetId").retrieve().body(JsonNode::class.java)
-                    scopeRevisionId != null && page?.path("id")?.asText() == scopeRevisionId.toString()
+                    scopeRevisionId != null && page?.path("id")?.scalarText() == scopeRevisionId.toString()
                 }
                 else -> false
             }
@@ -83,10 +84,10 @@ class RestLinkTargetClient(
         val revisions = amendment.get().uri("/amendments/$targetId/revisions")
             .header("Authorization", authorization).retrieve().body(JsonNode::class.java)
             ?: throw NotFoundException("Amendment revisions not found")
-        require(revisions.isArray && revisions.size() > 0 && revisions.last().path("id").asText() == scopeRevisionId.toString()) {
+        require(revisions.isArray && revisions.size() > 0 && revisions.last().path("id").scalarText() == scopeRevisionId.toString()) {
             "Only the current amendment draft can change links"
         }
-        require(allowPublished || owner.path("publishedRevisionId").asText() != scopeRevisionId.toString()) {
+        require(allowPublished || owner.path("publishedRevisionId").scalarText() != scopeRevisionId.toString()) {
             "Published amendment links are immutable"
         }
     }
@@ -101,7 +102,7 @@ class RestLinkTargetClient(
 
     override fun publishedAmendmentRevision(targetId: UUID): UUID? = runCatching {
         val owner = amendment.get().uri("/amendments/$targetId").retrieve().body(JsonNode::class.java)
-        owner?.path("publishedRevisionId")?.asText()?.takeIf { it.isNotBlank() }?.let(UUID::fromString)
+        owner?.path("publishedRevisionId")?.scalarText()?.takeIf { it.isNotBlank() }?.let(UUID::fromString)
     }.getOrNull()
 
     override fun requireWikiRevision(targetType: String, targetId: UUID, scopeRevisionId: UUID, authorization: String?) {
@@ -110,19 +111,19 @@ class RestLinkTargetClient(
         val draft = catalog.get().uri("/wiki/$kind/$targetId/draft")
             .header("Authorization", authorization).retrieve().body(JsonNode::class.java)
             ?: throw NotFoundException("Wiki draft not found")
-        require(draft.path("id").asText() == scopeRevisionId.toString()) { "Only the current wiki draft can change image links" }
+        require(draft.path("id").scalarText() == scopeRevisionId.toString()) { "Only the current wiki draft can change image links" }
         val published = catalog.get().uri("/wiki/$kind/$targetId").retrieve().body(JsonNode::class.java)
-        require(published?.path("id")?.asText() != scopeRevisionId.toString()) { "Published wiki image links are immutable" }
+        require(published?.path("id")?.scalarText() != scopeRevisionId.toString()) { "Published wiki image links are immutable" }
     }
 
     override fun isWikiImagePublic(targetType: String, targetId: UUID, scopeRevisionId: UUID, documentId: UUID, revision: Int): Boolean =
         runCatching {
             val kind = if (targetType == "country_wiki") "country" else "constitution"
             val page = catalog.get().uri("/wiki/$kind/$targetId/revisions/$scopeRevisionId").retrieve().body(JsonNode::class.java)
-            page?.path("id")?.asText() == scopeRevisionId.toString() &&
+            page?.path("id")?.scalarText() == scopeRevisionId.toString() &&
                 page.path("images").any { image ->
-                    image.path("documentId").asText() == documentId.toString() &&
-                        image.path("revision").asInt() == revision
+                    image.path("documentId").scalarText() == documentId.toString() &&
+                        image.path("revision").asInt(0) == revision
                 }
         }.getOrDefault(false)
 }

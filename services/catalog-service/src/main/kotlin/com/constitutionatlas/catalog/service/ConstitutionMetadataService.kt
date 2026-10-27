@@ -3,10 +3,10 @@ package com.constitutionatlas.catalog.service
 import com.constitutionatlas.catalog.ConflictException
 import com.constitutionatlas.platform.NotFoundException
 import com.fasterxml.jackson.annotation.JsonAnySetter
-import com.fasterxml.jackson.databind.JsonNode
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import tools.jackson.databind.JsonNode
 import java.util.UUID
 
 data class ConstitutionMetadata(val revisionId: UUID, val title: String, val slug: String, val predecessorId: UUID?)

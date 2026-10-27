@@ -1,9 +1,9 @@
 plugins {
-  kotlin("jvm") version "1.9.24"
-  kotlin("plugin.spring") version "1.9.24"
-  id("org.springframework.boot") version "3.5.16"
+  kotlin("jvm") version "2.4.21"
+  kotlin("plugin.spring") version "2.4.21"
+  id("org.springframework.boot") version "4.1.2"
   id("io.spring.dependency-management") version "1.1.7"
-  id("com.diffplug.spotless") version "6.25.0"
+  id("com.diffplug.spotless") version "8.10.4"
 }
 
 apply(
@@ -13,6 +13,8 @@ apply(
             rootDir.resolve("../../gradle/service-conventions.gradle"),
         ).first { it.isFile },
 )
+
+extra["kotlin.version"] = kotlin.coreLibrariesVersion
 
 group = "com.constitutionatlas"
 version = "0.1.0"
@@ -29,29 +31,26 @@ repositories {
 
 dependencies {
   implementation("com.constitutionatlas:platform:0.1.0")
-  implementation("org.springframework.boot:spring-boot-starter-web")
-  implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.17")
+  implementation("org.springframework.boot:spring-boot-starter-webmvc")
+  implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:3.2.0")
   implementation("org.springframework.boot:spring-boot-starter-actuator")
   implementation("org.springframework.boot:spring-boot-starter-validation")
   implementation("org.springframework.boot:spring-boot-starter-mail")
   implementation("org.springframework.boot:spring-boot-starter-data-jdbc")
   implementation("org.springframework.security:spring-security-crypto")
-  implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
+  implementation("tools.jackson.module:jackson-module-kotlin")
   implementation("com.yubico:webauthn-server-core:2.10.1")
   implementation("com.google.zxing:core:3.5.4")
   implementation("org.jetbrains.kotlin:kotlin-reflect")
   runtimeOnly("org.postgresql:postgresql")
-  implementation("org.flywaydb:flyway-core")
+  implementation("org.springframework.boot:spring-boot-starter-flyway")
   implementation("org.flywaydb:flyway-database-postgresql")
 
-  testImplementation("org.springframework.boot:spring-boot-starter-test")
-  testImplementation("org.testcontainers:junit-jupiter")
-  testImplementation("org.testcontainers:postgresql")
+  testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")
+  testImplementation("org.testcontainers:testcontainers-junit-jupiter")
+  testImplementation("org.testcontainers:testcontainers-postgresql")
 }
 
-tasks.withType<Test> {
-  useJUnitPlatform()
-}
 
 // One supported-language registry shared with the gateway.
 tasks.processResources {

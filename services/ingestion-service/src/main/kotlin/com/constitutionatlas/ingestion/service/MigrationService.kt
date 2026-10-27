@@ -12,13 +12,14 @@ import com.constitutionatlas.ingestion.repo.MigrationRepository
 import com.constitutionatlas.platform.Actor
 import com.constitutionatlas.platform.ForbiddenException
 import com.constitutionatlas.platform.NotFoundException
-import com.fasterxml.jackson.databind.JsonNode
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.databind.node.ObjectNode
+import com.constitutionatlas.platform.scalarText
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.server.ResponseStatusException
+import tools.jackson.databind.JsonNode
+import tools.jackson.databind.ObjectMapper
+import tools.jackson.databind.node.ObjectNode
 import java.security.MessageDigest
 import java.util.UUID
 
@@ -66,9 +67,9 @@ class MigrationService(private val repository: MigrationRepository, private val 
         val owner = owned(id, actor)
         val manifest = repository.manifest(id)
         val items = repository.items(id).map { item ->
-            val jobId = item.result.path("jobId").asText().takeIf { it.isNotBlank() }?.let(UUID::fromString)
+            val jobId = item.result.path("jobId").scalarText().takeIf { it.isNotBlank() }?.let(UUID::fromString)
             val job = jobId?.let(imports::getJob)
-            if (job != null && item.result.isObject) item.copy(result = item.result.deepCopy<ObjectNode>().put("status", job.status).also { value -> job.versionId?.let { value.put("versionId", it.toString()) } }) else item
+            if (job != null && item.result.isObject) item.copy(result = (item.result as ObjectNode).deepCopy().put("status", job.status).also { value -> job.versionId?.let { value.put("versionId", it.toString()) } }) else item
         }
         return MigrationRun(
             id,
@@ -82,8 +83,8 @@ class MigrationService(private val repository: MigrationRepository, private val 
                 "excluded" to manifest.sources.count { it.disposition == "excluded" },
                 "staged" to items.size,
                 "prepared" to items.count { it.state == "prepared" },
-                "approved" to items.count { it.result.path("status").asText() == "approved" },
-                "published" to items.count { it.result.path("status").asText() == "completed" },
+                "approved" to items.count { it.result.path("status").scalarText() == "approved" },
+                "published" to items.count { it.result.path("status").scalarText() == "completed" },
                 "blocked" to items.count { it.state in setOf("blocked", "failed") },
             ),
         )
@@ -138,7 +139,7 @@ class MigrationService(private val repository: MigrationRepository, private val 
             }
             val result: JsonNode = when (item.kind) {
                 "snapshot" -> {
-                    val jobId = UUID.fromString(item.result.path("jobId").asText())
+                    val jobId = UUID.fromString(item.result.path("jobId").scalarText())
                     var job = imports.getJob(jobId) ?: throw NotFoundException("Staged snapshot job is missing")
                     if (job.versionId == null || job.status == "failed") job = imports.prepare(authorization, jobId, actor.id)
                     if (job.versionId == null || job.status == "failed") throw org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.CONFLICT, "Snapshot preparation failed: ${job.errors.joinToString { it.message }}")
@@ -146,13 +147,13 @@ class MigrationService(private val repository: MigrationRepository, private val 
                     mapper.valueToTree(mapOf("jobId" to job.id, "versionId" to job.versionId, "constitutionId" to request.constitutionId, "status" to job.status))
                 }
                 "document", "citation" -> {
-                    val request = payload.deepCopy<ObjectNode>().put("attemptId", itemId.toString())
+                    val request = (payload as ObjectNode).deepCopy().put("attemptId", itemId.toString())
                     val document = domains.capture(request, authorization)
                     mapper.valueToTree(mapOf("documentId" to document.path("id"), "revisionId" to document.path("revision").path("id"), "revision" to document.path("revision").path("revision"), "fileSha256" to payload.path("fileSha256")))
                 }
                 "amendment" -> {
-                    val constitution = UUID.fromString(payload.path("constitutionId").asText())
-                    val record = payload.path("record").deepCopy<ObjectNode>().put("publishAttemptId", itemId.toString())
+                    val constitution = UUID.fromString(payload.path("constitutionId").scalarText())
+                    val record = (payload.path("record") as ObjectNode).deepCopy().put("publishAttemptId", itemId.toString())
                     val amendment = domains.amendment(constitution, record, authorization)
                     require(!amendment.path("revisionId").isMissingNode && !amendment.path("revisionId").isNull) { "Prepared amendment has no revision pin" }
                     mapper.valueToTree(mapOf("amendmentId" to amendment.path("id"), "scopeRevisionId" to amendment.path("revisionId"), "status" to amendment.path("status")))
@@ -162,34 +163,34 @@ class MigrationService(private val repository: MigrationRepository, private val 
                     require(request.targetType in setOf("constitution", "version", "amendment")) { "Unsupported relationship target" }
                     val document = dependency(request.documentKey)
                     val target = dependency(request.targetKey)
-                    val targetId = UUID.fromString(target.path("${request.targetType}Id").asText())
-                    val scope = if (request.targetType == "amendment") target.path("scopeRevisionId").asText().also { UUID.fromString(it) } else null
-                    domains.documentLink(request.targetType, targetId, mapOf("documentId" to document.path("documentId").asText(), "revisionId" to document.path("revisionId").asText(), "scopeRevisionId" to scope), authorization)
+                    val targetId = UUID.fromString(target.path("${request.targetType}Id").scalarText())
+                    val scope = if (request.targetType == "amendment") target.path("scopeRevisionId").scalarText().also { UUID.fromString(it) } else null
+                    domains.documentLink(request.targetType, targetId, mapOf("documentId" to document.path("documentId").scalarText(), "revisionId" to document.path("revisionId").scalarText(), "scopeRevisionId" to scope), authorization)
                     mapper.valueToTree(mapOf("targetType" to request.targetType, "targetId" to targetId, "documentId" to document.path("documentId"), "revisionId" to document.path("revisionId")))
                 }
                 "legacy_mapping" -> {
-                    val mapping = payload.deepCopy<ObjectNode>()
-                    mapping.remove("targetKey")?.asText()?.let { key -> mapping.put("versionId", dependency(key).path("versionId").asText()) }
-                    mapping.remove("documentKey")?.asText()?.let { key ->
+                    val mapping = (payload as ObjectNode).deepCopy()
+                    mapping.remove("targetKey")?.scalarText()?.let { key -> mapping.put("versionId", dependency(key).path("versionId").scalarText()) }
+                    mapping.remove("documentKey")?.scalarText()?.let { key ->
                         val document = dependency(key)
-                        mapping.set<JsonNode>("documentId", document.path("documentId"))
-                        mapping.set<JsonNode>("documentRevision", document.path("revision"))
+                        mapping.set("documentId", document.path("documentId"))
+                        mapping.set("documentRevision", document.path("revision"))
                     }
                     domains.legacyMapping(mapping, authorization)
                 }
                 "comparison" -> {
-                    val definition = payload.deepCopy<ObjectNode>().put("attemptId", itemId.toString())
-                    definition.remove("sourceDocumentKey")?.asText()?.let { key ->
+                    val definition = (payload as ObjectNode).deepCopy().put("attemptId", itemId.toString())
+                    definition.remove("sourceDocumentKey")?.scalarText()?.let { key ->
                         val document = dependency(key)
-                        definition.set<JsonNode>("sourceDocumentId", document.path("documentId"))
-                        definition.set<JsonNode>("sourceDocumentRevision", document.path("revision"))
+                        definition.set("sourceDocumentId", document.path("documentId"))
+                        definition.set("sourceDocumentRevision", document.path("revision"))
                     }
                     definition.path("columns").forEach { column ->
                         if (column is ObjectNode) {
-                            column.remove("versionKey")?.asText()?.let { key ->
+                            column.remove("versionKey")?.scalarText()?.let { key ->
                                 val snapshot = dependency(key)
-                                column.set<JsonNode>("versionId", snapshot.path("versionId"))
-                                column.set<JsonNode>("constitutionId", snapshot.path("constitutionId"))
+                                column.set("versionId", snapshot.path("versionId"))
+                                column.set("constitutionId", snapshot.path("constitutionId"))
                             }
                         }
                     }
@@ -215,7 +216,7 @@ class MigrationService(private val repository: MigrationRepository, private val 
 
     private fun hash(node: JsonNode): String {
         fun canonical(value: JsonNode): JsonNode = when {
-            value.isObject -> mapper.createObjectNode().also { target -> value.fieldNames().asSequence().sorted().forEach { key -> target.set<JsonNode>(key, canonical(value.path(key))) } }
+            value.isObject -> mapper.createObjectNode().also { target -> value.propertyNames().asSequence().sorted().forEach { key -> target.set(key, canonical(value.path(key))) } }
             value.isArray -> mapper.createArrayNode().also { target -> value.forEach { target.add(canonical(it)) } }
             else -> value
         }

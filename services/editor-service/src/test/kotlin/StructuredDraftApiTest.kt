@@ -23,13 +23,13 @@ import org.junit.jupiter.api.Test
 import org.mockito.Mockito
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
-import org.springframework.boot.test.mock.mockito.MockBean
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
-import org.testcontainers.containers.PostgreSQLContainer
+import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
+import org.testcontainers.postgresql.PostgreSQLContainer
 import java.util.UUID
 
 @Testcontainers
@@ -45,23 +45,23 @@ class StructuredDraftApiTest {
 
     @Autowired lateinit var jdbc: JdbcTemplate
 
-    @MockBean lateinit var identity: IdentityClient
+    @MockitoBean lateinit var identity: IdentityClient
 
     @Autowired lateinit var editorService: com.constitutionatlas.editor.service.EditorService
 
-    @MockBean lateinit var publishClient: com.constitutionatlas.editor.client.OrderedPublishClient
+    @MockitoBean lateinit var publishClient: com.constitutionatlas.editor.client.OrderedPublishClient
 
-    @MockBean lateinit var catalogClient: com.constitutionatlas.editor.client.CatalogClient
+    @MockitoBean lateinit var catalogClient: com.constitutionatlas.editor.client.CatalogClient
 
-    @MockBean lateinit var contentClient: com.constitutionatlas.editor.client.ContentClient
+    @MockitoBean lateinit var contentClient: com.constitutionatlas.editor.client.ContentClient
 
-    @MockBean lateinit var amendmentClient: com.constitutionatlas.editor.client.AmendmentClient
+    @MockitoBean lateinit var amendmentClient: com.constitutionatlas.editor.client.AmendmentClient
 
-    @MockBean lateinit var auditClient: com.constitutionatlas.editor.client.AuditClient
+    @MockitoBean lateinit var auditClient: com.constitutionatlas.editor.client.AuditClient
 
-    @MockBean lateinit var searchClient: com.constitutionatlas.editor.client.SearchIndexClient
+    @MockitoBean lateinit var searchClient: com.constitutionatlas.editor.client.SearchIndexClient
 
-    @MockBean lateinit var sources: StructuredSourceClient
+    @MockitoBean lateinit var sources: StructuredSourceClient
 
     private val settings = DraftSettings(
         UUID.randomUUID(),
@@ -430,7 +430,7 @@ class StructuredDraftApiTest {
 
     companion object {
         @Container @JvmStatic
-        val postgres = PostgreSQLContainer<Nothing>("postgres:16-alpine")
+        val postgres = PostgreSQLContainer("postgres:16-alpine")
 
         @JvmStatic @DynamicPropertySource
         fun properties(registry: DynamicPropertyRegistry) {

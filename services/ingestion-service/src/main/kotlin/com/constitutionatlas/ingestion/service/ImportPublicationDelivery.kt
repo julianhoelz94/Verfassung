@@ -2,13 +2,13 @@ package com.constitutionatlas.ingestion.service
 
 import com.constitutionatlas.ingestion.repo.ImportPublicationOutbox
 import com.constitutionatlas.platform.timedRestClientBuilder
-import com.fasterxml.jackson.databind.ObjectMapper
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.MediaType
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import tools.jackson.databind.ObjectMapper
 import java.time.Duration
 
 @Service

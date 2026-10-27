@@ -20,7 +20,7 @@ class ImportExportController(private val exports: ImportExportService, private v
     ): ImportExportPage = exports.export(id, access.authenticate(authorization), view, cursor, authorization)
 }
 
-data class ExportValue(val path: String, val value: com.fasterxml.jackson.databind.JsonNode)
+data class ExportValue(val path: String, val value: tools.jackson.databind.JsonNode)
 data class FidelityMismatch(val path: String, val reason: String)
 data class ImportExportPage(
     val jobId: UUID,

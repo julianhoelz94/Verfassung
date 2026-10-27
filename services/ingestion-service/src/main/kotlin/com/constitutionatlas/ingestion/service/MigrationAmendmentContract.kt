@@ -1,12 +1,12 @@
 package com.constitutionatlas.ingestion.service
 
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 
 /** Keep the migration write surface exact without changing the established native revision API. */
 internal fun validateMigrationAmendment(payload: JsonNode) {
     fun fields(value: JsonNode, allowed: Set<String>, path: String) {
         require(value.isObject) { "$path must be an object" }
-        val unknown = value.fieldNames().asSequence().filter { it !in allowed }.toList()
+        val unknown = value.propertyNames().asSequence().filter { it !in allowed }.toList()
         require(unknown.isEmpty()) { "$path contains unsupported fields: ${unknown.joinToString()}" }
     }
     fields(payload, setOf("constitutionId", "record"), "amendment")

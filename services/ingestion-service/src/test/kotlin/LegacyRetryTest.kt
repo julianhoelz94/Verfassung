@@ -3,11 +3,11 @@ import com.constitutionatlas.ingestion.client.RestContentClient
 import com.constitutionatlas.platform.OrderedEntry
 import com.constitutionatlas.platform.OrderedNode
 import com.constitutionatlas.platform.OrderedSnapshot
-import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.sun.net.httpserver.HttpServer
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Test
+import tools.jackson.module.kotlin.jacksonObjectMapper
 import java.net.InetSocketAddress
 import java.util.UUID
 

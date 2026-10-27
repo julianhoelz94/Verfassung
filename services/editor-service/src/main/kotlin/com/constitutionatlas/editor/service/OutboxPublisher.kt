@@ -2,6 +2,7 @@ package com.constitutionatlas.editor.service
 
 import com.constitutionatlas.editor.client.SearchIndexClient
 import com.constitutionatlas.editor.repo.EditorRepository
+import com.constitutionatlas.platform.scalarText
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.scheduling.annotation.Scheduled
@@ -38,9 +39,9 @@ class OutboxPublisher(
                     ?: throw IllegalStateException("editor downstream bearer is required for amendment retries")
                 when (event.eventName) {
                     DomainEvents.AMENDMENT_LINK_REQUESTED -> {
-                        val amendmentId = UUID.fromString(event.payload.path("amendmentId").asText())
-                        val sourceId = UUID.fromString(event.payload.path("sourceVersionId").asText())
-                        val targetId = UUID.fromString(event.payload.path("targetVersionId").asText())
+                        val amendmentId = UUID.fromString(event.payload.path("amendmentId").scalarText())
+                        val sourceId = UUID.fromString(event.payload.path("sourceVersionId").scalarText())
+                        val targetId = UUID.fromString(event.payload.path("targetVersionId").scalarText())
                         amendmentActions.completeLink(amendmentId, sourceId, targetId, authorization, event.sessionId)
                         editorRepository.insertOutboxEvent(
                             event.sessionId,
@@ -50,8 +51,8 @@ class OutboxPublisher(
                         )
                     }
                     DomainEvents.REVIEW_STATUS_REFRESH_REQUESTED -> amendmentActions.refresh(
-                        UUID.fromString(event.payload.path("constitutionId").asText()),
-                        UUID.fromString(event.payload.path("legalVersionId").asText()),
+                        UUID.fromString(event.payload.path("constitutionId").scalarText()),
+                        UUID.fromString(event.payload.path("legalVersionId").scalarText()),
                         authorization,
                     )
                 }

@@ -2,9 +2,9 @@ package com.constitutionatlas.catalog.repo
 
 import com.constitutionatlas.catalog.api.CreateCuratedComparison
 import com.constitutionatlas.catalog.api.CuratedComparison
-import com.fasterxml.jackson.databind.ObjectMapper
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Repository
+import tools.jackson.databind.ObjectMapper
 import java.util.UUID
 
 @Repository

@@ -3,11 +3,12 @@ package com.constitutionatlas.ingestion.repo
 import com.constitutionatlas.ingestion.api.CreateMigrationRun
 import com.constitutionatlas.ingestion.api.MigrationItem
 import com.constitutionatlas.ingestion.api.StageMigrationItem
-import com.fasterxml.jackson.databind.JsonNode
-import com.fasterxml.jackson.databind.ObjectMapper
+import com.constitutionatlas.platform.scalarText
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Repository
 import org.springframework.transaction.annotation.Transactional
+import tools.jackson.databind.JsonNode
+import tools.jackson.databind.ObjectMapper
 import java.util.UUID
 
 @Repository
@@ -27,7 +28,7 @@ class MigrationRepository(private val jdbc: JdbcTemplate, private val mapper: Ob
     fun items(run: UUID): List<MigrationItem> = jdbc.query("SELECT * FROM migration_items WHERE run_id = ? ORDER BY source_key", { rs, _ ->
         MigrationItem(
             rs.getObject("id", UUID::class.java), rs.getString("source_key"), rs.getString("kind"), rs.getString("request_sha256"),
-            mapper.readTree(rs.getString("dependencies")).map { it.asText() }, rs.getString("state"), mapper.readTree(rs.getString("result")), rs.getInt("attempts"), rs.getString("error"),
+            mapper.readTree(rs.getString("dependencies")).toList().map { it.scalarText() }, rs.getString("state"), mapper.readTree(rs.getString("result")), rs.getInt("attempts"), rs.getString("error"),
         )
     }, run)
     fun payload(id: UUID): JsonNode = jdbc.queryForObject("SELECT payload FROM migration_items WHERE id = ?", { rs, _ -> mapper.readTree(rs.getString(1)) }, id)!!

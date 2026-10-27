@@ -3,9 +3,10 @@ package com.constitutionatlas.identity.setup
 import com.constitutionatlas.identity.config.IdentityMfaProperties
 import com.constitutionatlas.identity.crypto.SecretBox
 import com.constitutionatlas.identity.repo.StoredIdentitySettings
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.databind.node.ObjectNode
+import com.constitutionatlas.platform.scalarText
 import org.springframework.stereotype.Component
+import tools.jackson.databind.ObjectMapper
+import tools.jackson.databind.node.ObjectNode
 
 @Component
 class SettingsEnvironment(private val configuration: DeploymentConfiguration, private val mapper: ObjectMapper, mfa: IdentityMfaProperties) {
@@ -24,8 +25,8 @@ class SettingsEnvironment(private val configuration: DeploymentConfiguration, pr
 
     fun effective(stored: StoredIdentitySettings): StoredIdentitySettings {
         val tree = mapper.valueToTree<ObjectNode>(stored)
-        if (tree.path("mailPublicBaseUrl").asText().isBlank()) tree.put("mailPublicBaseUrl", configuration.publicUrl)
-        overrides.forEach { (key, value) -> tree.set<com.fasterxml.jackson.databind.JsonNode>(key, mapper.valueToTree(value)) }
+        if (tree.path("mailPublicBaseUrl").scalarText().isBlank()) tree.put("mailPublicBaseUrl", configuration.publicUrl)
+        overrides.forEach { (key, value) -> tree.set(key, mapper.valueToTree(value)) }
         return mapper.treeToValue(tree, StoredIdentitySettings::class.java)
     }
 
@@ -33,7 +34,7 @@ class SettingsEnvironment(private val configuration: DeploymentConfiguration, pr
     fun writable(updated: StoredIdentitySettings, stored: StoredIdentitySettings): StoredIdentitySettings {
         val tree = mapper.valueToTree<ObjectNode>(updated)
         val original = mapper.valueToTree<ObjectNode>(stored)
-        overrides.keys.forEach { tree.set<com.fasterxml.jackson.databind.JsonNode>(it, original[it]) }
+        overrides.keys.forEach { tree.set(it, original[it]) }
         return mapper.treeToValue(tree, StoredIdentitySettings::class.java)
     }
 
@@ -46,7 +47,7 @@ class SettingsEnvironment(private val configuration: DeploymentConfiguration, pr
                     "smtpPort" -> value.toInt()
                     else -> value
                 }
-                tree.set<com.fasterxml.jackson.databind.JsonNode>(descriptor.key, mapper.valueToTree(parsed))
+                tree.set(descriptor.key, mapper.valueToTree(parsed))
             }
         }
         if (configuration.value("SMTP_PASSWORD") != null) tree.put("clearSmtpPassword", false)

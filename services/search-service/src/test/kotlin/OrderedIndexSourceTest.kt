@@ -1,9 +1,9 @@
 package com.constitutionatlas.search.client
 
-import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.sun.net.httpserver.HttpServer
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import tools.jackson.module.kotlin.jacksonObjectMapper
 import java.net.InetSocketAddress
 import java.util.UUID
 

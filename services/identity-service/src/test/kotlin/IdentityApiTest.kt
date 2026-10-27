@@ -7,28 +7,28 @@ import com.constitutionatlas.identity.mail.OutboundMailer
 import com.constitutionatlas.identity.repo.ContentTranslationRepository
 import com.constitutionatlas.identity.service.AccountService
 import com.constitutionatlas.identity.service.IdentitySeedRunner
-import com.fasterxml.jackson.databind.ObjectMapper
 import org.junit.jupiter.api.Test
 import org.mockito.ArgumentCaptor
 import org.mockito.Mockito
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.DefaultApplicationArguments
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
 import org.springframework.boot.test.context.SpringBootTest
-import org.springframework.boot.test.mock.mockito.MockBean
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.http.MediaType
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
+import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.delete
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.post
 import org.springframework.test.web.servlet.put
-import org.testcontainers.containers.PostgreSQLContainer
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
+import org.testcontainers.postgresql.PostgreSQLContainer
+import tools.jackson.databind.json.JsonMapper
 import java.io.File
 import java.security.MessageDigest
 import java.util.Base64
@@ -63,13 +63,13 @@ class IdentityApiTest {
     @Autowired
     lateinit var authAudit: AuthAudit
 
-    @MockBean
+    @MockitoBean
     lateinit var auditClient: AuditClient
 
-    @MockBean
+    @MockitoBean
     lateinit var outboundMailer: OutboundMailer
 
-    private val objectMapper = ObjectMapper()
+    private val objectMapper = JsonMapper()
 
     @Test
     fun recoveryCodeHasExactlyOneWinnerUnderConcurrentUse() {
@@ -1295,7 +1295,7 @@ class IdentityApiTest {
             """.trimIndent(),
             String::class.java,
             email,
-        )
+        ).map { checkNotNull(it) }
 
     private fun login(email: String, password: String): String {
         val json =
@@ -1336,7 +1336,7 @@ class IdentityApiTest {
 
         @Container
         @JvmStatic
-        val postgres: PostgreSQLContainer<*> = PostgreSQLContainer("postgres:16-alpine")
+        val postgres: PostgreSQLContainer = PostgreSQLContainer("postgres:16-alpine")
 
         @JvmStatic
         @DynamicPropertySource

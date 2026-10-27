@@ -2,10 +2,11 @@ package com.constitutionatlas.catalog.client
 
 import com.constitutionatlas.catalog.ConflictException
 import com.constitutionatlas.catalog.api.WikiImage
+import com.constitutionatlas.platform.scalarText
 import com.constitutionatlas.platform.timedRestClient
-import com.fasterxml.jackson.databind.JsonNode
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Component
+import tools.jackson.databind.JsonNode
 import java.util.UUID
 
 interface WikiMedia {
@@ -30,11 +31,11 @@ class WikiMediaClient(
             ?: throw ConflictException("Wiki images could not be verified", "wiki_image_missing")
         images.forEach { image ->
             if (!links.any { link ->
-                    link.path("documentId").asText() == image.documentId.toString() &&
-                        link.path("document").path("revision").path("revision").asInt() == image.revision &&
-                        link.path("document").path("revision").path("contentType").asText() in
+                    link.path("documentId").scalarText() == image.documentId.toString() &&
+                        link.path("document").path("revision").path("revision").asInt(0) == image.revision &&
+                        link.path("document").path("revision").path("contentType").scalarText() in
                         setOf("image/png", "image/jpeg", "image/gif", "image/webp", "image/avif") &&
-                        link.path("document").path("revision").path("fileName").asText().isNotBlank()
+                        link.path("document").path("revision").path("fileName").scalarText().isNotBlank()
                 }
             ) {
                 throw ConflictException("Wiki image is not pinned to this draft revision", "wiki_image_missing")

@@ -3,28 +3,28 @@ import com.constitutionatlas.platform.Actor
 import com.constitutionatlas.platform.CorrelationIdFilter
 import com.constitutionatlas.platform.IdentityClient
 import com.constitutionatlas.platform.UnauthorizedException
-import com.fasterxml.jackson.databind.JsonNode
-import com.fasterxml.jackson.databind.ObjectMapper
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito
 import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
 import org.springframework.boot.test.context.SpringBootTest
-import org.springframework.boot.test.mock.mockito.MockBean
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.http.MediaType
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
+import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.springframework.test.context.jdbc.Sql
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.post
 import org.springframework.test.web.servlet.put
-import org.testcontainers.containers.PostgreSQLContainer
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
+import org.testcontainers.postgresql.PostgreSQLContainer
+import tools.jackson.databind.JsonNode
+import tools.jackson.databind.json.JsonMapper
 import java.io.File
 import java.util.UUID
 
@@ -45,10 +45,10 @@ class CatalogApiTest {
     @Autowired
     lateinit var catalogRepository: com.constitutionatlas.catalog.repo.CatalogRepository
 
-    @MockBean
+    @MockitoBean
     lateinit var archiveTargets: com.constitutionatlas.catalog.client.ArchiveTargetClient
 
-    @MockBean
+    @MockitoBean
     lateinit var settingsUsage: com.constitutionatlas.catalog.client.SettingsUsageClient
 
     @Autowired lateinit var writes: com.constitutionatlas.catalog.service.CatalogWriteService
@@ -59,13 +59,13 @@ class CatalogApiTest {
 
     @Autowired lateinit var provisionLifecycle: com.constitutionatlas.catalog.service.ProvisionLifecycleService
 
-    @MockBean lateinit var provisionScope: com.constitutionatlas.catalog.client.ProvisionScope
+    @MockitoBean lateinit var provisionScope: com.constitutionatlas.catalog.client.ProvisionScope
 
-    @MockBean lateinit var wikiMedia: com.constitutionatlas.catalog.client.WikiMedia
+    @MockitoBean lateinit var wikiMedia: com.constitutionatlas.catalog.client.WikiMedia
 
-    @MockBean lateinit var readiness: com.constitutionatlas.catalog.client.SuccessorReadinessClient
+    @MockitoBean lateinit var readiness: com.constitutionatlas.catalog.client.SuccessorReadinessClient
 
-    @MockBean
+    @MockitoBean
     lateinit var identityClient: IdentityClient
 
     private val editor =
@@ -968,8 +968,8 @@ class CatalogApiTest {
             content = """{"kinds":$kinds}"""
         }.andExpect { status { isOk() } }
         mockMvc.get("/constitutions/$id/settings") { header("Authorization", TOKEN) }.andExpect { jsonPath("$.id") { value(initial.path("id").asText()) } }
-        val displayKinds = kinds.deepCopy<com.fasterxml.jackson.databind.node.ArrayNode>()
-        (displayKinds[0] as com.fasterxml.jackson.databind.node.ObjectNode).put("displayLabel", "Grandfathered provision")
+        val displayKinds = kinds.deepCopy()
+        (displayKinds[0] as tools.jackson.databind.node.ObjectNode).put("displayLabel", "Grandfathered provision")
         mockMvc.put("/constitutions/$id/settings") {
             header("Authorization", TOKEN)
             contentType = MediaType.APPLICATION_JSON
@@ -1721,7 +1721,7 @@ class CatalogApiTest {
         private const val TOKEN = "Bearer test-token"
         private const val PUBLISHER_TOKEN = "Bearer publisher-token"
         private const val VIEWER_TOKEN = "Bearer viewer-token"
-        private val objectMapper = ObjectMapper()
+        private val objectMapper = JsonMapper()
 
         private fun gatewayContract(contractFile: String): JsonNode =
             objectMapper.readTree(File("../../apps/gateway-web/lib/contracts/$contractFile"))
@@ -1734,7 +1734,7 @@ class CatalogApiTest {
 
         @Container
         @JvmStatic
-        val postgres: PostgreSQLContainer<*> = PostgreSQLContainer("postgres:16-alpine")
+        val postgres: PostgreSQLContainer = PostgreSQLContainer("postgres:16-alpine")
 
         @JvmStatic
         @DynamicPropertySource

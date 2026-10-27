@@ -1,23 +1,20 @@
 package com.constitutionatlas.platform
 
-import com.fasterxml.jackson.core.StreamReadConstraints
-import com.fasterxml.jackson.databind.ObjectMapper
-import org.springframework.beans.factory.config.BeanPostProcessor
+import org.springframework.boot.jackson.autoconfigure.JsonFactoryBuilderCustomizer
+import tools.jackson.core.StreamReadConstraints
+import tools.jackson.core.json.JsonFactoryBuilder
 
 /**
  * Opt-in limits for services accepting structured content. Import this configuration
  * explicitly; multipart uploads keep their separate streaming and size constraints.
  */
-class JsonReadLimits : BeanPostProcessor {
-    override fun postProcessAfterInitialization(bean: Any, beanName: String): Any {
-        if (bean is ObjectMapper) {
-            bean.factory.setStreamReadConstraints(CONSTRAINTS)
-        }
-        return bean
+class JsonReadLimits : JsonFactoryBuilderCustomizer {
+    override fun customize(jsonFactoryBuilder: JsonFactoryBuilder) {
+        jsonFactoryBuilder.streamReadConstraints(CONSTRAINTS)
     }
 
     companion object {
-        private val CONSTRAINTS: StreamReadConstraints =
+        val CONSTRAINTS: StreamReadConstraints =
             StreamReadConstraints.builder()
                 .maxNestingDepth(32)
                 .maxDocumentLength(2_097_152)

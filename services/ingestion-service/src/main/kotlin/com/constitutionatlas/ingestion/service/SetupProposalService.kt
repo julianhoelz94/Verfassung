@@ -8,11 +8,12 @@ import com.constitutionatlas.ingestion.client.DownstreamAuth
 import com.constitutionatlas.ingestion.repo.SetupProposalRepository
 import com.constitutionatlas.platform.ForbiddenException
 import com.constitutionatlas.platform.NotFoundException
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.databind.node.ObjectNode
+import com.constitutionatlas.platform.scalarText
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.web.server.ResponseStatusException
+import tools.jackson.databind.ObjectMapper
+import tools.jackson.databind.node.ObjectNode
 import java.util.UUID
 
 @Service
@@ -47,11 +48,11 @@ class SetupProposalService(
         if (request.kinds.map { it.kindCode }.toSet() != current.payload.outline.kinds.map { it.kindCode }.toSet() || request.kinds.size != current.payload.outline.kinds.size) {
             throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Display settings must retain the submitted hierarchy")
         }
-        val overrides = proposals.displayOverrides(id).deepCopy<ObjectNode>()
+        val overrides = (proposals.displayOverrides(id) as ObjectNode).deepCopy()
         request.kinds.forEach { kind ->
             val fields = mapper.valueToTree<ObjectNode>(kind)
             fields.remove("kindCode")
-            overrides.set<ObjectNode>(kind.kindCode, fields)
+            overrides.set(kind.kindCode, fields)
         }
         val configured = applyDisplay(current.payload, overrides)
         validate(configured)
@@ -104,10 +105,10 @@ class SetupProposalService(
 
     private fun stale(): Nothing = throw ResponseStatusException(HttpStatus.CONFLICT, "Proposal changed; reload and review the latest revision")
 
-    private fun applyDisplay(request: SetupProposalRequest, overrides: com.fasterxml.jackson.databind.JsonNode): SetupProposalRequest {
+    private fun applyDisplay(request: SetupProposalRequest, overrides: tools.jackson.databind.JsonNode): SetupProposalRequest {
         val payload = mapper.valueToTree<ObjectNode>(request)
         payload.path("outline").path("kinds").forEach { kind ->
-            overrides.path(kind.path("kindCode").asText()).fields().forEachRemaining { (name, value) -> (kind as ObjectNode).set<com.fasterxml.jackson.databind.JsonNode>(name, value) }
+            overrides.path(kind.path("kindCode").scalarText()).properties().forEach { (name, value) -> (kind as ObjectNode).set(name, value) }
         }
         return mapper.treeToValue(payload, SetupProposalRequest::class.java)
     }

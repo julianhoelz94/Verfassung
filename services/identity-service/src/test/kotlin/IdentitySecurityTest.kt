@@ -5,6 +5,7 @@ import com.constitutionatlas.identity.api.CreateMcpKeyRequest
 import com.constitutionatlas.identity.client.AuditClient
 import com.constitutionatlas.identity.crypto.Tokens
 import com.constitutionatlas.identity.crypto.Totp
+import com.constitutionatlas.identity.crypto.encodeRequired
 import com.constitutionatlas.identity.mail.OutboundMailer
 import com.constitutionatlas.identity.repo.IdentityRepository
 import com.constitutionatlas.identity.repo.OAuthCode
@@ -16,28 +17,28 @@ import com.constitutionatlas.identity.service.McpKeyService
 import com.constitutionatlas.identity.service.McpOAuthService
 import com.constitutionatlas.identity.service.MfaService
 import com.constitutionatlas.platform.UnauthorizedException
-import com.fasterxml.jackson.databind.JsonNode
-import com.fasterxml.jackson.databind.ObjectMapper
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
 import org.springframework.boot.test.context.SpringBootTest
-import org.springframework.boot.test.mock.mockito.MockBean
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.http.MediaType
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
+import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.post
 import org.springframework.transaction.PlatformTransactionManager
 import org.springframework.transaction.support.TransactionTemplate
-import org.testcontainers.containers.PostgreSQLContainer
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
+import org.testcontainers.postgresql.PostgreSQLContainer
+import tools.jackson.databind.JsonNode
+import tools.jackson.databind.ObjectMapper
 import java.security.MessageDigest
 import java.time.Instant
 import java.time.OffsetDateTime
@@ -78,9 +79,9 @@ class IdentitySecurityTest {
 
     @Autowired lateinit var transactions: PlatformTransactionManager
 
-    @MockBean lateinit var audit: AuditClient
+    @MockitoBean lateinit var audit: AuditClient
 
-    @MockBean lateinit var mail: OutboundMailer
+    @MockitoBean lateinit var mail: OutboundMailer
 
     @Test
     fun passwordCannotBypassAnExistingPasskeyOrBootstrapAnotherFactor() {
@@ -124,7 +125,7 @@ class IdentitySecurityTest {
         post("/oauth/approve", request, token, 403)
         val start = post("/mfa/enroll/start", mapOf("password" to PASSWORD), token)
         val enrollment = post("/mfa/enroll/confirm", mapOf("challengeToken" to start.path("challengeToken").asText(), "code" to Totp.generate(start.path("secret").asText())), token)
-        assertThat(enrollment.path("recoveryCodes").map { it.asText().replace("-", "").length }).allMatch { it >= 20 }
+        assertThat(enrollment.path("recoveryCodes").toList().map { it.asText().replace("-", "").length }).allMatch { it >= 20 }
         post("/oauth/approve", request, token)
         jdbc.update("UPDATE sessions SET step_up_at = NOW() - INTERVAL '10 minutes' WHERE token_hash = ?", Tokens.sha256Hex(token))
         post("/oauth/approve", request, token, 403)
@@ -359,7 +360,7 @@ class IdentitySecurityTest {
     }
 
     private fun user(role: String, enabled: Boolean = true): UUID {
-        val id = users.insertUser("security-${UUID.randomUUID()}@example.test", passwords.encode(PASSWORD), enabled)
+        val id = users.insertUser("security-${UUID.randomUUID()}@example.test", passwords.encodeRequired(PASSWORD), enabled)
         users.assignRole(id, users.findRoleId(role)!!)
         return id
     }

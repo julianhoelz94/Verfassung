@@ -7,13 +7,13 @@ import com.constitutionatlas.ingestion.client.DownstreamVersion
 import com.constitutionatlas.ingestion.repo.ImportJobRepository
 import com.constitutionatlas.ingestion.service.ImportService
 import com.constitutionatlas.platform.OrderedSnapshot
-import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito
 import org.springframework.http.HttpStatus
 import org.springframework.web.client.HttpClientErrorException
+import tools.jackson.module.kotlin.jacksonObjectMapper
 import java.util.UUID
 
 class ImportPublicationTest {
@@ -46,7 +46,7 @@ class ImportPublicationTest {
     @Test
     fun internalAuthorizationFailureRetainsApprovalAndReturnsSafeConfigurationError() {
         approved()
-        Mockito.doThrow(HttpClientErrorException.create(HttpStatus.FORBIDDEN, "Forbidden", null, "private downstream detail".toByteArray(), null))
+        Mockito.doThrow(HttpClientErrorException.create(HttpStatus.FORBIDDEN, "Forbidden", org.springframework.http.HttpHeaders.EMPTY, "private downstream detail".toByteArray(), null))
             .`when`(content).sealImport(version, job, 1, settings)
         val failure = assertThrows(ImportPublicationException::class.java) { service().publish("Bearer admin", job, actor) }
         assertThat(failure.code).isEqualTo("publication_credentials_invalid")

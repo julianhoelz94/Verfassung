@@ -76,5 +76,6 @@ test('source corrections are reviewed, attributed and published without changing
   expect((await json(await request.get(`/api/catalog/versions/${version.id}`))).sourceEvidence).toEqual(original);
   await page.getByRole('link', { name: 'Open published correction' }).click();
   await expect(page.getByText('Archive operator, official source', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Full text', exact: true }).click();
   await expect(page.getByText('Unchanged constitutional text.', { exact: true })).toBeVisible();
 });

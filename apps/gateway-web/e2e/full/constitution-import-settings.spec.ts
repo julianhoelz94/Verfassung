@@ -261,18 +261,19 @@ test('constitution configuration governs MCP imports, review previews and the pu
       await expect(reader.getByText('Provision Protected rights I', { exact: true }).first()).toBeVisible();
       expect(await json(await request.get(`/api/content/versions/${prepared.versionId}/content`))).toEqual(contentBefore);
       await startFromViewer(page, 'XA', prepared.versionId, 'editorial_correction');
+      await page.getByRole('complementary', { name: 'Top-level units', exact: true }).getByRole('link', { name: 'Provision I Protected rights', exact: true }).click();
       const draft = page.locator('#draft-form');
-      await page.getByLabel('Editor view', { exact: true }).selectOption('constitution');
-      await draft.getByRole('button', { name: 'Provision I Protected rights', exact: true }).click();
+      const paragraphText = draft.getByRole('textbox', { name: /^Paragraph text$/i });
+      await expect(page.getByRole('combobox', { name: 'Editor view', exact: true })).toHaveValue('article');
       await expect(draft.getByRole('button', { name: 'Suggest sentence boundaries', exact: true })).toHaveCount(2);
-      await draft.getByLabel('Paragraph text', { exact: true }).first().fill('Every person is free. Rights are protected.');
+      await paragraphText.first().fill('Every person is free. Rights are protected.');
       await draft.getByRole('button', { name: 'Suggest sentence boundaries', exact: true }).first().click();
-      await expect(draft.getByLabel('Paragraph text', { exact: true })).toHaveCount(3);
+      await expect(paragraphText).toHaveCount(3);
       await draft.getByRole('button', { name: 'Save draft', exact: true }).click();
       await expect(page.getByText('Draft saved.', { exact: true })).toBeVisible();
       await page.reload();
-      await expect(draft.getByLabel('Paragraph text', { exact: true })).toHaveCount(3);
-      await expect(draft.getByLabel('Paragraph text', { exact: true }).nth(1)).toHaveValue('Rights are protected.');
+      await expect(paragraphText).toHaveCount(3);
+      await expect(paragraphText.nth(1)).toHaveValue('Rights are protected.');
       expect(await json(await request.get(`/api/content/versions/${prepared.versionId}/content`))).toEqual(contentBefore);
     } finally { await readerContext.close(); }
   } finally {

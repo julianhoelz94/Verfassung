@@ -40,7 +40,7 @@ test('source corrections are reviewed, attributed and published without changing
   await expect.poll(async () => (await json(await request.get(`/api/editor/edit-sessions/${sessionId}`, { headers }))).sourceEvidenceRevisions[0].revision).toBe(2);
   await staleTab.getByLabel('Source attribution').fill('Stale correction');
   await staleTab.getByRole('button', { name: 'Save source draft' }).click();
-  await expect(staleTab.getByRole('alert')).toContainText('Your input is retained');
+  await expect(staleTab.locator('main').getByRole('alert')).toContainText('Your input is retained');
   await expect(staleTab.getByLabel('Source attribution')).toHaveValue('Stale correction');
   await staleTab.close({ runBeforeUnload: false });
   expect((await json(await request.get(`/api/catalog/versions/${version.id}`))).sourceEvidence).toEqual(original);

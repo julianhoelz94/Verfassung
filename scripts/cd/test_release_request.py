@@ -16,12 +16,11 @@ REFERENCE = {"ref": "refs/tags/v.1.1", "object": {"type": "commit", "sha": SHA}}
 
 
 class ReleaseRequestTests(unittest.TestCase):
-    def test_explicit_tag_and_main_controller_required(self):
-        for tag in ["", "refs/heads/main", "refs/tags/v.1.1", " v.1.1", "v.1.1\n"]:
-            with self.subTest(tag=tag), self.assertRaises(ValueError):
-                check_request.validate_request("workflow_dispatch", "refs/heads/main", "test", tag)
-        with self.assertRaisesRegex(ValueError, "release_tag input"):
-            check_request.validate_request("workflow_dispatch", "refs/tags/v.1.1", "test", "v.1.1")
+    def test_workflow_must_be_dispatched_from_a_tag(self):
+        for ref in ["", "refs/heads/main", "refs/heads/v.1.1", SHA, "refs/tags/", "refs/tags/refs/heads/main", "refs/tags/v.1.1\n"]:
+            with self.subTest(ref=ref), self.assertRaises(ValueError):
+                check_request.validate_request("workflow_dispatch", ref, "test")
+        self.assertEqual(check_request.validate_request("workflow_dispatch", "refs/tags/v.1.1", "test"), "v.1.1")
 
     def test_lightweight_release_pins_tag_object_instead_of_target_branch(self):
         with patch.object(check_request, "github_get", side_effect=[{**PUBLISHED, "target_commitish": "main"}, REFERENCE]) as get:
@@ -87,8 +86,8 @@ class ReleaseRequestTests(unittest.TestCase):
     def test_request_checks_both_actors_and_exports_only_resolved_sha(self):
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory) / "output"
-            environment = {"DEPLOYMENT_ENVIRONMENT": "test", "RELEASE_TAG": "v.1.1", "GITHUB_EVENT_NAME": "workflow_dispatch",
-                           "GITHUB_REF": "refs/heads/main", "GITHUB_REPOSITORY": REPOSITORY,
+            environment = {"DEPLOYMENT_ENVIRONMENT": "test", "GITHUB_EVENT_NAME": "workflow_dispatch",
+                           "GITHUB_REF": "refs/tags/v.1.1", "GITHUB_SHA": SHA, "GITHUB_REPOSITORY": REPOSITORY,
                            "GITHUB_ACTOR": "initial-admin", "GITHUB_TRIGGERING_ACTOR": "rerun-admin", "GH_TOKEN": "token",
                            "GITHUB_OUTPUT": str(output)}
             with patch.dict(os.environ, environment, clear=True), patch.object(check_request, "require_admin") as admin, \
@@ -101,6 +100,27 @@ class ReleaseRequestTests(unittest.TestCase):
                 with self.assertRaises(PermissionError):
                     check_request.main()
                 resolve.assert_not_called()
+
+    def test_tag_moved_after_dispatch_is_rejected_before_export(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "output"
+            environment = {"DEPLOYMENT_ENVIRONMENT": "test", "GITHUB_EVENT_NAME": "workflow_dispatch",
+                           "GITHUB_REF": "refs/tags/v.1.1", "GITHUB_SHA": "b" * 40, "GITHUB_REPOSITORY": REPOSITORY,
+                           "GITHUB_ACTOR": "julianhoelz94", "GITHUB_TRIGGERING_ACTOR": "julianhoelz94", "GH_TOKEN": "token",
+                           "GITHUB_OUTPUT": str(output)}
+            with patch.dict(os.environ, environment, clear=True), patch.object(check_request, "require_admin"), \
+                    patch.object(check_request, "release_commit", return_value=SHA):
+                with self.assertRaisesRegex(ValueError, "tag moved"):
+                    check_request.main()
+            self.assertFalse(output.exists())
+
+    def test_main_cannot_deploy_even_with_a_release_tag_input(self):
+        environment = {"DEPLOYMENT_ENVIRONMENT": "test", "GITHUB_EVENT_NAME": "workflow_dispatch",
+                       "GITHUB_REF": "refs/heads/main", "RELEASE_TAG": "v.1.1"}
+        with patch.dict(os.environ, environment, clear=True), patch.object(check_request, "release_commit") as resolve:
+            with self.assertRaisesRegex(ValueError, "branches cannot deploy"):
+                check_request.main()
+            resolve.assert_not_called()
 
 
 if __name__ == "__main__":

@@ -10,13 +10,15 @@ import urllib.request
 from release import PUBLIC_URLS, SHA
 
 
-def validate_request(event, ref, environment, tag):
-    if event != "workflow_dispatch" or ref != "refs/heads/main":
-        raise ValueError("Run the deployment workflow from main and select a release_tag input")
+def validate_request(event, ref, environment):
+    if event != "workflow_dispatch" or not ref.startswith("refs/tags/"):
+        raise ValueError("Run the deployment workflow from a published release tag; branches cannot deploy")
     if environment not in PUBLIC_URLS:
         raise ValueError("Select test or prod")
+    tag = ref.removeprefix("refs/tags/")
     if not tag or tag.startswith("refs/") or any(character.isspace() for character in tag):
         raise ValueError("Select a published release tag by its exact name")
+    return tag
 
 
 def github_get(repository, path, token):
@@ -68,11 +70,12 @@ def require_admin(repository, actor, token):
 
 def main():
     environment = os.environ["DEPLOYMENT_ENVIRONMENT"]
-    tag = os.environ.get("RELEASE_TAG", "")
-    validate_request(os.environ["GITHUB_EVENT_NAME"], os.environ["GITHUB_REF"], environment, tag)
+    tag = validate_request(os.environ["GITHUB_EVENT_NAME"], os.environ["GITHUB_REF"], environment)
     for actor in {os.environ["GITHUB_ACTOR"], os.environ["GITHUB_TRIGGERING_ACTOR"]}:
         require_admin(os.environ["GITHUB_REPOSITORY"], actor, os.environ["GH_TOKEN"])
     sha = release_commit(os.environ["GITHUB_REPOSITORY"], tag, os.environ["GH_TOKEN"])
+    if sha != os.environ["GITHUB_SHA"]:
+        raise ValueError("Release tag moved after this workflow was dispatched; start a new run from the tag")
     with open(os.environ["GITHUB_OUTPUT"], "a") as output:
         output.write(f"source-sha={sha}\n")
     print(f"Approved release {tag} ({sha}) for {environment}: {PUBLIC_URLS[environment]}")

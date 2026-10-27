@@ -5,6 +5,8 @@ plugins {
   id("com.diffplug.spotless") version "8.10.4"
 }
 
+apply(from = rootDir.resolve("../../gradle/coverage-conventions.gradle"))
+
 extra["kotlin.version"] = kotlin.coreLibrariesVersion
 
 group = "com.constitutionatlas"

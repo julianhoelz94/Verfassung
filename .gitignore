@@ -40,6 +40,8 @@ logs/
 coverage/
 .nyc_output/
 *.lcov
+.coverage
+.coverage.*
 test-results/
 .scannerwork/
 

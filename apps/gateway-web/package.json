@@ -11,7 +11,8 @@
     "test:e2e:full": "playwright test --config=playwright.full.config.js",
     "fixtures:generate": "node e2e/fixtures/generate.mjs",
     "prepopulate": "npm run fixtures:generate && node e2e/fixtures/prepopulate.mjs",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:coverage": "c8 --all --include=\"{app,lib}/**/*.{js,mjs,cjs}\" --include=\"proxy.{js,mjs,cjs}\" --exclude=\"**/*.test.*\" --exclude=\"**/*.spec.*\" --reporter=json --reporter=html --reports-dir=coverage/node node --test lib/interpret-me.test.cjs e2e/fixtures/prepopulate-import.test.mjs e2e/fixtures/prepopulate-access.test.mjs && vitest run --coverage"
   },
   "dependencies": {
     "next": "16.4.3",
@@ -32,6 +33,8 @@
     "qrcode": "^1.5.4",
     "typescript": "5.5.4",
     "vite": "7.3.7",
-    "vitest": "4.1.12"
+    "vitest": "4.1.12",
+    "@vitest/coverage-v8": "4.1.12",
+    "c8": "10.1.3"
   }
 }

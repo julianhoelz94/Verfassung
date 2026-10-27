@@ -10,6 +10,7 @@ export const sourceEvidenceUi = {
   attribution: { en: 'Source attribution', de: 'Quellenangabe' },
   reason: { en: 'Reason for the correction', de: 'Begründung der Korrektur' },
   reasonHelp: { en: 'This note belongs to the editing history and is kept separate from the source information.', de: 'Dieser Vermerk gehört zur Bearbeitungshistorie und wird getrennt von den Quellenangaben geführt.' },
+  changeNote: { en: 'Correction note', de: 'Korrekturvermerk' },
   save: { en: 'Save source draft', de: 'Quellenentwurf speichern' },
   saved: { en: 'Source draft saved. The public source information is unchanged.', de: 'Quellenentwurf gespeichert. Die öffentlichen Quellenangaben sind unverändert.' },
   before: { en: 'Published source information', de: 'Veröffentlichte Quellenangaben' },

@@ -120,7 +120,7 @@ export function SourceEvidenceWorkspace({ preview, publishedEvidence, userId, ro
       </Stack> : null}
       {latest ? <><h3><T value={copy.after} /></h3><EvidenceTable before={original} after={latest.evidence} /></> : <p><T value={copy.noDraft} /></p>}
     </Stack>
-    <Stack as="section" id="source-change-reason" aria-labelledby="source-reason-heading">
+    <Stack as="section" id="source-change-reason" aria-label={t(copy.changeNote)}>
       <h2 id="source-reason-heading"><T value={copy.reason} /></h2>
       <p><T value={copy.reasonHelp} /></p>
       {canEdit ? <>

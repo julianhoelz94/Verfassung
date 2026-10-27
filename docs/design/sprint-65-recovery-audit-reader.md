@@ -53,7 +53,7 @@ in CI. All changed services also run their full checks in CI.
 The PR's `full-stack-e2e` job runs the regional legacy-source reader and independent
 country-route journeys, then the disposable restore. Its `legacy-migration-coverage`
 artifact contains reader screenshots and fidelity coverage. Its `recovery-report`
-artifact records all nine database fingerprints, rejection of corrupt backups
+artifact records verification of all nine database fingerprints, rejection of corrupt backups
 before writes, recovery after an SQL failure, preserved encryption configuration,
 source-document API/file read-back, authentication/content fixture verification,
 Search outage/recovery and measured durations. Use the successful run for the

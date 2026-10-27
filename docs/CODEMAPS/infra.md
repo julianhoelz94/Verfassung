@@ -67,6 +67,10 @@ outage detection. `scripts/operations/check.py` supplies read-only operational
 checks; see `docs/operations/recovery-and-monitoring.md`. Audit runtime credentials
 are separate from Flyway owner credentials in canonical and generated Compose.
 
+## Code coverage
+
+Every CI run publishes whole-repository and new-code line coverage. New or changed executable production lines require at least 80%; overall coverage is informational. `coverage` merges JVM execution probes and source-mapped JS/Python inputs, rejects stale/incomplete artifacts, and is required by `ci-status`. Shared JVM setup: `gradle/coverage-conventions.gradle`. Aggregation and regression tests: `scripts/code_coverage/`. Policy and reproduction: `docs/wiki/Technical-Development.md` and `docs/design/sprint-67-ci-code-coverage.md`. Browser acceptance checks remain separate.
+
 ## Gateway scripts (`apps/gateway-web/package.json`)
 
 `npm run dev` (port 3000), `lint`, `typecheck`, `build`, `test`, `test:e2e`.

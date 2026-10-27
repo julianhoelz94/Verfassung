@@ -1,9 +1,13 @@
 name: Deploy
-run-name: Deploy ${{ inputs.environment }} by @${{ github.actor }}
+run-name: Deploy ${{ inputs.release_tag }} to ${{ inputs.environment }} by @${{ github.actor }}
 
 on:
   workflow_dispatch:
     inputs:
+      release_tag:
+        description: Published GitHub release tag to deploy (run this workflow from main)
+        required: true
+        type: string
       environment:
         description: Deployment environment
         required: true
@@ -31,6 +35,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 50
     outputs:
+      source-sha: ${{ steps.release.outputs.source-sha }}
       image-matrix: ${{ steps.images.outputs.matrix }}
     permissions:
       contents: read
@@ -38,25 +43,42 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
+          ref: ${{ github.sha }}
           persist-credentials: false
-      - name: Require an administrator and an explicit main-branch request
+      - name: Require an administrator and resolve a published release tag
+        id: release
         env:
           GH_TOKEN: ${{ github.token }}
           DEPLOYMENT_ENVIRONMENT: ${{ inputs.environment }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
         run: python3 scripts/cd/check_request.py
+      - name: Check out the resolved release commit
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ steps.release.outputs.source-sha }}
+          path: source
+          persist-credentials: false
       - name: Wait for existing CI compilation for this exact commit
+        working-directory: source
         env:
           GH_TOKEN: ${{ github.token }}
-        run: python3 scripts/cd/check_ci.py --timeout-seconds 2700 --poll-seconds 30
+          SOURCE_SHA: ${{ steps.release.outputs.source-sha }}
+        run: python3 ../scripts/cd/check_ci.py --source-sha "$SOURCE_SHA" --timeout-seconds 2700 --poll-seconds 30
       - name: Discover release image packages
         id: images
-        run: echo "matrix=$(python3 scripts/cd/release.py --matrix)" >> "$GITHUB_OUTPUT"
+        working-directory: source
+        run: echo "matrix=$(python3 ../scripts/cd/release.py --matrix)" >> "$GITHUB_OUTPUT"
 
   build-image:
     name: Build ${{ matrix.service }}
     needs: authorize
     runs-on: ubuntu-24.04
     timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: source
+    env:
+      SOURCE_SHA: ${{ needs.authorize.outputs.source-sha }}
     strategy:
       fail-fast: false
       max-parallel: 6
@@ -67,6 +89,12 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ needs.authorize.outputs.source-sha }}
+          path: source
           persist-credentials: false
       - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         if: matrix.gradle
@@ -84,13 +112,13 @@ jobs:
           DEPLOYMENT_ENVIRONMENT: ${{ inputs.environment }}
           IMAGE_SERVICE: ${{ matrix.service }}
         run: |
-          python3 scripts/cd/build_images.py --repository "$GITHUB_REPOSITORY" \
-            --environment "$DEPLOYMENT_ENVIRONMENT" --source-sha "$GITHUB_SHA" \
+          python3 ../scripts/cd/build_images.py --repository "$GITHUB_REPOSITORY" \
+            --environment "$DEPLOYMENT_ENVIRONMENT" --source-sha "$SOURCE_SHA" \
             --run-id "$GITHUB_RUN_ID" --run-attempt "$GITHUB_RUN_ATTEMPT" --service "$IMAGE_SERVICE"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: candidate-image-${{ matrix.service }}
-          path: .image/image.json
+          path: source/.image/image.json
           include-hidden-files: true
           if-no-files-found: error
           overwrite: true
@@ -100,25 +128,36 @@ jobs:
     needs: [authorize, build-image]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
+    defaults:
+      run:
+        working-directory: source
+    env:
+      SOURCE_SHA: ${{ needs.authorize.outputs.source-sha }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ needs.authorize.outputs.source-sha }}
+          path: source
           persist-credentials: false
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           pattern: candidate-image-*
-          path: .image-artifacts
+          path: source/.image-artifacts
           merge-multiple: false
       - name: Require every image from this workflow run, source revision and environment
         env:
           DEPLOYMENT_ENVIRONMENT: ${{ inputs.environment }}
         run: |
-          python3 scripts/cd/collect_images.py --repository "$GITHUB_REPOSITORY" \
-            --environment "$DEPLOYMENT_ENVIRONMENT" --source-sha "$GITHUB_SHA" --run-id "$GITHUB_RUN_ID"
+          python3 ../scripts/cd/collect_images.py --repository "$GITHUB_REPOSITORY" \
+            --environment "$DEPLOYMENT_ENVIRONMENT" --source-sha "$SOURCE_SHA" --run-id "$GITHUB_RUN_ID"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: release-candidate
-          path: .release/
+          path: source/.release/
           include-hidden-files: true
           if-no-files-found: error
           overwrite: true
@@ -128,6 +167,9 @@ jobs:
     needs: [authorize, candidate-images]
     runs-on: ubuntu-24.04
     timeout-minutes: 60
+    defaults:
+      run:
+        working-directory: source
     environment:
       name: ${{ inputs.environment }}
       url: ${{ inputs.environment == 'prod' && 'https://verfassungen.julianhoelz.de' || 'https://tst.verfassungen.julianhoelz.de' }}
@@ -135,6 +177,7 @@ jobs:
       contents: read
       id-token: write
     env:
+      SOURCE_SHA: ${{ needs.authorize.outputs.source-sha }}
       DEPLOYMENT_ENVIRONMENT: ${{ inputs.environment }}
       COOLIFY_URL: ${{ vars.COOLIFY_URL }}
       COOLIFY_PROJECT_UUID: ${{ vars.COOLIFY_PROJECT_UUID }}
@@ -147,11 +190,17 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ needs.authorize.outputs.source-sha }}
+          path: source
           persist-credentials: false
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: release-candidate
-          path: .release
+          path: source/.release
       - name: Require deployment settings
         env:
           TS_CLIENT_ID: ${{ vars.TS_CLIENT_ID }}
@@ -190,15 +239,15 @@ jobs:
           tags: ${{ vars.TS_TAGS }}
       - name: Deploy the compiled release through the private Coolify API
         run: |
-          python3 scripts/cd/deploy.py --repository "$GITHUB_REPOSITORY" \
-            --environment "$DEPLOYMENT_ENVIRONMENT" --source-sha "$GITHUB_SHA"
+          python3 ../scripts/cd/deploy.py --repository "$GITHUB_REPOSITORY" \
+            --environment "$DEPLOYMENT_ENVIRONMENT" --source-sha "$SOURCE_SHA"
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         if: inputs.prepopulate
         with:
           node-version: '22'
       - name: Prepopulate the selected environment after successful deployment
         if: inputs.prepopulate
-        working-directory: apps/gateway-web
+        working-directory: source/apps/gateway-web
         env:
           PREPOPULATE_DEPLOYMENT_ENVIRONMENT: ${{ inputs.environment }}
           PREPOPULATE_BASE_URL: ${{ inputs.environment == 'prod' && 'https://verfassungen.julianhoelz.de' || 'https://tst.verfassungen.julianhoelz.de' }}

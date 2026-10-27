@@ -1,6 +1,6 @@
 # Sprint 66 — Coordinated dependency upgrades
 
-Status: implementation in progress. This document records scope and verification; it is not a completion claim.
+Status: implementation and local verification complete. Required CI, merge and published Wiki/media close-out are tracked in Linear; this document records the review candidate.
 
 Tracker: Sprint 66 in Linear; [VER-192](https://linear.app/verfassung/issue/VER-192/dep-3-upgrade-checklist-test-one-service-then-ci) covers the repeatable upgrade checklist. Initial base: `61ef2f2bb4af92da94c7d3b44f66856f382fbf62`. Main was merged again through `922089235becff0fae59f74f153ab245334e5556` during verification, preserving the intervening import, coverage and recovery work.
 
@@ -36,3 +36,13 @@ Java 21, Node 22, Gradle 9.8.2 and Ubuntu 24.04 remain the baseline. Gateway Typ
 - Actual pre-upgrade DTOs were compiled and serialized with Boot 3.5.16/Jackson 2.21.4. Legacy and ordered fixture bytes/hashes are checked in; Boot 4 integration tests passed both exact serialization and retries against preseeded persisted old checksums. The same fixture bytes were confirmed with Kotlin runtimes 1.9.24 and 1.9.25. Nine service mappers and the separate HTTP-client converter retain their respective legacy defaults.
 - Main merges: `130b25a` includes coverage/import changes through `36371db`; `4f037b6` includes recovery/audit/reader changes through `9220892`. The new coverage gate remains enabled. Reviewer found the renamed proxy missing from coverage inventory; `efe2b98` fixes it, with 24 tooling tests and actual collected-source completeness verified independently.
 - Final combined reviewer/verifier clearance, verification after the last main merge, complete CI and published Wiki/media verification remain pending.
+
+## Final local candidate
+
+After integrating main through `9220892`, all ten backend projects pass `check` and `jacocoTestReport`: 405 tests, no failures/errors/skips (Platform 10, Identity 84, Catalog 57, Editor 47, Content 43, Amendment 63, Document 18, Ingestion 60, Search 13, Audit 10). Both platform and Catalog resolve Kotlin stdlib/reflect to 2.4.21. Applied migrations exactly match main.
+
+The gateway passes 453 Vitest and 13 Node tests, coverage collection, typecheck, lint, production build and 11 independent reader/search/setup browser journeys. MCP's 33 tests and native compiler source-map coverage pass. Production and full npm audits report zero vulnerabilities for both projects. The final gateway lock restores all native optional platform entries without changing any already tested dependency version; the earlier macOS-generated lock omitted Linux Rollup.
+
+Independent verification also passes 66 focused backend tests spanning JSON constraints/defaults, old-checksum retries, upload limits, password/security audit behavior, durable audit delivery and the restricted Audit database runtime role. Frozen full-suite reports remain unchanged. Coverage tooling, deployment safeguards, Wiki references and repository hygiene pass. The new 80 percent changed-code coverage gate remains required in CI.
+
+Independent source review cleared the combined migration, including the corrected proxy coverage inventory and both main-merge conflict resolutions. Final commit binding, required CI and published Wiki/video evidence are recorded in the PR and Linear completion note after their gates finish.

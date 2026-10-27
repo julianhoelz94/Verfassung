@@ -103,7 +103,7 @@ of the same run/revision may be reused when rerunning failed jobs; inputs from
 another run or source revision are rejected.
 
 The denominator includes Kotlin service/platform production sources, gateway
-`app`, `lib` and `middleware` TypeScript/JavaScript, MCP TypeScript, and Python
+`app`, `lib` and `proxy` TypeScript/JavaScript (including legacy `middleware` entry points), MCP TypeScript, and Python
 operational tooling. It excludes tests, fixtures, generated output, declaration
 files, dependencies, CSS, SQL migrations, shell scripts and build configuration.
 Coverage reflects instrumented service/unit tests; browser, publication, visual

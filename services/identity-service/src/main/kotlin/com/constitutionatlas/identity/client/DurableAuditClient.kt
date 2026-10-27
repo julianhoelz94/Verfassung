@@ -3,7 +3,6 @@ package com.constitutionatlas.identity.client
 import com.constitutionatlas.identity.repo.AuditOutboxRepository
 import com.constitutionatlas.identity.repo.PendingAudit
 import com.constitutionatlas.platform.timedRestClient
-import tools.jackson.databind.node.ObjectNode
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.annotation.Bean
@@ -14,6 +13,7 @@ import org.springframework.stereotype.Component
 import org.springframework.transaction.PlatformTransactionManager
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.transaction.support.TransactionTemplate
+import tools.jackson.databind.node.ObjectNode
 import java.util.UUID
 
 open class DurableAuditClient(private val outbox: AuditOutboxRepository) : AuditClient {

@@ -1,6 +1,6 @@
 import { expect, test, type APIRequestContext } from '../fixtures/consent';
 import { randomUUID } from 'node:crypto';
-import { adminHeaders, createIsolatedConstitution } from './api-fixtures';
+import { adminHeaders, roleHeaders, createIsolatedConstitution } from './api-fixtures';
 
 async function tool(request: APIRequestContext, name: string, args: Record<string, unknown>, key?: string) {
   const response = await request.post('/mcp', {
@@ -93,6 +93,163 @@ test('an admin reviews and publishes their MCP import in the editor journey', as
   }
 });
 
+test('MCP setup display controls persist and render the same source through review and publication', async ({ page, request, browser }, testInfo) => {
+  test.setTimeout(240_000);
+  const admin = await adminHeaders(request);
+  const keyResponse = await request.post('/api/identity/mcp-keys', { headers: admin, data: {
+    name: `Display settings ${randomUUID()}`, scopes: ['mcp:read', 'ingestion:import'],
+  } });
+  expect(keyResponse.status()).toBe(201);
+  const key = await keyResponse.json();
+  const slug = `display-settings-${randomUUID()}`;
+  const roots = [{ kind: 'article', label: 'I', title: 'Rights', content: [
+    { type: 'child', node: { kind: 'paragraph', label: '(1)', title: 'Freedom', content: [{ type: 'text', text: 'Alle Menschen sind frei.' }] } },
+    { type: 'child', node: { kind: 'paragraph', label: '(2)', title: 'Equality', content: [{ type: 'text', text: 'Alle Menschen sind gleich.' }] } },
+  ] }];
+  const proposal = { isoCode: 'XA', countryName: 'Atlas Testland', constitutionSlug: slug,
+    constitutionTitle: 'Display settings charter', languageCode: 'de', sourceUrl: 'https://example.org/atlas-e2e/display',
+    outline: { kinds: [
+      { kindCode: 'article', displayLabel: 'Article', root: true, allowedChildKinds: ['paragraph'], showKind: true, showLabel: true, showTitle: true, titlePolicy: 'optional', labelPolicy: 'optional' },
+      { kindCode: 'paragraph', displayLabel: 'Paragraph', root: false, allowedChildKinds: [], showKind: true, showLabel: true, showTitle: true, titlePolicy: 'optional', labelPolicy: 'optional' },
+    ] }, sampleRoots: roots };
+  try {
+    const proposed = await tool(request, 'propose_constitution_setup', { proposal }, key.token);
+    expect(proposed.isError).toBeUndefined();
+    const proposalId = proposed.structuredContent!.proposalId;
+    const path = `/api/ingestion/import-setup-proposals/${proposalId}`;
+    const readProposal = async () => {
+      const response = await request.get(path, { headers: admin });
+      expect(response.ok()).toBeTruthy();
+      return response.json();
+    };
+    await page.context().addCookies([{ name: 'ca_session', value: admin.Authorization.slice(7), url: String(testInfo.project.use.baseURL), httpOnly: true, sameSite: 'Lax' }]);
+    await page.goto(`/admin/import/setup/${proposalId}`);
+    const controls = page.locator('fieldset').nth(1);
+    const preview = page.locator('[data-preview-kind="paragraph"]:visible').first();
+    const heading = preview.locator(':scope > .node-heading');
+    const openSettings = () => page.getByText('Display settings', { exact: true }).click();
+    const saveAndReload = async (expected: Record<string, unknown>) => {
+      const before = await readProposal();
+      await page.getByRole('button', { name: 'Save display settings' }).click();
+      await expect.poll(async () => (await readProposal()).revision).toBe(before.revision + 1);
+      // Wait for the form's full-page navigation before reloading persisted state.
+      await expect(page.locator('input[name="revision"]')).toHaveValue(String(before.revision + 1));
+      await page.reload();
+      const saved = await readProposal();
+      expect(saved.payload.outline.kinds[1]).toMatchObject(expected);
+      expect(saved.payload.sampleRoots).toEqual(before.payload.sampleRoots);
+      await openSettings();
+    };
+
+    await openSettings();
+    await expect(heading).toHaveText('Paragraph (1) — Freedom');
+    const parentPlacement = page.locator('fieldset').first().getByLabel('Label placement', { exact: true });
+    await expect(parentPlacement.locator('option[value="inline"]')).toBeDisabled();
+    await expect(parentPlacement.locator('option[value="superscript"]')).toBeDisabled();
+    await controls.getByLabel('Displayed unit name', { exact: true }).fill('Absatz');
+    await controls.getByLabel('Label placement', { exact: true }).selectOption('after_title');
+    await expect(heading).toHaveText('Absatz Freedom (1)');
+    await saveAndReload({ displayLabel: 'Absatz', labelPlacement: 'after_title' });
+    await expect(controls.getByLabel('Displayed unit name', { exact: true })).toHaveValue('Absatz');
+    await expect(heading).toHaveText('Absatz Freedom (1)');
+
+    await controls.getByLabel('Show unit name', { exact: true }).uncheck();
+    await expect(heading).toHaveText('Freedom (1)');
+    await controls.getByLabel('Show title', { exact: true }).uncheck();
+    await expect(heading).toHaveText('(1)');
+    await expect(controls.getByLabel('Label placement', { exact: true }).locator('option[value="after_title"]')).toBeDisabled();
+    await controls.getByLabel('Show source label', { exact: true }).uncheck();
+    await expect(heading).toHaveCount(0);
+    await expect(controls.getByLabel('Label placement', { exact: true })).toBeDisabled();
+    await saveAndReload({ showKind: false, showTitle: false, showLabel: false });
+    await expect(heading).toHaveCount(0);
+    for (const label of ['Show unit name', 'Show title', 'Show source label']) {
+      await expect(controls.getByLabel(label, { exact: true })).not.toBeChecked();
+      await controls.getByLabel(label, { exact: true }).check();
+    }
+    await controls.getByLabel('Label placement', { exact: true }).selectOption('before_title');
+    await saveAndReload({ showKind: true, showTitle: true, showLabel: true, labelPlacement: 'before_title' });
+    await expect(heading).toHaveText('Absatz (1) — Freedom');
+    await controls.getByLabel('Label placement', { exact: true }).selectOption('inline');
+    await saveAndReload({ labelPlacement: 'inline' });
+    await expect(heading).toHaveText('Absatz — Freedom');
+    await expect(preview.locator(':scope > span.num')).toHaveText('(1)');
+    await expect(preview.locator(':scope > sup.num')).toHaveCount(0);
+    await controls.getByLabel('Label placement', { exact: true }).selectOption('superscript');
+    await saveAndReload({ labelPlacement: 'superscript' });
+    await expect(preview.locator(':scope > sup.num')).toHaveText('(1)');
+    await expect(preview.locator(':scope > span.num')).toHaveCount(0);
+
+    await controls.getByLabel('Layout', { exact: true }).selectOption('concatenated');
+    await expect(controls.getByLabel('Show unit name', { exact: true })).toBeDisabled();
+    await expect(controls.getByLabel('Show title', { exact: true })).toBeDisabled();
+    await expect(controls.getByLabel('Label placement', { exact: true }).locator('option[value="before_title"]')).toBeDisabled();
+    await saveAndReload({ presentation: 'concatenated', labelPlacement: 'superscript' });
+    await expect(controls.getByLabel('Layout', { exact: true })).toHaveValue('concatenated');
+    await expect(page.locator('.constitution-concat:visible')).toHaveCount(1);
+    await expect(page.locator('.constitution-concat:visible sup.num')).toHaveText(['(1)', '(2)']);
+    await expect(page.locator('.constitution-concat:visible')).toHaveText('(1)Alle Menschen sind frei. (2)Alle Menschen sind gleich.');
+    await expect(page.locator('.constitution-concat:visible .node-heading')).toHaveCount(0);
+
+    // Confirmation also persists edits made since the last explicit save.
+    await page.locator('fieldset').first().getByLabel('Displayed unit name', { exact: true }).fill('Artikel');
+    await page.getByRole('button', { name: 'Confirm structure and enable full upload' }).click();
+    await expect(page.getByRole('heading', { name: 'Structure confirmed – full upload enabled' })).toBeVisible();
+    const setup = await tool(request, 'get_import_setup', { countryCode: 'XA', constitutionSlug: slug }, key.token);
+    expect(setup.isError).toBeUndefined();
+    const settingsResponse = await request.get(`/api/catalog/constitutions/${setup.structuredContent!.constitutionId}/settings`, { headers: admin });
+    expect(settingsResponse.ok()).toBeTruthy();
+    const settings = await settingsResponse.json();
+    expect(settings.id).toBe(setup.structuredContent!.settingsRevisionId);
+    expect(settings.outline.kinds[0].displayLabel).toBe('Artikel');
+    expect(settings.outline.kinds[1]).toMatchObject({ displayLabel: 'Absatz', presentation: 'concatenated', labelPlacement: 'superscript' });
+    const staged = await tool(request, 'stage_constitution_import', { payload: {
+      isoCode: proposal.isoCode, countryName: proposal.countryName, constitutionSlug: slug, constitutionTitle: proposal.constitutionTitle,
+      constitutionId: setup.structuredContent!.constitutionId, settingsRevisionId: setup.structuredContent!.settingsRevisionId,
+      versionLabel: 'Display controls verified', languageCode: 'de', sourceUrl: proposal.sourceUrl, roots,
+    } }, key.token);
+    expect(staged.isError).toBeUndefined();
+    expect(staged.structuredContent!.status).toBe('pending_review');
+    const jobId = staged.structuredContent!.jobId;
+    await page.goto(`/editor?importJobId=${jobId}`);
+    await page.getByRole('button', { name: 'Prepare unpublished draft' }).click();
+    await expect(page.getByRole('heading', { name: 'Prepared draft as readers will see it' })).toBeVisible();
+    const assertRendered = async (view: typeof page) => {
+      await expect(view.locator('.constitution-concat:visible')).toHaveText('(1)Alle Menschen sind frei. (2)Alle Menschen sind gleich.');
+      await expect(view.locator('.constitution-concat:visible sup.num')).toHaveText(['(1)', '(2)']);
+      await expect(view.locator('.constitution-concat:visible .node-heading')).toHaveCount(0);
+    };
+    await assertRendered(page);
+    await page.reload();
+    await assertRendered(page);
+    await expect(page.locator('.node-heading:visible').filter({ hasText: 'Artikel I — Rights' })).toHaveCount(1);
+    const prepared = await (await request.get(`/api/ingestion/import-jobs/${jobId}`, { headers: admin })).json();
+    const before = await (await request.get(`/api/content/versions/${prepared.versionId}/content`, { headers: admin })).json();
+    expect(before.roots[0]).toMatchObject({ kind: 'article', label: 'I', title: 'Rights' });
+    expect(before.roots[0].content.map((entry: any) => ({ label: entry.node.label, title: entry.node.title, text: entry.node.content[0].text }))).toEqual([
+      { label: '(1)', title: 'Freedom', text: 'Alle Menschen sind frei.' }, { label: '(2)', title: 'Equality', text: 'Alle Menschen sind gleich.' },
+    ]);
+    expect((await request.get(`/api/content/versions/${prepared.versionId}/content`)).status()).toBe(404);
+    for (const [role, action] of [['reviewer', 'approve'], ['publisher', 'publish']] as const) {
+      const response = await request.post(`/api/ingestion/import-jobs/${jobId}/${action}`, { headers: await roleHeaders(request, role),
+        ...(action === 'approve' ? { data: { reason: 'Verified persisted display settings, exact source wording and reader preview.' } } : {}) });
+      expect(response.ok(), `${action}: ${await response.text()}`).toBeTruthy();
+    }
+    const anonymous = await browser.newContext({ baseURL: String(testInfo.project.use.baseURL) });
+    try {
+      const reader = await anonymous.newPage();
+      await reader.goto(`/countries/XA/versions/${prepared.versionId}/units/${before.roots[0].occurrenceId}`);
+      await expect(reader.getByRole('heading', { name: 'Artikel · I · Rights', exact: true })).toBeVisible();
+      await assertRendered(reader);
+      await reader.reload();
+      await assertRendered(reader);
+      expect(await (await request.get(`/api/content/versions/${prepared.versionId}/content`)).json()).toEqual(before);
+    } finally { await anonymous.close(); }
+  } finally {
+    expect((await request.delete(`/api/identity/mcp-keys/${key.key.id}`, { headers: admin })).status()).toBe(204);
+  }
+});
+
 test('MCP waits while an administrator requests and confirms an exact setup revision on the website', async ({ page, request }, testInfo) => {
   test.setTimeout(180_000);
   const admin = await adminHeaders(request);
@@ -115,6 +272,7 @@ test('MCP waits while an administrator requests and confirms an exact setup revi
     await page.getByLabel('Displayed unit name', { exact: true }).fill('Art.');
     await page.getByRole('button', { name: 'Save display settings' }).click();
     await expect.poll(async () => (await (await request.get(path, { headers: admin })).json()).revision).toBe(2);
+    await expect(page.locator('input[name="revision"]')).toHaveValue('2');
     await page.reload();
     await expect(page.locator('[data-preview-kind="article"]:visible')).toContainText('Art. 1');
     await page.getByText('Request changes through your chat client', { exact: true }).click();

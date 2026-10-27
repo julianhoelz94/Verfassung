@@ -6,7 +6,7 @@ import { AdminForbidden } from '../components/AdminForbidden';
 import { Alert, Button, Card, PageHeader, WorkflowSteps } from '../components/ui';
 import { WorkspacePage } from '../components/layout/templates';
 import { getImportJob, getImportPayload, getPreparedImportContent, getImportReviewDecisions } from '../../lib/ingestion-api';
-import { getVersionSettings } from '../../lib/api';
+import { getReaderOutline } from '../../lib/api';
 import { OrderedContentTree } from '../components/ConstitutionText';
 import { currentUser, requireSessionBearer } from '../../lib/session';
 import { transitionImportAction } from '../admin/import/actions';
@@ -36,11 +36,11 @@ export async function ImportReview({ jobId, error }: { jobId: string; error?: st
   if (!job) {
     notFound();
   }
-  const [payload, decisions, prepared, settings] = await Promise.all([
+  const [payload, decisions, prepared, outline] = await Promise.all([
     getImportPayload(jobId, authorization).catch(() => null),
     getImportReviewDecisions(jobId, authorization).catch(() => []),
     job.versionId ? getPreparedImportContent(job.versionId, authorization).catch(() => null) : null,
-    job.versionId ? getVersionSettings(job.versionId, authorization).catch(() => null) : null,
+    job.versionId ? getReaderOutline(job.versionId, authorization).catch(() => null) : null,
   ]);
   const publisher = user.roles.includes('publisher') || user.roles.includes('admin');
   const phase = importPhase(job);
@@ -90,12 +90,12 @@ export async function ImportReview({ jobId, error }: { jobId: string; error?: st
         <p>{String(payload.countryName ?? job.isoCode ?? '')}</p>
         {typeof payload.sourceUrl === 'string' && payload.sourceUrl.startsWith('https://') ? <p><a href={payload.sourceUrl} target="_blank" rel="noreferrer"><T value={ui.importReview.source} /></a></p> : null}
         {typeof payload.gazetteReference === 'string' ? <p>{payload.gazetteReference}</p> : null}
-        {settings?.outline?.kinds.length ? <p><strong><T value={ui.importWorkflow.structure} />:</strong> {settings.outline.kinds.map(kind => kind.displayLabel).join(' → ')}</p> : null}
+        {outline?.kinds.length ? <p><strong><T value={ui.importWorkflow.structure} />:</strong> {outline.kinds.map(kind => kind.displayLabel).join(' → ')}</p> : null}
         <p><a href="#import-structure"><T value={ui.importWorkflow.checkStructure} /></a></p>
       </Card> : null}
       {prepared ? <Card>
         <h2><T value={ui.admin.import.jobid.page.preparedDraftAsReadersWillSeeIt} /></h2>
-        <OrderedContentTree entries={prepared.roots.map(node => ({ type: 'child' as const, node }))} outline={settings?.outline} />
+        <OrderedContentTree entries={prepared.roots.map(node => ({ type: 'child' as const, node }))} outline={outline ?? undefined} />
       </Card> : null}
       <Disclosure summary={<T value={reviewUi.technicalDetails} />}>
         <dl className="technical-identifiers">
@@ -107,7 +107,7 @@ export async function ImportReview({ jobId, error }: { jobId: string; error?: st
           </> : null}
         </dl>
       </Disclosure>
-      {payload ? <details id="import-structure"><summary><T value={ui.importReview.submittedContent} /></summary><ImportPreview payload={payload} outline={settings?.outline} /></details> : null}
+      {payload ? <details id="import-structure"><summary><T value={ui.importReview.submittedContent} /></summary><ImportPreview payload={payload} outline={outline ?? undefined} /></details> : null}
       {decisions.length ? <Card><h2><T value={ui.admin.import.jobid.page.reviewDecisions} /></h2><ol>{decisions.map(decision => <li key={decision.id}>
         <strong>{decision.decision}</strong> · {new Date(decision.decidedAt).toLocaleString()}<p>{decision.reason}</p>
       </li>)}</ol></Card> : null}

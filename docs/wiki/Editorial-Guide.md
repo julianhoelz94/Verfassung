@@ -37,7 +37,9 @@
 
 Choose **Edit source information** directly in the **Archival source** block on the current reading version. Editors and administrators can correct the source date wording and precision, import coverage, status wording and attribution. The general legal-validity notice remains fixed site text.
 
-Save the source draft with a reason, then compare the published and saved values. The history retains every saved revision and records accounts, timestamps and review decisions. Unsaved fields block submission; stale-write errors retain your input.
+The four text fields hold the source information. Date precision is folded away under **Additional date information**. The **Reason for the correction** has its own section and belongs only to the editing history.
+
+Save the source draft with that reason, then compare the published and saved values. The history retains every saved revision and records accounts, timestamps and review decisions. Unsaved fields block submission; stale-write errors retain your input.
 
 Submitting locks the draft. A reviewer can approve the displayed revision or request changes with a reason. A requested correction requires a new saved source revision and another submission. As with text corrections, a non-admin cannot approve their own session.
 

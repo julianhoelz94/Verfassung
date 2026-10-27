@@ -98,8 +98,9 @@ export function SourceEvidenceWorkspace({ preview, publishedEvidence, userId, ro
     {error || saveError ? <Alert tone="error">{saveError ?? error}</Alert> : null}
     {saved ? <Alert tone="success"><T value={copy.saved} /></Alert> : null}
     <p><T value={copy.explanation} /></p>
-    <Stack as="section" id="source-evidence" aria-label={t(copy.edit)}>
-      {canEdit ? <Stack as="form" action="/editor/command" method="post" onSubmit={save} onChange={() => { setDirty(true); setSaved(false); }}>
+    <Stack as="section" id="source-evidence" aria-label={t(copy.fieldsGroup)}>
+      <h2><T value={copy.fieldsGroup} /></h2>
+      {canEdit ? <Stack as="form" id="source-evidence-form" action="/editor/command" method="post" onSubmit={save} onChange={() => { setDirty(true); setSaved(false); }}>
         {fields}
         <input type="hidden" name="command" value="source-evidence" />
         <input type="hidden" name="expectedRevision" value={expectedRevision} />
@@ -108,15 +109,25 @@ export function SourceEvidenceWorkspace({ preview, publishedEvidence, userId, ro
           <textarea id={`source-${field}`} name={field} value={evidence[field] ?? ''} maxLength={10000} rows={field === 'coverage' ? 3 : 2}
             onChange={event => setEvidence(current => ({ ...current, [field]: event.target.value }))} />
         </Stack>)}
-        <label htmlFor="source-datePrecision"><T value={copy.datePrecision} /></label>
-        <select id="source-datePrecision" name="datePrecision" value={evidence.datePrecision} onChange={event => setEvidence(current => ({ ...current, datePrecision: event.target.value as SourceEvidence['datePrecision'] }))}>
-          {Object.entries(sourcePrecisionUi).map(([value, label]) => <option key={value} value={value}>{t(label)}</option>)}
-        </select>
-        <label htmlFor="source-reason"><T value={copy.reason} /></label>
-        <textarea id="source-reason" name="reason" value={reason} maxLength={4000} rows={3} required onChange={event => setReason(event.target.value)} />
-        <Button disabled={saving || !dirty}><T value={copy.save} /></Button>
+        <details><summary><T value={copy.moreDates} /></summary>
+          <Stack>
+            <label htmlFor="source-datePrecision"><T value={copy.datePrecision} /></label>
+            <select id="source-datePrecision" name="datePrecision" value={evidence.datePrecision} onChange={event => setEvidence(current => ({ ...current, datePrecision: event.target.value as SourceEvidence['datePrecision'] }))}>
+              {Object.entries(sourcePrecisionUi).map(([value, label]) => <option key={value} value={value}>{t(label)}</option>)}
+            </select>
+          </Stack>
+        </details>
       </Stack> : null}
-      {latest ? <><h2><T value={copy.after} /></h2><EvidenceTable before={original} after={latest.evidence} /><p><strong><T value={copy.reason} />:</strong> {latest.reason}</p></> : <p><T value={copy.noDraft} /></p>}
+      {latest ? <><h3><T value={copy.after} /></h3><EvidenceTable before={original} after={latest.evidence} /></> : <p><T value={copy.noDraft} /></p>}
+    </Stack>
+    <Stack as="section" id="source-change-reason" aria-labelledby="source-reason-heading">
+      <h2 id="source-reason-heading"><T value={copy.reason} /></h2>
+      <p><T value={copy.reasonHelp} /></p>
+      {canEdit ? <>
+        <textarea id="source-reason" name="reason" form="source-evidence-form" aria-labelledby="source-reason-heading" value={reason} maxLength={4000} rows={3} required
+          onChange={event => { setReason(event.target.value); setDirty(true); setSaved(false); }} />
+        <Button form="source-evidence-form" disabled={saving || !dirty}><T value={copy.save} /></Button>
+      </> : <p>{latest?.reason ?? t(copy.noDraft)}</p>}
     </Stack>
     <p><T value={copy.textReminder} /> <a href={`/editor?sessionId=${encodeURIComponent(session.id)}&scope=text`}><T value={copy.inspectText} /></a></p>
     <Inline>
@@ -139,8 +150,9 @@ export function SourceEvidenceWorkspace({ preview, publishedEvidence, userId, ro
       <h2><T value={copy.history} /></h2>
       <ol>{(preview.sourceEvidenceRevisions ?? []).map(revision => <li key={revision.id}>
         <details><summary><T value={copy.revision} /> {revision.revision} · <time dateTime={revision.createdAt}>{date(revision.createdAt)}</time></summary>
-          <p><T value={copy.author} />: {revision.actorEmail ?? revision.actorId}</p><p>{revision.reason}</p>
+          <p><T value={copy.author} />: {revision.actorEmail ?? revision.actorId}</p>
           <EvidenceTable before={revision.original} after={revision.evidence} />
+          <p><strong><T value={copy.reason} />:</strong> {revision.reason}</p>
         </details>
       </li>)}</ol>
       <ol>{(preview.sourceEvidenceDecisions ?? []).map(decision => <li key={decision.id}>

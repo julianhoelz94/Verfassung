@@ -37,7 +37,9 @@
 
 Öffnen Sie in der aktuellen Lesefassung direkt am Block **Archivquelle** die Aktion **Quellenangaben bearbeiten**. Bearbeiter und Administratoren können Datierung und deren Genauigkeit, Umfang des Imports, Statuswortlaut und Quellenangabe ändern. Der allgemeine Hinweis zur Rechtsgeltung bleibt ein fester Seitentext.
 
-Speichern Sie den **Quellenentwurf** mit einer Begründung und kontrollieren Sie die Gegenüberstellung der veröffentlichten und gespeicherten Angaben. Die Historie enthält jede gespeicherte Revision sowie Benutzerkonto, Zeitpunkt und Prüfentscheidungen. Noch ungespeicherte Felder verhindern das Einreichen; ein Konflikt mit einer neueren Revision erhält Ihre Eingaben.
+Die vier Textfelder bilden die Quellenangaben ab. Die Datierungsgenauigkeit liegt eingeklappt unter **Weitere Datierungsangaben**. Die **Begründung der Korrektur** steht in einem eigenen Abschnitt und gehört ausschließlich zur Bearbeitungshistorie.
+
+Speichern Sie den **Quellenentwurf** mit dieser Begründung und kontrollieren Sie die Gegenüberstellung der veröffentlichten und gespeicherten Angaben. Die Historie enthält jede gespeicherte Revision sowie Benutzerkonto, Zeitpunkt und Prüfentscheidungen. Noch ungespeicherte Felder verhindern das Einreichen; ein Konflikt mit einer neueren Revision erhält Ihre Eingaben.
 
 Nach **Zur Prüfung einreichen** sind die Angaben gesperrt. Ein Prüfer kann die Korrektur freigeben oder begründete Änderungen anfordern. Nach einer Änderungsanforderung muss der Bearbeiter eine neue Quellenrevision speichern und erneut einreichen. Die Freigabe gilt für die angezeigte Revision. Wie bei Textkorrekturen darf ein Bearbeiter ohne Administratorrolle seine eigene Sitzung nicht freigeben.
 

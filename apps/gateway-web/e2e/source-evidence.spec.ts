@@ -13,6 +13,9 @@ test('the reader source block opens a source correction with protected unsaved i
   await expect(page).toHaveURL(/scope=sources/);
   await expect(page.getByRole('heading', { name: 'Edit source information' })).toBeVisible();
   await expect(page.getByLabel('Date precision')).toHaveValue('unknown');
+  await expect(page.getByLabel('Date precision')).not.toBeVisible();
+  await expect(page.locator('#source-evidence textarea')).toHaveCount(4);
+  await expect(page.locator('#source-change-reason textarea')).toHaveCount(1);
   await page.getByLabel('Coverage of the imported text').fill('Articles 1–10 only.');
   await page.getByLabel('Reason for the correction').fill('Describe the imported excerpt.');
   await expect(page.getByRole('button', { name: 'Save source draft' })).toBeEnabled();

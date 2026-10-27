@@ -34,12 +34,23 @@ describe('source evidence workflow', () => {
     await act(async () => { coverage.value = 'My unsaved correction'; Simulate.change(coverage); });
     expect(button('Zur Prüfung einreichen').disabled).toBe(true);
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ key: 'stale_source_evidence' }, { status: 400 })));
-    await act(async () => Simulate.submit(button('Quellenentwurf speichern').closest('form')!));
+    await act(async () => Simulate.submit(host.querySelector('#source-evidence-form')!));
     expect(coverage.value).toBe('My unsaved correction');
     expect(host.querySelector('[role="alert"]')?.textContent).toContain('Deine Eingaben bleiben erhalten');
     expect(button('Zur Prüfung einreichen').disabled).toBe(true);
     const submitted = (fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].body as FormData;
     expect(submitted.get('expectedRevision')).toBe('1');
+    expect(submitted.get('reason')).toBe('Clarify scope');
+  });
+
+  it('keeps the correction reason separate from the source fields and folds away date precision', async () => {
+    await mount();
+    const source = host.querySelector('#source-evidence')!;
+    expect(source.querySelector('[name="reason"]')).toBeNull();
+    expect(source.querySelectorAll('textarea')).toHaveLength(4);
+    expect(host.querySelector('#source-change-reason #source-reason')).not.toBeNull();
+    expect(source.querySelector('details')?.open).toBe(false);
+    expect(button('Quellenentwurf speichern').getAttribute('form')).toBe('source-evidence-form');
   });
 
   it('shows saved before/after values and exact approval revision to a reviewer', async () => {

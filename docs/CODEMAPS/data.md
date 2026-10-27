@@ -13,11 +13,11 @@ columns and indexes; historical seed/compatibility migrations must remain availa
 | Content | `content_snapshots`, immutable `content_node_revisions` / `content_text_revisions`, ordered `content_revision_entries`, snapshot roots/occurrences and publication receipts; legacy `content_nodes` and the `articles` compatibility view remain supported |
 | Amendment | Legal change identity/revisions/changes, published version pins, diff runs/decisions and publication-attempt receipts; legacy transitions remain for compatibility |
 | Document | Documents, immutable metadata/files/revisions and append-only lifecycle/link events; legal-page revisions/publication and shared imprint-contact revisions |
-| Identity | Users/roles/sessions, throttles, invites/reset/registration verification, MFA/recovery/challenges, passkeys, service/MCP/OAuth credentials, saved mail/access/translation policies and durable `deployment_setup` |
+| Identity | Users/roles/sessions, throttles, invites/reset/registration verification, MFA/recovery/challenges, passkeys, service/MCP/OAuth credentials, saved mail/access/translation policies, durable `deployment_setup` and transactional `security_audit_outbox` |
 | Editor | Sessions, draft changes/revisions, pinned structured sources/operations, publication jobs, diff runs/decisions and delivery outbox |
 | Ingestion | Jobs/errors/staging records, batches/review decisions, setup proposals, resumable uploads/chunks and publication outbox |
 | Search | Rebuildable `search_documents` and `index_sync_state`; generation-pinned reads use one consistent index transaction |
-| Audit | Append-only `audit_events`; event attribution and payload are recorded without changing authored content |
+| Audit | Append-only `audit_events`; stable event IDs deduplicate retries; original attribution/time are retained; restricted runtime INSERT/SELECT role is separate from Flyway owner |
 
 Catalog V25/V26 add `jurisdictions` with stable IDs, sibling-unique slugs, optional codes, historical status and optional existence dates. Existing countries retain their UUIDs as root jurisdictions. Constitutions, slug aliases and succession are scoped to `jurisdiction_id`; nullable `country_id` preserves legacy national-owner reads. Historical codes may be reused without merging identities.
 

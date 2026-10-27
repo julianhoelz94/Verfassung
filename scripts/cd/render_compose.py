@@ -35,6 +35,7 @@ def render(root):
         for key, value in list(environment.items()):
             if isinstance(value, str):
                 environment[key] = value.replace("${POSTGRES_PASSWORD:-postgres}", "${POSTGRES_PASSWORD:?Set a database password}")
+                environment[key] = environment[key].replace("${AUDIT_RUNTIME_PASSWORD:-local-audit-runtime-change-me}", "${AUDIT_RUNTIME_PASSWORD:?Set a separate Audit runtime password}")
         if "SPRING_PROFILES_ACTIVE" in environment:
             environment["SPRING_PROFILES_ACTIVE"] = "production"
             service["healthcheck"] = {

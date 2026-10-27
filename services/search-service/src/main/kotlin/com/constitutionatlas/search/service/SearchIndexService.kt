@@ -7,6 +7,7 @@ import com.constitutionatlas.search.api.SearchQuery
 import com.constitutionatlas.search.client.IndexSource
 import com.constitutionatlas.search.repo.SearchRepository
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Isolation
 import org.springframework.transaction.annotation.Transactional
 
 @Service
@@ -30,5 +31,6 @@ class SearchIndexService(
             ),
         )
 
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     fun facets(): SearchFacets = searchRepository.facets()
 }

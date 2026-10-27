@@ -9,8 +9,9 @@ import java.util.UUID
 
 class OrderedIndexSourceTest {
     @Test
-    fun historicalAndRegionalCodesNeverBecomeCompatibleNationalRoutes() {
-        for ((kind, historical, expectedCode) in listOf(Triple("country", false, "DE"), Triple("country", true, ""), Triple("region", false, ""))) {
+    fun usesCatalogOwnershipForCountryRoutesIncludingNonstandardSlugs() {
+        data class Case(val kind: String, val historical: Boolean, val slug: String, val expectedCode: String)
+        for ((kind, historical, slug, expectedCode) in listOf(Case("country", false, "de", "DE"), Case("country", true, "de", ""), Case("region", false, "de", ""), Case("country", false, "germany", ""))) {
             val jurisdiction = UUID.randomUUID()
             val version = UUID.randomUUID()
             val unit = UUID.randomUUID()
@@ -18,8 +19,9 @@ class OrderedIndexSourceTest {
             val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
             server.createContext("/") { exchange ->
                 val response: Any = when (exchange.requestURI.path) {
-                    "/jurisdictions" -> listOf(mapOf("id" to jurisdiction, "name" to "Recorded jurisdiction", "code" to "DE", "kind" to kind, "historical" to historical))
+                    "/jurisdictions" -> listOf(mapOf("id" to jurisdiction, "name" to "Recorded jurisdiction", "code" to "DE", "kind" to kind, "historical" to historical, "slug" to slug))
                     "/jurisdictions/$jurisdiction" -> mapOf("children" to emptyList<Any>(), "constitutions" to listOf(mapOf("title" to "Source charter", "versions" to listOf(mapOf("id" to version, "versionLabel" to "Source")))))
+                    "/versions/$version" -> mapOf("jurisdictionId" to jurisdiction, "countryCode" to expectedCode.ifBlank { null })
                     "/versions/$version/units" -> listOf(mapOf("id" to unit))
                     else -> mapOf("id" to unit, "versionId" to version, "articleNumber" to "1", "title" to "Title", "body" to "Exact source text")
                 }
@@ -60,6 +62,7 @@ class OrderedIndexSourceTest {
             val response: Any = when (path) {
                 "/jurisdictions" -> listOf(mapOf("id" to jurisdiction, "code" to "DE", "name" to "Germany"))
                 "/jurisdictions/$jurisdiction" -> mapOf("name" to "Germany", "constitutions" to listOf(mapOf("title" to "Constitution", "versions" to listOf(mapOf("id" to firstLegal, "currentVersionId" to firstTip, "versionLabel" to "1"), mapOf("id" to secondLegal, "versionLabel" to "2")))))
+                "/versions/$firstTip", "/versions/$secondLegal" -> mapOf("jurisdictionId" to jurisdiction, "countryCode" to "DE")
                 "/versions/$firstTip/units" -> listOf(mapOf("id" to firstOccurrence))
                 "/versions/$secondLegal/units" -> listOf(mapOf("id" to secondOccurrence))
                 "/versions/$firstTip/units/$firstOccurrence" -> unit(firstTip, firstOccurrence)

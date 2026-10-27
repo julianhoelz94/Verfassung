@@ -343,6 +343,7 @@ export type VersionFacet = {
   label: string;
   constitutionTitle: string;
   countryCode: string;
+  jurisdictionId?: string | null;
   count: number;
 };
 
@@ -355,7 +356,7 @@ export type SearchFacets = {
   countries: CountryFacet[];
   versions: VersionFacet[];
   dates: DateFacet[];
-  jurisdictions?: { id: string; name: string; historical: boolean; count: number }[];
+  jurisdictions?: { id: string; name: string; historical: boolean; countryCode?: string; count: number }[];
 };
 
 export function searchArticles(query: string, filters: SearchFilters = {}): Promise<SearchPage | null> {

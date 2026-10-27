@@ -421,22 +421,18 @@ class EditorService(
             DomainEvents.SEARCH_REINDEX_REQUESTED,
             mapOf("versionId" to published.id),
         )
-        try {
-            auditClient.record(
-                actor,
-                "version_published",
-                "edit_session",
-                session.id,
-                mapOf(
-                    "sourceVersionId" to session.versionId,
-                    "newVersionId" to published.id,
-                    "articleIds" to drafts.map { it.articleId },
-                    "hopKind" to hopKind,
-                ),
-            )
-        } catch (ex: RuntimeException) {
-            log.warn("audit append failed after successor {} was published: {}", published.id, ex.message)
-        }
+        auditClient.record(
+            actor,
+            "version_published",
+            "edit_session",
+            session.id,
+            mapOf(
+                "sourceVersionId" to session.versionId,
+                "newVersionId" to published.id,
+                "articleIds" to drafts.map { it.articleId },
+                "hopKind" to hopKind,
+            ),
+        )
         return previewDto(session.id)
     }
 

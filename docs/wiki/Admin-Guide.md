@@ -28,6 +28,8 @@ In **Constitutions**, create a constitution through **Basics → Structure → R
 
 Consecutive sentence units configured as running text flow together. Unnumbered parent text between units starts a separate paragraph. Supplied source samples retain their original order.
 
+If confirmation of an import structure is interrupted, use **Resume confirmation** on the same proposal. Its reviewed revision stays fixed while confirmation runs; display settings and change requests remain unavailable. If another attempt is active, reload or retry after two minutes. Recovery reuses the original constitution creation and reviewed outline; it does not confirm a newer client revision or publish imported text.
+
 ## First installation
 
 Changing roles or disabling an account revokes its sessions, pending enrollment challenges and personal MCP/OAuth credentials. Disabling an invited account also invalidates the invitation. Re-enabling does not restore revoked credentials. Automation service tokens retain separate rotation/revocation controls.

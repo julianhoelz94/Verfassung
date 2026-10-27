@@ -80,6 +80,69 @@ class CatalogApiTest {
         .first { catalogRepository.findCountrySummary(it) == null }
 
     @Test
+    fun constitutionCreationRetriesReturnTheOriginalReviewedSettingsAndRejectDifferentPayloads() {
+        val country = writes.createCountry(com.constitutionatlas.catalog.api.CreateCountryRequest(uniqueCountryCode(), "Setup receipt"))
+        val attempt = UUID.randomUUID()
+        val kind = com.constitutionatlas.catalog.api.OutlineKindWrite("article", "Reviewed article", root = true, allowedChildKinds = emptyList())
+        val request = com.constitutionatlas.catalog.api.CreateConstitutionRequest("setup-receipt", "Reviewed title", listOf(kind), creationAttemptId = attempt)
+        val created = writes.createConstitution(country.isoCode, request)
+        val replay = writes.createJurisdictionConstitution(country.id, request)
+        assertThat(replay).isEqualTo(created)
+        assertThat(created.settingsRevisionId).isNotNull()
+        assertThat(created.contentOutline.kinds.single().displayLabel).isEqualTo("Reviewed article")
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM constitutions WHERE jurisdiction_id = ? AND slug = ?", Int::class.java, country.id, request.slug)).isEqualTo(1)
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM constitution_settings_revisions WHERE constitution_id = ?", Int::class.java, created.id)).isEqualTo(1)
+
+        writes.replaceOutline(created.id, listOf(kind.copy(displayLabel = "Later label")))
+        assertThat(settingsRepository.currentId(created.id)).isNotEqualTo(created.settingsRevisionId)
+        assertThat(writes.createConstitution(country.isoCode, request)).isEqualTo(created)
+        org.junit.jupiter.api.Assertions.assertThrows(com.constitutionatlas.catalog.ConflictException::class.java) {
+            writes.createConstitution(country.isoCode, request.copy(title = "Unreviewed title"))
+        }
+        org.junit.jupiter.api.Assertions.assertThrows(com.constitutionatlas.catalog.ConflictException::class.java) {
+            writes.createConstitution(country.isoCode, request.copy(creationAttemptId = UUID.randomUUID()))
+        }
+        val other = writes.createCountry(com.constitutionatlas.catalog.api.CreateCountryRequest(uniqueCountryCode(), "Other owner"))
+        org.junit.jupiter.api.Assertions.assertThrows(com.constitutionatlas.catalog.ConflictException::class.java) {
+            writes.createJurisdictionConstitution(other.id, request)
+        }
+    }
+
+    @Test
+    fun invalidSetupOutlineRollsBackConstitutionAndCreationReceiptTogether() {
+        val country = writes.createCountry(com.constitutionatlas.catalog.api.CreateCountryRequest(uniqueCountryCode(), "Setup rollback"))
+        val attempt = UUID.randomUUID()
+        val kind = com.constitutionatlas.catalog.api.OutlineKindWrite("article", "Article", allowedChildKinds = listOf("missing"))
+        val request = com.constitutionatlas.catalog.api.CreateConstitutionRequest("setup-rollback", "Setup", listOf(kind), creationAttemptId = attempt)
+        assertThat(org.junit.jupiter.api.Assertions.assertThrows(com.constitutionatlas.catalog.ConflictException::class.java) { writes.createConstitution(country.isoCode, request) }.code).isEqualTo("constitution_creation_rejected")
+        assertThat(catalogRepository.findConstitutionId(country.id, request.slug)).isNull()
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM constitution_creation_receipts WHERE id = ?", Int::class.java, attempt)).isZero()
+        val valid = request.copy(outline = listOf(kind.copy(allowedChildKinds = emptyList())))
+        assertThat(writes.createConstitution(country.isoCode, valid).settingsRevisionId).isNotNull()
+    }
+
+    @Test
+    fun concurrentSetupCreationSharesOneConstitutionAndReceipt() {
+        val country = writes.createCountry(com.constitutionatlas.catalog.api.CreateCountryRequest(uniqueCountryCode(), "Concurrent setup"))
+        val request = com.constitutionatlas.catalog.api.CreateConstitutionRequest("concurrent-setup", "Reviewed charter", creationAttemptId = UUID.randomUUID())
+        val ready = java.util.concurrent.CyclicBarrier(2)
+        val executor = java.util.concurrent.Executors.newFixedThreadPool(2)
+        try {
+            val results = (1..2).map {
+                executor.submit<com.constitutionatlas.catalog.api.ConstitutionSummary> {
+                    ready.await(5, java.util.concurrent.TimeUnit.SECONDS)
+                    writes.createConstitution(country.isoCode, request)
+                }
+            }.map { it.get(10, java.util.concurrent.TimeUnit.SECONDS) }
+            assertThat(results[0]).isEqualTo(results[1])
+            assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM constitutions WHERE jurisdiction_id = ? AND slug = ?", Int::class.java, country.id, request.slug)).isEqualTo(1)
+            assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM constitution_creation_receipts WHERE id = ?", Int::class.java, request.creationAttemptId)).isEqualTo(1)
+        } finally {
+            executor.shutdownNow()
+        }
+    }
+
+    @Test
     fun curatedComparisonsPinDistinctConstitutionsAndRequireReviewAndFreshPublication() {
         val code = uniqueCountryCode()
         mockMvc.post("/countries") {

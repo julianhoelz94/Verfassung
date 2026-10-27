@@ -7,6 +7,8 @@ import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Repository
 import java.util.UUID
 
+data class SetupConfirmationClaim(val proposal: SetupProposalDto, val attempt: UUID, val operationId: UUID)
+
 @Repository
 class SetupProposalRepository(private val jdbc: JdbcTemplate, private val mapper: ObjectMapper) {
     private val columns = "id, owner_id, status, payload, constitution_id, settings_revision_id, confirmed_by, revision, previous_payload, requested_changes, changes_requested"
@@ -22,13 +24,13 @@ class SetupProposalRepository(private val jdbc: JdbcTemplate, private val mapper
     }
 
     fun find(id: UUID): SetupProposalDto? = jdbc.query(
-        "SELECT $columns FROM import_setup_proposals WHERE id = ? AND (expires_at > now() OR status = 'confirmed')",
+        "SELECT $columns FROM import_setup_proposals WHERE id = ? AND (expires_at > now() OR status IN ('confirming', 'confirmed'))",
         ::map,
         id,
     ).firstOrNull()
 
     fun replace(id: UUID, payload: SetupProposalRequest, revision: Long): SetupProposalDto? = jdbc.query(
-        "UPDATE import_setup_proposals SET previous_payload = payload, payload = ?::jsonb, changes_requested = false, revision = revision + 1, updated_at = now() WHERE id = ? AND revision = ? AND status = 'proposed' AND expires_at > now() RETURNING $columns",
+        "UPDATE import_setup_proposals SET previous_payload = payload, payload = ?::jsonb, changes_requested = false, revision = revision + 1, confirmation_operation = NULL, updated_at = now() WHERE id = ? AND revision = ? AND status = 'proposed' AND expires_at > now() RETURNING $columns",
         ::map,
         mapper.writeValueAsString(payload),
         id,
@@ -38,7 +40,7 @@ class SetupProposalRepository(private val jdbc: JdbcTemplate, private val mapper
     fun displayOverrides(id: UUID): com.fasterxml.jackson.databind.JsonNode = mapper.readTree(jdbc.queryForObject("SELECT display_overrides::text FROM import_setup_proposals WHERE id = ?", String::class.java, id))
 
     fun display(id: UUID, revision: Long, payload: SetupProposalRequest, overrides: com.fasterxml.jackson.databind.JsonNode): SetupProposalDto? = jdbc.query(
-        "UPDATE import_setup_proposals SET payload = ?::jsonb, display_overrides = ?::jsonb, revision = revision + 1, updated_at = now() WHERE id = ? AND revision = ? AND status = 'proposed' AND expires_at > now() RETURNING $columns",
+        "UPDATE import_setup_proposals SET payload = ?::jsonb, display_overrides = ?::jsonb, revision = revision + 1, confirmation_operation = NULL, updated_at = now() WHERE id = ? AND revision = ? AND status = 'proposed' AND expires_at > now() RETURNING $columns",
         ::map,
         mapper.writeValueAsString(payload),
         mapper.writeValueAsString(overrides),
@@ -47,39 +49,52 @@ class SetupProposalRepository(private val jdbc: JdbcTemplate, private val mapper
     ).firstOrNull()
 
     fun feedback(id: UUID, revision: Long, message: String): SetupProposalDto? = jdbc.query(
-        "UPDATE import_setup_proposals SET requested_changes = ?, changes_requested = true, revision = revision + 1, updated_at = now() WHERE id = ? AND revision = ? AND status = 'proposed' AND expires_at > now() RETURNING $columns",
+        "UPDATE import_setup_proposals SET requested_changes = ?, changes_requested = true, revision = revision + 1, confirmation_operation = NULL, updated_at = now() WHERE id = ? AND revision = ? AND status = 'proposed' AND expires_at > now() RETURNING $columns",
         ::map,
         message,
         id,
         revision,
     ).firstOrNull()
 
-    /** Freeze only the revision the editor actually reviewed. */
-    fun claim(id: UUID, revision: Long): SetupProposalDto? = jdbc.query(
-        """UPDATE import_setup_proposals SET status = 'confirming', updated_at = now()
-           WHERE id = ? AND revision = ? AND NOT changes_requested AND status = 'proposed' AND expires_at > now()
-           RETURNING $columns""",
-        ::map,
-        id,
-        revision,
-    ).firstOrNull()
-
-    fun setConstitution(id: UUID, constitutionId: UUID) {
-        jdbc.update("UPDATE import_setup_proposals SET constitution_id = ?, updated_at = now() WHERE id = ? AND status = 'confirming'", constitutionId, id)
+    /** Freeze the reviewed revision; a recovery attempt can only resume this same payload. */
+    fun claim(id: UUID, revision: Long): SetupConfirmationClaim? {
+        val attempt = UUID.randomUUID()
+        return jdbc.query(
+            """UPDATE import_setup_proposals
+               SET status = 'confirming', confirmation_attempt = ?, confirmation_started_at = now(),
+                   confirmation_requested_at = COALESCE(confirmation_requested_at, now()),
+                   confirmation_operation = COALESCE(confirmation_operation, ?), updated_at = now()
+               WHERE id = ? AND revision = ? AND NOT changes_requested AND (
+                 (status = 'proposed' AND expires_at > now()) OR
+                 (status = 'confirming' AND (confirmation_started_at IS NULL OR confirmation_started_at < now() - interval '2 minutes'))
+               ) RETURNING $columns, confirmation_operation""",
+            { rs, index -> SetupConfirmationClaim(map(rs, index), attempt, rs.getObject("confirmation_operation", UUID::class.java)) },
+            attempt,
+            UUID.randomUUID(),
+            id,
+            revision,
+        ).firstOrNull()
     }
 
-    fun confirm(id: UUID, revisionId: UUID, actorId: UUID) {
+    fun confirm(id: UUID, attempt: UUID, constitutionId: UUID, revisionId: UUID, actorId: UUID): Boolean =
         jdbc.update(
-            "UPDATE import_setup_proposals SET status = 'confirmed', settings_revision_id = ?, confirmed_by = ?, updated_at = now() WHERE id = ? AND status = 'confirming'",
+            "UPDATE import_setup_proposals SET status = 'confirmed', constitution_id = ?, settings_revision_id = ?, confirmed_by = ?, confirmation_attempt = NULL, confirmation_started_at = NULL, updated_at = now() WHERE id = ? AND status = 'confirming' AND confirmation_attempt = ?",
+            constitutionId,
             revisionId,
             actorId,
             id,
-        )
+            attempt,
+        ) == 1
+
+    fun retry(id: UUID, attempt: UUID) {
+        jdbc.update("UPDATE import_setup_proposals SET confirmation_attempt = NULL, confirmation_started_at = NULL, updated_at = now() WHERE id = ? AND status = 'confirming' AND confirmation_attempt = ?", id, attempt)
     }
 
-    fun retry(id: UUID) {
-        jdbc.update("UPDATE import_setup_proposals SET status = 'proposed', updated_at = now() WHERE id = ? AND status = 'confirming'", id)
-    }
+    fun rejectWithoutWrites(id: UUID, attempt: UUID): Boolean = jdbc.update(
+        "UPDATE import_setup_proposals SET status = 'proposed', confirmation_attempt = NULL, confirmation_started_at = NULL, confirmation_requested_at = NULL, updated_at = now() WHERE id = ? AND status = 'confirming' AND confirmation_attempt = ? AND constitution_id IS NULL AND NOT confirmation_legacy",
+        id,
+        attempt,
+    ) == 1
 
     fun withdraw(id: UUID, revision: Long): Boolean = jdbc.update(
         "UPDATE import_setup_proposals SET status = 'withdrawn', updated_at = now() WHERE id = ? AND revision = ? AND status = 'proposed'",

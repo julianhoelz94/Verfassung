@@ -26,7 +26,7 @@
 
 Länder-, Verfassungs- und Leseseiten verwenden dieselbe Navigation mit **Übersicht** und **Geschichte**. Geschichte zeigt Verfassungsereignisse und Verfassungsänderungen in gemeinsamer Datumsreihenfolge. Kennzeichnungen unterscheiden die Ereignisarten; **Ereignisse anzeigen** filtert bei Bedarf denselben Zeitstrahl. Kleine Marker kennzeichnen die Meilensteine direkt auf der zentrierten Zeitlinie. Zeigen Sie auf einen Marker oder fokussieren Sie ihn mit der Tastatur für die Beschriftung; wählen Sie ihn für die Details aus. Auf Touchscreens tippen Sie auf den Marker. Escape schließt die Beschriftung. Die Ereignisse sind nach Jahren gruppiert. Nutzen Sie **Zum Jahr springen**, die Vor-/Zurück-Schaltflächen oder die chronologische Liste. Die Pfeiltasten wechseln zwischen Meilensteinen; Pos1/Ende wählen den ersten/letzten. Ungefähre Datumsangaben bleiben gekennzeichnet, und Einträge ohne Datum stehen getrennt.
 
-Die Suchfilter bieten kompakte Auswahlfelder für Land, Fassung und Gültigkeitsdatum. Lange Länder- und Fassungslisten besitzen eine Optionssuche. Beim Länderwechsel wird eine unpassende Fassung zurückgesetzt. **Filter anwenden** aktualisiert die Adresse. Entfernen Sie einen aktiven Filter oder wählen Sie **Filter zurücksetzen**, um die Suche zu erweitern. Auf kleineren Bildschirmen öffnen Sie **Filter** oberhalb der Treffer.
+Die Suchfilter bieten Gebiet, Land, Fassung und Gültigkeitsdatum. Lange Listen besitzen eine Optionssuche. Beim Gebiets- oder Länderwechsel werden unpassende Filter mit einem Hinweis zurückgesetzt. **Filter anwenden** aktualisiert die Adresse. Entfernen Sie einen aktiven Filter oder wählen Sie **Filter zurücksetzen**, um die Suche zu erweitern. Auf kleineren Bildschirmen öffnen Sie **Filter** über den Treffern. Ein Gebiet erfasst seine eigenen Verfassungen; untergeordnete Gebiete wählen Sie gesondert. Gespeicherte Filter für unbekannte oder ältere Fassungen bleiben sichtbar und erweitern die Suche nicht unbemerkt.
 
 ![Vergleich mit Fassungswahl und geänderten Texten](https://raw.githubusercontent.com/wiki/julianhoelz94/Verfassung/media/reading-compare-de.png)
 *Prüfen Sie die ausgewählten Fassungen vor dem Lesen.*
@@ -36,6 +36,8 @@ Zum Zitieren speichern Sie die Adresse der geöffneten Vorschrift und die Fassun
 ## Regionale und historische Archive
 
 Die Startseite verlinkt Regionen und historische Sammlungen. Die Navigation zeigt den belegten Gebietskontext. Datumsformulierungen und alte Statusangaben bleiben Quellenbelege. Gekennzeichnete Anmerkungen stehen getrennt vom Rechtstext und sind auch gesondert lesbar. Das **Änderungsregister** durchsucht Instrumente, Fundstellen und wörtliche Einheitenbezeichnungen; Instrument- und Wirksamkeitsdaten sind getrennte Filter. **Kuratierte Vergleiche** verbinden belegte Passagen eigenständiger Verfassungen, kennzeichnen fehlende Entsprechungen und speichern Auswahl und Thema in der URL. Alt-Links behalten ihr genaues historisches Ziel.
+
+Regionale und historische Fassungen bieten Inhaltsverzeichnis und Gliederungstiefe, Quelldokumente, Suche innerhalb der Fassung sowie benachbarte rechtliche Fassungen. Ein gespeicherter älterer Textstand behält seinen genauen Wortlaut und weist auf den aktuellen Text hin. Ein Link auf eine Einheit öffnet den zugehörigen Abschnitt. Der Originaltext bleibt auch ohne JavaScript lesbar.
 
 ## Quellen, Sprachen und Sonderfälle
 

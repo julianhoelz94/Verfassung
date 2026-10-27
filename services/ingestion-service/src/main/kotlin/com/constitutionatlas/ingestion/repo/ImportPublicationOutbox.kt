@@ -7,7 +7,7 @@ import java.time.OffsetDateTime
 import java.time.ZoneOffset
 import java.util.UUID
 
-data class PublicationEvent(val id: UUID, val type: String, val payload: String, val attempts: Int)
+data class PublicationEvent(val id: UUID, val type: String, val payload: String, val attempts: Int, val createdAt: OffsetDateTime)
 
 @Repository
 class ImportPublicationOutbox(private val jdbc: JdbcTemplate, private val mapper: ObjectMapper) {
@@ -22,8 +22,8 @@ class ImportPublicationOutbox(private val jdbc: JdbcTemplate, private val mapper
     }
 
     fun pending(limit: Int = 10): List<PublicationEvent> = jdbc.query(
-        "SELECT id, event_type, payload::text, attempts FROM import_publication_outbox WHERE delivered_at IS NULL AND available_at <= now() ORDER BY created_at LIMIT ? FOR UPDATE SKIP LOCKED",
-        { rs, _ -> PublicationEvent(rs.getObject("id", UUID::class.java), rs.getString("event_type"), rs.getString(3), rs.getInt("attempts")) },
+        "SELECT id, event_type, payload::text, attempts, created_at FROM import_publication_outbox WHERE delivered_at IS NULL AND available_at <= now() ORDER BY created_at LIMIT ? FOR UPDATE SKIP LOCKED",
+        { rs, _ -> PublicationEvent(rs.getObject("id", UUID::class.java), rs.getString("event_type"), rs.getString(3), rs.getInt("attempts"), rs.getObject("created_at", OffsetDateTime::class.java)) },
         limit,
     )
 

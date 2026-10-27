@@ -1,0 +1,11 @@
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'audit_runtime') THEN
+    CREATE ROLE audit_runtime NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS;
+  END IF;
+END $$;
+
+REVOKE CREATE ON SCHEMA public FROM PUBLIC;
+REVOKE ALL ON SCHEMA public FROM audit_runtime;
+GRANT USAGE ON SCHEMA public TO audit_runtime;
+REVOKE ALL ON audit_events FROM audit_runtime;
+GRANT INSERT, SELECT ON audit_events TO audit_runtime;

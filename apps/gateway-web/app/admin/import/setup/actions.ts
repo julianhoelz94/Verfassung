@@ -18,7 +18,8 @@ export async function reviewSetupAction(formData: FormData): Promise<string> {
     if (!['display', 'confirm', 'request-changes', 'withdraw'].includes(intent)) throw new SetupActionError('invalid');
     const message = String(formData.get('message') ?? '').trim();
     if (intent === 'request-changes' && (message.length < 10 || message.length > 4000)) throw new SetupActionError('invalid');
-    if (intent !== 'withdraw') {
+    if (proposal.status === 'confirming' && intent !== 'confirm') throw new SetupActionError('stale');
+    if (intent !== 'withdraw' && proposal.status !== 'confirming') {
       const kinds = JSON.parse(String(formData.get('display') ?? 'null')) as unknown;
       if (!Array.isArray(kinds)) throw new SetupActionError('invalid');
       if (JSON.stringify(kinds) !== JSON.stringify(displayKinds(setupKinds(proposal.payload)))) {

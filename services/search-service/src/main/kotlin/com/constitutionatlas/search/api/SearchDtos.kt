@@ -49,6 +49,7 @@ data class VersionFacet(
     val constitutionTitle: String,
     val countryCode: String,
     val count: Int,
+    val jurisdictionId: UUID? = null,
 )
 
 data class DateFacet(
@@ -63,7 +64,7 @@ data class SearchFacets(
     val jurisdictions: List<JurisdictionFacet> = emptyList(),
 )
 
-data class JurisdictionFacet(val id: UUID, val name: String, val historical: Boolean, val count: Int)
+data class JurisdictionFacet(val id: UUID, val name: String, val historical: Boolean, val count: Int, val countryCode: String = "")
 
 data class ReindexResult(
     val documentCount: Int,

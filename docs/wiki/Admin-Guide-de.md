@@ -28,6 +28,8 @@ Unter **Verfassungen** erstellen Sie eine Verfassung über **Grunddaten → Stru
 
 Aufeinanderfolgende Satzeinheiten mit Fließtextdarstellung werden verbunden. Nicht nummerierter übergeordneter Text zwischen Einheiten beginnt einen eigenen Absatz. Mitgelieferte Quellenbeispiele behalten ihre ursprüngliche Reihenfolge.
 
+Wurde die Bestätigung einer Importstruktur unterbrochen, wählen Sie beim selben Vorschlag **Bestätigung fortsetzen**. Die geprüfte Revision bleibt währenddessen festgeschrieben; Anzeigeeinstellungen und Änderungswünsche können nicht bearbeitet werden. Läuft noch ein anderer Versuch, laden Sie die Seite neu oder versuchen es nach zwei Minuten erneut. Die Wiederaufnahme verwendet dieselbe angelegte Verfassung und geprüfte Gliederung. Sie bestätigt keine neuere Client-Revision und veröffentlicht noch keinen importierten Text.
+
 ## Erste Einrichtung
 
 Eine Rollenänderung oder Kontosperre widerruft Sitzungen, offene Einrichtungsabfragen und persönliche MCP/OAuth-Zugangsdaten. Die Sperre eines eingeladenen Kontos macht auch die Einladung ungültig. Eine erneute Aktivierung stellt widerrufene Zugangsdaten nicht wieder her. Automatisierungs-Tokens werden weiterhin separat ausgetauscht oder widerrufen.

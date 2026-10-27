@@ -31,6 +31,7 @@ class CatalogWriteService(
     private val successorReadiness: com.constitutionatlas.catalog.client.SuccessorReadinessClient,
     private val publishAttempts: com.constitutionatlas.catalog.repo.PublishAttemptRepository,
     private val jurisdictions: JurisdictionRepository,
+    private val creationReceipts: com.constitutionatlas.catalog.repo.ConstitutionCreationRepository,
 ) {
     @Transactional
     fun createCountry(request: CreateCountryRequest): CountrySummary {
@@ -59,6 +60,24 @@ class CatalogWriteService(
     @Transactional
     fun createJurisdictionConstitution(jurisdictionId: UUID, request: CreateConstitutionRequest): ConstitutionSummary {
         if (jurisdictions.find(jurisdictionId) == null) throw NotFoundException("Unknown jurisdiction '$jurisdictionId'")
+        request.creationAttemptId?.let { attempt ->
+            creationReceipts.replay(attempt, jurisdictionId, request)?.let { return it }
+        }
+        return try {
+            val response = createConstitutionRecord(jurisdictionId, request)
+            request.creationAttemptId?.let { creationReceipts.record(it, jurisdictionId, request, response) }
+            response
+        } catch (ex: RuntimeException) {
+            // Receipt lookup/mismatch happens before this block. A rejected new attempt has
+            // no earlier receipt, and throwing rolls back every write in this transaction.
+            if (request.creationAttemptId != null && (ex is IllegalArgumentException || ex is ConflictException || ex is DataIntegrityViolationException)) {
+                throw ConflictException("Constitution creation was rejected without saving changes; correct the proposal", "constitution_creation_rejected")
+            }
+            throw ex
+        }
+    }
+
+    private fun createConstitutionRecord(jurisdictionId: UUID, request: CreateConstitutionRequest): ConstitutionSummary {
         val slug = request.slug.trim()
         catalogRepository.findConstitutionId(jurisdictionId, slug)?.let {
             throw ConflictException("Constitution '$slug' already exists")
@@ -71,9 +90,9 @@ class CatalogWriteService(
         if (!request.outline.isNullOrEmpty()) {
             catalogRepository.replaceOutline(id, normalizeOutline(request.outline))
         }
-        settingsRepository.append(id, catalogRepository.findOutline(id))
+        val settingsRevisionId = settingsRepository.append(id, catalogRepository.findOutline(id))
         metadataService.initialize(id, jurisdictionId, request.title.trim(), slug)
-        return ConstitutionSummary(
+        val response = ConstitutionSummary(
             id,
             slug,
             request.title.trim(),
@@ -82,7 +101,9 @@ class CatalogWriteService(
             catalogRepository.findOutline(id),
             predecessor,
             request.interim,
+            settingsRevisionId = settingsRevisionId,
         )
+        return response
     }
 
     @Transactional

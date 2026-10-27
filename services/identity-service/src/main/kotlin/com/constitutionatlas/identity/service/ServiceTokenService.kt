@@ -109,6 +109,7 @@ class ServiceTokenService(
                 "search:reindex",
                 "audit:append",
                 "audit:read",
+                "operations:read",
                 "ingestion:import",
                 "ingestion:publish",
             )

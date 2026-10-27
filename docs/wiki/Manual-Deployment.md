@@ -42,6 +42,7 @@ Required **Coolify environment-wide shared variables**:
 | Name | Example or generation command | Purpose |
 | --- | --- | --- |
 | `POSTGRES_PASSWORD` | `openssl rand -hex 32` | Strong database password; keep stable across deployments |
+| `AUDIT_RUNTIME_PASSWORD` | `openssl rand -hex 32` | Separate restricted Audit runtime identity; Flyway uses the database owner. Add this shared variable before deploying this revision. |
 | `IDENTITY_MFA_ENCRYPTION_KEY` | `openssl rand -base64 32` | Stable 32-byte Base64 key for persisted MFA credentials |
 | `PROD_ADMIN_EMAIL` | Your real administrator email address | First administrator; both environments use this exact name |
 | `PROD_ADMIN_PASSWORD` | Run `openssl rand -hex 32` again | Separate administrator password, at least 12 characters |

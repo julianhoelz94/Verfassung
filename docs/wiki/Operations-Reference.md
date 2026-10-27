@@ -10,6 +10,12 @@ Each service's Postgres database must be backed up with its migration history. T
 Identity also stores the registration switch, mail configuration, email confirmation tokens, TOTP secrets, and passkey credentials. Preserve `IDENTITY_MFA_ENCRYPTION_KEY` with its database backup; it encrypts SMTP credentials. Configure a stable HTTPS `PUBLIC_BASE_URL` before enrolling passkeys because WebAuthn validates its origin and relying party ID. New installations leave outgoing mail and self-registration disabled. The [account registration runbook](https://github.com/julianhoelz94/Verfassung/blob/main/docs/operations/account-registration.md) describes setup, the test email, and confirmation behavior. The CI full-stack profile uses Mailpit to exercise confirmation mail.
 
 
+## Delivery and usable-content monitoring
+
+Identity and Editor persist audit work in their own transactional outboxes. Audit deduplicates stable event IDs; retries after an outage or lost response retain the original event time. Audit uses a separate `audit_runtime` database connection with INSERT/SELECT permissions; its Flyway owner credential performs migrations. Preserve the existing append-only rules and set a separate `AUDIT_RUNTIME_PASSWORD` in deployment configuration.
+
+The [operational checker and recovery drill](https://github.com/julianhoelz94/Verfassung/blob/main/docs/operations/recovery-and-monitoring.md) verify a published reader/search canary, queue ages/failures, stuck imports and backup integrity/freshness. Identity, Editor and Ingestion expose aggregate `/operations/status` only to administrators or `operations:read` tokens. Configure the operator's existing monitor to alert on nonzero results and missed runs. No scheduler or notification integration is installed automatically.
+
 ## UI verification coverage
 
 

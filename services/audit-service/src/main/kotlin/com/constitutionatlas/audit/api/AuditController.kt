@@ -32,10 +32,10 @@ class AuditController(
             if (actor.roles.isEmpty() && "audit:append" in actor.scopes) {
                 request
             } else {
-                request.copy(actorId = actor.id, actorEmail = actor.email)
+                request.copy(actorId = actor.id, actorEmail = actor.email, occurredAt = null)
             }
         val id = auditRepository.insert(attributed)
-        return auditRepository.listByEntity(request.entityType, request.entityId).first { it.id == id }
+        return requireNotNull(auditRepository.findById(id))
     }
 
     @GetMapping("/events")

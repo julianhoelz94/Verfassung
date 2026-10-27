@@ -91,4 +91,12 @@ describe('prepared import reader presentation', () => {
     expect(buttons).toContain('Reject import');
     expect(document.querySelector('[role="alert"]')?.textContent).toContain('prepared');
   });
+
+  it('keeps prepared source text inspectable when the current presentation service is unavailable', async () => {
+    clients.getReaderOutline.mockRejectedValue(new Error('catalog unavailable'));
+    const document = await renderedReview();
+    const preview = preparedPreview(document);
+    expect(Array.from(preview.querySelectorAll('.constitution-body'), element => element.textContent)).toEqual(['Everyone is free.', 'Everyone is equal.']);
+    expect(document.body.textContent).toContain('pinned-structural-revision');
+  });
 });

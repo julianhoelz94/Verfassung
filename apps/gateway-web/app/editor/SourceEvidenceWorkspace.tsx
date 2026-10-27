@@ -5,18 +5,18 @@ import { useRouter } from 'next/navigation';
 import type { SourceEvidence } from '../../lib/api';
 import type { DraftPreview } from '../../lib/editor-api';
 import { sourceEvidenceUi as copy, sourceDecisionUi, sourcePrecisionUi } from '../../lib/source-evidence-messages';
-import { statusMessage } from '../../lib/ui-labels';
 import { ui } from '../../lib/messages';
 import { WorkspacePage } from '../components/layout/templates';
 import { Stack, Inline } from '../components/layout/Layout';
-import { Alert, Badge, Button, PageHeader, WorkflowSteps } from '../components/ui';
+import { Alert, Button, PageHeader, WorkflowSteps } from '../components/ui';
 import { T, useLocale, useTranslation } from '../components/TranslationProvider';
 
 const textFields = ['dateWording', 'coverage', 'statusWording', 'attribution'] as const;
 const emptyEvidence: SourceEvidence = { datePrecision: 'unknown' };
 
 function EvidenceTable({ before, after }: { before: SourceEvidence | null; after: SourceEvidence }) {
-  return <div className="table-wrap"><table>
+  const t = useTranslation();
+  return <div className="legal-table-scroll" role="region" aria-label={t(copy.after)} tabIndex={0}><table className="legal-table">
     <thead><tr><th scope="col"><T value={copy.field} /></th><th scope="col"><T value={copy.before} /></th><th scope="col"><T value={copy.after} /></th></tr></thead>
     <tbody>{[...textFields, 'datePrecision' as const].map(field => <tr key={field}>
       <th scope="row"><T value={copy[field]} /></th>
@@ -92,7 +92,7 @@ export function SourceEvidenceWorkspace({ preview, publishedEvidence, userId, ro
   return <WorkspacePage width="content" header={<PageHeader
     title={<T value={copy.edit} />}
     breadcrumbs={[{ href: '/editor', label: <T value={ui.nav.editor} /> }, { label: session.id.slice(0, 8) }]}
-    meta={<><Badge tone="info"><T value={statusMessage(session.status)} /></Badge><WorkflowSteps status={session.status} /></>}
+    meta={<WorkflowSteps status={session.status} />}
     actions={(publishedHref || sourceHref) ? <a className="btn" href={publishedHref ?? sourceHref}><T value={publishedHref ? copy.published : copy.source} /></a> : null}
   />}>
     {error || saveError ? <Alert tone="error">{saveError ?? error}</Alert> : null}

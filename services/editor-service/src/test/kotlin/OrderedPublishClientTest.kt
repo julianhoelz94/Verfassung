@@ -7,6 +7,36 @@ import java.util.UUID
 
 class OrderedPublishClientTest {
     @Test
+    fun sourceCorrectionReservationTransmitsTheReviewedEvidence() {
+        val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
+        val constitution = UUID.randomUUID()
+        val version = UUID.randomUUID()
+        val target = UUID.randomUUID()
+        val evidence = com.constitutionatlas.platform.SourceEvidence(coverage = "Articles 1–10 only", attribution = "Official archive")
+        var request = ""
+        server.createContext("/constitutions/$constitution/versions") { exchange ->
+            request = exchange.requestBody.bufferedReader().readText()
+            val body = """{"id":"$target","constitutionId":"$constitution","versionLabel":"correction","publicationStatus":"draft"}""".toByteArray()
+            exchange.responseHeaders.set("Content-Type", "application/json")
+            exchange.sendResponseHeaders(200, body.size.toLong())
+            exchange.responseBody.use { it.write(body) }
+        }
+        server.start()
+        try {
+            val url = "http://127.0.0.1:${server.address.port}"
+            val source = com.constitutionatlas.editor.client.CatalogVersion(version, constitution, "2025", "published", sourceEvidence = evidence)
+            val reserved = OrderedPublishClient(url, url).reserve(UUID.randomUUID(), source, "editorial_correction", "Clarify excerpt", UUID.randomUUID(), "Bearer publisher")
+            assertThat(reserved.id).isEqualTo(target)
+            val payload = com.fasterxml.jackson.databind.ObjectMapper().readTree(request)
+            assertThat(payload.path("sourceEvidence").path("coverage").asText()).isEqualTo(evidence.coverage)
+            assertThat(payload.path("sourceEvidence").path("attribution").asText()).isEqualTo(evidence.attribution)
+            assertThat(payload.path("predecessorVersionId").asText()).isEqualTo(version.toString())
+        } finally {
+            server.stop(0)
+        }
+    }
+
+    @Test
     fun reservationUsesServiceCredentialInsteadOfPublisherCredential() {
         val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
         val headers = mutableListOf<String?>()

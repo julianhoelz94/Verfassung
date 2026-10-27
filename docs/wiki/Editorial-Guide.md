@@ -24,7 +24,7 @@
 
 1. Open **Review queue**, then the submitted session.
 2. Compare draft and source; inspect the comment, affected units and change type.
-3. Approve only when the text is ready. Editing sessions currently have no return action; leave work unapproved if it needs changes. Imported constitutions have a separate rejection action.
+3. Approve only when the text is ready. Source corrections support **Request changes** with a reason. Text-only editing sessions currently have no return action; leave work unapproved if they need changes. Imported constitutions have a separate rejection action.
 
 **Result:** approved work appears under **Ready to publish**. Approval does not publish it.
 
@@ -32,6 +32,16 @@
 *Check the proposed text and its context before approval.*
 
 [▶ Watch review and approval](https://julianhoelz94.github.io/Verfassung/#reviewing-a-draft-en)
+
+### Correct source information
+
+Choose **Edit source information** directly in the **Archival source** block on the current reading version. Editors and administrators can correct the source date wording and precision, import coverage, status wording and attribution. The general legal-validity notice remains fixed site text.
+
+Save the source draft with a reason, then compare the published and saved values. The history retains every saved revision and records accounts, timestamps and review decisions. Unsaved fields block submission; stale-write errors retain your input.
+
+Submitting locks the draft. A reviewer can approve the displayed revision or request changes with a reason. A requested correction requires a new saved source revision and another submission. As with text corrections, a non-admin cannot approve their own session.
+
+A publisher explicitly publishes the approved correction after fresh MFA. Only then does a new editorial snapshot show the changed source information. Historical snapshots remain unchanged; a source-only correction reuses all constitutional text revisions. If the session also contains text changes, inspect them through **Inspect the constitutional text in this session** before approval.
 
 ### Imported constitutions
 

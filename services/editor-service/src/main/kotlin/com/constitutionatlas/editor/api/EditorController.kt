@@ -48,13 +48,29 @@ class EditorController(private val editorService: EditorService) {
     fun review(
         @RequestHeader(value = "Authorization", required = false) authorization: String?,
         @PathVariable sessionId: UUID,
-    ): DraftPreviewDto = editorService.submitReview(authorization, sessionId)
+        @RequestBody(required = false) request: SourceEvidenceReviewRequest?,
+    ): DraftPreviewDto = editorService.submitReview(authorization, sessionId, request?.sourceEvidenceRevision)
+
+    @PostMapping("/edit-sessions/{sessionId}/source-evidence")
+    fun saveSourceEvidence(
+        @RequestHeader(value = "Authorization", required = false) authorization: String?,
+        @PathVariable sessionId: UUID,
+        @RequestBody request: SaveSourceEvidenceRequest,
+    ): DraftPreviewDto = editorService.saveSourceEvidence(authorization, sessionId, request)
+
+    @PostMapping("/edit-sessions/{sessionId}/source-evidence/changes-requested")
+    fun requestSourceEvidenceChanges(
+        @RequestHeader(value = "Authorization", required = false) authorization: String?,
+        @PathVariable sessionId: UUID,
+        @RequestBody request: SourceEvidenceChangesRequest,
+    ): DraftPreviewDto = editorService.requestSourceEvidenceChanges(authorization, sessionId, request)
 
     @PostMapping("/edit-sessions/{sessionId}/approval")
     fun approve(
         @RequestHeader(value = "Authorization", required = false) authorization: String?,
         @PathVariable sessionId: UUID,
-    ): DraftPreviewDto = editorService.approve(authorization, sessionId)
+        @RequestBody(required = false) request: SourceEvidenceReviewRequest?,
+    ): DraftPreviewDto = editorService.approve(authorization, sessionId, request?.sourceEvidenceRevision)
 
     @PostMapping("/edit-sessions/{sessionId}/publish-details")
     fun savePublishDetails(

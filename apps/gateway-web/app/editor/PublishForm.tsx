@@ -74,9 +74,10 @@ type PublishFormProps = {
   outline?: ContentOutline;
   diffReview?: DiffReviewState | null;
   canReviewDiff?: boolean;
+  sourceEvidenceRevision?: number;
 };
 
-export function PublishForm({ sessionId, versionId, articleId, hopKind, status, canEdit, canPublish, record, comment, structuredDraft, outline, diffReview, canReviewDiff = false }: PublishFormProps) {
+export function PublishForm({ sessionId, versionId, articleId, hopKind, status, canEdit, canPublish, record, comment, structuredDraft, outline, diffReview, canReviewDiff = false, sourceEvidenceRevision }: PublishFormProps) {
   const t = useTranslation();
   const { setDetailsDirty } = useDraftState();
   const unsaved = useRef(false);
@@ -120,6 +121,7 @@ export function PublishForm({ sessionId, versionId, articleId, hopKind, status, 
     <input type="hidden" name="versionId" value={versionId} />
     <input type="hidden" name="articleId" value={articleId} />
     <input type="hidden" name="hopKind" value={hopKind} />
+    <input type="hidden" name="sourceEvidenceRevision" value={sourceEvidenceRevision ?? ''} />
   </>;
   const ready = hopKind === 'legal' ? Boolean(record) && (!structuredDraft || changes.length > 0 && changes.every((change) => change.changeType === 'added' ? Boolean(change.afterRef || change.pendingAfterLogicalId) : change.changeType === 'removed' ? Boolean(change.beforeRef) : Boolean(change.beforeRef && (change.afterRef || change.pendingAfterLogicalId)))) : Boolean(comment);
   function updateChange(index: number, patch: Partial<ChangeRecordChange>) {

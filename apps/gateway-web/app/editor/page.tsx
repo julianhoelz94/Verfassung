@@ -27,6 +27,8 @@ import { Stack } from '../components/layout/Layout';
 import { workflowUi } from '../../lib/workflow-messages';
 import { loginHref } from '../../lib/return-to';
 import surfaceStyles from '../components/surfaces.module.css';
+import { SourceEvidenceWorkspace } from './SourceEvidenceWorkspace';
+import { sourceEvidenceUi } from '../../lib/source-evidence-messages';
 
 type EditorPageProps = {
   searchParams: Promise<{
@@ -83,6 +85,16 @@ export default async function EditorPage(props: EditorPageProps) {
   const session = preview?.session;
   if (!session) {
     return <EditorLanding userId={user.id} email={user.email} roles={user.roles} status={searchParams.status} error={searchParams.error} />;
+  }
+
+  if (searchParams.scope === 'sources' || (preview.sourceEvidenceRevisions?.length && searchParams.scope !== 'text')) {
+    const source = await getVersion(session.versionId, await requireSessionBearer());
+    const href = (id: string) => source?.countryCode
+      ? `/countries/${encodeURIComponent(source.countryCode)}/versions/${encodeURIComponent(id)}`
+      : source?.jurisdictionId ? `/jurisdictions/${encodeURIComponent(source.jurisdictionId)}/versions/${encodeURIComponent(id)}` : undefined;
+    return <SourceEvidenceWorkspace preview={preview} publishedEvidence={source?.sourceEvidence ?? null} userId={user.id} roles={user.roles}
+      sourceHref={href(session.versionId)} publishedHref={preview.newVersionId ? href(preview.newVersionId) : undefined}
+      error={editorErrorMessage(searchParams.error, locale)} />;
   }
 
   let countries: CountrySummary[] = [];
@@ -182,6 +194,7 @@ export default async function EditorPage(props: EditorPageProps) {
       <input type="hidden" name="sessionId" value={searchParams.sessionId} />
       <input type="hidden" name="versionId" value={versionId ?? ''} />
       <input type="hidden" name="articleId" value={selectedId ?? ''} />
+      <input type="hidden" name="sourceEvidenceRevision" value={preview.sourceEvidenceRevisions?.[0]?.revision ?? ''} />
     </>
   );
 
@@ -200,6 +213,7 @@ export default async function EditorPage(props: EditorPageProps) {
       />}>
 
       {alerts}
+      {preview.sourceEvidenceRevisions?.length ? <Alert tone="info"><a href={`/editor?sessionId=${encodeURIComponent(session.id)}&scope=sources`}><T value={sourceEvidenceUi.inspectSources} /></a></Alert> : null}
       {searchParams.sessionId && articles.length > 0 ? (
         <EditorDraftState><WorkspaceLayout>
           <aside className={["panel", surfaceStyles.panel].join(' ')} aria-label={message(locale, ui.accessibility.topLevelUnits)}>
@@ -331,6 +345,7 @@ export default async function EditorPage(props: EditorPageProps) {
                 outline={displayOutline}
                 diffReview={diffReview}
                 canReviewDiff={canReview}
+                sourceEvidenceRevision={preview.sourceEvidenceRevisions?.[0]?.revision}
               />
             ) : null}
             {!session.hopKind && session.status === 'approved' && canPublish && searchParams.sessionId && versionId && selectedId ? (

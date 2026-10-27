@@ -55,6 +55,7 @@ data class PublishRequest(
     val amendmentId: UUID? = null,
     val comment: String? = null,
     val changeRecord: ChangeRecordRequest? = null,
+    val sourceEvidenceRevision: Int? = null,
 )
 
 data class ChangeRecordRequest(
@@ -150,4 +151,6 @@ data class DraftPreviewDto(
     val unitMapping: Map<String, String>? = null,
     val sourceGeneration: Long? = null,
     val settingsRevisionId: UUID? = null,
+    val sourceEvidenceRevisions: List<SourceEvidenceRevisionDto> = emptyList(),
+    val sourceEvidenceDecisions: List<SourceEvidenceDecisionDto> = emptyList(),
 )

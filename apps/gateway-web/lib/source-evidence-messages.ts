@@ -1,0 +1,46 @@
+export const sourceEvidenceUi = {
+  edit: { en: 'Edit source information', de: 'Quellenangaben bearbeiten' },
+  explanation: { en: 'Save a correction with a reason. Review and publication are required before it becomes public.', de: 'Speichere die Korrektur mit einer Begründung. Erst nach Prüfung und Veröffentlichung wird sie öffentlich sichtbar.' },
+  dateWording: { en: 'Date as described by the source', de: 'Datierung laut Quelle' },
+  datePrecision: { en: 'Date precision', de: 'Genauigkeit der Datierung' },
+  coverage: { en: 'Coverage of the imported text', de: 'Umfang des importierten Textes' },
+  statusWording: { en: 'Status as described by the source', de: 'Statusangabe der Quelle' },
+  attribution: { en: 'Source attribution', de: 'Quellenangabe' },
+  reason: { en: 'Reason for the correction', de: 'Begründung der Korrektur' },
+  save: { en: 'Save source draft', de: 'Quellenentwurf speichern' },
+  saved: { en: 'Source draft saved. The public source information is unchanged.', de: 'Quellenentwurf gespeichert. Die öffentlichen Quellenangaben sind unverändert.' },
+  before: { en: 'Published source information', de: 'Veröffentlichte Quellenangaben' },
+  after: { en: 'Saved correction', de: 'Gespeicherte Korrektur' },
+  history: { en: 'Source history and decisions', de: 'Quellenhistorie und Prüfentscheidungen' },
+  revision: { en: 'Revision', de: 'Revision' },
+  field: { en: 'Field', de: 'Angabe' },
+  author: { en: 'Account', de: 'Benutzerkonto' },
+  noDraft: { en: 'No source correction has been saved yet.', de: 'Es wurde noch keine Quellenkorrektur gespeichert.' },
+  review: { en: 'Submit for review', de: 'Zur Prüfung einreichen' },
+  approve: { en: 'Approve source correction', de: 'Quellenkorrektur freigeben' },
+  publish: { en: 'Publish source correction', de: 'Quellenkorrektur veröffentlichen' },
+  requestChanges: { en: 'Request changes', de: 'Änderungen anfordern' },
+  reviewReason: { en: 'Required changes and reason', de: 'Benötigte Änderungen und Begründung' },
+  inspectText: { en: 'Inspect the constitutional text in this session', de: 'Verfassungstext dieser Sitzung prüfen' },
+  inspectSources: { en: 'Inspect source correction and history', de: 'Quellenkorrektur und Historie prüfen' },
+  textReminder: { en: 'This correction uses the same review and publication workflow as the constitutional text. Review any text changes in this session too.', de: 'Diese Korrektur verwendet denselben Prüfungs- und Veröffentlichungsablauf wie der Verfassungstext. Prüfe auch eventuelle Textänderungen dieser Sitzung.' },
+  source: { en: 'Open source version', de: 'Ausgangsfassung öffnen' },
+  published: { en: 'Open published correction', de: 'Veröffentlichte Korrektur öffnen' },
+  unsaved: { en: 'Save the source information before submitting for review.', de: 'Speichere die Quellenangaben, bevor du sie zur Prüfung einreichst.' },
+  stale: { en: 'Another tab saved a newer source revision. Your input is retained. Open the session in another tab to compare the newer revision before reloading.', de: 'In einem anderen Tab wurde eine neuere Quellenrevision gespeichert. Deine Eingaben bleiben erhalten. Öffne die Sitzung zum Vergleich in einem weiteren Tab, bevor du neu lädst.' },
+  invalid: { en: 'Check the source fields and provide a change reason. Date precision requires date wording, and an unchanged draft cannot be saved.', de: 'Prüfe die Quellenfelder und ergänze eine Begründung. Eine genaue Datierung benötigt einen Datierungstext; ein unveränderter Entwurf kann nicht gespeichert werden.' },
+  saveFailed: { en: 'Saving could not be confirmed. Your input is retained. Check the session in another tab before retrying.', de: 'Die Speicherung konnte nicht bestätigt werden. Deine Eingaben bleiben erhalten. Prüfe die Sitzung vor einem erneuten Versuch in einem weiteren Tab.' },
+  changesRequired: { en: 'A reviewer requested changes. Save a new source revision before submitting it again.', de: 'Ein Prüfer hat Änderungen angefordert. Speichere eine neue Quellenrevision, bevor du sie erneut einreichst.' },
+};
+
+export const sourcePrecisionUi = {
+  unknown: { en: 'Unknown', de: 'Unbekannt' }, year: { en: 'Year', de: 'Jahr' }, month: { en: 'Month', de: 'Monat' },
+  day: { en: 'Day', de: 'Tag' }, range: { en: 'Date range', de: 'Zeitraum' }, uncertain: { en: 'Uncertain', de: 'Unsicher' },
+};
+
+export const sourceDecisionUi = {
+  review_submitted: { en: 'Submitted for review', de: 'Zur Prüfung eingereicht' },
+  changes_requested: { en: 'Changes requested', de: 'Änderungen angefordert' },
+  review_approved: { en: 'Approved for publication', de: 'Zur Veröffentlichung freigegeben' },
+  version_published: { en: 'Published', de: 'Veröffentlicht' },
+};

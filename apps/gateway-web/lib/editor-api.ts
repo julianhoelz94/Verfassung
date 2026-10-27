@@ -4,6 +4,8 @@ import type { Locale } from './locale';
 import { cookies } from 'next/headers';
 import { SESSION_COOKIE } from './session';
 import type { DiffReviewState, ReviewDecisionInput } from './diff-review';
+import type { SourceEvidence } from './api';
+import { sourceEvidenceUi } from './source-evidence-messages';
 
 const PUBLISH_TIMEOUT_MS = 60_000;
 
@@ -52,6 +54,17 @@ export type DraftPreview = {
   amendmentStatus?: 'pending' | 'ready' | 'failed' | null;
   publishComment?: string | null;
   changeRecord?: { title: string; comment: string; documents: { url?: string; fileId?: string; label?: string }[]; changes?: ChangeRecordChange[] } | null;
+  sourceEvidenceRevisions?: SourceEvidenceRevision[];
+  sourceEvidenceDecisions?: SourceEvidenceDecision[];
+};
+
+export type SourceEvidenceRevision = {
+  id: string; revision: number; original: SourceEvidence | null; evidence: SourceEvidence;
+  reason: string; actorId: string; actorEmail?: string; createdAt: string;
+};
+export type SourceEvidenceDecision = {
+  id: string; revision: number; action: 'review_submitted' | 'changes_requested' | 'review_approved' | 'version_published';
+  actorId: string; actorEmail?: string; reason: string | null; createdAt: string;
 };
 
 export type ChangeRecordUnitRef = {
@@ -93,6 +106,9 @@ export const EDITOR_ERROR_MESSAGES = {
   open_failed: ui.errors.openSessionFailed,
   list_failed: ui.errors.listSessionsFailed,
   save_failed: ui.errors.saveDraftFailed,
+  stale_source_evidence: sourceEvidenceUi.stale,
+  source_evidence_changes_required: sourceEvidenceUi.changesRequired,
+  source_evidence_invalid: sourceEvidenceUi.invalid,
   review_failed: ui.errors.submitReviewFailed,
   approve_failed: ui.errors.approveDraftFailed,
   publish_failed: ui.errors.publishFailed,
@@ -186,7 +202,8 @@ async function throwIfNotOk(response: Response, fallback: EditorErrorKey): Promi
     throw new EditorApiError('forbidden', code);
   }
   if (response.status === 409) {
-    throw new EditorApiError(code === 'not_tip' || code === 'not_editorial_tip' || code === 'not_legal_tip' ? code : 'not_ready', code);
+    if (code === 'source_evidence_changes_required') throw new EditorApiError(code, code);
+    throw new EditorApiError(code === 'stale_source_evidence' || code === 'not_tip' || code === 'not_editorial_tip' || code === 'not_legal_tip' ? code : 'not_ready', code);
   }
   if (response.status === 400) {
     throw new EditorApiError('invalid', code);
@@ -202,6 +219,18 @@ export async function openSession(versionId: string, hopKind: 'legal' | 'editori
     method: 'POST',
     body: JSON.stringify({ versionId, hopKind }),
   }, 'open_failed');
+}
+
+export async function saveSourceEvidence(sessionId: string, expectedRevision: number, evidence: SourceEvidence, reason: string): Promise<DraftPreview> {
+  return editorWrite<DraftPreview>(`/edit-sessions/${encodeURIComponent(sessionId)}/source-evidence`, {
+    method: 'POST', body: JSON.stringify({ expectedRevision, evidence, reason }),
+  }, 'save_failed');
+}
+
+export async function requestSourceEvidenceChanges(sessionId: string, expectedRevision: number, reason: string): Promise<DraftPreview> {
+  return editorWrite<DraftPreview>(`/edit-sessions/${encodeURIComponent(sessionId)}/source-evidence/changes-requested`, {
+    method: 'POST', body: JSON.stringify({ expectedRevision, reason }),
+  }, 'review_failed');
 }
 
 export async function listSessions(filters: {
@@ -259,15 +288,17 @@ export async function saveDraft(
   }, 'save_failed');
 }
 
-export async function submitReview(sessionId: string): Promise<DraftPreview> {
+export async function submitReview(sessionId: string, sourceEvidenceRevision?: number): Promise<DraftPreview> {
   return editorWrite<DraftPreview>(`/edit-sessions/${encodeURIComponent(sessionId)}/review`, {
     method: 'POST',
+    body: JSON.stringify({ sourceEvidenceRevision }),
   }, 'review_failed');
 }
 
-export async function approveReview(sessionId: string): Promise<DraftPreview> {
+export async function approveReview(sessionId: string, sourceEvidenceRevision?: number): Promise<DraftPreview> {
   return editorWrite<DraftPreview>(`/edit-sessions/${encodeURIComponent(sessionId)}/approval`, {
     method: 'POST',
+    body: JSON.stringify({ sourceEvidenceRevision }),
   }, 'approve_failed');
 }
 
@@ -283,7 +314,7 @@ export async function savePublishDetails(
 
 export async function publishSession(
   sessionId: string,
-  options: { hopKind: 'legal' | 'editorial_correction'; amendmentId?: string; comment?: string; changeRecord?: { title: string; comment: string; documents: { url: string; label?: string }[]; changes?: ChangeRecordChange[] } },
+  options: { hopKind: 'legal' | 'editorial_correction'; sourceEvidenceRevision?: number; amendmentId?: string; comment?: string; changeRecord?: { title: string; comment: string; documents: { url: string; label?: string }[]; changes?: ChangeRecordChange[] } },
 ): Promise<DraftPreview> {
   return editorWrite<DraftPreview>(`/edit-sessions/${encodeURIComponent(sessionId)}/publish`, {
     method: 'POST',

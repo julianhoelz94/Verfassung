@@ -104,10 +104,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         return redirectTo(request, editorPath(form));
       }
       const evidence: SourceEvidence = {
-        dateWording: value(form, 'dateWording') || null,
-        datePrecision: value(form, 'datePrecision') as SourceEvidence['datePrecision'],
-        coverage: value(form, 'coverage') || null, statusWording: value(form, 'statusWording') || null,
-        attribution: value(form, 'attribution') || null,
+        description: value(form, 'description'), datePrecision: 'unknown',
       };
       const preview = await saveSourceEvidence(sessionId, revision, evidence, value(form, 'reason'));
       if (request.headers.get('accept')?.includes('application/json')) return NextResponse.json(preview);

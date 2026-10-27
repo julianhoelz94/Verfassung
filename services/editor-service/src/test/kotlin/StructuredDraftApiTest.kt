@@ -149,7 +149,7 @@ class StructuredDraftApiTest {
         val target = UUID.randomUUID()
         val root = fixture()
         val original = com.constitutionatlas.platform.SourceEvidence(coverage = "Excerpt", attribution = "Archive")
-        val revised = original.copy(coverage = "Articles 1–10 only")
+        val revised = com.constitutionatlas.platform.SourceEvidence(description = "# Official archive\n\nArticles 1–10 only\n\n[Source](https://example.test/source)")
         val source = com.constitutionatlas.editor.client.CatalogVersion(version, UUID.randomUUID(), "2025", "published", currentVersionId = version, sourceEvidence = original)
         val successor = source.copy(id = target, versionLabel = "2025-correction", publicationStatus = "draft", sourceEvidence = revised)
         Mockito.`when`(catalogClient.getVersion(version)).thenReturn(source)

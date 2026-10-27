@@ -12,11 +12,12 @@ test('the reader source block opens a source correction with protected unsaved i
   await page.getByRole('button', { name: 'Edit source information' }).click();
   await expect(page).toHaveURL(/scope=sources/);
   await expect(page.getByRole('heading', { name: 'Edit source information' })).toBeVisible();
-  await expect(page.getByLabel('Date precision')).toHaveValue('unknown');
-  await expect(page.getByLabel('Date precision')).not.toBeVisible();
-  await expect(page.locator('#source-evidence textarea')).toHaveCount(4);
+  await expect(page.locator('#source-evidence textarea')).toHaveCount(1);
+  await expect(page.locator('#source-evidence select')).toHaveCount(0);
   await expect(page.locator('#source-change-reason textarea')).toHaveCount(1);
-  await page.getByLabel('Coverage of the imported text').fill('Articles 1–10 only.');
+  await page.getByLabel('Source description', { exact: true }).fill('# Official source\n\n- [Official text](https://example.org/constitution)');
+  await page.getByText('Preview source description', { exact: true }).click();
+  await expect(page.getByRole('link', { name: 'Official text' })).toHaveAttribute('href', 'https://example.org/constitution');
   await page.getByLabel('Reason for the correction').fill('Describe the imported excerpt.');
   await expect(page.getByRole('button', { name: 'Save source draft' })).toBeEnabled();
   await expect(page.getByRole('status').filter({ hasText: 'Save the source information' })).toBeVisible();

@@ -12,7 +12,7 @@ class OrderedPublishClientTest {
         val constitution = UUID.randomUUID()
         val version = UUID.randomUUID()
         val target = UUID.randomUUID()
-        val evidence = com.constitutionatlas.platform.SourceEvidence(coverage = "Articles 1–10 only", attribution = "Official archive")
+        val evidence = com.constitutionatlas.platform.SourceEvidence(description = "# Official archive\n\n[Source](https://example.test/source)")
         var request = ""
         server.createContext("/constitutions/$constitution/versions") { exchange ->
             request = exchange.requestBody.bufferedReader().readText()
@@ -28,8 +28,7 @@ class OrderedPublishClientTest {
             val reserved = OrderedPublishClient(url, url).reserve(UUID.randomUUID(), source, "editorial_correction", "Clarify excerpt", UUID.randomUUID(), "Bearer publisher")
             assertThat(reserved.id).isEqualTo(target)
             val payload = com.fasterxml.jackson.databind.ObjectMapper().readTree(request)
-            assertThat(payload.path("sourceEvidence").path("coverage").asText()).isEqualTo(evidence.coverage)
-            assertThat(payload.path("sourceEvidence").path("attribution").asText()).isEqualTo(evidence.attribution)
+            assertThat(payload.path("sourceEvidence").path("description").asText()).isEqualTo(evidence.description)
             assertThat(payload.path("predecessorVersionId").asText()).isEqualTo(version.toString())
         } finally {
             server.stop(0)

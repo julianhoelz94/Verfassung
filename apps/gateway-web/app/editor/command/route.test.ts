@@ -86,8 +86,14 @@ describe('source evidence commands', () => {
   });
   it('preserves stale revision errors as JSON so the form retains input', async () => {
     vi.stubGlobal('fetch', vi.fn<typeof fetch>().mockResolvedValue(Response.json({ code: 'stale_source_evidence' }, { status: 409 })));
-    const response = await POST(request('source-evidence', { expectedRevision: '1', datePrecision: 'unknown', coverage: 'Revised excerpt', reason: 'Clarify' }));
+    const response = await POST(request('source-evidence', { expectedRevision: '1', description: 'Revised source description', reason: 'Clarify' }));
     expect(await response.json()).toEqual({ key: 'stale_source_evidence' });
+  });
+  it('saves one description while keeping the correction reason outside the source data', async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(Response.json({ sourceEvidenceRevisions: [] }));
+    vi.stubGlobal('fetch', fetchMock);
+    await POST(request('source-evidence', { expectedRevision: '1', description: '# Archive\n\nFree source text', reason: 'Correct citation' }));
+    expect(JSON.parse(fetchMock.mock.calls[0][1]!.body as string)).toEqual({ expectedRevision: 1, evidence: { description: '# Archive\n\nFree source text', datePrecision: 'unknown' }, reason: 'Correct citation' });
   });
   it.each(['review', 'approve', 'publish'])('pins the source revision for %s', async command => {
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(Response.json({}));

@@ -35,9 +35,9 @@
 
 ### Quellenangaben korrigieren
 
-Öffnen Sie in der aktuellen Lesefassung direkt am Block **Archivquelle** die Aktion **Quellenangaben bearbeiten**. Bearbeiter und Administratoren können Datierung und deren Genauigkeit, Umfang des Imports, Statuswortlaut und Quellenangabe ändern. Der allgemeine Hinweis zur Rechtsgeltung bleibt ein fester Seitentext.
+Öffnen Sie in der aktuellen Lesefassung direkt am Block **Archivquelle** die Aktion **Quellenangaben bearbeiten**. Bearbeiter und Administratoren gestalten die **Quellenbeschreibung** in einem einzigen freien Textfeld. Absätze, Überschriften (`#`), Listen (`-`) und Links (`[Text](https://…)`) sind möglich; **Quellenbeschreibung ansehen** zeigt die Vorschau. Es gibt keine getrennten Pflichtfelder für Datierung, Importumfang, Status oder Herausgeber. Bestehende Angaben werden vollständig in den Text übernommen und können dort frei angeordnet werden. Der allgemeine Hinweis zur Rechtsgeltung bleibt ein fester Seitentext.
 
-Die vier Textfelder bilden die Quellenangaben ab. Die Datierungsgenauigkeit liegt eingeklappt unter **Weitere Datierungsangaben**. Die **Begründung der Korrektur** steht in einem eigenen Abschnitt und gehört ausschließlich zur Bearbeitungshistorie.
+Die **Begründung der Korrektur** steht in einem eigenen Abschnitt und gehört ausschließlich zur Bearbeitungshistorie.
 
 Speichern Sie den **Quellenentwurf** mit dieser Begründung und kontrollieren Sie die Gegenüberstellung der veröffentlichten und gespeicherten Angaben. Die Historie enthält jede gespeicherte Revision sowie Benutzerkonto, Zeitpunkt und Prüfentscheidungen. Noch ungespeicherte Felder verhindern das Einreichen; ein Konflikt mit einer neueren Revision erhält Ihre Eingaben.
 

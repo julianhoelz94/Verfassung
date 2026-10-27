@@ -30,7 +30,7 @@ describe('source evidence workflow', () => {
   it('blocks review while source input is unsaved and retains it after a stale-write rejection', async () => {
     await mount();
     expect(button('Zur Prüfung einreichen').disabled).toBe(false);
-    const coverage = host.querySelector<HTMLTextAreaElement>('#source-coverage')!;
+    const coverage = host.querySelector<HTMLTextAreaElement>('#source-description')!;
     await act(async () => { coverage.value = 'My unsaved correction'; Simulate.change(coverage); });
     expect(button('Zur Prüfung einreichen').disabled).toBe(true);
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ key: 'stale_source_evidence' }, { status: 400 })));
@@ -43,11 +43,13 @@ describe('source evidence workflow', () => {
     expect(submitted.get('reason')).toBe('Clarify scope');
   });
 
-  it('keeps the correction reason separate from the source fields and folds away date precision', async () => {
+  it('offers one free source description and keeps the correction reason separate', async () => {
     await mount();
     const source = host.querySelector('#source-evidence')!;
     expect(source.querySelector('[name="reason"]')).toBeNull();
-    expect(source.querySelectorAll('textarea')).toHaveLength(4);
+    expect(source.querySelectorAll('textarea')).toHaveLength(1);
+    expect(source.querySelector('select')).toBeNull();
+    expect(host.querySelector<HTMLTextAreaElement>('#source-description')!.value).toContain('Excerpt: articles 1–10 only');
     expect(host.querySelector('#source-change-reason #source-reason')).not.toBeNull();
     expect(source.querySelector('details')?.open).toBe(false);
     expect(button('Quellenentwurf speichern').getAttribute('form')).toBe('source-evidence-form');
@@ -55,7 +57,7 @@ describe('source evidence workflow', () => {
 
   it('shows saved before/after values and exact approval revision to a reviewer', async () => {
     await mount({ ...preview, session: { ...preview.session, status: 'reviewing' } }, 'reviewer', ['reviewer']);
-    expect(host.querySelector('#source-coverage')).toBeNull();
+    expect(host.querySelector('#source-description')).toBeNull();
     expect(host.textContent).toContain('Articles 1–10');
     expect(host.textContent).toContain('Excerpt: articles 1–10 only');
     expect(host.textContent).toContain('owner');

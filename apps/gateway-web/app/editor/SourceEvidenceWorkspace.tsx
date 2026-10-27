@@ -4,26 +4,20 @@ import { useRef, useState, useEffect, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import type { SourceEvidence } from '../../lib/api';
 import type { DraftPreview } from '../../lib/editor-api';
-import { sourceEvidenceUi as copy, sourceDecisionUi, sourcePrecisionUi } from '../../lib/source-evidence-messages';
+import { sourceEvidenceUi as copy, sourceDecisionUi } from '../../lib/source-evidence-messages';
 import { ui } from '../../lib/messages';
+import { sourceDescriptionText } from '../../lib/source-evidence';
+import { SourceDescription } from '../components/SourceDescription';
 import { WorkspacePage } from '../components/layout/templates';
-import { Stack, Inline } from '../components/layout/Layout';
+import { Stack, Inline, Grid } from '../components/layout/Layout';
 import { Alert, Button, PageHeader, WorkflowSteps } from '../components/ui';
 import { T, useLocale, useTranslation } from '../components/TranslationProvider';
 
-const textFields = ['dateWording', 'coverage', 'statusWording', 'attribution'] as const;
-const emptyEvidence: SourceEvidence = { datePrecision: 'unknown' };
-
-function EvidenceTable({ before, after }: { before: SourceEvidence | null; after: SourceEvidence }) {
-  const t = useTranslation();
-  return <div className="legal-table-scroll" role="region" aria-label={t(copy.after)} tabIndex={0}><table className="legal-table">
-    <thead><tr><th scope="col"><T value={copy.field} /></th><th scope="col"><T value={copy.before} /></th><th scope="col"><T value={copy.after} /></th></tr></thead>
-    <tbody>{[...textFields, 'datePrecision' as const].map(field => <tr key={field}>
-      <th scope="row"><T value={copy[field]} /></th>
-      <td>{field === 'datePrecision' ? <T value={sourcePrecisionUi[before?.datePrecision ?? 'unknown']} /> : before?.[field] || '—'}</td>
-      <td>{field === 'datePrecision' ? <T value={sourcePrecisionUi[after.datePrecision]} /> : after[field] || '—'}</td>
-    </tr>)}</tbody>
-  </table></div>;
+function EvidenceComparison({ before, after }: { before: SourceEvidence | null; after: SourceEvidence }) {
+  return <Grid columns={2}>
+    <section><h3><T value={copy.before} /></h3><SourceDescription evidence={before} /></section>
+    <section><h3><T value={copy.after} /></h3><SourceDescription evidence={after} /></section>
+  </Grid>;
 }
 
 type Props = {
@@ -42,7 +36,7 @@ export function SourceEvidenceWorkspace({ preview, publishedEvidence, userId, ro
   const locale = useLocale();
   const latest = preview.sourceEvidenceRevisions?.[0];
   const original = latest ? latest.original : publishedEvidence;
-  const [evidence, setEvidence] = useState(latest?.evidence ?? publishedEvidence ?? emptyEvidence);
+  const [description, setDescription] = useState(() => sourceDescriptionText(latest?.evidence ?? publishedEvidence));
   const [reason, setReason] = useState(latest?.reason ?? '');
   const [expectedRevision, setExpectedRevision] = useState(latest?.revision ?? 0);
   const [dirty, setDirty] = useState(false);
@@ -104,21 +98,15 @@ export function SourceEvidenceWorkspace({ preview, publishedEvidence, userId, ro
         {fields}
         <input type="hidden" name="command" value="source-evidence" />
         <input type="hidden" name="expectedRevision" value={expectedRevision} />
-        {textFields.map(field => <Stack key={field} gap="related">
-          <label htmlFor={`source-${field}`}><T value={copy[field]} /></label>
-          <textarea id={`source-${field}`} name={field} value={evidence[field] ?? ''} maxLength={10000} rows={field === 'coverage' ? 3 : 2}
-            onChange={event => setEvidence(current => ({ ...current, [field]: event.target.value }))} />
-        </Stack>)}
-        <details><summary><T value={copy.moreDates} /></summary>
-          <Stack>
-            <label htmlFor="source-datePrecision"><T value={copy.datePrecision} /></label>
-            <select id="source-datePrecision" name="datePrecision" value={evidence.datePrecision} onChange={event => setEvidence(current => ({ ...current, datePrecision: event.target.value as SourceEvidence['datePrecision'] }))}>
-              {Object.entries(sourcePrecisionUi).map(([value, label]) => <option key={value} value={value}>{t(label)}</option>)}
-            </select>
-          </Stack>
+        <label htmlFor="source-description"><T value={copy.description} /></label>
+        <p id="source-format-help" className="muted"><T value={copy.formatHelp} /></p>
+        <textarea id="source-description" name="description" value={description} maxLength={50000} rows={12}
+          aria-describedby="source-format-help" onChange={event => setDescription(event.target.value)} />
+        <details><summary><T value={copy.preview} /></summary>
+          <SourceDescription evidence={{ description, datePrecision: 'unknown' }} />
         </details>
       </Stack> : null}
-      {latest ? <><h3><T value={copy.after} /></h3><EvidenceTable before={original} after={latest.evidence} /></> : <p><T value={copy.noDraft} /></p>}
+      {latest ? <EvidenceComparison before={original} after={latest.evidence} /> : <p><T value={copy.noDraft} /></p>}
     </Stack>
     <Stack as="section" id="source-change-reason" aria-label={t(copy.changeNote)}>
       <h2 id="source-reason-heading"><T value={copy.reason} /></h2>
@@ -151,7 +139,7 @@ export function SourceEvidenceWorkspace({ preview, publishedEvidence, userId, ro
       <ol>{(preview.sourceEvidenceRevisions ?? []).map(revision => <li key={revision.id}>
         <details><summary><T value={copy.revision} /> {revision.revision} · <time dateTime={revision.createdAt}>{date(revision.createdAt)}</time></summary>
           <p><T value={copy.author} />: {revision.actorEmail ?? revision.actorId}</p>
-          <EvidenceTable before={revision.original} after={revision.evidence} />
+          <EvidenceComparison before={revision.original} after={revision.evidence} />
           <p><strong><T value={copy.reason} />:</strong> {revision.reason}</p>
         </details>
       </li>)}</ol>

@@ -9,11 +9,14 @@ data class SourceEvidence(
     val coverage: String? = null,
     val statusWording: String? = null,
     val attribution: String? = null,
+    @get:com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+    val description: String? = null,
 ) : StrictOrderedWrite() {
     fun validate() {
         require(datePrecision in setOf("unknown", "year", "month", "day", "range", "uncertain")) { "Unsupported source date precision" }
         require(datePrecision == "unknown" || !dateWording.isNullOrBlank()) { "Source date precision requires original date wording" }
         require(listOf(dateWording, coverage, statusWording, attribution).all { it == null || it.length <= 10000 }) { "Source evidence exceeds 10000 characters" }
+        require(description == null || description.length <= 50000) { "Source description exceeds 50000 characters" }
     }
 }
 

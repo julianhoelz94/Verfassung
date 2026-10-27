@@ -302,6 +302,11 @@ class CatalogApiTest {
         val correction = writes.createDraftVersion(constitution.id, com.constitutionatlas.catalog.api.CreateVersionRequest("1849 r2", predecessorVersionId = first.id, hopKind = "editorial_correction"))
         assertThat(catalogRepository.findVersion(correction.id)?.sourceEvidence).isEqualTo(evidence)
         assertThat(catalogRepository.findVersion(first.id)?.sourceEvidence).isEqualTo(evidence)
+        mockMvc.post("/versions/${correction.id}/publish") { header("Authorization", PUBLISHER_TOKEN) }.andExpect { status { isOk() } }
+        val freeDescription = com.constitutionatlas.platform.SourceEvidence(description = "# Archive\n\n[Original source](https://example.org)\n\nEditorially designed description")
+        val designed = writes.createDraftVersion(constitution.id, com.constitutionatlas.catalog.api.CreateVersionRequest("1849 r3", predecessorVersionId = correction.id, hopKind = "editorial_correction", sourceEvidence = freeDescription))
+        assertThat(catalogRepository.findVersion(designed.id)?.sourceEvidence).isEqualTo(freeDescription)
+        assertThat(catalogRepository.findVersion(first.id)?.sourceEvidence).isEqualTo(evidence)
     }
 
     @Test

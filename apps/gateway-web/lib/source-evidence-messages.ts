@@ -1,13 +1,10 @@
 export const sourceEvidenceUi = {
   edit: { en: 'Edit source information', de: 'Quellenangaben bearbeiten' },
   explanation: { en: 'Save a correction with a reason. Review and publication are required before it becomes public.', de: 'Speichere die Korrektur mit einer Begründung. Erst nach Prüfung und Veröffentlichung wird sie öffentlich sichtbar.' },
-  dateWording: { en: 'Date as described by the source', de: 'Datierung laut Quelle' },
-  datePrecision: { en: 'Date precision', de: 'Genauigkeit der Datierung' },
-  moreDates: { en: 'Additional date information', de: 'Weitere Datierungsangaben' },
+  description: { en: 'Source description', de: 'Quellenbeschreibung' },
+  formatHelp: { en: 'Write freely. Use blank lines for paragraphs, # for headings, - for lists and [text](https://…) for links.', de: 'Gestalte den Text frei: Leerzeilen für Absätze, # für Überschriften, - für Listen und [Text](https://…) für Links.' },
+  preview: { en: 'Preview source description', de: 'Quellenbeschreibung ansehen' },
   fieldsGroup: { en: 'Source information', de: 'Quellenangaben' },
-  coverage: { en: 'Coverage of the imported text', de: 'Umfang des importierten Textes' },
-  statusWording: { en: 'Status as described by the source', de: 'Statusangabe der Quelle' },
-  attribution: { en: 'Source attribution', de: 'Quellenangabe' },
   reason: { en: 'Reason for the correction', de: 'Begründung der Korrektur' },
   reasonHelp: { en: 'This note belongs to the editing history and is kept separate from the source information.', de: 'Dieser Vermerk gehört zur Bearbeitungshistorie und wird getrennt von den Quellenangaben geführt.' },
   changeNote: { en: 'Correction note', de: 'Korrekturvermerk' },
@@ -17,7 +14,6 @@ export const sourceEvidenceUi = {
   after: { en: 'Saved correction', de: 'Gespeicherte Korrektur' },
   history: { en: 'Source history and decisions', de: 'Quellenhistorie und Prüfentscheidungen' },
   revision: { en: 'Revision', de: 'Revision' },
-  field: { en: 'Field', de: 'Angabe' },
   author: { en: 'Account', de: 'Benutzerkonto' },
   noDraft: { en: 'No source correction has been saved yet.', de: 'Es wurde noch keine Quellenkorrektur gespeichert.' },
   review: { en: 'Submit for review', de: 'Zur Prüfung einreichen' },
@@ -32,14 +28,9 @@ export const sourceEvidenceUi = {
   published: { en: 'Open published correction', de: 'Veröffentlichte Korrektur öffnen' },
   unsaved: { en: 'Save the source information before submitting for review.', de: 'Speichere die Quellenangaben, bevor du sie zur Prüfung einreichst.' },
   stale: { en: 'Another tab saved a newer source revision. Your input is retained. Open the session in another tab to compare the newer revision before reloading.', de: 'In einem anderen Tab wurde eine neuere Quellenrevision gespeichert. Deine Eingaben bleiben erhalten. Öffne die Sitzung zum Vergleich in einem weiteren Tab, bevor du neu lädst.' },
-  invalid: { en: 'Check the source fields and provide a change reason. Date precision requires date wording, and an unchanged draft cannot be saved.', de: 'Prüfe die Quellenfelder und ergänze eine Begründung. Eine genaue Datierung benötigt einen Datierungstext; ein unveränderter Entwurf kann nicht gespeichert werden.' },
+  invalid: { en: 'Check the source description and provide a separate change reason. An unchanged draft cannot be saved.', de: 'Prüfe die Quellenbeschreibung und ergänze eine separate Begründung. Ein unveränderter Entwurf kann nicht gespeichert werden.' },
   saveFailed: { en: 'Saving could not be confirmed. Your input is retained. Check the session in another tab before retrying.', de: 'Die Speicherung konnte nicht bestätigt werden. Deine Eingaben bleiben erhalten. Prüfe die Sitzung vor einem erneuten Versuch in einem weiteren Tab.' },
   changesRequired: { en: 'A reviewer requested changes. Save a new source revision before submitting it again.', de: 'Ein Prüfer hat Änderungen angefordert. Speichere eine neue Quellenrevision, bevor du sie erneut einreichst.' },
-};
-
-export const sourcePrecisionUi = {
-  unknown: { en: 'Unknown', de: 'Unbekannt' }, year: { en: 'Year', de: 'Jahr' }, month: { en: 'Month', de: 'Monat' },
-  day: { en: 'Day', de: 'Tag' }, range: { en: 'Date range', de: 'Zeitraum' }, uncertain: { en: 'Uncertain', de: 'Unsicher' },
 };
 
 export const sourceDecisionUi = {

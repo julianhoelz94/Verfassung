@@ -35,9 +35,9 @@
 
 ### Correct source information
 
-Choose **Edit source information** directly in the **Archival source** block on the current reading version. Editors and administrators can correct the source date wording and precision, import coverage, status wording and attribution. The general legal-validity notice remains fixed site text.
+Choose **Edit source information** directly in the **Archival source** block on the current reading version. Editors and administrators design the **Source description** in one free text field. Paragraphs, headings (`#`), lists (`-`) and links (`[text](https://…)`) are supported; **Preview source description** shows the result. Date wording, import coverage, status and attribution have no separate required fields. Existing information is carried into the description in full and can be arranged freely. The general legal-validity notice remains fixed site text.
 
-The four text fields hold the source information. Date precision is folded away under **Additional date information**. The **Reason for the correction** has its own section and belongs only to the editing history.
+The **Reason for the correction** has its own section and belongs only to the editing history.
 
 Save the source draft with that reason, then compare the published and saved values. The history retains every saved revision and records accounts, timestamps and review decisions. Unsaved fields block submission; stale-write errors retain your input.
 

@@ -18,6 +18,7 @@ import { orderVersions } from '../../../../../lib/compare';
 import { currentLocale } from '../../../../../lib/server-locale';
 import { httpUrl, provenanceLabel, verificationLabel } from '../../../../../lib/provenance';
 import { FormattedDate } from '../../../../../lib/format-date';
+import { currentUser } from '../../../../../lib/session';
 
 export default async function JurisdictionVersionPage({ params }: { params: Promise<{ id: string; versionId: string }> }) {
   const { id, versionId } = await params;
@@ -36,6 +37,8 @@ export default async function JurisdictionVersionPage({ params }: { params: Prom
   const previous = index > 0 ? line[index - 1] : undefined;
   const next = index >= 0 ? line[index + 1] : undefined;
   const sourceHref = httpUrl(version.sourceUrl);
+  const user = await currentUser();
+  const canEdit = Boolean(user?.roles.some(role => role === 'editor' || role === 'admin'));
   const changeByArticle: Record<string, string> = {};
   for (const amendment of (await listAmendments(versionId).catch(() => [])) ?? []) {
     for (const change of amendment.changes) {
@@ -59,7 +62,7 @@ export default async function JurisdictionVersionPage({ params }: { params: Prom
     </>}
   />}>
     {detail.jurisdiction.historical ? <p><T value={migrationUi.historical} /></p> : null}
-    <SourceEvidenceNotice evidence={snapshot.sourceEvidence} versionId={versionId} />
+    <SourceEvidenceNotice evidence={snapshot.sourceEvidence} versionId={versionId} canEdit={canEdit && (version.currentVersionId ?? version.id) === versionId} />
     <p><a href={`/constitutions/${constitution.id}/amendments`}><T value={migrationUi.amendmentRegister} /></a></p>
     <SnapshotNotice jurisdictionId={id} viewedId={versionId} currentId={version.currentVersionId ?? version.id} />
     <VersionDocuments constitutionId={constitution.id} versionId={versionId} legalVersionId={snapshot.legalVersionId ?? snapshot.id} />

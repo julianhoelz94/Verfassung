@@ -22,7 +22,7 @@ export type VersionSummary = {
   sourceEvidence?: SourceEvidence | null;
 };
 
-export type SourceEvidence = { dateWording?: string | null; datePrecision: 'unknown' | 'year' | 'month' | 'day' | 'range' | 'uncertain'; coverage?: string | null; statusWording?: string | null; attribution?: string | null };
+export type SourceEvidence = { description?: string | null; dateWording?: string | null; datePrecision: 'unknown' | 'year' | 'month' | 'day' | 'range' | 'uncertain'; coverage?: string | null; statusWording?: string | null; attribution?: string | null };
 
 export type VersionDetail = Pick<VersionSummary, 'id' | 'versionLabel' | 'effectiveDate' | 'languageCode' | 'predecessorVersionId' | 'legalVersionId' | 'currentVersionId' | 'hopKind' | 'listing'> & {
   constitutionId: string;

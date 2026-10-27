@@ -17,6 +17,18 @@ class StructuredPublicationService(private val drafts: StructuredDraftRepository
     fun lock(session: UUID) = drafts.lockSession(session)
     fun reservation(session: UUID, authorization: String?): CatalogVersion? = client.reservation(session, authorization)
 
+    fun pinUnchanged(session: UUID, version: UUID) {
+        if (drafts.pin(session) != null) {
+            prepare(session, version)
+            return
+        }
+        val source = sources.source(version)
+        val settings = sources.settings(version)
+        if (source.settingsRevisionId != settings.id) throw ConflictException("Source and settings pins disagree", "stale_source")
+        StructuredDraftEngine.validate(source.roots, settings)
+        drafts.createPin(session, source, settings.id)
+    }
+
     fun prepare(session: UUID, version: UUID): StructuredDraftPreview {
         val pin = drafts.pin(session) ?: throw ConflictException("No structured draft")
         val source = sources.source(version)

@@ -25,7 +25,7 @@ class OrderedPublishClient(@Value("\${content.api.url}") contentUrl: String, @Va
 
     fun reserve(attempt: UUID, source: CatalogVersion, hopKind: String, comment: String?, settings: UUID, authorization: String?): CatalogVersion =
         catalog.post().uri("/constitutions/{id}/versions", source.constitutionId).headers { headers -> downstreamAuthorization(authorization)?.let { headers.set("Authorization", it) } }.contentType(MediaType.APPLICATION_JSON)
-            .body(mapOf("publishAttemptId" to attempt, "versionLabel" to "${source.versionLabel}-${attempt.toString().take(8)}", "effectiveDate" to source.effectiveDate, "languageCode" to source.languageCode, "predecessorVersionId" to source.id, "hopKind" to hopKind, "publicationComment" to comment, "structuralSettingsRevisionId" to settings))
+            .body(mapOf("publishAttemptId" to attempt, "versionLabel" to "${source.versionLabel}-${attempt.toString().take(8)}", "effectiveDate" to source.effectiveDate, "languageCode" to source.languageCode, "predecessorVersionId" to source.id, "hopKind" to hopKind, "publicationComment" to comment, "structuralSettingsRevisionId" to settings, "sourceEvidence" to source.sourceEvidence.takeIf { hopKind == "editorial_correction" }))
             .retrieve().body(CatalogVersion::class.java) ?: error("Missing reserved successor")
 
     fun save(version: UUID, request: OrderedSnapshotWrite, authorization: String?): OrderedSnapshot =

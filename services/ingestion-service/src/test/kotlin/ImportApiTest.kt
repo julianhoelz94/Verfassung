@@ -108,7 +108,11 @@ class ImportApiTest {
             val key = "jackson2-$name-${UUID.randomUUID()}"
             jdbc.update(
                 "INSERT INTO import_jobs (id, status, payload, submitted_by, idempotency_key, payload_sha256) VALUES (?, 'pending_review', ?::jsonb, ?, ?, ?)",
-                previousId, expectedBytes.toString(Charsets.UTF_8), admin.id, key, expectedHash,
+                previousId,
+                expectedBytes.toString(Charsets.UTF_8),
+                admin.id,
+                key,
+                expectedHash,
             )
             val retry = importService.importVersion(TOKEN, admin.id, request, idempotencyKey = key, expectedChecksum = expectedHash)
             assertEquals(previousId, retry.id)

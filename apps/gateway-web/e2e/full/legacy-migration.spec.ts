@@ -245,6 +245,8 @@ test('offline archive package preserves evidence through review, publication and
       await context.addInitScript(() => localStorage.setItem('ca_cookie_notice_v1', 'dismissed'));
       const reader = await context.newPage();
       await reader.goto(`/jurisdictions/${jurisdiction.id}/versions/${versionId}`);
+      await expect(reader.locator('.segmented button').first()).toHaveText(locale === 'de' ? 'Übersicht' : 'Overview');
+      await expect(reader.locator('.segmented button').last()).toHaveText(locale === 'de' ? 'Volltext' : 'Full text');
       await reader.locator('.segmented button').last().click();
       await expect(reader.getByText(manifest.annexText, { exact: true })).toBeVisible();
       const readerImage = testInfo.outputPath(`regional-reader-${locale}.png`);

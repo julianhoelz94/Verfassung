@@ -147,6 +147,8 @@ export const ui = {
     article: { en: 'Article', de: 'Artikel' },
   },
   readerDynamic: {
+    overview: { en: 'Overview', de: 'Übersicht' },
+    fullText: { en: 'Full text', de: 'Volltext' },
     unchanged: { en: 'Unchanged', de: 'Unverändert' },
     unchangedSince: { en: 'Unchanged since', de: 'Unverändert seit' },
     filterArticles: { en: 'Filter articles', de: 'Artikel filtern' },

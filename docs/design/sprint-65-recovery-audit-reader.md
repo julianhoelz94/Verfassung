@@ -40,7 +40,7 @@ prerequisite; this sprint does not publish operator legal details or deploy the 
 
 Local service checks passed with no failures or skipped tests: Audit 10, Identity
 82, Editor 47, Catalog 57, Ingestion 57 and Search 13. Gateway verification passed
-441 Vitest tests, 13 Node tests, type checking, lint and production build. Focused
+447 Vitest tests, 13 Node tests, type checking, lint and production build. Focused
 mock browser journeys cover setup recovery and reader usability; these are
 separate from the real full-stack acceptance gate.
 

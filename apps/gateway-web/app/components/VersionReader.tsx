@@ -42,7 +42,8 @@ export function VersionReader({
   const t = useTranslation();
   const readerHref = jurisdictionId ? `/jurisdictions/${jurisdictionId}/versions/${versionId}` : `/countries/${code}/versions/${versionId}`;
   const max = depthStopCount(outline);
-  const labels = depthStopLabels(outline);
+  const labels = depthStopLabels(outline).map((label, index) =>
+    index === 0 ? t(ui.readerDynamic.overview) : index === max - 1 ? t(ui.readerDynamic.fullText) : label);
   const [depth, setDepth] = useState(initialDepth === 'full' ? max : 1);
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => new Set());
   const tocItems = useMemo(

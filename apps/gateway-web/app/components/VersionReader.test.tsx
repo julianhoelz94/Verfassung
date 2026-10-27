@@ -5,6 +5,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { ArticleSummary, ContentOutline } from '../../lib/api';
 import { VersionReader } from './VersionReader';
 import { ConstitutionText } from './ConstitutionText';
+import { TranslationProvider } from './TranslationProvider';
 
 let host: HTMLDivElement;
 let root: Root;
@@ -53,4 +54,14 @@ it('keeps the regional reader text in the server response when JavaScript is dis
 it('keeps an occurrence anchor on a standalone unit', () => {
   host.innerHTML = renderToStaticMarkup(<ConstitutionText article={articles[0]} outline={outline} />);
   expect(host.querySelectorAll('#root')).toHaveLength(1);
+});
+
+it('localizes reading controls while preserving authored outline labels and source text', async () => {
+  const sourceOutline: ContentOutline = { kinds: [...outline.kinds, {
+    kindCode: 'chapter', displayLabel: 'Authored chapter label', sortOrder: 2,
+    mayHoldText: true, mayHoldChildren: false, allowedChildKinds: [], showTitle: true,
+  }] };
+  await act(async () => root.render(<TranslationProvider locale="de"><VersionReader jurisdictionId="region" versionId="old-snapshot" articles={articles} outline={sourceOutline} initialDepth="full" /></TranslationProvider>));
+  expect(Array.from(host.querySelectorAll('.segmented button'), button => button.textContent)).toEqual(['Übersicht', 'Authored chapter label', 'Volltext']);
+  expect(host.textContent).toContain('Exact historical source note.');
 });

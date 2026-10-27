@@ -81,14 +81,14 @@ class ReleaseTests(unittest.TestCase):
 
 class AuthorizationTests(unittest.TestCase):
     def test_manual_main_and_known_environment_required(self):
-        check_request.validate_request("workflow_dispatch", "refs/heads/main", "prod")
+        check_request.validate_request("workflow_dispatch", "refs/heads/main", "prod", "v.1.1")
         for event, ref, environment in [
             ("push", "refs/heads/main", "test"),
             ("workflow_dispatch", "refs/heads/other", "test"),
             ("workflow_dispatch", "refs/heads/main", "unknown"),
         ]:
             with self.assertRaises(ValueError):
-                check_request.validate_request(event, ref, environment)
+                check_request.validate_request(event, ref, environment, "v.1.1")
 
     def test_write_permission_is_insufficient(self):
         response = Mock()
@@ -335,7 +335,9 @@ class RuntimeTests(unittest.TestCase):
         workflow = yaml.load((ROOT / ".github/workflows/deploy.yml").read_text(), Loader=yaml.BaseLoader)
         self.assertEqual(set(workflow["on"]), {"workflow_dispatch"})
         inputs = workflow["on"]["workflow_dispatch"]["inputs"]
-        self.assertEqual(set(inputs), {"environment", "prepopulate"})
+        self.assertEqual(set(inputs), {"release_tag", "environment", "prepopulate"})
+        self.assertEqual(inputs["release_tag"]["required"], "true")
+        self.assertNotIn("default", inputs["release_tag"])
         self.assertEqual(inputs["prepopulate"]["default"], "false")
         self.assertEqual(set(workflow["jobs"]), {"authorize", "build-image", "candidate-images", "deploy"})
         for job in workflow["jobs"].values():
@@ -343,6 +345,32 @@ class RuntimeTests(unittest.TestCase):
         steps = workflow["jobs"]["deploy"]["steps"]
         populate = next(step for step in steps if step.get("run") == "npm run prepopulate")
         self.assertEqual(populate["if"], "inputs.prepopulate")
+
+    def test_release_commit_is_used_for_ci_build_collection_and_deployment(self):
+        workflow = yaml.load((ROOT / ".github/workflows/deploy.yml").read_text(), Loader=yaml.BaseLoader)
+        jobs = workflow["jobs"]
+        self.assertEqual(jobs["authorize"]["outputs"]["source-sha"], "${{ steps.release.outputs.source-sha }}")
+        for name, job in jobs.items():
+            with self.subTest(job=name):
+                checkouts = [step["with"] for step in job["steps"]
+                             if step.get("uses", "").startswith("actions/checkout@")]
+                self.assertEqual(len(checkouts), 2)
+                self.assertEqual(checkouts[0]["ref"], "${{ github.sha }}")
+                expected = "${{ steps.release.outputs.source-sha }}" if name == "authorize" else "${{ needs.authorize.outputs.source-sha }}"
+                self.assertEqual(checkouts[1]["ref"], expected)
+                self.assertEqual(checkouts[1]["path"], "source")
+                for step in job["steps"]:
+                    command = step.get("run", "")
+                    if "--source-sha" in command:
+                        self.assertIn('--source-sha "$SOURCE_SHA"', command)
+                        environment = {**job.get("env", {}), **step.get("env", {})}
+                        self.assertEqual(environment["SOURCE_SHA"], expected)
+                        directory = step.get("working-directory", job.get("defaults", {}).get("run", {}).get("working-directory"))
+                        self.assertEqual(directory, "source")
+                        self.assertIn("../scripts/cd/", command)
+                        self.assertNotIn("$GITHUB_SHA", command)
+        populate = next(step for step in jobs["deploy"]["steps"] if step.get("run") == "npm run prepopulate")
+        self.assertEqual(populate["working-directory"], "source/apps/gateway-web")
 
 
 if __name__ == "__main__":

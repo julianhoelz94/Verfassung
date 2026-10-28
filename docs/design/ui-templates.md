@@ -41,6 +41,8 @@ The global stylesheet is in the `base` cascade layer; scoped structural layout r
 
 Runtime tokens live only in `apps/gateway-web/app/styles/tokens.css`, imported by the root layout. The historical prototype token file imports that source instead of copying it.
 
+The shared visual language follows the constitution viewer: warm near-white paper, white surfaces, muted green accents, restrained shadows and regular-weight Georgia headings. Constitutional text uses the same serif face at `1.0625rem / 1.85`; navigation, forms, metadata and actions retain the system sans-serif face. `--font-heading`, `--weight-heading` and `--weight-ui-emphasis` keep page headings and interface emphasis consistent. Authored bold text retains its semantic emphasis. Status and diff colors use subdued but distinct foreground/background pairs, and keyboard focus keeps a contrasting amber outline.
+
 | Token / layout gap | Value | Relationship |
 | --- | --- | --- |
 | `--gap-related` / `related` | 8px | Label, control, help, error |

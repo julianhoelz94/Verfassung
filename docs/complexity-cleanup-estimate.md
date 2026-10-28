@@ -1,5 +1,56 @@
 # Cognitive complexity cleanup estimate
 
+## Current target and pilot
+
+The agreed maximum is now **20 per function**, with `EditorPage` temporarily
+deferred while under construction. The original assessment below used a target
+of 15 and remains a historical comparison, not the active cleanup scope.
+
+The pilot starts from fetched `main` revision `bee7b4b` (2026-10-28), including
+Kotlin 2.4 / Spring Boot 4.1, Next.js 16 / React 19, and the specification-derived
+behavioral tests. The CI branch was rebased onto that revision before cleanup.
+
+Two bounded responsibilities were selected to exercise both languages:
+
+| Function | Before | After | Refactoring boundary |
+| --- | ---: | ---: | --- |
+| `ContentTranslationProvider.translateMany` | 22 | 0 | Provider-specific request construction and ordered response validation |
+| `SearchPage` | 24 | 15 | Result loading/error handling and normalized active-filter labels |
+
+The Kotlin helpers score 10 and 12; the TypeScript helpers score 2 and 6. All are
+below the new maximum. New Kotlin KDoc records provider-specific behavior,
+timeouts, ordering, errors and language handling; TypeScript helper documentation
+records the search fallback and filter contracts. Existing provider endpoints,
+payloads and page rendering are preserved.
+
+The pilot also updates boundary checks to **20 passes / 21 fails**, adds a Kotlin
+score-increase check, and keeps the unfinished editor page visible as a named
+reporting exception. Baselines are initialized from current `main`, then only the
+two pilot exceptions are removed. The rest of the cleanup remains separate work.
+
+At a maximum of 20, current `main` starts with 19 Kotlin findings and 38
+TypeScript/JavaScript findings, including the deferred editor page. After the
+pilot, 18 Kotlin findings and 36 TypeScript/JavaScript baseline findings remain,
+plus that one deferred page. The active remaining scope is **48 production
+functions and 6 test/fixture functions**.
+
+Local pilot verification passed the full identity check (96 tests and Spotless),
+the gateway suite (917 Vitest and 13 Node tests), gateway lint/typecheck and
+production build, 13 TypeScript policy tests, 7 Kotlin score-check tests, and the
+real Gradle 20/21 boundary test. Search-page statement coverage is 100%; the new
+Python score check exceeds 90%. An integration probe confirmed that a native
+Kotlin exception cannot hide a score above its reviewed maximum.
+
+The two refactors and local checks took approximately ten minutes of elapsed
+execution, with some setup, review and tests running in parallel. Browser checks
+could not launch locally because Chromium was absent and the pinned container
+image download was denied; PR CI supplies the browser verification. This small
+pilot demonstrates the straightforward extraction path, but does not measure the
+more involved publishing, replay and diff refactors. Re-estimate those after the
+first domain workflow cleanup rather than extrapolating these two functions.
+
+## Original assessment at a maximum of 15
+
 Assessment date: 2026-10-28. Source revision: `5c359b1`, before application
 refactoring. This is a planning estimate based on the initial scan and inspection
 of the largest functions and their existing tests; no cleanup has been performed.

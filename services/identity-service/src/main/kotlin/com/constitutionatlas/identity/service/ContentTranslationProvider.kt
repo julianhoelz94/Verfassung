@@ -15,8 +15,29 @@ import java.time.Duration
 class ContentTranslationProvider(private val mapper: ObjectMapper) {
     private val http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build()
 
+    /**
+     * Translates one ordered batch using Google or DeepL, returning one text per input.
+     * `auto` omits the source language so the provider detects it. Requests retain the
+     * five-second connection and twenty-second request timeouts; transport failures propagate.
+     *
+     * @throws IllegalStateException for unsupported providers, non-success responses,
+     * incomplete batches, or blank translated text.
+     */
     fun translateMany(provider: String, apiKey: String, sourceTexts: List<String>, sourceLanguage: String, targetLanguage: String): List<String> {
-        val request = when (provider) {
+        val request = buildRequest(provider, apiKey, sourceTexts, sourceLanguage, targetLanguage)
+        val response = http.send(request, HttpResponse.BodyHandlers.ofString())
+        return translatedTexts(provider, response.statusCode(), response.body(), sourceTexts.size)
+    }
+
+    /**
+     * Builds the provider-specific JSON request without sending it. Google keys are
+     * URL-encoded; DeepL `:fx` keys use its free endpoint. Explicit language casing is
+     * preserved for Google and uppercased for DeepL, while `auto` is omitted for both.
+     *
+     * @throws IllegalStateException when [provider] is neither `google` nor `deepl`.
+     */
+    internal fun buildRequest(provider: String, apiKey: String, sourceTexts: List<String>, sourceLanguage: String, targetLanguage: String): HttpRequest =
+        when (provider) {
             "google" -> HttpRequest.newBuilder(
                 URI.create("https://translation.googleapis.com/language/translate/v2?key=${URLEncoder.encode(apiKey, StandardCharsets.UTF_8)}"),
             ).header("Content-Type", "application/json")
@@ -47,11 +68,20 @@ class ContentTranslationProvider(private val mapper: ObjectMapper) {
                 ).timeout(Duration.ofSeconds(20)).build()
             else -> error("Unsupported translation provider")
         }
-        val response = http.send(request, HttpResponse.BodyHandlers.ofString())
-        if (response.statusCode() !in 200..299) error("Translation provider unavailable")
-        val root = mapper.readTree(response.body())
+
+    /**
+     * Validates a successful provider response and preserves its translation order.
+     * Google HTML entities are decoded; DeepL text is returned unchanged. Malformed
+     * JSON propagates the mapper error; validation errors do not include the response body.
+     *
+     * @throws IllegalStateException for non-2xx status, a batch size different from
+     * [expectedCount], or any missing/blank translated text.
+     */
+    internal fun translatedTexts(provider: String, statusCode: Int, body: String, expectedCount: Int): List<String> {
+        if (statusCode !in 200..299) error("Translation provider unavailable")
+        val root = mapper.readTree(body)
         val translations = if (provider == "google") root.path("data").path("translations") else root.path("translations")
-        if (translations.size() != sourceTexts.size) error("Translation provider returned an incomplete response")
+        if (translations.size() != expectedCount) error("Translation provider returned an incomplete response")
         return translations.toList().map { entry ->
             val translated = entry.path(if (provider == "google") "translatedText" else "text").asString("")
             if (translated.isBlank()) error("Translation provider returned no text")

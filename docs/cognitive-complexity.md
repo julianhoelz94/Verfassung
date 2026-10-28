@@ -9,7 +9,7 @@ rule are LGPLv3. Newer releases examined during setup had a source-available
 license despite LGPL package metadata; review the distributed license when
 upgrading. No analyzer code is copied into application bundles.
 
-The limit is **15 per function**: 15 passes, 16 fails unless the function is an
+The limit is **20 per function**: 20 passes, 21 fails unless the function is an
 existing, reviewed baseline exception. Cognitive complexity measures control-flow
 and nesting difficulty, not runtime cost or overall design quality. Kotlin and
 TypeScript scores use different implementations and are not directly comparable.
@@ -30,6 +30,12 @@ debt. Kotlin's `all.html` / `all.xml` show all over-limit functions;
 TypeScript's `summary.md` distinguishes baseline exceptions from new violations;
 `summary.json` includes all analyzed function scores.
 
+`EditorPage` in `apps/gateway-web/app/editor/page.tsx` is temporarily deferred
+while the page is under construction. Its current score remains in reports with
+status `deferred`; body changes do not invalidate that specific exemption. Other
+functions in the file and other editor files remain subject to the normal gate.
+Remove this named exemption when construction finishes.
+
 ## Run locally
 
 Use JDK 21 and Node 22, from the repository root:
@@ -37,6 +43,7 @@ Use JDK 21 and Node 22, from the repository root:
 ```sh
 npm ci --prefix scripts/complexity
 npm test --prefix scripts/complexity
+python3 -m unittest discover -s scripts/complexity -p 'test_kotlin_scores.py'
 python3 scripts/complexity/test_kotlin.py
 ./gradlew cognitiveComplexity
 npm run check --prefix scripts/complexity
@@ -56,13 +63,17 @@ for rejecting invalid Kotlin; TypeScript parser errors fail the complexity check
 The initial baselines accept existing violations so adopting the check does not
 require an unrelated application rewrite. CI **never regenerates baselines**.
 
-Kotlin uses detekt's native baseline identifiers (file, declaration, and
-signature). An existing baseline entry continues to suppress that function when
-its body changes; this is a gate on new findings, not a guarantee against
-increasing complexity in an already-baselined function. Review the full report
-when editing these functions. TypeScript exceptions are tied to function token
+Kotlin combines detekt's native identifiers (file, declaration, and signature)
+with reviewed maximum scores in `config/detekt/cognitive-complexity-scores.json`.
+The native baseline accepts existing declarations; the score check rejects a
+function whose current score exceeds its reviewed maximum, including body changes
+that the native baseline alone would suppress. New unbaselined functions above
+20 also fail. Ambiguous overloaded findings fail for explicit review.
+
+TypeScript exceptions are tied to function token
 fingerprints (ignoring whitespace and comments), so code changes to an over-limit
 function require reducing its complexity or explicitly reviewing a new exception.
+The named unfinished editor page is the sole construction exemption.
 
 Prefer early returns, named domain operations, smaller validation steps, and
 components with focused responsibilities. Preserve behavior and add regression

@@ -4,6 +4,6 @@ complexity:
   active: true
   CognitiveComplexMethod:
     active: true
-    # detekt reports scores >= threshold; 16 therefore permits a maximum of 15,
+    # detekt reports scores >= threshold; 21 therefore permits a maximum of 20,
     # matching SonarJS's rule, which reports scores > its configured maximum.
-    threshold: 16
+    threshold: 21

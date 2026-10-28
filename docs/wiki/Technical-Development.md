@@ -82,10 +82,13 @@ Production deployment remains [[pending|Deployment-Information]] until a site CD
 ## Cognitive complexity in CI
 
 The required `cognitive-complexity` job checks Kotlin with detekt and
-TypeScript/JavaScript with ESLint and SonarJS. The limit is **15 per function**;
+TypeScript/JavaScript with ESLint and SonarJS. The limit is **20 per function**;
 existing debt is recorded in reviewed baselines. These tools are free and need no
 Sonar server. The downloadable `cognitive-complexity` artifact includes locations
 and scores for over-limit functions, including existing debt. Tests are included.
+Kotlin exceptions also have reviewed maximum scores, so an increase in an existing
+function fails CI. The unfinished `EditorPage` is temporarily exempt from blocking
+and retains its current score in reports.
 
 From the repository root, run `npm ci --prefix scripts/complexity`,
 `./gradlew cognitiveComplexity`, and `npm run check --prefix scripts/complexity`.

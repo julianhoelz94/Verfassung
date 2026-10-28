@@ -24,13 +24,28 @@ test('SonarJS scores nesting and reports zero-score functions', () => {
   assert.deepEqual(functions.map(fn => [fn.function, fn.score]), [['example', 21], ['simple', 0]]);
 });
 
-test('limit is inclusive at 15, and 16 fails without a baseline', () => {
-  for (const score of [15, 16]) {
+test('limit is inclusive at 20, and 21 fails without a baseline', () => {
+  for (const score of [20, 21]) {
     const functions = analyze(`function branches(x: number) { ${'if (x) x--;'.repeat(score)} }`);
     assert.equal(functions[0].score, score);
     const [fn] = applyBaseline(functions, makeBaseline([]));
-    assert.equal(fn.status, score === 15 ? 'pass' : 'violation');
+    assert.equal(fn.status, score === 20 ? 'pass' : 'violation');
   }
+});
+
+test('only the named unfinished editor page is deferred, with its score retained', () => {
+  const source = complex.replace('example', 'EditorPage');
+  const functions = analyze(source, 'apps/gateway-web/app/editor/page.tsx');
+  assert.deepEqual(makeBaseline(functions).entries, []);
+  const [page] = applyBaseline(functions, makeBaseline([]));
+  assert.equal(page.status, 'deferred');
+  assert.equal(page.score, 21);
+  const [changed] = applyBaseline(analyze(source.replace('return 0', 'return 1'), page.path), makeBaseline([]));
+  assert.equal(changed.status, 'deferred');
+  const [otherFunction] = applyBaseline(analyze(source.replace('EditorPage', 'OtherPage'), page.path), makeBaseline([]));
+  assert.equal(otherFunction.status, 'violation');
+  const [otherFile] = applyBaseline(analyze(source, 'apps/gateway-web/app/editor/other.tsx'), makeBaseline([]));
+  assert.equal(otherFile.status, 'violation');
 });
 
 test('baseline allows unchanged tokens after line, formatting, and comment changes', () => {

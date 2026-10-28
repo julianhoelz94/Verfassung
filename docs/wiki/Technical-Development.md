@@ -90,8 +90,11 @@ changed lines are included. Migration inventory coverage is a separate artifact.
 
 The required `ci-status` check includes the coverage gate. Added or changed executable
 production lines must reach **at least 80% line coverage**, using the unrounded
-ratio. The total repository figure establishes the baseline and has no minimum.
-A change with no executable production lines reports **N/A**, with a passing gate.
+ratio. Whole-repository line coverage must also reach **80%**. The committed
+`scripts/code_coverage/minimums.json` policy sets component floors so a strong
+component cannot hide a regression elsewhere. Floors use exact covered/eligible
+ratios, not rounded display percentages. A change with no executable production
+lines reports **N/A** for new code; overall and component floors still apply.
 Missing, incomplete or stale inputs fail the coverage job and cannot produce a
 passing percentage.
 
@@ -106,9 +109,19 @@ The denominator includes Kotlin service/platform production sources, gateway
 `app`, `lib` and `proxy` TypeScript/JavaScript (including legacy `middleware` entry points), MCP TypeScript, and Python
 operational tooling. It excludes tests, fixtures, generated output, declaration
 files, dependencies, CSS, SQL migrations, shell scripts and build configuration.
-Coverage reflects instrumented service/unit tests; browser, publication, visual
-and full-stack acceptance checks remain separate required checks. Execution does
-not establish that every behavior is asserted correctly.
+Coverage reflects instrumented service/unit tests and Python execution from the
+real publication, transport and recovery acceptance checks. Browser and visual
+checks remain separate required gates. Existing acceptance execution newly added
+to collection must be distinguished from new behavioral tests. Execution alone
+does not establish that a requirement is asserted correctly.
+
+New tests must identify their specification: accepted ADRs, documented role/workflow
+rules or service HTTP contracts. Use independently authored inputs and expected
+outcomes, cover rejected and interrupted actions, and assert forbidden side effects.
+A discrepancy between implementation and specification is investigated as a defect;
+expectations are not rewritten merely to make the suite pass. Representative
+controlled faults must demonstrate that important assertions reject unwanted
+behavior. See the [specification test inventory](https://github.com/julianhoelz94/Verfassung/blob/main/docs/design/specification-test-coverage.md).
 
 JVM probes from all services and platform tests are merged before JaCoCo analyzes
 each production class once. Platform coverage therefore includes service-test
@@ -132,7 +145,8 @@ python -m coverage json
 
 The CI workflow packages commit-bound collector inputs, validates the complete
 source inventory, runs `./gradlew repositoryCoverage`, and executes
-`python3 scripts/code_coverage/coverage_report.py report --event "$GITHUB_EVENT_PATH" --minimum 80`.
+`python3 scripts/code_coverage/coverage_report.py report --event "$GITHUB_EVENT_PATH" --minimum 80 --policy scripts/code_coverage/minimums.json`.
 Use `--base <revision>` in place of `--event` for a local aggregate. See the
 [Sprint 67 measurement policy](https://github.com/julianhoelz94/Verfassung/blob/main/docs/design/sprint-67-ci-code-coverage.md)
-for scope and acceptance.
+for the original measurement scope; the specification test inventory defines the
+follow-up regression and overall-floor policy.

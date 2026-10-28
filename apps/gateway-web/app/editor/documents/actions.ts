@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { currentUser, requireSessionBearer } from '../../../lib/session';
 import { attachDocument, createDocument, detachDocument, reviseDocument, uploadDocument } from '../../../lib/document-api';
+import { safeReturnTo } from '../../../lib/return-to';
 
 async function writer(): Promise<string> {
   const user = await currentUser();
@@ -14,8 +15,7 @@ async function writer(): Promise<string> {
 }
 
 function safeReturnPath(value: FormDataEntryValue | null): string {
-  const path = String(value ?? '/editor/documents');
-  return path.startsWith('/') && !path.startsWith('//') && !path.includes('\\') ? path : '/editor/documents';
+  return safeReturnTo(String(value ?? ''), '/editor/documents');
 }
 
 export async function createDocumentAction(form: FormData): Promise<string> {

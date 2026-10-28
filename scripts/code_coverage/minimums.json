@@ -1,0 +1,20 @@
+{
+  "schema": 1,
+  "whole_repo": "80",
+  "components": {
+    "gateway-typescript": "70",
+    "gateway-javascript": "100",
+    "mcp": "80",
+    "python": "80",
+    "jvm-amendment-service": "89",
+    "jvm-audit-service": "96",
+    "jvm-catalog-service": "91",
+    "jvm-content-service": "92",
+    "jvm-document-service": "80",
+    "jvm-editor-service": "83",
+    "jvm-identity-service": "83",
+    "jvm-ingestion-service": "82",
+    "jvm-platform": "94",
+    "jvm-search-service": "92"
+  }
+}

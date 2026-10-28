@@ -72,3 +72,38 @@ actually reject unwanted behavior. Record fault, test, and observed failure.
 
 Implementation results, discovered defects, controlled-fault checks, final
 coverage and exact CI revisions are recorded here as delivery proceeds.
+
+
+### Implemented behavior and controlled-fault evidence
+
+- Added specification suites for session/MFA/passkey cookies, account and admin
+  commands, setup admission/CSP, public legal identities and historical permalinks,
+  complete/scoped API reads, comparison and history, editorial role/state controls,
+  structure preflight/revision guards, document pins, contextual draft/publication,
+  reviewed imports, consent and translation, and OAuth redirect/resource binding.
+- Document attach return paths accepted control characters, encoded slashes and
+  dot segments that could normalize to external navigation. The three new
+  regressions failed before replacing the duplicate check with `safeReturnTo`;
+  all pass after the correction.
+- Translation accepted missing, partial and non-string response arrays. Five
+  specification cases failed before adding response cardinality/type validation;
+  rejected responses now preserve original content through the existing error UI.
+- Four isolated faults were inserted and automatically restored locally. Assertion
+  failures detected removal of HTTP-only cookies, replacement of the current
+  editorial tip with the legal snapshot ID, bypassing fresh MFA for import
+  publication, and enabling writes in migration dry-run. Test logs were inspected
+  to distinguish assertion failures from tooling/compilation errors.
+- Migration regressions execute dry-run/apply/retry selection against a transport
+  double: preserve legacy attribution and published revisions, pin exact document
+  and scope revisions, do not duplicate work, and recover after a partial failure.
+- Media regressions use valid PNG fixtures and a fake codec process boundary to
+  verify dimensions/duration validation, decode failure and revision-bound output.
+  Actual encoding, complete decoding and browser playback remain CI obligations.
+- Python CI now collects existing publication and transport acceptance execution,
+  in addition to real recovery execution. This is measurement of existing checks;
+  it is not counted as newly implemented behavioral testing.
+- Overall/component threshold regressions cover exact boundaries, rounding below
+  a floor, independent component failure, N/A changed lines, invalid policy and
+  readable failure reports. The existing changed-code gate remains independent.
+
+Final review, CI coverage, merge and Wiki evidence follow below once complete.

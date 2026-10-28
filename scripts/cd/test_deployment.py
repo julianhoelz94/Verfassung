@@ -80,12 +80,13 @@ class ReleaseTests(unittest.TestCase):
 
 
 class AuthorizationTests(unittest.TestCase):
-    def test_manual_main_and_known_environment_required(self):
-        check_request.validate_request("workflow_dispatch", "refs/heads/main", "prod")
+    def test_manual_tag_and_known_environment_required(self):
+        self.assertEqual(check_request.validate_request("workflow_dispatch", "refs/tags/v.1.1", "prod"), "v.1.1")
         for event, ref, environment in [
-            ("push", "refs/heads/main", "test"),
+            ("push", "refs/tags/v.1.1", "test"),
+            ("workflow_dispatch", "refs/heads/main", "test"),
             ("workflow_dispatch", "refs/heads/other", "test"),
-            ("workflow_dispatch", "refs/heads/main", "unknown"),
+            ("workflow_dispatch", "refs/tags/v.1.1", "unknown"),
         ]:
             with self.assertRaises(ValueError):
                 check_request.validate_request(event, ref, environment)
@@ -343,6 +344,32 @@ class RuntimeTests(unittest.TestCase):
         steps = workflow["jobs"]["deploy"]["steps"]
         populate = next(step for step in steps if step.get("run") == "npm run prepopulate")
         self.assertEqual(populate["if"], "inputs.prepopulate")
+
+    def test_release_commit_is_used_for_ci_build_collection_and_deployment(self):
+        workflow = yaml.load((ROOT / ".github/workflows/deploy.yml").read_text(), Loader=yaml.BaseLoader)
+        jobs = workflow["jobs"]
+        self.assertIn("${{ github.ref_name }}", workflow["run-name"])
+        self.assertEqual(jobs["authorize"]["outputs"]["source-sha"], "${{ steps.release.outputs.source-sha }}")
+        for name, job in jobs.items():
+            with self.subTest(job=name):
+                checkouts = [step["with"] for step in job["steps"]
+                             if step.get("uses", "").startswith("actions/checkout@")]
+                self.assertEqual(len(checkouts), 1)
+                self.assertEqual(checkouts[0]["ref"], "${{ github.sha }}")
+                expected = "${{ steps.release.outputs.source-sha }}" if name == "authorize" else "${{ needs.authorize.outputs.source-sha }}"
+                self.assertNotIn("path", checkouts[0])
+                for step in job["steps"]:
+                    command = step.get("run", "")
+                    if "--source-sha" in command:
+                        self.assertIn('--source-sha "$SOURCE_SHA"', command)
+                        environment = {**job.get("env", {}), **step.get("env", {})}
+                        self.assertEqual(environment["SOURCE_SHA"], expected)
+                        directory = step.get("working-directory", job.get("defaults", {}).get("run", {}).get("working-directory"))
+                        self.assertIsNone(directory)
+                        self.assertIn("python3 scripts/cd/", command)
+                        self.assertNotIn("$GITHUB_SHA", command)
+        populate = next(step for step in jobs["deploy"]["steps"] if step.get("run") == "npm run prepopulate")
+        self.assertEqual(populate["working-directory"], "apps/gateway-web")
 
 
 if __name__ == "__main__":

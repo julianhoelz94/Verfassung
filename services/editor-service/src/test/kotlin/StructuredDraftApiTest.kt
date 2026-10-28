@@ -98,6 +98,86 @@ class StructuredDraftApiTest {
     )
 
     @Test
+    fun sourceEvidenceRevisionHistoryAndDecisionsArePinnedAndImmutable() {
+        val owner = Actor(UUID.randomUUID(), "sources@test.local", listOf("editor", "reviewer"))
+        val reviewer = Actor(UUID.randomUUID(), "review@test.local", listOf("reviewer"))
+        val other = Actor(UUID.randomUUID(), "other@test.local", listOf("editor"))
+        Mockito.`when`(identity.authenticate("owner")).thenReturn(owner)
+        Mockito.`when`(identity.authenticate("reviewer")).thenReturn(reviewer)
+        Mockito.`when`(identity.authenticate("other")).thenReturn(other)
+        val version = UUID.randomUUID()
+        val original = com.constitutionatlas.platform.SourceEvidence(coverage = "Articles 1–10", attribution = "Original archive")
+        val source = com.constitutionatlas.editor.client.CatalogVersion(version, UUID.randomUUID(), "2025", "published", currentVersionId = version, sourceEvidence = original)
+        Mockito.`when`(catalogClient.getVersion(version)).thenReturn(source)
+        Mockito.`when`(sources.source(version)).thenReturn(DraftSource(version, 7, settings.id, listOf(fixture())))
+        Mockito.`when`(sources.settings(version)).thenReturn(settings)
+        val session = sessions.insertSession(owner.id, version, "editorial_correction")
+        val save = com.constitutionatlas.editor.api.SaveSourceEvidenceRequest(0, original.copy(attribution = "Corrected archive"), "Correct attribution")
+        assertThrows(com.constitutionatlas.platform.ForbiddenException::class.java) { editorService.saveSourceEvidence("other", session, save) }
+        assertThrows(IllegalArgumentException::class.java) { editorService.saveSourceEvidence("owner", session, save.copy(reason = " ")) }
+        assertThrows(IllegalArgumentException::class.java) { editorService.saveSourceEvidence("owner", session, save.copy(evidence = save.evidence.copy(datePrecision = "day"))) }
+        val saved = editorService.saveSourceEvidence("owner", session, save)
+        assertThat(saved.sourceEvidenceRevisions.single().original).isEqualTo(original)
+        assertThat(saved.sourceEvidenceRevisions.single().actorId).isEqualTo(owner.id)
+        assertThat(saved.sourceEvidenceRevisions.single().createdAt).isNotNull()
+        assertThat(saved.session.revisionCount).isEqualTo(1)
+        assertThat(catalogClient.getVersion(version).sourceEvidence).isEqualTo(original)
+        val stale = assertThrows(ConflictException::class.java) { editorService.saveSourceEvidence("owner", session, save) }
+        assertThat(stale.code).isEqualTo("stale_source_evidence")
+        editorService.submitReview("owner", session, 1)
+        assertThrows(ConflictException::class.java) { editorService.saveSourceEvidence("owner", session, save.copy(expectedRevision = 1)) }
+        assertThrows(com.constitutionatlas.platform.ForbiddenException::class.java) { editorService.approve("owner", session, 1) }
+        editorService.requestSourceEvidenceChanges("reviewer", session, com.constitutionatlas.editor.api.SourceEvidenceChangesRequest(1, "Clarify coverage"))
+        assertThrows(ConflictException::class.java) { editorService.submitReview("owner", session, 1) }
+        editorService.saveSourceEvidence("owner", session, save.copy(expectedRevision = 1, evidence = save.evidence.copy(coverage = "Complete articles 1–10"), reason = "Clarify the excerpt"))
+        editorService.submitReview("owner", session, 2)
+        assertThrows(ConflictException::class.java) { editorService.approve("reviewer", session, 1) }
+        val approved = editorService.approve("reviewer", session, 2)
+        assertThat(approved.sourceEvidenceRevisions.map { it.revision }).containsExactly(2, 1)
+        assertThat(approved.sourceEvidenceDecisions.map { it.action }).containsExactly("review_submitted", "changes_requested", "review_submitted", "review_approved")
+        assertThat(approved.sourceEvidenceDecisions.last().actorId).isEqualTo(reviewer.id)
+        assertThrows(org.springframework.dao.DataAccessException::class.java) { jdbc.update("UPDATE source_evidence_revisions SET reason = 'tampered' WHERE session_id = ?", session) }
+        assertThrows(org.springframework.dao.DataAccessException::class.java) { jdbc.update("DELETE FROM source_evidence_decisions WHERE revision_id = ?", approved.sourceEvidenceRevisions.first().id) }
+    }
+
+    @Test
+    fun sourceOnlyPublicationReusesAllContentRevisionsAndRequiresTheReviewedRevision() {
+        val auth = "source-publisher"
+        val actor = Actor(UUID.randomUUID(), "admin@test.local", listOf("admin"), stepUpFresh = true)
+        Mockito.`when`(identity.authenticate(auth)).thenReturn(actor)
+        val version = UUID.randomUUID()
+        val target = UUID.randomUUID()
+        val root = fixture()
+        val original = com.constitutionatlas.platform.SourceEvidence(coverage = "Excerpt", attribution = "Archive")
+        val revised = com.constitutionatlas.platform.SourceEvidence(description = "# Official archive\n\nArticles 1–10 only\n\n[Source](https://example.test/source)")
+        val source = com.constitutionatlas.editor.client.CatalogVersion(version, UUID.randomUUID(), "2025", "published", currentVersionId = version, sourceEvidence = original)
+        val successor = source.copy(id = target, versionLabel = "2025-correction", publicationStatus = "draft", sourceEvidence = revised)
+        Mockito.`when`(catalogClient.getVersion(version)).thenReturn(source)
+        Mockito.`when`(sources.source(version)).thenReturn(DraftSource(version, 7, settings.id, listOf(root)))
+        Mockito.`when`(sources.settings(version)).thenReturn(settings)
+        Mockito.`when`(contentClient.listArticles(version)).thenReturn(listOf(com.constitutionatlas.editor.client.ContentTreeArticle(root.logicalId, version, "46a", "Rights", 1, "Before. Original wording. After.")))
+        val session = sessions.insertSession(actor.id, version, "editorial_correction")
+        editorService.saveSourceEvidence(auth, session, com.constitutionatlas.editor.api.SaveSourceEvidenceRequest(0, revised, "Describe the excerpt precisely"))
+        editorService.submitReview(auth, session, 1)
+        editorService.approve(auth, session, 1)
+        val request = com.constitutionatlas.editor.api.PublishRequest("editorial_correction", sourceEvidenceRevision = 1)
+        assertThrows(ConflictException::class.java) { editorService.publish(auth, session, request.copy(sourceEvidenceRevision = 0)) }
+        assertThrows(ConflictException::class.java) { editorService.publish(auth, session, request.copy(comment = "Unreviewed reason")) }
+        Mockito.`when`(publishClient.reserve(session, source.copy(sourceEvidence = revised), "editorial_correction", "Describe the excerpt precisely", settings.id, auth)).thenReturn(successor)
+        val write = com.constitutionatlas.platform.OrderedSnapshotWrite(0, version, 7, listOf(com.constitutionatlas.platform.OrderedNodeWrite(revisionId = root.revisionId)), session)
+        val snapshot = com.constitutionatlas.platform.OrderedSnapshot(target, 1, settings.id, listOf(com.constitutionatlas.platform.OrderedNode(root.logicalId, root.revisionId!!, UUID.randomUUID(), root.kind, root.label, root.title, emptyList())))
+        Mockito.`when`(publishClient.save(target, write, auth)).thenReturn(snapshot)
+        Mockito.`when`(catalogClient.publishVersion(target)).thenReturn(successor.copy(publicationStatus = "published"))
+        val published = editorService.publish(auth, session, request)
+        assertThat(published.newVersionId).isEqualTo(target)
+        assertThat(published.sourceEvidenceDecisions.last().action).isEqualTo("version_published")
+        Mockito.verify(publishClient).save(target, write, auth)
+        Mockito.verify(contentClient, Mockito.never()).replaceArticles(Mockito.any(UUID::class.java) ?: target, Mockito.anyList())
+        assertThat(catalogClient.getVersion(version).sourceEvidence).isEqualTo(original)
+        assertThat(editorService.publish(auth, session, request).newVersionId).isEqualTo(target)
+    }
+
+    @Test
     fun reviewedDuplicateRowsTransferBySourceIdAndPublishedRetryIsIdempotent() {
         val auth = "Bearer duplicate-review"
         val actor = Actor(UUID.randomUUID(), "reviewer@test.local", listOf("admin"), stepUpFresh = true)

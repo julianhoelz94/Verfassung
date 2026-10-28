@@ -125,11 +125,12 @@ def check(repository, source_sha, root, get=github_get, timeout=2700, poll_inter
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--source-sha", required=True)
     parser.add_argument("--timeout-seconds", type=int, default=2700)
     parser.add_argument("--poll-seconds", type=int, default=30)
     args = parser.parse_args()
     try:
-        check(os.environ["GITHUB_REPOSITORY"], os.environ["GITHUB_SHA"], Path.cwd(),
+        check(os.environ["GITHUB_REPOSITORY"], args.source_sha, Path.cwd(),
               timeout=args.timeout_seconds, poll_interval=args.poll_seconds)
     except (ValueError, TimeoutError) as error:
         print(f"::error::{error}", flush=True)

@@ -34,6 +34,7 @@ data class CatalogVersion(
     val currentVersionId: UUID? = null,
     val legalPredecessorVersionId: UUID? = null,
     val editorialPredecessorVersionId: UUID? = null,
+    val sourceEvidence: com.constitutionatlas.platform.SourceEvidence? = null,
 )
 
 @JsonIgnoreProperties(ignoreUnknown = true)

@@ -11,7 +11,10 @@ import {
   saveStructuredDraft,
   savePublishDetails,
   submitReview,
+  saveSourceEvidence,
+  requestSourceEvidenceChanges,
 } from '../../../lib/editor-api';
+import type { SourceEvidence } from '../../../lib/api';
 
 function value(form: FormData, key: string): string {
   return String(form.get(key) ?? '').trim();
@@ -55,6 +58,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const form = await request.formData();
   const command = request.nextUrl.searchParams.get('command') ?? value(form, 'command');
   const sessionId = value(form, 'sessionId');
+  const sourceRevision = value(form, 'sourceEvidenceRevision');
+  const sourceEvidenceRevision = sourceRevision && /^\d+$/.test(sourceRevision) && Number.isSafeInteger(Number(sourceRevision)) ? Number(sourceRevision) : undefined;
   try {
     if (command === 'amendment-save') {
       const id = value(form, 'amendmentId');
@@ -81,14 +86,29 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       else await confirmAmendmentQuotes(id);
       return redirectTo(request, `/editor/amendments/${encodeURIComponent(id)}?${command === 'amendment-publish' ? 'published' : 'confirmed'}=1`);
     }
-    if (command === 'open') {
-      const hopKind = value(form, 'hopKind');
+    if (command === 'open' || command === 'open-sources') {
+      const hopKind = command === 'open-sources' ? 'editorial_correction' : value(form, 'hopKind');
       if (hopKind !== 'legal' && hopKind !== 'editorial_correction') {
         return redirectTo(request, '/editor?error=invalid');
       }
       const versionId = value(form, 'versionId');
       const session = await openSession(versionId, hopKind);
-      return redirectTo(request, `/editor?versionId=${encodeURIComponent(versionId)}&sessionId=${encodeURIComponent(session.id)}`);
+      return redirectTo(request, `/editor?versionId=${encodeURIComponent(versionId)}&sessionId=${encodeURIComponent(session.id)}${command === 'open-sources' ? '&scope=sources' : ''}`);
+    }
+    if (command === 'source-evidence' || command === 'source-evidence-changes') {
+      const rawRevision = value(form, 'expectedRevision');
+      if (!/^\d+$/.test(rawRevision) || !Number.isSafeInteger(Number(rawRevision))) throw new EditorApiError('source_evidence_invalid');
+      const revision = Number(rawRevision);
+      if (command === 'source-evidence-changes') {
+        await requestSourceEvidenceChanges(sessionId, revision, value(form, 'reason'));
+        return redirectTo(request, editorPath(form));
+      }
+      const evidence: SourceEvidence = {
+        description: value(form, 'description'), datePrecision: 'unknown',
+      };
+      const preview = await saveSourceEvidence(sessionId, revision, evidence, value(form, 'reason'));
+      if (request.headers.get('accept')?.includes('application/json')) return NextResponse.json(preview);
+      return redirectTo(request, editorPath(form, { saved: '1' }));
     }
     if (command === 'load') {
       if (!sessionId) return redirectTo(request, '/editor?error=session_id');
@@ -118,11 +138,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       return redirectTo(request, editorPath(form, { detailsSaved: '1' }));
     }
     if (command === 'review') {
-      await submitReview(sessionId);
+      await submitReview(sessionId, sourceEvidenceRevision);
       return redirectTo(request, editorPath(form, { reviewed: '1' }));
     }
     if (command === 'approve') {
-      await approveReview(sessionId);
+      await approveReview(sessionId, sourceEvidenceRevision);
       return redirectTo(request, editorPath(form, { approved: '1' }));
     }
     if (command === 'publish') {
@@ -134,6 +154,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       const normalizedChanges = readPublishChanges(String(form.get('changesJson') ?? '[]'));
       const preview = await publishSession(sessionId, {
         hopKind,
+        sourceEvidenceRevision,
         amendmentId: value(form, 'amendmentId') || undefined,
         comment: value(form, 'comment') || undefined,
         changeRecord: inlineTitle ? {
@@ -165,6 +186,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       return redirectTo(request, `/account/step-up?returnTo=${encodeURIComponent(editorPath(form))}`);
     }
     if (error instanceof EditorApiError) {
+      if (command === 'source-evidence' && request.headers.get('accept')?.includes('application/json')) {
+        return NextResponse.json({ key: error.key === 'invalid' ? 'source_evidence_invalid' : error.key }, { status: 400 });
+      }
       return redirectTo(request, editorPath(form, { error: error.key }));
     }
     throw error;

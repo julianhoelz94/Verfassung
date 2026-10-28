@@ -24,7 +24,7 @@
 
 1. Öffnen Sie **Prüfliste** und die eingereichte Sitzung.
 2. Vergleichen Sie Entwurf und Quelle. Prüfen Sie Kommentar, betroffene Einheiten und Änderungsart.
-3. Geben Sie den Entwurf nur frei, wenn der Text bereit ist. Bearbeitungssitzungen haben derzeit keine Aktion zum Zurückgeben; lassen Sie fehlerhafte Entwürfe ungeprüft. Für importierte Verfassungen gibt es eine eigene Ablehnungsaktion.
+3. Geben Sie den Entwurf nur frei, wenn der Text bereit ist. Bei Quellenkorrekturen können Sie mit Begründung **Änderungen anfordern**. Reine Textbearbeitungen haben derzeit keine Aktion zum Zurückgeben; lassen Sie fehlerhafte Entwürfe ungeprüft. Für importierte Verfassungen gibt es eine eigene Ablehnungsaktion.
 
 **Ergebnis:** Die Sitzung ist bereit zur Veröffentlichung. Die Freigabe veröffentlicht noch nichts.
 
@@ -32,6 +32,18 @@
 *Text und Kontext vor der Freigabe prüfen.*
 
 [▶ Prüfung und Freigabe ansehen](https://julianhoelz94.github.io/Verfassung/#reviewing-a-draft-de)
+
+### Quellenangaben korrigieren
+
+Öffnen Sie in der aktuellen Lesefassung direkt am Block **Archivquelle** die Aktion **Quellenangaben bearbeiten**. Bearbeiter und Administratoren gestalten die **Quellenbeschreibung** in einem einzigen freien Textfeld. Absätze, Überschriften (`#`), Listen (`-`) und Links (`[Text](https://…)`) sind möglich; **Quellenbeschreibung ansehen** zeigt die Vorschau. Es gibt keine getrennten Pflichtfelder für Datierung, Importumfang, Status oder Herausgeber. Bestehende Angaben werden vollständig in den Text übernommen und können dort frei angeordnet werden. Der allgemeine Hinweis zur Rechtsgeltung bleibt ein fester Seitentext.
+
+Die **Begründung der Korrektur** steht in einem eigenen Abschnitt und gehört ausschließlich zur Bearbeitungshistorie.
+
+Speichern Sie den **Quellenentwurf** mit dieser Begründung und kontrollieren Sie die Gegenüberstellung der veröffentlichten und gespeicherten Angaben. Die Historie enthält jede gespeicherte Revision sowie Benutzerkonto, Zeitpunkt und Prüfentscheidungen. Noch ungespeicherte Felder verhindern das Einreichen; ein Konflikt mit einer neueren Revision erhält Ihre Eingaben.
+
+Nach **Zur Prüfung einreichen** sind die Angaben gesperrt. Ein Prüfer kann die Korrektur freigeben oder begründete Änderungen anfordern. Nach einer Änderungsanforderung muss der Bearbeiter eine neue Quellenrevision speichern und erneut einreichen. Die Freigabe gilt für die angezeigte Revision. Wie bei Textkorrekturen darf ein Bearbeiter ohne Administratorrolle seine eigene Sitzung nicht freigeben.
+
+Ein Herausgeber veröffentlicht die freigegebene Quellenkorrektur nach frischer MFA. Erst dann erscheinen die Angaben in einer neuen redaktionellen Fassung. Frühere Fassungen bleiben unverändert; bei einer reinen Quellenkorrektur werden sämtliche Verfassungstextrevisionen unverändert übernommen. Falls dieselbe Sitzung auch Textänderungen enthält, prüfen Sie diese über **Verfassungstext dieser Sitzung prüfen** mit.
 
 ### Importierte Verfassungen
 

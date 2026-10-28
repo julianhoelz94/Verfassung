@@ -160,7 +160,7 @@ export default async function VersionPage(props: VersionPageProps) {
       />}>
 
       <CountryNavigation code={params.code} active="reading" />
-      <SourceEvidenceNotice evidence={snapshot?.sourceEvidence} versionId={params.versionId} />
+      <SourceEvidenceNotice evidence={snapshot?.sourceEvidence} versionId={params.versionId} canEdit={canEdit && (version.version.currentVersionId ?? version.version.id) === params.versionId} />
       <p><a href={`/constitutions/${version.constitution.id}/amendments`}><T value={migrationUi.amendmentRegister} /></a></p>
       <SnapshotNotice code={country.isoCode} viewedId={params.versionId} currentId={version.version.currentVersionId ?? version.version.id} />
       {canEdit ? <EditorEntry

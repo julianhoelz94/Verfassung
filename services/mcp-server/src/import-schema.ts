@@ -90,7 +90,7 @@ export const setupProposalSchema = z.strictObject({
 
 export const importPayloadSchema = z.strictObject({
   ...sourceFields,
-  sourceEvidence: z.strictObject({ dateWording: nullableText, datePrecision: z.enum(['unknown', 'year', 'month', 'day', 'range', 'uncertain']).optional(), coverage: nullableText, statusWording: nullableText, attribution: nullableText }).nullable().optional(),
+  sourceEvidence: z.strictObject({ description: z.string().max(50_000).nullable().optional(), dateWording: nullableText, datePrecision: z.enum(['unknown', 'year', 'month', 'day', 'range', 'uncertain']).optional(), coverage: nullableText, statusWording: nullableText, attribution: nullableText }).nullable().optional(),
   expectedCounts: z.record(z.enum(['units', 'textEntries', 'tables', 'cells', 'footnotes', 'references', 'documents']), z.number().int().min(0)).nullable().optional(),
   versionLabel: shortText,
   effectiveDate: z.iso.date().nullable().optional(),

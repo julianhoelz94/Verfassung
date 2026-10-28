@@ -7,19 +7,21 @@ The workflow is [`.github/workflows/deploy.yml`](https://github.com/julianhoelz9
 
 ## Run a deployment
 
-After this change is merged into `main`, open **GitHub → Actions → Deploy → Run workflow** as a repository administrator. Select branch `main` and choose:
+After this change is merged into `main`, open **GitHub → Actions → Deploy → Run workflow** as a repository administrator. Under **Use workflow from**, select the published release tag, for example `v.1.1`, then choose the environment below. Both the workflow and application source come from that tag. Branches, including `main`, cannot deploy.
 
 | Input | Default | Effect |
 | --- | --- | --- |
 | `environment` | `test` | Selects the GitHub environment, its credentials, Coolify application and public domain |
 | `prepopulate` | `false` | Runs the existing `npm run prepopulate` after rollout, uploading, reviewing, publishing and reading back generated fixture content |
 
+GitHub loads the workflow stored in the selected tag. A release created before this correction still contains the old main-only check; merging the correction into `main` does not update that tag. Use a release whose commit includes the tag-only workflow. Do not move or recreate an existing published tag automatically. Publishing a release alone does not trigger deployment.
+
 | Environment | Public origin |
 | --- | --- |
 | `test` | `https://tst.verfassungen.julianhoelz.de` |
 | `prod` | `https://verfassungen.julianhoelz.de` |
 
-The source is the fixed `GITHUB_SHA` of the selected `main` dispatch. CD checks the existing push-to-main CI run for that exact commit. CD waits up to **45 minutes**, checking every **30 seconds**, for CI to appear and for the service-discovery prerequisite `backend-services`, `frontend`, `mcp-server`, `gateway-image`, `full-stack-service-artifacts`, and every `images (<service>)` job to succeed. Queued, running or not-yet-created compilation jobs keep CD waiting. Each job's newest attempt must succeed; a failed, cancelled, skipped or timed-out job in the current compilation attempt stops CD immediately. During a rerun, an older failure can wait for its replacement job to appear. A completed CI run with missing required jobs, or expiry of the wait limit, also stops CD with a clear error. Rerunning service discovery also requires fresh image-matrix results from that attempt. A partial rerun of unrelated jobs retains the earlier successful compilation results for this same commit. CD does not wait for or rerun E2E jobs and does not require their result. These existing jobs include their usual CI checks; CD does not change the normal CI suite.
+CD derives the release name from `GITHUB_REF`, requires a published GitHub release and resolves lightweight or annotated tags to a commit. That commit must equal the dispatched `GITHUB_SHA`; a tag moved after dispatch is rejected. Every workflow/source checkout, CI check, image build, artifact and Coolify deployment uses that same SHA. CD checks the existing push-to-main CI run for the **release commit**, even when `main` has moved ahead. CD waits up to **45 minutes**, checking every **30 seconds**, for CI to appear and for the service-discovery prerequisite `backend-services`, `frontend`, `mcp-server`, `gateway-image`, `full-stack-service-artifacts`, and every `images (<service>)` job to succeed. Queued, running or not-yet-created compilation jobs keep CD waiting. Each job's newest attempt must succeed; a failed, cancelled, skipped or timed-out job in the current compilation attempt stops CD immediately. During a rerun, an older failure can wait for its replacement job to appear. A completed CI run with missing required jobs, or expiry of the wait limit, also stops CD with a clear error. Rerunning service discovery also requires fresh image-matrix results from that attempt. A partial rerun of unrelated jobs retains the earlier successful compilation results for this same commit. CD does not wait for or rerun E2E jobs and does not require their result. These existing jobs include their usual CI checks; CD does not change the normal CI suite.
 
 CD discovers twelve image packages and builds them in a matrix with **up to six GitHub-hosted `ubuntu-24.04` AMD64 runners at once**. Each runner builds one image. Kotlin runners compile their service JAR using `bootJar -x test`; the other runners build the gateway, MCP and Caddy images directly. CD runs no unit, integration or browser test suite. The gateway build argument selects the correct public origin. These are newly compiled images of the CI-checked source, not a reuse of CI's image binaries.
 
@@ -35,7 +37,7 @@ The Ubuntu host is `coolify`, running **AMD64**, with 8 vCPUs, 16 GB RAM and 320
 
 1. **Prepare Coolify.** Keep project **Constitution Atlas** with environments named exactly `test` and `prod`, the running Traefik proxy and public DNS. Under **Shared Variables → Environment wide**, choose the project's `test` environment and save the five values below. Repeat with separate secrets for `prod` before its first deployment. Ensure the host management user can pull the GHCR packages; private packages need the registry login described in [server-guide step 10](Coolify-Server-Setup#10-prepare-image-pulls-if-ghcr-images-are-private).
 2. **Prepare GitHub.** Add the [environment variables and secrets](#github-environments-and-tailscale-identity) to GitHub environments `test` and `prod`. Copy the project and server UUIDs from Coolify. No application UUID or manually created application is required.
-3. **Deploy manually from main.** Open **Actions → Deploy → Run workflow**, select `main`, `test`, and leave `prepopulate` unchecked. CD waits for the selected commit's CI compilation to pass, then creates `constitution-atlas-test`, connects the shared values, sets `https://tst.verfassungen.julianhoelz.de:80` on `edge-proxy`, and deploys. Open the public HTTPS site and complete first-run setup. Use `prod` later for `constitution-atlas-prod` and its production domain.
+3. **Deploy a published release manually.** Open **Actions → Deploy → Run workflow**, select the published release tag under **Use workflow from**, select `test`, and leave `prepopulate` unchecked. CD waits for the release commit's CI compilation to pass, then creates `constitution-atlas-test`, connects the shared values, sets `https://tst.verfassungen.julianhoelz.de:80` on `edge-proxy`, and deploys. Open the public HTTPS site and complete first-run setup. Use `prod` later for `constitution-atlas-prod` and its production domain.
 
 Required **Coolify environment-wide shared variables**:
 
@@ -158,7 +160,7 @@ If a browser shows a self-signed/default certificate or issuance fails, inspect 
 
 ## GitHub environments and Tailscale identity
 
-Create GitHub environments **test** and **prod**, each restricted to branch **main**. Use required reviewers if desired. The workflow also checks that both the initial actor and the rerunning actor are repository administrators.
+Create GitHub environments **test** and **prod**. Under **Deployment branches and tags**, allow the intended release tags (for this repository, a selected **Tag** rule such as `v*`) and remove branch deployment rules. The workflow independently rejects every branch and every tag without a published GitHub release. Use required reviewers if desired. The workflow also checks that both the initial actor and the rerunning actor are repository administrators.
 
 Set these **environment variables** in each:
 
@@ -194,7 +196,7 @@ Set these **environment secrets**:
 | `COOLIFY_DEPLOY_TOKEN` | Coolify `deploy` |
 | `COOLIFY_CONFIG_TOKEN` | Coolify `read` and `write` |
 
-One Tailscale trust credential can cover both environments with subject `repo:julianhoelz94@26120868/Verfassung@1341839964:environment:*`. Retain claim restrictions for repository `julianhoelz94/Verfassung`, ref `refs/heads/main` and workflow_ref `julianhoelz94/Verfassung/.github/workflows/deploy.yml@refs/heads/main`. Allow authentication-key write access for `tag:github-deploy`. No reusable Tailscale auth key, OAuth secret or custom tailnet access rules are added. [Tailscale action OIDC inputs](https://tailscale.com/docs/integrations/github/github-action)
+One Tailscale trust credential can cover both environments with subject `repo:julianhoelz94@26120868/Verfassung@1341839964:environment:*`. Retain claim restrictions for repository `julianhoelz94/Verfassung`, ref `refs/tags/v*` and workflow_ref `julianhoelz94/Verfassung/.github/workflows/deploy.yml@refs/tags/v*`. Replace any earlier main-only claim rules before running from a release tag; otherwise the OIDC token exchange is rejected. Allow authentication-key write access for `tag:github-deploy`. No reusable Tailscale auth key, OAuth secret or custom tailnet access rules are added. [Tailscale action OIDC inputs](https://tailscale.com/docs/integrations/github/github-action)
 
 ## Optional npm prepopulate
 
@@ -204,7 +206,7 @@ Complete the following setup once for each site where you want to use it. A norm
 
 ### 1. Deploy the site and finish its setup
 
-1. Run **Actions → Deploy → Run workflow**, select `main` and the intended environment, and leave the prepopulate checkbox clear. If the site is already deployed, continue with its setup instead.
+1. Run **Actions → Deploy → Run workflow**, select the published release tag under **Use workflow from** and choose the intended environment, and leave the prepopulate checkbox clear. If the site is already deployed, continue with its setup instead.
 2. Open the corresponding website: [test](https://tst.verfassungen.julianhoelz.de) or [production](https://verfassungen.julianhoelz.de). Sign in with the initial administrator email and password configured through `PROD_ADMIN_EMAIL` and `PROD_ADMIN_PASSWORD` in that Coolify environment. Those variable names also apply to the test installation.
 3. Finish authenticator enrollment and the site setup wizard, including the required settings and legal-page publications. Finish the final review so that setup is marked complete. See the [administrator guide](https://github.com/julianhoelz94/Verfassung/wiki/Admin-Guide#first-installation) for the wizard. **Configure email later** is supported; the invitation flow below also works without outgoing mail.
 
@@ -262,7 +264,7 @@ No additional Coolify variables, service tokens or GitHub access tokens are requ
 
 ### 5. Run the deployment with prepopulate enabled
 
-1. Open **Actions → Deploy → Run workflow** as a repository administrator. Select branch `main` and the environment whose accounts and secrets you just prepared.
+1. Open **Actions → Deploy → Run workflow** as a repository administrator. Select the published release tag under **Use workflow from** and select the environment whose accounts and secrets you just prepared.
 2. Select **Upload and publish generated fixture content after deployment (requires completed site setup and fixture accounts)**, then choose **Run workflow**. This opt-in applies only to this run; later runs still default to leaving it off.
 3. Complete any required environment approval. CD waits for successful CI compilation checks for the selected source, compiles/publishes its images, deploys through Coolify and checks the public HTTPS endpoint. Then it runs **Prepopulate the selected environment after successful deployment** using the same source checkout.
 4. Open that step's log. A successful run finishes with:
@@ -294,6 +296,6 @@ Email/password presence is checked before deployment; account validity, setup co
 
 ## Release recovery and first-rollout evidence
 
-The `release-candidate` artifact contains `manifest.json` and an image override for inspection. Record its source SHA, digests, Coolify deployment UUID, domain and outcome. Keep any release needed for rollback beyond the artifact's 30-day retention. Coolify may retain earlier releases, but choosing earlier images does not roll back databases or schema migrations. Use your host backup recovery procedure when state recovery is required.
+The `release-candidate` artifact contains `manifest.json` and an image override for inspection. Record the selected release tag, its resolved source SHA, digests, Coolify deployment UUID, domain and outcome. Keep any release needed for rollback beyond the artifact's 30-day retention. Coolify may retain earlier releases, but choosing earlier images does not roll back databases or schema migrations. Use your host backup recovery procedure when state recovery is required.
 
 For the first rollout, verify TLS, all services' health in Coolify, setup completion, authentication and persisted content across a second manual deployment. E2E remains in normal CI, outside CD. Public launch also retains the real legal-details gate tracked in [VER-269](https://linear.app/verfassung/issue/VER-269/publish-verified-legal-details-and-check-german-hosting-before-public). The production procedure remains unverified until these operator checks are exercised on the host.

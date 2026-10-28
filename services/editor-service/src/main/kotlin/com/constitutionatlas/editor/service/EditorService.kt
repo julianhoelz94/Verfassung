@@ -12,6 +12,8 @@ import com.constitutionatlas.editor.api.EditSessionSummaryDto
 import com.constitutionatlas.editor.api.PublishDetailsRequest
 import com.constitutionatlas.editor.api.PublishRequest
 import com.constitutionatlas.editor.api.SaveDraftRequest
+import com.constitutionatlas.editor.api.SaveSourceEvidenceRequest
+import com.constitutionatlas.editor.api.SourceEvidenceChangesRequest
 import com.constitutionatlas.editor.api.canEdit
 import com.constitutionatlas.editor.api.canPublish
 import com.constitutionatlas.editor.api.canReview
@@ -28,6 +30,7 @@ import com.constitutionatlas.editor.client.ContentTreeNode
 import com.constitutionatlas.editor.client.LinkedAmendment
 import com.constitutionatlas.editor.client.NodeWritePayload
 import com.constitutionatlas.editor.repo.EditorRepository
+import com.constitutionatlas.editor.repo.SourceEvidenceRepository
 import com.constitutionatlas.platform.Actor
 import com.constitutionatlas.platform.ForbiddenException
 import com.constitutionatlas.platform.IdentityClient
@@ -51,6 +54,7 @@ class EditorService(
     private val structuredPublication: StructuredPublicationService,
     private val structuredPublishJobs: com.constitutionatlas.editor.repo.StructuredPublishJobRepository,
     private val structuredDiffReview: StructuredDiffReviewService,
+    private val sourceEvidence: SourceEvidenceRepository,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
@@ -134,12 +138,60 @@ class EditorService(
     }
 
     @Transactional
-    fun submitReview(authorization: String?, sessionId: UUID): DraftPreviewDto {
+    fun saveSourceEvidence(authorization: String?, sessionId: UUID, request: SaveSourceEvidenceRequest): DraftPreviewDto {
         val actor = actor(authorization)
         requireEdit(actor)
         structuredPublication.lock(sessionId)
         val session = requireOwned(actor, sessionId)
         requireStatus(session, EditSessionStatus.OPEN)
+        require(session.hopKind == "editorial_correction") { "Source evidence requires an editorial correction" }
+        request.evidence.validate()
+        val reason = request.reason.trim()
+        require(reason.isNotEmpty() && reason.length <= 4000) { "A change reason of at most 4000 characters is required" }
+        val previous = sourceEvidence.latest(sessionId)
+        if (request.expectedRevision != (previous?.revision ?: 0)) throw ConflictException("Source evidence changed; reload before saving", "stale_source_evidence")
+        val source = catalogClient.getVersion(session.versionId)
+        if (source.publicationStatus != "published") throw ConflictException("Source must be published", "stale_source")
+        if (source.currentVersionId != null && source.currentVersionId != source.id) throw ConflictException("Source is no longer the editorial tip", "not_editorial_tip")
+        require(request.evidence != (previous?.evidence ?: source.sourceEvidence)) { "No source evidence changes to save" }
+        if (editorRepository.listLatestDrafts(sessionId).isNotEmpty()) throw ConflictException("Source evidence needs an ordered-content session", "mixed_draft_formats")
+        structuredPublication.pinUnchanged(sessionId, session.versionId)
+        sourceEvidence.save(sessionId, (previous?.revision ?: 0) + 1, if (previous != null) previous.original else source.sourceEvidence, request.evidence, reason, actor.id, actor.email)
+        editorRepository.insertRevision(sessionId, editorRepository.nextRevisionSequence(sessionId), mapOf("format" to "source_evidence", "evidence" to request.evidence, "reason" to reason))
+        editorRepository.recordPublishComment(sessionId, reason)
+        auditClient.record(actor, "source_evidence_saved", "edit_session", sessionId, mapOf("revision" to (previous?.revision ?: 0) + 1, "reason" to reason))
+        return previewDto(sessionId)
+    }
+
+    @Transactional
+    fun requestSourceEvidenceChanges(authorization: String?, sessionId: UUID, request: SourceEvidenceChangesRequest): DraftPreviewDto {
+        val actor = actor(authorization)
+        requireReview(actor)
+        structuredPublication.lock(sessionId)
+        val session = requireVisible(actor, sessionId)
+        requireStatus(session, EditSessionStatus.REVIEWING)
+        val revision = sourceEvidence.latest(sessionId) ?: throw IllegalArgumentException("No source evidence draft")
+        if (revision.revision != request.expectedRevision) throw ConflictException("Source evidence changed", "stale_source_evidence")
+        val reason = request.reason.trim()
+        require(reason.isNotEmpty() && reason.length <= 4000) { "A review reason of at most 4000 characters is required" }
+        sourceEvidence.recordDecision(sessionId, "changes_requested", actor.id, actor.email, reason)
+        editorRepository.updateStatus(sessionId, EditSessionStatus.OPEN)
+        auditClient.record(actor, "source_evidence_changes_requested", "edit_session", sessionId, mapOf("reason" to reason, "revision" to revision.revision))
+        return previewDto(sessionId)
+    }
+
+    @Transactional
+    fun submitReview(authorization: String?, sessionId: UUID, sourceEvidenceRevision: Int? = null): DraftPreviewDto {
+        val actor = actor(authorization)
+        requireEdit(actor)
+        structuredPublication.lock(sessionId)
+        val session = requireOwned(actor, sessionId)
+        requireStatus(session, EditSessionStatus.OPEN)
+        requireSourceEvidenceRevision(sessionId, sourceEvidenceRevision)
+        val lastDecision = sourceEvidence.decisions(sessionId).lastOrNull()
+        if (lastDecision?.action == "changes_requested" && lastDecision.revision == sourceEvidence.latest(sessionId)?.revision) {
+            throw ConflictException("Save a revised source draft before resubmitting", "source_evidence_changes_required")
+        }
         if (session.hopKind == "legal" && editorRepository.changeRecord(session.id) == null) {
             throw IllegalArgumentException("Save the change record before review")
         }
@@ -151,17 +203,19 @@ class EditorService(
             if (session.hopKind == "legal") structuredDiffReview.requireReadyForReview(prepared)
         }
         editorRepository.updateStatus(session.id, EditSessionStatus.REVIEWING)
+        sourceEvidence.recordDecision(sessionId, "review_submitted", actor.id, actor.email)
         auditClient.record(actor, "review_submitted", "edit_session", session.id)
         return previewDto(session.id)
     }
 
     @Transactional
-    fun approve(authorization: String?, sessionId: UUID): DraftPreviewDto {
+    fun approve(authorization: String?, sessionId: UUID, sourceEvidenceRevision: Int? = null): DraftPreviewDto {
         val actor = actor(authorization)
         requireReview(actor)
         structuredPublication.lock(sessionId)
         val session = requireVisible(actor, sessionId)
         requireStatus(session, EditSessionStatus.REVIEWING)
+        requireSourceEvidenceRevision(sessionId, sourceEvidenceRevision)
         if (session.actorId == actor.id && !actor.isAdmin()) {
             throw ForbiddenException("A different reviewer must approve this draft")
         }
@@ -170,6 +224,7 @@ class EditorService(
             if (session.hopKind == "legal") structuredDiffReview.requireComplete(prepared)
         }
         editorRepository.updateStatus(session.id, EditSessionStatus.APPROVED)
+        sourceEvidence.recordDecision(sessionId, "review_approved", actor.id, actor.email)
         auditClient.record(actor, "review_approved", "edit_session", session.id)
         return previewDto(session.id)
     }
@@ -205,6 +260,7 @@ class EditorService(
         requirePublish(actor)
         structuredPublication.lock(sessionId)
         val session = requireVisible(actor, sessionId)
+        requireSourceEvidenceRevision(sessionId, request.sourceEvidenceRevision)
         val structured = editorRepository.hasStructuredDraft(sessionId)
         if (structured && session.status == EditSessionStatus.PUBLISHED) {
             structuredPublishJobs.pin(session.id, request.toString())
@@ -223,6 +279,9 @@ class EditorService(
             throw IllegalArgumentException("publish hopKind must match the session job")
         }
         val comment = request.comment ?: editorRepository.publishComment(session.id)
+        if (sourceEvidence.latest(sessionId) != null && comment != editorRepository.publishComment(session.id)) {
+            throw ConflictException("Save and review the publication reason before publishing", "stale_source_evidence")
+        }
         val changeRecord = if (request.amendmentId != null) request.changeRecord else request.changeRecord ?: editorRepository.changeRecord(session.id)
         if (structured && hopKind == "legal" && request.amendmentId == null && request.changeRecord != null && request.changeRecord != editorRepository.changeRecord(session.id)) {
             throw ConflictException("Save and review the change record before publishing", "stale_diff_review")
@@ -342,7 +401,8 @@ class EditorService(
         if (structured && amendment != null && recordedAmendment == null) structuredPublishJobs.recordAmendment(session.id, amendment.id)
         var orderedMapping: Map<String, String> = emptyMap()
         val successor = if (structuredPreview != null) {
-            val (reserved, snapshot) = structuredPublication.write(structuredPreview, source, hopKind, comment, authorization)
+            val reviewedSource = sourceEvidence.latest(sessionId)?.let { source.copy(sourceEvidence = it.evidence) } ?: source
+            val (reserved, snapshot) = structuredPublication.write(structuredPreview, reviewedSource, hopKind, comment, authorization)
             val mapping = linkedMapOf<String, String>()
             fun mapNode(node: com.constitutionatlas.platform.OrderedNode) {
                 mapping[node.logicalId.toString()] = node.occurrenceId.toString()
@@ -401,6 +461,7 @@ class EditorService(
             editorRepository.recordPublishComment(session.id, comment!!)
         }
         editorRepository.updateStatus(session.id, EditSessionStatus.PUBLISHED)
+        sourceEvidence.recordDecision(sessionId, "version_published", actor.id, actor.email)
         editorRepository.insertOutboxEvent(
             session.id,
             DomainEvents.VERSION_PUBLISHED,
@@ -448,6 +509,11 @@ class EditorService(
         if (!actor.canEdit()) {
             throw ForbiddenException("Editor role required")
         }
+    }
+
+    private fun requireSourceEvidenceRevision(sessionId: UUID, expected: Int?) {
+        val latest = sourceEvidence.latest(sessionId) ?: return
+        if (expected != latest.revision) throw ConflictException("Source evidence revision changed; reload before deciding", "stale_source_evidence")
     }
 
     private fun requireReview(actor: Actor) {
@@ -508,6 +574,8 @@ class EditorService(
             unitMapping = published?.unitMapping,
             sourceGeneration = published?.sourceGeneration,
             settingsRevisionId = published?.settingsRevisionId,
+            sourceEvidenceRevisions = sourceEvidence.revisions(sessionId),
+            sourceEvidenceDecisions = sourceEvidence.decisions(sessionId),
         )
     }
 

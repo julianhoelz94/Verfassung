@@ -1,6 +1,19 @@
 import type { UiMessage } from './messages';
 
 export const workflowUi = {
+  filterStatus: { en: 'Status', de: 'Status' },
+  allStatuses: { en: 'All statuses', de: 'Alle Status' },
+  filterArchive: { en: 'Show', de: 'Anzeigen' },
+  unarchived: { en: 'Current work', de: 'Aktuelle Bearbeitungen' },
+  archived: { en: 'Archived work', de: 'Archivierte Bearbeitungen' },
+  applyFilters: { en: 'Apply filters', de: 'Filter anwenden' },
+  noMatchingWork: { en: 'No work matches these filters.', de: 'Keine Bearbeitungen entsprechen diesen Filtern.' },
+  archive: { en: 'Archive', de: 'Archivieren' },
+  restore: { en: 'Restore', de: 'Wiederherstellen' },
+  deleteDraft: { en: 'Delete draft', de: 'Entwurf löschen' },
+  deleteDraftHint: { en: 'This removes the draft from your work. You cannot resume it afterwards. Published text stays unchanged.', de: 'Der Entwurf wird aus Ihren Bearbeitungen entfernt und kann danach nicht fortgesetzt werden. Veröffentlichte Texte bleiben unverändert.' },
+  confirmDelete: { en: 'Confirm deletion', de: 'Löschen bestätigen' },
+  managementFailed: { en: 'The action could not be confirmed. Reload your work and try again.', de: 'Die Aktion konnte nicht bestätigt werden. Laden Sie Ihre Bearbeitungen neu und versuchen Sie es erneut.' },
   myWork: { en: 'My work', de: 'Meine Bearbeitungen' },
   myWorkHint: { en: 'Follow your work from draft to publication. Submitted drafts stay here while they are reviewed.', de: 'Verfolgen Sie Ihre Bearbeitungen vom Entwurf bis zur Veröffentlichung. Eingereichte Entwürfe bleiben während der Prüfung hier sichtbar.' },
   noWork: { en: 'You have not started any work yet.', de: 'Sie haben noch keine Bearbeitung begonnen.' },

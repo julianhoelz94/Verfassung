@@ -105,7 +105,7 @@ class ImportJobRepository(
     fun claimPreparation(jobId: UUID, actorId: UUID): UUID? {
         val attempt = UUID.randomUUID()
         val changed = jdbc.update(
-            "UPDATE import_jobs SET status = 'preparing', prepared_by = ?, preparation_attempt = ?, updated_at = NOW() WHERE id = ? AND (status IN ('pending_review', 'failed') OR (status = 'preparing' AND updated_at < NOW() - INTERVAL '2 minutes')) AND approved_by IS NULL",
+            "UPDATE import_jobs SET status = 'preparing', prepared_by = ?, preparation_attempt = ?, updated_at = NOW() WHERE id = ? AND (status IN ('pending_review', 'failed') OR (status = 'preparing' AND updated_at < NOW() - INTERVAL '2 minutes')) AND approved_by IS NULL AND archived_at IS NULL",
             actorId,
             attempt,
             jobId,
@@ -216,23 +216,29 @@ class ImportJobRepository(
         jobId,
     ).firstOrNull()
 
-    fun list(status: String?, limit: Int = 100): List<ImportJobDto> {
-        val ids = if (status == null) {
-            jdbc.query(
-                "SELECT id FROM import_jobs ORDER BY created_at DESC LIMIT ?",
-                { rs, _ -> rs.getObject("id", UUID::class.java) },
-                limit,
-            )
-        } else {
-            jdbc.query(
-                "SELECT id FROM import_jobs WHERE status = ? ORDER BY created_at DESC LIMIT ?",
-                { rs, _ -> rs.getObject("id", UUID::class.java) },
-                status,
-                limit,
-            )
+    fun list(status: String?, limit: Int = 100, owner: UUID? = null, archived: Boolean = false, offset: Int = 0): List<ImportJobDto> {
+        val sql = StringBuilder("SELECT id FROM import_jobs WHERE (archived_at IS NOT NULL) = ?")
+        val args = mutableListOf<Any>(archived)
+        if (status != null) {
+            sql.append(" AND status = ?")
+            args.add(status)
         }
-        return ids.mapNotNull(::find)
+        if (owner != null) {
+            sql.append(" AND submitted_by = ?")
+            args.add(owner)
+        }
+        sql.append(" ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?")
+        args.add(limit)
+        args.add(offset)
+        return jdbc.query(sql.toString(), { rs, _ -> rs.getObject("id", UUID::class.java) }, *args.toTypedArray()).mapNotNull(::find)
     }
+
+    fun setArchived(jobId: UUID, actorId: UUID, archived: Boolean): Boolean = jdbc.update(
+        "UPDATE import_jobs SET archived_at = CASE WHEN ? THEN COALESCE(archived_at, NOW()) ELSE NULL END WHERE id = ? AND submitted_by = ? AND status IN ('completed', 'rejected', 'failed')",
+        archived,
+        jobId,
+        actorId,
+    ) == 1
 
     fun fail(jobId: UUID, errors: List<Pair<String, String>>) {
         jdbc.update(

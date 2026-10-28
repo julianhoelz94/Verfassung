@@ -50,10 +50,22 @@ class ImportController(
     fun list(
         @RequestHeader(value = "Authorization", required = false) authorization: String?,
         @RequestParam(required = false) status: String?,
+        @RequestParam(defaultValue = "false") mine: Boolean,
+        @RequestParam(defaultValue = "false") archived: Boolean,
+        @RequestParam(defaultValue = "100") limit: Int,
+        @RequestParam(defaultValue = "0") offset: Int,
     ): List<ImportJobDto> {
-        writeAccess.requireStaff(authorization)
-        return importService.listJobs(status)
+        val actor = writeAccess.requireStaff(authorization)
+        return importService.listJobs(status, if (mine) actor.id else null, archived, limit, offset)
     }
+
+    @PostMapping("/import-jobs/{jobId}/archive")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    fun archive(
+        @RequestHeader(value = "Authorization", required = false) authorization: String?,
+        @PathVariable jobId: UUID,
+        @RequestBody request: ImportArchiveRequest,
+    ) = importService.archive(jobId, writeAccess.requireStaff(authorization).id, request.archived)
 
     @GetMapping("/import-jobs/{jobId}/payload")
     fun payload(

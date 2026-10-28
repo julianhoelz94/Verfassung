@@ -31,6 +31,7 @@ import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.springframework.test.web.servlet.MockMvc
+import org.springframework.test.web.servlet.delete
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.post
 import org.testcontainers.junit.jupiter.Container
@@ -89,6 +90,50 @@ class EditorApiTest {
             UnauthorizedException("Missing session"),
         )
         stub(editor)
+    }
+
+    @Test
+    fun ownerCanDiscardOpenDraftWithoutDeletingHistory() {
+        val versionId = UUID.randomUUID()
+        val id = openSession(versionId)
+        saveDraft(id, UUID.randomUUID())
+        stub(admin)
+        mockMvc.delete("/edit-sessions/$id") { header("Authorization", TOKEN) }.andExpect { status { isForbidden() } }
+        stub(editor)
+        mockMvc.delete("/edit-sessions/$id") { header("Authorization", TOKEN) }.andExpect { status { isNoContent() } }
+        mockMvc.delete("/edit-sessions/$id") { header("Authorization", TOKEN) }.andExpect { status { isNoContent() } }
+        mockMvc.get("/edit-sessions/$id") { header("Authorization", TOKEN) }.andExpect { status { isNotFound() } }
+        assertEquals("discarded", jdbcTemplate.queryForObject("SELECT status FROM edit_sessions WHERE id = ?::uuid", String::class.java, id))
+        assertEquals(1, jdbcTemplate.queryForObject("SELECT COUNT(*) FROM edit_revisions WHERE session_id = ?::uuid", Int::class.java, id))
+        assertNotEquals(id, openSession(versionId))
+    }
+
+    @Test
+    fun onlyFinishedOwnedWorkCanBeArchivedAndRestored() {
+        val versionId = UUID.randomUUID()
+        val id = openSession(versionId)
+        fun archive(archived: Boolean) = mockMvc.post("/edit-sessions/$id/archive") {
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"archived":$archived}"""
+        }
+        archive(true).andExpect { status { isConflict() } }
+        for (state in listOf("reviewing", "approved", "published")) {
+            jdbcTemplate.update("UPDATE edit_sessions SET status = ? WHERE id = ?::uuid", state, id)
+            mockMvc.delete("/edit-sessions/$id") { header("Authorization", TOKEN) }.andExpect { status { isConflict() } }
+        }
+        stub(admin)
+        archive(true).andExpect { status { isForbidden() } }
+        stub(editor)
+        archive(true).andExpect { status { isNoContent() } }
+        mockMvc.get("/edit-sessions?openedBy=me&versionId=$versionId") { header("Authorization", TOKEN) }
+            .andExpect { jsonPath("$.length()") { value(0) } }
+        mockMvc.get("/edit-sessions?openedBy=me&archived=true") { header("Authorization", TOKEN) }
+            .andExpect { jsonPath("$[?(@.id == '$id')]") { isNotEmpty() } }
+        archive(false).andExpect { status { isNoContent() } }
+        mockMvc.get("/edit-sessions?openedBy=me&versionId=$versionId") { header("Authorization", TOKEN) }
+            .andExpect { jsonPath("$.length()") { value(1) } }
+        assertEquals("published", jdbcTemplate.queryForObject("SELECT status FROM edit_sessions WHERE id = ?::uuid", String::class.java, id))
     }
 
     @Test

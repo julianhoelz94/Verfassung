@@ -6,12 +6,15 @@ import { currentLocale } from '../../lib/server-locale';
 import Link from 'next/link';
 import { getCountry, getVersion, listCountries, type CountryDetail } from '../../lib/api';
 import { editorErrorMessage, listAllSessions, type EditSessionSummary } from '../../lib/editor-api';
-import { listImportJobs, type ImportJob } from '../../lib/ingestion-api';
+import { listMyImportJobs, listImportJobs, type ImportJob } from '../../lib/ingestion-api';
 import { requireSessionBearer } from '../../lib/session';
 import { CollectionPage } from '../components/layout/templates';
-import { Alert, PageHeader } from '../components/ui';
+import { Alert, PageHeader, Select, Button } from '../components/ui';
 import { Badge } from '../components/ui';
 import { statusMessage } from '../../lib/ui-labels';
+import { WorkActions } from './WorkActions';
+import { Inline } from '../components/layout/Layout';
+import { matchesWorkStatus, validWorkStatus, workStatuses } from '../../lib/work-filters';
 import { workflowUi } from '../../lib/workflow-messages';
 
 type SessionRow = {
@@ -56,25 +59,27 @@ async function sessionRows(sessions: EditSessionSummary[], locale: Locale): Prom
   }));
 }
 
-export async function EditorLanding({ userId, email, roles, status, error }: { userId: string; email: string; roles: string[]; status?: string; error?: string }) {
+export async function EditorLanding({ userId, email, roles, status, workStatus, archived = false, error }: { userId: string; email: string; roles: string[]; status?: string; workStatus?: string; archived?: boolean; error?: string }) {
   const locale = await currentLocale();
   const canEdit = roles.includes('editor') || roles.includes('admin');
   const canReview = roles.includes('reviewer') || roles.includes('admin');
   const canPublish = roles.includes('publisher') || roles.includes('admin');
   const queue = status === 'reviewing' && canReview ? 'reviewing' : status === 'approved' && canPublish ? 'approved' :
     !canEdit && canReview ? 'reviewing' : !canEdit && canPublish ? 'approved' : null;
+  const selectedStatus = validWorkStatus(workStatus);
   let sessions: EditSessionSummary[] = [];
   let rows: SessionRow[] = [];
   let unavailable = false;
   try {
-    sessions = await listAllSessions(queue ? { status: queue } : { openedBy: 'me' });
+    sessions = await listAllSessions(queue ? { status: queue } : { openedBy: 'me', archived });
     rows = await sessionRows(sessions, locale);
   } catch {
     unavailable = true;
   }
   let importsUnavailable = false;
   try {
-    const jobs = await listImportJobs(await requireSessionBearer(), queue === 'reviewing' ? 'pending_review' : queue === 'approved' ? 'approved' : undefined);
+    const authorization = await requireSessionBearer();
+    const jobs = queue ? await listImportJobs(authorization, queue === 'reviewing' ? 'pending_review' : 'approved') : await listMyImportJobs(authorization, archived);
     const imports = queue ? jobs : jobs.filter(job => job.submittedBy === userId);
     rows.push(...imports.map(importJob => ({
       importJob,
@@ -85,6 +90,7 @@ export async function EditorLanding({ userId, email, roles, status, error }: { u
   } catch {
     importsUnavailable = true;
   }
+  if (!queue) rows = rows.filter(row => matchesWorkStatus(row.session?.status ?? row.importJob!.status, selectedStatus));
   rows.sort((a, b) => a.country.localeCompare(b.country) || a.constitution.localeCompare(b.constitution) || (b.session?.updatedAt ?? '').localeCompare(a.session?.updatedAt ?? ''));
   const countries = [...new Set(rows.map((row) => row.country))];
   const heading = localize(locale, queue === 'reviewing' ? ui.nav.reviewQueue : queue === 'approved' ? ui.nav.readyToPublish : workflowUi.myWork);
@@ -104,11 +110,23 @@ export async function EditorLanding({ userId, email, roles, status, error }: { u
     </nav>
     <h2 className="section-title">{heading}</h2>
     {!queue ? <p className="muted"><T value={workflowUi.myWorkHint} /></p> : null}
+    {!queue ? <Inline as="form" align="end" action="/editor">
+      <input type="hidden" name="mine" value="1" />
+      <Select label={<T value={workflowUi.filterStatus} />} id="work-status" name="workStatus" defaultValue={selectedStatus}>
+          <option value="">{localize(locale, workflowUi.allStatuses)}</option>
+          {workStatuses.map(value => <option key={value} value={value}>{localize(locale, statusMessage(value))}</option>)}
+      </Select>
+      <Select label={<T value={workflowUi.filterArchive} />} id="work-archive" name="archived" defaultValue={String(archived)}>
+          <option value="false">{localize(locale, workflowUi.unarchived)}</option>
+          <option value="true">{localize(locale, workflowUi.archived)}</option>
+      </Select>
+      <Button><T value={workflowUi.applyFilters} /></Button>
+    </Inline> : null}
     {message ? <Alert tone="error">{message}</Alert> : null}
     {unavailable ? <Alert tone="error"><T value={ui.editor.editorlanding.editSessionsAreTemporarilyUnavailableTryAgain} /></Alert> : null}
     {importsUnavailable ? <Alert tone="error"><T value={ui.importReview.unavailable} /></Alert> : null}
     {rows.length === 0 ?
-      unavailable || importsUnavailable ? null : <p className="muted">{queue ? <T value={queue === 'reviewing' ? ui.editorDynamic.noReviewSessions : ui.editorDynamic.noPublishSessions} /> : <><T value={workflowUi.noWork} />{" "}<Link href="/"><T value={ui.editor.editorlanding.browseCountries} /></Link> <T value={ui.editor.editorlanding.andChooseAConstitutionToStartEditing} /></>}</p> :
+      unavailable || importsUnavailable ? null : <p className="muted">{queue ? <T value={queue === 'reviewing' ? ui.editorDynamic.noReviewSessions : ui.editorDynamic.noPublishSessions} /> : <><T value={selectedStatus || archived ? workflowUi.noMatchingWork : workflowUi.noWork} />{" "}<Link href="/"><T value={ui.editor.editorlanding.browseCountries} /></Link> <T value={ui.editor.editorlanding.andChooseAConstitutionToStartEditing} /></>}</p> :
       countries.map((country) => <section key={country} className="editor-session-country">
         <h2>{country}</h2>
         {[...new Set(rows.filter((row) => row.country === country).map((row) => row.constitution))].map((constitution) =>
@@ -116,8 +134,11 @@ export async function EditorLanding({ userId, email, roles, status, error }: { u
             <h3>{constitution}</h3>
             <ul className="editor-session-list">{rows.filter((row) => row.country === country && row.constitution === constitution).map(({ session, importJob, version }) =>
               <li key={session?.id ?? importJob!.id}>
-                <div><strong>{version}</strong><span>{session ? <><T value={workType(session.hopKind)} /> <T value={ui.editor.editorlanding.lastEdited} />{" "}{lastEdit(session.updatedAt, locale)}</> : <T value={ui.importReview.kind} />}</span><Badge tone="changed"><T value={statusMessage(session?.status ?? importJob!.status)} /></Badge></div>
+                <div className="editor-session-summary"><strong>{version}</strong><span>{session ? <><T value={workType(session.hopKind)} /> <T value={ui.editor.editorlanding.lastEdited} />{" "}{lastEdit(session.updatedAt, locale)}</> : <T value={ui.importReview.kind} />}</span><Badge tone="changed"><T value={statusMessage(session?.status ?? importJob!.status)} /></Badge></div>
+                <Inline className="editor-work-actions">
                 <a className="btn btn-sm" href={session ? sessionHref(session) : `/editor?importJobId=${encodeURIComponent(importJob!.id)}`}><T value={queue ? queue === 'reviewing' ? ui.editorDynamic.openReview : ui.editorDynamic.openPublishView : session?.status === 'open' ? ui.editorDynamic.continueEditing : workflowUi.viewWork} /></a>
+                {!queue ? <WorkActions id={session?.id ?? importJob!.id} kind={session ? 'session' : 'import'} status={session?.status ?? importJob!.status} archived={archived} workStatus={selectedStatus} /> : null}
+                </Inline>
               </li>)}</ul>
           </section>)}
       </section>)}

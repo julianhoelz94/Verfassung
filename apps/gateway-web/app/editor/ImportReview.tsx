@@ -107,7 +107,7 @@ export async function ImportReview({ jobId, error }: { jobId: string; error?: st
           </> : null}
         </dl>
       </Disclosure>
-      {payload ? <details id="import-structure"><summary><T value={ui.importReview.submittedContent} /></summary><ImportPreview payload={payload} outline={outline ?? undefined} /></details> : null}
+      {payload ? <Disclosure id="import-structure" summary={<T value={ui.importReview.submittedContent} />}><ImportPreview payload={payload} outline={outline ?? undefined} /></Disclosure> : null}
       {decisions.length ? <Card><h2><T value={ui.admin.import.jobid.page.reviewDecisions} /></h2><ol>{decisions.map(decision => <li key={decision.id}>
         <strong>{decision.decision}</strong> · {new Date(decision.decidedAt).toLocaleString()}<p>{decision.reason}</p>
       </li>)}</ol></Card> : null}

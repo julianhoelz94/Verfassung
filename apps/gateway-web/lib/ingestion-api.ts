@@ -52,6 +52,24 @@ export function listImportJobs(authorization: string, status?: string): Promise<
   return readJson<ImportJob[]>(`${ingestionBaseUrl()}/import-jobs${query}`, 'ingestion', authorization).then(jobs => jobs ?? []);
 }
 
+export async function listMyImportJobs(authorization: string, archived: boolean): Promise<ImportJob[]> {
+  const jobs: ImportJob[] = [];
+  for (let offset = 0; ; offset += 100) {
+    const page = await readJson<ImportJob[]>(`${ingestionBaseUrl()}/import-jobs?mine=true&archived=${archived}&limit=100&offset=${offset}`, 'ingestion', authorization);
+    if (!page) throw new Error('Imports unavailable');
+    jobs.push(...page);
+    if (page.length < 100) return jobs;
+  }
+}
+
+export async function archiveImportJob(jobId: string, archived: boolean, authorization: string): Promise<void> {
+  const response = await fetchWithTimeout(`${ingestionBaseUrl()}/import-jobs/${encodeURIComponent(jobId)}/archive`, {
+    method: 'POST', cache: 'no-store', headers: { 'Content-Type': 'application/json', Authorization: authorization },
+    body: JSON.stringify({ archived }),
+  });
+  if (!response.ok) throw new Error('Import archive failed');
+}
+
 export function getImportPayload(jobId: string, authorization: string): Promise<Record<string, unknown> | null> {
   return readJson<Record<string, unknown>>(`${ingestionBaseUrl()}/import-jobs/${encodeURIComponent(jobId)}/payload`, 'ingestion', authorization);
 }

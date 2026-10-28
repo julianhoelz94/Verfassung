@@ -15,6 +15,7 @@ import { MfaLoginForm } from './MfaLoginForm';
 import { MfaSetup } from '../../components/MfaSetup';
 import { PasskeyLoginEnrollment } from '../../passkeys/PasskeyLoginEnrollment';
 import { PasskeyLogin } from '../../passkeys/PasskeyLogin';
+import { Stack } from '../../components/layout/Layout';
 import { identityRequestFetch } from '../../../lib/identity-request';
 
 type MfaPageProps = {
@@ -60,6 +61,7 @@ export default async function MfaPage(props: MfaPageProps) {
       ) : null}
       {enroll ? (
         <Card>
+          <Stack gap="field">
           {secret ? (
             <MfaSetup secret={secret} qrDataUrl={qrDataUrl} qrLabel={message(locale, ui.accessibility.authenticatorQr)} />
           ) : (
@@ -68,11 +70,14 @@ export default async function MfaPage(props: MfaPageProps) {
           <LoginEnrollForm next={next} />
           {setup.completed && !user ? <PasskeyLoginEnrollment next={next} /> : null}
           {setup.completed && !user ? <PasskeyLogin next={next} /> : null}
+          </Stack>
         </Card>
       ) : (
         <Card>
+          <Stack gap="field">
           <MfaLoginForm next={next} recovery={searchParams.method === 'recovery'} focus={['recovery', 'authenticator'].includes(searchParams.method ?? '')} />
           {setup.completed && !user ? <PasskeyLogin next={next} /> : null}
+          </Stack>
         </Card>
       )}
     </FocusedPage>

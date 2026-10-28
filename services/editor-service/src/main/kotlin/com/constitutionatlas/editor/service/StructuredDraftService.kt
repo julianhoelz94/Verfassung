@@ -58,6 +58,7 @@ class StructuredDraftService(
         val actor = editor.actor(authorization)
         val session = sessions.findSession(sessionId) ?: throw NotFoundException("Unknown session")
         if (session.actorId != actor.id && !actor.canReview() && !actor.canPublish()) throw ForbiddenException("Not your session")
+        if (session.status == EditSessionStatus.DISCARDED) throw NotFoundException("Unknown session")
         val pin = drafts.pin(sessionId)
         val source = sources.source(session.versionId)
         val settings = sources.settings(session.versionId)

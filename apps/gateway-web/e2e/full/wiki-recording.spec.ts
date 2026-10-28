@@ -13,7 +13,7 @@ const capture = process.env.WIKI_MEDIA_CAPTURE === 'merged';
 const baseURL = process.env.E2E_BASE_URL ?? 'http://127.0.0.1:18080';
 
 // Screenshots are published evidence, not local test baselines. Only the merged-PR
-// workflow may refresh them; regular PR/full-stack suites exclude this file.
+// workflow may refresh them; PR/full-stack checks verify the journeys without media.
 test.beforeAll(() => {
   if (process.env.CI !== 'true' || !['merged', 'verify'].includes(process.env.WIKI_MEDIA_CAPTURE ?? '')) {
     throw new Error('Wiki journeys require CI: verify without media, or capture after a merge');
@@ -148,7 +148,7 @@ for (const locale of ['en', 'de'] as const) {
         await selectArticle(page, watch, source.article.id);
         await expect(page.locator('#draft-form input[name=articleId]')).toHaveValue(source.article.id);
         await watch.explain(text('Edit the selected article, then save the draft.', 'Bearbeiten Sie den Artikel und speichern Sie den Entwurf.'));
-        await watch.type(page.locator('#draft-form').getByRole('textbox', { name:text('Constitution text', 'Verfassungstext'), exact:true }).first(), correction);
+        await watch.type(page.locator('#draft-form textarea, #draft-form [role=textbox][contenteditable=true]').first(), correction);
         await shot(page, 'editor-draft', page.locator('#draft-form'));
         await watch.click(page.locator('#draft-form button[type=submit]'));
         await expect(page.getByText(t(ui.editor.page.draftSaved), { exact:true })).toBeVisible();

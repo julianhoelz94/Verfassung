@@ -20,7 +20,7 @@ describe('WebAuthn transport', () => {
   });
   it('preserves challenge, allowed identity and all assertion bytes', async () => {
     const result = await getPasskey({ challenge: 'AQI', rpId: 'atlas.example', allowCredentials: [{ type: 'public-key', id: '-_8' }] });
-    expect(get.mock.calls[0][0].publicKey.rpId).toBe('atlas.example'); expect(new Uint8Array(get.mock.calls[0][0].publicKey.challenge)).toEqual(new Uint8Array([1, 2]));
+    expect(get.mock.calls[0][0].publicKey.rpId).toBe('atlas.example'); expect(new Uint8Array(get.mock.calls[0][0].publicKey.allowCredentials[0].id)).toEqual(new Uint8Array([251, 255])); expect(new Uint8Array(get.mock.calls[0][0].publicKey.challenge)).toEqual(new Uint8Array([1, 2]));
     expect(result).toMatchObject({ rawId: '-_8', response: { authenticatorData: 'AQ', clientDataJSON: 'Ag', signature: 'Aw', userHandle: 'BA' } });
   });
   it('keeps a missing user handle as null and missing transports as an empty list', async () => {

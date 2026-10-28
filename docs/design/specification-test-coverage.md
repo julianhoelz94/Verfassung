@@ -106,7 +106,7 @@ coverage and exact CI revisions are recorded here as delivery proceeds.
   a floor, independent component failure, N/A changed lines, invalid policy and
   readable failure reports. The existing changed-code gate remains independent.
 
-Final review, CI coverage, merge and Wiki evidence follow below once complete.
+Final CI and publication evidence is maintained in [PR #213](https://github.com/julianhoelz94/Verfassung/pull/213); the exact implementation checks are recorded below.
 
 
 ### Review corrections and current-main compatibility
@@ -128,3 +128,41 @@ rebased combined tree rather than the earlier 72.33% snapshot.
 The current local run passes 13 Node tests and 898 Vitest tests across 87 files;
 gateway line coverage is 73.85% (4,136 / 5,600). Typecheck and lint pass. These are
 local component observations, not a substitute for the complete CI aggregate.
+
+
+### Verified combined implementation
+
+Independent reviewer and verifier cleared `e4c43aaaafbccd533696a0caad698600fbaad66f`
+after rechecking all three corrections. The verifier independently passed 13 Node
+and 898 Vitest tests, typecheck, lint, a Next 16 production build, 34 coverage-policy
+checks and 27 operational checks. Source duplication/dead-helper and repository
+hygiene scans found no remaining cleanup blocker.
+
+[CI run 40749461326](https://github.com/julianhoelz94/Verfassung/actions/runs/40749461326)
+passed all 31 jobs, including real publication, mock/visual/full-stack browser
+journeys, documentation journeys and disposable backup recovery. Its tested merged
+revision is `73750e19fd39ebcc6ae27f1ad716a548ff02023e`, base `d2f41ae61d1272b790c4117f93e5878e85edf103`.
+The artifact's source-line totals independently reconcile with disjoint component
+totals: **17,981 / 21,631 lines (83.13%)**; changed code **34 / 35 (97.14%)**.
+Gateway is **4,136 / 5,600 (73.86%)**, Python **1,655 / 1,980 (83.59%)**. Every JVM
+and MCP component retains the upgraded baseline's covered/eligible counts. The
+80% repository objective is met within the requested 80–85% range. Python's floor
+is ratcheted to 83%; gateway's is 73%; unchanged components keep conservative
+floors based on verified main. No production-source exclusion was added.
+
+A final quality pass strengthens the translation batching examples: three distinct
+chunks cross the 20,000-character budget, and 129 distinct passages cross the
+128-passage budget. Separate controlled faults removing each guard produce
+assertion failures; the restored implementation passes. This brings controlled
+fault evidence to six cases. The passkey assertion also checks the allowed
+credential's decoded bytes. These are stronger behavioral assertions, not changes
+to application behavior. Final head/main CI and published Wiki/media references
+are recorded in the PR once their workflows complete. No site deployment belongs
+to this task.
+
+The final settings tests also execute the real admin/session guard against a
+verified HTTP identity, rejecting viewer/editor/reviewer/publisher attempts for
+all three settings commands before any write. The final local suite passes 13
+Node tests and 912 Vitest tests; typecheck and lint remain clean. These supplemental
+changes modify tests, evidence and the Python floor only; application behavior is
+the same as the fully verified combined implementation above.

@@ -38,9 +38,17 @@ describe('content translation preserves consent and the source', () => {
   it('does not send content already authored in the selected language', async () => {
     await show({ alwaysTranslate: true, sourceLanguage: 'en-GB' }); expect(translateContentAction).not.toHaveBeenCalled(); expect(view.host.querySelector('button')).toBeNull();
   });
+  it('splits more than 128 distinct passages into bounded batches without losing their order', async () => {
+    vi.mocked(translateContentAction).mockImplementation(async texts => texts.map(text => `translated ${text}`));
+    await show({}, <article>{Array.from({ length: 129 }, (_, index) => <p key={index} data-translate-content>{`Source ${index}`}</p>)}</article>);
+    await click(button(view.host, 'Translate this content'));
+    expect(vi.mocked(translateContentAction).mock.calls.map(([texts]) => texts.length)).toEqual([128, 1]);
+    expect([...view.host.querySelectorAll('p')].map(node => node.textContent)).toEqual(Array.from({ length: 129 }, (_, index) => `translated Source ${index}`));
+  });
   it('bounds batch sizes for long authored passages and reconstructs the translated text', async () => {
     vi.mocked(translateContentAction).mockImplementation(async texts => texts.map(text => `translated(${text.length})`));
-    await show({}, <p data-translate-content>{'a'.repeat(23000)}</p>); await click(button(view.host, 'Translate this content'));
+    await show({}, <p data-translate-content>{'a'.repeat(10000) + 'b'.repeat(10000) + 'c'.repeat(3000)}</p>); await click(button(view.host, 'Translate this content'));
+    expect(translateContentAction).toHaveBeenCalledTimes(2);
     for (const [texts] of vi.mocked(translateContentAction).mock.calls) { expect(texts.length).toBeLessThanOrEqual(128); expect(texts.reduce((sum, text) => sum + text.length, 0)).toBeLessThanOrEqual(20000); expect(texts.every(text => text.length <= 10000)).toBe(true); }
     expect(view.host.textContent).toContain('translated(10000)translated(10000)translated(3000)');
   });

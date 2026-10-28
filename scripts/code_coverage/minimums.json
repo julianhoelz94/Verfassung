@@ -5,7 +5,7 @@
     "gateway-typescript": "73",
     "gateway-javascript": "100",
     "mcp": "80",
-    "python": "80",
+    "python": "83",
     "jvm-amendment-service": "89",
     "jvm-audit-service": "96",
     "jvm-catalog-service": "91",

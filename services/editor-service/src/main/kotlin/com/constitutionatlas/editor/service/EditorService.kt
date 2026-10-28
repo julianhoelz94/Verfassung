@@ -263,7 +263,7 @@ class EditorService(
         requireSourceEvidenceRevision(sessionId, request.sourceEvidenceRevision)
         val structured = editorRepository.hasStructuredDraft(sessionId)
         if (structured && session.status == EditSessionStatus.PUBLISHED) {
-            structuredPublishJobs.pin(session.id, request.toString())
+            structuredPublishJobs.pin(session.id, request)
             return previewDto(session.id)
         }
         requireStatus(session, EditSessionStatus.APPROVED)
@@ -314,7 +314,7 @@ class EditorService(
                 }
             }
         }
-        if (structured) structuredPublishJobs.pin(session.id, request.toString())
+        if (structured) structuredPublishJobs.pin(session.id, request)
         val source = catalogClient.getVersion(session.versionId)
         if (structured && source.publicationStatus != "published") throw ConflictException("Structured successors require a published source", "stale_source")
         val versions = if (hopKind == "editorial_correction" && source.currentVersionId != null) {

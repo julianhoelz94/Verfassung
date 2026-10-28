@@ -812,19 +812,32 @@ class CatalogApiTest {
         }
     }
 
-    @Test
-    fun successorReservationRetriesRequireCompleteContentAndRejectChangedPayload() {
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = ["none", "current", "legacy"])
+    fun successorReservationRetriesRequireCompleteContentAndRejectChangedPayload(sourceFormat: String) {
         val countryCode = uniqueCountryCode()
         writes.createCountry(com.constitutionatlas.catalog.api.CreateCountryRequest(countryCode, "Reservation country"))
         val constitution = writes.createConstitution(countryCode, com.constitutionatlas.catalog.api.CreateConstitutionRequest("reservation-${UUID.randomUUID()}", "Reservation test"))
         val initial = writes.createDraftVersion(constitution.id, com.constitutionatlas.catalog.api.CreateVersionRequest("0"))
         writes.publishVersion(initial.id)
         val attempt = UUID.randomUUID()
-        val request = com.constitutionatlas.catalog.api.CreateVersionRequest("1", predecessorVersionId = initial.id, hopKind = "editorial_correction", publicationComment = "Correction", publishAttemptId = attempt)
+        val evidence = if (sourceFormat == "none") null else com.constitutionatlas.platform.SourceEvidence(coverage = "Excerpt", attribution = "Archive")
+        val request = com.constitutionatlas.catalog.api.CreateVersionRequest("1", predecessorVersionId = initial.id, hopKind = "editorial_correction", publicationComment = "Correction", publishAttemptId = attempt, sourceEvidence = evidence)
         val reserved = writes.createDraftVersion(constitution.id, request)
+        if (sourceFormat == "legacy") {
+            // Exact pre-description DTO bytes, independent of the current toString().
+            val original = "CreateVersionRequest(versionLabel=1, effectiveDate=null, languageCode=en, sourceUrl=null, gazetteReference=null, predecessorVersionId=${initial.id}, hopKind=editorial_correction, publicationComment=Correction, structuralSettingsRevisionId=null, publishAttemptId=$attempt, importJobId=null, sourceEvidence=SourceEvidence(dateWording=null, datePrecision=unknown, coverage=Excerpt, statusWording=null, attribution=Archive))"
+            val hash = java.security.MessageDigest.getInstance("SHA-256").digest(original.toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it) }
+            jdbcTemplate.update("UPDATE successor_publish_attempts SET request_hash = ? WHERE id = ?", hash, attempt)
+        }
+        val pinnedHash = jdbcTemplate.queryForObject("SELECT request_hash FROM successor_publish_attempts WHERE id = ?", String::class.java, attempt)
         assertThat(writes.createDraftVersion(constitution.id, request).id).isEqualTo(reserved.id)
         assertThat(writes.publishAttempt(attempt).id).isEqualTo(reserved.id)
         org.junit.jupiter.api.Assertions.assertThrows(com.constitutionatlas.catalog.ConflictException::class.java) { writes.createDraftVersion(constitution.id, request.copy(publicationComment = "Changed request")) }
+        if (evidence != null) {
+            org.junit.jupiter.api.Assertions.assertThrows(com.constitutionatlas.catalog.ConflictException::class.java) { writes.createDraftVersion(constitution.id, request.copy(sourceEvidence = evidence.copy(attribution = "Changed archive"))) }
+            org.junit.jupiter.api.Assertions.assertThrows(com.constitutionatlas.catalog.ConflictException::class.java) { writes.createDraftVersion(constitution.id, request.copy(sourceEvidence = evidence.copy(description = "New description"))) }
+        }
         val settings = settingsRepository.forVersion(reserved.id).id
         Mockito.doThrow(com.constitutionatlas.catalog.ConflictException("Incomplete roots")).`when`(readiness).requireReady(reserved.id, attempt, settings)
         org.junit.jupiter.api.Assertions.assertThrows(com.constitutionatlas.catalog.ConflictException::class.java) { writes.publishVersion(reserved.id) }
@@ -832,6 +845,7 @@ class CatalogApiTest {
         Mockito.doNothing().`when`(readiness).requireReady(reserved.id, attempt, settings)
         assertThat(writes.publishVersion(reserved.id).publicationStatus).isEqualTo("published")
         assertThat(writes.createDraftVersion(constitution.id, request).id).isEqualTo(reserved.id)
+        assertThat(jdbcTemplate.queryForObject("SELECT request_hash FROM successor_publish_attempts WHERE id = ?", String::class.java, attempt)).isEqualTo(pinnedHash)
         org.junit.jupiter.api.Assertions.assertThrows(com.constitutionatlas.catalog.ConflictException::class.java) { writes.createDraftVersion(constitution.id, request.copy(versionLabel = "concurrent", publishAttemptId = UUID.randomUUID())) }
     }
 

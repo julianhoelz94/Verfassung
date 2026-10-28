@@ -221,8 +221,17 @@ class StructuredDraftApiTest {
     }
 
     @org.junit.jupiter.params.ParameterizedTest
-    @org.junit.jupiter.params.provider.ValueSource(strings = ["editorial_correction", "legal"])
-    fun orderedPublishRetriesReuseReservationAndPreserveMapping(hop: String) {
+    @org.junit.jupiter.params.provider.CsvSource(
+        "editorial_correction,",
+        "legal,",
+        // SHA-256 of the exact pre-source-review PublishRequest.toString() bytes.
+        "editorial_correction,d1a6e65a92335bcec051ab8917065742ec6585134e5aeeaff7fe026136ac6d1d",
+        "legal,844e006da3d5d3751283348effeb801a87a855b0f3e52fcf141913acf26093ee",
+        // Also retain hashes written after the optional source revision was added.
+        "editorial_correction,ebf08c066f8a9a4aac8c0da6c8cdd3403b22f0bebaec9fceee6fdbe907f7d0ac",
+        "legal,b6c8d01897615350c38c943ee4e419283b6969497484db5e0f801b7cd7a8e778",
+    )
+    fun orderedPublishRetriesReuseReservationAndPreserveMapping(hop: String, storedHash: String?) {
         val auth = "Bearer ordered-$hop"
         val actor = Actor(UUID.randomUUID(), "admin@test.local", listOf("admin"), stepUpFresh = true)
         val version = UUID.randomUUID()
@@ -234,7 +243,7 @@ class StructuredDraftApiTest {
         Mockito.`when`(identity.authenticate(auth)).thenReturn(actor)
         Mockito.`when`(sources.source(version)).thenReturn(source)
         Mockito.`when`(sources.settings(version)).thenReturn(settings)
-        val catalogSource = com.constitutionatlas.editor.client.CatalogVersion(version, constitution, "1", "published", legalVersionId = version, currentVersionId = version)
+        val catalogSource = com.constitutionatlas.editor.client.CatalogVersion(version, constitution, "1", "published", legalVersionId = version, currentVersionId = version, sourceEvidence = com.constitutionatlas.platform.SourceEvidence(attribution = "Archive"))
         val catalogTarget = catalogSource.copy(id = target, versionLabel = "2", publicationStatus = "draft", predecessorVersionId = version, hopKind = hop)
         Mockito.`when`(catalogClient.getVersion(version)).thenReturn(catalogSource)
         Mockito.`when`(catalogClient.listVersions(constitution, "all")).thenReturn(listOf(catalogSource))
@@ -280,6 +289,7 @@ class StructuredDraftApiTest {
         val write = com.constitutionatlas.platform.OrderedSnapshotWrite(0, version, 7, com.constitutionatlas.editor.service.OrderedSuccessorPlan.build(source.roots, preview.roots, preview.operations), session)
         Mockito.`when`(publishClient.save(target, write, auth)).thenThrow(com.constitutionatlas.editor.DownstreamException("content unavailable")).thenReturn(snapshot)
         val request = com.constitutionatlas.editor.api.PublishRequest(hop)
+        if (storedHash != null) jdbc.update("INSERT INTO structured_publish_jobs(session_id, request_hash) VALUES (?, ?)", session, storedHash)
         assertThrows(com.constitutionatlas.editor.DownstreamException::class.java) { editorService.publish(auth, session, request) }
         assertThat(sessions.findSession(session)!!.status).isEqualTo(com.constitutionatlas.editor.api.EditSessionStatus.APPROVED)
         Mockito.`when`(publishClient.reservation(session, auth)).thenReturn(catalogTarget)
@@ -290,7 +300,9 @@ class StructuredDraftApiTest {
         assertThat(published.unitMapping).containsEntry(entry.logicalId.toString(), UUID.nameUUIDFromBytes("$target:${entry.logicalId}".toByteArray()).toString())
         assertThat(published.sourceGeneration).isEqualTo(7)
         assertThat(editorService.publish(auth, session, request).newVersionId).isEqualTo(target)
+        if (storedHash != null) assertThat(jdbc.queryForObject("SELECT request_hash FROM structured_publish_jobs WHERE session_id = ?", String::class.java, session)).isEqualTo(storedHash)
         Mockito.verify(publishClient, Mockito.times(3)).save(target, write, auth)
+        Mockito.verify(publishClient, Mockito.times(1)).reserve(session, catalogSource, hop, comment, settings.id, auth)
         if (hop == "legal") Mockito.verify(amendmentClient, Mockito.times(1)).createAmendment(Mockito.eq(constitution) ?: constitution, Mockito.any(com.constitutionatlas.editor.api.ChangeRecordRequest::class.java) ?: record, Mockito.eq(auth) ?: auth)
         val payload = jdbc.queryForObject("SELECT payload::text FROM outbox_events WHERE session_id = ? AND event_name = 'version.published'", String::class.java, session)
         assertThat(payload).contains("unitMapping", entry.logicalId.toString(), "sourceGeneration", "settingsRevisionId")

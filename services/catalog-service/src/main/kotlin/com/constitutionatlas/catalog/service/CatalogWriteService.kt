@@ -106,6 +106,14 @@ class CatalogWriteService(
         return response
     }
 
+    private fun legacySourceRequestHash(request: CreateVersionRequest): String? {
+        val source = request.sourceEvidence?.takeIf { it.description == null } ?: return null
+        // Preserve reservation hashes from before SourceEvidence gained description.
+        val evidence = "SourceEvidence(dateWording=${source.dateWording}, datePrecision=${source.datePrecision}, coverage=${source.coverage}, statusWording=${source.statusWording}, attribution=${source.attribution})"
+        val original = "CreateVersionRequest(versionLabel=${request.versionLabel}, effectiveDate=${request.effectiveDate}, languageCode=${request.languageCode}, sourceUrl=${request.sourceUrl}, gazetteReference=${request.gazetteReference}, predecessorVersionId=${request.predecessorVersionId}, hopKind=${request.hopKind}, publicationComment=${request.publicationComment}, structuralSettingsRevisionId=${request.structuralSettingsRevisionId}, publishAttemptId=${request.publishAttemptId}, importJobId=${request.importJobId}, sourceEvidence=$evidence)"
+        return java.security.MessageDigest.getInstance("SHA-256").digest(original.toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it) }
+    }
+
     @Transactional
     fun createDraftVersion(constitutionId: UUID, request: CreateVersionRequest): VersionCreated {
         if (!catalogRepository.constitutionExists(constitutionId)) {
@@ -115,7 +123,7 @@ class CatalogWriteService(
         val requestHash = java.security.MessageDigest.getInstance("SHA-256").digest(request.toString().toByteArray()).joinToString("") { "%02x".format(it) }
         request.publishAttemptId?.let { attempt ->
             publishAttempts.find(attempt)?.let { reservation ->
-                if (reservation.constitutionId != constitutionId || reservation.requestHash != requestHash) throw ConflictException("Publish attempt payload changed", "publish_attempt_mismatch")
+                if (reservation.constitutionId != constitutionId || (reservation.requestHash != requestHash && reservation.requestHash != legacySourceRequestHash(request))) throw ConflictException("Publish attempt payload changed", "publish_attempt_mismatch")
                 return catalogRepository.findVersionCreated(reservation.versionId) ?: throw NotFoundException("Reserved version missing")
             }
         }

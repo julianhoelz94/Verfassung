@@ -1,6 +1,6 @@
 import type { ComponentPropsWithoutRef, ReactNode } from 'react';
 import { PageMain, type PageWidth } from '../PageMain';
-import { Stack } from './Layout';
+import { Stack, type LayoutGap } from './Layout';
 import styles from './templates.module.css';
 
 type PageProps = {
@@ -9,6 +9,7 @@ type PageProps = {
   children?: ReactNode;
   width?: PageWidth;
   className?: string;
+  gap?: LayoutGap;
 };
 
 function PageFrame({
@@ -17,11 +18,12 @@ function PageFrame({
   children,
   width = 'content',
   className,
+  gap = 'section',
   template,
 }: PageProps & { template: string }) {
   return (
     <PageMain width={width} className={className} data-template={template}>
-      <Stack gap="section">
+      <Stack gap={gap}>
         {header}
         {notices ? (
           <Stack gap="related" className={styles.notices}>

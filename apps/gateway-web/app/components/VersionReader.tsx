@@ -9,12 +9,13 @@ import type { ArticleSummary, ContentOutline } from '../../lib/api';
 import { orderedTargets } from '../../lib/ordered-content';
 import { articleHeading, clipOrderedEntries, clipNodes, depthStopCount, depthStopLabels, kindByCode } from '../../lib/outline';
 import { Badge, Toolbar } from './ui';
-import { ConstitutionText, OrderedContentTree } from './ConstitutionText';
+import { ConstitutionArticleHeading, ConstitutionFootnotes, ConstitutionText } from './ConstitutionText';
 import { FootnoteProvider } from './Footnotes';
 import { footnoteBacklinks, footnoteEntries, footnoteItems } from '../../lib/footnotes';
 import { Segmented } from './Segmented';
 import { Toc } from './Toc';
 import { ReaderLayout } from './layout/templates';
+import documentStyles from './ConstitutionDocument.module.css';
 
 type VersionReaderProps = {
   code?: string;
@@ -133,7 +134,7 @@ export function VersionReader({
             {articles.length} <T value={articles.length === 1 ? ui.remainingStatus.unitSingular : ui.remainingStatus.unitPlural} />
           </span>
         </Toolbar>
-        <ol className="version-articles text-column" lang={language}>
+        <ol className={`version-articles text-column ${documentStyles.text}`} lang={language}>
           {articles.map((article) => {
             const shown = shownDepth(article.id);
             const nodes = clipNodes(article.children ?? [], outline, shown);
@@ -146,7 +147,7 @@ export function VersionReader({
             const permalink = code ? `/countries/${code}/versions/${versionId}/${article.kind && article.kind !== 'article' ? 'units' : 'articles'}/${article.id}#article-${article.articleNumber}` : `/versions/${versionId}/units/${article.id}`;
             const historyHref = `/countries/${code}/articles/${encodeURIComponent(article.articleNumber)}`;
             return (
-              <li key={article.id} id={article.id} className="version-article article">
+              <li key={article.id} id={article.id} className={`version-article article ${documentStyles.article}`}>
                 <h2 className="article-head">
                   <button
                     type="button"
@@ -157,7 +158,7 @@ export function VersionReader({
                     disabled={depth >= max}
                     onClick={() => toggleArticle(article.id)}
                   >
-                    <span data-translate-content>{articleHeading(outline, article) || t(ui.editorDynamic.unit)}</span>
+                    <span data-translate-content>{articleHeading(outline, article) ? <ConstitutionArticleHeading article={article} outline={outline} /> : t(ui.editorDynamic.unit)}</span>
                   </button>
                 </h2>
                 {open ? (
@@ -196,7 +197,7 @@ export function VersionReader({
             );
           })}
         </ol>
-        {endnotes.length ? <div className="constitution-text text-column" lang={language}><OrderedContentTree entries={endnotes} outline={outline} indexedBacklinks={backlinks} /></div> : null}
+        {endnotes.length ? <div lang={language}><ConstitutionFootnotes entries={endnotes} outline={outline} indexedBacklinks={backlinks} /></div> : null}
       </section>
     </ReaderLayout></FootnoteProvider>
   );

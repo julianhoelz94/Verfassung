@@ -17,7 +17,7 @@ const json = (value: unknown) => ({ content: [{ type: 'text' as const, text: JSO
 
 type Country = { isoCode: string; name: string; versionCount: number };
 type CountryDetail = { isoCode: string; name: string; constitutions: Array<{ id: string; slug: string; title: string; versions: unknown[] }> };
-type OrderedEntry = { type: string; text?: string | null; node?: { logicalId?: string; content?: OrderedEntry[] } | null };
+type OrderedEntry = { type: string; text?: string | null; lineBreaksBefore?: number; node?: { logicalId?: string; content?: OrderedEntry[] } | null };
 type Unit = { id: string; versionId: string; articleNumber: string; title: string; body?: string; kind?: string; children?: Array<{ id: string }>; content?: OrderedEntry[] };
 
 const settingsGuidance = [
@@ -47,8 +47,9 @@ export function orderedText(entries: OrderedEntry[]): string {
   for (const entry of entries) {
     const child = entry.type === 'child';
     const part = child ? orderedText(entry.node?.content ?? []) : entry.text ?? '';
+    if ((entry.lineBreaksBefore ?? 0) > 0) text += '\n'.repeat(entry.lineBreaksBefore!);
     if (!part) continue;
-    if (text && (child || previousChild) && !/\s$/.test(text) && /^[\p{L}\p{N}]/u.test(part)) text += ' ';
+    if ((entry.lineBreaksBefore ?? 0) === 0 && text && (child || previousChild) && !/\s$/.test(text) && /^[\p{L}\p{N}]/u.test(part)) text += ' ';
     text += part;
     previousChild = child;
   }
@@ -139,7 +140,7 @@ export function createServer(authorization?: string): McpServer {
     structure: {
       outline: { kinds: [{ kindCode: 'article', displayLabel: 'Article', presentation: 'section', showLabel: true, showTitle: true, showKind: false, allowTextAlongsideChildren: false, titlePolicy: 'optional', labelPolicy: 'optional', labelPlacement: 'before_title', segmentation: 'plain', root: true, allowedChildKinds: [] }] },
       migrationUpload: { migrationRunId: 'run UUID', item: { sourceKey: 'gg/source', kind: 'document', dependencies: [], payload: { title: 'Original source bytes', sourceUrl: 'https://example.org/source.htm', fileName: 'source.htm', fileBase64: 'base64 of original bytes', fileSha256: 'SHA-256 of original bytes' } } },
-      richContent: { formats: ['plain', 'table', 'footnote'], fields: ['format', 'table', 'footnoteLabel', 'references', 'marks'], marks: { types: ['bold', 'italic', 'underline', 'strikethrough'], ranges: 'UTF-16 offsets [start, end), up to 4096 marks per plain or footnote entry' }, footnotes: 'All note bodies must follow all constitution body content, across every root. A footnote reference may have start equal to end to insert a marker at the cursor.', table: { caption: 'Source table', rows: [{ logicalId: 'row UUID', cells: [{ logicalId: 'cell UUID', text: 'Exact cell wording', header: true, rowSpan: 1, colSpan: 2, headers: [] }] }] }, reference: { logicalId: 'reference UUID', start: 0, end: 4, target: { type: 'footnote', footnoteId: 'note entry UUID' } } },
+      richContent: { formats: ['plain', 'table', 'footnote'], fields: ['format', 'table', 'footnoteLabel', 'references', 'marks', 'lineBreaksBefore'], lineBreaksBefore: 'Integer 0..16; authored newlines before a text entry, outside text and UTF-16 offsets; omitted means 0.', marks: { types: ['bold', 'italic', 'underline', 'strikethrough'], ranges: 'UTF-16 offsets [start, end), up to 4096 marks per plain or footnote entry' }, footnotes: 'All note bodies must follow all constitution body content, across every root. A footnote reference may have start equal to end to insert a marker at the cursor.', table: { caption: 'Source table', rows: [{ logicalId: 'row UUID', cells: [{ logicalId: 'cell UUID', text: 'Exact cell wording', header: true, rowSpan: 1, colSpan: 2, headers: [] }] }] }, reference: { logicalId: 'reference UUID', start: 0, end: 4, target: { type: 'footnote', footnoteId: 'note entry UUID' } } },
       articles: [{ articleNumber: '1', title: 'Example', body: 'Text', sortOrder: 1, nodes: [] }],
       roots: [{ logicalId: 'stable UUID', kind: 'article', label: '1', title: 'Example', content: [{ type: 'text', text: 'Text' }] }],
       setupProposal: { isoCode: 'FR', countryName: 'France', constitutionSlug: 'constitution', constitutionTitle: 'Constitution', languageCode: 'fr', sourceUrl: 'https://example.org/source', outline: { kinds: [{ kindCode: 'article', displayLabel: 'Article' }] }, sampleRoots: [{ kind: 'article', label: '1', content: [{ type: 'text', text: 'Representative text' }] }] },

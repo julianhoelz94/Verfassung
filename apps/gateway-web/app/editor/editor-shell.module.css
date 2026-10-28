@@ -1,0 +1,3 @@
+.page:global(.page) { padding-block-start:var(--space-4); }
+.documentSection { min-width:0; }
+.documentSection > :global(.action-bar) { margin-top:var(--space-3); }

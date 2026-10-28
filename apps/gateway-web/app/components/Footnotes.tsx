@@ -1,10 +1,11 @@
 'use client';
 
-import { createContext, useCallback, useContext, useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import type { FootnoteItem } from '../../lib/footnotes';
 import { useTranslation } from './TranslationProvider';
 import { InlineText } from './InlineText';
+import { updateFootnoteHitTargets } from '../../lib/footnote-hit-targets';
 import styles from './Footnotes.module.css';
 
 export type { FootnoteItem } from '../../lib/footnotes';
@@ -41,6 +42,8 @@ function FootnoteScope({ notes, children, onNavigate }: {
   const closeButton = useRef<HTMLButtonElement | null>(null);
   const active = notes.find(note => note.logicalId === opened);
   const preview = notes.find(note => note.logicalId === peek?.id);
+  useLayoutEffect(()=>updateFootnoteHitTargets());
+  useEffect(()=>{const update=()=>updateFootnoteHitTargets();window.addEventListener('resize',update);return()=>window.removeEventListener('resize',update);},[]);
   const close = useCallback((restore = false) => {
     setOpened(null); setPeek(null);
     if (restore) trigger.current?.focus({ preventScroll: true });
@@ -113,7 +116,7 @@ export function FootnoteMarker({ noteId, label, referenceId, children }: {
   const context = useContext(Context), t = useTranslation();
   const note = context?.notes.find(note => note.logicalId === noteId);
   if (!note || !context) return <sup id={referenceId}>{children ?? label ?? '*'}</sup>;
-  return <a href={note.href} role="button" contentEditable={false} id={referenceId} className={styles.marker}
+  return <a href={note.href} role="button" contentEditable={false} data-footnote-marker id={referenceId} className={styles.marker}
     aria-label={t(copy.show) + ' ' + note.label} aria-haspopup="dialog" aria-describedby={context.tooltipId}
     onClick={event => { event.preventDefault(); context.showNote(noteId, event.currentTarget); }}
     onKeyDown={event => { if (event.key === ' ') { event.preventDefault(); context.showNote(noteId, event.currentTarget); } }}

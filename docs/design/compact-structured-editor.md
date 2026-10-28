@@ -29,6 +29,10 @@ The interaction prototype was reviewed before implementation. This document reco
 15. Show the sentence-boundary toggle only in flowing mode. Use a dashed-box icon in the toolbar.
 16. Provide bold, italic, underline, and strikethrough.
 17. Provide Undo and Redo. Disable and visually mute each when its history is empty.
+18. Store newly edited sentence text without leading or trailing whitespace. Flowing presentation supplies the ordinary space between sentences.
+19. Enter between sentences authors a persistent line break; repeated Enter preserves blank lines independently of sentence wording.
+20. Match the viewer concept's article and footnote presentation in the public reader and editor Preview.
+21. Give the constitution Wiki its own entry next to the text views. Keep constitution-wide metadata in a quiet Details disclosure, respecting each field's existing write workflow.
 
 ## 3. Screen composition and progressive disclosure
 
@@ -117,7 +121,7 @@ Boundary handling must consider:
 - configurable Unicode delimiters;
 - removal of a delimiter and joining a previously split sentence.
 
-Boundary suggestions remain manually adjustable. Preserve exact text and whitespace. Never silently move child units or turn an article heading into a sentence.
+Boundary suggestions remain manually adjustable. Newly edited sentences store their wording without leading or trailing whitespace; a normal flowing gap belongs to presentation. Preserve internal wording and explicitly authored breaks, and remap UTF-16 mark/reference positions when cleaning the edges. Historical immutable source records remain unchanged. Never silently move child units or turn an article heading into a sentence.
 
 Implement automatic operations as transactions with stable identities. Reuse unchanged units; assign new identities only to genuinely new units. Preserve or explicitly remap formatting, references, note markers, and review identity through splitting and merging.
 
@@ -129,6 +133,14 @@ Use the constitution’s existing presentation setting as the source of truth:
 - **Line by line:** each sentence starts a new visual line.
 
 Switching presentation must not insert newlines into the legal source, change wording, recreate node identities, or alter ordering. The dashed-box toggle is a temporary view control available only in flowing mode.
+
+### Authored line breaks
+
+Enter at a sentence boundary adds a separator before the following text entry. The entry's rich-content metadata contains `lineBreaksBefore`, an integer from 0 through 16 (missing means 0). Zero uses the ordinary flow gap; a positive value supplies that number of line breaks outside text/mark/reference offsets. Repeated Enter supports blank lines. Do not store the separator as leading or trailing whitespace in either sentence.
+
+Keep separators through save/reload, undo/redo, rich replacements, manual/automatic splitting, merging, imports/exports, revision cloning, comparison and publication. The first split part retains its incoming separator; later parts have their own explicit separator. A merge retains the first incoming separator and accounts for consumed internal layout. Shared import/write validation rejects invalid types or out-of-range counts with an actionable path. The field lives in existing rich JSON and needs no database migration. Omit zero in canonical historical payloads so old receipts and fingerprints remain compatible.
+
+The reader, Preview and print render the same authored breaks in flowing text. A line-by-line display already supplies the structural sentence boundary and must not accidentally add another ordinary blank line. Switching display retains the authored metadata.
 
 ## 7. Inline text formatting
 
@@ -156,7 +168,7 @@ Use a structured production editor core with reliable selection/composition supp
 
 Canonical constitution content has body material followed by a final notes section. No constitutional unit or substantive body entry may follow the first endnote. The validator operates across the entire constitution version, including nested nodes and multiple roots.
 
-Inline references are separate from note bodies. Preserve their stable identities, authored marker labels, and exact anchor positions. Multiple references may point to one note. A note’s label need not be globally generated Arabic numbering.
+Inline references are separate from note bodies. Preserve their stable identities, authored marker labels, and exact anchor positions. A note’s label need not be globally generated Arabic numbering. While editing, a note may temporarily have no marker. A completed text-draft Save requires exactly one marker per note, and every marker must resolve to a note. Count across all roots, not just the visible article; fail atomically before persisting any part of an invalid batch. Recheck this at publication when the session changes structured text. Historical reads and source-information-only corrections retain their existing behavior; this editor Save policy does not rewrite imported historical cardinality.
 
 Use the owning Content service as the authoritative write boundary. Share a deterministic validation routine with import and draft adapters so early feedback and final enforcement agree. Do not implement this rule only in CSS or one upload form.
 
@@ -171,6 +183,14 @@ Existing ordered storage may be retained if it can express the invariant unambig
 5. Confirm with Insert marker and note.
 
 Clicking Edit on a note replaces that note’s text with an inline editor at its current location. Apply or Cancel returns to the ordinary note row. Removing a note handles all of its references explicitly and is undoable in a draft.
+
+In **Editor view → This article**, project only notes whose markers appear in the selected article. Keep the full note index available for resolving references and validation. This filtered display does not move bodies from their canonical constitution-end position. Whole-constitution Preview includes every note.
+
+### Marker and passage context menu
+
+Right-click an editing marker, press Shift+F10/the context-menu key, or use its Footnotes-menu actions. Offer **Edit footnote**, **Move marker…**, **Remove marker**, **Go to footnote**, and **Copy link** where an actual destination exists. A move retains the original anchor until the editor chooses a new caret position and confirms **Place marker here**; Cancel changes nothing. Removing only a marker retains its note and blocks Save until the one-to-one relation is restored. Reference creation selects an unmarked note, avoiding accidental duplicate markers. All changes support Undo/Redo.
+
+Keep other passage actions contextual and reuse the toolbar commands. Selected words offer a new footnote, a link, and formatting. A sentence offers splitting at the caret, merging with its next sibling when valid, and Properties. Do not mix deleting a note body with removing its marker or fill the menu with unavailable actions. Provide ordinary toolbar access for touch users, clear focus return, arrow-key navigation, Escape and outside-click dismissal.
 
 The editor offers no paragraph/article placement choices for note bodies. Creating or moving constitutional content must keep notes at the end or produce a clear placement error before saving.
 
@@ -280,6 +300,13 @@ Complete change/review/reader/print behavior. Update Wiki sources. Run all chang
 | Hover/focus an early-article marker | Its endnote text is shown; navigation remains usable |
 | Edit a footnote | The editor appears at the note’s location |
 | Read Preview | No placement captions or editing instructions appear in the document |
+| This article without a given note marker | Its endnote is omitted from the scoped editing display; global note data is retained |
+| Remove/reinsert or move a marker | Text body remains, exact anchor survives save/reload, Undo/Redo restores the transaction |
+| Save with zero or multiple markers for a note | Client reports the note and server rejects the complete invalid batch atomically |
+| Enter between sentences, save, reload, Preview | Authored break count survives; stored sentence text has no surrounding whitespace |
+| Repeated Enter and Undo/Redo | Blank lines restore without moving footnote or mark offsets |
+| Read an article or its Preview | Same heading hierarchy, paragraph labels, prose measure and numbered endnote structure |
+| Edit Wiki or metadata | Wiki draft, constitution identity and archival-source correction retain separate save/review/publication boundaries |
 | Hide/show navigation | Width is reclaimed without losing changes |
 | Scroll/edit around Article 20 | Toolbar remains accessible |
 | Undo, redo, then make a new edit | Exact restoration; new edit clears redo; empty histories are disabled |
@@ -318,3 +345,19 @@ The narrow-viewport override did not resize the current in-app preview surface. 
 - Platform OrderedContentRules validates endnote position, UTF-16 marks, and global reference targets. Content is the final authority, while Editor and Ingestion supply early feedback and final assembly/publication validation.
 - Explicit split/merge operations retain rich ranges and lineage. A unit reference to split text follows its first part; a merge or an explicit replacement redirects targets to the surviving identity. Annotation anchors may expand to all split parts.
 - Catalog stores sentenceDelimiters in V32 and immutable settings JSON. The strict existing MCP import transport carries these settings and text marks without adding a new service.
+
+## 18. Viewer language, Wiki and Details
+
+The reference is the continuous document in the **Review thread plan** viewer concept. Use warm neutral surfaces, restrained green accents, serif article headings and prose, a readable document measure, inline muted paragraph labels, and article spacing instead of repeated cards or rules. Endnotes use one ruled Footnotes heading and a simple numbered list. Keep tiny visible superscripts, transparent touch hit areas, hover/focus note previews, and the dismissible drawer. The public reader and editor Preview share rendering and styling so the preview accurately predicts reading and print output.
+
+The **Wiki** tab edits a constitution-wide short description, page text, source links and optional pictures inside the workspace. Sources and pictures stay collapsed. Pictures expose ordering, placement, alt text, caption, credit, rights and source URL only when requested. **Save Wiki draft** is independent of the legal text draft. Editors/admins save; publishers/admins separately preview and publish the Wiki page. The standalone route remains `/editor/wiki/constitution/{constitutionId}`; the reader's constitution-details disclosure also offers **Edit constitution page**. Independent panels remain mounted across tab changes; failed Wiki saves retain typed fields, and history navigation retains the current text session and Wiki tab. Save pending text/publication details before a Wiki command navigates.
+
+The **Details** view opens one scope at a time:
+
+- **Constitution:** title; slug under Advanced, preserving permanent aliases on rename. The Catalog metadata endpoint uses its own expected revision.
+- **Version:** read-only label, effective date, language, source URL and gazette reference. These are version-creation facts, not generic editable fields on a published record.
+- **Archival source:** source description and required reason for correction, saved to the existing separate editorial correction workflow with reviewer and publisher gates.
+- **Structure & display:** current hierarchy/presentation summary and entry to versioned settings. Incompatible structural changes require migration.
+- **Lifecycle:** dated event history and role-dependent event recording. Status is derived from events.
+
+Unit labels and titles stay in contextual Properties. Publication comments and legal change-record details stay with publication. Creation-only country/predecessor/interim values, immutable IDs, revision IDs, authors, timestamps, latest-version pointers and derived state must not become editable controls merely because the data model exposes them. The gateway adapts the existing revision-guarded Catalog identity endpoint; it does not add new domain write capabilities or combine separate editorial workflows.

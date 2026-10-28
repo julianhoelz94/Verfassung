@@ -167,6 +167,7 @@ object ImportValidator {
         fun walk(node: com.constitutionatlas.platform.OrderedNodeWrite, path: String) {
             node.content.orEmpty().forEachIndexed { index, entry ->
                 val entryPath = "$path.content[$index]"
+                errors += OrderedContentRules.lineBreakErrors(entry.lineBreaksBefore, entry.type, "$entryPath.lineBreaksBefore", entry.logicalId)
                 entry.node?.let { walk(it, "$entryPath.node") }
                 if (entry.type == "text") {
                     errors += OrderedContentRules.markErrors(entry.text.orEmpty(), entry.format, entry.marks, "$entryPath.marks", entry.logicalId)

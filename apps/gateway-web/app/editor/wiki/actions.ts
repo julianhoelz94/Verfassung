@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { publishWikiPage, saveWikiDraft, type WikiImage } from '../../../lib/api';
 import { attachDocument, createDocument, getDocument, uploadDocument } from '../../../lib/document-api';
 import { requireSessionBearer } from '../../../lib/session';
+import { safeReturnTo } from '../../../lib/return-to';
 
 function target(form: FormData) {
   const targetType = String(form.get('targetType'));
@@ -15,7 +16,15 @@ function target(form: FormData) {
   return { targetType, targetId, code } as { targetType: 'country' | 'constitution'; targetId: string; code: string };
 }
 
-function editHref(targetType: string, targetId: string, code: string, status: string) {
+function editHref(targetType: string, targetId: string, code: string, status: string, form: FormData) {
+  const returnTo = safeReturnTo(String(form.get('returnTo') ?? ''), '');
+  if (returnTo) {
+    const url = new URL(returnTo, 'http://atlas.local');
+    if (url.pathname === '/editor' && url.searchParams.get('sessionId') && url.searchParams.get('versionId')) {
+      url.searchParams.set('tab', 'wiki'); url.searchParams.set('wikiStatus', status);
+      return url.pathname + url.search;
+    }
+  }
   return `/editor/wiki/${targetType}/${targetId}?code=${encodeURIComponent(code)}&${status}=1`;
 }
 
@@ -85,10 +94,10 @@ export async function saveWikiAction(form: FormData): Promise<string> {
       );
     }
   } catch {
-    return editHref(targetType, targetId, code, 'error');
+    return editHref(targetType, targetId, code, 'error', form);
   }
   revalidatePath(`/countries/${code}`);
-  return editHref(targetType, targetId, code, 'saved');
+  return editHref(targetType, targetId, code, 'saved', form);
 }
 
 export async function publishWikiAction(form: FormData): Promise<string> {
@@ -97,9 +106,9 @@ export async function publishWikiAction(form: FormData): Promise<string> {
   try {
     await publishWikiPage(targetType, targetId, String(form.get('revisionId') ?? ''), authorization);
   } catch {
-    return editHref(targetType, targetId, code, 'error');
+    return editHref(targetType, targetId, code, 'error', form);
   }
   revalidatePath(`/countries/${code}`);
   if (targetType === 'constitution') revalidatePath(`/countries/${code}/constitutions/${targetId}`);
-  return editHref(targetType, targetId, code, 'published');
+  return editHref(targetType, targetId, code, 'published', form);
 }

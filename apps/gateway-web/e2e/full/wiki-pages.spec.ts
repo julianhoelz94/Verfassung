@@ -19,7 +19,7 @@ test('country links open context editors before a wiki page exists and save a pr
   await expect(page.getByLabel('Short description')).toHaveValue('');
   await page.getByLabel('Short description').fill(title);
   await page.getByLabel('Page text').fill('Private context draft for the new constitution.');
-  await page.getByRole('button', { name: 'Save draft', exact: true }).click();
+  await page.getByRole('button', { name: 'Save Wiki draft', exact: true }).click();
   await expect(page).toHaveURL(/[?&](saved|error)=1/, { timeout: 15_000 });
   expect(new URL(page.url()).searchParams.get('error'), 'Wiki save must succeed').toBeNull();
   await expect(page.getByText('Draft saved.', { exact: true })).toBeVisible();

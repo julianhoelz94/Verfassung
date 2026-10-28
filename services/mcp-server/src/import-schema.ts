@@ -78,6 +78,7 @@ export const orderedNode: z.ZodTypeAny = z.lazy(() => z.strictObject({
     footnoteLabel: nullableText,
     references: z.array(reference).max(10_000).optional(),
     marks: z.array(textMark).max(4096).optional(),
+    lineBreaksBefore: z.number().int().min(0).max(16).optional(),
     annotation: z.strictObject({ kind: z.enum(['source', 'editorial', 'amendment']), attribution: nullableText, sourceUrl: z.string().url().startsWith('https://').nullable().optional(), anchorLogicalIds: z.array(uuid).max(100).optional() }).nullable().optional(),
   })).max(10_000).nullable().optional(),
   lineage: z.array(uuid).max(32).optional(),

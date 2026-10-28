@@ -34,6 +34,20 @@ class ImportValidatorTest {
     }
 
     @Test
+    fun `all import paths reject invalid entry separators before preparation`() {
+        val body = OrderedEntryWrite("text", logicalId = UUID.randomUUID(), text = "Exact wording", lineBreaksBefore = 2)
+        val root = OrderedNodeWrite(kind = "article", content = listOf(body))
+        val request = ImportRequest(isoCode = "DE", countryName = "Germany", constitutionSlug = "layout", constitutionTitle = "Layout", versionLabel = "1", sourceUrl = "https://example.org/source", roots = listOf(root))
+        assertTrue(ImportValidator.validate(request).isEmpty())
+        for (count in listOf(-1, 17)) {
+            val roots = listOf(root.copy(content = listOf(body.copy(lineBreaksBefore = count))))
+            assertTrue(ImportValidator.validate(request.copy(roots = roots)).any { it.first == "TEXT_LINE_BREAKS" })
+            assertTrue(ImportValidator.richContentErrors(roots).any { it.first == "TEXT_LINE_BREAKS" && it.second.contains("roots[0].content[0].lineBreaksBefore") })
+        }
+        assertTrue(ImportValidator.richContentErrors(listOf(root.copy(content = listOf(OrderedEntryWrite("child", node = root, lineBreaksBefore = 1))))).any { it.first == "TEXT_LINE_BREAKS" })
+    }
+
+    @Test
     fun `complete imports resolve cross-root node and text reference targets`() {
         val nodeId = UUID.randomUUID()
         val textId = UUID.randomUUID()

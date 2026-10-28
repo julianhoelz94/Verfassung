@@ -30,9 +30,13 @@ export function ChangeOverview({ differences, roots, sourceRoots, outline, onNav
   function rich(value: string): OrderedEntry | null {
     try { const parsed = JSON.parse(value); return parsed && typeof parsed === 'object' ? parsed : null; } catch { return null; }
   }
-  function richPreview(value: string, text?: string): ReactNode {
+  function richPreview(value: string, text: string | undefined, comparedValue: string): ReactNode {
     const content = rich(value); if (!content) return copy('Text properties changed', 'Texteigenschaften geändert');
     const descriptions: string[] = [];
+    const breaks = content.lineBreaksBefore ?? 0;
+    if (breaks || breaks !== (rich(comparedValue)?.lineBreaksBefore ?? 0)) descriptions.push(breaks
+      ? breaks + ' ' + copy(breaks === 1 ? 'line break before' : 'line breaks before', breaks === 1 ? 'Zeilenumbruch davor' : 'Zeilenumbrüche davor')
+      : copy('Normal sentence spacing', 'Normaler Satzabstand'));
     if (content.format === 'footnote') descriptions.push(copy('Footnote', 'Fußnote') + ' ' + (content.footnoteLabel ?? '*'));
     if (content.table) descriptions.push([content.table.caption, content.table.rows.map(row => row.cells.map(cell => cell.text).join(' | ')).join('\n')].filter(Boolean).join('\n'));
     for (const mark of content.marks ?? []) descriptions.push(markLabels[mark.type] + ' ' + copy('characters', 'Zeichen') + ' ' + (mark.start + 1) + '–' + mark.end);
@@ -43,7 +47,7 @@ export function ChangeOverview({ differences, roots, sourceRoots, outline, onNav
   function preview(difference: OverviewDifference, side: 'before' | 'after'): ReactNode {
     const value = difference[side], context = side === 'before' ? sourceRoots : roots;
     const text = (side === 'before' ? difference.beforeText : difference.afterText) ?? entry(context, difference.logicalId)?.text ?? undefined;
-    if (difference.field === 'rich') return richPreview(value, text);
+    if (difference.field === 'rich') return richPreview(value, text, difference[side === 'before' ? 'after' : 'before']);
     if (difference.field === 'parent') return value ? unitLabel(all.find(node => node.logicalId === value)) : copy('Top level', 'Oberste Ebene');
     if (difference.field === 'position') return copy('Position', 'Position') + ' ' + (Number(value) + 1);
     const rendered = ['inserted', 'removed'].includes(difference.field) ? text ?? (value ? unitLabel(all.find(node => node.logicalId === difference.logicalId)) : '') : value;

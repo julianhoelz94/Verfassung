@@ -71,7 +71,7 @@ describe('personal import archive', () => {
 });
 
 describe('import transition errors', () => {
-  it.each(['FOOTNOTE_NOT_AT_END', 'UNIT_REFERENCE_TARGET', 'INLINE_REFERENCE', 'TEXT_MARK_RANGE', 'publication_validation_failed'])('keeps actionable content validation %s distinct from an availability failure', async code => {
+  it.each(['FOOTNOTE_NOT_AT_END', 'FOOTNOTE_MARK_CARDINALITY', 'UNIT_REFERENCE_TARGET', 'INLINE_REFERENCE', 'TEXT_MARK_RANGE', 'TEXT_LINE_BREAKS', 'publication_validation_failed'])('keeps actionable content validation %s distinct from an availability failure', async code => {
     const fetchMock = vi.fn().mockResolvedValue(Response.json({ code, path: 'roots[1].content[2]' }, { status: 400 }));
     vi.stubGlobal('fetch', fetchMock);
     await expect(transitionImportJob('job', 'publish', 'Bearer session')).rejects.toMatchObject({ code });

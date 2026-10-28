@@ -47,7 +47,8 @@ class StructuredDraftService(
         require(request.operations.isNotEmpty()) { "At least one targeted operation is required" }
         require((existing + request.operations).map { it.id }.distinct().size == existing.size + request.operations.size) { "Operation IDs must be unique" }
         StructuredDraftEngine.validate(source.roots, settings, enforceEndnotes = false)
-        StructuredDraftEngine.replay(source.roots, existing + request.operations, settings)
+        val replayed = StructuredDraftEngine.replay(source.roots, existing + request.operations, settings)
+        StructuredDraftEngine.requireFootnoteMarkers(replayed)
         drafts.append(sessionId, request.operations)
         sessions.insertRevision(sessionId, sessions.nextRevisionSequence(sessionId), mapOf("format" to "ordered_operations", "operations" to request.operations))
         return preview(authorization, sessionId)

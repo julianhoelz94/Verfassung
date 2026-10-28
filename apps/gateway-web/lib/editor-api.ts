@@ -108,6 +108,8 @@ export const EDITOR_ERROR_MESSAGES = {
   list_failed: ui.errors.listSessionsFailed,
   manage_failed: workflowUi.managementFailed,
   save_failed: ui.errors.saveDraftFailed,
+  footnote_marks: {en:'Each footnote needs exactly one marker. Add missing markers and remove duplicate markers before saving.',de:'Jede Fußnote benötigt genau ein Verweiszeichen. Ergänzen Sie fehlende Zeichen und entfernen Sie doppelte Zeichen vor dem Speichern.'},
+  text_line_breaks: {en:'Use between zero and 16 line breaks between sentences.',de:'Verwenden Sie zwischen Sätzen null bis 16 Zeilenumbrüche.'},
   stale_source_evidence: sourceEvidenceUi.stale,
   source_evidence_changes_required: sourceEvidenceUi.changesRequired,
   source_evidence_invalid: sourceEvidenceUi.invalid,
@@ -203,6 +205,8 @@ async function throwIfNotOk(response: Response, fallback: EditorErrorKey): Promi
   if (response.status === 403) {
     throw new EditorApiError('forbidden', code);
   }
+  if(code==='FOOTNOTE_MARK_CARDINALITY')throw new EditorApiError('footnote_marks',code);
+  if(code==='TEXT_LINE_BREAKS')throw new EditorApiError('text_line_breaks',code);
   if (response.status === 409) {
     if (code === 'source_evidence_changes_required') throw new EditorApiError(code, code);
     throw new EditorApiError(code === 'stale_source_evidence' || code === 'not_tip' || code === 'not_editorial_tip' || code === 'not_legal_tip' ? code : 'not_ready', code);

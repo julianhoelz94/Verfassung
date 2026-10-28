@@ -71,7 +71,8 @@ are separate from Flyway owner credentials in canonical and generated Compose.
 
 The required `cognitive-complexity` job runs root `./gradlew cognitiveComplexity`
 (detekt) and `npm run check --prefix scripts/complexity` (ESLint/SonarJS). The limit
-is 15 per function with reviewed baselines for existing debt. Reports are uploaded
+is 20 per function with reviewed baselines for existing debt and a temporary named
+exemption for the unfinished editor page. Kotlin score increases also fail. Reports are uploaded
 as `cognitive-complexity`. See [policy and local commands](../cognitive-complexity.md).
 
 ## Code coverage

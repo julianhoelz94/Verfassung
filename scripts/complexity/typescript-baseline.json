@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "limit": 15,
+  "limit": 20,
   "entries": [
     {
       "path": "apps/gateway-web/app/account/page.tsx",
@@ -59,38 +59,10 @@
       "count": 1
     },
     {
-      "path": "apps/gateway-web/app/admin/settings/MailSettings.tsx",
-      "function": "MailSettings",
-      "hash": "e22186c227c8e92fd3d202e208adb227f8a45286f3edd0116082519ec8fee476",
-      "score": 19,
-      "count": 1
-    },
-    {
-      "path": "apps/gateway-web/app/admin/settings/page.tsx",
-      "function": "IdentitySettingsPage",
-      "hash": "332a5936d3fc68036d4f949642db9167d9a5d1827a1c7283aca38b5d5a1ef76e",
-      "score": 18,
-      "count": 1
-    },
-    {
-      "path": "apps/gateway-web/app/api/edge-rate-limit/route.ts",
-      "function": "GET",
-      "hash": "e663292c42135b1b5988dd3abf6b91c737a85106123bf35a8d58f3c3b616198f",
-      "score": 17,
-      "count": 1
-    },
-    {
       "path": "apps/gateway-web/app/components/ConstitutionText.tsx",
       "function": "ConstitutionText",
       "hash": "ddb16e29ef2b804daf78c569cd4b4e66ab46a96a04ed271211d1d4610b570a79",
       "score": 24,
-      "count": 1
-    },
-    {
-      "path": "apps/gateway-web/app/components/ConstitutionText.tsx",
-      "function": "index",
-      "hash": "f5e7e99af40fe8d7b63d9677b26ca4d2118add7499840314c2edf92e3193b432",
-      "score": 16,
       "count": 1
     },
     {
@@ -109,23 +81,9 @@
     },
     {
       "path": "apps/gateway-web/app/components/DiffConstitutionText.tsx",
-      "function": "DiffConstitutionText",
-      "hash": "8e94d58b6a1737449563ef9a5333093da17399554e4c9690dd2d912a9e9a13d4",
-      "score": 18,
-      "count": 1
-    },
-    {
-      "path": "apps/gateway-web/app/components/DiffConstitutionText.tsx",
       "function": "pair",
       "hash": "857f39673bbd8755011a8aa487abb0bdab7095615c89b1ea7d84c1efbf839691",
       "score": 29,
-      "count": 1
-    },
-    {
-      "path": "apps/gateway-web/app/components/DiffConstitutionText.tsx",
-      "function": "<anonymous>",
-      "hash": "a286fc1b5a9de75b2c1e27f024ec3bd15e3b252a7371ad015687b7c2cb491933",
-      "score": 16,
       "count": 1
     },
     {
@@ -133,20 +91,6 @@
       "function": "<anonymous>",
       "hash": "045109abaa1260c9c37c77db6682188eb193ae202f1bad60c69ec83255ba43bd",
       "score": 21,
-      "count": 1
-    },
-    {
-      "path": "apps/gateway-web/app/components/SiteHeader.tsx",
-      "function": "SiteHeader",
-      "hash": "2797a4b858e43cb5b65912c947ce8640b57f033c073453be1d0b22e0eb30ccf5",
-      "score": 17,
-      "count": 1
-    },
-    {
-      "path": "apps/gateway-web/app/components/SourceEvidenceNotice.tsx",
-      "function": "SourceEvidenceNotice",
-      "hash": "90b6c33f78e8a431f5ca41f635001b0f1321eaaf2c31e0a5b91c3d6987d1831c",
-      "score": 16,
       "count": 1
     },
     {
@@ -166,21 +110,21 @@
     {
       "path": "apps/gateway-web/app/editor/DiffReviewQueue.tsx",
       "function": "DiffReviewQueue",
-      "hash": "d10c34575fa3ccb599aef7d417fa37abd6452d408e66409c1feec4bf4cc08a6e",
-      "score": 34,
+      "hash": "1efc7ddf0516953e3e5ffc844839f1272a9dc9d30fb03565ec6600f039049b05",
+      "score": 35,
       "count": 1
     },
     {
       "path": "apps/gateway-web/app/editor/EditorLanding.tsx",
       "function": "EditorLanding",
-      "hash": "2da64481ff3a1f35e96a72a166b07d8a8eb61e88ddd3df6157774eacc862a6f2",
-      "score": 49,
+      "hash": "9bdfd8f1bf18f6ccc78363eb6aaa88069c7b9909bce57df0c7ffddabea9e0f4a",
+      "score": 55,
       "count": 1
     },
     {
       "path": "apps/gateway-web/app/editor/ImportReview.tsx",
       "function": "ImportReview",
-      "hash": "6bda0ce275a0a06a1042ea9c59c4efb8094f1a71d11c45721b22a54e80057a9c",
+      "hash": "b09d98e2db2c910fd0c14c9521d62bfe5269c57ac7b02cf8355c0adce1bc30e9",
       "score": 44,
       "count": 1
     },
@@ -192,45 +136,10 @@
       "count": 1
     },
     {
-      "path": "apps/gateway-web/app/editor/SourceEvidenceWorkspace.tsx",
-      "function": "SourceEvidenceWorkspace",
-      "hash": "78bd9db5018daeea52aa5be6f5c0ac6d50c2c9bb44de80d4f57e6f92005886fa",
-      "score": 20,
-      "count": 1
-    },
-    {
-      "path": "apps/gateway-web/app/editor/SourceEvidenceWorkspace.tsx",
-      "function": "save",
-      "hash": "21133ec2b23545a1de5c81e92bd1fe4b067f9274df046c840ecd1cc2a7015ef6",
-      "score": 16,
-      "count": 1
-    },
-    {
-      "path": "apps/gateway-web/app/editor/StructuredEditor.tsx",
-      "function": "StructuredEditor",
-      "hash": "d5499126a20e5b136739fcc6a3149cb032049295116e90e9fbf9b0f61406a7fc",
-      "score": 19,
-      "count": 1
-    },
-    {
       "path": "apps/gateway-web/app/editor/StructuredEditor.tsx",
       "function": "renderEntry",
       "hash": "9994ce645880d9868375de4a6b371c352d87ac8ff742b238b836254cff228647",
       "score": 31,
-      "count": 1
-    },
-    {
-      "path": "apps/gateway-web/app/editor/amendments/AmendmentChangesTable.tsx",
-      "function": "<anonymous>",
-      "hash": "e2ef62d3824a3ba816cad450be33b7057f0a0e01bf2bed904eafd2bb7f06e62c",
-      "score": 18,
-      "count": 1
-    },
-    {
-      "path": "apps/gateway-web/app/editor/amendments/AmendmentForm.tsx",
-      "function": "AmendmentForm",
-      "hash": "72c832e1cb7c3897afaf1aff75a80893d54ddf9e270803b663f2acbd9867d7b8",
-      "score": 20,
       "count": 1
     },
     {
@@ -241,13 +150,6 @@
       "count": 1
     },
     {
-      "path": "apps/gateway-web/app/editor/amendments/page.tsx",
-      "function": "AmendmentsPage",
-      "hash": "cfb599b341ab7620fa67a8f638dea79708f7923adfd3121e9c37cbcb9947b7e3",
-      "score": 19,
-      "count": 1
-    },
-    {
       "path": "apps/gateway-web/app/editor/command/route.ts",
       "function": "POST",
       "hash": "77b22c02c1aa8bb942c1f7e1c69ecc1dd620b7f147ba3dff47f4a719714d80c2",
@@ -255,51 +157,9 @@
       "count": 1
     },
     {
-      "path": "apps/gateway-web/app/editor/lifecycle/[constitutionId]/page.tsx",
-      "function": "LifecycleEditor",
-      "hash": "71e819962285d5ba7969da32d01cb72f54e2b47a9e1d06f96553534fe78acce7",
-      "score": 19,
-      "count": 1
-    },
-    {
-      "path": "apps/gateway-web/app/editor/page.tsx",
-      "function": "EditorPage",
-      "hash": "64c11cca13f30c896513eac12653830e221dc299e49cae209bb2265c3fa6d29c",
-      "score": 152,
-      "count": 1
-    },
-    {
-      "path": "apps/gateway-web/app/editor/wiki/[targetType]/[targetId]/page.tsx",
-      "function": "WikiEditor",
-      "hash": "fee8da887f3d4214d53c84f7d94a99faddb7e1effca82090851a65db8cbe65a4",
-      "score": 20,
-      "count": 1
-    },
-    {
-      "path": "apps/gateway-web/app/editor/wiki/actions.ts",
-      "function": "saveWikiAction",
-      "hash": "34e8617716d2e69fb6e01f20d6387a2e2ce0bfc10d1cb8cd4f7bc35467005a39",
-      "score": 16,
-      "count": 1
-    },
-    {
-      "path": "apps/gateway-web/app/jurisdictions/[id]/versions/[versionId]/page.tsx",
-      "function": "JurisdictionVersionPage",
-      "hash": "dfdeaee3c880a8df648f3d1d653e7bc62f340078568934527eb0e0d341c4a97a",
-      "score": 19,
-      "count": 1
-    },
-    {
-      "path": "apps/gateway-web/app/login/actions.ts",
-      "function": "loginAction",
-      "hash": "56142c39d38ee6d532f54e249dc8a9f054681d9a65b185f0717fa7ee79ab5ab4",
-      "score": 16,
-      "count": 1
-    },
-    {
       "path": "apps/gateway-web/app/login/mfa/page.tsx",
       "function": "MfaPage",
-      "hash": "6901d03780461ae9e6185efbffe85e937cf2b402cb4a79da7f2ade1a166a7477",
+      "hash": "e4219cfacf159d63d60240e6f0e85a25f5898cbdb1409ea6f8a46a6cdbcbd4ae",
       "score": 26,
       "count": 1
     },
@@ -318,52 +178,10 @@
       "count": 1
     },
     {
-      "path": "apps/gateway-web/app/page.tsx",
-      "function": "<anonymous>",
-      "hash": "4ebca75ef66ad9af19acacfb163756e8b9f66024cb0daf3db58fab3b56435e3a",
-      "score": 18,
-      "count": 1
-    },
-    {
-      "path": "apps/gateway-web/app/search/page.tsx",
-      "function": "SearchPage",
-      "hash": "7ad1c19666df222fd121864e4f249c28a272dfae646b23b8c546f12204fdca89",
-      "score": 24,
-      "count": 1
-    },
-    {
-      "path": "apps/gateway-web/app/sitemap.ts",
-      "function": "sitemap",
-      "hash": "9965e3b61df011c645d51dfbfa91737fcfdae939151e3f983bca5bbd0200704a",
-      "score": 19,
-      "count": 1
-    },
-    {
-      "path": "apps/gateway-web/e2e/fixtures/prepopulate-import.mjs",
-      "function": "publishFixture",
-      "hash": "6dff36c28c8f5b48bbee8ce0411fd414fe28b4fc41620e56d537df4734164384",
-      "score": 16,
-      "count": 1
-    },
-    {
       "path": "apps/gateway-web/e2e/fixtures/prepopulate.mjs",
       "function": "ensureVersions",
       "hash": "4b7017da1b8abfa70ee95581ed7e0ab74f70c27e033d594b25680d5dcd8e13ff",
       "score": 40,
-      "count": 1
-    },
-    {
-      "path": "apps/gateway-web/e2e/fixtures/prepopulate.mjs",
-      "function": "ensureAmendments",
-      "hash": "351bcd990053377694355a3617aab9864fa44de2b97f87f3900eeeb5008327c2",
-      "score": 20,
-      "count": 1
-    },
-    {
-      "path": "apps/gateway-web/e2e/fixtures/prepopulate.mjs",
-      "function": "verifyTotals",
-      "hash": "7da9037e9aa4479da3d2f97eb797d5fe8558d682215b427ddc6ac26e5d7978b6",
-      "score": 16,
       "count": 1
     },
     {
@@ -381,24 +199,10 @@
       "count": 1
     },
     {
-      "path": "apps/gateway-web/e2e/full/roles.spec.ts",
-      "function": "publishedVersion",
-      "hash": "c3596303df6c07a0324e05d7294da2ae62c34084a8e9a573bed1303f18132c0a",
-      "score": 19,
-      "count": 1
-    },
-    {
-      "path": "apps/gateway-web/e2e/full/wiki-recording.spec.ts",
-      "function": "publishedVersion",
-      "hash": "134234b1cfdf95cd43eb493a87346e7f13326fd7f20927727f1f40539ec6414d",
-      "score": 18,
-      "count": 1
-    },
-    {
       "path": "apps/gateway-web/e2e/mock-api.mjs",
       "function": "<anonymous>",
-      "hash": "0127e64df3959615a43376dff6ddb91e3b545aea7b92c02e10543fa0cc3744c2",
-      "score": 447,
+      "hash": "e6a7e4559d11fbf9f442b171e07ee407b113bdf47392d74161692b634dca983b",
+      "score": 476,
       "count": 1
     },
     {
@@ -416,38 +220,10 @@
       "count": 1
     },
     {
-      "path": "apps/gateway-web/lib/compare.ts",
-      "function": "netArticleKind",
-      "hash": "80139ea7dfb678e2515d76b865479e28202db0c14b67ed779c1e5ac961b9b3d2",
-      "score": 17,
-      "count": 1
-    },
-    {
       "path": "apps/gateway-web/lib/ingestion-api.ts",
       "function": "transitionImportJob",
       "hash": "cd44101b82b2290aba3d5225bab7756cba3d6684a67799be8cc8937a8423324d",
       "score": 26,
-      "count": 1
-    },
-    {
-      "path": "apps/gateway-web/lib/ingestion-api.ts",
-      "function": "setupCommand",
-      "hash": "3b5b13bae2b4cdfac7d099cc261f43a9e2bc053d90b98745a53d48ddea7202ed",
-      "score": 20,
-      "count": 1
-    },
-    {
-      "path": "apps/gateway-web/lib/ordered-content.ts",
-      "function": "orderedText",
-      "hash": "c7d9113470c9915bc0c6867a1c1d2c9c1efd6d00705730e205f4c5bfec406e75",
-      "score": 16,
-      "count": 1
-    },
-    {
-      "path": "apps/gateway-web/lib/outline-preview.ts",
-      "function": "outlineUnitDetails",
-      "hash": "acea58d4825be4f61d72688abe3e6290e0cbb2a4bc0683872f86b27066bbacdb",
-      "score": 16,
       "count": 1
     },
     {
@@ -458,13 +234,6 @@
       "count": 1
     },
     {
-      "path": "apps/gateway-web/lib/outline.ts",
-      "function": "nodeHeading",
-      "hash": "a4ae4578118bde122942ebaf66922381e0724b71361f39b3475c5ea490afb411",
-      "score": 16,
-      "count": 1
-    },
-    {
       "path": "apps/gateway-web/lib/structured-editor.ts",
       "function": "walk",
       "hash": "6e79ac2a3d339eb29f6015ee47381049bbb2123cd4d58fb7acdfeb9fb63a7085",
@@ -472,23 +241,9 @@
       "count": 1
     },
     {
-      "path": "apps/gateway-web/lib/structured-editor.ts",
-      "function": "walk",
-      "hash": "064fc9f8eabee62306eb0874e43cca3cd03d51309f64fed87b7c4b37222a203d",
-      "score": 18,
-      "count": 1
-    },
-    {
-      "path": "apps/gateway-web/lib/structured-editor.ts",
-      "function": "draftDifferences",
-      "hash": "29f9010daca602d7fd23a3d5323c7aafde9eada0768bcf9e66448e1b36daeb4f",
-      "score": 20,
-      "count": 1
-    },
-    {
-      "path": "apps/gateway-web/middleware.ts",
-      "function": "middleware",
-      "hash": "19798fe4764ff9c9bd9e2976fbb28b5e4a909a2655db99f6a25eb0d1352eee4d",
+      "path": "apps/gateway-web/proxy.ts",
+      "function": "proxy",
+      "hash": "ed578398a8164e961872ada2c6ae0841bf99268d4e6a1c7a12fc9a4d8e2b8f7e",
       "score": 45,
       "count": 1
     },

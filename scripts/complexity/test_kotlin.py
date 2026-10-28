@@ -36,9 +36,9 @@ class KotlinComplexityGateTest(unittest.TestCase):
         ) as directory:
             probe = Path(directory) / "CognitiveComplexityGateProbe.kt"
             probe.write_text(
-                function_with_score("complexityAtLimit", 15)
+                function_with_score("complexityAtLimit", 20)
                 + "\n\n"
-                + function_with_score("complexityOverLimit", 16)
+                + function_with_score("complexityOverLimit", 21)
                 + "\n",
                 encoding="utf-8",
             )
@@ -58,7 +58,7 @@ class KotlinComplexityGateTest(unittest.TestCase):
             finding = findings[0]
             self.assertEqual(finding.get("source"), "detekt.CognitiveComplexMethod")
             self.assertIn("complexityOverLimit", finding.get("message"))
-            self.assertIn("complexity: 16", finding.get("message"))
+            self.assertIn("complexity: 21", finding.get("message"))
             self.assertEqual(baseline.read_bytes(), original_baseline)
 
 

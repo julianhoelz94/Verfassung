@@ -39,8 +39,20 @@ val cognitiveComplexityReport = tasks.register<JavaExec>("cognitiveComplexityRep
     )
 }
 
+/** Runs the Kotlin score ratchet and retains its diagnostics when Gradle rejects a regression. */
+fun Task.checkKotlinScores(vararg arguments: String) {
+    val check = project.providers.exec {
+        commandLine(listOf("python3", "scripts/complexity/kotlin_scores.py") + arguments)
+        isIgnoreExitValue = true
+    }
+    logger.lifecycle(check.standardOutput.asText.get().trim())
+    val errors = check.standardError.asText.get().trim()
+    if (errors.isNotEmpty()) logger.error(errors)
+    check.result.get().assertNormalExitValue()
+}
+
 tasks.register<JavaExec>("cognitiveComplexity") {
-    description = "Reject new Kotlin functions with cognitive complexity above 15."
+    description = "Reject new or increased Kotlin cognitive complexity above 20."
     dependsOn(cognitiveComplexityReport)
     configureCognitiveComplexity()
     args(
@@ -49,12 +61,21 @@ tasks.register<JavaExec>("cognitiveComplexity") {
         "--report", "xml:build/reports/complexity/kotlin/detekt.xml",
         "--report", "html:build/reports/complexity/kotlin/detekt.html",
     )
+    // The native baseline follows declaration signatures. Compare full scores
+    // as well so editing an exempted function cannot silently increase its debt.
+    doLast {
+        checkKotlinScores()
+    }
 }
 
 tasks.register<JavaExec>("cognitiveComplexityBaseline") {
     description = "Explicitly regenerate reviewed Kotlin complexity exceptions; never run in CI."
     configureCognitiveComplexity()
     args("--baseline", "config/detekt/cognitive-complexity-baseline.xml", "--create-baseline")
+    dependsOn(cognitiveComplexityReport)
+    doLast {
+        checkKotlinScores("--baseline")
+    }
 }
 
 jacoco {

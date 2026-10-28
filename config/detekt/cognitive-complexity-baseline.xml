@@ -7,12 +7,8 @@
     <ID>CognitiveComplexMethod:AmendmentService.kt$AmendmentService$private fun validateChangeRefs( constitutionId: UUID, sourceVersionId: UUID?, targetVersionId: UUID?, changes: List&lt;AmendmentChangeWriteRequest&gt;, allowDraftTarget: Boolean = false, ): List&lt;AmendmentChangeWriteRequest&gt;</ID>
     <ID>CognitiveComplexMethod:CatalogWriteService.kt$CatalogWriteService$@Transactional fun createDraftVersion(constitutionId: UUID, request: CreateVersionRequest): VersionCreated</ID>
     <ID>CognitiveComplexMethod:CatalogWriteService.kt$CatalogWriteService.Companion$fun normalizeOutline(kinds: List&lt;OutlineKindWrite&gt;): List&lt;OutlineKindWrite&gt;</ID>
-    <ID>CognitiveComplexMethod:ContentTranslationProvider.kt$ContentTranslationProvider$fun translateMany(provider: String, apiKey: String, sourceTexts: List&lt;String&gt;, sourceLanguage: String, targetLanguage: String): List&lt;String&gt;</ID>
-    <ID>CognitiveComplexMethod:ContentTranslationService.kt$ContentTranslationService$fun translateBatch(authorization: String?, request: TranslateContentBatchRequest): TranslateContentBatchResponse</ID>
     <ID>CognitiveComplexMethod:EditorService.kt$EditorService$@Transactional fun publish(authorization: String?, sessionId: UUID, request: PublishRequest): DraftPreviewDto</ID>
     <ID>CognitiveComplexMethod:HierarchicalDiff.kt$HierarchicalDiff$fun compare( beforeVersionId: UUID?, before: List&lt;DiffNode&gt;, afterVersionId: UUID?, after: List&lt;DiffNode&gt;, beforeSettingsRevisionId: UUID? = null, afterSettingsRevisionId: UUID? = null, skipSharedRevision: Boolean = true, ): DiffRun</ID>
-    <ID>CognitiveComplexMethod:IdentitySettingsService.kt$IdentitySettingsService$private fun validate(request: UpdateIdentitySettingsRequest): Triple&lt;String, String, String&gt;</ID>
-    <ID>CognitiveComplexMethod:ImageValidation.kt$ImageValidation$private fun validImageDimensions(contentType: String, bytes: ByteArray): Boolean</ID>
     <ID>CognitiveComplexMethod:ImportExportService.kt$ImportExportService$fun export(id: UUID, actor: Actor, view: String, cursor: String?, authorization: String? = null): ImportExportPage</ID>
     <ID>CognitiveComplexMethod:ImportExportService.kt$ImportExportService$private fun compare(expected: JsonNode, actual: JsonNode, path: String, result: MutableList&lt;FidelityMismatch&gt;)</ID>
     <ID>CognitiveComplexMethod:ImportService.kt$ImportService$@Transactional fun importVersion(authorization: String?, submittedBy: UUID, request: ImportRequest, batchId: UUID? = null, idempotencyKey: String? = null, expectedChecksum: String? = null): ImportJobDto</ID>
@@ -20,12 +16,9 @@
     <ID>CognitiveComplexMethod:MigrationService.kt$MigrationService$fun prepare(run: UUID, itemId: UUID, actor: Actor, authorization: String?): MigrationItem</ID>
     <ID>CognitiveComplexMethod:OrderedContentService.kt$OrderedContentService$@Transactional fun save(version: UUID, request: OrderedSnapshotWrite): OrderedSnapshot</ID>
     <ID>CognitiveComplexMethod:OrderedContentService.kt$OrderedContentService$fun validate(roots: List&lt;OrderedNode&gt;, settings: StructuralSettings)</ID>
-    <ID>CognitiveComplexMethod:OrderedSuccessorPlan.kt$OrderedSuccessorPlan$fun build(source: List&lt;DraftNode&gt;, target: List&lt;DraftNode&gt;, operations: List&lt;DraftOperation&gt;): List&lt;OrderedNodeWrite&gt;</ID>
-    <ID>CognitiveComplexMethod:ProvisionLifecycleService.kt$ProvisionLifecycleService$@Transactional fun append(constitutionId: UUID, request: CreateProvisionLifecycleEvent, actorId: UUID): ProvisionLifecycleEvent</ID>
     <ID>CognitiveComplexMethod:SettingsUsageClient.kt$SettingsUsageClient$fun inspect(versions: List&lt;UUID&gt;, proposed: List&lt;OutlineKindWrite&gt;, authorization: String?): SettingsUsage</ID>
     <ID>CognitiveComplexMethod:SetupProposalService.kt$SetupProposalService$fun confirm(authorization: String?, id: UUID, actorId: UUID, admin: Boolean, revision: Long): SetupProposalDto</ID>
     <ID>CognitiveComplexMethod:SetupProposalService.kt$SetupProposalService$private fun validate(request: SetupProposalRequest)</ID>
-    <ID>CognitiveComplexMethod:SetupService.kt$SetupService$private fun missing(authorization: String?, state: SetupState): List&lt;String&gt;</ID>
     <ID>CognitiveComplexMethod:StructuredDraftEngine.kt$StructuredDraftEngine$fun replay(source: List&lt;DraftNode&gt;, operations: List&lt;DraftOperation&gt;, settings: DraftSettings): List&lt;DraftNode&gt;</ID>
   </CurrentIssues>
 </SmellBaseline>

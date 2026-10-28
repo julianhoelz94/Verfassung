@@ -14,6 +14,7 @@ CHECKS = [
     ['-m', 'unittest', 'discover', '-s', 'scripts/cd', '-p', 'test_*.py'],
     ['-m', 'unittest', 'discover', '-s', 'scripts/operations', '-p', 'test_*.py'],
     ['-m', 'unittest', 'discover', '-s', 'scripts/code_coverage', '-p', 'test_*.py'],
+    ['-m', 'unittest', 'discover', '-s', 'scripts/complexity', '-p', 'test_kotlin_scores.py'],
     ['-m', 'unittest', 'discover', '-s', 'infra/caddy', '-p', 'test_*.py'],
 ]
 

@@ -3,7 +3,8 @@
 .navigation, .document { min-width: 0; }
 .navigation[hidden] { display: none; }
 .session { min-width: 0; flex: 1; grid-column: 1 / -1; }
-.session > summary { width: fit-content; cursor: pointer; padding-block: var(--space-2); color: var(--color-ink-2); }
+.session > summary { display: list-item; list-style: disclosure-closed inside; width: fit-content; cursor: pointer; padding-block: var(--space-2); color: var(--color-ink-2); }
+.session[open] > summary { list-style-type: disclosure-open; }
 .session[open] { flex-basis: 100%; }
 .session > aside { position: static; margin-block-start: var(--space-3); }
 @media (min-width: 900px) { .workspace[data-navigation='shown'] { grid-template-columns: 14rem minmax(0, 1fr); } }

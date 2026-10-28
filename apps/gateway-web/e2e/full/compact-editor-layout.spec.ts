@@ -103,6 +103,9 @@ for (const viewport of [
       const fixture = await layoutFixture(request);
       await signIn(page, 'editor');
       await startFromViewer(page, 'XA', fixture.versionId, 'editorial_correction');
+      const fixtureLocation = { width: viewport.width, url: page.url(), versionId: fixture.versionId };
+      console.log('Compact editor fixture', JSON.stringify(fixtureLocation));
+      await testInfo.attach('fixture-location', { body: JSON.stringify(fixtureLocation, null, 2), contentType: 'application/json' });
       const workspace = page.locator('[data-editor-workspace]'), toolbar = workspace.locator('[data-editor-tools]');
       await expect(workspace).toBeVisible();
       await noHorizontalOverflow(page);
@@ -115,7 +118,7 @@ for (const viewport of [
       });
       console.log('Compact editor initial layout', JSON.stringify(initialLayout));
       await testInfo.attach('initial-layout-metrics', { body: JSON.stringify(initialLayout, null, 2), contentType: 'application/json' });
-      expect(initialLayout.firstLegalTextTop, 'the initial screen must expose legal text below its controls').toBeLessThan(viewport.height - 80);
+      expect(initialLayout.firstLegalTextTop, 'legal text must start within the first 60% of the screen').toBeLessThanOrEqual(viewport.height * .6);
       expect(initialLayout.firstLegalTextTop, 'the toolbar must not cover the first line of legal text').toBeGreaterThanOrEqual(initialLayout.toolbarTop + initialLayout.toolbarHeight - 1);
       await noToolbarOverlap(workspace.locator(':scope > div').first());
       await screenshot(page, testInfo, `editor-${viewport.width}-initial`);
@@ -124,6 +127,12 @@ for (const viewport of [
       const shownWidth = (await workspace.boundingBox())!.width;
       if (viewport.width >= 900) expect(hiddenWidth - shownWidth).toBeGreaterThan(100);
       else expect(shownWidth).toBeCloseTo(hiddenWidth, 0);
+      const session = page.locator('details').filter({ has: page.locator('summary').filter({ hasText: /^Session and publication$/ }) });
+      await session.locator('summary').first().click();
+      const sessionWidth = (await session.boundingBox())!.width, layoutWidth = (await page.locator('[data-navigation]').boundingBox())!.width;
+      expect(sessionWidth, 'the workflow must span the full workspace with navigation open').toBeGreaterThanOrEqual(layoutWidth - 2);
+      await noHorizontalOverflow(page); await noToolbarOverlap(session);
+      await session.locator('summary').first().click();
       await page.getByRole('button', { name: 'Hide article navigation', exact: true }).click();
       await noHorizontalOverflow(page);
 
@@ -157,8 +166,8 @@ for (const viewport of [
           const size = (value: string) => Number.parseFloat(value) || 0;
           return { width: Math.max(box.width, size(pseudo.width)), height: Math.max(box.height, size(pseudo.height)) };
         });
-        expect(hit.width, 'a transparent touch target must be at least44px wide').toBeGreaterThanOrEqual(44);
-        expect(hit.height, 'a transparent touch target must be at least44px high').toBeGreaterThanOrEqual(44);
+        expect(hit.width, 'a transparent touch target must be at least 44px wide').toBeGreaterThanOrEqual(44);
+        expect(hit.height, 'a transparent touch target must be at least 44px high').toBeGreaterThanOrEqual(44);
       }
       const scrollBefore = await page.evaluate(() => window.scrollY);
       await marker.click();
@@ -188,8 +197,8 @@ for (const viewport of [
       await workspace.locator('[data-editor-unit="' + fixture.lastRootId + '"]').scrollIntoViewIfNeeded();
       await expect(toolbar).toBeInViewport();
       const top = (await toolbar.boundingBox())!.y, headerBottom = await page.locator('.topbar').evaluate(element => element.getBoundingClientRect().bottom);
-      expect(top, 'the toolbar must remain below the application header near Article20').toBeGreaterThanOrEqual(headerBottom - 1);
-      expect(top, 'the toolbar must remain at the visible top near Article20').toBeLessThanOrEqual(headerBottom + 3);
+      expect(top, 'the toolbar must remain below the application header near Article 20').toBeGreaterThanOrEqual(headerBottom - 1);
+      expect(top, 'the toolbar must remain at the visible top near Article 20').toBeLessThanOrEqual(headerBottom + 3);
       await noToolbarOverlap(toolbar);
       await toolbar.getByRole('button', { name: 'Footnotes', exact: true }).click();
       await withinViewport(workspace.locator('[data-tool-panel]'), page);
@@ -201,6 +210,8 @@ for (const viewport of [
 
       await workspace.getByRole('button', { name: 'Wiki', exact: true }).click();
       const wiki = workspace.locator('[data-editor-panel=wiki]');
+      await expect(workspace.getByRole('button', { name: 'Undo', exact: true }), 'Wiki must not show unrelated constitutional-text history controls').toHaveCount(0);
+      await expect(workspace.getByRole('button', { name: 'Redo', exact: true })).toHaveCount(0);
       await expect(wiki.getByLabel('Short description', { exact: true })).toBeVisible();
       await expect(wiki.getByLabel('Page text', { exact: true })).toBeVisible();
       expect(await wiki.locator('#wiki-sources').evaluate(element => element.closest('details')!.open)).toBe(false);
@@ -209,6 +220,8 @@ for (const viewport of [
       await noHorizontalOverflow(page); await screenshot(page, testInfo, `editor-${viewport.width}-wiki`);
       await workspace.getByRole('button', { name: 'Details', exact: true }).click();
       const details = workspace.locator('[data-editor-panel=details]');
+      await expect(workspace.getByRole('button', { name: 'Undo', exact: true }), 'Details must not show unrelated constitutional-text history controls').toHaveCount(0);
+      await expect(workspace.getByRole('button', { name: 'Redo', exact: true })).toHaveCount(0);
       await expect(details.getByLabel('Title', { exact: true })).toBeVisible();
       await expect(details.getByLabel('URL slug', { exact: true })).toBeHidden();
       await details.locator('summary').filter({ hasText: /^Version$/ }).click();
@@ -228,3 +241,45 @@ for (const viewport of [
     });
   });
 }
+
+test.describe('compact editor in a short viewport at 200% zoom-equivalent reflow', () => {
+  test.use({ viewport: { width: 720, height: 430 } });
+  test('keeps every tool panel inside the available screen height', async ({ page, request }, testInfo) => {
+    test.setTimeout(120_000);
+    const fixture = await layoutFixture(request);
+    await signIn(page, 'editor');
+    await startFromViewer(page, 'XA', fixture.versionId, 'editorial_correction');
+    const workspace = page.locator('[data-editor-workspace]'), toolbar = workspace.locator('[data-editor-tools]');
+    await expect(toolbar).toBeVisible();
+    for (const name of ['Insert', 'Text tools', 'References', 'Unit properties', 'Footnotes']) {
+      await toolbar.getByRole('button', { name, exact: true }).click();
+      const panel = workspace.locator('[data-tool-panel]');
+      await expect(panel).toBeVisible();
+      await withinViewport(panel, page);
+      await withinViewport(panel.getByRole('button', { name: 'Close tools', exact: true }), page);
+      if (name === 'Insert') {
+        const lastAction = panel.getByRole('button').last();
+        await expect(lastAction).toBeEnabled();
+        await lastAction.scrollIntoViewIfNeeded();
+        await lastAction.click({ trial: true });
+        await page.setViewportSize({ width: 720, height: 360 });
+        await expect.poll(async () => { const box = await panel.boundingBox(); return box!.y + box!.height; }, { message: 'an open tool panel must adapt when the viewport becomes shorter' }).toBeLessThanOrEqual(361);
+        await lastAction.scrollIntoViewIfNeeded();
+        await lastAction.click({ trial: true });
+        await panel.evaluate(element => element.scrollTo(0, 0));
+        await page.setViewportSize({ width: 720, height: 430 });
+        await withinViewport(panel, page);
+        await workspace.getByRole('button', { name: /^Changes \(/ }).click();
+        await expect(toolbar).toHaveCount(0);
+        await workspace.getByRole('button', { name: 'Edit', exact: true }).click();
+        await expect(panel).toBeVisible();
+        await page.evaluate(() => window.scrollTo(0, 0));
+        await expect.poll(async () => { const box = await panel.boundingBox(); return box!.y + box!.height; }, { message: 'returning to Edit must measure the remounted open panel' }).toBeLessThanOrEqual(431);
+        await withinViewport(panel, page);
+      }
+      await noHorizontalOverflow(page);
+      await screenshot(page, testInfo, `editor-720-short-${name.toLowerCase().replaceAll(' ', '-')}`);
+      await panel.getByRole('button', { name: 'Close tools', exact: true }).click();
+    }
+  });
+});

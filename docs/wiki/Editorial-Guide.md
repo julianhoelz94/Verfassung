@@ -22,7 +22,7 @@ Use the **Status** filter to show drafts, work in review, approved work, or publ
 
 ### Writing and footnotes
 
-The article navigation can be hidden to give the document more width. **Session and publication** opens the workflow details when needed. The sticky icon toolbar follows the active text selection; its menus contain named actions for inserting units and tables, editing properties, splitting or merging text, and managing references. **Changes** collects the session's wording, formatting, note and structural differences. Save the draft before submitting it for review.
+The navigation button beside **Edit** hides the article navigation to give the document more width. **Session and publication**, below the document, opens the workflow details when needed. The sticky icon toolbar follows the active text selection and keeps **Undo**, **Redo** and **Editor view** available while scrolling. Its menus contain named actions for inserting units and tables, editing properties, splitting or merging text, and managing references. On phones, the active workspace tab keeps its label and the other tabs use icons. **Changes** collects the session's wording, formatting, note and structural differences. Save the draft before submitting it for review.
 
 Use **Bold**, **Italic**, **Underline**, and **Strikethrough** for the selected text or continued typing. **Undo** and **Redo** are disabled when their history is empty. Strikethrough is a text style; it does not record a repeal.
 

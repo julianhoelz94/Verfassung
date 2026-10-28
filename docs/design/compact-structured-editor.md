@@ -342,6 +342,10 @@ The implementation is on the compact editor feature branch. No deployment is par
 
 The narrow-viewport override did not resize the current in-app preview surface. Dedicated mobile/200%-zoom verification remains in the implementation acceptance work; it is not claimed as completed here.
 
+### Implemented-site responsive acceptance
+
+The final local production build passed the real-stack responsive suite at 390×844, 820×1180 and 1440×1000. The first legal text began at 424px, 377px and 363px respectively, within the enforced first-60%-of-screen budget. The phone layout previously began at 721px. Captured Edit, focused passage, Article 20, drawer, Wiki, Details and reader states were checked for overflow, clipping, overlapping controls, correct note destinations and accessibility. Adjacent superscripts kept small glyphs with separate 44px effective touch targets. First-click note Apply, Undo, explicit jumps, dismissal and a full-width publication disclosure with navigation open all passed. This is actual website evidence rather than a mock-only check.
+
 ## 17. Implementation locations
 
 - Gateway StructuredEditor and ContinuousCanvas provide the compact toolbar, continuous editing, history, scoped loading, complete Preview, and in-place endnotes. ChangeOverview presents readable session-wide changes; EditorWorkspace remembers hidden navigation and discloses workflow details.

@@ -74,6 +74,25 @@ export function StructuredEditor({ initialTab,wikiPanel,detailsPanel,review = []
   function remember(view: string, selected: string) { const url = new URL(window.location.href); url.searchParams.set('scope', view); url.searchParams.set('selectedNode', selected); window.history.replaceState(null, '', url); }
   function select(id: string) { setSelection(id); remember(scope, id); }
   useEffect(() => { const header = document.querySelector('.topbar'); if (!header) return; const measure = () => setToolbarTop(header.getBoundingClientRect().height); measure(); if (typeof ResizeObserver === 'undefined') { window.addEventListener('resize', measure); return () => window.removeEventListener('resize', measure); } const observer = new ResizeObserver(measure); observer.observe(header); return () => observer.disconnect(); }, []);
+  useLayoutEffect(() => {
+    const menu = rootRef.current?.querySelector<HTMLElement>('[data-tool-panel]');
+    if (!menu) return;
+    const viewport = window.visualViewport;
+    const measure = () => {
+      const visibleBottom = viewport ? viewport.offsetTop + viewport.height : window.innerHeight;
+      menu.style.setProperty('--editor-panel-space', Math.max(0, visibleBottom - menu.getBoundingClientRect().top - 12) + 'px');
+    };
+    measure();
+    window.addEventListener('resize', measure); window.addEventListener('scroll', measure, true);
+    viewport?.addEventListener('resize', measure); viewport?.addEventListener('scroll', measure);
+    const toolbar = rootRef.current?.querySelector('[data-editor-tools]');
+    const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(measure) : undefined;
+    if (toolbar) observer?.observe(toolbar);
+    return () => {
+      window.removeEventListener('resize', measure); window.removeEventListener('scroll', measure, true);
+      viewport?.removeEventListener('resize', measure); viewport?.removeEventListener('scroll', measure); observer?.disconnect();
+    };
+  }, [panel, mode, toolbarTop]);
   function install(nextRoots: DraftNode[], nextOperations: DraftOperation[]) { rootsRef.current = nextRoots; operationsRef.current = nextOperations; setRoots(nextRoots); setOperations(nextOperations); }
   function transaction(build: (emit: (operation: Omit<DraftOperation, 'id'>) => DraftOperation, current: () => DraftNode[]) => void, grouping = '') {
     const before = { roots: rootsRef.current, operations: operationsRef.current }; let nextRoots = before.roots, nextOperations = before.operations;
@@ -336,7 +355,7 @@ export function StructuredEditor({ initialTab,wikiPanel,detailsPanel,review = []
       {wikiPanel?<button type="button" aria-label={copy('Wiki','Wiki')} title={copy('Wiki','Wiki')} aria-pressed={mode==='wiki'} disabled={Boolean(noteEdit||markerMove)} onClick={()=>{setMode('wiki');setPanel('');}}><BookOpen size={17} aria-hidden="true"/><span className={styles.viewLabel}>{copy('Wiki','Wiki')}</span></button>:<a href={'/editor/wiki/constitution/'+encodeURIComponent(constitutionId)} aria-label={copy('Wiki','Wiki')} title={copy('Wiki','Wiki')} aria-disabled={Boolean(noteEdit)} onClick={event=>{if(noteEdit)event.preventDefault();}}><BookOpen size={17} aria-hidden="true"/><span className={styles.viewLabel}>{copy('Wiki','Wiki')}</span></a>}
       {detailsPanel?<button type="button" aria-label={copy('Details','Details')} title={copy('Details','Details')} aria-pressed={mode==='details'} disabled={Boolean(noteEdit||markerMove)} onClick={()=>{setMode('details');setPanel('');}}><Info size={17} aria-hidden="true"/><span className={styles.viewLabel}>{copy('Details','Details')}</span></button>:null}
       {canManageStructure ? <a className={styles.iconButton} aria-label={copy('Constitution structure settings', 'Verfassungsstruktur')} title={copy('Constitution structure settings', 'Verfassungsstruktur')} href={'/admin/constitutions/'+constitutionId}><Settings2 size={17} aria-hidden="true" /></a> : null}
-      {mode!=='edit'?<><span className={styles.spacer}/><span className={styles.history} role="group" aria-label={copy('Edit history','Bearbeitungsverlauf')}><IconTool name={copy('Undo', 'Rückgängig')} icon={Undo2} onClick={() => travel()} disabled={!history.length || !editable || mode==='wiki'||mode==='details'}/><IconTool name={copy('Redo', 'Wiederholen')} icon={Redo2} onClick={() => travel(true)} disabled={!future.length || !editable || mode==='wiki'||mode==='details'}/></span></>:null}
+      {(mode==='changes'||mode==='preview')?<><span className={styles.spacer}/><span className={styles.history} role="group" aria-label={copy('Edit history','Bearbeitungsverlauf')}><IconTool name={copy('Undo', 'Rückgängig')} icon={Undo2} onClick={() => travel()} disabled={!history.length || !editable}/><IconTool name={copy('Redo', 'Wiederholen')} icon={Redo2} onClick={() => travel(true)} disabled={!future.length || !editable}/></span></>:null}
     </div>
     <form action="/editor/command" method="post" id="draft-form" className={styles.textForm} hidden={mode==='wiki'||mode==='details'} onSubmit={event=>{if(noteProblems.length){event.preventDefault();setSaveAttempted(true);setMessage(noteProblemText(noteProblems[0]));return;}saving.current=true;}}>
     <input type="hidden" name="command" value="structured-save" /><input type="hidden" name="sessionId" value={preview.sessionId} /><input type="hidden" name="versionId" value={versionId} /><input type="hidden" name="articleId" value={articleId} /><input type="hidden" name="scope" value={scope} /><input type="hidden" name="selectedNode" value={selection} /><input type="hidden" name="structuredDraft" value={JSON.stringify({ expectedGeneration: preview.generation, operations })} />

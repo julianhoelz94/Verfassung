@@ -22,7 +22,7 @@ Mit dem Filter **Status** zeigen Sie Entwürfe, Bearbeitungen in Prüfung, freig
 
 ### Schreiben und Fußnoten
 
-Die Artikelnavigation lässt sich ausblenden, damit der Text mehr Platz erhält. **Sitzung und Veröffentlichung** öffnet die Angaben zum Arbeitsablauf bei Bedarf. Die haftende Symbolleiste folgt der Textauswahl; ihre Menüs enthalten benannte Aktionen für Einheiten, Tabellen, Eigenschaften, das Teilen und Zusammenführen von Text sowie Verweise. **Änderungen** zeigt die Text-, Formatierungs-, Fußnoten- und Strukturänderungen der Sitzung. Speichern Sie den Entwurf vor dem Einreichen.
+Die Navigationsschaltfläche neben **Bearbeiten** blendet die Artikelnavigation aus, damit der Text mehr Platz erhält. **Sitzung und Veröffentlichung** unterhalb des Dokuments öffnet die Angaben zum Arbeitsablauf bei Bedarf. Die haftende Symbolleiste folgt der Textauswahl und hält **Rückgängig**, **Wiederholen** und **Editoransicht** beim Scrollen erreichbar. Ihre Menüs enthalten benannte Aktionen für Einheiten, Tabellen, Eigenschaften, das Teilen und Zusammenführen von Text sowie Verweise. Auf dem Smartphone bleibt die aktive Registerkarte beschriftet; die anderen verwenden Symbole. **Änderungen** zeigt die Text-, Formatierungs-, Fußnoten- und Strukturänderungen der Sitzung. Speichern Sie den Entwurf vor dem Einreichen.
 
 **Fett**, **Kursiv**, **Unterstrichen** und **Durchgestrichen** formatieren die Auswahl oder den anschließend eingegebenen Text. **Rückgängig** und **Wiederholen** sind ohne verfügbare Schritte deaktiviert. Durchstreichen ist eine Textformatierung und erfasst keine rechtliche Aufhebung.
 

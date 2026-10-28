@@ -1,6 +1,4 @@
 // OUTLINE-1: settings/editing contract; each test asserts submitted settings or a user decision.
-import { act } from 'react';
-import { Simulate } from 'react-dom/test-utils';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { mount, click, button, change } from '../../../test/dom';
 import { DEFAULT_NEW_OUTLINE } from '../../../lib/outline';
@@ -76,7 +74,7 @@ describe('guided creation requires explicit review and creation', () => {
     expect(settings().map(item => item.kindCode)).toEqual(['article']);
     await click(button(view.host, 'Continue to review')); expect(view.host.textContent).toContain('New Charter · XA'); expect(action).not.toHaveBeenCalled();
     const create = button(view.host, 'Create constitution');
-    await act(async () => Simulate.submit(view.host.querySelector('form')!, { nativeEvent: { submitter: create } }));
+    await click(create);
     expect(action).toHaveBeenCalledTimes(1); expect((action.mock.calls[0][0] as FormData).get('title')).toBe('New Charter'); expect(view.host.querySelector('[role="alert"]')).not.toBeNull(); expect(create.disabled).toBe(false);
   });
   it('does not advance a structure with duplicate kind codes to creation', async () => {

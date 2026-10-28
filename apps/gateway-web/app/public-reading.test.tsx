@@ -16,8 +16,6 @@ import Timeline from './countries/[code]/timeline/page';
 import ArticleHistory from './countries/[code]/articles/[articleNumber]/page';
 import ArticlePage, { generateMetadata as articleMetadata } from './countries/[code]/versions/[versionId]/articles/[articleId]/page';
 
-// Next supplies React's server cache; the test adapter preserves uncached execution.
-vi.mock('react', async originalModule => ({ ...await originalModule<typeof import('react')>(), cache: (fn: unknown) => fn }));
 vi.mock('../lib/api', async originalModule => ({ ...await originalModule<typeof import('../lib/api')>(), getCountry: vi.fn(), getWikiPage: vi.fn(), listCountries: vi.fn(), listArticlePage: vi.fn(), listConstitutionAmendments: vi.fn(), listAllUnits: vi.fn(), getVersion: vi.fn(), getReaderOutline: vi.fn(), listAmendments: vi.fn(), getConstitutionLifecycle: vi.fn(), getProvisionLifecycle: vi.fn(), resolveUnit: vi.fn(), listAllArticles: vi.fn(), listAmendmentsByArticle: vi.fn(), getUnit: vi.fn() }));
 vi.mock('../lib/document-api', () => ({ listDocumentLinks: vi.fn() }));
 vi.mock('../lib/session', () => ({ currentUser: vi.fn(), requireSessionBearer: async () => 'Bearer staff-session' }));

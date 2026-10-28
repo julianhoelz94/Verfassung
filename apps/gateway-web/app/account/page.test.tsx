@@ -5,8 +5,6 @@ import { cookies } from 'next/headers';
 import { currentUser, mfaChallengeToken } from '../../lib/session';
 import { cookieJar, json } from '../../test/server-boundary';
 import Account from './page';
-// Next supplies server-action hooks; SSR tests keep their initial presentation state.
-vi.mock('react-dom', async original => ({ ...await original<typeof import('react-dom')>(), useFormState: (_action: unknown, initial: unknown) => [initial, () => undefined], useFormStatus: () => ({ pending: false }) }));
 vi.mock('../../lib/session', () => ({ SESSION_COOKIE: 'ca_session', currentUser: vi.fn(), mfaChallengeToken: vi.fn() }));
 vi.mock('../../lib/server-locale', () => ({ currentLocale: async () => 'en' }));
 vi.mock('../../lib/deployment-setup', () => ({ siteLanguages: async () => ({ enabled: ['en', 'de'], defaultLanguage: 'en' }) }));

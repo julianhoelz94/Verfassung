@@ -1,6 +1,6 @@
 import { act, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { Simulate } from 'react-dom/test-utils';
+import { fireEvent } from '@testing-library/dom';
 
 export async function mount(element: ReactNode) {
   const host = document.createElement('div'); document.body.append(host);
@@ -20,5 +20,5 @@ export function button(host: Element, text: string): HTMLButtonElement {
   return found;
 }
 export async function change(element: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement, value: string) {
-  await act(async () => { element.value = value; Simulate.change(element); });
+  await act(async () => { fireEvent.change(element, { target: { value } }); });
 }

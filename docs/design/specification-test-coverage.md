@@ -107,3 +107,24 @@ coverage and exact CI revisions are recorded here as delivery proceeds.
   readable failure reports. The existing changed-code gate remains independent.
 
 Final review, CI coverage, merge and Wiki evidence follow below once complete.
+
+
+### Review corrections and current-main compatibility
+
+Independent review found and corrected a revision-pin fixture that returned the
+current document revision regardless of the requested historical revision. The
+fixture now honors document ID and `?revision=2`, and the assertion requires the
+revision-2 pin. The import matrix now rejects every non-capable editorial role,
+not just viewers. Both new execution artifacts replace prior artifacts on rerun.
+
+Main advanced during implementation through dependency upgrade PR #205 and work
+controls PR #212. The branch was rebased onto `d2f41ae61d1272b790c4117f93e5878e85edf103`.
+React 19 tests use native DOM events through the already pinned testing-library
+helper; proxy admission tests follow the new `proxy.ts` entry point and avoid
+repeating the existing proxy regression cases. Original expected outcomes remain.
+The upgraded baseline is 73.34% (15,842 / 21,600 lines); final evidence must use the
+rebased combined tree rather than the earlier 72.33% snapshot.
+
+The current local run passes 13 Node tests and 898 Vitest tests across 87 files;
+gateway line coverage is 73.85% (4,136 / 5,600). Typecheck and lint pass. These are
+local component observations, not a substitute for the complete CI aggregate.

@@ -8,5 +8,9 @@ export async function translateContentAction(texts: string[], sourceLanguage: st
   const token = (await cookies()).get(SESSION_COOKIE)?.value;
   if (!token) throw new Error('Login required');
   const result = await translateContentBatch(token, texts, sourceLanguage, targetLanguage);
+  if (!Array.isArray(result.texts) || result.texts.length !== texts.length ||
+    result.texts.some(text => typeof text !== 'string')) {
+    throw new Error('The translation response did not match the requested passages');
+  }
   return result.texts;
 }

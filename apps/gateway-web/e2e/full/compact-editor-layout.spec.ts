@@ -251,7 +251,7 @@ test.describe('compact editor in a short viewport at 200% zoom-equivalent reflow
     await startFromViewer(page, 'XA', fixture.versionId, 'editorial_correction');
     const workspace = page.locator('[data-editor-workspace]'), toolbar = workspace.locator('[data-editor-tools]');
     await expect(toolbar).toBeVisible();
-    for (const name of ['Insert', 'Text tools', 'References', 'Unit properties', 'Footnotes']) {
+    for (const name of ['Insert', 'Text tools', 'References', 'Unit properties', 'Footnotes', 'Editor view']) {
       await toolbar.getByRole('button', { name, exact: true }).click();
       const panel = workspace.locator('[data-tool-panel]');
       await expect(panel).toBeVisible();
@@ -269,13 +269,21 @@ test.describe('compact editor in a short viewport at 200% zoom-equivalent reflow
         await panel.evaluate(element => element.scrollTo(0, 0));
         await page.setViewportSize({ width: 720, height: 430 });
         await withinViewport(panel, page);
-        await workspace.getByRole('button', { name: /^Changes \(/ }).click();
+        await workspace.getByRole('button', { name: /^Changes \(/ }).focus();
+        await page.keyboard.press('Enter');
         await expect(toolbar).toHaveCount(0);
-        await workspace.getByRole('button', { name: 'Edit', exact: true }).click();
+        await workspace.getByRole('button', { name: 'Edit', exact: true }).focus();
+        await page.keyboard.press('Enter');
         await expect(panel).toBeVisible();
         await page.evaluate(() => window.scrollTo(0, 0));
         await expect.poll(async () => { const box = await panel.boundingBox(); return box!.y + box!.height; }, { message: 'returning to Edit must measure the remounted open panel' }).toBeLessThanOrEqual(431);
         await withinViewport(panel, page);
+      }
+      if (name === 'Editor view') {
+        const lastArticle = panel.getByRole('button').last();
+        await lastArticle.scrollIntoViewIfNeeded();
+        await lastArticle.click({ trial: true });
+        await panel.evaluate(element => element.scrollTo(0, 0));
       }
       await noHorizontalOverflow(page);
       await screenshot(page, testInfo, `editor-720-short-${name.toLowerCase().replaceAll(' ', '-')}`);

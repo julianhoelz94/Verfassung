@@ -14,6 +14,24 @@ function textCanvas(canvas: Locator, entryId: string) {
 function unitCanvas(canvas: Locator, unitId: string) {
   return canvas.locator(`[role="textbox"]:has([data-unit="${unitId}"])`);
 }
+async function selectBodyText(canvas: Locator, end = 0) {
+  await canvas.focus();
+  await canvas.locator('span.ce-sentence').first().evaluate((element, end) => {
+    const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT, { acceptNode: node => node.parentElement?.closest('button') ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT });
+    const text = walker.nextNode();
+    if (!text) throw new Error('The sentence has no body text to select');
+    const range = document.createRange(); range.setStart(text, 0); range.setEnd(text, end);
+    const selection = window.getSelection()!; selection.removeAllRanges(); selection.addRange(range);
+    document.dispatchEvent(new Event('selectionchange'));
+  }, end);
+}
+async function expectWordingChange(canvas: Locator) {
+  const changes = canvas.getByRole('region', { name: 'Changes', exact: true });
+  await expect(changes.getByText('Before', { exact: true })).toBeVisible();
+  await expect(changes.getByText('Original wording.', { exact: true })).toBeVisible();
+  await expect(changes.getByText('After', { exact: true })).toBeVisible();
+  await expect(changes.getByText('Changed wording.', { exact: true })).toBeVisible();
+}
 async function setScope(page: Page, scope: string) {
   await page.getByRole('button', { name: 'Editor view', exact: true }).click();
   const select = page.getByRole('combobox', { name: 'Editor view', exact: true });
@@ -74,8 +92,7 @@ for (const hop of ['editorial_correction', 'legal'] as const) {
     await page.reload();
     await expect(unitCanvas(canvas, sourceSentence.logicalId)).toContainText('Changed wording.');
     await canvas.getByRole('button', { name: /^Changes \(/ }).click();
-    await expect(canvas.locator('del')).toContainText(['Original wording.']);
-    await expect(canvas.locator('ins')).toContainText(['Changed wording.']);
+    await expectWordingChange(canvas);
     const sessionId = new URL(page.url()).searchParams.get('sessionId');
     const draft = await json(await request.get(`/api/editor/edit-sessions/${sessionId}/structured-draft`, { headers }));
     expect(draft.operations).toHaveLength(1);
@@ -90,6 +107,7 @@ for (const hop of ['editorial_correction', 'legal'] as const) {
       await page.getByLabel('Draft after unit').selectOption(sourceSentence.logicalId);
       await page.getByRole('button', { name: 'Save change record' }).click();
       await expect(page.getByText('Publish details saved.')).toBeVisible();
+      await sessionDetails(page);
       const sessionId = new URL(page.url()).searchParams.get('sessionId');
       const review = await json(await request.get(`/api/editor/edit-sessions/${sessionId}/diff-review`, { headers }));
       const queue = page.getByRole('region', { name: 'Review differences' });
@@ -111,9 +129,10 @@ for (const hop of ['editorial_correction', 'legal'] as const) {
     await page.getByRole('button', { name: 'Submit for review' }).click();
     const sessionUrl = page.url();
     await signOut(page); await signIn(page, 'reviewer'); await page.goto(sessionUrl);
+    await canvas.getByRole('button', { name: 'Edit', exact: true }).click();
     await expect(unitCanvas(canvas, sourceSentence.logicalId)).toHaveAttribute('contenteditable', 'false');
     await canvas.getByRole('button', { name: /^Changes \(/ }).click();
-    await expect(canvas.locator('del')).toContainText(['Original wording.']);
+    await expectWordingChange(canvas);
     if (hop === 'legal') {
       await sessionDetails(page);
       const queue = page.getByRole('region', { name: 'Review differences' });
@@ -265,7 +284,7 @@ test('pasted boundaries, inline titles and keyboard edits persist with explicit 
   await canvas.getByLabel('Sentence title').fill('Inline title');
   await canvas.getByRole('button', { name: 'Close tools', exact: true }).click();
   await canvas.locator(`[data-unit="${original.logicalId}"]`).click();
-  await sentence.press('ControlOrMeta+Home');
+  await selectBodyText(sentence);
   await canvas.getByRole('button', { name: 'Text tools', exact: true }).click();
   await canvas.getByRole('button', { name: 'Merge with next sentence', exact: true }).click();
   await expect(sentence.locator('span.ce-sentence')).toHaveCount(1);
@@ -300,8 +319,7 @@ test('configured delimiters, all inline styles and undo/redo survive saving and 
   await sentence.fill('Styled phrase; More remains. Final;');
   await expect(sentence.locator('span.ce-sentence')).toHaveCount(2);
   await expect(sentence.locator('span.ce-sentence').nth(1)).toHaveText('More remains. Final;');
-  await sentence.press('ControlOrMeta+Home');
-  await sentence.press('ControlOrMeta+Shift+ArrowRight');
+  await selectBodyText(sentence, 'Styled'.length);
   for (const name of ['Bold', 'Italic', 'Underline', 'Strikethrough']) await canvas.getByRole('button', { name, exact: true }).click();
   for (const selector of ['strong', 'em', 'u', 's']) await expect(sentence.locator(selector).first()).toContainText('Styled');
   const formatted = await canvas.locator('input[name="structuredDraft"]').inputValue();

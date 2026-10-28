@@ -14,7 +14,7 @@ import styles from './compact-editor.module.css';
 const schema = new Schema({
   nodes: {
     doc: { content: 'sentence+' },
-    sentence: { content: 'text*', group: 'block', attrs: { nodeId: { default: '' }, textId: { default: '' }, protected: { default: false }, anchors: { default: [] }, gapBefore: { default: false } }, toDOM: node => ['span', { class: 'ce-sentence', 'data-unit': node.attrs.nodeId, 'data-editor-entry': node.attrs.textId, 'data-gap': String(node.attrs.gapBefore) }, 0], parseDOM: [{ tag: 'span.ce-sentence' }, { tag: 'p' }] },
+    sentence: { content: 'text*', group: 'block', whitespace: 'pre', attrs: { nodeId: { default: '' }, textId: { default: '' }, protected: { default: false }, anchors: { default: [] }, gapBefore: { default: false } }, toDOM: node => ['span', { class: 'ce-sentence', 'data-unit': node.attrs.nodeId, 'data-editor-entry': node.attrs.textId, 'data-gap': String(node.attrs.gapBefore) }, 0], parseDOM: [{ tag: 'span.ce-sentence', preserveWhitespace: 'full' }, { tag: 'p', preserveWhitespace: 'full' }] },
     text: { group: 'inline' },
   },
   marks: {
@@ -91,10 +91,11 @@ function restoreParsedIdentities(transaction:Transaction, previous:ProseNode):Tr
 }
 
 export type CanvasController = { isAlive: () => boolean; format: (type: OrderedTextMark['type']) => void; focus: (position?: { textId: string; start: number; end?: number }) => void; segment: () => void; split: () => void; merge: () => void; addReference: (target: OrderedInlineReference['target']) => boolean; selection: () => { textId: string; nodeId: string; start: number; end: number }; activeMarks: () => string[] };
-type Props = { units: CanvasUnit[]; label: string; editable: boolean; flowing: boolean; boundaries: boolean; automatic: boolean; delimiters: string[]; notes: { logicalId: string; label: string }[]; unitLabels?: Record<string, string>; onSelectUnit?: (id: string) => void; onChange: (blocks: CanvasBlock[], grouping: string) => void; onActivate: (controller: CanvasController, textId: string) => void; onUndo: () => void; onRedo: () => void };
+type Props = { units: CanvasUnit[]; label: string; editable: boolean; flowing: boolean; boundaries: boolean; automatic: boolean; delimiters: string[]; notes: { logicalId: string; label: string }[]; unitLabels?: Record<string, string>; resetVersion?: number; onSelectUnit?: (id: string) => void; onChange: (blocks: CanvasBlock[], grouping: string) => CanvasBlock[] | false | void; onActivate: (controller: CanvasController, textId: string) => void; onUndo: () => void; onRedo: () => void };
 
 export function ContinuousCanvas(props: Props) {
   const host = useRef<HTMLDivElement>(null), viewRef = useRef<EditorView | null>(null), latest = useRef(props), composing = useRef(false), lastSent = useRef('');
+  const lastReceived=useRef(''), pending=useRef<string[]>([]), presentation=useRef(''), receivedReset=useRef(props.resetVersion);
   useLayoutEffect(() => { latest.current = props; }, [props]);
   const { showNote, previewNote, hidePreview } = useFootnoteActions();
   const noteActions = useRef({ showNote, previewNote, hidePreview }); useLayoutEffect(() => { noteActions.current = { showNote, previewNote, hidePreview }; }, [showNote, previewNote, hidePreview]);
@@ -126,6 +127,17 @@ export function ContinuousCanvas(props: Props) {
       },
       handleDOMEvents: {
         focus: () => { activate(); return false; },
+        beforeinput: (current,event) => {
+          const input=event as InputEvent;
+          if(!latest.current.editable||composing.current||input.isComposing||!input.cancelable||input.data===null||!['insertText','insertReplacementText'].includes(input.inputType))return false;
+          // Commit native text before the browser mutates the inline sentence
+          // wrappers. Target ranges also cover replacement/autocorrection when
+          // the DOM selection has not reached ProseMirror's selection observer.
+          const range=input.getTargetRanges?.()[0];
+          const from=range?current.posAtDOM(range.startContainer,range.startOffset):current.state.selection.from;
+          const to=range?current.posAtDOM(range.endContainer,range.endOffset):current.state.selection.to;
+          input.preventDefault();current.dispatch(current.state.tr.insertText(input.data,from,to));return true;
+        },
         compositionstart: () => { composing.current = true; return false; },
         compositionend: () => { composing.current = false; queueMicrotask(() => { if (!view.isDestroyed) view.dispatch(view.state.tr.setMeta('segment', true)); }); return false; },
       },
@@ -147,6 +159,7 @@ export function ContinuousCanvas(props: Props) {
         return DecorationSet.create(state.doc, decorations);
       },
       dispatchTransaction(incoming) {
+        const previousState=view.state;
         let transaction = incoming;
         if(!latest.current.editable&&transaction.docChanged){view.updateState(view.state);return;}
         if (transaction.docChanged) {
@@ -175,7 +188,7 @@ export function ContinuousCanvas(props: Props) {
           const segmented = blocks.flatMap(block => {
             const before = originalBlocks.find(previous => previous.nodeId === block.nodeId); if (!transaction.getMeta('segment-all') && (!before || before.text === block.text)) return [block];
             const previousText=before?.text ?? ''; let prefix = 0, suffix = 0; while (prefix < previousText.length && prefix < block.text.length && previousText[prefix] === block.text[prefix]) prefix++; while (suffix < previousText.length - prefix && suffix < block.text.length - prefix && previousText[previousText.length-1-suffix] === block.text[block.text.length-1-suffix]) suffix++; const changedEnd = block.text.length-suffix;
-            const parts = segmentBlock(block, latest.current.delimiters); let offset=0; const cuts:number[]=[]; for (const part of parts.slice(0,-1)) { offset+=part.text.length; const punctuationEnd=offset-(part.text.length-part.text.trimEnd().length); if (transaction.getMeta('segment-all') || offset === prefix || punctuationEnd > prefix && punctuationEnd <= changedEnd) cuts.push(offset); }
+            const parts = segmentBlock(block, latest.current.delimiters); let offset=0; const cuts:number[]=[]; for (const part of parts.slice(0,-1)) { offset+=part.text.length; const punctuationEnd=offset-(part.text.length-part.text.trimEnd().length), extendsTerminal=prefix===previousText.length&&punctuationEnd<=prefix&&previousText.slice(punctuationEnd).trim()===''; if (transaction.getMeta('segment-all') || offset === prefix || extendsTerminal || punctuationEnd > prefix && punctuationEnd <= changedEnd) cuts.push(offset); }
             const boundaries=[0,...cuts,block.text.length]; return boundaries.slice(1).map((end,index)=>({ nodeId:index ? crypto.randomUUID() : block.nodeId, textId:index ? crypto.randomUUID() : block.textId,...sliceBlock(block,boundaries[index],end) }));
           });
           if (JSON.stringify(segmented) !== JSON.stringify(blocksOf(state.doc))) {
@@ -189,7 +202,17 @@ export function ContinuousCanvas(props: Props) {
         view.updateState(state); activate();
         if (transaction.docChanged || transaction.getMeta('segment') || transaction.getMeta('segment-all')) {
           const blocks = blocksOf(state.doc).filter((block, index, all) => block.text.length || index < all.length - 1 || latest.current.units.some(unit => unit.node.logicalId === block.nodeId));
-          const signature = JSON.stringify(blocks); if (signature !== lastSent.current) { lastSent.current = signature; latest.current.onChange(blocks, transaction.getMeta('paste') || transaction.getMeta('manual-boundary') || transaction.getMeta('segment-all') ? '' : 'typing:'+latest.current.units[0].node.logicalId); }
+          const signature = JSON.stringify(blocks); if (signature !== lastSent.current) {
+            const previousSent=lastSent.current;lastSent.current=signature;
+            const accepted=latest.current.onChange(blocks, transaction.getMeta('paste') || transaction.getMeta('manual-boundary') || transaction.getMeta('segment-all') ? '' : 'typing:'+latest.current.units[0].node.logicalId);
+            if(accepted===false){view.updateState(previousState);lastSent.current=previousSent;activate();return;}
+            const canonical=accepted??blocks,canonicalSignature=JSON.stringify(canonical);lastSent.current=canonicalSignature;pending.current.push(canonicalSignature);
+            // Reconciliation may retarget links after a merge. Commit that
+            // accepted rich state now, before a later keystroke can race its
+            // React acknowledgement and restore an obsolete target.
+            const doc=documentOf(canonical,latest.current.units);
+            if(!doc.eq(state.doc)){const from=flatPosition(state.doc,state.selection.from),to=flatPosition(state.doc,state.selection.to),update=state.tr.replaceWith(0,state.doc.content.size,doc.content);update.setSelection(TextSelection.create(update.doc,documentPosition(update.doc,from),documentPosition(update.doc,to)));if(state.storedMarks)update.setStoredMarks(state.storedMarks);view.updateState(state.apply(update));}
+          }
         }
       },
     });
@@ -210,18 +233,26 @@ export function ContinuousCanvas(props: Props) {
       latest.current.onActivate(controller, $from.parent.attrs.textId || latest.current.units[0].entry.logicalId!);
       void $to;
     }
-    lastSent.current = JSON.stringify(latest.current.units.map(blockOf));
+    lastSent.current = lastReceived.current = JSON.stringify(latest.current.units.map(blockOf));
     return () => { view.destroy(); viewRef.current = null; };
   }, []);
   useEffect(() => {
     const view = viewRef.current; if (!view) return;
-    const incoming = props.units.map(blockOf), signature = JSON.stringify(incoming), incomingDoc = documentOf(incoming, props.units);
+    const incoming = props.units.map(blockOf), signature = JSON.stringify(incoming);
+    const decorationSignature=JSON.stringify([props.editable,props.notes,props.unitLabels,props.units.map(unit=>[unit.node.logicalId,unit.node.label,unit.node.title])]);
+    const acknowledgement=pending.current.indexOf(signature), changed=signature!==lastReceived.current, reset=receivedReset.current!==props.resetVersion;
+    receivedReset.current=props.resetVersion;
+    lastReceived.current=signature;
+    if(acknowledgement>=0)pending.current.splice(0,acknowledgement+1);
+    const external=reset||changed&&acknowledgement<0;
+    const incomingDoc=documentOf(external?incoming:blocksOf(view.state.doc),props.units);
     if (!incomingDoc.eq(view.state.doc)) {
       const previous = view.state.selection, from = flatPosition(view.state.doc, previous.from), to = flatPosition(view.state.doc, previous.to), doc = incomingDoc;
-      const state = EditorState.create({ doc, plugins: view.state.plugins, selection: TextSelection.create(doc, documentPosition(doc, from), documentPosition(doc, to)) });
-      view.updateState(state); lastSent.current = signature;
+      const state = EditorState.create({ doc, plugins: view.state.plugins, selection: TextSelection.create(doc, documentPosition(doc, from), documentPosition(doc, to)),storedMarks:view.state.storedMarks });
+      view.updateState(state);
     }
-    view.setProps({ editable: () => latest.current.editable });
-  }, [props.units, props.editable]);
+    if(external){lastSent.current=signature;pending.current=[];}
+    if(presentation.current!==decorationSignature){presentation.current=decorationSignature;view.setProps({ editable: () => latest.current.editable });}
+  }, [props.units, props.editable,props.notes,props.unitLabels,props.resetVersion]);
   return <div className={[styles.canvas, props.flowing ? styles.flowing : styles.lines, props.boundaries ? styles.boundaries : ''].join(' ')} ref={host} />;
 }

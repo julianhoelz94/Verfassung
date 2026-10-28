@@ -83,7 +83,13 @@ test('constitution configuration governs MCP imports, review previews and the pu
     await select(article, 'label-placement').selectOption('after_title');
     await select(paragraph, 'title-policy').selectOption('none');
     await select(paragraph, 'label-policy').selectOption('required');
-    await select(paragraph, 'segmentation').selectOption('sentence');
+    const automaticSentences = paragraph.getByRole('checkbox', { name: 'Automatically create sentence nodes', exact: true });
+    await expect(automaticSentences).toBeDisabled();
+    await expect(paragraph.getByText('Automatic creation is unavailable when labels or titles are required. Enter these units explicitly.', { exact: true })).toBeVisible();
+    await select(paragraph, 'label-policy').selectOption('optional');
+    await expect(automaticSentences).toBeEnabled();
+    await automaticSentences.check();
+    await paragraph.getByRole('textbox', { name: 'Sentence delimiters', exact: true }).fill('. ! ? ;');
     await select(paragraph, 'presentation').selectOption('concatenated');
     await select(paragraph, 'label-placement').selectOption('superscript');
     await paragraph.getByRole('checkbox', { name: 'Show literal legal label', exact: true }).check();
@@ -107,7 +113,9 @@ test('constitution configuration governs MCP imports, review previews and the pu
     await expect(select(article, 'title-policy')).toHaveValue('required');
     await expect(select(article, 'label-policy')).toHaveValue('required');
     await expect(select(article, 'label-placement')).toHaveValue('after_title');
-    await expect(select(paragraph, 'segmentation')).toHaveValue('sentence');
+    await expect(select(paragraph, 'label-policy')).toHaveValue('optional');
+    await expect(automaticSentences).toBeChecked();
+    await expect(paragraph.getByRole('textbox', { name: 'Sentence delimiters', exact: true })).toHaveValue('. ! ? ;');
     await expect(select(paragraph, 'presentation')).toHaveValue('concatenated');
     await expect(select(paragraph, 'label-placement')).toHaveValue('superscript');
     await expect(select(paragraph, 'label-placement').locator('option[value="inline"]')).toBeEnabled();
@@ -117,10 +125,11 @@ test('constitution configuration governs MCP imports, review previews and the pu
     const settings = await json(await request.get(`/api/catalog/constitutions/${confirmed.constitutionId}/settings`, { headers: admin }));
     const setup = await mcp(request, key.token, 'get_import_setup', { countryCode: 'XA', constitutionSlug: slug });
     expect(setup.settingsRevisionId).toBe(settings.id);
+    expect(setup.outline.kinds.find((kind: { kindCode: string }) => kind.kindCode === 'paragraph').sentenceDelimiters).toEqual(['.', '!', '?', ';']);
     expect(settings.id).not.toBe(confirmed.settingsRevisionId);
     expect(settings.outline.kinds).toEqual(expect.arrayContaining([
       expect.objectContaining({ kindCode: 'article', displayLabel: 'Provision', root: true, allowedChildKinds: ['paragraph'], allowTextAlongsideChildren: true, titlePolicy: 'required', labelPolicy: 'required', labelPlacement: 'after_title' }),
-      expect.objectContaining({ kindCode: 'paragraph', root: false, titlePolicy: 'none', labelPolicy: 'required', segmentation: 'sentence', presentation: 'concatenated', labelPlacement: 'superscript' }),
+      expect.objectContaining({ kindCode: 'paragraph', root: false, titlePolicy: 'none', labelPolicy: 'optional', segmentation: 'sentence', sentenceDelimiters: ['.', '!', '?', ';'], presentation: 'concatenated', labelPlacement: 'superscript' }),
       expect.objectContaining({ kindCode: 'preamble', root: true, titlePolicy: 'none', labelPolicy: 'none' }),
     ]));
 
@@ -155,8 +164,8 @@ test('constitution configuration governs MCP imports, review previews and the pu
     expect(invalidChild.errors).toEqual(expect.arrayContaining([expect.objectContaining({ code: 'HIERARCHY_KIND' })]));
 
     // Failed preparation reserves a draft chain, so policy failures need their own constitutions.
-    const policyKinds = settings.outline.kinds.map(({ kindCode, displayLabel, presentation, showKind, showLabel, showTitle, root, allowedChildKinds, allowTextAlongsideChildren, titlePolicy, labelPolicy, labelPlacement, segmentation }: Record<string, unknown>) => ({
-      kindCode, displayLabel, presentation, showKind, showLabel, showTitle, root, allowedChildKinds, allowTextAlongsideChildren, titlePolicy, labelPolicy, labelPlacement, segmentation,
+    const policyKinds = settings.outline.kinds.map(({ kindCode, displayLabel, presentation, showKind, showLabel, showTitle, root, allowedChildKinds, allowTextAlongsideChildren, titlePolicy, labelPolicy, labelPlacement, segmentation, sentenceDelimiters }: Record<string, unknown>) => ({
+      kindCode, displayLabel, presentation, showKind, showLabel, showTitle, root, allowedChildKinds, allowTextAlongsideChildren, titlePolicy, labelPolicy, labelPlacement, segmentation, sentenceDelimiters,
     }));
     for (const [versionLabel, invalidArticle, field] of [
       ['Required title', { ...roots[1], title: null }, 'title'],
@@ -261,19 +270,34 @@ test('constitution configuration governs MCP imports, review previews and the pu
       await expect(reader.getByText('Provision Protected rights I', { exact: true }).first()).toBeVisible();
       expect(await json(await request.get(`/api/content/versions/${prepared.versionId}/content`))).toEqual(contentBefore);
       await startFromViewer(page, 'XA', prepared.versionId, 'editorial_correction');
+      await page.getByRole('button', { name: 'Show article navigation', exact: true }).click();
       await page.getByRole('complementary', { name: 'Top-level units', exact: true }).getByRole('link', { name: 'Provision I Protected rights', exact: true }).click();
       const draft = page.locator('#draft-form');
-      const paragraphText = draft.getByRole('textbox', { name: /^Paragraph text$/i });
+      const preparedArticle = contentBefore.roots.find((node: { kind: string }) => node.kind === 'article');
+      const firstParagraphId = preparedArticle.content.find((entry: { node?: { kind: string } }) => entry.node?.kind === 'paragraph').node.logicalId;
+      const paragraphCanvas = draft.locator('[role="textbox"]:has([data-unit="' + firstParagraphId + '"])');
+      const paragraphText = paragraphCanvas.locator('span.ce-sentence');
+      await draft.getByRole('button', { name: 'Editor view', exact: true }).click();
       await expect(page.getByRole('combobox', { name: 'Editor view', exact: true })).toHaveValue('article');
-      await expect(draft.getByRole('button', { name: 'Suggest sentence boundaries', exact: true })).toHaveCount(2);
-      await paragraphText.first().fill('Every person is free. Rights are protected.');
-      await draft.getByRole('button', { name: 'Suggest sentence boundaries', exact: true }).first().click();
+      await draft.getByRole('button', { name: 'Editor view', exact: true }).click();
+      await expect(paragraphText).toHaveCount(2);
+      await paragraphCanvas.focus();
+      await paragraphText.first().evaluate(element => {
+        const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT, { acceptNode: node => node.parentElement?.closest('button') ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT });
+        const text = walker.nextNode();
+        if (!text) throw new Error('The first paragraph has no text to edit');
+        const range = document.createRange(); range.selectNodeContents(text);
+        const selection = window.getSelection()!; selection.removeAllRanges(); selection.addRange(range);
+        document.dispatchEvent(new Event('selectionchange'));
+      });
+      await page.keyboard.insertText('Every person is free. Rights are protected.');
       await expect(paragraphText).toHaveCount(3);
+      await expect(paragraphText.nth(1)).toHaveText('Rights are protected.');
       await draft.getByRole('button', { name: 'Save draft', exact: true }).click();
       await expect(page.getByText('Draft saved.', { exact: true })).toBeVisible();
       await page.reload();
       await expect(paragraphText).toHaveCount(3);
-      await expect(paragraphText.nth(1)).toHaveValue('Rights are protected.');
+      await expect(paragraphText.nth(1)).toHaveText('Rights are protected.');
       expect(await json(await request.get(`/api/content/versions/${prepared.versionId}/content`))).toEqual(contentBefore);
     } finally { await readerContext.close(); }
   } finally {

@@ -90,3 +90,12 @@ test('footnote preview, drawer and comparison retain accessible names and dismis
   });
   expect(violations).toEqual([]);
 });
+
+test('the global phone menu stays above the sticky reading controls',async({page})=>{
+  await page.setViewportSize({width:390,height:844}); await page.goto(href);
+  await page.getByRole('button',{name:'Menu',exact:true}).click();
+  const section=page.locator('.menu-panel details').first(), trigger=section.locator('summary');
+  await expect(section).toHaveAttribute('open',''); await trigger.click(); await expect(section).not.toHaveAttribute('open','');
+  await trigger.click(); await page.locator('.menu-panel').getByRole('link',{name:'Search',exact:true}).click();
+  await expect(page).toHaveURL('/search');
+});

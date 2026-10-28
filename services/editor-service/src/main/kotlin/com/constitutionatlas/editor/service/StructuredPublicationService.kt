@@ -50,8 +50,7 @@ class StructuredPublicationService(private val drafts: StructuredDraftRepository
     fun write(preview: StructuredDraftPreview, source: CatalogVersion, hopKind: String, comment: String?, authorization: String?): Pair<CatalogVersion, OrderedSnapshot> {
         val original = sources.source(source.id)
         if (original.generation != preview.sourceGeneration || original.roots.map { it.revisionId } != preview.sourceRootRevisionIds) throw ConflictException("Pinned source changed", "stale_source")
-        val successor = client.reservation(preview.sessionId, authorization)
-            ?: client.reserve(preview.sessionId, source, hopKind, comment, preview.settingsRevisionId, authorization)
+        val successor = client.reserve(preview.sessionId, source, hopKind, comment, preview.settingsRevisionId, authorization)
         val request = OrderedSnapshotWrite(0, source.id, preview.sourceGeneration, OrderedSuccessorPlan.build(original.roots, preview.roots, preview.operations), preview.sessionId)
         return successor to client.save(successor.id, request, authorization)
     }

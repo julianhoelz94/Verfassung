@@ -290,6 +290,11 @@ class StructuredDraftApiTest {
         Mockito.`when`(publishClient.save(target, write, auth)).thenThrow(com.constitutionatlas.editor.DownstreamException("content unavailable")).thenReturn(snapshot)
         val request = com.constitutionatlas.editor.api.PublishRequest(hop)
         if (storedHash != null) jdbc.update("INSERT INTO structured_publish_jobs(session_id, request_hash) VALUES (?, ?)", session, storedHash)
+        Mockito.`when`(publishClient.reservation(session, auth)).thenReturn(catalogTarget)
+        Mockito.`when`(publishClient.reserve(session, catalogSource, hop, comment, settings.id, auth)).thenThrow(ConflictException("Different reserved metadata", "publish_attempt_mismatch")).thenReturn(catalogTarget)
+        val mismatch = assertThrows(ConflictException::class.java) { editorService.publish(auth, session, request) }
+        assertThat(mismatch.code).isEqualTo("publish_attempt_mismatch")
+        Mockito.verify(publishClient, Mockito.never()).save(target, write, auth)
         assertThrows(com.constitutionatlas.editor.DownstreamException::class.java) { editorService.publish(auth, session, request) }
         assertThat(sessions.findSession(session)!!.status).isEqualTo(com.constitutionatlas.editor.api.EditSessionStatus.APPROVED)
         Mockito.`when`(publishClient.reservation(session, auth)).thenReturn(catalogTarget)
@@ -302,7 +307,7 @@ class StructuredDraftApiTest {
         assertThat(editorService.publish(auth, session, request).newVersionId).isEqualTo(target)
         if (storedHash != null) assertThat(jdbc.queryForObject("SELECT request_hash FROM structured_publish_jobs WHERE session_id = ?", String::class.java, session)).isEqualTo(storedHash)
         Mockito.verify(publishClient, Mockito.times(3)).save(target, write, auth)
-        Mockito.verify(publishClient, Mockito.times(1)).reserve(session, catalogSource, hop, comment, settings.id, auth)
+        Mockito.verify(publishClient, Mockito.times(4)).reserve(session, catalogSource, hop, comment, settings.id, auth)
         if (hop == "legal") Mockito.verify(amendmentClient, Mockito.times(1)).createAmendment(Mockito.eq(constitution) ?: constitution, Mockito.any(com.constitutionatlas.editor.api.ChangeRecordRequest::class.java) ?: record, Mockito.eq(auth) ?: auth)
         val payload = jdbc.queryForObject("SELECT payload::text FROM outbox_events WHERE session_id = ? AND event_name = 'version.published'", String::class.java, session)
         assertThat(payload).contains("unitMapping", entry.logicalId.toString(), "sourceGeneration", "settingsRevisionId")

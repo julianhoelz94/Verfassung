@@ -4,7 +4,7 @@ Status: implementation and local verification complete. Required CI, merge and p
 
 Tracker: Sprint 66 in Linear; [VER-192](https://linear.app/verfassung/issue/VER-192/dep-3-upgrade-checklist-test-one-service-then-ci) covers the repeatable upgrade checklist. Initial base: `61ef2f2bb4af92da94c7d3b44f66856f382fbf62`. Main was merged again through `922089235becff0fae59f74f153ab245334e5556` during verification, preserving the intervening import, coverage and recovery work.
 
-On resumption, main was integrated through `5c359b1511b7769c14c1c57dd827377ca54a888a`, preserving source-information editing, published-release deployment safeguards and the country-label spacing fix. Imported mapper/test references were adapted to Jackson 3 and React 19. Publication retry regressions now seed pre-update Editor and Catalog hashes, retain hashes written after source review was added, reject changed payloads and reuse existing successor reservations. No applied migrations were changed.
+On resumption, main was integrated through `5c359b1511b7769c14c1c57dd827377ca54a888a`, preserving source-information editing, published-release deployment safeguards and the country-label spacing fix. Imported mapper/test references were adapted to Jackson 3 and React 19. Publication retry regressions now seed pre-update Editor and Catalog hashes, retain hashes written after source review was added, and require Catalog to validate the complete payload even when a successor is already reserved. An omitted source override remains compatible only when it exactly matches evidence inherited from the published predecessor. No applied migrations were changed.
 
 ## Scope
 

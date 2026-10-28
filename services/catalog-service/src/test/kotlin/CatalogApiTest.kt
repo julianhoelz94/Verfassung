@@ -813,17 +813,17 @@ class CatalogApiTest {
     }
 
     @org.junit.jupiter.params.ParameterizedTest
-    @org.junit.jupiter.params.provider.ValueSource(strings = ["none", "current", "legacy"])
+    @org.junit.jupiter.params.provider.ValueSource(strings = ["none", "current", "legacy", "inherited"])
     fun successorReservationRetriesRequireCompleteContentAndRejectChangedPayload(sourceFormat: String) {
         val countryCode = uniqueCountryCode()
         writes.createCountry(com.constitutionatlas.catalog.api.CreateCountryRequest(countryCode, "Reservation country"))
         val constitution = writes.createConstitution(countryCode, com.constitutionatlas.catalog.api.CreateConstitutionRequest("reservation-${UUID.randomUUID()}", "Reservation test"))
-        val initial = writes.createDraftVersion(constitution.id, com.constitutionatlas.catalog.api.CreateVersionRequest("0"))
+        val evidence = if (sourceFormat == "none") null else com.constitutionatlas.platform.SourceEvidence(coverage = "Excerpt", attribution = "Archive")
+        val initial = writes.createDraftVersion(constitution.id, com.constitutionatlas.catalog.api.CreateVersionRequest("0", sourceEvidence = evidence.takeIf { sourceFormat == "inherited" }))
         writes.publishVersion(initial.id)
         val attempt = UUID.randomUUID()
-        val evidence = if (sourceFormat == "none") null else com.constitutionatlas.platform.SourceEvidence(coverage = "Excerpt", attribution = "Archive")
         val request = com.constitutionatlas.catalog.api.CreateVersionRequest("1", predecessorVersionId = initial.id, hopKind = "editorial_correction", publicationComment = "Correction", publishAttemptId = attempt, sourceEvidence = evidence)
-        val reserved = writes.createDraftVersion(constitution.id, request)
+        val reserved = writes.createDraftVersion(constitution.id, if (sourceFormat == "inherited") request.copy(sourceEvidence = null) else request)
         if (sourceFormat == "legacy") {
             // Exact pre-description DTO bytes, independent of the current toString().
             val original = "CreateVersionRequest(versionLabel=1, effectiveDate=null, languageCode=en, sourceUrl=null, gazetteReference=null, predecessorVersionId=${initial.id}, hopKind=editorial_correction, publicationComment=Correction, structuralSettingsRevisionId=null, publishAttemptId=$attempt, importJobId=null, sourceEvidence=SourceEvidence(dateWording=null, datePrecision=unknown, coverage=Excerpt, statusWording=null, attribution=Archive))"

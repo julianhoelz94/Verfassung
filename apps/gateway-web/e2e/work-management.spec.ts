@@ -79,9 +79,10 @@ test('imports use shared disclosures and completed imports can be archived and r
   await expect(submitted).toHaveCount(1);
   for (const disclosure of [technical, submitted]) {
     await expect(disclosure).not.toHaveAttribute('open', '');
-    await disclosure.locator('summary').focus();
-    await page.keyboard.press('Enter');
+    await disclosure.locator('summary').click();
     await expect(disclosure).toHaveAttribute('open', '');
+    await disclosure.locator('summary').press('Enter');
+    await expect(disclosure).not.toHaveAttribute('open', '');
   }
   await page.goto('/editor?mine=1&workStatus=published');
   await expect(page.getByText('Archive example', { exact: true })).toBeVisible();

@@ -2,6 +2,7 @@ package com.constitutionatlas.editor.api
 
 import com.constitutionatlas.editor.service.EditorService
 import org.springframework.http.HttpStatus
+import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
@@ -29,7 +30,23 @@ class EditorController(private val editorService: EditorService) {
         @RequestParam(required = false) versionId: UUID?,
         @RequestParam(defaultValue = "100") limit: Int,
         @RequestParam(defaultValue = "0") offset: Int,
-    ): List<EditSessionSummaryDto> = editorService.listSessions(authorization, status, openedBy, versionId, limit, offset)
+        @RequestParam(defaultValue = "false") archived: Boolean,
+    ): List<EditSessionSummaryDto> = editorService.listSessions(authorization, status, openedBy, versionId, limit, offset, archived)
+
+    @PostMapping("/edit-sessions/{sessionId}/archive")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    fun archive(
+        @RequestHeader(value = "Authorization", required = false) authorization: String?,
+        @PathVariable sessionId: UUID,
+        @RequestBody request: SessionArchiveRequest,
+    ) = editorService.archive(authorization, sessionId, request.archived)
+
+    @DeleteMapping("/edit-sessions/{sessionId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    fun discard(
+        @RequestHeader(value = "Authorization", required = false) authorization: String?,
+        @PathVariable sessionId: UUID,
+    ) = editorService.discard(authorization, sessionId)
 
     @GetMapping("/edit-sessions/{sessionId}")
     fun preview(

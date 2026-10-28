@@ -62,7 +62,7 @@ class EditorRepository(
         return session.copy(revisionCount = revisionCount)
     }
 
-    fun listSessions(status: EditSessionStatus?, openedBy: UUID?, versionId: UUID?, limit: Int, offset: Int): List<EditSessionSummaryDto> {
+    fun listSessions(status: EditSessionStatus?, openedBy: UUID?, versionId: UUID?, limit: Int, offset: Int, archived: Boolean = false): List<EditSessionSummaryDto> {
         val sql = StringBuilder(
             """
             SELECT s.id, s.actor_id, s.version_id, s.status, s.hop_kind, s.created_at, s.updated_at,
@@ -72,10 +72,10 @@ class EditorRepository(
                 WHERE c.session_id = s.id AND c.article_id IS NOT NULL
               ) AS changed_article_count
             FROM edit_sessions s
-            WHERE 1 = 1
+            WHERE s.status <> 'discarded' AND (s.archived_at IS NOT NULL) = ?
             """.trimIndent(),
         )
-        val args = mutableListOf<Any>()
+        val args = mutableListOf<Any>(archived)
         if (status != null) {
             sql.append(" AND s.status = ?")
             args.add(status.toJson())
@@ -155,6 +155,10 @@ class EditorRepository(
             { rs, _ -> rs.getObject("id", UUID::class.java) },
             *listOf(actorId, versionId, hopKind).plus(statuses.map { it.toJson() }).toTypedArray(),
         ).firstOrNull()
+    }
+
+    fun setArchived(sessionId: UUID, archived: Boolean) {
+        jdbc.update("UPDATE edit_sessions SET archived_at = CASE WHEN ? THEN COALESCE(archived_at, NOW()) ELSE NULL END WHERE id = ?", archived, sessionId)
     }
 
     fun updateStatus(sessionId: UUID, status: EditSessionStatus) {

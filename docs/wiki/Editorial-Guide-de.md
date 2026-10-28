@@ -13,6 +13,8 @@
 
 **Ergebnis:** Der Entwurf wartet in der Prüfwarteschlange. Unter **Meine Bearbeitungen** finden Sie Entwürfe, eingereichte und freigegebene Bearbeitungen sowie veröffentlichte Ergebnisse mit ihrem jeweiligen Status. Gespeicherte Arbeit bleibt bei der Rückkehr zu dieser Liste erhalten. Ist das Einreichen noch nicht möglich, führen die Hinweise neben der Schaltfläche zu den fehlenden Angaben.
 
+Mit dem Filter **Status** zeigen Sie Entwürfe, Bearbeitungen in Prüfung, freigegebene oder veröffentlichte Ergebnisse an. **Archivieren** entfernt abgeschlossene Bearbeitungen und Importe aus der aktuellen Liste. Unter **Archivierte Bearbeitungen** finden Sie diese wieder und können sie wiederherstellen. **Entwurf löschen** verlangt eine Bestätigung und entfernt einen eigenen offenen Entwurf aus dem Arbeitsbereich. Eingereichte und veröffentlichte Bearbeitungen können nicht gelöscht werden; Veröffentlichungen und Prüfverlauf bleiben erhalten.
+
 ![Entwurfsbearbeitung mit Text und Arbeitsablauf](https://raw.githubusercontent.com/wiki/julianhoelz94/Verfassung/media/editor-draft-de.png)
 *Vor dem Einreichen speichern und kontrollieren.*
 

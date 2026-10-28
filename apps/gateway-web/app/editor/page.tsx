@@ -52,6 +52,8 @@ type EditorPageProps = {
     error?: string;
     mine?: string;
     status?: string;
+    workStatus?: string;
+    archived?: string;
   }>;
 };
 
@@ -84,7 +86,7 @@ export default async function EditorPage(props: EditorPageProps) {
   const preview = searchParams.sessionId ? await getDraftPreview(searchParams.sessionId) : null;
   const session = preview?.session;
   if (!session) {
-    return <EditorLanding userId={user.id} email={user.email} roles={user.roles} status={searchParams.status} error={searchParams.error} />;
+    return <EditorLanding userId={user.id} email={user.email} roles={user.roles} status={searchParams.status} workStatus={searchParams.workStatus} archived={searchParams.archived === 'true'} error={searchParams.error} />;
   }
 
   if (searchParams.scope === 'sources' || (preview.sourceEvidenceRevisions?.length && searchParams.scope !== 'text')) {

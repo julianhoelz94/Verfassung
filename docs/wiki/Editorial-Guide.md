@@ -13,6 +13,8 @@
 
 **Result:** the saved draft waits in the review queue. Open **My work** to find drafts, submitted work, approved work and published results. Each entry shows its current status. Returning to this list keeps saved work. If submission is unavailable, follow the links beside the button to complete the missing information.
 
+Use the **Status** filter to show drafts, work in review, approved work, or published results. **Archive** moves finished edits and imports out of the current list; choose **Archived work** to find and restore them. **Delete draft** asks for confirmation and removes an owned open draft from the workspace. Submitted and published work cannot be deleted; publication and review history are retained.
+
 ![Draft editor with text and workflow controls](https://raw.githubusercontent.com/wiki/julianhoelz94/Verfassung/media/editor-draft-en.png)
 *Save and inspect the draft before submitting it.*
 

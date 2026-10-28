@@ -86,6 +86,7 @@ class EditorService(
         versionId: UUID?,
         limit: Int,
         offset: Int,
+        archived: Boolean = false,
     ): List<EditSessionSummaryDto> {
         require(limit in 1..100) { "limit must be between 1 and 100" }
         require(offset >= 0) { "offset must be non-negative" }
@@ -103,7 +104,29 @@ class EditorService(
             }
         val statusFilter =
             status?.ifBlank { null }?.let { EditSessionStatus.fromJson(it) }
-        return editorRepository.listSessions(statusFilter, owner, versionId, limit, offset)
+        return editorRepository.listSessions(statusFilter, owner, versionId, limit, offset, archived)
+    }
+
+    @Transactional
+    fun archive(authorization: String?, sessionId: UUID, archived: Boolean) {
+        val actor = actor(authorization)
+        structuredPublication.lock(sessionId)
+        val session = requireOwned(actor, sessionId)
+        requireStatus(session, EditSessionStatus.PUBLISHED)
+        editorRepository.setArchived(sessionId, archived)
+        auditClient.record(actor, if (archived) "session_archived" else "session_restored", "edit_session", sessionId, emptyMap<String, Any>())
+    }
+
+    @Transactional
+    fun discard(authorization: String?, sessionId: UUID) {
+        val actor = actor(authorization)
+        requireEdit(actor)
+        structuredPublication.lock(sessionId)
+        val session = requireOwned(actor, sessionId)
+        if (session.status == EditSessionStatus.DISCARDED) return
+        requireStatus(session, EditSessionStatus.OPEN)
+        editorRepository.updateStatus(sessionId, EditSessionStatus.DISCARDED)
+        auditClient.record(actor, "draft_discarded", "edit_session", sessionId, emptyMap<String, Any>())
     }
 
     fun preview(authorization: String?, sessionId: UUID): DraftPreviewDto {
@@ -542,6 +565,7 @@ class EditorService(
     private fun requireVisible(actor: Actor, sessionId: UUID): EditSessionDto {
         val session = editorRepository.findSession(sessionId)
             ?: throw NotFoundException("Unknown session '$sessionId'")
+        if (session.status == EditSessionStatus.DISCARDED) throw NotFoundException("Unknown session")
         if (session.actorId == actor.id || actor.canReview() || actor.canPublish()) {
             return session
         }

@@ -105,7 +105,17 @@ class ImportService(
         return importVersion(authorization, actorId, item.payload, batchId, key, item.checksumSha256)
     }
 
-    fun listJobs(status: String?): List<ImportJobDto> = importJobRepository.list(status)
+    fun listJobs(status: String?, owner: UUID? = null, archived: Boolean = false, limit: Int = 100, offset: Int = 0): List<ImportJobDto> {
+        require(limit in 1..100 && offset >= 0) { "Invalid pagination" }
+        return importJobRepository.list(status, limit, owner, archived, offset)
+    }
+
+    @Transactional
+    fun archive(jobId: UUID, actorId: UUID, archived: Boolean) {
+        val job = importJobRepository.find(jobId) ?: throw com.constitutionatlas.platform.NotFoundException("Unknown import job")
+        if (job.submittedBy != actorId) throw com.constitutionatlas.platform.ForbiddenException("Not your import")
+        if (!importJobRepository.setArchived(jobId, actorId, archived)) throw ResponseStatusException(HttpStatus.CONFLICT, "Only finished imports can be archived")
+    }
 
     fun stagedRequest(jobId: UUID): ImportRequest? = importJobRepository.request(jobId)
 

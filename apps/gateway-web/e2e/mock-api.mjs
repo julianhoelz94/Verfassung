@@ -1124,6 +1124,7 @@ const server = createServer(async (req, res) => {
           },
         ]
       : [])];
+    sessions = sessions.filter(session => session.status !== 'discarded' && Boolean(session.archived) === (searchParams.get('archived') === 'true'));
     const status = searchParams.get('status');
     if (status) {
       sessions = sessions.filter((session) => session.status === status);
@@ -1150,6 +1151,21 @@ const server = createServer(async (req, res) => {
     };
     json(res, 200, editorState.session);
     return;
+  }
+  const managedSession = pathname.match(/^\/api\/editor\/edit-sessions\/([^/]+)(\/archive)?$/);
+  if (managedSession && (method === 'DELETE' || (method === 'POST' && managedSession[2]))) {
+    const session = editorState.seededSessions.find(item => item.id === managedSession[1]) ??
+      (editorState.session?.id === managedSession[1] ? editorState.session : null);
+    if (!session) { json(res, 404, {}); return; }
+    if ((session.openedBy ?? session.actorId) !== currentUser?.id) { json(res, 403, {}); return; }
+    if (method === 'DELETE') {
+      if (session.status !== 'open') { json(res, 409, {}); return; }
+      session.status = 'discarded';
+    } else {
+      if (session.status !== 'published') { json(res, 409, {}); return; }
+      session.archived = (await readBody(req)).archived;
+    }
+    res.writeHead(204); res.end(); return;
   }
   const editorSession = pathname.match(/^\/api\/editor\/edit-sessions\/([^/]+)$/);
   if (method === 'GET' && editorSession) {
@@ -1233,7 +1249,12 @@ const server = createServer(async (req, res) => {
 
   if (method === 'GET' && pathname === '/api/ingestion/import-jobs') {
     const status = new URL(req.url, 'http://mock').searchParams.get('status');
-    json(res, 200, [...importJobs.values()].filter(job => !status || job.status === status)); return;
+    const mine = searchParams.get('mine') === 'true';
+    const archived = searchParams.get('archived') === 'true';
+    const offset = Number(searchParams.get('offset') ?? 0);
+    const limit = Number(searchParams.get('limit') ?? 100);
+    const jobs = [...importJobs.values()].filter(job => (!status || job.status === status) && (!mine || job.submittedBy === currentUser?.id) && Boolean(job.archived) === archived);
+    json(res, 200, jobs.slice(offset, offset + limit)); return;
   }
   if (method === 'POST' && pathname === '/api/ingestion/import-jobs') {
     const payload = await readBody(req);
@@ -1243,13 +1264,19 @@ const server = createServer(async (req, res) => {
     importJobs.set(job.id, job);
     json(res, 201, job); return;
   }
-  const importMatch = pathname.match(/^\/api\/ingestion\/import-jobs\/([^/]+)(?:\/(payload|decisions|confirm-outline|prepare|approve|reject|publish))?$/);
+  const importMatch = pathname.match(/^\/api\/ingestion\/import-jobs\/([^/]+)(?:\/(payload|decisions|confirm-outline|prepare|approve|reject|publish|archive))?$/);
   if (importMatch) {
     const [, id, action] = importMatch;
     const job = importJobs.get(id);
     if (!job) { json(res, 404, {}); return; }
     if (method === 'GET') { json(res, 200, action === 'payload' ? job.payload : action === 'decisions' ? job.decisions : job); return; }
     if (method === 'POST') {
+      if (action === 'archive') {
+        if (job.submittedBy !== currentUser?.id) { json(res, 403, {}); return; }
+        if (!['completed', 'rejected', 'failed'].includes(job.status)) { json(res, 409, {}); return; }
+        job.archived = (await readBody(req)).archived;
+        res.writeHead(204); res.end(); return;
+      }
       if (action === 'confirm-outline') job.outlineConfirmedBy = currentUser.id;
       if (action === 'prepare') job.versionId = '01900000-0000-4000-8000-000000000705';
       if (action === 'approve' || action === 'reject') {

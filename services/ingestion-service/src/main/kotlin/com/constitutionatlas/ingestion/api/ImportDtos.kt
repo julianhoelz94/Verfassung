@@ -91,6 +91,8 @@ data class ImportBatchDto(val id: UUID, val items: List<ImportJobDto>, val statu
 
 data class StageBatchItemRequest(val idempotencyKey: String, val payload: ImportRequest, val checksumSha256: String? = null)
 
+data class ImportArchiveRequest(val archived: Boolean)
+
 data class ReviewDecisionRequest(val reason: String)
 
 data class ReviewDecisionDto(val id: UUID, val decision: String, val reason: String, val decidedBy: UUID, val decidedAt: java.time.OffsetDateTime)

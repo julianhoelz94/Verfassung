@@ -21,6 +21,7 @@ enum class EditSessionStatus {
     REVIEWING,
     APPROVED,
     PUBLISHED,
+    DISCARDED,
     ;
 
     @JsonValue
@@ -38,6 +39,8 @@ enum class EditSessionStatus {
         fun fromJson(value: String): EditSessionStatus = fromDb(value)
     }
 }
+
+data class SessionArchiveRequest(val archived: Boolean)
 
 data class CreateSessionRequest(
     val versionId: UUID,

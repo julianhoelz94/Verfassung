@@ -129,6 +129,38 @@ class ImportApiTest {
     )
 
     @Test
+    fun importArchiveIsOwnedReversibleAndPreservesTheJob() {
+        val id = UUID.randomUUID()
+        jdbc.update("INSERT INTO import_jobs(id, status, payload, submitted_by) VALUES (?, 'pending_review', '{}'::jsonb, ?)", id, admin.id)
+        fun archive(token: String, archived: Boolean) = mockMvc.post("/import-jobs/$id/archive") {
+            header("Authorization", token)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"archived":$archived}"""
+        }
+        archive(TOKEN, true).andExpect { status { isConflict() } }
+        jdbc.update("UPDATE import_jobs SET status = 'completed' WHERE id = ?", id)
+        archive(EDITOR_TOKEN, true).andExpect { status { isForbidden() } }
+        archive(TOKEN, true).andExpect { status { isNoContent() } }
+        mockMvc.get("/import-jobs?mine=true&archived=true") { header("Authorization", TOKEN) }
+            .andExpect { jsonPath("$[?(@.id == '$id')]") { isNotEmpty() } }
+        mockMvc.get("/import-jobs?mine=true&archived=true") { header("Authorization", EDITOR_TOKEN) }
+            .andExpect { jsonPath("$[?(@.id == '$id')]") { isEmpty() } }
+        mockMvc.get("/import-jobs?mine=true") { header("Authorization", TOKEN) }
+            .andExpect { jsonPath("$[?(@.id == '$id')]") { isEmpty() } }
+        mockMvc.get("/import-jobs/$id") { header("Authorization", TOKEN) }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.status") { value("completed") }
+            }
+        archive(TOKEN, false).andExpect { status { isNoContent() } }
+        mockMvc.get("/import-jobs?mine=true") { header("Authorization", TOKEN) }
+            .andExpect { jsonPath("$[?(@.id == '$id')]") { isNotEmpty() } }
+        jdbc.update("UPDATE import_jobs SET status = 'failed' WHERE id = ?", id)
+        archive(TOKEN, true).andExpect { status { isNoContent() } }
+        assertEquals(null, jobs.claimPreparation(id, admin.id))
+    }
+
+    @Test
     fun setupLostResponseResumesTheSameReviewedOperationAfterRestart() {
         val mapper = com.fasterxml.jackson.module.kotlin.jacksonObjectMapper()
         val repository = com.constitutionatlas.ingestion.repo.SetupProposalRepository(jdbc, mapper)

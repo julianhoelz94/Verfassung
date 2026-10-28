@@ -5,6 +5,7 @@ import { cookies } from 'next/headers';
 import { SESSION_COOKIE } from './session';
 import type { DiffReviewState, ReviewDecisionInput } from './diff-review';
 import type { SourceEvidence } from './api';
+import { workflowUi } from './workflow-messages';
 import { sourceEvidenceUi } from './source-evidence-messages';
 
 const PUBLISH_TIMEOUT_MS = 60_000;
@@ -105,6 +106,7 @@ export const EDITOR_ERROR_MESSAGES = {
   invalid: ui.errors.publishDraftFailed,
   open_failed: ui.errors.openSessionFailed,
   list_failed: ui.errors.listSessionsFailed,
+  manage_failed: workflowUi.managementFailed,
   save_failed: ui.errors.saveDraftFailed,
   stale_source_evidence: sourceEvidenceUi.stale,
   source_evidence_changes_required: sourceEvidenceUi.changesRequired,
@@ -239,6 +241,7 @@ export async function listSessions(filters: {
   versionId?: string;
   limit?: number;
   offset?: number;
+  archived?: boolean;
 } = {}): Promise<EditSessionSummary[]> {
   const params = new URLSearchParams();
   if (filters.status) {
@@ -252,13 +255,14 @@ export async function listSessions(filters: {
   }
   if (filters.limit != null) params.set('limit', String(filters.limit));
   if (filters.offset != null) params.set('offset', String(filters.offset));
+  if (filters.archived != null) params.set('archived', String(filters.archived));
   const query = params.toString();
   const response = await editorFetch(query ? `/edit-sessions?${query}` : '/edit-sessions');
   await throwIfNotOk(response, 'list_failed');
   return (await response.json()) as EditSessionSummary[];
 }
 
-export async function listAllSessions(filters: { status?: string; openedBy?: string; versionId?: string } = {}): Promise<EditSessionSummary[]> {
+export async function listAllSessions(filters: { status?: string; openedBy?: string; versionId?: string; archived?: boolean } = {}): Promise<EditSessionSummary[]> {
   const sessions: EditSessionSummary[] = [];
   const limit = 100;
   for (let offset = 0; ; offset += limit) {
@@ -266,6 +270,14 @@ export async function listAllSessions(filters: { status?: string; openedBy?: str
     sessions.push(...page);
     if (page.length < limit) return sessions;
   }
+}
+
+export async function manageSession(sessionId: string, action: 'archive' | 'restore' | 'discard'): Promise<void> {
+  const response = await editorFetch(`/edit-sessions/${encodeURIComponent(sessionId)}${action === 'discard' ? '' : '/archive'}`, {
+    method: action === 'discard' ? 'DELETE' : 'POST',
+    ...(action === 'discard' ? {} : { body: JSON.stringify({ archived: action === 'archive' }) }),
+  });
+  await throwIfNotOk(response, 'save_failed');
 }
 
 export async function getDraftPreview(sessionId: string): Promise<DraftPreview | null> {

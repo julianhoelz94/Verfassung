@@ -83,8 +83,12 @@ object OrderedContentRules {
         if (marks.isNotEmpty() && (format ?: "plain") !in setOf("plain", "footnote")) errors += OrderedValidationError("TEXT_MARK_FORMAT", path, logicalId, "Inline marks require plain text or a footnote body")
         val ends = mutableMapOf<String, Int>()
         marks.sortedWith(compareBy<OrderedTextMark> { it.type }.thenBy { it.start }.thenBy { it.end }).forEach { mark ->
-            val valid = mark.type in setOf("bold", "italic", "underline", "strikethrough") && mark.start >= 0 && mark.start < mark.end && mark.end <= text.length &&
-                !splitsSurrogate(text, mark.start) && !splitsSurrogate(text, mark.end)
+            val valid = mark.type in setOf("bold", "italic", "underline", "strikethrough") &&
+                mark.start >= 0 &&
+                mark.start < mark.end &&
+                mark.end <= text.length &&
+                !splitsSurrogate(text, mark.start) &&
+                !splitsSurrogate(text, mark.end)
             if (!valid) errors += OrderedValidationError("TEXT_MARK_RANGE", path, logicalId, "Invalid style or UTF-16 range '${mark.type}' [${mark.start},${mark.end})")
             if (mark.start < (ends[mark.type] ?: 0)) errors += OrderedValidationError("TEXT_MARK_OVERLAP", path, logicalId, "Overlapping ranges of the same style must be normalized")
             ends[mark.type] = maxOf(ends[mark.type] ?: 0, mark.end)
@@ -102,9 +106,12 @@ object OrderedContentRules {
         val identities = mutableSetOf<UUID>()
         references.withIndex().sortedWith(compareBy<IndexedValue<OrderedInlineReference>> { it.value.start }.thenBy { it.value.end }).forEach { (index, reference) ->
             val target = reference.target
-            val span = reference.start >= end && reference.start >= 0 && reference.end <= text.length &&
+            val span = reference.start >= end &&
+                reference.start >= 0 &&
+                reference.end <= text.length &&
                 (reference.start < reference.end || reference.start == reference.end && target.type == "footnote") &&
-                !splitsSurrogate(text, reference.start) && !splitsSurrogate(text, reference.end)
+                !splitsSurrogate(text, reference.start) &&
+                !splitsSurrogate(text, reference.end)
             val validTarget = when (target.type) {
                 "unit" -> target.logicalId != null && target.url == null && target.footnoteId == null && (units == null || target.logicalId in units)
                 "external" -> target.url?.startsWith("https://") == true && target.logicalId == null && target.footnoteId == null

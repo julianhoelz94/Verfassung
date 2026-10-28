@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import { getCountry, getReaderOutline, getUnit, getVersion, listAllUnits } from '../../../../../../../lib/api';
 import { orderedTargets } from '../../../../../../../lib/ordered-content';
+import { footnoteItems } from '../../../../../../../lib/footnotes';
 import { publicSnapshotContext } from '../../../../../../../lib/reading';
 import { ConstitutionText } from '../../../../../../components/ConstitutionText';
 import { ContentTranslationRegion } from '../../../../../../components/ContentTranslationRegion';
@@ -28,7 +29,7 @@ export default async function UnitPage({ params }: { params: Promise<{ code: str
 
     <SnapshotNotice code={code} viewedId={versionId} currentId={context!.version.currentVersionId ?? context!.version.id} />
     <ContentTranslationRegion sourceLanguage={context!.version.languageCode}>
-      <ConstitutionText article={unit} showHeading={false} lang={context!.version.languageCode} outline={outline ?? constitution.contentOutline} crossRefs={{ code, versionId, articlesByNumber, unitsByLogicalId: orderedTargets(roots) }} />
+      <ConstitutionText article={unit} showHeading={false} lang={context!.version.languageCode} outline={outline ?? constitution.contentOutline} crossRefs={{ code, versionId, articlesByNumber, unitsByLogicalId: orderedTargets(roots), footnotes: footnoteItems(roots.flatMap(item => item.content ?? []), '/countries/' + code + '/versions/' + versionId) }} />
     </ContentTranslationRegion>
   </ReaderPage>;
 }

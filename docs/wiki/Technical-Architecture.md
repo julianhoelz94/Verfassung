@@ -59,6 +59,12 @@ Version history has two axes: legal changes and editorial corrections. The legal
 
 ## API addresses
 
+Ordered text carries optional UTF-16 range marks (bold, italic, underline, strikethrough) separately from exact source text and inline references. Rich JSON persists those marks through import, draft replay, comparison, and immutable publication. Footnote references may have an empty range to anchor a superscript at a cursor without inserting text. Other reference types require a nonempty range.
+
+Content enforces a constitution-wide endnote invariant after resolving all roots and reused revisions: no body unit, nonblank body text, or table follows the first footnote. Shared deterministic validation supplies the same placement error to import and draft adapters; assembly, preparation, sealing, and publication retries revalidate the complete version. Existing historical snapshots are readable and are corrected through a reviewed successor. Readers build one pinned note index across roots; marker clicks show a dismissible drawer, and only its explicit destination link navigates.
+
+Catalog versions automatic leaf segmentation and punctuation delimiters with the outline settings. The gateway's continuous editor uses ProseMirror for composition, selection and structured marks while preserving the targeted draft operation contract. Presentation and temporary sentence boxes do not rewrite legal text.
+
 Catalog represents current and historical constitutional jurisdictions as a hierarchy without a fixed depth. Each jurisdiction has a stable UUID, sibling-unique slug, name, kind (such as `country`, `region`, `subregion`, or `municipality`), optional code, and optional parent. A constitution belongs directly to one jurisdiction; its slug aliases and predecessor constitutions are scoped to that jurisdiction. Creating a child does not copy or inherit its parent's constitution. Hierarchy relationships are creation-only in this API.
 
 Set `historical: true` for a country or region that no longer exists. Optional `existedFrom` and `existedUntil` dates describe its existence; omit dates when they are unknown, rather than inventing an exact day. An end date requires a historical jurisdiction and must not precede its start date. Historical jurisdictions remain publicly browsable and their constitutions use the normal review/publication rules. An old constitution of a country that still exists belongs to that continuing jurisdiction; the age of its constitution alone does not make the jurisdiction historical.

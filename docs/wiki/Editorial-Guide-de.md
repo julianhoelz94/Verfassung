@@ -20,6 +20,16 @@ Mit dem Filter **Status** zeigen Sie Entwürfe, Bearbeitungen in Prüfung, freig
 
 [▶ Bearbeitung und Einreichung ansehen](https://julianhoelz94.github.io/Verfassung/#editing-a-draft-de)
 
+### Schreiben und Fußnoten
+
+Die Artikelnavigation lässt sich ausblenden, damit der Text mehr Platz erhält. **Sitzung und Veröffentlichung** öffnet die Angaben zum Arbeitsablauf bei Bedarf. Die haftende Symbolleiste folgt der Textauswahl; ihre Menüs enthalten benannte Aktionen für Einheiten, Tabellen, Eigenschaften, das Teilen und Zusammenführen von Text sowie Verweise. **Änderungen** zeigt die Text-, Formatierungs-, Fußnoten- und Strukturänderungen der Sitzung. Speichern Sie den Entwurf vor dem Einreichen.
+
+**Fett**, **Kursiv**, **Unterstrichen** und **Durchgestrichen** formatieren die Auswahl oder den anschließend eingegebenen Text. **Rückgängig** und **Wiederholen** sind ohne verfügbare Schritte deaktiviert. Durchstreichen ist eine Textformatierung und erfasst keine rechtliche Aufhebung.
+
+Die Struktureinstellungen bestimmen, ob Blatteinheiten als Fließtext oder zeilenweise erscheinen. Bei eingeschalteter automatischer Satzerstellung erzeugt die konfigurierte Zeichensetzung den nächsten Satz; der Cursor bleibt im Text. Standardmäßig sind Punkt, Ausrufezeichen und Fragezeichen eingestellt. Ebenen mit untergeordneten Arten können diese Funktion nicht verwenden. **Satzgrenzen anzeigen** umrahmt Sätze nur im Fließtext und verändert den gespeicherten Wortlaut nicht.
+
+Unter **Fußnoten → Neue Fußnote…** erfassen Sie das wörtliche Zeichen und den Fußnotentext am Verfassungsende; der Verweis steht an der gewählten Cursorposition. **Bearbeiten** an der tatsächlichen Fußnote öffnet die Bearbeitung an dieser Stelle. Zeigen oder fokussieren Sie ein Fußnotenzeichen für die Vorschau; ein Klick öffnet die untere Ansicht, ohne die Leseposition zu verändern. **×**, **Escape** oder ein Klick außerhalb schließen sie. **Zur Fußnote** springt ausdrücklich zur Fußnote am Ende. Importe mit späterem Verfassungstext nach einer Fußnote werden zurückgewiesen; veröffentlichte historische Texte bleiben lesbar.
+
 ## 2. Prüfen
 
 **Erforderlich: Prüfer oder Administrator.**

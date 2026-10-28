@@ -21,6 +21,7 @@ object OrderedContentFidelity {
                                 a.footnoteLabel == b.footnoteLabel &&
                                 a.references == b.references &&
                                 a.annotation == b.annotation &&
+                                a.marks == b.marks &&
                                 (a.lineage.isEmpty() || a.lineage == b.lineage)
                         }
                 }

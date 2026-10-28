@@ -56,6 +56,20 @@ it('keeps an occurrence anchor on a standalone unit', () => {
   expect(host.querySelectorAll('#root')).toHaveLength(1);
 });
 
+it('reveals a collapsed early article when an endnote backlink targets its marker', async () => {
+  const source: ArticleSummary[] = [
+    { ...articles[0], id: 'early', content: [{ type: 'text', logicalId: 'text', occurrenceId: 'text-occ', text: 'Original body.', references: [{ logicalId: 'marker', start: 14, end: 14, target: { type: 'footnote', footnoteId: 'note' } }] }] },
+    { ...articles[0], id: 'last', articleNumber: '20' },
+  ];
+  await act(async () => root.render(<VersionReader jurisdictionId="region" versionId="old-snapshot" articles={source} outline={outline} />));
+  expect(host.querySelector('#fn-note-occurrence')).not.toBeNull();
+  expect(host.querySelector('#ref-marker')).toBeNull();
+  await act(async () => { window.history.replaceState({}, '', '/#ref-marker'); window.dispatchEvent(new HashChangeEvent('hashchange')); });
+  expect(host.querySelector('#ref-marker')).not.toBeNull();
+  expect(host.querySelector('#unit-early')?.getAttribute('aria-expanded')).toBe('true');
+  expect(host.querySelectorAll('#fn-note-occurrence')).toHaveLength(1);
+});
+
 it('localizes reading controls while preserving authored outline labels and source text', async () => {
   const sourceOutline: ContentOutline = { kinds: [...outline.kinds, {
     kindCode: 'chapter', displayLabel: 'Authored chapter label', sortOrder: 2,

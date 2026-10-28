@@ -86,7 +86,7 @@ class CatalogSettingsContractTest {
         val revision = UUID.randomUUID()
         val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
         server.createContext("/") { exchange ->
-            val bytes = """{"id":"$revision","outline":{"kinds":[{"kindCode":"article","displayLabel":"Article","root":true,"allowedChildKinds":[],"mayHoldText":true,"mayHoldChildren":false,"sortOrder":1}]}}""".toByteArray()
+            val bytes = """{"id":"$revision","outline":{"kinds":[{"kindCode":"article","displayLabel":"Article","root":true,"allowedChildKinds":[],"mayHoldText":true,"mayHoldChildren":false,"sortOrder":1,"sentenceDelimiters":[";","。"]}]}}""".toByteArray()
             exchange.responseHeaders.set("Content-Type", "application/json")
             exchange.sendResponseHeaders(200, bytes.size.toLong())
             exchange.responseBody.use { it.write(bytes) }
@@ -99,6 +99,7 @@ class CatalogSettingsContractTest {
             assertEquals(true, kind.root)
             assertEquals(emptyList<String>(), kind.allowedChildKinds)
             assertEquals("article", kind.kindCode)
+            assertEquals(listOf(";", "。"), kind.sentenceDelimiters)
         } finally {
             server.stop(0)
         }

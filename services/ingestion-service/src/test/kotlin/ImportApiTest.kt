@@ -533,6 +533,61 @@ class ImportApiTest {
     }
 
     @Test
+    fun chunkAssemblyValidatesEndnotesAcrossTheWholeConstitutionBeforePreparation() {
+        val laterText = "x".repeat(600_000)
+        val payload = """{"isoCode":"FR","countryName":"France","constitutionSlug":"notes","constitutionTitle":"Notes","versionLabel":"1","sourceUrl":"https://example.org/test-import","roots":[{"kind":"article","content":[{"type":"text","format":"footnote","text":"Source note"}]},{"kind":"article","content":[{"type":"text","text":"$laterText"}]}]}"""
+        val item = assembleChunkedPayload(payload, "invalid-endnotes")
+        mockMvc.get("/import-jobs/$item") { header("Authorization", TOKEN) }.andExpect {
+            status { isOk() }
+            jsonPath("$.status") { value("failed") }
+            jsonPath("$.errors[0].code") { value("FOOTNOTE_NOT_AT_END") }
+        }
+        Mockito.verifyNoInteractions(catalogClient, contentClient)
+    }
+
+    @Test
+    fun chunkAssemblyResolvesForwardNodeTextAndFootnoteTargetsAfterTheLastChunkArrives() {
+        val target = UUID.randomUUID()
+        val text = UUID.randomUUID()
+        val note = UUID.randomUUID()
+        val padding = "x".repeat(600_000)
+        val payload = """{"isoCode":"FR","countryName":"France","constitutionSlug":"references","constitutionTitle":"References","versionLabel":"1","sourceUrl":"https://example.org/test-import","roots":[{"kind":"article","content":[{"type":"text","text":"See","references":[{"logicalId":"${UUID.randomUUID()}","start":0,"end":1,"target":{"type":"unit","logicalId":"$target"}},{"logicalId":"${UUID.randomUUID()}","start":1,"end":3,"target":{"type":"unit","logicalId":"$text"}},{"logicalId":"${UUID.randomUUID()}","start":0,"end":0,"target":{"type":"footnote","footnoteId":"$note"}}]},{"type":"text","text":"$padding"}]},{"logicalId":"$target","kind":"article","content":[{"type":"text","logicalId":"$text","text":"Target text"},{"type":"text","logicalId":"$note","text":"Source note","format":"footnote"}]}]}"""
+        val item = assembleChunkedPayload(payload, "valid-cross-chunk")
+        mockMvc.get("/import-jobs/$item") { header("Authorization", TOKEN) }.andExpect {
+            status { isOk() }
+            jsonPath("$.status") { value("pending_review") }
+            jsonPath("$.errors.length()") { value(0) }
+        }
+        val references = importService.stagedRequest(UUID.fromString(item))!!.roots.first().content!!.first().references
+        assertEquals(listOf(target, text, note), references.map { it.target.logicalId ?: it.target.footnoteId })
+        Mockito.verifyNoInteractions(catalogClient, contentClient)
+    }
+
+    private fun assembleChunkedPayload(payload: String, key: String): String {
+        val batch = jobId(mockMvc.post("/import-batches") { header("Authorization", TOKEN) }.andExpect { status { isCreated() } }.andReturn().response.contentAsString)
+        val bytes = payload.toByteArray()
+        fun checksum(value: ByteArray) = MessageDigest.getInstance("SHA-256").digest(value).joinToString("") { "%02x".format(it) }
+        val uploadId = jobId(
+            mockMvc.post("/import-batches/$batch/uploads") {
+                header("Authorization", TOKEN)
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"idempotencyKey":"$key","checksumSha256":"${checksum(bytes)}","totalBytes":${bytes.size}}"""
+            }.andExpect { status { isCreated() } }.andReturn().response.contentAsString,
+        )
+        val chunkSize = com.constitutionatlas.ingestion.service.ImportUploadService.CHUNK_BYTES
+        for ((index, start) in bytes.indices.step(chunkSize).withIndex()) {
+            val chunk = bytes.copyOfRange(start, minOf(start + chunkSize, bytes.size))
+            mockMvc.put("/import-uploads/$uploadId/chunks/$index") {
+                header("Authorization", TOKEN)
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"dataBase64":"${Base64.getEncoder().encodeToString(chunk)}","checksumSha256":"${checksum(chunk)}"}"""
+            }.andExpect { status { isOk() } }
+        }
+        val assembled = mockMvc.post("/import-uploads/$uploadId/complete") { header("Authorization", TOKEN) }.andExpect { status { isOk() } }.andReturn()
+        return json.readTree(assembled.response.contentAsString).path("itemId").asString()
+    }
+
+    @Test
     fun unfinishedUploadCanBeCanceledOnlyByItsOwner() {
         val batch = json.readTree(
             mockMvc.post("/import-batches") { header("Authorization", MCP_TOKEN) }

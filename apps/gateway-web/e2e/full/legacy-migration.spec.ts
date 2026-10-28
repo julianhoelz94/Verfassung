@@ -66,10 +66,12 @@ test('offline archive package preserves evidence through review, publication and
           { logicalId: id('row1'), cells: [{ logicalId: id('header'), text: 'Pflicht', header: true, colSpan: 2 }] },
           { logicalId: id('row2'), cells: [{ logicalId: id('cell1'), text: 'Bericht' }, { logicalId: id('cell2'), text: 'jährlich' }] },
         ] } },
+      ] },
+      { logicalId: id('appendix'), kind: 'appendix', label: 'Anhang A', content: [
+        { type: 'text', logicalId: id('annex'), text: manifest.annexText },
         { type: 'text', logicalId: id('note'), text: manifest.annotationText, format: 'footnote', footnoteLabel: '[a]',
           annotation: { kind: 'editorial', attribution: manifest.attribution, sourceUrl: 'https://verfassungen.de/annotated.htm', anchorLogicalIds: [id('wording')] } },
       ] },
-      { logicalId: id('appendix'), kind: 'appendix', label: 'Anhang A', content: [{ type: 'text', logicalId: id('annex'), text: manifest.annexText }] },
     ];
     const proposal = await mcp(request, importer, 'propose_constitution_setup', { proposal: {
       jurisdictionId: jurisdiction.id, constitutionSlug: 'archive', constitutionTitle: 'Synthetic regional constitution', languageCode: 'de', sourceUrl: 'https://verfassungen.de/annotated.htm', outline, sampleRoots: roots,

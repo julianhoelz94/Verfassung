@@ -16,7 +16,16 @@ import { Stack, Inline } from '../../components/layout/Layout';
 import surfaceStyles from '../../components/surfaces.module.css';
 import fieldStyles from '../../components/fields.module.css';
 
-type Layer = OutlineKindWrite & { existing?: boolean };
+type Layer = OutlineKindWrite & { existing?: boolean; delimiterInput?: string };
+
+const sentenceSettingsCopy = {
+  automatic: { en: 'Automatically create sentence nodes', de: 'Satzknoten automatisch anlegen' },
+  delimiters: { en: 'Sentence delimiters', de: 'Satztrennzeichen' },
+  delimiterHelp: { en: 'Separate punctuation sequences with spaces, for example . ! ? or 。 ！ ？. Each sequence is one delimiter.', de: 'Satzzeichenfolgen durch Leerzeichen trennen, zum Beispiel . ! ? oder 。 ！ ？. Jede Folge ist ein Trennzeichen.' },
+  optionalMetadata: { en: 'Automatic creation is unavailable when labels or titles are required. Enter these units explicitly.', de: 'Automatisches Anlegen ist bei vorgeschriebenen Bezeichnungen oder Titeln nicht verfügbar. Legen Sie diese Einheiten ausdrücklich an.' },
+  leafOnly: { en: 'Automatic sentence creation is available only on a level without child units.', de: 'Automatisches Anlegen von Sätzen ist nur auf einer Ebene ohne untergeordnete Einheiten möglich.' },
+  invalid: { en: 'Use 1–16 distinct punctuation sequences, each at most 8 characters, for automatic sentence creation.', de: 'Verwenden Sie für automatische Sätze 1–16 unterschiedliche Satzzeichenfolgen mit jeweils höchstens 8 Zeichen.' },
+} satisfies Record<string, UiMessage>;
 
 type OutlineEditorProps = {
   constitutionId?: string;
@@ -39,7 +48,7 @@ function slugify(label: string): string {
 }
 
 function withoutExisting(layers: Layer[]): OutlineKindWrite[] {
-  return layers.map(({ existing: _ignored, ...kind }) => kind);
+  return layers.map(({ existing: _ignored, delimiterInput: _input, ...kind }) => kind);
 }
 
 function explicitLayers(kinds: OutlineKindWrite[], existing: boolean): Layer[] {
@@ -47,6 +56,8 @@ function explicitLayers(kinds: OutlineKindWrite[], existing: boolean): Layer[] {
     ...kind,
     root: kind.root ?? index === 0,
     allowedChildKinds: kind.allowedChildKinds ?? (kinds[index + 1] ? [kinds[index + 1]!.kindCode] : []),
+    sentenceDelimiters: kind.sentenceDelimiters ?? ['.', '!', '?'],
+    delimiterInput: (kind.sentenceDelimiters ?? ['.', '!', '?']).join(' '),
     existing,
   }));
 }
@@ -78,6 +89,7 @@ export function OutlineEditor({
   const [checking, setChecking] = useState(false);
 
   async function checkImpact() {
+    if (outlineError) { setShowErrors(true); return; }
     setChecking(true);
     setImpactError(false);
     try {
@@ -95,7 +107,9 @@ export function OutlineEditor({
     setLayers((current) => current.map((layer, i) => {
       const renamed = patch.kindCode && patch.kindCode !== current[index]?.kindCode;
       const children = renamed ? layer.allowedChildKinds?.map(code => code === current[index]?.kindCode ? patch.kindCode! : code) : layer.allowedChildKinds;
-      return i === index ? { ...layer, ...patch, allowedChildKinds: patch.allowedChildKinds ?? children } : { ...layer, allowedChildKinds: children };
+      if (i !== index) return { ...layer, allowedChildKinds: children };
+      const updated = { ...layer, ...patch, allowedChildKinds: patch.allowedChildKinds ?? children };
+      return (updated.allowedChildKinds?.length || updated.labelPolicy === 'required' || updated.titlePolicy === 'required') ? { ...updated, segmentation: 'plain' as const } : updated;
     }));
   }
 
@@ -151,7 +165,12 @@ export function OutlineEditor({
       ? t(ui.remainingStatus.outlineUniqueCodes)
       : !layers.some(layer => layer.root) ? t(ui.remainingStatus.outlineRootRequired)
         : layers.some(layer => layer.allowedChildKinds?.some(code => !codes.includes(code))) ? t(ui.remainingStatus.outlineMissingChild)
-          : null;
+          : layers.some(layer => {
+            const delimiters = layer.sentenceDelimiters ?? ['.', '!', '?'];
+            return (layer.segmentation === 'sentence' && (!delimiters.length || layer.allowedChildKinds?.length || layer.labelPolicy === 'required' || layer.titlePolicy === 'required')) ||
+              delimiters.length > 16 || new Set(delimiters).size !== delimiters.length ||
+              delimiters.some(delimiter => !delimiter || [...delimiter].length > 8 || !/^[\p{P}\p{S}]+$/u.test(delimiter));
+          }) ? t(sentenceSettingsCopy.invalid) : null;
 
   function advance() {
     if (step === 1) {
@@ -172,7 +191,7 @@ export function OutlineEditor({
       if (step !== 3) advance();
       return;
     }
-    if (guidedCreation && outlineError) { setShowErrors(true); return; }
+    if (outlineError) { setShowErrors(true); return; }
     if (submitting) return;
     setSubmitting(true);
     setSubmitError(false);
@@ -274,9 +293,11 @@ export function OutlineEditor({
                 <option value="none"><T value={ui.admin.constitutions.outlineeditor.notAllowed} /></option><option value="optional"><T value={ui.admin.constitutions.outlineeditor.optional} /></option><option value="required"><T value={ui.admin.constitutions.outlineeditor.required} /></option>
               </Select>
               <p className="muted"><T value={ui.admin.constitutions.outlineeditor.labelsSuchAs46aBisAnd2a} /></p>
-              {!layer.allowedChildKinds?.length ? <Select label={<T value={ui.attrs.adminConstitutionsOutlineeditorSelectLabelText} />} info={{ description: <T value={ui.help.textEditingHelp} />, changeability: 'review' }} name={`segmentation-${index}`} value={layer.segmentation ?? 'plain'} onChange={(event) => update(index, { segmentation: event.target.value as Layer['segmentation'] })}>
-                <option value="plain"><T value={ui.admin.constitutions.outlineeditor.plainText} /></option><option value="sentence"><T value={ui.admin.constitutions.outlineeditor.sentenceBoundaryAssistance} /></option>
-              </Select> : null}
+              {!layer.allowedChildKinds?.length ? <>
+                <label className="choice-row"><input type="checkbox" name={`segmentation-${index}`} checked={layer.segmentation === 'sentence'} disabled={(layer.labelPolicy === 'required' || layer.titlePolicy === 'required') && layer.segmentation !== 'sentence'} onChange={event => update(index, { segmentation: event.target.checked ? 'sentence' : 'plain' })} /> <T value={sentenceSettingsCopy.automatic} /></label>
+                {layer.labelPolicy === 'required' || layer.titlePolicy === 'required' ? <p className="muted"><T value={sentenceSettingsCopy.optionalMetadata} /></p> : null}
+                {layer.segmentation === 'sentence' ? <Input label={<T value={sentenceSettingsCopy.delimiters} />} name={`sentence-delimiters-${index}`} value={layer.delimiterInput ?? (layer.sentenceDelimiters ?? ['.', '!', '?']).join(' ')} onChange={event => update(index, { delimiterInput: event.target.value, sentenceDelimiters: event.target.value.trim().split(/\s+/u).filter(Boolean) })} info={{ description: <T value={sentenceSettingsCopy.delimiterHelp} />, changeability: 'review' }} /> : null}
+              </> : <p className="muted"><T value={sentenceSettingsCopy.leafOnly} /></p>}
             </Stack>
             <Stack as="fieldset">
               <legend><T value={ui.admin.constitutions.outlineeditor.publicReaderDisplay} /></legend>
@@ -359,7 +380,7 @@ export function OutlineEditor({
         {constitutionId ? <p><T value={ui.admin.constitutions.outlineeditor.occupiedStructureAndStricterPermissionsAreChecked} /></p> : null}
       </aside>
       </div>
-      {guidedCreation && showErrors && outlineError ? <Alert tone="error">{outlineError}</Alert> : null}
+      {showErrors && outlineError ? <Alert tone="error">{outlineError}</Alert> : null}
       {impactError ? <Alert tone="error"><T value={ui.admin.constitutions.outlineeditor.impactCouldNotBeCheckedRetryWhen} /></Alert> : null}
       {submitError ? <Alert tone="error"><T value={ui.admin.constitutions.outlineeditor.theConstitutionCouldNotBeSavedTry} /></Alert> : null}
       {impact ? <section aria-live="polite" className={["card", surfaceStyles.card].join(' ')}>

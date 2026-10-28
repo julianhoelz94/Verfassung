@@ -63,7 +63,6 @@ function xcRoots(key) {
     ] }),
     child('xc-paragraph', 'paragraph', '(1)', null, [text('xc-paragraph-text', 'Every person has equal standing.')]),
     text('xc-source', 'Source', { references: [{ logicalId: id('xc-source-ref'), start: 0, end: 6, target: { type: 'external', url: changed ? 'https://example.org/atlas-e2e/revised-source' : 'https://example.org/atlas-e2e/original-source' } }] }),
-    footnote,
   ]);
   const appendix = child('xc-appendix', 'appendix', 'A', null, [
     text('xc-appendix-intro', 'Schedule of civic duties.'),
@@ -79,6 +78,7 @@ function xcRoots(key) {
       { logicalId: id('xc-row-span'), cells: [{ logicalId: id('xc-cell-span'), text: 'Applies nationally', colSpan: 2, headers: [id('xc-cell-duty'), id('xc-cell-period')] }] },
     ] } }),
     child('xc-clause', 'clause', null, null, [text('xc-clause-text', 'This clause has no title or number.')]),
+    footnote,
   ]);
   return [preamble.node, article.node, appendix.node];
 }

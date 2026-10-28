@@ -20,6 +20,16 @@ Use the **Status** filter to show drafts, work in review, approved work, or publ
 
 [▶ Watch editing and submission](https://julianhoelz94.github.io/Verfassung/#editing-a-draft-en)
 
+### Writing and footnotes
+
+The article navigation can be hidden to give the document more width. **Session and publication** opens the workflow details when needed. The sticky icon toolbar follows the active text selection; its menus contain named actions for inserting units and tables, editing properties, splitting or merging text, and managing references. **Changes** collects the session's wording, formatting, note and structural differences. Save the draft before submitting it for review.
+
+Use **Bold**, **Italic**, **Underline**, and **Strikethrough** for the selected text or continued typing. **Undo** and **Redo** are disabled when their history is empty. Strikethrough is a text style; it does not record a repeal.
+
+Constitution structure settings determine whether leaf units appear as flowing text or on separate lines. When automatic sentence creation is enabled for a leaf level, typing its configured punctuation creates the next sentence while retaining the cursor in the text. The default delimiters are period, exclamation mark and question mark. Levels with child kinds cannot use automatic sentence creation. **Show sentence boundaries** adds boxes only in flowing text and does not change the stored wording.
+
+Choose **Footnotes → New footnote…** to add a literal label and note at the constitution's end, with its marker at the selected cursor position. **Edit** on the actual note edits it in place. Hovering or focusing a marker previews its note; clicking it opens a bottom drawer and keeps the reading position. Close the drawer with **×**, **Escape**, or a click outside it. **Go to footnote** explicitly jumps to the actual note at the end. Import validation rejects a note followed by later body content; published historical text remains available.
+
 ## 2. Review
 
 **Requires: Reviewer or Admin.**

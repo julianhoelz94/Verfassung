@@ -7,7 +7,7 @@ import { ui } from '../../lib/messages';
 import { redirect } from 'next/navigation';
 import { ArticleFilterList } from '../components/ArticleFilterList';
 import { ConstitutionText } from '../components/ConstitutionText';
-import { WorkspacePage, WorkspaceLayout } from '../components/layout/templates';
+import { WorkspacePage } from '../components/layout/templates';
 import { Alert, Badge, Button, PageHeader, WorkflowSteps } from '../components/ui';
 import { getCountry, getVersion, listAllArticles, getArticle, listAllUnits, getUnit, getVersionSettings, listCountries, type ArticleSummary, type CountryDetail, type CountrySummary } from '../../lib/api';
 import { editorErrorMessage, getDraftPreview, getEditorDiffReview, getStructuredDraft } from '../../lib/editor-api';
@@ -15,8 +15,7 @@ import { decisionReadyForReview } from '../../lib/diff-review';
 import { currentUser, requireSessionBearer } from '../../lib/session';
 import { ArticleEditor } from './ArticleEditor';
 import { EditorDraftState, SubmitReviewButton } from './EditorDraftState';
-import { draftDifferences, nodes, readerNode } from '../../lib/structured-editor';
-import { OrderedContentTree } from '../components/ConstitutionText';
+import { draftDifferences, nodes } from '../../lib/structured-editor';
 import { StructuredEditor } from './StructuredEditor';
 import { PublishForm } from './PublishForm';
 import { LegacyPublishForm } from './LegacyPublishForm';
@@ -29,6 +28,9 @@ import { loginHref } from '../../lib/return-to';
 import surfaceStyles from '../components/surfaces.module.css';
 import { SourceEvidenceWorkspace } from './SourceEvidenceWorkspace';
 import { sourceEvidenceUi } from '../../lib/source-evidence-messages';
+import { indexDraftFootnotes, indexDraftFootnoteReferences } from '../../lib/draft-footnotes';
+import { EditorWorkspace } from './EditorWorkspace';
+import { changeExcerpt } from '../../lib/editor-change-context';
 
 type EditorPageProps = {
   searchParams: Promise<{
@@ -217,7 +219,7 @@ export default async function EditorPage(props: EditorPageProps) {
       {alerts}
       {preview.sourceEvidenceRevisions?.length ? <Alert tone="info"><a href={`/editor?sessionId=${encodeURIComponent(session.id)}&scope=sources`}><T value={sourceEvidenceUi.inspectSources} /></a></Alert> : null}
       {searchParams.sessionId && articles.length > 0 ? (
-        <EditorDraftState><WorkspaceLayout>
+        <EditorDraftState><EditorWorkspace navigation={
           <aside className={["panel", surfaceStyles.panel].join(' ')} aria-label={message(locale, ui.accessibility.topLevelUnits)}>
             <h2 className="panel-title"><T value={articles.every(article => (article.kind ?? 'article') === 'article') ? ui.editorDynamic.articles : ui.editorDynamic.topLevelUnits} /></h2>
             <p className="muted">{draftIds.length} <T value={ui.editor.page.changed} /></p>
@@ -229,69 +231,7 @@ export default async function EditorPage(props: EditorPageProps) {
               outline={displayOutline}
             />
           </aside>
-          <section className={["panel", surfaceStyles.panel].join(' ')} aria-labelledby="edit-title">
-            <p className="panel-title" id="edit-title">
-              {selected ? `${kindLabel(selected.kind)} ${selected.articleNumber}` : message(locale, ui.editorDynamic.unit)}
-            </p>
-            {structured && selectedRoot && settings && versionId && selected && selectedConstitution ? <StructuredEditor
-              key={`${session.id}:${structured.generation}:${selectedRoot.logicalId}`}
-              review={differences.map(difference => { const sourceRoot = structured.sourceRoots.find(root => nodes([root]).some(node => node.logicalId === difference.logicalId || node.content.some(entry => entry.logicalId === difference.logicalId))); const targetRoot = structured.roots.find(root => nodes([root]).some(node => node.logicalId === difference.logicalId || node.content.some(entry => entry.logicalId === difference.logicalId))); const targetOccurrence = targetRoot && preview.unitMapping?.[targetRoot.logicalId]; return { ...difference, sourceLink: sourceRoot?.occurrenceId ? `/versions/${structured.sourceVersionId}/units/${sourceRoot.occurrenceId}` : undefined, targetLink: preview.newVersionId && targetOccurrence ? `/versions/${preview.newVersionId}/units/${targetOccurrence}` : undefined }; })} preview={{ ...structured, roots: structured.roots.map(root => root.logicalId === selectedRoot.logicalId ? root : { ...root, content: [] }), sourceRoots: structured.sourceRoots.map(root => root.logicalId === selectedRoot.logicalId ? root : { ...root, content: [] }) }} outline={settings.outline} rootId={selectedRoot.logicalId} versionId={versionId} articleId={selected.id} constitutionId={selectedConstitution.id} canManageStructure={user.roles.includes('admin')} publishedVersionId={preview.newVersionId} unitMapping={preview.unitMapping} editable={canSave && session.actorId === user.id} scope={searchParams.scope} selectedNode={searchParams.selectedNode}
-            /> : canSave && selected && versionId && searchParams.sessionId ? (
-              <ArticleEditor
-                sessionId={searchParams.sessionId}
-                versionId={versionId}
-                articleId={selected.id}
-                title={draft?.title ?? selected.title}
-                body={draft?.body ?? selected.body}
-              />
-            ) : selected ? (
-              <ConstitutionText
-                article={{
-                  articleNumber: selected.articleNumber,
-                  title: draft?.title ?? selected.title,
-                  body: draft?.body ?? selected.body,
-                  children: draft ? undefined : selected.children,
-                }}
-                headingLevel="h3"
-                outline={settings?.outline ?? selectedConstitution?.contentOutline}
-                canEditTitles
-                returnTo={editorReturnTo}
-              />
-            ) : null}
-            {selected && versionId && searchParams.sessionId && canEdit && session.status === 'open' && !structured && selected.children && selected.children.length > 0 ? (
-              <details>
-                <summary className="btn btn-sm"><T value={ui.editor.page.sectionTitles} /></summary>
-                <p className="muted"><T value={ui.editor.page.nameNestedLayersSuchAsParagraphsTitles} /></p>
-                <ConstitutionText
-                  nodes={selected.children}
-                  showHeading={false}
-                  outline={settings?.outline ?? selectedConstitution?.contentOutline}
-                  canEditTitles
-                  returnTo={editorReturnTo}
-                />
-              </details>
-            ) : null}
-            <div className="action-bar">
-              {canEdit && session.status === 'open' ? (
-                <a className="btn" href="/editor">
-                  <T value={reviewUi.returnToSessions} />{" "}</a>
-              ) : null}
-              {canEdit && session.status === 'open' ? (
-                <Stack as="form" action="/editor/command" method="post">
-                  <input type="hidden" name="command" value="review" />
-                  {hiddenFields}
-                  <SubmitReviewButton disabled={submissionRequirements.length > 0} requirements={submissionRequirements} />
-                </Stack>
-              ) : null}
-              {canReview && session.status === 'reviewing' ? (
-                <Stack as="form" action="/editor/command" method="post">
-                  <input type="hidden" name="command" value="approve" />
-                  {hiddenFields}
-                  <Button><T value={ui.editor.page.approveReview} /></Button>
-                </Stack>
-              ) : null}
-            </div>
-          </section>
+        } session={
           <aside className={["panel panel-side", surfaceStyles.panel].join(' ')} aria-label={message(locale, ui.accessibility.session)}>
             <p className="panel-title"><T value={ui.editor.page.session} /></p>
             <dl className="provenance provenance-list">
@@ -353,24 +293,72 @@ export default async function EditorPage(props: EditorPageProps) {
             {!session.hopKind && session.status === 'approved' && canPublish && searchParams.sessionId && versionId && selectedId ? (
               <LegacyPublishForm sessionId={searchParams.sessionId} versionId={versionId} articleId={selectedId} />
             ) : null}
-            {selected ? (
-              <>
-                <p className="panel-title"><T value={ui.editor.page.preview} /></p>
-                {structured && selectedRoot ? <OrderedContentTree entries={[{ type: 'child', node: readerNode(selectedRoot) }]} outline={settings?.outline} /> : <ConstitutionText
-                  article={{
-                    articleNumber: selected.articleNumber,
-                    title: draft?.title ?? selected.title,
-                    body: draft?.body ?? selected.body,
-                    children: draft ? undefined : selected.children,
-                  }}
-                  headingLevel="h3"
+          </aside>
+        }>
+          <section className={["panel", surfaceStyles.panel].join(' ')} aria-labelledby="edit-title">
+            <p className="panel-title" id="edit-title">
+              {selected ? `${kindLabel(selected.kind)} ${selected.articleNumber}` : message(locale, ui.editorDynamic.unit)}
+            </p>
+            {structured && selectedRoot && settings && versionId && selected && selectedConstitution ? <StructuredEditor
+              key={`${session.id}:${structured.generation}:${selectedRoot.logicalId}`}
+              review={differences.map(difference => { const sourceRoot = structured.sourceRoots.find(root => nodes([root]).some(node => node.logicalId === difference.logicalId || node.content.some(entry => entry.logicalId === difference.logicalId))); const targetRoot = structured.roots.find(root => nodes([root]).some(node => node.logicalId === difference.logicalId || node.content.some(entry => entry.logicalId === difference.logicalId))); const targetOccurrence = targetRoot && preview.unitMapping?.[targetRoot.logicalId]; return { ...difference, beforeText: ["rich", "inserted", "removed"].includes(difference.field) ? changeExcerpt(structured.sourceRoots, difference.logicalId) : undefined, afterText: ["rich", "inserted", "removed"].includes(difference.field) ? changeExcerpt(structured.roots, difference.logicalId) : undefined, rootId: (targetRoot ?? sourceRoot)?.logicalId, sourceLink: sourceRoot?.occurrenceId ? `/versions/${structured.sourceVersionId}/units/${sourceRoot.occurrenceId}` : undefined, targetLink: preview.newVersionId && targetOccurrence ? `/versions/${preview.newVersionId}/units/${targetOccurrence}` : undefined }; })} preview={{ ...structured, footnotes: indexDraftFootnotes(structured.roots), footnoteReferences: indexDraftFootnoteReferences(structured.roots), roots: structured.roots.map(root => root.logicalId === selectedRoot.logicalId ? root : { ...root, content: [] }), sourceRoots: structured.sourceRoots.map(root => root.logicalId === selectedRoot.logicalId ? root : { ...root, content: [] }) }} outline={settings.outline} rootId={selectedRoot.logicalId} versionId={versionId} articleId={selected.id} constitutionId={selectedConstitution.id} canManageStructure={user.roles.includes('admin')} publishedVersionId={preview.newVersionId} unitMapping={preview.unitMapping} editable={canSave && session.actorId === user.id} scope={searchParams.scope} selectedNode={searchParams.selectedNode}
+            /> : canSave && selected && versionId && searchParams.sessionId ? (
+              <ArticleEditor
+                sessionId={searchParams.sessionId}
+                versionId={versionId}
+                articleId={selected.id}
+                title={draft?.title ?? selected.title}
+                body={draft?.body ?? selected.body}
+              />
+            ) : selected ? (
+              <ConstitutionText
+                article={{
+                  articleNumber: selected.articleNumber,
+                  title: draft?.title ?? selected.title,
+                  body: draft?.body ?? selected.body,
+                  children: draft ? undefined : selected.children,
+                }}
+                headingLevel="h3"
+                outline={settings?.outline ?? selectedConstitution?.contentOutline}
+                canEditTitles
+                returnTo={editorReturnTo}
+              />
+            ) : null}
+            {selected && versionId && searchParams.sessionId && canEdit && session.status === 'open' && !structured && selected.children && selected.children.length > 0 ? (
+              <details>
+                <summary className="btn btn-sm"><T value={ui.editor.page.sectionTitles} /></summary>
+                <p className="muted"><T value={ui.editor.page.nameNestedLayersSuchAsParagraphsTitles} /></p>
+                <ConstitutionText
+                  nodes={selected.children}
                   showHeading={false}
                   outline={settings?.outline ?? selectedConstitution?.contentOutline}
-                />}
-              </>
+                  canEditTitles
+                  returnTo={editorReturnTo}
+                />
+              </details>
             ) : null}
-          </aside>
-        </WorkspaceLayout></EditorDraftState>
+            <div className="action-bar">
+              {canEdit && session.status === 'open' ? (
+                <a className="btn" href="/editor">
+                  <T value={reviewUi.returnToSessions} />{" "}</a>
+              ) : null}
+              {canEdit && session.status === 'open' ? (
+                <Stack as="form" action="/editor/command" method="post">
+                  <input type="hidden" name="command" value="review" />
+                  {hiddenFields}
+                  <SubmitReviewButton disabled={submissionRequirements.length > 0} requirements={submissionRequirements} />
+                </Stack>
+              ) : null}
+              {canReview && session.status === 'reviewing' ? (
+                <Stack as="form" action="/editor/command" method="post">
+                  <input type="hidden" name="command" value="approve" />
+                  {hiddenFields}
+                  <Button><T value={ui.editor.page.approveReview} /></Button>
+                </Stack>
+              ) : null}
+            </div>
+          </section>
+        </EditorWorkspace></EditorDraftState>
       ) : (
         <Alert tone="error"><T value={ui.editor.page.thisSessionCouldNotBeLoadedOr} /></Alert>
       )}

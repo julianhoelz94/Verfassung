@@ -45,6 +45,8 @@ data class OrderedEntry(
     val references: List<OrderedInlineReference> = emptyList(),
     @get:com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
     val annotation: OrderedAnnotation? = null,
+    @get:JsonInclude(JsonInclude.Include.NON_EMPTY)
+    val marks: List<OrderedTextMark> = emptyList(),
 )
 
 data class OrderedTableCell(
@@ -71,12 +73,17 @@ data class OrderedReferenceTarget(
 
 data class OrderedInlineReference(val logicalId: UUID, val start: Int, val end: Int, val target: OrderedReferenceTarget) : StrictOrderedWrite()
 
+/** Exact UTF-16 text offsets, shared with the browser. Different styles may overlap. */
+data class OrderedTextMark(val type: String, val start: Int, val end: Int) : StrictOrderedWrite()
+
 data class OrderedRichContent(
     val table: OrderedTable? = null,
     val footnoteLabel: String? = null,
     val references: List<OrderedInlineReference> = emptyList(),
     @get:com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
     val annotation: OrderedAnnotation? = null,
+    @get:JsonInclude(JsonInclude.Include.NON_EMPTY)
+    val marks: List<OrderedTextMark> = emptyList(),
 )
 
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -131,6 +138,8 @@ data class OrderedEntryWrite(
     val references: List<OrderedInlineReference> = emptyList(),
     @get:com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
     val annotation: OrderedAnnotation? = null,
+    @get:JsonInclude(JsonInclude.Include.NON_EMPTY)
+    val marks: List<OrderedTextMark> = emptyList(),
 ) : StrictOrderedWrite()
 
 data class OrderedSnapshotWrite(

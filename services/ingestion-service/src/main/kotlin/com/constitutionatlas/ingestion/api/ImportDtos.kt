@@ -35,6 +35,8 @@ data class ImportOutlineKind(
     val segmentation: String = "plain",
     val root: Boolean? = null,
     val allowedChildKinds: List<String>? = null,
+    @get:com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+    val sentenceDelimiters: List<String>? = null,
 ) : StrictOrderedWrite()
 
 data class ImportOutline(

@@ -9,6 +9,7 @@ import com.constitutionatlas.ingestion.client.CatalogClient
 import com.constitutionatlas.ingestion.client.ContentClient
 import com.constitutionatlas.ingestion.client.DownstreamAuth
 import com.constitutionatlas.ingestion.repo.ImportJobRepository
+import com.constitutionatlas.platform.scalarText
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.HttpStatus
@@ -42,6 +43,7 @@ class ImportService(
             val previous = if (batchId == null) importJobRepository.findDirectItem(submittedBy, idempotencyKey) else importJobRepository.findBatchItem(batchId, idempotencyKey)
             previous?.let { (existing, previousChecksum) ->
                 if (previousChecksum != checksum) throw ResponseStatusException(HttpStatus.CONFLICT, "Idempotency key was used for different content")
+                requireCurrentRichRules(request)
                 return existing
             }
         }
@@ -60,7 +62,10 @@ class ImportService(
             } else {
                 importJobRepository.findBatchItem(batchId, idempotencyKey)
             }
-            if (existing?.second == checksum) return existing.first
+            if (existing?.second == checksum) {
+                requireCurrentRichRules(request)
+                return existing.first
+            }
             throw ResponseStatusException(HttpStatus.CONFLICT, "Idempotency key was used for different content")
         }
         importJobRepository.stage(jobId, "request", request)
@@ -133,6 +138,7 @@ class ImportService(
 
     fun prepare(authorization: String?, jobId: UUID, actorId: UUID): ImportJobDto {
         val request = importJobRepository.request(jobId) ?: throw com.constitutionatlas.platform.NotFoundException("Unknown import job")
+        requireCurrentRichRules(request)
         DownstreamAuth.withAuthorization(authorization) {
             val existing = findSelectedConstitution(request)
             if (existing == null && !importJobRepository.isOutlineConfirmed(jobId)) {
@@ -153,6 +159,11 @@ class ImportService(
             importJobRepository.preparationFailed(jobId, attempt, ex.message ?: "draft preparation failed")
         }
         return importJobRepository.find(jobId)!!
+    }
+
+    private fun requireCurrentRichRules(request: ImportRequest) {
+        val errors = ImportValidator.richContentErrors(request.roots)
+        if (errors.isNotEmpty()) throw ResponseStatusException(HttpStatus.BAD_REQUEST, errors.joinToString("; ") { it.second })
     }
 
     private fun reviewReason(reason: String): String = reason.trim().also {
@@ -207,6 +218,8 @@ class ImportService(
                 ex is ImportPublicationException -> ex
                 ex is RestClientResponseException && stage in setOf("seal", "publish") && ex.statusCode.value() in setOf(401, 403) ->
                     ImportPublicationException(HttpStatus.SERVICE_UNAVAILABLE, "publication_credentials_invalid")
+                ex is RestClientResponseException && stage in setOf("seal", "publish") && ex.statusCode.value() == 400 ->
+                    publicationValidationFailure(ex)
                 ex is RestClientResponseException && ex.statusCode.value() == 409 ->
                     ImportPublicationException(HttpStatus.CONFLICT, "publication_conflict")
                 else -> ImportPublicationException(HttpStatus.SERVICE_UNAVAILABLE, "publication_unavailable")
@@ -215,6 +228,18 @@ class ImportService(
             throw failure
         }
         return importJobRepository.find(jobId)!!
+    }
+
+    /** Only a known validation code and bounded structural identity may leave the service. */
+    private fun publicationValidationFailure(ex: RestClientResponseException): ImportPublicationException {
+        val allowed = setOf("FOOTNOTE_NOT_AT_END", "UNIT_REFERENCE_TARGET", "INLINE_REFERENCE", "TEXT_MARK_RANGE", "TEXT_MARK_OVERLAP", "TEXT_MARK_FORMAT", "TEXT_MARK_LIMIT")
+        val body = if (ex.responseBodyAsByteArray.size <= 16_384) runCatching { objectMapper.readTree(ex.responseBodyAsByteArray) }.getOrNull() else null
+        val code = body?.path("code")?.scalarText()?.takeIf { it in allowed }
+            ?: return ImportPublicationException(HttpStatus.BAD_REQUEST, "publication_validation_failed")
+        val candidate = body.path("path").scalarText()
+        val safePath = candidate.takeIf { it.length <= 512 && it.matches(Regex("(roots\\[[0-9]+\\]|node\\[[0-9a-fA-F-]{36}\\]\\.text\\[[0-9a-fA-F-]{36}\\])(?:\\.(?:content\\[[0-9]+\\](?:\\.node)?|marks|references\\[[0-9]+\\]))*")) }
+        val logicalId = runCatching { UUID.fromString(body.path("logicalId").scalarText()) }.getOrNull()
+        return ImportPublicationException(HttpStatus.BAD_REQUEST, code, safePath, logicalId)
     }
 
     @Scheduled(initialDelay = 120_000, fixedDelay = 60_000)

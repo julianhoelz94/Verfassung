@@ -14,6 +14,7 @@ import com.constitutionatlas.platform.OrderedReferenceTarget
 import com.constitutionatlas.platform.OrderedTable
 import com.constitutionatlas.platform.OrderedTableCell
 import com.constitutionatlas.platform.OrderedTableRow
+import com.constitutionatlas.platform.OrderedTextMark
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Test
@@ -40,7 +41,62 @@ class OrderedContentApiTest {
 
     @Autowired lateinit var jdbc: JdbcTemplate
 
+    @Autowired lateinit var orderedRepository: com.constitutionatlas.content.repo.OrderedContentRepository
+
     @MockitoBean lateinit var catalog: CatalogClient
+
+    @Test
+    fun invalidEndnotesAndMarksRollBackTheWholeSnapshotIncludingNewRevisions() {
+        val version = UUID.randomUUID()
+        Mockito.`when`(catalog.getVersion(version)).thenReturn(CatalogVersion(version, "draft", UUID.randomUUID()))
+        Mockito.`when`(catalog.getSettings(version)).thenReturn(StructuralSettings(UUID.randomUUID(), StructuralOutline(listOf(StructuralLevel("article", true, false, emptyList(), root = true)))))
+        val empty = content.get(version)
+        val nodesBefore = jdbc.queryForObject("SELECT COUNT(*) FROM content_node_revisions", Int::class.java)
+        val note = OrderedEntryWrite("text", text = "Note", format = "footnote")
+        val later = OrderedNodeWrite(logicalId = UUID.randomUUID(), kind = "article", content = listOf(OrderedEntryWrite("text", text = "Later body")))
+        val misplaced = listOf(OrderedNodeWrite(kind = "article", content = listOf(note)), later)
+        val placement = assertThrows(com.constitutionatlas.platform.OrderedContentValidationException::class.java) { content.save(version, OrderedSnapshotWrite(0, roots = misplaced)) }
+        assertThat(placement.body()["code"]).isEqualTo("FOOTNOTE_NOT_AT_END")
+        assertThat(placement.body()["logicalId"]).isEqualTo(later.logicalId.toString())
+        val malformed = later.copy(content = listOf(OrderedEntryWrite("text", text = "Law", marks = listOf(OrderedTextMark("bold", 0, 4)))))
+        assertThrows(com.constitutionatlas.platform.OrderedContentValidationException::class.java) { content.save(version, OrderedSnapshotWrite(0, roots = listOf(malformed))) }
+        val dangling = later.copy(content = listOf(OrderedEntryWrite("text", text = "Law", references = listOf(OrderedInlineReference(UUID.randomUUID(), 0, 3, OrderedReferenceTarget("unit", logicalId = UUID.randomUUID()))))))
+        val target = assertThrows(com.constitutionatlas.platform.OrderedContentValidationException::class.java) { content.save(version, OrderedSnapshotWrite(0, roots = listOf(dangling))) }
+        assertThat(target.errors.single().code).isEqualTo("UNIT_REFERENCE_TARGET")
+        assertThat(content.get(version)).isEqualTo(empty)
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM content_node_revisions", Int::class.java)).isEqualTo(nodesBefore)
+    }
+
+    @Test
+    fun historicalMisplacedNotesRemainReadableButCannotBeReusedOrSealed() {
+        val source = UUID.randomUUID()
+        val target = UUID.randomUUID()
+        val constitution = UUID.randomUUID()
+        val settings = StructuralSettings(UUID.randomUUID(), StructuralOutline(listOf(StructuralLevel("article", true, false, emptyList(), root = true))))
+        for (version in listOf(source, target)) {
+            Mockito.`when`(catalog.getVersion(version)).thenReturn(CatalogVersion(version, if (version == source) "published" else "draft", constitution))
+            Mockito.`when`(catalog.getSettings(version)).thenReturn(settings)
+        }
+        // An immutable snapshot authored before the invariant was introduced.
+        orderedRepository.lock(source)
+        val rootRevision = UUID.randomUUID()
+        orderedRepository.insertNode(rootRevision, UUID.randomUUID(), source, null, "article", null, null)
+        for ((position, format) in listOf("footnote", "plain").withIndex()) {
+            val revision = UUID.randomUUID()
+            orderedRepository.insertText(revision, UUID.randomUUID(), source, null, if (format == "footnote") "Historical note" else "Historical body", emptyList(), format)
+            orderedRepository.insertEntry(rootRevision, position, revision, null)
+        }
+        orderedRepository.seal(rootRevision)
+        orderedRepository.bind(source, constitution, settings.id)
+        orderedRepository.replaceRoots(source, listOf(rootRevision))
+        val historical = content.get(source)
+        assertThat(historical.roots.single().content).hasSize(2)
+        val request = OrderedSnapshotWrite(0, sourceVersionId = source, sourceGeneration = historical.generation, roots = listOf(OrderedNodeWrite(revisionId = rootRevision)))
+        assertThrows(com.constitutionatlas.platform.OrderedContentValidationException::class.java) { content.save(target, request) }
+        assertThrows(com.constitutionatlas.platform.OrderedContentValidationException::class.java) { content.sealImport(source, UUID.randomUUID(), historical.generation, settings.id) }
+        assertThat(content.get(source)).isEqualTo(historical)
+        assertThat(content.get(target).roots).isEmpty()
+    }
 
     @Test
     fun importPublicationSealsOnlyTheApprovedGenerationAndReservationWithoutRewritingRoots() {
@@ -95,7 +151,6 @@ class OrderedContentApiTest {
         val articleId = UUID.randomUUID()
         val annotation = com.constitutionatlas.platform.OrderedAnnotation("editorial", "Archive editor", "https://example.org/source", listOf(articleId))
         val noteId = UUID.randomUUID()
-        val unavailableId = UUID.randomUUID()
         val appendixId = UUID.randomUUID()
         val headingId = UUID.randomUUID()
         val table = OrderedTable(
@@ -112,25 +167,27 @@ class OrderedContentApiTest {
                 content = listOf(
                     OrderedEntryWrite(
                         "text",
-                        text = "See note and lost.",
+                        text = "See note and unit.",
+                        marks = listOf(OrderedTextMark("bold", 0, 3), OrderedTextMark("italic", 0, 8)),
                         references = listOf(
                             OrderedInlineReference(UUID.randomUUID(), 4, 8, OrderedReferenceTarget("footnote", footnoteId = noteId)),
-                            OrderedInlineReference(UUID.randomUUID(), 13, 17, OrderedReferenceTarget("unit", logicalId = unavailableId)),
+                            OrderedInlineReference(UUID.randomUUID(), 13, 17, OrderedReferenceTarget("unit", logicalId = appendixId)),
                         ),
                     ),
-                    OrderedEntryWrite("text", logicalId = noteId, text = "Source note.", format = "footnote", footnoteLabel = "1", annotation = annotation),
                 ),
             ),
-            OrderedNodeWrite(logicalId = appendixId, kind = "appendix", content = listOf(OrderedEntryWrite("text", format = "table", table = table))),
+            OrderedNodeWrite(logicalId = appendixId, kind = "appendix", content = listOf(OrderedEntryWrite("text", format = "table", table = table), OrderedEntryWrite("text", logicalId = noteId, text = "Source note.", format = "footnote", footnoteLabel = "1", annotation = annotation))),
         )
         val saved = content.save(version, OrderedSnapshotWrite(0, roots = roots))
         assertThat(saved.roots[0].content[0].references.first().target.footnoteId).isEqualTo(noteId)
-        assertThat(saved.roots[0].content[0].references.last().target.logicalId).isEqualTo(unavailableId)
-        assertThat(saved.roots[1].content.single().text).isEqualTo("Duty\nReport")
-        assertThat(content.get(version).roots[0].content[1].annotation).isEqualTo(annotation)
-        assertThat(content.export(version).roots[0].content!![1].annotation).isEqualTo(annotation)
-        assertThat(content.get(version).roots[1].content.single().table).isEqualTo(table)
-        assertThat(content.export(version).roots[1].content!!.single().table).isEqualTo(table)
+        assertThat(content.get(version).roots[0].content[0].marks).containsExactly(OrderedTextMark("bold", 0, 3), OrderedTextMark("italic", 0, 8))
+        assertThat(content.export(version).roots[0].content!![0].marks).isEqualTo(saved.roots[0].content[0].marks)
+        assertThat(saved.roots[0].content[0].references.last().target.logicalId).isEqualTo(appendixId)
+        assertThat(saved.roots[1].content.first().text).isEqualTo("Duty\nReport")
+        assertThat(content.get(version).roots[1].content[1].annotation).isEqualTo(annotation)
+        assertThat(content.export(version).roots[1].content!![1].annotation).isEqualTo(annotation)
+        assertThat(content.get(version).roots[1].content.first().table).isEqualTo(table)
+        assertThat(content.export(version).roots[1].content!!.first().table).isEqualTo(table)
     }
 
     @Test

@@ -7,6 +7,8 @@ Pinned versions we actually use. Validate one consumer first, then the complete 
 | JDK | Eclipse Temurin | 21 | Host, CI `setup-java`, Kotlin Dockerfiles (`eclipse-temurin:21-jre`) |
 | Gradle | Gradle | 9.8.2 | Repo wrapper (`gradle/wrapper`), CI `setup-gradle`, host `bootJar` for Kotlin images |
 | Lint | Spotless + ktlint | Spotless 8.10.4 / ktlint 1.3.1 | `gradle/service-conventions.gradle`, `./gradlew check` |
+| Complexity / Kotlin | detekt CLI | 1.23.8 | Root `build.gradle.kts`, `./gradlew cognitiveComplexity` |
+| Complexity / TypeScript | ESLint + SonarJS + TypeScript parser | 9.39.5 / 2.0.4 / 8.72.1 | Isolated `scripts/complexity/package.json`; SonarJS 2.0.4 uses LGPL-3.0-only |
 | Logs | logstash-logback-encoder | 7.4 | JSON console logs + MDC `correlationId` |
 | Kotlin | `kotlin("jvm")` / Spring plugin | 2.4.21 | `services/*/build.gradle.kts` |
 | Spring | Spring Boot | 4.1.2 | Service plugins and platform BOM in `services/*/build.gradle.kts` |

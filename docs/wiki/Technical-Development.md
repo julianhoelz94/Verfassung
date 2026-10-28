@@ -79,6 +79,19 @@ Edit [docs/wiki](https://github.com/julianhoelz94/Verfassung/tree/main/docs/wiki
 
 Production deployment remains [[pending|Deployment-Information]] until a site CD workflow and verified production procedure exist. The static video player does not deploy the application.
 
+## Cognitive complexity in CI
+
+The required `cognitive-complexity` job checks Kotlin with detekt and
+TypeScript/JavaScript with ESLint and SonarJS. The limit is **15 per function**;
+existing debt is recorded in reviewed baselines. These tools are free and need no
+Sonar server. The downloadable `cognitive-complexity` artifact includes locations
+and scores for over-limit functions, including existing debt. Tests are included.
+
+From the repository root, run `npm ci --prefix scripts/complexity`,
+`./gradlew cognitiveComplexity`, and `npm run check --prefix scripts/complexity`.
+See the [complexity policy](https://github.com/julianhoelz94/Verfassung/blob/main/docs/cognitive-complexity.md)
+for baseline behavior, limitations, and cleanup guidance.
+
 ## Code coverage in CI
 
 Every CI run publishes **whole-repository line coverage** and **new-code line

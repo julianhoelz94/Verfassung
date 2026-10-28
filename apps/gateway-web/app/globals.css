@@ -1094,6 +1094,14 @@ button.article-toggle:disabled::after {
   gap: var(--space-4);
 }
 
+.country-card .badge {
+  display: block;
+  max-width: 100%;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  overflow-wrap: anywhere;
+}
+
 .iso {
   flex: 0 0 auto;
   width: 48px;

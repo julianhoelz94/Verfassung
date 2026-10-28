@@ -6,6 +6,11 @@ The agreed maximum is now **20 per function**, with `EditorPage` temporarily
 deferred while under construction. The original assessment below used a target
 of 15 and remains a historical comparison, not the active cleanup scope.
 
+Refactoring `services/editor-service` is also deferred until the new editor is
+ready. Its current method and file scores remain recorded as existing debt;
+the file-budget change introduces no service source changes. Kotlin's separate
+file budget is **100**, including contained helper functions.
+
 The pilot starts from fetched `main` revision `bee7b4b` (2026-10-28), including
 Kotlin 2.4 / Spring Boot 4.1, Next.js 16 / React 19, and the specification-derived
 behavioral tests. The CI branch was rebased onto that revision before cleanup.
@@ -31,8 +36,10 @@ two pilot exceptions are removed. The rest of the cleanup remains separate work.
 At a maximum of 20, current `main` starts with 19 Kotlin findings and 38
 TypeScript/JavaScript findings, including the deferred editor page. After the
 pilot, 18 Kotlin findings and 36 TypeScript/JavaScript baseline findings remain,
-plus that one deferred page. The active remaining scope is **48 production
-functions and 6 test/fixture functions**.
+plus that one deferred page. That pilot inventory contained **48 production
+functions and 6 test/fixture functions**. Deferring the editor service's two
+over-limit functions (`publish` and `replay`) leaves **46 production functions
+and 6 test/fixture functions** in the current cleanup scope.
 
 Local pilot verification passed the full identity check (96 tests and Spotless),
 the gateway suite (917 Vitest and 13 Node tests), gateway lint/typecheck and

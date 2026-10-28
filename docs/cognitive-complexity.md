@@ -16,6 +16,29 @@ TypeScript scores use different implementations and are not directly comparable.
 Kotlin reports list over-limit functions. The TypeScript JSON report includes
 scores for every analyzed function, including those below the limit.
 
+Kotlin also has a **maximum of 100 cognitive-complexity points per file**:
+100 passes and 101 fails unless covered by reviewed existing debt. This uses
+detekt's own file metric through the repository's `CognitiveComplexFile` rule,
+including named functions below the per-function limit. Nested function bodies
+are counted by detekt's enclosing traversal without summing their score twice.
+Classes, objects, and top-level functions in one file share its budget.
+This follows detekt's named-function metric; constructor/property initializers
+and property accessors outside those functions are not scored separately.
+
+The initial file baseline contains eight production files: `EditorService` (179),
+`ImportValidator` (130), `AmendmentService` (116), `HierarchicalDiff` (115),
+`StructuredDraftEngine` (113), `ImportExportService` (111), `OrderedContentService`
+(110), and `CatalogWriteService` (107). The other 303 of 311 scanned Kotlin files
+meet the limit. These are measured findings, not automatic exemptions for future
+files with similar names.
+
+Extracting helpers within one file does not remove their control flow from this
+budget. Reducing nesting can still legitimately lower the total. When a file
+carries several responsibilities, move cohesive behavior to
+named domain classes or modules, for example a translation request factory or
+response parser. Utility files have the same budget; gathering unrelated helpers
+in one shared file would create another hotspot. The function limit remains 20.
+
 ## Scope and reports
 
 - Kotlin: `services/**/src/**/*.kt`, including the shared platform and tests.
@@ -25,7 +48,7 @@ scores for every analyzed function, including those below the limit.
 
 CI uploads the `cognitive-complexity` artifact even when a check fails. Reports
 under `build/reports/complexity/` show locations and scores, including existing
-debt. Kotlin's `all.html` / `all.xml` show all over-limit functions;
+debt. Kotlin's `all.html` / `all.xml` show all over-limit functions and files;
 `detekt.html` / `detekt.xml` show unbaselined findings that fail the gate.
 TypeScript's `summary.md` distinguishes baseline exceptions from new violations;
 `summary.json` includes all analyzed function scores.
@@ -38,13 +61,14 @@ Remove this named exemption when construction finishes.
 
 ## Run locally
 
-Use JDK 21 and Node 22, from the repository root:
+Use JDK 21, Node 22, and Python 3, from the repository root:
 
 ```sh
 npm ci --prefix scripts/complexity
 npm test --prefix scripts/complexity
 python3 -m unittest discover -s scripts/complexity -p 'test_kotlin_scores.py'
 python3 scripts/complexity/test_kotlin.py
+python3 scripts/complexity/test_kotlin_files.py
 ./gradlew cognitiveComplexity
 npm run check --prefix scripts/complexity
 ```
@@ -52,6 +76,11 @@ npm run check --prefix scripts/complexity
 No service compilation, database, or Docker stack is needed. The complexity npm
 package is separate from application dependencies and does not change gateway
 lint rules or production bundles.
+
+Gradle compiles the small custom file rule using the compiler bundled with the
+pinned detekt CLI, packages its service provider, and supplies that JAR to detekt.
+This keeps the extension compatible with the analyzer's API independently of the
+application Kotlin version. Rule sources and KDoc are under `tools/detekt-rules/`.
 
 These checks supplement compilation. In particular, detekt's standalone CLI can
 accept malformed Kotlin, so it is not a syntax-validation replacement. The
@@ -69,6 +98,11 @@ The native baseline accepts existing declarations; the score check rejects a
 function whose current score exceeds its reviewed maximum, including body changes
 that the native baseline alone would suppress. New unbaselined functions above
 20 also fail. Ambiguous overloaded findings fail for explicit review.
+
+The same baseline records file maxima. A new file above 100 fails; an existing
+over-budget file may retain or reduce its reviewed score, but an increase fails
+even if its native file finding is baselined. File identity uses the full
+repository-relative path. CI never grants new exceptions automatically.
 
 TypeScript exceptions are tied to function token
 fingerprints (ignoring whitespace and comments), so code changes to an over-limit

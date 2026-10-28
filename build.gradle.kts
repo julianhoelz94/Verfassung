@@ -15,22 +15,63 @@ dependencies {
     }
 }
 
+val detektRuleClasses = layout.buildDirectory.dir("detekt-rules/classes")
+val detektRuleSources = fileTree("tools/detekt-rules/src/main/kotlin") { include("**/*.kt") }
+
+// Compile the extension with the compiler bundled in the pinned CLI. The
+// application's Kotlin compiler and dependencies stay outside its runtime.
+val compileDetektRules = tasks.register<JavaExec>("compileDetektRules") {
+    group = "verification"
+    description = "Compile the repository's detekt rules with detekt's bundled Kotlin compiler."
+    classpath = detektCli
+    mainClass.set("org.jetbrains.kotlin.cli.jvm.K2JVMCompiler")
+    inputs.files(detektRuleSources)
+    inputs.files(detektCli)
+    outputs.dir(detektRuleClasses)
+    doFirst {
+        val directory = detektRuleClasses.get().asFile
+        directory.deleteRecursively()
+        directory.mkdirs()
+        setArgs(
+            listOf(
+                "-no-stdlib", "-no-reflect",
+                "-classpath", detektCli.asPath,
+                "-jvm-target", "17",
+                "-d", directory.absolutePath,
+            ) + detektRuleSources.files.sortedBy { it.path }.map { it.absolutePath },
+        )
+    }
+}
+
+val detektRulesJar = tasks.register<Jar>("detektRulesJar") {
+    group = "verification"
+    description = "Package the repository's detekt rules and service registration."
+    dependsOn(compileDetektRules)
+    archiveFileName.set("repository-detekt-rules.jar")
+    destinationDirectory.set(layout.buildDirectory.dir("detekt-rules"))
+    from(detektRuleClasses)
+    from("tools/detekt-rules/src/main/resources")
+}
+
+/** Configures a complete method-and-file scan without compiling the application services. */
 fun JavaExec.configureCognitiveComplexity() {
     group = "verification"
     classpath = detektCli
     mainClass.set("io.gitlab.arturbosch.detekt.cli.Main")
     workingDir = rootDir
+    dependsOn(detektRulesJar)
     args(
         "--input", "services",
         "--includes", "**/src/**/*.kt",
         "--excludes", "**/build/**,**/generated/**,**/node_modules/**",
         "--config", "config/detekt/cognitive-complexity.yml",
+        "--plugins", detektRulesJar.get().archiveFile.get().asFile.absolutePath,
         "--base-path", rootDir.absolutePath,
     )
 }
 
 val cognitiveComplexityReport = tasks.register<JavaExec>("cognitiveComplexityReport") {
-    description = "Report all Kotlin cognitive complexity findings, including accepted debt."
+    description = "Report over-budget Kotlin methods and files, including accepted debt."
     configureCognitiveComplexity()
     args(
         "--max-issues", Int.MAX_VALUE.toString(),
@@ -52,7 +93,7 @@ fun Task.checkKotlinScores(vararg arguments: String) {
 }
 
 tasks.register<JavaExec>("cognitiveComplexity") {
-    description = "Reject new or increased Kotlin cognitive complexity above 20."
+    description = "Enforce Kotlin method (20) and file (100) cognitive complexity budgets."
     dependsOn(cognitiveComplexityReport)
     configureCognitiveComplexity()
     args(

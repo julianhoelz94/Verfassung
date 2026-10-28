@@ -35,6 +35,7 @@ jobs:
         run: |
           python3 -m unittest discover -s scripts/complexity -p 'test_kotlin_scores.py'
           python3 scripts/complexity/test_kotlin.py
+          python3 scripts/complexity/test_kotlin_files.py
       - name: Check Kotlin cognitive complexity
         run: ./gradlew cognitiveComplexity
       - name: Check TypeScript and JavaScript cognitive complexity

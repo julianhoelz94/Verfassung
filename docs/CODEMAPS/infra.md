@@ -74,6 +74,8 @@ The required `cognitive-complexity` job runs root `./gradlew cognitiveComplexity
 is 20 per function with reviewed baselines for existing debt and a temporary named
 exemption for the unfinished editor page. Kotlin score increases also fail. Reports are uploaded
 as `cognitive-complexity`. See [policy and local commands](../cognitive-complexity.md).
+Kotlin files additionally have a maximum total cognitive complexity of 100 via
+the custom detekt rule in `tools/detekt-rules/`; reviewed file-score increases fail.
 
 ## Code coverage
 

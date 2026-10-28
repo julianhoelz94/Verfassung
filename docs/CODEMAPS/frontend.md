@@ -1,7 +1,7 @@
 <!-- Reviewed: 2026-10-19 -->
 # Frontend (`apps/gateway-web`)
 
-Next.js 15 App Router, React 18, strict TypeScript. No database: compose service APIs
+Next.js 16 App Router, React 19, strict TypeScript. No database: compose service APIs
 over HTTP. Rules: `apps/gateway-web/AGENTS.md`. Current UI decisions and route/state
 coverage: `docs/design/sprint-59-ui-review.md`. Earlier prototypes are historical
 references; ADR 0005 and `docs/design/two-axis-versions.md` define version semantics.
@@ -46,7 +46,7 @@ Actions live beside pages. Native POST command routes validate trusted origins a
 redirect to persisted outcomes. Do not remove framework exports based on import
 counts. Optional-service failures must not erase required reading content.
 
-Middleware checks deployment setup and anonymous browsing, then supplies the CSP
+`proxy.ts` checks deployment setup and anonymous browsing, then supplies the CSP
 nonce. Caddy's setup/rate checks have separate API routes and credentials. Public
 navigation visibility does not replace service authorization.
 

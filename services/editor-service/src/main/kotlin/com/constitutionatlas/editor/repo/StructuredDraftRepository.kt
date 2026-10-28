@@ -2,9 +2,9 @@ package com.constitutionatlas.editor.repo
 
 import com.constitutionatlas.editor.api.DraftOperation
 import com.constitutionatlas.editor.api.DraftSource
-import com.fasterxml.jackson.databind.ObjectMapper
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Repository
+import tools.jackson.databind.ObjectMapper
 import java.util.UUID
 
 data class DraftPin(val sourceGeneration: Long, val settingsRevisionId: UUID, val rootRevisionIds: List<UUID>, val generation: Long)

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { T } from './TranslationProvider';
 import { ui } from '../../lib/messages';
 import { Stack } from './layout/Layout';
+import { useHydrated } from '../../lib/use-hydrated';
 
 /** Await the saved result before loading a fresh server-rendered page. */
 export function NavigatingActionForm({ action, children, className, autoFocusName }: {
@@ -13,10 +14,9 @@ export function NavigatingActionForm({ action, children, className, autoFocusNam
   autoFocusName?: string;
 }) {
   const form = useRef<HTMLFormElement>(null);
-  const [ready, setReady] = useState(false);
+  const ready = useHydrated();
   const [pending, setPending] = useState(false);
   const [failed, setFailed] = useState(false);
-  useEffect(() => { setReady(true); }, []);
   useEffect(() => {
     if (!ready || !autoFocusName) return;
     const field = form.current?.elements.namedItem(autoFocusName);

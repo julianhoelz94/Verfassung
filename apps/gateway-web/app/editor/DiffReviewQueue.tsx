@@ -77,11 +77,13 @@ export function DiffReviewQueue({ target, initial, rows, canDecide, canAcknowled
   const selected = visible.find((candidate) => candidate.key === selectedKey) ?? visible[0];
   const selectedIndex = selected ? visible.findIndex((candidate) => candidate.key === selected.key) : -1;
   const selectedDecision = selected ? decisions.get(selected.key) : undefined;
-  useEffect(() => {
+  const [editingDecision, setEditingDecision] = useState<{ key?: string; decision?: typeof selectedDecision }>({});
+  if (editingDecision.key !== selected?.key || editingDecision.decision !== selectedDecision) {
+    setEditingDecision({ key: selected?.key, decision: selectedDecision });
     setLinkedIds(selectedDecision?.linkedChangeIds ?? selectedDecision?.linkedRowIds ?? []);
     setReason(selectedDecision?.reason ?? selectedDecision?.exclusionReason ?? '');
     setAcknowledge(selectedDecision?.reviewerAcknowledged ?? false);
-  }, [selected?.key, selectedDecision]);
+  }
   useEffect(() => {
     if (focusAfterNavigation.current) {
       activeRef.current?.focus();

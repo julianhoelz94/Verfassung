@@ -37,6 +37,12 @@ For the gateway, run `npm test`, `npm run typecheck`, `npm run lint`, `npm run b
 
 Enabled local/CI API docs: `/api/docs/<service>/swagger-ui/index.html` with `CADDY_EXPOSE_API_DOCS=true`.
 
+## Upgrade dependencies
+
+Review the weekly Dependabot queue as related packages: Kotlin and the backend framework across all services, React with DOM/types, and Next with its lint configuration. The [dependency inventory](https://github.com/julianhoelz94/Verfassung/blob/main/docs/dependencies.md) records current pins. Follow the [upgrade checklist](https://github.com/julianhoelz94/Verfassung/blob/main/docs/dependency-upgrades.md): validate one consumer first, then every changed service/app and the complete CI journeys before merge. A grouped PR still needs compatibility review.
+
+Keep runtime images, CI, toolchains and Node type packages aligned. Java 21 and Node 22 remain the runtime baseline during the coordinated framework migration. MCP uses the native TypeScript 7 compiler; gateway TypeScript remains on its separately validated version. The Boot 4 migration preserves previous JSON property order, null handling and date formats, including the separate HTTP-client defaults. Fixed pre-upgrade import fixtures protect checksums already stored in the database; retain those contracts when revisiting mapper settings.
+
 ## Navigate the code
 
 | Area | Start here |
@@ -97,7 +103,7 @@ of the same run/revision may be reused when rerunning failed jobs; inputs from
 another run or source revision are rejected.
 
 The denominator includes Kotlin service/platform production sources, gateway
-`app`, `lib` and `middleware` TypeScript/JavaScript, MCP TypeScript, and Python
+`app`, `lib` and `proxy` TypeScript/JavaScript (including legacy `middleware` entry points), MCP TypeScript, and Python
 operational tooling. It excludes tests, fixtures, generated output, declaration
 files, dependencies, CSS, SQL migrations, shell scripts and build configuration.
 Coverage reflects instrumented service/unit tests; browser, publication, visual

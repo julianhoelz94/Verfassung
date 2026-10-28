@@ -44,8 +44,8 @@ class CatalogSettingsContractTest {
         val constitution = UUID.randomUUID()
         val settings = UUID.randomUUID()
         val jurisdiction = UUID.randomUUID()
-        val requests = mutableListOf<Pair<String, com.fasterxml.jackson.databind.JsonNode>>()
-        val mapper = com.fasterxml.jackson.module.kotlin.jacksonObjectMapper()
+        val requests = mutableListOf<Pair<String, tools.jackson.databind.JsonNode>>()
+        val mapper = tools.jackson.module.kotlin.jacksonObjectMapper()
         val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
         server.createContext("/") { exchange ->
             requests += exchange.requestURI.path to mapper.readTree(exchange.requestBody)

@@ -87,6 +87,8 @@ export function AmendmentRevisionPanel({
         try {
           window.location.assign(await restoreRevisionAction(new FormData(event.currentTarget)));
         } catch {
+          // Reload the server-rendered account/editor state after this action, including its failure state.
+          // eslint-disable-next-line @next/next/no-location-assign-relative-destination
           window.location.assign(`/editor/amendments/${encodeURIComponent(amendmentId)}?error=save_failed`);
         }
       }}>

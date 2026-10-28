@@ -2,8 +2,7 @@
 
 import { T } from '../components/TranslationProvider';
 import { ui } from '../../lib/messages';
-import { useFormState } from 'react-dom';
-import { useState } from 'react';
+import { useActionState, useState } from 'react';
 import { Alert, Button, Input } from '../components/ui';
 import { confirmEnrollAction, type EnrollConfirmState } from '../login/actions';
 import { confirmAccountMfaAction, regenerateRecoveryAction, startMfaEnrollAction, type RecoveryRevealState } from './actions';
@@ -22,6 +21,8 @@ export function StartMfaEnrollForm() {
       const started = await startMfaEnrollAction(password);
       window.location.assign(started ? '/account?enroll=1' : '/account?error=mfa');
     } catch {
+      // Reload the server-rendered account/editor state after this action, including its failure state.
+      // eslint-disable-next-line @next/next/no-location-assign-relative-destination
       window.location.assign('/account?error=mfa');
     }
   }}><Input label={<T value={ui.attrs.loginPageInputLabelPassword} />} id="mfaPassword" name="password" type="password" autoComplete="current-password" required /><Button variant="primary" disabled={pending}><T value={ui.account.page.enrollAuthenticator} /></Button></Stack>;
@@ -41,7 +42,7 @@ function RecoveryCodes({ codes }: { codes: string[] }) {
 const failed = <Alert tone="error"><T value={ui.account.mfaforms.authenticatorActionFailedCheckTheCodeAnd} /></Alert>;
 
 export function ConfirmEnrollForm({ challengeToken }: { challengeToken: string }) {
-  const [state, action] = useFormState(confirmAccountMfaAction, initial);
+  const [state, action] = useActionState(confirmAccountMfaAction, initial);
   if (state.recoveryCodes) {
     return (
       <>
@@ -65,7 +66,7 @@ export function ConfirmEnrollForm({ challengeToken }: { challengeToken: string }
 }
 
 export function RegenerateRecoveryForm() {
-  const [state, action] = useFormState(regenerateRecoveryAction, initial);
+  const [state, action] = useActionState(regenerateRecoveryAction, initial);
   return (
     <>
       {state.recoveryCodes ? <RecoveryCodes codes={state.recoveryCodes} /> : null}

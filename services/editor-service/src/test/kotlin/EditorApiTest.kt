@@ -23,20 +23,21 @@ import org.junit.jupiter.api.Test
 import org.mockito.ArgumentCaptor
 import org.mockito.Mockito
 import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
 import org.springframework.boot.test.context.SpringBootTest
-import org.springframework.boot.test.mock.mockito.MockBean
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.http.MediaType
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
+import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.delete
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.post
-import org.testcontainers.containers.PostgreSQLContainer
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
+import org.testcontainers.postgresql.PostgreSQLContainer
+import tools.jackson.databind.json.JsonMapper
 import java.time.LocalDate
 import java.util.UUID
 import java.util.concurrent.Executors
@@ -58,22 +59,22 @@ class EditorApiTest {
     @Autowired
     lateinit var jdbcTemplate: JdbcTemplate
 
-    @MockBean
+    @MockitoBean
     lateinit var identityClient: IdentityClient
 
-    @MockBean
+    @MockitoBean
     lateinit var auditDelivery: AuditDeliveryClient
 
-    @MockBean
+    @MockitoBean
     lateinit var contentClient: ContentClient
 
-    @MockBean
+    @MockitoBean
     lateinit var catalogClient: CatalogClient
 
-    @MockBean
+    @MockitoBean
     lateinit var amendmentClient: AmendmentClient
 
-    @MockBean
+    @MockitoBean
     lateinit var searchIndexClient: SearchIndexClient
 
     private val editor = actor("01900000-0000-4000-8000-000000000410", "editor")
@@ -500,7 +501,7 @@ class EditorApiTest {
         postCommand(sessionId, "approval", "approved")
         stub(publisher)
         Mockito.doAnswer { throw DownstreamException("audit denied") }.`when`(auditDelivery).deliver(
-            Mockito.any(com.constitutionatlas.editor.repo.PendingAudit::class.java) ?: com.constitutionatlas.editor.repo.PendingAudit(UUID(0, 0), java.time.OffsetDateTime.now(), com.fasterxml.jackson.databind.ObjectMapper().createObjectNode()),
+            Mockito.any(com.constitutionatlas.editor.repo.PendingAudit::class.java) ?: com.constitutionatlas.editor.repo.PendingAudit(UUID(0, 0), java.time.OffsetDateTime.now(), JsonMapper().createObjectNode()),
         )
         mockMvc.post("/edit-sessions/$sessionId/publish") {
             header("Authorization", TOKEN)
@@ -1095,7 +1096,7 @@ class EditorApiTest {
 
         @Container
         @JvmStatic
-        val postgres: PostgreSQLContainer<*> = PostgreSQLContainer("postgres:16-alpine")
+        val postgres: PostgreSQLContainer = PostgreSQLContainer("postgres:16-alpine")
 
         @JvmStatic
         @DynamicPropertySource

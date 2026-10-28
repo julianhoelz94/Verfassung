@@ -7,10 +7,11 @@ import com.constitutionatlas.editor.api.EditSessionStatus
 import com.constitutionatlas.editor.api.EditSessionSummaryDto
 import com.constitutionatlas.editor.api.SearchIndexStatus
 import com.constitutionatlas.editor.service.DomainEvents
-import com.fasterxml.jackson.databind.JsonNode
-import com.fasterxml.jackson.databind.ObjectMapper
+import com.constitutionatlas.platform.scalarText
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Repository
+import tools.jackson.databind.JsonNode
+import tools.jackson.databind.ObjectMapper
 import java.sql.Timestamp
 import java.time.Instant
 import java.util.UUID
@@ -153,7 +154,7 @@ class EditorRepository(
             LIMIT 1
             """.trimIndent(),
             { rs, _ -> rs.getObject("id", UUID::class.java) },
-            *listOf(actorId, versionId, hopKind).plus(statuses.map { it.toJson() }).toTypedArray(),
+            *listOf<Any?>(actorId, versionId, hopKind).plus(statuses.map { it.toJson() }).toTypedArray(),
         ).firstOrNull()
     }
 
@@ -220,8 +221,8 @@ class EditorRepository(
                 val node = objectMapper.readTree(rs.getString("payload"))
                 DraftArticleDto(
                     articleId = articleId,
-                    title = node.path("title").asText(""),
-                    body = node.path("body").asText(""),
+                    title = node.path("title").asString(""),
+                    body = node.path("body").asString(""),
                 )
             },
             sessionId,
@@ -259,8 +260,8 @@ class EditorRepository(
             """.trimIndent(),
             { rs, _ ->
                 val node = objectMapper.readTree(rs.getString("payload"))
-                val source = node.path("sourceVersionId").asText("")
-                val next = node.path("newVersionId").asText("")
+                val source = node.path("sourceVersionId").asString("")
+                val next = node.path("newVersionId").asString("")
                 if (source.isBlank() || next.isBlank()) {
                     null
                 } else {
@@ -268,10 +269,10 @@ class EditorRepository(
                     PublishedPreview(
                         sourceVersionId = UUID.fromString(source),
                         newVersionId = UUID.fromString(next),
-                        versionLabel = if (labelNode == null || labelNode.isNull) null else labelNode.asText(),
-                        unitMapping = node.get("unitMapping")?.takeIf { it.isObject }?.fields()?.asSequence()?.associate { it.key to it.value.asText() },
-                        sourceGeneration = node.get("sourceGeneration")?.takeUnless { it.isNull }?.asLong(),
-                        settingsRevisionId = node.get("settingsRevisionId")?.takeUnless { it.isNull }?.asText()?.let(UUID::fromString),
+                        versionLabel = if (labelNode == null || labelNode.isNull) null else labelNode.scalarText(),
+                        unitMapping = node.get("unitMapping")?.takeIf { it.isObject }?.properties()?.asSequence()?.associate { it.key to it.value.scalarText() },
+                        sourceGeneration = node.get("sourceGeneration")?.takeUnless { it.isNull }?.asLong(0L),
+                        settingsRevisionId = node.get("settingsRevisionId")?.takeUnless { it.isNull }?.scalarText()?.let(UUID::fromString),
                     )
                 }
             },

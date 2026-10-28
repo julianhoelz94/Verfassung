@@ -15,7 +15,7 @@ import org.springframework.stereotype.Repository
 import java.util.UUID
 
 @Repository
-class CatalogRepository(private val jdbc: JdbcTemplate, private val mapper: com.fasterxml.jackson.databind.ObjectMapper) {
+class CatalogRepository(private val jdbc: JdbcTemplate, private val mapper: tools.jackson.databind.ObjectMapper) {
     fun holdImportedVersion(versionId: UUID, jobId: UUID) {
         jdbc.update("INSERT INTO import_publication_holds (version_id, import_job_id) VALUES (?, ?)", versionId, jobId)
     }
@@ -106,7 +106,7 @@ class CatalogRepository(private val jdbc: JdbcTemplate, private val mapper: com.
         ORDER BY title
         """.trimIndent(),
         { rs, _ ->
-            arrayOf(
+            arrayOf<Any?>(
                 rs.getObject("id", UUID::class.java),
                 rs.getString("slug"),
                 rs.getString("title"),

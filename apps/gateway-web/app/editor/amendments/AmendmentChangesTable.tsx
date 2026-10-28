@@ -3,7 +3,7 @@
 import { T, useTranslation } from '../../components/TranslationProvider';
 import { ui, type UiMessage } from '../../../lib/messages';
 import { builtinKindMessage } from '../../../lib/ui-labels';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Button, Input, Select } from '../../components/ui';
 import type { AmendmentUnitRef, ArticleSummary, OrderedEntry } from '../../../lib/api';
 import { Stack, Inline } from '../../components/layout/Layout';
@@ -106,9 +106,11 @@ export function AmendmentChangesTable({
   const [rows, setRows] = useState<ChangeRow[]>(initialRows.length > 0 ? initialRows : [emptyRow()]);
   const [search, setSearch] = useState<Record<string, string>>({});
 
-  useEffect(() => {
+  const [previousInitialRows, setPreviousInitialRows] = useState(initialRows);
+  if (previousInitialRows !== initialRows) {
+    setPreviousInitialRows(initialRows);
     setRows(initialRows.length > 0 ? initialRows : [emptyRow()]);
-  }, [initialRows]);
+  }
 
   const unitsByVersion = useMemo(() => Object.fromEntries(
     Object.entries(unitTreesByVersion).map(([versionId, roots]) => [versionId, treeUnits(versionId, roots, t)]),

@@ -2,7 +2,7 @@
 
 import { T } from '../../components/TranslationProvider';
 import { ui } from '../../../lib/messages';
-import { useFormState } from 'react-dom';
+import { useActionState } from 'react';
 import { Alert, Button, Input } from '../../components/ui';
 import { inviteUserAction, issueResetAction, createServiceTokenAction, rotateServiceTokenAction, type TokenRevealState } from '../../account/actions';
 import { Stack } from '../../components/layout/Layout';
@@ -11,7 +11,7 @@ import { RoleFields } from './RoleFields';
 const initial: TokenRevealState = {};
 
 export function InviteUserForm() {
-  const [state, action] = useFormState(inviteUserAction, initial);
+  const [state, action] = useActionState(inviteUserAction, initial);
   return (
     <>
       {state.token ? (
@@ -31,7 +31,7 @@ export function InviteUserForm() {
 }
 
 export function IssueResetForm({ userId }: { userId: string }) {
-  const [state, action] = useFormState(issueResetAction, initial);
+  const [state, action] = useActionState(issueResetAction, initial);
   return (
     <>
       {state.token ? (
@@ -50,7 +50,7 @@ export function IssueResetForm({ userId }: { userId: string }) {
 }
 
 export function CreateServiceTokenForm() {
-  const [state, action] = useFormState(createServiceTokenAction, initial);
+  const [state, action] = useActionState(createServiceTokenAction, initial);
   return (
     <>
       {state.token ? (
@@ -75,7 +75,7 @@ export function CreateServiceTokenForm() {
 }
 
 export function RotateServiceTokenForm({ tokenId }: { tokenId: string }) {
-  const [state, action] = useFormState(rotateServiceTokenAction, initial);
+  const [state, action] = useActionState(rotateServiceTokenAction, initial);
   return (
     <>
       {state.token ? (

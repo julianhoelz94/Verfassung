@@ -1,6 +1,6 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { Simulate } from 'react-dom/test-utils';
+import { fireEvent } from '@testing-library/dom';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { ContentOutline } from '../../lib/api';
 import type { DraftNode, StructuredPreview } from '../../lib/structured-editor';
@@ -59,11 +59,11 @@ describe('independent text and details unsaved guards', () => {
   function submitReview() { return [...host.querySelectorAll('button')].find(button => button.textContent === 'Submit for review')!; }
   function blockers() { return [...host.querySelectorAll('#submit-review-help li')]; }
   async function change(field: HTMLInputElement | HTMLTextAreaElement, value: string) {
-    await act(async () => { field.value = value; Simulate.change(field); });
+    await act(async () => { fireEvent.change(field, { target: { value: value } }); });
   }
   async function submit(selector: string) {
     // Simulate the form handler without submitting a POST or navigating in jsdom.
-    await act(async () => Simulate.submit(host.querySelector<HTMLFormElement>(selector)!));
+    await act(async () => fireEvent.submit(host.querySelector<HTMLFormElement>(selector)!));
   }
   function navigationBlocked() {
     const event = new Event('beforeunload', { cancelable: true });

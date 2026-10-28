@@ -1,6 +1,6 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { Simulate } from 'react-dom/test-utils';
+import { fireEvent } from '@testing-library/dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as axeCore from 'axe-core';
 import type { ContentOutline, OrderedNode } from '../../../lib/api';
@@ -55,7 +55,7 @@ describe('annotated reader preview', () => {
     const settings = outline();
     settings.kinds[2] = { ...settings.kinds[2]!, displayLabel: 'Sentence leaf', showKind: true, showTitle: true };
     await mount(settings);
-    await act(async () => Simulate.pointerOver(sentence()));
+    await act(async () => fireEvent.pointerOver(sentence()));
     const tooltip = host.querySelector('[role="tooltip"]')!;
     expect(host.querySelectorAll('[role="tooltip"]')).toHaveLength(1);
     expect(tooltip.textContent).toContain('Sentence leaf');
@@ -64,7 +64,7 @@ describe('annotated reader preview', () => {
     expect(tooltip.textContent).toContain('Kind name: hidden · Title: hidden');
     expect(tooltip.textContent).toContain('sentence boundary assistance');
     expect(sentence().getAttribute('aria-describedby')).toBe(tooltip.id);
-    await act(async () => Simulate.keyDown(sentence(), { key: 'Escape' }));
+    await act(async () => fireEvent.keyDown(sentence(), { key: 'Escape' }));
     expect(host.querySelector('[role="tooltip"]')).toBeNull();
   });
 

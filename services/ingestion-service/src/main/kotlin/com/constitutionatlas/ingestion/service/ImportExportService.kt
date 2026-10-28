@@ -11,12 +11,13 @@ import com.constitutionatlas.ingestion.repo.ImportJobRepository
 import com.constitutionatlas.platform.Actor
 import com.constitutionatlas.platform.ForbiddenException
 import com.constitutionatlas.platform.NotFoundException
-import com.fasterxml.jackson.databind.JsonNode
-import com.fasterxml.jackson.databind.ObjectMapper
+import com.constitutionatlas.platform.scalarText
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.web.server.ResponseStatusException
+import tools.jackson.databind.JsonNode
+import tools.jackson.databind.ObjectMapper
 import java.security.MessageDigest
 import java.util.Base64
 import java.util.UUID
@@ -51,9 +52,9 @@ class ImportExportService(
         val linkedResources = if (snapshot != null && domains != null) domains.importLinks(id, snapshot.versionId, authorization) else mapper.createArrayNode()
         val resourcesComplete = snapshot != null && domains != null && linkedResources?.isArray == true
         val tree = snapshot?.let {
-            mapper.valueToTree<com.fasterxml.jackson.databind.node.ObjectNode>(it).also { value ->
-                value.set<JsonNode>("sourcePins", mapper.valueToTree(persistedVersion))
-                value.set<JsonNode>("linkedDocuments", linkedResources ?: mapper.createArrayNode())
+            mapper.valueToTree<tools.jackson.databind.node.ObjectNode>(it).also { value ->
+                value.set("sourcePins", mapper.valueToTree(persistedVersion))
+                value.set("linkedDocuments", linkedResources ?: mapper.createArrayNode())
             }
         } ?: submitted
         val serialized = mapper.writeValueAsBytes(tree)
@@ -111,13 +112,13 @@ class ImportExportService(
         fun visit(node: JsonNode) {
             increment("units")
             node.path("content").forEach { entry ->
-                if (entry.path("type").asText() == "child") {
+                if (entry.path("type").scalarText() == "child") {
                     visit(entry.path("node"))
                 } else {
                     increment("textEntries")
                     increment("references", entry.path("references").size())
-                    if (entry.path("format").asText() == "footnote") increment("footnotes")
-                    if (entry.path("format").asText() == "table") {
+                    if (entry.path("format").scalarText() == "footnote") increment("footnotes")
+                    if (entry.path("format").scalarText() == "table") {
                         increment("tables")
                         entry.path("table").path("rows").forEach { row -> increment("cells", row.path("cells").size()) }
                     }
@@ -130,7 +131,7 @@ class ImportExportService(
 
     private fun flatten(node: JsonNode, path: String, result: MutableList<ExportValue>) {
         when {
-            node.isObject && !node.isEmpty -> node.fields().forEachRemaining { (key, value) -> flatten(value, "$path/${key.replace("~", "~0").replace("/", "~1")}", result) }
+            node.isObject && !node.isEmpty -> node.properties().forEach { (key, value) -> flatten(value, "$path/${key.replace("~", "~0").replace("/", "~1")}", result) }
             node.isArray && !node.isEmpty -> node.forEachIndexed { index, value -> flatten(value, "$path/$index", result) }
             node.isTextual && node.textValue().length > 16000 -> {
                 val text = node.textValue()
@@ -149,12 +150,12 @@ class ImportExportService(
 
     private fun compare(expected: JsonNode, actual: JsonNode, path: String, result: MutableList<FidelityMismatch>) {
         if (expected.isObject) {
-            expected.fields().forEachRemaining { (key, value) ->
+            expected.properties().forEach { (key, value) ->
                 if (key !in setOf("revisionId", "predecessorRevisionId", "lineage") && !(key == "logicalId" && value.isNull)) {
                     val found = actual.path(key)
                     val sameDefault = (value.isNull && (found.isMissingNode || found.isNull)) ||
-                        (key == "format" && value.isNull && found.asText() == "plain") ||
-                        (key == "text" && value.isNull && expected.path("format").asText() == "table") ||
+                        (key == "format" && value.isNull && found.scalarText() == "plain") ||
+                        (key == "text" && value.isNull && expected.path("format").scalarText() == "table") ||
                         (key == "kind" && value.isNull) ||
                         (value.isArray && value.isEmpty && found.isMissingNode)
                     if (!sameDefault) compare(value, found, "$path/$key", result)

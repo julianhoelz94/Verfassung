@@ -20,15 +20,15 @@ import org.junit.jupiter.api.Test
 import org.mockito.Mockito
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
-import org.springframework.boot.test.mock.mockito.MockBean
 import org.springframework.dao.DataAccessException
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
+import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.springframework.web.server.ResponseStatusException
-import org.testcontainers.containers.PostgreSQLContainer
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
+import org.testcontainers.postgresql.PostgreSQLContainer
 import java.util.UUID
 
 @Testcontainers
@@ -40,7 +40,7 @@ class OrderedContentApiTest {
 
     @Autowired lateinit var jdbc: JdbcTemplate
 
-    @MockBean lateinit var catalog: CatalogClient
+    @MockitoBean lateinit var catalog: CatalogClient
 
     @Test
     fun importPublicationSealsOnlyTheApprovedGenerationAndReservationWithoutRewritingRoots() {
@@ -504,7 +504,7 @@ class OrderedContentApiTest {
 
     companion object {
         @Container @JvmStatic
-        val postgres = PostgreSQLContainer<Nothing>("postgres:16-alpine")
+        val postgres = PostgreSQLContainer("postgres:16-alpine")
 
         @JvmStatic @DynamicPropertySource
         fun properties(registry: DynamicPropertyRegistry) {

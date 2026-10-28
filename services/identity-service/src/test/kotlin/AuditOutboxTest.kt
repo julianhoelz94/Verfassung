@@ -10,20 +10,21 @@ import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito
 import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
 import org.springframework.boot.test.context.SpringBootTest
-import org.springframework.boot.test.mock.mockito.MockBean
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
+import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
 import org.springframework.transaction.PlatformTransactionManager
 import org.springframework.transaction.support.TransactionTemplate
-import org.testcontainers.containers.PostgreSQLContainer
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
+import org.testcontainers.postgresql.PostgreSQLContainer
+import tools.jackson.databind.json.JsonMapper
 import java.util.UUID
 
 @Testcontainers
@@ -45,7 +46,7 @@ class AuditOutboxTest {
 
     @Autowired lateinit var mockMvc: MockMvc
 
-    @MockBean lateinit var delivery: AuditDeliveryClient
+    @MockitoBean lateinit var delivery: AuditDeliveryClient
 
     @Test
     fun committedEventsSurviveDeliveryFailureAndPublisherRestartWithStableIdentity() {
@@ -109,12 +110,12 @@ class AuditOutboxTest {
 
     private fun anyAudit(): PendingAudit {
         Mockito.any(PendingAudit::class.java)
-        return PendingAudit(UUID(0, 0), java.time.OffsetDateTime.now(), com.fasterxml.jackson.databind.ObjectMapper().createObjectNode())
+        return PendingAudit(UUID(0, 0), java.time.OffsetDateTime.now(), JsonMapper().createObjectNode())
     }
 
     companion object {
         @Container @JvmStatic
-        val postgres: PostgreSQLContainer<*> = PostgreSQLContainer("postgres:16-alpine")
+        val postgres: PostgreSQLContainer = PostgreSQLContainer("postgres:16-alpine")
 
         @JvmStatic @DynamicPropertySource
         fun databaseProperties(registry: DynamicPropertyRegistry) {

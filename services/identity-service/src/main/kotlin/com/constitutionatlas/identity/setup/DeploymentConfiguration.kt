@@ -1,9 +1,9 @@
 package com.constitutionatlas.identity.setup
 
-import com.fasterxml.jackson.databind.ObjectMapper
 import org.springframework.core.env.Environment
 import org.springframework.core.io.ClassPathResource
 import org.springframework.stereotype.Component
+import tools.jackson.databind.ObjectMapper
 import java.net.URI
 
 data class SettingDescriptor(val key: String, val group: String, val environment: String, val optional: Boolean, val secret: Boolean = false)

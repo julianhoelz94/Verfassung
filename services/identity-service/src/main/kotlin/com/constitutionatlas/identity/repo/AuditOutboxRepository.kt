@@ -1,9 +1,9 @@
 package com.constitutionatlas.identity.repo
 
-import com.fasterxml.jackson.databind.JsonNode
-import com.fasterxml.jackson.databind.ObjectMapper
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Repository
+import tools.jackson.databind.JsonNode
+import tools.jackson.databind.ObjectMapper
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
 import java.util.UUID

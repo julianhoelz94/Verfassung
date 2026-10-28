@@ -5,9 +5,9 @@ import com.constitutionatlas.content.api.OrderedNode
 import com.constitutionatlas.content.api.OrderedSnapshot
 import com.constitutionatlas.platform.NotFoundException
 import com.constitutionatlas.platform.OrderedRichContent
-import com.fasterxml.jackson.databind.ObjectMapper
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Repository
+import tools.jackson.databind.ObjectMapper
 import java.nio.ByteBuffer
 import java.security.MessageDigest
 import java.util.UUID

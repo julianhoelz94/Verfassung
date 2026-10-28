@@ -1,6 +1,7 @@
 package com.constitutionatlas.identity.setup
 
 import com.constitutionatlas.identity.config.IdentitySeedProperties
+import com.constitutionatlas.identity.crypto.encodeRequired
 import com.constitutionatlas.identity.repo.IdentityRepository
 import org.springframework.boot.ApplicationArguments
 import org.springframework.boot.ApplicationRunner
@@ -35,7 +36,7 @@ class SetupBootstrap(
         if (configuration.production) check(password.length >= 12 && password !in setOf("change-me", "use-secret-store")) { "Bootstrap administrator password must contain at least 12 characters" }
         val existing = users.findUserByEmail(email)
         check(existing == null || "admin" in users.rolesForUser(existing.id)) { "Bootstrap email belongs to a non-administrator" }
-        val id = existing?.id ?: users.insertUser(email, passwordEncoder.encode(password)).also {
+        val id = existing?.id ?: users.insertUser(email, passwordEncoder.encodeRequired(password)).also {
             users.assignRole(it, users.findRoleId("admin") ?: error("Administrator role missing"))
         }
         repository.designate(id)

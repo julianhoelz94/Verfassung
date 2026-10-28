@@ -8,9 +8,9 @@ import com.constitutionatlas.catalog.repo.CatalogRepository
 import com.constitutionatlas.catalog.repo.CuratedComparisonRepository
 import com.constitutionatlas.platform.NotFoundException
 import com.constitutionatlas.platform.OrderedNode
-import com.fasterxml.jackson.databind.ObjectMapper
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import tools.jackson.databind.ObjectMapper
 import java.security.MessageDigest
 import java.util.UUID
 
@@ -33,7 +33,7 @@ class CuratedComparisonService(private val comparisons: CuratedComparisonReposit
         require(request.topics.size in 1..500 && mapper.writeValueAsBytes(request).size <= 512 * 1024) { "Comparison exceeds 500 topics or 512 KiB" }
         require(request.sourceDocumentRevision > 0) { "An exact captured source revision is required" }
         val source = targets.document(request.sourceDocumentId, request.sourceDocumentRevision, authorization)
-        require(source.path("revision").path("fileName").isTextual && source.path("revision").path("revision").asInt() == request.sourceDocumentRevision) { "Comparison source must preserve captured original bytes at the selected revision" }
+        require(source.path("revision").path("fileName").isTextual && source.path("revision").path("revision").asInt(0) == request.sourceDocumentRevision) { "Comparison source must preserve captured original bytes at the selected revision" }
         val identities = request.columns.map { column ->
             require(column.label.length in 1..512) { "Column label is required" }
             val version = catalog.findVersion(column.versionId) ?: throw NotFoundException("Comparison version is missing")

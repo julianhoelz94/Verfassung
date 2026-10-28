@@ -202,7 +202,7 @@ class ArticleRepository(private val jdbc: JdbcTemplate) {
                     sortOrder = rs.getInt("sort_order"),
                 )
             },
-            *listOf(versionId).plus(keepKinds).toTypedArray(),
+            *listOf<Any>(versionId).plus(keepKinds).toTypedArray(),
         )
 
     fun parentMap(versionId: UUID): Map<UUID, UUID?> =

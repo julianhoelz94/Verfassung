@@ -3,18 +3,17 @@ import com.constitutionatlas.document.service.LinkTargetClient
 import com.constitutionatlas.platform.Actor
 import com.constitutionatlas.platform.IdentityClient
 import com.constitutionatlas.platform.UnauthorizedException
-import com.fasterxml.jackson.databind.ObjectMapper
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito
 import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
 import org.springframework.boot.test.context.SpringBootTest
-import org.springframework.boot.test.mock.mockito.MockBean
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.http.MediaType
 import org.springframework.mock.web.MockMultipartFile
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
+import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.delete
 import org.springframework.test.web.servlet.get
@@ -23,9 +22,10 @@ import org.springframework.test.web.servlet.put
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
-import org.testcontainers.containers.PostgreSQLContainer
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
+import org.testcontainers.postgresql.PostgreSQLContainer
+import tools.jackson.databind.ObjectMapper
 import java.util.UUID
 
 @Testcontainers
@@ -36,9 +36,9 @@ class DocumentApiTest {
 
     @Autowired lateinit var mapper: ObjectMapper
 
-    @MockBean lateinit var identity: IdentityClient
+    @MockitoBean lateinit var identity: IdentityClient
 
-    @MockBean lateinit var targets: LinkTargetClient
+    @MockitoBean lateinit var targets: LinkTargetClient
 
     private val editor = Actor(UUID.randomUUID(), "editor@example.local", listOf("editor"))
     private val viewer = Actor(UUID.randomUUID(), "viewer@example.local", listOf("viewer"))
@@ -435,7 +435,7 @@ class DocumentApiTest {
         private const val ADMIN = "Bearer admin"
 
         @Container @JvmStatic
-        val postgres: PostgreSQLContainer<*> = PostgreSQLContainer("postgres:16-alpine")
+        val postgres: PostgreSQLContainer = PostgreSQLContainer("postgres:16-alpine")
 
         @JvmStatic @DynamicPropertySource
         fun databaseProperties(registry: DynamicPropertyRegistry) {

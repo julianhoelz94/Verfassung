@@ -1,11 +1,11 @@
 import com.constitutionatlas.ingestion.service.validateMigrationAmendment
-import com.fasterxml.jackson.databind.ObjectMapper
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
+import tools.jackson.databind.json.JsonMapper
 
 class MigrationAmendmentContractTest {
-    private val mapper = ObjectMapper()
+    private val mapper = JsonMapper()
 
     @Test
     fun unsupportedFieldsAtEveryNestingLevelFailBeforeAnyNativeAmendmentWrite() {

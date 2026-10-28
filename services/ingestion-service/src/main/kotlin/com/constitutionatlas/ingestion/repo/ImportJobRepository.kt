@@ -5,10 +5,10 @@ import com.constitutionatlas.ingestion.api.ImportJobDto
 import com.constitutionatlas.ingestion.api.ImportRequest
 import com.constitutionatlas.ingestion.api.ReviewDecisionDto
 import com.constitutionatlas.platform.OrderedSnapshot
-import com.fasterxml.jackson.databind.ObjectMapper
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Repository
 import org.springframework.transaction.annotation.Transactional
+import tools.jackson.databind.ObjectMapper
 import java.util.UUID
 
 @Repository
@@ -275,15 +275,15 @@ class ImportJobRepository(
                     rs.getObject("id", UUID::class.java),
                     rs.getString("status"),
                     rs.getObject("version_id", UUID::class.java),
-                    payload?.path("isoCode")?.asText(null)?.ifBlank { null },
+                    payload?.path("isoCode")?.asString(null)?.ifBlank { null },
                     rs.getObject("submitted_by", UUID::class.java),
                     rs.getObject("prepared_by", UUID::class.java),
                     rs.getObject("approved_by", UUID::class.java),
                     rs.getObject("published_by", UUID::class.java),
                     rs.getObject("outline_confirmed_by", UUID::class.java),
-                    payload?.path("countryName")?.asText(null),
-                    payload?.path("constitutionTitle")?.asText(null),
-                    payload?.path("versionLabel")?.asText(null),
+                    payload?.path("countryName")?.asString(null),
+                    payload?.path("constitutionTitle")?.asString(null),
+                    payload?.path("versionLabel")?.asString(null),
                 )
             },
             jobId,

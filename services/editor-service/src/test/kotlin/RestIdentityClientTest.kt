@@ -1,8 +1,8 @@
 import com.constitutionatlas.platform.RestIdentityClient
-import com.fasterxml.jackson.databind.ObjectMapper
 import com.sun.net.httpserver.HttpServer
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import tools.jackson.databind.json.JsonMapper
 import java.io.File
 import java.net.InetSocketAddress
 
@@ -10,7 +10,7 @@ class RestIdentityClientTest {
     @Test
     fun authenticateReadsIdentityMeContract() {
         val contract = File("../../apps/gateway-web/lib/contracts/identity-me.json").readText()
-        val expected = ObjectMapper().readTree(contract)
+        val expected = JsonMapper().readTree(contract)
         val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
         server.createContext("/me") { exchange ->
             val authorized = exchange.requestHeaders.getFirst("Authorization") == "Bearer test-token"

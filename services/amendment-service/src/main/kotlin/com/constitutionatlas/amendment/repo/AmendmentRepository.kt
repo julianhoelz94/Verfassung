@@ -6,10 +6,10 @@ import com.constitutionatlas.amendment.api.AmendmentDocumentDto
 import com.constitutionatlas.amendment.api.AmendmentDto
 import com.constitutionatlas.amendment.api.AmendmentRevisionDto
 import com.constitutionatlas.amendment.api.AmendmentUnitRefDto
-import com.fasterxml.jackson.core.type.TypeReference
-import com.fasterxml.jackson.databind.ObjectMapper
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Repository
+import tools.jackson.core.type.TypeReference
+import tools.jackson.databind.ObjectMapper
 import java.time.LocalDate
 import java.util.UUID
 

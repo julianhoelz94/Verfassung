@@ -2,6 +2,7 @@ import com.constitutionatlas.ingestion.IngestionServiceApplication
 import com.constitutionatlas.ingestion.api.ImportArticle
 import com.constitutionatlas.ingestion.api.ImportOutline
 import com.constitutionatlas.ingestion.api.ImportOutlineKind
+import com.constitutionatlas.ingestion.api.ImportRequest
 import com.constitutionatlas.ingestion.api.SetupProposalRequest
 import com.constitutionatlas.ingestion.client.CatalogClient
 import com.constitutionatlas.ingestion.client.ContentClient
@@ -15,27 +16,28 @@ import com.constitutionatlas.platform.Actor
 import com.constitutionatlas.platform.IdentityClient
 import com.constitutionatlas.platform.OrderedSnapshot
 import com.constitutionatlas.platform.UnauthorizedException
-import com.fasterxml.jackson.databind.ObjectMapper
+import org.junit.jupiter.api.Assertions.assertArrayEquals
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito
 import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
 import org.springframework.boot.test.context.SpringBootTest
-import org.springframework.boot.test.mock.mockito.MockBean
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.http.MediaType
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
+import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.delete
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.post
 import org.springframework.test.web.servlet.put
-import org.testcontainers.containers.PostgreSQLContainer
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
+import org.testcontainers.postgresql.PostgreSQLContainer
+import tools.jackson.databind.json.JsonMapper
 import java.security.MessageDigest
 import java.time.LocalDate
 import java.util.Base64
@@ -55,18 +57,21 @@ class ImportApiTest {
     lateinit var importService: ImportService
 
     @Autowired
+    lateinit var objectMapper: JsonMapper
+
+    @Autowired
     lateinit var jobs: com.constitutionatlas.ingestion.repo.ImportJobRepository
 
-    @MockBean
+    @MockitoBean
     lateinit var catalogClient: CatalogClient
 
-    @MockBean
+    @MockitoBean
     lateinit var contentClient: ContentClient
 
-    @MockBean
+    @MockitoBean
     lateinit var identityClient: IdentityClient
 
-    @MockBean
+    @MockitoBean
     lateinit var migrationDomains: com.constitutionatlas.ingestion.client.MigrationDomainClient
 
     private val admin =
@@ -75,7 +80,7 @@ class ImportApiTest {
     private val publisher = Actor(UUID.randomUUID(), "publisher@example.local", listOf("publisher"), stepUpFresh = true)
     private val otherEditor = Actor(UUID.randomUUID(), "other-editor@example.local", listOf("editor"))
     private val scopedImporter = Actor(UUID.randomUUID(), "mcp@example.local", emptyList(), listOf("ingestion:import"))
-    private val json = ObjectMapper()
+    private val json = JsonMapper()
 
     @BeforeEach
     fun stubIdentity() {
@@ -86,6 +91,34 @@ class ImportApiTest {
         Mockito.`when`(identityClient.authenticate(PUBLISHER_TOKEN)).thenReturn(publisher)
         Mockito.`when`(identityClient.authenticate(EDITOR_TOKEN)).thenReturn(otherEditor)
         Mockito.`when`(identityClient.authenticate(MCP_TOKEN)).thenReturn(scopedImporter)
+    }
+
+    @Test
+    fun `Jackson 2 imports retain exact bytes and retry against persisted pre-upgrade hashes`() {
+        val fixtures = mapOf(
+            "legacy" to "fa390a8e25f94c57d363e5757d407c34c1c143f2c3444f1cce35fb43ba41928e",
+            "ordered" to "d615418c8aeaed9b6302b2662756b9c62f28bad087672961314c79036000437d",
+        )
+        fixtures.forEach { (name, expectedHash) ->
+            val input = checkNotNull(javaClass.getResourceAsStream("/jackson2-import-contracts/$name-input.json")).use { it.readBytes() }
+            val expectedBytes = checkNotNull(javaClass.getResourceAsStream("/jackson2-import-contracts/$name-jackson2.json")).use { it.readBytes() }
+            val request = objectMapper.readValue(input, ImportRequest::class.java)
+            val bytes = objectMapper.writeValueAsBytes(request)
+            assertArrayEquals(expectedBytes, bytes, "$name serialization changed from Jackson 2")
+            assertEquals(expectedHash, MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) })
+            val previousId = UUID.randomUUID()
+            val key = "jackson2-$name-${UUID.randomUUID()}"
+            jdbc.update(
+                "INSERT INTO import_jobs (id, status, payload, submitted_by, idempotency_key, payload_sha256) VALUES (?, 'pending_review', ?::jsonb, ?, ?, ?)",
+                previousId,
+                expectedBytes.toString(Charsets.UTF_8),
+                admin.id,
+                key,
+                expectedHash,
+            )
+            val retry = importService.importVersion(TOKEN, admin.id, request, idempotencyKey = key, expectedChecksum = expectedHash)
+            assertEquals(previousId, retry.id)
+        }
     }
 
     private fun jobId(response: String): String = json.readTree(response).path("id").asText()
@@ -123,7 +156,7 @@ class ImportApiTest {
 
     private fun setupOperation(id: UUID): UUID = jdbc.queryForObject("SELECT confirmation_operation FROM import_setup_proposals WHERE id = ?", UUID::class.java, id)!!
 
-    private fun reviewedSetup(slug: String): SetupProposalRequest = com.fasterxml.jackson.module.kotlin.jacksonObjectMapper().readValue(
+    private fun reviewedSetup(slug: String): SetupProposalRequest = tools.jackson.module.kotlin.jacksonObjectMapper().readValue(
         """{"isoCode":"FR","countryName":"France","constitutionSlug":"$slug","constitutionTitle":"Reviewed charter","sourceUrl":"https://example.org/source","outline":{"kinds":[{"kindCode":"article","displayLabel":"Article"}]},"sampleRoots":[{"kind":"article","label":"1","content":[{"type":"text","text":"Exact reviewed words."}]}]}""",
         SetupProposalRequest::class.java,
     )
@@ -162,7 +195,7 @@ class ImportApiTest {
 
     @Test
     fun setupLostResponseResumesTheSameReviewedOperationAfterRestart() {
-        val mapper = com.fasterxml.jackson.module.kotlin.jacksonObjectMapper()
+        val mapper = tools.jackson.module.kotlin.jacksonObjectMapper()
         val repository = com.constitutionatlas.ingestion.repo.SetupProposalRepository(jdbc, mapper)
         val service = com.constitutionatlas.ingestion.service.SetupProposalService(repository, catalogClient, mapper)
         val request = reviewedSetup("lost-response-${UUID.randomUUID()}")
@@ -191,7 +224,7 @@ class ImportApiTest {
 
     @Test
     fun setupResumesAfterCountryCreationLosesItsResponse() {
-        val mapper = com.fasterxml.jackson.module.kotlin.jacksonObjectMapper()
+        val mapper = tools.jackson.module.kotlin.jacksonObjectMapper()
         val repository = com.constitutionatlas.ingestion.repo.SetupProposalRepository(jdbc, mapper)
         val service = com.constitutionatlas.ingestion.service.SetupProposalService(repository, catalogClient, mapper)
         val request = reviewedSetup("country-response-${UUID.randomUUID()}").copy(isoCode = "ZX", countryName = "Setup country")
@@ -211,7 +244,7 @@ class ImportApiTest {
 
     @Test
     fun legacyInterruptedSetupOnlyReconcilesItsRecordedConstitutionIdentity() {
-        val mapper = com.fasterxml.jackson.module.kotlin.jacksonObjectMapper()
+        val mapper = tools.jackson.module.kotlin.jacksonObjectMapper()
         val repository = com.constitutionatlas.ingestion.repo.SetupProposalRepository(jdbc, mapper)
         val request = reviewedSetup("legacy-confirmation-${UUID.randomUUID()}")
         val proposal = repository.insert(admin.id, request)
@@ -232,7 +265,7 @@ class ImportApiTest {
 
     @Test
     fun setupProcessDeathCanBeReclaimedWithoutChangingTheReviewedRevision() {
-        val mapper = com.fasterxml.jackson.module.kotlin.jacksonObjectMapper()
+        val mapper = tools.jackson.module.kotlin.jacksonObjectMapper()
         val repository = com.constitutionatlas.ingestion.repo.SetupProposalRepository(jdbc, mapper)
         val service = com.constitutionatlas.ingestion.service.SetupProposalService(repository, catalogClient, mapper)
         val request = reviewedSetup("process-death-${UUID.randomUUID()}")
@@ -264,7 +297,7 @@ class ImportApiTest {
 
     @Test
     fun obsoleteSetupCallbacksCannotReleaseOrFinishARecoveryClaim() {
-        val mapper = com.fasterxml.jackson.module.kotlin.jacksonObjectMapper()
+        val mapper = tools.jackson.module.kotlin.jacksonObjectMapper()
         val repository = com.constitutionatlas.ingestion.repo.SetupProposalRepository(jdbc, mapper)
         val proposal = repository.insert(admin.id, reviewedSetup("fenced-setup-${UUID.randomUUID()}"))
         val old = repository.claim(proposal.id, proposal.revision)!!
@@ -283,7 +316,7 @@ class ImportApiTest {
 
     @Test
     fun guaranteedNoWriteRejectionAllowsAnExplicitlyReviewedCorrectionWithANewOperation() {
-        val mapper = com.fasterxml.jackson.module.kotlin.jacksonObjectMapper()
+        val mapper = tools.jackson.module.kotlin.jacksonObjectMapper()
         val repository = com.constitutionatlas.ingestion.repo.SetupProposalRepository(jdbc, mapper)
         val service = com.constitutionatlas.ingestion.service.SetupProposalService(repository, catalogClient, mapper)
         val request = reviewedSetup("rejected-${UUID.randomUUID()}")
@@ -309,13 +342,13 @@ class ImportApiTest {
 
     @Test
     fun receiptConflictAndLegacyUncertaintyNeverUnfreezeTheReviewedProposal() {
-        val mapper = com.fasterxml.jackson.module.kotlin.jacksonObjectMapper()
+        val mapper = tools.jackson.module.kotlin.jacksonObjectMapper()
         val repository = com.constitutionatlas.ingestion.repo.SetupProposalRepository(jdbc, mapper)
         val service = com.constitutionatlas.ingestion.service.SetupProposalService(repository, catalogClient, mapper)
         val request = reviewedSetup("receipt-conflict-${UUID.randomUUID()}")
         val proposal = service.create(TOKEN, admin.id, request)
         Mockito.`when`(catalogClient.createSetupConstitution(anyUuid(), Mockito.eq(request) ?: request))
-            .thenThrow(org.springframework.web.client.HttpClientErrorException.create(org.springframework.http.HttpStatus.CONFLICT, "Conflict", null, "{\"code\":\"creation_attempt_mismatch\"}".toByteArray(), null))
+            .thenThrow(org.springframework.web.client.HttpClientErrorException.create(org.springframework.http.HttpStatus.CONFLICT, "Conflict", org.springframework.http.HttpHeaders.EMPTY, "{\"code\":\"creation_attempt_mismatch\"}".toByteArray(), null))
         org.junit.jupiter.api.Assertions.assertThrows(org.springframework.web.client.HttpClientErrorException::class.java) {
             service.confirm(TOKEN, proposal.id, admin.id, true, proposal.revision)
         }
@@ -341,7 +374,7 @@ class ImportApiTest {
         jdbc.update("UPDATE import_jobs SET status = 'preparing', updated_at = now() - interval '10 minutes' WHERE id = ?", job)
         val event = UUID.randomUUID()
         jdbc.update("INSERT INTO import_publication_outbox(id, import_job_id, event_type, payload, attempts, created_at) VALUES (?, ?, 'audit_publish', '{}'::jsonb, 2, now() - interval '10 minutes')", event, job)
-        val setups = com.constitutionatlas.ingestion.repo.SetupProposalRepository(jdbc, com.fasterxml.jackson.module.kotlin.jacksonObjectMapper())
+        val setups = com.constitutionatlas.ingestion.repo.SetupProposalRepository(jdbc, tools.jackson.module.kotlin.jacksonObjectMapper())
         val setup = setups.insert(admin.id, reviewedSetup("monitored-${UUID.randomUUID()}"))
         val claim = setups.claim(setup.id, setup.revision)!!
         setups.retry(setup.id, claim.attempt)
@@ -548,7 +581,7 @@ class ImportApiTest {
             jsonPath("$.status") { value("proposed") }
         }.andReturn()
         val id = jobId(response.response.contentAsString)
-        val reviewed = com.fasterxml.jackson.module.kotlin.jacksonObjectMapper().readValue(body, SetupProposalRequest::class.java)
+        val reviewed = tools.jackson.module.kotlin.jacksonObjectMapper().readValue(body, SetupProposalRequest::class.java)
         Mockito.`when`(catalogClient.createSetupConstitution(anyUuid(), Mockito.eq(reviewed) ?: reviewed)).thenReturn(DownstreamSetupConstitution(constitutionId, SETTINGS_REVISION))
         mockMvc.get("/import-setup-proposals/$id") { header("Authorization", EDITOR_TOKEN) }
             .andExpect { status { isForbidden() } }
@@ -674,7 +707,7 @@ class ImportApiTest {
             header("If-Match", "3")
         }
             .andExpect { status { isConflict() } }
-        val reviewed = com.fasterxml.jackson.module.kotlin.jacksonObjectMapper().readValue(jdbc.queryForObject("SELECT payload::text FROM import_setup_proposals WHERE id = ?", String::class.java, UUID.fromString(id)), SetupProposalRequest::class.java)
+        val reviewed = tools.jackson.module.kotlin.jacksonObjectMapper().readValue(jdbc.queryForObject("SELECT payload::text FROM import_setup_proposals WHERE id = ?", String::class.java, UUID.fromString(id)), SetupProposalRequest::class.java)
         Mockito.verify(catalogClient, Mockito.never()).createSetupConstitution(anyUuid(), Mockito.eq(reviewed) ?: reviewed)
         val constitutionId = UUID.randomUUID()
         Mockito.`when`(catalogClient.createSetupConstitution(anyUuid(), Mockito.eq(reviewed) ?: reviewed)).thenReturn(DownstreamSetupConstitution(constitutionId, SETTINGS_REVISION))
@@ -690,7 +723,7 @@ class ImportApiTest {
 
     @Test
     fun setupDisplayResponseDoesNotAdoptANewerChatRevisionForConfirmation() {
-        val mapper = com.fasterxml.jackson.module.kotlin.jacksonObjectMapper()
+        val mapper = tools.jackson.module.kotlin.jacksonObjectMapper()
         val repository = Mockito.spy(com.constitutionatlas.ingestion.repo.SetupProposalRepository(jdbc, mapper))
         val service = com.constitutionatlas.ingestion.service.SetupProposalService(repository, catalogClient, mapper)
         val request = mapper.readValue(
@@ -706,7 +739,7 @@ class ImportApiTest {
             anyUuid(),
             Mockito.anyLong(),
             Mockito.any(com.constitutionatlas.ingestion.api.SetupProposalRequest::class.java) ?: request,
-            Mockito.any(com.fasterxml.jackson.databind.JsonNode::class.java) ?: mapper.createObjectNode(),
+            Mockito.any(tools.jackson.databind.JsonNode::class.java) ?: mapper.createObjectNode(),
         )
         val saved = service.display(created.id, admin.id, true, com.constitutionatlas.ingestion.api.SetupDisplayRequest(listOf(com.constitutionatlas.ingestion.api.SetupDisplayKind("article", "Art."))), created.revision)
         assertEquals(2, saved.revision.toInt())
@@ -720,7 +753,7 @@ class ImportApiTest {
 
     @Test
     fun setupConfirmationRejectsARevisionThatChangedBeforeTheClaim() {
-        val mapper = com.fasterxml.jackson.module.kotlin.jacksonObjectMapper()
+        val mapper = tools.jackson.module.kotlin.jacksonObjectMapper()
         val repository = Mockito.spy(com.constitutionatlas.ingestion.repo.SetupProposalRepository(jdbc, mapper))
         val service = com.constitutionatlas.ingestion.service.SetupProposalService(repository, catalogClient, mapper)
         val request = mapper.readValue(
@@ -1367,7 +1400,7 @@ class ImportApiTest {
 
         @Container
         @JvmStatic
-        val postgres: PostgreSQLContainer<*> = PostgreSQLContainer("postgres:16-alpine")
+        val postgres: PostgreSQLContainer = PostgreSQLContainer("postgres:16-alpine")
 
         @JvmStatic
         @DynamicPropertySource

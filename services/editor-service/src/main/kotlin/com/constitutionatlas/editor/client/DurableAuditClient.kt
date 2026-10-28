@@ -5,12 +5,12 @@ import com.constitutionatlas.editor.repo.PendingAudit
 import com.constitutionatlas.editor.service.DomainEvents
 import com.constitutionatlas.platform.Actor
 import com.constitutionatlas.platform.timedRestClient
-import com.fasterxml.jackson.databind.node.ObjectNode
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.http.MediaType
 import org.springframework.transaction.annotation.Transactional
+import tools.jackson.databind.node.ObjectNode
 import java.util.UUID
 
 open class DurableAuditClient(private val repository: EditorRepository) : AuditClient {
@@ -39,7 +39,7 @@ fun interface AuditDeliveryClient {
 class RestAuditDeliveryClient(auditUrl: String, private val bearerToken: String?) : AuditDeliveryClient {
     private val client = timedRestClient(auditUrl)
     override fun deliver(event: PendingAudit) {
-        val body = event.body.deepCopy<ObjectNode>().put("eventId", event.eventId.toString()).put("occurredAt", event.occurredAt.toString())
+        val body = (event.body as ObjectNode).deepCopy().put("eventId", event.eventId.toString()).put("occurredAt", event.occurredAt.toString())
         val request = client.post().uri("/events").contentType(MediaType.APPLICATION_JSON)
         if (!bearerToken.isNullOrBlank()) request.header("Authorization", bearerHeader(bearerToken))
         request.body(body).retrieve().toBodilessEntity()

@@ -1,8 +1,8 @@
 package com.constitutionatlas.identity.service
 
-import com.fasterxml.jackson.databind.ObjectMapper
 import org.springframework.stereotype.Component
 import org.springframework.web.util.HtmlUtils
+import tools.jackson.databind.ObjectMapper
 import java.net.URI
 import java.net.URLEncoder
 import java.net.http.HttpClient
@@ -52,8 +52,8 @@ class ContentTranslationProvider(private val mapper: ObjectMapper) {
         val root = mapper.readTree(response.body())
         val translations = if (provider == "google") root.path("data").path("translations") else root.path("translations")
         if (translations.size() != sourceTexts.size) error("Translation provider returned an incomplete response")
-        return translations.map { entry ->
-            val translated = entry.path(if (provider == "google") "translatedText" else "text").asText("")
+        return translations.toList().map { entry ->
+            val translated = entry.path(if (provider == "google") "translatedText" else "text").asString("")
             if (translated.isBlank()) error("Translation provider returned no text")
             if (provider == "google") HtmlUtils.htmlUnescape(translated) else translated
         }

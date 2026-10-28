@@ -3,10 +3,10 @@ import com.constitutionatlas.ingestion.repo.UploadRow
 import com.constitutionatlas.ingestion.service.ImportService
 import com.constitutionatlas.ingestion.service.ImportUploadService
 import com.constitutionatlas.platform.Actor
-import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito
+import tools.jackson.module.kotlin.jacksonObjectMapper
 import java.util.UUID
 
 class ImportUploadStatusTest {

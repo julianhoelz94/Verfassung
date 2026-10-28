@@ -1,9 +1,9 @@
 package com.constitutionatlas.amendment.repo
 
 import com.constitutionatlas.platform.DiffItem
-import com.fasterxml.jackson.databind.ObjectMapper
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Repository
+import tools.jackson.databind.ObjectMapper
 import java.util.UUID
 
 data class AmendmentDiffPin(val sourceVersionId: UUID, val targetVersionId: UUID, val algorithmVersion: String)

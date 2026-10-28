@@ -8,8 +8,6 @@ import com.constitutionatlas.identity.repo.IdentityRepository
 import com.constitutionatlas.identity.repo.PasskeyRepository
 import com.constitutionatlas.identity.repo.StoredUser
 import com.constitutionatlas.platform.UnauthorizedException
-import com.fasterxml.jackson.databind.JsonNode
-import com.fasterxml.jackson.databind.ObjectMapper
 import com.yubico.webauthn.AssertionRequest
 import com.yubico.webauthn.FinishAssertionOptions
 import com.yubico.webauthn.FinishRegistrationOptions
@@ -26,6 +24,8 @@ import com.yubico.webauthn.data.UserVerificationRequirement
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import tools.jackson.databind.JsonNode
+import tools.jackson.databind.ObjectMapper
 import java.net.URI
 import java.nio.ByteBuffer
 import java.time.Instant

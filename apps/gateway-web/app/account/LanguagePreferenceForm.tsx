@@ -18,6 +18,8 @@ export function LanguagePreferenceForm({ preference, enabled = availableLocales 
         const saved = await updateLanguagePreferenceAction(new FormData(event.currentTarget));
         window.location.assign(saved ? '/account?languageSaved=1' : '/account?error=language');
       } catch {
+        // Reload the server-rendered account/editor state after this action, including its failure state.
+        // eslint-disable-next-line @next/next/no-location-assign-relative-destination
         window.location.assign('/account?error=language');
       }
     }}>

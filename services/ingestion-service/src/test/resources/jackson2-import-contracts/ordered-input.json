@@ -1,0 +1,43 @@
+{
+  "isoCode": "ZZ",
+  "countryName": "Probe",
+  "constitutionSlug": "ordered-probe",
+  "constitutionTitle": "Prüfung – Import",
+  "versionLabel": "Fassung 2026",
+  "effectiveDate": "2026-10-26",
+  "languageCode": "de",
+  "sourceUrl": "https://example.org/source",
+  "gazetteReference": "Quelle 2026/1",
+  "constitutionId": "11111111-1111-4111-8111-111111111111",
+  "settingsRevisionId": "22222222-2222-4222-8222-222222222222",
+  "outline": null,
+  "articles": [],
+  "sourceEvidence": {
+    "dateWording": "Oktober 2026",
+    "datePrecision": "month",
+    "coverage": "Artikel 1",
+    "attribution": "Archiv"
+  },
+  "expectedCounts": {
+    "roots": 1,
+    "articles": 0
+  },
+  "roots": [
+    {
+      "logicalId": "33333333-3333-4333-8333-333333333333",
+      "kind": "article",
+      "label": "1",
+      "content": [
+        {
+          "type": "text",
+          "logicalId": "44444444-4444-4444-8444-444444444444",
+          "text": "Text mit Umlaut: ä",
+          "annotation": {
+            "kind": "source",
+            "sourceUrl": "https://example.org/note"
+          }
+        }
+      ]
+    }
+  ]
+}

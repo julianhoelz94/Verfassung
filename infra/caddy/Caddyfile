@@ -37,7 +37,7 @@
 	# sessions and bearer credentials are exempt. The gateway also gates public pages
 	# when anonymous browsing is disabled.
 	@api_request {
-		path /api/catalog* /api/content* /api/amendment* /api/audit* /api/search* /api/ingestion* /api/document* /api/identity* /api/editor* /api/docs/* /oauth/token* /oauth/register* /oauth/revoke*
+		path /api/reader* /api/catalog* /api/content* /api/amendment* /api/audit* /api/search* /api/ingestion* /api/document* /api/identity* /api/editor* /api/docs/* /oauth/token* /oauth/register* /oauth/revoke*
 	}
 	route @api_request {
 		forward_auth gateway-web:3000 {
@@ -54,7 +54,7 @@
 	@missing_write_auth {
 		method POST PUT PATCH DELETE
 		header !Authorization
-		path /api/catalog* /api/content* /api/amendment* /api/audit* /api/search* /api/ingestion* /api/document* /api/docs/catalog* /api/docs/content* /api/docs/amendment* /api/docs/audit* /api/docs/search* /api/docs/ingestion* /api/docs/document*
+		path /api/reader* /api/catalog* /api/content* /api/amendment* /api/audit* /api/search* /api/ingestion* /api/document* /api/docs/catalog* /api/docs/content* /api/docs/amendment* /api/docs/audit* /api/docs/search* /api/docs/ingestion* /api/docs/document*
 	}
 	route @missing_write_auth {
 		respond 401

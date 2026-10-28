@@ -23,6 +23,13 @@ describe('content translation preserves consent and the source', () => {
     expect(view.host.textContent).toContain('Interface text'); expect(view.host.textContent).toContain('Excluded quote'); expect(view.host.textContent).toContain('literal-code');
     await click(button(view.host, 'Show original')); expect(view.host.querySelector('[data-translate-content]')?.textContent).toBe(' Original wording '); expect(view.host.querySelector('article')?.getAttribute('lang')).toBe('de');
   });
+  it('keeps a nested Wiki language scope separate from the constitution source', async () => {
+    vi.mocked(translateContentAction).mockResolvedValue(['Translated law']);
+    await show({}, <><p data-translate-content>Legal wording</p><div data-content-translation><p data-translate-content>Wiki introduction</p></div></>);
+    await click(button(view.host, 'Translate this content'));
+    expect(translateContentAction).toHaveBeenCalledWith(['Legal wording'], 'de', 'en');
+    expect(view.host.textContent).toContain('Wiki introduction');
+  });
   it('deduplicates repeated source passages while updating each occurrence', async () => {
     vi.mocked(translateContentAction).mockResolvedValue(['Translated']); await show({}, <div><p data-translate-content>Same source</p><p data-translate-content>Same source</p></div>); await click(button(view.host, 'Translate this content'));
     expect(translateContentAction).toHaveBeenCalledWith(['Same source'], 'de', 'en'); expect([...view.host.querySelectorAll('p')].map(p => p.textContent)).toEqual(['Translated', 'Translated']);

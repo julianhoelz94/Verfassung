@@ -60,7 +60,6 @@ async function readPublishedText(page: Page, href: string, text: string) {
   const response = await page.goto(href);
   expect(response?.status(), `Published reader ${href}`).toBe(200);
   await expect(page.locator('.version-articles'), `Published snapshot ${href} must remain readable`).toBeVisible();
-  await page.locator('.version-articles .article-toggle').first().click();
   await expect(page.getByText(text, { exact: true }).first()).toBeVisible();
 }
 
@@ -193,7 +192,6 @@ test('owned work survives role handoffs and published corrections remain readabl
     await expect(page.locator('.article-list').getByText('draft', { exact: true })).toHaveCount(0);
     await page.screenshot({ path: testInfo.outputPath(`published-work-${index + 1}.png`), fullPage: true });
     await resultLink.click();
-    await page.locator('.version-articles .article-toggle').first().click();
     await expect(page.getByText(correctedText, { exact: true }).first()).toBeVisible();
     published.push({ sessionId: sessionId!, sessionPath, href, versionId: versionId! });
     sourceVersionId = versionId!;

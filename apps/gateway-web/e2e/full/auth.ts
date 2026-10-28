@@ -47,7 +47,7 @@ export async function signOut(page: Page) {
 
 export async function startFromViewer(page: Page, countryIso: string, versionId: string, kind: 'legal' | 'editorial_correction') {
   await page.goto(`/countries/${countryIso}/versions/${versionId}`);
-  await page.getByRole('link', { name: 'Edit this constitution' }).click();
+  await page.getByRole('button', { name: 'Edit this constitution' }).click();
   await page.locator('#editor-entry').getByRole('button', { name: kind === 'legal' ? 'Record the next legal change' : 'Correct this text' }).click();
   await expect(page).toHaveURL(/sessionId=/);
 }

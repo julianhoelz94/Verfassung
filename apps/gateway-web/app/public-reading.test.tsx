@@ -32,7 +32,6 @@ async function expandedReader(id = 'law-1949') {
   const container = document.createElement('div'); mounted = createRoot(container);
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   await act(async () => mounted!.render(await Version(versionProps(id))));
-  await act(async () => (container.querySelector('#unit-old-1') as HTMLButtonElement).click());
   return container;
 }
 const params = () => Promise.resolve({ code: 'XA' });

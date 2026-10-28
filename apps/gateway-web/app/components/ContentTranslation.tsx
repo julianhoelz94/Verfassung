@@ -42,6 +42,7 @@ function ContentTranslationBody({ children, sourceLanguage, authenticated, enabl
       while (walker.nextNode()) {
         const node = walker.currentNode as Text;
         if (node.textContent?.trim()
+          && node.parentElement?.closest('[data-content-translation]') === originalRef.current
           && node.parentElement?.closest('.constitution-body, .node-heading, .legal-table, .legal-footnote, .wiki-body, [data-translate-content]')
           && !node.parentElement?.closest('script, style, code, pre, [data-no-translate]')) nodes.push(node);
       }
@@ -123,6 +124,6 @@ function ContentTranslationBody({ children, sourceLanguage, authenticated, enabl
       {authenticated && !enabled ? <span><T value={ui.contentTranslation.unavailable} /></span> : null}
       {failed ? <span role="alert"><T value={ui.contentTranslation.failed} /></span> : null}
     </Inline> : null}
-    <div ref={originalRef} lang={translated ? locale : sourceLanguage === 'auto' ? undefined : sourceLanguage}>{children}</div>
+    <div ref={originalRef} data-content-translation lang={translated ? locale : sourceLanguage === 'auto' ? undefined : sourceLanguage}>{children}</div>
   </div>;
 }

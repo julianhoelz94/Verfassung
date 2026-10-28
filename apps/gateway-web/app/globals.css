@@ -742,16 +742,21 @@ button.article-toggle:disabled::after {
 }
 
 .brand-mark {
-  width: 26px;
-  height: 26px;
-  border-radius: 7px;
-  background: var(--color-accent);
-  color: var(--color-on-accent);
+  width: 20px;
+  height: 24px;
+  border-radius: 0;
+  background: transparent;
+  color: var(--color-ink);
   display: grid;
   place-items: center;
   font-family: var(--font-text);
   font-size: 15px;
 }
+
+.brand-mark svg { width:20px;height:20px; }
+
+::highlight(reader-find) { background:var(--color-changed-bg);color:var(--color-ink); }
+::highlight(reader-current) { background:var(--color-accent);color:var(--color-on-accent); }
 
 .brand-name {
   white-space: nowrap;

@@ -21,6 +21,7 @@ import {
 import { Badge } from './ui';
 import { MenuDisclosure } from './MenuDisclosure';
 import { SiteSearchForm } from './SiteSearchForm';
+import { ReaderIcon } from './ReaderIcon';
 
 type SiteHeaderProps = {
   user: NavUser | null;
@@ -81,12 +82,13 @@ export function SiteHeader({ user, identityUnavailable = false, needsReviewCount
   ] : [] : menuSections(user, false, needsReviewCount, anonymousBrowsingAllowed);
   const versionId = versionIdFromPath(pathname);
   const country = versionId ? countryFromPath(pathname) : undefined;
+  const continuousReader = Boolean(versionId && !pathname.includes('/articles/') && !pathname.includes('/units/'));
   return (
     <header className="topbar">
       <div className="topbar-inner">
         <a className="brand" href={setupInProgress && user ? '/setup' : '/'}>
           <span className="brand-mark" aria-hidden="true">
-            §
+            <ReaderIcon name="book" />
           </span>
           <span className="brand-name"><T value={ui.components.siteheader.constitutionAtlas} /></span>
         </a>
@@ -102,7 +104,7 @@ export function SiteHeader({ user, identityUnavailable = false, needsReviewCount
           ))}
         </nav>
         <div className="topbar-actions">
-          {!setupInProgress && (user || anonymousBrowsingAllowed) ? <SiteSearchForm
+          {!continuousReader && !setupInProgress && (user || anonymousBrowsingAllowed) ? <SiteSearchForm
             id="header-search-inline"
             className="search-inline"
             versionId={versionId}
@@ -136,7 +138,7 @@ export function SiteHeader({ user, identityUnavailable = false, needsReviewCount
           )}
         </div>
       </div>
-      {!setupInProgress && (user || anonymousBrowsingAllowed) ? <div className="search-row">
+      {!continuousReader && !setupInProgress && (user || anonymousBrowsingAllowed) ? <div className="search-row">
         <SiteSearchForm
           id="header-search-phone"
           versionId={versionId}

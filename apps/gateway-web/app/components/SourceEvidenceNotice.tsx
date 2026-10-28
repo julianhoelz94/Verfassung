@@ -4,10 +4,11 @@ import { T } from './TranslationProvider';
 import { sourceEvidenceUi } from '../../lib/source-evidence-messages';
 import { SourceDescription } from './SourceDescription';
 
-export function SourceEvidenceNotice({ evidence, versionId, canEdit = false }: { evidence?: SourceEvidence | null; versionId?: string; canEdit?: boolean }) {
+export function SourceEvidenceNotice({ evidence, versionId, canEdit = false, headingLevel = 'h2' }: { evidence?: SourceEvidence | null; versionId?: string; canEdit?: boolean; headingLevel?: 'h2' | 'h3' | 'none' }) {
   if (!evidence && !canEdit) return versionId ? <p><a href={`/versions/${versionId}/annotations`}><T value={migrationUi.annotations} /></a></p> : null;
+  const Heading = headingLevel === 'none' ? null : headingLevel;
   return <aside role="note">
-    <h2><T value={migrationUi.source} /></h2>
+    {Heading ? <Heading><T value={migrationUi.source} /></Heading> : null}
     {evidence?.description != null ? <SourceDescription evidence={evidence} /> : <>
     {evidence?.dateWording ? <p><T value={migrationUi.sourceDate} />: {evidence.dateWording}</p> : null}
     {evidence?.coverage ? <p>{evidence.coverage}</p> : null}

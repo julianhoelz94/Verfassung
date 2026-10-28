@@ -28,7 +28,7 @@ export async function signInEditor(page: Page): Promise<void> {
 
 export async function startEditorSession(page: Page, versionId: string, workType: 'legal' | 'editorial_correction'): Promise<void> {
   await page.goto(`/countries/DE/versions/${versionId}`);
-  await page.getByRole('link', { name: 'Edit this constitution' }).click();
+  await page.getByRole('button', { name: 'Edit this constitution' }).click();
   const label = workType === 'legal' ? 'Record the next legal change' : 'Correct this text';
   await page.locator('#editor-entry').getByRole('button', { name: label }).click();
   await expect(page).toHaveURL(/sessionId=/);

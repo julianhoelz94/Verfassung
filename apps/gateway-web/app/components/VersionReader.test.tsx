@@ -6,6 +6,7 @@ import type { ArticleSummary, ContentOutline } from '../../lib/api';
 import { VersionReader } from './VersionReader';
 import { ConstitutionText } from './ConstitutionText';
 import { TranslationProvider } from './TranslationProvider';
+import { fireEvent, getByRole } from '@testing-library/dom';
 
 let host: HTMLDivElement;
 let root: Root;
@@ -19,6 +20,7 @@ beforeEach(() => {
   vi.stubGlobal('requestAnimationFrame', (callback: () => void) => { callback(); return 1; });
   vi.stubGlobal('cancelAnimationFrame', vi.fn());
   vi.stubGlobal('IntersectionObserver', class { observe() {} disconnect() {} });
+  vi.stubGlobal('scrollBy', vi.fn()); localStorage.clear();
   host = document.createElement('div'); document.body.appendChild(host); root = createRoot(host);
 });
 afterEach(async () => {
@@ -28,7 +30,7 @@ afterEach(async () => {
 it('opens the exact historical note from a legacy fragment and retains an owner-neutral snapshot permalink', async () => {
   window.history.replaceState({}, '', '/#fn-note-occurrence');
   await act(async () => root.render(<VersionReader jurisdictionId="historical-region" versionId="old-snapshot" articles={articles} outline={outline} />));
-  expect(host.querySelector<HTMLButtonElement>('.article-toggle')?.getAttribute('aria-expanded')).toBe('true');
+  expect(host.querySelector('#unit-root')).not.toBeNull();
   expect(host.textContent).toContain('Exact historical source note.');
   expect(host.querySelector('#fn-note-occurrence')).not.toBeNull();
   expect(host.querySelector('a[href="/versions/old-snapshot/units/root"]')).not.toBeNull();
@@ -39,7 +41,7 @@ it('opens the exact historical note from a legacy fragment and retains an owner-
 it('opens a pinned unit when navigation changes only the fragment', async () => {
   await act(async () => root.render(<VersionReader jurisdictionId="region" versionId="old-snapshot" articles={articles} outline={outline} />));
   await act(async () => { window.history.replaceState({}, '', '/#root'); window.dispatchEvent(new HashChangeEvent('hashchange')); });
-  expect(host.querySelector<HTMLButtonElement>('.article-toggle')?.getAttribute('aria-expanded')).toBe('true');
+  expect(host.querySelector('#unit-root')).not.toBeNull();
   expect(host.textContent).toContain('Exact historical source note.');
 });
 
@@ -61,12 +63,12 @@ it('reveals a collapsed early article when an endnote backlink targets its marke
     { ...articles[0], id: 'early', content: [{ type: 'text', logicalId: 'text', occurrenceId: 'text-occ', text: 'Original body.', references: [{ logicalId: 'marker', start: 14, end: 14, target: { type: 'footnote', footnoteId: 'note' } }] }] },
     { ...articles[0], id: 'last', articleNumber: '20' },
   ];
-  await act(async () => root.render(<VersionReader jurisdictionId="region" versionId="old-snapshot" articles={source} outline={outline} />));
+  await act(async () => root.render(<VersionReader jurisdictionId="region" versionId="old-snapshot" articles={source} outline={outline} initialDepth="summary" />));
   expect(host.querySelector('#fn-note-occurrence')).not.toBeNull();
   expect(host.querySelector('#ref-marker')).toBeNull();
   await act(async () => { window.history.replaceState({}, '', '/#ref-marker'); window.dispatchEvent(new HashChangeEvent('hashchange')); });
   expect(host.querySelector('#ref-marker')).not.toBeNull();
-  expect(host.querySelector('#unit-early')?.getAttribute('aria-expanded')).toBe('true');
+  expect(host.querySelector('#unit-early button')?.getAttribute('aria-expanded')).toBe('true');
   expect(host.querySelectorAll('#fn-note-occurrence')).toHaveLength(1);
 });
 
@@ -76,6 +78,7 @@ it('localizes reading controls while preserving authored outline labels and sour
     mayHoldText: true, mayHoldChildren: false, allowedChildKinds: [], showTitle: true,
   }] };
   await act(async () => root.render(<TranslationProvider locale="de"><VersionReader jurisdictionId="region" versionId="old-snapshot" articles={articles} outline={sourceOutline} initialDepth="full" /></TranslationProvider>));
-  expect(Array.from(host.querySelectorAll('.segmented button'), button => button.textContent)).toEqual(['Übersicht', 'Authored chapter label', 'Volltext']);
+  await act(async () => fireEvent.click(getByRole(host, 'button', { name: 'Leseeinstellungen' })));
+  expect(Array.from(host.querySelectorAll('select[aria-label="Detailgrad"] option'), option => option.textContent)).toEqual(['Übersicht', 'Authored chapter label', 'Volltext']);
   expect(host.textContent).toContain('Exact historical source note.');
 });

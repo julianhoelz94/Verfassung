@@ -65,7 +65,7 @@ import threading
 class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path in {'/api/setup-gate', '/api/edge-rate-limit'}:
-            blocked = self.path == '/api/edge-rate-limit' and self.headers.get('X-Atlas-Original-URI') in {'/api/catalog/countries', '/api/docs/catalog/countries'}
+            blocked = self.path == '/api/edge-rate-limit' and self.headers.get('X-Atlas-Original-URI') in {'/api/catalog/countries', '/api/docs/catalog/countries', '/api/reader/compare'}
             self.send_response(403 if blocked else 204)
             self.end_headers()
             return
@@ -203,6 +203,7 @@ https://''' + HOST + ''' {
             for path in docs_paths + ['/api/docs/catalog/countries', '/api/docs/content/versions']:
                 expect_code(404, public + path, data='{}', **tls)
         expect_code(403, public + '/api/catalog/countries', **tls)
+        expect_code(403, public + '/api/reader/compare', **tls)
         expect_code(403 if arguments.docs_enabled else 404, public + '/api/docs/catalog/countries', **tls)
         expect_code(401, public + '/api/content/versions', data='{}', **tls)
         expect_code(401 if arguments.docs_enabled else 404, public + '/api/docs/content/versions', data='{}', **tls)

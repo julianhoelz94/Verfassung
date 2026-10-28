@@ -113,9 +113,7 @@ for (const locale of ['en', 'de'] as const) {
         await shot(page, 'reading-country');
         await page.goto(`/countries/${source.countryIso}/versions/${source.versionId}`);
         await expect(page.getByRole('heading', { level:1 })).toBeVisible();
-        const detailLevel = page.getByRole('group', { name:t(ui.accessibility.detailLevel) });
-        await detailLevel.getByRole('button').last().click();
-        await shot(page, 'reading-text', detailLevel);
+        await shot(page, 'reading-text', page.getByRole('toolbar'));
         await page.goto(`/countries/${source.countryIso}/compare`);
         await expect(page.locator('#compare-from')).toBeVisible();
         await expect(page.locator('#compare-to')).toBeVisible();
@@ -139,7 +137,7 @@ for (const locale of ['en', 'de'] as const) {
       paths.push(await record(browser, 'editor', locale, `editing-a-draft-${locale}.webm`, staging, async (page, watch) => {
         await page.goto(`/countries/${source.countryIso}/versions/${source.versionId}`);
         await watch.explain(text('Editor: start from the published text.', 'Bearbeitung: Beginnen Sie beim veröffentlichten Text.'));
-        await watch.click(page.getByRole('link', { name:t(ui.countries.code.versions.versionid.page.editThisConstitution) }));
+        await watch.click(page.getByRole('button', { name:t(ui.countries.code.versions.versionid.page.editThisConstitution) }));
         await watch.explain(text('Choose a text correction for a transcription error.', 'Wählen Sie die Textkorrektur für einen Übertragungsfehler.'));
         await watch.click(page.locator('#editor-entry').getByRole('button', { name:t(ui.remainingStatus.correctThisText) }));
         await expect(page).toHaveURL(/sessionId=/);
@@ -199,8 +197,7 @@ for (const locale of ['en', 'de'] as const) {
         await page.goto(`/countries/${source.countryIso}`);
         await watch.click(page.locator(`a[href="/countries/${source.countryIso}/versions/${publishedVersionId}"]`).first());
         await expect(page).toHaveURL(new RegExp(`/versions/${publishedVersionId}$`));
-        await watch.explain(text('Choose Full text to read the published wording.', 'Wählen Sie Full text, um den veröffentlichten Wortlaut zu lesen.'));
-        await watch.click(page.getByRole('group', { name:t(ui.accessibility.detailLevel) }).getByRole('button').last());
+        await watch.explain(text('Read the published wording in the continuous document.', 'Lesen Sie den veröffentlichten Wortlaut im fortlaufenden Dokument.'));
         const publicCorrection = page.getByText(correction).first();
         await expect(publicCorrection).toBeVisible();
         await watch.point(publicCorrection);

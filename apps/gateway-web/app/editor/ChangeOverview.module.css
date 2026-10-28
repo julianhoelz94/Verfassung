@@ -1,0 +1,11 @@
+.group { margin-block: var(--space-4); }
+.group h3 { margin-block: 0 var(--space-2); }
+.group ol { margin: 0; padding-inline-start: var(--space-4); }
+.row { padding-block: var(--space-3); border-bottom: 1px solid var(--color-line); }
+.versions { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--space-4); margin-block: var(--space-2); }
+.versions > div { min-width: 0; }
+.excerpt { margin-block: var(--space-1) var(--space-2); white-space: pre-wrap; overflow-wrap: anywhere; }
+.description { color: var(--color-ink-2); font-size: var(--text-sm); white-space: pre-wrap; overflow-wrap: anywhere; }
+.row details { margin-block-start: var(--space-2); font-size: var(--text-sm); }
+.row details p { overflow-wrap: anywhere; }
+@media (max-width: 600px) { .versions { grid-template-columns: minmax(0, 1fr); gap: var(--space-2); } }

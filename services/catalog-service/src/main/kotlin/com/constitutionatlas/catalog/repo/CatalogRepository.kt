@@ -404,7 +404,7 @@ class CatalogRepository(private val jdbc: JdbcTemplate, private val mapper: tool
             """
             SELECT kind_code, display_label, sort_order, may_hold_text, may_hold_children,
                    presentation, show_label, show_title, show_kind, allow_text_alongside_children,
-                   title_policy, label_policy, label_placement, segmentation, is_root
+                   title_policy, label_policy, label_placement, segmentation, is_root, sentence_delimiters
             FROM constitution_node_kinds
             WHERE constitution_id = ?
             ORDER BY sort_order
@@ -428,6 +428,7 @@ class CatalogRepository(private val jdbc: JdbcTemplate, private val mapper: tool
                     labelPlacement = rs.getString("label_placement"),
                     segmentation = rs.getString("segmentation"),
                     root = rs.getBoolean("is_root"),
+                    sentenceDelimiters = (rs.getArray("sentence_delimiters").array as Array<*>).map { it.toString() },
                 )
             },
             constitutionId,
@@ -452,8 +453,8 @@ class CatalogRepository(private val jdbc: JdbcTemplate, private val mapper: tool
                 INSERT INTO constitution_node_kinds (
                   id, constitution_id, kind_code, display_label, sort_order, may_hold_text, may_hold_children,
                   presentation, show_label, show_title, show_kind, allow_text_alongside_children,
-                  title_policy, label_policy, label_placement, segmentation, is_root
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                  title_policy, label_policy, label_placement, segmentation, is_root, sentence_delimiters
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """.trimIndent(),
                 UUID.randomUUID(),
                 constitutionId,
@@ -472,6 +473,7 @@ class CatalogRepository(private val jdbc: JdbcTemplate, private val mapper: tool
                 kind.labelPlacement,
                 kind.segmentation,
                 kind.root == true,
+                kind.sentenceDelimiters.toTypedArray(),
             )
         }
         kinds.forEach { parent ->

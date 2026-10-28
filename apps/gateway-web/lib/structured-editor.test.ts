@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyOperation, draftDifferences, sentenceParts, scopedNodes, validateDraft, type DraftNode } from './structured-editor';
+import { applyOperation, draftDifferences, remapDraftTargets, sentenceParts, scopedNodes, validateDraft, type DraftNode } from './structured-editor';
 import type { ContentOutline } from './api';
 const outline: ContentOutline = { kinds: [
   { kindCode: 'clause', displayLabel: 'Clause', sortOrder: 0, mayHoldText: true, mayHoldChildren: true, allowedChildKinds: ['sentence'], presentation: 'section', showLabel: true, showTitle: true, showKind: true, labelPolicy: 'required' },
@@ -46,4 +46,20 @@ describe('ordered editorial commands', () => {
     expect(next[0].content.slice(0, 2).map(entry => entry.text).join('')).toBe('Before. ');
     expect(draftDifferences([root], next).filter(change => change.field === 'inserted')).toHaveLength(2);
   });
+});
+
+
+describe('rich draft identity preservation',()=>{
+  const annotationRoot:DraftNode={logicalId:'note-root',revisionId:'note-root-revision',kind:'clause',label:'2',content:[{type:'child',node:{logicalId:'note-owner',revisionId:'note-owner-revision',kind:'sentence',content:[{type:'text',logicalId:'linked',revisionId:'linked-revision',text:'See source',references:[{logicalId:'unit-link',start:0,end:3,target:{type:'unit',logicalId:'second'}}]},{type:'text',logicalId:'note',revisionId:'note-revision',text:'Annotation',format:'footnote',footnoteLabel:'a',annotation:{kind:'editorial',anchorLogicalIds:['first','second']}}]}}]};
+  it('remaps cross-root text references and annotation anchors while preserving ancestor tokens',()=>{
+    const source:DraftNode={logicalId:'source',revisionId:'source-revision',kind:'clause',label:'1',content:[{type:'text',logicalId:'first',revisionId:'first-revision',text:'First. ',marks:[{type:'bold',start:0,end:6}]},{type:'text',logicalId:'second',revisionId:'second-revision',text:'Second.',marks:[{type:'italic',start:0,end:7}]}]};
+    const next=applyOperation([source,annotationRoot],{id:'merge',type:'merge_text',targetId:'first',expectedRevisionId:'first-revision',mergeIds:['first','second'],parts:[{logicalId:'first',text:'First. Second.'}]});
+    expect(next[0].content[0].marks).toEqual([{type:'bold',start:0,end:6},{type:'italic',start:7,end:14}]);const owner=next[1].content[0].node!;expect(owner.content[0].references?.[0].target.logicalId).toBe('first');expect(owner.content[1].annotation?.anchorLogicalIds).toEqual(['first']);expect(owner.draftId).toBe('merge');expect(next[1].draftId).toBeUndefined();
+  });
+  it('expands split annotation anchors but retains unit references at the first part and boundary markers before the split',()=>{
+    const source:DraftNode={logicalId:'source',revisionId:'source-revision',kind:'clause',label:'1',content:[{type:'text',logicalId:'second',revisionId:'second-revision',text:'One. Two',marks:[{type:'underline',start:0,end:8}],references:[{logicalId:'footnote-reference',start:5,end:5,target:{type:'footnote',footnoteId:'note'}}]}]};
+    const next=applyOperation([source,annotationRoot],{id:'split',type:'split_text',targetId:'second',expectedRevisionId:'second-revision',parts:[{logicalId:'second',text:'One. '},{logicalId:'third',text:'Two'}]});expect(next[0].content[0].references?.[0].start).toBe(5);expect(next[0].content[1].references).toEqual([]);expect(next[0].content[1].marks).toEqual([{type:'underline',start:0,end:3}]);expect(next[1].content[0].node?.content[0].references?.[0].target.logicalId).toBe('second');expect(next[1].content[0].node?.content[1].annotation?.anchorLogicalIds).toEqual(['first','second','third']);
+  });
+  it('remaps removed node targets only with an explicit replacement',()=>{const next=remapDraftTargets([annotationRoot],{id:'remove',type:'remove',targetId:'second',expectedRevisionId:'second-revision',replacementId:'first'});expect(next[0].content[0].node?.content[0].references?.[0].target.logicalId).toBe('first');expect(next[0].content[0].node?.content[1].annotation?.anchorLogicalIds).toEqual(['first']);expect(remapDraftTargets([annotationRoot],{id:'remove',type:'remove',targetId:'second',expectedRevisionId:'second-revision'})).toEqual([annotationRoot]);});
+  it('mirrors the server rich replacement defaults and validates endnote order and mark ranges',()=>{const marked={...root,content:[{...root.content[0],marks:[{type:'bold' as const,start:0,end:6}]}]};expect(applyOperation([marked],{id:'plain',type:'replace_text',targetId:'before',expectedRevisionId:'r1',text:'Before. ',format:'plain'})[0].content[0].marks).toEqual([]);expect(applyOperation([marked],{id:'legacy',type:'replace_text',targetId:'before',expectedRevisionId:'r1',text:'Before. '})[0].content[0].marks).toEqual(marked.content[0].marks);const invalid={...marked,content:[{...marked.content[0],marks:[{type:'bold' as const,start:0,end:99}]}]};expect(validateDraft([invalid],outline)).toContain('Clause 46a: invalid text entry.');expect(validateDraft([annotationRoot,root],outline).some(error=>error.includes('end of the constitution'))).toBe(true);});
 });

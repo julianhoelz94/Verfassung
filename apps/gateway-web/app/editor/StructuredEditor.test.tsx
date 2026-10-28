@@ -4,259 +4,87 @@ import { fireEvent } from '@testing-library/dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as axeCore from 'axe-core';
 import type { ContentOutline } from '../../lib/api';
-import type { DraftNode, DraftOperation, StructuredPreview } from '../../lib/structured-editor';
+import { applyOperation, nodes, type DraftNode, type DraftOperation, type StructuredPreview } from '../../lib/structured-editor';
 import { TranslationProvider } from '../components/TranslationProvider';
 import { StructuredEditor } from './StructuredEditor';
 import { EditorDraftState, SubmitReviewButton } from './EditorDraftState';
 
 const axeRun = typeof axeCore.run === 'function' ? axeCore.run.bind(axeCore) : (axeCore as unknown as { default: { run: typeof axeCore.run } }).default.run;
 type Level = ContentOutline['kinds'][number];
-function level(kind: string, depth: number, child?: string, overrides: Partial<Level> = {}): Level {
-  return { kindCode: kind.toLowerCase(), displayLabel: kind, sortOrder: depth, mayHoldText: !child, mayHoldChildren: Boolean(child), allowedChildKinds: child ? [child.toLowerCase()] : [], presentation: 'section', showLabel: true, showTitle: true, showKind: true, titlePolicy: 'optional', labelPolicy: 'optional', segmentation: 'plain', ...overrides };
-}
-function node(kind: string, id: string, text = 'One. Two!'): DraftNode {
-  return { logicalId: id, revisionId: `revision-${id}`, kind: kind.toLowerCase(), label: null, title: null, content: [{ type: 'text', logicalId: `text-${id}`, revisionId: `revision-text-${id}`, text }] };
-}
-function mixed() {
-  const outline = { kinds: [level('Article', 0, 'Sentence', { mayHoldText: true, titlePolicy: 'required', labelPolicy: 'required' }), level('Sentence', 1, undefined, { segmentation: 'sentence', presentation: 'concatenated' })] };
-  const sentence = node('Sentence', 'sentence');
-  const article: DraftNode = { ...node('Article', 'article'), label: '46a', title: 'Rights', content: [
-    { type: 'text', logicalId: 'before', revisionId: 'revision-before', text: 'Before.' },
-    { type: 'child', node: sentence },
-    { type: 'text', logicalId: 'after', revisionId: 'revision-after', text: 'After.' },
-  ] };
-  return { outline, roots: [article] };
-}
+function level(kind:string,depth:number,child?:string,overrides:Partial<Level>={}):Level{return {kindCode:kind.toLowerCase(),displayLabel:kind,sortOrder:depth,mayHoldText:!child,mayHoldChildren:Boolean(child),allowedChildKinds:child?[child.toLowerCase()]:[],presentation:'section',showLabel:true,showTitle:true,showKind:true,titlePolicy:'optional',labelPolicy:'optional',segmentation:'plain',...overrides};}
+function node(kind:string,id:string,text='One. Two!'):DraftNode{return {logicalId:id,revisionId:'revision-'+id,kind:kind.toLowerCase(),label:null,title:null,content:[{type:'text',logicalId:'text-'+id,revisionId:'revision-text-'+id,text}]};}
+function mixed(){const outline={kinds:[level('Article',0,'Sentence',{mayHoldText:true,titlePolicy:'required',labelPolicy:'required'}),level('Sentence',1,undefined,{segmentation:'sentence',presentation:'concatenated',showKind:false})]};const article:DraftNode={...node('Article','article'),label:'46a',title:'Rights',content:[{type:'text',logicalId:'before',revisionId:'revision-before',text:'Before.'},{type:'child',node:node('Sentence','sentence')},{type:'text',logicalId:'after',revisionId:'revision-after',text:'After.'}]};return {outline,roots:[article]};}
 
-describe('structured editor acceptance', () => {
-  let host: HTMLElement;
-  let root: Root;
-  beforeEach(() => {
-    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
-    document.documentElement.lang = 'en'; document.title = 'Constitution editor';
-    window.history.replaceState(null, '', '/editor');
-    host = document.createElement('main'); document.body.appendChild(host); root = createRoot(host);
-  });
-  afterEach(async () => { await act(async () => root.unmount()); host.remove(); vi.unstubAllGlobals(); });
-  async function mount(outline: ContentOutline, roots: DraftNode[], scope?: string, extras: Partial<ComponentProps<typeof StructuredEditor>> = {}, locale: 'en' | 'de' = 'en') {
-    const preview: StructuredPreview = { sessionId: 'session', sourceVersionId: 'source', sourceGeneration: 1, settingsRevisionId: 'settings', generation: 0, sourceRoots: roots, roots, operations: [] };
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => preview }));
-    await act(async () => root.render(<TranslationProvider locale={locale}><EditorDraftState><StructuredEditor preview={preview} outline={outline} rootId={roots[0].logicalId} versionId="source" articleId="unit" constitutionId="constitution" editable scope={scope} {...extras} /><SubmitReviewButton disabled={false} /></EditorDraftState></TranslationProvider>));
-    return preview;
-  }
-  function button(name: string, index = 0): HTMLButtonElement {
-    const found = [...host.querySelectorAll('button')].filter(item => item.textContent === name)[index];
-    expect(found, `button ${name}`).toBeDefined(); return found;
-  }
-  async function click(name: string, index = 0) { await act(async () => button(name, index).click()); }
-  async function change(field: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement, value: string) {
-    await act(async () => { fireEvent.change(field, { target: { value: value } }); });
-  }
-  function field(label: string): HTMLInputElement { return host.querySelector(`[aria-label="${label}"]`)!; }
-  function payload(): { expectedGeneration: number; operations: DraftOperation[] } { return JSON.parse((host.querySelector('[name="structuredDraft"]') as HTMLInputElement).value); }
-  function texts() { return [...host.querySelectorAll('textarea')]; }
+describe('compact structured editor acceptance',()=>{
+ let host:HTMLElement,root:Root,base:StructuredPreview;
+ beforeEach(()=>{(globalThis as {IS_REACT_ACT_ENVIRONMENT?:boolean}).IS_REACT_ACT_ENVIRONMENT=true;document.documentElement.lang='en';window.history.replaceState(null,'','/editor');Object.defineProperty(Range.prototype,'getClientRects',{configurable:true,value:()=>[]});Object.defineProperty(Range.prototype,'getBoundingClientRect',{configurable:true,value:()=>new DOMRect()});Element.prototype.scrollIntoView=vi.fn();host=document.createElement('main');document.body.appendChild(host);root=createRoot(host);});
+ afterEach(async()=>{await act(async()=>root.unmount());host.remove();vi.unstubAllGlobals();});
+ async function mount(outline:ContentOutline,roots:DraftNode[],extras:Partial<ComponentProps<typeof StructuredEditor>>={},locale:'en'|'de'='en',indices:Partial<StructuredPreview>={}){base={sessionId:'session',sourceVersionId:'source',sourceGeneration:1,settingsRevisionId:'settings',generation:0,sourceRoots:roots,roots,operations:[],...indices};vi.stubGlobal('fetch',vi.fn().mockResolvedValue({ok:true,json:async()=>base}));await act(async()=>root.render(<TranslationProvider locale={locale}><EditorDraftState><StructuredEditor preview={base} outline={outline} rootId={roots[0].logicalId} versionId="source" articleId="unit" constitutionId="constitution" editable {...extras}/><SubmitReviewButton disabled={false}/></EditorDraftState></TranslationProvider>));}
+ function button(name:string){const found=[...host.querySelectorAll('button')].find(button=>button.getAttribute('aria-label')===name||button.textContent?.trim()===name);expect(found,'button '+name).toBeDefined();return found!;}
+ async function click(name:string){await act(async()=>button(name).click());}
+ function editors(){return [...host.querySelectorAll<HTMLElement>('[role=textbox][aria-label="Constitution text"]')];}
+ async function edit(editor:HTMLElement,value:string){await act(async()=>{editor.focus();editor.querySelector('[data-unit]')!.textContent=value;fireEvent.input(editor);await new Promise(resolve=>setTimeout(resolve,0));});}
+ async function paste(editor:HTMLElement,value:string){await act(async()=>{editor.focus();fireEvent.paste(editor,{clipboardData:{getData:()=>value}});});}
+ async function change(field:HTMLInputElement|HTMLTextAreaElement|HTMLSelectElement,value:string){await act(async()=>fireEvent.change(field,{target:{value}}));}
+ function payload():{expectedGeneration:number;operations:DraftOperation[]}{return JSON.parse((host.querySelector('[name=structuredDraft]') as HTMLInputElement).value);}
+ function result(from=base.roots){return payload().operations.reduce((roots,operation)=>applyOperation(roots,operation),from);}
+ function scope(){return (host.querySelector('[name=scope]') as HTMLInputElement).value;}
+ async function chooseScope(value:string){await click('Editor view');await change(host.querySelector('select')!,value);}
+ function field(label:string){return host.querySelector<HTMLInputElement>('[aria-label="'+label+'"]')!;}
 
-  it.each(['preamble', 'article', 'appendix'])('opens the selected %s root with its text immediately editable', async kind => {
-    const outline = { kinds: ['Preamble', 'Article', 'Appendix'].map((name, index) => level(name, index, undefined, { root: true })) };
-    const roots = outline.kinds.map(item => ({ ...node(item.kindCode, item.kindCode, `${item.displayLabel} wording.`), content: item.kindCode === kind ? node(item.kindCode, item.kindCode, `${item.displayLabel} wording.`).content : [] }));
-    await mount(outline, roots, undefined, { rootId: kind });
-    expect(host.querySelector('select')!.value).toBe(kind);
-    expect(texts()).toHaveLength(1);
-    expect(texts()[0].value).toBe(`${outline.kinds.find(item => item.kindCode === kind)!.displayLabel} wording.`);
-    expect(texts()[0].disabled).toBe(false);
-    expect(fetch).not.toHaveBeenCalled();
-    await change(texts()[0], 'Revised wording.');
-    expect(payload().operations).toEqual([expect.objectContaining({ type: 'replace_text', targetId: `text-${kind}`, text: 'Revised wording.' })]);
-    expect(button('Submit for review').disabled).toBe(true);
-    const leaving = new Event('beforeunload', { cancelable: true });
-    window.dispatchEvent(leaving);
-    expect(leaving.defaultPrevented).toBe(true);
-  });
+ it.each(['preamble','article','appendix'])('opens a selected %s root immediately without a broad fetch',async kind=>{const outline={kinds:['Preamble','Article','Appendix'].map((name,index)=>level(name,index,undefined,{root:true}))};const roots=outline.kinds.map(level=>({...node(level.kindCode,level.kindCode,level.displayLabel+' wording.'),content:level.kindCode===kind?node(kind,kind,level.displayLabel+' wording.').content:[]}));await mount(outline,roots,{rootId:kind});expect(scope()).toBe(kind);expect(editors()).toHaveLength(1);expect(editors()[0].textContent).toContain('wording.');expect(fetch).not.toHaveBeenCalled();await edit(editors()[0],'Revised wording.');expect(payload().operations).toEqual([expect.objectContaining({type:'replace_text',targetId:'text-'+kind,text:'Revised wording.'})]);expect(button('Submit for review').disabled).toBe(true);const leaving=new Event('beforeunload',{cancelable:true});window.dispatchEvent(leaving);expect(leaving.defaultPrevented).toBe(true);});
+ it('replaces an irrelevant inherited scope but retains a relevant child scope',async()=>{const fixture=mixed();await mount(fixture.outline,fixture.roots,{scope:'appendix'});expect(scope()).toBe('article');await chooseScope('sentence');expect(scope()).toBe('sentence');expect(editors()).toHaveLength(1);expect(editors()[0].textContent).toBe('One. Two!');});
+ it.each(['none','optional','required'])('shows %s metadata only on request and validates literal labels/titles',async policy=>{const outline={kinds:[level('Clause',0,undefined,{titlePolicy:policy,labelPolicy:policy})]};await mount(outline,[{...node('Clause','clause','Plain custom text.'),label:policy==='none'?null:'bis',title:policy==='none'?null:'Custom title'}]);expect(host.querySelector('[aria-label="Clause title"]')).toBeNull();await click('Unit properties');expect(Boolean(field('Clause title'))).toBe(policy!=='none');if(policy!=='none'){expect(field('Clause title').required).toBe(policy==='required');await change(field('Clause title'),'');await change(field('Clause literal label'),'');expect(button('Save draft').disabled).toBe(policy==='required');if(policy==='required'){await change(field('Clause title'),'Restored');await change(field('Clause literal label'),'(2a)');expect(button('Save draft').disabled).toBe(false);}}});
+ it('preserves mixed parent runs, creates sentence children automatically, and undoes/redoes the transaction',async()=>{const fixture=mixed();await mount(fixture.outline,fixture.roots);await edit(editors()[1],'Dr. Meier misst 3.14 Meter. Fertig!');const final=nodes(result());expect(final.filter(node=>node.kind==='sentence')).toHaveLength(2);expect(result()[0].content[0].text).toBe('Before.');expect(result()[0].content.at(-1)?.text).toBe('After.');const split=payload().operations.find(operation=>operation.type==='split_text')!;expect(split.parts?.map(part=>part.text)).toEqual(['Dr. Meier misst 3.14 Meter. ','Fertig!']);expect(split.parts?.[0].logicalId).toBe('text-sentence');expect(payload().operations.some(operation=>operation.type==='move')).toBe(true);await click('Undo');expect(payload().operations).toEqual([]);expect(button('Redo').disabled).toBe(false);await click('Redo');expect(nodes(result()).filter(node=>node.kind==='sentence')).toHaveLength(2);await click('Undo');await edit(editors()[1],'Other wording.');expect(button('Redo').disabled).toBe(true);});
+ it('preserves note bodies at the end while the final leaf automatically splits',async()=>{const fixture=mixed();fixture.roots[0].content=fixture.roots[0].content.slice(0,2);fixture.roots[0].content[1].node!.content.push({type:'text',logicalId:'note',revisionId:'note-revision',format:'footnote',footnoteLabel:'a',text:'Source note'});await mount(fixture.outline,fixture.roots);await edit(editors()[1],'First. Second!');const children=nodes(result()).filter(node=>node.kind==='sentence');expect(children).toHaveLength(2);expect(children[0].content.some(entry=>entry.format==='footnote')).toBe(false);expect(children[1].content.at(-1)?.logicalId).toBe('note');});
+ it('respects configured delimiters and block presentation without a boundary button',async()=>{const fixture=mixed();Object.assign(fixture.outline.kinds[1],{sentenceDelimiters:[';'],presentation:'section'});await mount(fixture.outline,fixture.roots);await edit(editors()[1],'Eins; Zwei. Drei');expect(nodes(result()).filter(node=>node.kind==='sentence').map(node=>node.content[0].text)).toEqual(['Eins; ','Zwei. Drei']);expect(host.querySelector('[aria-label="Show sentence boundaries"]')).toBeNull();});
+ it('retains ordinary punctuation when automatic creation is disabled and exposes compact manual tools',async()=>{const fixture=mixed();fixture.outline.kinds[1].segmentation='plain';await mount(fixture.outline,fixture.roots);await edit(editors()[1],'First. Second!');expect(nodes(result()).filter(node=>node.kind==='sentence')).toHaveLength(1);await click('Text tools');expect(button('Split at cursor')).toBeDefined();expect(button('Merge with next sentence')).toBeDefined();expect(host.querySelectorAll('[data-tool-panel]')).toHaveLength(1);await click('Close tools');expect(host.querySelector('[data-tool-panel]')).toBeNull();});
+ it('saves semantic inline formatting and restores it with undo/redo',async()=>{const outline={kinds:[level('Clause',0)]};await mount(outline,[node('Clause','clause','')]);await act(async()=>editors()[0].focus());for(const name of ['Bold','Italic','Underline','Strikethrough'])await click(name);await paste(editors()[0],'word');const operation=payload().operations.at(-1)!;expect(operation.marks?.map(mark=>mark.type).sort()).toEqual(['bold','italic','strikethrough','underline']);expect(editors()[0].querySelector('strong em u s')??editors()[0].querySelector('strong')).not.toBeNull();await click('Undo');expect(payload().operations).toEqual([]);await click('Redo');expect(payload().operations.at(-1)?.marks).toEqual(operation.marks);});
+ it('preserves source note classification, marks and literal labels during in-place editing',async()=>{const outline={kinds:[level('Article',0)]};const article=node('Article','article');const annotation={kind:'editorial' as const,attribution:'Archive editor',sourceUrl:'https://example.org/source',anchorLogicalIds:['article']};article.content.push({type:'text',logicalId:'note',revisionId:'note-revision',text:'Original note',format:'footnote',footnoteLabel:'a',annotation,marks:[{type:'bold',start:0,end:8}]});await mount(outline,[article]);await click('Edit footnote a');await change(field('Footnote label'),'b');const editor=host.querySelector<HTMLElement>('[role=textbox][aria-label="Footnote text"]')!;await act(async()=>{editor.querySelector('[data-unit]')!.appendChild(document.createTextNode(' revised'));fireEvent.input(editor);await new Promise(resolve=>setTimeout(resolve,0));});await click('Apply changes');expect(payload().operations.at(-1)).toEqual(expect.objectContaining({type:'replace_text',footnoteLabel:'b',text:'Original note revised',annotation,marks:[{type:'bold',start:0,end:8}]}));});
+ it('hydrates unloaded reference owners before deleting a note and every reference',async()=>{const outline={kinds:[level('Article',0)]};const first=node('Article','first','Referenced source.'),last=node('Article','last','End.');first.content[0].references=[{logicalId:'ref',start:10,end:10,target:{type:'footnote',footnoteId:'note'}}];last.content.push({type:'text',logicalId:'note',revisionId:'note-revision',format:'footnote',footnoteLabel:'1',text:'Note.'});await mount(outline,[{...first,content:[]},last],{rootId:'last'},'en',{footnoteReferences:[{noteId:'note',rootId:'first',parentId:'first',entryId:'text-first'}]});vi.stubGlobal('fetch',vi.fn().mockResolvedValue({ok:true,json:async()=>({...base,roots:[first,last],sourceRoots:[first,last]})}));await click('Edit footnote 1');await click('Remove footnote and its references');expect(fetch).toHaveBeenCalledWith(expect.stringContaining('rootId=first'),expect.anything());expect(payload().operations).toContainEqual(expect.objectContaining({type:'replace_text',targetId:'text-first',references:[]}));expect(payload().operations.at(-1)?.type).toBe('remove');});
+ it('keeps saved/unloaded review differences and loads the changed branch before navigating',async()=>{const outline={kinds:[level('Clause',0)]};const first=node('Clause','first','Selected source.'),second=node('Clause','second','Saved correction.');await mount(outline,[first,{...second,content:[]}],{review:[{logicalId:'text-second',rootId:'second',field:'text',before:'Historical wording.',after:'Saved correction.',sourceLink:'/versions/historical/units/second',targetLink:'/versions/successor/units/second'}]});await click('Changes (1)');expect(host.textContent).toContain('Historical wording.');expect(host.querySelector('a[href="/versions/historical/units/second"]')).not.toBeNull();vi.stubGlobal('fetch',vi.fn().mockResolvedValue({ok:true,json:async()=>({...base,roots:[{...first,content:[]},second],sourceRoots:[{...first,content:[]},second]})}));await click('Wording');expect(editors()[0].textContent).toContain('Saved correction.');await act(async()=>{await new Promise(resolve=>setTimeout(resolve,30));});expect(Element.prototype.scrollIntoView).toHaveBeenCalled();});
+ it('shows a removed changed unit in its source context rather than editing an unrelated passage',async()=>{const outline={kinds:[level('Clause',0)]};await mount(outline,[node('Clause','first')],{review:[{logicalId:'removed',field:'removed',before:'Removed wording.',beforeText:'Removed wording.',after:'',sourceLink:'/source'}]});await click('Changes (1)');await click('Removed');expect(host.textContent).toContain('Removed wording.');expect(host.textContent).toContain('This unit was removed.');expect(editors()).toHaveLength(0);});
+ it('loads another root without overwriting local edits and keeps it hydrated through undo',async()=>{const outline={kinds:[level('Article',0)]};const first={...node('Article','first','First source.'),label:'1'},second={...node('Article','second','Second saved wording.'),label:'2'};await mount(outline,[first,{...second,content:[]}]);await edit(editors()[0],'Unsaved first wording.');vi.stubGlobal('fetch',vi.fn(async(url:string)=>({ok:true,json:async()=>url.includes('rootId=second')?{...base,roots:[{...first,content:[]},second],sourceRoots:[{...first,content:[]},second]}:{...base,roots:[{...first,content:[]},{...second,content:[]}]}})));await chooseScope('constitution');await click('Article 2');expect(scope()).toBe('constitution');expect(host.textContent).toContain('Second saved wording.');expect(payload().operations[0].text).toBe('Unsaved first wording.');await click('Undo');expect(host.textContent).toContain('First source.');expect(host.textContent).toContain('Second saved wording.');});
+ it.each(['generation','settingsRevisionId'] as const)('rejects changed %s pins without losing local work',async pin=>{const fixture=mixed();await mount(fixture.outline,fixture.roots);await edit(editors()[1],'Keep unsaved wording.');vi.stubGlobal('fetch',vi.fn().mockResolvedValue({ok:true,json:async()=>({...base,[pin]:pin==='generation'?2:'different'})}));await chooseScope('constitution');expect(scope()).toBe('article');expect(host.textContent).toContain('Keep unsaved wording.');expect(host.textContent).toContain('This session changed.');});
 
-  it.each([['preamble', 'article'], ['appendix', 'preamble'], ['article', 'appendix']])('replaces an irrelevant %s root scope inherited from %s navigation', async (selectedKind, inheritedScope) => {
-    const outline = { kinds: ['Preamble', 'Article', 'Appendix'].map((name, index) => level(name, index, undefined, { root: true })) };
-    const roots = outline.kinds.map(item => node(item.kindCode, item.kindCode));
-    await mount(outline, roots, inheritedScope, { rootId: selectedKind });
-    expect(host.querySelector('select')!.value).toBe(selectedKind);
-    expect(texts()).toHaveLength(1);
-    expect(fetch).not.toHaveBeenCalled();
-  });
+ it('hydrates note annotations for each history generation before undo and a later edit',async()=>{const fixture=mixed();const last=node('Appendix','last','End.');last.content.push({type:'text',logicalId:'note',revisionId:'note-revision',format:'footnote',footnoteLabel:'a',text:'Source note',annotation:{kind:'editorial',anchorLogicalIds:['text-sentence']}});fixture.outline.kinds.push(level('Appendix',2,undefined,{root:true}));fixture.outline.kinds[0].root=true;const index={entry:last.content[1],parentId:'last',rootId:'last'};await mount(fixture.outline,[...fixture.roots,{...last,content:[]}],{},'en',{footnotes:[index]});await edit(editors()[1],'First. Second!');vi.stubGlobal('fetch',vi.fn().mockResolvedValue({ok:true,json:async()=>({...base,roots:[...fixture.roots,last],sourceRoots:[...fixture.roots,last]})}));await click('Footnotes');await click('Edit footnote a');await click('Apply changes');await click('Undo');expect(payload().operations).toEqual([]);await click('Edit footnote a');await change(field('Footnote label'),'b');await click('Apply changes');expect(payload().operations.at(-1)).toEqual(expect.objectContaining({targetId:'note',expectedRevisionId:'note-revision',annotation:{kind:'editorial',anchorLogicalIds:['text-sentence']}}));});
+ it('treats a pending note edit as unsaved and keeps local note undo separate until Apply',async()=>{const outline={kinds:[level('Article',0)]},article=node('Article','article');article.content.push({type:'text',logicalId:'note',revisionId:'note-revision',format:'footnote',footnoteLabel:'a',text:'Note'});await mount(outline,[article]);await click('Edit footnote a');await change(field('Footnote label'),'b');expect(button('Submit for review').disabled).toBe(true);expect(payload().operations).toEqual([]);await click('Undo');expect(field('Footnote label').value).toBe('a');await click('Redo');expect(field('Footnote label').value).toBe('b');await click('Cancel');expect(button('Submit for review').disabled).toBe(false);});
 
-  it('keeps a requested child scope when it exists in the selected root', async () => {
-    const fixture = mixed();
-    await mount(fixture.outline, fixture.roots, 'sentence');
-    expect(host.querySelector('select')!.value).toBe('sentence');
-    expect(texts().map(text => text.value)).toEqual(['One. Two!']);
-    expect(field('Sentence title')).not.toBeNull();
-  });
+ it('fetches an unloaded saved root even when its projection has a draft token',async()=>{const outline={kinds:[level('Article',0)]},first=node('Article','first','First.'),second={...node('Article','second','Saved second.'),label:'2',draftId:'saved-edit'};await mount(outline,[first,{...second,content:[]}]);vi.stubGlobal('fetch',vi.fn().mockResolvedValue({ok:true,json:async()=>({...base,roots:[{...first,content:[]},second],sourceRoots:[{...first,content:[]},second]})}));await click('Editor view');await click('Article 2');expect(fetch).toHaveBeenCalledWith(expect.stringContaining('rootId=second'),expect.anything());expect(host.textContent).toContain('Saved second.');});
+ it.each(['Apply changes','Cancel'])('restores the live body controller after note %s without refocusing text',async action=>{const outline={kinds:[level('Article',0)]},article=node('Article','article','Body.');article.content.push({type:'text',logicalId:'note',revisionId:'note-revision',format:'footnote',footnoteLabel:'a',text:'Note'});await mount(outline,[article]);await act(async()=>editors()[0].focus());await click('Edit footnote a');await act(async()=>{host.querySelector<HTMLElement>('[aria-label="Footnote text"]')!.focus();});expect(button('Text tools').disabled).toBe(true);expect(button('Insert').disabled).toBe(true);expect(button('References').disabled).toBe(true);expect(button('Unit properties').disabled).toBe(true);await click(action);await click('Bold');expect(button('Bold').getAttribute('aria-pressed')).toBe('true');await paste(editors()[0],'New ');expect(payload().operations.at(-1)?.marks).toContainEqual({type:'bold',start:0,end:4});await click('Undo');expect(payload().operations).toEqual([]);});
+ it('inserts a cursor note at the start of linked text and updates an existing marker label immediately',async()=>{const outline={kinds:[level('Article',0)]},article=node('Article','article','Linked text');article.content[0].references=[{logicalId:'url',start:0,end:6,target:{type:'external',url:'https://example.org'}}];await mount(outline,[article]);await act(async()=>editors()[0].focus());await click('Footnotes');await click('New footnote…');const noteText=host.querySelector<HTMLElement>('[role=textbox][aria-label="Footnote text"]')!;await paste(noteText,'Annotation');await click('Insert marker and note');const referenceOperation=payload().operations.find(operation=>operation.type==='replace_text')!;expect(referenceOperation.references?.map(reference=>[reference.start,reference.end])).toEqual([[0,0],[0,6]]);expect(host.querySelector('button[aria-label="Show footnote 1"]')).not.toBeNull();await click('Edit footnote 1');await change(field('Footnote label'),'*');await click('Apply changes');expect(host.querySelector('button[aria-label="Show footnote *"]')?.textContent).toBe('*');expect(host.querySelector('button[aria-label="Show footnote 1"]')).toBeNull();});
+ it('appends a new endnote after existing notes instead of inside an earlier nested leaf',async()=>{
+  const fixture=mixed(),article=fixture.roots[0],sentence=node('Sentence','sentence','Final body.');
+  article.content=[{type:'child',node:sentence},{type:'text',logicalId:'existing-note',revisionId:'note-revision',format:'footnote',footnoteLabel:'1',text:'Existing note.'}];
+  await mount(fixture.outline,[article]);await act(async()=>editors()[0].focus());await click('Footnotes');await click('New footnote…');
+  await paste(host.querySelector<HTMLElement>('[role=textbox][aria-label="Footnote text"]')!,'New note.');await click('Insert marker and note');
+  expect(payload().operations.find(operation=>operation.type==='insert_text')).toEqual(expect.objectContaining({targetId:'article',position:2}));
+  expect(result()[0].content.filter(entry=>entry.format==='footnote').map(entry=>entry.footnoteLabel)).toEqual(['1','2']);
+  expect(nodes(result()).find(node=>node.logicalId==='sentence')!.content.some(entry=>entry.format==='footnote')).toBe(false);
+ });
+ it('lists nested and parent endnotes in document order in the footnote menu',async()=>{
+  const fixture=mixed(),sentence=node('Sentence','sentence','Final body.');
+  sentence.content.push({type:'text',logicalId:'nested-note',revisionId:'nested-note-revision',format:'footnote',footnoteLabel:'1',text:'First note.'});
+  fixture.roots[0].content=[{type:'child',node:sentence},{type:'text',logicalId:'parent-note',revisionId:'parent-note-revision',format:'footnote',footnoteLabel:'2',text:'Second note.'}];
+  await mount(fixture.outline,fixture.roots);await click('Footnotes');
+  const references=[...host.querySelectorAll('[data-tool-panel] button')].filter(button=>button.textContent?.startsWith('Reference footnote'));
+  expect(references.map(button=>button.textContent?.trim().slice(-1))).toEqual(['1','2']);
+ });
+ it('retains a new note when the final structural branch has no text container',async()=>{
+  const outline={kinds:[level('Article',0,'Paragraph',{allowedChildKinds:['paragraph','section']}),level('Section',1,'Paragraph'),level('Paragraph',2)]};
+  const article={...node('Article','article'),content:[{type:'child' as const,node:node('Paragraph','paragraph','Body.')},{type:'child' as const,node:{...node('Section','section'),content:[]}}]};
+  await mount(outline,[article]);await act(async()=>editors()[0].focus());await click('Footnotes');await click('New footnote…');
+  const editor=host.querySelector<HTMLElement>('[role=textbox][aria-label="Footnote text"]')!;await paste(editor,'Keep this note.');await click('Insert marker and note');
+  expect(payload().operations).toEqual([]);expect(editor.textContent).toBe('Keep this note.');expect(host.textContent).toContain('Add a text unit to the final section before adding footnotes.');
+ });
+ it('refreshes configured leaf headings when metadata changes while retaining the same canvas',async()=>{const fixture=mixed();fixture.roots[0].content[1].node!.title='Original title';await mount(fixture.outline,fixture.roots);await act(async()=>editors()[1].focus());await click('Unit properties');await change(field('Sentence title'),'New title');expect(editors()[1].textContent).toContain('New title');expect(editors()[1].textContent).not.toContain('Original title');});
+ it('loads complete Preview once without losing local edits',async()=>{const outline={kinds:[level('Article',0)]},first=node('Article','first','First.'),second=node('Article','second','Second.');await mount(outline,[first,{...second,content:[]}]);await edit(editors()[0],'Local first.');vi.stubGlobal('fetch',vi.fn().mockResolvedValue({ok:true,json:async()=>({...base,roots:[first,second],sourceRoots:[first,second]})}));await click('Preview');expect(fetch).toHaveBeenCalledWith(expect.stringContaining('includeBody=true'),expect.anything());expect(host.textContent).toContain('Local first.');expect(host.textContent).toContain('Second.');expect(payload().operations[0].text).toBe('Local first.');});
 
-  it('preserves an imported annotation classification and anchors when editing its wording or label', async () => {
-    const outline = { kinds: [level('Article', 0)] };
-    const annotation = { kind: 'editorial' as const, attribution: 'Archive editor', sourceUrl: 'https://example.org/source', anchorLogicalIds: ['article'] };
-    const article = node('Article', 'article');
-    article.content = [{ type: 'text', logicalId: 'note', revisionId: 'revision-note', text: 'Original note', format: 'footnote', footnoteLabel: 'a', annotation }];
-    await mount(outline, [article]);
-    await change(texts()[0], 'Revised note');
-    expect(payload().operations.at(-1)).toEqual(expect.objectContaining({ type: 'replace_text', text: 'Revised note', annotation }));
-    const label = [...host.querySelectorAll('label')].find(item => item.textContent?.includes('Footnote label'))!.querySelector('input')!;
-    await change(label, 'b');
-    expect(payload().operations.at(-1)).toEqual(expect.objectContaining({ footnoteLabel: 'b', annotation }));
-  });
+ it.each(['node','text'] as const)('keeps surviving same-canvas unit references retargeted after merging a %s target',async target=>{const fixture=mixed(),first=node('Sentence','first','See.'),second=node('Sentence','second','Next.');first.content[0].references=[{logicalId:'same-canvas-link',start:0,end:3,target:{type:'unit',logicalId:target==='node'?'second':'text-second'}}];fixture.roots[0].content=[{type:'child',node:first},{type:'child',node:second}];await mount(fixture.outline,fixture.roots);await act(async()=>editors()[0].focus());await click('Text tools');await click('Merge with next sentence');const final=nodes(result()).find(node=>node.logicalId==='first')!,link=final.content[0].references?.find(reference=>reference.logicalId==='same-canvas-link');expect(final.content[0].text).toBe('See. Next.');expect(link?.target.logicalId).toBe(target==='node'?'first':'text-first');expect(nodes(result()).some(node=>node.logicalId==='second')).toBe(false);expect(payload().operations.some(operation=>operation.type==='merge_text')).toBe(true);});
+ it('keeps the captured body anchor stable by allowing only note editing while a note is pending',async()=>{const outline={kinds:[level('Article',0)]},article=node('Article','article','Body.');article.content.push({type:'text',logicalId:'table',revisionId:'table-revision',format:'table',text:'Cell',table:{rows:[{logicalId:'row',cells:[{logicalId:'cell',text:'Cell'}]}]}});article.content.push({type:'text',logicalId:'existing-note',revisionId:'note-revision',format:'footnote',footnoteLabel:'a',text:'Existing'});await mount(outline,[article]);await act(async()=>editors()[0].focus());await click('Footnotes');await click('New footnote…');expect(editors()[0].getAttribute('contenteditable')).toBe('false');expect(button('Edit table').disabled).toBe(true);expect(button('Edit footnote a').disabled).toBe(true);expect(button('Editor view').disabled).toBe(true);expect(button('Preview').disabled).toBe(true);await paste(editors()[0],'Lost body');expect(payload().operations).toEqual([]);expect(editors()[0].textContent).toBe('Body.');const note=host.querySelector<HTMLElement>('[role=textbox][aria-label="Footnote text"]')!;await paste(note,'New note');await act(async()=>editors()[0].focus());await click('Bold');expect(button('Bold').getAttribute('aria-pressed')).toBe('true');expect(payload().operations).toEqual([]);await click('Insert marker and note');const reference=payload().operations.find(operation=>operation.targetId==='text-article')?.references?.find(reference=>reference.target.type==='footnote');expect(reference).toEqual(expect.objectContaining({start:0,end:0}));expect(result()[0].content.find(entry=>entry.logicalId==='text-article')?.text).toBe('Body.');expect(editors()[0].getAttribute('contenteditable')).toBe('true');});
 
-  it('creates new draft metadata in the selected UI language', async () => {
-    const outline = { kinds: [level('Artikel', 0, undefined, { titlePolicy: 'required', labelPolicy: 'required' })] };
-    await mount(outline, [{ ...node('Artikel', 'article'), label: '1', title: 'Rechte' }], undefined, {}, 'de');
-    await click('Einheit auf oberster Ebene hinzufügen');
-    const inserted = payload().operations.find(operation => operation.type === 'insert_root')?.node;
-    expect(inserted?.label).toBe('Neue Bezeichnung');
-    expect(inserted?.title).toBe('Neuer Titel');
-    await change(field('Artikel Titel'), '');
-    expect(host.textContent).toContain('Ein Titel ist erforderlich.');
-  });
-
-  it.each(['none', 'optional', 'required'])('honors %s title and literal-label policies for a one-level custom plain root', async policy => {
-    const outline = { kinds: [level('Clause', 0, undefined, { titlePolicy: policy, labelPolicy: policy })] };
-    const clause = { ...node('Clause', 'clause', 'Plain custom text.'), label: policy === 'none' ? null : 'bis', title: policy === 'none' ? null : 'Custom title' };
-    await mount(outline, [clause]);
-    expect(texts()[0].value).toBe('Plain custom text.');
-    expect(host.querySelector('[aria-label="Clause title"]') !== null).toBe(policy !== 'none');
-    expect(host.querySelector('[aria-label="Clause literal label"]') !== null).toBe(policy !== 'none');
-    expect([...host.querySelectorAll('button')].some(item => item.textContent === 'Suggest sentence boundaries')).toBe(false);
-    if (policy !== 'none') {
-      expect(field('Clause title').required).toBe(policy === 'required');
-      await change(field('Clause title'), ''); await change(field('Clause literal label'), '');
-      expect(button('Save draft').disabled).toBe(policy === 'required');
-      if (policy === 'required') { await change(field('Clause literal label'), '(2a)'); await change(field('Clause title'), 'Restored'); expect(button('Save draft').disabled).toBe(false); }
-    }
-  });
-
-  it('derives five-depth scope stops, hides parent text in narrower views and retains keyboard focus/selection', async () => {
-    const kinds = ['Part', 'Chapter', 'Article', 'Paragraph', 'Sentence'];
-    const outline = { kinds: kinds.map((kind, depth) => level(kind, depth, kinds[depth + 1], { titlePolicy: depth === 0 ? 'none' : 'optional', labelPolicy: depth === 0 ? 'none' : 'optional' })) };
-    let nested = node('Sentence', 'sentence');
-    for (let depth = kinds.length - 2; depth >= 0; depth--) nested = { ...node(kinds[depth], kinds[depth].toLowerCase()), content: [{ type: 'child', node: nested }] };
-    await mount(outline, [nested]);
-    const scope = host.querySelector('select')!;
-    expect([...scope.options].map(item => item.textContent)).toEqual(['Constitution', ...kinds]);
-    expect(scope.value).toBe('article'); expect(texts()).toHaveLength(1);
-    await act(async () => texts()[0].focus());
-    expect(document.activeElement).toBe(texts()[0]);
-    expect(new URL(window.location.href).searchParams.get('selectedNode')).toBe('text-sentence');
-    await change(scope, 'constitution'); expect(texts()).toHaveLength(0);
-    await change(scope, 'paragraph'); expect(texts()[0].value).toBe('One. Two!');
-    expect(new URL(window.location.href).searchParams.get('selectedNode')).toBe('text-sentence');
-    expect(field('Paragraph title')).not.toBeNull();
-  });
-
-  it('labels interactive fields for assistive technology and permits optional sentence title editing', async () => {
-    const fixture = mixed(); await mount(fixture.outline, fixture.roots);
-    await change(field('Sentence title'), 'Optional sentence title');
-    expect(payload().operations).toContainEqual(expect.objectContaining({ type: 'set_metadata', targetId: 'sentence', title: 'Optional sentence title' }));
-    expect(host.querySelector('[aria-label="Selection inspector"]')).not.toBeNull();
-    const results = await axeRun(host, { rules: { 'color-contrast': { enabled: false } } });
-    expect(results.violations.map(item => `${item.id}: ${item.description}`)).toEqual([]);
-  });
-
-  it('segments pasted sentence wording into explicit children without changing parent runs, and undoes the complete action', async () => {
-    const fixture = mixed(); await mount(fixture.outline, fixture.roots);
-    const pasted = 'Art.12 applies. Next!\nLast?';
-    await change(texts()[1], pasted);
-    await click('Suggest sentence boundaries');
-    expect(texts().map(item => item.value)).toEqual(['Before.', 'Art.12 applies. ', 'Next!\n', 'Last?', 'After.']);
-    const saved = payload();
-    const split = saved.operations.find(item => item.type === 'split_text')!;
-    expect(split.targetId).toBe('text-sentence'); expect(split.parts!.map(part => part.text).join('')).toBe(pasted);
-    const inserts = saved.operations.filter(item => item.type === 'insert_child');
-    expect(inserts).toHaveLength(2); expect(inserts.every(item => item.node?.kind === 'sentence')).toBe(true);
-    expect(saved.operations.filter(item => item.type === 'move').map(item => item.targetId)).toEqual(split.parts!.slice(1).map(part => part.logicalId));
-    expect(saved.operations.every(item => !['before', 'after'].includes(item.targetId))).toBe(true);
-    expect(button('Submit for review').disabled).toBe(true);
-    await click('Undo'); expect(texts().map(item => item.value)).toEqual(['Before.', pasted, 'After.']);
-    expect(payload().operations.map(item => item.type)).toEqual(['replace_text']);
-    await click('Undo'); expect(texts()[1].value).toBe('One. Two!'); expect(button('Submit for review').disabled).toBe(false);
-  });
-
-  it('splits at the selected cursor and merges adjacent untitled sentence children with explicit lineage', async () => {
-    const fixture = mixed(); await mount(fixture.outline, fixture.roots);
-    await act(async () => { texts()[1].focus(); texts()[1].setSelectionRange(5, 5); fireEvent.keyUp(texts()[1], { key: 'ArrowRight' }); });
-    await click('Split at cursor', 1);
-    expect(texts().map(item => item.value)).toEqual(['Before.', 'One. ', 'Two!', 'After.']);
-    const split = payload().operations.find(item => item.type === 'split_text')!;
-    expect(split.expectedRevisionId).toBe('revision-text-sentence');
-    expect(split.parts!.map(part => part.text)).toEqual(['One. ', 'Two!']);
-    await click('Merge with next sentence');
-    expect(texts().map(item => item.value)).toEqual(['Before.', 'One. Two!', 'After.']);
-    const merge = payload().operations.find(item => item.type === 'merge_text')!;
-    expect(merge.mergeIds).toEqual(split.parts!.map(part => part.logicalId));
-    expect(merge.parts![0].text).toBe('One. Two!');
-    expect(payload().operations.at(-1)?.type).toBe('remove');
-  });
-
-  it('does not merge parent text across a child, or erase a titled following sentence', async () => {
-    const fixture = mixed();
-    const second = { ...node('Sentence', 'second', 'Titled successor.'), title: 'Keep this title' };
-    fixture.roots[0].content.splice(2, 0, { type: 'child', node: second });
-    await mount(fixture.outline, fixture.roots);
-    expect(button('Merge with next', 0).disabled).toBe(true);
-    expect([...host.querySelectorAll('button')].some(item => item.textContent === 'Merge with next sentence')).toBe(false);
-    expect(payload().operations).toEqual([]); expect(field('Sentence title').value).toBe('');
-    expect(host.querySelectorAll('[aria-label="Sentence title"]')[1].getAttribute('value')).toBe('Keep this title');
-  });
-
-  it('retains saved review differences and historical links for an unloaded root', async () => {
-    const outline = { kinds: [level('Clause', 0)] };
-    const first = node('Clause', 'first', 'Selected source.'), second = { ...node('Clause', 'second'), content: [] };
-    await mount(outline, [first, second], undefined, { review: [{ logicalId: 'text-second', field: 'text', before: 'Historical wording.', after: 'Saved correction.', sourceRevisionId: 'old-text', targetRevisionId: 'saved-op', sourceLink: '/versions/historical/units/second', targetLink: '/versions/successor/units/second' }] });
-    expect(texts()).toHaveLength(1);
-    expect(host.querySelector('del')?.textContent).toBe('Historical wording.');
-    expect(host.querySelector('ins')?.textContent).toBe('Saved correction.');
-    expect(host.querySelector('a[href="/versions/historical/units/second"]')).not.toBeNull();
-    await change(texts()[0], 'Unsaved first correction.');
-    expect([...host.querySelectorAll('ins')].map(item => item.textContent)).toEqual(['Saved correction.', 'Unsaved first correction.']);
-  });
-
-  it('locks scope, navigation and saving while an overview request is pending', async () => {
-    const fixture = mixed(); const preview = await mount(fixture.outline, fixture.roots, 'constitution');
-    let release!: (response: { ok: boolean; json: () => Promise<StructuredPreview> }) => void;
-    vi.stubGlobal('fetch', vi.fn().mockReturnValue(new Promise(resolve => { release = resolve; })));
-    const scope = host.querySelector('select')!;
-    await change(scope, 'constitution');
-    expect(scope.disabled).toBe(true); expect(button('Save draft').disabled).toBe(true);
-    expect(button('Article 46a Rights').disabled).toBe(true);
-    expect(host.textContent).toContain('Loading editor view');
-    await act(async () => release({ ok: true, json: async () => preview }));
-    expect(scope.disabled).toBe(false); expect(button('Article 46a Rights').disabled).toBe(false);
-  });
-
-  it('loads another root without overwriting unsaved text, and preserves the loaded root through undo', async () => {
-    const outline = { kinds: [level('Article', 0)] };
-    const first = { ...node('Article', 'first', 'First source.'), label: '1' };
-    const second = { ...node('Article', 'second', 'Second saved wording.'), label: '2' };
-    const preview = await mount(outline, [first, { ...second, content: [] }]);
-    await change(texts()[0], 'Unsaved first wording.');
-    const fetchView = vi.fn(async (url: string) => ({ ok: true, json: async () => url.includes('rootId=second') ? { ...preview, roots: [{ ...first, content: [] }, second], sourceRoots: [{ ...first, content: [] }, second] } : { ...preview, roots: [{ ...first, content: [] }, { ...second, content: [] }] } }));
-    vi.stubGlobal('fetch', fetchView);
-    const scope = host.querySelector('select')!;
-    await change(scope, 'constitution'); await click('Article 2 ');
-    expect(fetchView.mock.calls[1][0]).toContain('rootId=second');
-    expect(texts()[0].value).toBe('Second saved wording.');
-    expect(payload().operations).toEqual([expect.objectContaining({ targetId: 'text-first', text: 'Unsaved first wording.' })]);
-    await change(scope, 'constitution'); await click('Article 1 ');
-    expect(texts()[0].value).toBe('Unsaved first wording.');
-    await click('Undo'); expect(texts()[0].value).toBe('First source.');
-    await change(scope, 'constitution'); await click('Article 2 ');
-    expect(texts()[0].value).toBe('Second saved wording.');
-    expect(fetchView.mock.calls.filter(([url]) => url.includes('rootId=second'))).toHaveLength(1);
-  });
-
-  it.each(['generation', 'settingsRevisionId'] as const)('rejects a mismatched %s without losing unsaved work or changing scope', async pin => {
-    const fixture = mixed(); const preview = await mount(fixture.outline, fixture.roots);
-    await change(texts()[1], 'Keep unsaved wording.');
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ ...preview, [pin]: pin === 'generation' ? 2 : 'different-settings' }) }));
-    const scope = host.querySelector('select')!; await change(scope, 'constitution');
-    expect(scope.value).toBe('article'); expect(scope.disabled).toBe(false);
-    expect(texts()[1].value).toBe('Keep unsaved wording.');
-    expect(payload().operations[0].text).toBe('Keep unsaved wording.');
-    expect(host.textContent).toContain('This session changed. Save or reload before navigating.');
-  });
+ it('retains a labelled sentence identity after native whole-canvas replacement and scope navigation',async()=>{const fixture=mixed();fixture.roots[0].content[1].node!.label='(2a)';fixture.roots[0].content[1].node!.title='Sentence title';await mount(fixture.outline,fixture.roots,{scope:'sentence'});await act(async()=>{const editor=editors()[0];editor.focus();editor.textContent='Changed wording.';fireEvent.input(editor);await new Promise(resolve=>setTimeout(resolve,0));});expect(payload().operations).toContainEqual(expect.objectContaining({type:'replace_text',targetId:'text-sentence',text:'Changed wording.'}));await chooseScope('constitution');await chooseScope('article');expect(host.querySelector('[data-unit=sentence]')?.textContent).toContain('Changed wording.');});
+ it('keeps the sentence-scope editing host and caret alive while new sibling sentences are typed',async()=>{const fixture=mixed();fixture.roots[0].content[1].node!.content[0].text='';await mount(fixture.outline,fixture.roots,{scope:'sentence'});const editor=editors()[0];await act(async()=>editor.focus());for(const data of ['First.\nK',...'eyboard second?']){await act(async()=>editor.dispatchEvent(new InputEvent('beforeinput',{bubbles:true,cancelable:true,inputType:'insertText',data})));expect(editor.isConnected).toBe(true);}expect(editors()).toHaveLength(1);expect(editor.textContent).toBe('First.\nKeyboard second?');expect(nodes(result()).filter(node=>node.kind==='sentence').map(node=>node.content[0].text)).toEqual(['First.\n','Keyboard second?']);});
+ it('restores accepted text after rejecting a destructive merge into an authored heading',async()=>{const fixture=mixed(),first=node('Sentence','first','First.'),second={...node('Sentence','second','Second.'),title:'Keep me'};fixture.outline.kinds[1].segmentation='plain';fixture.roots[0].content=[{type:'child',node:first},{type:'child',node:second}];await mount(fixture.outline,fixture.roots);await act(async()=>{const editor=editors()[0];editor.focus();editor.textContent='First. Second.';fireEvent.input(editor);await new Promise(resolve=>setTimeout(resolve,0));});expect(payload().operations).toEqual([]);expect(host.querySelector('[data-unit=first]')?.textContent).toBe('First.');expect(host.querySelector('[data-unit=second]')?.textContent).toContain('Second.');expect(host.textContent).toContain('Keep me');expect(host.querySelector('[role=status]')?.textContent).toBe('Invalid change');});
+ it('uses configured display labels and accessible controls with no repeated per-sentence forms',async()=>{const fixture=mixed();await mount(fixture.outline,fixture.roots);expect(host.querySelectorAll('textarea')).toHaveLength(0);expect(host.querySelectorAll('[data-editor-tools]')).toHaveLength(1);expect(button('Undo').disabled).toBe(true);expect(button('Redo').disabled).toBe(true);await click('Show sentence boundaries');expect(button('Show sentence boundaries').getAttribute('aria-pressed')).toBe('true');const result=await axeRun(host,{rules:{'color-contrast':{enabled:false}}});expect(result.violations.map(item=>item.id)).toEqual([]);});
 });

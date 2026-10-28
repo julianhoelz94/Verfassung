@@ -17,7 +17,8 @@ class ConstitutionCreationRepository(private val jdbc: JdbcTemplate, private val
         return jdbc.query(
             "SELECT jurisdiction_id, request_hash, response::text FROM constitution_creation_receipts WHERE id = ?",
             { rs, _ ->
-                if (rs.getObject("jurisdiction_id", UUID::class.java) != jurisdictionId || rs.getString("request_hash") != hash(request)) {
+                val savedHash = rs.getString("request_hash")
+                if (rs.getObject("jurisdiction_id", UUID::class.java) != jurisdictionId || (savedHash != hash(request) && savedHash != legacyHash(request))) {
                     throw ConflictException("Constitution creation attempt payload changed", "creation_attempt_mismatch")
                 }
                 mapper.readValue(rs.getString("response"), ConstitutionSummary::class.java)
@@ -39,4 +40,12 @@ class ConstitutionCreationRepository(private val jdbc: JdbcTemplate, private val
 
     private fun hash(request: CreateConstitutionRequest): String = MessageDigest.getInstance("SHA-256")
         .digest(mapper.writeValueAsBytes(request)).joinToString("") { "%02x".format(it) }
+
+    private fun legacyHash(request: CreateConstitutionRequest): String? {
+        if (request.outline?.any { it.sentenceDelimiters != listOf(".", "!", "?") } == true) return null
+        // Adding the default delimiter field must not invalidate a previously recorded setup retry.
+        val original = mapper.readTree(mapper.writeValueAsBytes(request))
+        original.path("outline").forEach { (it as tools.jackson.databind.node.ObjectNode).remove("sentenceDelimiters") }
+        return MessageDigest.getInstance("SHA-256").digest(mapper.writeValueAsBytes(original)).joinToString("") { "%02x".format(it) }
+    }
 }

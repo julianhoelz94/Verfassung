@@ -16,6 +16,7 @@ export function toOutlineKindWrite(kind: {
   labelPolicy?: string;
   labelPlacement?: string;
   segmentation?: string;
+  sentenceDelimiters?: string[];
   root?: boolean;
   allowedChildKinds?: string[];
 }): OutlineKindWrite {
@@ -32,6 +33,7 @@ export function toOutlineKindWrite(kind: {
     labelPolicy: (kind.labelPolicy ?? 'optional') as OutlineKindWrite['labelPolicy'],
     labelPlacement: (kind.labelPlacement ?? 'before_title') as OutlineKindWrite['labelPlacement'],
     segmentation: (kind.segmentation ?? 'plain') as OutlineKindWrite['segmentation'],
+    sentenceDelimiters: kind.sentenceDelimiters ?? ['.', '!', '?'],
     ...(kind.root === undefined ? {} : { root: kind.root }),
     ...(kind.allowedChildKinds === undefined ? {} : { allowedChildKinds: kind.allowedChildKinds }),
   };

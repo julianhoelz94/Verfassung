@@ -76,7 +76,7 @@ class CatalogApiTest {
         Actor(UUID.fromString("01900000-0000-4000-8000-000000000414"), "local-viewer@example.local", listOf("viewer"))
 
     // Keep generated countries separate from fixed fixtures and independent of randomness.
-    private fun uniqueCountryCode(): String = ('A'..'Z').asSequence().map { "Q$it" }
+    private fun uniqueCountryCode(): String = ('Q'..'W').asSequence().flatMap { prefix -> ('A'..'Z').asSequence().map { "$prefix$it" } }
         .first { catalogRepository.findCountrySummary(it) == null }
 
     @Test
@@ -119,6 +119,49 @@ class CatalogApiTest {
         assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM constitution_creation_receipts WHERE id = ?", Int::class.java, attempt)).isZero()
         val valid = request.copy(outline = listOf(kind.copy(allowedChildKinds = emptyList())))
         assertThat(writes.createConstitution(country.isoCode, valid).settingsRevisionId).isNotNull()
+    }
+
+    @Test
+    fun creationReceiptsFromBeforeDelimiterSettingsRemainRetryableOnlyForDefaultDelimiters() {
+        val country = writes.createCountry(com.constitutionatlas.catalog.api.CreateCountryRequest(uniqueCountryCode(), "Legacy setup receipt"))
+        val kind = com.constitutionatlas.catalog.api.OutlineKindWrite("clause", "Clause", root = true, allowedChildKinds = emptyList())
+        val request = com.constitutionatlas.catalog.api.CreateConstitutionRequest("legacy-sentence-settings", "Legacy settings", listOf(kind), creationAttemptId = UUID.randomUUID())
+        val created = writes.createConstitution(country.isoCode, request)
+        val oldRequest = objectMapper.readTree(objectMapper.writeValueAsBytes(request))
+        oldRequest.path("outline").forEach { (it as tools.jackson.databind.node.ObjectNode).remove("sentenceDelimiters") }
+        val oldHash = java.security.MessageDigest.getInstance("SHA-256").digest(objectMapper.writeValueAsBytes(oldRequest)).joinToString("") { "%02x".format(it) }
+        jdbcTemplate.update("UPDATE constitution_creation_receipts SET request_hash = ? WHERE id = ?", oldHash, request.creationAttemptId)
+        assertThat(writes.createConstitution(country.isoCode, request)).isEqualTo(created)
+        org.junit.jupiter.api.Assertions.assertThrows(com.constitutionatlas.catalog.ConflictException::class.java) {
+            writes.createConstitution(country.isoCode, request.copy(outline = listOf(kind.copy(sentenceDelimiters = listOf(";")))))
+        }
+    }
+
+    @Test
+    fun delimiterSettingsRoundTripWithoutChangingPinnedHistoricalRevisions() {
+        val country = writes.createCountry(com.constitutionatlas.catalog.api.CreateCountryRequest(uniqueCountryCode(), "Sentence settings"))
+        val kind = com.constitutionatlas.catalog.api.OutlineKindWrite("clause", "Clause", segmentation = "sentence", root = true, allowedChildKinds = emptyList())
+        val created = writes.createConstitution(country.isoCode, com.constitutionatlas.catalog.api.CreateConstitutionRequest("sentence-settings", "Sentence settings", listOf(kind)))
+        val initialRevision = requireNotNull(created.settingsRevisionId)
+        val version = writes.createDraftVersion(created.id, com.constitutionatlas.catalog.api.CreateVersionRequest("Original"))
+        assertThat(settingsRepository.find(created.id, initialRevision).outline.kinds.single().sentenceDelimiters).containsExactly(".", "!", "?")
+        writes.replaceOutline(created.id, listOf(kind.copy(sentenceDelimiters = listOf(";", "。", "?!"))))
+        val changedRevision = requireNotNull(settingsRepository.currentId(created.id))
+        assertThat(changedRevision).isNotEqualTo(initialRevision)
+        assertThat(catalogRepository.findOutline(created.id).kinds.single().sentenceDelimiters).containsExactly(";", "。", "?!")
+        assertThat(settingsRepository.find(created.id, changedRevision).outline.kinds.single().sentenceDelimiters).containsExactly(";", "。", "?!")
+        assertThat(settingsRepository.find(created.id, initialRevision).outline.kinds.single().sentenceDelimiters).containsExactly(".", "!", "?")
+        writes.replaceOutline(created.id, listOf(kind.copy(sentenceDelimiters = listOf(";", "。", "?!"))))
+        assertThat(settingsRepository.currentId(created.id)).isEqualTo(changedRevision)
+        assertThat(settingsRepository.forVersion(version.id).outline.kinds.single().sentenceDelimiters).containsExactly(".", "!", "?")
+        mockMvc.post("/constitutions/${created.id}/settings/$initialRevision/restore") {
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"expectedRevisionId":"$changedRevision"}"""
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.outline.kinds[0].sentenceDelimiters[0]") { value(".") }
+        }
     }
 
     @Test

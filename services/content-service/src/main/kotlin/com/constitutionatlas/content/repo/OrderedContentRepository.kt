@@ -182,7 +182,7 @@ class OrderedContentRepository(private val jdbc: JdbcTemplate, private val mappe
                 OrderedEntry("child", node = resolveNode(version, child, path + revision))
             } else {
                 val record = textRecord(text!!)
-                OrderedEntry("text", logicalId = record.logicalId, revisionId = text, occurrenceId = occurrenceId(version, record.logicalId), text = record.text, lineage = record.lineage, format = record.format.takeIf { it != "plain" }, table = record.rich.table, footnoteLabel = record.rich.footnoteLabel, references = record.rich.references, annotation = record.rich.annotation)
+                OrderedEntry("text", logicalId = record.logicalId, revisionId = text, occurrenceId = occurrenceId(version, record.logicalId), text = record.text, lineage = record.lineage, format = record.format.takeIf { it != "plain" }, table = record.rich.table, footnoteLabel = record.rich.footnoteLabel, references = record.rich.references, annotation = record.rich.annotation, marks = record.rich.marks)
             }
         }
         return OrderedNode(row.logicalId, revision, occurrenceId(version, row.logicalId), row.kind, row.label, row.title, content, row.inferred, row.lineage)

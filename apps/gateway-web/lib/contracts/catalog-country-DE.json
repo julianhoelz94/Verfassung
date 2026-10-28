@@ -70,7 +70,12 @@
             "labelPolicy": "optional",
             "labelPlacement": "before_title",
             "segmentation": "plain",
-            "root": true
+            "root": true,
+            "sentenceDelimiters": [
+              ".",
+              "!",
+              "?"
+            ]
           },
           {
             "kindCode": "paragraph",
@@ -90,7 +95,12 @@
             "labelPolicy": "optional",
             "labelPlacement": "before_title",
             "segmentation": "plain",
-            "root": false
+            "root": false,
+            "sentenceDelimiters": [
+              ".",
+              "!",
+              "?"
+            ]
           },
           {
             "kindCode": "sentence",
@@ -108,7 +118,12 @@
             "labelPolicy": "optional",
             "labelPlacement": "before_title",
             "segmentation": "sentence",
-            "root": false
+            "root": false,
+            "sentenceDelimiters": [
+              ".",
+              "!",
+              "?"
+            ]
           }
         ]
       },

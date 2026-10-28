@@ -3,9 +3,11 @@ import type { ArticleSummary, OrderedEntry } from './api';
 export function orderedTargets(roots: Pick<ArticleSummary, 'id' | 'logicalId' | 'content'>[]): Record<string, { rootId: string; occurrenceId: string }> {
   const result: Record<string, { rootId: string; occurrenceId: string }> = {};
   function visit(entries: OrderedEntry[], rootId: string) {
-    for (const entry of entries) if (entry.node) {
-      result[entry.node.logicalId] = { rootId, occurrenceId: entry.node.occurrenceId };
-      visit(entry.node.content, rootId);
+    for (const entry of entries) {
+      if (entry.node) {
+        result[entry.node.logicalId] = { rootId, occurrenceId: entry.node.occurrenceId };
+        visit(entry.node.content, rootId);
+      } else if (entry.logicalId && entry.occurrenceId) result[entry.logicalId] = { rootId, occurrenceId: entry.occurrenceId };
     }
   }
   for (const root of roots) {

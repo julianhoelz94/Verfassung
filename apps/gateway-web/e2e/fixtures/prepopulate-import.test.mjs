@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { fixtureVersion, publishFixture } from './prepopulate-import.mjs';
 
 const payload = { isoCode: 'XA', constitutionSlug: 'atlas-charter', versionLabel: '2020', articles: [{ articleNumber: '1', body: 'Dignity.' }] };
@@ -29,6 +30,24 @@ function fixtureApi(initialJob, staged = payload) {
 }
 
 const run = (context) => publishFixture(context, { key: 'xa-2020' }, payload, payload, false);
+
+test('generated rich constitution fixtures end with notes and retain cross-root reference targets', () => {
+  for (const version of ['xc-2020', 'xc-2024']) {
+    const source = JSON.parse(readFileSync(new URL(`./generated/${version}.json`, import.meta.url), 'utf8'));
+    const notes = new Set(); const references = []; let noteSection = false;
+    function walk(node) {
+      assert.equal(noteSection, false, `${version}: constitutional node follows endnotes`);
+      for (const entry of node.content) {
+        if (entry.node) walk(entry.node);
+        else if (entry.format === 'footnote') { noteSection = true; notes.add(entry.logicalId); }
+        else { assert.equal(noteSection, false, `${version}: body entry follows endnotes`); references.push(...(entry.references ?? [])); }
+      }
+    }
+    source.roots.forEach(walk);
+    assert.equal(notes.size, 1);
+    assert.ok(references.some(ref => ref.target.type === 'footnote' && notes.has(ref.target.footnoteId)));
+  }
+});
 
 test('preparation leaves pending_review with a version ID; separate roles approve and publish it', async () => {
   const { calls, context } = fixtureApi();

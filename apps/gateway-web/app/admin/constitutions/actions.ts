@@ -36,6 +36,7 @@ function parseOutline(raw: string): OutlineKindWrite[] {
       labelPolicy: kind.labelPolicy as OutlineKindWrite['labelPolicy'],
       labelPlacement: kind.labelPlacement as OutlineKindWrite['labelPlacement'],
       segmentation: kind.segmentation as OutlineKindWrite['segmentation'],
+      sentenceDelimiters: Array.isArray(kind.sentenceDelimiters) ? kind.sentenceDelimiters.map(String) : undefined,
       root: kind.root === undefined ? undefined : Boolean(kind.root),
       allowedChildKinds: Array.isArray(kind.allowedChildKinds) ? kind.allowedChildKinds.map(String) : undefined,
     });

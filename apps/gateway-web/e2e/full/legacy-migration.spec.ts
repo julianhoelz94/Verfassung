@@ -66,10 +66,12 @@ test('offline archive package preserves evidence through review, publication and
           { logicalId: id('row1'), cells: [{ logicalId: id('header'), text: 'Pflicht', header: true, colSpan: 2 }] },
           { logicalId: id('row2'), cells: [{ logicalId: id('cell1'), text: 'Bericht' }, { logicalId: id('cell2'), text: 'jährlich' }] },
         ] } },
+      ] },
+      { logicalId: id('appendix'), kind: 'appendix', label: 'Anhang A', content: [
+        { type: 'text', logicalId: id('annex'), text: manifest.annexText },
         { type: 'text', logicalId: id('note'), text: manifest.annotationText, format: 'footnote', footnoteLabel: '[a]',
           annotation: { kind: 'editorial', attribution: manifest.attribution, sourceUrl: 'https://verfassungen.de/annotated.htm', anchorLogicalIds: [id('wording')] } },
       ] },
-      { logicalId: id('appendix'), kind: 'appendix', label: 'Anhang A', content: [{ type: 'text', logicalId: id('annex'), text: manifest.annexText }] },
     ];
     const proposal = await mcp(request, importer, 'propose_constitution_setup', { proposal: {
       jurisdictionId: jurisdiction.id, constitutionSlug: 'archive', constitutionTitle: 'Synthetic regional constitution', languageCode: 'de', sourceUrl: 'https://verfassungen.de/annotated.htm', outline, sampleRoots: roots,
@@ -156,7 +158,14 @@ test('offline archive package preserves evidence through review, publication and
     expect(records.length).toBe(fidelity.totalRecords);
     expect(records.find(r => r.path === '/roots/0/content/1/node/content/0/text')?.value).toBe(manifest.legalText);
     expect(records.find(r => r.path === '/roots/0/content/2/table/rows/0/cells/0/colSpan')?.value).toBe(2);
-    expect(records.find(r => r.path === '/roots/0/content/3/annotation/kind')?.value).toBe('editorial');
+    const noteIdentity = records.find(record => record.path.endsWith('/logicalId') && record.value === id('note'));
+    expect(noteIdentity).toBeTruthy();
+    const notePath = noteIdentity!.path.replace(/\/logicalId$/, '');
+    expect(records.find(record => record.path === notePath + '/text')?.value).toBe(manifest.annotationText);
+    expect(records.find(record => record.path === notePath + '/annotation/kind')?.value).toBe('editorial');
+    expect(records.find(record => record.path === notePath + '/annotation/attribution')?.value).toBe(manifest.attribution);
+    expect(records.find(record => record.path === notePath + '/annotation/sourceUrl')?.value).toBe('https://verfassungen.de/annotated.htm');
+    expect(records.find(record => record.path === notePath + '/annotation/anchorLogicalIds/0')?.value).toBe(id('wording'));
     await page.context().addCookies([{ name: 'ca_session', value: admin.Authorization.slice(7), url: String(testInfo.project.use.baseURL), httpOnly: true, sameSite: 'Lax' }]);
     await page.goto(`/admin/migrations/${run.id}?item=${snapshot.id}&source=annotated.htm`);
     await expect(page.locator('pre')).toHaveText(new TextDecoder('windows-1252').decode(captured.find(source => source.file === 'annotated.htm').bytes));
@@ -235,7 +244,9 @@ test('offline archive package preserves evidence through review, publication and
     expect((await json(await request.get(`/api/catalog/curated-comparisons/${comparisonId}`))).needsReview).toBe(true);
     expect(await json(await request.get(`/api/content/versions/${versionId}/content`))).toEqual(original);
     expect((await request.put(`/api/content/versions/${versionId}/content`, { headers: admin, data: { expectedGeneration: original.generation, roots: [] } })).status()).toBe(409);
-    const oldUrl = `http://legacy.localhost:18080/annotated-${namespace}.htm#note-a`;
+    const legacyOrigin = new URL(String(testInfo.project.use.baseURL));
+    legacyOrigin.hostname = 'legacy.localhost';
+    const oldUrl = `${legacyOrigin.origin}/annotated-${namespace}.htm#note-a`;
     await prepare(await stage('legacy-note', 'legacy_mapping', { sourceUrl: oldUrl, kind: 'note', targetKey: 'regional', logicalId: id('note') }, ['regional']));
     const resolved = await json(await request.get(`/api/catalog/legacy-resolve?url=${encodeURIComponent(oldUrl)}`));
     expect(resolved.targetUrl).toContain(versionId); expect(resolved.targetUrl).toContain('#');

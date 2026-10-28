@@ -8,8 +8,11 @@ import { LocalizedTitle, LocalizedTableRegion, LocalizedFootnoteBacklink } from 
 import { ui } from '../../lib/messages';
 import { migrationUi } from '../../lib/migration-messages';
 import { T } from './TranslationProvider';
+import { FootnoteMarker, FootnoteProvider } from './Footnotes';
+import { footnoteItems, type FootnoteItem } from '../../lib/footnotes';
+import { InlineText } from './InlineText';
 
-export type ConstitutionCrossRefs = Omit<CrossRefContext, 'kindLabel'> & { unitsByLogicalId?: Record<string, { rootId: string; occurrenceId: string }> };
+export type ConstitutionCrossRefs = Omit<CrossRefContext, 'kindLabel'> & { unitsByLogicalId?: Record<string, { rootId: string; occurrenceId: string }>; footnotes?: FootnoteItem[] };
 
 type ConstitutionTextProps = {
   article?:
@@ -27,6 +30,7 @@ type ConstitutionTextProps = {
   headingIdPrefix?: string;
   lang?: string;
   crossRefs?: ConstitutionCrossRefs;
+  hideFootnotes?: boolean;
 };
 
 export function ConstitutionText({
@@ -43,6 +47,7 @@ export function ConstitutionText({
   headingIdPrefix = 'article',
   lang,
   crossRefs,
+  hideFootnotes = false,
 }: ConstitutionTextProps) {
   const Heading = headingLevel;
   const children = nodes ?? (article && 'children' in article ? article.children : undefined);
@@ -67,7 +72,7 @@ export function ConstitutionText({
       {article && rootKind?.showLabel && rootKind.labelPlacement === 'inline' ? <span className="num">{article.articleNumber}</span> : null}
       {article && rootKind?.showLabel && rootKind.labelPlacement === 'superscript' ? <sup className="num">{article.articleNumber}</sup> : null}
       {entries !== undefined || article?.content != null ? (
-        <OrderedContentTree entries={entries ?? article?.content ?? []} outline={outline} withRefs={withRefs} canEditTitles={canEditTitles} returnTo={returnTo} crossRefs={crossRefs} />
+        <OrderedContentTree entries={entries ?? article?.content ?? []} outline={outline} withRefs={withRefs} canEditTitles={canEditTitles} returnTo={returnTo} crossRefs={crossRefs} hideFootnotes={hideFootnotes} />
       ) : children && children.length > 0 ? (
         <NodeTree
           nodes={children}
@@ -173,9 +178,10 @@ function SectionNode({
 export type OrderedNodeElement = ReactElement<HTMLAttributes<HTMLElement> & RefAttributes<HTMLElement>>;
 
 /** Ordered reader rendering shares heading and sibling presentation rules with NodeTree. */
-export function OrderedContentTree({ entries, outline, withRefs = (text) => text, renderText, renderTableCell, renderTableCaption, renderReference, renderHeading, renderLabel, renderNode, idPrefix = '', canEditTitles = false, returnTo, indexedTargets, indexedNotes, indexedBacklinks, crossRefs }: {
+export function OrderedContentTree({ entries, outline, withRefs = (text) => text, renderText, renderTextSlice, renderTableCell, renderTableCaption, renderReference, renderHeading, renderLabel, renderNode, idPrefix = '', canEditTitles = false, returnTo, indexedTargets, indexedNotes, indexedBacklinks, crossRefs, hideFootnotes = false }: {
   entries: OrderedEntry[]; outline?: ContentOutline; withRefs?: (text: string) => ReactNode;
   renderText?: (entry: OrderedEntry) => ReactNode;
+  renderTextSlice?: (entry: OrderedEntry, start: number, end: number) => ReactNode;
   renderTableCell?: (cell: OrderedTableCell, entry: OrderedEntry) => ReactNode;
   renderTableCaption?: (entry: OrderedEntry) => ReactNode;
   renderReference?: (reference: OrderedInlineReference, label: string, href: string | undefined, entry: OrderedEntry) => ReactNode;
@@ -189,6 +195,7 @@ export function OrderedContentTree({ entries, outline, withRefs = (text) => text
   indexedNotes?: Map<string, string>;
   indexedBacklinks?: Map<string, string[]>;
   crossRefs?: ConstitutionCrossRefs;
+  hideFootnotes?: boolean;
 }) {
   const targets = indexedTargets ?? new Map<string, { rootId: string; occurrenceId: string }>();
   const notes = indexedNotes ?? new Map<string, string>();
@@ -200,6 +207,7 @@ export function OrderedContentTree({ entries, outline, withRefs = (text) => text
         targets.set(item.node.logicalId, { rootId: root, occurrenceId: item.node.occurrenceId });
         index(item.node.content, root);
       } else {
+        if (item.logicalId && item.occurrenceId) targets.set(item.logicalId, { rootId: rootId ?? item.occurrenceId, occurrenceId: item.occurrenceId });
         if (item.format === 'footnote' && item.logicalId && item.occurrenceId) notes.set(item.logicalId, item.occurrenceId);
         for (const ref of item.references ?? []) if (ref.target.type === 'footnote' && ref.target.footnoteId) backlinks.set(ref.target.footnoteId, [...(backlinks.get(ref.target.footnoteId) ?? []), ref.logicalId]);
       }
@@ -208,23 +216,26 @@ export function OrderedContentTree({ entries, outline, withRefs = (text) => text
   if (!indexedTargets) index(entries);
   function richText(entry: OrderedEntry): ReactNode {
     const value = entry.text ?? '';
-    if (!entry.references?.length) return withRefs(value);
+    if (!entry.references?.length && renderTextSlice) return renderTextSlice(entry, 0, value.length);
+    if (!entry.references?.length) return <InlineText text={value} marks={entry.marks} render={withRefs} />;
     const result: ReactNode[] = [];
     let previous = 0;
-    for (const ref of [...entry.references].sort((a, b) => a.start - b.start)) {
-      if (ref.start > previous) result.push(withRefs(value.slice(previous, ref.start)));
+    for (const ref of [...entry.references].sort((a, b) => a.start - b.start || a.end - b.end)) {
+      if (ref.start > previous) result.push(renderTextSlice ? <Fragment key={'text-' + previous}>{renderTextSlice(entry, previous, ref.start)}</Fragment> : <InlineText key={'text-' + previous} text={value} marks={entry.marks} start={previous} end={ref.start} render={withRefs} />);
       const target = ref.target;
-      const unit = target.logicalId ? targets.get(target.logicalId) ?? crossRefs?.unitsByLogicalId?.[target.logicalId] : undefined;
+      const unit = target.logicalId ? crossRefs?.unitsByLogicalId?.[target.logicalId] ?? targets.get(target.logicalId) : undefined;
       const href = target.type === 'external' ? target.url ?? undefined : target.type === 'footnote' && target.footnoteId && notes.get(target.footnoteId) ? `#${idPrefix}fn-${notes.get(target.footnoteId)}` : unit && crossRefs ? crossRefs.code ? `/countries/${crossRefs.code}/versions/${crossRefs.versionId}/units/${unit.rootId}#${unit.occurrenceId}` : `/versions/${crossRefs.versionId}/units/${unit.rootId}?occurrenceId=${unit.occurrenceId}` : unit ? `#${idPrefix}${unit.occurrenceId}` : undefined;
       const label = value.slice(ref.start, ref.end);
-      result.push(renderReference ? <span key={ref.logicalId} id={`${idPrefix}ref-${ref.logicalId}`}>{renderReference(ref, label, href, entry)}</span> : href ? <a key={ref.logicalId} id={`${idPrefix}ref-${ref.logicalId}`} className="xref" href={href}>{label}</a> : <LocalizedTitle key={ref.logicalId} className="xref-unavailable" label={ui.accessibilityDynamic.referenceUnavailable}>{label}</LocalizedTitle>);
+      const formatted = <InlineText text={value} marks={entry.marks} start={ref.start} end={ref.end} />;
+      result.push(renderReference ? <span key={ref.logicalId} id={idPrefix + 'ref-' + ref.logicalId}>{renderReference(ref, label, href, entry)}</span> : target.type === 'footnote' && target.footnoteId ? <FootnoteMarker key={ref.logicalId} noteId={target.footnoteId} referenceId={idPrefix + 'ref-' + ref.logicalId}>{label ? formatted : undefined}</FootnoteMarker> : href ? <a key={ref.logicalId} id={idPrefix + 'ref-' + ref.logicalId} className="xref" href={href}>{formatted}</a> : <LocalizedTitle key={ref.logicalId} className="xref-unavailable" label={ui.accessibilityDynamic.referenceUnavailable}>{formatted}</LocalizedTitle>);
       previous = ref.end;
     }
-    if (previous < value.length) result.push(withRefs(value.slice(previous)));
+    if (previous < value.length) result.push(renderTextSlice ? <Fragment key={'text-' + previous}>{renderTextSlice(entry, previous, value.length)}</Fragment> : <InlineText key={'text-' + previous} text={value} marks={entry.marks} start={previous} render={withRefs} />);
     return result;
   }
   const groups: Array<{ entries: OrderedEntry[]; concatenated: boolean }> = [];
   for (const entry of entries) {
+    if (hideFootnotes && entry.format === 'footnote') continue;
     const kind = effectiveDisplayKind(kindByCode(outline, entry.node?.kind ?? ''));
     const concatenated = !(canEditTitles && returnTo && kindByCode(outline, entry.node?.kind ?? '')?.titlePolicy !== 'none') && entry.type === 'child' && Boolean(entry.node) &&
       kind?.presentation === 'concatenated' &&
@@ -234,7 +245,7 @@ export function OrderedContentTree({ entries, outline, withRefs = (text) => text
     if ((concatenated && last?.concatenated) || (entry.type === 'text' && (!entry.format || entry.format === 'plain') && last?.entries.every((part) => part.type === 'text' && (!part.format || part.format === 'plain')))) last!.entries.push(entry);
     else groups.push({ entries: [entry], concatenated });
   }
-  return <div className="node-tree">{groups.map((group, index) => {
+  const tree = <div className="node-tree">{groups.map((group, index) => {
     if (group.concatenated) return <p key={index} className="constitution-body constitution-concat">{group.entries.map((part, partIndex) => {
       const unit = part.node!;
       const kind = effectiveDisplayKind(kindByCode(outline, unit.kind));
@@ -246,7 +257,7 @@ export function OrderedContentTree({ entries, outline, withRefs = (text) => text
     })}</p>;
     const entry = group.entries[0]!;
     if (entry.type === 'text' && entry.format === 'table' && entry.table) return <LocalizedTableRegion key={entry.occurrenceId ?? entry.logicalId ?? index} id={entry.occurrenceId ? `${idPrefix}${entry.occurrenceId}` : undefined} caption={entry.table.caption}><table className="legal-table">{entry.table.caption ? <caption>{renderTableCaption ? renderTableCaption(entry) : entry.table.caption}</caption> : null}<tbody>{entry.table.rows.map(row => <tr key={row.logicalId}>{row.cells.map(cell => cell.header ? <th key={cell.logicalId} id={`${idPrefix}cell-${cell.logicalId}`} scope="col" rowSpan={cell.rowSpan ?? 1} colSpan={cell.colSpan ?? 1}>{renderTableCell ? renderTableCell(cell, entry) : cell.text}</th> : <td key={cell.logicalId} id={`${idPrefix}cell-${cell.logicalId}`} headers={cell.headers?.map(id => `${idPrefix}cell-${id}`).join(' ') || undefined} rowSpan={cell.rowSpan ?? 1} colSpan={cell.colSpan ?? 1}>{renderTableCell ? renderTableCell(cell, entry) : cell.text}</td>)}</tr>)}</tbody></table></LocalizedTableRegion>;
-    if (entry.type === 'text' && entry.format === 'footnote') return <aside key={entry.occurrenceId ?? entry.logicalId ?? index} id={entry.occurrenceId ? `${idPrefix}fn-${entry.occurrenceId}` : undefined} className="legal-footnote" role="note">{entry.annotation ? <p><strong><T value={entry.annotation.kind === 'editorial' ? migrationUi.editorial : entry.annotation.kind === 'amendment' ? migrationUi.amendment : migrationUi.sourceAnnotation} /></strong>{entry.annotation.attribution ? <> · {entry.annotation.attribution}</> : null}{entry.annotation.sourceUrl?.startsWith('https://') ? <> · <a href={entry.annotation.sourceUrl}><T value={migrationUi.source} /></a></> : null}</p> : null}<sup>{entry.footnoteLabel ?? '*'}</sup> {renderText ? renderText(entry) : entry.text} {(entry.logicalId ? backlinks.get(entry.logicalId) : undefined)?.map((id, linkIndex) => <LocalizedFootnoteBacklink key={id} href={`#${idPrefix}ref-${id}`} index={linkIndex + 1} />)}</aside>;
+    if (entry.type === 'text' && entry.format === 'footnote') return <aside key={entry.occurrenceId ?? entry.logicalId ?? index} id={entry.occurrenceId ? `${idPrefix}fn-${entry.occurrenceId}` : undefined} className="legal-footnote" role="note">{entry.annotation ? <p><strong><T value={entry.annotation.kind === 'editorial' ? migrationUi.editorial : entry.annotation.kind === 'amendment' ? migrationUi.amendment : migrationUi.sourceAnnotation} /></strong>{entry.annotation.attribution ? <> · {entry.annotation.attribution}</> : null}{entry.annotation.sourceUrl?.startsWith('https://') ? <> · <a href={entry.annotation.sourceUrl}><T value={migrationUi.source} /></a></> : null}</p> : null}<sup>{entry.footnoteLabel ?? '*'}</sup> <span id={entry.occurrenceId ? idPrefix + entry.occurrenceId : undefined}>{renderText ? renderText(entry) : richText(entry)}</span> {(entry.logicalId ? backlinks.get(entry.logicalId) : undefined)?.map((id, linkIndex) => <LocalizedFootnoteBacklink key={id} href={`#${idPrefix}ref-${id}`} index={linkIndex + 1} />)}</aside>;
     if (entry.type === 'text') return <p key={entry.occurrenceId ?? entry.logicalId ?? index} className="constitution-body">{group.entries.map((part, partIndex) => <span key={part.occurrenceId ?? part.logicalId ?? partIndex} id={part.occurrenceId ? `${idPrefix}${part.occurrenceId}` : undefined}>{renderText && !part.references?.length ? renderText(part) : richText(part)}</span>)}</p>;
     const node = entry.node;
     if (!node) return null;
@@ -259,8 +270,9 @@ export function OrderedContentTree({ entries, outline, withRefs = (text) => text
       {canEditTitles && returnTo && kind?.titlePolicy !== 'none' ? <NodeTitleForm nodeId={node.occurrenceId} title={node.title} label={node.label ?? kind?.displayLabel ?? node.kind} returnTo={returnTo} /> : null}
       {superscriptLabel ? <sup className="num">{renderLabel ? renderLabel(node, superscriptLabel) : superscriptLabel}</sup> : null}
       {inlineLabel ? <span className="num">{renderLabel ? renderLabel(node, inlineLabel) : inlineLabel}</span> : null}
-      <OrderedContentTree entries={node.content} outline={outline} withRefs={withRefs} renderText={renderText} renderTableCell={renderTableCell} renderTableCaption={renderTableCaption} renderReference={renderReference} renderHeading={renderHeading} renderLabel={renderLabel} renderNode={renderNode} idPrefix={idPrefix} canEditTitles={canEditTitles} returnTo={returnTo} indexedTargets={targets} indexedNotes={notes} indexedBacklinks={backlinks} crossRefs={crossRefs} />
+      <OrderedContentTree entries={node.content} outline={outline} withRefs={withRefs} renderText={renderText} renderTextSlice={renderTextSlice} renderTableCell={renderTableCell} renderTableCaption={renderTableCaption} renderReference={renderReference} renderHeading={renderHeading} renderLabel={renderLabel} renderNode={renderNode} idPrefix={idPrefix} canEditTitles={canEditTitles} returnTo={returnTo} indexedTargets={targets} indexedNotes={notes} indexedBacklinks={backlinks} crossRefs={crossRefs} hideFootnotes={hideFootnotes} />
     </section>;
     return renderNode ? <Fragment key={node.occurrenceId}>{renderNode(node, element)}</Fragment> : element;
   })}</div>;
+  return indexedTargets ? tree : <FootnoteProvider notes={crossRefs?.footnotes ?? footnoteItems(entries, '', idPrefix)}>{tree}</FootnoteProvider>;
 }

@@ -74,4 +74,41 @@ class ImportPublicationTest {
         Mockito.verify(catalog).publishVersion(version, job)
         Mockito.verify(jobs).complete(job, version, actor)
     }
+
+    @Test
+    fun deterministicContentValidationPreservesSafeCodeAndPathWithoutTransientRetryWording() {
+        approved()
+        val logical = UUID.randomUUID()
+        val body = """{"code":"UNIT_REFERENCE_TARGET","path":"roots[1].content[0].references[2]","logicalId":"$logical","error":"private downstream detail","token":"must not leave the service"}"""
+        Mockito.doThrow(HttpClientErrorException.create(HttpStatus.BAD_REQUEST, "Bad Request", org.springframework.http.HttpHeaders.EMPTY, body.toByteArray(), null))
+            .`when`(content).sealImport(version, job, 1, settings)
+        val failure = assertThrows(ImportPublicationException::class.java) { service().publish("Bearer admin", job, actor) }
+        assertThat(failure.status).isEqualTo(HttpStatus.BAD_REQUEST)
+        assertThat(ImportPublicationAdvice().publication(failure).body).isEqualTo(mapOf("code" to "UNIT_REFERENCE_TARGET", "path" to "roots[1].content[0].references[2]", "logicalId" to logical.toString()))
+        Mockito.verify(jobs).publishFailed(job)
+        Mockito.verify(catalog, Mockito.never()).publishVersion(version, job)
+    }
+
+    @Test
+    fun unrecognizedValidationDetailsAreNotForwardedToTheStaffResponse() {
+        approved()
+        val body = """{"code":"internal_private_failure","path":"/etc/private","error":"private downstream detail"}"""
+        Mockito.doThrow(HttpClientErrorException.create(HttpStatus.BAD_REQUEST, "Bad Request", org.springframework.http.HttpHeaders.EMPTY, body.toByteArray(), null))
+            .`when`(content).sealImport(version, job, 1, settings)
+        val failure = assertThrows(ImportPublicationException::class.java) { service().publish("Bearer admin", job, actor) }
+        assertThat(failure.status).isEqualTo(HttpStatus.BAD_REQUEST)
+        assertThat(ImportPublicationAdvice().publication(failure).body).isEqualTo(mapOf("code" to "publication_validation_failed"))
+        Mockito.verify(jobs).publishFailed(job)
+    }
+
+    @Test
+    fun unavailableContentServiceStillReturnsATransientAvailabilityFailure() {
+        approved()
+        Mockito.doThrow(org.springframework.web.client.HttpServerErrorException.create(HttpStatus.SERVICE_UNAVAILABLE, "Unavailable", org.springframework.http.HttpHeaders.EMPTY, "private downstream detail".toByteArray(), null))
+            .`when`(content).sealImport(version, job, 1, settings)
+        val failure = assertThrows(ImportPublicationException::class.java) { service().publish("Bearer admin", job, actor) }
+        assertThat(failure.status).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE)
+        assertThat(ImportPublicationAdvice().publication(failure).body).isEqualTo(mapOf("code" to "publication_unavailable"))
+        Mockito.verify(jobs).publishFailed(job)
+    }
 }

@@ -25,7 +25,7 @@ class StructuredPublicationService(private val drafts: StructuredDraftRepository
         val source = sources.source(version)
         val settings = sources.settings(version)
         if (source.settingsRevisionId != settings.id) throw ConflictException("Source and settings pins disagree", "stale_source")
-        StructuredDraftEngine.validate(source.roots, settings)
+        StructuredDraftEngine.validate(source.roots, settings, enforceEndnotes = false)
         drafts.createPin(session, source, settings.id)
     }
 

@@ -1,8 +1,13 @@
 /* eslint-disable */
-import { test, expect } from './fixtures/consent';
+import { test, expect, type Page } from './fixtures/consent';
 import { ARTICLE_1, VERSION_1949, VERSION_2022, signInEditor, signInPublisher, signInReviewer, signOut, startEditorSession } from './helpers';
 
 const MOCK_ORIGIN = `http://127.0.0.1:${process.env.E2E_MOCK_PORT ?? 4010}`;
+
+async function sessionDetails(page: Page) {
+  const summary = page.locator('summary').filter({ hasText: 'Session and publication' });
+  if (!(await summary.evaluate(element => element.parentElement!.hasAttribute('open')))) await summary.click();
+}
 
 test.beforeEach(async ({ request }) => {
   const response = await request.post(`${MOCK_ORIGIN}/__reset`);
@@ -105,20 +110,22 @@ test('edit, review, and publish a draft', async ({ page }) => {
   await signInEditor(page);
   await startEditorSession(page, VERSION_2022, 'editorial_correction');
   await expect(page).toHaveURL(/sessionId=/);
+  await page.getByRole('button', { name: 'Show article navigation', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Articles' })).toBeVisible();
   await page.getByLabel('Filter articles').fill('dignity');
   await expect(page.getByRole('link', { name: /Article 1 Human dignity/ })).toBeVisible();
   await expect(page.getByRole('link', { name: /Article 2/ })).toHaveCount(0);
   await page.getByLabel('Filter articles').fill('');
   await expect(page.getByRole('link', { name: 'Back to my work' })).toBeVisible();
-  await expect(page.getByText('Preview', { exact: true })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Article 1', exact: true })).toBeVisible();
   await expect(page.getByText('Section titles', { exact: true })).toBeVisible();
   await page.getByLabel('Title', { exact: true }).fill('Human dignity (draft)');
   await page.getByLabel('Article text').fill('Draft body for the e2e journey.');
   await page.getByRole('button', { name: 'Save draft' }).click();
   await expect(page).toHaveURL(/saved=1/);
   await expect(page.getByText('Draft saved.')).toBeVisible();
-  await expect(page.getByLabel('Session').getByText('Draft body for the e2e journey.')).toBeVisible();
+  await sessionDetails(page);
+  await expect(page.getByRole('region', { name: 'Article 1', exact: true }).getByLabel('Article text')).toHaveValue('Draft body for the e2e journey.');
   await expect(page.getByLabel('Session').getByText('Draft', { exact: true })).toBeVisible();
   await page.getByLabel('What was corrected in this transcription?').fill('Corrected text.');
   await page.getByRole('button', { name: 'Save comment' }).click();
@@ -134,8 +141,10 @@ test('edit, review, and publish a draft', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Review queue' })).toBeVisible();
   await page.locator('.editor-session-list').getByRole('link').first().click();
   await expect(page).toHaveURL(/sessionId=/);
-  await expect(page.getByText('Preview', { exact: true })).toBeVisible();
+  await sessionDetails(page);
+  await expect(page.getByLabel('Session').getByText('Corrected text.', { exact: true })).toBeVisible();
   await expect(page.getByLabel('Article 1').getByText('Draft body for the e2e journey.')).toBeVisible();
+  await expect(page.getByLabel('Article text')).toHaveCount(0);
   await expect(page.getByRole('link', { name: 'View original text' })).toBeVisible();
   const reviewerSessionUrl = page.url();
   await page.goto('/editor/amendments');
@@ -152,8 +161,10 @@ test('edit, review, and publish a draft', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Ready to publish' })).toBeVisible();
   await page.locator('.editor-session-list').getByRole('link').first().click();
   await expect(page).toHaveURL(/sessionId=/);
+  await sessionDetails(page);
   await page.getByRole('button', { name: 'Publish transcription' }).click();
   await expect(page.getByText('Published as version 2022-1.')).toBeVisible();
+  await sessionDetails(page);
   await expect(page.getByText('ready', { exact: true })).toBeVisible();
 });
 
@@ -202,6 +213,7 @@ test('publisher confirms stale old-law quotes without changing the public commen
   await expect(page).toHaveURL(/sessionId=/);
   await page.getByLabel('Article text').fill('Corrected 1949 transcription.');
   await page.getByRole('button', { name: 'Save draft' }).click();
+  await sessionDetails(page);
   await page.getByLabel('What was corrected in this transcription?').fill('Corrected the historical transcription.');
   await page.getByRole('button', { name: 'Save comment' }).click();
   await page.getByRole('button', { name: 'Submit for review' }).click();
@@ -214,6 +226,7 @@ test('publisher confirms stale old-law quotes without changing the public commen
   await signOut(page);
   await signInPublisher(page);
   await page.goto(approvedHistoricalCorrectionUrl);
+  await sessionDetails(page);
   await page.getByRole('button', { name: 'Publish transcription' }).click();
   await expect(page.getByText('Published as version 1949-1.')).toBeVisible();
   await page.getByRole('button', { name: 'Account menu' }).click();
@@ -245,12 +258,14 @@ test('editorial correction hop stays off the public timeline', async ({ page }) 
   await signInEditor(page);
   await startEditorSession(page, VERSION_2022, 'editorial_correction');
   await expect(page).toHaveURL(/sessionId=/);
+  await page.getByRole('button', { name: 'Show article navigation', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Articles' })).toBeVisible();
   await page.getByLabel('Title', { exact: true }).fill('Human dignity (typo fix)');
   await page.getByLabel('Article text').fill('Corrected transcription.');
   await page.getByRole('button', { name: 'Save draft' }).click();
   await expect(page).toHaveURL(/saved=1/);
   await expect(page.getByText('Draft saved.')).toBeVisible();
+  await sessionDetails(page);
   await page.getByLabel('What was corrected in this transcription?').fill('Corrected text.');
   await page.getByRole('button', { name: 'Save comment' }).click();
   await expect(page).toHaveURL(/detailsSaved=1/);
@@ -269,6 +284,7 @@ test('editorial correction hop stays off the public timeline', async ({ page }) 
   await signOut(page);
   await signInPublisher(page);
   await page.goto(approvedCorrectionUrl);
+  await sessionDetails(page);
   await page.getByRole('button', { name: 'Publish transcription' }).click();
   await expect(page.getByText('Published as version 2022-1.')).toBeVisible();
   await signOut(page);
@@ -324,17 +340,21 @@ test('legal successor passes queues and requires fresh authentication before pub
   await page.getByRole('region', { name: 'Article' }).getByLabel('Title', { exact: true }).fill('Human dignity in 2027');
   await page.getByLabel('Article text').fill('The 2027 legally amended text.');
   await page.getByRole('button', { name: 'Save draft' }).click();
-  await page.getByLabel('Title', { exact: true }).last().fill('2027 dignity amendment');
+  await sessionDetails(page);
+  await page.locator('#editor-change-record').getByLabel('Title', { exact: true }).fill('2027 dignity amendment');
   await page.getByLabel('Comment', { exact: true }).fill('Parliament amended Article 1.');
   await page.getByLabel('Document URL').fill('https://example.gov/2027-dignity.pdf');
   await page.getByLabel('Document label').fill('Official 2027 act');
   await page.getByRole('button', { name: 'Save change record' }).click();
+  await expect(page).toHaveURL(/detailsSaved=1/);
+  await expect(page.getByRole('region', { name: 'Article 1', exact: true }).getByLabel('Title', { exact: true })).toHaveValue('Human dignity in 2027');
   await page.getByRole('button', { name: 'Submit for review' }).click();
   await signOut(page);
 
   await signInReviewer(page);
   await page.goto('/editor?status=reviewing');
   await page.locator('.editor-session-list').getByRole('link').first().click();
+  await sessionDetails(page);
   await expect(page.getByText('2027 dignity amendment')).toBeVisible();
   await expect(page.getByRole('link', { name: 'Official 2027 act' })).toHaveAttribute('href', 'https://example.gov/2027-dignity.pdf');
   await page.getByRole('button', { name: 'Approve review' }).click();
@@ -344,10 +364,12 @@ test('legal successor passes queues and requires fresh authentication before pub
   await page.goto('/editor?status=approved');
   await page.locator('.editor-session-list').getByRole('link').first().click();
   expect((await request.post(`${MOCK_ORIGIN}/__step_up_stale`)).ok()).toBeTruthy();
+  await sessionDetails(page);
   await page.getByRole('button', { name: 'Publish new legal version' }).click();
   await expect(page).toHaveURL(/\/account\/step-up/);
   await page.getByLabel('Authenticator code').fill('123456');
   await page.getByRole('button', { name: 'Continue' }).click();
+  await sessionDetails(page);
   await page.getByRole('button', { name: 'Publish new legal version' }).click();
   await expect(page.getByText(/Published as version 2027.*2027 dignity amendment/)).toBeVisible();
   await signOut(page);

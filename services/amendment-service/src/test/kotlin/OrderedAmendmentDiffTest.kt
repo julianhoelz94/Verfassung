@@ -8,6 +8,15 @@ import java.util.UUID
 
 class OrderedAmendmentDiffTest {
     @Test
+    fun formattingOnlyChangesAppearInTheHierarchicalReview() {
+        val entry = OrderedEntry("text", logicalId = UUID.randomUUID(), revisionId = UUID.randomUUID(), occurrenceId = UUID.randomUUID(), text = "Exact wording")
+        val article = ContentTreeArticle(UUID.randomUUID(), UUID.randomUUID(), "1", "Rights", 1, logicalId = UUID.randomUUID(), revisionId = UUID.randomUUID(), content = listOf(entry))
+        val target = article.copy(revisionId = UUID.randomUUID(), content = listOf(entry.copy(revisionId = UUID.randomUUID(), marks = listOf(com.constitutionatlas.platform.OrderedTextMark("bold", 0, 5)))))
+        val changes = AmendmentDiff.hierarchical(UUID.randomUUID(), listOf(article), UUID.randomUUID(), listOf(target)).items
+        assertThat(changes.map { it.facet }).contains("text_changed")
+    }
+
+    @Test
     fun removedUnitsKeepTheirSourceForExactAmendmentReferences() {
         val source = FlatNode(UUID.randomUUID(), "article", "1", "1", "Repealed provision", "Old text", null, UUID.randomUUID(), "1", UUID.randomUUID(), UUID.randomUUID())
         val removal = AmendmentDiff.diff(listOf(source), emptyList()).single()

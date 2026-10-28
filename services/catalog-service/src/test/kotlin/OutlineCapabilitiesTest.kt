@@ -18,12 +18,12 @@ class OutlineCapabilitiesTest {
         val outline = CatalogWriteService.normalizeOutline(
             listOf(
                 OutlineKindWrite("article", "Article", allowTextAlongsideChildren = true),
-                OutlineKindWrite("clause", "Clause", labelPolicy = "required", segmentation = "sentence"),
+                OutlineKindWrite("clause", "Clause", labelPolicy = "required", segmentation = "plain"),
             ),
         )
         assertEquals(true, outline.first().allowTextAlongsideChildren)
         assertEquals("required", outline.last().labelPolicy)
-        assertEquals("sentence", outline.last().segmentation)
+        assertEquals("plain", outline.last().segmentation)
     }
 
     @Test
@@ -34,9 +34,33 @@ class OutlineCapabilitiesTest {
             listOf(OutlineKindWrite("article", "Article", titlePolicy = "none", showTitle = true)),
             listOf(OutlineKindWrite("article", "Article", labelPlacement = "generated")),
             listOf(OutlineKindWrite("article", "Article", segmentation = "sentence"), OutlineKindWrite("clause", "Clause")),
+            listOf(OutlineKindWrite("clause", "Clause", segmentation = "sentence", labelPolicy = "required")),
+            listOf(OutlineKindWrite("clause", "Clause", segmentation = "sentence", titlePolicy = "required")),
         )
         invalid.forEach { kinds ->
             assertThrows(IllegalArgumentException::class.java) { CatalogWriteService.normalizeOutline(kinds) }
         }
+    }
+
+    @Test
+    fun automaticSentenceCreationUsesConfiguredPunctuationOnAnyLeafKind() {
+        val leaf = OutlineKindWrite("provision", "Provision", segmentation = "sentence", sentenceDelimiters = listOf(";", "。", "?!"))
+        assertEquals(leaf.sentenceDelimiters, CatalogWriteService.normalizeOutline(listOf(leaf)).single().sentenceDelimiters)
+        assertEquals(listOf(".", "!", "?"), CatalogWriteService.normalizeOutline(listOf(leaf.copy(sentenceDelimiters = listOf(".", "!", "?")))).single().sentenceDelimiters)
+        assertThrows(IllegalArgumentException::class.java) {
+            CatalogWriteService.normalizeOutline(listOf(leaf.copy(allowedChildKinds = listOf("clause")), OutlineKindWrite("clause", "Clause")))
+        }
+    }
+
+    @Test
+    fun automaticCreationRejectsEmptyAmbiguousAndUnboundedDelimiterConfigurations() {
+        val leaf = OutlineKindWrite("clause", "Clause", segmentation = "sentence")
+        val invalid = listOf(emptyList(), listOf(""), listOf(" ", "."), listOf("end"), listOf("1"), listOf(".", "."), listOf("........."), (1..17).map { "!" + ".".repeat(it) })
+        invalid.forEach { delimiters ->
+            assertThrows(IllegalArgumentException::class.java) {
+                CatalogWriteService.normalizeOutline(listOf(leaf.copy(sentenceDelimiters = delimiters)))
+            }
+        }
+        assertEquals(emptyList<String>(), CatalogWriteService.normalizeOutline(listOf(leaf.copy(segmentation = "plain", sentenceDelimiters = emptyList()))).single().sentenceDelimiters)
     }
 }

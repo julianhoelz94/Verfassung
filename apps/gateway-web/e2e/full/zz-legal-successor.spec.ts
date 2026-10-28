@@ -1,6 +1,11 @@
-import { expect, test } from '../fixtures/consent';
+import { expect, test, type Page } from '../fixtures/consent';
 import { authenticatorCode, signIn, signOut, startFromViewer } from './auth';
 import { createIsolatedConstitution } from './api-fixtures';
+
+async function sessionDetails(page: Page) {
+  const summary = page.locator('summary').filter({ hasText: 'Session and publication' });
+  if (!(await summary.evaluate(element => element.parentElement!.hasAttribute('open')))) await summary.click();
+}
 
 test('editor, reviewer, and publisher release a real legal successor with its source document', async ({ page, request }) => {
   test.setTimeout(180_000);
@@ -11,11 +16,13 @@ test('editor, reviewer, and publisher release a real legal successor with its so
   await page.locator('#draft-form textarea').first().fill('A new legal duty protects public dignity in this journey.');
   await page.getByRole('button', { name: 'Save draft' }).click();
   await expect(page.getByText('Draft saved.')).toBeVisible();
-  await page.getByLabel('Title', { exact: true }).last().fill(recordTitle);
+  await sessionDetails(page);
+  await page.locator('#editor-change-record').getByLabel('Title', { exact: true }).fill(recordTitle);
   await page.getByLabel('Comment').fill('The legislature updated Article 1.');
   await page.getByLabel('Document URL').fill('https://example.org/atlas-e2e/journey-law.pdf');
   await page.getByLabel('Document label').fill('Journey source act');
   await page.getByRole('button', { name: 'Save change record' }).click();
+  await expect(page).toHaveURL(/detailsSaved=1/);
   await page.getByRole('button', { name: 'Submit for review' }).click();
   await expect(page.getByText('Submitted for review.')).toBeVisible();
   const sessionUrl = page.url();
@@ -23,6 +30,7 @@ test('editor, reviewer, and publisher release a real legal successor with its so
 
   await signIn(page, 'reviewer');
   await page.goto(sessionUrl);
+  await sessionDetails(page);
   await expect(page.getByText(recordTitle)).toBeVisible();
   await expect(page.getByRole('link', { name: 'Journey source act' })).toHaveAttribute('href', 'https://example.org/atlas-e2e/journey-law.pdf');
   await page.getByRole('button', { name: 'Approve review' }).click();
@@ -31,6 +39,7 @@ test('editor, reviewer, and publisher release a real legal successor with its so
 
   await signIn(page, 'publisher');
   await page.goto(sessionUrl);
+  await sessionDetails(page);
   await page.getByRole('button', { name: 'Publish new legal version' }).click();
   await expect(page).toHaveURL(/(?:published=1|\/account\/step-up\?)/, { timeout: 15_000 });
   if (page.url().includes('/account/step-up')) {
@@ -38,6 +47,7 @@ test('editor, reviewer, and publisher release a real legal successor with its so
     await page.getByLabel('Authenticator code').fill(authenticatorCode(secret));
     await page.getByRole('button', { name: 'Continue' }).click();
     await expect(page).toHaveURL(/\/editor\?/);
+    await sessionDetails(page);
     await page.getByRole('button', { name: 'Publish new legal version' }).click();
     await expect(page).toHaveURL(/published=1/, { timeout: 15_000 });
   }

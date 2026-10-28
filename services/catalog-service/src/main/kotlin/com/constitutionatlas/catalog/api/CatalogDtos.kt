@@ -56,6 +56,7 @@ data class NodeKindDto(
     val labelPlacement: String = "before_title",
     val segmentation: String = "plain",
     val root: Boolean = false,
+    val sentenceDelimiters: List<String> = listOf(".", "!", "?"),
 )
 
 data class ContentOutlineDto(
@@ -130,6 +131,7 @@ data class OutlineKindWrite(
     val segmentation: String = "plain",
     val root: Boolean? = null,
     val allowedChildKinds: List<String>? = null,
+    val sentenceDelimiters: List<String> = listOf(".", "!", "?"),
 )
 
 data class ContentOutlineWrite(

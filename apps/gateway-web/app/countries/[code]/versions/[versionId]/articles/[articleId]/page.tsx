@@ -22,6 +22,7 @@ import {
 } from '../../../../../../../lib/api';
 import { atlasTitle, metaDescription, pageMetadata } from '../../../../../../../lib/page-meta';
 import { orderedTargets } from '../../../../../../../lib/ordered-content';
+import { footnoteItems } from '../../../../../../../lib/footnotes';
 import { publicSnapshotContext } from '../../../../../../../lib/reading';
 
 type ArticlePageProps = {
@@ -128,6 +129,7 @@ export default async function ArticlePage(props: ArticlePageProps) {
             versionId: params.versionId,
             articlesByNumber,
             unitsByLogicalId: orderedTargets(siblings),
+            footnotes: footnoteItems(siblings.flatMap(item => item.content ?? []), '/countries/' + country.isoCode + '/versions/' + params.versionId),
           }}
         />
         </ContentTranslationRegion>

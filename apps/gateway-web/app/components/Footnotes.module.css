@@ -1,0 +1,43 @@
+.marker {
+  display: inline-block;
+  min-width: 0;
+  min-height: 0;
+  padding: 0 .15em;
+  margin: 0 .1em;
+  border: 0;
+  border-radius: 2px;
+  background: transparent;
+  color: var(--color-accent);
+  font: 500 .7em/1 var(--font-ui);
+  vertical-align: super;
+  white-space: nowrap;
+  text-decoration: none;
+  touch-action: manipulation;
+  cursor: pointer;
+}
+.drawer {
+  position: fixed;
+  inset: auto 0 0;
+  z-index: 120;
+  max-width: 52rem;
+  margin-inline: auto;
+  padding: var(--space-4) max(var(--space-4), env(safe-area-inset-right)) max(var(--space-4), env(safe-area-inset-bottom)) max(var(--space-4), env(safe-area-inset-left));
+  border: 1px solid var(--color-line);
+  border-bottom: 0;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  background: var(--color-paper);
+  color: var(--color-ink);
+  box-shadow: 0 -4px 24px color-mix(in srgb, var(--color-ink) 15%, transparent);
+}
+.heading { display: flex; justify-content: space-between; align-items: center; gap: var(--space-3); }
+.heading h2 { margin: 0; font: 500 1rem/1.5 var(--font-ui); }
+.heading button { min-width: 36px; min-height: 36px; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; font-size: 1.4rem; cursor: pointer; }
+.body { max-height: min(35dvh, 18rem); overflow-y: auto; margin-block: var(--space-2) var(--space-3); white-space: pre-wrap; overflow-wrap: anywhere; }
+.drawer a { display: inline-flex; align-items: center; min-height: 36px; }
+.peek { position: fixed; z-index: 121; width: min(20rem, calc(100vw - 16px)); max-height: 30vh; overflow: auto; padding: var(--space-3); border: 1px solid var(--color-line); border-radius: var(--radius-sm); background: var(--color-paper); color: var(--color-ink); box-shadow: 0 3px 12px color-mix(in srgb, var(--color-ink) 15%, transparent); white-space: pre-wrap; overflow-wrap: anywhere; pointer-events: none; }
+@media (pointer: coarse) {
+  .marker { min-width: 24px; min-height: 24px; padding: 0 3px; font-size: .7em; }
+  .heading button, .drawer a { min-height: 44px; }
+  .heading button { min-width: 44px; }
+}
+@media print { .drawer, .peek { display: none; } .marker { color: inherit; } }

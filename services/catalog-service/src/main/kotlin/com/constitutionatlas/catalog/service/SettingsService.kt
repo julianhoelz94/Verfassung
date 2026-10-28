@@ -72,7 +72,7 @@ class SettingsService(private val catalog: CatalogRepository, private val settin
             OutlineKindWrite(
                 kind.kindCode, kind.displayLabel, kind.presentation, kind.showLabel, kind.showTitle, kind.showKind,
                 kind.allowTextAlongsideChildren, kind.titlePolicy, kind.labelPolicy, kind.labelPlacement, kind.segmentation,
-                kind.root, kind.allowedChildKinds,
+                kind.root, kind.allowedChildKinds, kind.sentenceDelimiters,
             )
         },
     )
@@ -88,7 +88,7 @@ class SettingsService(private val catalog: CatalogRepository, private val settin
                     OutlineKindWrite(
                         kind.kindCode, kind.displayLabel, kind.presentation, kind.showLabel, kind.showTitle, kind.showKind,
                         kind.allowTextAlongsideChildren, kind.titlePolicy, kind.labelPolicy, kind.labelPlacement, kind.segmentation,
-                        kind.root, kind.allowedChildKinds,
+                        kind.root, kind.allowedChildKinds, kind.sentenceDelimiters,
                     )
                 },
             ),

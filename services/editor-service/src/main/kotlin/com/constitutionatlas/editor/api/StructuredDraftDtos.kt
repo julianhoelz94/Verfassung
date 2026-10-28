@@ -2,6 +2,7 @@ package com.constitutionatlas.editor.api
 
 import com.constitutionatlas.platform.OrderedInlineReference
 import com.constitutionatlas.platform.OrderedTable
+import com.constitutionatlas.platform.OrderedTextMark
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import java.util.UUID
 
@@ -31,12 +32,13 @@ data class DraftEntry(
     val footnoteLabel: String? = null,
     val references: List<OrderedInlineReference> = emptyList(),
     val annotation: com.constitutionatlas.platform.OrderedAnnotation? = null,
+    val marks: List<OrderedTextMark> = emptyList(),
 )
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 data class DraftSource(val versionId: UUID, val generation: Long, val settingsRevisionId: UUID?, val roots: List<DraftNode>)
 
-data class TextPart(val logicalId: UUID, val text: String, val format: String? = null, val table: OrderedTable? = null, val footnoteLabel: String? = null, val references: List<OrderedInlineReference> = emptyList(), val annotation: com.constitutionatlas.platform.OrderedAnnotation? = null)
+data class TextPart(val logicalId: UUID, val text: String, val format: String? = null, val table: OrderedTable? = null, val footnoteLabel: String? = null, val references: List<OrderedInlineReference> = emptyList(), val annotation: com.constitutionatlas.platform.OrderedAnnotation? = null, val marks: List<OrderedTextMark> = emptyList())
 
 data class DraftOperation(
     val id: UUID,
@@ -57,6 +59,8 @@ data class DraftOperation(
     val footnoteLabel: String? = null,
     val references: List<OrderedInlineReference> = emptyList(),
     val annotation: com.constitutionatlas.platform.OrderedAnnotation? = null,
+    val marks: List<OrderedTextMark> = emptyList(),
+    val replacementId: UUID? = null,
 )
 
 data class StructuredDraftSave(val expectedGeneration: Long, val operations: List<DraftOperation>)

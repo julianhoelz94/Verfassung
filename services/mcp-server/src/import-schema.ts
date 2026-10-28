@@ -16,10 +16,23 @@ const outlineKind = z.strictObject({
   labelPolicy: z.enum(['required', 'optional', 'none']).optional(),
   labelPlacement: z.enum(['before_title', 'after_title', 'inline', 'superscript']).optional(),
   segmentation: z.enum(['plain', 'sentence']).optional(),
+  sentenceDelimiters: z.array(z.string().regex(/^[\p{P}\p{S}]+$/u).refine(value => [...value].length <= 8, 'Delimiter sequences may contain at most 8 characters')).max(16).refine(values => new Set(values).size === values.length, 'Delimiter sequences must be distinct').optional(),
   root: z.boolean().nullable().optional(),
   allowedChildKinds: z.array(z.string().regex(/^[a-z][a-z0-9_-]{0,31}$/)).max(32).nullable().optional(),
 });
-export const outlineSchema = z.strictObject({ kinds: z.array(outlineKind).min(1).max(32) });
+export const outlineSchema = z.strictObject({ kinds: z.array(outlineKind).min(1).max(32) }).superRefine((outline, context) => {
+  outline.kinds.forEach((kind, index) => {
+    const children = kind.allowedChildKinds ?? (outline.kinds[index + 1] ? [outline.kinds[index + 1]!.kindCode] : []);
+    if (kind.segmentation === 'sentence' && (children.length || kind.sentenceDelimiters?.length === 0 || kind.labelPolicy === 'required' || kind.titlePolicy === 'required')) {
+      context.addIssue({ code: 'custom', path: ['kinds', index, 'segmentation'], message: 'Automatic sentence creation requires a leaf level, optional or disallowed labels and titles, and at least one delimiter.' });
+    }
+  });
+});
+
+const textMark = z.strictObject({
+  type: z.enum(['bold', 'italic', 'underline', 'strikethrough']),
+  start: z.number().int().min(0), end: z.number().int().min(1),
+}).refine(mark => mark.start < mark.end, 'Inline marks need a nonempty text range');
 
 const reference = z.strictObject({
   logicalId: uuid, start: z.number().int().min(0), end: z.number().int().min(0),
@@ -64,6 +77,7 @@ export const orderedNode: z.ZodTypeAny = z.lazy(() => z.strictObject({
     table: table.nullable().optional(),
     footnoteLabel: nullableText,
     references: z.array(reference).max(10_000).optional(),
+    marks: z.array(textMark).max(4096).optional(),
     annotation: z.strictObject({ kind: z.enum(['source', 'editorial', 'amendment']), attribution: nullableText, sourceUrl: z.string().url().startsWith('https://').nullable().optional(), anchorLogicalIds: z.array(uuid).max(100).optional() }).nullable().optional(),
   })).max(10_000).nullable().optional(),
   lineage: z.array(uuid).max(32).optional(),

@@ -1,7 +1,12 @@
-import { expect, test } from './fixtures/consent';
+import { expect, test, type Page } from './fixtures/consent';
 import { signInAdmin, startEditorSession, VERSION_2022 } from './helpers';
 
 const mockOrigin = `http://127.0.0.1:${process.env.E2E_MOCK_PORT ?? 4010}`;
+
+async function sessionDetails(page: Page) {
+  const summary = page.locator('summary').filter({ hasText: 'Session and publication' });
+  if (!(await summary.evaluate(element => element.parentElement!.hasAttribute('open')))) await summary.click();
+}
 
 test.beforeEach(async ({ request }) => {
   expect((await request.post(`${mockOrigin}/__reset`)).ok()).toBeTruthy();
@@ -236,10 +241,12 @@ test('administrator can carry an editorial correction through every role action'
   await startEditorSession(page, VERSION_2022, 'editorial_correction');
   await page.getByLabel('Article text').fill('Administrator correction.');
   await page.getByRole('button', { name: 'Save draft' }).click();
+  await sessionDetails(page);
   await page.getByLabel('What was corrected in this transcription?').fill('Administrator fixed the transcription.');
   await page.getByRole('button', { name: 'Save comment' }).click();
   await page.getByRole('button', { name: 'Submit for review' }).click();
   await page.getByRole('button', { name: 'Approve review' }).click();
+  await sessionDetails(page);
   await page.getByRole('button', { name: 'Publish transcription' }).click();
   await expect(page.getByText(/Published as version/)).toBeVisible();
 });

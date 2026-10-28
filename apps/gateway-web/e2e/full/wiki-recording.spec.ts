@@ -13,7 +13,7 @@ const capture = process.env.WIKI_MEDIA_CAPTURE === 'merged';
 const baseURL = process.env.E2E_BASE_URL ?? 'http://127.0.0.1:18080';
 
 // Screenshots are published evidence, not local test baselines. Only the merged-PR
-// workflow may refresh them; regular PR/full-stack suites exclude this file.
+// workflow may refresh them; PR/full-stack checks verify the journeys without media.
 test.beforeAll(() => {
   if (process.env.CI !== 'true' || !['merged', 'verify'].includes(process.env.WIKI_MEDIA_CAPTURE ?? '')) {
     throw new Error('Wiki journeys require CI: verify without media, or capture after a merge');
@@ -52,8 +52,16 @@ async function authenticated(browser: Browser, role: Role, locale: Locale) {
 
 async function selectArticle(page: Page, watch: Walkthrough, articleId: string) {
   const articleLink = page.locator(`a[href*="articleId=${articleId}"]`).first();
+  if (!(await articleLink.isVisible())) await watch.click(page.getByRole('button', { name: /^(Show article navigation|Artikelnavigation einblenden)$/ }));
   await watch.click(articleLink);
   await expect(articleLink).toHaveAttribute('aria-current', 'true');
+  const hideNavigation = page.getByRole('button', { name: /^(Hide article navigation|Artikelnavigation ausblenden)$/ });
+  if (await hideNavigation.isVisible()) await watch.click(hideNavigation);
+}
+
+async function sessionDetails(page: Page, watch: Walkthrough, locale: Locale) {
+  const summary = page.getByText(locale === 'de' ? 'Sitzung und Veröffentlichung' : 'Session and publication', { exact: true });
+  if (!(await summary.evaluate(element => element.parentElement!.hasAttribute('open')))) await watch.click(summary);
 }
 
 async function record(browser: Browser, role: Exclude<Role, 'admin'>, locale: Locale, file: string, staging: string,
@@ -140,11 +148,12 @@ for (const locale of ['en', 'de'] as const) {
         await selectArticle(page, watch, source.article.id);
         await expect(page.locator('#draft-form input[name=articleId]')).toHaveValue(source.article.id);
         await watch.explain(text('Edit the selected article, then save the draft.', 'Bearbeiten Sie den Artikel und speichern Sie den Entwurf.'));
-        await watch.type(page.locator('#draft-form textarea').first(), correction);
+        await watch.type(page.locator('#draft-form textarea, #draft-form [role=textbox][contenteditable=true]').first(), correction);
         await shot(page, 'editor-draft', page.locator('#draft-form'));
         await watch.click(page.locator('#draft-form button[type=submit]'));
         await expect(page.getByText(t(ui.editor.page.draftSaved), { exact:true })).toBeVisible();
         await watch.explain(text('Describe the correction so the reviewer can check it.', 'Beschreiben Sie die Korrektur für die anschließende Prüfung.'));
+        await sessionDetails(page, watch, locale);
         await watch.type(page.getByLabel(t(ui.attrs.editorPublishformTextAreaLabelWhatWas)), text('Checked the transcription against its source.', 'Übertragung anhand der Quelle geprüft.'));
         await watch.click(page.locator('form').filter({ has:page.locator('input[name=command][value=details]') }).getByRole('button').last());
         await watch.explain(text('Submit the saved draft for independent review.', 'Reichen Sie den gespeicherten Entwurf zur Prüfung ein.'));
@@ -160,6 +169,7 @@ for (const locale of ['en', 'de'] as const) {
         await selectArticle(page, watch, source.article.id);
         await expect(page.getByText(correction).first()).toBeVisible();
         await watch.explain(text('Compare the draft, its source and the correction comment.', 'Vergleichen Sie Entwurf, Quelle und Korrekturkommentar.'));
+        await sessionDetails(page, watch, locale);
         await shot(page, 'editor-review');
         await watch.click(page.getByRole('button', { name:t(ui.editor.page.approveReview) }));
         await expect(page.getByText(t(ui.editor.page.reviewApprovedAPublisherCanNowPublish), { exact:true })).toBeVisible();
@@ -173,6 +183,7 @@ for (const locale of ['en', 'de'] as const) {
         await selectArticle(page, watch, source.article.id);
         await expect(page.getByText(correction).first()).toBeVisible();
         await watch.explain(text('Check the approved text and its change type.', 'Kontrollieren Sie Text und Änderungsart.'));
+        await sessionDetails(page, watch, locale);
         await shot(page, 'editor-publish');
         await watch.click(page.getByRole('button', { name:t(ui.editorDynamic.publishTranscription) }));
         await expect(page).toHaveURL(/(?:published=1|\/account\/step-up\?)/, { timeout:15_000 });

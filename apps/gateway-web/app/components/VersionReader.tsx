@@ -9,7 +9,9 @@ import type { ArticleSummary, ContentOutline } from '../../lib/api';
 import { orderedTargets } from '../../lib/ordered-content';
 import { articleHeading, clipOrderedEntries, clipNodes, depthStopCount, depthStopLabels, kindByCode } from '../../lib/outline';
 import { Badge, Toolbar } from './ui';
-import { ConstitutionText } from './ConstitutionText';
+import { ConstitutionText, OrderedContentTree } from './ConstitutionText';
+import { FootnoteProvider } from './Footnotes';
+import { footnoteBacklinks, footnoteEntries, footnoteItems } from '../../lib/footnotes';
 import { Segmented } from './Segmented';
 import { Toc } from './Toc';
 import { ReaderLayout } from './layout/templates';
@@ -60,6 +62,10 @@ export function VersionReader({
     [articles],
   );
   const unitsByLogicalId = useMemo(() => orderedTargets(articles), [articles]);
+  const entries = useMemo(() => articles.flatMap(article => article.content ?? []), [articles]);
+  const notes = useMemo(() => footnoteItems(entries), [entries]);
+  const endnotes = useMemo(() => footnoteEntries(entries), [entries]);
+  const backlinks = useMemo(() => footnoteBacklinks(entries), [entries]);
 
   useEffect(() => {
     function revealTarget() {
@@ -106,7 +112,7 @@ export function VersionReader({
   const toc = <Toc items={tocItems} />;
 
   return (
-    <ReaderLayout navigation={<Toc items={tocItems} landmarkId="toc" />}>
+    <FootnoteProvider notes={notes}><ReaderLayout navigation={<Toc items={tocItems} landmarkId="toc" />}>
       <section>
         <Toolbar label={t(ui.accessibility.readingOptions)}>
           <details className="toc-mobile">
@@ -169,6 +175,7 @@ export function VersionReader({
                       returnTo={readerHref}
                       lang={language}
                       crossRefs={{ code, versionId, articlesByNumber, unitsByLogicalId }}
+                      hideFootnotes
                     />
                   </div>
                 ) : (
@@ -189,12 +196,14 @@ export function VersionReader({
             );
           })}
         </ol>
+        {endnotes.length ? <div className="constitution-text text-column" lang={language}><OrderedContentTree entries={endnotes} outline={outline} indexedBacklinks={backlinks} /></div> : null}
       </section>
-    </ReaderLayout>
+    </ReaderLayout></FootnoteProvider>
   );
 }
 
 function containsOccurrence(entries: import('../../lib/api').OrderedEntry[], target: string): boolean {
   return entries.some(entry => entry.occurrenceId === target || `fn-${entry.occurrenceId}` === target ||
+    entry.references?.some(reference => 'ref-' + reference.logicalId === target) ||
     Boolean(entry.node && (entry.node.occurrenceId === target || containsOccurrence(entry.node.content, target))));
 }

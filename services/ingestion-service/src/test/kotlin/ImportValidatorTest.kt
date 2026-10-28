@@ -10,6 +10,44 @@ import java.util.UUID
 
 class ImportValidatorTest {
     @Test
+    fun `sentence settings accept Unicode punctuation only on a leaf`() {
+        val leaf = ImportOutlineKind("sentence", "Sentence", segmentation = "sentence", allowedChildKinds = emptyList(), sentenceDelimiters = listOf(";", "。"))
+        assertTrue(ImportValidator.outlineSentenceErrors(listOf(leaf)).isEmpty())
+        assertTrue(ImportValidator.outlineSentenceErrors(listOf(leaf.copy(sentenceDelimiters = emptyList()))).any { it.first == "SENTENCE_DELIMITERS" })
+        assertTrue(ImportValidator.outlineSentenceErrors(listOf(leaf.copy(sentenceDelimiters = listOf("word")))).any { it.first == "SENTENCE_DELIMITERS" })
+        assertTrue(ImportValidator.outlineSentenceErrors(listOf(leaf.copy(allowedChildKinds = listOf("clause")))).any { it.first == "SENTENCE_SEGMENTATION" })
+        assertTrue(ImportValidator.outlineSentenceErrors(listOf(leaf.copy(labelPolicy = "required"))).any { it.first == "SENTENCE_SEGMENTATION" })
+        assertTrue(ImportValidator.outlineSentenceErrors(listOf(leaf.copy(titlePolicy = "required"))).any { it.first == "SENTENCE_SEGMENTATION" })
+    }
+
+    @Test
+    fun `every structured import validates the complete endnotes sequence and marks`() {
+        val noteId = UUID.randomUUID()
+        val note = OrderedEntryWrite("text", logicalId = noteId, text = "Source note", format = "footnote", marks = listOf(com.constitutionatlas.platform.OrderedTextMark("italic", 0, 6)))
+        val body = OrderedEntryWrite("text", text = "Law", references = listOf(com.constitutionatlas.platform.OrderedInlineReference(UUID.randomUUID(), 3, 3, com.constitutionatlas.platform.OrderedReferenceTarget("footnote", footnoteId = noteId))))
+        val request = ImportRequest(isoCode = "DE", countryName = "Germany", constitutionSlug = "test", constitutionTitle = "Test", versionLabel = "1", sourceUrl = "https://example.org/source", roots = listOf(OrderedNodeWrite(kind = "article", content = listOf(body)), OrderedNodeWrite(kind = "article", content = listOf(note))))
+        assertTrue(ImportValidator.validate(request).isEmpty())
+        val invalidOrder = ImportValidator.validate(request.copy(roots = request.roots.reversed()))
+        assertTrue(invalidOrder.any { it.first == "FOOTNOTE_NOT_AT_END" && it.second.contains("roots[1]") })
+        val invalidMark = request.roots.last().copy(content = listOf(note.copy(marks = listOf(com.constitutionatlas.platform.OrderedTextMark("bold", 0, 100)))))
+        assertTrue(ImportValidator.validate(request.copy(roots = listOf(request.roots.first(), invalidMark))).any { it.first == "TEXT_MARK_RANGE" })
+    }
+
+    @Test
+    fun `complete imports resolve cross-root node and text reference targets`() {
+        val nodeId = UUID.randomUUID()
+        val textId = UUID.randomUUID()
+        val references = listOf(
+            com.constitutionatlas.platform.OrderedInlineReference(UUID.randomUUID(), 0, 1, com.constitutionatlas.platform.OrderedReferenceTarget("unit", logicalId = nodeId)),
+            com.constitutionatlas.platform.OrderedInlineReference(UUID.randomUUID(), 1, 2, com.constitutionatlas.platform.OrderedReferenceTarget("unit", logicalId = textId)),
+        )
+        val source = OrderedNodeWrite(kind = "article", content = listOf(OrderedEntryWrite("text", text = "AB", references = references)))
+        val target = OrderedNodeWrite(logicalId = nodeId, kind = "article", content = listOf(OrderedEntryWrite("text", logicalId = textId, text = "Target")))
+        assertTrue(ImportValidator.richContentErrors(listOf(source, target)).isEmpty())
+        assertTrue(ImportValidator.richContentErrors(listOf(source)).all { it.first == "UNIT_REFERENCE_TARGET" })
+    }
+
+    @Test
     fun `legacy aggregate bodies remain compatible while distinct mixed wording is rejected`() {
         val node = com.constitutionatlas.ingestion.api.ImportNode("paragraph", body = "Exact text")
         val article = com.constitutionatlas.ingestion.api.ImportArticle("1", "Title", "Exact text", 1, listOf(node))

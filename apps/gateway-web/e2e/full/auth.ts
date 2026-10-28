@@ -32,6 +32,7 @@ export async function signIn(page: Page, role: 'editor' | 'reviewer' | 'publishe
     await page.getByRole('button', { name: 'Continue' }).click();
   }
   await expect(page).toHaveURL(/\/editor$/, { timeout: 15_000 });
+  await expect(page.getByRole('heading', { name: 'Editor', exact: true, level: 1 })).toBeVisible({ timeout: 15_000 });
   return email;
 }
 

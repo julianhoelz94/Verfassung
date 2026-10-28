@@ -209,6 +209,7 @@ test('owned work survives role handoffs and published corrections remain readabl
   }
   await ownWorkRow(page, published[0].sessionId).getByRole('link', { name: 'View progress', exact: true }).click();
   await page.reload();
+  await sessionDetails(page);
   await expect(page.getByRole('link', { name: 'Open published version', exact: true })).toHaveAttribute('href', published[0].href);
   await signOut(page);
 

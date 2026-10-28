@@ -27,7 +27,7 @@ class OrderedPublishClientTest {
             val source = com.constitutionatlas.editor.client.CatalogVersion(version, constitution, "2025", "published", sourceEvidence = evidence)
             val reserved = OrderedPublishClient(url, url).reserve(UUID.randomUUID(), source, "editorial_correction", "Clarify excerpt", UUID.randomUUID(), "Bearer publisher")
             assertThat(reserved.id).isEqualTo(target)
-            val payload = com.fasterxml.jackson.databind.ObjectMapper().readTree(request)
+            val payload = tools.jackson.databind.json.JsonMapper().readTree(request)
             assertThat(payload.path("sourceEvidence").path("description").asText()).isEqualTo(evidence.description)
             assertThat(payload.path("predecessorVersionId").asText()).isEqualTo(version.toString())
         } finally {

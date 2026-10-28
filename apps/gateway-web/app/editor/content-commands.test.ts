@@ -32,7 +32,11 @@ beforeEach(() => {
     requests.push({ path: url.pathname + url.search, method: init?.method ?? 'GET', body, authorization: new Headers(init?.headers).get('Authorization') });
     if (responseBody !== undefined) return json(responseBody, status);
     if (url.pathname.endsWith('/preflight')) return json({ classification: impact, currentRevisionId: 'settings-r2' }, status);
-    if (url.pathname.includes('/api/document/documents')) return json(documentRecord, status);
+    if (url.pathname.includes('/api/document/documents')) {
+      const requestedId = url.pathname.split('/').at(-1)!;
+      const revision = Number(url.searchParams.get('revision') ?? documentRecord.currentRevision);
+      return json((init?.method ?? 'GET') === 'GET' ? { ...documentRecord, id: requestedId, revision: { ...documentRecord.revision, id: `${requestedId}-r${revision}`, revision } } : documentRecord, status);
+    }
     return json({ id: 'saved-draft', ...documentRecord, ...(url.pathname.includes('/wiki/') ? { id: 'wiki-r2' } : {}) }, status);
   });
 });
@@ -128,7 +132,8 @@ describe('contextual pages separate draft and publication', () => {
     const data = wikiForm({ images: JSON.stringify([{ documentId: 'keep', revision: 2, alt: 'Old alt' }, { documentId: 'remove', revision: 1, alt: 'Remove' }]), 'remove-remove': 'on', 'alt-keep': ' Official seal ', 'placement-keep': 'before_body' });
     expect(await wiki.saveWikiAction(data)).toContain('saved=1');
     expect(requests[0].body).toMatchObject({ images: [expect.objectContaining({ documentId: 'keep', revision: 2, alt: 'Official seal', placement: 'before_body' })] });
-    expect(requests[2]).toMatchObject({ path: `/api/document/links/constitution_wiki/${id}`, body: { documentId: 'keep', revisionId: 'document-r3', scopeRevisionId: 'wiki-r2' } });
+    expect(requests[1].path).toBe('/api/document/documents/keep?revision=2');
+    expect(requests[2]).toMatchObject({ path: `/api/document/links/constitution_wiki/${id}`, body: { documentId: 'keep', revisionId: 'keep-r2', scopeRevisionId: 'wiki-r2' } });
   });
   it('requires alternative text before creating a newly uploaded image', async () => {
     const data = wikiForm(); data.set('imageFile', new File(['pixels'], 'seal.png', { type: 'image/png' })); expect(await wiki.saveWikiAction(data)).toContain('error=1'); expect(requests).toEqual([]);
@@ -153,6 +158,12 @@ describe('reviewed imports enforce the role and decision boundaries', () => {
     vi.mocked(currentUser).mockResolvedValue({ id: role, email: 'staff@example.test', roles: [role], stepUpFresh: true }); expect(await imports.transitionImportAction(data)).toBe('/editor?importJobId=job'); expect(requests[0]).toMatchObject({ path: `/api/ingestion/import-jobs/job/${action}`, method: 'POST' });
     requests.length = 0; vi.mocked(currentUser).mockResolvedValue({ id: 'viewer', email: 'viewer@example.test', roles: ['viewer'] }); expect(await imports.transitionImportAction(data)).toContain('error=forbidden'); expect(requests).toEqual([]);
   });
+  for (const [action, requiredRole] of [['prepare', 'editor'], ['confirm-outline', 'editor'], ['approve', 'reviewer'], ['reject', 'reviewer'], ['publish', 'publisher']]) {
+    it.each(['editor', 'reviewer', 'publisher', 'viewer'].filter(role => role !== requiredRole))(`rejects %s attempting ${action} without ${requiredRole} capability`, async role => {
+      vi.mocked(currentUser).mockResolvedValue({ id: role, email: 'staff@example.test', roles: [role], stepUpFresh: true });
+      expect(await imports.transitionImportAction(form({ jobId: 'job', action, reason: 'Checked against the official source.' }))).toContain('error=forbidden'); expect(requests).toEqual([]);
+    });
+  }
   it('requires a review reason and fresh proof before publication', async () => {
     expect(await imports.transitionImportAction(form({ jobId: 'job', action: 'reject', reason: 'short' }))).toContain('error=reason');
     vi.mocked(currentUser).mockResolvedValue({ id: 'publisher', email: 'publisher@example.test', roles: ['publisher'], stepUpFresh: false });

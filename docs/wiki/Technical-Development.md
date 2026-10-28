@@ -89,6 +89,10 @@ and scores for over-limit functions, including existing debt. Tests are included
 Kotlin exceptions also have reviewed maximum scores, so an increase in an existing
 function fails CI. The unfinished `EditorPage` is temporarily exempt from blocking
 and retains its current score in reports.
+Kotlin files also have a total cognitive-complexity budget of **100**, computed
+with detekt's file metric. Functions below 20 contribute to the total. Existing
+over-budget files are baselined and cannot exceed their reviewed maxima. This
+encourages extraction into focused classes and modules as part of cleanup.
 
 From the repository root, run `npm ci --prefix scripts/complexity`,
 `./gradlew cognitiveComplexity`, and `npm run check --prefix scripts/complexity`.

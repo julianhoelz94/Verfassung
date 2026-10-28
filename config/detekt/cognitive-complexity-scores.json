@@ -1,6 +1,7 @@
 {
-  "version": 1,
+  "version": 2,
   "limit": 20,
+  "file_limit": 100,
   "entries": [
     {
       "path": "services/amendment-service/src/main/kotlin/com/constitutionatlas/amendment/service/AmendmentDiff.kt",
@@ -91,6 +92,40 @@
       "path": "services/platform/src/main/kotlin/com/constitutionatlas/platform/HierarchicalDiff.kt",
       "function": "compare",
       "score": 92
+    }
+  ],
+  "file_entries": [
+    {
+      "path": "services/amendment-service/src/main/kotlin/com/constitutionatlas/amendment/service/AmendmentService.kt",
+      "score": 116
+    },
+    {
+      "path": "services/catalog-service/src/main/kotlin/com/constitutionatlas/catalog/service/CatalogWriteService.kt",
+      "score": 107
+    },
+    {
+      "path": "services/content-service/src/main/kotlin/com/constitutionatlas/content/service/OrderedContentService.kt",
+      "score": 110
+    },
+    {
+      "path": "services/editor-service/src/main/kotlin/com/constitutionatlas/editor/service/EditorService.kt",
+      "score": 179
+    },
+    {
+      "path": "services/editor-service/src/main/kotlin/com/constitutionatlas/editor/service/StructuredDraftEngine.kt",
+      "score": 113
+    },
+    {
+      "path": "services/ingestion-service/src/main/kotlin/com/constitutionatlas/ingestion/service/ImportExportService.kt",
+      "score": 111
+    },
+    {
+      "path": "services/ingestion-service/src/main/kotlin/com/constitutionatlas/ingestion/service/ImportValidator.kt",
+      "score": 130
+    },
+    {
+      "path": "services/platform/src/main/kotlin/com/constitutionatlas/platform/HierarchicalDiff.kt",
+      "score": 115
     }
   ]
 }

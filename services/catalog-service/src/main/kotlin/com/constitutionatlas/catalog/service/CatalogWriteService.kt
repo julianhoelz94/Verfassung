@@ -346,7 +346,8 @@ class CatalogWriteService(
                 if (kind.sentenceDelimiters.size > 16 ||
                     kind.sentenceDelimiters.distinct().size != kind.sentenceDelimiters.size ||
                     kind.sentenceDelimiters.any { delimiter ->
-                        delimiter.isEmpty() || delimiter.codePointCount(0, delimiter.length) > 8 ||
+                        delimiter.isEmpty() ||
+                            delimiter.codePointCount(0, delimiter.length) > 8 ||
                             !delimiter.matches(Regex("[\\p{P}\\p{S}]+"))
                     } ||
                     (kind.segmentation == "sentence" && kind.sentenceDelimiters.isEmpty())

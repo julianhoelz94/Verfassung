@@ -22,6 +22,7 @@ test('mixed roots and rich entries survive API publication and read on a narrow 
   await expect(page.getByRole('cell', { name: 'Applies nationally' })).toHaveAttribute('colspan', '2');
   await page.goto(`/countries/XC/versions/${version}/articles/${article.occurrenceId}`);
   await expect(page.getByRole('link', { name: 'Appendix A' })).toHaveAttribute('href', new RegExp(`/versions/${version}/units/${appendix.occurrenceId}`));
+  await expect(page.getByRole('link', { name: 'Source', exact: true })).toHaveAttribute('href', 'https://example.org/atlas-e2e/revised-source');
   const marker = page.getByRole('button', { name: 'Show footnote 1', exact: true });
   const markerSize = await marker.boundingBox();
   expect(markerSize!.height).toBeLessThanOrEqual(28);
@@ -34,16 +35,17 @@ test('mixed roots and rich entries survive API publication and read on a narrow 
   await drawer.getByRole('link', { name: 'Go to footnote', exact: true }).click();
   await expect(page).toHaveURL(new RegExp(`/versions/${version}#fn-`));
   await expect(page.getByRole('note').filter({ hasText: 'The revised source note.' })).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Source', exact: true })).toHaveAttribute('href', 'https://example.org/atlas-e2e/revised-source');
 });
 
 test('rich table, note and reference changes appear in compare and search', async ({ page, request }) => {
   const from = ids.versions['xc-2020'];
   const to = ids.versions['xc-2024'];
   await page.goto(`/countries/XC/compare?from=${from}&to=${to}&all=1`);
+  await page.getByRole('tab', { name: '2020', exact: true }).click();
   await expect(page.getByText('Annual', { exact: true }).first()).toBeVisible();
+  await page.getByRole('tab', { name: '2024', exact: true }).click();
   await expect(page.getByText('Biennial', { exact: true }).first()).toBeVisible();
-  await expect(page.locator('.legal-table').first()).toBeVisible();
+  await expect(page.getByRole('table', { name: 'Civic duties' })).toBeVisible();
   const search = await (await request.get(`/api/search/search?q=Biennial&country=XC&versionId=${to}`)).json();
   expect(search.total).toBe(1);
   await page.goto('/search');

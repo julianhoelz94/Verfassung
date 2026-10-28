@@ -2,7 +2,7 @@
 
 import { useEffect, useLayoutEffect, useRef } from 'react';
 import { Schema, type Node as ProseNode } from 'prosemirror-model';
-import { EditorState, TextSelection } from 'prosemirror-state';
+import { EditorState, TextSelection, type Transaction } from 'prosemirror-state';
 import { Decoration, DecorationSet, EditorView } from 'prosemirror-view';
 import { baseKeymap, toggleMark } from 'prosemirror-commands';
 import { keymap } from 'prosemirror-keymap';
@@ -69,6 +69,27 @@ function documentPosition(doc: ProseNode, point: number): number {
   return result;
 }
 
+/** Native select-all replacement can remove the rendered sentence wrappers. The
+ * DOM parser then supplies default attributes; recover legal identity from the
+ * previous blocks before publishing a transaction to the structured draft. */
+function restoreParsedIdentities(transaction:Transaction, previous:ProseNode):Transaction {
+  const originals:{node:ProseNode;position:number}[]=[];
+  previous.forEach((node,offset)=>originals.push({node,position:transaction.mapping.map(offset,1)}));
+  const claimedNodes=new Set<string>(),claimedTexts=new Set<string>();
+  transaction.doc.forEach(node=>{if(node.attrs.nodeId)claimedNodes.add(node.attrs.nodeId);if(node.attrs.textId)claimedTexts.add(node.attrs.textId);});
+  const seenNodes=new Set<string>(),seenTexts=new Set<string>();
+  transaction.doc.forEach((node,offset)=>{
+    const identified=node.attrs.nodeId&&node.attrs.textId&&!seenNodes.has(node.attrs.nodeId)&&!seenTexts.has(node.attrs.textId);
+    if(identified){seenNodes.add(node.attrs.nodeId);seenTexts.add(node.attrs.textId);return;}
+    const available=originals.filter(({node})=>!claimedNodes.has(node.attrs.nodeId)&&!claimedTexts.has(node.attrs.textId));
+    const original=available.find(({position})=>position>=offset&&position<=offset+node.nodeSize)??available[0];
+    const nodeId=original?.node.attrs.nodeId??crypto.randomUUID(),textId=original?.node.attrs.textId??crypto.randomUUID();
+    claimedNodes.add(nodeId);claimedTexts.add(textId);seenNodes.add(nodeId);seenTexts.add(textId);
+    transaction=transaction.setNodeMarkup(offset,undefined,{...node.attrs,...original?.node.attrs,nodeId,textId});
+  });
+  return transaction;
+}
+
 export type CanvasController = { isAlive: () => boolean; format: (type: OrderedTextMark['type']) => void; focus: (position?: { textId: string; start: number; end?: number }) => void; segment: () => void; split: () => void; merge: () => void; addReference: (target: OrderedInlineReference['target']) => boolean; selection: () => { textId: string; nodeId: string; start: number; end: number }; activeMarks: () => string[] };
 type Props = { units: CanvasUnit[]; label: string; editable: boolean; flowing: boolean; boundaries: boolean; automatic: boolean; delimiters: string[]; notes: { logicalId: string; label: string }[]; unitLabels?: Record<string, string>; onSelectUnit?: (id: string) => void; onChange: (blocks: CanvasBlock[], grouping: string) => void; onActivate: (controller: CanvasController, textId: string) => void; onUndo: () => void; onRedo: () => void };
 
@@ -129,6 +150,7 @@ export function ContinuousCanvas(props: Props) {
         let transaction = incoming;
         if(!latest.current.editable&&transaction.docChanged){view.updateState(view.state);return;}
         if (transaction.docChanged) {
+          transaction=restoreParsedIdentities(transaction,view.state.doc);
           const anchors = new Map<number, OrderedInlineReference[]>(), previousAnchorIds = new Set<string>();
           view.state.doc.forEach(node => (node.attrs.anchors as OrderedInlineReference[]).forEach(reference => previousAnchorIds.add(reference.logicalId)));
           const retainedAnchors = new Map<string, Set<string>>(); transaction.doc.forEach(node => retainedAnchors.set(node.attrs.nodeId, new Set((node.attrs.anchors as OrderedInlineReference[]).map(reference => reference.logicalId))));

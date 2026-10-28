@@ -23,6 +23,10 @@ updates:
     groups:
       mcp-sdk:
         patterns: ['@modelcontextprotocol/*', zod]
+  - package-ecosystem: npm
+    directory: /scripts/complexity
+    schedule:
+      interval: weekly
   - package-ecosystem: docker
     directories:
       - /infra/caddy

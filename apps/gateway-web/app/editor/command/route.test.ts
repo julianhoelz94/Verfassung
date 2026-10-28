@@ -107,3 +107,57 @@ describe('source evidence commands', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });
+
+// EDIT-1/API-1: native command contract; expected outcomes come from the editorial workflow.
+describe('draft, review and legal-change command boundaries', () => {
+  function request(command: string, fields: Record<string, string> = {}, headers: Record<string, string> = { origin: 'http://localhost', host: 'localhost' }) {
+    return new NextRequest('http://localhost/editor/command', { method: 'POST', headers, body: new URLSearchParams({ ...context, command, ...fields }) });
+  }
+  const commands = [
+    { command: 'open', fields: { hopKind: 'legal' }, path: '/edit-sessions', body: { versionId: 'version-1', hopKind: 'legal' }, result: { id: 'opened' }, destination: 'sessionId=opened' },
+    { command: 'save', fields: { title: 'Authored title', body: 'Authored wording' }, path: '/edit-sessions/session-1/saves', body: { articleId: 'article-1', title: 'Authored title', body: 'Authored wording' }, destination: 'saved=1' },
+    { command: 'structured-save', fields: { structuredDraft: JSON.stringify({ expectedGeneration: 4, operations: [{ type: 'set_title', logicalId: 'unit', title: 'Authored title' }] }) }, path: '/edit-sessions/session-1/structured-saves', body: { expectedGeneration: 4, operations: [{ type: 'set_title', logicalId: 'unit', title: 'Authored title' }] }, destination: 'saved=1' },
+    { command: 'details', fields: { hopKind: 'editorial_correction', comment: 'Corrected against the archive.' }, path: '/edit-sessions/session-1/publish-details', body: { comment: 'Corrected against the archive.' }, destination: 'detailsSaved=1' },
+    { command: 'review', fields: {}, path: '/edit-sessions/session-1/review', body: {}, destination: 'reviewed=1' },
+    { command: 'approve', fields: {}, path: '/edit-sessions/session-1/approval', body: {}, destination: 'approved=1' },
+    { command: 'source-evidence-changes', fields: { expectedRevision: '4', reason: 'Source attribution needs correction.' }, path: '/edit-sessions/session-1/source-evidence/changes-requested', body: { expectedRevision: 4, reason: 'Source attribution needs correction.' }, destination: 'sessionId=session-1' },
+  ];
+  for (const spec of commands) it(`keeps ${spec.command} separate from publication and preserves its context`, async () => {
+    const upstream = vi.fn<typeof fetch>().mockResolvedValue(Response.json(spec.result ?? {})); vi.stubGlobal('fetch', upstream);
+    const response = await POST(request(spec.command, spec.fields)); expect(response.status).toBe(303); expect(response.headers.get('location')).toContain(spec.destination);
+    expect(new URL(String(upstream.mock.calls[0][0])).pathname).toBe('/api/editor' + spec.path); expect(JSON.parse(String(upstream.mock.calls[0][1]?.body))).toEqual(spec.body); expect(upstream).toHaveBeenCalledTimes(1);
+  });
+  it.each(['load', 'open', 'publish', 'structured-save', 'unknown'])('rejects invalid %s input without an upstream write', async command => {
+    const upstream = vi.fn<typeof fetch>(); vi.stubGlobal('fetch', upstream);
+    const response = await POST(request(command, { sessionId: '', hopKind: 'official_errata', structuredDraft: '{}' })); expect(response.headers.get('location')).toMatch(/error=(invalid|session_id)/); expect(upstream).not.toHaveBeenCalled();
+  });
+  it('loads a selected session without mutating it', async () => {
+    const upstream = vi.fn<typeof fetch>(); vi.stubGlobal('fetch', upstream); const response = await POST(request('load')); expect(response.headers.get('location')).toContain('sessionId=session-1'); expect(upstream).not.toHaveBeenCalled();
+  });
+  it('keeps legal publication details separate from an editorial correction reason', async () => {
+    const upstream = vi.fn<typeof fetch>().mockResolvedValue(Response.json({})); vi.stubGlobal('fetch', upstream);
+    await POST(request('details', { hopKind: 'legal', recordTitle: 'Voting reform', recordComment: 'Enacted law', documentUrl: 'https://archive.example/law', documentLabel: 'Gazette', changesJson: '[]' }));
+    expect(JSON.parse(String(upstream.mock.calls[0][1]?.body))).toEqual({ changeRecord: { title: 'Voting reform', comment: 'Enacted law', documents: [{ url: 'https://archive.example/law', label: 'Gazette' }], changes: [] } });
+  });
+  it.each([['amendment-withdraw', 'withdraw', 'withdrawn'], ['amendment-publish', 'publish', 'published'], ['amendment-confirm', 'confirm-quotes', 'confirmed']])('routes %s to the selected record only', async (command, path, outcome) => {
+    const upstream = vi.fn<typeof fetch>().mockResolvedValue(Response.json({ id: 'instrument' })); vi.stubGlobal('fetch', upstream);
+    const response = await POST(request(command, { amendmentId: 'instrument/id' })); expect(new URL(String(upstream.mock.calls[0][0])).pathname).toBe(`/api/amendment/amendments/instrument%2Fid/${path}`); expect(response.headers.get('location')).toContain(`/editor/amendments/instrument%2Fid?${outcome}=1`);
+  });
+  it('does not publish a legal-change record that does not exist yet', async () => {
+    const upstream = vi.fn<typeof fetch>(); vi.stubGlobal('fetch', upstream); const response = await POST(request('amendment-publish', { amendmentId: 'new' })); expect(response.headers.get('location')).toContain('/editor/amendments?error=invalid'); expect(upstream).not.toHaveBeenCalled();
+  });
+  it.each([['new', '/constitutions/charter/amendments'], ['instrument', '/amendments/instrument/revisions']])('saves %s as a draft revision without publishing it', async (id, path) => {
+    const upstream = vi.fn<typeof fetch>().mockResolvedValue(Response.json({ id: 'instrument' })); vi.stubGlobal('fetch', upstream);
+    const response = await POST(request('amendment-save', { amendmentId: id, constitutionId: 'charter', title: 'Voting reform', comment: 'Enacted instrument', changesJson: '[]' })); expect(new URL(String(upstream.mock.calls[0][0])).pathname).toBe('/api/amendment' + path); expect(response.headers.get('location')).toContain('?saved=1');
+  });
+  it('preserves rejected legal-change edits at their selected record', async () => {
+    vi.stubGlobal('fetch', vi.fn<typeof fetch>().mockResolvedValue(Response.json({ code: 'forbidden' }, { status: 403 })));
+    const response = await POST(request('amendment-save', { amendmentId: 'instrument', title: 'Voting reform', changesJson: '[]' })); expect(response.headers.get('location')).toContain('/editor/amendments/instrument?error=forbidden');
+  });
+  it.each(['https://foreign.example', 'not a URL'])('rejects an untrusted origin %s before making any write', async origin => {
+    const upstream = vi.fn<typeof fetch>(); vi.stubGlobal('fetch', upstream); expect((await POST(request('save', {}, { origin, host: 'localhost' }))).status).toBe(403); expect(upstream).not.toHaveBeenCalled();
+  });
+  it('returns native redirects on the configured forwarded public origin', async () => {
+    const upstream = vi.fn<typeof fetch>(); vi.stubGlobal('fetch', upstream); const response = await POST(request('load', {}, { 'x-forwarded-host': 'atlas.example', 'x-forwarded-proto': 'https' })); expect(response.headers.get('location')).toContain('https://atlas.example/editor?'); expect(upstream).not.toHaveBeenCalled();
+  });
+});

@@ -283,6 +283,30 @@ def summarize(files, groups, changed, head, base, minimum):
                                         for path in sorted({p for p, _, hit in new if not hit})}}
 
 
+def enforce_minimums(result, policy):
+    """Enforce exact ratios; a rounded display value cannot satisfy a floor."""
+    if not isinstance(policy, dict) or set(policy) != {'schema', 'whole_repo', 'components'} or policy['schema'] != SCHEMA:
+        raise ValueError('Invalid coverage minimum policy')
+    if not isinstance(policy['components'], dict) or set(policy['components']) != set(result['components']):
+        raise ValueError('Coverage minimum policy must name every component exactly once')
+    floors = {'whole_repo': policy['whole_repo'], **policy['components']}
+    failures = []
+    for name, value in floors.items():
+        try:
+            minimum = Decimal(str(value))
+        except ArithmeticError as exc:
+            raise ValueError('Invalid coverage minimum: ' + name) from exc
+        if not minimum.is_finite() or not 0 <= minimum <= 100:
+            raise ValueError('Coverage minimum must be between 0 and 100: ' + name)
+        metric = result['whole_repo'] if name == 'whole_repo' else result['components'][name]['lines']
+        if not metric['total'] or Decimal(metric['covered']) * 100 < minimum * metric['total']:
+            failures.append(f"{name}: {display(metric)} is below {minimum}%")
+    result['minimum_whole_repo'] = str(policy['whole_repo'])
+    result['component_minimums'] = {name: str(value) for name, value in policy['components'].items()}
+    result['coverage_failures'] = failures
+    result['gate_passed'] = result['gate_passed'] and not failures
+
+
 def render(root, result, files):
     output = root / 'coverage'
     write_json(output / 'summary.json', result)
@@ -295,6 +319,12 @@ def render(root, result, files):
             + result['scope'] + '\n\n| Component | Lines | Branches |\n| --- | --- | --- |\n')
     for component, data in result['components'].items():
         text += f"| {component} | {display(data['lines'])} | {display(data['branches'])} |\n"
+    if 'minimum_whole_repo' in result:
+        text += f"\nWhole-repository minimum: {result['minimum_whole_repo']}%.\n"
+        text += '\nComponent line minimums: ' + ', '.join(
+            f'{name} >= {minimum}%' for name, minimum in result['component_minimums'].items()) + '.\n'
+        for failure in result['coverage_failures']:
+            text += '\nFAILED: ' + failure + '\n'
     for name, lines in result['uncovered_changed_lines'].items():
         text += '\nUncovered changed lines in `' + name + '`: ' + ', '.join(map(str, lines)) + '\n'
     (output / 'summary.md').write_text(text)
@@ -318,7 +348,7 @@ def render(root, result, files):
     print(text)
 
 
-def report(root, base, minimum):
+def report(root, base, minimum, policy=None):
     groups = inventory(root)
     validate_inputs(root, groups)
     files = {}
@@ -336,6 +366,8 @@ def report(root, base, minimum):
     head = git(root, 'rev-parse', 'HEAD')
     changed = changed_lines(root, base, head, eligible)
     result = summarize(files, groups, changed, head, base, minimum)
+    if policy is not None:
+        enforce_minimums(result, json.loads(policy.read_text()))
     render(root, result, files)
     return 0 if result['gate_passed'] else 1
 
@@ -352,6 +384,7 @@ def main(argv=None):
     gate.add_argument('--base')
     gate.add_argument('--event', type=Path)
     gate.add_argument('--minimum', type=Decimal, default=Decimal('80'))
+    gate.add_argument('--policy', type=Path, help='Whole-repository and per-component minimums')
     sub.add_parser('validate')
     args = parser.parse_args(argv)
     try:
@@ -364,7 +397,7 @@ def main(argv=None):
         base = args.base or comparison_base(args.root, args.event)
         if not args.minimum.is_finite() or not 0 <= args.minimum <= 100:
             raise ValueError('Coverage minimum must be between 0 and 100')
-        return report(args.root, base, args.minimum)
+        return report(args.root, base, args.minimum, args.policy)
     except (ValueError, OSError, KeyError, TypeError, ET.ParseError, subprocess.CalledProcessError) as exc:
         message = 'Coverage unavailable: ' + str(exc)
         print(message, file=sys.stderr)

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { isImportRequest, parseImportJson, ImportTransitionError, transitionImportJob, transitionSetupProposal } from './ingestion-api';
+import { archiveImportJob, isImportRequest, listMyImportJobs, parseImportJson, ImportTransitionError, transitionImportJob, transitionSetupProposal } from './ingestion-api';
 
 const valid = {
   isoCode: 'US',
@@ -36,6 +36,40 @@ describe('isImportRequest', () => {
 });
 
 afterEach(() => vi.unstubAllGlobals());
+
+describe('personal import archive', () => {
+  it('loads every page of owned archived work without mixing in the active list', async () => {
+    const firstPage = Array.from({ length: 100 }, (_, index) => ({ id: String(index) }));
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValueOnce(Response.json(firstPage)).mockResolvedValueOnce(Response.json([{ id: 'last' }]));
+    vi.stubGlobal('fetch', fetchMock);
+    await expect(listMyImportJobs('Bearer author', true)).resolves.toHaveLength(101);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    for (const [index, [url, init]] of fetchMock.mock.calls.entries()) {
+      expect(Object.fromEntries(new URL(String(url)).searchParams)).toEqual({ mine: 'true', archived: 'true', limit: '100', offset: String(index * 100) });
+      expect(init?.headers).toEqual(expect.objectContaining({ Authorization: 'Bearer author' }));
+    }
+  });
+
+  it('does not present an unavailable archive as an empty list', async () => {
+    vi.stubGlobal('fetch', vi.fn<typeof fetch>().mockResolvedValue(new Response(null, { status: 404 })));
+    await expect(listMyImportJobs('Bearer author', false)).rejects.toThrow('Imports unavailable');
+  });
+
+  it.each([true, false])('accepts bodyless archive/restore responses (archived=%s)', async archived => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(new Response(null, { status: 204 }));
+    vi.stubGlobal('fetch', fetchMock);
+    await expect(archiveImportJob('job', archived, 'Bearer author')).resolves.toBeUndefined();
+    expect(fetchMock).toHaveBeenCalledWith(expect.stringMatching(/\/import-jobs\/job\/archive$/), expect.objectContaining({
+      method: 'POST', body: JSON.stringify({ archived }), headers: expect.objectContaining({ Authorization: 'Bearer author' }),
+    }));
+  });
+
+  it('propagates a forbidden archive change rather than reporting success', async () => {
+    vi.stubGlobal('fetch', vi.fn<typeof fetch>().mockResolvedValue(new Response(null, { status: 403 })));
+    await expect(archiveImportJob('job', true, 'Bearer another-user')).rejects.toThrow('Import archive failed');
+  });
+});
+
 describe('import transition errors', () => {
   it('preserves the safe configuration error instead of reporting user permissions', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ code: 'publication_not_configured' }, { status: 503 })));

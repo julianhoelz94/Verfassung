@@ -7,7 +7,7 @@ vi.mock('next/headers', () => ({
 }));
 vi.mock('./session', () => ({ SESSION_COOKIE: 'ca_session' }));
 
-import { getDraftPreview, publishSession, saveDraft, submitReview } from './editor-api';
+import { getDraftPreview, listSessions, manageSession, publishSession, saveDraft, submitReview } from './editor-api';
 
 const published = { sessionId: 'session-1', status: 'published', newVersionId: 'version-2' };
 
@@ -39,6 +39,30 @@ describe('editor request outcomes', () => {
       return controller.signal;
     });
   }
+
+  it('requests the owned archive independently from status and pagination', async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(Response.json([]));
+    vi.stubGlobal('fetch', fetchMock);
+    await expect(listSessions({ openedBy: 'me', archived: true, status: 'published', limit: 100, offset: 100 })).resolves.toEqual([]);
+    const url = new URL(String(fetchMock.mock.calls[0][0]));
+    expect(Object.fromEntries(url.searchParams)).toEqual({ openedBy: 'me', archived: 'true', status: 'published', limit: '100', offset: '100' });
+  });
+
+  it.each(['archive', 'restore', 'discard'] as const)('accepts a bodyless successful session %s response', async action => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(new Response(null, { status: 204 }));
+    vi.stubGlobal('fetch', fetchMock);
+    await expect(manageSession('session-1', action)).resolves.toBeUndefined();
+    expect(fetchMock).toHaveBeenCalledWith(expect.stringMatching(action === 'discard' ? /\/edit-sessions\/session-1$/ : /\/edit-sessions\/session-1\/archive$/), expect.objectContaining({
+      method: action === 'discard' ? 'DELETE' : 'POST',
+      headers: expect.objectContaining({ Authorization: 'Bearer test-session' }),
+      ...(action === 'discard' ? {} : { body: JSON.stringify({ archived: action === 'archive' }) }),
+    }));
+  });
+
+  it('rejects a session state conflict rather than treating deletion as successful', async () => {
+    vi.stubGlobal('fetch', vi.fn<typeof fetch>().mockResolvedValue(Response.json({ code: 'conflict' }, { status: 409 })));
+    await expect(manageSession('session-1', 'discard')).rejects.toMatchObject({ key: 'not_ready' });
+  });
 
   it('allows one coordinated publication to finish after the normal ten-second deadline', async () => {
     useTimedDeadlines();

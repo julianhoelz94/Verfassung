@@ -73,7 +73,7 @@ async function screenshot(page: Page, testInfo: TestInfo, name: string) {
 async function distinctMarkerTargets(container: Locator, page: Page, touch: boolean) {
   for (const [label, body] of [['1', 'Layout acceptance source note.'], ['2', 'Second adjacent-marker source note.']]) {
     const marker = container.getByRole('button', { name: 'Show footnote ' + label, exact: true }).first();
-    await marker.scrollIntoViewIfNeeded();
+    await marker.scrollIntoViewIfNeeded({ timeout: 15_000 });
     if (touch) await marker.tap({ timeout: 15_000 }); else await marker.click({ timeout: 15_000 });
     const drawer = page.getByRole('dialog', { name: 'Footnote ' + label, exact: true });
     await expect(drawer, 'tapping a visible numeral must open that exact note').toContainText(body);
@@ -221,6 +221,7 @@ for (const viewport of [
       await page.goto(`/countries/XA/versions/${fixture.versionId}`);
       const readerFont = await page.locator('.version-articles').evaluate(element => ({ body: getComputedStyle(element).fontFamily, heading: getComputedStyle(element.querySelector('h2')!).fontFamily }));
       expect(readerFont, 'viewer and preview must use the same document typography').toEqual(previewFont);
+      await page.getByRole('button', { name: 'Full text', exact: true }).click();
       await distinctMarkerTargets(page.locator('main'), page, viewport.touch);
       await noHorizontalOverflow(page);
       await screenshot(page, testInfo, `viewer-${viewport.width}`);

@@ -126,7 +126,7 @@ test('edit, review, and publish a draft', async ({ page }) => {
   await expect(page.getByText('Draft saved.')).toBeVisible();
   await sessionDetails(page);
   await expect(page.getByRole('region', { name: 'Article 1', exact: true }).getByLabel('Article text')).toHaveValue('Draft body for the e2e journey.');
-  await expect(page.getByLabel('Session').getByText('Draft', { exact: true })).toBeVisible();
+  await expect(page.getByLabel('Session').locator('dd').getByText('Draft', { exact: true })).toBeVisible();
   await page.getByLabel('What was corrected in this transcription?').fill('Corrected text.');
   await page.getByRole('button', { name: 'Save comment' }).click();
   await expect(page).toHaveURL(/detailsSaved=1/);

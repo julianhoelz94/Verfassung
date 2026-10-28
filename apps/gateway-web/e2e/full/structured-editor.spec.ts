@@ -100,7 +100,7 @@ for (const hop of ['editorial_correction', 'legal'] as const) {
     expect(draft.roots[0].content[3].node.revisionId).toBe(sourceRoot.content[3].node.revisionId);
     await sessionDetails(page);
     if (hop === 'legal') {
-      await page.getByLabel('Title', { exact: true }).last().fill('Structured law');
+      await page.getByLabel('Session').getByLabel('Title', { exact: true }).fill('Structured law');
       await page.getByLabel('Comment', { exact: true }).fill('Changed one sentence.');
       await page.getByLabel('Document URL').fill('https://example.org/structured-law.pdf');
       await page.getByLabel('Before unit').selectOption(sourceSentence.logicalId);
@@ -381,6 +381,12 @@ test('marker context actions retain notes, move atomically and enforce one marke
   await marker.click({ button: 'right' });
   await page.getByRole('menuitem', { name: 'Remove marker', exact: true }).click();
   await expect(marker).toHaveCount(0);
+  const unsavedUrl = page.url(), sessionIdBeforeSave = new URL(unsavedUrl).searchParams.get('sessionId');
+  await workspace.getByRole('button', { name: 'Save draft', exact: true }).click();
+  await expect(workspace.getByRole('alert')).toContainText('Footnote 1 needs a marker before you can save.');
+  expect(page.url()).toBe(unsavedUrl);
+  const beforeSave = await json(await request.get(`/api/editor/edit-sessions/${sessionIdBeforeSave}/structured-draft`, { headers }));
+  expect(beforeSave.operations).toHaveLength(0);
   await expect(workspace.getByRole('button', { name: 'Save draft', exact: true })).toBeDisabled();
   await selectBodyText(sentence, 0);
   await workspace.getByRole('button', { name: 'Footnotes', exact: true }).click();

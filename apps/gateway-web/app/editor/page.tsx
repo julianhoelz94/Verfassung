@@ -210,21 +210,14 @@ export default async function EditorPage(props: EditorPageProps) {
 
   return (
     <WorkspacePage width="content" gap="control" className={shellStyles.page} header={<PageHeader compact
-        breadcrumbs={[{ href: '/editor', label: <T value={ui.nav.editor} /> }, { label: `${message(locale, ui.remainingStatus.session)} ${session.id.slice(0, 8)}` }]}
         eyebrow={`${message(locale, session.hopKind === 'legal' ? ui.remainingStatus.nextLegalChange : ui.remainingStatus.transcriptionCorrection)} · ${message(locale, session.status === 'open' ? ui.workflow.draft : session.status === 'reviewing' ? ui.workflow.inReview : session.status === 'approved' ? ui.workflow.approved : ui.workflow.published)}`}
         title={title || <T value={ui.nav.editor} />}
-        actions={
-          publicHref ? (
-            <a className="btn btn-ghost" href={publicHref}>
-              <T value={publishedHref ? workflowUi.publishedVersion : workflowUi.sourceVersion} />{" "}</a>
-          ) : null
-        }
       />}>
 
       {alerts}
       {preview.sourceEvidenceRevisions?.length ? <Alert tone="info"><a href={`/editor?sessionId=${encodeURIComponent(session.id)}&scope=sources`}><T value={sourceEvidenceUi.inspectSources} /></a></Alert> : null}
       {searchParams.sessionId && articles.length > 0 ? (
-        <EditorDraftState><EditorWorkspace navigation={
+        <EditorDraftState><EditorWorkspace inlineControls={Boolean(structured && selectedRoot)} navigation={
           <aside className={["panel", surfaceStyles.panel].join(' ')} aria-label={message(locale, ui.accessibility.topLevelUnits)}>
             <h2 className="panel-title"><T value={articles.every(article => (article.kind ?? 'article') === 'article') ? ui.editorDynamic.articles : ui.editorDynamic.topLevelUnits} /></h2>
             <p className="muted">{draftIds.length} <T value={ui.editor.page.changed} /></p>
@@ -240,6 +233,7 @@ export default async function EditorPage(props: EditorPageProps) {
           <aside className={["panel panel-side", surfaceStyles.panel].join(' ')} aria-label={message(locale, ui.accessibility.session)}>
             <p className="panel-title"><T value={ui.editor.page.session} /></p>
             <WorkflowSteps status={session.status} />
+            {publicHref ? <a className="btn btn-ghost" href={publicHref}><T value={publishedHref ? workflowUi.publishedVersion : workflowUi.sourceVersion} /></a> : null}
             <dl className="provenance provenance-list">
               <div>
                 <dt><T value={ui.editor.page.status} /></dt>

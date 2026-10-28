@@ -1,3 +1,7 @@
 .page:global(.page) { padding-block-start:var(--space-4); }
 .documentSection { min-width:0; }
 .documentSection > :global(.action-bar) { margin-top:var(--space-3); }
+.page :global(.action-bar) { align-items:flex-start; }
+@media (max-width:639px) {
+  :global(body):has(.page) :global(.topbar .search-row) { display:none; }
+}

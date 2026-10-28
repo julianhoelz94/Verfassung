@@ -84,6 +84,8 @@ The context/formatting bar sticks to the top of the active document scroll area.
 
 Account for the application header, browser zoom, narrow windows, and touch targets. The toolbar may reflow into two compact rows on a narrow touch screen. It must not overlap text or steal the active selection. Its menus open over the document without pushing every paragraph downward.
 
+Keep Undo, Redo and Editor view inside the sticky editing toolbar. On phones, the active workspace tab keeps its label while inactive tabs use labelled icons. Put the navigation toggle in that same mode bar; do not spend another full row on it. Session and publication controls follow the document in a closed disclosure, with the current workflow status still visible in the compact page heading. Hide the duplicate global phone search row on this workspace; search remains available in the application menu. An active passage expands until another passage is selected, including while its Apply button receives focus.
+
 The test mock includes a long-document view and examples through Article 20 so this behavior can be tested directly.
 
 ## 6. Continuous writing and automatic sentence nodes
@@ -197,6 +199,8 @@ The editor offers no paragraph/article placement choices for note bodies. Creati
 ### Hover, focus, and navigation
 
 Show the referenced note in a lightweight popover on hover and keyboard focus. Clicking or tapping a marker opens a bottom drawer containing the note, without changing the reading position. Close the drawer with ×, Escape, or a tap outside. Include a “Go to footnote” link that explicitly closes the drawer and jumps to the actual note at the constitution’s end. Keep the endnote’s Edit action for editing its text in place. On phones, retain a small superscript numeral with a transparent touch target rather than applying full toolbar-button dimensions. Provide stable accessible relationships, usable contrast, and sensible positioning near viewport edges. Keep the existing real note destination and backlinks.
+
+The global note index already supplies the destination body: jumping to an endnote must not wait for a different article to load. Hydrate its owning root only when an edit requires it. Keep nearby touch targets separate even for adjacent markers at the same text offset. If an asynchronous destination fails elsewhere, retain the readable drawer and offer a visible retry.
 
 Resolve notes across roots: a marker in Article 1 must still work when its note is at the end after Article 20. Public readers, single-unit pages, preview, and review need the same version-pinned note index. Avoid loading a complete large constitution repeatedly for each marker.
 

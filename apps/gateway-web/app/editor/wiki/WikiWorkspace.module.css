@@ -4,6 +4,7 @@
 .form textarea { width:100%; resize:vertical; }
 .form button[type=submit] { width:fit-content; }
 .disclosure { border-top:1px solid var(--color-line); padding-top:var(--space-4); min-width:0; }
-.disclosure > summary { font-weight:500; }
+.disclosure > summary { font-weight:500; display:list-item; list-style:disclosure-closed inside; padding-block:var(--space-3); }
+.disclosure[open] > summary { list-style-type:disclosure-open; }
 .disclosure > div { display:grid; gap:var(--space-3); margin-top:var(--space-4); }
 @media (max-width:600px) { .workspace { padding-inline:var(--space-3); } }

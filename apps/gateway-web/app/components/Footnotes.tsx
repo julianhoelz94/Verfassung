@@ -14,6 +14,7 @@ const copy = {
   show: { en: 'Show footnote', de: 'Fußnote anzeigen' },
   close: { en: 'Close footnote', de: 'Fußnote schließen' },
   jump: { en: 'Go to footnote', de: 'Zur Fußnote' },
+  navigationFailed: { en: 'The footnote could not be loaded. Try “Go to footnote” again.', de: 'Die Fußnote konnte nicht geladen werden. Versuchen Sie „Zur Fußnote“ erneut.' },
 };
 type Actions = {
   showNote: (id: string, trigger?: HTMLElement) => void;
@@ -37,19 +38,21 @@ function FootnoteScope({ notes, children, onNavigate }: {
 }) {
   const t = useTranslation(), id = useId();
   const [opened, setOpened] = useState<string | null>(null);
+  const [navigating, setNavigating] = useState(false), [navigationError, setNavigationError] = useState(false);
   const [peek, setPeek] = useState<{ id: string; left: number; top: number } | null>(null);
   const trigger = useRef<HTMLElement | null>(null), drawer = useRef<HTMLElement | null>(null);
   const closeButton = useRef<HTMLButtonElement | null>(null);
   const active = notes.find(note => note.logicalId === opened);
+  const activeId = active?.logicalId;
   const preview = notes.find(note => note.logicalId === peek?.id);
   useLayoutEffect(()=>updateFootnoteHitTargets());
   useEffect(()=>{const update=()=>updateFootnoteHitTargets();window.addEventListener('resize',update);return()=>window.removeEventListener('resize',update);},[]);
   const close = useCallback((restore = false) => {
-    setOpened(null); setPeek(null);
+    setOpened(null); setPeek(null); setNavigationError(false);
     if (restore) trigger.current?.focus({ preventScroll: true });
   }, []);
   useEffect(() => {
-    if (!active) return;
+    if (!activeId) return;
     closeButton.current?.focus({ preventScroll: true });
     function outside(event: PointerEvent) {
       if (event.target instanceof Node && !drawer.current?.contains(event.target)) setOpened(null);
@@ -60,7 +63,7 @@ function FootnoteScope({ notes, children, onNavigate }: {
     document.addEventListener('pointerdown', outside, true);
     document.addEventListener('keydown', escape, true);
     return () => { document.removeEventListener('pointerdown', outside, true); document.removeEventListener('keydown', escape, true); };
-  }, [active, close]);
+  }, [activeId, close]);
   useEffect(() => {
     if (!peek) return;
     const hide = () => setPeek(null);
@@ -74,7 +77,7 @@ function FootnoteScope({ notes, children, onNavigate }: {
     showNote(noteId, element) {
       if (!notes.some(note => note.logicalId === noteId)) return;
       trigger.current = element ?? (document.activeElement instanceof HTMLElement ? document.activeElement : null);
-      setPeek(null); setOpened(noteId);
+      setPeek(null); setNavigationError(false); setOpened(noteId);
     },
     previewNote(noteId, element) {
       if (opened || !notes.some(note => note.logicalId === noteId) || window.matchMedia?.('(pointer: coarse)').matches) return;
@@ -89,10 +92,16 @@ function FootnoteScope({ notes, children, onNavigate }: {
       <section className={styles.drawer} ref={drawer} role="dialog" aria-modal="false" aria-labelledby={id + '-title'} aria-describedby={id + '-body'}>
         <div className={styles.heading}><h2 id={id + '-title'}>{t(copy.footnote)} {active.label}</h2><button ref={closeButton} type="button" aria-label={t(copy.close)} onClick={() => close(true)}>×</button></div>
         <div id={id + '-body'} className={styles.body}><InlineText text={active.text} marks={active.marks} /></div>
-        <a href={active.href} onClick={async event => {
+        {navigationError ? <p role="alert">{t(copy.navigationFailed)}</p> : null}
+        <a href={active.href} aria-busy={navigating || undefined} aria-disabled={navigating || undefined} onClick={async event => {
           if (onNavigate) {
-            event.preventDefault(); await onNavigate(active); close();
-            requestAnimationFrame(() => document.getElementById(decodeURIComponent(active.href.split('#')[1] ?? ''))?.scrollIntoView({ block: 'center' }));
+            event.preventDefault(); if (navigating) return;
+            setNavigating(true); setNavigationError(false);
+            try {
+              await onNavigate(active); close();
+              requestAnimationFrame(() => document.getElementById(decodeURIComponent(active.href.split('#')[1] ?? ''))?.scrollIntoView({ block: 'center' }));
+            } catch { setNavigationError(true); }
+            finally { setNavigating(false); }
           } else {
             const destination = new URL(active.href, window.location.href);
             if (destination.pathname === window.location.pathname && destination.search === window.location.search) {

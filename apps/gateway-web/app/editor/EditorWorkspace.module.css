@@ -2,9 +2,9 @@
 .controls { display: flex; flex-wrap: wrap; gap: var(--space-3); align-items: start; grid-column: 1 / -1; }
 .navigation, .document { min-width: 0; }
 .navigation[hidden] { display: none; }
-.session { min-width: 0; flex: 1; }
+.session { min-width: 0; flex: 1; grid-column: 1 / -1; }
 .session > summary { width: fit-content; cursor: pointer; padding-block: var(--space-2); color: var(--color-ink-2); }
 .session[open] { flex-basis: 100%; }
 .session > aside { position: static; margin-block-start: var(--space-3); }
 @media (min-width: 900px) { .workspace[data-navigation='shown'] { grid-template-columns: 14rem minmax(0, 1fr); } }
-@media print { .controls, .navigation { display: none; } .workspace { display: block; } }
+@media print { .controls, .navigation, .session { display: none; } .workspace { display: block; } }

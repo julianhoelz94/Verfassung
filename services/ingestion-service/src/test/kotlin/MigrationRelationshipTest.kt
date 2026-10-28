@@ -1,11 +1,11 @@
 import com.constitutionatlas.ingestion.client.reconcileDocumentLink
-import com.fasterxml.jackson.databind.ObjectMapper
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Test
+import tools.jackson.databind.json.JsonMapper
 
 class MigrationRelationshipTest {
-    private val mapper = ObjectMapper()
+    private val mapper = JsonMapper()
     private val empty = mapper.readTree("[]")
     private val linked = mapper.readTree("""[{"documentId":"document","revisionId":"exact"}]""")
 

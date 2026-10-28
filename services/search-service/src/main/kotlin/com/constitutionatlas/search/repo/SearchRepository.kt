@@ -83,7 +83,7 @@ class SearchRepository(private val jdbcTemplate: JdbcTemplate) {
               AND (?::date IS NULL OR effective_date = ?)
             """.trimIndent()
         val filterArgs =
-            arrayOf(
+            arrayOf<Any?>(
                 query.text,
                 query.text,
                 query.countryCode,

@@ -1,6 +1,6 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { Simulate } from 'react-dom/test-utils';
+import { fireEvent } from '@testing-library/dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { DraftPreview } from '../../lib/editor-api';
 import { TranslationProvider } from '../components/TranslationProvider';
@@ -31,10 +31,10 @@ describe('source evidence workflow', () => {
     await mount();
     expect(button('Zur Prüfung einreichen').disabled).toBe(false);
     const coverage = host.querySelector<HTMLTextAreaElement>('#source-description')!;
-    await act(async () => { coverage.value = 'My unsaved correction'; Simulate.change(coverage); });
+    await act(async () => { fireEvent.change(coverage, { target: { value: 'My unsaved correction' } }); });
     expect(button('Zur Prüfung einreichen').disabled).toBe(true);
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ key: 'stale_source_evidence' }, { status: 400 })));
-    await act(async () => Simulate.submit(host.querySelector('#source-evidence-form')!));
+    await act(async () => { fireEvent.submit(host.querySelector('#source-evidence-form')!); });
     expect(coverage.value).toBe('My unsaved correction');
     expect(host.querySelector('[role="alert"]')?.textContent).toContain('Deine Eingaben bleiben erhalten');
     expect(button('Zur Prüfung einreichen').disabled).toBe(true);

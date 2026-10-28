@@ -1,6 +1,6 @@
 import { act, type ComponentProps } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { Simulate } from 'react-dom/test-utils';
+import { fireEvent } from '@testing-library/dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as axeCore from 'axe-core';
 import type { ContentOutline } from '../../lib/api';
@@ -50,7 +50,7 @@ describe('structured editor acceptance', () => {
   }
   async function click(name: string, index = 0) { await act(async () => button(name, index).click()); }
   async function change(field: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement, value: string) {
-    await act(async () => { field.value = value; Simulate.change(field); });
+    await act(async () => { fireEvent.change(field, { target: { value: value } }); });
   }
   function field(label: string): HTMLInputElement { return host.querySelector(`[aria-label="${label}"]`)!; }
   function payload(): { expectedGeneration: number; operations: DraftOperation[] } { return JSON.parse((host.querySelector('[name="structuredDraft"]') as HTMLInputElement).value); }
@@ -178,7 +178,7 @@ describe('structured editor acceptance', () => {
 
   it('splits at the selected cursor and merges adjacent untitled sentence children with explicit lineage', async () => {
     const fixture = mixed(); await mount(fixture.outline, fixture.roots);
-    await act(async () => { texts()[1].focus(); texts()[1].setSelectionRange(5, 5); Simulate.select(texts()[1]); });
+    await act(async () => { texts()[1].focus(); texts()[1].setSelectionRange(5, 5); fireEvent.keyUp(texts()[1], { key: 'ArrowRight' }); });
     await click('Split at cursor', 1);
     expect(texts().map(item => item.value)).toEqual(['Before.', 'One. ', 'Two!', 'After.']);
     const split = payload().operations.find(item => item.type === 'split_text')!;

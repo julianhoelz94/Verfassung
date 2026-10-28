@@ -1,6 +1,6 @@
 # gateway-web
 
-Next.js 15 App Router + TypeScript. See the [`frontend map`](../../docs/CODEMAPS/frontend.md).
+Next.js 16 App Router + TypeScript. See the [`frontend map`](../../docs/CODEMAPS/frontend.md).
 
 - Compose service data through HTTP clients; no direct database access. Use SSR for public content and let optional services fail gracefully.
 - Reuse the article renderer for public and preview views.

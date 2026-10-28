@@ -52,7 +52,11 @@ Caddy must remain the trusted entry point that supplies the client IP header.
 Locally, `./manageLocalStack.sh --start` starts the service and exposes
 `http://localhost/mcp`; `http://localhost/mcp/ping` is its health check. Run
 `npm ci && npm test` in this directory for its focused checks. The Docker image
-builds from the committed package lockfile.
+builds from the committed package lockfile. Host checks use Node 22 and matching
+Node 22 type declarations. TypeScript 7 runs through its native `tsc` CLI; keep
+optional dependencies enabled during the build so npm selects the compiler for
+the build platform. The production stage contains only emitted JavaScript and
+runtime dependencies.
 
 An import batch accepts at most 100 items. Each item has its own idempotency
 key, checksum, validation errors, and review status. For a large JSON item,

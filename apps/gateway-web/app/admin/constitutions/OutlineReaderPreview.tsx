@@ -1,10 +1,10 @@
 'use client';
 
-import { cloneElement, useId, useLayoutEffect, useRef, useState, type Dispatch, type ReactElement, type SetStateAction, type SyntheticEvent } from 'react';
+import { cloneElement, useId, useLayoutEffect, useRef, useState, type Dispatch, type SetStateAction, type SyntheticEvent } from 'react';
 import type { ContentOutline, OrderedNode } from '../../../lib/api';
 import { kindByCode, type OutlineKind } from '../../../lib/outline';
 import { outlineUnitDetails } from '../../../lib/outline-preview';
-import { OrderedContentTree } from '../../components/ConstitutionText';
+import { OrderedContentTree, type OrderedNodeElement } from '../../components/ConstitutionText';
 import { useTranslation } from '../../components/TranslationProvider';
 import { ui } from '../../../lib/messages';
 
@@ -22,7 +22,7 @@ export function OutlineReaderPreview({ roots, outline, label }: { roots: Ordered
 }
 
 function PreviewUnit({ node, kind, unitLabel, outline, element, inspected, setInspected }: {
-  node: OrderedNode; kind: OutlineKind; unitLabel: string; outline: ContentOutline; element: ReactElement;
+  node: OrderedNode; kind: OutlineKind; unitLabel: string; outline: ContentOutline; element: OrderedNodeElement;
   inspected: string | null; setInspected: Dispatch<SetStateAction<string | null>>;
 }) {
   const id = useId();
@@ -32,7 +32,7 @@ function PreviewUnit({ node, kind, unitLabel, outline, element, inspected, setIn
   const [position, setPosition] = useState<{ left: number; top: number } | null>(null);
   const open = inspected === node.occurrenceId;
   useLayoutEffect(() => {
-    if (!open) { setPosition(null); return; }
+    if (!open) return;
     function place() {
       if (!root.current || !tooltip.current) return;
       const anchor = root.current.getBoundingClientRect();
@@ -88,6 +88,8 @@ function PreviewUnit({ node, kind, unitLabel, outline, element, inspected, setIn
       if (event.key === 'Escape') { event.stopPropagation(); close(); }
     },
   };
+  // cloneElement forwards this ref to the rendered DOM element; it does not read ref.current.
+  // eslint-disable-next-line react-hooks/refs
   return cloneElement(element, attributes, <>{element.props.children}{open ? <span ref={tooltip} id={id} role="tooltip" className="outline-preview-tooltip" style={position ?? { visibility: 'hidden' }}>
     <strong>{kind.displayLabel}{node.label ? ` ${node.label}` : ''}</strong>
     {outlineUnitDetails(kind, outline, t).map(detail => <span key={detail}>{detail}</span>)}

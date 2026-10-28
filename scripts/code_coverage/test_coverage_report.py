@@ -119,7 +119,7 @@ class CoverageTests(unittest.TestCase):
 
     def test_unsupported_application_source_extensions_fail_closed(self):
         for name in ('services/example/src/main/java/demo/Example.java',
-                     'apps/gateway-web/lib/example.mts', 'services/mcp-server/src/extra.mjs'):
+                     'apps/gateway-web/lib/example.mts', 'apps/gateway-web/proxy.mts', 'services/mcp-server/src/extra.mjs'):
             self.write(name, 'new source\n')
             self.commit()
             with self.assertRaisesRegex(ValueError, 'Unsupported production source'):
@@ -127,16 +127,24 @@ class CoverageTests(unittest.TestCase):
             (self.root / name).unlink()
             self.commit()
 
-    def test_javascript_middleware_remains_in_inventory_and_changed_code_gate(self):
-        name = 'apps/gateway-web/middleware.js'
-        self.write(name, 'export function middleware() { return null; }\n')
-        self.commit()
-        self.assertIn(name, cr.inventory(self.root)['gateway-javascript'])
-        changed = cr.changed_lines(self.root, self.base, cr.git(self.root, 'rev-parse', 'HEAD'), {name})
-        self.assertEqual(changed[name], {1})
-        raw = self.write('raw.json', json.dumps(self.istanbul('apps/gateway-web/lib/example.js', (1,))))
-        with self.assertRaisesRegex(ValueError, 'omitted production sources.*middleware.js'):
-            cr.pack(self.root, 'gateway-javascript', 'istanbul', raw)
+    def test_request_entry_points_remain_in_inventory_and_changed_code_gate(self):
+        for entry, component, observed in (
+            ('middleware.js', 'gateway-javascript', 'apps/gateway-web/lib/example.js'),
+            ('proxy.js', 'gateway-javascript', 'apps/gateway-web/lib/example.js'),
+            ('proxy.ts', 'gateway-typescript', 'apps/gateway-web/lib/example.ts'),
+        ):
+            with self.subTest(entry=entry):
+                name = 'apps/gateway-web/' + entry
+                self.write(name, 'export function proxy() { return null; }\n')
+                self.commit()
+                self.assertIn(name, cr.inventory(self.root)[component])
+                changed = cr.changed_lines(self.root, self.base, cr.git(self.root, 'rev-parse', 'HEAD'), {name})
+                self.assertEqual(changed[name], {1})
+                raw = self.write('raw.json', json.dumps(self.istanbul(observed, (1,))))
+                with self.assertRaisesRegex(ValueError, 'omitted production sources.*' + entry):
+                    cr.pack(self.root, component, 'istanbul', raw)
+                (self.root / name).unlink()
+                self.commit()
 
     def test_overlapping_observations_count_each_line_and_branch_once(self):
         target = {}

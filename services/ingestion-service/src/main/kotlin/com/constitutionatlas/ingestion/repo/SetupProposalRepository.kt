@@ -2,9 +2,9 @@ package com.constitutionatlas.ingestion.repo
 
 import com.constitutionatlas.ingestion.api.SetupProposalDto
 import com.constitutionatlas.ingestion.api.SetupProposalRequest
-import com.fasterxml.jackson.databind.ObjectMapper
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Repository
+import tools.jackson.databind.ObjectMapper
 import java.util.UUID
 
 data class SetupConfirmationClaim(val proposal: SetupProposalDto, val attempt: UUID, val operationId: UUID)
@@ -37,9 +37,9 @@ class SetupProposalRepository(private val jdbc: JdbcTemplate, private val mapper
         revision,
     ).firstOrNull()
 
-    fun displayOverrides(id: UUID): com.fasterxml.jackson.databind.JsonNode = mapper.readTree(jdbc.queryForObject("SELECT display_overrides::text FROM import_setup_proposals WHERE id = ?", String::class.java, id))
+    fun displayOverrides(id: UUID): tools.jackson.databind.JsonNode = mapper.readTree(jdbc.queryForObject("SELECT display_overrides::text FROM import_setup_proposals WHERE id = ?", String::class.java, id))
 
-    fun display(id: UUID, revision: Long, payload: SetupProposalRequest, overrides: com.fasterxml.jackson.databind.JsonNode): SetupProposalDto? = jdbc.query(
+    fun display(id: UUID, revision: Long, payload: SetupProposalRequest, overrides: tools.jackson.databind.JsonNode): SetupProposalDto? = jdbc.query(
         "UPDATE import_setup_proposals SET payload = ?::jsonb, display_overrides = ?::jsonb, revision = revision + 1, confirmation_operation = NULL, updated_at = now() WHERE id = ? AND revision = ? AND status = 'proposed' AND expires_at > now() RETURNING $columns",
         ::map,
         mapper.writeValueAsString(payload),

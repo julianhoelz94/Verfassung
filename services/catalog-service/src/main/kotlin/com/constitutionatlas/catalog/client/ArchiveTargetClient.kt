@@ -2,12 +2,12 @@ package com.constitutionatlas.catalog.client
 
 import com.constitutionatlas.platform.OrderedSnapshot
 import com.constitutionatlas.platform.timedRestClient
-import com.fasterxml.jackson.databind.JsonNode
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.http.HttpHeaders
+import tools.jackson.databind.JsonNode
 import java.util.UUID
 
 interface ArchiveTargetClient {

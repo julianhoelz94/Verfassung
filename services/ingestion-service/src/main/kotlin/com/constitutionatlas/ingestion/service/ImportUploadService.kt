@@ -9,14 +9,15 @@ import com.constitutionatlas.ingestion.repo.UploadRow
 import com.constitutionatlas.platform.Actor
 import com.constitutionatlas.platform.ForbiddenException
 import com.constitutionatlas.platform.NotFoundException
-import com.fasterxml.jackson.core.StreamReadConstraints
-import com.fasterxml.jackson.databind.ObjectMapper
 import org.springframework.dao.DuplicateKeyException
 import org.springframework.http.HttpStatus
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.server.ResponseStatusException
+import tools.jackson.core.StreamReadConstraints
+import tools.jackson.databind.ObjectMapper
+import tools.jackson.databind.json.JsonMapper
 import java.io.ByteArrayOutputStream
 import java.security.MessageDigest
 import java.util.Base64
@@ -29,12 +30,7 @@ class ImportUploadService(
     private val mapper: ObjectMapper,
     private val migrations: MigrationService? = null,
 ) {
-    private val uploadMapper = mapper.copy().apply {
-        factory.setStreamReadConstraints(
-            StreamReadConstraints.builder().maxNestingDepth(32).maxDocumentLength(26L * 1024 * 1024)
-                .maxStringLength(1_048_576).maxNameLength(256).build(),
-        )
-    }
+    private val uploadReader = importUploadReader(mapper)
     companion object {
         const val CHUNK_BYTES = 512 * 1024
         const val MAX_ITEM_BYTES = 25 * 1024 * 1024
@@ -107,13 +103,13 @@ class ImportUploadService(
         val bytes = payload.toByteArray()
         if (bytes.size != upload.totalBytes || sha256(bytes) != upload.checksumSha256) bad("Full upload checksum mismatch")
         val tree = try {
-            uploadMapper.readTree(bytes)
+            uploadReader.readTree(bytes)
         } catch (ex: Exception) {
             bad("Uploaded JSON is invalid")
         }
         if (tree.has("migrationRunId")) {
             val envelope = try {
-                uploadMapper.treeToValue(tree, com.constitutionatlas.ingestion.api.MigrationUploadEnvelope::class.java)
+                mapper.treeToValue(tree, com.constitutionatlas.ingestion.api.MigrationUploadEnvelope::class.java)
             } catch (ex: Exception) {
                 bad("Uploaded migration envelope is invalid")
             }
@@ -123,7 +119,7 @@ class ImportUploadService(
             return status(uploads.find(id)!!)
         }
         val request = try {
-            uploadMapper.readValue(bytes, ImportRequest::class.java)
+            uploadReader.forType(ImportRequest::class.java).readValue<ImportRequest>(bytes)
         } catch (ex: Exception) {
             bad("Uploaded JSON is not a valid import payload")
         }
@@ -159,4 +155,15 @@ class ImportUploadService(
     private fun bad(message: String): Nothing = throw ResponseStatusException(HttpStatus.BAD_REQUEST, message)
     private fun conflict(message: String): Nothing = throw ResponseStatusException(HttpStatus.CONFLICT, message)
     private fun tooLarge(message: String): Nothing = throw ResponseStatusException(HttpStatus.PAYLOAD_TOO_LARGE, message)
+}
+
+/** Preserve the application's deserialization settings while enlarging only the upload document limit. */
+internal fun importUploadReader(mapper: ObjectMapper): tools.jackson.databind.ObjectReader {
+    val factory = tools.jackson.core.json.JsonFactory.builder()
+        .streamReadConstraints(
+            StreamReadConstraints.builder().maxNestingDepth(32).maxDocumentLength(26L * 1024 * 1024)
+                .maxStringLength(1_048_576).maxNameLength(256).build(),
+        ).build()
+    return JsonMapper.builder(factory)
+        .addModules(mapper.registeredModules()).build().reader().with(mapper.deserializationConfig())
 }

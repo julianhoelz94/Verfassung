@@ -14,7 +14,6 @@ import com.constitutionatlas.platform.Actor
 import com.constitutionatlas.platform.IdentityClient
 import com.constitutionatlas.platform.OrderedEntry
 import com.constitutionatlas.platform.UnauthorizedException
-import com.fasterxml.jackson.databind.ObjectMapper
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.BeforeEach
@@ -22,19 +21,20 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.mockito.Mockito
 import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
 import org.springframework.boot.test.context.SpringBootTest
-import org.springframework.boot.test.mock.mockito.MockBean
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.http.MediaType
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
+import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.springframework.test.context.jdbc.Sql
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.post
-import org.testcontainers.containers.PostgreSQLContainer
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
+import org.testcontainers.postgresql.PostgreSQLContainer
+import tools.jackson.databind.json.JsonMapper
 import java.util.UUID
 
 @Testcontainers
@@ -49,15 +49,15 @@ class AmendmentApiTest {
     @Autowired
     lateinit var mockMvc: MockMvc
 
-    private val objectMapper = ObjectMapper()
+    private val objectMapper = JsonMapper()
 
-    @MockBean
+    @MockitoBean
     lateinit var identityClient: IdentityClient
 
-    @MockBean
+    @MockitoBean
     lateinit var contentClient: ContentClient
 
-    @MockBean
+    @MockitoBean
     lateinit var catalogClient: CatalogClient
 
     private val editor =
@@ -179,7 +179,7 @@ class AmendmentApiTest {
     @Test
     fun publishAttemptRetriesReturnSameChangeRecordAndRejectPayloadChanges() {
         val attempt = UUID.randomUUID()
-        fun request(title: String): String = objectMapper.readTree(createAmendmentJson(title)).also { (it as com.fasterxml.jackson.databind.node.ObjectNode).put("publishAttemptId", attempt.toString()) }.toString()
+        fun request(title: String): String = objectMapper.readTree(createAmendmentJson(title)).also { (it as tools.jackson.databind.node.ObjectNode).put("publishAttemptId", attempt.toString()) }.toString()
         fun create(title: String) = mockMvc.post("/constitutions/$CONSTITUTION_ID/amendments") {
             header("Authorization", TOKEN)
             contentType = MediaType.APPLICATION_JSON
@@ -1344,7 +1344,7 @@ class AmendmentApiTest {
 
         @Container
         @JvmStatic
-        val postgres: PostgreSQLContainer<*> = PostgreSQLContainer("postgres:16-alpine")
+        val postgres: PostgreSQLContainer = PostgreSQLContainer("postgres:16-alpine")
 
         @JvmStatic
         @DynamicPropertySource

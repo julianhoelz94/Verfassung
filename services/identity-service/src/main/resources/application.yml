@@ -1,4 +1,7 @@
 spring:
+  jackson:
+    # Preserve persisted request hashes and existing null/coercion contracts on Jackson 3.
+    use-jackson2-defaults: true
   application:
     name: identity-service
   http:

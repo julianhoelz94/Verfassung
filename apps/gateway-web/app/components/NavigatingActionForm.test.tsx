@@ -1,7 +1,7 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { renderToString } from 'react-dom/server';
-import { Simulate } from 'react-dom/test-utils';
+import { fireEvent } from '@testing-library/dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { NavigatingActionForm } from './NavigatingActionForm';
 import { TranslationProvider } from './TranslationProvider';
@@ -42,13 +42,13 @@ describe('client action readiness', () => {
     const form = host.querySelector('form')!;
     const fieldset = host.querySelector('fieldset')!;
     expect(fieldset.disabled).toBe(false);
-    await act(async () => Simulate.submit(form));
+    await act(async () => fireEvent.submit(form));
     expect(action).toHaveBeenCalledTimes(1);
     const data = action.mock.calls[0][0] as FormData;
     expect(data.get('code')).toBe('123456');
     expect(data.get('next')).toBe('/editor?status=approved');
     expect(fieldset.disabled).toBe(true);
-    await act(async () => Simulate.submit(form));
+    await act(async () => fireEvent.submit(form));
     expect(action).toHaveBeenCalledTimes(1);
     await act(async () => rejectAction(new Error('Connection interrupted')));
     expect(fieldset.disabled).toBe(false);

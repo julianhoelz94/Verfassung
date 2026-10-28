@@ -1,11 +1,11 @@
 import com.constitutionatlas.ingestion.repo.ImportPublicationOutbox
 import com.constitutionatlas.ingestion.repo.PublicationEvent
 import com.constitutionatlas.ingestion.service.ImportPublicationDelivery
-import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.sun.net.httpserver.HttpServer
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito
+import tools.jackson.module.kotlin.jacksonObjectMapper
 import java.net.InetSocketAddress
 import java.time.OffsetDateTime
 import java.util.UUID
@@ -17,7 +17,7 @@ class ImportAuditDeliveryTest {
         val outbox = Mockito.mock(ImportPublicationOutbox::class.java)
         val event = PublicationEvent(UUID.randomUUID(), "audit_publish", """{"action":"published","entityType":"version","entityId":"${UUID.randomUUID()}"}""", 0, OffsetDateTime.parse("2026-10-20T10:00:00Z"))
         Mockito.`when`(outbox.pending()).thenReturn(listOf(event))
-        val received = mutableListOf<com.fasterxml.jackson.databind.JsonNode>()
+        val received = mutableListOf<tools.jackson.databind.JsonNode>()
         val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
         server.createContext("/events") { exchange ->
             received.add(mapper.readTree(exchange.requestBody))

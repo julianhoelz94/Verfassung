@@ -1,14 +1,14 @@
 import com.constitutionatlas.content.repo.OrderedContentRepository
-import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import org.assertj.core.api.Assertions.assertThat
 import org.flywaydb.core.Flyway
 import org.flywaydb.core.api.MigrationVersion
 import org.junit.jupiter.api.Test
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.jdbc.datasource.DriverManagerDataSource
-import org.testcontainers.containers.PostgreSQLContainer
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
+import org.testcontainers.postgresql.PostgreSQLContainer
+import tools.jackson.module.kotlin.jacksonObjectMapper
 import java.util.UUID
 
 @Testcontainers
@@ -45,6 +45,6 @@ class OrderedContentMigrationTest {
 
     companion object {
         @Container @JvmStatic
-        val postgres = PostgreSQLContainer<Nothing>("postgres:16-alpine")
+        val postgres = PostgreSQLContainer("postgres:16-alpine")
     }
 }

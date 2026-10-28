@@ -5,9 +5,9 @@ import com.constitutionatlas.document.api.SaveDocumentRequest
 import com.constitutionatlas.document.repo.MigrationCaptureRepository
 import com.constitutionatlas.platform.Actor
 import com.constitutionatlas.platform.StrictOrderedWrite
-import com.fasterxml.jackson.databind.ObjectMapper
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import tools.jackson.databind.ObjectMapper
 import java.security.MessageDigest
 import java.util.Base64
 import java.util.UUID

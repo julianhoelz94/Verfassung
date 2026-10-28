@@ -24,7 +24,7 @@ private fun restClient(baseUrl: String): RestClient =
         }
         .build()
 
-private fun <T> RestClient.postJson(path: String, body: Any, type: Class<T>, vararg uriVars: Any): T =
+private fun <T : Any> RestClient.postJson(path: String, body: Any, type: Class<T>, vararg uriVars: Any): T =
     post()
         .uri(path, *uriVars)
         .contentType(MediaType.APPLICATION_JSON)

@@ -19,6 +19,8 @@ export function LegacyResolver({ initialUrl, canonicalOrigin }: { initialUrl: st
   }, [canonicalOrigin]);
   useEffect(() => {
     const source = initialUrl || (window.location.host !== new URL(canonicalOrigin).host ? window.location.href : '');
+    // Synchronize the browser-only fragment and loading state with the legacy resolution request.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (source) { setUrl(source); void resolve(source); }
     // The source fragment is read in the browser because HTTP requests do not contain it.
   }, [initialUrl, canonicalOrigin, resolve]);

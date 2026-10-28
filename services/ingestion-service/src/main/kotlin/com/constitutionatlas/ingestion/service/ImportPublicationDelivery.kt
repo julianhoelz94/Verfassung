@@ -2,13 +2,13 @@ package com.constitutionatlas.ingestion.service
 
 import com.constitutionatlas.ingestion.repo.ImportPublicationOutbox
 import com.constitutionatlas.platform.timedRestClientBuilder
-import com.fasterxml.jackson.databind.ObjectMapper
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.MediaType
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import tools.jackson.databind.ObjectMapper
 import java.time.Duration
 
 @Service
@@ -34,7 +34,7 @@ class ImportPublicationDelivery(
                 when (event.type) {
                     "audit_publish" -> {
                         if (auditToken.isBlank()) continue
-                        val payload = mapper.readTree(event.payload) as com.fasterxml.jackson.databind.node.ObjectNode
+                        val payload = mapper.readTree(event.payload) as tools.jackson.databind.node.ObjectNode
                         payload.put("eventId", event.id.toString())
                         payload.put("occurredAt", event.createdAt.toString())
                         audit.post().uri("/events").header("Authorization", bearer(auditToken))

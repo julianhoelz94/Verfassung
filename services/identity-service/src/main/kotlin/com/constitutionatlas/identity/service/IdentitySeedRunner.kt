@@ -2,6 +2,7 @@ package com.constitutionatlas.identity.service
 
 import com.constitutionatlas.identity.config.IdentitySeedProperties
 import com.constitutionatlas.identity.crypto.Tokens
+import com.constitutionatlas.identity.crypto.encodeRequired
 import com.constitutionatlas.identity.repo.IdentityRepository
 import org.slf4j.LoggerFactory
 import org.springframework.boot.ApplicationArguments
@@ -100,9 +101,9 @@ class IdentitySeedRunner(
         val existing = identityRepository.findUserByEmail(email)
         val userId =
             if (existing == null) {
-                identityRepository.insertUser(email, passwordEncoder.encode(password))
+                identityRepository.insertUser(email, passwordEncoder.encodeRequired(password))
             } else if (mode == "reset") {
-                identityRepository.updatePasswordHash(existing.id, passwordEncoder.encode(password))
+                identityRepository.updatePasswordHash(existing.id, passwordEncoder.encodeRequired(password))
                 existing.id
             } else {
                 existing.id

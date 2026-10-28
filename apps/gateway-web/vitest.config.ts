@@ -10,7 +10,7 @@ export default defineConfig({
     exclude: ['e2e/**', 'node_modules/**'],
     coverage: {
       provider: 'v8',
-      include: ['app/**/*.{ts,tsx,jsx}', 'lib/**/*.{ts,tsx,jsx}', 'middleware.ts'],
+      include: ['app/**/*.{ts,tsx,jsx}', 'lib/**/*.{ts,tsx,jsx}', 'proxy.ts'],
       exclude: ['**/*.test.*', '**/*.d.ts'],
       reporter: ['text-summary', 'json', 'html'],
       reportsDirectory: 'coverage/vitest',

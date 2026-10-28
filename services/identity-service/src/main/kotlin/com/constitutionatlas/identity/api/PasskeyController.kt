@@ -3,7 +3,6 @@ package com.constitutionatlas.identity.api
 import com.constitutionatlas.identity.service.PasskeyInfo
 import com.constitutionatlas.identity.service.PasskeyService
 import com.constitutionatlas.identity.service.PasskeyStart
-import com.fasterxml.jackson.databind.JsonNode
 import jakarta.servlet.http.HttpServletRequest
 import org.springframework.http.HttpStatus
 import org.springframework.web.bind.annotation.DeleteMapping
@@ -14,6 +13,7 @@ import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestHeader
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
+import tools.jackson.databind.JsonNode
 import java.util.UUID
 
 data class StartPasskeyEnrollmentRequest(val password: String)

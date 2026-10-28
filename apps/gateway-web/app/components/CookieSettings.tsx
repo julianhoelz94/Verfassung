@@ -2,21 +2,28 @@
 
 import { T, useLocale, useTranslation } from './TranslationProvider';
 import { ui } from '../../lib/messages';
-import { useEffect, useState } from 'react';
+import { useState, useSyncExternalStore } from 'react';
 
 export const COOKIE_NOTICE_KEY = 'ca_cookie_notice_v1';
+
+function subscribeToStorage(onChange: () => void) {
+  window.addEventListener('storage', onChange);
+  return () => window.removeEventListener('storage', onChange);
+}
+
+function noticeIsUndismissed() {
+  try { return localStorage.getItem(COOKIE_NOTICE_KEY) !== 'dismissed'; }
+  catch { return true; }
+}
+
+const serverNoticeIsUndismissed = () => false;
 
 export function CookieSettings() {
   const t = useTranslation();
   const locale = useLocale();
-  const [open, setOpen] = useState(false);
-  useEffect(() => {
-    try {
-      setOpen(localStorage.getItem(COOKIE_NOTICE_KEY) !== 'dismissed');
-    } catch {
-      setOpen(true);
-    }
-  }, []);
+  const undismissed = useSyncExternalStore(subscribeToStorage, noticeIsUndismissed, serverNoticeIsUndismissed);
+  const [openOverride, setOpen] = useState<boolean | null>(null);
+  const open = openOverride ?? undismissed;
 
   function dismiss() {
     try {

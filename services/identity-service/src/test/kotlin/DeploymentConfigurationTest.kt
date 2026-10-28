@@ -1,9 +1,9 @@
 import com.constitutionatlas.identity.setup.DeploymentConfiguration
 import com.constitutionatlas.identity.setup.SetupState
-import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.springframework.mock.env.MockEnvironment
+import tools.jackson.module.kotlin.jacksonObjectMapper
 
 class DeploymentConfigurationTest {
     private fun environment() = MockEnvironment().apply { setActiveProfiles("local-stack") }

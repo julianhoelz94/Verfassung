@@ -9,6 +9,7 @@ import com.constitutionatlas.identity.api.PasswordResetIssuedDto
 import com.constitutionatlas.identity.api.UserAdminDto
 import com.constitutionatlas.identity.client.AuthAudit
 import com.constitutionatlas.identity.crypto.Tokens
+import com.constitutionatlas.identity.crypto.encodeRequired
 import com.constitutionatlas.identity.mail.OutboundMailer
 import com.constitutionatlas.identity.repo.IdentityRepository
 import com.constitutionatlas.identity.repo.StoredUser
@@ -54,7 +55,7 @@ class AccountService(
         authService.recordLockedFailure(emailKey, ipKey)
         val existing = identityRepository.findUserByEmail(email)
         if (existing != null && !identityRepository.hasPendingRegistration(existing.id)) return
-        val userId = existing?.id ?: identityRepository.insertUser(email, passwordEncoder.encode(Tokens.urlToken(random)), enabled = false)
+        val userId = existing?.id ?: identityRepository.insertUser(email, passwordEncoder.encodeRequired(Tokens.urlToken(random)), enabled = false)
         if (existing == null) assignRoles(userId, listOf("viewer"))
         val token = Tokens.urlToken(random)
         identityRepository.insertRegistrationVerification(userId, Tokens.sha256Hex(token), Instant.now().plus(Duration.ofHours(24)))
@@ -72,7 +73,7 @@ class AccountService(
             throw BadRequestException("Invalid or expired confirmation link")
         }
         validatePassword(password, user.email)
-        identityRepository.updatePasswordHash(user.id, passwordEncoder.encode(password))
+        identityRepository.updatePasswordHash(user.id, passwordEncoder.encodeRequired(password))
         identityRepository.setEnabled(user.id, true)
         authAudit.record("registration_confirmed", user.id, user.id, user.email, clientIp, userAgent)
     }
@@ -112,7 +113,7 @@ class AccountService(
                 assignRoles(existing.id, roleNames)
                 existing.id
             } else {
-                val id = identityRepository.insertUser(email, passwordEncoder.encode(Tokens.urlToken(random)), enabled = false)
+                val id = identityRepository.insertUser(email, passwordEncoder.encodeRequired(Tokens.urlToken(random)), enabled = false)
                 assignRoles(id, roleNames)
                 id
             }
@@ -146,7 +147,7 @@ class AccountService(
             ?: throw BadRequestException("Invalid or expired invite")
         validatePassword(password, user.email)
         if (user.enabled || !identityRepository.consumeInvite(invite.id)) throw BadRequestException("Invalid or expired invite")
-        identityRepository.updatePasswordHash(user.id, passwordEncoder.encode(password))
+        identityRepository.updatePasswordHash(user.id, passwordEncoder.encodeRequired(password))
         identityRepository.setEnabled(user.id, true)
         authAudit.record("user_activated", user.id, user.id, user.email, clientIp, userAgent)
         return toAdminDto(identityRepository.findUserById(user.id)!!)
@@ -230,7 +231,7 @@ class AccountService(
         val user = authService.requireLockedSession(authorization)
         authService.verifyPassword(user, currentPassword)
         validatePassword(newPassword, user.email)
-        identityRepository.updatePasswordHash(user.id, passwordEncoder.encode(newPassword))
+        identityRepository.updatePasswordHash(user.id, passwordEncoder.encodeRequired(newPassword))
         authService.revokeCredentials(user.id, tokenHash)
         identityRepository.deleteUnusedResets(user.id)
         identityRepository.deleteUnusedInvites(user.id)
@@ -295,7 +296,7 @@ class AccountService(
             ?: throw BadRequestException("Invalid or expired reset token")
         validatePassword(newPassword, user.email)
         if (!identityRepository.consumePasswordReset(reset.id)) throw BadRequestException("Invalid or expired reset token")
-        identityRepository.updatePasswordHash(user.id, passwordEncoder.encode(newPassword))
+        identityRepository.updatePasswordHash(user.id, passwordEncoder.encodeRequired(newPassword))
         authService.revokeCredentials(user.id)
         identityRepository.deleteUnusedResets(user.id)
         identityRepository.deleteUnusedInvites(user.id)

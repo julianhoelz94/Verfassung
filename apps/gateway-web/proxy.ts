@@ -4,7 +4,7 @@ import { requestAnonymousBrowsingPolicy } from './lib/anonymous-browsing-policy'
 import { setupStatus, setupPathAllowed } from './lib/deployment-setup';
 import { identityBaseUrl } from './lib/identity-client';
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const path = request.nextUrl.pathname;
   if (path !== '/api/setup-gate' && path !== '/api/edge-rate-limit') {
     let setup;

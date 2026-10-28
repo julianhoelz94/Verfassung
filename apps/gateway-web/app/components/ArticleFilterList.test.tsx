@@ -1,6 +1,6 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { Simulate } from 'react-dom/test-utils';
+import { fireEvent } from '@testing-library/dom';
 import { afterEach, beforeEach, expect, it } from 'vitest';
 import type { ContentOutline } from '../../lib/api';
 import { ArticleFilterList } from './ArticleFilterList';
@@ -43,8 +43,8 @@ it('labels and filters mixed roots by each configured kind while retaining the s
   expect(host.querySelector('a[aria-current="true"] .badge')?.textContent).toBe('draft');
   const filter = host.querySelector('input')!;
   expect(filter.getAttribute('aria-label')).toBe('Filter units');
-  await act(async () => { filter.value = 'appendix'; Simulate.change(filter); });
+  await act(async () => { fireEvent.change(filter, { target: { value: 'appendix' } }); });
   expect(labels()).toEqual(['Appendix A Sources']);
-  await act(async () => { filter.value = 'article'; Simulate.change(filter); });
+  await act(async () => { fireEvent.change(filter, { target: { value: 'article' } }); });
   expect(labels()).toEqual(['Article 1 Civic rights']);
 });

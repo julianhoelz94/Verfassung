@@ -36,10 +36,19 @@ jobs:
       CI_VIEWER_PASSWORD: change-me
       IDENTITY_SEED_TOTP_SECRET: CAATLASMFASEED22
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event.pull_request.merge_commit_sha }}
+          # Start from trusted main; checkout v7 rejects fork PR payload SHAs.
+          ref: main
+          fetch-depth: 0
           persist-credentials: false
+      - name: Verify and select the merged revision
+        env:
+          MERGED_REVISION: ${{ github.event.pull_request.merge_commit_sha }}
+        run: |
+          set -euo pipefail
+          git merge-base --is-ancestor "$MERGED_REVISION" HEAD
+          git checkout --detach "$MERGED_REVISION"
       - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
           distribution: temurin
@@ -141,10 +150,19 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event.pull_request.merge_commit_sha }}
+          # Start from trusted main; checkout v7 rejects fork PR payload SHAs.
+          ref: main
+          fetch-depth: 0
           persist-credentials: false
+      - name: Verify and select the merged revision
+        env:
+          MERGED_REVISION: ${{ github.event.pull_request.merge_commit_sha }}
+        run: |
+          set -euo pipefail
+          git merge-base --is-ancestor "$MERGED_REVISION" HEAD
+          git checkout --detach "$MERGED_REVISION"
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: wiki-media

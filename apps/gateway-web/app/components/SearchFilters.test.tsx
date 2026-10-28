@@ -1,6 +1,6 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { Simulate } from 'react-dom/test-utils';
+import { fireEvent } from '@testing-library/dom';
 import { afterEach, beforeEach, expect, it } from 'vitest';
 import { SearchFilters } from './SearchFilters';
 import type { SearchFacets } from '../../lib/api';
@@ -23,7 +23,7 @@ afterEach(async () => { await act(async () => root.unmount()); host.remove(); })
 it('submits only compatible owner/version fields after switching from a country to a historical region', async () => {
   await act(async () => root.render(<form><SearchFilters facets={facets} country="DE" jurisdictionId="national" versionId="law" effectiveDate="" /></form>));
   const jurisdiction = host.querySelector<HTMLSelectElement>('[name="jurisdictionId"]')!;
-  await act(async () => { jurisdiction.value = 'region'; Simulate.change(jurisdiction); });
+  await act(async () => { fireEvent.change(jurisdiction, { target: { value: 'region' } }); });
   const form = new FormData(host.querySelector('form')!);
   expect(form.get('country')).toBe(''); expect(form.get('jurisdictionId')).toBe('region'); expect(form.get('versionId')).toBe('');
   expect([...host.querySelectorAll<HTMLSelectElement>('[name="versionId"] option')].map(option => option.value)).toEqual(['', 'charter']);

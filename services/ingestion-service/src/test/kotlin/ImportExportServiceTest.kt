@@ -13,7 +13,6 @@ import com.constitutionatlas.platform.OrderedEntryWrite
 import com.constitutionatlas.platform.OrderedNode
 import com.constitutionatlas.platform.OrderedNodeWrite
 import com.constitutionatlas.platform.OrderedSnapshot
-import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNull
@@ -26,13 +25,14 @@ import org.mockito.Mockito.mock
 import org.mockito.Mockito.verifyNoInteractions
 import org.mockito.Mockito.`when`
 import org.springframework.web.server.ResponseStatusException
+import tools.jackson.module.kotlin.jacksonObjectMapper
 import java.util.UUID
 
 class ImportExportServiceTest {
     private val jobs = mock(ImportJobRepository::class.java)
     private val content = mock(ContentClient::class.java)
     private val catalog = mock(CatalogClient::class.java)
-    private val mapper = jacksonObjectMapper().findAndRegisterModules()
+    private val mapper = jacksonObjectMapper()
     private val exports = ImportExportService(jobs, content, catalog, mapper, "internal-read-credential")
     private val owner = Actor(UUID.randomUUID(), "importer@example.local", emptyList(), listOf("ingestion:import"))
     private val id = UUID.randomUUID()

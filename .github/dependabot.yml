@@ -4,68 +4,29 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    groups:
+      ci-actions:
+        patterns: ['*']
   - package-ecosystem: npm
     directory: /apps/gateway-web
     schedule:
       interval: weekly
+    groups:
+      react:
+        patterns: [react, react-dom, '@types/react', '@types/react-dom']
+      next-lint:
+        patterns: [next, eslint, eslint-config-next, '@next/eslint-plugin-next']
   - package-ecosystem: npm
     directory: /services/mcp-server
     schedule:
       interval: weekly
-  - package-ecosystem: docker
-    directory: /infra/caddy
-    schedule:
-      interval: weekly
-  - package-ecosystem: docker
-    directory: /apps/gateway-web
-    schedule:
-      interval: weekly
-  - package-ecosystem: gradle
-    directory: /
-    schedule:
-      interval: weekly
-  - package-ecosystem: gradle
-    directory: /services/catalog-service
-    schedule:
-      interval: weekly
-  - package-ecosystem: gradle
-    directory: /services/content-service
-    schedule:
-      interval: weekly
-  - package-ecosystem: gradle
-    directory: /services/amendment-service
-    schedule:
-      interval: weekly
-  - package-ecosystem: gradle
-    directory: /services/identity-service
-    schedule:
-      interval: weekly
-  - package-ecosystem: gradle
-    directory: /services/editor-service
-    schedule:
-      interval: weekly
-  - package-ecosystem: gradle
-    directory: /services/audit-service
-    schedule:
-      interval: weekly
-  - package-ecosystem: gradle
-    directory: /services/ingestion-service
-    schedule:
-      interval: weekly
-  - package-ecosystem: gradle
-    directory: /services/search-service
-    schedule:
-      interval: weekly
-  - package-ecosystem: gradle
-    directory: /services/document-service
-    schedule:
-      interval: weekly
-  - package-ecosystem: gradle
-    directory: /services/platform
-    schedule:
-      interval: weekly
+    groups:
+      mcp-sdk:
+        patterns: ['@modelcontextprotocol/*', zod]
   - package-ecosystem: docker
     directories:
+      - /infra/caddy
+      - /apps/gateway-web
       - /services/catalog-service
       - /services/content-service
       - /services/amendment-service
@@ -79,3 +40,38 @@ updates:
       - /infra/local-stack
     schedule:
       interval: weekly
+    groups:
+      node-runtime:
+        patterns: [node]
+      java-runtime:
+        patterns: [eclipse-temurin]
+  - package-ecosystem: gradle
+    # One entry groups the shared platform and its consumers in the same PR.
+    directories:
+      - /
+      - /services/catalog-service
+      - /services/content-service
+      - /services/amendment-service
+      - /services/identity-service
+      - /services/editor-service
+      - /services/audit-service
+      - /services/ingestion-service
+      - /services/search-service
+      - /services/document-service
+      - /services/platform
+    schedule:
+      interval: weekly
+    groups:
+      backend-framework:
+        patterns:
+          - org.springframework.boot
+          - 'org.springframework.boot:*'
+          - 'org.jetbrains.kotlin*'
+          - jvm
+          - plugin.spring
+          - 'org.springdoc:*'
+          - 'com.fasterxml.jackson*'
+          - 'tools.jackson*'
+          - 'org.testcontainers:*'
+      spotless:
+        patterns: ['*spotless*']

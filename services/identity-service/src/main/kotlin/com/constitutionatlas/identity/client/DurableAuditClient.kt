@@ -3,7 +3,6 @@ package com.constitutionatlas.identity.client
 import com.constitutionatlas.identity.repo.AuditOutboxRepository
 import com.constitutionatlas.identity.repo.PendingAudit
 import com.constitutionatlas.platform.timedRestClient
-import com.fasterxml.jackson.databind.node.ObjectNode
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.annotation.Bean
@@ -14,6 +13,7 @@ import org.springframework.stereotype.Component
 import org.springframework.transaction.PlatformTransactionManager
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.transaction.support.TransactionTemplate
+import tools.jackson.databind.node.ObjectNode
 import java.util.UUID
 
 open class DurableAuditClient(private val outbox: AuditOutboxRepository) : AuditClient {
@@ -30,7 +30,7 @@ fun interface AuditDeliveryClient {
 class RestAuditDeliveryClient(auditUrl: String, private val bearerToken: String?) : AuditDeliveryClient {
     private val client = timedRestClient(auditUrl)
     override fun deliver(event: PendingAudit) {
-        val body = event.body.deepCopy<ObjectNode>().put("eventId", event.eventId.toString()).put("occurredAt", event.occurredAt.toString())
+        val body = (event.body as ObjectNode).deepCopy().put("eventId", event.eventId.toString()).put("occurredAt", event.occurredAt.toString())
         val request = client.post().uri("/events").contentType(MediaType.APPLICATION_JSON)
         if (!bearerToken.isNullOrBlank()) request.header("Authorization", if (bearerToken.startsWith("Bearer ")) bearerToken else "Bearer $bearerToken")
         request.body(body).retrieve().toBodilessEntity()

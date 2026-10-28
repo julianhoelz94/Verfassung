@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 # Local source build; CI can still package its tested JARs with services/*/Dockerfile.
-FROM eclipse-temurin:21-jdk AS build
+FROM eclipse-temurin:24-jdk AS build
 WORKDIR /workspace
 COPY --chmod=755 gradlew ./gradlew
 COPY gradle ./gradle
@@ -19,7 +19,7 @@ RUN --mount=type=cache,id=atlas-local-gradle,target=/root/.gradle,sharing=locked
       jar tf /workspace/app.jar | grep -qx BOOT-INF/classes/supported-languages.json; \
     fi
 
-FROM eclipse-temurin:21-jre
+FROM eclipse-temurin:24-jre
 WORKDIR /app
 COPY --from=build --chmod=644 /workspace/app.jar app.jar
 USER 65532:65532

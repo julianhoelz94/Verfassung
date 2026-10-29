@@ -93,7 +93,12 @@ describe('toOutlineKindWrite', () => {
       labelPolicy: 'optional',
       labelPlacement: 'before_title',
       segmentation: 'plain',
+      sentenceDelimiters: ['.', '!', '?'],
     });
+  });
+  it('preserves custom Unicode and multi-character sentence delimiters through settings conversion', () => {
+    expect(toOutlineKindWrite({ kindCode: 'clause', displayLabel: 'Clause', segmentation: 'sentence', sentenceDelimiters: [';', '。', '?!'] }))
+      .toMatchObject({ segmentation: 'sentence', sentenceDelimiters: [';', '。', '?!'] });
   });
 });
 

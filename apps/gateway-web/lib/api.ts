@@ -79,6 +79,7 @@ export type ContentOutline = {
     labelPolicy?: string;
     labelPlacement?: string;
     segmentation?: string;
+    sentenceDelimiters?: string[];
     root?: boolean;
   }[];
 };
@@ -613,6 +614,7 @@ export type OutlineKindWrite = {
   labelPolicy?: 'none' | 'optional' | 'required';
   labelPlacement?: 'before_title' | 'after_title' | 'inline' | 'superscript';
   segmentation?: 'plain' | 'sentence';
+  sentenceDelimiters?: string[];
   root?: boolean;
   allowedChildKinds?: string[];
 };
@@ -780,7 +782,8 @@ export type OrderedNode = { logicalId: string; revisionId: string; occurrenceId:
 export type OrderedTableCell = { logicalId: string; text: string; header?: boolean; rowSpan?: number; colSpan?: number; headers?: string[] };
 export type OrderedTable = { caption?: string | null; rows: { logicalId: string; cells: OrderedTableCell[] }[] };
 export type OrderedInlineReference = { logicalId: string; start: number; end: number; target: { type: 'unit' | 'external' | 'footnote'; logicalId?: string | null; url?: string | null; footnoteId?: string | null } };
-export type OrderedEntry = { type: 'text' | 'child'; node?: OrderedNode | null; logicalId?: string | null; revisionId?: string | null; occurrenceId?: string | null; text?: string | null; format?: 'plain' | 'table' | 'footnote' | null; table?: OrderedTable | null; footnoteLabel?: string | null; references?: OrderedInlineReference[]; annotation?: { kind: 'source' | 'editorial' | 'amendment'; attribution?: string | null; sourceUrl?: string | null; anchorLogicalIds?: string[] } | null };
+export type OrderedTextMark = { type: 'bold' | 'italic' | 'underline' | 'strikethrough'; start: number; end: number };
+export type OrderedEntry = { type: 'text' | 'child'; node?: OrderedNode | null; logicalId?: string | null; revisionId?: string | null; occurrenceId?: string | null; text?: string | null; format?: 'plain' | 'table' | 'footnote' | null; table?: OrderedTable | null; footnoteLabel?: string | null; lineBreaksBefore?: number; references?: OrderedInlineReference[]; marks?: OrderedTextMark[]; annotation?: { kind: 'source' | 'editorial' | 'amendment'; attribution?: string | null; sourceUrl?: string | null; anchorLogicalIds?: string[] } | null };
 
 export function getVersionSettings(versionId: string, authorization?: string): Promise<SettingsRevision | null> {
   return readJson<SettingsRevision>(`${catalogBaseUrl()}/versions/${encodeURIComponent(versionId)}/settings`, 'catalog', authorization);

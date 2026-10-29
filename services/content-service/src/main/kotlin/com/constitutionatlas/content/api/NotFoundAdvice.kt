@@ -25,5 +25,5 @@ class NotFoundAdvice {
 
     @ExceptionHandler(IllegalArgumentException::class)
     fun badRequest(ex: IllegalArgumentException): ResponseEntity<Map<String, String>> =
-        ResponseEntity.status(HttpStatus.BAD_REQUEST).body(mapOf("error" to (ex.message ?: "Bad request")))
+        ResponseEntity.status(HttpStatus.BAD_REQUEST).body((ex as? com.constitutionatlas.platform.OrderedContentValidationException)?.body() ?: mapOf("error" to (ex.message ?: "Bad request")))
 }

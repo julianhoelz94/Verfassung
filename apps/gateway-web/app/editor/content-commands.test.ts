@@ -128,6 +128,16 @@ describe('contextual pages separate draft and publication', () => {
     expect(await wiki.publishWikiAction(wikiForm({ revisionId: 'wiki-r2' }))).toContain('published=1'); expect(requests[0]).toMatchObject({ method: 'POST', path: `/api/catalog/wiki/constitution/${id}/publish`, body: { revisionId: 'wiki-r2' } });
     status = 409; expect(await wiki.publishWikiAction(wikiForm({ revisionId: 'stale' }))).toContain('error=1');
   });
+  it('returns an embedded Wiki save to the same editor session and tab', async () => {
+    const destination = await wiki.saveWikiAction(wikiForm({ returnTo: `/editor?versionId=${id}&sessionId=session-one&scope=article` }));
+    const url = new URL(destination, 'http://atlas.local');
+    expect(url.pathname).toBe('/editor'); expect(url.searchParams.get('sessionId')).toBe('session-one');
+    expect(url.searchParams.get('tab')).toBe('wiki'); expect(url.searchParams.get('wikiStatus')).toBe('saved');
+    expect(requests).toHaveLength(1);
+  });
+  it.each(['https://attacker.example/editor?sessionId=one&versionId=two', '//attacker.example', '/admin/users', '/editor?versionId=one'])('ignores an unsafe or unrelated Wiki return destination %s', async returnTo => {
+    expect(await wiki.saveWikiAction(wikiForm({ returnTo }))).toBe(`/editor/wiki/constitution/${id}?code=XA&saved=1`);
+  });
   it('pins retained images to the saved draft and removes the selected image', async () => {
     const data = wikiForm({ images: JSON.stringify([{ documentId: 'keep', revision: 2, alt: 'Old alt' }, { documentId: 'remove', revision: 1, alt: 'Remove' }]), 'remove-remove': 'on', 'alt-keep': ' Official seal ', 'placement-keep': 'before_body' });
     expect(await wiki.saveWikiAction(data)).toContain('saved=1');

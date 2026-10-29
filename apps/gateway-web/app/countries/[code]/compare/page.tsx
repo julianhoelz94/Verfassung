@@ -1,3 +1,5 @@
+import { orderedTargets } from "../../../../lib/ordered-content";
+import { footnoteItems } from '../../../../lib/footnotes';
 import { changeTypeMessage, changeTypeTone } from '../../../../lib/ui-labels';
 import { T } from '../../../components/TranslationProvider';
 import { ui, message, type UiMessage } from '../../../../lib/messages';
@@ -231,6 +233,10 @@ export default async function ComparePage(props: ComparePageProps) {
 
   const fromVersion = path?.[0];
   const toVersion = path?.[path.length - 1];
+  const fromReaderId = fromDetail?.id ?? (fromVersion ? snapshotVersionId(fromVersion) : fromId ?? '');
+  const toReaderId = toDetail?.id ?? (toVersion ? snapshotVersionId(toVersion) : toId ?? '');
+  const fromCrossRefs = { code: params.code, versionId: fromReaderId, articlesByNumber: Object.fromEntries(fromArticles.map(item => [item.articleNumber, item.id])), unitsByLogicalId: orderedTargets(fromArticles), footnotes: footnoteItems(fromArticles.flatMap(item => item.content ?? []), '/countries/' + params.code + '/versions/' + fromReaderId) };
+  const toCrossRefs = { code: params.code, versionId: toReaderId, articlesByNumber: Object.fromEntries(toArticles.map(item => [item.articleNumber, item.id])), unitsByLogicalId: orderedTargets(toArticles), footnotes: footnoteItems(toArticles.flatMap(item => item.content ?? []), '/countries/' + params.code + '/versions/' + toReaderId) };
   const rows = alignArticles(fromArticles, toArticles).map(({ key, left, right }) => {
     const number = right?.articleNumber ?? left?.articleNumber ?? '';
     const kind = netArticleKind(left, right, recorded.get(number) ?? []);
@@ -375,6 +381,7 @@ export default async function ComparePage(props: ComparePageProps) {
                           left={row.left}
                           right={row.right}
                           side="from"
+                          footnotes={fromCrossRefs.footnotes} crossRefs={fromCrossRefs}
                           oppositeOutline={toOutline}
                           showHeading={true}
                           outline={fromOutline}
@@ -383,6 +390,7 @@ export default async function ComparePage(props: ComparePageProps) {
                       ) : row.left ? (
                         <ConstitutionText
                           article={row.left}
+                          crossRefs={fromCrossRefs}
                           headingLevel="h3"
                           showHeading={false}
                           headingIdPrefix="article-from"
@@ -403,6 +411,7 @@ export default async function ComparePage(props: ComparePageProps) {
                           left={row.left}
                           right={row.right}
                           side="to"
+                          footnotes={toCrossRefs.footnotes} crossRefs={toCrossRefs}
                           oppositeOutline={fromOutline}
                           showHeading={true}
                           outline={toOutline}
@@ -411,6 +420,7 @@ export default async function ComparePage(props: ComparePageProps) {
                       ) : row.right ? (
                         <ConstitutionText
                           article={row.right}
+                          crossRefs={toCrossRefs}
                           headingLevel="h3"
                           showHeading={false}
                           headingIdPrefix="article-to"

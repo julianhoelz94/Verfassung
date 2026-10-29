@@ -9,6 +9,7 @@ import com.constitutionatlas.ingestion.client.CatalogClient
 import com.constitutionatlas.ingestion.client.ContentClient
 import com.constitutionatlas.ingestion.client.DownstreamAuth
 import com.constitutionatlas.ingestion.repo.ImportJobRepository
+import com.constitutionatlas.platform.scalarText
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.HttpStatus
@@ -42,6 +43,7 @@ class ImportService(
             val previous = if (batchId == null) importJobRepository.findDirectItem(submittedBy, idempotencyKey) else importJobRepository.findBatchItem(batchId, idempotencyKey)
             previous?.let { (existing, previousChecksum) ->
                 if (previousChecksum != checksum) throw ResponseStatusException(HttpStatus.CONFLICT, "Idempotency key was used for different content")
+                requireCurrentRichRules(request)
                 return existing
             }
         }
@@ -60,7 +62,10 @@ class ImportService(
             } else {
                 importJobRepository.findBatchItem(batchId, idempotencyKey)
             }
-            if (existing?.second == checksum) return existing.first
+            if (existing?.second == checksum) {
+                requireCurrentRichRules(request)
+                return existing.first
+            }
             throw ResponseStatusException(HttpStatus.CONFLICT, "Idempotency key was used for different content")
         }
         importJobRepository.stage(jobId, "request", request)
@@ -133,6 +138,7 @@ class ImportService(
 
     fun prepare(authorization: String?, jobId: UUID, actorId: UUID): ImportJobDto {
         val request = importJobRepository.request(jobId) ?: throw com.constitutionatlas.platform.NotFoundException("Unknown import job")
+        requireCurrentRichRules(request)
         DownstreamAuth.withAuthorization(authorization) {
             val existing = findSelectedConstitution(request)
             if (existing == null && !importJobRepository.isOutlineConfirmed(jobId)) {
@@ -155,6 +161,10 @@ class ImportService(
         return importJobRepository.find(jobId)!!
     }
 
+    private fun requireCurrentRichRules(request: ImportRequest) {
+        com.constitutionatlas.platform.OrderedContentRules.requireValid(ImportValidator.richContentValidationErrors(request.roots))
+    }
+
     private fun reviewReason(reason: String): String = reason.trim().also {
         if (it.length !in 10..2000) throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Review reason must contain 10 to 2000 characters")
     }
@@ -164,6 +174,7 @@ class ImportService(
         val versionId = importJobRepository.find(jobId)?.versionId
             ?: throw ResponseStatusException(HttpStatus.CONFLICT, "Import has no prepared draft")
         val snapshot = DownstreamAuth.withAuthorization(authorization) { contentClient.snapshot(versionId) }
+        com.constitutionatlas.platform.OrderedContentRules.requireValid(com.constitutionatlas.platform.OrderedContentRules.contentErrors(snapshot.roots))
         if (!importJobRepository.approve(jobId, actorId, snapshot, recordedReason)) throw ResponseStatusException(HttpStatus.CONFLICT, "Import is not prepared for review")
         return importJobRepository.find(jobId)!!
     }
@@ -186,6 +197,9 @@ class ImportService(
             if (current.generation != approved.first || current.settingsRevisionId != approved.second) {
                 throw ImportPublicationException(HttpStatus.CONFLICT, "approved_snapshot_changed")
             }
+            com.constitutionatlas.platform.OrderedContentRules.contentErrors(current.roots).firstOrNull()?.let {
+                throw ImportPublicationException(HttpStatus.BAD_REQUEST, it.code, it.path, it.logicalId)
+            }
             DownstreamAuth.withAuthorization("Bearer $publishToken") {
                 stage = "seal"
                 contentClient.sealImport(versionId, jobId, approved.first, requireNotNull(approved.second))
@@ -207,6 +221,8 @@ class ImportService(
                 ex is ImportPublicationException -> ex
                 ex is RestClientResponseException && stage in setOf("seal", "publish") && ex.statusCode.value() in setOf(401, 403) ->
                     ImportPublicationException(HttpStatus.SERVICE_UNAVAILABLE, "publication_credentials_invalid")
+                ex is RestClientResponseException && stage in setOf("seal", "publish") && ex.statusCode.value() == 400 ->
+                    publicationValidationFailure(ex)
                 ex is RestClientResponseException && ex.statusCode.value() == 409 ->
                     ImportPublicationException(HttpStatus.CONFLICT, "publication_conflict")
                 else -> ImportPublicationException(HttpStatus.SERVICE_UNAVAILABLE, "publication_unavailable")
@@ -215,6 +231,18 @@ class ImportService(
             throw failure
         }
         return importJobRepository.find(jobId)!!
+    }
+
+    /** Only a known validation code and bounded structural identity may leave the service. */
+    private fun publicationValidationFailure(ex: RestClientResponseException): ImportPublicationException {
+        val allowed = setOf("FOOTNOTE_NOT_AT_END", "FOOTNOTE_MARK_CARDINALITY", "UNIT_REFERENCE_TARGET", "INLINE_REFERENCE", "TEXT_MARK_RANGE", "TEXT_MARK_OVERLAP", "TEXT_MARK_FORMAT", "TEXT_MARK_LIMIT", "TEXT_LINE_BREAKS")
+        val body = if (ex.responseBodyAsByteArray.size <= 16_384) runCatching { objectMapper.readTree(ex.responseBodyAsByteArray) }.getOrNull() else null
+        val code = body?.path("code")?.scalarText()?.takeIf { it in allowed }
+            ?: return ImportPublicationException(HttpStatus.BAD_REQUEST, "publication_validation_failed")
+        val candidate = body.path("path").scalarText()
+        val safePath = candidate.takeIf { it.length <= 512 && it.matches(Regex("(roots\\[[0-9]+\\]|node\\[[0-9a-fA-F-]{36}\\]\\.text\\[[0-9a-fA-F-]{36}\\])(?:\\.(?:content\\[[0-9]+\\](?:\\.node)?|marks|lineBreaksBefore|references\\[[0-9]+\\]))*")) }
+        val logicalId = runCatching { UUID.fromString(body.path("logicalId").scalarText()) }.getOrNull()
+        return ImportPublicationException(HttpStatus.BAD_REQUEST, code, safePath, logicalId)
     }
 
     @Scheduled(initialDelay = 120_000, fixedDelay = 60_000)

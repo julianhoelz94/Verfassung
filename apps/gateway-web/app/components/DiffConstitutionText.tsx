@@ -2,9 +2,12 @@ import { T } from './TranslationProvider';
 import { ui } from '../../lib/messages';
 import type { ArticleSummary, ContentNode, ContentOutline, OrderedEntry, OrderedNode } from '../../lib/api';
 import { articleHeading, asOutlinePresentation, concatenatedText, effectiveDisplayKind, kindByCode, nodeHeading } from '../../lib/outline';
-import { OrderedContentTree } from './ConstitutionText';
+import { OrderedContentTree, type ConstitutionCrossRefs } from './ConstitutionText';
 import { LocalizedTitle } from './LocalizedRegion';
 import { alignNodes, diffText, segsForSide, type DiffSeg } from '../../lib/text-diff';
+import { InlineText } from './InlineText';
+import { FootnoteMarker, FootnoteProvider } from './Footnotes';
+import { footnoteItems, type FootnoteItem } from '../../lib/footnotes';
 
 type ArticleLike = Pick<ArticleSummary, 'articleNumber' | 'title' | 'body' | 'children' | 'content' | 'kind' | 'legacyIdentity'>;
 
@@ -17,6 +20,8 @@ type DiffConstitutionTextProps = {
   outline?: ContentOutline;
   oppositeOutline?: ContentOutline;
   lang?: string;
+  footnotes?: FootnoteItem[];
+  crossRefs?: ConstitutionCrossRefs;
 };
 
 export function DiffConstitutionText({
@@ -28,6 +33,8 @@ export function DiffConstitutionText({
   outline,
   oppositeOutline,
   lang,
+  footnotes,
+  crossRefs,
 }: DiffConstitutionTextProps) {
   const Heading = headingLevel;
   const article = side === 'from' ? left : right;
@@ -41,22 +48,22 @@ export function DiffConstitutionText({
   const rightChildren = right?.children ?? [];
   const hasTree = leftChildren.length > 0 || rightChildren.length > 0;
   return (
-    <div className="constitution-text text-column" lang={lang}>
+    <FootnoteProvider notes={footnotes ?? footnoteItems(article?.content ?? [])}><div className="constitution-text text-column" lang={lang}>
       {showHeading && heading ? <Heading>{rootHeading.map((seg, index) => <DiffMark key={index} seg={seg} />)}</Heading> : null}
       {article && rootKind?.showLabel && rootKind.labelPlacement === 'inline' ? <span className="num">{rootLabel}</span> : null}
       {article && rootKind?.showLabel && rootKind.labelPlacement === 'superscript' ? <sup className="num">{rootLabel}</sup> : null}
       {left?.content != null || right?.content != null ? (
-        <OrderedDiff entries={article?.content ?? []} opposite={(side === 'from' ? right : left)?.content ?? []} side={side} outline={outline} oppositeOutline={oppositeOutline ?? outline} legacyIdentity={Boolean(left?.legacyIdentity && right?.legacyIdentity)} />
+        <OrderedDiff entries={article?.content ?? []} opposite={(side === 'from' ? right : left)?.content ?? []} side={side} outline={outline} oppositeOutline={oppositeOutline ?? outline} legacyIdentity={Boolean(left?.legacyIdentity && right?.legacyIdentity)} crossRefs={crossRefs} />
       ) : hasTree ? (
         <DiffNodeTree left={leftChildren} right={rightChildren} side={side} outline={outline} />
       ) : (
         <DiffBody left={left?.body ?? ''} right={right?.body ?? ''} side={side} />
       )}
-    </div>
+    </div></FootnoteProvider>
   );
 }
 
-function OrderedDiff({ entries, opposite, side, outline, oppositeOutline, legacyIdentity }: { entries: OrderedEntry[]; opposite: OrderedEntry[]; side: 'from' | 'to'; outline?: ContentOutline; oppositeOutline?: ContentOutline; legacyIdentity: boolean }) {
+function OrderedDiff({ entries, opposite, side, outline, oppositeOutline, legacyIdentity, crossRefs }: { entries: OrderedEntry[]; opposite: OrderedEntry[]; side: 'from' | 'to'; outline?: ContentOutline; oppositeOutline?: ContentOutline; legacyIdentity: boolean; crossRefs?: ConstitutionCrossRefs }) {
   const textIdentities = new Map<string, OrderedEntry>();
   const nodeIdentities = new Map<string, OrderedNode>();
   const texts = new Map<OrderedEntry, OrderedEntry>();
@@ -98,8 +105,24 @@ function OrderedDiff({ entries, opposite, side, outline, oppositeOutline, legacy
     const segments = segsForSide(side === 'from' ? diffText(value, other) : diffText(other, value), side);
     return segments.map((segment, index) => <DiffMark key={index} seg={segment} />);
   }
-  return <OrderedContentTree entries={entries} outline={outline} idPrefix={`diff-${side}-`}
-    renderText={(entry) => marks(entry.text ?? '', texts.get(entry)?.text ?? '')}
+  function richMarks(entry: OrderedEntry, start = 0, end = (entry.text ?? '').length) {
+    const value = entry.text ?? '', other = texts.get(entry)?.text ?? '';
+    const segments = segsForSide(side === 'from' ? diffText(value, other) : diffText(other, value), side);
+    let offset = 0;
+    return segments.map((segment, index) => {
+      const from = Math.max(start, offset), to = Math.min(end, offset + segment.text.length);
+      offset += segment.text.length;
+      return to > from ? <InlineText key={index} text={value} marks={entry.marks} start={from} end={to} render={text => <DiffMark seg={{ ...segment, text }} />} /> : null;
+    });
+  }
+  function richPreview(entry: OrderedEntry, start = 0, end = (entry.text ?? '').length) {
+    const rendered = richMarks(entry, start, end), other = texts.get(entry);
+    if ((entry.lineBreaksBefore ?? 0) !== (other?.lineBreaksBefore ?? 0)) return <LocalizedTitle className="diff-cell-changed" label={{ en: 'Sentence spacing changed', de: 'Satzabstand geändert' }}>{rendered}</LocalizedTitle>;
+    return JSON.stringify(entry.marks ?? []) === JSON.stringify(other?.marks ?? []) ? rendered : <LocalizedTitle className="diff-cell-changed" label={{ en: 'Text formatting changed', de: 'Textformatierung geändert' }}>{rendered}</LocalizedTitle>;
+  }
+  return <OrderedContentTree entries={entries} outline={outline} crossRefs={crossRefs} idPrefix={`diff-${side}-`}
+    renderText={(entry) => richPreview(entry)}
+    renderTextSlice={(entry, start, end) => richPreview(entry, start, end)}
     renderTableCell={(cell, entry) => {
       const other = texts.get(entry)?.table?.rows.flatMap(row => row.cells).find(candidate => candidate.logicalId === cell.logicalId);
       const metadataChanged = other && (other.header !== cell.header || other.rowSpan !== cell.rowSpan || other.colSpan !== cell.colSpan || JSON.stringify(other.headers ?? []) !== JSON.stringify(cell.headers ?? []));
@@ -109,7 +132,9 @@ function OrderedDiff({ entries, opposite, side, outline, oppositeOutline, legacy
     renderReference={(reference, label, href, entry) => {
       const other = texts.get(entry)?.references?.find(candidate => candidate.logicalId === reference.logicalId);
       const changed = !other || JSON.stringify(other.target) !== JSON.stringify(reference.target) || other.start !== reference.start || other.end !== reference.end;
-      const content = changed ? <LocalizedTitle className="diff-cell-changed" label={ui.accessibilityDynamic.referenceChanged}>{label}</LocalizedTitle> : label;
+      const formatted = label ? richMarks(entry, reference.start, reference.end) : undefined;
+      const content = changed && label ? <LocalizedTitle className="diff-cell-changed" label={ui.accessibilityDynamic.referenceChanged}>{formatted}</LocalizedTitle> : formatted;
+      if (reference.target.type === 'footnote' && reference.target.footnoteId) return <FootnoteMarker noteId={reference.target.footnoteId}>{content}</FootnoteMarker>;
       return href ? <a className="xref" href={href}>{content}</a> : <LocalizedTitle className="xref-unavailable" label={ui.accessibilityDynamic.referenceUnavailable}>{content}</LocalizedTitle>;
     }}
     renderHeading={(node, heading) => {

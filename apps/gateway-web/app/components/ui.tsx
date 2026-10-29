@@ -59,6 +59,7 @@ export function Chip({ href, active, children }: ChipProps) {
 }
 
 type PageHeaderProps = {
+  compact?: boolean;
   breadcrumbs?: { href?: string; label: ReactNode }[];
   eyebrow?: ReactNode;
   title: ReactNode;
@@ -66,9 +67,9 @@ type PageHeaderProps = {
   actions?: ReactNode;
 };
 
-export function PageHeader({ breadcrumbs, eyebrow, title, meta, actions }: PageHeaderProps) {
+export function PageHeader({ breadcrumbs, eyebrow, title, meta, actions, compact = false }: PageHeaderProps) {
   return (
-    <div className={`page-header ${headerStyles.header}`}>
+    <div className={`page-header ${headerStyles.header} ${compact ? headerStyles.compact : ''}`}>
       <div className={headerStyles.heading}>
         {breadcrumbs && breadcrumbs.length > 0 ? <Breadcrumbs items={breadcrumbs} /> : null}
         {eyebrow ? <p className={headerStyles.eyebrow}>{eyebrow}</p> : null}

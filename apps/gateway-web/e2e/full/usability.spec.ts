@@ -3,6 +3,11 @@ import { expect, test, type APIRequestContext, type Page } from '../fixtures/con
 import { adminHeaders, createIsolatedConstitution } from './api-fixtures';
 import { authenticatorCode, signIn, signOut, startFromViewer } from './auth';
 
+async function sessionDetails(page: Page) {
+  const summary = page.locator('summary').filter({ hasText: 'Session and publication' });
+  if (!(await summary.evaluate(element => element.parentElement!.hasAttribute('open')))) await summary.click();
+}
+
 test.use({ locale: 'en-US', extraHTTPHeaders: { 'Accept-Language': 'en' }, screenshot: 'only-on-failure', actionTimeout: 20_000 });
 
 async function createEditorAccount(request: APIRequestContext) {
@@ -103,6 +108,7 @@ test('owned work survives role handoffs and published corrections remain readabl
     await expect(text).toHaveValue(interimText);
 
     const comment = `Checked fictional Article 1 against source, correction ${index + 1}.`;
+    await sessionDetails(page);
     await page.getByLabel('What was corrected in this transcription?', { exact: true }).fill(comment);
     await expect(submit).toBeDisabled();
     await page.getByRole('button', { name: 'Save comment', exact: true }).click();
@@ -111,12 +117,14 @@ test('owned work survives role handoffs and published corrections remain readabl
 
     // A changed, previously saved comment must not silently submit its old value.
     const finalComment = `${comment} Wording and punctuation verified.`;
+    await sessionDetails(page);
     await page.getByLabel('What was corrected in this transcription?', { exact: true }).fill(finalComment);
     await expect(submit).toBeDisabled();
     await expect(page.getByText('Save your changes to the comment or change record.', { exact: true })).toBeVisible();
     await page.getByRole('button', { name: 'Save comment', exact: true }).click();
     await expect(submit).toBeEnabled();
     await page.reload();
+    await sessionDetails(page);
     await expect(page.getByLabel('What was corrected in this transcription?', { exact: true })).toHaveValue(finalComment);
     // Once all saved requirements are ready, a later text edit must gate submission too.
     await expect(submit).toBeEnabled();
@@ -142,6 +150,7 @@ test('owned work survives role handoffs and published corrections remain readabl
     await signOut(page);
 
     await signInToProtectedPage(page, 'reviewer', sessionPath);
+    await sessionDetails(page);
     await expect(page.getByRole('heading', { name: new RegExp(title) })).toBeVisible();
     await expect(page.getByText(finalComment, { exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Save draft', exact: true })).toHaveCount(0);
@@ -158,12 +167,14 @@ test('owned work survives role handoffs and published corrections remain readabl
     await signOut(page);
 
     await signInToProtectedPage(page, 'publisher', sessionPath);
+    await sessionDetails(page);
     await expect(page.getByRole('button', { name: 'Save draft', exact: true })).toHaveCount(0);
     await page.getByRole('button', { name: 'Publish transcription', exact: true }).click({ noWaitAfter: true });
     await expect(page).toHaveURL(/(?:published=1|\/account\/step-up\?)/, { timeout: 70_000 });
     if (page.url().includes('/account/step-up')) {
       await page.getByLabel('Authenticator code', { exact: true }).fill(authenticatorCode(process.env.IDENTITY_SEED_TOTP_SECRET ?? 'CAATLASMFASEED22'));
       await page.getByRole('button', { name: 'Continue', exact: true }).click();
+      await sessionDetails(page);
       await page.getByRole('button', { name: 'Publish transcription', exact: true }).click({ noWaitAfter: true });
     }
     await expect(page).toHaveURL(/published=1/, { timeout: 70_000 });
@@ -175,6 +186,7 @@ test('owned work survives role handoffs and published corrections remain readabl
     // Remove the success query parameters: the link must come from saved state.
     await page.goto(sessionPath);
     await page.reload();
+    await sessionDetails(page);
     const resultLink = page.getByRole('link', { name: 'Open published version', exact: true });
     await expect(resultLink).toHaveCount(1);
     await expect(resultLink).toHaveAttribute('href', href);
@@ -197,6 +209,7 @@ test('owned work survives role handoffs and published corrections remain readabl
   }
   await ownWorkRow(page, published[0].sessionId).getByRole('link', { name: 'View progress', exact: true }).click();
   await page.reload();
+  await sessionDetails(page);
   await expect(page.getByRole('link', { name: 'Open published version', exact: true })).toHaveAttribute('href', published[0].href);
   await signOut(page);
 

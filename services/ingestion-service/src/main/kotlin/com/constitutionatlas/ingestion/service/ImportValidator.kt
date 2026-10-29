@@ -4,6 +4,7 @@ import com.constitutionatlas.ingestion.api.ImportNode
 import com.constitutionatlas.ingestion.api.ImportOutline
 import com.constitutionatlas.ingestion.api.ImportRequest
 import com.constitutionatlas.platform.Actor
+import com.constitutionatlas.platform.OrderedContentRules
 import org.springframework.http.HttpStatus
 import org.springframework.web.server.ResponseStatusException
 
@@ -85,15 +86,11 @@ object ImportValidator {
                                 }
                             }
                         }
-                        var previousEnd = 0
-                        entry.references.sortedBy { it.start }.forEachIndexed { refIndex, ref ->
-                            if (format != "plain" || ref.start < previousEnd || ref.start >= ref.end || ref.end > (entry.text?.length ?: 0)) errors += "INLINE_REFERENCE" to "$entryPath.references[$refIndex]: invalid or overlapping span"
-                            previousEnd = ref.end
-                        }
                     }
                 }
             }
             request.roots.forEachIndexed { index, root -> visit(root, null, "roots[$index]") }
+            errors += richContentErrors(request.roots)
         }
         fun legacyText(node: ImportNode): String = if (node.children.isEmpty()) node.body.orEmpty() else node.children.joinToString(" ", transform = ::legacyText)
         fun legacyMixed(node: ImportNode): Boolean = (!node.body.isNullOrEmpty() && node.children.isNotEmpty() && node.body != node.children.joinToString(" ", transform = ::legacyText)) || node.children.any(::legacyMixed)
@@ -120,6 +117,7 @@ object ImportValidator {
             errors += "UNKNOWN_KIND" to "kind '$kind' is not in the outline"
         }
         val kinds = (pinnedOutline ?: request.outline)?.kinds.orEmpty()
+        errors += outlineSentenceErrors(kinds)
         if (kinds.isNotEmpty() && request.articles.isNotEmpty()) {
             val roots = kinds.filter { it.root == true }.map { it.kindCode }.toSet().ifEmpty { setOf(kinds.first().kindCode) }
             if ("article" !in roots) errors += "ROOT_KIND" to "Article format requires an article root; use roots for this outline"
@@ -147,6 +145,43 @@ object ImportValidator {
     private fun unknownKinds(request: ImportRequest, pinnedOutline: ImportOutline?): List<String> {
         val allowed = allowedKinds(request, pinnedOutline)
         return request.articles.flatMap { article -> collectKinds(article.nodes) }.filter { it !in allowed }
+    }
+
+    fun outlineSentenceErrors(kinds: List<com.constitutionatlas.ingestion.api.ImportOutlineKind>): List<Pair<String, String>> = buildList {
+        kinds.forEachIndexed { index, kind ->
+            val children = kind.allowedChildKinds ?: kinds.getOrNull(index + 1)?.let { listOf(it.kindCode) }.orEmpty()
+            val delimiters = kind.sentenceDelimiters ?: listOf(".", "!", "?")
+            if (kind.segmentation !in setOf("plain", "sentence") || kind.segmentation == "sentence" && (children.isNotEmpty() || kind.titlePolicy == "required" || kind.labelPolicy == "required")) add("SENTENCE_SEGMENTATION" to "outline.kinds[$index]: automatic sentence creation requires a leaf level without required labels or titles")
+            if (delimiters.size > 16 || delimiters.distinct().size != delimiters.size || kind.segmentation == "sentence" && delimiters.isEmpty() || delimiters.any { it.isEmpty() || it.codePointCount(0, it.length) > 8 || !it.matches(Regex("[\\p{P}\\p{S}]+")) }) {
+                add("SENTENCE_DELIMITERS" to "outline.kinds[$index]: use at most 16 unique punctuation delimiters of 1 to 8 Unicode characters")
+            }
+        }
+    }
+
+    /** Re-run on retries and preparation as older staged items may predate a new invariant. */
+    fun richContentErrors(roots: List<com.constitutionatlas.platform.OrderedNodeWrite>): List<Pair<String, String>> =
+        richContentValidationErrors(roots).map { it.code to it.message }
+
+    fun richContentValidationErrors(roots: List<com.constitutionatlas.platform.OrderedNodeWrite>): List<com.constitutionatlas.platform.OrderedValidationError> {
+        val positions = OrderedContentRules.writePositions(roots)
+        val errors = OrderedContentRules.endnoteErrors(positions).toMutableList()
+        val footnotes = positions.filter { it.format == "footnote" }.mapNotNull { it.logicalId }.toSet()
+        val units = positions.mapNotNull { it.logicalId }.toSet()
+        fun walk(node: com.constitutionatlas.platform.OrderedNodeWrite, path: String) {
+            node.content.orEmpty().forEachIndexed { index, entry ->
+                val entryPath = "$path.content[$index]"
+                errors += OrderedContentRules.lineBreakErrors(entry.lineBreaksBefore, entry.type, "$entryPath.lineBreaksBefore", entry.logicalId)
+                entry.node?.let { walk(it, "$entryPath.node") }
+                if (entry.type == "text") {
+                    errors += OrderedContentRules.markErrors(entry.text.orEmpty(), entry.format, entry.marks, "$entryPath.marks", entry.logicalId)
+                    errors += OrderedContentRules.referenceErrors(entry.text.orEmpty(), entry.format, entry.references, footnotes, entryPath, entry.logicalId, units)
+                }
+            }
+        }
+        roots.forEachIndexed { index, root -> walk(root, "roots[$index]") }
+        errors += OrderedContentRules.referenceIdentityErrors(positions)
+        errors += OrderedContentRules.writeFootnoteMarkerErrors(roots)
+        return errors
     }
 
     private fun collectKinds(nodes: List<ImportNode>): List<String> =

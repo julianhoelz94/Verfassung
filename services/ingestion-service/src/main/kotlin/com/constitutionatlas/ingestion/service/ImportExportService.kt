@@ -150,6 +150,9 @@ class ImportExportService(
 
     private fun compare(expected: JsonNode, actual: JsonNode, path: String, result: MutableList<FidelityMismatch>) {
         if (expected.isObject) {
+            if (expected.path("type").scalarText() == "text" && expected.path("lineBreaksBefore").isMissingNode && actual.path("lineBreaksBefore").let { it.isIntegralNumber && it.intValue() != 0 }) {
+                result += FidelityMismatch("$path/lineBreaksBefore", "Persisted separator differs from the historical default zero")
+            }
             expected.properties().forEach { (key, value) ->
                 if (key !in setOf("revisionId", "predecessorRevisionId", "lineage") && !(key == "logicalId" && value.isNull)) {
                     val found = actual.path(key)
@@ -157,6 +160,7 @@ class ImportExportService(
                         (key == "format" && value.isNull && found.scalarText() == "plain") ||
                         (key == "text" && value.isNull && expected.path("format").scalarText() == "table") ||
                         (key == "kind" && value.isNull) ||
+                        (key == "lineBreaksBefore" && value.isIntegralNumber && value.intValue() == 0 && found.isMissingNode) ||
                         (value.isArray && value.isEmpty && found.isMissingNode)
                     if (!sameDefault) compare(value, found, "$path/$key", result)
                 }

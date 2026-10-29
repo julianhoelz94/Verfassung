@@ -82,7 +82,7 @@ export async function transitionImportJob(jobId: string, action: ImportAction, a
   if (!response.ok) {
     const raw = await response.json().catch(() => null);
     const problem = raw && typeof raw === 'object' ? raw : {};
-    const known = ['publication_not_configured', 'publication_credentials_invalid', 'approved_snapshot_changed', 'publication_conflict', 'publication_unavailable'];
+    const known = ['publication_not_configured', 'publication_credentials_invalid', 'approved_snapshot_changed', 'publication_conflict', 'publication_unavailable', 'publication_validation_failed', 'FOOTNOTE_NOT_AT_END', 'FOOTNOTE_MARK_CARDINALITY', 'UNIT_REFERENCE_TARGET', 'INLINE_REFERENCE', 'TEXT_LINE_BREAKS', 'TEXT_MARK_LIMIT', 'TEXT_MARK_FORMAT', 'TEXT_MARK_RANGE', 'TEXT_MARK_OVERLAP'];
     const code = known.includes(problem.code) ? problem.code
       : response.status === 401 ? 'session_expired'
       : response.status === 403 && problem.error === 'Fresh authenticator confirmation required' ? 'mfa'

@@ -20,6 +20,24 @@ Mit dem Filter **Status** zeigen Sie Entwürfe, Bearbeitungen in Prüfung, freig
 
 [▶ Bearbeitung und Einreichung ansehen](https://julianhoelz94.github.io/Verfassung/#editing-a-draft-de)
 
+### Schreiben und Fußnoten
+
+Die Navigationsschaltfläche neben **Bearbeiten** blendet die Artikelnavigation aus, damit der Text mehr Platz erhält. **Sitzung und Veröffentlichung** unterhalb des Dokuments öffnet die Angaben zum Arbeitsablauf bei Bedarf. Die haftende Symbolleiste folgt der Textauswahl und hält **Rückgängig**, **Wiederholen** und **Editoransicht** beim Scrollen erreichbar. Ihre Menüs enthalten benannte Aktionen für Einheiten, Tabellen, Eigenschaften, das Teilen und Zusammenführen von Text sowie Verweise. Auf dem Smartphone bleibt die aktive Registerkarte beschriftet; die anderen verwenden Symbole. **Änderungen** zeigt die Text-, Formatierungs-, Fußnoten- und Strukturänderungen der Sitzung. Speichern Sie den Entwurf vor dem Einreichen.
+
+**Fett**, **Kursiv**, **Unterstrichen** und **Durchgestrichen** formatieren die Auswahl oder den anschließend eingegebenen Text. **Rückgängig** und **Wiederholen** sind ohne verfügbare Schritte deaktiviert. Durchstreichen ist eine Textformatierung und erfasst keine rechtliche Aufhebung.
+
+Die Struktureinstellungen bestimmen, ob Blatteinheiten als Fließtext oder zeilenweise erscheinen. Bei eingeschalteter automatischer Satzerstellung erzeugt die konfigurierte Zeichensetzung den nächsten Satz; der Cursor bleibt im Text. Standardmäßig sind Punkt, Ausrufezeichen und Fragezeichen eingestellt. Ebenen mit untergeordneten Arten können diese Funktion nicht verwenden. **Satzgrenzen anzeigen** umrahmt Sätze nur im Fließtext und verändert den gespeicherten Wortlaut nicht.
+
+Bearbeitete Sätze werden ohne umgebende Leerzeichen gespeichert; die Fließtextansicht ergänzt den Abstand. **Enter** zwischen Sätzen fügt einen gespeicherten Zeilenumbruch ein, erneutes Enter eine Leerzeile. Die Umbrüche bleiben nach dem Speichern erhalten und erscheinen in Vorschau und öffentlicher Ansicht. Ein Klick auf Text gibt der aktiven Bearbeitungsstelle mehr Raum; der übrige Text bleibt kompakt.
+
+Unter **Fußnoten → Neue Fußnote…** erfassen Sie das wörtliche Zeichen und den Fußnotentext am Verfassungsende; der Verweis steht an der gewählten Cursorposition. Die beschriftete Stiftschaltfläche an der tatsächlichen Fußnote öffnet die Bearbeitung an dieser Stelle. Zeigen oder fokussieren Sie ein Fußnotenzeichen für die Vorschau; ein Klick öffnet die untere Ansicht, ohne die Leseposition zu verändern. **×**, **Escape** oder ein Klick außerhalb schließen sie. **Zur Fußnote** springt ausdrücklich zur Fußnote am Ende. Importe mit späterem Verfassungstext nach einer Fußnote werden zurückgewiesen; veröffentlichte historische Texte bleiben lesbar.
+
+Das Kontextmenü eines Zeichens bietet **Fußnote bearbeiten**, **Zeichen verschieben…**, **Zeichen entfernen** und **Zur Fußnote**. Dieselben Aktionen sind über Fußnoten und das Tastatur-Kontextmenü erreichbar. Eine Fußnote darf mehrere Verweiszeichen haben, auch in verschiedenen Artikeln. Über **Fußnoten → Verweiszeichen für Fußnote hinzufügen…** lässt sich eine bereits verknüpfte Fußnote erneut referenzieren. Beim Verschieben bleibt der bisherige Anker des ausgewählten Zeichens bestehen, bis Sie eine Cursorposition wählen und **Verweiszeichen platzieren** bestätigen. Verschieben oder Entfernen verändert die anderen Zeichen dieser Fußnote nicht. Eine Bearbeitung des Fußnotentextes gilt für alle zugehörigen Zeichen.
+
+Das Entfernen eines Zeichens erhält den Fußnotentext. Vor dem Speichern benötigt jede Fußnote mindestens ein Zeichen. Nach dem Entfernen des letzten Zeichens ist Speichern gesperrt, bis die Fußnote über das Fußnotenmenü erneut verknüpft wird. Dieselbe Regel gilt für sämtliche Verfassungsimporte und neue Inhaltsstände, auch bei einer Veröffentlichung, die nur Quelleninformationen korrigiert. Mehrere Zeichen sind zulässig; veröffentlichte historische Texte bleiben lesbar. **Dieser Artikel** zeigt nur die dort referenzierten Fußnoten. Die Vorschau verwendet dieselben Artikelüberschriften, Absatzbezeichnungen und nummerierten Fußnoten wie die öffentliche Ansicht.
+
+**Wiki** bearbeitet die Hintergrundseite unabhängig vom Verfassungstext. Kurzbeschreibung und Seitentext bleiben sichtbar; Quellen, Bilder und Revisionsgeschichte öffnen sich bei Bedarf. Der Wiki-Entwurf wird getrennt gespeichert und durch einen Herausgeber veröffentlicht. **Details** bearbeitet den Titel und unter Erweitert den URL-Namen; alte Adressen bleiben als Aliase erhalten. Fakten zur Fassung sind schreibgeschützt. Quellenkorrekturen, Struktureinstellungen und Lebenszyklusereignisse behalten ihre eigenen Arbeitsabläufe. Speichern Sie offene Text- und Veröffentlichungsangaben vor einem Wechsel in einen solchen Ablauf.
+
 ## 2. Prüfen
 
 **Erforderlich: Prüfer oder Administrator.**

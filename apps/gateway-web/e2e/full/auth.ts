@@ -31,7 +31,8 @@ export async function signIn(page: Page, role: 'editor' | 'reviewer' | 'publishe
     await page.getByLabel('Authenticator code').fill(authenticatorCode(process.env.IDENTITY_SEED_TOTP_SECRET ?? 'CAATLASMFASEED22'));
     await page.getByRole('button', { name: 'Continue' }).click();
   }
-  await expect(page).toHaveURL(/\/editor$/);
+  await expect(page).toHaveURL(/\/editor$/, { timeout: 15_000 });
+  await expect(page.getByRole('heading', { name: 'Editor', exact: true, level: 1 })).toBeVisible({ timeout: 15_000 });
   return email;
 }
 
@@ -49,5 +50,5 @@ export async function startFromViewer(page: Page, countryIso: string, versionId:
   await page.goto(`/countries/${countryIso}/versions/${versionId}`);
   await page.getByRole('link', { name: 'Edit this constitution' }).click();
   await page.locator('#editor-entry').getByRole('button', { name: kind === 'legal' ? 'Record the next legal change' : 'Correct this text' }).click();
-  await expect(page).toHaveURL(/sessionId=/);
+  await expect(page).toHaveURL(/sessionId=/, { timeout: 15_000 });
 }

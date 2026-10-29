@@ -68,7 +68,7 @@ internal object AmendmentDiff {
             val node = requireNotNull(entry.node)
             DiffEntry.Child(DiffNode(node.logicalId, node.revisionId, node.occurrenceId, node.kind, node.label, node.title, node.content.map(::asDiffEntry), lineage = node.lineage))
         }
-        "text" -> DiffEntry.Text(entry.logicalId ?: requireNotNull(entry.occurrenceId), entry.revisionId, entry.occurrenceId, requireNotNull(entry.text), entry.lineage, listOf(entry.format, entry.table, entry.footnoteLabel, entry.references, entry.annotation).toString())
+        "text" -> DiffEntry.Text(entry.logicalId ?: requireNotNull(entry.occurrenceId), entry.revisionId, entry.occurrenceId, requireNotNull(entry.text), entry.lineage, listOf(entry.format, entry.table, entry.footnoteLabel, entry.references, entry.annotation).let { if (entry.marks.isEmpty()) it else it + listOf(entry.marks) }.let { if (entry.lineBreaksBefore == 0) it else it + entry.lineBreaksBefore }.toString())
         else -> throw IllegalArgumentException("Unknown ordered entry type '${entry.type}'")
     }
 

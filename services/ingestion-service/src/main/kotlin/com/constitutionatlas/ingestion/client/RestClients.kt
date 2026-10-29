@@ -192,8 +192,9 @@ class RestCatalogClient(
         val segmentation: String = "plain",
         val root: Boolean? = null,
         val allowedChildKinds: List<String>? = null,
+        val sentenceDelimiters: List<String>? = null,
     ) {
-        fun importKind() = ImportOutlineKind(kindCode, displayLabel, presentation, showLabel, showTitle, showKind, allowTextAlongsideChildren, titlePolicy, labelPolicy, labelPlacement, segmentation, root, allowedChildKinds)
+        fun importKind() = ImportOutlineKind(kindCode, displayLabel, presentation, showLabel, showTitle, showKind, allowTextAlongsideChildren, titlePolicy, labelPolicy, labelPlacement, segmentation, root, allowedChildKinds, sentenceDelimiters)
     }
 }
 
@@ -209,6 +210,7 @@ class RestContentClient(
     override fun replaceRoots(versionId: UUID, roots: List<OrderedNodeWrite>, sourceVersionId: UUID?) {
         val persisted = snapshot(versionId)
         if (persisted.generation > 0) {
+            com.constitutionatlas.platform.OrderedContentRules.requireValid(com.constitutionatlas.platform.OrderedContentRules.contentErrors(persisted.roots))
             check(com.constitutionatlas.platform.OrderedContentFidelity.matches(roots, persisted.roots)) { "Reserved draft already contains different persisted content; reconcile before retrying" }
             return
         }
@@ -219,6 +221,7 @@ class RestContentClient(
     override fun replaceArticles(versionId: UUID, articles: List<ImportArticle>) {
         val persisted = snapshot(versionId)
         if (persisted.generation > 0) {
+            com.constitutionatlas.platform.OrderedContentRules.requireValid(com.constitutionatlas.platform.OrderedContentRules.contentErrors(persisted.roots))
             check(com.constitutionatlas.platform.OrderedContentFidelity.matches(com.constitutionatlas.ingestion.service.legacyImportRoots(articles), persisted.roots)) { "Reserved legacy draft already contains different persisted content; reconcile before retrying" }
             return
         }

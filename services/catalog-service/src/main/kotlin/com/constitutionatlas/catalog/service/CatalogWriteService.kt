@@ -263,7 +263,13 @@ class CatalogWriteService(
         } else if (actor != null && "ingestion:publish" in actor.scopes && actor.roles.none { it == "publisher" || it == "admin" } && "catalog:publish" !in actor.scopes) {
             throw ForbiddenException("Import publication token cannot publish an ordinary version")
         }
-        publishAttempts.forVersion(versionId)?.let { attempt -> successorReadiness.requireReady(versionId, attempt, settingsRepository.forVersion(versionId).id, authorization) }
+        if (catalogRepository.findVersionCreated(versionId) == null) throw NotFoundException("Unknown version '$versionId'")
+        val attempt = publishAttempts.forVersion(versionId)
+        if (attempt != null) {
+            successorReadiness.requireReady(versionId, attempt, settingsRepository.forVersion(versionId).id, authorization)
+        } else {
+            successorReadiness.requireValidContent(versionId, authorization)
+        }
         if (!catalogRepository.publishVersion(versionId)) {
             throw NotFoundException("Unknown version '$versionId'")
         }
@@ -339,9 +345,20 @@ class CatalogWriteService(
                 }
                 if (kind.labelPlacement == "superscript" && children.isNotEmpty()) throw IllegalArgumentException("superscript labels are only available on a leaf")
                 if (kind.segmentation !in setOf("plain", "sentence") ||
-                    (kind.segmentation == "sentence" && children.isNotEmpty())
+                    (kind.segmentation == "sentence" && (children.isNotEmpty() || kind.labelPolicy == "required" || kind.titlePolicy == "required"))
                 ) {
-                    throw IllegalArgumentException("sentence segmentation is only available on a leaf")
+                    throw IllegalArgumentException("automatic sentence creation requires a leaf with optional or disallowed labels and titles")
+                }
+                if (kind.sentenceDelimiters.size > 16 ||
+                    kind.sentenceDelimiters.distinct().size != kind.sentenceDelimiters.size ||
+                    kind.sentenceDelimiters.any { delimiter ->
+                        delimiter.isEmpty() ||
+                            delimiter.codePointCount(0, delimiter.length) > 8 ||
+                            !delimiter.matches(Regex("[\\p{P}\\p{S}]+"))
+                    } ||
+                    (kind.segmentation == "sentence" && kind.sentenceDelimiters.isEmpty())
+                ) {
+                    throw IllegalArgumentException("sentenceDelimiters must contain up to 16 unique punctuation sequences of 1 to 8 characters; automatic sentence creation requires at least one")
                 }
                 kind.copy(
                     kindCode = code,

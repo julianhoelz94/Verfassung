@@ -55,9 +55,9 @@ test('rich imports survive the actual MCP parser for direct and batch staging', 
   const originalFetch = globalThis.fetch;
   const noteId = randomUUID();
   const root = { logicalId: randomUUID(), kind: 'article', label: 'I a', title: null, content: [
-    { type: 'text', text: 'Wort', references: [{ logicalId: randomUUID(), start: 0, end: 4, target: { type: 'footnote', footnoteId: noteId } }] },
-    { type: 'text', logicalId: noteId, text: 'Anmerkung: spätere Redaktion.', format: 'footnote', footnoteLabel: '*' },
+    { type: 'text', text: 'Wort', lineBreaksBefore: 2, marks: [{ type: 'bold', start: 0, end: 4 }, { type: 'italic', start: 0, end: 4 }], references: [{ logicalId: randomUUID(), start: 4, end: 4, target: { type: 'footnote', footnoteId: noteId } }] },
     { type: 'text', format: 'table', table: { caption: 'Übersicht', rows: [{ logicalId: randomUUID(), cells: [{ logicalId: randomUUID(), text: 'unverändert', header: true, rowSpan: 2, colSpan: 1, headers: [] }] }] } },
+    { type: 'text', logicalId: noteId, text: 'Anmerkung: spätere Redaktion.', format: 'footnote', footnoteLabel: '*' },
   ] };
   const payload = { isoCode: 'DE', countryName: 'Deutschland', constitutionSlug: 'archiv', constitutionTitle: 'Verfassung', versionLabel: '1849', constitutionId: randomUUID(), settingsRevisionId: randomUUID(), roots: [root] };
   let received: unknown;
@@ -75,7 +75,7 @@ test('rich imports survive the actual MCP parser for direct and batch staging', 
     const invalid = { ...payload, roots: [{ ...root, accidentalField: 'must not disappear' }] };
     assert.equal((await callTool('stage_constitution_import', { payload: invalid }, 'Bearer ca_mcp_importer')).isError, true);
     assert.equal(received, undefined);
-    const outline = { kinds: [{ kindCode: 'article', displayLabel: 'Artikel', root: true, allowedChildKinds: [] }] };
+    const outline = { kinds: [{ kindCode: 'article', displayLabel: 'Artikel', root: true, allowedChildKinds: [], segmentation: 'sentence', sentenceDelimiters: ['。', '?!'] }] };
     assert.deepEqual(setupProposalSchema.parse({ isoCode: 'DE', countryName: 'Deutschland', constitutionSlug: 'archiv', constitutionTitle: 'Verfassung', outline, sampleRoots: [root] }).outline, outline);
   } finally { globalThis.fetch = originalFetch; }
 });
@@ -461,4 +461,17 @@ test('MCP importer can cancel an unfinished upload without publishing', async ()
     assert.deepEqual(calls.map(call => call.method), ['GET', 'DELETE']);
     assert.equal(calls.some(call => call.path.includes('publish')), false);
   } finally { globalThis.fetch = originalFetch; }
+});
+
+test('ordered plain-text projection includes layout metadata without changing source words', () => {
+  const first = { type: 'text', text: 'First.' };
+  const second = { type: 'text', text: 'Second.', lineBreaksBefore: 2 };
+  assert.equal(orderedText([first, second]), 'First.\n\nSecond.');
+  assert.equal(second.text, 'Second.');
+  assert.equal(orderedText([{ type: 'child', node: { content: [first] } }, { type: 'child', node: { content: [second] } }]), 'First.\n\nSecond.');
+  const empty = { type: 'text', text: '', lineBreaksBefore: 2 };
+  const next = { type: 'text', text: 'Second.' };
+  assert.equal(orderedText([first, empty, next]), 'First.\n\nSecond.');
+  assert.equal(orderedText([first, { type: 'child', node: { content: [empty] } }, next]), 'First.\n\nSecond.');
+  assert.equal(orderedText([empty]), '\n\n');
 });

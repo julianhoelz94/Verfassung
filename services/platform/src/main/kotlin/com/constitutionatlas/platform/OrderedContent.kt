@@ -45,6 +45,12 @@ data class OrderedEntry(
     val references: List<OrderedInlineReference> = emptyList(),
     @get:com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
     val annotation: OrderedAnnotation? = null,
+    @get:JsonInclude(JsonInclude.Include.NON_EMPTY)
+    val marks: List<OrderedTextMark> = emptyList(),
+    @get:JsonInclude(JsonInclude.Include.NON_DEFAULT)
+    @param:tools.jackson.databind.annotation.JsonDeserialize(converter = com.constitutionatlas.platform.LineBreakCountConverter::class)
+    @param:com.fasterxml.jackson.annotation.JsonSetter(nulls = com.fasterxml.jackson.annotation.Nulls.FAIL)
+    val lineBreaksBefore: Int = 0,
 )
 
 data class OrderedTableCell(
@@ -71,12 +77,21 @@ data class OrderedReferenceTarget(
 
 data class OrderedInlineReference(val logicalId: UUID, val start: Int, val end: Int, val target: OrderedReferenceTarget) : StrictOrderedWrite()
 
+/** Exact UTF-16 text offsets, shared with the browser. Different styles may overlap. */
+data class OrderedTextMark(val type: String, val start: Int, val end: Int) : StrictOrderedWrite()
+
 data class OrderedRichContent(
     val table: OrderedTable? = null,
     val footnoteLabel: String? = null,
     val references: List<OrderedInlineReference> = emptyList(),
     @get:com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
     val annotation: OrderedAnnotation? = null,
+    @get:JsonInclude(JsonInclude.Include.NON_EMPTY)
+    val marks: List<OrderedTextMark> = emptyList(),
+    @get:JsonInclude(JsonInclude.Include.NON_DEFAULT)
+    @param:tools.jackson.databind.annotation.JsonDeserialize(converter = com.constitutionatlas.platform.LineBreakCountConverter::class)
+    @param:com.fasterxml.jackson.annotation.JsonSetter(nulls = com.fasterxml.jackson.annotation.Nulls.FAIL)
+    val lineBreaksBefore: Int = 0,
 )
 
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -98,8 +113,11 @@ object OrderedContentText {
                 "child" -> entries(requireNotNull(entry.node) { "Ordered child entry has no node" }.content)
                 else -> throw IllegalArgumentException("Unknown ordered entry type '${entry.type}'")
             }
+            if (entry.lineBreaksBefore > 0) append("\n".repeat(entry.lineBreaksBefore))
             if (part.isEmpty()) continue
-            if (isNotEmpty() && (child || previousChild) && !last().isWhitespace() && !part.first().isWhitespace()) append(' ')
+            if (entry.lineBreaksBefore == 0 && isNotEmpty() && (child || previousChild) && !last().isWhitespace() && !part.first().isWhitespace()) {
+                append(' ')
+            }
             append(part)
             previousChild = child
         }
@@ -131,6 +149,12 @@ data class OrderedEntryWrite(
     val references: List<OrderedInlineReference> = emptyList(),
     @get:com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
     val annotation: OrderedAnnotation? = null,
+    @get:JsonInclude(JsonInclude.Include.NON_EMPTY)
+    val marks: List<OrderedTextMark> = emptyList(),
+    @get:JsonInclude(JsonInclude.Include.NON_DEFAULT)
+    @param:tools.jackson.databind.annotation.JsonDeserialize(converter = com.constitutionatlas.platform.LineBreakCountConverter::class)
+    @param:com.fasterxml.jackson.annotation.JsonSetter(nulls = com.fasterxml.jackson.annotation.Nulls.FAIL)
+    val lineBreaksBefore: Int = 0,
 ) : StrictOrderedWrite()
 
 data class OrderedSnapshotWrite(

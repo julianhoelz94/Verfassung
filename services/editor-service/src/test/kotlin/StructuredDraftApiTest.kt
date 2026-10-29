@@ -440,6 +440,82 @@ class StructuredDraftApiTest {
     }
 
     @Test
+    fun finalSaveRejectsUnmarkedNotesButAllowsSharedNotesAndMovingAMarkerWithinTheSameBatch() {
+        val actor = Actor(UUID.randomUUID(), "notes@test.local", listOf("editor"))
+        val version = UUID.randomUUID()
+        val note = DraftEntry("text", logicalId = UUID.randomUUID(), revisionId = UUID.randomUUID(), text = "Source note", format = "footnote", footnoteLabel = "1")
+        val base = fixture()
+        val body = base.content.first().copy(text = "Body")
+        fun marker(offset: Int) = com.constitutionatlas.platform.OrderedInlineReference(UUID.randomUUID(), offset, offset, com.constitutionatlas.platform.OrderedReferenceTarget("footnote", footnoteId = note.logicalId))
+        Mockito.`when`(identity.authenticate("notes")).thenReturn(actor)
+        Mockito.`when`(sources.settings(version)).thenReturn(settings)
+        for (references in listOf(emptyList<com.constitutionatlas.platform.OrderedInlineReference>())) {
+            val root = base.copy(content = listOf(body.copy(references = references), note))
+            Mockito.`when`(sources.source(version)).thenReturn(DraftSource(version, 7, settings.id, listOf(root)))
+            val session = sessions.insertSession(actor.id, version, "editorial_correction")
+            assertThat(drafts.preview("notes", session).roots).containsExactly(root)
+            val change = DraftOperation(UUID.randomUUID(), "replace_text", body.logicalId!!, body.revisionId!!, text = "Body!")
+            val failure = assertThrows(com.constitutionatlas.platform.OrderedContentValidationException::class.java) { drafts.save("notes", session, StructuredDraftSave(0, listOf(change))) }
+            assertThat(failure.errors.single().code).isEqualTo("FOOTNOTE_MARK_CARDINALITY")
+            assertThat(failure.errors.single().logicalId).isEqualTo(note.logicalId)
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM structured_draft_operations WHERE session_id = ?", Int::class.java, session)).isZero()
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM structured_draft_sources WHERE session_id = ?", Int::class.java, session)).isZero()
+        }
+        val root = base.copy(content = listOf(body.copy(references = listOf(marker(0))), note))
+        Mockito.`when`(sources.source(version)).thenReturn(DraftSource(version, 7, settings.id, listOf(root)))
+        val session = sessions.insertSession(actor.id, version, "editorial_correction")
+        val detach = DraftOperation(UUID.randomUUID(), "replace_text", body.logicalId!!, body.revisionId!!, text = body.text, format = "plain")
+        val attach = detach.copy(id = UUID.randomUUID(), expectedRevisionId = detach.id, references = listOf(marker(4)))
+        val saved = drafts.save("notes", session, StructuredDraftSave(0, listOf(detach, attach)))
+        assertThat(saved.roots.single().content.first().references.single().start).isEqualTo(4)
+        assertThat(saved.roots.single().content.last().logicalId).isEqualTo(note.logicalId)
+        assertThat(drafts.preview("notes", session)).isEqualTo(saved)
+        val shared = attach.copy(id = UUID.randomUUID(), expectedRevisionId = attach.id, references = listOf(marker(0), marker(4)))
+        val many = drafts.save("notes", session, StructuredDraftSave(1, listOf(shared)))
+        assertThat(many.roots.single().content.first().references).hasSize(2)
+        assertThat(drafts.preview("notes", session)).isEqualTo(many)
+        val freshVersion = UUID.randomUUID()
+        val withoutNotes = base.copy(content = listOf(body))
+        Mockito.`when`(sources.source(freshVersion)).thenReturn(DraftSource(freshVersion, 7, settings.id, listOf(withoutNotes)))
+        Mockito.`when`(sources.settings(freshVersion)).thenReturn(settings)
+        val freshSession = sessions.insertSession(actor.id, freshVersion, "editorial_correction")
+        val addNote = DraftOperation(UUID.randomUUID(), "insert_text", base.logicalId, base.revisionId!!, position = 1, parts = listOf(TextPart(note.logicalId!!, note.text!!, format = "footnote", footnoteLabel = "1")))
+        val addMarker = DraftOperation(UUID.randomUUID(), "replace_text", body.logicalId!!, body.revisionId!!, text = body.text, format = "plain", references = listOf(marker(4)))
+        val added = drafts.save("notes", freshSession, StructuredDraftSave(0, listOf(addNote, addMarker)))
+        assertThat(added.roots.single().content.last().logicalId).isEqualTo(note.logicalId)
+        assertThat(added.roots.single().content.first().references).hasSize(1)
+    }
+
+    @Test
+    fun finalSaveRejectsGlobalReferenceIdentityReuseAtomicallyButAllowsIntermediateRepair() {
+        val actor = Actor(UUID.randomUUID(), "identity@test.local", listOf("editor"))
+        val version = UUID.randomUUID()
+        val note = DraftEntry("text", logicalId = UUID.randomUUID(), revisionId = UUID.randomUUID(), text = "Shared note", format = "footnote")
+        val reference = com.constitutionatlas.platform.OrderedInlineReference(UUID.randomUUID(), 4, 4, com.constitutionatlas.platform.OrderedReferenceTarget("footnote", footnoteId = note.logicalId))
+        val base = fixture()
+        val firstBody = base.content.first().copy(text = "Body", references = listOf(reference))
+        val secondBody = firstBody.copy(logicalId = UUID.randomUUID(), revisionId = UUID.randomUUID(), references = emptyList())
+        val first = base.copy(content = listOf(firstBody))
+        val second = base.copy(logicalId = UUID.randomUUID(), revisionId = UUID.randomUUID(), content = listOf(secondBody, note))
+        val source = DraftSource(version, 7, settings.id, listOf(first, second))
+        Mockito.`when`(identity.authenticate("identities")).thenReturn(actor)
+        Mockito.`when`(sources.source(version)).thenReturn(source)
+        Mockito.`when`(sources.settings(version)).thenReturn(settings)
+        val session = sessions.insertSession(actor.id, version, "editorial_correction")
+        val duplicate = DraftOperation(UUID.randomUUID(), "replace_text", secondBody.logicalId!!, secondBody.revisionId!!, text = secondBody.text, format = "plain", references = listOf(reference))
+        val failure = assertThrows(com.constitutionatlas.platform.OrderedContentValidationException::class.java) { drafts.save("identities", session, StructuredDraftSave(0, listOf(duplicate))) }
+        assertThat(failure.errors.single().code).isEqualTo("INLINE_REFERENCE")
+        assertThat(failure.errors.single().path).isEqualTo("roots[1].content[0].references[0]")
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM structured_draft_operations WHERE session_id = ?", Int::class.java, session)).isZero()
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM structured_draft_sources WHERE session_id = ?", Int::class.java, session)).isZero()
+        assertThat(drafts.preview("identities", session).roots).containsExactly(first, second)
+        val repair = duplicate.copy(id = UUID.randomUUID(), targetId = firstBody.logicalId!!, expectedRevisionId = firstBody.revisionId!!, references = listOf(reference.copy(logicalId = UUID.randomUUID())))
+        val saved = drafts.save("identities", session, StructuredDraftSave(0, listOf(duplicate, repair)))
+        assertThat(saved.operations).hasSize(2)
+        assertThat(saved.roots.flatMap { it.content }.flatMap { it.references }.map { it.logicalId }.distinct()).hasSize(2)
+    }
+
+    @Test
     fun targetedSaveReopensLosslesslyAndPersistsOnlyOperation() {
         val actor = Actor(UUID.randomUUID(), "editor@test.local", listOf("editor"))
         val version = UUID.randomUUID()

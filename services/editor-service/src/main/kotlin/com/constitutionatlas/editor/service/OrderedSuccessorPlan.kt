@@ -32,10 +32,10 @@ object OrderedSuccessorPlan {
                     OrderedEntryWrite("child", node = nodeWrite(child))
                 } else {
                     val old = texts[entry.logicalId]
-                    if (old != null && old.text == entry.text && old.format == entry.format && old.table == entry.table && old.footnoteLabel == entry.footnoteLabel && old.references == entry.references && old.annotation == entry.annotation) {
+                    if (old != null && old.text == entry.text && old.format == entry.format && old.table == entry.table && old.footnoteLabel == entry.footnoteLabel && old.references == entry.references && old.annotation == entry.annotation && old.marks == entry.marks && old.lineBreaksBefore == entry.lineBreaksBefore) {
                         OrderedEntryWrite("text", revisionId = requireNotNull(old.revisionId))
                     } else {
-                        OrderedEntryWrite("text", logicalId = requireNotNull(entry.logicalId), predecessorRevisionId = old?.revisionId, text = requireNotNull(entry.text), lineage = ancestry[entry.logicalId].orEmpty().filter { it != old?.revisionId }, format = entry.format, table = entry.table, footnoteLabel = entry.footnoteLabel, references = entry.references, annotation = entry.annotation)
+                        OrderedEntryWrite("text", logicalId = requireNotNull(entry.logicalId), predecessorRevisionId = old?.revisionId, text = requireNotNull(entry.text), lineage = ancestry[entry.logicalId].orEmpty().filter { it != old?.revisionId }, format = entry.format, table = entry.table, footnoteLabel = entry.footnoteLabel, references = entry.references, annotation = entry.annotation, marks = entry.marks, lineBreaksBefore = entry.lineBreaksBefore)
                     }
                 }
             }

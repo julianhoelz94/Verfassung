@@ -39,3 +39,5 @@ only after every dump succeeds. `restore.sh` rejects marked backups and validate
 all required nonempty readable dumps before its first schema replacement. Restoration is still a
 sequence of per-database operations, not a distributed transaction. See the Wiki's
 Local Stack Reference for the explicit restore command.
+
+Catalog V32 adds sentence_delimiters to current outline kinds; immutable settings revision JSON includes sentenceDelimiters with defaults for historical revisions. Text formatting remains in existing rich-content JSON as validated UTF-16 marks. Endnotes remain ordered footnote text entries at the constitution tail; there is no new notes table or migration of historical snapshots.

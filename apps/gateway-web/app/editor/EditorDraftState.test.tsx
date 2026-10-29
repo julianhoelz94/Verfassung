@@ -47,6 +47,8 @@ describe('independent text and details unsaved guards', () => {
   beforeEach(() => {
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
     window.history.replaceState(null, '', '/editor');
+    Object.defineProperty(Range.prototype, 'getClientRects', { configurable: true, value: () => [] });
+    Object.defineProperty(Range.prototype, 'getBoundingClientRect', { configurable: true, value: () => new DOMRect() });
     host = document.createElement('div'); document.body.appendChild(host); root = createRoot(host);
   });
   afterEach(async () => { await act(async () => root.unmount()); host.remove(); });
@@ -54,12 +56,26 @@ describe('independent text and details unsaved guards', () => {
   async function render(kind: EditorKind, options: { showText?: boolean; showDetails?: boolean; legal?: boolean } = {}) {
     await act(async () => root.render(<Workspace kind={kind} {...options} />));
   }
-  function textInput() { return host.querySelector<HTMLTextAreaElement>('#draft-form textarea')!; }
+  function textInput() { return host.querySelector<HTMLElement>('#draft-form [role="textbox"], #draft-form textarea')!; }
+  function textValue() {
+    const input = textInput();
+    if (input instanceof HTMLTextAreaElement) return input.value;
+    const copy = input.cloneNode(true) as HTMLElement;
+    copy.querySelectorAll('button, [contenteditable="false"]').forEach(element => element.remove());
+    return copy.textContent;
+  }
   function detailsInput() { return host.querySelector<HTMLTextAreaElement>('#editor-change-record textarea')!; }
   function submitReview() { return [...host.querySelectorAll('button')].find(button => button.textContent === 'Submit for review')!; }
   function blockers() { return [...host.querySelectorAll('#submit-review-help li')]; }
-  async function change(field: HTMLInputElement | HTMLTextAreaElement, value: string) {
-    await act(async () => { fireEvent.change(field, { target: { value: value } }); });
+  async function change(field: HTMLElement, value: string) {
+    await act(async () => {
+      if (field.getAttribute('role') === 'textbox') {
+        field.focus();
+        field.querySelector('[data-unit]')!.textContent = value;
+        fireEvent.input(field);
+        await new Promise(resolve => setTimeout(resolve, 0));
+      } else fireEvent.change(field, { target: { value } });
+    });
   }
   async function submit(selector: string) {
     // Simulate the form handler without submitting a POST or navigating in jsdom.
@@ -85,7 +101,7 @@ describe('independent text and details unsaved guards', () => {
       await change(textInput(), 'Unsaved wording.');
       expect(blockers()).toHaveLength(2);
       if (kind === 'structured') {
-        await act(async () => [...host.querySelectorAll('button')].find(button => button.textContent === 'Undo')!.click());
+        await act(async () => host.querySelector<HTMLButtonElement>('button[aria-label="Undo"]')!.click());
       } else {
         await change(textInput(), 'Original wording.');
       }
@@ -102,7 +118,7 @@ describe('independent text and details unsaved guards', () => {
         await change(detailsInput(), 'Unsaved explanation.');
         await submit(saving === 'text' ? '#draft-form' : '#editor-change-record form');
         expect(navigationBlocked()).toBe(true);
-        expect(textInput().value).toBe('Unsaved wording.');
+        expect(textValue()).toBe('Unsaved wording.');
         expect(detailsInput().value).toBe('Unsaved explanation.');
         expect(submitReview().disabled).toBe(true);
 

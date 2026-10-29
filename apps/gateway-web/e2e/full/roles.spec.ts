@@ -1,5 +1,10 @@
-import { expect, test, type APIRequestContext } from '../fixtures/consent';
+import { expect, test, type APIRequestContext, type Page } from '../fixtures/consent';
 import { signIn, signOut, startFromViewer } from './auth';
+
+async function sessionDetails(page: Page) {
+  const summary = page.locator('summary').filter({ hasText: 'Session and publication' });
+  if (!(await summary.evaluate(element => element.parentElement!.hasAttribute('open')))) await summary.click();
+}
 
 async function publishedVersion(request: APIRequestContext, requirePlainArticle = false): Promise<{ countryIso: string; versionId: string }> {
   const countries = await (await request.get('/api/catalog/countries')).json();
@@ -34,7 +39,7 @@ for (const story of roles) {
     await expect(page.getByText(email, { exact: true })).toBeVisible();
     await expect(page.getByRole('navigation', { name: 'Primary' }).getByRole('link', { name: 'Admin', exact: true })).toHaveCount(story.admin ? 1 : 0);
     await page.goto('/editor');
-    await expect(page.getByRole('heading', { name: 'Editor' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Editor', exact: true, level: 1 })).toBeVisible();
     const source = await publishedVersion(request);
     await page.goto(`/countries/${source.countryIso}/versions/${source.versionId}`);
     await expect(page.getByRole('link', { name: 'Edit this constitution' })).toHaveCount(story.canEdit ? 1 : 0);
@@ -64,6 +69,7 @@ test('editor, reviewer, and publisher carry a real transcription correction to t
   await page.locator('#draft-form textarea').first().fill('Dignity and civic equality protect every person. Verified transcription.');
   await page.getByRole('button', { name: 'Save draft' }).click();
   await expect(page.getByText('Draft saved.')).toBeVisible();
+  await sessionDetails(page);
   await page.getByLabel('What was corrected in this transcription?').fill(`Verified Article ${plainArticle.articleNumber} transcription.`);
   await page.getByRole('button', { name: 'Save comment' }).click();
   await page.getByRole('button', { name: 'Submit for review' }).click();
@@ -80,6 +86,7 @@ test('editor, reviewer, and publisher carry a real transcription correction to t
 
   await signIn(page, 'publisher');
   await page.goto(sessionUrl);
+  await sessionDetails(page);
   await page.getByRole('button', { name: 'Publish transcription' }).click();
   await expect(page.getByText(/Published as version/)).toBeVisible();
   const newVersionId = new URL(page.url()).searchParams.get('newVersionId');

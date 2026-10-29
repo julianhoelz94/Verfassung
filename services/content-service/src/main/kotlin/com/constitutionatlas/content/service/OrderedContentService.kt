@@ -11,6 +11,7 @@ import com.constitutionatlas.content.client.CatalogClient
 import com.constitutionatlas.content.client.StructuralSettings
 import com.constitutionatlas.content.repo.OrderedContentRepository
 import com.constitutionatlas.platform.NotFoundException
+import com.constitutionatlas.platform.OrderedContentRules
 import com.constitutionatlas.platform.OrderedRichContent
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.HttpStatus
@@ -32,6 +33,7 @@ class OrderedContentService(
         catalog.requireImportReservation(version, attempt)
         val snapshot = get(version)
         if (repository.lock(version) != generation || snapshot.generation != generation || snapshot.settingsRevisionId != settings || snapshot.roots.isEmpty()) stale("Approved import content or settings changed")
+        OrderedContentRules.requireValid(OrderedContentRules.contentErrors(snapshot.roots))
         val hash = "import:$version:$generation:$settings"
         receipts.find(attempt)?.let { existing ->
             if (existing.versionId != version || existing.requestHash != hash || existing.generation != generation) stale("Import publication attempt changed")
@@ -63,12 +65,14 @@ class OrderedContentService(
      */
     @Transactional
     fun save(version: UUID, request: OrderedSnapshotWrite): OrderedSnapshot {
-        val requestHash = java.security.MessageDigest.getInstance("SHA-256").digest(request.toString().toByteArray()).joinToString("") { "%02x".format(it) }
+        val requestHash = com.constitutionatlas.platform.OrderedWriteFingerprint.current(request)
+        val acceptedHashes = com.constitutionatlas.platform.OrderedWriteFingerprint.accepted(request)
         request.publishAttemptId?.let { attempt ->
             receipts.find(attempt)?.let { receipt ->
-                if (receipt.versionId != version || receipt.requestHash != requestHash) stale("Publish attempt payload changed")
+                if (receipt.versionId != version || receipt.requestHash !in acceptedHashes) stale("Publish attempt payload changed")
                 val snapshot = get(version)
                 if (snapshot.generation != receipt.generation) stale("Reserved roots changed")
+                OrderedContentRules.requireValid(OrderedContentRules.contentErrors(snapshot.roots))
                 return snapshot
             }
         }
@@ -80,7 +84,8 @@ class OrderedContentService(
         val current = get(version)
         request.publishAttemptId?.let { attempt ->
             receipts.find(attempt)?.let { receipt ->
-                if (receipt.versionId != version || receipt.requestHash != requestHash || receipt.generation != current.generation) stale("Publish attempt payload or roots changed")
+                if (receipt.versionId != version || receipt.requestHash !in acceptedHashes || receipt.generation != current.generation) stale("Publish attempt payload or roots changed")
+                OrderedContentRules.requireValid(OrderedContentRules.contentErrors(current.roots))
                 return current
             }
         }
@@ -126,13 +131,13 @@ class OrderedContentService(
             entries.forEachIndexed { position, entry ->
                 when (entry.type) {
                     "child" -> {
-                        require(entry.node != null && entry.text == null && entry.revisionId == null && entry.logicalId == null && entry.predecessorRevisionId == null && entry.lineage.isEmpty() && entry.format == null && entry.table == null && entry.footnoteLabel == null && entry.references.isEmpty() && entry.annotation == null) { "Invalid child entry at $logical/content/$position" }
+                        require(entry.node != null && entry.text == null && entry.revisionId == null && entry.logicalId == null && entry.predecessorRevisionId == null && entry.lineage.isEmpty() && entry.format == null && entry.table == null && entry.footnoteLabel == null && entry.references.isEmpty() && entry.annotation == null && entry.marks.isEmpty() && entry.lineBreaksBefore == 0) { "Invalid child entry at $logical/content/$position" }
                         repository.insertEntry(revision, position, null, store(requireNotNull(entry.node), depth + 1))
                     }
                     "text" -> {
                         require(entry.node == null) { "Text entry cannot contain a child" }
                         val textRevision = if (entry.revisionId != null) {
-                            require(entry.text == null && entry.logicalId == null && entry.predecessorRevisionId == null && entry.lineage.isEmpty() && entry.format == null && entry.table == null && entry.footnoteLabel == null && entry.references.isEmpty() && entry.annotation == null) { "Text reference cannot contain changed fields" }
+                            require(entry.text == null && entry.logicalId == null && entry.predecessorRevisionId == null && entry.lineage.isEmpty() && entry.format == null && entry.table == null && entry.footnoteLabel == null && entry.references.isEmpty() && entry.annotation == null && entry.marks.isEmpty() && entry.lineBreaksBefore == 0) { "Text reference cannot contain changed fields" }
                             require(entry.revisionId in allowedTexts) { "Text reference is not in the pinned snapshot" }
                             entry.revisionId
                         } else {
@@ -148,7 +153,7 @@ class OrderedContentService(
                             if (allowedTexts.values.any { it.first == textLogical }) require(entry.predecessorRevisionId != null) { "Existing text identity requires its predecessor revision" }
                             require(entry.lineage.all { it in allowedTexts }) { "Unknown split/merge lineage" }
                             val id = UUID.randomUUID()
-                            repository.insertText(id, textLogical, version, entry.predecessorRevisionId, text, entry.lineage, format, OrderedRichContent(entry.table, entry.footnoteLabel, entry.references, entry.annotation))
+                            repository.insertText(id, textLogical, version, entry.predecessorRevisionId, text, entry.lineage, format, OrderedRichContent(entry.table, entry.footnoteLabel, entry.references, entry.annotation, entry.marks, entry.lineBreaksBefore))
                             id
                         }
                         repository.insertEntry(revision, position, textRevision, null)
@@ -183,7 +188,7 @@ class OrderedContentService(
             lineage = node.lineage,
             content = node.content.map { entry ->
                 entry.node?.let { com.constitutionatlas.platform.OrderedEntryWrite("child", node = nodeWrite(it)) }
-                    ?: com.constitutionatlas.platform.OrderedEntryWrite("text", logicalId = entry.logicalId, predecessorRevisionId = entry.revisionId?.let { repository.revisionPredecessor(it, true) }, text = entry.text, lineage = entry.lineage, format = entry.format, table = entry.table, footnoteLabel = entry.footnoteLabel, references = entry.references, annotation = entry.annotation)
+                    ?: com.constitutionatlas.platform.OrderedEntryWrite("text", logicalId = entry.logicalId, predecessorRevisionId = entry.revisionId?.let { repository.revisionPredecessor(it, true) }, text = entry.text, lineage = entry.lineage, format = entry.format, table = entry.table, footnoteLabel = entry.footnoteLabel, references = entry.references, annotation = entry.annotation, marks = entry.marks, lineBreaksBefore = entry.lineBreaksBefore)
             },
         )
         return com.constitutionatlas.content.api.OrderedContentExport(version, snapshot.settingsRevisionId, snapshot.roots.map(::nodeWrite))
@@ -195,6 +200,7 @@ class OrderedContentService(
         if (receipt.versionId != version) throw NotFoundException("Receipt belongs to another version")
         val snapshot = get(version)
         if (snapshot.generation != receipt.generation) stale("Reserved roots changed")
+        OrderedContentRules.requireValid(OrderedContentRules.contentErrors(snapshot.roots))
         return snapshot
     }
 
@@ -226,6 +232,7 @@ class OrderedContentService(
             }
         }
         roots.forEach { walk(it, null) }
+        OrderedContentRules.requireValid(OrderedContentRules.endnoteErrors(OrderedContentRules.positions(roots)))
         fun collect(node: OrderedNode, footnotes: MutableSet<UUID>) {
             node.content.forEach { entry ->
                 entry.node?.let { collect(it, footnotes) }
@@ -253,30 +260,17 @@ class OrderedContentService(
                     require(entry.format == "footnote") { "Annotations must be anchored notes" }
                     require(annotation.anchorLogicalIds.all { it in identities }) { "Annotation has an unknown unit anchor" }
                 }
+                OrderedContentRules.requireValid(OrderedContentRules.lineBreakErrors(entry.lineBreaksBefore, entry.type, "node[${node.logicalId}].text[${entry.logicalId}].lineBreaksBefore", entry.logicalId))
+                OrderedContentRules.requireValid(OrderedContentRules.markErrors(entry.text.orEmpty(), entry.format, entry.marks, "node[${node.logicalId}].text[${entry.logicalId}].marks", entry.logicalId))
                 if (entry.format == "footnote") require(!entry.text.isNullOrBlank() && entry.table == null) { "Footnote text is required at '${node.logicalId}'" }
-                var end = 0
-                val referenceIds = mutableSetOf<UUID>()
-                entry.references.sortedBy { it.start }.forEach { ref ->
-                    val text = requireNotNull(entry.text)
-                    require(referenceIds.add(ref.logicalId) && ref.start >= end && ref.start < ref.end && ref.end <= text.length) { "Invalid or overlapping inline reference at '${node.logicalId}'" }
-                    end = ref.end
-                    val target = ref.target
-                    require(
-                        when (target.type) {
-                            "unit" -> target.logicalId != null && target.url == null && target.footnoteId == null
-                            "external" -> target.url?.startsWith("https://") == true && target.logicalId == null && target.footnoteId == null
-                            "footnote" -> target.footnoteId in footnotes && target.logicalId == null && target.url == null
-                            else -> false
-                        },
-                    ) { "Invalid inline target at '${node.logicalId}'" }
-                }
+                OrderedContentRules.requireValid(OrderedContentRules.referenceErrors(entry.text.orEmpty(), entry.format, entry.references, footnotes, "node[${node.logicalId}].text[${entry.logicalId}]", entry.logicalId, units = identities))
             }
         }
-        roots.forEach { root ->
-            val footnotes = mutableSetOf<UUID>()
-            collect(root, footnotes)
-            rich(root, footnotes)
-        }
+        val footnotes = mutableSetOf<UUID>()
+        roots.forEach { collect(it, footnotes) }
+        roots.forEach { rich(it, footnotes) }
+        OrderedContentRules.requireValid(OrderedContentRules.referenceIdentityErrors(OrderedContentRules.positions(roots)))
+        OrderedContentRules.requireValid(OrderedContentRules.footnoteMarkerErrors(roots))
     }
 
     @Transactional

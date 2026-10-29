@@ -150,6 +150,8 @@ function comparableEntries(entries: OrderedEntry[]): unknown[] {
     type: entry.type,
     text: entry.text ?? entry.table?.rows.map((row) => row.cells.map((cell) => cell.text).join(' ')).join('\n') ?? '',
     format: entry.format ?? 'plain',
+    lineBreaksBefore: entry.lineBreaksBefore ?? 0,
+    marks: [...(entry.marks ?? [])].sort((left, right) => left.start - right.start || left.end - right.end || left.type.localeCompare(right.type)),
     table: entry.table ? {
       caption: entry.table.caption ?? '',
       rows: entry.table.rows.map((row) => row.cells.map((cell) => ({

@@ -133,13 +133,6 @@
               }
             }
           ]
-        },
-        {
-          "type": "text",
-          "logicalId": "6ab1acd6-c79a-47dd-8bef-72251725b0ce",
-          "text": "The original source note.",
-          "format": "footnote",
-          "footnoteLabel": "1"
         }
       ]
     },
@@ -227,6 +220,13 @@
               }
             ]
           }
+        },
+        {
+          "type": "text",
+          "logicalId": "6ab1acd6-c79a-47dd-8bef-72251725b0ce",
+          "text": "The original source note.",
+          "format": "footnote",
+          "footnoteLabel": "1"
         }
       ]
     }

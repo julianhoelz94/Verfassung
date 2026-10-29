@@ -57,3 +57,9 @@ unused locals/parameters. `npm run test:e2e` covers mocked journeys, accessibili
 and visual checks; `npm run test:e2e:full` uses real APIs and uploaded fixtures.
 Linux screenshots are pinned to the Playwright image/version in CI. Wiki recording
 is verified in PR CI; actual media capture/publication runs after merge.
+
+## Compact structured editing
+
+The active canvas is app/editor/StructuredEditor.tsx with ContinuousCanvas.tsx (ProseMirror), compact-editor.module.css and lib/continuous-editor.ts. EditorWorkspace.tsx owns hideable navigation and workflow disclosure; ChangeOverview.tsx presents readable differences. The authenticated editor/view projection returns a pinned global note/reference index, lazy root bodies, or the full body only for explicit Preview.
+
+Shared app/components/Footnotes.tsx and InlineText.tsx render note drawers and structured marks in editing, reading and comparison. lib/footnotes.ts indexes a pinned version once; lib/draft-footnotes.ts indexes draft notes before lazy projection. Readers use lib/ordered-content.ts for node and text-entry targets.

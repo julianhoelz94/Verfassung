@@ -46,8 +46,9 @@ class StructuredDraftService(
         val existing = drafts.operations(sessionId)
         require(request.operations.isNotEmpty()) { "At least one targeted operation is required" }
         require((existing + request.operations).map { it.id }.distinct().size == existing.size + request.operations.size) { "Operation IDs must be unique" }
-        StructuredDraftEngine.validate(source.roots, settings)
-        StructuredDraftEngine.replay(source.roots, existing + request.operations, settings)
+        StructuredDraftEngine.validate(source.roots, settings, enforceEndnotes = false)
+        val replayed = StructuredDraftEngine.replay(source.roots, existing + request.operations, settings)
+        StructuredDraftEngine.requireFootnoteMarkers(replayed)
         drafts.append(sessionId, request.operations)
         sessions.insertRevision(sessionId, sessions.nextRevisionSequence(sessionId), mapOf("format" to "ordered_operations", "operations" to request.operations))
         return preview(authorization, sessionId)
@@ -65,6 +66,6 @@ class StructuredDraftService(
         if (source.settingsRevisionId != settings.id) throw ConflictException("Source and settings pins disagree", "stale_source")
         if (pin != null && (source.generation != pin.sourceGeneration || settings.id != pin.settingsRevisionId || source.roots.map { it.revisionId } != pin.rootRevisionIds)) throw ConflictException("Pinned source changed", "stale_source")
         val operations = drafts.operations(sessionId)
-        return StructuredDraftPreview(sessionId, session.versionId, pin?.sourceGeneration ?: source.generation, pin?.settingsRevisionId ?: settings.id, pin?.generation ?: 0, pin?.rootRevisionIds ?: source.roots.map { requireNotNull(it.revisionId) }, operations, StructuredDraftEngine.replay(source.roots, operations, settings), source.roots)
+        return StructuredDraftPreview(sessionId, session.versionId, pin?.sourceGeneration ?: source.generation, pin?.settingsRevisionId ?: settings.id, pin?.generation ?: 0, pin?.rootRevisionIds ?: source.roots.map { requireNotNull(it.revisionId) }, operations, StructuredDraftEngine.replay(source.roots, operations, settings, enforceEndnotes = false), source.roots)
     }
 }

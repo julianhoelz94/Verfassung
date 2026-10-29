@@ -1,6 +1,11 @@
-import { expect, test, type APIRequestContext } from '../fixtures/consent';
+import { expect, test, type APIRequestContext, type Page } from '../fixtures/consent';
 import { signIn, signOut, startFromViewer } from './auth';
 import { adminHeaders, createIsolatedConstitution } from './api-fixtures';
+
+async function sessionDetails(page: Page) {
+  const summary = page.locator('summary').filter({ hasText: 'Session and publication' });
+  if (!(await summary.evaluate(element => element.parentElement!.hasAttribute('open')))) await summary.click();
+}
 
 async function createPublishedRecord(request: APIRequestContext, title: string, constitutionId: string, sourceVersionId: string, targetVersionId: string, twoRevisions = false) {
   const headers = await adminHeaders(request);
@@ -105,6 +110,7 @@ test('publisher reviews stale quotes after a historical transcription correction
   await startFromViewer(page, pair.countryIso, sourceVersionId, 'editorial_correction');
   await page.locator('#draft-form textarea').first().fill('The historical dignity text was checked and corrected.');
   await page.getByRole('button', { name: 'Save draft' }).click();
+  await sessionDetails(page);
   await page.getByLabel('What was corrected in this transcription?').fill('Corrected the historical transcription.');
   await page.getByRole('button', { name: 'Save comment' }).click();
   await page.getByRole('button', { name: 'Submit for review' }).click();
@@ -118,6 +124,7 @@ test('publisher reviews stale quotes after a historical transcription correction
 
   await signIn(page, 'publisher');
   await page.goto(sessionUrl);
+  await sessionDetails(page);
   await page.getByRole('button', { name: 'Publish transcription' }).click();
   await expect(page.getByText(/Published as version/)).toBeVisible();
   await page.goto(`/editor/amendments/${amendmentId}`);

@@ -1,286 +1,382 @@
 'use client';
 
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { Bold, Italic, Underline, Strikethrough, SquareDashed, Plus, TextCursorInput, Link, SlidersHorizontal, Superscript, Undo2, Redo2, Eye, Pencil, GitCompare, BookOpen, Info, ListTree, Settings2, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { fetchWithTimeout } from '../../lib/fetch-with-timeout';
-
-
-import { T, useTranslation } from '../components/TranslationProvider';
+import type { ContentOutline, OrderedInlineReference, OrderedTextMark } from '../../lib/api';
+import { applyOperation, draftDifferences, findNode, nodes, readerNode, remapDraftTargets, scopedNodes, token, validateDraft, type DraftDifference, type DraftEntry, type DraftNode, type DraftOperation, type StructuredPreview } from '../../lib/structured-editor';
+import { blockOf, canvasSignature, cleanSentenceBlock, cleanSentenceLayout, normalizeMarks, SentenceLayoutError, simpleUnit, sliceBlock, WhitespaceOnlyReferenceError, type CanvasBlock, type CanvasUnit } from '../../lib/continuous-editor';
+import { footnoteCardinality, indexDraftFootnoteReferences, indexDraftFootnotes } from '../../lib/draft-footnotes';
+import { articleHeading } from '../../lib/outline';
+import { useTranslation } from '../components/TranslationProvider';
 import { ui, type UiMessage } from '../../lib/messages';
-import { useEffect, useRef, useState } from 'react';
-import type { ContentOutline } from '../../lib/api';
-import { applyOperation, draftDifferences, findNode, nodes, scopedNodes, sentenceParts, token, validateDraft, type DraftDifference, type DraftEntry, type DraftNode, type DraftOperation, type StructuredPreview } from '../../lib/structured-editor';
 import { useDraftState } from './EditorDraftState';
-import { Button } from '../components/ui';
-import { Stack } from '../components/layout/Layout';
+import { EditorNavigationToggle } from './EditorWorkspace';
+import { ConstitutionArticleHeading, ConstitutionFootnotes, ConstitutionText } from '../components/ConstitutionText';
+import { FootnoteProvider } from '../components/Footnotes';
+import { footnoteBacklinks } from '../../lib/footnotes';
+import { ChangeOverview } from './ChangeOverview';
+import { ContinuousCanvas, type CanvasController, type CanvasMarkerContext, type CanvasTextContext } from './ContinuousCanvas';
+import { EditorContextMenu, FootnoteMarkerMenu } from './FootnoteMarkerMenu';
+import styles from './compact-editor.module.css';
 
-class LocalizedEditorError extends Error {
-  constructor(readonly copy: UiMessage) { super(copy.en); }
-}
+class LocalizedEditorError extends Error { constructor(readonly copy: UiMessage) { super(copy.en); } }
+type Snapshot = { roots: DraftNode[]; operations: DraftOperation[] };
+type ReviewDifference = DraftDifference & { sourceLink?: string; targetLink?: string; rootId?: string; beforeText?: string; afterText?: string };
+type NoteDraft = { id?: string; label: string; text: string; marks?: OrderedTextMark[]; anchor?: ReturnType<CanvasController['selection']> };
+type IndexedNote = { entry: DraftEntry; parentId: string; rootId: string };
+type Props = { initialTab?:'wiki'|'details'; wikiPanel?:React.ReactNode; detailsPanel?:React.ReactNode; review?: ReviewDifference[]; preview: StructuredPreview; outline: ContentOutline; rootId: string; versionId: string; articleId: string; constitutionId: string; editable: boolean; canManageStructure?: boolean; scope?: string; selectedNode?: string; publishedVersionId?: string | null; unitMapping?: Record<string, string> | null };
 
-function differenceField(field: string): UiMessage {
-  switch (field) {
-    case 'title': return ui.remainingStatus.title;
-    case 'label': return ui.remainingStatus.label;
-    case 'text': return ui.editorDynamic.text;
-    case 'parent': return ui.editorDynamic.parentText;
-    case 'position': return ui.editorDefaults.position;
-    case 'rich': return ui.editorDefaults.rich;
-    case 'inserted': return ui.editorDefaults.inserted;
-    case 'removed': return ui.editor.publishform.removed;
-    default: return ui.editor.structurededitor.changes;
-  }
-}
+function IconTool({ name, icon: Icon, onClick, pressed, disabled = false }: { name: string; icon: typeof Bold; onClick: () => void; pressed?: boolean | 'mixed'; disabled?: boolean }) { return <button type="button" className={styles.iconButton} aria-label={name} title={name} aria-pressed={pressed} disabled={disabled} onMouseDown={event => event.preventDefault()} onClick={onClick}><Icon size={17} aria-hidden="true" /></button>; }
 
-type ReviewDifference = DraftDifference & { sourceLink?: string; targetLink?: string };
-type Props = { review?: ReviewDifference[]; preview: StructuredPreview; outline: ContentOutline; rootId: string; versionId: string; articleId: string; constitutionId: string; editable: boolean; canManageStructure?: boolean; scope?: string; selectedNode?: string; publishedVersionId?: string | null; unitMapping?: Record<string, string> | null };
-export function StructuredEditor({ review = [], preview, outline, rootId, versionId, articleId, constitutionId, editable, canManageStructure = false, scope: initialScope, selectedNode, publishedVersionId, unitMapping }: Props) {
-  const t = useTranslation();
-  const [sourceRoots, setSourceRoots] = useState(preview.sourceRoots);
-  const [overviewRoots, setOverviewRoots] = useState<DraftNode[]>([]);
-  const [loadedRootIds, setLoadedRootIds] = useState([rootId]);
-  const [loading, setLoading] = useState(false);
-  const [roots, setRoots] = useState(preview.roots);
-  const [operations, setOperations] = useState<DraftOperation[]>([]);
-  const [history, setHistory] = useState<{ roots: DraftNode[]; operations: DraftOperation[] }[]>([]);
-  const saving = useRef(false);
-  const [selection, setSelection] = useState(selectedNode ?? rootId);
+export function StructuredEditor({ initialTab,wikiPanel,detailsPanel,review = [], preview, outline, rootId, versionId, articleId, constitutionId, editable, canManageStructure = false, scope: initialScope, selectedNode, publishedVersionId, unitMapping }: Props) {
+  const t = useTranslation(), copy = (en: string, de: string) => t({ en, de });
+  const [sourceRoots, setSourceRoots] = useState(preview.sourceRoots), [roots, setRoots] = useState(preview.roots), [operations, setOperations] = useState<DraftOperation[]>([]);
+  const [history, setHistory] = useState<Snapshot[]>([]), [future, setFuture] = useState<Snapshot[]>([]), [loadedRootIds, setLoadedRootIds] = useState([rootId]);
+  const [canvasReset,setCanvasReset]=useState(0);
+  const [overviewRoots, setOverviewRoots] = useState<DraftNode[]>([]), [loading, setLoading] = useState(false), [message, setMessage] = useState('');
+  const [selection, setSelection] = useState(selectedNode ?? rootId), [panel, setPanel] = useState(''), [mode, setMode] = useState<'edit' | 'changes' | 'preview'|'wiki'|'details'>(initialTab==='wiki'&&wikiPanel?'wiki':initialTab==='details'&&detailsPanel?'details':editable ? 'edit' : 'changes');
+  const [noteHistory,setNoteHistory]=useState<NoteDraft[]>([]),[noteFuture,setNoteFuture]=useState<NoteDraft[]>([]),[insertPosition,setInsertPosition]=useState('after');
+  const [noteError, setNoteError] = useState('');
+  const [markerContext,setMarkerContext]=useState<CanvasMarkerContext|null>(null),[activeMarker,setActiveMarker]=useState<CanvasMarkerContext|null>(null),[markerMove,setMarkerMove]=useState<{noteId:string;referenceId:string}|null>(null),[onlyUnmarked,setOnlyUnmarked]=useState(false),[saveAttempted,setSaveAttempted]=useState(false);
+  const [textContext,setTextContext]=useState<(CanvasTextContext&{formatting?:boolean})|null>(null);
+  const [toolbarTop, setToolbarTop] = useState(0), [changeIndex, setChangeIndex] = useState(0);
+  const [boundaries, setBoundaries] = useState(false), [activeMarks, setActiveMarks] = useState<string[]>([]), [noteEdit, setNoteEdit] = useState<NoteDraft | null>(null), [referenceTarget, setReferenceTarget] = useState(''), [externalUrl, setExternalUrl] = useState('');
   const initialRoot = findNode(preview.roots, rootId) ?? preview.roots[0];
   const defaultScope = scopedNodes(preview.roots, rootId, selectedNode ?? rootId, 'article').length ? 'article' : initialRoot.kind;
-  const kindName = (kindCode: string) => outline.kinds.find(kind => kind.kindCode === kindCode)?.displayLabel ?? kindCode;
   const [scope, setScope] = useState(initialScope === 'constitution' || (initialScope && scopedNodes(preview.roots, rootId, selectedNode ?? rootId, initialScope).length) ? initialScope! : defaultScope);
-  const [message, setMessage] = useState('');
+  const rootRef = useRef<HTMLDivElement>(null), loadedIdsRef = useRef(new Set([rootId])), rootsRef = useRef(roots), operationsRef = useRef(operations), historyRef = useRef(history), futureRef = useRef(future), saving = useRef(false), lastTyping = useRef({ key: '', time: 0 });
+  useLayoutEffect(() => { rootsRef.current = roots; operationsRef.current = operations; historyRef.current = history; futureRef.current = future; }, [roots, operations, history, future]);
+  const bodyCanvas=useRef<CanvasController|null>(null), pendingChangeScroll=useRef<{id:string;unitId:string}|null>(null);
+  const [activeCanvas, setActiveCanvas] = useState<CanvasController | null>(null);
   const { setDirty } = useDraftState();
-  useEffect(() => { setDirty(operations.length > 0); return () => setDirty(false); }, [operations.length, setDirty]);
-  useEffect(() => {
-    function guard(event: BeforeUnloadEvent) {
-      if (saving.current) { saving.current = false; return; }
-      if (operations.length) { event.preventDefault(); event.returnValue = ''; }
-    }
-    window.addEventListener('beforeunload', guard); return () => window.removeEventListener('beforeunload', guard);
-  }, [operations.length]);
-  const caret = useRef<Record<string, number>>({});
-  const ranges = useRef<Record<string, { start: number; end: number }>>({});
-  const [referenceTargets, setReferenceTargets] = useState<Record<string, string>>({});
-  const allNodes = nodes(roots);
-  const root = roots.find(root => nodes([root]).some(node => node.logicalId === selection || node.content.some(entry => entry.logicalId === selection))) ?? findNode(roots, rootId) ?? roots[0];
+  useEffect(() => { setDirty(operations.length > 0 || Boolean(noteEdit)); return () => setDirty(false); }, [operations.length, noteEdit, setDirty]);
+  useEffect(() => { function guard(event: BeforeUnloadEvent) { if (saving.current) { saving.current = false; return; } if (operations.length || noteEdit) { event.preventDefault(); event.returnValue = ''; } } window.addEventListener('beforeunload', guard); return () => window.removeEventListener('beforeunload', guard); }, [operations.length, noteEdit]);
+  useEffect(() => { function dismiss(event: PointerEvent) { if (panel && !rootRef.current?.querySelector('[data-editor-tools]')?.contains(event.target as Node) && !rootRef.current?.querySelector('[data-tool-panel]')?.contains(event.target as Node)) setPanel(''); } document.addEventListener('pointerdown', dismiss); return () => document.removeEventListener('pointerdown', dismiss); }, [panel]);
+  const allNodes = nodes(roots), kindName = (code: string) => outline.kinds.find(kind => kind.kindCode === code)?.displayLabel ?? code;
+  const selectedUnit = findNode(roots, selection) ?? allNodes.find(node => node.content.some(entry => entry.logicalId === selection)) ?? initialRoot;
+  const selectedEntry = selectedUnit.content.find(entry => entry.logicalId === selection);
+  const currentRoot = roots.find(root => nodes([root]).some(node => node.logicalId === selectedUnit.logicalId)) ?? roots[0];
+  const activeLevel = outline.kinds.find(level => level.kindCode === selectedUnit.kind)!;
+  const eligible = (level: ContentOutline['kinds'][number]) => level.segmentation === 'sentence' && !level.mayHoldChildren && level.allowedChildKinds.length === 0 && level.labelPolicy !== 'required' && level.titlePolicy !== 'required';
   const errors = validateDraft(roots, outline, t);
-  const loadedIds = new Set(nodes([...sourceRoots, ...roots]).flatMap(node => [node.logicalId, ...node.content.map(entry => entry.logicalId).filter((id): id is string => Boolean(id))]));
+  const loadedIds = new Set(nodes([...sourceRoots, ...roots]).flatMap(node => [node.logicalId, ...node.content.flatMap(entry => entry.logicalId ? [entry.logicalId] : [])]));
   const differences: ReviewDifference[] = [...review.filter(item => !loadedIds.has(item.logicalId)), ...draftDifferences(sourceRoots, roots)];
-  function remember(view: string, selected: string) {
-    const url = new URL(window.location.href); url.searchParams.set('scope', view); url.searchParams.set('selectedNode', selected); window.history.replaceState(null, '', url);
+  const localNotes = indexDraftFootnotes(roots);
+  const notes = roots.flatMap(root => (loadedRootIds.includes(root.logicalId) || localNotes.some(note => note.rootId === root.logicalId) ? localNotes : preview.footnotes ?? []).filter(note => note.rootId === root.logicalId));
+  const articleNoteIds=new Set(nodes([currentRoot]).flatMap(node=>node.content.filter(entry=>!entry.node&&entry.format!=='footnote').flatMap(entry=>(entry.references??[]).flatMap(reference=>reference.target.type==='footnote'&&reference.target.footnoteId?[reference.target.footnoteId]:[]))));
+  const visibleNotes=scope==='constitution'?notes:notes.filter(note=>articleNoteIds.has(note.entry.logicalId!));
+  const completeRoots=new Set([...loadedRootIds,...roots.filter(root=>root.content.length>0).map(root=>root.logicalId)]);
+  const noteReferences=[...(preview.footnoteReferences??[]).filter(reference=>!completeRoots.has(reference.rootId)),...indexDraftFootnoteReferences(roots).filter(reference=>completeRoots.has(reference.rootId))];
+  const markerCount=(id:string)=>noteReferences.filter(reference=>reference.noteId===id).length;
+  const noteProblems=footnoteCardinality(notes.map(note=>({logicalId:note.entry.logicalId!,label:note.entry.footnoteLabel??'*'})),noteReferences);
+  const noteProblemText=(problem:typeof noteProblems[number])=>problem.kind==='missing'?copy('Footnote '+problem.label+' needs a marker before you can save.','Fußnote '+problem.label+' benötigt vor dem Speichern ein Verweiszeichen.'):copy('A marker points to a missing footnote. Remove it or restore its note before saving.','Ein Verweiszeichen verweist auf eine fehlende Fußnote. Entfernen Sie es oder stellen Sie die Fußnote vor dem Speichern wieder her.');
+  function remember(view: string, selected: string) { const url = new URL(window.location.href); url.searchParams.set('scope', view); url.searchParams.set('selectedNode', selected); window.history.replaceState(null, '', url); }
+  function select(id: string) { setSelection(id); remember(scope, id); }
+  useEffect(() => { const header = document.querySelector('.topbar'); if (!header) return; const measure = () => setToolbarTop(header.getBoundingClientRect().height); measure(); if (typeof ResizeObserver === 'undefined') { window.addEventListener('resize', measure); return () => window.removeEventListener('resize', measure); } const observer = new ResizeObserver(measure); observer.observe(header); return () => observer.disconnect(); }, []);
+  useLayoutEffect(() => {
+    const menu = rootRef.current?.querySelector<HTMLElement>('[data-tool-panel]');
+    if (!menu) return;
+    const viewport = window.visualViewport;
+    const measure = () => {
+      const visibleBottom = viewport ? viewport.offsetTop + viewport.height : window.innerHeight;
+      menu.style.setProperty('--editor-panel-space', Math.max(0, visibleBottom - menu.getBoundingClientRect().top - 12) + 'px');
+    };
+    measure();
+    window.addEventListener('resize', measure); window.addEventListener('scroll', measure, true);
+    viewport?.addEventListener('resize', measure); viewport?.addEventListener('scroll', measure);
+    const toolbar = rootRef.current?.querySelector('[data-editor-tools]');
+    const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(measure) : undefined;
+    if (toolbar) observer?.observe(toolbar);
+    return () => {
+      window.removeEventListener('resize', measure); window.removeEventListener('scroll', measure, true);
+      viewport?.removeEventListener('resize', measure); viewport?.removeEventListener('scroll', measure); observer?.disconnect();
+    };
+  }, [panel, mode, toolbarTop]);
+  function install(nextRoots: DraftNode[], nextOperations: DraftOperation[]) { rootsRef.current = nextRoots; operationsRef.current = nextOperations; setRoots(nextRoots); setOperations(nextOperations); }
+  function transaction(build: (emit: (operation: Omit<DraftOperation, 'id'>) => DraftOperation, current: () => DraftNode[]) => void, grouping = '') {
+    const before = { roots: rootsRef.current, operations: operationsRef.current }; let nextRoots = before.roots, nextOperations = before.operations;
+    try {
+      build(op => { const previous = nextOperations.at(-1), coalesce = previous && previous.targetId === op.targetId && previous.type === op.type && ['replace_text', 'set_metadata'].includes(op.type); const command = coalesce ? { ...op, id: previous.id, expectedRevisionId: previous.expectedRevisionId } : { ...op, id: crypto.randomUUID() }; nextRoots = applyOperation(nextRoots, command); nextOperations = coalesce ? [...nextOperations.slice(0, -1), command] : [...nextOperations, command]; return command; }, () => nextRoots);
+      if (JSON.stringify(nextRoots) === JSON.stringify(before.roots)) return true;
+      // Transaction callbacks run on input, never during rendering; the clock groups typing history.
+      // eslint-disable-next-line react-hooks/purity
+      const now = Date.now(), grouped = grouping && lastTyping.current.key === grouping && now - lastTyping.current.time < 900;
+      const nextHistory = grouped ? historyRef.current : [...historyRef.current, before].slice(-100); historyRef.current = nextHistory; setHistory(nextHistory); futureRef.current = []; setFuture([]); lastTyping.current = { key: grouping, time: now };
+      for(const operation of nextOperations)if(operation.type==='insert_root'&&operation.node)loadedIdsRef.current.add(operation.node.logicalId);setLoadedRootIds([...loadedIdsRef.current]);
+      install(nextRoots, nextOperations); setMessage(t(ui.state.unsavedChanges));return true;
+    } catch(error) { setCanvasReset(current=>current+1);setMessage(error instanceof WhitespaceOnlyReferenceError?copy('Move the link onto sentence text before removing its surrounding spaces.','Verschieben Sie den Link auf Satztext, bevor Sie die umgebenden Leerzeichen entfernen.'):error instanceof SentenceLayoutError?copy('At most 16 line breaks are allowed between sentences.','Zwischen Sätzen sind höchstens 16 Zeilenumbrüche erlaubt.'):t(ui.state.invalidChange));return false; }
   }
-  async function loadView(view: string, selected = selection, fullRootId?: string) {
+  function change(operation: Omit<DraftOperation, 'id'>) { transaction(emit => { emit(operation); }); }
+  function closeNoteEditor() {setNoteEdit(null);setNoteError('');const body=bodyCanvas.current?.isAlive()?bodyCanvas.current:null;setActiveCanvas(body);requestAnimationFrame(()=>body?.focus());}
+  function updateNoteDraft(next:NoteDraft) { if (noteEdit) setNoteHistory(current=>[...current,noteEdit].slice(-100)); setNoteFuture([]);setNoteEdit(next); }
+  function openNoteEditor(next:NoteDraft) {if(next.id&&scope!=='constitution'&&!visibleNotes.some(note=>note.entry.logicalId===next.id)){setScope('constitution');remember('constitution',selection);}setNoteHistory([]);setNoteFuture([]);setNoteError('');setActiveCanvas(null);setActiveMarks([]);setNoteEdit(next);requestAnimationFrame(()=>rootRef.current?.querySelector<HTMLElement>((next.id ? '#editor-fn-'+next.id : '#editor-new-note')+' [role=textbox]')?.focus({preventScroll:true}));}
+  function travel(redo = false) {
+    if (noteEdit) {const stack=redo?noteFuture:noteHistory, previous=stack.at(-1);if(!previous)return;setCanvasReset(current=>current+1);if(redo){setNoteFuture(stack.slice(0,-1));setNoteHistory(current=>[...current,noteEdit]);}else{setNoteHistory(stack.slice(0,-1));setNoteFuture(current=>[...current,noteEdit]);}setNoteEdit(previous);return;}
+    const stack = redo ? futureRef.current : historyRef.current, previous = stack.at(-1); if (!previous) return;
+    setCanvasReset(current=>current+1);
+    const now = { roots: rootsRef.current, operations: operationsRef.current };
+    if (redo) { futureRef.current = stack.slice(0, -1); historyRef.current = [...historyRef.current, now]; } else { historyRef.current = stack.slice(0, -1); futureRef.current = [...futureRef.current, now]; }
+    setHistory(historyRef.current); setFuture(futureRef.current); install(previous.roots, previous.operations); lastTyping.current = { key: '', time: 0 }; setMessage(copy(redo ? 'Last change restored.' : 'Last change undone.', redo ? 'Letzte Änderung wiederhergestellt.' : 'Letzte Änderung rückgängig gemacht.')); requestAnimationFrame(() => activeCanvas?.focus());
+  }
+  async function fetchView(view: string, targetRoot?: string): Promise<StructuredPreview> {
+    const params = new URLSearchParams({ sessionId: preview.sessionId, scope: view }); if (targetRoot) params.set('rootId', targetRoot);
+    const response = await fetchWithTimeout('/editor/view?'+params, { cache: 'no-store' }); if (!response.ok) throw new LocalizedEditorError(ui.editorDefaults.viewRetry);
+    const loaded: StructuredPreview = await response.json(); if (loaded.generation !== preview.generation || loaded.settingsRevisionId !== preview.settingsRevisionId) throw new LocalizedEditorError(ui.editorDefaults.sessionChanged); return loaded;
+  }
+  async function ensureRoot(id: string): Promise<DraftNode[]> {
+    if (loadedIdsRef.current.has(id)) return rootsRef.current;
+    const loaded = await fetchView('constitution', id), serverRoot = loaded.roots.find(root => root.logicalId === id), original = loaded.sourceRoots.find(root => root.logicalId === id);
+    if (!serverRoot) throw new LocalizedEditorError(ui.editorDefaults.viewRetry);
+    const hydrate = (operations: DraftOperation[]) => operations.reduce((roots, operation) => remapDraftTargets(roots, operation), [serverRoot])[0];
+    const replace = (current: DraftNode[], operations: DraftOperation[]) => current.map(root => root.logicalId === id ? hydrate(operations) : root), next = replace(rootsRef.current, operationsRef.current);
+    install(next, operationsRef.current); setSourceRoots(current => current.map(root => root.logicalId === id && original ? original : root));
+    historyRef.current = historyRef.current.map(snapshot => ({ ...snapshot, roots: replace(snapshot.roots, snapshot.operations) })); futureRef.current = futureRef.current.map(snapshot => ({ ...snapshot, roots: replace(snapshot.roots, snapshot.operations) })); setHistory(historyRef.current); setFuture(futureRef.current); loadedIdsRef.current.add(id); setLoadedRootIds([...loadedIdsRef.current]); return next;
+  }
+  async function showPreview() {
+    setLoading(true); setPanel('');
+    try {
+      const response = await fetchWithTimeout('/editor/view?'+new URLSearchParams({ sessionId:preview.sessionId, scope:'constitution', includeBody:'true' }), { cache:'no-store' }); if (!response.ok) throw new LocalizedEditorError(ui.editorDefaults.viewRetry);
+      const loaded:StructuredPreview = await response.json(); if (loaded.generation !== preview.generation || loaded.settingsRevisionId !== preview.settingsRevisionId) throw new LocalizedEditorError(ui.editorDefaults.sessionChanged);
+      const fresh = new Map(loaded.roots.filter(root => !loadedIdsRef.current.has(root.logicalId)).map(root => [root.logicalId,root]));
+      const hydrate = (current:DraftNode[], operations:DraftOperation[]) => current.map(root => fresh.has(root.logicalId) ? operations.reduce((roots,operation)=>remapDraftTargets(roots,operation),[fresh.get(root.logicalId)!])[0] : root);
+      install(hydrate(rootsRef.current,operationsRef.current),operationsRef.current); setSourceRoots(current=>current.map(root=>fresh.has(root.logicalId)?loaded.sourceRoots.find(original=>original.logicalId===root.logicalId)??root:root));
+      historyRef.current=historyRef.current.map(snapshot=>({...snapshot,roots:hydrate(snapshot.roots,snapshot.operations)}));futureRef.current=futureRef.current.map(snapshot=>({...snapshot,roots:hydrate(snapshot.roots,snapshot.operations)}));setHistory(historyRef.current);setFuture(futureRef.current);
+      loaded.roots.forEach(root=>loadedIdsRef.current.add(root.logicalId));setLoadedRootIds([...loadedIdsRef.current]);setScope('constitution');setMode('preview');remember('constitution',selection);
+    } catch(error) {setMessage(t(error instanceof LocalizedEditorError?error.copy:ui.state.viewLoadFailed));}
+    finally {setLoading(false);}
+  }
+
+  async function changeScope(view: string) {
+    setLoading(true); setPanel('');
+    try { if (view === 'constitution') { const loaded = await fetchView(view); setOverviewRoots(loaded.roots); } setScope(view); remember(view, selection); }
+    catch (error) { setMessage(t(error instanceof LocalizedEditorError ? error.copy : ui.state.viewLoadFailed)); }
+    finally { setLoading(false); }
+  }
+  useEffect(() => { if (scope === 'constitution') { queueMicrotask(() => { void changeScope(scope); }); } /* Initial pinned view only. */ // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  async function navigateRoot(id: string) { setPanel('');setLoading(true); try { const loaded = await ensureRoot(id), root = loaded.find(root => root.logicalId === id)!; const nextScope = scope === 'constitution' ? 'constitution' : root.kind; setScope(nextScope); select(id); remember(nextScope, id); setMode('edit'); } catch (error) { setMessage(t(error instanceof LocalizedEditorError ? error.copy : ui.state.viewLoadFailed)); } finally { setLoading(false); } }
+  function createNode(code: string, ancestors = new Set<string>()): DraftNode { const level = outline.kinds.find(level => level.kindCode === code); if (!level || ancestors.has(code)) throw new Error('Invalid outline'); return { logicalId: crypto.randomUUID(), kind: code, label: level.labelPolicy === 'required' ? t(ui.editorDefaults.newLabel) : null, title: level.titlePolicy === 'required' ? t(ui.editorDefaults.newTitle) : null, content: level.allowedChildKinds[0] ? [{ type: 'child', node: createNode(level.allowedChildKinds[0], new Set([...ancestors, code])) }] : [{ type: 'text', logicalId: crypto.randomUUID(), text: '' }] }; }
+  function reconcile(units: CanvasUnit[], blocks: CanvasBlock[], parentId: string | null, grouping: string, entriesOnly = false) {
+    const accepted=transaction((emit, current) => {
+      const automatic=!entriesOnly&&eligible(outline.kinds.find(level=>level.kindCode===units[0].node.kind)!);
+      const touched=new Set(blocks.filter(block=>{const old=units.find(unit=>unit.entry.logicalId===block.textId);return !old||canvasSignature([blockOf(old)])!==canvasSignature([block]);}).map(block=>block.textId));
+      const plannedLayout=new Map((automatic?cleanSentenceLayout(blocks,touched):blocks).map(block=>[block.textId,block.lineBreaksBefore??0]));
+      const identity = (unit: CanvasUnit) => entriesOnly ? unit.entry.logicalId! : unit.node.logicalId;
+      const blockIdentity = (block: CanvasBlock) => entriesOnly ? block.textId : block.nodeId;
+      const targetReplacements=new Map<string,string>();
+      const existing = new Map(units.map(unit => [identity(unit), unit])), retained = new Set(blocks.map(blockIdentity)), handled = new Set<string>();
+      const combine = (parts: CanvasBlock[]): CanvasBlock => { let offset = 0; const marks: OrderedTextMark[] = [], references: OrderedInlineReference[] = []; for (const part of parts) { marks.push(...part.marks.map(mark => ({ ...mark, start: mark.start + offset, end: mark.end + offset }))); references.push(...part.references.map(reference => ({ ...reference, start: reference.start + offset, end: reference.end + offset }))); offset += part.text.length; } return { ...parts[0], text: parts.map(part => part.text).join(''), marks: normalizeMarks(marks), references }; };
+      const entryIn = (id: string) => nodes(current()).flatMap(node => node.content).find(entry => entry.logicalId === id)!;
+      const replace = (entry: DraftEntry, block: Pick<CanvasBlock, 'text' | 'marks' | 'references'|'lineBreaksBefore'>) => { const rich = { text: block.text, format: 'plain' as const, marks: block.marks, references: block.references,lineBreaksBefore:block.lineBreaksBefore??entry.lineBreaksBefore??0 }; if (JSON.stringify({ text: entry.text ?? '', format: entry.format ?? 'plain', marks: entry.marks ?? [],references: entry.references ?? [],lineBreaksBefore:entry.lineBreaksBefore??0 }) !== JSON.stringify(rich)) emit({ type:'replace_text', targetId:entry.logicalId!, expectedRevisionId:token(entry), ...rich }); };
+      for (let index = 0; index < blocks.length; index++) {
+        const block = blocks[index], old = existing.get(blockIdentity(block)); if (!old) continue;
+        const removed: CanvasUnit[] = [], oldAt = units.indexOf(old);
+        for (let position = oldAt + 1; position < units.length && !retained.has(identity(units[position])); position++) removed.push(units[position]);
+        const suffix = removed.map(unit => unit.entry.text ?? '').join('');
+        // The canvas keeps transient separator whitespace while automatic leaves store clean text.
+        // Merge the exact source slices first; the final replacement applies the authored rich text.
+        const mergeText = block.text.endsWith(suffix) ? block.text : automatic ? block.text.trimEnd() : block.text;
+        if (removed.length && suffix && mergeText.endsWith(suffix)) {
+          if (removed.some(unit => unit.node.label || unit.node.title)) throw new Error('A titled or labelled unit must not be merged implicitly');
+          const prefix = sliceBlock(block, 0, mergeText.length - suffix.length), movedReferences = new Set(removed.flatMap(unit => unit.entry.references ?? []).map(reference => reference.logicalId));
+          prefix.references = prefix.references.filter(reference => !movedReferences.has(reference.logicalId)); replace(entryIn(old.entry.logicalId!), prefix);
+          if (!entriesOnly) for (const unit of removed) { const destination = findNode(current(), old.node.logicalId)!; emit({ type:'move', targetId:unit.entry.logicalId!, expectedRevisionId:token(entryIn(unit.entry.logicalId!)), destinationParentId:destination.logicalId, destinationRevisionId:token(destination), position:destination.content.length }); }
+          emit({ type:'merge_text', targetId:old.entry.logicalId!, expectedRevisionId:token(entryIn(old.entry.logicalId!)), mergeIds:[old.entry.logicalId!, ...removed.map(unit => unit.entry.logicalId!)], parts:[{ logicalId:old.entry.logicalId!, text:mergeText }] });
+          if (!entriesOnly) for (const unit of removed) { for (const note of findNode(current(), unit.node.logicalId)!.content.filter(entry => entry.format === 'footnote')) { const destination = findNode(current(), old.node.logicalId)!; emit({ type:'move', targetId:note.logicalId!, expectedRevisionId:token(note), destinationParentId:destination.logicalId, destinationRevisionId:token(destination), position:destination.content.length }); } }
+          if (!entriesOnly) for (const unit of removed) emit({ type:'remove', targetId:unit.node.logicalId, expectedRevisionId:token(findNode(current(), unit.node.logicalId)!), replacementId:old.node.logicalId });
+          removed.forEach(unit => {handled.add(identity(unit));targetReplacements.set(unit.entry.logicalId!,old.entry.logicalId!);if(!entriesOnly)targetReplacements.set(unit.node.logicalId,old.node.logicalId);});
+        }
+        const parts = [block]; while (index + 1 < blocks.length && !existing.has(blockIdentity(blocks[index + 1]))) { parts.push(blocks[++index]); }
+        const combined=combine(parts);combined.references=combined.references.map(reference=>{if(reference.target.type!=='unit'||!reference.target.logicalId)return reference;let target=reference.target.logicalId;const visited=new Set<string>();while(targetReplacements.has(target)&&!visited.has(target)){visited.add(target);target=targetReplacements.get(target)!;}return target===reference.target.logicalId?reference:{...reference,target:{...reference.target,logicalId:target}};});
+        replace(entryIn(old.entry.logicalId!),parts.length===1&&automatic&&touched.has(block.textId)?{...cleanSentenceBlock(combined),lineBreaksBefore:plannedLayout.get(block.textId)??0}:combined);
+        if (parts.length > 1) {
+          parts.forEach(part=>touched.add(part.textId));
+          const split = emit({ type:'split_text', targetId:old.entry.logicalId!, expectedRevisionId:token(entryIn(old.entry.logicalId!)), parts:parts.map(part => ({ logicalId:part.textId, text:part.text })) });
+          if (!entriesOnly) for (let part = 1; part < parts.length; part++) {
+            const parent = parentId ? findNode(current(), parentId)! : null, at = parent ? parent.content.findIndex(entry => entry.node?.logicalId === old.node.logicalId) + part : current().findIndex(node => node.logicalId === old.node.logicalId) + part;
+            const node: DraftNode = { logicalId:parts[part].nodeId, kind:old.node.kind, label:null, title:null, content:[] };
+            emit({ type:parent ? 'insert_child' : 'insert_root', targetId:parent?.logicalId ?? current()[0].logicalId, expectedRevisionId:token(parent ?? current()[0]), position:at, node });
+            const inserted = findNode(current(), node.logicalId)!; emit({ type:'move', targetId:parts[part].textId, expectedRevisionId:split.id, destinationParentId:inserted.logicalId, destinationRevisionId:token(inserted), position:0 });
+          }
+        }
+        if (!entriesOnly && parts.length > 1) { const source = findNode(current(), old.node.logicalId)!; for (const note of source.content.filter(entry => entry.format === 'footnote')) { const destination = findNode(current(), parts.at(-1)!.nodeId)!; emit({ type:'move', targetId:note.logicalId!, expectedRevisionId:token(note), destinationParentId:destination.logicalId, destinationRevisionId:token(destination), position:destination.content.length }); } }
+        handled.add(identity(old));
+      }
+      for (const unit of units) if (!retained.has(identity(unit)) && !handled.has(identity(unit))) emit({ type:'remove', targetId:identity(unit), expectedRevisionId:token(entriesOnly ? entryIn(unit.entry.logicalId!) : findNode(current(), unit.node.logicalId)!) });
+      if(automatic)for(const block of cleanSentenceLayout(blocks,touched)){const entry=entryIn(block.textId),rich={...block,text:entry.text??'',marks:entry.marks??[],references:entry.references??[]};replace(entry,{...(touched.has(block.textId)?cleanSentenceBlock(rich):rich),lineBreaksBefore:block.lineBreaksBefore??0});}
+    }, grouping);
+    if(!accepted)return false;
+    const entries=new Map(nodes(rootsRef.current).flatMap(node=>node.content.flatMap(entry=>entry.logicalId?[[entry.logicalId,entry] as const]:[])));
+    return blocks.map(block=>{const entry=entries.get(block.textId)!;return {...block,text:entry.text??'',marks:entry.marks??[],references:entry.references??[],lineBreaksBefore:entry.lineBreaksBefore??0};});
+  }
+
+  function activate(controller: CanvasController, id: string) { if(noteEdit)return;bodyCanvas.current=controller; setActiveCanvas(controller); setActiveMarks(controller.activeMarks()); select(id); }
+  async function locateMarker(noteId:string,referenceId:string){
+    const indexed=noteReferences.filter(reference=>reference.referenceId?reference.referenceId===referenceId:reference.noteId===noteId);
+    for(const id of new Set(indexed.map(reference=>reference.rootId)))await ensureRoot(id);
+    const matches=nodes(rootsRef.current).flatMap(owner=>owner.content.flatMap(entry=>(entry.references??[]).filter(reference=>reference.logicalId===referenceId).map(reference=>({entry,reference}))));
+    if(matches.length>1)throw new LocalizedEditorError({en:'This marker ID is used more than once. Correct the duplicate IDs before moving or removing a marker. Your draft is retained.',de:'Diese Verweiszeichen-ID wird mehrfach verwendet. Korrigieren Sie die doppelten IDs, bevor Sie ein Zeichen verschieben oder entfernen. Ihr Entwurf bleibt erhalten.'});
+    const found=matches[0];if(found?.reference.target.type==='footnote'&&found.reference.target.footnoteId===noteId)return found;
+    throw new Error('The marker is no longer present.');
+  }
+  async function beginMarkerMove(noteId:string,referenceId:string){setLoading(true);try{const found=await locateMarker(noteId,referenceId);setMarkerMove({noteId,referenceId:found.reference.logicalId});setPanel('');setMessage(copy('Choose the new position in the text, then select Place marker.','Wählen Sie die neue Textposition und anschließend „Verweiszeichen platzieren“.'));}catch(error){setMessage(error instanceof LocalizedEditorError?t(error.copy):copy('The marker could not be loaded. Your draft is retained.','Das Verweiszeichen konnte nicht geladen werden. Ihr Entwurf bleibt erhalten.'));}finally{setLoading(false);}}
+  async function removeMarker(noteId:string,referenceId:string){setLoading(true);try{const found=await locateMarker(noteId,referenceId);updateEntry(found.entry,{references:found.entry.references?.filter(reference=>reference.logicalId!==referenceId)});setActiveMarker(null);if(markerMove?.referenceId===referenceId)setMarkerMove(null);setMessage(markerCount(noteId)>1?copy('Marker removed. The footnote and its other markers are retained.','Verweiszeichen entfernt. Die Fußnote und ihre anderen Verweiszeichen bleiben erhalten.'):copy('Marker removed. The footnote is retained; add a marker before saving.','Verweiszeichen entfernt. Die Fußnote bleibt erhalten; ergänzen Sie vor dem Speichern ein Verweiszeichen.'));}catch(error){setMessage(error instanceof LocalizedEditorError?t(error.copy):copy('The marker could not be removed. Your draft is retained.','Das Verweiszeichen konnte nicht entfernt werden. Ihr Entwurf bleibt erhalten.'));}finally{setLoading(false);}}
+  async function placeMarker(){if(!markerMove||!activeCanvas?.isAlive())return;const anchor=activeCanvas.endAnchor();setLoading(true);try{const source=await locateMarker(markerMove.noteId,markerMove.referenceId),target=nodes(rootsRef.current).flatMap(node=>node.content).find(entry=>entry.logicalId===anchor.textId);if(!target||target.format==='footnote'||target.format==='table'||anchor.end<0||anchor.end>(target.text??'').length){setMessage(copy('Choose a position in the constitution text.','Wählen Sie eine Position im Verfassungstext.'));return;}if(target.references?.some(reference=>reference.logicalId!==markerMove.referenceId&&reference.start<anchor.end&&reference.end>anchor.end)){setMessage(copy('Place the footnote before or after the linked text.','Setzen Sie die Fußnote vor oder hinter den verlinkten Text.'));return;}const moved={...source.reference,start:anchor.end,end:anchor.end};const accepted=transaction((emit,current)=>{const replace=(entry:DraftEntry,references:OrderedInlineReference[])=>emit({type:'replace_text',targetId:entry.logicalId!,expectedRevisionId:token(entry),text:entry.text??'',format:entry.format??'plain',table:entry.table,footnoteLabel:entry.footnoteLabel,marks:entry.marks??[],lineBreaksBefore:entry.lineBreaksBefore??0,annotation:entry.annotation,references:references.sort((a,b)=>a.start-b.start||a.end-b.end)});if(source.entry.logicalId!==target.logicalId)replace(source.entry,(source.entry.references??[]).filter(reference=>reference.logicalId!==markerMove.referenceId));const destination=nodes(current()).flatMap(node=>node.content).find(entry=>entry.logicalId===target.logicalId)!;replace(destination,[...(destination.references??[]).filter(reference=>reference.logicalId!==markerMove.referenceId),moved]);});if(accepted){setMarkerMove(null);setActiveMarker(null);setMessage(copy('Marker moved.','Verweiszeichen verschoben.'));requestAnimationFrame(()=>activeCanvas.focus());}}catch(error){setMessage(error instanceof LocalizedEditorError?t(error.copy):copy('The marker could not be moved. Its original position is retained.','Das Verweiszeichen konnte nicht verschoben werden. Seine ursprüngliche Position bleibt erhalten.'));}finally{setLoading(false);}}
+  function canvas(units: CanvasUnit[], parentId: string | null, entriesOnly = false, showUnitMetadata = true) {
+    const level = outline.kinds.find(level => level.kindCode === units[0].node.kind)!;
+    return <ContinuousCanvas active={!noteEdit&&units.some(unit=>unit.entry.logicalId===selection)} key={units[0].entry.logicalId} units={units} resetVersion={canvasReset} label={copy('Constitution text', 'Verfassungstext')} editable={editable && !noteEdit} flowing={level.presentation === 'concatenated'} boundaries={boundaries && level.presentation === 'concatenated'} automatic={!entriesOnly && eligible(level)} delimiters={level.sentenceDelimiters ?? ['.', '!', '?']} notes={notes.map(note => ({ logicalId: note.entry.logicalId!, label: note.entry.footnoteLabel ?? '*' }))} unitLabels={showUnitMetadata && !entriesOnly ? Object.fromEntries(units.map(unit => [unit.node.logicalId, [level.showKind ? level.displayLabel : '', level.showLabel ? unit.node.label : '', level.showTitle ? unit.node.title : ''].filter(Boolean).join(' ')])) : {}} onSelectUnit={select} onActivate={activate} onMarkerActivate={setActiveMarker} onMarkerContextMenu={context=>{setPanel('');setTextContext(null);setActiveMarker(context);setMarkerContext(context);}} onTextContextMenu={context=>{setPanel('');setMarkerContext(null);setTextContext(context);}} onChange={(blocks, grouping) => reconcile(units, blocks, parentId, grouping, entriesOnly)} onUndo={() => travel()} onRedo={() => travel(true)} />;
+  }
+  function renderNode(node: DraftNode): React.ReactNode {
+    const level = outline.kinds.find(level => level.kindCode === node.kind); if (!level) return null;
+    const isRoot = roots.some(root => root.logicalId === node.logicalId), article = { articleNumber: node.label ?? '', title: node.title ?? '', kind: node.kind };
+    const sharedHeading = isRoot && level.labelPlacement !== 'inline' && level.labelPlacement !== 'superscript' ? articleHeading(outline, article) : '';
+    const contextualHeading = [level.showKind ? level.displayLabel : '', level.showLabel ? node.label : '', level.showTitle ? node.title : ''].filter(Boolean).join(' ');
+    const heading = sharedHeading || contextualHeading ? <button type="button" className={[styles.unitHeading, isRoot ? styles.articleHeading : ''].join(' ')} onClick={() => select(node.logicalId)}>{sharedHeading ? <ConstitutionArticleHeading article={article} outline={outline} /> : contextualHeading}</button> : null;
+    const own = simpleUnit(node); if (own) return <section key={node.logicalId} data-editor-unit={node.logicalId}>{heading}{canvas([own], allNodes.find(parent => parent.content.some(entry => entry.node?.logicalId === node.logicalId))?.logicalId ?? null,false,false)}</section>;
+    const items: React.ReactNode[] = [];
+    for (let index = 0; index < node.content.length; index++) {
+      const entry = node.content[index]; if (entry.format === 'footnote') continue;
+      if (entry.node) {
+        const childLevel = outline.kinds.find(level => level.kindCode === entry.node!.kind), first = simpleUnit(entry.node);
+        if (first && childLevel && !childLevel.mayHoldChildren && childLevel.allowedChildKinds.length === 0) { const units = [first]; while (index + 1 < node.content.length) { const next = node.content[index + 1].node; const unit = next && next.kind === entry.node.kind ? simpleUnit(next) : null; if (!unit) break; units.push(unit); index++; } items.push(<div key={first.node.logicalId} className={styles.paragraph}>{canvas(units, node.logicalId)}</div>); }
+        else items.push(renderNode(entry.node));
+      } else if (entry.format === 'table' && entry.table) items.push(renderTable(entry));
+      else items.push(<div key={entry.logicalId} className={styles.paragraph}>{canvas([{ node, entry }], node.logicalId, true)}</div>);
+    }
+    return <section key={node.logicalId} data-editor-unit={node.logicalId} className={styles.unit}>{heading}{items}</section>;
+  }
+  function updateEntry(entry: DraftEntry, patch: Partial<Pick<DraftEntry, 'text' | 'format' | 'table' | 'footnoteLabel' | 'annotation' | 'references' | 'marks'|'lineBreaksBefore'>>) {
+    const fields = (value:DraftEntry) => ({text:value.text ?? '',format:value.format ?? 'plain',table:value.table ?? null,footnoteLabel:value.footnoteLabel ?? null,annotation:value.annotation ?? null,references:value.references ?? [],marks:value.marks ?? [],lineBreaksBefore:value.lineBreaksBefore??0});
+    if (JSON.stringify(fields(entry)) === JSON.stringify(fields({...entry,...patch}))) return;
+    change({ type: 'replace_text', targetId: entry.logicalId!, expectedRevisionId: token(entry), format: entry.format ?? 'plain', table: entry.table, footnoteLabel: entry.footnoteLabel, annotation: entry.annotation, references: entry.references ?? [], marks: entry.marks ?? [],lineBreaksBefore:entry.lineBreaksBefore??0, ...patch, text: patch.text ?? entry.text ?? '' });
+  }
+
+  function renderTable(entry: DraftEntry) {
+    const table = entry.table!, editing = selection === entry.logicalId && panel === 'table';
+    const update = (next: typeof table) => updateEntry(entry, { table: next, text: next.rows.map(row => row.cells.map(cell => cell.text).join(' ')).join('\n') });
+    const cell = (id: string, patch: Partial<typeof table.rows[number]['cells'][number]>) => update({ ...table, rows: table.rows.map(row => ({ ...row, cells: row.cells.map(cell => cell.logicalId === id ? { ...cell, ...patch } : cell) })) });
+    return <div key={entry.logicalId} className={styles.table} data-editor-entry={entry.logicalId}>{editing ? <fieldset><legend>{copy('Edit table', 'Tabelle bearbeiten')}</legend><label>{t(ui.editor.structurededitor.caption)}<input value={table.caption ?? ''} onChange={event => update({ ...table, caption: event.target.value })} /></label>{table.rows.map((row, rowIndex) => <div key={row.logicalId} className={styles.tableRow}>{row.cells.map((item, column) => <details key={item.logicalId} open><summary>{copy('Cell', 'Zelle')} {column + 1}</summary><textarea aria-label={copy('Cell text', 'Zellentext')} value={item.text} onChange={event => cell(item.logicalId, { text: event.target.value })} /><label><input type="checkbox" checked={item.header ?? false} onChange={event => cell(item.logicalId, { header: event.target.checked })} />{t(ui.editor.structurededitor.header)}</label><label>{t(ui.editor.structurededitor.rowSpan)}<input type="number" min={1} max={100} value={item.rowSpan ?? 1} onChange={event => cell(item.logicalId, { rowSpan: Number(event.target.value) })} /></label><label>{t(ui.editor.structurededitor.columnSpan)}<input type="number" min={1} max={100} value={item.colSpan ?? 1} onChange={event => cell(item.logicalId, { colSpan: Number(event.target.value) })} /></label><label>{t(ui.editor.structurededitor.headerCells)}<select multiple value={item.headers ?? []} onChange={event => cell(item.logicalId, { headers: Array.from(event.target.selectedOptions, option => option.value) })}>{table.rows.flatMap(row => row.cells).filter(cell => cell.header && cell.logicalId !== item.logicalId).map(cell => <option value={cell.logicalId} key={cell.logicalId}>{cell.text || t(ui.editorDefaults.untitledHeader)}</option>)}</select></label></details>)}<button type="button" onClick={() => update({ ...table, rows: table.rows.map((current, at) => at === rowIndex ? { ...current, cells: [...current.cells, { logicalId: crypto.randomUUID(), text: '' }] } : current) })}>{t(ui.editor.structurededitor.cell2)}</button><button type="button" disabled={table.rows.length < 2} onClick={() => update({ ...table, rows: table.rows.filter(current => current.logicalId !== row.logicalId) })}>{t(ui.editor.structurededitor.removeRow)}</button></div>)}<button type="button" onClick={() => update({ ...table, rows: [...table.rows, { logicalId: crypto.randomUUID(), cells: [{ logicalId: crypto.randomUUID(), text: '' }] }] })}>{t(ui.editor.structurededitor.row)}</button><button type="button" onClick={() => setPanel('')}>{copy('Done', 'Fertig')}</button></fieldset> : <><table>{table.caption ? <caption>{table.caption}</caption> : null}<tbody>{table.rows.map(row => <tr key={row.logicalId}>{row.cells.map(cell => cell.header ? <th key={cell.logicalId} colSpan={cell.colSpan} rowSpan={cell.rowSpan}>{cell.text}</th> : <td key={cell.logicalId} colSpan={cell.colSpan} rowSpan={cell.rowSpan}>{cell.text}</td>)}</tr>)}</tbody></table>{editable ? <button type="button" disabled={Boolean(noteEdit)} onClick={() => { select(entry.logicalId!); setPanel('table'); }}>{copy('Edit table', 'Tabelle bearbeiten')}</button> : null}</>}</div>;
+  }
+  async function noteDestination(): Promise<{ parent: DraftNode; position: number }> {
+    const loaded = await ensureRoot(rootsRef.current.at(-1)!.logicalId), last = loaded.at(-1)!;
+    function endContainer(node: DraftNode): DraftNode | undefined {
+      if (outline.kinds.find(level => level.kindCode === node.kind)?.mayHoldText) return node;
+      const child = node.content.at(-1)?.node;
+      return child ? endContainer(child) : undefined;
+    }
+    const parent = endContainer(last);
+    if (!parent) throw new LocalizedEditorError({ en: 'Add a text unit to the final section before adding footnotes. Your note is retained.', de: 'Fügen Sie dem letzten Abschnitt zuerst eine Texteinheit hinzu. Ihre Fußnote bleibt erhalten.' }); return { parent, position: parent.content.length };
+  }
+  async function applyNote() {
+    if (!noteEdit?.label.trim() || !noteEdit.text.trim()) { setMessage(copy('Enter a label and footnote text.', 'Geben Sie eine Bezeichnung und den Fußnotentext ein.')); return; }
     setLoading(true);
     try {
-      const params = new URLSearchParams({ sessionId: preview.sessionId, scope: view });
-      if (fullRootId) params.set('rootId', fullRootId);
-      const response = await fetchWithTimeout(`/editor/view?${params}`, { cache: 'no-store' });
-      if (!response.ok) throw new LocalizedEditorError(ui.editorDefaults.viewRetry);
-      const loaded: StructuredPreview = await response.json();
-      if (loaded.generation !== preview.generation || loaded.settingsRevisionId !== preview.settingsRevisionId) throw new LocalizedEditorError(ui.editorDefaults.sessionChanged);
-      if (fullRootId) {
-        const newRoot = loaded.roots.find(root => root.logicalId === fullRootId);
-        const original = loaded.sourceRoots.find(root => root.logicalId === fullRootId);
-        if (newRoot) {
-          setRoots(current => current.map(root => root.logicalId === fullRootId ? newRoot : root));
-          setHistory(current => current.map(snapshot => ({ ...snapshot, roots: snapshot.roots.map(root => root.logicalId === fullRootId ? newRoot : root) })));
-          setLoadedRootIds(current => [...current, fullRootId]);
+      if (noteEdit.id) { const indexed = notes.find(note => note.entry.logicalId === noteEdit.id)!; await ensureRoot(indexed.rootId); const entry = nodes(rootsRef.current).flatMap(node => node.content).find(entry => entry.logicalId === noteEdit.id)!; updateEntry(entry, { text: noteEdit.text, footnoteLabel: noteEdit.label, marks: noteEdit.marks ?? [] }); }
+      else { const anchor = noteEdit.anchor, source = anchor && nodes(rootsRef.current).flatMap(node => node.content).find(entry => entry.logicalId === anchor.textId); if (anchor && source?.references?.some(reference => reference.start < anchor.end && reference.end > anchor.end)) { setNoteError(copy('Place the footnote before or after the linked text.', 'Setzen Sie die Fußnote vor oder hinter den verlinkten Text.')); return; } const destination = await noteDestination(), id = crypto.randomUUID(); transaction((emit, current) => { emit({ type: 'insert_text', targetId: destination.parent.logicalId, expectedRevisionId: token(destination.parent), position: destination.position, parts: [{ logicalId: id, text: noteEdit.text, format: 'footnote', footnoteLabel: noteEdit.label, marks: noteEdit.marks ?? [] }] }); if (anchor) { const entry = nodes(current()).flatMap(node => node.content).find(entry => entry.logicalId === anchor.textId); if (entry) emit({ type: 'replace_text', targetId: entry.logicalId!, expectedRevisionId: token(entry), text: entry.text ?? '', format: 'plain', marks: entry.marks ?? [],lineBreaksBefore:entry.lineBreaksBefore??0, references: [...(entry.references ?? []), { logicalId: crypto.randomUUID(), start: anchor.end, end: anchor.end, target: { type: 'footnote' as const, footnoteId: id } }].sort((a,b)=>a.start-b.start||a.end-b.end) }); } }); }
+      closeNoteEditor(); setPanel('');
+    } catch (error) { if (error instanceof LocalizedEditorError) setNoteError(t(error.copy)); else setMessage(copy('The endnotes could not be loaded. Your text is retained.', 'Die Fußnoten konnten nicht geladen werden. Ihr Text bleibt erhalten.')); }
+    finally { setLoading(false); }
+  }
+  function newNote() { const anchor = activeCanvas?.endAnchor(); if (!anchor || !nodes(rootsRef.current).flatMap(node => node.content).some(entry => entry.logicalId === anchor.textId && entry.format !== 'footnote')) { setMessage(copy('Place the cursor in the constitution text first.', 'Setzen Sie zuerst den Cursor in den Verfassungstext.')); return; } setNoteError(''); const labels = new Set(notes.map(note => note.entry.footnoteLabel)); let number = 1; while (labels.has(String(number))) number++; openNoteEditor({ label: String(number), text: '', anchor }); setPanel(''); requestAnimationFrame(() => document.getElementById('editor-new-note')?.scrollIntoView({ block: 'nearest' })); }
+  async function navigateNote(id: string) { if (!notes.some(note => note.entry.logicalId === id)) return; setMode('edit'); setScope('constitution'); await new Promise<void>(resolve => requestAnimationFrame(() => resolve())); }
+  async function removeNote(indexed: IndexedNote) {
+    setLoading(true);
+    try {
+      const owners = new Set([indexed.rootId, ...(preview.footnoteReferences ?? []).filter(reference => reference.noteId === indexed.entry.logicalId).map(reference => reference.rootId)]);
+      for (const id of owners) await ensureRoot(id);
+      transaction((emit, current) => {
+        for (const entry of nodes(current()).flatMap(node => node.content)) {
+          const references = entry.references?.filter(reference => reference.target.footnoteId !== indexed.entry.logicalId);
+          if (references?.length !== entry.references?.length) emit({ type: 'replace_text', targetId: entry.logicalId!, expectedRevisionId: token(entry), text: entry.text ?? '', format: entry.format ?? 'plain', marks: entry.marks ?? [], references });
         }
-        if (original) setSourceRoots(current => current.map(root => root.logicalId === fullRootId ? original : root));
-      } else setOverviewRoots(loaded.roots);
-      setScope(view); setSelection(selected); remember(view, selected);
+        const entry = nodes(current()).flatMap(node => node.content).find(entry => entry.logicalId === indexed.entry.logicalId)!;
+        emit({ type: 'remove', targetId: entry.logicalId!, expectedRevisionId: token(entry) });
+      });
+      closeNoteEditor();
+    } catch { setMessage(copy('The note references could not be loaded. Nothing was removed.', 'Die Fußnotenverweise konnten nicht geladen werden. Es wurde nichts entfernt.')); }
+    finally { setLoading(false); }
+  }
+  async function normalizeEndnotes() {
+    setLoading(true);
+    try {
+      for (const note of notes) await ensureRoot(note.rootId);
+      const destination = await noteDestination();
+      transaction((emit, current) => {
+        for (const indexed of notes) {
+          const parent = findNode(current(), destination.parent.logicalId)!, owner = nodes(current()).find(node => node.content.some(entry => entry.logicalId === indexed.entry.logicalId))!, entry = owner.content.find(entry => entry.logicalId === indexed.entry.logicalId)!;
+          const position = parent.content.length - (parent.logicalId === owner.logicalId ? 1 : 0);
+          if (parent.logicalId !== owner.logicalId || owner.content.indexOf(entry) !== position) emit({ type: 'move', targetId: entry.logicalId!, expectedRevisionId: token(entry), destinationParentId: parent.logicalId, destinationRevisionId: token(parent), position });
+        }
+      });
+    } catch { setMessage(copy('The endnotes could not be moved. Your draft is retained.', 'Die Fußnoten konnten nicht verschoben werden. Ihr Entwurf bleibt erhalten.')); }
+    finally { setLoading(false); }
+  }
+
+  function moveSelected(delta: number) { const parent = allNodes.find(node => node.content.some(entry => entry.node?.logicalId === selectedUnit.logicalId || entry.logicalId === selection)), entry = parent?.content.find(entry => entry.node?.logicalId === selectedUnit.logicalId || entry.logicalId === selection); if (parent && entry) { const at = parent.content.indexOf(entry), position = at + delta; if (position >= 0 && position < parent.content.length && parent.content[position].format !== 'footnote') change({ type: 'move', targetId: entry.node?.logicalId ?? entry.logicalId!, expectedRevisionId: token(entry.node ?? entry), destinationParentId: parent.logicalId, destinationRevisionId: token(parent), position }); } else if (roots.indexOf(selectedUnit) >= 0) change({ type: 'move_root', targetId: selectedUnit.logicalId, expectedRevisionId: token(selectedUnit), position: Math.max(0, Math.min(roots.length - 1, roots.indexOf(selectedUnit) + delta)) }); }
+  function insert(kind?: string, format: 'plain' | 'table' = 'plain') { const parent = selectedUnit, end = parent.content.findIndex(entry => entry.format === 'footnote'), limit = end < 0 ? parent.content.length : end, selectedAt = selectedEntry ? parent.content.indexOf(selectedEntry) : -1, position = insertPosition === 'start' ? 0 : insertPosition === 'end' || selectedAt < 0 ? limit : Math.min(limit,selectedAt+(insertPosition==='after'?1:0)); if (kind) change({ type: 'insert_child', targetId: parent.logicalId, expectedRevisionId: token(parent), position, node: createNode(kind) }); else if (activeLevel.mayHoldText) { const table = format === 'table' ? { caption: '', rows: [{ logicalId: crypto.randomUUID(), cells: [{ logicalId: crypto.randomUUID(), text: t(ui.editorDefaults.heading), header: true }] }, { logicalId: crypto.randomUUID(), cells: [{ logicalId: crypto.randomUUID(), text: t(ui.editorDefaults.value) }] }] } : undefined; change({ type: 'insert_text', targetId: parent.logicalId, expectedRevisionId: token(parent), position, parts: [{ logicalId: crypto.randomUUID(), text: table ? table.rows.map(row => row.cells[0].text).join('\n') : '', format, table }] }); } setPanel(''); }
+  function link(target: OrderedInlineReference['target']) {if(!activeCanvas?.isAlive()){setMessage(copy('Place the cursor in the constitution text first.','Setzen Sie zuerst den Cursor in den Verfassungstext.'));return;} if (!activeCanvas.addReference(target)) { setMessage(target.type === 'footnote' ? copy('Place the footnote before or after the linked text.', 'Setzen Sie die Fußnote vor oder hinter den verlinkten Text.') : copy('Select text that is not already linked.', 'Wählen Sie Text aus, der noch nicht verlinkt ist.')); return; } setPanel(''); }
+
+  const scopeLevel=outline.kinds.find(level=>level.kindCode===scope), leafScope=scopeLevel&&!scopeLevel.mayHoldChildren&&!scopeLevel.allowedChildKinds.length;
+  const focusedNodes = scope === 'constitution' ? roots : leafScope ? (currentRoot.kind===scope?(eligible(scopeLevel!)?roots:[currentRoot]):nodes([currentRoot])).filter(node=>node.kind===scope) : scopedNodes(roots, currentRoot.logicalId, selection, scope), rootKinds = outline.kinds.some(kind => kind.root) ? outline.kinds.filter(kind => kind.root) : outline.kinds.slice(0, 1);
+  function renderFocusedNodes(){
+    const items:React.ReactNode[]=[];
+    const parentOf=(node:DraftNode)=>allNodes.find(parent=>parent.content.some(entry=>entry.node?.logicalId===node.logicalId));
+    const position=(node:DraftNode,parent?:DraftNode)=>parent?parent.content.findIndex(entry=>entry.node?.logicalId===node.logicalId):roots.indexOf(node);
+    for(let index=0;index<focusedNodes.length;index++){
+      const node=focusedNodes[index];
+      if(!loadedRootIds.includes(node.logicalId)&&roots.some(root=>root.logicalId===node.logicalId)&&!node.content.length){items.push(<section key={node.logicalId} className={styles.unit}><button type="button" disabled={loading} onClick={()=>void navigateRoot(node.logicalId)}>{kindName(node.kind)} {node.label} {node.title}</button></section>);continue;}
+      const first=simpleUnit(node),level=outline.kinds.find(level=>level.kindCode===node.kind),parent=parentOf(node),units=first?[first]:[];
+      if(first&&level&&!level.mayHoldChildren&&!level.allowedChildKinds.length){while(index+1<focusedNodes.length){const next=focusedNodes[index+1],unit=simpleUnit(next);if(!unit||next.kind!==node.kind||parentOf(next)?.logicalId!==parent?.logicalId||position(next,parent)!==position(units.at(-1)!.node,parent)+1)break;units.push(unit);index++;}}
+      items.push(units.length>1?<section key={node.logicalId} data-editor-unit={node.logicalId}>{canvas(units,parent?.logicalId??null)}</section>:renderNode(node));
+    }
+    return items;
+  }
+  useEffect(()=>{const pending=pendingChangeScroll.current;if(!pending)return;const target=rootRef.current?.querySelector('[data-editor-entry="'+pending.id+'"], [data-unit="'+pending.id+'"], [data-editor-unit="'+pending.unitId+'"]');if(target){pendingChangeScroll.current=null;target.scrollIntoView({block:'center'});}});
+  async function navigateDifference(index: number) {
+    const difference = differences[index]; if (!difference) return; setChangeIndex(index); setLoading(true);
+    try {
+      const ownerId = difference.rootId ?? roots.find(root => nodes([root]).some(node => node.logicalId === difference.logicalId || node.content.some(entry => entry.logicalId === difference.logicalId)))?.logicalId;
+      const current = ownerId ? await ensureRoot(ownerId) : rootsRef.current, owner = ownerId ? current.find(root => root.logicalId === ownerId) : undefined;
+      const unit = nodes(current).find(node => node.logicalId === difference.logicalId || node.content.some(entry => entry.logicalId === difference.logicalId));
+      select(difference.logicalId);
+      if (!unit) { setMode('changes'); setMessage(copy('This unit was removed. Its original wording and source snapshot are shown in Changes.', 'Diese Einheit wurde entfernt. Der ursprüngliche Wortlaut und der Ausgangsstand stehen unter Änderungen.')); return; }
+      pendingChangeScroll.current={id:difference.logicalId,unitId:unit.logicalId};
+      const nextScope = scope === 'constitution' ? scope : owner?.kind ?? unit.kind; setScope(nextScope); remember(nextScope, difference.logicalId); setMode('edit');
     } catch (error) { setMessage(t(error instanceof LocalizedEditorError ? error.copy : ui.state.viewLoadFailed)); }
     finally { setLoading(false); }
   }
-  function isOverviewScope(view: string) {
-    const index = outline.kinds.findIndex(kind => kind.kindCode === view);
-    const article = outline.kinds.findIndex(kind => kind.kindCode === 'article');
-    return view === 'constitution' || (article >= 0 && index >= 0 && index < article && !outline.kinds[index].root);
-  }
-  function changeScope(view: string) {
-    if (isOverviewScope(view)) void loadView(view);
-    else { setScope(view); remember(view, selection); }
-  }
-  useEffect(() => {
-    // Initial overview navigation fetches a remote view and owns its loading state.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (isOverviewScope(scope)) void loadView(scope);
-    // Only initial navigation; subsequent changes explicitly call loadView.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-  function select(id: string) { setSelection(id); remember(scope, id); }
-  function transaction(build: (emit: (operation: Omit<DraftOperation, 'id'>) => DraftOperation, current: () => DraftNode[]) => void) {
-    let nextRoots = roots; let nextOperations = operations;
-    try {
-      build(op => {
-        const previous = nextOperations.at(-1);
-        const coalesce = previous && previous.targetId === op.targetId && previous.type === op.type && ['replace_text', 'set_metadata'].includes(op.type);
-        const command = coalesce ? { ...op, id: previous.id, expectedRevisionId: previous.expectedRevisionId } : { ...op, id: crypto.randomUUID() };
-        nextRoots = applyOperation(nextRoots, command);
-        nextOperations = coalesce ? [...nextOperations.slice(0, -1), command] : [...nextOperations, command];
-        return command;
-      }, () => nextRoots);
-      setHistory([...history, { roots, operations }]); setRoots(nextRoots); setOperations(nextOperations); setMessage(t(ui.state.unsavedChanges));
-    } catch { setMessage(t(ui.state.invalidChange)); }
-  }
-  function change(op: Omit<DraftOperation, 'id'>) { transaction(emit => { emit(op); }); }
-  function undo() {
-    const previous = history.at(-1); if (!previous) return;
-    setRoots(previous.roots); setOperations(previous.operations); setHistory(history.slice(0, -1)); setMessage(t(ui.state.lastChangeUndone));
-  }
-  function createNode(kindCode: string, ancestors: Set<string> = new Set()): DraftNode {
-      const level = outline.kinds.find(kind => kind.kindCode === kindCode);
-      if (!level || ancestors.has(kindCode)) throw new Error(`Invalid kind ${kindCode}`);
-      const childKind = level.allowedChildKinds[0];
-      return { logicalId: crypto.randomUUID(), kind: level.kindCode, label: level.labelPolicy === 'required' ? t(ui.editorDefaults.newLabel) : null, title: level.titlePolicy === 'required' ? t(ui.editorDefaults.newTitle) : null, content: childKind ? [{ type: 'child', node: createNode(childKind, new Set([...ancestors, kindCode])) }] : [{ type: 'text', logicalId: crypto.randomUUID(), text: '' }] };
-  }
-  function newChild(parent: DraftNode, position: number, kindCode: string) {
-    change({ type: 'insert_child', targetId: parent.logicalId, expectedRevisionId: token(parent), position, node: createNode(kindCode) });
-  }
-  function renderNode(node: DraftNode): React.ReactNode {
-    const level = outline.kinds.find(kind => kind.kindCode === node.kind)!;
-    const children = node.content.some(entry => entry.node);
-    return <section key={node.logicalId} className={`structured-unit ${selection === node.logicalId ? 'is-selected' : ''}`} aria-label={`${level.displayLabel} ${node.label ?? ''}`}>
-      <div className="structured-heading">
-        <button type="button" className="btn btn-sm" onClick={() => select(node.logicalId)} aria-pressed={selection === node.logicalId}>{level.displayLabel} {node.label}</button>
-        {level.labelPolicy !== 'none' ? <label><T value={ui.editor.structurededitor.literalLabel} /><input aria-label={`${level.displayLabel} ${t(ui.editorDefaults.literalLabel)}`} value={node.label ?? ''} disabled={!editable} required={level.labelPolicy === 'required'} onChange={event => change({ type: 'set_metadata', targetId: node.logicalId, expectedRevisionId: token(node), label: event.target.value, title: node.title })} /></label> : null}
-        {level.titlePolicy !== 'none' ? <label><T value={ui.editor.structurededitor.title} /><input aria-label={`${level.displayLabel} ${t(ui.editorDefaults.titleLabel)}`} value={node.title ?? ''} disabled={!editable} required={level.titlePolicy === 'required'} onChange={event => change({ type: 'set_metadata', targetId: node.logicalId, expectedRevisionId: token(node), title: event.target.value, label: node.label })} /></label> : null}
-      </div>
-      <div className={level.presentation === 'concatenated' ? 'sentence-canvas' : 'structured-content'}>
-        {Array.from({ length: node.content.length + 1 }, (_, position) => <div key={position} className="structured-slot">
-          {editable ? <div className="structured-insert" aria-label={t(ui.editorDefaults.insertPosition).replace('{position}', String(position + 1)).replace('{kind}', level.displayLabel)}>
-            {level.mayHoldText ? <button type="button" onClick={() => change({ type: 'insert_text', targetId: node.logicalId, expectedRevisionId: token(node), position, parts: [{ logicalId: crypto.randomUUID(), text: '' }] })}>+ <T value={level.mayHoldChildren ? ui.editorDynamic.parentText : ui.editorDynamic.text} /></button> : null}
-            {level.mayHoldText ? <button type="button" onClick={() => change({ type: 'insert_text', targetId: node.logicalId, expectedRevisionId: token(node), position, parts: [{ logicalId: crypto.randomUUID(), text: `${t(ui.editorDefaults.heading)}\n${t(ui.editorDefaults.value)}`, format: 'table', table: { caption: '', rows: [{ logicalId: crypto.randomUUID(), cells: [{ logicalId: crypto.randomUUID(), text: t(ui.editorDefaults.heading), header: true }] }, { logicalId: crypto.randomUUID(), cells: [{ logicalId: crypto.randomUUID(), text: t(ui.editorDefaults.value) }] }] } }] })}><T value={ui.editor.structurededitor.table} /></button> : null}
-            {level.mayHoldText ? <button type="button" onClick={() => change({ type: 'insert_text', targetId: node.logicalId, expectedRevisionId: token(node), position, parts: [{ logicalId: crypto.randomUUID(), text: t(ui.editorDefaults.sourceNote), format: 'footnote', footnoteLabel: '1' }] })}><T value={ui.editor.structurededitor.footnote} /></button> : null}
-            {level.allowedChildKinds.map(kindCode => <button key={kindCode} type="button" onClick={() => newChild(node, position, kindCode)}>+ {kindName(kindCode)}</button>)}
-          </div> : null}
-          {node.content[position] ? renderEntry(node.content[position], node, position, children) : null}
-        </div>)}
-      </div>
-    </section>;
-  }
-  function renderEntry(entry: DraftEntry, parent: DraftNode, position: number, children: boolean): React.ReactNode {
-    if (entry.node) return <div key={entry.node.logicalId}>{renderNode(entry.node)}{editable ? <div className="action-bar">
-      <button type="button" disabled={position === 0} onClick={() => change({ type: 'move', targetId: entry.node!.logicalId, expectedRevisionId: token(entry.node!), destinationParentId: parent.logicalId, destinationRevisionId: token(parent), position: position - 1 })}><T value={ui.editor.structurededitor.moveUnitEarlier} /></button>
-      <button type="button" disabled={position === parent.content.length - 1} onClick={() => change({ type: 'move', targetId: entry.node!.logicalId, expectedRevisionId: token(entry.node!), destinationParentId: parent.logicalId, destinationRevisionId: token(parent), position: position + 1 })}><T value={ui.editor.structurededitor.moveUnitLater} /></button>
-      <button type="button" onClick={() => change({ type: 'remove', targetId: entry.node!.logicalId, expectedRevisionId: token(entry.node!) })}><T value={ui.editor.structurededitor.removeUnit} /></button>
-    </div> : null}</div>;
-    const level = outline.kinds.find(kind => kind.kindCode === parent.kind)!;
-    const id = entry.logicalId!;
-    const next = parent.content[position + 1];
-    const format = entry.format ?? 'plain';
-    const updateRich = (nextEntry: { text: string; format: DraftEntry['format']; table?: DraftEntry['table']; footnoteLabel?: string | null; references?: DraftEntry['references'] }) => change({ type: 'replace_text', targetId: id, expectedRevisionId: token(entry), annotation: nextEntry.format === 'footnote' ? entry.annotation : null, ...nextEntry });
-    const updateTable = (table: NonNullable<DraftEntry['table']>) => updateRich({ text: table.rows.map(row => row.cells.map(cell => cell.text).join(' ')).join('\n'), format: 'table', table });
-    const updateCell = (cellId: string, patch: Partial<NonNullable<DraftEntry['table']>['rows'][number]['cells'][number]>) => {
-      if (!entry.table) return;
-      updateTable({ ...entry.table, rows: entry.table.rows.map(row => ({ ...row, cells: row.cells.map(cell => cell.logicalId === cellId ? { ...cell, ...patch } : cell) })) });
-    };
-    const addReference = (target: NonNullable<DraftEntry['references']>[number]['target']) => {
-      const range = ranges.current[id];
-      if (!range || range.start === range.end) { setMessage(t(ui.state.selectReferenceText)); return; }
-      if (target.type === 'external' && !target.url?.startsWith('https://')) { setMessage(t(ui.state.referenceHttps)); return; }
-      if (entry.references?.some(ref => range.start < ref.end && range.end > ref.start)) { setMessage(t(ui.state.referenceOverlap)); return; }
-      updateRich({ text: entry.text ?? '', format: 'plain', references: [...(entry.references ?? []), { logicalId: crypto.randomUUID(), start: range.start, end: range.end, target }] });
-    };
-    const editText = (value: string) => {
-      const old = entry.text ?? '';
-      let prefix = 0; while (prefix < old.length && prefix < value.length && old[prefix] === value[prefix]) prefix++;
-      let suffix = 0; while (suffix < old.length - prefix && suffix < value.length - prefix && old[old.length - 1 - suffix] === value[value.length - 1 - suffix]) suffix++;
-      const oldEnd = old.length - suffix;
-      const shift = value.length - old.length;
-      const references = entry.references?.flatMap(ref => ref.end <= prefix ? [ref] : ref.start >= oldEnd ? [{ ...ref, start: ref.start + shift, end: ref.end + shift }] : []);
-      updateRich({ text: value, format, footnoteLabel: entry.footnoteLabel, references });
-    };
-    function split(parts: string[]) {
-      if (parts.length < 2 || parts.some(part => !part)) { setMessage(t(ui.state.splitCursor)); return; }
-      transaction((emit, current) => {
-        const identified = parts.map(text => ({ logicalId: crypto.randomUUID(), text }));
-        const splitCommand = emit({ type: 'split_text', targetId: id, expectedRevisionId: token(entry), parts: identified });
-        if (level.segmentation !== 'sentence' || level.mayHoldChildren || parent.content.length !== 1) return;
-        const container = nodes(current()).find(node => node.content.some(item => item.node?.logicalId === parent.logicalId));
-        for (let i = 1; i < identified.length; i++) {
-          const child: DraftNode = { logicalId: crypto.randomUUID(), kind: parent.kind, label: level.labelPolicy === 'required' ? t(ui.editorDefaults.newLabel) : null, title: level.titlePolicy === 'required' ? t(ui.editorDefaults.newTitle) : null, content: [] };
-          const currentContainer = container ? findNode(current(), container.logicalId)! : findNode(current(), parent.logicalId)!;
-          const at = container ? currentContainer.content.findIndex(item => item.node?.logicalId === parent.logicalId) + i : current().findIndex(node => node.logicalId === parent.logicalId) + i;
-          emit({ type: container ? 'insert_child' : 'insert_root', targetId: currentContainer.logicalId, expectedRevisionId: token(currentContainer), position: at, node: child });
-          const inserted = findNode(current(), child.logicalId)!;
-          emit({ type: 'move', targetId: identified[i].logicalId, expectedRevisionId: splitCommand.id, destinationParentId: inserted.logicalId, destinationRevisionId: token(inserted), position: 0 });
-        }
-      });
-    }
-    const container = allNodes.find(node => node.content.some(item => item.node?.logicalId === parent.logicalId));
-    const siblingPosition = container?.content.findIndex(item => item.node?.logicalId === parent.logicalId) ?? -1;
-    const nextSentence = container ? container.content[siblingPosition + 1]?.node : roots[roots.findIndex(node => node.logicalId === parent.logicalId) + 1];
-    const canMergeSentence = level.segmentation === 'sentence' && parent.content.length === 1 && nextSentence?.kind === parent.kind && nextSentence.content.length === 1 && nextSentence.content[0].type === 'text' && !nextSentence.label && !nextSentence.title;
-    function mergeSentence() {
-      if (!canMergeSentence || !nextSentence) return;
-      transaction((emit, current) => {
-        const moved = nextSentence.content[0];
-        emit({ type: 'move', targetId: moved.logicalId!, expectedRevisionId: token(moved), destinationParentId: parent.logicalId, destinationRevisionId: token(parent), position: 1 });
-        const destination = findNode(current(), parent.logicalId)!;
-        emit({ type: 'merge_text', targetId: id, expectedRevisionId: token(destination.content[0]), mergeIds: [id, moved.logicalId!], parts: [{ logicalId: crypto.randomUUID(), text: (entry.text ?? '') + (moved.text ?? '') }] });
-        emit({ type: 'remove', targetId: nextSentence.logicalId, expectedRevisionId: token(findNode(current(), nextSentence.logicalId)!) });
-      });
-    }
-    return <div className={`sentence-box ${selection === id ? 'is-selected' : ''}`} key={id}>
-      {format === 'table' && entry.table ? <fieldset><legend><T value={ui.editor.structurededitor.table2} /></legend>
-        <label><T value={ui.editor.structurededitor.caption} /><input value={entry.table.caption ?? ''} disabled={!editable} onChange={event => updateTable({ ...entry.table!, caption: event.target.value })} /></label>
-        {entry.table.rows.map((row, rowIndex) => <div key={row.logicalId} className="action-bar" aria-label={`${t(ui.editorDefaults.tableRow)} ${rowIndex + 1}`}>
-          {row.cells.map((cell, cellIndex) => <div key={cell.logicalId}>
-            <label><T value={ui.editor.structurededitor.cell} />{" "}{cellIndex + 1}<textarea value={cell.text} disabled={!editable} onChange={event => updateCell(cell.logicalId, { text: event.target.value })} /></label>
-            <label><T value={ui.editor.structurededitor.header} /><input type="checkbox" checked={cell.header ?? false} disabled={!editable} onChange={event => updateCell(cell.logicalId, { header: event.target.checked })} /></label>
-            <label><T value={ui.editor.structurededitor.rowSpan} /><input type="number" min={1} max={100} value={cell.rowSpan ?? 1} disabled={!editable} onChange={event => updateCell(cell.logicalId, { rowSpan: Number(event.target.value) })} /></label>
-            <label><T value={ui.editor.structurededitor.columnSpan} /><input type="number" min={1} max={100} value={cell.colSpan ?? 1} disabled={!editable} onChange={event => updateCell(cell.logicalId, { colSpan: Number(event.target.value) })} /></label>
-            <label><T value={ui.editor.structurededitor.headerCells} /><select multiple value={cell.headers ?? []} disabled={!editable} onChange={event => updateCell(cell.logicalId, { headers: Array.from(event.target.selectedOptions, option => option.value) })}>{entry.table!.rows.flatMap(item => item.cells).filter(item => item.header && item.logicalId !== cell.logicalId).map(item => <option key={item.logicalId} value={item.logicalId}>{item.text || t(ui.editorDefaults.untitledHeader)}</option>)}</select></label>
-          </div>)}
-          {editable ? <button type="button" onClick={() => updateTable({ ...entry.table!, rows: entry.table!.rows.map((current, index) => index === rowIndex ? { ...current, cells: [...current.cells, { logicalId: crypto.randomUUID(), text: '' }] } : current) })}><T value={ui.editor.structurededitor.cell2} /></button> : null}
-          {editable && entry.table!.rows.length > 1 ? <button type="button" onClick={() => updateTable({ ...entry.table!, rows: entry.table!.rows.filter((_, index) => index !== rowIndex) })}><T value={ui.editor.structurededitor.removeRow} /></button> : null}
-        </div>)}
-        {editable ? <button type="button" onClick={() => updateTable({ ...entry.table!, rows: [...entry.table!.rows, { logicalId: crypto.randomUUID(), cells: [{ logicalId: crypto.randomUUID(), text: '' }] }] })}><T value={ui.editor.structurededitor.row} /></button> : null}
-      </fieldset> : <>
-        {format === 'footnote' ? <label><T value={ui.editor.structurededitor.footnoteLabel} /><input value={entry.footnoteLabel ?? ''} disabled={!editable} onChange={event => updateRich({ text: entry.text ?? '', format: 'footnote', footnoteLabel: event.target.value })} /></label> : null}
-        <label>{format === 'footnote' ? <T value={ui.editorDynamic.footnoteText} /> : children || level.mayHoldChildren ? <T value={ui.editorDynamic.unnumberedParentText} /> : <>{level.displayLabel} <T value={ui.editorDynamic.text} /></>}
-          <textarea value={entry.text ?? ''} disabled={!editable} rows={2} onFocus={() => select(id)} onSelect={event => { caret.current[id] = event.currentTarget.selectionStart; ranges.current[id] = { start: event.currentTarget.selectionStart, end: event.currentTarget.selectionEnd }; }} onChange={event => editText(event.target.value)} />
-        </label>
-      </>}
-      {editable ? <div className="action-bar">
-        {format === 'plain' && !entry.references?.length ? <button type="button" onClick={() => { const point = caret.current[id] ?? 0; split([(entry.text ?? '').slice(0, point), (entry.text ?? '').slice(point)]); }}><T value={ui.editor.structurededitor.splitAtCursor} /></button> : null}
-        {format === 'plain' && !entry.references?.length && level.segmentation === 'sentence' && !level.mayHoldChildren ? <button type="button" onClick={() => split(sentenceParts(entry.text ?? ''))}><T value={ui.editor.structurededitor.suggestSentenceBoundaries} /></button> : null}
-        <button type="button" disabled={format !== 'plain' || Boolean(entry.references?.length) || next?.type !== 'text' || Boolean(next.format && next.format !== 'plain') || Boolean(next.references?.length)} onClick={() => change({ type: 'merge_text', targetId: id, expectedRevisionId: token(entry), mergeIds: [id, next.logicalId!], parts: [{ logicalId: crypto.randomUUID(), text: (entry.text ?? '') + (next.text ?? '') }] })}><T value={ui.editor.structurededitor.mergeWithNext} /></button>
-        {canMergeSentence ? <button type="button" onClick={mergeSentence}><T value={ui.editor.structurededitor.mergeWithNextSentence} /></button> : null}
-        <button type="button" onClick={() => change({ type: 'remove', targetId: id, expectedRevisionId: token(entry) })}><T value={ui.editor.structurededitor.removeText} /></button>
-      </div> : null}
-        {format === 'plain' && editable ? <div className="action-bar"><label><T value={ui.editor.structurededitor.referenceTarget} /><select value={referenceTargets[id] ?? ''} onChange={event => setReferenceTargets(current => ({ ...current, [id]: event.target.value }))}><option value=""><T value={ui.editor.structurededitor.chooseATarget} /></option>{allNodes.map(node => <option key={node.logicalId} value={`unit:${node.logicalId}`}>{kindName(node.kind)} {node.label ?? node.title ?? node.logicalId}</option>)}{nodes(root ? [root] : []).flatMap(node => node.content).filter(item => item.format === 'footnote').map(item => <option key={item.logicalId} value={`footnote:${item.logicalId}`}><T value={ui.editor.structurededitor.footnote2} />{" "}{item.footnoteLabel ?? item.logicalId}</option>)}</select></label><button type="button" onClick={() => { const [type, logicalId] = (referenceTargets[id] ?? '').split(':'); if (!logicalId) { setMessage(t(ui.state.chooseReferenceTarget)); return; } addReference(type === 'footnote' ? { type: 'footnote', footnoteId: logicalId } : { type: 'unit', logicalId }); }}><T value={ui.editor.structurededitor.linkSelection} /></button><button type="button" onClick={() => { const url = window.prompt(t(ui.state.httpsReferenceUrl)); if (url) addReference({ type: 'external', url }); }}><T value={ui.editor.structurededitor.linkToUrl} /></button>{entry.references?.map(ref => <button key={ref.logicalId} type="button" onClick={() => updateRich({ text: entry.text ?? '', format: 'plain', references: entry.references?.filter(item => item.logicalId !== ref.logicalId) })}><T value={ui.editor.structurededitor.removeLink} />{" "}{(entry.text ?? '').slice(ref.start, ref.end)}</button>)}</div> : null}
-    </div>;
-  }
-  const scopeIndex = outline.kinds.findIndex(kind => kind.kindCode === scope);
-  const broad = isOverviewScope(scope);
-  const selectedUnit = findNode(roots, selection) ?? allNodes.find(node => node.content.some(entry => entry.logicalId === selection)) ?? root;
-  const navigationRoots = overviewRoots.length ? [...overviewRoots.filter(root => roots.some(current => current.logicalId === root.logicalId)).map(root => loadedRootIds.includes(root.logicalId) ? roots.find(current => current.logicalId === root.logicalId)! : root), ...roots.filter(root => !overviewRoots.some(item => item.logicalId === root.logicalId))] : roots;
-  const focusedNodes = scopedNodes(roots, root?.logicalId ?? rootId, selection, scope);
-  const rootKinds = outline.kinds.some(kind => kind.root) ? outline.kinds.filter(kind => kind.root) : outline.kinds.slice(0, 1);
-  function reference(id: string, target: boolean) {
-    const sourceRoot = sourceRoots.find(root => nodes([root]).some(node => node.logicalId === id || node.content.some(entry => entry.logicalId === id)));
-    const targetRoot = roots.find(root => nodes([root]).some(node => node.logicalId === id || node.content.some(entry => entry.logicalId === id)));
-    const sourceUnit = sourceRoot && (findNode([sourceRoot], id) ?? nodes([sourceRoot]).flatMap(node => node.content).find(entry => entry.logicalId === id));
-    const version = target ? publishedVersionId : preview.sourceVersionId;
-    const rootOccurrence = target ? targetRoot && unitMapping?.[targetRoot.logicalId] : sourceRoot?.occurrenceId;
-    const occurrence = target ? unitMapping?.[id] : sourceUnit?.occurrenceId;
-    return version && rootOccurrence ? `/versions/${encodeURIComponent(version)}/units/${encodeURIComponent(rootOccurrence)}${occurrence ? `?occurrenceId=${encodeURIComponent(occurrence)}` : ''}` : undefined;
-  }
-  return <Stack as="form" action="/editor/command" method="post" id="draft-form" onSubmit={() => { saving.current = true; }}>
-    <input type="hidden" name="command" value="structured-save" /><input type="hidden" name="sessionId" value={preview.sessionId} /><input type="hidden" name="versionId" value={versionId} /><input type="hidden" name="articleId" value={articleId} />
-    <input type="hidden" name="scope" value={scope} /><input type="hidden" name="selectedNode" value={selection} /><input type="hidden" name="structuredDraft" value={JSON.stringify({ expectedGeneration: preview.generation, operations })} />
-    <div className="action-bar"><label><T value={ui.editor.structurededitor.editorView} /><select value={scope} disabled={loading} onChange={event => changeScope(event.target.value)}><option value="constitution"><T value={ui.editor.structurededitor.constitution} /></option>{outline.kinds.map(kind => <option key={kind.kindCode} value={kind.kindCode}>{kind.displayLabel}</option>)}</select></label>{canManageStructure ? <a href={`/admin/constitutions/${constitutionId}`}><T value={ui.editor.structurededitor.constitutionStructureSettings} /></a> : null}</div>
-    <p role="status">{loading ? <T value={ui.editorDynamic.loadingEditor} /> : message || <T value={preview.operations.length ? ui.editor.structurededitor.savedDraft : ui.editor.structurededitor.sourceSnapshot} />}</p>
-    {errors.length ? <div role="alert"><p><T value={ui.editor.structurededitor.resolveTheseIssuesBeforeSavingOrReview} /></p><ul>{errors.map(error => <li key={error}>{error}</li>)}</ul></div> : null}
-    <aside aria-label={t(ui.accessibility.selectionInspector)}><p><T value={ui.editor.structurededitor.selected} />{" "}{selectedUnit?.kind ? kindName(selectedUnit.kind) : ''} {selectedUnit?.label} {selection !== selectedUnit?.logicalId ? <T value={ui.remainingStatus.unnumberedParentText} /> : ''}</p></aside>
-    {broad ? <ul>{nodes(navigationRoots).filter(node => scope === 'constitution' ? roots.some(root => root.logicalId === node.logicalId) : node.kind === scope).map(node => <li key={node.logicalId}><button type="button" disabled={loading} onClick={() => { const nextScope = node.kind; const selectedRoot = navigationRoots.find(root => nodes([root]).some(child => child.logicalId === node.logicalId)); if (selectedRoot && !loadedRootIds.includes(selectedRoot.logicalId) && sourceRoots.some(root => root.logicalId === selectedRoot.logicalId)) void loadView(nextScope, node.logicalId, selectedRoot.logicalId); else { select(node.logicalId); setScope(nextScope); remember(nextScope, node.logicalId); } }}>{kindName(node.kind)} {node.label} {node.title}</button></li>)}</ul> : focusedNodes.length ? focusedNodes.map(node => renderNode(node)) : <p><T value={ui.editor.structurededitor.no} />{" "}{outline.kinds[scopeIndex]?.displayLabel} <T value={ui.editor.structurededitor.unitsInThisSelectionAddAChild} /></p>}
-    {editable && root ? <div className="action-bar" aria-label={t(ui.accessibility.topLevelUnitActions)}>
-      {rootKinds.map(kind => <button key={kind.kindCode} type="button" onClick={() => change({ type: 'insert_root', targetId: root.logicalId, expectedRevisionId: token(root), position: roots.indexOf(root) + 1, node: createNode(kind.kindCode) })}>{rootKinds.length === 1 ? <T value={ui.editorDynamic.addTopLevelUnit} /> : <><T value={ui.editorDynamic.add} /> {kind.displayLabel}</>}</button>)}
-      <button type="button" disabled={roots.indexOf(root) === 0} onClick={() => change({ type: 'move_root', targetId: root.logicalId, expectedRevisionId: token(root), position: roots.indexOf(root) - 1 })}><T value={ui.editor.structurededitor.moveTopLevelUnitEarlier} /></button>
-      <button type="button" disabled={roots.length < 2} onClick={() => change({ type: 'remove', targetId: root.logicalId, expectedRevisionId: token(root) })}><T value={ui.editor.structurededitor.removeTopLevelUnit} /></button>
-    </div> : null}
-    {editable ? <div className="action-bar"><Button variant="primary" disabled={loading || !operations.length || errors.length > 0}><T value={ui.editor.structurededitor.saveDraft} /></Button><button type="button" disabled={!history.length} onClick={undo}><T value={ui.editor.structurededitor.undo} /></button></div> : null}
-    <details open={!editable}><summary><T value={ui.editor.structurededitor.entryLevelReview} />{differences.length} <T value={ui.editor.structurededitor.changes} /></summary>{differences.length ? <ol>{differences.map((difference, index) => <li key={index}><strong>{t(differenceField(difference.field))}</strong><div><del>{difference.before}</del> → <ins>{difference.after}</ins></div><div>{(difference.sourceLink ?? reference(difference.logicalId, false)) ? <a href={difference.sourceLink ?? reference(difference.logicalId, false)}><T value={ui.editor.structurededitor.sourceSnapshot} /></a> : null} {(difference.targetLink ?? reference(difference.logicalId, true)) ? <a href={difference.targetLink ?? reference(difference.logicalId, true)}><T value={ui.editor.structurededitor.publishedSuccessor} /></a> : null}</div><details><summary><T value={ui.editor.structurededitor.revisionDetails} /></summary><small><T value={ui.editor.structurededitor.unit} />{" "}{difference.logicalId} <T value={ui.editor.structurededitor.sourceRevision} />{" "}{difference.sourceRevisionId ?? t(ui.remainingStatus.new)} <T value={ui.editor.structurededitor.target} />{" "}{difference.targetRevisionId ?? t(ui.editor.publishform.removed)}</small></details></li>)}</ol> : <p><T value={ui.editor.structurededitor.noChanges} /></p>}</details>
-  </Stack>;
+  function differenceReference(id: string, target: boolean) { const list = target ? roots : sourceRoots, owner = list.find(root => nodes([root]).some(node => node.logicalId === id || node.content.some(entry => entry.logicalId === id))); const unit = owner && (findNode([owner], id) ?? nodes([owner]).flatMap(node => node.content).find(entry => entry.logicalId === id)); const version = target ? publishedVersionId : preview.sourceVersionId, rootOccurrence = target ? owner && unitMapping?.[owner.logicalId] : owner?.occurrenceId, occurrence = target ? unitMapping?.[id] : unit?.occurrenceId; return version && rootOccurrence ? '/versions/'+encodeURIComponent(version)+'/units/'+encodeURIComponent(rootOccurrence)+(occurrence ? '?occurrenceId='+encodeURIComponent(occurrence) : '') : undefined; }
+  const noteEditor = (id?: string) => noteEdit && noteEdit.id === id ? <div className={styles.noteEditor} id={id ? 'editor-fn-'+id : 'editor-new-note'}><label>{t(ui.editor.structurededitor.footnoteLabel)}<input aria-label={copy('Footnote label', 'Fußnotenbezeichnung')} value={noteEdit.label} onChange={event => updateNoteDraft({ ...noteEdit, label: event.target.value })} /></label><span>{copy('Footnote text', 'Fußnotentext')}</span><ContinuousCanvas units={[{ node:{ logicalId:id ?? 'new-note-node', kind:'footnote', content:[] }, entry:{ type:'text', logicalId:id ?? 'new-note-text', text:noteEdit.text, marks:noteEdit.marks ?? [] } }]} resetVersion={canvasReset} label={copy('Footnote text', 'Fußnotentext')} active editable flowing boundaries={false} automatic={false} delimiters={[]} notes={[]} onActivate={controller => {setActiveCanvas(controller);setActiveMarks(controller.activeMarks());}} onChange={blocks => {let offset=0;const marks:OrderedTextMark[]=[];for(const block of blocks){marks.push(...block.marks.map(mark=>({...mark,start:mark.start+offset,end:mark.end+offset})));offset+=block.text.length;}updateNoteDraft({...noteEdit,text:blocks.map(block=>block.text).join(''),marks:normalizeMarks(marks)});}} onUndo={() => travel()} onRedo={() => travel(true)} />{noteError ? <p role="alert">{noteError}</p> : null}<div className={styles.actions}><button type="button" disabled={loading} onClick={() => void applyNote()}>{id ? copy('Apply changes', 'Änderungen anwenden') : copy('Insert marker and note', 'Verweiszeichen und Fußnote einfügen')}</button><button type="button" onClick={closeNoteEditor}>{copy('Cancel', 'Abbrechen')}</button>{id ? <button type="button" disabled={loading} onClick={() => void removeNote(notes.find(note => note.entry.logicalId === id)!)}>{copy('Remove footnote and its references', 'Fußnote und ihre Verweise entfernen')}</button> : null}</div></div> : null;
+  return <FootnoteProvider notes={notes.map(note => ({ logicalId: note.entry.logicalId!, label: note.entry.footnoteLabel ?? '*', text: note.entry.text ?? '', marks: note.entry.marks, href: '#editor-fn-'+note.entry.logicalId }))} onNavigate={note => navigateNote(note.logicalId)}><div ref={rootRef} data-editor-workspace className={styles.editor} style={{ '--editor-toolbar-top': toolbarTop+'px' } as React.CSSProperties} onKeyDown={event => { if (event.key === 'Escape') { setPanel(''); if(mode==='edit')activeCanvas?.focus(); } }}>
+    <div className={styles.viewbar} data-editor-views role="group" aria-label={copy('Editor views','Editoransichten')}>
+      <EditorNavigationToggle />
+      <button type="button" aria-label={copy('Edit','Bearbeiten')} title={copy('Edit','Bearbeiten')} aria-pressed={mode === 'edit'} onClick={()=>{setMode('edit');requestAnimationFrame(()=>{const target=noteEdit?activeCanvas:bodyCanvas.current;if(target?.isAlive())target.focus();else rootRef.current?.querySelector<HTMLElement>('[role=textbox]')?.focus({preventScroll:true});});}}><Pencil size={17} aria-hidden="true"/><span className={styles.viewLabel}>{copy('Edit','Bearbeiten')}</span></button>
+      <button type="button" aria-label={copy('Changes','Änderungen')+' ('+differences.length+')'} title={copy('Changes','Änderungen')+' ('+differences.length+')'} aria-pressed={mode === 'changes'} disabled={Boolean(noteEdit||markerMove)} onClick={() => setMode('changes')}><GitCompare size={17} aria-hidden="true"/><span className={styles.viewLabel}>{copy('Changes','Änderungen')} ({differences.length})</span></button>
+      <button type="button" aria-label={copy('Preview','Vorschau')} title={copy('Preview','Vorschau')} aria-pressed={mode === 'preview'} disabled={Boolean(noteEdit||markerMove)} onClick={() => void showPreview()}><Eye size={17} aria-hidden="true"/><span className={styles.viewLabel}>{copy('Preview','Vorschau')}</span></button>
+      {wikiPanel?<button type="button" aria-label={copy('Wiki','Wiki')} title={copy('Wiki','Wiki')} aria-pressed={mode==='wiki'} disabled={Boolean(noteEdit||markerMove)} onClick={()=>{setMode('wiki');setPanel('');}}><BookOpen size={17} aria-hidden="true"/><span className={styles.viewLabel}>{copy('Wiki','Wiki')}</span></button>:<a href={'/editor/wiki/constitution/'+encodeURIComponent(constitutionId)} aria-label={copy('Wiki','Wiki')} title={copy('Wiki','Wiki')} aria-disabled={Boolean(noteEdit)} onClick={event=>{if(noteEdit)event.preventDefault();}}><BookOpen size={17} aria-hidden="true"/><span className={styles.viewLabel}>{copy('Wiki','Wiki')}</span></a>}
+      {detailsPanel?<button type="button" aria-label={copy('Details','Details')} title={copy('Details','Details')} aria-pressed={mode==='details'} disabled={Boolean(noteEdit||markerMove)} onClick={()=>{setMode('details');setPanel('');}}><Info size={17} aria-hidden="true"/><span className={styles.viewLabel}>{copy('Details','Details')}</span></button>:null}
+      {canManageStructure ? <a className={styles.iconButton} aria-label={copy('Constitution structure settings', 'Verfassungsstruktur')} title={copy('Constitution structure settings', 'Verfassungsstruktur')} href={'/admin/constitutions/'+constitutionId}><Settings2 size={17} aria-hidden="true" /></a> : null}
+      {(mode==='changes'||mode==='preview')?<><span className={styles.spacer}/><span className={styles.history} role="group" aria-label={copy('Edit history','Bearbeitungsverlauf')}><IconTool name={copy('Undo', 'Rückgängig')} icon={Undo2} onClick={() => travel()} disabled={!history.length || !editable}/><IconTool name={copy('Redo', 'Wiederholen')} icon={Redo2} onClick={() => travel(true)} disabled={!future.length || !editable}/></span></>:null}
+    </div>
+    <form action="/editor/command" method="post" id="draft-form" className={styles.textForm} hidden={mode==='wiki'||mode==='details'} onSubmit={event=>{if(noteProblems.length){event.preventDefault();setSaveAttempted(true);setMessage(noteProblemText(noteProblems[0]));return;}saving.current=true;}}>
+    <input type="hidden" name="command" value="structured-save" /><input type="hidden" name="sessionId" value={preview.sessionId} /><input type="hidden" name="versionId" value={versionId} /><input type="hidden" name="articleId" value={articleId} /><input type="hidden" name="scope" value={scope} /><input type="hidden" name="selectedNode" value={selection} /><input type="hidden" name="structuredDraft" value={JSON.stringify({ expectedGeneration: preview.generation, operations })} />
+
+    {mode === 'edit' ? <div className={styles.toolbar} data-editor-tools><span className={styles.context} role="note" aria-label={t(ui.accessibility.selectionInspector)}>{noteEdit ? copy('Footnote','Fußnote')+' '+noteEdit.label : kindName(selectedUnit.kind)+' '+(selectedUnit.label??'')}{!noteEdit && selectedEntry ? ' › '+copy('Text', 'Text') : ''}</span><div className={styles.tools} role="group" aria-label={copy('Editing tools', 'Bearbeitungswerkzeuge')}><IconTool name={copy('Undo', 'Rückgängig')} icon={Undo2} onClick={() => travel()} disabled={(noteEdit ? !noteHistory.length : !history.length) || !editable || Boolean(markerMove)}/><IconTool name={copy('Redo', 'Wiederholen')} icon={Redo2} onClick={() => travel(true)} disabled={(noteEdit ? !noteFuture.length : !future.length) || !editable || Boolean(markerMove)}/><span className={styles.separator}/>{(['bold', 'italic', 'underline', 'strikethrough'] as const).map((type, index) => <span key={type}>{<IconTool name={[copy('Bold', 'Fett'), copy('Italic', 'Kursiv'), copy('Underline', 'Unterstrichen'), copy('Strikethrough', 'Durchgestrichen')][index]} icon={[Bold, Italic, Underline, Strikethrough][index]} onClick={() => activeCanvas?.format(type)} pressed={activeMarks.includes('mixed:'+type)?'mixed':activeMarks.includes(type)} disabled={!editable || !activeCanvas} />}</span>)}{!noteEdit && selectedEntry?.format !== 'footnote' && (activeLevel.presentation === 'concatenated' || outline.kinds.some(level => level.presentation === 'concatenated' && !selectedEntry)) ? <IconTool name={copy('Show sentence boundaries', 'Satzgrenzen anzeigen')} icon={SquareDashed} onClick={() => setBoundaries(!boundaries)} pressed={boundaries} /> : null}<span className={styles.separator} />{<IconTool name={copy('Insert', 'Einfügen')} icon={Plus} onClick={() => setPanel(panel === 'insert' ? '' : 'insert')} pressed={panel === 'insert'} disabled={!editable || Boolean(noteEdit||markerMove)} />}{<IconTool name={copy('Text tools', 'Textwerkzeuge')} icon={TextCursorInput} onClick={() => setPanel(panel === 'text' ? '' : 'text')} pressed={panel === 'text'} disabled={!editable || Boolean(noteEdit||markerMove)} />}{<IconTool name={copy('References', 'Verweise')} icon={Link} onClick={() => setPanel(panel === 'references' ? '' : 'references')} pressed={panel === 'references'} disabled={!editable || Boolean(noteEdit||markerMove)} />}{<IconTool name={copy('Unit properties', 'Eigenschaften')} icon={SlidersHorizontal} onClick={() => setPanel(panel === 'properties' ? '' : 'properties')} pressed={panel === 'properties'} disabled={Boolean(noteEdit||markerMove)} />}{<IconTool name={copy('Footnotes', 'Fußnoten')} icon={Superscript} onClick={() => setPanel(panel === 'footnotes' ? '' : 'footnotes')} pressed={panel === 'footnotes'} disabled={Boolean(noteEdit)} />}<IconTool name={copy('Editor view', 'Editoransicht')} disabled={Boolean(noteEdit)} icon={ListTree} onClick={() => setPanel(panel === 'view' ? '' : 'view')} pressed={panel==='view'}/></div>
+    {markerMove?<div className={styles.markerMove} role="status"><span>{copy('Choose the new marker position.','Wählen Sie die neue Position des Verweiszeichens.')}</span><button type="button" disabled={loading||!activeCanvas?.isAlive()} onMouseDown={event=>event.preventDefault()} onClick={()=>void placeMarker()}>{copy('Place marker','Verweiszeichen platzieren')}</button><button type="button" onClick={()=>{setMarkerMove(null);setMessage('');}}>{copy('Cancel move','Verschieben abbrechen')}</button></div>:null}
+    {panel && panel !== 'table' ? <section className={styles.toolPanel} data-tool-panel aria-label={copy('Selected tool', 'Ausgewähltes Werkzeug')}><div className={styles.panelHead}><strong>{({ insert: copy('Insert', 'Einfügen'), text: copy('Text tools', 'Textwerkzeuge'), references: copy('References', 'Verweise'), properties: copy('Unit properties', 'Eigenschaften'), footnotes: copy('Footnotes', 'Fußnoten'), view: copy('Editor view', 'Editoransicht') } as Record<string,string>)[panel]}</strong>{<IconTool name={copy('Close tools', 'Werkzeuge schließen')} icon={X} onClick={() => setPanel('')} />}</div>
+      {panel === 'view' ? <><label>{t(ui.editor.structurededitor.editorView)}<select value={scope} disabled={loading} onChange={event => void changeScope(event.target.value)}><option value="constitution">{t(ui.editor.structurededitor.constitution)}</option>{outline.kinds.map(level => <option key={level.kindCode} value={level.kindCode}>{level.displayLabel}</option>)}</select></label><nav className={styles.menu}>{(overviewRoots.length ? overviewRoots : roots).map(root => <button type="button" disabled={loading} key={root.logicalId} onClick={() => void navigateRoot(root.logicalId)}>{kindName(root.kind)} {root.label} {root.title}</button>)}</nav></> : null}
+      {panel === 'insert' ? <div className={styles.menu}><label>{copy('Position', 'Position')}<select value={insertPosition} onChange={event=>setInsertPosition(event.target.value)}><option value="before">{copy('Before selection', 'Vor der Auswahl')}</option><option value="after">{copy('After selection', 'Nach der Auswahl')}</option><option value="start">{copy('Start of unit', 'Anfang der Einheit')}</option><option value="end">{copy('End of unit', 'Ende der Einheit')}</option></select></label>{activeLevel.mayHoldText ? <><button type="button" onClick={() => insert()}>{t(ui.editorDynamic.text)}</button><button type="button" onClick={() => insert(undefined, 'table')}>{t(ui.editor.structurededitor.table)}</button></> : null}{activeLevel.allowedChildKinds.map(code => <button type="button" key={code} onClick={() => insert(code)}>{kindName(code)}</button>)}<button type="button" onClick={newNote}>{copy('New footnote…', 'Neue Fußnote…')}</button>{rootKinds.map(level => <button type="button" key={level.kindCode} onClick={() => { const at = roots.indexOf(currentRoot); change({ type: 'insert_root', targetId: currentRoot.logicalId, expectedRevisionId: token(currentRoot), position: at+1, node: createNode(level.kindCode) }); setPanel(''); }}>{copy('Add top-level unit', 'Einheit auf oberster Ebene hinzufügen')} · {level.displayLabel}</button>)}</div> : null}
+      {panel === 'text' ? <div className={styles.menu}>{eligible(activeLevel)?<button type="button" onClick={()=>{activeCanvas?.segment();setPanel('');}}>{t(ui.editor.structurededitor.suggestSentenceBoundaries)}</button>:null}<button type="button" onClick={() => { activeCanvas?.split(); setPanel(''); }}>{t(ui.editor.structurededitor.splitAtCursor)}</button><button type="button" onClick={() => { activeCanvas?.merge(); setPanel(''); }}>{t(ui.editor.structurededitor.mergeWithNextSentence)}</button></div> : null}
+      {panel === 'references' ? <><label>{t(ui.editor.structurededitor.referenceTarget)}<select value={referenceTarget} onChange={event => setReferenceTarget(event.target.value)}><option value="">{t(ui.editor.structurededitor.chooseATarget)}</option>{allNodes.map(node => <option key={node.logicalId} value={'unit:'+node.logicalId}>{kindName(node.kind)} {node.label ?? node.title}</option>)}{notes.map(note => <option key={note.entry.logicalId} value={'footnote:'+note.entry.logicalId}>{copy('Footnote', 'Fußnote')} {note.entry.footnoteLabel}</option>)}</select></label><button type="button" onClick={() => { const [type,id] = referenceTarget.split(':'); if(id) link(type === 'footnote' ? { type, footnoteId:id } : { type:'unit', logicalId:id }); }}>{t(ui.editor.structurededitor.linkSelection)}</button><label>{copy('HTTPS URL', 'HTTPS-URL')}<input type="url" value={externalUrl} onChange={event => setExternalUrl(event.target.value)} /></label><button type="button" disabled={!externalUrl.startsWith('https://')} onClick={() => link({ type:'external', url:externalUrl })}>{t(ui.editor.structurededitor.linkToUrl)}</button>{selectedEntry?.references?.map(reference => <button type="button" key={reference.logicalId} onClick={() => updateEntry(selectedEntry, { references:selectedEntry.references?.filter(item => item.logicalId !== reference.logicalId) })}>{t(ui.editor.structurededitor.removeLink)} {(selectedEntry.text ?? '').slice(reference.start,reference.end)}</button>)}</> : null}
+      {panel === 'properties' ? <>{(['label','title'] as const).map(field => { const policy = field === 'label' ? activeLevel.labelPolicy : activeLevel.titlePolicy; return policy !== 'none' ? <label key={field}>{field === 'label' ? t(ui.editor.structurededitor.literalLabel) : t(ui.editor.structurededitor.title)}<input aria-label={activeLevel.displayLabel+' '+(field === 'label' ? t(ui.editorDefaults.literalLabel) : t(ui.editorDefaults.titleLabel))} required={policy === 'required'} disabled={!editable} value={selectedUnit[field] ?? ''} onChange={event => change({ type:'set_metadata', targetId:selectedUnit.logicalId, expectedRevisionId:token(selectedUnit), label:selectedUnit.label, title:selectedUnit.title, [field]:event.target.value })} /></label> : null; })}{editable ? <div className={styles.menu}><button type="button" onClick={() => moveSelected(-1)}>{t(ui.editor.structurededitor.moveUnitEarlier)}</button><button type="button" onClick={() => moveSelected(1)}>{t(ui.editor.structurededitor.moveUnitLater)}</button><button type="button" disabled={roots.length === 1 && selectedUnit.logicalId === roots[0].logicalId} onClick={() => { change({ type:'remove', targetId:selectedEntry?.logicalId ?? selectedUnit.logicalId, expectedRevisionId:token(selectedEntry ?? selectedUnit) }); setPanel(''); }}>{selectedEntry ? t(ui.editor.structurededitor.removeText) : t(ui.editor.structurededitor.removeUnit)}</button></div> : null}</> : null}
+      {panel === 'footnotes' ? <div className={styles.menu}><button type="button" onClick={newNote} disabled={!editable||Boolean(markerMove)}>{copy('New footnote…', 'Neue Fußnote…')}</button><label><input type="checkbox" checked={onlyUnmarked} onChange={event=>setOnlyUnmarked(event.target.checked)}/>{copy('Unmarked footnotes only','Nur Fußnoten ohne Verweiszeichen')}</label>{activeMarker&&noteReferences.some(reference=>reference.referenceId===activeMarker.referenceId)?<div><strong>{copy('Selected marker','Ausgewähltes Verweiszeichen')}</strong><button type="button" onClick={()=>void beginMarkerMove(activeMarker.noteId,activeMarker.referenceId)} disabled={!editable||Boolean(markerMove)}>{copy('Move selected marker…','Ausgewähltes Verweiszeichen verschieben…')}</button><button type="button" onClick={()=>void removeMarker(activeMarker.noteId,activeMarker.referenceId)} disabled={!editable||Boolean(markerMove)}>{copy('Remove selected marker','Ausgewähltes Verweiszeichen entfernen')}</button></div>:null}{notes.filter(note=>!onlyUnmarked||markerCount(note.entry.logicalId!)===0).map(note=><div key={note.entry.logicalId}><button type="button" onClick={()=>link({type:'footnote',footnoteId:note.entry.logicalId!})} disabled={!editable||Boolean(markerMove)}>{copy('Add marker for footnote','Verweiszeichen für Fußnote hinzufügen')} {note.entry.footnoteLabel}</button><button type="button" disabled={Boolean(markerMove)} onClick={()=>{openNoteEditor({id:note.entry.logicalId??undefined,label:note.entry.footnoteLabel??'',text:note.entry.text??'',marks:note.entry.marks});setPanel('');requestAnimationFrame(()=>document.getElementById('editor-fn-'+note.entry.logicalId)?.scrollIntoView({block:'nearest'}));}}>{copy('Edit footnote','Fußnote bearbeiten')} {note.entry.footnoteLabel}</button></div>)}</div> : null}
+    </section> : null}</div> : null}
+    {saveAttempted&&noteProblems.length?<div role="alert" className={styles.validation}><ul>{noteProblems.map(problem=><li key={problem.noteId}>{noteProblemText(problem)}</li>)}</ul></div>:null}
+    <p role="status" className={styles.status}>{loading ? t(ui.editorDynamic.loadingEditor) : message || t(preview.operations.length ? ui.editor.structurededitor.savedDraft : ui.editor.structurededitor.sourceSnapshot)}</p>
+    {errors.length ? <details className={styles.validation}><summary>{copy('Needs attention', 'Zu prüfen')} ({errors.length})</summary><div role="alert">{notes.length && editable ? <button type="button" disabled={loading} onClick={() => void normalizeEndnotes()}>{copy('Move footnotes to the constitution’s end', 'Fußnoten ans Verfassungsende verschieben')}</button> : null}<ul>{[...new Set(errors)].map(error => <li key={error}>{error}</li>)}</ul></div></details> : null}
+    {mode === 'changes' ? <section className={styles.changes} aria-label={copy('Changes', 'Änderungen')}>{differences.length ? <><div className={styles.actions}>{<IconTool name={copy('Previous change', 'Vorherige Änderung')} icon={ChevronLeft} onClick={() => { void navigateDifference((changeIndex-1+differences.length)%differences.length); }} />}{<IconTool name={copy('Next change', 'Nächste Änderung')} icon={ChevronRight} onClick={() => { void navigateDifference((changeIndex+1)%differences.length); }} />}</div><ChangeOverview differences={differences.map(difference=>({...difference,sourceLink:difference.sourceLink??differenceReference(difference.logicalId,false),targetLink:difference.targetLink??differenceReference(difference.logicalId,true)}))} roots={roots} sourceRoots={sourceRoots} outline={outline} onNavigate={index=>void navigateDifference(index)} /></> : <p>{t(ui.editor.structurededitor.noChanges)}</p>}</section> : mode === 'preview' ? <div className={styles.document}>{focusedNodes.map(node => <ConstitutionText key={node.logicalId} headingLevel="h2" article={{ articleNumber: node.label ?? '', title: node.title ?? '', kind: node.kind, body: '', content: readerNode(node).content }} outline={outline} hideFootnotes crossRefs={{ versionId, articlesByNumber:{}, footnotes:notes.map(note=>({ logicalId:note.entry.logicalId!, label:note.entry.footnoteLabel??'*', text:note.entry.text??'', marks:note.entry.marks, href:'#editor-fn-'+note.entry.logicalId })) }} />)}</div> : <div className={styles.document}>{renderFocusedNodes()}</div>}
+    {mode !== 'changes' && (visibleNotes.length || noteEdit) ? <div className={styles.endnotes}><ConstitutionFootnotes indexedBacklinks={mode==='preview'?footnoteBacklinks(focusedNodes.flatMap(node=>readerNode(node).content)):undefined} backlinkIdPrefix={mode==='preview'?'':undefined} entries={visibleNotes.map(note=>({...note.entry,type:'text' as const,node:undefined,revisionId:token(note.entry),occurrenceId:note.entry.logicalId}))} outline={outline} idPrefix="editor-" renderFootnote={(entry,element)=>noteEdit?.id===entry.logicalId?noteEditor(entry.logicalId!):element} footnoteActions={editable&&mode==='edit'?entry=><button type="button" className={styles.iconButton} disabled={Boolean(noteEdit)} aria-label={copy('Edit footnote','Fußnote bearbeiten')+' '+entry.footnoteLabel} title={copy('Edit footnote','Fußnote bearbeiten')+' '+entry.footnoteLabel} onClick={()=>openNoteEditor({id:entry.logicalId??undefined,label:entry.footnoteLabel??'',text:entry.text??'',marks:entry.marks})}><Pencil size={17} aria-hidden="true" /></button>:undefined}>{noteEdit&&!noteEdit.id?noteEditor():null}</ConstitutionFootnotes></div> : null}
+    {editable ? <div className={styles.footer}><button type="submit" className="btn btn-primary" disabled={loading || !operations.length || errors.length > 0 || Boolean(noteEdit) || Boolean(markerMove) || saveAttempted&&noteProblems.length>0}>{t(ui.editor.structurededitor.saveDraft)}</button></div> : null}
+  </form>{wikiPanel?<div hidden={mode!=='wiki'} data-editor-panel="wiki">{wikiPanel}</div>:null}{detailsPanel?<div hidden={mode!=='details'} data-editor-panel="details">{detailsPanel}</div>:null}{textContext?<EditorContextMenu anchor={textContext.anchor} label={textContext.formatting?copy('Formatting','Formatierung'):copy('Text tools','Textwerkzeuge')} onClose={()=>setTextContext(null)} items={textContext.formatting?(['bold','italic','underline','strikethrough'] as const).map((type,index)=>({label:[copy('Bold','Fett'),copy('Italic','Kursiv'),copy('Underline','Unterstrichen'),copy('Strikethrough','Durchgestrichen')][index],onSelect:()=>activeCanvas?.format(type)})):[{label:copy('New footnote…','Neue Fußnote…'),onSelect:newNote,disabled:Boolean(markerMove)},...(textContext.selected?[{label:copy('Link selection…','Auswahl verlinken…'),onSelect:()=>setPanel('references'),disabled:Boolean(markerMove)}]:[]),...(!markerMove&&textContext.canSplit?[{label:t(ui.editor.structurededitor.splitAtCursor),onSelect:()=>activeCanvas?.split()}]:[]),...(!markerMove&&textContext.canMerge?[{label:t(ui.editor.structurededitor.mergeWithNextSentence),onSelect:()=>activeCanvas?.merge()}]:[]),{label:copy('Formatting…','Formatierung…'),onSelect:()=>setTextContext({...textContext,formatting:true})},{label:copy('Unit properties','Eigenschaften'),onSelect:()=>{setPanel('properties');requestAnimationFrame(()=>rootRef.current?.querySelector<HTMLInputElement>('[data-tool-panel] input')?.focus());},disabled:Boolean(markerMove)}]}/>:null}{markerContext?<FootnoteMarkerMenu copyDisabled={operations.length>0} onCopyLink={()=>{const url=new URL(window.location.href);url.searchParams.set('selectedNode',markerContext.textId);url.searchParams.set('tab','edit');for(const key of ['wikiStatus','wikiHistoryPage','historyPage'])url.searchParams.delete(key);url.hash='editor-ref-'+markerContext.referenceId;void navigator.clipboard.writeText(url.toString()).then(()=>setMessage(copy('Link to marker copied.','Link zum Verweiszeichen kopiert.')),()=>setMessage(copy('The link could not be copied.','Der Link konnte nicht kopiert werden.')));}} anchor={markerContext.anchor} label={notes.find(note=>note.entry.logicalId===markerContext.noteId)?.entry.footnoteLabel??'*'} onClose={()=>setMarkerContext(null)} onMove={()=>void beginMarkerMove(markerContext.noteId,markerContext.referenceId)} onRemove={()=>void removeMarker(markerContext.noteId,markerContext.referenceId)} onEdit={()=>{const note=notes.find(note=>note.entry.logicalId===markerContext.noteId);if(note)openNoteEditor({id:note.entry.logicalId!,label:note.entry.footnoteLabel??'*',text:note.entry.text??'',marks:note.entry.marks});}} onNavigate={()=>void navigateNote(markerContext.noteId).then(()=>document.getElementById('editor-fn-'+markerContext.noteId)?.scrollIntoView({block:'center'}))}/>:null}</div></FootnoteProvider>;
 }

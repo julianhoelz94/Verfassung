@@ -20,6 +20,24 @@ Use the **Status** filter to show drafts, work in review, approved work, or publ
 
 [▶ Watch editing and submission](https://julianhoelz94.github.io/Verfassung/#editing-a-draft-en)
 
+### Writing and footnotes
+
+The navigation button beside **Edit** hides the article navigation to give the document more width. **Session and publication**, below the document, opens the workflow details when needed. The sticky icon toolbar follows the active text selection and keeps **Undo**, **Redo** and **Editor view** available while scrolling. Its menus contain named actions for inserting units and tables, editing properties, splitting or merging text, and managing references. On phones, the active workspace tab keeps its label and the other tabs use icons. **Changes** collects the session's wording, formatting, note and structural differences. Save the draft before submitting it for review.
+
+Use **Bold**, **Italic**, **Underline**, and **Strikethrough** for the selected text or continued typing. **Undo** and **Redo** are disabled when their history is empty. Strikethrough is a text style; it does not record a repeal.
+
+Constitution structure settings determine whether leaf units appear as flowing text or on separate lines. When automatic sentence creation is enabled for a leaf level, typing its configured punctuation creates the next sentence while retaining the cursor in the text. The default delimiters are period, exclamation mark and question mark. Levels with child kinds cannot use automatic sentence creation. **Show sentence boundaries** adds boxes only in flowing text and does not change the stored wording.
+
+Edited sentence text is saved without surrounding spaces; flowing text supplies the gap between sentences. Press **Enter** between sentences to insert a saved line break, or Enter again for a blank line. These breaks survive saving and appear in Preview and the public reader. Clicking text gives the active editing passage more room while surrounding text stays compact.
+
+Choose **Footnotes → New footnote…** to add a literal label and note at the constitution's end, with its marker at the selected cursor position. The labelled pencil button on the actual note edits it in place. Hovering or focusing a marker previews its note; clicking it opens a bottom drawer and keeps the reading position. Close the drawer with **×**, **Escape**, or a click outside it. **Go to footnote** explicitly jumps to the actual note at the end. Import validation rejects a note followed by later body content; published historical text remains available.
+
+Right-click a marker for **Edit footnote**, **Move marker…**, **Remove marker**, or **Go to footnote**. The same actions are available from Footnotes and through keyboard context menus. One footnote may have several markers, including in different articles; **Footnotes → Add marker for footnote…** can reference an already-linked note. Moving retains the selected marker's old anchor until you choose a caret position and confirm **Place marker**. Moving or removing that marker leaves the note's other markers unchanged. Editing the note updates the shared text displayed by all of its markers.
+
+Removing a marker keeps the note. Every note needs at least one marker before saving; removing its last marker blocks Save until you attach it again from Footnotes. The same rule applies to all constitution imports and new content snapshots, including source-information-only publication. Multiple markers are accepted. Published historical text remains readable. **This article** displays only notes referenced by the current article. Preview uses the reader's article headings, paragraph labels, and numbered endnote presentation.
+
+**Wiki** edits the constitution's context page independently of its legal text. Short description and page text stay visible; Sources, Pictures and revision history open on demand. Save the Wiki draft separately; a publisher reviews and publishes it. **Details** edits the title and, under Advanced, the URL slug while retaining old aliases. Version facts remain read-only. Archival source corrections, structural settings and lifecycle events retain their own workflows. Pending text and publication details must be saved before leaving through one of these workflows.
+
 ## 2. Review
 
 **Requires: Reviewer or Admin.**

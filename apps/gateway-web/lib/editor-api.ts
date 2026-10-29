@@ -108,7 +108,7 @@ export const EDITOR_ERROR_MESSAGES = {
   list_failed: ui.errors.listSessionsFailed,
   manage_failed: workflowUi.managementFailed,
   save_failed: ui.errors.saveDraftFailed,
-  footnote_marks: {en:'Each footnote needs exactly one marker. Add missing markers and remove duplicate markers before saving.',de:'Jede Fußnote benötigt genau ein Verweiszeichen. Ergänzen Sie fehlende Zeichen und entfernen Sie doppelte Zeichen vor dem Speichern.'},
+  footnote_marks: {en:'Each footnote needs at least one marker, and every marker must refer to an existing footnote before saving.',de:'Jede Fußnote benötigt mindestens ein Verweiszeichen. Jedes Zeichen muss vor dem Speichern auf eine vorhandene Fußnote verweisen.'},
   text_line_breaks: {en:'Use between zero and 16 line breaks between sentences.',de:'Verwenden Sie zwischen Sätzen null bis 16 Zeilenumbrüche.'},
   stale_source_evidence: sourceEvidenceUi.stale,
   source_evidence_changes_required: sourceEvidenceUi.changesRequired,

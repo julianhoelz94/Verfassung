@@ -159,7 +159,10 @@ object ImportValidator {
     }
 
     /** Re-run on retries and preparation as older staged items may predate a new invariant. */
-    fun richContentErrors(roots: List<com.constitutionatlas.platform.OrderedNodeWrite>): List<Pair<String, String>> {
+    fun richContentErrors(roots: List<com.constitutionatlas.platform.OrderedNodeWrite>): List<Pair<String, String>> =
+        richContentValidationErrors(roots).map { it.code to it.message }
+
+    fun richContentValidationErrors(roots: List<com.constitutionatlas.platform.OrderedNodeWrite>): List<com.constitutionatlas.platform.OrderedValidationError> {
         val positions = OrderedContentRules.writePositions(roots)
         val errors = OrderedContentRules.endnoteErrors(positions).toMutableList()
         val footnotes = positions.filter { it.format == "footnote" }.mapNotNull { it.logicalId }.toSet()
@@ -176,7 +179,9 @@ object ImportValidator {
             }
         }
         roots.forEachIndexed { index, root -> walk(root, "roots[$index]") }
-        return errors.map { it.code to it.message }
+        errors += OrderedContentRules.referenceIdentityErrors(positions)
+        errors += OrderedContentRules.writeFootnoteMarkerErrors(roots)
+        return errors
     }
 
     private fun collectKinds(nodes: List<ImportNode>): List<String> =

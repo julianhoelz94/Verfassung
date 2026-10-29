@@ -47,7 +47,7 @@ async function properties(page: Page, canvas: Locator, unitId: string) {
   await canvas.locator(`[data-unit="${unitId}"]`).click();
   await canvas.getByRole('button', { name: 'Unit properties', exact: true }).click();
 }
-async function fixture(request: APIRequestContext, single = false, delimiters = ['.', '!', '?']) {
+async function fixture(request: APIRequestContext, single = false, delimiters = ['.', '!', '?'], sharedFootnote = false) {
   const headers = await adminHeaders(request);
   const outline = single ? [{ kindCode: 'clause', displayLabel: 'Clause', titlePolicy: 'none', labelPolicy: 'required', segmentation: 'plain' }] : [
     { kindCode: 'article', displayLabel: 'Article', allowTextAlongsideChildren: true, titlePolicy: 'required', labelPolicy: 'required' },
@@ -62,7 +62,9 @@ async function fixture(request: APIRequestContext, single = false, delimiters = 
     { type: 'child', node: { kind: 'sentence', label: null, title: null, content: [{ type: 'text', text: 'Untouched branch.' }] } },
     { type: 'text', text: 'After.' },
   ] }];
-  const source = await json(await request.put(`/api/content/versions/${version.id}/content`, { headers, data: { expectedGeneration: 0, roots } }));
+  const noteId = randomUUID();
+  const contentRoots = sharedFootnote ? [{ ...roots[0], content: roots[0].content.map((entry, index) => index === 0 ? { ...entry, references: [{ logicalId: randomUUID(), start: 7, end: 7, target: { type: 'footnote', footnoteId: noteId } }] } : entry) }, { kind: 'article', label: '47', title: 'Shared footnotes', content: [{ type: 'text', text: 'Second article.' }, { type: 'text', logicalId: noteId, format: 'footnote', footnoteLabel: 'a', text: 'Shared source note.' }] }] : roots;
+  const source = await json(await request.put(`/api/content/versions/${version.id}/content`, { headers, data: { expectedGeneration: 0, roots: contentRoots } }));
   await json(await request.post(`/api/catalog/versions/${version.id}/publish`, { headers }));
   return { headers, constitution, version, source };
 }
@@ -367,7 +369,7 @@ test('authored Enter breaks survive save and preview outside clean sentence text
   expect(await json(await request.get(`/api/content/versions/${version.id}/content`))).toEqual(source);
 });
 
-test('marker context actions retain notes, move atomically and enforce one marker per saved footnote', async ({ page, request }) => {
+test('marker context actions retain notes, move atomically and require a marker while allowing shared footnotes', async ({ page, request }) => {
   const { version, headers, source } = await fixture(request);
   const original = source.roots[0].content[1].node;
   await signIn(page, 'editor'); await startFromViewer(page, 'XA', version.id, 'editorial_correction');
@@ -390,7 +392,7 @@ test('marker context actions retain notes, move atomically and enforce one marke
   await expect(workspace.getByRole('button', { name: 'Save draft', exact: true })).toBeDisabled();
   await selectBodyText(sentence, 0);
   await workspace.getByRole('button', { name: 'Footnotes', exact: true }).click();
-  await workspace.getByRole('button', { name: 'Reference footnote 1', exact: true }).click();
+  await workspace.getByRole('button', { name: 'Add marker for footnote 1', exact: true }).click();
   await expect(marker).toHaveCount(1);
   await marker.click({ button: 'right' });
   await page.getByRole('menuitem', { name: 'Move marker…', exact: true }).click();
@@ -407,5 +409,48 @@ test('marker context actions retain notes, move atomically and enforce one marke
   const references = entries.flatMap((entry: { references?: { start: number; target: { type: string; footnoteId: string } }[] }) => entry.references ?? []).filter((reference: { target: { type: string } }) => reference.target.type === 'footnote');
   expect(notes).toHaveLength(1); expect(references).toHaveLength(1);
   expect(references[0].start).toBe('Original'.length);
+  expect(await json(await request.get(`/api/content/versions/${version.id}/content`))).toEqual(source);
+});
+
+test('one endnote can be reused across articles while moving and removing only a selected marker', async ({ page, request }) => {
+  const { version, headers, source } = await fixture(request, false, ['.', '!', '?'], true);
+  await signIn(page, 'editor'); await startFromViewer(page, 'XA', version.id, 'editorial_correction');
+  const workspace = page.locator('[data-editor-workspace]'), firstId = source.roots[0].content[0].logicalId, secondId = source.roots[1].content[0].logicalId;
+  const noteId = source.roots[1].content[1].logicalId, first = textCanvas(workspace, firstId);
+  await expect(workspace.locator('#editor-fn-' + noteId)).toContainText('Shared source note.');
+  await selectBodyText(first, 0);
+  await workspace.getByRole('button', { name: 'Footnotes', exact: true }).click();
+  await workspace.getByRole('button', { name: 'Add marker for footnote a', exact: true }).click();
+  await expect(first.getByRole('button', { name: 'Show footnote a', exact: true })).toHaveCount(2);
+  await workspace.getByRole('button', { name: 'Editor view', exact: true }).click();
+  await workspace.getByRole('button', { name: 'Article 47 Shared footnotes', exact: true }).click();
+  const second = textCanvas(workspace, secondId);
+  await selectBodyText(second, 6);
+  await workspace.getByRole('button', { name: 'Footnotes', exact: true }).click();
+  await workspace.getByRole('button', { name: 'Add marker for footnote a', exact: true }).click();
+  await expect(workspace.locator('#editor-fn-' + noteId)).toContainText('Shared source note.');
+  const marker = second.getByRole('button', { name: 'Show footnote a', exact: true });
+  await marker.focus(); await marker.press('Shift+F10');
+  await page.getByRole('menuitem', { name: 'Move marker…', exact: true }).click();
+  await selectBodyText(second, 3);
+  await workspace.getByRole('button', { name: 'Place marker', exact: true }).click();
+  await workspace.getByRole('button', { name: 'Save draft', exact: true }).click();
+  await expect(page.getByText('Draft saved.', { exact: true })).toBeVisible(); await page.reload();
+  const sessionId = new URL(page.url()).searchParams.get('sessionId');
+  const saved = await json(await request.get(`/api/editor/edit-sessions/${sessionId}/structured-draft`, { headers }));
+  const firstEntry = saved.roots[0].content.find((entry: { logicalId: string }) => entry.logicalId === firstId);
+  const secondEntry = saved.roots[1].content.find((entry: { logicalId: string }) => entry.logicalId === secondId);
+  expect(firstEntry.references.map((reference: { start: number }) => reference.start)).toEqual([0, 7]);
+  expect(secondEntry.references).toEqual([expect.objectContaining({ start: 3, end: 3, target: { type: 'footnote', footnoteId: noteId } })]);
+  expect(saved.roots.flatMap((root: { content: { format?: string }[] }) => root.content).filter((entry: { format?: string }) => entry.format === 'footnote')).toHaveLength(1);
+  await marker.focus(); await marker.press('Shift+F10');
+  await page.getByRole('menuitem', { name: 'Remove marker', exact: true }).click();
+  await expect(marker).toHaveCount(0);
+  await expect(workspace.locator('#editor-fn-' + noteId), 'article scope hides a note after its local marker is removed').toHaveCount(0);
+  await workspace.getByRole('button', { name: 'Save draft', exact: true }).click();
+  await expect(page.getByText('Draft saved.', { exact: true })).toBeVisible();
+  const after = await json(await request.get(`/api/editor/edit-sessions/${sessionId}/structured-draft`, { headers }));
+  expect(after.roots[0].content.find((entry: { logicalId: string }) => entry.logicalId === firstId).references).toEqual(firstEntry.references);
+  expect(after.roots[1].content.find((entry: { logicalId: string }) => entry.logicalId === secondId).references ?? []).toEqual([]);
   expect(await json(await request.get(`/api/content/versions/${version.id}/content`))).toEqual(source);
 });

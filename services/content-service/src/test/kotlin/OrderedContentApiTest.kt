@@ -43,6 +43,8 @@ class OrderedContentApiTest {
 
     @Autowired lateinit var orderedRepository: com.constitutionatlas.content.repo.OrderedContentRepository
 
+    @Autowired lateinit var receipts: com.constitutionatlas.content.repo.OrderedPublishReceiptRepository
+
     @MockitoBean lateinit var catalog: CatalogClient
 
     @Test
@@ -101,6 +103,99 @@ class OrderedContentApiTest {
         assertThrows(com.constitutionatlas.platform.OrderedContentValidationException::class.java) { content.sealImport(source, UUID.randomUUID(), historical.generation, settings.id) }
         assertThat(content.get(source)).isEqualTo(historical)
         assertThat(content.get(target).roots).isEmpty()
+    }
+
+    @Test
+    fun completeWritesRejectOrphanNotesAtomicallyAndAcceptManyMarkersAcrossRoots() {
+        val constitution = UUID.randomUUID()
+        val settings = StructuralSettings(UUID.randomUUID(), StructuralOutline(listOf(StructuralLevel("article", true, false, emptyList(), root = true))))
+        val noteId = UUID.randomUUID()
+        val note = OrderedNodeWrite(kind = "article", content = listOf(OrderedEntryWrite("text", logicalId = noteId, text = "Shared note", format = "footnote")))
+        for (count in 0..3) {
+            val version = UUID.randomUUID()
+            Mockito.`when`(catalog.getVersion(version)).thenReturn(CatalogVersion(version, "draft", constitution))
+            Mockito.`when`(catalog.getSettings(version)).thenReturn(settings)
+            val original = content.get(version)
+            val before = jdbc.queryForObject("SELECT COUNT(*) FROM content_text_revisions", Int::class.java)
+            val bodies = List(count) { OrderedNodeWrite(kind = "article", content = listOf(OrderedEntryWrite("text", text = "Body", references = listOf(OrderedInlineReference(UUID.randomUUID(), 4, 4, OrderedReferenceTarget("footnote", footnoteId = noteId)))))) }
+            val request = OrderedSnapshotWrite(0, roots = bodies + note)
+            if (count == 0) {
+                val error = assertThrows(com.constitutionatlas.platform.OrderedContentValidationException::class.java) { content.save(version, request) }.errors.single()
+                assertThat(error.code).isEqualTo("FOOTNOTE_MARK_CARDINALITY")
+                assertThat(error.path).isEqualTo("roots[0].content[0]")
+                assertThat(error.logicalId).isEqualTo(noteId)
+                assertThat(content.get(version)).isEqualTo(original)
+                assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM content_text_revisions", Int::class.java)).isEqualTo(before)
+            } else {
+                val saved = content.save(version, request)
+                assertThat(saved.roots.dropLast(1).flatMap { it.content }.flatMap { it.references }).hasSize(count)
+                assertThat(content.sealImport(version, UUID.randomUUID(), saved.generation, settings.id)).isEqualTo(saved)
+            }
+        }
+    }
+
+    @Test
+    fun duplicateCrossRootReferenceIdentitiesRejectTheCompleteWriteAtomically() {
+        val version = UUID.randomUUID()
+        val constitution = UUID.randomUUID()
+        val settings = StructuralSettings(UUID.randomUUID(), StructuralOutline(listOf(StructuralLevel("article", true, false, emptyList(), root = true))))
+        Mockito.`when`(catalog.getVersion(version)).thenReturn(CatalogVersion(version, "draft", constitution))
+        Mockito.`when`(catalog.getSettings(version)).thenReturn(settings)
+        val noteId = UUID.randomUUID()
+        val reference = OrderedInlineReference(UUID.randomUUID(), 4, 4, OrderedReferenceTarget("footnote", footnoteId = noteId))
+        val secondId = UUID.randomUUID()
+        val bodies = listOf(OrderedNodeWrite(kind = "article", content = listOf(OrderedEntryWrite("text", text = "Body", references = listOf(reference)))), OrderedNodeWrite(kind = "article", content = listOf(OrderedEntryWrite("text", logicalId = secondId, text = "Body", references = listOf(reference)))))
+        val note = OrderedNodeWrite(kind = "article", content = listOf(OrderedEntryWrite("text", logicalId = noteId, text = "Note", format = "footnote")))
+        val original = content.get(version)
+        val before = jdbc.queryForObject("SELECT COUNT(*) FROM content_text_revisions", Int::class.java)
+        val request = OrderedSnapshotWrite(0, roots = bodies + note)
+        val error = assertThrows(com.constitutionatlas.platform.OrderedContentValidationException::class.java) { content.save(version, request) }.errors.single()
+        assertThat(error.code).isEqualTo("INLINE_REFERENCE")
+        assertThat(error.path).isEqualTo("roots[1].content[0].references[0]")
+        assertThat(error.logicalId).isEqualTo(secondId)
+        assertThat(content.get(version)).isEqualTo(original)
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM content_text_revisions", Int::class.java)).isEqualTo(before)
+        val distinct = bodies.last().copy(content = listOf(bodies.last().content!!.single().copy(references = listOf(reference.copy(logicalId = UUID.randomUUID())))))
+        assertThat(content.save(version, request.copy(roots = listOf(bodies.first(), distinct, note))).roots).hasSize(3)
+    }
+
+    @Test
+    fun historicalOrphanNotesStayReadableButCannotBypassReuseSealOrReceiptRetries() {
+        val source = UUID.randomUUID()
+        val target = UUID.randomUUID()
+        val constitution = UUID.randomUUID()
+        val settings = StructuralSettings(UUID.randomUUID(), StructuralOutline(listOf(StructuralLevel("article", true, false, emptyList(), root = true))))
+        for (version in listOf(source, target)) {
+            Mockito.`when`(catalog.getVersion(version)).thenReturn(CatalogVersion(version, "draft", constitution))
+            Mockito.`when`(catalog.getSettings(version)).thenReturn(settings)
+        }
+        orderedRepository.lock(source)
+        val root = UUID.randomUUID()
+        val note = UUID.randomUUID()
+        orderedRepository.insertNode(root, UUID.randomUUID(), source, null, "article", null, null)
+        val text = UUID.randomUUID()
+        orderedRepository.insertText(text, note, source, null, "Historical orphan", emptyList(), "footnote")
+        orderedRepository.insertEntry(root, 0, text, null)
+        orderedRepository.seal(root)
+        orderedRepository.bind(source, constitution, settings.id)
+        orderedRepository.replaceRoots(source, listOf(root))
+        val historical = content.get(source)
+        val targetBefore = content.get(target)
+        val clone = OrderedSnapshotWrite(0, sourceVersionId = source, sourceGeneration = historical.generation, roots = listOf(OrderedNodeWrite(revisionId = root)))
+        fun rejected(action: () -> Unit) {
+            val error = assertThrows(com.constitutionatlas.platform.OrderedContentValidationException::class.java) { action() }.errors.single()
+            assertThat(error.code).isEqualTo("FOOTNOTE_MARK_CARDINALITY")
+            assertThat(error.logicalId).isEqualTo(note)
+        }
+        rejected { content.save(target, clone) }
+        rejected { content.sealImport(source, UUID.randomUUID(), historical.generation, settings.id) }
+        val attempt = UUID.randomUUID()
+        val retry = OrderedSnapshotWrite(historical.generation, roots = listOf(OrderedNodeWrite(revisionId = root)), publishAttemptId = attempt)
+        receipts.insert(attempt, source, com.constitutionatlas.platform.OrderedWriteFingerprint.current(retry), historical.generation)
+        rejected { content.save(source, retry) }
+        rejected { content.publishReceipt(source, attempt) }
+        assertThat(content.get(source)).isEqualTo(historical)
+        assertThat(content.get(target)).isEqualTo(targetBefore)
     }
 
     @Test

@@ -11,6 +11,42 @@ class OrderedContentRulesTest {
     private fun root(vararg entries: OrderedEntryWrite) = OrderedNodeWrite(logicalId = UUID.randomUUID(), kind = "article", content = entries.toList())
 
     @Test
+    fun `complete reference identities are unique across nested roots for every reference type`() {
+        for (type in listOf("footnote", "unit", "external")) {
+            val note = UUID.randomUUID()
+            val targetNode = UUID.randomUUID()
+            val target = when (type) {
+                "footnote" -> OrderedReferenceTarget(type, footnoteId = note)
+                "unit" -> OrderedReferenceTarget(type, logicalId = targetNode)
+                else -> OrderedReferenceTarget(type, url = "https://example.org")
+            }
+            val reference = OrderedInlineReference(UUID.randomUUID(), if (type == "footnote") 3 else 0, 3, target)
+            val first = root(text("Law").copy(references = listOf(reference))).copy(logicalId = targetNode)
+            val secondText = text("Law").copy(references = listOf(reference))
+            val second = root(OrderedEntryWrite("child", node = root(secondText)))
+            val writes = listOf(first, second) + if (type == "footnote") listOf(root(text("Shared note", "footnote").copy(logicalId = note))) else emptyList()
+            val error = OrderedContentRules.referenceIdentityErrors(OrderedContentRules.writePositions(writes)).single()
+            assertEquals("INLINE_REFERENCE", error.code)
+            assertEquals("roots[1].content[0].node.content[0].references[0]", error.path)
+            assertEquals(secondText.logicalId, error.logicalId)
+            fun resolved(node: OrderedNodeWrite): OrderedNode = OrderedNode(
+                node.logicalId!!,
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                node.kind!!,
+                null,
+                null,
+                node.content!!.map { entry ->
+                    entry.node?.let { OrderedEntry("child", node = resolved(it)) } ?: OrderedEntry("text", logicalId = entry.logicalId, text = entry.text, format = entry.format, references = entry.references)
+                },
+            )
+            assertEquals(listOf(error), OrderedContentRules.contentErrors(writes.map(::resolved)))
+            val distinct = second.copy(content = listOf(OrderedEntryWrite("child", node = second.content!!.single().node!!.copy(content = listOf(secondText.copy(references = listOf(reference.copy(logicalId = UUID.randomUUID()))))))))
+            assertTrue(OrderedContentRules.contentErrors((listOf(first, distinct) + writes.drop(2)).map(::resolved)).isEmpty())
+        }
+    }
+
+    @Test
     fun `legacy receipts remain valid only for writes without the new marks field`() {
         val request = OrderedSnapshotWrite(
             0,

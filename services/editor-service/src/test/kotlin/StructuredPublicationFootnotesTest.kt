@@ -34,7 +34,7 @@ class StructuredPublicationFootnotesTest {
     fun publicationRechecksFinalCardinalityAcrossRootsBeforeReservingASuccessor() {
         val roots = listOf(root(body), root(note))
         val marker = OrderedInlineReference(UUID.randomUUID(), 5, 5, OrderedReferenceTarget("footnote", footnoteId = note.logicalId))
-        for (references in listOf(emptyList(), listOf(marker, marker.copy(logicalId = UUID.randomUUID())))) {
+        for (references in listOf(emptyList<OrderedInlineReference>())) {
             val changed = roots.first().copy(content = listOf(body.copy(references = references)))
             val operation = DraftOperation(UUID.randomUUID(), "replace_text", body.logicalId!!, body.revisionId!!, text = body.text, format = "plain", references = references)
             val preview = preview(roots, listOf(operation)).copy(roots = listOf(changed, roots.last()))
@@ -47,11 +47,15 @@ class StructuredPublicationFootnotesTest {
         val markedRoots = listOf(roots.first().copy(content = listOf(body.copy(references = listOf(marker)))), roots.last())
         val operation = DraftOperation(UUID.randomUUID(), "replace_text", body.logicalId!!, body.revisionId!!, text = body.text, format = "plain", references = listOf(marker))
         assertPublishes(preview(roots, listOf(operation)).copy(roots = markedRoots))
+        val shared = markedRoots.first().copy(content = listOf(body.copy(references = listOf(marker, marker.copy(logicalId = UUID.randomUUID())))))
+        assertPublishes(preview(roots, listOf(operation)).copy(roots = listOf(shared, roots.last())))
     }
 
     @Test
-    fun sourceInformationOnlyPublicationCanReuseHistoricalUnmarkedNotes() {
-        assertPublishes(preview(listOf(root(body), root(note)), emptyList()))
+    fun newPublicationCannotReuseHistoricalOrphanNotesEvenWithoutStructuredOperations() {
+        val failure = assertThrows(OrderedContentValidationException::class.java) { service.write(preview(listOf(root(body), root(note)), emptyList()), version, "editorial_correction", null, null) }
+        assertThat(failure.errors.single().code).isEqualTo("FOOTNOTE_MARK_CARDINALITY")
+        Mockito.verifyNoInteractions(client)
     }
 
     private fun preview(roots: List<DraftNode>, operations: List<DraftOperation>): StructuredDraftPreview {

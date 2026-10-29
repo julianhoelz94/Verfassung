@@ -1,5 +1,6 @@
 import com.constitutionatlas.ingestion.api.ImportArticle
 import com.constitutionatlas.ingestion.client.RestContentClient
+import com.constitutionatlas.platform.OrderedContentValidationException
 import com.constitutionatlas.platform.OrderedEntry
 import com.constitutionatlas.platform.OrderedNode
 import com.constitutionatlas.platform.OrderedSnapshot
@@ -12,6 +13,41 @@ import java.net.InetSocketAddress
 import java.util.UUID
 
 class LegacyRetryTest {
+    @Test
+    fun persistedOrphanNotesRemainReadableButCannotBeReusedByEitherImportAdapter() {
+        val version = UUID.randomUUID()
+        val noteId = UUID.randomUUID()
+        val root = OrderedNode(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "article", "1", "Title", listOf(OrderedEntry("text", logicalId = noteId, revisionId = UUID.randomUUID(), occurrenceId = UUID.randomUUID(), text = "Source note", format = "footnote")))
+        val snapshot = OrderedSnapshot(version, 1, null, listOf(root))
+        var writes = 0
+        val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
+        server.createContext("/") { exchange ->
+            if (exchange.requestMethod != "GET") writes++
+            val bytes = jacksonObjectMapper().writeValueAsBytes(snapshot)
+            exchange.responseHeaders.set("Content-Type", "application/json")
+            exchange.sendResponseHeaders(200, bytes.size.toLong())
+            exchange.responseBody.use { it.write(bytes) }
+        }
+        server.start()
+        try {
+            val client = RestContentClient("http://127.0.0.1:${server.address.port}")
+            assertEquals(snapshot, client.snapshot(version))
+            val attempts = listOf<() -> Unit>(
+                { client.replaceRoots(version, listOf(com.constitutionatlas.platform.OrderedNodeWrite(logicalId = root.logicalId, kind = root.kind, label = root.label, title = root.title, content = listOf(com.constitutionatlas.platform.OrderedEntryWrite("text", logicalId = noteId, text = "Source note", format = "footnote"))))) },
+                { client.replaceArticles(version, listOf(ImportArticle("1", "Title", "Source note", 1))) },
+            )
+            attempts.forEach { attempt ->
+                val error = assertThrows(OrderedContentValidationException::class.java) { attempt() }.errors.single()
+                assertEquals("FOOTNOTE_MARK_CARDINALITY", error.code)
+                assertEquals("roots[0].content[0]", error.path)
+                assertEquals(noteId, error.logicalId)
+            }
+            assertEquals(0, writes)
+        } finally {
+            server.stop(0)
+        }
+    }
+
     @Test
     fun retryReadsThePersistedLegacyDraftWithoutReplacingIdentitiesOrOverwritingAReconciliation() {
         val version = UUID.randomUUID()

@@ -18,7 +18,7 @@ class OrderedContentValidationException(val errors: List<OrderedValidationError>
 }
 
 /** Adapters emit nodes on entry and text in stored order, across all roots. */
-data class OrderedContentPosition(val path: String, val logicalId: UUID?, val node: Boolean = false, val format: String? = null, val text: String? = null)
+data class OrderedContentPosition(val path: String, val logicalId: UUID?, val node: Boolean = false, val format: String? = null, val text: String? = null, val references: List<OrderedInlineReference> = emptyList())
 
 /** Deterministic rules used by import feedback, draft replay and the Content write authority. */
 object OrderedContentRules {
@@ -38,6 +38,8 @@ object OrderedContentRules {
             }
         }
         roots.forEachIndexed { index, root -> walk(root, "roots[$index]") }
+        errors += referenceIdentityErrors(positions)
+        errors += footnoteMarkerErrors(roots)
         return errors
     }
 
@@ -60,7 +62,7 @@ object OrderedContentRules {
             node.content.forEachIndexed { index, entry ->
                 val entryPath = "$path.content[$index]"
                 entry.node?.let { walk(it, "$entryPath.node") }
-                    ?: add(OrderedContentPosition(entryPath, entry.logicalId, format = entry.format, text = entry.text))
+                    ?: add(OrderedContentPosition(entryPath, entry.logicalId, format = entry.format, text = entry.text, references = entry.references))
             }
         }
         roots.forEachIndexed { index, root -> walk(root, "roots[$index]") }
@@ -72,19 +74,50 @@ object OrderedContentRules {
             node.content.orEmpty().forEachIndexed { index, entry ->
                 val entryPath = "$path.content[$index]"
                 entry.node?.let { walk(it, "$entryPath.node") }
-                    ?: add(OrderedContentPosition(entryPath, entry.logicalId, format = entry.format, text = entry.text))
+                    ?: add(OrderedContentPosition(entryPath, entry.logicalId, format = entry.format, text = entry.text, references = entry.references))
             }
         }
         roots.forEachIndexed { index, root -> walk(root, "roots[$index]") }
     }
 
-    /** Editing may be incomplete, but an editor save requires one marker per note body. */
+    /** Reference identities belong to the complete constitution, across every reference type. */
+    fun referenceIdentityErrors(positions: Iterable<OrderedContentPosition>): List<OrderedValidationError> {
+        val identities = mutableSetOf<UUID>()
+        return buildList {
+            positions.forEach { position ->
+                position.references.forEachIndexed { index, reference ->
+                    if (!identities.add(reference.logicalId)) add(OrderedValidationError("INLINE_REFERENCE", "${position.path}.references[$index]", position.logicalId, "Inline reference identity '${reference.logicalId}' is repeated; each marker or link requires its own identity"))
+                }
+            }
+        }
+    }
+
+    /** Complete snapshots require a marker for every note; references may share a note body. */
     fun footnoteMarkerErrors(notes: Iterable<OrderedContentPosition>, references: Iterable<OrderedInlineReference>): List<OrderedValidationError> {
         val counts = references.filter { it.target.type == "footnote" }.groupingBy { it.target.footnoteId }.eachCount()
         return notes.filter { it.format == "footnote" }.mapNotNull { note ->
             val count = counts[note.logicalId] ?: 0
-            if (count == 1) null else OrderedValidationError("FOOTNOTE_MARK_CARDINALITY", note.path, note.logicalId, "Each footnote body requires exactly one marker when saving; found $count")
+            if (count > 0) null else OrderedValidationError("FOOTNOTE_MARK_CARDINALITY", note.path, note.logicalId, "Footnote body has no marker; add at least one inline footnote reference targeting this note")
         }
+    }
+
+    fun footnoteMarkerErrors(roots: List<OrderedNode>): List<OrderedValidationError> {
+        val references = mutableListOf<OrderedInlineReference>()
+        fun walk(node: OrderedNode) {
+            node.content.forEach { entry -> entry.node?.let(::walk) ?: references.addAll(entry.references) }
+        }
+        roots.forEach(::walk)
+        return footnoteMarkerErrors(positions(roots), references)
+    }
+
+    /** Only call for a complete submitted constitution, never a page or configuration sample. */
+    fun writeFootnoteMarkerErrors(roots: List<OrderedNodeWrite>): List<OrderedValidationError> {
+        val references = mutableListOf<OrderedInlineReference>()
+        fun walk(node: OrderedNodeWrite) {
+            node.content.orEmpty().forEach { entry -> entry.node?.let(::walk) ?: references.addAll(entry.references) }
+        }
+        roots.forEach(::walk)
+        return footnoteMarkerErrors(writePositions(roots), references)
     }
 
     fun lineBreakErrors(count: Int, type: String, path: String, logicalId: UUID? = null): List<OrderedValidationError> =

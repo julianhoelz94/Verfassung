@@ -18,7 +18,7 @@ The interaction prototype was reviewed before implementation. This document reco
 4. Keep the toolbar accessible while scrolling a long constitution, including around Article 20.
 5. Use small anchored menus. Show one focused editor or settings panel at a time.
 6. Expose every existing editing capability through an identifiable control; remove repeated controls only after their replacements work.
-7. Use precise labels. “New footnote…” opens an editor. “Insert marker and note” confirms creation. “Reference existing footnote…” creates a reference to an existing note.
+7. Use precise labels. “New footnote…” opens an editor. “Insert marker and note” confirms creation. “Add marker for footnote…” adds a reference to an existing note, including one already referenced elsewhere.
 8. Edit footnote text in its displayed position.
 9. Footnote bodies belong at the end of the constitution. Inline markers may occur inside its body text.
 10. Hovering or focusing a marker reveals its note. Clicking/tapping remains usable.
@@ -170,7 +170,9 @@ Use a structured production editor core with reliable selection/composition supp
 
 Canonical constitution content has body material followed by a final notes section. No constitutional unit or substantive body entry may follow the first endnote. The validator operates across the entire constitution version, including nested nodes and multiple roots.
 
-Inline references are separate from note bodies. Preserve their stable identities, authored marker labels, and exact anchor positions. A note’s label need not be globally generated Arabic numbering. While editing, a note may temporarily have no marker. A completed text-draft Save requires exactly one marker per note, and every marker must resolve to a note. Count across all roots, not just the visible article; fail atomically before persisting any part of an invalid batch. Recheck this at publication when the session changes structured text. Historical reads and source-information-only corrections retain their existing behavior; this editor Save policy does not rewrite imported historical cardinality.
+Inline references are separate from note bodies. Preserve their stable identities, authored marker labels, and exact anchor positions. Different markers have distinct reference identities, even when they target the same note. A note’s label need not be globally generated Arabic numbering. Each footnote must have at least one marker; several markers may refer to the same shared note from different passages or articles. Every marker must resolve to a note. While editing, a note may temporarily have no marker, but a completed text-draft Save rejects it. Count across all roots, not just the visible article, and fail atomically before persisting any part of an invalid batch.
+
+The minimum-one rule is a shared complete-content data-model invariant for every import and write path, including assembled uploads, full replacements, reused revisions, cloning, sealing, and publication retries. Source-information-only publication also creates a new content snapshot and must revalidate it. Historical snapshots remain readable and unchanged; reading them does not retroactively rewrite their cardinality.
 
 Use the owning Content service as the authoritative write boundary. Share a deterministic validation routine with import and draft adapters so early feedback and final enforcement agree. Do not implement this rule only in CSS or one upload form.
 
@@ -190,7 +192,7 @@ In **Editor view → This article**, project only notes whose markers appear in 
 
 ### Marker and passage context menu
 
-Right-click an editing marker, press Shift+F10/the context-menu key, or use its Footnotes-menu actions. Offer **Edit footnote**, **Move marker…**, **Remove marker**, **Go to footnote**, and **Copy link** where an actual destination exists. A move retains the original anchor until the editor chooses a new caret position and confirms **Place marker here**; Cancel changes nothing. Removing only a marker retains its note and blocks Save until the one-to-one relation is restored. Reference creation selects an unmarked note, avoiding accidental duplicate markers. All changes support Undo/Redo.
+Right-click an editing marker, press Shift+F10/the context-menu key, or use its Footnotes-menu actions. Offer **Edit footnote**, **Move marker…**, **Remove marker**, **Go to footnote**, and **Copy link** where an actual destination exists. In the Footnotes toolbar, **Add marker for footnote…** may select any existing note, including one already referenced elsewhere. Moving or removing a marker targets its stable identity and leaves every other marker for the same note unchanged. A move retains the original anchor until the editor chooses a new caret position and confirms **Place marker**; Cancel changes nothing. Removing a marker retains its note; Save is blocked only when the note loses its last marker. Editing the shared note body updates the content shown by all of its markers. All changes support Undo/Redo.
 
 Keep other passage actions contextual and reuse the toolbar commands. Selected words offer a new footnote, a link, and formatting. A sentence offers splitting at the caret, merging with its next sibling when valid, and Properties. Do not mix deleting a note body with removing its marker or fill the menu with unavailable actions. Provide ordinary toolbar access for touch users, clear focus return, arrow-key navigation, Escape and outside-click dismissal.
 
@@ -217,7 +219,7 @@ Inventory every route into constitution content before implementation:
 - editor draft saves and publication;
 - revision reuse, successor copying, and publication retry/sealing paths.
 
-All recognized structured notes must reach the same authoritative placement validation. Legacy/plain text does not become a structured footnote merely because it contains a number or asterisk; explicit conversion must be deliberate.
+All recognized structured notes must reach the same authoritative placement and minimum-one-marker validation. Check the complete resolved constitution after assembly, rather than rejecting an individual chunk whose matching marker or note may arrive in a later chunk. Multiple markers for the same note are valid. Legacy/plain text does not become a structured footnote merely because it contains a number or asterisk; explicit conversion must be deliberate.
 
 Invalid placement receives a stable error code and actionable path/identity. Validate before public visibility; transaction rollback must prevent partial writes. Revalidate the assembled upload, not only individual chunks. Retry/receipt paths must not bypass a newer invariant.
 
@@ -306,7 +308,9 @@ Complete change/review/reader/print behavior. Update Wiki sources. Run all chang
 | Read Preview | No placement captions or editing instructions appear in the document |
 | This article without a given note marker | Its endnote is omitted from the scoped editing display; global note data is retained |
 | Remove/reinsert or move a marker | Text body remains, exact anchor survives save/reload, Undo/Redo restores the transaction |
-| Save with zero or multiple markers for a note | Client reports the note and server rejects the complete invalid batch atomically |
+| Save or import a note with zero markers | Client or import feedback identifies the note; shared server validation rejects the complete invalid write atomically |
+| Save or import several markers for one note | Accepted; every marker resolves to the same note body, including across articles |
+| Move or remove one of several markers | Only that marker changes; all other anchors and the shared note remain stable |
 | Enter between sentences, save, reload, Preview | Authored break count survives; stored sentence text has no surrounding whitespace |
 | Repeated Enter and Undo/Redo | Blank lines restore without moving footnote or mark offsets |
 | Read an article or its Preview | Same heading hierarchy, paragraph labels, prose measure and numbered endnote structure |

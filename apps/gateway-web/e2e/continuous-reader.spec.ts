@@ -102,3 +102,15 @@ test('the global phone menu stays above the sticky reading controls',async({page
   await trigger.click(); await page.locator('.menu-panel').getByRole('link',{name:'Search',exact:true}).click();
   await expect(page).toHaveURL('/search');
 });
+
+test('finds authored words inside footnote links and across their inline formatting', async ({ page, request }) => {
+  await request.post(`${mock}/__continuous_reader`, { data: { authoredFootnoteWords: true } });
+  await page.goto(href); await page.getByRole('button', { name: 'Find in text', exact: true }).click();
+  const input = page.getByRole('searchbox', { name: 'Find in constitution', exact: true });
+  await input.fill('Freyheit');
+  await expect(page.locator('#reader-search output')).toContainText('1 of 1');
+  await expect(page.getByRole('button', { name: 'Next match', exact: true })).toBeEnabled();
+  await input.fill('Die Freyheit jedes');
+  await expect(page.locator('#reader-search output')).toContainText('1 of 1');
+  await expect(page.locator('.constitution-body').filter({ hasText: 'Die Freyheit' })).toHaveText('Every person has equal rights. Die Freyheit jedes Bürgers ist unverletzlich.');
+});

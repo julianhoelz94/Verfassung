@@ -126,7 +126,7 @@ export function FootnoteMarker({ noteId, label, referenceId, children }: {
   const context = useContext(Context), t = useTranslation();
   const note = context?.notes.find(note => note.logicalId === noteId);
   if (!note || !context) return <sup id={referenceId}>{children ?? label ?? '*'}</sup>;
-  return <a href={note.href} role="button" contentEditable={false} data-footnote-marker id={referenceId} className={styles.marker}
+  return <a href={note.href} role="button" contentEditable={false} data-footnote-marker data-footnote-text={children != null ? 'true' : undefined} id={referenceId} className={styles.marker}
     aria-label={t(copy.show) + ' ' + note.label} aria-haspopup="dialog" aria-describedby={context.previewId === noteId ? context.tooltipId : undefined}
     onClick={event => { event.preventDefault(); context.showNote(noteId, event.currentTarget); }}
     onKeyDown={event => { if (event.key === ' ') { event.preventDefault(); context.showNote(noteId, event.currentTarget); } }}

@@ -8,7 +8,12 @@ export function findReaderText(container: HTMLElement, query: string): ReaderMat
   const document = container.ownerDocument;
   const groups = new Map<HTMLElement, Text[]>();
   const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, {
-    acceptNode(node) { return node.parentElement?.closest('button, [role="button"], [data-reader-chrome], script, style') ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT; },
+    acceptNode(node) {
+      const parent = node.parentElement;
+      if (parent?.closest('[data-reader-chrome], script, style')) return NodeFilter.FILTER_REJECT;
+      const control = parent?.closest('button, [role="button"]');
+      return control && !parent?.closest('[data-footnote-text]') ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT;
+    },
   });
   while (walker.nextNode()) {
     const node = walker.currentNode as Text;

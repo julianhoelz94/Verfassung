@@ -7,7 +7,6 @@
     <ID>CognitiveComplexFile:EditorService.kt$com.constitutionatlas.editor.service.EditorService.kt</ID>
     <ID>CognitiveComplexFile:HierarchicalDiff.kt$com.constitutionatlas.platform.HierarchicalDiff.kt</ID>
     <ID>CognitiveComplexFile:ImportExportService.kt$com.constitutionatlas.ingestion.service.ImportExportService.kt</ID>
-    <ID>CognitiveComplexFile:ImportValidator.kt$com.constitutionatlas.ingestion.service.ImportValidator.kt</ID>
     <ID>CognitiveComplexFile:OrderedContentService.kt$com.constitutionatlas.content.service.OrderedContentService.kt</ID>
     <ID>CognitiveComplexFile:StructuredDraftEngine.kt$com.constitutionatlas.editor.service.StructuredDraftEngine.kt</ID>
     <ID>CognitiveComplexMethod:AmendmentDiff.kt$AmendmentDiff$fun diff(source: List&lt;FlatNode&gt;, target: List&lt;FlatNode&gt;): List&lt;NodeChange&gt;</ID>
@@ -17,16 +16,16 @@
     <ID>CognitiveComplexMethod:CatalogWriteService.kt$CatalogWriteService.Companion$fun normalizeOutline(kinds: List&lt;OutlineKindWrite&gt;): List&lt;OutlineKindWrite&gt;</ID>
     <ID>CognitiveComplexMethod:EditorService.kt$EditorService$@Transactional fun publish(authorization: String?, sessionId: UUID, request: PublishRequest): DraftPreviewDto</ID>
     <ID>CognitiveComplexMethod:HierarchicalDiff.kt$HierarchicalDiff$fun compare( beforeVersionId: UUID?, before: List&lt;DiffNode&gt;, afterVersionId: UUID?, after: List&lt;DiffNode&gt;, beforeSettingsRevisionId: UUID? = null, afterSettingsRevisionId: UUID? = null, skipSharedRevision: Boolean = true, ): DiffRun</ID>
+    <ID>CognitiveComplexMethod:ImportApiTest.kt$ImportApiTest$@Test fun directBatchAndChunkedImportsRequireMarkersAndAllowSharedNotes()</ID>
     <ID>CognitiveComplexMethod:ImportExportService.kt$ImportExportService$fun export(id: UUID, actor: Actor, view: String, cursor: String?, authorization: String? = null): ImportExportPage</ID>
     <ID>CognitiveComplexMethod:ImportExportService.kt$ImportExportService$private fun compare(expected: JsonNode, actual: JsonNode, path: String, result: MutableList&lt;FidelityMismatch&gt;)</ID>
     <ID>CognitiveComplexMethod:ImportService.kt$ImportService$@Transactional fun importVersion(authorization: String?, submittedBy: UUID, request: ImportRequest, batchId: UUID? = null, idempotencyKey: String? = null, expectedChecksum: String? = null): ImportJobDto</ID>
-    <ID>CognitiveComplexMethod:ImportValidator.kt$ImportValidator$fun validate(request: ImportRequest, pinnedOutline: ImportOutline? = null): List&lt;Pair&lt;String, String&gt;&gt;</ID>
     <ID>CognitiveComplexMethod:MigrationService.kt$MigrationService$fun prepare(run: UUID, itemId: UUID, actor: Actor, authorization: String?): MigrationItem</ID>
     <ID>CognitiveComplexMethod:OrderedContentService.kt$OrderedContentService$@Transactional fun save(version: UUID, request: OrderedSnapshotWrite): OrderedSnapshot</ID>
     <ID>CognitiveComplexMethod:OrderedContentService.kt$OrderedContentService$fun validate(roots: List&lt;OrderedNode&gt;, settings: StructuralSettings)</ID>
     <ID>CognitiveComplexMethod:SettingsUsageClient.kt$SettingsUsageClient$fun inspect(versions: List&lt;UUID&gt;, proposed: List&lt;OutlineKindWrite&gt;, authorization: String?): SettingsUsage</ID>
     <ID>CognitiveComplexMethod:SetupProposalService.kt$SetupProposalService$fun confirm(authorization: String?, id: UUID, actorId: UUID, admin: Boolean, revision: Long): SetupProposalDto</ID>
     <ID>CognitiveComplexMethod:SetupProposalService.kt$SetupProposalService$private fun validate(request: SetupProposalRequest)</ID>
-    <ID>CognitiveComplexMethod:StructuredDraftEngine.kt$StructuredDraftEngine$fun replay(source: List&lt;DraftNode&gt;, operations: List&lt;DraftOperation&gt;, settings: DraftSettings): List&lt;DraftNode&gt;</ID>
+    <ID>CognitiveComplexMethod:StructuredDraftEngine.kt$StructuredDraftEngine$fun replay(source: List&lt;DraftNode&gt;, operations: List&lt;DraftOperation&gt;, settings: DraftSettings, enforceEndnotes: Boolean = true): List&lt;DraftNode&gt;</ID>
   </CurrentIssues>
 </SmellBaseline>

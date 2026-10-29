@@ -110,6 +110,7 @@ Source: `client/RestIndexSource.kt`.
 ## ingestion — `services/ingestion-service`
 
 `ImportController` → `ImportService` + `ImportValidator` → `ImportJobRepository`  
+`ImportValidator` delegates metadata, outline policy, ordered traversal, legacy compatibility and rich-content checks to focused validation helpers in `service/`; public diagnostics retain their encounter order.
 `POST /import-jobs`, `GET /import-jobs/{id}` and confirm-outline/prepare/approve/reject/publish commands. Batch, resumable upload and setup-proposal controllers are separate. Uploads stage content; preparation writes draft Catalog/Content data. Approval and publication are separate actions with reviewer/admin and publisher/admin checks respectively, and publication requires fresh MFA. One account may perform all steps if it has the required roles. `ImportPublicationDelivery` retries audit/search side effects.
 
 ## audit — `services/audit-service`

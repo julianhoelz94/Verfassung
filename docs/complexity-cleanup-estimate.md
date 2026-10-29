@@ -39,7 +39,7 @@ pilot, 18 Kotlin findings and 36 TypeScript/JavaScript baseline findings remain,
 plus that one deferred page. That pilot inventory contained **48 production
 functions and 6 test/fixture functions**. Deferring the editor service's two
 over-limit functions (`publish` and `replay`) leaves **46 production functions
-and 6 test/fixture functions** in the current cleanup scope.
+and 6 test/fixture functions** in the pilot cleanup scope.
 
 Local pilot verification passed the full identity check (96 tests and Spotless),
 the gateway suite (917 Vitest and 13 Node tests), gateway lint/typecheck and
@@ -55,6 +55,55 @@ image download was denied; PR CI supplies the browser verification. This small
 pilot demonstrates the straightforward extraction path, but does not measure the
 more involved publishing, replay and diff refactors. Re-estimate those after the
 first domain workflow cleanup rather than extrapolating these two functions.
+
+## Work package 2: import validation
+
+The draft branch was rebased onto fetched `main` revision **`4d07d6a`**
+(2026-10-29) before this package. That revision adds sentence settings,
+complete-document footnotes and other validation rules; its original
+`ImportValidator.validate` scores **114**, and the file scores **139**.
+The older pilot inventory is therefore not the current remaining inventory.
+
+Import validation now has a public facade and five focused internal helpers:
+
+| Responsibility | Kotlin file | File score |
+| --- | --- | ---: |
+| Public validation and retry entry points | `ImportValidator.kt` | 8 |
+| Provenance, jurisdiction and format selection | `ImportMetadataValidation.kt` | 28 |
+| Root, child and sentence-setting policy | `ImportOutlineValidation.kt` | 14 |
+| Ordered hierarchy, ancestry and shared identities | `OrderedImportValidation.kt` | 12 |
+| Legacy text projections, numbering and hierarchy | `LegacyImportValidation.kt` | 30 |
+| Entry payloads and complete-document rich rules | `ImportRichContentValidation.kt` | 24 |
+
+`validate` now scores **2**, and the largest extracted function scores **19**.
+All six files meet the maximum of 100 and every function meets 20. Their total
+file score is **116**, compared with 139 before decomposition; no control flow
+was moved into unmeasured property initializers. Both ImportValidator baseline
+exceptions are removed. New classes and helper functions have KDoc describing
+ordering, pinned outlines, exact text and complete-document validation contracts.
+
+The service's **100 tests** pass, including **15 new characterization tests**
+covering exact public diagnostic codes, messages and ordering. An independent
+seeded differential check compared **1,500 requests / 6,000 public results**
+against the original implementation with no differences. It exercised metadata,
+outline fallback and duplicate levels, legacy and ordered trees, identities,
+ancestry, rich tables, annotations, marks, references and line breaks.
+The comparison used isolated temporary test sources and build output, which are
+not part of the application or repository test suite.
+
+Baselines were first synchronized to current `main`; all newly accepted or
+changed debt came from source matching that revision byte for byte, then the
+cleaned validator exceptions were removed. The remaining inventory is **18 Kotlin
+method exceptions, 7 Kotlin file exceptions, and 44 TypeScript/JavaScript
+exceptions plus the deferred EditorPage**. Excluding the editor service's two
+functions leaves **53 production functions and 7 test/fixture functions** in the
+active cleanup scope. Editor-service and EditorPage refactoring remain deferred;
+this package changes no editor source compared with current `main`.
+
+The next domain packages can address ingestion import/export or shared
+hierarchical diffing. Treat their workflow and fidelity risks separately from
+this validation-only decomposition; the original human effort ranges below
+remain historical estimates, not measured delivery times.
 
 ## Original assessment at a maximum of 15
 

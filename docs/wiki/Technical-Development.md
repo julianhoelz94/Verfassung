@@ -94,6 +94,11 @@ with detekt's file metric. Functions below 20 contribute to the total. Existing
 over-budget files are baselined and cannot exceed their reviewed maxima. This
 encourages extraction into focused classes and modules as part of cleanup.
 
+Import validation demonstrates this boundary: `ImportValidator` retains its public
+entry points and delegates metadata, outline, ordered-content, legacy and rich-content
+checks to focused classes with KDoc. Contract tests preserve diagnostic codes,
+messages and order, exact legacy text projections and complete-document references.
+
 From the repository root, run `npm ci --prefix scripts/complexity`,
 `./gradlew cognitiveComplexity`, and `npm run check --prefix scripts/complexity`.
 See the [complexity policy](https://github.com/julianhoelz94/Verfassung/blob/main/docs/cognitive-complexity.md)

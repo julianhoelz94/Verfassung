@@ -83,7 +83,7 @@ class ReleaseRequestTests(unittest.TestCase):
         self.assertEqual(request.get_header("Authorization"), "Bearer token")
         check_request.require_admin(REPOSITORY, "JulianHoelz94", "token")
 
-    def test_request_checks_both_actors_and_exports_only_resolved_sha(self):
+    def test_request_checks_both_actors_and_exports_resolved_sha_and_tag(self):
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory) / "output"
             environment = {"DEPLOYMENT_ENVIRONMENT": "test", "GITHUB_EVENT_NAME": "workflow_dispatch",
@@ -94,7 +94,7 @@ class ReleaseRequestTests(unittest.TestCase):
                     patch.object(check_request, "release_commit", return_value=SHA):
                 check_request.main()
             self.assertEqual({call.args[1] for call in admin.call_args_list}, {"initial-admin", "rerun-admin"})
-            self.assertEqual(output.read_text(), f"source-sha={SHA}\n")
+            self.assertEqual(output.read_text(), f"source-sha={SHA}\nrelease-tag=v.1.1\n")
             with patch.dict(os.environ, environment, clear=True), patch.object(check_request, "require_admin", side_effect=PermissionError), \
                     patch.object(check_request, "release_commit") as resolve:
                 with self.assertRaises(PermissionError):

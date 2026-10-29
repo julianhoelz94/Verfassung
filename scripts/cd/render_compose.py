@@ -64,7 +64,7 @@ def render(root):
             environment.update({"SESSION_COOKIE_SECURE": "true", "IDENTITY_SEED_MODE": "off",
                                 "NEXT_PUBLIC_BASE_URL": "${PUBLIC_BASE_URL:?Set the public HTTPS origin}"})
         if name == "edge-proxy":
-            environment.update({"PROFILE": "production", "CADDY_EXPOSE_API_DOCS": "false",
+            environment.update({"PROFILE": "production", "CADDY_EXPOSE_API_DOCS": "true",
                                 "CADDY_BIND_ADDRESS": "0.0.0.0",
                                 "TLS_TRUSTED_PROXIES": "${TLS_TRUSTED_PROXIES:?Set the actual Coolify proxy CIDRs}"})
             environment.pop("ACME_TEST_DIRECTORY", None)

@@ -21,6 +21,7 @@ NAME = 'atlas-proxy-test-' + uuid.uuid4().hex[:10]
 NETWORK = NAME + '-network'
 HOST = 'proxy.example.test'
 CONTAINERS = []
+SERVICES = ('catalog', 'content', 'amendment', 'identity', 'editor', 'search', 'ingestion', 'audit', 'document')
 
 
 def docker(*args, capture=False):
@@ -66,6 +67,8 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path in {'/api/setup-gate', '/api/edge-rate-limit'}:
             blocked = self.path == '/api/edge-rate-limit' and self.headers.get('X-Atlas-Original-URI') in {'/api/catalog/countries', '/api/docs/catalog/countries', '/api/reader/compare'}
+            if self.path == '/api/edge-rate-limit' and self.headers.get('X-Atlas-Original-URI') == '/api/docs/identity/swagger-ui/index.html':
+                blocked = self.headers.get('X-Atlas-Original-Method') != 'GET'
             self.send_response(403 if blocked else 204)
             self.end_headers()
             return
@@ -74,7 +77,7 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header('Content-Type', 'application/json')
             self.end_headers()
             self.wfile.write(json.dumps({name: self.headers.get_all(name) for name in
-                ('X-Atlas-Client-IP', 'X-Forwarded-For', 'X-Atlas-Edge-Check')}).encode())
+                ('X-Atlas-Client-IP', 'X-Forwarded-For', 'X-Atlas-Edge-Check', 'X-Atlas-Original-Method')}).encode())
             return
         self.send_response(200)
         self.send_header('Content-Type', 'text/html')
@@ -88,8 +91,9 @@ ThreadingHTTPServer(('0.0.0.0', 3000), Handler).serve_forever()
 ''')
         gateway = NAME + '-gateway'
         CONTAINERS.append(gateway)
+        service_aliases = [argument for service in SERVICES for argument in ('--network-alias', service + '-service')]
         docker('run', '-d', '--name', gateway, '--network', NETWORK,
-               '--network-alias', 'gateway-web', '--network-alias', 'identity-service', '-v', str(folder) + ':/test:ro',
+               '--network-alias', 'gateway-web', *service_aliases, '-v', str(folder) + ':/test:ro',
                '--entrypoint', 'python3', IMAGE, '/test/gateway.py')
         # The initial probe must reject the front proxy's private CA. Replace
         # this file in place later so the next real probe can verify its chain.
@@ -197,8 +201,23 @@ https://''' + HOST + ''' {
                  '/api/identity/passkeys/login/start', '/api/identity/password/reset',
                  '/security-header-probe', '/account']
         docs_paths = ['/api/docs/identity/oauth/register', '/api/docs/identity/login']
+        # The infrastructure opt-out covers Springdoc's canonical paths as well
+        # as /api/docs aliases, including decoded and matrix-parameter variants.
+        documentation_resources = ('swagger-ui', 'swagger-ui.html', 'swagger-ui/index.html',
+                                   'v3/api-docs', 'v3/api-docs.yaml', 'v3/api-docs/swagger-config',
+                                   'v3/api-docs/', 'v3/api-docs/public', '%73wagger-ui/index.html',
+                                   'swagger-ui;v=1/index.html', 'v3;v=1/api-docs;v=1/swagger-config',
+                                   '/swagger-ui/index.html', 'v3//api-docs')
+        for service in SERVICES:
+            for resource in documentation_resources:
+                expect_code(200 if arguments.docs_enabled else 404, public + '/api/' + service + '/' + resource, **tls)
+        for path in ['/api/identity/swagger-ui-settings', '/api/identity/v3/api-docs-other']:
+            expect_code(200, public + path, **tls)
+        print(f'Proxy documentation: {len(SERVICES) * len(documentation_resources)} canonical resource cases pass; docs_enabled={arguments.docs_enabled}')
         if arguments.docs_enabled:
             paths += docs_paths
+            expect_code(200, public + '/api/docs/identity/swagger-ui/index.html', headers=['X-Atlas-Original-Method: POST'], **tls)
+            expect_code(403, public + '/api/docs/identity/swagger-ui/index.html', headers=['X-Atlas-Original-Method: GET'], data='{}', **tls)
         else:
             for path in docs_paths + ['/api/docs/catalog/countries', '/api/docs/content/versions']:
                 expect_code(404, public + path, data='{}', **tls)
@@ -213,11 +232,13 @@ https://''' + HOST + ''' {
                     'X-Forwarded-For: ' + forged, 'x-forwarded-for: 192.0.2.77',
                     'X-Atlas-Client-IP: 192.0.2.10', 'x-atlas-client-ip: 192.0.2.11',
                     'X-Atlas-Edge-Check: 1',
+                    'X-Atlas-Original-Method: GET',
                 ], data='{}', **tls))
                 assert echoed['X-Atlas-Client-IP'] == peer, (path, echoed)
                 assert echoed['X-Forwarded-For'] == peer, (path, echoed)
                 if path in {'/security-header-probe', '/account'}:
                     assert echoed['X-Atlas-Edge-Check'] is None, (path, echoed)
+                    assert echoed['X-Atlas-Original-Method'] is None, (path, echoed)
         print(f'Proxy peer identity: {len(paths) * 2} forged-header cases pass; docs_enabled={arguments.docs_enabled}; docs aliases retain edge policy and write guards')
 except Exception:
     for container in CONTAINERS:

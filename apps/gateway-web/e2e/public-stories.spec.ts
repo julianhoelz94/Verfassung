@@ -36,6 +36,15 @@ test('visitor reads the site scope, sources and accessibility statement', async 
   await expect(page.getByRole('heading', { name: 'Sources' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Verification labels' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Accessibility' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Deployed version' })).toBeVisible();
+  await expect(page.locator('#version')).toContainText(process.env.DEPLOYED_TAG?.trim() || 'No release tag available.');
+  await expect(page.getByRole('heading', { name: 'API documentation' })).toBeVisible();
+  const docs = page.locator('#api-docs');
+  await expect(docs.getByRole('link')).toHaveCount(9);
+  for (const service of ['catalog', 'content', 'amendment', 'identity', 'editor', 'search', 'ingestion', 'audit', 'document']) {
+    await expect(docs.getByRole('link', { name: `${service}-service — Swagger UI`, exact: true }))
+      .toHaveAttribute('href', `/api/docs/${service}/swagger-ui/index.html`);
+  }
 });
 
 test('visitor filters search and result retains its version', async ({ page }) => {

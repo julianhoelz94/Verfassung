@@ -10,6 +10,10 @@ class ImportPublicationException(val status: HttpStatus, val code: String, val p
 /** Stable, safe errors for staff; downstream response bodies may contain private data. */
 @RestControllerAdvice
 class ImportPublicationAdvice {
+    @ExceptionHandler(com.constitutionatlas.platform.OrderedContentValidationException::class)
+    fun content(ex: com.constitutionatlas.platform.OrderedContentValidationException): ResponseEntity<Map<String, String>> =
+        ResponseEntity.badRequest().body(ex.body())
+
     @ExceptionHandler(ImportPublicationException::class)
     fun publication(ex: ImportPublicationException): ResponseEntity<Map<String, String>> =
         ResponseEntity.status(ex.status).body(

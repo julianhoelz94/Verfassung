@@ -82,6 +82,7 @@ Clients: `client/AuditClient.kt`. Seed: `IdentitySeedRunner`. Prod guard: `Produ
 | MFA | `/mfa/enroll/start`, `/confirm`, `/step-up`, `/recovery/regenerate`; `DELETE /mfa` |
 | Account | `POST /password/change`, `/password/reset`, `/password/reset/confirm`, `/invites/accept` |
 | Admin | `/users`, invites, enable/disable, `PUT /users/{id}/roles`, password-resets |
+| Swagger access | Public `GET /swagger-access`; admin `GET/PUT /admin/swagger-access` (`{enabled: boolean}`, defaults true; updates require fresh MFA) |
 | Tokens | `/service-tokens` GET/POST, `POST /service-tokens/{id}/rotate`, `DELETE /service-tokens/{id}` |
 
 Bearer `Authorization`. Tests: `IdentityApiTest.kt`.

@@ -60,6 +60,20 @@ class FakeCoolify:
 
 
 class ReleaseTests(unittest.TestCase):
+    def test_release_tag_is_validated_and_preserved_in_inspection_artifacts(self):
+        for tag, compose_tag in [("v.1.1", "v.1.1"), ("releases/v1.1", "releases/v1.1"), ("v$build", "v$$build")]:
+            candidate = {**manifest(), "release_tag": tag}
+            release.validate_manifest(candidate, ROOT, REPOSITORY, "test", SHA)
+            with tempfile.TemporaryDirectory() as directory:
+                release.write_manifest(directory, candidate)
+                stored = json.loads((Path(directory) / "manifest.json").read_text())
+                override = json.loads((Path(directory) / "release-images.compose.json").read_text())
+            self.assertEqual(stored["release_tag"], tag)
+            self.assertEqual(override["services"]["gateway-web"]["environment"]["DEPLOYED_TAG"], compose_tag)
+        for tag in [None, 42, "", "refs/tags/v.1.1", "v.1.1\n", "v\x001"]:
+            with self.subTest(tag=tag), self.assertRaises(ValueError):
+                release.validate_manifest({**manifest(), "release_tag": tag}, ROOT, REPOSITORY, "test", SHA)
+
     def test_cross_environment_revision_and_floating_image_rejected(self):
         valid = manifest()
         release.validate_manifest(valid, ROOT, REPOSITORY, "test", SHA)
@@ -103,6 +117,17 @@ class AuthorizationTests(unittest.TestCase):
 
 
 class CoolifyTests(unittest.TestCase):
+    def test_deployed_tag_comes_from_selected_manifest_including_rollback(self):
+        for tag in ["v.1.2", "v.1.1", None]:
+            candidate = manifest()
+            if tag is not None:
+                candidate["release_tag"] = tag
+            release.validate_manifest(candidate, ROOT, REPOSITORY, "test", SHA)
+            with patch.dict(os.environ, {"DEPLOYED_TAG": "stale-version"}):
+                payload = {item["key"]: item["value"] for item in deploy.env_payload(candidate)["data"]}
+            self.assertEqual(payload["DEPLOYED_TAG"], tag or "")
+            self.assertEqual(payload["CADDY_EXPOSE_API_DOCS"], "true")
+
     def test_production_credentials_are_independent_and_rotated_without_demo_seeding(self):
         first = {item["key"]: item["value"] for item in deploy.env_payload(manifest())["data"]}
         second = {item["key"]: item["value"] for item in deploy.env_payload(manifest())["data"]}
@@ -319,6 +344,8 @@ class CoolifyTests(unittest.TestCase):
 class RuntimeTests(unittest.TestCase):
     def test_runtime_has_no_host_ports_builds_or_checkout_mounts(self):
         document = yaml.safe_load(render_compose.render(ROOT))
+        self.assertEqual(document["services"]["gateway-web"]["environment"]["DEPLOYED_TAG"], "${DEPLOYED_TAG:-}")
+        self.assertEqual(document["services"]["edge-proxy"]["environment"]["CADDY_EXPOSE_API_DOCS"], "true")
         self.assertNotIn("backup-service", document["services"])
         for name, service in document["services"].items():
             with self.subTest(service=name):
@@ -350,6 +377,11 @@ class RuntimeTests(unittest.TestCase):
         jobs = workflow["jobs"]
         self.assertIn("${{ github.ref_name }}", workflow["run-name"])
         self.assertEqual(jobs["authorize"]["outputs"]["source-sha"], "${{ steps.release.outputs.source-sha }}")
+        self.assertEqual(jobs["authorize"]["outputs"]["release-tag"], "${{ steps.release.outputs.release-tag }}")
+        collection = next(step for step in jobs["candidate-images"]["steps"]
+                          if "collect_images.py" in step.get("run", ""))
+        self.assertEqual(collection["env"]["RELEASE_TAG"], "${{ needs.authorize.outputs.release-tag }}")
+        self.assertIn('--release-tag "$RELEASE_TAG"', collection["run"])
         for name, job in jobs.items():
             with self.subTest(job=name):
                 checkouts = [step["with"] for step in job["steps"]

@@ -4,11 +4,54 @@ import com.constitutionatlas.ingestion.api.ImportRequest
 import com.constitutionatlas.ingestion.service.ImportValidator
 import com.constitutionatlas.platform.OrderedEntryWrite
 import com.constitutionatlas.platform.OrderedNodeWrite
+import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import java.util.UUID
 
 class ImportValidatorTest {
+    @Test
+    fun `complete import rejects cross-root reference UUID reuse but allows distinct shared markers`() {
+        val note = UUID.randomUUID()
+        val reference = com.constitutionatlas.platform.OrderedInlineReference(UUID.randomUUID(), 3, 3, com.constitutionatlas.platform.OrderedReferenceTarget("footnote", footnoteId = note))
+        val first = OrderedNodeWrite(kind = "article", content = listOf(OrderedEntryWrite("text", text = "Law", references = listOf(reference))))
+        val second = first.copy(content = listOf(first.content!!.single().copy(logicalId = UUID.randomUUID())))
+        val endnote = OrderedNodeWrite(kind = "article", content = listOf(OrderedEntryWrite("text", logicalId = note, text = "Shared note", format = "footnote")))
+        val request = ImportRequest(isoCode = "DE", countryName = "Germany", constitutionSlug = "unique-markers", constitutionTitle = "Unique markers", versionLabel = "1", sourceUrl = "https://example.org", roots = listOf(first, second, endnote))
+        val error = ImportValidator.richContentValidationErrors(request.roots).single()
+        assertEquals("INLINE_REFERENCE", error.code)
+        assertEquals("roots[1].content[0].references[0]", error.path)
+        assertEquals(second.content!!.single().logicalId, error.logicalId)
+        assertEquals("INLINE_REFERENCE", ImportValidator.validate(request).single().first)
+        val distinct = second.copy(content = listOf(second.content!!.single().copy(references = listOf(reference.copy(logicalId = UUID.randomUUID())))))
+        assertTrue(ImportValidator.validate(request.copy(roots = listOf(first, distinct, endnote))).isEmpty())
+    }
+
+    @Test
+    fun `complete imports require at least one marker per endnote and accept shared markers across roots`() {
+        val noteId = UUID.randomUUID()
+        val note = OrderedNodeWrite(kind = "article", content = listOf(OrderedEntryWrite("text", logicalId = noteId, text = "Source note", format = "footnote")))
+        for (count in 0..3) {
+            val bodyRoots = (0 until count).map {
+                OrderedNodeWrite(kind = "article", content = listOf(OrderedEntryWrite("text", text = "Law", references = listOf(com.constitutionatlas.platform.OrderedInlineReference(UUID.randomUUID(), 3, 3, com.constitutionatlas.platform.OrderedReferenceTarget("footnote", footnoteId = noteId))))))
+            }
+            val roots = bodyRoots + note
+            val request = ImportRequest(isoCode = "DE", countryName = "Germany", constitutionSlug = "notes", constitutionTitle = "Notes", versionLabel = "1", sourceUrl = "https://example.org/source", roots = roots)
+            val errors = ImportValidator.richContentValidationErrors(roots)
+            if (count == 0) {
+                assertEquals("FOOTNOTE_MARK_CARDINALITY", errors.single().code)
+                assertEquals("roots[0].content[0]", errors.single().path)
+                assertEquals(noteId, errors.single().logicalId)
+                assertEquals("FOOTNOTE_MARK_CARDINALITY", ImportValidator.validate(request).single().first)
+            } else {
+                assertTrue(errors.isEmpty())
+                assertTrue(ImportValidator.validate(request).isEmpty())
+            }
+        }
+        val dangling = OrderedNodeWrite(kind = "article", content = listOf(OrderedEntryWrite("text", text = "Law", references = listOf(com.constitutionatlas.platform.OrderedInlineReference(UUID.randomUUID(), 3, 3, com.constitutionatlas.platform.OrderedReferenceTarget("footnote", footnoteId = UUID.randomUUID()))))))
+        assertTrue(ImportValidator.richContentErrors(listOf(dangling)).any { it.first == "INLINE_REFERENCE" })
+    }
+
     @Test
     fun `sentence settings accept Unicode punctuation only on a leaf`() {
         val leaf = ImportOutlineKind("sentence", "Sentence", segmentation = "sentence", allowedChildKinds = emptyList(), sentenceDelimiters = listOf(";", "。"))

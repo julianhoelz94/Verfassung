@@ -183,7 +183,16 @@ for (const viewport of [
       await workspace.getByRole('button', { name: 'Edit footnote 1', exact: true }).click();
       const noteEditor = workspace.getByRole('textbox', { name: 'Footnote text', exact: true });
       await noteEditor.fill('Short note.');
-      await workspace.getByRole('button', { name: 'Apply changes', exact: true }).click();
+      // The indexed note is visible before its Article 20 owner is hydrated.
+      // Keep the single-click assertion, but wait for that required read first.
+      const [noteOwner] = await Promise.all([
+        page.waitForResponse(response => {
+          const url = new URL(response.url());
+          return url.pathname === '/editor/view' && url.searchParams.get('rootId') === fixture.lastRootId;
+        }),
+        workspace.getByRole('button', { name: 'Apply changes', exact: true }).click(),
+      ]);
+      expect(noteOwner.ok(), 'applying the indexed note must load its pinned owner').toBeTruthy();
       await expect(noteEditor, 'the first pointer click must apply without the button moving away on blur').toHaveCount(0);
       await expect(workspace.locator('#editor-fn-' + fixture.noteId)).toContainText('Short note.');
       await workspace.getByRole('button', { name: 'Undo', exact: true }).click();

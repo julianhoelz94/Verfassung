@@ -90,6 +90,17 @@ class DeploymentSetupApiTest {
             content = """{"challengeToken":"$challenge","code":"${Totp.generate(secret)}"}"""
         }.andExpect { status { isOk() } }.andReturn().response.contentAsString
         val authorization = "Bearer " + mapper.readTree(confirmed)["token"].asText()
+        mvc.get("/swagger-access").andExpect {
+            status { isOk() }
+            jsonPath("$.enabled") { value(true) }
+        }
+        mvc.put("/admin/swagger-access") {
+            header("Authorization", authorization)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"enabled":false}"""
+        }.andExpect { status { isOk() } }
+        mvc.get("/swagger-access").andExpect { jsonPath("$.enabled") { value(false) } }
+        mvc.get("/v3/api-docs").andExpect { status { isForbidden() } }
         mvc.get("/setup") { header("Authorization", authorization) }.andExpect {
             status { isOk() }
             jsonPath("$.status.completed") { value(false) }

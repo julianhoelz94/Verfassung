@@ -546,6 +546,71 @@ class ImportApiTest {
     }
 
     @Test
+    fun directBatchAndChunkedImportsRequireMarkersAndAllowSharedNotes() {
+        val note = UUID.randomUUID()
+        for (count in listOf(0, 1, 3)) {
+            val body = List(count) { index ->
+                com.constitutionatlas.platform.OrderedNodeWrite(
+                    kind = "article",
+                    content = listOf(
+                        com.constitutionatlas.platform.OrderedEntryWrite(
+                            "text",
+                            text = "Law",
+                            references = listOf(com.constitutionatlas.platform.OrderedInlineReference(UUID.randomUUID(), 3, 3, com.constitutionatlas.platform.OrderedReferenceTarget("footnote", footnoteId = note))),
+                        ),
+                    ) + if (index == 0) listOf(com.constitutionatlas.platform.OrderedEntryWrite("text", text = "x".repeat(600_000))) else emptyList(),
+                )
+            }
+            val request = ImportRequest(
+                isoCode = "FR",
+                countryName = "France",
+                constitutionSlug = "shared-note-$count",
+                constitutionTitle = "Shared notes",
+                versionLabel = "1",
+                sourceUrl = "https://example.org/test-import",
+                roots = body + com.constitutionatlas.platform.OrderedNodeWrite(kind = "article", content = listOf(com.constitutionatlas.platform.OrderedEntryWrite("text", logicalId = note, text = "Shared source note", format = "footnote", footnoteLabel = "†"))),
+            )
+            val payload = objectMapper.writeValueAsString(request)
+            val direct = jobId(
+                mockMvc.post("/import-jobs") {
+                    header("Authorization", TOKEN)
+                    contentType = MediaType.APPLICATION_JSON
+                    content = payload
+                }.andExpect { status { isCreated() } }.andReturn().response.contentAsString,
+            )
+            val batch = jobId(mockMvc.post("/import-batches") { header("Authorization", TOKEN) }.andExpect { status { isCreated() } }.andReturn().response.contentAsString)
+            val batched = jobId(
+                mockMvc.post("/import-batches/$batch/items") {
+                    header("Authorization", TOKEN)
+                    contentType = MediaType.APPLICATION_JSON
+                    content = """{"idempotencyKey":"shared-notes-$count","payload":$payload}"""
+                }.andExpect { status { isCreated() } }.andReturn().response.contentAsString,
+            )
+            val chunked = assembleChunkedPayload(payload, "shared-note-$count")
+            for (id in listOf(direct, batched, chunked)) {
+                mockMvc.get("/import-jobs/$id") { header("Authorization", TOKEN) }.andExpect {
+                    status { isOk() }
+                    jsonPath("$.status") { value(if (count == 0) "failed" else "pending_review") }
+                    if (count == 0) {
+                        jsonPath("$.errors[0].code") { value("FOOTNOTE_MARK_CARDINALITY") }
+                    } else {
+                        jsonPath("$.errors.length()") { value(0) }
+                    }
+                }
+                if (count == 0) {
+                    mockMvc.post("/import-jobs/$id/prepare") { header("Authorization", TOKEN) }.andExpect {
+                        status { isBadRequest() }
+                        jsonPath("$.code") { value("FOOTNOTE_MARK_CARDINALITY") }
+                        jsonPath("$.path") { value("roots[0].content[0]") }
+                        jsonPath("$.logicalId") { value(note.toString()) }
+                    }
+                }
+            }
+        }
+        Mockito.verifyNoInteractions(catalogClient, contentClient)
+    }
+
+    @Test
     fun chunkAssemblyResolvesForwardNodeTextAndFootnoteTargetsAfterTheLastChunkArrives() {
         val target = UUID.randomUUID()
         val text = UUID.randomUUID()

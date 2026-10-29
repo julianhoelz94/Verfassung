@@ -892,6 +892,43 @@ class CatalogApiTest {
         org.junit.jupiter.api.Assertions.assertThrows(com.constitutionatlas.catalog.ConflictException::class.java) { writes.createDraftVersion(constitution.id, request.copy(versionLabel = "concurrent", publishAttemptId = UUID.randomUUID())) }
     }
 
+    @Test
+    fun ordinaryPublicationValidatesFootnotesBeforeMutationAndRechecksPublicationRetries() {
+        val country = writes.createCountry(com.constitutionatlas.catalog.api.CreateCountryRequest(uniqueCountryCode(), "Footnote publication"))
+        val constitution = writes.createConstitution(country.isoCode, com.constitutionatlas.catalog.api.CreateConstitutionRequest("shared-notes", "Shared notes"))
+        val version = writes.createDraftVersion(constitution.id, com.constitutionatlas.catalog.api.CreateVersionRequest("2020"))
+        val note = UUID.randomUUID()
+        val failure = com.constitutionatlas.platform.OrderedContentValidationException(listOf(com.constitutionatlas.platform.OrderedValidationError("FOOTNOTE_MARK_CARDINALITY", "roots[1].content[0]", note, "Footnote body has no marker")))
+        Mockito.doThrow(failure).`when`(readiness).requireValidContent(version.id, PUBLISHER_TOKEN)
+        mockMvc.post("/versions/${version.id}/publish") { header("Authorization", PUBLISHER_TOKEN) }.andExpect {
+            status { isBadRequest() }
+            jsonPath("$.code") { value("FOOTNOTE_MARK_CARDINALITY") }
+            jsonPath("$.path") { value("roots[1].content[0]") }
+            jsonPath("$.logicalId") { value(note.toString()) }
+        }
+        assertThat(catalogRepository.findVersion(version.id)!!.publicationStatus).isEqualTo("draft")
+        Mockito.doNothing().`when`(readiness).requireValidContent(version.id, PUBLISHER_TOKEN)
+        mockMvc.post("/versions/${version.id}/publish") { header("Authorization", PUBLISHER_TOKEN) }.andExpect { status { isOk() } }
+        Mockito.doThrow(failure).`when`(readiness).requireValidContent(version.id, PUBLISHER_TOKEN)
+        mockMvc.post("/versions/${version.id}/publish") { header("Authorization", PUBLISHER_TOKEN) }.andExpect { status { isBadRequest() } }
+        Mockito.verify(readiness, Mockito.times(3)).requireValidContent(version.id, PUBLISHER_TOKEN)
+        // The new write rule does not alter reads of already published snapshots.
+        mockMvc.get("/versions/${version.id}").andExpect {
+            status { isOk() }
+            jsonPath("$.publicationStatus") { value("published") }
+        }
+    }
+
+    @Test
+    fun ordinaryPublicationRetainsTheDraftWhenContentValidationIsUnavailable() {
+        val country = writes.createCountry(com.constitutionatlas.catalog.api.CreateCountryRequest(uniqueCountryCode(), "Unavailable content"))
+        val constitution = writes.createConstitution(country.isoCode, com.constitutionatlas.catalog.api.CreateConstitutionRequest("unavailable-content", "Unavailable content"))
+        val version = writes.createDraftVersion(constitution.id, com.constitutionatlas.catalog.api.CreateVersionRequest("2020"))
+        Mockito.doThrow(org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE, "Content validation is unavailable")).`when`(readiness).requireValidContent(version.id, PUBLISHER_TOKEN)
+        mockMvc.post("/versions/${version.id}/publish") { header("Authorization", PUBLISHER_TOKEN) }.andExpect { status { isServiceUnavailable() } }
+        assertThat(catalogRepository.findVersion(version.id)!!.publicationStatus).isEqualTo("draft")
+    }
+
     @BeforeEach
     fun stubIdentity() {
         val constitutionId = UUID.fromString("01900000-0000-4000-8000-000000000002")

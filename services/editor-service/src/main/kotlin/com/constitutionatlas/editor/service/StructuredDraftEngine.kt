@@ -231,13 +231,13 @@ object StructuredDraftEngine {
             node.content.forEachIndexed { index, entry ->
                 val entryPath = "$path.content[$index]"
                 entry.node?.let { walk(it, "$entryPath.node") } ?: run {
-                    notes += OrderedContentPosition(entryPath, entry.logicalId, format = entry.format)
+                    notes += OrderedContentPosition(entryPath, entry.logicalId, format = entry.format, references = entry.references)
                     references += entry.references
                 }
             }
         }
         roots.forEachIndexed { index, root -> walk(root, "roots[$index]") }
-        OrderedContentRules.requireValid(OrderedContentRules.footnoteMarkerErrors(notes, references))
+        OrderedContentRules.requireValid(OrderedContentRules.referenceIdentityErrors(notes) + OrderedContentRules.footnoteMarkerErrors(notes, references))
     }
 
     private fun markInserted(node: DraftNode, id: UUID): DraftNode = node.copy(draftId = id, content = node.content.map { entry -> entry.node?.let { entry.copy(node = markInserted(it, id)) } ?: entry.copy(draftId = id) })

@@ -16,8 +16,8 @@ export function indexDraftFootnoteReferences(roots: DraftNode[]): DraftFootnoteR
   return roots.flatMap(root => walk(root, root.logicalId));
 }
 
-export function footnoteCardinality(notes:{logicalId:string;label:string}[],references:{noteId:string}[]):{kind:'missing'|'multiple'|'unknown';noteId:string;label:string;count:number}[]{
+export function footnoteCardinality(notes:{logicalId:string;label:string}[],references:{noteId:string}[]):{kind:'missing'|'unknown';noteId:string;label:string;count:number}[]{
   const counts=new Map<string,number>();for(const reference of references)counts.set(reference.noteId,(counts.get(reference.noteId)??0)+1);
   const known=new Set(notes.map(note=>note.logicalId));
-  return [...notes.flatMap(note=>{const count=counts.get(note.logicalId)??0;return count===1?[]:[{kind:count?'multiple' as const:'missing' as const,noteId:note.logicalId,label:note.label,count}];}),...[...counts].flatMap(([noteId,count])=>known.has(noteId)?[]:[{kind:'unknown' as const,noteId,label:'',count}])];
+  return [...notes.flatMap(note=>{const count=counts.get(note.logicalId)??0;return count>0?[]:[{kind:'missing' as const,noteId:note.logicalId,label:note.label,count}];}),...[...counts].flatMap(([noteId,count])=>known.has(noteId)?[]:[{kind:'unknown' as const,noteId,label:'',count}])];
 }

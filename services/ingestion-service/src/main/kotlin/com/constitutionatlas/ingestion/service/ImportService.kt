@@ -162,8 +162,7 @@ class ImportService(
     }
 
     private fun requireCurrentRichRules(request: ImportRequest) {
-        val errors = ImportValidator.richContentErrors(request.roots)
-        if (errors.isNotEmpty()) throw ResponseStatusException(HttpStatus.BAD_REQUEST, errors.joinToString("; ") { it.second })
+        com.constitutionatlas.platform.OrderedContentRules.requireValid(ImportValidator.richContentValidationErrors(request.roots))
     }
 
     private fun reviewReason(reason: String): String = reason.trim().also {
@@ -175,6 +174,7 @@ class ImportService(
         val versionId = importJobRepository.find(jobId)?.versionId
             ?: throw ResponseStatusException(HttpStatus.CONFLICT, "Import has no prepared draft")
         val snapshot = DownstreamAuth.withAuthorization(authorization) { contentClient.snapshot(versionId) }
+        com.constitutionatlas.platform.OrderedContentRules.requireValid(com.constitutionatlas.platform.OrderedContentRules.contentErrors(snapshot.roots))
         if (!importJobRepository.approve(jobId, actorId, snapshot, recordedReason)) throw ResponseStatusException(HttpStatus.CONFLICT, "Import is not prepared for review")
         return importJobRepository.find(jobId)!!
     }
@@ -196,6 +196,9 @@ class ImportService(
             val current = DownstreamAuth.withAuthorization(authorization) { contentClient.snapshot(versionId) }
             if (current.generation != approved.first || current.settingsRevisionId != approved.second) {
                 throw ImportPublicationException(HttpStatus.CONFLICT, "approved_snapshot_changed")
+            }
+            com.constitutionatlas.platform.OrderedContentRules.contentErrors(current.roots).firstOrNull()?.let {
+                throw ImportPublicationException(HttpStatus.BAD_REQUEST, it.code, it.path, it.logicalId)
             }
             DownstreamAuth.withAuthorization("Bearer $publishToken") {
                 stage = "seal"
@@ -232,7 +235,7 @@ class ImportService(
 
     /** Only a known validation code and bounded structural identity may leave the service. */
     private fun publicationValidationFailure(ex: RestClientResponseException): ImportPublicationException {
-        val allowed = setOf("FOOTNOTE_NOT_AT_END", "UNIT_REFERENCE_TARGET", "INLINE_REFERENCE", "TEXT_MARK_RANGE", "TEXT_MARK_OVERLAP", "TEXT_MARK_FORMAT", "TEXT_MARK_LIMIT", "TEXT_LINE_BREAKS")
+        val allowed = setOf("FOOTNOTE_NOT_AT_END", "FOOTNOTE_MARK_CARDINALITY", "UNIT_REFERENCE_TARGET", "INLINE_REFERENCE", "TEXT_MARK_RANGE", "TEXT_MARK_OVERLAP", "TEXT_MARK_FORMAT", "TEXT_MARK_LIMIT", "TEXT_LINE_BREAKS")
         val body = if (ex.responseBodyAsByteArray.size <= 16_384) runCatching { objectMapper.readTree(ex.responseBodyAsByteArray) }.getOrNull() else null
         val code = body?.path("code")?.scalarText()?.takeIf { it in allowed }
             ?: return ImportPublicationException(HttpStatus.BAD_REQUEST, "publication_validation_failed")

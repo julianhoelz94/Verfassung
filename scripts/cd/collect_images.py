@@ -8,7 +8,7 @@ from pathlib import Path
 from release import PUBLIC_URLS, image_paths, validate_image_fragment, validate_manifest, write_manifest
 
 
-def collect(root, directory, repository, environment, source_sha, run_id):
+def collect(root, directory, repository, environment, source_sha, run_id, release_tag):
     root = Path(root)
     directory = Path(directory)
     images = {}
@@ -32,7 +32,7 @@ def collect(root, directory, repository, environment, source_sha, run_id):
     # of this same workflow run. Every fragment still pins the same source/target.
     manifest = {"schema": 1, "source_sha": source_sha, "environment": environment,
                 "public_url": PUBLIC_URLS[environment], "architecture": "amd64", "images": images,
-                "run_id": run_id, "image_build_attempts": attempts}
+                "run_id": run_id, "image_build_attempts": attempts, "release_tag": release_tag}
     validate_manifest(manifest, root, repository, environment, source_sha)
     write_manifest(root / ".release", manifest)
     return manifest
@@ -45,5 +45,6 @@ if __name__ == "__main__":
     parser.add_argument("--environment", choices=PUBLIC_URLS, required=True)
     parser.add_argument("--source-sha", required=True)
     parser.add_argument("--run-id", required=True)
+    parser.add_argument("--release-tag", required=True)
     args = parser.parse_args()
-    collect(Path.cwd(), args.directory, args.repository, args.environment, args.source_sha, args.run_id)
+    collect(Path.cwd(), args.directory, args.repository, args.environment, args.source_sha, args.run_id, args.release_tag)

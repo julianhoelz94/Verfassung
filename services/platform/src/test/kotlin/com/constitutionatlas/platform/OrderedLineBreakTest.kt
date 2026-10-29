@@ -67,15 +67,23 @@ class OrderedLineBreakTest {
     }
 
     @Test
-    fun `editor save marker cardinality is separate from historical import validation`() {
+    fun `complete models require at least one marker and allow many markers across roots`() {
         val note = UUID.randomUUID()
         val position = OrderedContentPosition("roots[1].content[0]", note, format = "footnote")
         val marker = OrderedInlineReference(UUID.randomUUID(), 0, 0, OrderedReferenceTarget("footnote", footnoteId = note))
         assertTrue(OrderedContentRules.footnoteMarkerErrors(listOf(position), listOf(marker)).isEmpty())
-        for (references in listOf(emptyList(), listOf(marker, marker.copy(logicalId = UUID.randomUUID())))) {
-            val error = OrderedContentRules.footnoteMarkerErrors(listOf(position), references).single()
-            assertEquals("FOOTNOTE_MARK_CARDINALITY", error.code)
-            assertEquals(note, error.logicalId)
+        val error = OrderedContentRules.footnoteMarkerErrors(listOf(position), emptyList()).single()
+        assertEquals("FOOTNOTE_MARK_CARDINALITY", error.code)
+        assertEquals(note, error.logicalId)
+        assertEquals(position.path, error.path)
+        fun root(entries: List<OrderedEntry>) = OrderedNode(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "article", null, null, entries)
+        val noteRoot = root(listOf(OrderedEntry("text", logicalId = note, text = "Note", format = "footnote")))
+        for (count in 0..3) {
+            val bodyRoots = List(count) { root(listOf(OrderedEntry("text", text = "Law", references = listOf(marker.copy(logicalId = UUID.randomUUID()))))) }
+            val errors = OrderedContentRules.contentErrors(bodyRoots + noteRoot)
+            assertEquals(if (count == 0) listOf("FOOTNOTE_MARK_CARDINALITY") else emptyList(), errors.map { it.code })
+            val writes = bodyRoots.map { OrderedNodeWrite(kind = "article", content = listOf(OrderedEntryWrite("text", text = "Law", references = it.content.single().references))) } + OrderedNodeWrite(kind = "article", content = listOf(OrderedEntryWrite("text", logicalId = note, text = "Note", format = "footnote")))
+            assertEquals(errors.map { it.code }, OrderedContentRules.writeFootnoteMarkerErrors(writes).map { it.code })
         }
     }
 

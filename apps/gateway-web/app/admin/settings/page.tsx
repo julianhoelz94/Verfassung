@@ -11,13 +11,15 @@ import { Alert, Button, Card, Input, Select, PageHeader } from '../../components
 import { requireAdminPage } from '../../../lib/admin';
 import { requestIdentitySettings } from '../../../lib/identity-client';
 import { SESSION_COOKIE, currentUser } from '../../../lib/session';
-import { saveContentTranslationSettingsAction } from './actions';
+import { saveContentTranslationSettingsAction, saveSwaggerAccessAction } from './actions';
 import { MailSettings } from './MailSettings';
 import { SetupPreferences } from '../../setup/SetupPreferences';
 import { ConnectionSettings } from '../../setup/ConnectionSettings';
 import { setupRequest, type SetupDetails } from '../../../lib/deployment-setup';
 import { setupMessages as m } from '../../../lib/setup-messages';
 import { translationSiteSettings } from '../../../lib/content-translation';
+import { requestAdminSwaggerAccessPolicy } from '../../../lib/swagger-access';
+import { swaggerMessages } from '../../../lib/swagger-messages';
 
 export default async function IdentitySettingsPage({
   searchParams,
@@ -31,6 +33,7 @@ export default async function IdentitySettingsPage({
   const settings = token ? await requestIdentitySettings(token).catch(() => null) : null;
   const translationSettings = token ? await translationSiteSettings(token).catch(() => null) : null;
   const details = token ? await setupRequest<SetupDetails>('/setup', `Bearer ${token}`).catch(() => null) : null;
+  const swaggerAccess = token ? await requestAdminSwaggerAccessPolicy(token).catch(() => null) : null;
   return (
     <SettingsPage
       header={<PageHeader title={<T value={reviewUi.siteSettings} />} meta={<T value={reviewUi.siteSettingsHint} />} />}
@@ -57,6 +60,7 @@ export default async function IdentitySettingsPage({
               <T value={ui.contentTranslation.title} />
             </a>
           ) : null}
+          <a href="#api-documentation"><T value={swaggerMessages.title} /></a>
         </LocalizedRegion>
       }
       notices={
@@ -153,6 +157,19 @@ export default async function IdentitySettingsPage({
           </NavigatingActionForm>
         </Card>
       ) : null}
+      <Card id="api-documentation">
+        <h2><T value={swaggerMessages.title} /></h2>
+        {swaggerAccess ? (
+          <NavigatingActionForm action={saveSwaggerAccessAction}>
+            <label>
+              <input type="checkbox" name="swaggerEnabled" defaultChecked={swaggerAccess.enabled} aria-describedby="swagger-access-help" />{' '}
+              <T value={swaggerMessages.enabled} />
+            </label>
+            <p id="swagger-access-help"><T value={swaggerMessages.description} /></p>
+            <Button variant="primary"><T value={swaggerMessages.save} /></Button>
+          </NavigatingActionForm>
+        ) : <Alert tone="error"><T value={swaggerMessages.unavailable} /></Alert>}
+      </Card>
     </SettingsPage>
   );
 }

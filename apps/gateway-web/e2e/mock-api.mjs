@@ -214,6 +214,7 @@ let legalPages = {};
 let imprintDetailsState;
 let translationSite = { provider: 'google', sharedKeyConfigured: true, sharedGoogleCharactersUsed: 0, sharedGoogleCharacterLimit: 500000 };
 let translationUser = { alwaysTranslate: false, personalGoogleKeyConfigured: false };
+let swaggerAccess = { enabled: true };
 let anonymousBrowsing = { allowed: true, perIp: { requests: 600, windowValue: 1, windowUnit: 'minutes' }, total: { requests: 6000, windowValue: 1, windowUnit: 'minutes' }, revision: 0 };
 const WIKI_IMAGE_ID = '01900000-0000-4000-8000-000000000736';
 const WIKI_IMAGE = { documentId: WIKI_IMAGE_ID, revision: 2, alt: 'A historic flag', caption: 'Historic flag', credit: 'Archive', sourceUrl: 'https://example.org/flag', rights: 'Public domain', placement: 'before_body' };
@@ -247,6 +248,7 @@ function resetMockState() {
   historyUnavailable = { lifecycle: false, amendments: false };
   translationSite = { provider: 'google', sharedKeyConfigured: true, sharedGoogleCharactersUsed: 0, sharedGoogleCharacterLimit: 500000 };
   translationUser = { alwaysTranslate: false, personalGoogleKeyConfigured: false };
+  swaggerAccess = { enabled: true };
   anonymousBrowsing = { allowed: true, perIp: { requests: 600, windowValue: 1, windowUnit: 'minutes' }, total: { requests: 6000, windowValue: 1, windowUnit: 'minutes' }, revision: 0 };
   const impressum = { revision: 1, content: 'Example publisher information', separateContact: true, createdAt: '2026-01-01T00:00:00Z', createdBy: identityMe.id };
   const impressumEn = { revision: 1, content: 'English publisher information', separateContact: true, createdAt: '2026-01-01T00:00:00Z', createdBy: identityMe.id };
@@ -1003,6 +1005,23 @@ const server = createServer(async (req, res) => {
   if (method === 'GET' && pathname === '/api/identity/anonymous-browsing') {
     json(res, 200, anonymousBrowsing.allowed ? anonymousBrowsing : { ...anonymousBrowsing, perIp: { ...anonymousBrowsing.perIp, requests: 0 }, total: { ...anonymousBrowsing.total, requests: 0 } });
     return;
+  }
+  if (method === 'GET' && pathname === '/api/identity/swagger-access') {
+    json(res, 200, swaggerAccess);
+    return;
+  }
+  if (pathname === '/api/identity/admin/swagger-access') {
+    if (bearer(req) !== SESSION_TOKEN) { json(res, 401, { error: 'Unauthorized' }); return; }
+    if (!currentUser.roles.includes('admin')) { json(res, 403, { error: 'Forbidden' }); return; }
+    if (method === 'GET') { json(res, 200, swaggerAccess); return; }
+    if (method === 'PUT') {
+      if (!stepUpFresh) { json(res, 403, { code: 'step_up_required' }); return; }
+      const body = await readBody(req);
+      if (typeof body.enabled !== 'boolean') { json(res, 400, { error: 'Invalid setting' }); return; }
+      swaggerAccess = { enabled: body.enabled };
+      json(res, 200, swaggerAccess);
+      return;
+    }
   }
   if (pathname === '/api/identity/admin/anonymous-browsing' && bearer(req) === SESSION_TOKEN) {
     if (method === 'GET') {

@@ -456,7 +456,7 @@ export const ui = {
     errors: {
       publication_not_configured: { en: 'Publication is not configured on the server. Deploy with the managed ingestion credentials; your approval is retained.', de: 'Die Veröffentlichung ist serverseitig nicht eingerichtet. Die Bereitstellung muss die internen Import-Zugangsdaten einrichten. Ihre Freigabe bleibt erhalten.' },
       publication_validation_failed: { en: 'Publication is blocked by a content validation error. Correct the import and have it reviewed again.', de: 'Ein Inhaltsfehler verhindert die Veröffentlichung. Korrigieren Sie den Import und lassen Sie ihn erneut prüfen.' },
-      FOOTNOTE_MARK_CARDINALITY: { en: 'Each footnote needs exactly one marker. Add missing markers and remove duplicate markers before saving or publishing.', de: 'Jede Fußnote benötigt genau ein Verweiszeichen. Ergänzen Sie fehlende Zeichen und entfernen Sie doppelte Zeichen vor dem Speichern oder Veröffentlichen.' },
+      FOOTNOTE_MARK_CARDINALITY: { en: 'Each footnote needs at least one marker, and every marker must refer to an existing footnote before saving or publishing.', de: 'Jede Fußnote benötigt mindestens ein Verweiszeichen. Jedes Zeichen muss vor dem Speichern oder Veröffentlichen auf eine vorhandene Fußnote verweisen.' },
       FOOTNOTE_NOT_AT_END: { en: 'A footnote precedes later constitutional text. Move all notes to the end of the import and have it reviewed again.', de: 'Nach einer Fußnote folgt weiterer Verfassungstext. Verschieben Sie alle Fußnoten ans Ende des Imports und lassen Sie ihn erneut prüfen.' },
       UNIT_REFERENCE_TARGET: { en: 'A reference points to a unit missing from this constitution. Correct the import and have it reviewed again.', de: 'Ein Verweis zeigt auf eine fehlende Einheit dieser Verfassung. Korrigieren Sie den Import und lassen Sie ihn erneut prüfen.' },
       INLINE_REFERENCE: { en: 'A reference has an invalid position or target. Correct the affected reference before publication.', de: 'Ein Verweis hat eine ungültige Position oder ein ungültiges Ziel. Korrigieren Sie ihn vor der Veröffentlichung.' },
@@ -1914,6 +1914,10 @@ export const ui = {
   },
   about: {
     page: {
+      deployedVersion: { en: "Deployed version", de: "Bereitgestellte Version" },
+      versionUnavailable: { en: "No release tag available.", de: "Kein Release-Tag verfügbar." },
+      apiDocumentation: { en: "API documentation", de: "API-Dokumentation" },
+      swaggerAvailability: { en: "Explore each service’s API in Swagger UI. Documentation is public; protected API operations require authorization.", de: "Erkunden Sie die API jedes Dienstes in Swagger UI. Die Dokumentation ist öffentlich; geschützte API-Aufrufe erfordern eine Berechtigung." },
       accessibility: { en: "Accessibility", de: "Barrierefreiheit" },
       constitutionAtlasIsAPublicReadingSite: { en: "Constitution Atlas is a public reading site for versioned constitutions. Each country page lists published versions; each version shows the articles as they stood on that date, with amendment history and search.", de: "Constitution Atlas ist eine öffentliche Leseseite für versionierte Verfassungen. Jede Länderseite listet veröffentlichte Versionen auf; jede Version zeigt die Artikel, wie sie an diesem Datum standen, mit Änderungshistorie und Suche." },
       everyPublishedVersionRecordsWhereTheText: { en: "Every published version records where the text came from: an official gazette, a government publication, or an imported corpus. Provenance on version and article pages names that source so you can check it against the original.", de: "In jeder veröffentlichten Version wird festgehalten, woher der Text stammt: ein Amtsblatt, eine Regierungsveröffentlichung oder ein importiertes Korpus. Die Herkunft auf Versions- und Artikelseiten nennt diese Quelle, damit Sie sie mit dem Original vergleichen können." },

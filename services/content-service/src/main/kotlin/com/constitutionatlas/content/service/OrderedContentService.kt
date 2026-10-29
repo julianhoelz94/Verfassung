@@ -269,6 +269,8 @@ class OrderedContentService(
         val footnotes = mutableSetOf<UUID>()
         roots.forEach { collect(it, footnotes) }
         roots.forEach { rich(it, footnotes) }
+        OrderedContentRules.requireValid(OrderedContentRules.referenceIdentityErrors(OrderedContentRules.positions(roots)))
+        OrderedContentRules.requireValid(OrderedContentRules.footnoteMarkerErrors(roots))
     }
 
     @Transactional

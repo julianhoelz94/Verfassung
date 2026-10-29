@@ -7,7 +7,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-from release import PUBLIC_URLS, SHA
+from release import PUBLIC_URLS, SHA, validate_release_tag
 
 
 def validate_request(event, ref, environment):
@@ -15,10 +15,7 @@ def validate_request(event, ref, environment):
         raise ValueError("Run the deployment workflow from a published release tag; branches cannot deploy")
     if environment not in PUBLIC_URLS:
         raise ValueError("Select test or prod")
-    tag = ref.removeprefix("refs/tags/")
-    if not tag or tag.startswith("refs/") or any(character.isspace() for character in tag):
-        raise ValueError("Select a published release tag by its exact name")
-    return tag
+    return validate_release_tag(ref.removeprefix("refs/tags/"))
 
 
 def github_get(repository, path, token):
@@ -77,7 +74,7 @@ def main():
     if sha != os.environ["GITHUB_SHA"]:
         raise ValueError("Release tag moved after this workflow was dispatched; start a new run from the tag")
     with open(os.environ["GITHUB_OUTPUT"], "a") as output:
-        output.write(f"source-sha={sha}\n")
+        output.write(f"source-sha={sha}\nrelease-tag={tag}\n")
     print(f"Approved release {tag} ({sha}) for {environment}: {PUBLIC_URLS[environment]}")
 
 

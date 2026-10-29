@@ -32,7 +32,7 @@ Compose services: `edge-proxy`, `gateway-web`, nine `*-service`, nine `*-db` (`p
 | `/api/catalog\|content\|amendment\|identity\|editor\|search\|ingestion\|audit\|document*` | matching service, strip `/api/<svc>` |
 | everything else | `gateway-web:3000` |
 
-Docs: `http://localhost/api/docs/<svc>/swagger-ui/index.html` when `CADDY_EXPOSE_API_DOCS=true` (local-stack/ci). Other profiles 404 that path.
+Docs: `/api/docs/<svc>/swagger-ui/index.html`, linked from About, are public after setup while the **Admin → Site settings → API documentation → Allow public Swagger UI access** setting is enabled (default). Disabling that setting hides the links and blocks Swagger routes for everyone. `CADDY_EXPOSE_API_DOCS` defaults to `true`; standalone deployments can explicitly set it to `false` as an infrastructure hard limit returning 404. Swagger assets and schemas are independent of anonymous constitution browsing; interactive API calls keep their normal access policy.
 
 ## Gradle
 

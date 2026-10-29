@@ -66,6 +66,10 @@ with tempfile.TemporaryDirectory(prefix='atlas-transport-') as directory:
             and upstream_proxies(route.get('handle', []), 'gateway-web:3000')
         ]
         assert docs_gates, 'Swagger API aliases must use the shared edge admission policy'
+        for route in docs_gates:
+            for proxy in upstream_proxies(route.get('handle', []), 'gateway-web:3000'):
+                headers = proxy.get('headers', {}).get('request', {}).get('set', {})
+                assert headers.get('X-Atlas-Original-Method') == ['{http.request.method}'], 'Docs admission must receive the real original method'
         gateways = upstream_proxies(adapted, 'gateway-web:3000')
         assert gateways, 'Public requests must reach the gateway through a trusted proxy'
         for proxy in gateways:

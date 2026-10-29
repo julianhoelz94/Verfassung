@@ -93,8 +93,9 @@ class ImageCollectionTests(unittest.TestCase):
             paths = artifacts(Path(directory))
             paths["gateway-web"].write_text(json.dumps(fragment("gateway-web", attempt="2")))
             with patch.object(collect_images, "write_manifest") as write:
-                result = collect_images.collect(ROOT, directory, REPOSITORY, "test", SHA, RUN_ID)
+                result = collect_images.collect(ROOT, directory, REPOSITORY, "test", SHA, RUN_ID, "releases/v1.1")
             release.validate_manifest(result, ROOT, REPOSITORY, "test", SHA)
+            self.assertEqual(result["release_tag"], "releases/v1.1")
             self.assertEqual(len(result["images"]), 12)
             self.assertEqual(result["image_build_attempts"]["gateway-web"], "2")
             self.assertEqual(result["image_build_attempts"]["identity-service"], "1")
@@ -113,7 +114,7 @@ class ImageCollectionTests(unittest.TestCase):
                     path.rename(path.parent / "renamed.json")
                 with patch.object(collect_images, "write_manifest") as write:
                     with self.assertRaises(ValueError):
-                        collect_images.collect(ROOT, directory, REPOSITORY, "test", SHA, RUN_ID)
+                        collect_images.collect(ROOT, directory, REPOSITORY, "test", SHA, RUN_ID, "v.1.1")
                     write.assert_not_called()
 
     def test_wrong_source_environment_run_architecture_or_image_blocks_release(self):
@@ -131,7 +132,7 @@ class ImageCollectionTests(unittest.TestCase):
                 paths["gateway-web"].write_text(json.dumps(bad))
                 with patch.object(collect_images, "write_manifest") as write:
                     with self.assertRaises(ValueError):
-                        collect_images.collect(ROOT, directory, REPOSITORY, "test", SHA, RUN_ID)
+                        collect_images.collect(ROOT, directory, REPOSITORY, "test", SHA, RUN_ID, "v.1.1")
                     write.assert_not_called()
 
     def test_workflow_bounds_parallelism_and_requires_all_images_before_deploy(self):

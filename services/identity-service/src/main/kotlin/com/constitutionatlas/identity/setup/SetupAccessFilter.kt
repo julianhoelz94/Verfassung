@@ -13,7 +13,7 @@ class SetupAccessFilter(private val repository: SetupRepository) : OncePerReques
         val allowed = path in setOf(
             "/internal/ping", "/actuator/health", "/setup/status", "/site/languages", "/me", "/login", "/login/mfa", "/logout",
             "/mfa/enroll/start", "/mfa/enroll/confirm", "/mfa/step-up", "/admin/settings", "/admin/settings/test-mail", "/admin/anonymous-browsing",
-            "/anonymous-browsing", "/registration/status", "/setup", "/setup/complete",
+            "/anonymous-browsing", "/swagger-access", "/admin/swagger-access", "/registration/status", "/setup", "/setup/complete",
         )
         if (!allowed && repository.get().completedAt == null) {
             response.status = 403

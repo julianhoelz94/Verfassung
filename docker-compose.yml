@@ -11,7 +11,7 @@ services:
       - TLS_TRUSTED_PROXIES=${TLS_TRUSTED_PROXIES:-}
       - CADDY_BIND_ADDRESS=${CADDY_BIND_ADDRESS:-127.0.0.1}
       - ACME_TEST_DIRECTORY=${ACME_TEST_DIRECTORY:-}
-      - CADDY_EXPOSE_API_DOCS=${CADDY_EXPOSE_API_DOCS:-false}
+      - CADDY_EXPOSE_API_DOCS=${CADDY_EXPOSE_API_DOCS:-true}
       - ATLAS_LEGACY_HOST=${ATLAS_LEGACY_HOST:-legacy.localhost}
     volumes:
       - caddy-data:/data
@@ -52,6 +52,7 @@ services:
       # SESSION_COOKIE_SECURE=false because Caddy serves plain http there.
       - TLS_MODE=${TLS_MODE:-local-http}
       - NODE_ENV=production
+      - DEPLOYED_TAG=${DEPLOYED_TAG:-}
       - SESSION_COOKIE_SECURE=${SESSION_COOKIE_SECURE:-true}
       # Gateway shows seed-account hints on /login only while identity seeding is on.
       - IDENTITY_SEED_MODE=${IDENTITY_SEED_MODE:-off}

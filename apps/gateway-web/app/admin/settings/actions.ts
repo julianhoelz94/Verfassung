@@ -1,6 +1,7 @@
 'use server';
 
 import { updateTranslationSiteSettings } from '../../../lib/content-translation';
+import { updateSwaggerAccessPolicy } from '../../../lib/swagger-access';
 
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
@@ -86,4 +87,17 @@ export async function saveContentTranslationSettingsAction(formData: FormData): 
     return '/admin/settings?error=translation';
   }
   return '/admin/settings?saved=translation';
+}
+
+export async function saveSwaggerAccessAction(formData: FormData): Promise<string> {
+  const token = await adminToken();
+  try {
+    await updateSwaggerAccessPolicy(token, { enabled: formData.get('swaggerEnabled') === 'on' });
+  } catch (error) {
+    if (error instanceof IdentityApiError && error.code === 'step_up_required') {
+      return `/account/step-up?returnTo=${encodeURIComponent('/admin/settings#api-documentation')}`;
+    }
+    return '/admin/settings?error=swagger#api-documentation';
+  }
+  return '/admin/settings?saved=swagger#api-documentation';
 }

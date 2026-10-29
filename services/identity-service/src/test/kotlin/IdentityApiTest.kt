@@ -125,6 +125,70 @@ class IdentityApiTest {
     }
 
     @Test
+    fun swaggerAccessDefaultsPublicAndOnlyFreshAdministratorsCanChangeIt() {
+        val admin = login("local-admin@example.local", "change-me")
+        val viewer = login("local-viewer@example.local", "change-me")
+        try {
+            mockMvc.get("/swagger-access").andExpect {
+                status { isOk() }
+                header { string("Cache-Control", "no-store") }
+                jsonPath("$.enabled") { value(true) }
+            }
+            mockMvc.get("/admin/swagger-access").andExpect { status { isUnauthorized() } }
+            mockMvc.get("/admin/swagger-access") {
+                header("Authorization", "Bearer $viewer")
+            }.andExpect { status { isForbidden() } }
+            for (token in listOf(null, viewer)) {
+                mockMvc.put("/admin/swagger-access") {
+                    if (token != null) header("Authorization", "Bearer $token")
+                    contentType = MediaType.APPLICATION_JSON
+                    content = """{"enabled":false}"""
+                }.andExpect { status { if (token == null) isUnauthorized() else isForbidden() } }
+            }
+            for (body in listOf("{}", """{"enabled":null}""")) {
+                mockMvc.put("/admin/swagger-access") {
+                    header("Authorization", "Bearer $admin")
+                    contentType = MediaType.APPLICATION_JSON
+                    content = body
+                }.andExpect { status { isBadRequest() } }
+            }
+            for (enabled in listOf(false, true)) {
+                mockMvc.put("/admin/swagger-access") {
+                    header("Authorization", "Bearer $admin")
+                    contentType = MediaType.APPLICATION_JSON
+                    content = """{"enabled":$enabled}"""
+                }.andExpect {
+                    status { isOk() }
+                    jsonPath("$.enabled") { value(enabled) }
+                }
+                mockMvc.get("/swagger-access").andExpect {
+                    status { isOk() }
+                    jsonPath("$.enabled") { value(enabled) }
+                }
+                mockMvc.get("/admin/swagger-access") {
+                    header("Authorization", "Bearer $admin")
+                }.andExpect {
+                    status { isOk() }
+                    jsonPath("$.enabled") { value(enabled) }
+                }
+                check(jdbcTemplate.queryForObject("SELECT enabled FROM swagger_access_settings WHERE id = TRUE", Boolean::class.java) == enabled)
+            }
+            jdbcTemplate.update("UPDATE sessions SET step_up_at = NOW() - INTERVAL '10 minutes' WHERE token_hash = ?", Tokens.sha256Hex(admin))
+            mockMvc.put("/admin/swagger-access") {
+                header("Authorization", "Bearer $admin")
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"enabled":false}"""
+            }.andExpect {
+                status { isForbidden() }
+                jsonPath("$.code") { value("step_up_required") }
+            }
+            mockMvc.get("/swagger-access").andExpect { jsonPath("$.enabled") { value(true) } }
+        } finally {
+            jdbcTemplate.update("UPDATE swagger_access_settings SET enabled = TRUE WHERE id = TRUE")
+        }
+    }
+
+    @Test
     fun anonymousBrowsingSettingsKeepSavedPositiveLimitsWhenDisabled() {
         val admin = login("local-admin@example.local", "change-me")
         val viewer = login("local-viewer@example.local", "change-me")

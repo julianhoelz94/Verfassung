@@ -25,12 +25,19 @@
 		defer
 	}
 
-	# OpenAPI/Swagger is local-only unless CADDY_EXPOSE_API_DOCS=true (SEC-3).
+	# Deployments expose public OpenAPI/Swagger by default; an explicit opt-out returns 404.
 	@docs_closed {
 		path /api/docs/*
 		expression `{env.CADDY_EXPOSE_API_DOCS} != "true"`
 	}
 	respond @docs_closed 404
+	# Springdoc is also reachable through each service's canonical API prefix.
+	# Cover matrix parameters, which Spring ignores when matching resource paths.
+	@canonical_docs_closed {
+		path_regexp canonical_docs ^/api/(catalog|content|amendment|identity|editor|search|ingestion|audit|document)(;[^/]*)?/+(swagger-ui([.]html)?(;[^/]*)?(/.*)?|v3(;[^/]*)?/+api-docs([.]yaml)?(;[^/]*)?(/.*)?)$
+		expression `{env.CADDY_EXPOSE_API_DOCS} != "true"`
+	}
+	respond @canonical_docs_closed 404
 
 
 	# Anonymous API requests share one edge quota across services. Validated account
@@ -46,6 +53,7 @@
 			header_up X-Forwarded-For {client_ip}
 			header_up X-Atlas-Edge-Check 1
 			header_up X-Atlas-Original-URI {uri}
+			header_up X-Atlas-Original-Method {method}
 		}
 	}
 
@@ -188,6 +196,7 @@
 			header_up X-Atlas-Client-IP {client_ip}
 			header_up X-Forwarded-For {client_ip}
 			header_up -X-Atlas-Original-URI
+			header_up -X-Atlas-Original-Method
 		}
 	}
 
@@ -202,6 +211,7 @@
 			header_up X-Atlas-Client-IP {client_ip}
 			header_up X-Forwarded-For {client_ip}
 			header_up -X-Atlas-Original-URI
+			header_up -X-Atlas-Original-Method
 		}
 	}
 }

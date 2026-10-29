@@ -7,7 +7,7 @@ services:
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:?Set the public HTTPS origin}
       TLS_TRUSTED_PROXIES: ${TLS_TRUSTED_PROXIES:?Set the actual Coolify proxy CIDRs}
       CADDY_BIND_ADDRESS: 0.0.0.0
-      CADDY_EXPOSE_API_DOCS: 'false'
+      CADDY_EXPOSE_API_DOCS: 'true'
       ATLAS_LEGACY_HOST: ${ATLAS_LEGACY_HOST:-legacy.localhost}
     volumes:
     - caddy-data:/data
@@ -47,6 +47,7 @@ services:
     environment:
       TLS_MODE: external-proxy
       NODE_ENV: production
+      DEPLOYED_TAG: ${DEPLOYED_TAG:-}
       SESSION_COOKIE_SECURE: 'true'
       IDENTITY_SEED_MODE: 'off'
       CATALOG_API_URL: http://catalog-service:8080

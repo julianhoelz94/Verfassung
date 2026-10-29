@@ -80,7 +80,7 @@ export function ConstitutionText({
   return (
     <div className={`constitution-text text-column ${documentStyles.text}${showHeading && article ? ' ' + documentStyles.article : ''}`} lang={lang} id={rootAnchor && article && 'id' in article && typeof article.id === 'string' ? article.id : undefined}>
       {showHeading && article && rootHeading ? (
-        <Heading id={`${headingIdPrefix}-${article.articleNumber}`}>
+        <Heading className={documentStyles.articleHeading} id={`${headingIdPrefix}-${article.articleNumber}`}>
           <ConstitutionArticleHeading article={{ ...article, kind: 'kind' in article ? article.kind : undefined }} outline={outline} />
         </Heading>
       ) : null}

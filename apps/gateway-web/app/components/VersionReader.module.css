@@ -1,5 +1,5 @@
 :global(main).page { max-width:none;margin:0;padding:0; }
-.viewer { --reader-header-height:var(--topbar-h);--reader-sticky-height:54px;--reader-font-size:17px;min-width:0;color:var(--color-ink);font-size:var(--text-sm); }
+.viewer { --reader-header-height:var(--topbar-h);--reader-sticky-height:54px;--constitution-anchor-offset:calc(var(--reader-header-height) + var(--reader-sticky-height) + var(--reader-navigation-height,0px) + 24px);min-width:0;color:var(--color-ink);font-size:var(--text-sm); }
 .breadcrumbs { padding:18px var(--gutter);border-bottom:1px solid var(--color-line);background:var(--color-paper); }
 .breadcrumbs :global(.crumbs) { margin:0;font-size:var(--text-xs); }
 .sticky { position:sticky;top:var(--reader-header-height);z-index:calc(var(--z-sticky) - 1);background:var(--color-surface);border-bottom:1px solid var(--color-line); }
@@ -37,25 +37,17 @@
 .toc a span { display:block;font-size:var(--text-xs);color:var(--color-ink-2);margin-top:3px; }
 .toc hr { border:0;border-top:1px solid var(--color-line);margin:17px 10px; }
 .main { min-width:0;background:var(--color-surface);padding:36px clamp(24px,5vw,66px) 38px; }
-.document { max-width:680px;margin-inline:auto;font-size:var(--reader-font-size); }
 .title { margin-bottom:32px;padding-bottom:25px;border-bottom:1px solid var(--color-line); }
 .title h1 { font:400 var(--text-2xl)/1.2 var(--font-text);letter-spacing:-.025em;margin:10px 0 13px; }
 .title p { font:400 var(--text-sm)/1.5 var(--font-ui);color:var(--color-ink-2);margin:0; }
 .status { display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:17px;color:var(--color-accent);font:400 var(--text-xs)/1.5 var(--font-ui); }
-.articles { font-family:var(--font-text);list-style:none;margin:0;padding:0; }
-.article { margin:0 0 38px;scroll-margin-top:calc(var(--reader-header-height) + var(--reader-sticky-height) + var(--reader-navigation-height,0px) + 24px); }
-.articleHead { display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:15px; }
-.articleHead h2 { margin:0;font:400 var(--text-xl)/1.4 var(--font-text); }
+.articles { list-style:none;margin:0;padding:0; }
 .articleHead h2 button { padding:0;min-width:0;min-height:0;border:0;background:transparent;text-align:start;justify-content:start;color:inherit;font:inherit;cursor:pointer; }
 .articleActions { display:flex;opacity:0;transition:opacity .15s; }
 .articleHead:hover .articleActions,.articleHead:focus-within .articleActions { opacity:1; }
 .articleMenu { position:relative; }
 .articlePopover { position:absolute;right:0;top:100%;z-index:2;width:min(260px,calc(100vw - 3rem));max-height:35dvh;overflow:auto;display:grid;justify-items:start;gap:10px;padding:16px;border:1px solid var(--color-line);border-radius:8px;background:var(--color-surface);box-shadow:var(--shadow-2);font:400 var(--text-xs)/1.5 var(--font-ui); }
 .document :global([id]:target) { background:var(--color-accent-soft); }
-.document :global(.text-column) { max-width:none;font-size:inherit; }
-.document :global(.constitution-body) { font-size:var(--reader-font-size);line-height:1.85; }
-.document :global(.node-heading) { font-weight:400; }
-.document :global([id]) { scroll-margin-top:calc(var(--reader-header-height) + var(--reader-sticky-height) + var(--reader-navigation-height,0px) + 24px); }
 .sentence { border-radius:3px; }
 .document[data-boundaries='true'] .sentence { outline:1px dashed var(--color-line-strong);outline-offset:2px; }
 .footer { display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-top:25px;padding-top:18px;border-top:1px solid var(--color-line);font:400 var(--text-xs)/1.5 var(--font-ui);color:var(--color-ink-2); }
@@ -100,8 +92,8 @@
 @media(prefers-reduced-motion:reduce) { .articleActions { transition:none; } }
 @media print {
   .sticky,.navigation,.breadcrumbs,.footer,.articleActions { display:none!important; }
-  .layout { display:block; }.main { padding:0; }.document { max-width:none; }
-  .article { break-inside:auto; }.title { border:0; }
+  .layout { display:block; }.main { padding:0; }
+  .title { border:0; }
 }
 
 @media(pointer:coarse) { .tool { min-width:44px;min-height:44px; } .articleActions { opacity:1; } }

@@ -158,7 +158,7 @@ function ReaderSurface({ code, jurisdictionId, versionId, articles, outline, can
   function renderNode(node: OrderedNode, element: OrderedNodeElement) {
     return cloneElement(element, { tabIndex: -1, className: [element.props.className, sentenceKinds.has(node.kind) ? styles.sentence : undefined].filter(Boolean).join(' ') });
   }
-  return <ReaderActions index={actionIndex} currentId={current}><div className={styles.viewer} ref={viewer} style={{ '--reader-font-size': preferences.size + 'px' } as React.CSSProperties}>
+  return <ReaderActions index={actionIndex} currentId={current}><div className={styles.viewer} ref={viewer} style={{ '--constitution-font-size': preferences.size + 'px' } as React.CSSProperties}>
     {breadcrumbs ? <div className={styles.breadcrumbs}>{breadcrumbs}</div> : null}
     <div className={styles.sticky} ref={sticky}>
       <div className={styles.toolbar} role="toolbar" aria-label={t(ui.accessibility.readingOptions)}>

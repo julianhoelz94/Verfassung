@@ -71,6 +71,9 @@
   --control-min: 44px;
   --topbar-h: 56px;
   --measure: 68ch;
+  --constitution-measure: 42.5rem;
+  --constitution-font-size: var(--text-md);
+  --constitution-anchor-offset: calc(var(--topbar-h) + 5rem);
   --content-max: 1280px;
   --sidebar-w: 280px;
   --gutter: clamp(16px, 4vw, 32px);

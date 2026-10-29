@@ -4,6 +4,7 @@ import { expect, test, type APIRequestContext, type Page } from '../fixtures/con
 import type { Locator, TestInfo } from '@playwright/test';
 import { adminHeaders } from './api-fixtures';
 import { signIn, startFromViewer, showFullReaderText } from './auth';
+import { documentDesign } from '../fixtures/document-design';
 
 async function json(response: Awaited<ReturnType<APIRequestContext['post']>>) {
   const body = await response.json();
@@ -201,7 +202,7 @@ for (const viewport of [
       await workspace.getByRole('button', { name: 'Preview', exact: true }).click();
       await expect(workspace.locator('.constitution-text')).toHaveCount(20);
       await distinctMarkerTargets(workspace, page, viewport.touch);
-      const previewFont = await workspace.locator('.constitution-text').first().evaluate(element => ({ body: getComputedStyle(element).fontFamily, heading: getComputedStyle(element.querySelector('h2')!).fontFamily }));
+      const previewFont = await workspace.locator('.constitution-text').first().evaluate(documentDesign);
       await workspace.getByRole('button', { name: 'Edit', exact: true }).click();
       await workspace.locator('[data-editor-unit="' + fixture.lastRootId + '"]').scrollIntoViewIfNeeded();
       await expect(toolbar).toBeInViewport();
@@ -241,8 +242,8 @@ for (const viewport of [
       await noHorizontalOverflow(page); await screenshot(page, testInfo, `editor-${viewport.width}-details`);
 
       await page.goto(`/countries/XA/versions/${fixture.versionId}`);
-      const readerFont = await page.locator('.version-articles').evaluate(element => ({ body: getComputedStyle(element).fontFamily, heading: getComputedStyle(element.querySelector('h2')!).fontFamily }));
-      expect(readerFont, 'viewer and preview must use the same document typography').toEqual(previewFont);
+      const readerFont = await page.locator('.version-articles').evaluate(documentDesign);
+      expect(readerFont, 'viewer and preview must use the same document design').toEqual(previewFont);
       await showFullReaderText(page);
       await distinctMarkerTargets(page.locator('main'), page, viewport.touch);
       await noHorizontalOverflow(page);

@@ -7,6 +7,7 @@ import { useTranslation } from './TranslationProvider';
 import { ReaderMenu } from './ReaderMenu';
 import styles from './ReaderMenu.module.css';
 import { ReaderIcon } from './ReaderIcon';
+import { ConstitutionDocument } from './ConstitutionDocument';
 const copy = {
   actions:{en:'Copy text or permalink',de:'Text oder dauerhaften Link kopieren'},
   link:{en:'Copy permalink',de:'Dauerhaften Link kopieren'}, text:{en:'Copy original text',de:'Originaltext kopieren'},
@@ -20,7 +21,7 @@ export function useReaderActions(){return useContext(Actions);}
 export function ReaderCopyButton({className,labelClassName}:{className:string;labelClassName:string}){const open=useReaderActions(),t=useTranslation();return <button type="button" className={className} aria-label={t(copy.actions)} aria-haspopup="menu" onClick={event=>open(undefined,undefined,event.currentTarget)}><ReaderIcon name="copy" /><span className={labelClassName}>{t({en:'Copy',de:'Kopieren'})}</span></button>;}
 export function ReaderDocument(props: HTMLAttributes<HTMLDivElement> & RefAttributes<HTMLDivElement>) {
   const open=useReaderActions();
-  return <div {...props} data-reader-document tabIndex={-1} onContextMenu={event=>{
+  return <ConstitutionDocument {...props} data-reader-document tabIndex={-1} onContextMenu={event=>{
     const target=event.target instanceof Element?event.target:null;
     if(!target||target.closest('a,button,input,textarea,select,[contenteditable=true],[role=note]')||(target.closest('[data-reader-chrome]')&&!target.closest('h1')))return;
     event.preventDefault();open(target,{x:event.clientX,y:event.clientY});

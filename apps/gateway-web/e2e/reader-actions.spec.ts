@@ -1,4 +1,5 @@
 import {test,expect} from './fixtures/consent';
+import path from 'node:path';
 import {VERSION_2022} from './helpers';
 import {continuousReaderUnits} from './fixtures/continuous-reader.mjs';
 const mock=`http://127.0.0.1:${process.env.E2E_MOCK_PORT??4010}`,href=`/countries/DE/versions/${VERSION_2022}`,units=continuousReaderUnits(VERSION_2022);
@@ -23,6 +24,11 @@ test('right-click copies exact published sentence, paragraph, article and consti
  const text=await page.evaluate(()=>navigator.clipboard.readText());expect(text).toContain('The legislature meets in public.\nThe executive remains accountable.');expect(text).toContain('Public body\tAccountability');expect(text).toContain('* A constitution-wide source note.');expect(text).not.toContain('Open passage');
  await expect(page.locator('a[aria-label^="Passage link"]')).toHaveCount(0);
  await page.locator(selector(sentence.occurrenceId)).click({button:'right'});await page.screenshot({path:info.outputPath('reader-context-menu.png')});
+ await page.addScriptTag({path:path.join(process.cwd(),'node_modules/axe-core/axe.min.js')});
+ const violations=await page.evaluate(async()=>{
+  // @ts-expect-error axe is injected for the audit
+  return (await window.axe.run(document)).violations.map(({id,nodes})=>({id,targets:nodes.map(node=>node.target)}));
+ });await expect(violations).toEqual([]);
 });
 test('keyboard menu stays within a short viewport and restores focus',async({page})=>{
  await page.setViewportSize({width:1280,height:320});await page.goto(href);const target=page.locator(selector(sentence.occurrenceId));await expect(target).toBeVisible();await expect(target).toHaveAttribute('tabindex','-1');await target.focus();await expect(target).toBeFocused();await page.keyboard.press('Shift+F10');

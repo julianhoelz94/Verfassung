@@ -197,7 +197,7 @@ function ReaderSurface({ code, jurisdictionId, versionId, articles, outline, can
             {open ? <ConstitutionText article={article} entries={article.content == null ? undefined : clipOrderedEntries(article.content, shownOutline, shown)} nodes={nodes} body={includeText && !nodes.length ? article.body : null} showHeading={false} rootAnchor={false} outline={shownOutline} lang={language} canEditTitles={canEditTitles} returnTo={readerHref(versionId)} crossRefs={{ code, versionId, articlesByNumber, unitsByLogicalId, footnotes: notes }} hideFootnotes renderNode={renderNode} /> : null}
           </ReaderArticle>;
         })}</ol>
-        {endnotes.length ? <section className={styles.notes} id="reader-footnotes" aria-label={t(copy.footnotes)}><ConstitutionFootnotes entries={endnotes} outline={outline} indexedBacklinks={backlinks} /></section> : null}
+        {endnotes.length ? <section id="reader-footnotes" aria-label={t(copy.footnotes)}><ConstitutionFootnotes entries={endnotes} outline={outline} indexedBacklinks={backlinks} /></section> : null}
         <footer className={styles.footer} data-reader-chrome>{footer ?? <span>{articles.length} <T value={articles.length === 1 ? ui.remainingStatus.unitSingular : ui.remainingStatus.unitPlural} /></span>}<a className={styles.textAction} href={articles[0] ? '#unit-' + articles[0].id : '#main-content'}><ReaderIcon name="up" />{t(copy.backBeginning)}</a></footer>
       </ReaderDocument></section>
     </div>

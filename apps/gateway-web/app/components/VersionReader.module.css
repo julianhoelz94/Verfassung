@@ -58,9 +58,6 @@
 .document :global([id]) { scroll-margin-top:calc(var(--reader-header-height) + var(--reader-sticky-height) + var(--reader-navigation-height,0px) + 24px); }
 .sentence { border-radius:3px; }
 .document[data-boundaries='true'] .sentence { outline:1px dashed var(--color-line-strong);outline-offset:2px; }
-.notes { margin-top:30px;padding-top:22px;border-top:1px solid var(--color-line); }
-.notes h2 { font:400 var(--text-xl)/1.4 var(--font-text);margin:0 0 18px; }
-.notes :global(.legal-footnote) { font-size:var(--text-sm);line-height:1.7;margin-bottom:20px; }
 .footer { display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-top:25px;padding-top:18px;border-top:1px solid var(--color-line);font:400 var(--text-xs)/1.5 var(--font-ui);color:var(--color-ink-2); }
 .wiki,.editorial { padding:21px var(--gutter);max-height:min(40dvh,340px);overflow:auto;border-top:1px solid var(--color-line); }
 .wikiHead { display:flex;align-items:center;justify-content:space-between;gap:12px; }

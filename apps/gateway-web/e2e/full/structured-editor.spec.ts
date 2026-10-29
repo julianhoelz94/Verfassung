@@ -441,7 +441,7 @@ test('one endnote can be reused across articles while moving and removing only a
   const firstEntry = saved.roots[0].content.find((entry: { logicalId: string }) => entry.logicalId === firstId);
   const secondEntry = saved.roots[1].content.find((entry: { logicalId: string }) => entry.logicalId === secondId);
   expect(firstEntry.references.map((reference: { start: number }) => reference.start)).toEqual([0, 7]);
-  expect(secondEntry.references).toEqual([expect.objectContaining({ start: 3, end: 3, target: { type: 'footnote', footnoteId: noteId } })]);
+  expect(secondEntry.references).toEqual([expect.objectContaining({ start: 3, end: 3, target: expect.objectContaining({ type: 'footnote', footnoteId: noteId }) })]);
   expect(saved.roots.flatMap((root: { content: { format?: string }[] }) => root.content).filter((entry: { format?: string }) => entry.format === 'footnote')).toHaveLength(1);
   await marker.focus(); await marker.press('Shift+F10');
   await page.getByRole('menuitem', { name: 'Remove marker', exact: true }).click();

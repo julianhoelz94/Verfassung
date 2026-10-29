@@ -52,6 +52,7 @@ test('document revisions link from both editors and appear on public readers wit
   await page.getByRole('button', { name: 'Attach' }).click();
   await expect(page.getByRole('link', { name: `${title} revised`, exact: true })).toBeVisible({ timeout: 15_000 });
   await page.goto(`/countries/${fixture.countryIso}/versions/${fixture.targetVersionId}`);
+  await page.getByRole('button', { name: 'Details', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Constitution documents' })).toBeVisible();
   await expect(page.getByRole('link', { name: `${title} revised` })).toBeVisible({ timeout: 15_000 });
   await page.getByRole('link', { name: `${title} revised` }).click();

@@ -42,7 +42,7 @@
 .title h1 { font:400 var(--text-2xl)/1.2 var(--font-text);letter-spacing:-.025em;margin:10px 0 13px; }
 .title p { font:400 var(--text-sm)/1.5 var(--font-ui);color:var(--color-ink-2);margin:0; }
 .status { display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:17px;color:var(--color-accent);font:400 var(--text-xs)/1.5 var(--font-ui); }
-.articles { list-style:none;margin:0;padding:0; }
+.articles { font-family:var(--font-text);list-style:none;margin:0;padding:0; }
 .article { margin:0 0 38px;scroll-margin-top:calc(var(--reader-header-height) + var(--reader-sticky-height) + var(--reader-navigation-height,0px) + 24px); }
 .articleHead { display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:15px; }
 .articleHead h2 { margin:0;font:400 var(--text-xl)/1.4 var(--font-text); }

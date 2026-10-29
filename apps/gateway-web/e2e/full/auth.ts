@@ -52,3 +52,11 @@ export async function startFromViewer(page: Page, countryIso: string, versionId:
   await page.locator('#editor-entry').getByRole('button', { name: kind === 'legal' ? 'Record the next legal change' : 'Correct this text' }).click();
   await expect(page).toHaveURL(/sessionId=/, { timeout: 15_000 });
 }
+
+/** Reveal all source levels through the reader's visible preferences. */
+export async function showFullReaderText(page: Page) {
+  await page.getByRole('button', { name: 'Reading preferences', exact: true }).click();
+  const depth = page.getByRole('combobox', { name: 'Detail level', exact: true });
+  await depth.selectOption({ index: await depth.locator('option').count() - 1 });
+  await page.keyboard.press('Escape');
+}

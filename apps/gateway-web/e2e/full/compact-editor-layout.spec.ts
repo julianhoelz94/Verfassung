@@ -3,7 +3,7 @@ import path from 'node:path';
 import { expect, test, type APIRequestContext, type Page } from '../fixtures/consent';
 import type { Locator, TestInfo } from '@playwright/test';
 import { adminHeaders } from './api-fixtures';
-import { signIn, startFromViewer } from './auth';
+import { signIn, startFromViewer, showFullReaderText } from './auth';
 
 async function json(response: Awaited<ReturnType<APIRequestContext['post']>>) {
   const body = await response.json();
@@ -243,7 +243,7 @@ for (const viewport of [
       await page.goto(`/countries/XA/versions/${fixture.versionId}`);
       const readerFont = await page.locator('.version-articles').evaluate(element => ({ body: getComputedStyle(element).fontFamily, heading: getComputedStyle(element.querySelector('h2')!).fontFamily }));
       expect(readerFont, 'viewer and preview must use the same document typography').toEqual(previewFont);
-      await page.getByRole('button', { name: 'Full text', exact: true }).click();
+      await showFullReaderText(page);
       await distinctMarkerTargets(page.locator('main'), page, viewport.touch);
       await noHorizontalOverflow(page);
       await screenshot(page, testInfo, `viewer-${viewport.width}`);

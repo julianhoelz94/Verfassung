@@ -13,6 +13,8 @@ for (const width of [390,820,1440]) {
     await page.setViewportSize({width,height:900}); await page.goto(href);
     const toolbar = page.getByRole('toolbar'); const contents = page.getByRole('navigation',{name:'Contents',exact:true});
     await expect(page.locator('strong').first()).toBeVisible();
+    const typography = await page.locator('.version-articles').evaluate(element => ({ document:getComputedStyle(element).fontFamily, text:getComputedStyle(element.querySelector('.constitution-text')!).fontFamily }));
+    expect(typography.document, 'reader document and shared text typography must agree').toBe(typography.text);
     await page.locator(`[id="unit-${units[19].id}"]`).scrollIntoViewIfNeeded();
     await expect.poll(async()=> (await toolbar.boundingBox())?.y).toBeGreaterThanOrEqual(0);
     const headerBottom = await page.locator('.topbar').evaluate(node=>node.getBoundingClientRect().bottom);

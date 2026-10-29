@@ -264,7 +264,7 @@ test('offline archive package preserves evidence through review, publication and
       await reader.screenshot({ path: readerImage, fullPage: true });
       await testInfo.attach(`regional-reader-${locale}`, { path: readerImage, contentType: 'image/png' });
       await reader.reload();
-      await expect(reader.getByText('nach 1849', { exact: false }).first()).toBeVisible();
+      await expect(reader.locator('[data-reader-document] > header').getByText('nach 1849', { exact: false })).toBeVisible();
       expect(await reader.locator('html').evaluate(element => element.scrollWidth <= window.innerWidth)).toBe(true);
       await reader.getByRole('button', { name: 'Details', exact: true }).click();
       await reader.getByRole('link', { name: 'annotated.htm', exact: true }).click();
@@ -276,8 +276,11 @@ test('offline archive package preserves evidence through review, publication and
       await reader.getByRole('button', { name: 'Details', exact: true }).click();
       await expect(reader.getByRole('link', { name: 'annotated.htm', exact: true })).toBeVisible();
       await expect(reader.getByText('Vorbemerkung. [Transkriptionskorrektur]', { exact: true })).toBeVisible();
-      await reader.locator('#version-search-q').fill('Freyheit');
-      await reader.locator('.version-search button[type="submit"]').click();
+      await reader.keyboard.press('Escape');
+      await reader.getByRole('button', { name: locale === 'de' ? 'Im Text suchen' : 'Find in text', exact: true }).click();
+      await reader.getByRole('searchbox', { name: locale === 'de' ? 'In der Verfassung suchen' : 'Find in constitution', exact: true }).fill('Freyheit');
+      await expect(reader.getByRole('button', { name: locale === 'de' ? 'Nächster Treffer' : 'Next match', exact: true })).toBeEnabled();
+      await reader.goto(`/search?q=Freyheit&jurisdictionId=${jurisdiction.id}&versionId=${correction.id}`);
       await expect(reader).toHaveURL(new RegExp(`jurisdictionId=${jurisdiction.id}.*versionId=${correction.id}`));
       const searchHit = reader.locator(`.search-hits a[href*="/jurisdictions/${jurisdiction.id}/versions/${correction.id}"]`).first();
       await expect(searchHit).toBeVisible();

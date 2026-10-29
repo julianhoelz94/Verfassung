@@ -41,21 +41,35 @@ class ImportExportServiceTest {
     private val settings = UUID.randomUUID()
     private val logical = UUID.randomUUID()
 
-    private fun setup(text: String = "Original wording", persisted: String = text, generation: Long = 1) {
+    private fun setup(text: String = "Original wording", persisted: String = text, generation: Long = 1, lineBreaksBefore: Int = 0, persistedBreaks: Int = lineBreaksBefore) {
         `when`(jobs.find(id)).thenReturn(ImportJobDto(id, "pending_review", version, emptyList(), submittedBy = owner.id))
         `when`(jobs.request(id)).thenReturn(
             ImportRequest(
                 "DE", "Germany", "archive", "Constitution", "1849", sourceUrl = "https://example.org/original",
                 constitutionId = constitution, settingsRevisionId = settings,
-                roots = listOf(OrderedNodeWrite(logicalId = logical, kind = "article", label = "I", content = listOf(OrderedEntryWrite("text", text = text)))),
+                roots = listOf(OrderedNodeWrite(logicalId = logical, kind = "article", label = "I", content = listOf(OrderedEntryWrite("text", text = text, lineBreaksBefore = lineBreaksBefore)))),
             ),
         )
-        val snapshot = OrderedSnapshot(version, generation, settings, listOf(OrderedNode(logical, UUID.randomUUID(), UUID.randomUUID(), "article", "I", null, listOf(OrderedEntry("text", text = persisted)))))
+        val snapshot = OrderedSnapshot(version, generation, settings, listOf(OrderedNode(logical, UUID.randomUUID(), UUID.randomUUID(), "article", "I", null, listOf(OrderedEntry("text", text = persisted, lineBreaksBefore = persistedBreaks)))))
         doAnswer {
             assertEquals("Bearer internal-read-credential", DownstreamAuth.header())
             snapshot
         }.`when`(content).snapshot(version)
         `when`(catalog.version(version)).thenReturn(DownstreamVersion(version, constitution, versionLabel = "1849", sourceUrl = "https://example.org/original", languageCode = "en"))
+    }
+
+    @Test
+    fun `prepared exports preserve authored separators and detect layout loss independently of words`() {
+        setup(lineBreaksBefore = 2)
+        val preserved = exports.export(id, owner, "prepared", null)
+        assertTrue(preserved.fidelity.isEmpty())
+        assertEquals(2, preserved.records.single { it.path.endsWith("/lineBreaksBefore") }.value.intValue())
+        setup(lineBreaksBefore = 2, persistedBreaks = 0)
+        assertTrue(exports.export(id, owner, "prepared", null).fidelity.any { it.path.endsWith("/lineBreaksBefore") })
+        setup(persistedBreaks = 2)
+        assertTrue(exports.export(id, owner, "prepared", null).fidelity.any { it.path.endsWith("/lineBreaksBefore") })
+        setup()
+        assertTrue(exports.export(id, owner, "prepared", null).fidelity.isEmpty())
     }
 
     @Test

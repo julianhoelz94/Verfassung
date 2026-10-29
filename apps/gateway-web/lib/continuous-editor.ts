@@ -2,7 +2,8 @@ import type { OrderedInlineReference, OrderedTextMark } from './api';
 import type { DraftEntry, DraftNode } from './structured-editor';
 
 export type CanvasUnit = { node: DraftNode; entry: DraftEntry };
-export type CanvasBlock = { nodeId: string; textId: string; text: string; marks: OrderedTextMark[]; references: OrderedInlineReference[] };
+export type CanvasBlock = { nodeId: string; textId: string; text: string; marks: OrderedTextMark[]; references: OrderedInlineReference[]; lineBreaksBefore?:number };
+export function canvasSignature(blocks:readonly CanvasBlock[]):string{return JSON.stringify(blocks.map(block=>({nodeId:block.nodeId,textId:block.textId,text:block.text,marks:block.marks,references:block.references,lineBreaksBefore:block.lineBreaksBefore??0})));}
 
 const abbreviations = new Set(['dr', 'prof', 'mr', 'mrs', 'ms', 'sr', 'jr', 'st', 'art', 'abs', 'nr', 'z', 'b', 'bzw', 'usw', 'vgl', 'ca', 'etc', 'e', 'g', 'i']);
 
@@ -37,7 +38,7 @@ export function simpleUnit(node: DraftNode): CanvasUnit | null {
 }
 
 export function blockOf(unit: CanvasUnit): CanvasBlock {
-  return { nodeId: unit.node.logicalId, textId: unit.entry.logicalId!, text: unit.entry.text ?? '', marks: unit.entry.marks ?? [], references: unit.entry.references ?? [] };
+  return { nodeId: unit.node.logicalId, textId: unit.entry.logicalId!, text: unit.entry.text ?? '', marks: unit.entry.marks ?? [], references: unit.entry.references ?? [],lineBreaksBefore:unit.entry.lineBreaksBefore??0 };
 }
 
 export function sliceBlock(block: CanvasBlock, start: number, end: number): Pick<CanvasBlock, 'text' | 'marks' | 'references'> {
@@ -48,13 +49,46 @@ export function sliceBlock(block: CanvasBlock, start: number, end: number): Pick
   };
 }
 
+export class WhitespaceOnlyReferenceError extends Error {}
+export class SentenceLayoutError extends Error {}
+
+/** Persist sentence wording without view separators; positions use UTF-16. */
+export function cleanSentenceBlock(block:CanvasBlock):CanvasBlock {
+  const start=block.text.length-block.text.trimStart().length,end=Math.max(start,block.text.trimEnd().length),length=end-start;
+  const point=(offset:number)=>Math.max(0,Math.min(length,offset-start));
+  const references=block.references.map(reference=>{
+    const next={...reference,start:point(reference.start),end:point(reference.end)};
+    if(next.start===next.end&&reference.target.type!=='footnote')throw new WhitespaceOnlyReferenceError('A link must retain sentence text.');
+    return next;
+  });
+  return {...block,text:block.text.slice(start,end),marks:normalizeMarks(block.marks.flatMap(mark=>{const from=point(mark.start),to=point(mark.end);return from<to?[{...mark,start:from,end:to}]:[];})),references};
+}
+
+/** Move edited boundary newlines into layout without changing inline offsets. */
+export function cleanSentenceLayout(blocks:CanvasBlock[],touched:ReadonlySet<string>):CanvasBlock[] {
+  const result=blocks.map(block=>touched.has(block.textId)?cleanSentenceBlock(block):{...block});
+  const breaks=(text:string)=>(text.match(/\r\n|\r|\n/g)??[]).length;
+  for(let index=0;index<blocks.length;index++){
+    const block=blocks[index];if(!touched.has(block.textId))continue;
+    const leading=block.text.match(/^\s*/u)![0],trailing=block.text.trim()?block.text.match(/\s*$/u)![0]:'';
+    result[index].lineBreaksBefore=(result[index].lineBreaksBefore??0)+breaks(leading);
+    if(index+1<result.length)result[index+1].lineBreaksBefore=(result[index+1].lineBreaksBefore??0)+breaks(trailing);
+  }
+  if(result.some(block=>!Number.isInteger(block.lineBreaksBefore??0)||(block.lineBreaksBefore??0)<0||(block.lineBreaksBefore??0)>16))throw new SentenceLayoutError('At most 16 line breaks are allowed between sentences.');
+  return result;
+}
+
+export function sentenceSeparator(previous:Pick<CanvasBlock,'text'>,next:Pick<CanvasBlock,'text'|'lineBreaksBefore'>):string {
+  return next.lineBreaksBefore?'\n'.repeat(Math.max(0,Math.min(16,next.lineBreaksBefore))):!/\s$/u.test(previous.text)&&!/^\s/u.test(next.text)?' ':'';
+}
+
 /** Keep reference spans indivisible; a zero-width note follows its exact cursor position. */
 export function segmentBlock(block: CanvasBlock, delimiters: readonly string[]): CanvasBlock[] {
   const parts = delimitSentences(block.text, delimiters);
   const offsets = [0]; parts.forEach(part => offsets.push(offsets.at(-1)! + part.length));
   const cuts = offsets.slice(1, -1).filter(cut => !block.references.some(reference => reference.start < cut && reference.end > cut));
   const boundaries = [0, ...cuts, block.text.length];
-  return boundaries.slice(1).map((end, index) => ({ nodeId: index ? crypto.randomUUID() : block.nodeId, textId: index ? crypto.randomUUID() : block.textId, ...sliceBlock(block, boundaries[index], end) }));
+  return boundaries.slice(1).map((end, index) => ({ nodeId: index ? crypto.randomUUID() : block.nodeId, textId: index ? crypto.randomUUID() : block.textId,lineBreaksBefore:index?0:block.lineBreaksBefore??0, ...sliceBlock(block, boundaries[index], end) }));
 }
 
 export function normalizeMarks(marks: OrderedTextMark[]): OrderedTextMark[] {

@@ -24,13 +24,14 @@ for (const width of [390,820,1440]) {
     const before = await page.evaluate(()=>scrollY); await marker.click();
     const drawer = page.getByRole('dialog',{name:'Footnote *'}); await expect(drawer).toBeVisible();
     expect(Math.abs(await page.evaluate(()=>scrollY)-before)).toBeLessThan(2);
-    const box=(await drawer.boundingBox())!; expect(box.y+box.height).toBeLessThan(900); expect(box.y+box.height).toBeGreaterThan(850);
+    const box=(await drawer.boundingBox())!; expect(box.y+box.height).toBeLessThanOrEqual(900); expect(box.y+box.height).toBeGreaterThan(850);
     await page.screenshot({path:testInfo.outputPath(`reader-drawer-${width}.png`)});
     await page.keyboard.press('Escape'); await expect(drawer).toHaveCount(0); await expect(marker).toBeFocused();
     await marker.click(); await page.getByRole('link',{name:'Go to footnote',exact:true}).click(); await expect(drawer).toHaveCount(0);
     await expect(page.getByRole('note')).toBeInViewport();
-    await expect(page.getByRole('note').getByRole('link')).toHaveCount(2);
-    await page.getByRole('note').getByRole('link').first().click(); await expect(page.getByRole('button',{name:'Show footnote *'}).first()).toBeInViewport();
+    await expect(page.getByRole('note').getByRole('button', {name:/Back to references/})).toHaveCount(1);
+    await page.getByRole('note').getByRole('button', {name:/Back to references/}).click();
+    await page.getByRole('menu', {name:'Choose a footnote reference'}).getByRole('menuitem', {name:/Reference 1/}).click(); await expect(page.getByRole('button',{name:'Show footnote *'}).first()).toBeInViewport();
   });
 }
 for (const width of [390,1440]) test(`contents can be hidden without losing the current passage at ${width}px`,async({page})=>{

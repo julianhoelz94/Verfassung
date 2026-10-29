@@ -40,3 +40,15 @@ it('keeps removed source wording readable and localized without exposing the ser
   expect(getByRole(host, 'button', { name: 'Article 20 · Entfernt' })).toBeTruthy();
   await act(async () => root.unmount()); host.remove();
 });
+
+it('explains a layout-only sentence change without presenting different wording', async () => {
+  (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+  const host = document.createElement('div'); document.body.append(host); const root = createRoot(host);
+  await act(async () => root.render(<ChangeOverview outline={outline} roots={roots} sourceRoots={roots} onNavigate={() => {}} differences={[{
+    logicalId: 'text-id', field: 'rich', before: JSON.stringify({ lineBreaksBefore: 0 }), after: JSON.stringify({ lineBreaksBefore: 2 }),
+  }]} />));
+  expect(host.textContent).toContain('Normal sentence spacing');
+  expect(host.textContent).toContain('2 line breaks before');
+  expect(Array.from(host.querySelectorAll('[class*="excerpt"]'), element => element.textContent)).toEqual(['Exact wording.', 'Exact wording.']);
+  await act(async () => root.unmount()); host.remove();
+});

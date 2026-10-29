@@ -23,7 +23,7 @@
 
 **Reading preferences** changes text size, configured sentence layout and detail level. **Overview** offers collapsible headings; **Full text** is the initial view. These preferences leave the published wording, formatting, source line breaks and permanent text identities intact.
 
-Hover over or focus a footnote marker for a preview. Select it to open the floating bottom drawer without moving your reading position. Close it with **×**, Escape or an outside click. **Go to footnote** explicitly jumps to the note at the document's end; its return links lead back to the referring passages.
+Hover over or focus a footnote marker for a preview. Select it to open the floating bottom drawer without moving your reading position. Close it with **×**, Escape or an outside click. **Go to footnote** explicitly jumps to the note at the document's end; The stored footnote label remains unchanged. A single reference has a direct return link. For multiple references, one return link opens a choice of the referring passages.
 
 ## Search, compare or follow history
 
@@ -85,3 +85,9 @@ Use **About** for source and verification policy, **Impressum** for the publishe
 </details>
 
 [[Account guide|Account-Guide]] · [[Documentation home|Home]] · [[Deutsch|User-Guide-de]]
+
+## Copy text and permanent links
+
+Right-click the constitution text to open the copy menu. It offers the clicked unit and its ancestors, such as sentence, paragraph, article and constitution. Clicking a paragraph does not invent a sentence target. **Copy permalink** stays pinned to the published snapshot being read. **Copy original text** includes stored wording, literal note labels, tables and authored breaks, without interface controls. It copies the published original even when a translation is displayed.
+
+Shift+F10 opens the menu on a focused passage. Arrow keys move between items; Enter or Space selects one, and Escape dismisses it. **Copy** in the toolbar provides the same access on touchscreens and for selected text or the current article. If clipboard access is unavailable, a selectable copy field appears. Separate permalink icons are no longer needed in the text.

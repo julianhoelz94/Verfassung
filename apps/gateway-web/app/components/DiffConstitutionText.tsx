@@ -115,12 +115,14 @@ function OrderedDiff({ entries, opposite, side, outline, oppositeOutline, legacy
       return to > from ? <InlineText key={index} text={value} marks={entry.marks} start={from} end={to} render={text => <DiffMark seg={{ ...segment, text }} />} /> : null;
     });
   }
+  function richPreview(entry: OrderedEntry, start = 0, end = (entry.text ?? '').length) {
+    const rendered = richMarks(entry, start, end), other = texts.get(entry);
+    if ((entry.lineBreaksBefore ?? 0) !== (other?.lineBreaksBefore ?? 0)) return <LocalizedTitle className="diff-cell-changed" label={{ en: 'Sentence spacing changed', de: 'Satzabstand geändert' }}>{rendered}</LocalizedTitle>;
+    return JSON.stringify(entry.marks ?? []) === JSON.stringify(other?.marks ?? []) ? rendered : <LocalizedTitle className="diff-cell-changed" label={{ en: 'Text formatting changed', de: 'Textformatierung geändert' }}>{rendered}</LocalizedTitle>;
+  }
   return <OrderedContentTree entries={entries} outline={outline} crossRefs={crossRefs} idPrefix={`diff-${side}-`}
-    renderText={(entry) => {
-      const rendered = richMarks(entry);
-      return JSON.stringify(entry.marks ?? []) === JSON.stringify(texts.get(entry)?.marks ?? []) ? rendered : <LocalizedTitle className="diff-cell-changed" label={{ en: 'Text formatting changed', de: 'Textformatierung geändert' }}>{rendered}</LocalizedTitle>;
-    }}
-    renderTextSlice={(entry, start, end) => richMarks(entry, start, end)}
+    renderText={(entry) => richPreview(entry)}
+    renderTextSlice={(entry, start, end) => richPreview(entry, start, end)}
     renderTableCell={(cell, entry) => {
       const other = texts.get(entry)?.table?.rows.flatMap(row => row.cells).find(candidate => candidate.logicalId === cell.logicalId);
       const metadataChanged = other && (other.header !== cell.header || other.rowSpan !== cell.rowSpan || other.colSpan !== cell.colSpan || JSON.stringify(other.headers ?? []) !== JSON.stringify(cell.headers ?? []));

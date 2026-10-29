@@ -624,6 +624,18 @@ class ImportApiTest {
     }
 
     @Test
+    fun setupProposalRejectsInvalidLineBreakMetadataBeforeAnyImportIsCreated() {
+        for (count in listOf("-1", "17", "1.5", "\"2\"", "null")) {
+            val body = """{"isoCode":"FR","countryName":"France","constitutionSlug":"invalid-layout","constitutionTitle":"Reviewed charter","sourceUrl":"https://example.org/source","outline":{"kinds":[{"kindCode":"article","displayLabel":"Article"}]},"sampleRoots":[{"kind":"article","content":[{"type":"text","text":"Exact reviewed words.","lineBreaksBefore":$count}]}]}"""
+            mockMvc.post("/import-setup-proposals") {
+                header("Authorization", TOKEN)
+                contentType = MediaType.APPLICATION_JSON
+                content = body
+            }.andExpect { status { isBadRequest() } }
+        }
+    }
+
+    @Test
     fun setupProposalIsPrivateUntilAnEditorConfirmsItsOutline() {
         val constitutionId = UUID.randomUUID()
         val body = """{"isoCode":"FR","countryName":"France","constitutionSlug":"new-constitution","constitutionTitle":"New constitution","languageCode":"fr","sourceUrl":"https://example.org/source","outline":{"kinds":[{"kindCode":"article","displayLabel":"Article"}]},"sampleRoots":[{"kind":"article","label":"1","title":"Opening","content":[{"type":"text","text":"Sample text"}]}]}"""

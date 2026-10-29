@@ -103,3 +103,31 @@ it('renders a cursor note appended at a link start exactly once without losing t
   expect(getByRole(host, 'link', { name: 'Linked' }).getAttribute('href')).toBe('https://example.org');
   expect(getByRole(host, 'button', { name: 'Show footnote *' })).toBeTruthy();
 });
+
+it('keeps a failed destination readable, reports the failure and allows an explicit retry', async () => {
+  vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => { callback(0); return 1; });
+  const scroll = vi.fn(), navigate = vi.fn().mockRejectedValueOnce(new DOMException('signal timed out','TimeoutError')).mockResolvedValueOnce(undefined);
+  await act(async () => root.render(<FootnoteProvider notes={[note]} onNavigate={navigate}><FootnoteMarker noteId="note" /><aside id="fn-note">{note.text}</aside></FootnoteProvider>));
+  host.querySelector<HTMLElement>('#fn-note')!.scrollIntoView=scroll;
+  await act(async () => fireEvent.click(getByRole(host,'button',{name:'Show footnote *'})));
+  await act(async () => fireEvent.click(getByRole(document.body,'link',{name:'Go to footnote'})));
+  expect(getByRole(document.body,'dialog').textContent).toContain(note.text);
+  expect(getByRole(document.body,'alert').textContent).toContain('The footnote could not be loaded');
+  expect(scroll).not.toHaveBeenCalled();
+  await act(async () => fireEvent.click(getByRole(document.body,'link',{name:'Go to footnote'})));
+  expect(navigate).toHaveBeenCalledTimes(2);expect(scroll).toHaveBeenCalledOnce();expect(queryByRole(document.body,'dialog')).toBeNull();
+});
+
+it('retains focus on the navigation link when a pending destination refreshes the pinned note object', async () => {
+  let finish!:()=>void;const navigate=vi.fn(()=>new Promise<void>(resolve=>{finish=resolve;}));
+  const render=(current:typeof note)=><FootnoteProvider notes={[current]} onNavigate={navigate}><FootnoteMarker noteId="note"/></FootnoteProvider>;
+  await act(async()=>root.render(render(note)));
+  await act(async()=>fireEvent.click(getByRole(host,'button',{name:'Show footnote *'})));
+  const link=getByRole(document.body,'link',{name:'Go to footnote'});
+  await act(async()=>{link.focus();fireEvent.click(link);});
+  expect(link.getAttribute('aria-busy')).toBe('true');
+  await act(async()=>root.render(render({...note})));
+  expect(document.activeElement).toBe(link);
+  await act(async()=>fireEvent.click(link));expect(navigate).toHaveBeenCalledOnce();
+  await act(async()=>finish());expect(queryByRole(document.body,'dialog')).toBeNull();
+});

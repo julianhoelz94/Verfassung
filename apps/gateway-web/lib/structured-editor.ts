@@ -2,16 +2,18 @@ import type { ContentOutline } from './api';
 import { normalizeMarks, sliceBlock } from './continuous-editor';
 import { ui, type UiMessage } from './messages';
 
-export type DraftEntry = { occurrenceId?: string | null; type: 'text' | 'child'; node?: DraftNode | null; logicalId?: string | null; revisionId?: string | null; draftId?: string | null; text?: string | null; format?: 'plain' | 'table' | 'footnote' | null; table?: import('./api').OrderedTable | null; footnoteLabel?: string | null; references?: import('./api').OrderedInlineReference[]; marks?: import('./api').OrderedTextMark[]; annotation?: import('./api').OrderedEntry['annotation'] };
+export type DraftEntry = { occurrenceId?: string | null; type: 'text' | 'child'; node?: DraftNode | null; logicalId?: string | null; revisionId?: string | null; draftId?: string | null; text?: string | null; format?: 'plain' | 'table' | 'footnote' | null; table?: import('./api').OrderedTable | null; footnoteLabel?: string | null; lineBreaksBefore?: number; references?: import('./api').OrderedInlineReference[]; marks?: import('./api').OrderedTextMark[]; annotation?: import('./api').OrderedEntry['annotation'] };
 export type DraftNode = { occurrenceId?: string | null; logicalId: string; revisionId?: string | null; draftId?: string | null; kind: string; label?: string | null; title?: string | null; content: DraftEntry[] };
-export type DraftOperation = { id: string; type: string; targetId: string; expectedRevisionId: string; text?: string; title?: string | null; label?: string | null; position?: number; destinationParentId?: string; destinationRevisionId?: string; replacementId?: string; parts?: { logicalId: string; text: string; format?: DraftEntry['format']; table?: DraftEntry['table']; footnoteLabel?: string | null; annotation?: DraftEntry['annotation']; references?: DraftEntry['references']; marks?: DraftEntry['marks'] }[]; mergeIds?: string[]; node?: DraftNode; format?: DraftEntry['format']; table?: DraftEntry['table']; footnoteLabel?: string | null; annotation?: DraftEntry['annotation']; references?: DraftEntry['references']; marks?: DraftEntry['marks'] };
-export type StructuredPreview = { sessionId: string; sourceVersionId: string; sourceGeneration: number; settingsRevisionId: string; generation: number; roots: DraftNode[]; sourceRoots: DraftNode[]; operations: DraftOperation[]; footnotes?: { entry: DraftEntry; parentId: string; rootId: string }[]; footnoteReferences?: { noteId: string; rootId: string; parentId: string; entryId: string }[] };
+export type DraftOperation = { id: string; type: string; targetId: string; expectedRevisionId: string; text?: string; title?: string | null; label?: string | null; position?: number; destinationParentId?: string; destinationRevisionId?: string; replacementId?: string; parts?: { logicalId: string; text: string; format?: DraftEntry['format']; table?: DraftEntry['table']; footnoteLabel?: string | null; annotation?: DraftEntry['annotation']; references?: DraftEntry['references']; lineBreaksBefore?: number; marks?: DraftEntry['marks'] }[]; mergeIds?: string[]; node?: DraftNode; format?: DraftEntry['format']; table?: DraftEntry['table']; footnoteLabel?: string | null; annotation?: DraftEntry['annotation']; references?: DraftEntry['references']; lineBreaksBefore?: number; marks?: DraftEntry['marks'] };
+export type StructuredPreview = { sessionId: string; sourceVersionId: string; sourceGeneration: number; settingsRevisionId: string; generation: number; roots: DraftNode[]; sourceRoots: DraftNode[]; operations: DraftOperation[]; footnotes?: { entry: DraftEntry; parentId: string; rootId: string }[]; footnoteReferences?: { noteId: string; rootId: string; parentId: string; entryId: string; referenceId?:string }[] };
 export function token(unit: DraftNode | DraftEntry): string { return unit.draftId ?? unit.revisionId ?? ''; }
 export function nodes(roots: DraftNode[]): DraftNode[] { return roots.flatMap(node => [node, ...nodes(node.content.flatMap(entry => entry.node ? [entry.node] : []))]); }
 export function findNode(roots: DraftNode[], id: string): DraftNode | undefined { return nodes(roots).find(node => node.logicalId === id); }
 
 /** Local replay of the targeted command contract. Server replay remains authoritative. */
 export function applyOperation(roots: DraftNode[], op: DraftOperation): DraftNode[] {
+  const invalidLayout=(value:number|undefined)=>value!==undefined&&(!Number.isInteger(value)||value<0||value>16);
+  if(invalidLayout(op.lineBreaksBefore)||op.parts?.some(part=>invalidLayout(part.lineBreaksBefore))||op.type==='replace_text'&&op.lineBreaksBefore!==undefined&&op.format===undefined)throw new Error('Line-break layout requires a valid rich-text replacement.');
   if (op.type === 'insert_root') return [...roots.slice(0, op.position), markInserted(op.node!, op.id), ...roots.slice(op.position)];
   if (op.type === 'move_root') {
     const root = roots.find(node => node.logicalId === op.targetId)!;
@@ -43,12 +45,12 @@ export function applyOperation(roots: DraftNode[], op: DraftOperation): DraftNod
     const index = content.findIndex(entry => entry.logicalId === op.targetId || entry.node?.logicalId === op.targetId);
     if (index >= 0) {
       const entry = content[index];
-      if (op.type === 'replace_text') content = content.map((item, i) => i === index ? { ...item, text: op.text, draftId: op.id, ...(op.format === undefined ? {} : { format: op.format, table: op.table, footnoteLabel: op.footnoteLabel, references: op.references ?? [], marks: op.marks ?? [], annotation: op.annotation }) } : item);
+      if (op.type === 'replace_text') content = content.map((item, i) => i === index ? { ...item, text: op.text, draftId: op.id, ...(op.format === undefined ? {} : { format: op.format, table: op.table, footnoteLabel: op.footnoteLabel, references: op.references ?? [], marks: op.marks ?? [], lineBreaksBefore:op.lineBreaksBefore??item.lineBreaksBefore??0, annotation: op.annotation }) } : item);
       if (op.type === 'remove') content = content.filter((_, i) => i !== index);
       if (op.type === 'split_text') {
         if (entry.type !== 'text' || (entry.format && entry.format !== 'plain') || entry.table || op.parts!.map(part => part.text).join('') !== entry.text) throw new Error('Split must preserve plain text exactly.');
         let offset = 0;
-        const parts = op.parts!.map(part => { const rich = sliceBlock({ nodeId: node.logicalId, textId: entry.logicalId!, text: entry.text!, marks: entry.marks ?? [], references: entry.references ?? [] }, offset, offset + part.text.length); offset += part.text.length; return { type: 'text' as const, ...part, ...rich, draftId: op.id }; });
+        const parts = op.parts!.map((part,index) => { const rich = sliceBlock({ nodeId: node.logicalId, textId: entry.logicalId!, text: entry.text!, marks: entry.marks ?? [], references: entry.references ?? [] }, offset, offset + part.text.length); offset += part.text.length; return { type: 'text' as const, ...part, ...rich, lineBreaksBefore:index?part.lineBreaksBefore??0:entry.lineBreaksBefore??0, draftId: op.id }; });
         content = [...content.slice(0, index), ...parts, ...content.slice(index + 1)];
       }
       if (op.type === 'merge_text') {
@@ -56,7 +58,7 @@ export function applyOperation(roots: DraftNode[], op: DraftOperation): DraftNod
         if (adjacent.some((item, i) => item.type !== 'text' || (item.format && item.format !== 'plain') || item.table || item.logicalId !== op.mergeIds![i])) throw new Error('Merge cannot cross a child boundary or rich entry.');
         let offset = 0; const marks: NonNullable<DraftEntry['marks']> = [], references: NonNullable<DraftEntry['references']> = [];
         adjacent.forEach(item => { marks.push(...(item.marks ?? []).map(mark => ({ ...mark, start: mark.start + offset, end: mark.end + offset }))); references.push(...(item.references ?? []).map(reference => ({ ...reference, start: reference.start + offset, end: reference.end + offset }))); offset += (item.text ?? '').length; });
-        content = [...content.slice(0, index), { type: 'text', ...op.parts![0], marks: normalizeMarks(marks), references, draftId: op.id }, ...content.slice(index + adjacent.length)];
+        content = [...content.slice(0, index), { type: 'text', ...op.parts![0], lineBreaksBefore:entry.lineBreaksBefore??0, marks: normalizeMarks(marks), references, draftId: op.id }, ...content.slice(index + adjacent.length)];
       }
       if (content !== result.content) result = { ...result, content, draftId: op.id };
     }
@@ -116,6 +118,7 @@ export function validateDraft(roots: DraftNode[], outline: ContentOutline, trans
       else if (!level.mayHoldText || entry.text == null || !entry.logicalId || identities.has(entry.logicalId)) errors.push(`${name}: ${translate(ui.draftValidation.invalidText)}`);
       else {
         identities.add(entry.logicalId);
+        if(!Number.isInteger(entry.lineBreaksBefore??0)||(entry.lineBreaksBefore??0)<0||(entry.lineBreaksBefore??0)>16)errors.push(name+': '+translate(ui.draftValidation.invalidText));
         if ((entry.marks ?? []).some(mark => !['bold', 'italic', 'underline', 'strikethrough'].includes(mark.type) || !Number.isInteger(mark.start) || !Number.isInteger(mark.end) || mark.start < 0 || mark.end <= mark.start || mark.end > entry.text!.length)) errors.push(name+': '+translate(ui.draftValidation.invalidText));
       }
     });
@@ -138,7 +141,7 @@ export function draftDifferences(source: DraftNode[], target: DraftNode[]): Draf
     const result = new Map<string, Unit>();
     function walk(node: DraftNode, parent: string, position: number) {
       result.set(node.logicalId, { id: node.logicalId, revision: token(node), fields: { title: node.title ?? '', label: node.label ?? '', parent, position: String(position) } });
-      node.content.forEach((entry, index) => entry.node ? walk(entry.node, node.logicalId, index) : result.set(entry.logicalId!, { id: entry.logicalId!, revision: token(entry), fields: { text: entry.text ?? '', rich: JSON.stringify({ format: entry.format ?? 'plain', table: entry.table ?? null, footnoteLabel: entry.footnoteLabel ?? null, references: entry.references ?? [], marks: entry.marks ?? [], annotation: entry.annotation ?? null }), parent: node.logicalId, position: String(index) } }));
+      node.content.forEach((entry, index) => entry.node ? walk(entry.node, node.logicalId, index) : result.set(entry.logicalId!, { id: entry.logicalId!, revision: token(entry), fields: { text: entry.text ?? '', rich: JSON.stringify({ format: entry.format ?? 'plain', table: entry.table ?? null, footnoteLabel: entry.footnoteLabel ?? null, references: entry.references ?? [], marks: entry.marks ?? [], lineBreaksBefore:entry.lineBreaksBefore??0, annotation: entry.annotation ?? null }), parent: node.logicalId, position: String(index) } }));
     }
     roots.forEach((root, i) => walk(root, '', i)); return result;
   }
@@ -153,5 +156,5 @@ export function draftDifferences(source: DraftNode[], target: DraftNode[]): Draf
 
 /** Draft preview IDs are local anchors; historical public IDs remain version scoped. */
 export function readerNode(node: DraftNode): import('./api').OrderedNode {
-  return { ...node, label: node.label ?? null, title: node.title ?? null, revisionId: token(node), occurrenceId: `draft-${node.logicalId}`, content: node.content.map(entry => entry.node ? { type: 'child', node: readerNode(entry.node) } : { type: 'text', logicalId: entry.logicalId, revisionId: token(entry), text: entry.text, format: entry.format, table: entry.table, footnoteLabel: entry.footnoteLabel, references: entry.references, marks: entry.marks, annotation: entry.annotation, occurrenceId: `draft-${entry.logicalId}` }) };
+  return { ...node, label: node.label ?? null, title: node.title ?? null, revisionId: token(node), occurrenceId: `draft-${node.logicalId}`, content: node.content.map(entry => entry.node ? { type: 'child', node: readerNode(entry.node) } : { type: 'text', logicalId: entry.logicalId, revisionId: token(entry), text: entry.text, format: entry.format, table: entry.table, footnoteLabel: entry.footnoteLabel, references: entry.references, marks: entry.marks, lineBreaksBefore:entry.lineBreaksBefore??0, annotation: entry.annotation, occurrenceId: `draft-${entry.logicalId}` }) };
 }

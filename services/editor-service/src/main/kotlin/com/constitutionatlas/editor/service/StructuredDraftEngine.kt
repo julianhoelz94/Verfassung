@@ -15,6 +15,13 @@ object StructuredDraftEngine {
     fun replay(source: List<DraftNode>, operations: List<DraftOperation>, settings: DraftSettings, enforceEndnotes: Boolean = true): List<DraftNode> {
         var roots = source
         operations.forEach { operation ->
+            operation.lineBreaksBefore?.let { count ->
+                require(operation.type == "replace_text" && operation.format != null) { "A text separator update requires a rich replace_text operation" }
+                OrderedContentRules.requireValid(OrderedContentRules.lineBreakErrors(count, "text", "operations[${operation.id}].lineBreaksBefore", operation.targetId))
+            }
+            operation.parts.forEachIndexed { index, part ->
+                OrderedContentRules.requireValid(OrderedContentRules.lineBreakErrors(part.lineBreaksBefore, "text", "operations[${operation.id}].parts[$index].lineBreaksBefore", part.logicalId))
+            }
             var foundNode: DraftNode? = null
             var foundEntry: DraftEntry? = null
             fun find(node: DraftNode) {
@@ -89,6 +96,7 @@ object StructuredDraftEngine {
                             references = if (operation.format != null) operation.references else it.references,
                             annotation = if (operation.format != null) operation.annotation else it.annotation,
                             marks = if (operation.format != null) operation.marks else it.marks,
+                            lineBreaksBefore = if (operation.format != null) operation.lineBreaksBefore ?: it.lineBreaksBefore else it.lineBreaksBefore,
                         ),
                     )
                 }
@@ -100,7 +108,7 @@ object StructuredDraftEngine {
                     require(foundNode != null) { "Insertion target must be a parent" }
                     val entry = if (operation.type == "insert_text") {
                         val part = operation.parts.singleOrNull() ?: throw IllegalArgumentException("insert_text requires one explicitly identified text part")
-                        DraftEntry("text", logicalId = part.logicalId, draftId = operation.id, text = part.text, format = part.format, table = part.table, footnoteLabel = part.footnoteLabel, references = part.references, annotation = part.annotation, marks = part.marks)
+                        DraftEntry("text", logicalId = part.logicalId, draftId = operation.id, text = part.text, format = part.format, table = part.table, footnoteLabel = part.footnoteLabel, references = part.references, annotation = part.annotation, marks = part.marks, lineBreaksBefore = part.lineBreaksBefore)
                     } else {
                         val child = operation.node ?: throw IllegalArgumentException("insert_child requires a node")
                         fun newNode(node: DraftNode) {
@@ -150,7 +158,7 @@ object StructuredDraftEngine {
                         operation.parts.mapIndexed { index, part ->
                             val start = boundaries[index]
                             val end = boundaries[index + 1]
-                            DraftEntry("text", logicalId = part.logicalId, draftId = operation.id, text = part.text, marks = sliceMarks(entry.marks, start, end), references = sliceReferences(entry.references, start, end))
+                            DraftEntry("text", logicalId = part.logicalId, draftId = operation.id, text = part.text, marks = sliceMarks(entry.marks, start, end), references = sliceReferences(entry.references, start, end), lineBreaksBefore = if (index == 0) entry.lineBreaksBefore else part.lineBreaksBefore)
                         }
                     }
                     remapDraftTargets(mapOf(operation.targetId to operation.parts.map { it.logicalId }))
@@ -176,7 +184,7 @@ object StructuredDraftEngine {
                                 references += entry.references.map { it.copy(start = it.start + offset, end = it.end + offset) }
                                 offset += entry.text.orEmpty().length
                             }
-                            node.copy(draftId = operation.id, content = node.content.take(first) + DraftEntry("text", logicalId = part.logicalId, draftId = operation.id, text = part.text, marks = normalizeMarks(marks), references = references) + node.content.drop(first + entries.size))
+                            node.copy(draftId = operation.id, content = node.content.take(first) + DraftEntry("text", logicalId = part.logicalId, draftId = operation.id, text = part.text, marks = normalizeMarks(marks), references = references, lineBreaksBefore = entries.first().lineBreaksBefore) + node.content.drop(first + entries.size))
                         }
                     }
                     require(merged) { "Merge target not found" }
@@ -214,6 +222,22 @@ object StructuredDraftEngine {
         }
         validate(roots, settings, enforceEndnotes)
         return roots
+    }
+
+    fun requireFootnoteMarkers(roots: List<DraftNode>) {
+        val notes = mutableListOf<OrderedContentPosition>()
+        val references = mutableListOf<OrderedInlineReference>()
+        fun walk(node: DraftNode, path: String) {
+            node.content.forEachIndexed { index, entry ->
+                val entryPath = "$path.content[$index]"
+                entry.node?.let { walk(it, "$entryPath.node") } ?: run {
+                    notes += OrderedContentPosition(entryPath, entry.logicalId, format = entry.format)
+                    references += entry.references
+                }
+            }
+        }
+        roots.forEachIndexed { index, root -> walk(root, "roots[$index]") }
+        OrderedContentRules.requireValid(OrderedContentRules.footnoteMarkerErrors(notes, references))
     }
 
     private fun markInserted(node: DraftNode, id: UUID): DraftNode = node.copy(draftId = id, content = node.content.map { entry -> entry.node?.let { entry.copy(node = markInserted(it, id)) } ?: entry.copy(draftId = id) })
@@ -263,7 +287,7 @@ object StructuredDraftEngine {
                     "text" -> require(level.mayHoldText && entry.node == null && entry.text != null && entry.logicalId != null && ids.add(entry.logicalId)) { "Invalid or duplicate text entry at '${node.logicalId}'" }
                     "child" -> {
                         require(level.mayHoldChildren && entry.node != null && entry.logicalId == null && entry.text == null && entry.node.kind in level.allowedChildKinds) { "Invalid child at '${node.logicalId}'" }
-                        require(entry.format == null && entry.table == null && entry.footnoteLabel == null && entry.references.isEmpty() && entry.annotation == null && entry.marks.isEmpty()) { "Text formatting belongs to text entries at '${node.logicalId}'" }
+                        require(entry.format == null && entry.table == null && entry.footnoteLabel == null && entry.references.isEmpty() && entry.annotation == null && entry.marks.isEmpty() && entry.lineBreaksBefore == 0) { "Text formatting belongs to text entries at '${node.logicalId}'" }
                         walk(entry.node!!, level, depth + 1)
                     }
                     else -> throw IllegalArgumentException("Invalid entry type '${entry.type}'")
@@ -293,6 +317,7 @@ object StructuredDraftEngine {
             require(format != "footnote" || !entry.text.isNullOrBlank()) { "Footnote body is required at $path" }
             entry.annotation?.validate()
             require(entry.annotation?.anchorLogicalIds.orEmpty().all { it in ids }) { "Annotation has unknown unit anchor at $path" }
+            OrderedContentRules.requireValid(OrderedContentRules.lineBreakErrors(entry.lineBreaksBefore, entry.type, "$path.lineBreaksBefore", entry.logicalId))
             OrderedContentRules.requireValid(OrderedContentRules.markErrors(entry.text.orEmpty(), format, entry.marks, "$path.marks", entry.logicalId))
             OrderedContentRules.requireValid(OrderedContentRules.referenceErrors(entry.text.orEmpty(), format, entry.references, footnotes, path, entry.logicalId, units = ids.takeIf { enforceEndnotes }))
         }

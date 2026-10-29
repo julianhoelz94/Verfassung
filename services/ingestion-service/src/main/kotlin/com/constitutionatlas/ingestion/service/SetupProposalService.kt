@@ -179,7 +179,10 @@ class SetupProposalService(
             if (node.content.orEmpty().any { it.type == "text" } && children(kind).isNotEmpty() && byCode[kind]?.allowTextAlongsideChildren != true) {
                 invalid(path, "text alongside child units is not allowed in '$kind'")
             }
-            node.content.orEmpty().forEachIndexed { index, entry -> entry.node?.let { visit(it, kind, "$path.content[$index].node") } }
+            node.content.orEmpty().forEachIndexed { index, entry ->
+                com.constitutionatlas.platform.OrderedContentRules.lineBreakErrors(entry.lineBreaksBefore, entry.type, "$path.content[$index].lineBreaksBefore", entry.logicalId).firstOrNull()?.let { invalid(it.path, it.detail) }
+                entry.node?.let { visit(it, kind, "$path.content[$index].node") }
+            }
         }
         request.sampleRoots.forEachIndexed { index, root -> visit(root, null, "sampleRoots[$index]") }
     }

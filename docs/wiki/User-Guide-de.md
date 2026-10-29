@@ -23,7 +23,7 @@
 
 **Leseeinstellungen** verändert Textgröße, die konfigurierte Satzdarstellung und den Detailgrad. **Übersicht** bietet aufklappbare Überschriften; zu Beginn ist der **Volltext** sichtbar. Wortlaut, Formatierungen, ursprüngliche Zeilenumbrüche und dauerhafte Textidentitäten bleiben erhalten.
 
-Zeigen Sie auf eine Fußnotenmarke oder fokussieren Sie sie für eine Vorschau. Ein Klick öffnet die schwebende Fußnote am unteren Bildschirmrand und erhält die Leseposition. **×**, Escape oder ein Klick außerhalb schließt sie. **Zur Fußnote** springt ausdrücklich zur Anmerkung am Textende; deren Rückverweise führen zu den verweisenden Textstellen.
+Zeigen Sie auf eine Fußnotenmarke oder fokussieren Sie sie für eine Vorschau. Ein Klick öffnet die schwebende Fußnote am unteren Bildschirmrand und erhält die Leseposition. **×**, Escape oder ein Klick außerhalb schließt sie. **Zur Fußnote** springt ausdrücklich zur Anmerkung am Textende; Die gespeicherte Fußnotenmarke bleibt unverändert. Bei einem Verweis führt der Rücklink direkt zur Textstelle. Bei mehreren Verweisen öffnet ein einziger Rücklink eine Auswahl der verweisenden Passagen.
 
 ## Suchen, vergleichen und Geschichte verfolgen
 
@@ -79,3 +79,9 @@ Unter **Über** finden Sie die Quellen- und Prüfgrundsätze, im **Impressum** d
 </details>
 
 [[Konto|Account-Guide-de]] · [[Dokumentationsstart|Home]] · [[English|User-Guide]]
+
+## Text und dauerhafte Links kopieren
+
+Öffnen Sie per Rechtsklick auf den Verfassungstext das Kopiermenü. Es bietet die angeklickte Einheit und ihre übergeordneten Einheiten: etwa Satz, Absatz, Artikel und Verfassung. Ein Absatz ohne ausgewählten Satz bietet keinen Satzlink. **Dauerhaften Link kopieren** bleibt an den angezeigten veröffentlichten Textstand gebunden. **Originaltext kopieren** übernimmt den gespeicherten Wortlaut mit wörtlichen Marken, Tabellen und Zeilenumbrüchen, ohne Bedienelemente. Auch bei einer Übersetzung wird der veröffentlichte Originaltext kopiert.
+
+Mit der Tastatur öffnet Umschalt+F10 das Menü an einer fokussierten Textstelle. Pfeiltasten wechseln zwischen Einträgen; Eingabe oder Leertaste wählt sie, Escape schließt das Menü. **Kopieren** in der Werkzeugleiste bietet denselben Zugang auf Touchscreens und für die ausgewählte Textstelle oder den aktuellen Artikel. Falls die Zwischenablage nicht zugänglich ist, erscheint ein markierbares Kopierfeld. Zusätzliche Linksymbole im Text entfallen.

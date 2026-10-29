@@ -22,6 +22,7 @@ object OrderedContentFidelity {
                                 a.references == b.references &&
                                 a.annotation == b.annotation &&
                                 a.marks == b.marks &&
+                                a.lineBreaksBefore == b.lineBreaksBefore &&
                                 (a.lineage.isEmpty() || a.lineage == b.lineage)
                         }
                 }

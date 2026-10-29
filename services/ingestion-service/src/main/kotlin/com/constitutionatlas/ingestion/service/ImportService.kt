@@ -232,12 +232,12 @@ class ImportService(
 
     /** Only a known validation code and bounded structural identity may leave the service. */
     private fun publicationValidationFailure(ex: RestClientResponseException): ImportPublicationException {
-        val allowed = setOf("FOOTNOTE_NOT_AT_END", "UNIT_REFERENCE_TARGET", "INLINE_REFERENCE", "TEXT_MARK_RANGE", "TEXT_MARK_OVERLAP", "TEXT_MARK_FORMAT", "TEXT_MARK_LIMIT")
+        val allowed = setOf("FOOTNOTE_NOT_AT_END", "UNIT_REFERENCE_TARGET", "INLINE_REFERENCE", "TEXT_MARK_RANGE", "TEXT_MARK_OVERLAP", "TEXT_MARK_FORMAT", "TEXT_MARK_LIMIT", "TEXT_LINE_BREAKS")
         val body = if (ex.responseBodyAsByteArray.size <= 16_384) runCatching { objectMapper.readTree(ex.responseBodyAsByteArray) }.getOrNull() else null
         val code = body?.path("code")?.scalarText()?.takeIf { it in allowed }
             ?: return ImportPublicationException(HttpStatus.BAD_REQUEST, "publication_validation_failed")
         val candidate = body.path("path").scalarText()
-        val safePath = candidate.takeIf { it.length <= 512 && it.matches(Regex("(roots\\[[0-9]+\\]|node\\[[0-9a-fA-F-]{36}\\]\\.text\\[[0-9a-fA-F-]{36}\\])(?:\\.(?:content\\[[0-9]+\\](?:\\.node)?|marks|references\\[[0-9]+\\]))*")) }
+        val safePath = candidate.takeIf { it.length <= 512 && it.matches(Regex("(roots\\[[0-9]+\\]|node\\[[0-9a-fA-F-]{36}\\]\\.text\\[[0-9a-fA-F-]{36}\\])(?:\\.(?:content\\[[0-9]+\\](?:\\.node)?|marks|lineBreaksBefore|references\\[[0-9]+\\]))*")) }
         val logicalId = runCatching { UUID.fromString(body.path("logicalId").scalarText()) }.getOrNull()
         return ImportPublicationException(HttpStatus.BAD_REQUEST, code, safePath, logicalId)
     }

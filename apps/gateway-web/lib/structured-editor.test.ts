@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyOperation, draftDifferences, remapDraftTargets, sentenceParts, scopedNodes, validateDraft, type DraftNode } from './structured-editor';
+import { applyOperation, draftDifferences, readerNode, remapDraftTargets, sentenceParts, scopedNodes, validateDraft, type DraftNode } from './structured-editor';
 import type { ContentOutline } from './api';
 const outline: ContentOutline = { kinds: [
   { kindCode: 'clause', displayLabel: 'Clause', sortOrder: 0, mayHoldText: true, mayHoldChildren: true, allowedChildKinds: ['sentence'], presentation: 'section', showLabel: true, showTitle: true, showKind: true, labelPolicy: 'required' },
@@ -46,6 +46,9 @@ describe('ordered editorial commands', () => {
     expect(next[0].content.slice(0, 2).map(entry => entry.text).join('')).toBe('Before. ');
     expect(draftDifferences([root], next).filter(change => change.field === 'inserted')).toHaveLength(2);
   });
+  it('preserves explicit layout through rich replacement, split, merge, diff and preview projection',()=>{const source={...root,content:[{...root.content[0],text:'First. Second.',lineBreaksBefore:2}]};const split=applyOperation([source],{id:'split',type:'split_text',targetId:'before',expectedRevisionId:'r1',parts:[{logicalId:'before',text:'First. ',lineBreaksBefore:9},{logicalId:'second',text:'Second.',lineBreaksBefore:3}]});expect(split[0].content.map(entry=>entry.lineBreaksBefore)).toEqual([2,3]);const changed=applyOperation(split,{id:'layout',type:'replace_text',targetId:'second',expectedRevisionId:'split',format:'plain',text:'Second.',lineBreaksBefore:4});expect(draftDifferences(split,changed)).toContainEqual(expect.objectContaining({logicalId:'second',field:'rich'}));expect(readerNode(changed[0]).content[1].lineBreaksBefore).toBe(4);const merged=applyOperation(changed,{id:'merge',type:'merge_text',targetId:'before',expectedRevisionId:'split',mergeIds:['before','second'],parts:[{logicalId:'before',text:'First. Second.',lineBreaksBefore:12}]});expect(merged[0].content[0].lineBreaksBefore).toBe(2);expect(applyOperation(merged,{id:'legacy',type:'replace_text',targetId:'before',expectedRevisionId:'merge',format:'plain',text:'Changed.'})[0].content[0].lineBreaksBefore).toBe(2);expect(applyOperation(merged,{id:'reset',type:'replace_text',targetId:'before',expectedRevisionId:'merge',format:'plain',text:'Changed.',lineBreaksBefore:0})[0].content[0].lineBreaksBefore).toBe(0);});
+  it.each([-1,17,1.5])('rejects invalid line-break count %s without requiring Catalog rules',value=>{expect(validateDraft([{...root,content:[{...root.content[0],lineBreaksBefore:value}]}],outline)).toContain('Clause 46a: invalid text entry.');expect(()=>applyOperation([root],{id:'invalid',type:'replace_text',targetId:'before',expectedRevisionId:'r1',format:'plain',text:'Before.',lineBreaksBefore:value})).toThrow();expect(()=>applyOperation([root],{id:'invalid-part',type:'split_text',targetId:'before',expectedRevisionId:'r1',parts:[{logicalId:'before',text:'Before. ',lineBreaksBefore:value}]})).toThrow();});
+  it('requires a rich replacement for explicit layout updates',()=>{expect(()=>applyOperation([root],{id:'invalid',type:'replace_text',targetId:'before',expectedRevisionId:'r1',text:'Before.',lineBreaksBefore:1})).toThrow('rich-text replacement');});
 });
 
 

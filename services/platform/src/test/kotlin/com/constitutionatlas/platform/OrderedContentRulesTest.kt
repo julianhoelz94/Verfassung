@@ -20,7 +20,8 @@ class OrderedContentRulesTest {
         val hash = java.security.MessageDigest.getInstance("SHA-256").digest(legacy.toByteArray()).joinToString("") { "%02x".format(it) }
         assertTrue(hash in OrderedWriteFingerprint.accepted(request))
         val marked = request.copy(roots = listOf(root(text("Law").copy(marks = listOf(OrderedTextMark("bold", 0, 3))))))
-        assertEquals(setOf(OrderedWriteFingerprint.current(marked)), OrderedWriteFingerprint.accepted(marked))
+        assertTrue(OrderedWriteFingerprint.current(marked) in OrderedWriteFingerprint.accepted(marked))
+        assertEquals(2, OrderedWriteFingerprint.accepted(marked).size)
     }
 
     @Test

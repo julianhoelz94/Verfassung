@@ -3,7 +3,6 @@
 import { cloneElement, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import type { ArticleSummary, ContentOutline, OrderedNode } from '../../lib/api';
 import { orderedTargets } from '../../lib/ordered-content';
-import { linkifyReferences } from '../../lib/crossrefs';
 import { articleHeading, clipNodes, clipOrderedEntries, depthStopCount, depthStopLabels } from '../../lib/outline';
 import { footnoteBacklinks, footnoteEntries, footnoteItems, type FootnoteItem } from '../../lib/footnotes';
 import { readerPresentation, readReaderPreferences, type ReaderPreferences, type ReaderPublication } from '../../lib/reader';
@@ -13,13 +12,15 @@ import { readerUi as copy } from '../../lib/reader-messages';
 import { ui } from '../../lib/messages';
 import { changeTypeMessage, changeTypeTone } from '../../lib/ui-labels';
 import { T, useTranslation } from './TranslationProvider';
-import { ConstitutionText, OrderedContentTree, type OrderedNodeElement } from './ConstitutionText';
+import { ConstitutionText, ConstitutionArticleHeading, ConstitutionFootnotes, type OrderedNodeElement } from './ConstitutionText';
 import { FootnoteProvider } from './Footnotes';
 import { Badge } from './ui';
 import { ReaderComparison } from './ReaderComparison';
 import { ReaderIcon, type ReaderIconName } from './ReaderIcon';
 import { ReaderArticle } from './ReaderArticle';
 import styles from './VersionReader.module.css';
+import { ReaderActions, ReaderCopyButton, ReaderDocument } from './ReaderActions';
+import { readerActionIndex, type ReaderActionIndex } from '../../lib/reader-actions';
 
 export type ReaderContext = {
   constitutionId: string; title: string; jurisdictionName: string; versionLabel: string;
@@ -36,16 +37,17 @@ export type VersionReaderProps = {
 
 export function VersionReader(props: VersionReaderProps) {
   const entries = useMemo(() => props.articles.flatMap(article => article.content ?? []), [props.articles]);
-  const notes = useMemo(() => footnoteItems(entries), [entries]);
   const endnotes = useMemo(() => footnoteEntries(entries), [entries]);
   const backlinks = useMemo(() => footnoteBacklinks(entries), [entries]);
-  return <FootnoteProvider notes={notes}><ReaderSurface {...props} notes={notes} endnotes={endnotes} backlinks={backlinks} /></FootnoteProvider>;
+  const actionIndex = useMemo(() => readerActionIndex(props.articles, props.jurisdictionId ? `/jurisdictions/${props.jurisdictionId}/versions/${props.versionId}` : `/countries/${props.code}/versions/${props.versionId}`, props.context?.title ?? '', props.outline), [props.articles, props.code, props.jurisdictionId, props.versionId, props.context?.title, props.outline]);
+  const notes = useMemo(() => footnoteItems(entries).map(note => ({ ...note, references: (backlinks.get(note.logicalId) ?? []).map(id => ({ id, label: actionIndex.references.get(id) ?? '' })) })), [entries, backlinks, actionIndex]);
+  return <FootnoteProvider notes={notes}><ReaderSurface {...props} notes={notes} endnotes={endnotes} backlinks={backlinks} actionIndex={actionIndex} /></FootnoteProvider>;
 }
 
 function ReaderSurface({ code, jurisdictionId, versionId, articles, outline, canEditTitles = false, language,
   changeByArticle = {}, unchangedSinceLabel, initialDepth = 'full', context, breadcrumbs, wiki, details, editorial,
-  notices, footer, notes, endnotes, backlinks }: VersionReaderProps & {
-    notes: FootnoteItem[]; endnotes: ReturnType<typeof footnoteEntries>; backlinks: ReturnType<typeof footnoteBacklinks>;
+  notices, footer, notes, endnotes, backlinks, actionIndex }: VersionReaderProps & {
+    actionIndex: ReaderActionIndex; notes: FootnoteItem[]; endnotes: ReturnType<typeof footnoteEntries>; backlinks: ReturnType<typeof footnoteBacklinks>;
   }) {
   const t = useTranslation();
   const viewer = useRef<HTMLDivElement>(null), sticky = useRef<HTMLDivElement>(null), documentRef = useRef<HTMLDivElement>(null);
@@ -154,10 +156,9 @@ function ReaderSurface({ code, jurisdictionId, versionId, articles, outline, can
     return <button type="button" className={styles.tool} aria-label={label} data-reader-trigger={name} aria-expanded={panel === name} aria-controls={panel === name ? 'reader-' + name : undefined} onClick={() => togglePanel(name)}><ReaderIcon name={icon} /><span className={name === 'wiki' ? undefined : styles.toolName}>{label}</span></button>;
   }
   function renderNode(node: OrderedNode, element: OrderedNodeElement) {
-    if (sentenceKinds.has(node.kind)) return cloneElement(element, { className: [element.props.className, styles.sentence].filter(Boolean).join(' ') });
-    return cloneElement(element, { className: [element.props.className, styles.passageBlock].filter(Boolean).join(' '), children: <>{element.props.children}<a className={styles.passageLink} data-reader-chrome href={'#' + node.occurrenceId} aria-label={t(copy.passage) + ' · ' + (node.label ?? node.title ?? '')}><ReaderIcon name="link" /></a></> });
+    return cloneElement(element, { tabIndex: -1, className: [element.props.className, sentenceKinds.has(node.kind) ? styles.sentence : undefined].filter(Boolean).join(' ') });
   }
-  return <div className={styles.viewer} ref={viewer} style={{ '--reader-font-size': preferences.size + 'px' } as React.CSSProperties}>
+  return <ReaderActions index={actionIndex} currentId={current}><div className={styles.viewer} ref={viewer} style={{ '--reader-font-size': preferences.size + 'px' } as React.CSSProperties}>
     {breadcrumbs ? <div className={styles.breadcrumbs}>{breadcrumbs}</div> : null}
     <div className={styles.sticky} ref={sticky}>
       <div className={styles.toolbar} role="toolbar" aria-label={t(ui.accessibility.readingOptions)}>
@@ -166,6 +167,7 @@ function ReaderSurface({ code, jurisdictionId, versionId, articles, outline, can
         {tool('search', 'search', t(copy.find))}
         {context ? tool('compare', 'compare', t(copy.compare)) : null}
         {context ? tool('wiki', 'wiki', t(copy.wiki)) : null}
+        <ReaderCopyButton className={styles.tool} labelClassName={styles.toolName} />
         <span className={styles.spacer} />
         {editorial ? <button type="button" className={styles.tool} aria-label={t(ui.countries.code.versions.versionid.page.editThisConstitution)} aria-expanded={panel === 'edit'} data-reader-trigger="edit" aria-controls={panel === 'edit' ? 'reader-edit' : undefined} onClick={() => togglePanel('edit')}><ReaderIcon name="edit" /><span className={styles.toolName}>{t(copy.edit)}</span></button> : null}
         {details ? <details className={styles.menuWrap} data-reader-menu open={menu === 'details'}><summary role="button" className={styles.tool} aria-label={t(copy.details)} aria-expanded={menu === 'details'} data-reader-trigger="details" onClick={event => { event.preventDefault(); setMenu(menu === 'details' ? null : 'details'); }}><ReaderIcon name="details" /><span className={styles.toolName}>{t(copy.details)}</span></summary><div className={styles.menu}>{details}</div></details> : null}
@@ -184,22 +186,22 @@ function ReaderSurface({ code, jurisdictionId, versionId, articles, outline, can
     </div>
     <div className={styles.layout} data-navigation={preferences.navigation}>
       <aside ref={navigation} className={styles.navigation} hidden={!preferences.navigation} id="reader-contents"><nav className={styles.toc} aria-label={t(copy.contents)}><h2 className={styles.eyebrow}>{t(copy.inConstitution)}</h2><ol>{articles.map(article => <li key={article.id}><a href={'#unit-' + article.id} aria-current={current === article.id ? 'true' : undefined} onClick={() => setCurrent(article.id)}>{articleHeading(outline, { ...article, title: '' }) || articleHeading(outline, article)}{article.title ? <span>{article.title}</span> : null}</a></li>)}</ol>{notes.length ? <><hr /><a href="#reader-footnotes">{t(copy.footnotes)}<span>{notes.length}</span></a></> : null}</nav></aside>
-      <section className={styles.main}><div className={styles.document} ref={documentRef} data-boundaries={flowing && preferences.boundaries}>
+      <section className={styles.main}><ReaderDocument className={styles.document} ref={documentRef} data-boundaries={flowing && preferences.boundaries}>
         <header className={styles.title} data-reader-chrome>{context ? <><div className={styles.eyebrow}>{context.jurisdictionName}</div><h1>{context.title}</h1><p>{context.versionLabel}{language ? ' · ' + language : ''}</p><span className={styles.status}><ReaderIcon name="check" />{t(copy.published)} · {t(copy.readingView)}</span></> : null}{notices}</header>
         <ol className={[styles.articles, 'version-articles'].join(' ')} lang={language}>{articles.map(article => {
           const shown = expanded.has(article.id) ? max : depth, includeText = shown >= max;
           const nodes = clipNodes(article.children ?? [], outline, shown), open = nodes.length > 0 || includeText;
           const permalink = code ? `/countries/${code}/versions/${versionId}/${article.kind && article.kind !== 'article' ? 'units' : 'articles'}/${article.id}#article-${article.articleNumber}` : `/versions/${versionId}/units/${article.id}`;
-          return <ReaderArticle id={article.id} key={article.id} heading={articleHeading(outline, article)} label={articleHeading(outline, { ...article, title: '' })} caption={article.title} permalink={permalink} expanded={open} onToggle={depth < max ? () => setExpanded(old => { const next = new Set(old); if (next.has(article.id)) next.delete(article.id); else next.add(article.id); return next; }) : undefined}
-            metadata={<><a href={permalink}><T value={ui.components.versionreader.permalink} /></a>{code && article.kind === 'article' ? <a href={`/countries/${code}/articles/${encodeURIComponent(article.articleNumber)}`}><T value={ui.components.versionreader.historyOf} /> {article.articleNumber}</a> : null}{changeByArticle[article.articleNumber] ? <Badge tone={changeTypeTone(changeByArticle[article.articleNumber])}><T value={changeTypeMessage(changeByArticle[article.articleNumber])} /></Badge> : <span>{unchangedSinceLabel ? `${t(ui.readerDynamic.unchangedSince)} ${unchangedSinceLabel}` : t(ui.readerDynamic.unchanged)}</span>}</>}>
-            {open ? <div>{article.content != null ? <div className="constitution-text text-column"><OrderedContentTree entries={clipOrderedEntries(article.content, shownOutline, shown)} outline={shownOutline} crossRefs={{ code, versionId, articlesByNumber, unitsByLogicalId, footnotes: notes }} withRefs={value => linkifyReferences(value, { code, versionId, articlesByNumber, kindLabel: outline?.kinds.find(kind => kind.kindCode === 'article')?.displayLabel ?? t(ui.remainingStatus.article) })} hideFootnotes renderNode={renderNode} canEditTitles={canEditTitles} returnTo={readerHref(versionId)} /></div> : <ConstitutionText article={article} nodes={nodes} body={includeText && !nodes.length ? article.body : null} showHeading={false} rootAnchor={false} outline={shownOutline} lang={language} crossRefs={{ code, versionId, articlesByNumber, unitsByLogicalId, footnotes: notes }} />}</div> : null}
+          return <ReaderArticle id={article.id} key={article.id} heading={articleHeading(outline, article)} headingContent={<ConstitutionArticleHeading article={article} outline={outline} />} expanded={open} onToggle={depth < max ? () => setExpanded(old => { const next = new Set(old); if (next.has(article.id)) next.delete(article.id); else next.add(article.id); return next; }) : undefined}
+            metadata={<><a href={permalink}>{t({ en: 'Open passage', de: 'Textstelle öffnen' })}</a>{code && article.kind === 'article' ? <a href={`/countries/${code}/articles/${encodeURIComponent(article.articleNumber)}`}><T value={ui.components.versionreader.historyOf} /> {article.articleNumber}</a> : null}{changeByArticle[article.articleNumber] ? <Badge tone={changeTypeTone(changeByArticle[article.articleNumber])}><T value={changeTypeMessage(changeByArticle[article.articleNumber])} /></Badge> : <span>{unchangedSinceLabel ? `${t(ui.readerDynamic.unchangedSince)} ${unchangedSinceLabel}` : t(ui.readerDynamic.unchanged)}</span>}</>}>
+            {open ? <ConstitutionText article={article} entries={article.content == null ? undefined : clipOrderedEntries(article.content, shownOutline, shown)} nodes={nodes} body={includeText && !nodes.length ? article.body : null} showHeading={false} rootAnchor={false} outline={shownOutline} lang={language} canEditTitles={canEditTitles} returnTo={readerHref(versionId)} crossRefs={{ code, versionId, articlesByNumber, unitsByLogicalId, footnotes: notes }} hideFootnotes renderNode={renderNode} /> : null}
           </ReaderArticle>;
         })}</ol>
-        {endnotes.length ? <section className={styles.notes} id="reader-footnotes" aria-label={t(copy.footnotes)}><h2>{t(copy.footnotes)}</h2><OrderedContentTree entries={endnotes} outline={outline} indexedBacklinks={backlinks} /></section> : null}
+        {endnotes.length ? <section className={styles.notes} id="reader-footnotes" aria-label={t(copy.footnotes)}><ConstitutionFootnotes entries={endnotes} outline={outline} indexedBacklinks={backlinks} /></section> : null}
         <footer className={styles.footer} data-reader-chrome>{footer ?? <span>{articles.length} <T value={articles.length === 1 ? ui.remainingStatus.unitSingular : ui.remainingStatus.unitPlural} /></span>}<a className={styles.textAction} href={articles[0] ? '#unit-' + articles[0].id : '#main-content'}><ReaderIcon name="up" />{t(copy.backBeginning)}</a></footer>
-      </div></section>
+      </ReaderDocument></section>
     </div>
-  </div>;
+  </div></ReaderActions>;
 }
 
 function containsOccurrence(entries: import('../../lib/api').OrderedEntry[], target: string): boolean {

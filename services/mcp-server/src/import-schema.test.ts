@@ -27,3 +27,14 @@ test('automatic sentence settings retain Unicode sequences and reject nonleaf or
   assert.equal(outlineSchema.safeParse({ kinds: [{ ...leaf, titlePolicy: 'required' }] }).success, false);
   assert.equal(outlineSchema.safeParse({ kinds: [{ ...leaf, allowedChildKinds: ['child'] }, { kindCode: 'child', displayLabel: 'Child' }] }).success, false);
 });
+
+test('authored separators roundtrip outside text and reject fractional or unbounded counts', () => {
+  const entry = { type: 'text', text: 'Exact wording.', lineBreaksBefore: 2 };
+  const node = { kind: 'clause', content: [entry] };
+  assert.deepEqual(orderedNode.parse(node), node);
+  for (const lineBreaksBefore of [-1, 17, 1.5, '2', null]) {
+    assert.equal(orderedNode.safeParse({ ...node, content: [{ ...entry, lineBreaksBefore }] }).success, false);
+  }
+  const legacy = { kind: 'clause', content: [{ type: 'text', text: 'Exact wording.' }] };
+  assert.deepEqual(orderedNode.parse(legacy), legacy);
+});

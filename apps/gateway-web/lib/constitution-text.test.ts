@@ -6,7 +6,7 @@ import type { ContentNode, ContentOutline, OrderedEntry } from './api';
 vi.mock('../app/components/NodeTitleForm', () => ({ NodeTitleForm: vi.fn(() => null) }));
 import { NodeTitleForm } from '../app/components/NodeTitleForm';
 import { DiffConstitutionText } from '../app/components/DiffConstitutionText';
-import { ConstitutionText, NodeTree, OrderedContentTree } from '../app/components/ConstitutionText';
+import { ConstitutionFootnotes, ConstitutionText, NodeTree, OrderedContentTree } from '../app/components/ConstitutionText';
 const outline: ContentOutline = { kinds: [
   { kindCode: 'article', displayLabel: 'Article', sortOrder: 1, mayHoldText: true, mayHoldChildren: true, allowedChildKinds: ['sentence'], showLabel: false, showTitle: false, showKind: false, presentation: 'section' },
   { kindCode: 'sentence', displayLabel: 'Sentence', sortOrder: 2, mayHoldText: true, mayHoldChildren: false, allowedChildKinds: [], showLabel: false, showTitle: false, showKind: false, presentation: 'concatenated' },
@@ -14,6 +14,61 @@ const outline: ContentOutline = { kinds: [
 const nodes: ContentNode[] = ['First.', 'Second.'].map((body, index) => ({ id: `${index}`, kind: 'sentence', label: `(${index})`, number: null, title: 'Hidden title', body, sortOrder: index, children: [] }));
 const entries: OrderedEntry[] = nodes.map((node) => ({ type: 'child', node: { logicalId: node.id, revisionId: node.id, occurrenceId: node.id, kind: node.kind, label: node.label, title: node.title, content: [{ type: 'text', text: node.body }] } }));
 describe('reader presentation', () => {
+  it('renders authored breaks outside the clean sentence and its mark and reference ranges', () => {
+    const text = 'Second.';
+    const flowing: OrderedEntry[] = [entries[0]!, { ...entries[1]!, node: { ...entries[1]!.node!, content: [{
+      type: 'text', occurrenceId: 'second-text', text, lineBreaksBefore: 2,
+      marks: [{ type: 'bold', start: 0, end: 6 }],
+      references: [{ logicalId: 'external', start: 0, end: 6, target: { type: 'external', url: 'https://example.org' } }],
+    }] } }];
+    const html = renderToStaticMarkup(createElement(ConstitutionText, { entries: flowing, outline }));
+    expect(html.match(/data-authored-break="true"/g)).toHaveLength(2);
+    expect(html).toContain('<a id="ref-external" class="xref" href="https://example.org"><strong>Second</strong></a>');
+    expect(html).toContain('id="second-text"><a');
+    expect(html).not.toContain('> Second');
+  });
+  it('uses the block boundary once in line-by-line mode while preserving extra authored blank lines', () => {
+    const lined = { kinds: outline.kinds.map(kind => ({ ...kind, presentation: 'section' })) };
+    const withBreaks = entries.map((entry, index) => ({ ...entry, node: { ...entry.node!, content: [{ ...entry.node!.content[0]!, lineBreaksBefore: index + 1 }] } }));
+    const html = renderToStaticMarkup(createElement(ConstitutionText, { entries: withBreaks, outline: lined }));
+    expect(html.match(/data-authored-break="true"/g)).toHaveLength(1);
+    expect(html.replace(/<[^>]*>/g, '')).toBe('First.Second.');
+  });
+  it('makes a layout-only comparison visible while retaining unchanged wording', () => {
+    const left = { articleNumber: '1', title: '', legacyIdentity: true, content: entries };
+    const right = { ...left, content: [entries[0]!, { ...entries[1]!, node: { ...entries[1]!.node!, content: [{ ...entries[1]!.node!.content[0]!, logicalId: 'second-text', lineBreaksBefore: 1 }] } }] };
+    left.content = [entries[0]!, { ...entries[1]!, node: { ...entries[1]!.node!, content: [{ ...entries[1]!.node!.content[0]!, logicalId: 'second-text' }] } }];
+    const html = renderToStaticMarkup(createElement(DiffConstitutionText, { left, right, side: 'to', outline }));
+    expect(html).toContain('title="Sentence spacing changed"');
+    expect(html).toContain('data-authored-break="true"');
+    expect(html).not.toContain('<ins');
+    expect(html).not.toContain('<del');
+    expect(html.replace(/<[^>]*>/g, '')).toBe('First.Second.');
+  });
+  it('shares numbered endnote rows, attribution and formatting with editable preview slots', () => {
+    const note: OrderedEntry = { type: 'text', logicalId: 'note', occurrenceId: 'note-occ', format: 'footnote', footnoteLabel: '3', text: 'Exact source.', marks: [{ type: 'italic', start: 0, end: 5 }], annotation: { kind: 'source', attribution: 'Archive' } };
+    const reader = renderToStaticMarkup(createElement(ConstitutionFootnotes, { entries: [note] }));
+    const preview = renderToStaticMarkup(createElement(ConstitutionFootnotes, { entries: [note], footnoteActions: () => createElement('button', { type: 'button' }, 'Edit') }));
+    expect(reader).toContain('<h2>Footnotes</h2>');
+    expect(reader).toContain('id="fn-note-occ"');
+    expect(reader).toContain('<em>Exact</em>');
+    expect(reader).toContain('Archive');
+    expect(reader.match(/role="note"/g)).toHaveLength(1);
+    expect(preview).toContain('<button type="button">Edit</button>');
+    expect(preview).toContain('class="legal-footnote');
+    const inline = renderToStaticMarkup(createElement(ConstitutionFootnotes, { entries: [note], renderFootnote: () => createElement('textarea', { defaultValue: note.text! }) }));
+    expect(inline).toContain('<textarea>Exact source.</textarea>');
+    expect(inline).not.toContain('role="note"');
+  });
+  it('links a preview endnote back to its real marker without inventing links for pending notes', () => {
+    const note: OrderedEntry = { type: 'text', logicalId: 'note', occurrenceId: 'note', format: 'footnote', footnoteLabel: '1', text: 'Source.' };
+    const linked = renderToStaticMarkup(createElement(ConstitutionFootnotes, { entries: [note], idPrefix: 'editor-', backlinkIdPrefix: '', indexedBacklinks: new Map([['note', ['marker']]]) }));
+    expect(linked).toContain('id="editor-fn-note"');
+    expect(linked).toContain('href="#ref-marker"');
+    expect(linked).toContain('Back to reference ↑');
+    const pending = renderToStaticMarkup(createElement(ConstitutionFootnotes, { entries: [note], idPrefix: 'editor-' }));
+    expect(pending).not.toContain('Back to reference');
+  });
   it('localizes table and footnote navigation labels without changing authored text', () => {
     const content: OrderedEntry[] = [
       { type: 'text', logicalId: 'table', format: 'table', text: 'Original heading', table: { caption: '', rows: [{ logicalId: 'row', cells: [{ logicalId: 'cell', header: true, text: 'Original heading' }] }] } },

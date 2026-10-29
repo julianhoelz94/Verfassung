@@ -23,5 +23,5 @@ export function LocalizedTableRegion({ caption, id, children }: { caption?: stri
 
 export function LocalizedFootnoteBacklink({ href, index }: { href: string; index: number }) {
   const t = useTranslation();
-  return <a href={href} aria-label={`${t(ui.editorDefaults.footnoteReference)} ${index}`}>↩</a>;
+  return <a href={href} aria-label={`${t(ui.editorDefaults.footnoteReference)} ${index}`}>{t({ en: 'Back to reference', de: 'Zurück zum Verweis' })}{index > 1 ? ` ${index}` : ''} ↑</a>;
 }

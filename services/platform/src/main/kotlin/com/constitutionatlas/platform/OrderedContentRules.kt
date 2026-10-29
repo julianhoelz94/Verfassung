@@ -30,6 +30,7 @@ object OrderedContentRules {
         fun walk(node: OrderedNode, path: String) {
             node.content.forEachIndexed { index, entry ->
                 val entryPath = "$path.content[$index]"
+                errors += lineBreakErrors(entry.lineBreaksBefore, entry.type, "$entryPath.lineBreaksBefore", entry.logicalId)
                 entry.node?.let { walk(it, "$entryPath.node") } ?: run {
                     errors += markErrors(entry.text.orEmpty(), entry.format, entry.marks, "$entryPath.marks", entry.logicalId)
                     errors += referenceErrors(entry.text.orEmpty(), entry.format, entry.references, footnotes, entryPath, entry.logicalId, units)
@@ -76,6 +77,22 @@ object OrderedContentRules {
         }
         roots.forEachIndexed { index, root -> walk(root, "roots[$index]") }
     }
+
+    /** Editing may be incomplete, but an editor save requires one marker per note body. */
+    fun footnoteMarkerErrors(notes: Iterable<OrderedContentPosition>, references: Iterable<OrderedInlineReference>): List<OrderedValidationError> {
+        val counts = references.filter { it.target.type == "footnote" }.groupingBy { it.target.footnoteId }.eachCount()
+        return notes.filter { it.format == "footnote" }.mapNotNull { note ->
+            val count = counts[note.logicalId] ?: 0
+            if (count == 1) null else OrderedValidationError("FOOTNOTE_MARK_CARDINALITY", note.path, note.logicalId, "Each footnote body requires exactly one marker when saving; found $count")
+        }
+    }
+
+    fun lineBreakErrors(count: Int, type: String, path: String, logicalId: UUID? = null): List<OrderedValidationError> =
+        if (count !in 0..16 || type != "text" && count != 0) {
+            listOf(OrderedValidationError("TEXT_LINE_BREAKS", path, logicalId, "Text entry lineBreaksBefore must be an integer from 0 to 16; child entries cannot carry text separators"))
+        } else {
+            emptyList()
+        }
 
     fun markErrors(text: String, format: String?, marks: List<OrderedTextMark>, path: String, logicalId: UUID? = null): List<OrderedValidationError> {
         val errors = mutableListOf<OrderedValidationError>()

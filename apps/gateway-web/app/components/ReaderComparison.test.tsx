@@ -57,3 +57,10 @@ it('discards late responses after selection changes', async () => {
   await act(async () => resolve({ ok:true,json:async()=>({ from:'a',to:'b',changes }) }));
   expect(view.host.textContent).toContain('No differences'); expect(view.host.querySelector('ins')).toBeNull();
 });
+
+it('recovers when a previously failed panel is reopened after the service becomes available', async () => {
+  vi.stubGlobal('fetch',vi.fn().mockRejectedValue(new Error('offline'))); view=await mount(<ReaderComparison {...props} />);
+  expect(getByRole(view.host,'alert')).toBeTruthy();await view.render(<ReaderComparison {...props} active={false} />);
+  respond();await view.render(<ReaderComparison {...props} active />);
+  expect(view.host.querySelector('[role=alert]')).toBeNull();expect(view.host.querySelector('ins')?.textContent).toBe('people');
+});

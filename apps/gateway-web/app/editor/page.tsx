@@ -31,6 +31,9 @@ import { sourceEvidenceUi } from '../../lib/source-evidence-messages';
 import { indexDraftFootnotes, indexDraftFootnoteReferences } from '../../lib/draft-footnotes';
 import { EditorWorkspace } from './EditorWorkspace';
 import { changeExcerpt } from '../../lib/editor-change-context';
+import { ConstitutionDetailsWorkspace } from './ConstitutionDetailsWorkspace';
+import { ConstitutionWikiPanel } from './wiki/WikiWorkspace';
+import shellStyles from './editor-shell.module.css';
 
 type EditorPageProps = {
   searchParams: Promise<{
@@ -44,6 +47,9 @@ type EditorPageProps = {
     articleId?: string;
     saved?: string;
     detailsSaved?: string;
+    tab?: string;
+    wikiStatus?: string;
+    wikiHistoryPage?: string;
     reviewed?: string;
     approved?: string;
     published?: string;
@@ -203,23 +209,15 @@ export default async function EditorPage(props: EditorPageProps) {
   );
 
   return (
-    <WorkspacePage width="content" header={<PageHeader
-        breadcrumbs={[{ href: '/editor', label: <T value={ui.nav.editor} /> }, { label: `${message(locale, ui.remainingStatus.session)} ${session.id.slice(0, 8)}` }]}
+    <WorkspacePage width="content" gap="control" className={shellStyles.page} header={<PageHeader compact
         eyebrow={`${message(locale, session.hopKind === 'legal' ? ui.remainingStatus.nextLegalChange : ui.remainingStatus.transcriptionCorrection)} · ${message(locale, session.status === 'open' ? ui.workflow.draft : session.status === 'reviewing' ? ui.workflow.inReview : session.status === 'approved' ? ui.workflow.approved : ui.workflow.published)}`}
         title={title || <T value={ui.nav.editor} />}
-        meta={<WorkflowSteps status={session.status} />}
-        actions={
-          publicHref ? (
-            <a className="btn btn-ghost" href={publicHref}>
-              <T value={publishedHref ? workflowUi.publishedVersion : workflowUi.sourceVersion} />{" "}</a>
-          ) : null
-        }
       />}>
 
       {alerts}
       {preview.sourceEvidenceRevisions?.length ? <Alert tone="info"><a href={`/editor?sessionId=${encodeURIComponent(session.id)}&scope=sources`}><T value={sourceEvidenceUi.inspectSources} /></a></Alert> : null}
       {searchParams.sessionId && articles.length > 0 ? (
-        <EditorDraftState><EditorWorkspace navigation={
+        <EditorDraftState><EditorWorkspace inlineControls={Boolean(structured && selectedRoot)} navigation={
           <aside className={["panel", surfaceStyles.panel].join(' ')} aria-label={message(locale, ui.accessibility.topLevelUnits)}>
             <h2 className="panel-title"><T value={articles.every(article => (article.kind ?? 'article') === 'article') ? ui.editorDynamic.articles : ui.editorDynamic.topLevelUnits} /></h2>
             <p className="muted">{draftIds.length} <T value={ui.editor.page.changed} /></p>
@@ -234,6 +232,8 @@ export default async function EditorPage(props: EditorPageProps) {
         } session={
           <aside className={["panel panel-side", surfaceStyles.panel].join(' ')} aria-label={message(locale, ui.accessibility.session)}>
             <p className="panel-title"><T value={ui.editor.page.session} /></p>
+            <WorkflowSteps status={session.status} />
+            {publicHref ? <a className="btn btn-ghost" href={publicHref}><T value={publishedHref ? workflowUi.publishedVersion : workflowUi.sourceVersion} /></a> : null}
             <dl className="provenance provenance-list">
               <div>
                 <dt><T value={ui.editor.page.status} /></dt>
@@ -295,11 +295,14 @@ export default async function EditorPage(props: EditorPageProps) {
             ) : null}
           </aside>
         }>
-          <section className={["panel", surfaceStyles.panel].join(' ')} aria-labelledby="edit-title">
-            <p className="panel-title" id="edit-title">
+          <section className={structured && selectedRoot ? shellStyles.documentSection : ["panel", surfaceStyles.panel].join(' ')} aria-labelledby="edit-title">
+            <p className={structured && selectedRoot ? 'sr-only' : 'panel-title'} id="edit-title">
               {selected ? `${kindLabel(selected.kind)} ${selected.articleNumber}` : message(locale, ui.editorDynamic.unit)}
             </p>
             {structured && selectedRoot && settings && versionId && selected && selectedConstitution ? <StructuredEditor
+              initialTab={searchParams.tab === 'wiki' ? 'wiki' : searchParams.tab === 'details' ? 'details' : undefined}
+              wikiPanel={selectedCountry ? <ConstitutionWikiPanel constitutionId={selectedConstitution.id} code={selectedCountry.isoCode} returnTo={editorReturnTo} historyPage={searchParams.wikiHistoryPage} status={searchParams.wikiStatus === 'saved' || searchParams.wikiStatus === 'published' || searchParams.wikiStatus === 'error' ? searchParams.wikiStatus : undefined} /> : undefined}
+              detailsPanel={<ConstitutionDetailsWorkspace constitutionId={selectedConstitution.id} versionId={versionId} code={selectedCountry?.isoCode} canEdit={canEdit} canManageStructure={user.roles.includes('admin')} canPublish={canPublish} />}
               key={`${session.id}:${structured.generation}:${selectedRoot.logicalId}`}
               review={differences.map(difference => { const sourceRoot = structured.sourceRoots.find(root => nodes([root]).some(node => node.logicalId === difference.logicalId || node.content.some(entry => entry.logicalId === difference.logicalId))); const targetRoot = structured.roots.find(root => nodes([root]).some(node => node.logicalId === difference.logicalId || node.content.some(entry => entry.logicalId === difference.logicalId))); const targetOccurrence = targetRoot && preview.unitMapping?.[targetRoot.logicalId]; return { ...difference, beforeText: ["rich", "inserted", "removed"].includes(difference.field) ? changeExcerpt(structured.sourceRoots, difference.logicalId) : undefined, afterText: ["rich", "inserted", "removed"].includes(difference.field) ? changeExcerpt(structured.roots, difference.logicalId) : undefined, rootId: (targetRoot ?? sourceRoot)?.logicalId, sourceLink: sourceRoot?.occurrenceId ? `/versions/${structured.sourceVersionId}/units/${sourceRoot.occurrenceId}` : undefined, targetLink: preview.newVersionId && targetOccurrence ? `/versions/${preview.newVersionId}/units/${targetOccurrence}` : undefined }; })} preview={{ ...structured, footnotes: indexDraftFootnotes(structured.roots), footnoteReferences: indexDraftFootnoteReferences(structured.roots), roots: structured.roots.map(root => root.logicalId === selectedRoot.logicalId ? root : { ...root, content: [] }), sourceRoots: structured.sourceRoots.map(root => root.logicalId === selectedRoot.logicalId ? root : { ...root, content: [] }) }} outline={settings.outline} rootId={selectedRoot.logicalId} versionId={versionId} articleId={selected.id} constitutionId={selectedConstitution.id} canManageStructure={user.roles.includes('admin')} publishedVersionId={preview.newVersionId} unitMapping={preview.unitMapping} editable={canSave && session.actorId === user.id} scope={searchParams.scope} selectedNode={searchParams.selectedNode}
             /> : canSave && selected && versionId && searchParams.sessionId ? (

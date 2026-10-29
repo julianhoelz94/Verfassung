@@ -1,10 +1,11 @@
 'use client';
 
-import { createContext, useCallback, useContext, useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import type { FootnoteItem } from '../../lib/footnotes';
 import { useTranslation } from './TranslationProvider';
 import { InlineText } from './InlineText';
+import { updateFootnoteHitTargets } from '../../lib/footnote-hit-targets';
 import styles from './Footnotes.module.css';
 
 export type { FootnoteItem } from '../../lib/footnotes';
@@ -13,6 +14,7 @@ const copy = {
   show: { en: 'Show footnote', de: 'Fußnote anzeigen' },
   close: { en: 'Close footnote', de: 'Fußnote schließen' },
   jump: { en: 'Go to footnote', de: 'Zur Fußnote' },
+  navigationFailed: { en: 'The footnote could not be loaded. Try “Go to footnote” again.', de: 'Die Fußnote konnte nicht geladen werden. Versuchen Sie „Zur Fußnote“ erneut.' },
 };
 type Actions = {
   showNote: (id: string, trigger?: HTMLElement) => void;
@@ -23,6 +25,7 @@ type Context = Actions & { notes: FootnoteItem[]; tooltipId: string; previewId?:
 const Context = createContext<Context | null>(null);
 const noopActions: Actions = { showNote: () => {}, previewNote: () => {}, hidePreview: () => {} };
 export function useFootnoteActions(): Actions { return useContext(Context) ?? noopActions; }
+export function useFootnoteReferences(noteId: string) { return useContext(Context)?.notes.find(note => note.logicalId === noteId)?.references ?? []; }
 
 export function FootnoteProvider({ notes, children, onNavigate }: {
   notes: FootnoteItem[]; children?: ReactNode; onNavigate?: (note: FootnoteItem) => void | Promise<void>;
@@ -36,17 +39,21 @@ function FootnoteScope({ notes, children, onNavigate }: {
 }) {
   const t = useTranslation(), id = useId();
   const [opened, setOpened] = useState<string | null>(null);
+  const [navigating, setNavigating] = useState(false), [navigationError, setNavigationError] = useState(false);
   const [peek, setPeek] = useState<{ id: string; left: number; top: number } | null>(null);
   const trigger = useRef<HTMLElement | null>(null), drawer = useRef<HTMLElement | null>(null);
   const closeButton = useRef<HTMLButtonElement | null>(null);
   const active = notes.find(note => note.logicalId === opened);
+  const activeId = active?.logicalId;
   const preview = notes.find(note => note.logicalId === peek?.id);
+  useLayoutEffect(()=>updateFootnoteHitTargets());
+  useEffect(()=>{const update=()=>updateFootnoteHitTargets();window.addEventListener('resize',update);return()=>window.removeEventListener('resize',update);},[]);
   const close = useCallback((restore = false) => {
-    setOpened(null); setPeek(null);
+    setOpened(null); setPeek(null); setNavigationError(false);
     if (restore) trigger.current?.focus({ preventScroll: true });
   }, []);
   useEffect(() => {
-    if (!active) return;
+    if (!activeId) return;
     closeButton.current?.focus({ preventScroll: true });
     function outside(event: PointerEvent) {
       if (event.target instanceof Node && !drawer.current?.contains(event.target)) setOpened(null);
@@ -57,7 +64,7 @@ function FootnoteScope({ notes, children, onNavigate }: {
     document.addEventListener('pointerdown', outside, true);
     document.addEventListener('keydown', escape, true);
     return () => { document.removeEventListener('pointerdown', outside, true); document.removeEventListener('keydown', escape, true); };
-  }, [active, close]);
+  }, [activeId, close]);
   useEffect(() => {
     if (!peek) return;
     const hide = () => setPeek(null);
@@ -71,7 +78,7 @@ function FootnoteScope({ notes, children, onNavigate }: {
     showNote(noteId, element) {
       if (!notes.some(note => note.logicalId === noteId)) return;
       trigger.current = element ?? (document.activeElement instanceof HTMLElement ? document.activeElement : null);
-      setPeek(null); setOpened(noteId);
+      setPeek(null); setNavigationError(false); setOpened(noteId);
     },
     previewNote(noteId, element) {
       if (opened || !notes.some(note => note.logicalId === noteId) || window.matchMedia?.('(pointer: coarse)').matches) return;
@@ -86,10 +93,16 @@ function FootnoteScope({ notes, children, onNavigate }: {
       <section className={styles.drawer} ref={drawer} role="dialog" aria-modal="false" aria-labelledby={id + '-title'} aria-describedby={id + '-body'}>
         <div className={styles.heading}><h2 id={id + '-title'}>{t(copy.footnote)} {active.label}</h2><button ref={closeButton} type="button" aria-label={t(copy.close)} onClick={() => close(true)}>×</button></div>
         <div id={id + '-body'} className={styles.body}><InlineText text={active.text} marks={active.marks} /></div>
-        <a href={active.href} onClick={async event => {
+        {navigationError ? <p role="alert">{t(copy.navigationFailed)}</p> : null}
+        <a href={active.href} aria-busy={navigating || undefined} aria-disabled={navigating || undefined} onClick={async event => {
           if (onNavigate) {
-            event.preventDefault(); await onNavigate(active); close();
-            requestAnimationFrame(() => document.getElementById(decodeURIComponent(active.href.split('#')[1] ?? ''))?.scrollIntoView({ block: 'center' }));
+            event.preventDefault(); if (navigating) return;
+            setNavigating(true); setNavigationError(false);
+            try {
+              await onNavigate(active); close();
+              requestAnimationFrame(() => document.getElementById(decodeURIComponent(active.href.split('#')[1] ?? ''))?.scrollIntoView({ block: 'center' }));
+            } catch { setNavigationError(true); }
+            finally { setNavigating(false); }
           } else {
             const destination = new URL(active.href, window.location.href);
             if (destination.pathname === window.location.pathname && destination.search === window.location.search) {
@@ -113,7 +126,7 @@ export function FootnoteMarker({ noteId, label, referenceId, children }: {
   const context = useContext(Context), t = useTranslation();
   const note = context?.notes.find(note => note.logicalId === noteId);
   if (!note || !context) return <sup id={referenceId}>{children ?? label ?? '*'}</sup>;
-  return <a href={note.href} role="button" contentEditable={false} id={referenceId} className={styles.marker}
+  return <a href={note.href} role="button" contentEditable={false} data-footnote-marker id={referenceId} className={styles.marker}
     aria-label={t(copy.show) + ' ' + note.label} aria-haspopup="dialog" aria-describedby={context.previewId === noteId ? context.tooltipId : undefined}
     onClick={event => { event.preventDefault(); context.showNote(noteId, event.currentTarget); }}
     onKeyDown={event => { if (event.key === ' ') { event.preventDefault(); context.showNote(noteId, event.currentTarget); } }}

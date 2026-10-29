@@ -33,7 +33,7 @@ export function ReaderComparison({ constitutionId, publications, viewedVersionId
         if (controller.signal.aborted) return;
         if (data.from !== from || data.to !== to || !Array.isArray(data.changes)) throw new Error('comparison');
         if (cache.current.size >= 12) cache.current.clear();
-        cache.current.set(key, data.changes); setResult({ key, changes: data.changes });
+        cache.current.set(key, data.changes); setResult({ key, changes: data.changes }); setFailed(false);
       }).catch(() => { if (!controller.signal.aborted) setFailed(true); });
     return () => controller.abort();
   }, [constitutionId, from, to, key, retry, active]);

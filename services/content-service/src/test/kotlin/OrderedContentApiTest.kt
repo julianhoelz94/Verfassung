@@ -60,6 +60,11 @@ class OrderedContentApiTest {
         assertThat(placement.body()["logicalId"]).isEqualTo(later.logicalId.toString())
         val malformed = later.copy(content = listOf(OrderedEntryWrite("text", text = "Law", marks = listOf(OrderedTextMark("bold", 0, 4)))))
         assertThrows(com.constitutionatlas.platform.OrderedContentValidationException::class.java) { content.save(version, OrderedSnapshotWrite(0, roots = listOf(malformed))) }
+        for (count in listOf(-1, 17)) {
+            val invalidLayout = later.copy(content = listOf(OrderedEntryWrite("text", text = "Law", lineBreaksBefore = count)))
+            val layoutError = assertThrows(com.constitutionatlas.platform.OrderedContentValidationException::class.java) { content.save(version, OrderedSnapshotWrite(0, roots = listOf(invalidLayout))) }
+            assertThat(layoutError.errors.single().code).isEqualTo("TEXT_LINE_BREAKS")
+        }
         val dangling = later.copy(content = listOf(OrderedEntryWrite("text", text = "Law", references = listOf(OrderedInlineReference(UUID.randomUUID(), 0, 3, OrderedReferenceTarget("unit", logicalId = UUID.randomUUID()))))))
         val target = assertThrows(com.constitutionatlas.platform.OrderedContentValidationException::class.java) { content.save(version, OrderedSnapshotWrite(0, roots = listOf(dangling))) }
         assertThat(target.errors.single().code).isEqualTo("UNIT_REFERENCE_TARGET")
@@ -130,6 +135,32 @@ class OrderedContentApiTest {
         assertThrows(ResponseStatusException::class.java) { articles.replaceForVersion(version, emptyList()) }
         assertThrows(ResponseStatusException::class.java) { articles.updateText(original.roots.single().occurrenceId, "Title", "Changed") }
         assertThat(content.publishReceipt(version, attempt)).isEqualTo(original)
+    }
+
+    @Test
+    fun authoredLineBreaksPersistExportAndCloneWithoutEnteringTextOrOffsets() {
+        val source = UUID.randomUUID()
+        val target = UUID.randomUUID()
+        val constitution = UUID.randomUUID()
+        val settings = StructuralSettings(UUID.randomUUID(), StructuralOutline(listOf(StructuralLevel("article", true, false, emptyList(), root = true))))
+        for (version in listOf(source, target)) {
+            Mockito.`when`(catalog.getVersion(version)).thenReturn(CatalogVersion(version, "draft", constitution))
+            Mockito.`when`(catalog.getSettings(version)).thenReturn(settings)
+        }
+        val marks = listOf(OrderedTextMark("bold", 0, 4))
+        val saved = content.save(source, OrderedSnapshotWrite(0, roots = listOf(OrderedNodeWrite(kind = "article", content = listOf(OrderedEntryWrite("text", text = "One."), OrderedEntryWrite("text", text = "Two.", marks = marks, lineBreaksBefore = 2))))))
+        val entries = content.get(source).roots.single().content
+        assertThat(entries.map { it.text }).containsExactly("One.", "Two.")
+        assertThat(entries.map { it.lineBreaksBefore }).containsExactly(0, 2)
+        assertThat(entries.last().marks).isEqualTo(marks)
+        assertThat(com.constitutionatlas.platform.OrderedContentText.entries(entries)).isEqualTo("One.\n\nTwo.")
+        val exported = content.export(source)
+        assertThat(exported.roots.single().content!!.last().lineBreaksBefore).isEqualTo(2)
+        assertThat(com.constitutionatlas.platform.OrderedContentFidelity.matches(exported.roots, saved.roots)).isTrue()
+        val cloned = content.save(target, OrderedSnapshotWrite(0, sourceVersionId = source, sourceGeneration = saved.generation, roots = listOf(OrderedNodeWrite(revisionId = saved.roots.single().revisionId))))
+        assertThat(cloned.roots.single().content.last().lineBreaksBefore).isEqualTo(2)
+        assertThat(cloned.roots.single().content.last().revisionId).isEqualTo(entries.last().revisionId)
+        assertThat(content.get(source)).isEqualTo(saved)
     }
 
     @Test

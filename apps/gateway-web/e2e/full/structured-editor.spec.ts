@@ -74,7 +74,7 @@ for (const hop of ['editorial_correction', 'legal'] as const) {
     await signIn(page, 'editor');
     await startFromViewer(page, 'XA', version.id, hop);
     await expect(page.locator('#draft-form input[name="scope"]')).toHaveValue('article');
-    const canvas = page.locator('#draft-form');
+    const canvas = page.locator('[data-editor-workspace]');
     await expect(textCanvas(canvas, sourceRoot.content[0].logicalId)).toContainText('Before.');
     await setScope(page, 'sentence');
     await expect(textCanvas(canvas, sourceRoot.content[0].logicalId)).toHaveCount(0);
@@ -100,7 +100,7 @@ for (const hop of ['editorial_correction', 'legal'] as const) {
     expect(draft.roots[0].content[3].node.revisionId).toBe(sourceRoot.content[3].node.revisionId);
     await sessionDetails(page);
     if (hop === 'legal') {
-      await page.getByLabel('Title', { exact: true }).last().fill('Structured law');
+      await page.getByLabel('Session').getByLabel('Title', { exact: true }).fill('Structured law');
       await page.getByLabel('Comment', { exact: true }).fill('Changed one sentence.');
       await page.getByLabel('Document URL').fill('https://example.org/structured-law.pdf');
       await page.getByLabel('Before unit').selectOption(sourceSentence.logicalId);
@@ -195,7 +195,7 @@ test('custom one-level root supports literal labels, plain text and new root nav
   const { version, source } = await fixture(request, true);
   await signIn(page, 'editor');
   await startFromViewer(page, 'XA', version.id, 'editorial_correction');
-  const canvas = page.locator('#draft-form');
+  const canvas = page.locator('[data-editor-workspace]');
   await expect(canvas.locator('input[name="scope"]')).toHaveValue('clause');
   await properties(page, canvas, source.roots[0].logicalId);
   await expect(canvas.getByLabel('Clause title')).toHaveCount(0);
@@ -224,7 +224,7 @@ test('mixed parent text and nested sentence decisions reopen when one draft unit
   const { version, headers, source } = await fixture(request);
   await signIn(page, 'editor');
   await startFromViewer(page, 'XA', version.id, 'legal');
-  const canvas = page.locator('#draft-form');
+  const canvas = page.locator('[data-editor-workspace]');
   const firstEntry = source.roots[0].content[0].logicalId, firstSentence = source.roots[0].content[1].node.logicalId;
   await textCanvas(canvas, firstEntry).fill('Before, revised.');
   await unitCanvas(canvas, firstSentence).fill('Nested right revised.');
@@ -271,7 +271,7 @@ test('pasted boundaries, inline titles and keyboard edits persist with explicit 
   const { version, headers, source } = await fixture(request);
   await signIn(page, 'editor');
   await startFromViewer(page, 'XA', version.id, 'editorial_correction');
-  const canvas = page.locator('#draft-form');
+  const canvas = page.locator('[data-editor-workspace]');
   const pasted = 'Art.12 applies. Next! ';
   const original = source.roots[0].content[1].node;
   const sentence = unitCanvas(canvas, original.logicalId);
@@ -288,11 +288,11 @@ test('pasted boundaries, inline titles and keyboard edits persist with explicit 
   await canvas.getByRole('button', { name: 'Text tools', exact: true }).click();
   await canvas.getByRole('button', { name: 'Merge with next sentence', exact: true }).click();
   await expect(sentence.locator('span.ce-sentence')).toHaveCount(1);
-  await expect(sentence).toContainText(pasted);
+  await expect(sentence).toContainText(pasted.trim());
   await canvas.getByRole('button', { name: 'Save draft', exact: true }).click();
   await expect(page.getByText('Draft saved.', { exact: true })).toBeVisible();
   await page.reload();
-  await expect(unitCanvas(canvas, original.logicalId)).toContainText(pasted);
+  await expect(unitCanvas(canvas, original.logicalId)).toContainText(pasted.trim());
   await properties(page, canvas, original.logicalId);
   await expect(canvas.getByLabel('Sentence title')).toHaveValue('Inline title');
   const sessionId = new URL(page.url()).searchParams.get('sessionId');
@@ -312,7 +312,7 @@ test('configured delimiters, all inline styles and undo/redo survive saving and 
   const original = source.roots[0].content[1].node;
   await signIn(page, 'editor');
   await startFromViewer(page, 'XA', version.id, 'editorial_correction');
-  const canvas = page.locator('#draft-form'), sentence = unitCanvas(canvas, original.logicalId);
+  const canvas = page.locator('[data-editor-workspace]'), sentence = unitCanvas(canvas, original.logicalId);
   const undo = canvas.getByRole('button', { name: 'Undo', exact: true }), redo = canvas.getByRole('button', { name: 'Redo', exact: true });
   await expect(undo).toBeDisabled();
   await expect(redo).toBeDisabled();
@@ -335,8 +335,77 @@ test('configured delimiters, all inline styles and undo/redo survive saving and 
   const sessionId = new URL(page.url()).searchParams.get('sessionId');
   const saved = await json(await request.get(`/api/editor/edit-sessions/${sessionId}/structured-draft`, { headers }));
   const sentences = saved.roots[0].content.filter((entry: { node?: { kind: string } }) => entry.node?.kind === 'sentence').map((entry: { node: { logicalId: string; content: { text: string; marks?: { type: string }[] }[] } }) => entry.node);
-  expect(sentences.map((node: { content: { text: string }[] }) => node.content[0].text)).toEqual(['Styled phrase; ', 'More remains. Final;', 'Untouched branch.']);
+  expect(sentences.map((node: { content: { text: string }[] }) => node.content[0].text)).toEqual(['Styled phrase;', 'More remains. Final;', 'Untouched branch.']);
   expect(sentences[0].logicalId).toBe(original.logicalId);
   expect(sentences[0].content[0].marks.map((mark: { type: string }) => mark.type).sort()).toEqual(['bold', 'italic', 'strikethrough', 'underline']);
+  expect(await json(await request.get(`/api/content/versions/${version.id}/content`))).toEqual(source);
+});
+
+test('authored Enter breaks survive save and preview outside clean sentence text', async ({ page, request }) => {
+  const { version, headers, source } = await fixture(request);
+  const original = source.roots[0].content[1].node;
+  await signIn(page, 'editor'); await startFromViewer(page, 'XA', version.id, 'editorial_correction');
+  const workspace = page.locator('[data-editor-workspace]'), sentence = unitCanvas(workspace, original.logicalId);
+  await sentence.fill('First. Second!');
+  await sentence.locator('span.ce-sentence').nth(1).evaluate(element => {
+    const text = document.createTreeWalker(element, NodeFilter.SHOW_TEXT).nextNode();
+    if (!text) throw new Error('Second sentence is missing');
+    const range = document.createRange(); range.setStart(text, 0); range.collapse(true);
+    const selection = window.getSelection()!; selection.removeAllRanges(); selection.addRange(range);
+  });
+  await sentence.press('Enter'); await sentence.press('Enter');
+  await workspace.getByRole('button', { name: 'Save draft', exact: true }).click();
+  await expect(page.getByText('Draft saved.', { exact: true })).toBeVisible();
+  await page.reload();
+  const sessionId = new URL(page.url()).searchParams.get('sessionId');
+  const saved = await json(await request.get(`/api/editor/edit-sessions/${sessionId}/structured-draft`, { headers }));
+  const sentences = saved.roots[0].content.filter((entry: { node?: { kind: string } }) => entry.node?.kind === 'sentence').map((entry: { node: { content: { text: string; lineBreaksBefore?: number }[] } }) => entry.node);
+  expect(sentences.slice(0, 2).map((node: { content: { text: string }[] }) => node.content[0].text)).toEqual(['First.', 'Second!']);
+  expect(sentences[1].content[0].lineBreaksBefore).toBe(2);
+  await workspace.getByRole('button', { name: 'Preview', exact: true }).click();
+  await expect(workspace.locator('[data-authored-break]')).toHaveCount(2);
+  expect(await json(await request.get(`/api/content/versions/${version.id}/content`))).toEqual(source);
+});
+
+test('marker context actions retain notes, move atomically and enforce one marker per saved footnote', async ({ page, request }) => {
+  const { version, headers, source } = await fixture(request);
+  const original = source.roots[0].content[1].node;
+  await signIn(page, 'editor'); await startFromViewer(page, 'XA', version.id, 'editorial_correction');
+  const workspace = page.locator('[data-editor-workspace]'), sentence = unitCanvas(workspace, original.logicalId);
+  await selectBodyText(sentence, 'Original wording.'.length);
+  await workspace.getByRole('button', { name: 'Footnotes', exact: true }).click();
+  await workspace.getByRole('button', { name: 'New footnote…', exact: true }).click();
+  await workspace.getByRole('textbox', { name: 'Footnote text', exact: true }).fill('A note retained while its marker moves.');
+  await workspace.getByRole('button', { name: 'Insert marker and note', exact: true }).click();
+  const marker = sentence.getByRole('button', { name: 'Show footnote 1', exact: true });
+  await marker.click({ button: 'right' });
+  await page.getByRole('menuitem', { name: 'Remove marker', exact: true }).click();
+  await expect(marker).toHaveCount(0);
+  const unsavedUrl = page.url(), sessionIdBeforeSave = new URL(unsavedUrl).searchParams.get('sessionId');
+  await workspace.getByRole('button', { name: 'Save draft', exact: true }).click();
+  await expect(workspace.getByRole('alert')).toContainText('Footnote 1 needs a marker before you can save.');
+  expect(page.url()).toBe(unsavedUrl);
+  const beforeSave = await json(await request.get(`/api/editor/edit-sessions/${sessionIdBeforeSave}/structured-draft`, { headers }));
+  expect(beforeSave.operations).toHaveLength(0);
+  await expect(workspace.getByRole('button', { name: 'Save draft', exact: true })).toBeDisabled();
+  await selectBodyText(sentence, 0);
+  await workspace.getByRole('button', { name: 'Footnotes', exact: true }).click();
+  await workspace.getByRole('button', { name: 'Reference footnote 1', exact: true }).click();
+  await expect(marker).toHaveCount(1);
+  await marker.click({ button: 'right' });
+  await page.getByRole('menuitem', { name: 'Move marker…', exact: true }).click();
+  await expect(marker).toHaveCount(1);
+  await selectBodyText(sentence, 'Original'.length);
+  await workspace.getByRole('button', { name: 'Place marker', exact: true }).click();
+  await expect(marker).toHaveCount(1);
+  await workspace.getByRole('button', { name: 'Save draft', exact: true }).click();
+  await expect(page.getByText('Draft saved.', { exact: true })).toBeVisible(); await page.reload();
+  const sessionId = new URL(page.url()).searchParams.get('sessionId');
+  const saved = await json(await request.get(`/api/editor/edit-sessions/${sessionId}/structured-draft`, { headers }));
+  const entries = saved.roots[0].content.flatMap((entry: { node?: { content: unknown[] } }) => entry.node ? entry.node.content : [entry]);
+  const notes = entries.filter((entry: { format?: string }) => entry.format === 'footnote');
+  const references = entries.flatMap((entry: { references?: { start: number; target: { type: string; footnoteId: string } }[] }) => entry.references ?? []).filter((reference: { target: { type: string } }) => reference.target.type === 'footnote');
+  expect(notes).toHaveLength(1); expect(references).toHaveLength(1);
+  expect(references[0].start).toBe('Original'.length);
   expect(await json(await request.get(`/api/content/versions/${version.id}/content`))).toEqual(source);
 });

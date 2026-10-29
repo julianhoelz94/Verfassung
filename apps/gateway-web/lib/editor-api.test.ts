@@ -7,7 +7,7 @@ vi.mock('next/headers', () => ({
 }));
 vi.mock('./session', () => ({ SESSION_COOKIE: 'ca_session' }));
 
-import { getDraftPreview, listSessions, manageSession, publishSession, saveDraft, submitReview } from './editor-api';
+import { getDraftPreview, listSessions, manageSession, publishSession, saveDraft, saveStructuredDraft, submitReview } from './editor-api';
 
 const published = { sessionId: 'session-1', status: 'published', newVersionId: 'version-2' };
 
@@ -63,6 +63,7 @@ describe('editor request outcomes', () => {
     vi.stubGlobal('fetch', vi.fn<typeof fetch>().mockResolvedValue(Response.json({ code: 'conflict' }, { status: 409 })));
     await expect(manageSession('session-1', 'discard')).rejects.toMatchObject({ key: 'not_ready' });
   });
+  it.each([['FOOTNOTE_MARK_CARDINALITY','footnote_marks'],['TEXT_LINE_BREAKS','text_line_breaks']])('keeps actionable structured validation %s localized',async(code,key)=>{vi.stubGlobal('fetch',vi.fn<typeof fetch>().mockResolvedValue(Response.json({code},{status:400})));await expect(saveStructuredDraft('session-1',{expectedGeneration:0,operations:[]})).rejects.toMatchObject({key,code});});
 
   it('allows one coordinated publication to finish after the normal ten-second deadline', async () => {
     useTimedDeadlines();

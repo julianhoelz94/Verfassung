@@ -35,6 +35,6 @@ test('staff can review a structured wiki draft, picture, and revision history', 
   await expect(page.getByRole('heading', { name: 'Review draft' })).toBeVisible();
   await expect(page.getByRole('listitem').filter({ hasText: /^First era$/ })).toBeVisible();
   await expect(page.getByRole('img', { name: 'A historic flag' }).first()).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Page revision history' })).toBeVisible();
+  await page.getByText('Page revision history', { exact: true }).click();
   await expect(page.getByText(/2022-01-01 · Published/)).toBeVisible();
 });

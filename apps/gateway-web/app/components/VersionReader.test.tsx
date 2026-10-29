@@ -58,6 +58,18 @@ it('keeps an occurrence anchor on a standalone unit', () => {
   expect(host.querySelectorAll('#root')).toHaveLength(1);
 });
 
+it('uses the same article heading and endnote row structure in the viewer and preview renderer', () => {
+  host.innerHTML = renderToStaticMarkup(<VersionReader jurisdictionId="region" versionId="old-snapshot" articles={articles} outline={outline} initialDepth="full" />);
+  const viewerHeading = host.querySelector('#unit-root')!.innerHTML;
+  const noteClass = host.querySelector('.legal-footnote')!.className;
+  const preview = document.createElement('div');
+  preview.innerHTML = renderToStaticMarkup(<ConstitutionText article={articles[0]} outline={outline} headingLevel="h2" />);
+  expect(preview.querySelector('h2')!.innerHTML).toBe(viewerHeading);
+  expect(preview.querySelector('.legal-footnote')!.className).toBe(noteClass);
+  expect(viewerHeading).toContain('articleTitle');
+  expect(host.querySelector('section > h2')?.textContent).toBe('Footnotes');
+});
+
 it('reveals a collapsed early article when an endnote backlink targets its marker', async () => {
   const source: ArticleSummary[] = [
     { ...articles[0], id: 'early', content: [{ type: 'text', logicalId: 'text', occurrenceId: 'text-occ', text: 'Original body.', references: [{ logicalId: 'marker', start: 14, end: 14, target: { type: 'footnote', footnoteId: 'note' } }] }] },

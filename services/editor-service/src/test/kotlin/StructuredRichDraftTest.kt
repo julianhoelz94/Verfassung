@@ -25,12 +25,13 @@ class StructuredRichDraftTest {
     fun splitAndMergePreserveFormattingAndReferenceIdentities() {
         val note = text("Source note").copy(format = "footnote", footnoteLabel = "*")
         val anchor = OrderedInlineReference(UUID.randomUUID(), 7, 7, OrderedReferenceTarget("footnote", footnoteId = note.logicalId))
-        val entry = text("First. Second!").copy(marks = listOf(OrderedTextMark("bold", 0, 13), OrderedTextMark("italic", 7, 13)), references = listOf(anchor))
+        val entry = text("First. Second!").copy(lineBreaksBefore = 2, marks = listOf(OrderedTextMark("bold", 0, 13), OrderedTextMark("italic", 7, 13)), references = listOf(anchor))
         val original = root(entry, note.copy(annotation = com.constitutionatlas.platform.OrderedAnnotation("source", anchorLogicalIds = listOf(entry.logicalId!!))))
         val first = TextPart(UUID.randomUUID(), "First. ")
-        val second = TextPart(UUID.randomUUID(), "Second!")
+        val second = TextPart(UUID.randomUUID(), "Second!", lineBreaksBefore = 3)
         val split = DraftOperation(UUID.randomUUID(), "split_text", entry.logicalId!!, entry.revisionId!!, parts = listOf(first, second))
         val divided = StructuredDraftEngine.replay(listOf(original), listOf(split), settings).single()
+        assertThat(divided.content.map { it.lineBreaksBefore }).containsExactly(2, 3, 0)
         assertThat(divided.content[0].marks).containsExactly(OrderedTextMark("bold", 0, 7))
         assertThat(divided.content[0].references).containsExactly(anchor)
         assertThat(divided.content.last().annotation!!.anchorLogicalIds).containsExactly(first.logicalId, second.logicalId)
@@ -39,9 +40,44 @@ class StructuredRichDraftTest {
         val mergedRoot = StructuredDraftEngine.replay(listOf(original), listOf(split, merge), settings).single()
         val merged = mergedRoot.content.first()
         assertThat(mergedRoot.content.last().annotation!!.anchorLogicalIds).containsExactly(merged.logicalId)
+        assertThat(merged.lineBreaksBefore).isEqualTo(2)
         assertThat(merged.text).isEqualTo(entry.text)
         assertThat(merged.references).containsExactly(anchor)
         assertThat(merged.marks).containsExactly(OrderedTextMark("bold", 0, 13), OrderedTextMark("italic", 7, 13))
+    }
+
+    @Test
+    fun historicalCommandsAndSavedNullableReplacementsRoundtripWithoutClearingLayout() {
+        val mapper = tools.jackson.module.kotlin.jacksonObjectMapper()
+        val entry = text("Exact wording").copy(lineBreaksBefore = 2)
+        val operation = DraftOperation(UUID.randomUUID(), "replace_text", entry.logicalId!!, entry.revisionId!!, text = entry.text)
+        assertThat(mapper.readValue(mapper.writeValueAsString(operation), DraftOperation::class.java)).isEqualTo(operation)
+        val legacyNull = mapper.writeValueAsString(operation).dropLast(1) + ",\"lineBreaksBefore\":null}"
+        assertThat(mapper.readValue(legacyNull, DraftOperation::class.java).lineBreaksBefore).isNull()
+        val changed = operation.copy(format = "plain", lineBreaksBefore = 3)
+        assertThat(mapper.readValue(mapper.writeValueAsString(changed), DraftOperation::class.java)).isEqualTo(changed)
+    }
+
+    @Test
+    fun richReplacementChangesOnlyExplicitLayoutAndRejectsInvalidSeparators() {
+        val entry = text("Exact wording").copy(lineBreaksBefore = 2)
+        val original = listOf(root(entry))
+        val replace = DraftOperation(UUID.randomUUID(), "replace_text", entry.logicalId!!, entry.revisionId!!, text = entry.text)
+        assertThat(StructuredDraftEngine.replay(original, listOf(replace), settings).single().content.single().lineBreaksBefore).isEqualTo(2)
+        assertThat(StructuredDraftEngine.replay(original, listOf(replace.copy(format = "plain")), settings).single().content.single().lineBreaksBefore).isEqualTo(2)
+        val reset = StructuredDraftEngine.replay(original, listOf(replace.copy(format = "plain", lineBreaksBefore = 0)), settings).single()
+        assertThat(reset.content.single().lineBreaksBefore).isZero()
+        assertThat(reset.content.single().text).isEqualTo(entry.text)
+        val write = OrderedSuccessorPlan.build(original, listOf(reset), emptyList()).single().content!!.single()
+        assertThat(write.predecessorRevisionId).isEqualTo(entry.revisionId)
+        assertThat(write.lineBreaksBefore).isZero()
+        for (count in listOf(-1, 17)) {
+            val error = assertThrows(OrderedContentValidationException::class.java) { StructuredDraftEngine.replay(original, listOf(replace.copy(format = "plain", lineBreaksBefore = count)), settings) }
+            assertThat(error.errors.single().code).isEqualTo("TEXT_LINE_BREAKS")
+            val split = DraftOperation(UUID.randomUUID(), "split_text", entry.logicalId!!, entry.revisionId!!, parts = listOf(TextPart(UUID.randomUUID(), "Exact ", lineBreaksBefore = count), TextPart(UUID.randomUUID(), "wording")))
+            assertThrows(OrderedContentValidationException::class.java) { StructuredDraftEngine.replay(original, listOf(split), settings) }
+        }
+        assertThrows(IllegalArgumentException::class.java) { StructuredDraftEngine.replay(original, listOf(replace.copy(lineBreaksBefore = 2)), settings) }
     }
 
     @Test

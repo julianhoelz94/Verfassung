@@ -185,6 +185,7 @@ test('owned work survives role handoffs and published corrections remain readabl
     // Remove the success query parameters: the link must come from saved state.
     await page.goto(sessionPath);
     await page.reload();
+    await sessionDetails(page);
     const resultLink = page.getByRole('link', { name: 'Open published version', exact: true });
     await expect(resultLink).toHaveCount(1);
     await expect(resultLink).toHaveAttribute('href', href);
@@ -206,6 +207,7 @@ test('owned work survives role handoffs and published corrections remain readabl
   }
   await ownWorkRow(page, published[0].sessionId).getByRole('link', { name: 'View progress', exact: true }).click();
   await page.reload();
+  await sessionDetails(page);
   await expect(page.getByRole('link', { name: 'Open published version', exact: true })).toHaveAttribute('href', published[0].href);
   await signOut(page);
 

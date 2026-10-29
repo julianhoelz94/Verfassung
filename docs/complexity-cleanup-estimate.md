@@ -105,6 +105,47 @@ hierarchical diffing. Treat their workflow and fidelity risks separately from
 this validation-only decomposition; the original human effort ranges below
 remain historical estimates, not measured delivery times.
 
+## Work package 3: import/export read-back
+
+Fetched `main` remains at **`4d07d6a`**. This package separates the export
+workflow while retaining its constructor, endpoint and response contracts.
+No new baseline debt or analyzer exemptions are introduced.
+
+| Responsibility | Kotlin file | File score |
+| --- | --- | ---: |
+| Authorization, snapshot loading and response assembly | `ImportExportService.kt` | 14 |
+| Snapshot hashing, flattening, cursors and bounded pages | `ImportExportRecords.kt` | 22 |
+| Source/version/content fidelity and manifest discrepancies | `ImportExportFidelity.kt` | 57 |
+| Ordered resource and linked-document counts | `ImportExportCounts.kt` | 12 |
+
+`export` falls from **57 to 6**, and the extracted directional `compare` falls
+from **35 to 5**. The largest function is the documented historical-default
+predicate at **15**. All four files meet 100; their total is **105**, compared
+with 117 in the original file. Two method exceptions and one file exception
+are removed. KDoc explains authorization boundaries, exact serialized hashes,
+JSON Pointer escaping, UTF-16-safe chunks and directional fidelity defaults.
+
+The contract tests cover ownership/scope checks before downstream access,
+service versus caller credentials, snapshot-bound cursors and their error
+precedence, 200-record pagination, long Unicode text and escaped paths.
+Focused helper tests cover source/settings/version pins, exact mismatch
+ordering, historical defaults, legacy projections, resource counts and the
+100-versus-101 mismatch completeness boundary. Complete mismatch lists are
+retained until response truncation; submitted views never claim persisted
+fidelity or complete linked resources.
+
+The full ingestion check and Spotless pass: **127 tests**, including **27 new
+contract/helper tests**, with no failures or skips. All four export files have
+**100% line coverage (159/159 lines)**; their combined branch coverage is
+215/234. The Kotlin complexity gate reports no new or increased scores.
+
+The current remaining inventory is **16 Kotlin method exceptions, 6 Kotlin file
+exceptions, and 44 TypeScript/JavaScript exceptions plus the deferred EditorPage**.
+Excluding the editor service's two functions leaves **51 production functions
+and 7 test/fixture functions** in the active cleanup scope. Editor code remains
+unchanged. Shared hierarchical diffing and the remaining domain write workflows
+remain separate packages.
+
 ## Original assessment at a maximum of 15
 
 Assessment date: 2026-10-28. Source revision: `5c359b1`, before application

@@ -25,12 +25,13 @@ Classes, objects, and top-level functions in one file share its budget.
 This follows detekt's named-function metric; constructor/property initializers
 and property accessors outside those functions are not scored separately.
 
-The initial file baseline contains eight production files: `EditorService` (179),
-`ImportValidator` (130), `AmendmentService` (116), `HierarchicalDiff` (115),
-`StructuredDraftEngine` (113), `ImportExportService` (111), `OrderedContentService`
-(110), and `CatalogWriteService` (107). The other 303 of 311 scanned Kotlin files
-meet the limit. These are measured findings, not automatic exemptions for future
-files with similar names.
+After synchronizing with `main` at `4d07d6a` and cleaning up import validation,
+the file baseline contains seven production files: `StructuredDraftEngine` (189),
+`EditorService` (179), `ImportExportService` (117), `AmendmentService` (116),
+`CatalogWriteService` (116), `HierarchicalDiff` (115), and `OrderedContentService`
+(102). `ImportValidator` and its focused helpers now meet both budgets. These are
+measured findings, not automatic exemptions for future files with similar names.
+Editor-service refactoring remains deferred until the new editor is ready.
 
 Extracting helpers within one file does not remove their control flow from this
 budget. Reducing nesting can still legitimately lower the total. When a file

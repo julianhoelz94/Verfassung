@@ -12,8 +12,8 @@
     {
       "path": "apps/gateway-web/app/admin/constitutions/OutlineEditor.tsx",
       "function": "OutlineEditor",
-      "hash": "ffda0d4662cdcba48a8afb3abd9b18f85c9185b72f57c14ce14fcdf970f3a37a",
-      "score": 46,
+      "hash": "c7ceed13c55fafb1ad585440390b444e96138dc610a382fe9bb33891d4fcffd1",
+      "score": 51,
       "count": 1
     },
     {
@@ -59,24 +59,31 @@
       "count": 1
     },
     {
+      "path": "apps/gateway-web/app/api/edge-rate-limit/route.ts",
+      "function": "GET",
+      "hash": "61466ddb364eafd403a81f5ac91ca323e44d1ab79de623dc45f300dbbe095e9c",
+      "score": 26,
+      "count": 1
+    },
+    {
       "path": "apps/gateway-web/app/components/ConstitutionText.tsx",
       "function": "ConstitutionText",
-      "hash": "ddb16e29ef2b804daf78c569cd4b4e66ab46a96a04ed271211d1d4610b570a79",
-      "score": 24,
+      "hash": "9e2dda05cfa0b9e81c90914e60d37b50ec9e6cfce479448639a7e73f50611902",
+      "score": 28,
       "count": 1
     },
     {
       "path": "apps/gateway-web/app/components/ConstitutionText.tsx",
       "function": "richText",
-      "hash": "4755a3291abd4360a0a2128f907a173c00acbfaeb5b7e06658189d67060ee888",
-      "score": 33,
+      "hash": "2894262db053aedacf5d1672b6b7c2d0d26e78bfb042ba86b0d33345da036eec",
+      "score": 49,
       "count": 1
     },
     {
       "path": "apps/gateway-web/app/components/ConstitutionText.tsx",
       "function": "<anonymous>",
-      "hash": "ad3535710a54c0f4480d7547c007c6850c58203109c62075af64122e0dde8259",
-      "score": 51,
+      "hash": "44c7928aa264a8a4ec0a2c860b36284a07a2f5a29959fa9af703ab061ad6ae74",
+      "score": 57,
       "count": 1
     },
     {
@@ -96,8 +103,8 @@
     {
       "path": "apps/gateway-web/app/countries/[code]/compare/page.tsx",
       "function": "ComparePage",
-      "hash": "7a784c884ef5c769a6d95149dce3e456144dffb847e45a7da9ef3990c5677894",
-      "score": 45,
+      "hash": "ab81a21ebc41e21db9f3625fabb96ad7843c655e0995174114ff47d2529d23b2",
+      "score": 47,
       "count": 1
     },
     {
@@ -105,6 +112,27 @@
       "function": "VersionPage",
       "hash": "4d44b15fc757cb14b7e7c39d54c7021cbfca80c534e5096cc4bc2abf6de77ff9",
       "score": 31,
+      "count": 1
+    },
+    {
+      "path": "apps/gateway-web/app/editor/ChangeOverview.tsx",
+      "function": "richPreview",
+      "hash": "cdb8aef873feda7041604f525c760068f393d3a8909931455da0d01b2faee12a",
+      "score": 24,
+      "count": 1
+    },
+    {
+      "path": "apps/gateway-web/app/editor/ConstitutionDetailsWorkspace.tsx",
+      "function": "ConstitutionDetailsWorkspace",
+      "hash": "9424d63b8b7b5df9ebd0527e49d456eab0166f0961ba968574c70db88192db6f",
+      "score": 43,
+      "count": 1
+    },
+    {
+      "path": "apps/gateway-web/app/editor/ContinuousCanvas.tsx",
+      "function": "dispatchTransaction",
+      "hash": "6f2ed0dff14c698d9d8b62decf2bb9e6545c63a58f30713679c050612da9f116",
+      "score": 32,
       "count": 1
     },
     {
@@ -137,9 +165,23 @@
     },
     {
       "path": "apps/gateway-web/app/editor/StructuredEditor.tsx",
-      "function": "renderEntry",
-      "hash": "9994ce645880d9868375de4a6b371c352d87ac8ff742b238b836254cff228647",
-      "score": 31,
+      "function": "StructuredEditor",
+      "hash": "4823dd006a7159e8578b9831129248c40ab2ed20883eaf52c86d6c4c04ba401d",
+      "score": 148,
+      "count": 1
+    },
+    {
+      "path": "apps/gateway-web/app/editor/StructuredEditor.tsx",
+      "function": "<anonymous>",
+      "hash": "fafd92ad4f50a87f3df3e662ec93ca3d026fe7934a5ffe0ee8bf4dc70c18ebfa",
+      "score": 94,
+      "count": 1
+    },
+    {
+      "path": "apps/gateway-web/app/editor/StructuredEditor.tsx",
+      "function": "renderNode",
+      "hash": "57add6171ae2c385c7fc6cdeeaaee286d10e62c23c10a2eeb1157bc86d5b11bf",
+      "score": 40,
       "count": 1
     },
     {
@@ -154,6 +196,13 @@
       "function": "POST",
       "hash": "77b22c02c1aa8bb942c1f7e1c69ecc1dd620b7f147ba3dff47f4a719714d80c2",
       "score": 88,
+      "count": 1
+    },
+    {
+      "path": "apps/gateway-web/app/editor/wiki/WikiWorkspace.tsx",
+      "function": "WikiWorkspace",
+      "hash": "9ef2a3ed5825569d986c93fa3483b2a7277348fe101ed2418628064529064363",
+      "score": 29,
       "count": 1
     },
     {
@@ -194,15 +243,15 @@
     {
       "path": "apps/gateway-web/e2e/full/legacy-migration.spec.ts",
       "function": "<anonymous>",
-      "hash": "8fcfd6976ab9180308f0c991a7116fc2de44ee51e3a62c78993cab90a85a9579",
+      "hash": "08be3d9092d7fb246f5cc616ee769473eeee7c57ed7a4fb9592b42b0fbafaf73",
       "score": 30,
       "count": 1
     },
     {
       "path": "apps/gateway-web/e2e/mock-api.mjs",
       "function": "<anonymous>",
-      "hash": "e6a7e4559d11fbf9f442b171e07ee407b113bdf47392d74161692b634dca983b",
-      "score": 476,
+      "hash": "a8d9ff17684a717226d36722eeb944d225d86b28e477abc4024afd1befb50ebf",
+      "score": 493,
       "count": 1
     },
     {
@@ -220,9 +269,16 @@
       "count": 1
     },
     {
+      "path": "apps/gateway-web/lib/continuous-editor.ts",
+      "function": "delimitSentences",
+      "hash": "531b4ff2f85711cc2e76bc1ce6545ff59abee48791131557e8ef6ee544e61a65",
+      "score": 24,
+      "count": 1
+    },
+    {
       "path": "apps/gateway-web/lib/ingestion-api.ts",
       "function": "transitionImportJob",
-      "hash": "cd44101b82b2290aba3d5225bab7756cba3d6684a67799be8cc8937a8423324d",
+      "hash": "7318039080c1249165b8b4cca81332896bf2be8d76f3a4d04ef866385014fe6c",
       "score": 26,
       "count": 1
     },
@@ -236,7 +292,7 @@
     {
       "path": "apps/gateway-web/lib/structured-editor.ts",
       "function": "walk",
-      "hash": "6e79ac2a3d339eb29f6015ee47381049bbb2123cd4d58fb7acdfeb9fb63a7085",
+      "hash": "10cd35fd48aa8979849bc82ffaab58d40b4dd679ccc14b12bdadf4192c4e3386",
       "score": 26,
       "count": 1
     },

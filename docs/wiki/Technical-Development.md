@@ -98,6 +98,9 @@ Import validation demonstrates this boundary: `ImportValidator` retains its publ
 entry points and delegates metadata, outline, ordered-content, legacy and rich-content
 checks to focused classes with KDoc. Contract tests preserve diagnostic codes,
 messages and order, exact legacy text projections and complete-document references.
+Export read-back similarly separates record pagination, fidelity checks and resource
+counts. Tests retain exact snapshot hashes, cursor error precedence, downstream
+authorization, Unicode chunks and explicit completeness reporting.
 
 From the repository root, run `npm ci --prefix scripts/complexity`,
 `./gradlew cognitiveComplexity`, and `npm run check --prefix scripts/complexity`.

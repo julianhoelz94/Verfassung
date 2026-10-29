@@ -25,11 +25,12 @@ Classes, objects, and top-level functions in one file share its budget.
 This follows detekt's named-function metric; constructor/property initializers
 and property accessors outside those functions are not scored separately.
 
-After synchronizing with `main` at `4d07d6a` and cleaning up import validation,
-the file baseline contains seven production files: `StructuredDraftEngine` (189),
-`EditorService` (179), `ImportExportService` (117), `AmendmentService` (116),
+After synchronizing with `main` at `4d07d6a` and cleaning up import validation
+and export read-back, the file baseline contains six production files:
+`StructuredDraftEngine` (189), `EditorService` (179), `AmendmentService` (116),
 `CatalogWriteService` (116), `HierarchicalDiff` (115), and `OrderedContentService`
-(102). `ImportValidator` and its focused helpers now meet both budgets. These are
+(102). `ImportValidator`, `ImportExportService` and their focused helpers meet
+both budgets. These are
 measured findings, not automatic exemptions for future files with similar names.
 Editor-service refactoring remains deferred until the new editor is ready.
 

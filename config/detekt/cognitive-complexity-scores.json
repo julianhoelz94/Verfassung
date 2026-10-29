@@ -54,16 +54,6 @@
       "score": 155
     },
     {
-      "path": "services/ingestion-service/src/main/kotlin/com/constitutionatlas/ingestion/service/ImportExportService.kt",
-      "function": "compare",
-      "score": 35
-    },
-    {
-      "path": "services/ingestion-service/src/main/kotlin/com/constitutionatlas/ingestion/service/ImportExportService.kt",
-      "function": "export",
-      "score": 57
-    },
-    {
       "path": "services/ingestion-service/src/main/kotlin/com/constitutionatlas/ingestion/service/ImportService.kt",
       "function": "importVersion",
       "score": 22
@@ -114,10 +104,6 @@
     {
       "path": "services/editor-service/src/main/kotlin/com/constitutionatlas/editor/service/StructuredDraftEngine.kt",
       "score": 189
-    },
-    {
-      "path": "services/ingestion-service/src/main/kotlin/com/constitutionatlas/ingestion/service/ImportExportService.kt",
-      "score": 117
     },
     {
       "path": "services/platform/src/main/kotlin/com/constitutionatlas/platform/HierarchicalDiff.kt",

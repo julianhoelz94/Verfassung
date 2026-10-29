@@ -6,7 +6,6 @@
     <ID>CognitiveComplexFile:CatalogWriteService.kt$com.constitutionatlas.catalog.service.CatalogWriteService.kt</ID>
     <ID>CognitiveComplexFile:EditorService.kt$com.constitutionatlas.editor.service.EditorService.kt</ID>
     <ID>CognitiveComplexFile:HierarchicalDiff.kt$com.constitutionatlas.platform.HierarchicalDiff.kt</ID>
-    <ID>CognitiveComplexFile:ImportExportService.kt$com.constitutionatlas.ingestion.service.ImportExportService.kt</ID>
     <ID>CognitiveComplexFile:OrderedContentService.kt$com.constitutionatlas.content.service.OrderedContentService.kt</ID>
     <ID>CognitiveComplexFile:StructuredDraftEngine.kt$com.constitutionatlas.editor.service.StructuredDraftEngine.kt</ID>
     <ID>CognitiveComplexMethod:AmendmentDiff.kt$AmendmentDiff$fun diff(source: List&lt;FlatNode&gt;, target: List&lt;FlatNode&gt;): List&lt;NodeChange&gt;</ID>
@@ -17,8 +16,6 @@
     <ID>CognitiveComplexMethod:EditorService.kt$EditorService$@Transactional fun publish(authorization: String?, sessionId: UUID, request: PublishRequest): DraftPreviewDto</ID>
     <ID>CognitiveComplexMethod:HierarchicalDiff.kt$HierarchicalDiff$fun compare( beforeVersionId: UUID?, before: List&lt;DiffNode&gt;, afterVersionId: UUID?, after: List&lt;DiffNode&gt;, beforeSettingsRevisionId: UUID? = null, afterSettingsRevisionId: UUID? = null, skipSharedRevision: Boolean = true, ): DiffRun</ID>
     <ID>CognitiveComplexMethod:ImportApiTest.kt$ImportApiTest$@Test fun directBatchAndChunkedImportsRequireMarkersAndAllowSharedNotes()</ID>
-    <ID>CognitiveComplexMethod:ImportExportService.kt$ImportExportService$fun export(id: UUID, actor: Actor, view: String, cursor: String?, authorization: String? = null): ImportExportPage</ID>
-    <ID>CognitiveComplexMethod:ImportExportService.kt$ImportExportService$private fun compare(expected: JsonNode, actual: JsonNode, path: String, result: MutableList&lt;FidelityMismatch&gt;)</ID>
     <ID>CognitiveComplexMethod:ImportService.kt$ImportService$@Transactional fun importVersion(authorization: String?, submittedBy: UUID, request: ImportRequest, batchId: UUID? = null, idempotencyKey: String? = null, expectedChecksum: String? = null): ImportJobDto</ID>
     <ID>CognitiveComplexMethod:MigrationService.kt$MigrationService$fun prepare(run: UUID, itemId: UUID, actor: Actor, authorization: String?): MigrationItem</ID>
     <ID>CognitiveComplexMethod:OrderedContentService.kt$OrderedContentService$@Transactional fun save(version: UUID, request: OrderedSnapshotWrite): OrderedSnapshot</ID>

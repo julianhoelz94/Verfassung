@@ -234,9 +234,11 @@ def env_payload(manifest):
     values.update({
         "PUBLIC_BASE_URL": manifest["public_url"],
         "NEXT_PUBLIC_BASE_URL": manifest["public_url"],
+        # Explicitly clear older artifacts' version instead of retaining a newer deployment's tag.
+        "DEPLOYED_TAG": manifest.get("release_tag", ""),
         "PROFILE": "production", "TLS_MODE": "external-proxy",
         "SESSION_COOKIE_SECURE": "true", "IDENTITY_SEED_MODE": "off",
-        "CADDY_EXPOSE_API_DOCS": "false",
+        "CADDY_EXPOSE_API_DOCS": "true",
     })
     values.update({key: "{{environment." + key + "}}" for key in SHARED_VARIABLES})
     # The production identity bootstrap registers these hashes with one narrow

@@ -14,6 +14,13 @@ SHA = re.compile(r"[a-f0-9]{40}\Z")
 RUN_NUMBER = re.compile(r"[1-9][0-9]*\Z")
 
 
+def validate_release_tag(tag):
+    if (not isinstance(tag, str) or not tag or tag.startswith("refs/")
+            or any(character.isspace() or ord(character) < 32 or ord(character) == 127 for character in tag)):
+        raise ValueError("Select a published release tag by its exact name")
+    return tag
+
+
 def image_paths(root):
     root = Path(root)
     paths = {
@@ -81,6 +88,9 @@ def validate_manifest(manifest, root, repository, environment, source_sha):
     for key, value in expected.items():
         if manifest.get(key) != value:
             raise ValueError(f"Release manifest has an unexpected {key}")
+    # Older release artifacts predate display metadata and remain deployable.
+    if "release_tag" in manifest:
+        validate_release_tag(manifest["release_tag"])
     images = manifest.get("images")
     if not isinstance(images, dict) or set(images) != set(image_paths(root)):
         raise ValueError("Release manifest does not contain exactly the application images")
@@ -94,6 +104,8 @@ def write_manifest(directory, manifest):
     directory.mkdir(parents=True, exist_ok=True)
     (directory / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
     override = {"services": {name: {"image": image} for name, image in manifest["images"].items()}}
+    # Compose interpolates dollar signs even inside JSON string values.
+    override["services"]["gateway-web"]["environment"] = {"DEPLOYED_TAG": manifest.get("release_tag", "").replace("$", "$$")}
     (directory / "release-images.compose.json").write_text(json.dumps(override, indent=2) + "\n")
 
 

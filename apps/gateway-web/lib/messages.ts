@@ -1904,6 +1904,10 @@ export const ui = {
   },
   about: {
     page: {
+      deployedVersion: { en: "Deployed version", de: "Bereitgestellte Version" },
+      versionUnavailable: { en: "No release tag available.", de: "Kein Release-Tag verfügbar." },
+      apiDocumentation: { en: "API documentation", de: "API-Dokumentation" },
+      swaggerAvailability: { en: "Explore each service’s API in Swagger UI. Documentation is public; protected API operations require authorization.", de: "Erkunden Sie die API jedes Dienstes in Swagger UI. Die Dokumentation ist öffentlich; geschützte API-Aufrufe erfordern eine Berechtigung." },
       accessibility: { en: "Accessibility", de: "Barrierefreiheit" },
       constitutionAtlasIsAPublicReadingSite: { en: "Constitution Atlas is a public reading site for versioned constitutions. Each country page lists published versions; each version shows the articles as they stood on that date, with amendment history and search.", de: "Constitution Atlas ist eine öffentliche Leseseite für versionierte Verfassungen. Jede Länderseite listet veröffentlichte Versionen auf; jede Version zeigt die Artikel, wie sie an diesem Datum standen, mit Änderungshistorie und Suche." },
       everyPublishedVersionRecordsWhereTheText: { en: "Every published version records where the text came from: an official gazette, a government publication, or an imported corpus. Provenance on version and article pages names that source so you can check it against the original.", de: "In jeder veröffentlichten Version wird festgehalten, woher der Text stammt: ein Amtsblatt, eine Regierungsveröffentlichung oder ein importiertes Korpus. Die Herkunft auf Versions- und Artikelseiten nennt diese Quelle, damit Sie sie mit dem Original vergleichen können." },

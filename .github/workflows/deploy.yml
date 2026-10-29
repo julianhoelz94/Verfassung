@@ -32,6 +32,7 @@ jobs:
     timeout-minutes: 50
     outputs:
       source-sha: ${{ steps.release.outputs.source-sha }}
+      release-tag: ${{ steps.release.outputs.release-tag }}
       image-matrix: ${{ steps.images.outputs.matrix }}
     permissions:
       contents: read
@@ -122,9 +123,11 @@ jobs:
       - name: Require every image from this workflow run, source revision and environment
         env:
           DEPLOYMENT_ENVIRONMENT: ${{ inputs.environment }}
+          RELEASE_TAG: ${{ needs.authorize.outputs.release-tag }}
         run: |
           python3 scripts/cd/collect_images.py --repository "$GITHUB_REPOSITORY" \
-            --environment "$DEPLOYMENT_ENVIRONMENT" --source-sha "$SOURCE_SHA" --run-id "$GITHUB_RUN_ID"
+            --environment "$DEPLOYMENT_ENVIRONMENT" --source-sha "$SOURCE_SHA" --run-id "$GITHUB_RUN_ID" \
+            --release-tag "$RELEASE_TAG"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: release-candidate

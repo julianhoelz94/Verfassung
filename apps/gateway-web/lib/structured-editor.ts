@@ -89,9 +89,6 @@ export function remapDraftTargets(roots: DraftNode[], op: DraftOperation): Draft
   return roots.map(walk);
 }
 
-/** Compatibility for callers restoring a previously projected draft. */
-export const remapAnnotationAnchors = remapDraftTargets;
-
 function markInserted(node: DraftNode, id: string): DraftNode {
   return { ...node, draftId: id, content: node.content.map(entry => entry.node ? { ...entry, node: markInserted(entry.node, id) } : { ...entry, draftId: id }) };
 }

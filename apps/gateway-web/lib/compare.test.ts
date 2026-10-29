@@ -111,6 +111,16 @@ describe('structured endpoint comparison', () => {
     }],
   });
 
+  it('includes authored sentence separators in changed-only comparisons', () => {
+    const text: OrderedEntry = { type: 'text', logicalId: 'sentence', text: 'The same wording.' };
+    const snapshot = (count?: number) => root('version', [{ ...text, ...(count == null ? {} : { lineBreaksBefore: count }) }]);
+    expect(netArticleKind(snapshot(), snapshot(0), [])).toBe('same');
+    expect(netArticleKind(snapshot(1), snapshot(1), [])).toBe('same');
+    expect(netArticleKind(snapshot(), snapshot(1), [])).toBe('changed');
+    expect(netArticleKind(snapshot(1), snapshot(2), [])).toBe('changed');
+    expect(netArticleKind(snapshot(1), snapshot(0), [])).toBe('changed');
+  });
+
   it('keeps a republished preamble unchanged despite new revision, occurrence and provenance IDs', () => {
     const left = { ...root('from'), predecessorRevisionId: 'original-revision' };
     const right = { ...root('to'), predecessorRevisionId: left.revisionId };

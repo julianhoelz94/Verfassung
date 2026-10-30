@@ -13,7 +13,7 @@ on:
           - test
           - prod
       prepopulate:
-        description: Upload and publish generated fixture content after deployment (requires completed site setup and fixture accounts)
+        description: Upload and publish generated fixture content after deployment (requires completed site setup and admin credentials)
         type: boolean
         required: false
         default: false
@@ -187,16 +187,6 @@ jobs:
           PREPOPULATE_ADMIN_EMAIL: ${{ secrets.PREPOPULATE_ADMIN_EMAIL }}
           PREPOPULATE_ADMIN_PASSWORD: ${{ secrets.PREPOPULATE_ADMIN_PASSWORD }}
           PREPOPULATE_TOTP_SECRET: ${{ secrets.PREPOPULATE_TOTP_SECRET }}
-          PREPOPULATE_REVIEWER_EMAIL: ${{ secrets.PREPOPULATE_REVIEWER_EMAIL }}
-          PREPOPULATE_REVIEWER_PASSWORD: ${{ secrets.PREPOPULATE_REVIEWER_PASSWORD }}
-          PREPOPULATE_PUBLISHER_EMAIL: ${{ secrets.PREPOPULATE_PUBLISHER_EMAIL }}
-          PREPOPULATE_PUBLISHER_PASSWORD: ${{ secrets.PREPOPULATE_PUBLISHER_PASSWORD }}
-          PREPOPULATE_PUBLISHER_TOTP_SECRET: ${{ secrets.PREPOPULATE_PUBLISHER_TOTP_SECRET }}
-          PREPOPULATE_EDITOR_EMAIL: ${{ secrets.PREPOPULATE_EDITOR_EMAIL }}
-          PREPOPULATE_EDITOR_PASSWORD: ${{ secrets.PREPOPULATE_EDITOR_PASSWORD }}
-          PREPOPULATE_EDITOR_TOTP_SECRET: ${{ secrets.PREPOPULATE_EDITOR_TOTP_SECRET }}
-          PREPOPULATE_VIEWER_EMAIL: ${{ secrets.PREPOPULATE_VIEWER_EMAIL }}
-          PREPOPULATE_VIEWER_PASSWORD: ${{ secrets.PREPOPULATE_VIEWER_PASSWORD }}
         run: |
           for setting in COOLIFY_URL COOLIFY_PROJECT_UUID COOLIFY_SERVER_UUID PUBLIC_BASE_URL \
             COOLIFY_CONFIG_TOKEN COOLIFY_DEPLOY_TOKEN TS_CLIENT_ID TS_AUDIENCE TS_TAGS; do
@@ -247,18 +237,6 @@ jobs:
           PREPOPULATE_ADMIN_EMAIL: ${{ secrets.PREPOPULATE_ADMIN_EMAIL }}
           PREPOPULATE_ADMIN_PASSWORD: ${{ secrets.PREPOPULATE_ADMIN_PASSWORD }}
           PREPOPULATE_TOTP_SECRET: ${{ secrets.PREPOPULATE_TOTP_SECRET }}
-          PREPOPULATE_REVIEWER_EMAIL: ${{ secrets.PREPOPULATE_REVIEWER_EMAIL }}
-          PREPOPULATE_REVIEWER_PASSWORD: ${{ secrets.PREPOPULATE_REVIEWER_PASSWORD }}
-          PREPOPULATE_REVIEWER_TOTP_SECRET: ${{ secrets.PREPOPULATE_REVIEWER_TOTP_SECRET }}
-          PREPOPULATE_PUBLISHER_EMAIL: ${{ secrets.PREPOPULATE_PUBLISHER_EMAIL }}
-          PREPOPULATE_PUBLISHER_PASSWORD: ${{ secrets.PREPOPULATE_PUBLISHER_PASSWORD }}
-          PREPOPULATE_PUBLISHER_TOTP_SECRET: ${{ secrets.PREPOPULATE_PUBLISHER_TOTP_SECRET }}
-          PREPOPULATE_EDITOR_EMAIL: ${{ secrets.PREPOPULATE_EDITOR_EMAIL }}
-          PREPOPULATE_EDITOR_PASSWORD: ${{ secrets.PREPOPULATE_EDITOR_PASSWORD }}
-          PREPOPULATE_EDITOR_TOTP_SECRET: ${{ secrets.PREPOPULATE_EDITOR_TOTP_SECRET }}
-          PREPOPULATE_VIEWER_EMAIL: ${{ secrets.PREPOPULATE_VIEWER_EMAIL }}
-          PREPOPULATE_VIEWER_PASSWORD: ${{ secrets.PREPOPULATE_VIEWER_PASSWORD }}
-          PREPOPULATE_VIEWER_TOTP_SECRET: ${{ secrets.PREPOPULATE_VIEWER_TOTP_SECRET }}
         run: |
           npm run prepopulate -- --profile "$PREPOPULATE_PROFILE"
           npm run prepopulate -- --profile "$PREPOPULATE_PROFILE" --verify-only

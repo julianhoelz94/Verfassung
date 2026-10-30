@@ -2,6 +2,7 @@ import argparse
 import copy
 import json
 import os
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -375,9 +376,9 @@ class RuntimeTests(unittest.TestCase):
         self.assertEqual(populate["if"], "inputs.prepopulate")
         self.assertIn('--profile "$PREPOPULATE_PROFILE" --verify-only', populate["run"])
         self.assertEqual(populate["env"]["PREPOPULATE_PROFILE"], "${{ inputs.prepopulate_profile || 'compact' }}")
-        for role in ("EDITOR", "VIEWER"):
+        for role in ("REVIEWER", "PUBLISHER", "EDITOR", "VIEWER"):
             for field in ("EMAIL", "PASSWORD", "TOTP_SECRET"):
-                self.assertIn(f"PREPOPULATE_{role}_{field}", populate["env"])
+                self.assertNotIn(f"PREPOPULATE_{role}_{field}", populate["env"])
         restore = next(step for step in steps if step.get("name") == "Restore the deployment fixture journal")
         self.assertEqual(restore["with"]["merge-multiple"], "true")
         self.assertEqual(restore["with"]["artifact-ids"], "${{ steps.fixture-state.outputs.artifact-id }}")
@@ -420,6 +421,30 @@ class RuntimeTests(unittest.TestCase):
                         self.assertNotIn("$GITHUB_SHA", command)
         populate = next(step for step in jobs["deploy"]["steps"] if step.get("id") == "prepopulate")
         self.assertEqual(populate["working-directory"], "apps/gateway-web")
+
+    def test_prepopulate_needs_only_the_existing_admin_and_checks_mfa_before_rollout(self):
+        workflow = yaml.load((ROOT / ".github/workflows/deploy.yml").read_text(), Loader=yaml.BaseLoader)
+        steps = workflow["jobs"]["deploy"]["steps"]
+        populate = next(step for step in steps if step.get("id") == "prepopulate")
+        credentials = {"PREPOPULATE_ADMIN_EMAIL", "PREPOPULATE_ADMIN_PASSWORD", "PREPOPULATE_TOTP_SECRET"}
+        self.assertEqual({name for name in populate["env"] if name.endswith(("EMAIL", "PASSWORD", "SECRET"))}, credentials)
+        preflight = next(step for step in steps if step.get("name") == "Require deployment settings")
+        environment = {name: "configured" for name in preflight["env"]}
+        environment.update({name: "configured" for name in workflow["jobs"]["deploy"]["env"]})
+        environment["PREPOPULATE"] = "true"
+        environment["PREPOPULATE_PROFILE"] = "compact"
+        result = subprocess.run(["bash", "-c", preflight["run"]], env=environment, cwd=ROOT, capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        for setting in credentials:
+            with self.subTest(setting=setting):
+                result = subprocess.run(["bash", "-c", preflight["run"]], env={**environment, setting: ""}, cwd=ROOT, capture_output=True, text=True)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn(setting, result.stdout + result.stderr)
+        for setting in credentials:
+            environment.pop(setting)
+        environment["PREPOPULATE"] = "false"
+        result = subprocess.run(["bash", "-c", preflight["run"]], env=environment, cwd=ROOT, capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
 
 if __name__ == "__main__":

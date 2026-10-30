@@ -14,12 +14,9 @@ export function prepopulateTarget(env) {
     if (baseUrl.origin !== deploymentOrigins[env.PREPOPULATE_DEPLOYMENT_ENVIRONMENT]) {
       throw new Error('Prepopulate origin does not match the selected deployment environment');
     }
-    const accounts = ['ADMIN', 'REVIEWER', 'PUBLISHER'].map(role => {
-      const email = env[`PREPOPULATE_${role}_EMAIL`];
-      if (!email || !env[`PREPOPULATE_${role}_PASSWORD`]) throw new Error(`Set PREPOPULATE_${role}_EMAIL/PASSWORD`);
-      return email.toLowerCase();
-    });
-    if (new Set(accounts).size !== 3) throw new Error('Prepopulate requires separate administrator, reviewer and publisher accounts');
+    for (const setting of ['PREPOPULATE_ADMIN_EMAIL', 'PREPOPULATE_ADMIN_PASSWORD', 'PREPOPULATE_TOTP_SECRET']) {
+      if (!env[setting]) throw new Error(`Set ${setting}`);
+    }
   } else if (!['127.0.0.1', 'localhost', '::1', '[::1]'].includes(baseUrl.hostname) || env.PREPOPULATE_TEST_STACK !== 'true') {
     throw new Error('prepopulate requires an explicit localhost test stack or a selected deployment environment');
   }
@@ -46,9 +43,9 @@ function totp(secret) {
 }
 
 export async function authenticateFixtures(api, env, extended = false) {
-  const password = env.PREPOPULATE_ADMIN_PASSWORD || env.CI_ADMIN_PASSWORD || env.LOCAL_ADMIN_PASSWORD;
-  const secret = env.PREPOPULATE_TOTP_SECRET || env.IDENTITY_SEED_TOTP_SECRET || (env.LOCAL_ADMIN_EMAIL ? 'CAATLASMFASEED22' : undefined);
   const remote = Boolean(env.PREPOPULATE_DEPLOYMENT_ENVIRONMENT);
+  const password = env.PREPOPULATE_ADMIN_PASSWORD || (remote ? undefined : env.CI_ADMIN_PASSWORD || env.LOCAL_ADMIN_PASSWORD);
+  const secret = env.PREPOPULATE_TOTP_SECRET || (remote ? undefined : env.IDENTITY_SEED_TOTP_SECRET || (env.LOCAL_ADMIN_EMAIL ? 'CAATLASMFASEED22' : undefined));
   async function login(role) {
     const email = env[`PREPOPULATE_${role}_EMAIL`] || (remote ? undefined :
       env[`CI_${role}_EMAIL`] || env[`LOCAL_${role}_EMAIL`] || (role !== 'ADMIN' ? `${env.CI_ADMIN_EMAIL ? 'ci' : 'local'}-${role.toLowerCase()}@example.local` : undefined));
@@ -63,10 +60,13 @@ export async function authenticateFixtures(api, env, extended = false) {
     if (!session.token) throw new Error(`Prepopulate ${role.toLowerCase()} login returned no session token`);
     return session.token;
   }
-  return { token: await login('ADMIN'), reviewerToken: await login('REVIEWER'), publisherToken: await login('PUBLISHER'), ...(extended ? { editorToken: await login('EDITOR'), viewerToken: await login('VIEWER') } : {}) };
+  const token = await login('ADMIN');
+  // CD uses the existing administrator. CI retains actual restricted-role accounts.
+  if (remote) return { token, reviewerToken: token, publisherToken: token, ...(extended ? { editorToken: token, viewerToken: false } : {}) };
+  return { token, reviewerToken: await login('REVIEWER'), publisherToken: await login('PUBLISHER'), ...(extended ? { editorToken: await login('EDITOR'), viewerToken: await login('VIEWER') } : {}) };
 }
 
 export async function requireCompletedFixtureSetup(api) {
   const setup = await api('GET', 'identity/setup/status');
-  if (setup.completed !== true) throw new Error('Complete the site setup wizard and create fixture accounts before running prepopulate.');
+  if (setup.completed !== true) throw new Error('Complete the site setup wizard before running prepopulate.');
 }

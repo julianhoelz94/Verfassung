@@ -20,18 +20,10 @@ def validate_credentials(env):
     profile = env.get("PREPOPULATE_PROFILE", "compact")
     if profile not in PROFILES:
         raise ValueError("Select compact, extended or scale as the fixture profile")
-    roles = ["ADMIN", "REVIEWER", "PUBLISHER"]
-    required = ["PREPOPULATE_TOTP_SECRET", "PREPOPULATE_PUBLISHER_TOTP_SECRET"]
-    if profile != "compact":
-        roles += ["EDITOR", "VIEWER"]
-        required += ["PREPOPULATE_EDITOR_TOTP_SECRET"]
-    required += [f"PREPOPULATE_{role}_{field}" for role in roles for field in ("EMAIL", "PASSWORD")]
+    required = ["PREPOPULATE_ADMIN_EMAIL", "PREPOPULATE_ADMIN_PASSWORD", "PREPOPULATE_TOTP_SECRET"]
     missing = [key for key in required if not env.get(key, "").strip()]
     if missing:
         raise ValueError("Missing environment secrets: " + ", ".join(missing))
-    emails = [env[f"PREPOPULATE_{role}_EMAIL"].strip().lower() for role in roles]
-    if len(set(emails)) != len(emails):
-        raise ValueError("Use separate fixture accounts for " + ", ".join(roles))
 
 
 def find_state(repository, environment, token, get=None, resolve=None):

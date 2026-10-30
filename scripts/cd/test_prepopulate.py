@@ -16,11 +16,8 @@ SHA = "a" * 40
 
 def credentials(profile="compact"):
     env = {"PREPOPULATE": "true", "PREPOPULATE_PROFILE": profile,
-           "PREPOPULATE_TOTP_SECRET": "admin-key", "PREPOPULATE_PUBLISHER_TOTP_SECRET": "publisher-key",
-           "PREPOPULATE_EDITOR_TOTP_SECRET": "editor-key"}
-    for role in ("ADMIN", "REVIEWER", "PUBLISHER", "EDITOR", "VIEWER"):
-        env[f"PREPOPULATE_{role}_EMAIL"] = role.lower() + "@example.test"
-        env[f"PREPOPULATE_{role}_PASSWORD"] = "private-" + role
+           "PREPOPULATE_ADMIN_EMAIL": "admin@example.test", "PREPOPULATE_ADMIN_PASSWORD": "private-ADMIN",
+           "PREPOPULATE_TOTP_SECRET": "admin-key"}
     return env
 
 
@@ -41,30 +38,20 @@ class FixtureCredentialsTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             prepopulate.validate_credentials({"PREPOPULATE": "yes"})
 
-    def test_compact_requires_three_accounts_and_mandatory_totp_only(self):
-        env = credentials()
-        for key in list(env):
-            if key.startswith(("PREPOPULATE_EDITOR_", "PREPOPULATE_VIEWER_")):
-                del env[key]
-        prepopulate.validate_credentials(env)
-        for key in ("PREPOPULATE_ADMIN_PASSWORD", "PREPOPULATE_TOTP_SECRET", "PREPOPULATE_PUBLISHER_TOTP_SECRET"):
-            with self.subTest(key=key), self.assertRaisesRegex(ValueError, key):
-                prepopulate.validate_credentials({**env, key: ""})
-
-    def test_extended_and_scale_require_editor_and_viewer_and_separate_accounts(self):
-        for profile in ("extended", "scale"):
+    def test_all_profiles_need_only_the_existing_admin(self):
+        for profile in ("compact", "extended", "scale"):
             env = credentials(profile)
             prepopulate.validate_credentials(env)
-            for key in ("PREPOPULATE_EDITOR_EMAIL", "PREPOPULATE_VIEWER_PASSWORD", "PREPOPULATE_EDITOR_TOTP_SECRET"):
+            for key in ("PREPOPULATE_ADMIN_EMAIL", "PREPOPULATE_ADMIN_PASSWORD", "PREPOPULATE_TOTP_SECRET"):
                 with self.subTest(profile=profile, key=key), self.assertRaisesRegex(ValueError, key):
                     prepopulate.validate_credentials({**env, key: ""})
-            with self.assertRaisesRegex(ValueError, "separate fixture accounts"):
-                prepopulate.validate_credentials({**env, "PREPOPULATE_VIEWER_EMAIL": env["PREPOPULATE_ADMIN_EMAIL"].upper()})
+
+    def test_invalid_profiles_are_rejected_without_disclosing_credentials(self):
         with self.assertRaisesRegex(ValueError, "profile"):
             prepopulate.validate_credentials(credentials("typo"))
         with self.assertRaises(ValueError) as error:
             prepopulate.validate_credentials({**credentials(), "PREPOPULATE_ADMIN_EMAIL": ""})
-        self.assertNotIn("private-PUBLISHER", str(error.exception))
+        self.assertNotIn("private-ADMIN", str(error.exception))
 
 
 class FixtureStateTest(unittest.TestCase):

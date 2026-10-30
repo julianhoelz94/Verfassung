@@ -518,7 +518,14 @@ jobs:
         env:
           WIKI_MEDIA_CAPTURE: verify
         run: ./node_modules/.bin/playwright test --config=playwright.wiki-recording.config.js
+      - name: Verify optional scale fixtures after browser journeys
+        working-directory: apps/gateway-web
+        run: |
+          npm run prepopulate -- --profile scale
+          npm run prepopulate -- --profile scale --verify-only
       - name: Verify disposable full-stack backup recovery
+        env:
+          PREPOPULATE_PROFILE: scale
         run: |
           python3 -m venv "$RUNNER_TEMP/recovery-coverage"
           "$RUNNER_TEMP/recovery-coverage/bin/pip" install coverage==7.17.0
@@ -542,11 +549,6 @@ jobs:
           path: test-results/recovery-report.json
           if-no-files-found: warn
           retention-days: 7
-      - name: Verify optional scale fixtures after browser journeys
-        working-directory: apps/gateway-web
-        run: |
-          npm run prepopulate -- --profile scale
-          npm run prepopulate -- --profile scale --verify-only
       - name: Verify local HTTPS authentication and deployment persistence
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         shell: bash

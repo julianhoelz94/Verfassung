@@ -133,6 +133,16 @@ def public_document_snapshot(stack, client):
     raise RuntimeError("drill needs a publicly readable pinned source-document file")
 
 
+def verify_fixture_readback(node, base_url):
+    checked = subprocess.run([node, "e2e/fixtures/prepopulate.mjs", "--verify-only"],
+                             cwd=ROOT / "apps/gateway-web", env={**os.environ,
+                                 "PREPOPULATE_BASE_URL": base_url, "PREPOPULATE_TEST_STACK": "true"},
+                             text=True, capture_output=True, timeout=300)
+    if checked.returncode:
+        detail = checked.stderr.strip()[-2000:]
+        raise RuntimeError("restored authentication/content/amendment/search fixture read-back failed: " + detail)
+
+
 def drill(args):
     stack = Stack(args.project, args.env_file)
     config = json.loads(stack.run("config", "--format", "json").stdout)
@@ -196,12 +206,7 @@ def drill(args):
     with urllib.request.urlopen(request, timeout=120) as response:
         if json.load(response).get("status") != "ready":
             raise RuntimeError("restored Search rebuild failed")
-    checked = subprocess.run([args.node, "e2e/fixtures/prepopulate.mjs", "--verify-only"],
-                             cwd=ROOT / "apps/gateway-web", env={**os.environ,
-                                 "PREPOPULATE_BASE_URL": args.base_url, "PREPOPULATE_TEST_STACK": "true"},
-                             text=True, capture_output=True, timeout=300)
-    if checked.returncode:
-        raise RuntimeError("restored authentication/content/amendment/search fixture read-back failed")
+    verify_fixture_readback(args.node, args.base_url)
     fixture_ids = json.loads((ROOT / "apps/gateway-web/e2e/fixtures/generated/.runtime/prepopulate-ids.json").read_text())
     monitor = Client(args.base_url, config["services"]["identity-service"]["environment"]["IDENTITY_SEED_SERVICE_TOKEN"])
     version = monitor.get("/api/catalog/versions/" + fixture_ids["versions"]["xa-2024"])

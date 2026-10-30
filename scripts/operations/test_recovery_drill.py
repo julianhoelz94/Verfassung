@@ -1,4 +1,5 @@
 import os
+import subprocess
 import hashlib
 import json
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -6,7 +7,7 @@ from threading import Thread
 import unittest
 from unittest.mock import patch
 
-from recovery_drill import Client, DATABASES, document_snapshot, validate_target
+from recovery_drill import Client, DATABASES, document_snapshot, validate_target, verify_fixture_readback
 
 
 def config(project="verfassung-recovery-test"):
@@ -50,6 +51,17 @@ class RecoveryTargetTest(unittest.TestCase):
             validate_target("full-stack-e2e", "full-stack-e2e", "http://localhost", config("full-stack-e2e"))
         with patch.dict(os.environ, {"CI": "true"}, clear=True):
             validate_target("full-stack-e2e", "full-stack-e2e", "http://localhost", config("full-stack-e2e"))
+
+
+class FixtureReadbackTest(unittest.TestCase):
+    def test_readback_is_read_only_and_reports_the_failing_fixture(self):
+        with patch("recovery_drill.subprocess.run", return_value=subprocess.CompletedProcess([], 0, "", "")) as run:
+            verify_fixture_readback("node", "http://localhost:18080")
+            self.assertEqual(run.call_args.args[0], ["node", "e2e/fixtures/prepopulate.mjs", "--verify-only"])
+            self.assertEqual(run.call_args.kwargs["env"]["PREPOPULATE_BASE_URL"], "http://localhost:18080")
+        with patch("recovery_drill.subprocess.run", return_value=subprocess.CompletedProcess([], 1, "", "AssertionError: missing fixture")):
+            with self.assertRaisesRegex(RuntimeError, "AssertionError: missing fixture"):
+                verify_fixture_readback("node", "http://localhost:18080")
 
 
 class DocumentRecoveryTest(unittest.TestCase):

@@ -11,7 +11,7 @@ const ids = JSON.parse(readFileSync(join(__dirname, '..', 'fixtures', 'generated
 test('visitor reads a published constitution and an article through the real stack', async ({ page, request }) => {
   await page.goto('/');
   await page.getByRole('link', { name: 'Atlas Testland' }).click();
-  await expect(page.getByRole('heading', { name: 'Atlas Testland' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Atlas Testland', level: 1, exact: true })).toBeVisible();
   const charter = page.locator('section.card').filter({ has: page.getByRole('heading', { name: 'Atlas Test Charter' }) });
   await charter.getByRole('link', { name: 'Read latest' }).click();
   await expect(page).toHaveURL(new RegExp(`/countries/XA/versions/${ids.versions['xa-2024']}$`));

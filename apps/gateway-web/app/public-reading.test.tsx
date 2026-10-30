@@ -197,7 +197,7 @@ describe('article permalinks and legal-edition history', () => {
     expect(await render(page())).toContain('role="status"');
   });
   it('renders the requested historical unit with a stable snapshot permalink', async () => {
-    const output = await render(ArticlePage(articleProps())); expect(output).toContain('Some citizens may vote.'); expect(output).toContain('/countries/XA/versions/law-1949/articles/old-1'); expect(output).toContain('/versions/correction-1949');
+    const output = await render(ArticlePage(articleProps())); expect(output).toContain('Some citizens may vote.'); expect(output).toContain('id="unit-old-1"'); expect(output).toContain('/versions/correction-1949');
     expect((await articleMetadata(articleProps())).alternates?.canonical).toContain('/versions/law-1949/articles/old-1');
   });
   it.each(passageRoutes)('rejects a unit from another snapshot at a %s permalink', async (_name, page) => {

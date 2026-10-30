@@ -27,13 +27,13 @@ afterEach(async () => {
   await act(async () => root.unmount()); host.remove(); window.history.replaceState({}, '', '/'); vi.unstubAllGlobals();
 });
 
-it('opens the exact historical note from a legacy fragment and retains an owner-neutral snapshot permalink', async () => {
+it('opens the exact historical note from a legacy fragment without inventing a country route', async () => {
   window.history.replaceState({}, '', '/#fn-note-occurrence');
   await act(async () => root.render(<VersionReader jurisdictionId="historical-region" versionId="old-snapshot" articles={articles} outline={outline} />));
   expect(host.querySelector('#unit-root')).not.toBeNull();
   expect(host.textContent).toContain('Exact historical source note.');
   expect(host.querySelector('#fn-note-occurrence')).not.toBeNull();
-  expect(host.querySelector('a[href="/versions/old-snapshot/units/root"]')).not.toBeNull();
+  expect(host.querySelector('a[href="#unit-root"]')).not.toBeNull();
   expect(host.querySelector('a[href^="/countries/"]')).toBeNull();
   expect(host.querySelectorAll('#root')).toHaveLength(1);
 });
@@ -60,7 +60,7 @@ it.each([
 it('keeps the regional reader text in the server response when JavaScript is disabled', () => {
   const html = renderToStaticMarkup(<VersionReader jurisdictionId="region" versionId="old-snapshot" articles={articles} outline={outline} initialDepth="full" />);
   expect(html).toContain('Exact historical source note.');
-  expect(html).toContain('href="/versions/old-snapshot/units/root"');
+  expect(html).toContain('href="#unit-root"');
   host.innerHTML = html;
   expect(host.querySelectorAll('#root')).toHaveLength(1);
 });

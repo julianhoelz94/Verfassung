@@ -21,11 +21,11 @@ test('browse from countries to an article', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Germany', exact: true })).toBeVisible();
   await page.getByRole('link', { name: /2022/ }).click();
   await expect(page.getByRole('heading', { name: 'Basic Law for the Federal Republic of Germany' })).toBeVisible();
-  await page.getByRole('button', { name: /^Details · Article 1/ }).first().click();
-  await page.getByRole('link', { name: 'Open passage', exact: true }).first().click();
+  await page.getByRole('navigation', { name: 'Contents', exact: true }).getByRole('link', { name: /^Article 1 / }).click();
   await expect(page.getByRole('heading', { name: /Human dignity/ })).toBeVisible();
-  await expect(page).toHaveURL(new RegExp(`/countries/DE/versions/${VERSION_2022}/articles/${ARTICLE_1}`));
+  await expect(page).toHaveURL(new RegExp(`/countries/DE/versions/${VERSION_2022}#unit-${ARTICLE_1}$`));
   await page.getByRole('button', { name: /^Details · Article 1/ }).first().click();
+  await expect(page.getByRole('link', { name: 'Open passage', exact: true })).toHaveCount(0);
   await expect(page.getByRole('link', { name: 'History of Article 1' })).toBeVisible();
   await page.getByRole('link', { name: 'History of Article 1' }).click();
   await expect(page.getByRole('heading', { name: 'History of Article 1' })).toBeVisible();

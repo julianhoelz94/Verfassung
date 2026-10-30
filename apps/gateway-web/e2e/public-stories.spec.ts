@@ -17,16 +17,13 @@ test('visitor follows the country, legal version, article and history', async ({
   await page.getByRole('link', { name: 'Germany' }).click();
   await page.getByRole('link', { name: 'Read latest' }).click();
   await expect(page).toHaveURL(new RegExp(`/versions/${VERSION_2022}$`));
-  await page.getByRole('button', { name: /^Details · Article 1/ }).first().click();
-  await page.getByRole('link', { name: 'Open passage', exact: true }).first().click();
-  await expect(page).toHaveURL(new RegExp(`/articles/${ARTICLE_1}#article-1$`));
+  await page.getByRole('navigation', { name: 'Contents', exact: true }).getByRole('link', { name: /^Article 1 / }).click();
+  await expect(page).toHaveURL(new RegExp(`/versions/${VERSION_2022}#unit-${ARTICLE_1}$`));
   await expect(page.getByRole('heading', { name: /Human dignity/ })).toBeVisible();
   await page.getByRole('navigation', { name: 'Contents', exact: true }).getByRole('link', { name: /^Article 2 / }).click();
   await expect(page.getByRole('heading', { name: /Personal freedoms/ })).toBeVisible();
   await page.getByRole('navigation', { name: 'Contents', exact: true }).getByRole('link', { name: /^Article 1 / }).click();
   await page.getByRole('button', { name: /^Details · Article 1/ }).first().click();
-  await page.getByRole('link', { name: 'Open passage', exact: true }).first().click();
-  if (!(await page.getByRole('link', { name: 'History of Article 1' }).isVisible())) await page.getByRole('button', { name: /^Details · Article 1/ }).first().click();
   await page.getByRole('link', { name: 'History of Article 1' }).click();
   await expect(page.getByRole('link', { name: 'Compare with previous' })).toBeVisible();
 });

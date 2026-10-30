@@ -1,12 +1,12 @@
 'use client';
 
 import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
-import { BookText } from 'lucide-react';
 import type { UiMessage } from '../../lib/messages';
 import { directoryUi } from '../../lib/country-directory-messages';
 import { readerUi } from '../../lib/reader-messages';
 import { useTranslation } from './TranslationProvider';
 import { ReaderIcon } from './ReaderIcon';
+import { WikiPanel, type WikiPanelContent } from './WikiPanel';
 import { PageChromeSurface, PageContentsBody, PageContentsLayout, PageContentsNavigation, PageMenuBar, PageMenuFrame, type PageContentsItem } from './layout/PageChrome';
 import { useKeepContentsVisible, usePageChromeMetrics } from './layout/usePageChromeMetrics';
 import styles from './CountryDirectory.module.css';
@@ -15,13 +15,13 @@ function flatten(items: PageContentsItem[]): PageContentsItem[] {
   return items.flatMap(item => [item, ...flatten(item.children ?? [])]);
 }
 
-export function ConstitutionDirectoryFrame({ background, contents, children, toolsLabel = directoryUi.tools, wikiOpen = false }: {
-  background?: ReactNode; contents: PageContentsItem[]; children: ReactNode; toolsLabel?: UiMessage; wikiOpen?: boolean;
+export function ConstitutionDirectoryFrame({ wiki, contents, children, toolsLabel = directoryUi.tools, wikiOpen = false }: {
+  wiki?: WikiPanelContent; contents: PageContentsItem[]; children: ReactNode; toolsLabel?: UiMessage; wikiOpen?: boolean;
 }) {
   const [open, setOpen] = useState(wikiOpen), [expanded, setExpanded] = useState(true);
   const [current, setCurrent] = useState(contents[0]?.id);
   const surface = useRef<HTMLDivElement>(null), menu = useRef<HTMLDivElement>(null), navigation = useRef<HTMLElement>(null);
-  const backgroundButton = useRef<HTMLButtonElement>(null), anchor = useRef<{ element: HTMLElement; top: number } | null>(null);
+  const wikiButton = useRef<HTMLButtonElement>(null), anchor = useRef<{ element: HTMLElement; top: number } | null>(null);
   const readingArea = usePageChromeMetrics(surface, menu, navigation);
   useKeepContentsVisible(navigation, current, expanded);
   const id = useId(), t = useTranslation();
@@ -58,14 +58,16 @@ export function ConstitutionDirectoryFrame({ background, contents, children, too
     setExpanded(value => !value);
   }
 
+  function closeWiki() { setOpen(false); wikiButton.current?.focus({ preventScroll: true }); }
+
   return <PageChromeSurface ref={surface}>
-    <PageMenuFrame ref={menu} onKeyDown={event => { if (event.key === 'Escape' && open) { setOpen(false); backgroundButton.current?.focus(); } }}>
+    <PageMenuFrame ref={menu} onKeyDown={event => { if (event.key === 'Escape' && open) closeWiki(); }}>
       <PageMenuBar as="nav" label={t(toolsLabel)}>
         <button type="button" className={styles.tool} aria-label={t(expanded ? readerUi.hideContents : readerUi.showContents)} aria-expanded={expanded} aria-controls="directory-contents" onClick={toggleContents}><ReaderIcon name="contents" />{t(readerUi.contents)}</button>
-        {background ? <button ref={backgroundButton} type="button" className={styles.tool} aria-expanded={open} aria-controls={id} onClick={() => setOpen(value => !value)}><BookText aria-hidden="true" />{t(directoryUi.background)}</button> : null}
+        {wiki ? <button ref={wikiButton} type="button" className={styles.tool} aria-expanded={open} aria-controls={id} onClick={() => setOpen(value => !value)}><ReaderIcon name="wiki" />{t(readerUi.wiki)}</button> : null}
       </PageMenuBar>
-      {background ? <section id={id} className={styles.background} aria-label={t(directoryUi.background)} hidden={!open}>{background}</section> : null}
     </PageMenuFrame>
+    {wiki ? <WikiPanel {...wiki} id={id} onClose={closeWiki} hidden={!open} /> : null}
     <PageContentsLayout expanded={expanded} navigationId="directory-contents" navigationRef={navigation} navigation={
       <PageContentsNavigation items={contents} label={t(readerUi.contents)} title={t(directoryUi.onThisPage)} currentId={current} onSelect={setCurrent} />
     }><PageContentsBody className={styles.contentsBody}>{children}</PageContentsBody></PageContentsLayout>

@@ -1,0 +1,2 @@
+.article { max-width:900px;min-width:0;overflow-wrap:anywhere; }
+.article p,.article li { font:400 var(--text-base)/1.8 var(--font-text); }

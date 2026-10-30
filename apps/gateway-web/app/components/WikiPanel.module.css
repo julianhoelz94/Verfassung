@@ -1,0 +1,10 @@
+.panel { padding:21px var(--gutter);background:var(--color-surface);border-bottom:1px solid var(--color-line);overflow-wrap:anywhere; }
+.header { display:flex;align-items:center;justify-content:space-between;gap:12px; }
+.eyebrow { font:400 var(--text-xs)/1.5 var(--font-ui);letter-spacing:.08em;text-transform:uppercase;color:var(--color-ink-2); }
+.close { composes:tool from './layout/PageChrome.module.css'; }
+.title { font:400 var(--text-xl)/1.4 var(--font-text);margin:5px 0 10px; }
+.content { max-width:900px; }
+.actions { display:flex;flex-wrap:wrap;gap:16px;margin-top:15px;font:400 var(--text-xs)/1.5 var(--font-ui); }
+.panel[hidden] { display:none!important; }
+@media(max-width:680px) { .panel { padding:16px; } }
+@media print { .panel { display:none!important; } }

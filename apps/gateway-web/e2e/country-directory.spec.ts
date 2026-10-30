@@ -250,7 +250,7 @@ test('directory and expanded reading controls are keyboard accessible and pass a
 });
 
 test('country directory screenshots at phone, tablet and desktop widths', async ({ page, request }) => {
-  test.skip(process.platform !== 'linux', 'Pinned Linux Chromium screenshot baselines.');
+  test.skip(process.env.E2E_SKIP_VISUAL === 'true' || process.platform !== 'linux', 'Pinned Linux Chromium screenshot baselines.');
   for (const [width, suffix] of [[390, 'narrow'], [820, 'tablet'], [1440, 'wide']] as const) {
     await page.setViewportSize({ width, height: width === 390 ? 844 : width === 820 ? 1180 : 900 });
     await request.post(`${mockOrigin}/__sprint50_content`);

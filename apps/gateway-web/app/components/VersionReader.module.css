@@ -34,12 +34,7 @@
 .sentence { border-radius:3px; }
 .document[data-boundaries='true'] .sentence { outline:1px dashed var(--color-line-strong);outline-offset:2px; }
 .footer { display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-top:25px;padding-top:18px;border-top:1px solid var(--color-line);font:400 var(--text-xs)/1.5 var(--font-ui);color:var(--color-ink-2); }
-.wiki,.editorial { padding:21px var(--gutter);max-height:min(40dvh,340px);overflow:auto;border-top:1px solid var(--color-line); }
-.wikiHead { display:flex;align-items:center;justify-content:space-between;gap:12px; }
-.wiki h2 { font:400 var(--text-xl)/1.4 var(--font-text);margin:5px 0 10px; }
-.wikiContent { max-width:900px; }
-.wikiContent p,.wikiContent li { font:400 var(--text-base)/1.8 var(--font-text); }
-.wikiActions { display:flex;flex-wrap:wrap;gap:16px;margin-top:15px;font-size:var(--text-xs); }
+.editorial { padding:21px var(--gutter);max-height:min(40dvh,340px);overflow:auto;border-top:1px solid var(--color-line); }
 .comparison { padding:21px var(--gutter);max-height:40dvh;overflow:auto;background:var(--color-accent-soft);border-top:1px solid var(--color-line); }
 .comparison h3 { font:500 var(--text-sm)/1.5 var(--font-ui);margin:0 0 5px; }
 .comparison p { margin:0 0 12px; }
@@ -60,7 +55,7 @@
   .toolName { display:none; }
   .title h1 { font-size:var(--text-2xl); }
   .publications label { flex-basis:100px; }
-  .comparison,.wiki { padding:16px; }
+  .comparison { padding:16px; }
   .menu { position:fixed;top:calc(var(--page-header-height) + 55px);right:12px;max-height:calc(100dvh - var(--page-header-height) - 70px); }
 }
 @media(prefers-reduced-motion:reduce) { .articleActions { transition:none; } }

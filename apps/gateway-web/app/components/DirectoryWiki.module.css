@@ -1,3 +1,0 @@
-.header { display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:14px; }
-.header h2 { margin:0; }
-.edit { composes:tool from './layout/PageChrome.module.css'; }

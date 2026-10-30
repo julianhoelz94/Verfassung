@@ -226,7 +226,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - run: npm ci
       - run: npm run build
-      - run: npx playwright test e2e/visual.spec.ts e2e/ui-review.spec.ts
+      - run: npx playwright test e2e/visual.spec.ts e2e/ui-review.spec.ts e2e/country-directory.spec.ts
         env:
           CI: true
       - if: failure()

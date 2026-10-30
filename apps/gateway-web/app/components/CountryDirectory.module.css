@@ -45,9 +45,6 @@
 .regionPath { display:flex;flex-wrap:wrap;gap:5px;font-size:var(--text-xs);color:var(--color-ink-2); }
 .regionPage { font-size:var(--text-xs); }
 .regionPath,.regionMeta { margin:6px 0;font-size:var(--text-xs);color:var(--color-ink-2); }
-.background { max-width:960px;max-height:min(40dvh,340px);overflow:auto;margin-inline:auto;padding:24px clamp(20px,5vw,62px);background:var(--color-surface);border-top:1px solid var(--color-line); }
-.background h2 { font:400 var(--text-xl)/1.4 var(--font-heading); }
-.background p { overflow-wrap:anywhere; }
 .details { margin-top:18px;font-size:var(--text-xs); }
 .details > summary { color:var(--color-accent);cursor:pointer; }
 .details a { display:inline-block; }

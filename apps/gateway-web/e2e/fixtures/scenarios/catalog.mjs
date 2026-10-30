@@ -36,7 +36,8 @@ export async function archiveScenario(ctx, scenario) {
       await ctx.api('POST', provisionPath, { eventType, eventDate, sourceVersionId: source.versionId, logicalUnitIds: [roots[1].logicalId], note: 'Synthetic provision lifecycle.' }, ctx.publisherToken);
     }
   }
-  const legacyUrl = `http://legacy.localhost/${namespace}/regional.htm#note-a`;
+  const legacyOrigin = new URL(ctx.baseUrl); legacyOrigin.hostname = 'legacy.localhost';
+  const legacyUrl = new URL(`/${namespace}/regional.htm#note-a`, legacyOrigin).toString();
   const response = await ctx.raw('GET', `catalog/legacy-resolve?url=${encodeURIComponent(legacyUrl)}`, undefined, false);
   if (response.status === 404 && !ctx.verifyOnly) await ctx.api('POST', 'catalog/legacy-mappings', { sourceUrl: legacyUrl, kind: 'note', versionId: source.versionId, logicalId: stableId(`${scenario.key}:note`) }, true);
   else assert.equal(response.status, 200, 'Legacy mapping read');

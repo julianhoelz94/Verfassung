@@ -33,19 +33,17 @@ test('limit is inclusive at 20, and 21 fails without a baseline', () => {
   }
 });
 
-test('only the named unfinished editor page is deferred, with its score retained', () => {
+test('editor page follows normal baselines and code changes cannot inherit an exception', () => {
   const source = complex.replace('example', 'EditorPage');
   const functions = analyze(source, 'apps/gateway-web/app/editor/page.tsx');
-  assert.deepEqual(makeBaseline(functions).entries, []);
-  const [page] = applyBaseline(functions, makeBaseline([]));
-  assert.equal(page.status, 'deferred');
-  assert.equal(page.score, 21);
-  const [changed] = applyBaseline(analyze(source.replace('return 0', 'return 1'), page.path), makeBaseline([]));
-  assert.equal(changed.status, 'deferred');
-  const [otherFunction] = applyBaseline(analyze(source.replace('EditorPage', 'OtherPage'), page.path), makeBaseline([]));
-  assert.equal(otherFunction.status, 'violation');
-  const [otherFile] = applyBaseline(analyze(source, 'apps/gateway-web/app/editor/other.tsx'), makeBaseline([]));
-  assert.equal(otherFile.status, 'violation');
+  const baseline = makeBaseline(functions);
+  assert.equal(baseline.entries.length, 1);
+  assert.equal(applyBaseline(functions, makeBaseline([]))[0].status, 'violation');
+  assert.equal(applyBaseline(functions, baseline)[0].status, 'baseline');
+  const changed = analyze(source.replace('return 0', 'return 1'), functions[0].path);
+  assert.equal(applyBaseline(changed, baseline)[0].status, 'violation');
+  const renamed = analyze(source.replace('EditorPage', 'OtherPage'), functions[0].path);
+  assert.equal(applyBaseline(renamed, baseline)[0].status, 'violation');
 });
 
 test('baseline allows unchanged tokens after line, formatting, and comment changes', () => {

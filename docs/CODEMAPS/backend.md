@@ -138,3 +138,9 @@ See [implementation notes](../design/sprint-40-implementation.md) and [ADR 0006]
 Shared HTTP DTOs and flattening rules: `services/platform/.../OrderedContent.kt`, [traversal contract](../design/ordered-content-traversal.md). Content serves version-scoped `/units`, ordered `/content`, and lossless `/export`; legacy article URLs remain aliases. Reader/setup use `OrderedContentTree`; comparison, search, and amendment quotations traverse canonical entries.
 
 Structured publication: `OrderedSuccessorPlan` reuses unchanged revisions and copies changed ancestor paths. `StructuredPublicationService` verifies draft/source/settings pins. Catalog successor reservations, content publish receipts, and amendment creation attempts make retries reuse their resources. Completed successor roots are sealed before catalog publication; publish responses retain logical-unit to occurrence mappings and source pins.
+
+Shared comparison enters `services/platform/.../HierarchicalDiff.kt`. Its internal
+`HierarchicalDiffIndex`, `Matching`, `Text`, `Ordering` and `Comparison` files own
+lookup views, lineage matching, text findings, stable ordering and finding
+identity. Amendment and Editor use the same API and algorithm version; Editor
+sets `skipSharedRevision=false` for in-memory preview changes.

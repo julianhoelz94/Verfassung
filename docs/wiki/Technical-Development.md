@@ -87,8 +87,9 @@ existing debt is recorded in reviewed baselines. These tools are free and need n
 Sonar server. The downloadable `cognitive-complexity` artifact includes locations
 and scores for over-limit functions, including existing debt. Tests are included.
 Kotlin exceptions also have reviewed maximum scores, so an increase in an existing
-function fails CI. The unfinished `EditorPage` is temporarily exempt from blocking
-and retains its current score in reports.
+function fails CI. All editor code follows the normal gates: the editor page's
+existing debt is tied to its reviewed token fingerprint, and body changes to an
+over-limit function fail. There are no construction exemptions.
 Kotlin files also have a total cognitive-complexity budget of **100**, computed
 with detekt's file metric. Functions below 20 contribute to the total. Existing
 over-budget files are baselined and cannot exceed their reviewed maxima. This
@@ -101,6 +102,11 @@ messages and order, exact legacy text projections and complete-document referenc
 Export read-back similarly separates record pagination, fidelity checks and resource
 counts. Tests retain exact snapshot hashes, cursor error precedence, downstream
 authorization, Unicode chunks and explicit completeness reporting.
+Shared hierarchical diffing similarly separates indexing, ancestry matching,
+text comparison, sibling/finding ordering and stable finding generation. Both
+amendment and editor review flows retain exact finding keys and fingerprints;
+editor previews continue to compare in-memory content even when revision IDs
+are shared.
 
 From the repository root, run `npm ci --prefix scripts/complexity`,
 `./gradlew cognitiveComplexity`, and `npm run check --prefix scripts/complexity`.

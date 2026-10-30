@@ -5,7 +5,6 @@
     <ID>CognitiveComplexFile:AmendmentService.kt$com.constitutionatlas.amendment.service.AmendmentService.kt</ID>
     <ID>CognitiveComplexFile:CatalogWriteService.kt$com.constitutionatlas.catalog.service.CatalogWriteService.kt</ID>
     <ID>CognitiveComplexFile:EditorService.kt$com.constitutionatlas.editor.service.EditorService.kt</ID>
-    <ID>CognitiveComplexFile:HierarchicalDiff.kt$com.constitutionatlas.platform.HierarchicalDiff.kt</ID>
     <ID>CognitiveComplexFile:OrderedContentService.kt$com.constitutionatlas.content.service.OrderedContentService.kt</ID>
     <ID>CognitiveComplexFile:StructuredDraftEngine.kt$com.constitutionatlas.editor.service.StructuredDraftEngine.kt</ID>
     <ID>CognitiveComplexMethod:AmendmentDiff.kt$AmendmentDiff$fun diff(source: List&lt;FlatNode&gt;, target: List&lt;FlatNode&gt;): List&lt;NodeChange&gt;</ID>
@@ -14,7 +13,6 @@
     <ID>CognitiveComplexMethod:CatalogWriteService.kt$CatalogWriteService$@Transactional fun createDraftVersion(constitutionId: UUID, request: CreateVersionRequest): VersionCreated</ID>
     <ID>CognitiveComplexMethod:CatalogWriteService.kt$CatalogWriteService.Companion$fun normalizeOutline(kinds: List&lt;OutlineKindWrite&gt;): List&lt;OutlineKindWrite&gt;</ID>
     <ID>CognitiveComplexMethod:EditorService.kt$EditorService$@Transactional fun publish(authorization: String?, sessionId: UUID, request: PublishRequest): DraftPreviewDto</ID>
-    <ID>CognitiveComplexMethod:HierarchicalDiff.kt$HierarchicalDiff$fun compare( beforeVersionId: UUID?, before: List&lt;DiffNode&gt;, afterVersionId: UUID?, after: List&lt;DiffNode&gt;, beforeSettingsRevisionId: UUID? = null, afterSettingsRevisionId: UUID? = null, skipSharedRevision: Boolean = true, ): DiffRun</ID>
     <ID>CognitiveComplexMethod:ImportApiTest.kt$ImportApiTest$@Test fun directBatchAndChunkedImportsRequireMarkersAndAllowSharedNotes()</ID>
     <ID>CognitiveComplexMethod:ImportService.kt$ImportService$@Transactional fun importVersion(authorization: String?, submittedBy: UUID, request: ImportRequest, batchId: UUID? = null, idempotencyKey: String? = null, expectedChecksum: String? = null): ImportJobDto</ID>
     <ID>CognitiveComplexMethod:MigrationService.kt$MigrationService$fun prepare(run: UUID, itemId: UUID, actor: Actor, authorization: String?): MigrationItem</ID>

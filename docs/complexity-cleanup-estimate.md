@@ -2,14 +2,16 @@
 
 ## Current target and pilot
 
-The agreed maximum is now **20 per function**, with `EditorPage` temporarily
-deferred while under construction. The original assessment below used a target
-of 15 and remains a historical comparison, not the active cleanup scope.
+The agreed maximum is **20 per function** and **100 per Kotlin file**.
+All editor code is back in scope as of 2026-10-30; there are no construction
+exemptions. The earlier editor deferrals described in the package history below
+have ended. EditorPage's existing score of 165 is now recorded under the same
+token-fingerprint baseline rules as other TypeScript functions. Kotlin's existing
+editor method/file score caps remain enforced.
 
-Refactoring `services/editor-service` is also deferred until the new editor is
-ready. Its current method and file scores remain recorded as existing debt;
-the file-budget change introduces no service source changes. Kotlin's separate
-file budget is **100**, including contained helper functions.
+The original assessment below used a target of 15 and remains a historical
+comparison, not the active cleanup scope. The current inventory follows work
+package 4 below.
 
 The pilot starts from fetched `main` revision `bee7b4b` (2026-10-28), including
 Kotlin 2.4 / Spring Boot 4.1, Next.js 16 / React 19, and the specification-derived
@@ -93,12 +95,12 @@ not part of the application or repository test suite.
 
 Baselines were first synchronized to current `main`; all newly accepted or
 changed debt came from source matching that revision byte for byte, then the
-cleaned validator exceptions were removed. The remaining inventory is **18 Kotlin
+cleaned validator exceptions were removed. At the end of that package the inventory was **18 Kotlin
 method exceptions, 7 Kotlin file exceptions, and 44 TypeScript/JavaScript
 exceptions plus the deferred EditorPage**. Excluding the editor service's two
 functions leaves **53 production functions and 7 test/fixture functions** in the
-active cleanup scope. Editor-service and EditorPage refactoring remain deferred;
-this package changes no editor source compared with current `main`.
+cleanup scope at that point. Editor-service and EditorPage were still deferred
+then; that package changed no editor source compared with its `main` base.
 
 The next domain packages can address ingestion import/export or shared
 hierarchical diffing. Treat their workflow and fidelity risks separately from
@@ -139,12 +141,59 @@ contract/helper tests**, with no failures or skips. All four export files have
 **100% line coverage (159/159 lines)**; their combined branch coverage is
 215/234. The Kotlin complexity gate reports no new or increased scores.
 
-The current remaining inventory is **16 Kotlin method exceptions, 6 Kotlin file
+At the end of package 3 the inventory was **16 Kotlin method exceptions, 6 Kotlin file
 exceptions, and 44 TypeScript/JavaScript exceptions plus the deferred EditorPage**.
 Excluding the editor service's two functions leaves **51 production functions
-and 7 test/fixture functions** in the active cleanup scope. Editor code remains
-unchanged. Shared hierarchical diffing and the remaining domain write workflows
-remain separate packages.
+and 7 test/fixture functions** in the cleanup scope at that point. Editor code
+was unchanged. Shared hierarchical diffing followed in the next package.
+
+## Work package 4: shared hierarchical diffing and editor inclusion
+
+Fetched `main` remains **`4d07d6a`**. The shared diff engine serves both
+amendment and editor review flows. Its public API and `hierarchical-1` algorithm
+version are unchanged, preserving stored finding keys, fingerprints and review
+pins. Editor previews still disable the shared-revision shortcut.
+
+| Responsibility | Kotlin file | File score |
+| --- | --- | ---: |
+| Public models and comparison entry point | `HierarchicalDiff.kt` | 0 |
+| Ordered indexing and reference construction | `HierarchicalDiffIndex.kt` | 3 |
+| Occurrence/revision groups and logical matches | `HierarchicalDiffMatching.kt` | 22 |
+| Finding identity, phases and subtree/pair changes | `HierarchicalDiffComparison.kt` | 18 |
+| Global text moves and local text lineage/edits | `HierarchicalDiffText.kt` | 28 |
+| Shared sibling order and final finding order | `HierarchicalDiffOrdering.kt` | 26 |
+
+`compare` falls from **92 to 0**; the largest extracted function scores **13**.
+All six files meet 100 and their total score is **97**, compared with 115 before
+refactoring. Indexing, grouping and emission helpers have KDoc documenting
+precedence, ambiguity, exact text, path anchoring and stable identity formats.
+The completed method and file exceptions are removed.
+
+Fourteen new characterization tests passed against the original engine before
+refactoring. They cover editor previews, shared revisions, global text movement,
+node/text split and merge ancestry, duplicate identities, subtree replacement,
+LIS tie choices, semantic-only edits and settings impact. A golden key and
+fingerprint captured from the original implementation protect stored review pins.
+An isolated seeded comparison checked **2,000 scenarios / 4,000 complete DiffRun
+results**, including both shared-revision modes, with no differences in findings,
+references, ordering, keys, fingerprints, groups or settings impact.
+Full local checks pass for **Platform (39 tests), Amendment (65 tests) and
+Editor (70 tests)**, plus **13 TypeScript policy tests**. Shared diff code has
+**270/273 covered lines** in the platform report; repository and consumer probes
+provide additional execution coverage. Both complexity gates pass with no
+unreviewed debt or score increases.
+
+The editor deferral has ended for the whole repository. The TypeScript checker
+no longer contains a named exemption or a deferred status. Only EditorPage's
+unchanged existing-debt entry is added (score **165**); no editor source or other
+TypeScript baseline changes are included. Its body can no longer change while
+retaining a construction waiver. Policy tests exercise that normal enforcement.
+
+The current inventory is **15 Kotlin method exceptions, 5 Kotlin file exceptions
+and 45 TypeScript/JavaScript exceptions**, with **no deferred functions**.
+All **53 production functions and 7 test/fixture functions** are now in scope,
+including editor publishing, structured replay and EditorPage. Those editor
+workflow packages can proceed under the same function/file budgets.
 
 ## Original assessment at a maximum of 15
 

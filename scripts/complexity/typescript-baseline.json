@@ -199,6 +199,13 @@
       "count": 1
     },
     {
+      "path": "apps/gateway-web/app/editor/page.tsx",
+      "function": "EditorPage",
+      "hash": "d7b54a9c3e1ed6f8fa4a2442afe280bfd0de723fd1a5bba97fcbeaba1a7e3019",
+      "score": 165,
+      "count": 1
+    },
+    {
       "path": "apps/gateway-web/app/editor/wiki/WikiWorkspace.tsx",
       "function": "WikiWorkspace",
       "hash": "9ef2a3ed5825569d986c93fa3483b2a7277348fe101ed2418628064529064363",

@@ -41,7 +41,9 @@ export default async function JurisdictionVersionPage({ params }: { params: Prom
     <VersionReader jurisdictionId={id} versionId={versionId} articles={articles} outline={outline ?? constitution.contentOutline} language={snapshot.languageCode}
       changeByArticle={changeByArticle} unchangedSinceLabel={previous?.versionLabel}
       context={{ constitutionId: constitution.id, title: constitution.title, jurisdictionName: detail.jurisdiction.name, versionLabel: version.versionLabel, publications,
-        overviewHref: `/jurisdictions/${id}`, wikiState: wiki ? 'published' : wikiUnavailable ? 'unavailable' : 'empty' }}
+        overviewHref: `/jurisdictions/${id}/constitutions/${constitution.id}`, comparisonHref: `/jurisdictions/${id}/compare`,
+        editWikiHref: canEdit ? `/editor/wiki/constitution/${constitution.id}?jurisdictionId=${id}` : undefined,
+        wikiState: wiki ? 'published' : wikiUnavailable ? 'unavailable' : 'empty' }}
       breadcrumbs={<Breadcrumbs items={[{ href: '/jurisdictions', label: <T value={migrationUi.jurisdictions} /> }, ...detail.ancestors.map(item => ({ href: `/jurisdictions/${item.id}`, label: item.name })), { href: `/jurisdictions/${id}`, label: detail.jurisdiction.name }, { label: constitution.title }]} />}
       wiki={wiki ? <ContentTranslationRegion sourceLanguage="auto" compact><WikiContent page={wiki} /></ContentTranslationRegion> : undefined}
       details={<ReaderDetails constitution={constitution} jurisdictionName={detail.jurisdiction.name} version={version} snapshot={snapshot} locale={locale} sourceEvidence={snapshot.sourceEvidence} canEditSource={canEdit && snapshotVersionId(version) === versionId}>

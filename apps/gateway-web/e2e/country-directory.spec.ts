@@ -105,11 +105,21 @@ for (const width of [390, 1440]) test(`country contents navigate and collapse wi
 });
 
 test('regional reading, comparison and overview retain the current published snapshot', async ({ page }) => {
+  await signInAdmin(page);
   await page.goto('/countries/DE');
   const regional = page.getByRole('article', { name: 'Example Regional Constitution', exact: true });
   await regional.getByRole('link', { name: 'Read latest', exact: true }).click();
   await expect(page).toHaveURL(new RegExp(`/jurisdictions/${regionId}/versions/${correctionId}$`));
   await expect(page.getByText(/Corrected spelling/)).toBeVisible();
+  await page.getByRole('button', { name: 'Wiki', exact: true }).click();
+  const wiki = page.getByRole('region', { name: 'Wiki', exact: true });
+  await expect(wiki.getByRole('link', { name: 'Open constitution overview', exact: true })).toHaveAttribute('href', `/jurisdictions/${regionId}/constitutions/${regionalConstitution}`);
+  await wiki.getByRole('link', { name: 'Edit constitution page', exact: true }).click();
+  await expect(page).toHaveURL(`/editor/wiki/constitution/${regionalConstitution}?jurisdictionId=${regionId}`);
+  await expect(page.getByRole('link', { name: 'View public page', exact: true })).toHaveAttribute('href', `/jurisdictions/${regionId}/constitutions/${regionalConstitution}`);
+  await page.goto(`/jurisdictions/${regionId}/versions/${correctionId}`);
+  await page.getByRole('button', { name: 'Compare', exact: true }).click();
+  await expect(page.getByRole('link', { name: 'Open full comparison', exact: true })).toHaveAttribute('href', `/jurisdictions/${regionId}/compare?from=${oldId}&to=${correctionId}`);
   await page.goto('/countries/DE');
   await regional.getByText('Compare versions', { exact: true }).click();
   await expect(regional.getByRole('combobox', { name: 'From', exact: true })).toHaveValue(oldId);

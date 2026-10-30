@@ -14,7 +14,7 @@ Import from `apps/gateway-web/app/components/layout/templates.tsx`.
 | `ReaderPage` | Legal text, contextual articles, comparison and source documents | Header, notices, content |
 | `WorkspacePage` | Editing, review, import and constitution configuration | Header, notices, content |
 
-`width="reading"` limits the page to the reading measure; `width="content"` uses the site maximum. Settings and collection/workspace templates default to content width. Focused and reader templates default to reading width. Full constitution readers use content width and place a `ReaderLayout` inside the existing shared renderer. `WorkspaceLayout` owns editor columns; its amendment variant stacks on phones and places revision history alongside the form on desktop. `FilterLayout` owns the responsive filter/results split. Each page has one `main#main-content`, one page heading and the existing skip-link target.
+`width="reading"` limits the page to the reading measure; `width="content"` uses the site maximum. Settings and collection/workspace templates default to content width. Focused and reader templates default to reading width. Full constitution readers use `PageMain` with the `VersionReader` page class and `data-template="reader"`. `VersionReader` owns the continuous document, sticky toolbar, independently scrolling contents, contextual panels and floating footnote drawer; routes provide the published content and permission-checked slots. Individual unit and comparison pages retain `ReaderPage` and the shared renderer. `WorkspaceLayout` owns editor columns; its amendment variant stacks on phones and places revision history alongside the form on desktop. `FilterLayout` owns the responsive filter/results split. Each page has one `main#main-content`, one page heading and the existing skip-link target.
 
 ```tsx
 <SettingsPage
@@ -40,6 +40,8 @@ Use existing localized messages for product text. Navigation is a slot so route-
 The global stylesheet is in the `base` cascade layer; scoped structural layout rules take precedence over base margins regardless of stylesheet order. Typography defaults stay in the base layer at low specificity so the hero heading, legal-text editing font and larger MFA code font retain their intended variants. Print-specific module rules preserve hidden action groups.
 
 Runtime tokens live only in `apps/gateway-web/app/styles/tokens.css`, imported by the root layout. The historical prototype token file imports that source instead of copying it.
+
+The shared visual language follows the constitution viewer: warm near-white paper, white surfaces, muted green accents, restrained shadows and regular-weight Georgia headings. Constitutional text uses the same serif face at `1.0625rem / 1.85`; navigation, forms, metadata and actions retain the system sans-serif face. `--font-heading`, `--weight-heading` and `--weight-ui-emphasis` keep page headings and interface emphasis consistent. Authored bold text retains its semantic emphasis. Status and diff colors use subdued but distinct foreground/background pairs, and keyboard focus keeps a contrasting amber outline.
 
 | Token / layout gap | Value | Relationship |
 | --- | --- | --- |

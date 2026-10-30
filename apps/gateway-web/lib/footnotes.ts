@@ -1,6 +1,6 @@
 import type { OrderedEntry, OrderedTextMark } from './api';
 
-export type FootnoteItem = { logicalId: string; label: string; text: string; href: string; marks?: OrderedTextMark[] };
+export type FootnoteItem = { logicalId: string; label: string; text: string; href: string; marks?: OrderedTextMark[]; references?: { id: string; label: string }[] };
 
 /** One index per pinned version, shared by every marker instead of fetched per reference. */
 export function footnoteItems(entries: OrderedEntry[], hrefPrefix = '', idPrefix = ''): FootnoteItem[] {

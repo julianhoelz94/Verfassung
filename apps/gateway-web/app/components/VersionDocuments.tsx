@@ -4,7 +4,7 @@ import { reviewUi } from '../../lib/ui-review-messages';
 import { T } from './TranslationProvider';
 import surfaceStyles from './surfaces.module.css';
 
-export async function VersionDocuments({ constitutionId, versionId, legalVersionId }: { constitutionId: string; versionId: string; legalVersionId?: string }) {
+export async function VersionDocuments({ constitutionId, versionId, legalVersionId, compact = false }: { constitutionId: string; versionId: string; legalVersionId?: string; compact?: boolean }) {
   const links = (await Promise.all([
     listDocumentLinks('constitution', constitutionId).catch(() => []),
     ...[...new Set([versionId, legalVersionId].filter((id): id is string => Boolean(id)))].map(id => listDocumentLinks('version', id).catch(() => [])),
@@ -15,7 +15,7 @@ export async function VersionDocuments({ constitutionId, versionId, legalVersion
     if (!documents.has(key) || link.revisionId) documents.set(key, link);
   }
   if (!documents.size) return null;
-  return <section className={['card', surfaceStyles.card].join(' ')}>
+  return <section className={compact ? undefined : ['card', surfaceStyles.card].join(' ')}>
     <h2><T value={ui.countries.code.versions.versionid.page.constitutionDocuments} /></h2>
     <ul className="link-list">{[...documents].map(([key, link]) => <li key={key}>
       <a href={`/documents/${link.documentId}${link.revisionId ? `?revision=${link.document.revision.revision}` : ''}`}>{link.document.revision.title}</a>

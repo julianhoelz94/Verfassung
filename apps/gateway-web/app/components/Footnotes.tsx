@@ -21,10 +21,11 @@ type Actions = {
   previewNote: (id: string, trigger: HTMLElement) => void;
   hidePreview: () => void;
 };
-type Context = Actions & { notes: FootnoteItem[]; tooltipId: string };
+type Context = Actions & { notes: FootnoteItem[]; tooltipId: string; previewId?: string };
 const Context = createContext<Context | null>(null);
 const noopActions: Actions = { showNote: () => {}, previewNote: () => {}, hidePreview: () => {} };
 export function useFootnoteActions(): Actions { return useContext(Context) ?? noopActions; }
+export function useFootnoteReferences(noteId: string) { return useContext(Context)?.notes.find(note => note.logicalId === noteId)?.references ?? []; }
 
 export function FootnoteProvider({ notes, children, onNavigate }: {
   notes: FootnoteItem[]; children?: ReactNode; onNavigate?: (note: FootnoteItem) => void | Promise<void>;
@@ -73,7 +74,7 @@ function FootnoteScope({ notes, children, onNavigate }: {
     return () => { window.removeEventListener('scroll', hide, true); window.removeEventListener('resize', hide); document.removeEventListener('keydown', escape); };
   }, [peek]);
   const actions: Context = {
-    notes, tooltipId: id + '-peek',
+    notes, tooltipId: id + '-peek', previewId: peek?.id,
     showNote(noteId, element) {
       if (!notes.some(note => note.logicalId === noteId)) return;
       trigger.current = element ?? (document.activeElement instanceof HTMLElement ? document.activeElement : null);
@@ -125,8 +126,8 @@ export function FootnoteMarker({ noteId, label, referenceId, children }: {
   const context = useContext(Context), t = useTranslation();
   const note = context?.notes.find(note => note.logicalId === noteId);
   if (!note || !context) return <sup id={referenceId}>{children ?? label ?? '*'}</sup>;
-  return <a href={note.href} role="button" contentEditable={false} data-footnote-marker id={referenceId} className={styles.marker}
-    aria-label={t(copy.show) + ' ' + note.label} aria-haspopup="dialog" aria-describedby={context.tooltipId}
+  return <a href={note.href} role="button" contentEditable={false} data-footnote-marker data-footnote-text={children != null ? 'true' : undefined} id={referenceId} className={styles.marker}
+    aria-label={t(copy.show) + ' ' + note.label} aria-haspopup="dialog" aria-describedby={context.previewId === noteId ? context.tooltipId : undefined}
     onClick={event => { event.preventDefault(); context.showNote(noteId, event.currentTarget); }}
     onKeyDown={event => { if (event.key === ' ') { event.preventDefault(); context.showNote(noteId, event.currentTarget); } }}
     onMouseEnter={event => context.previewNote(noteId, event.currentTarget)} onMouseLeave={context.hidePreview}

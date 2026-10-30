@@ -20,10 +20,12 @@ test('browse from countries to an article', async ({ page }) => {
   await page.getByRole('link', { name: 'Germany' }).click();
   await expect(page.getByRole('heading', { name: 'Germany', exact: true })).toBeVisible();
   await page.getByRole('link', { name: /2022/ }).click();
-  await expect(page.getByRole('heading', { name: /Version in force since/ })).toBeVisible();
-  await page.getByRole('link', { name: 'Permalink' }).first().click();
+  await expect(page.getByRole('heading', { name: 'Basic Law for the Federal Republic of Germany' })).toBeVisible();
+  await page.getByRole('navigation', { name: 'Contents', exact: true }).getByRole('link', { name: /^Article 1 / }).click();
   await expect(page.getByRole('heading', { name: /Human dignity/ })).toBeVisible();
-  await expect(page).toHaveURL(new RegExp(`/countries/DE/versions/${VERSION_2022}/articles/${ARTICLE_1}`));
+  await expect(page).toHaveURL(new RegExp(`/countries/DE/versions/${VERSION_2022}#unit-${ARTICLE_1}$`));
+  await page.getByRole('button', { name: /^Details · Article 1/ }).first().click();
+  await expect(page.getByRole('link', { name: 'Open passage', exact: true })).toHaveCount(0);
   await expect(page.getByRole('link', { name: 'History of Article 1' })).toBeVisible();
   await page.getByRole('link', { name: 'History of Article 1' }).click();
   await expect(page.getByRole('heading', { name: 'History of Article 1' })).toBeVisible();
@@ -73,7 +75,7 @@ test('editor landing lists every owned open session and keeps creation on the vi
   await expect(page.getByRole('heading', { name: 'Basic Law for the Federal Republic of Germany' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Correct this text' })).toHaveCount(0);
   await page.goto(`/countries/DE/versions/${VERSION_1949}`);
-  await page.getByRole('link', { name: 'Edit this constitution' }).click();
+  await page.getByRole('button', { name: 'Edit this constitution' }).click();
   await expect(page.locator('#editor-entry').getByRole('link', { name: 'Continue your open session' })).toBeVisible();
   await expect(page.locator('#editor-entry').getByRole('button', { name: 'Correct this text' })).toHaveCount(0);
 });
@@ -82,7 +84,7 @@ test('viewer explains when session lookup is unavailable', async ({ page, reques
   await request.post(`${MOCK_ORIGIN}/__editor_sessions`, { data: { unavailable: true } });
   await signInEditor(page);
   await page.goto(`/countries/DE/versions/${VERSION_2022}`);
-  await page.getByRole('link', { name: 'Edit this constitution' }).click();
+  await page.getByRole('button', { name: 'Edit this constitution' }).click();
   await expect(page.getByText('Edit sessions are temporarily unavailable. Try again before starting a new session.')).toBeVisible();
   await expect(page.locator('#editor-entry').getByRole('button', { name: 'Correct this text' })).toHaveCount(0);
 });
@@ -99,7 +101,7 @@ test('viewer shows one matching session and ignores another constitution', async
   ] } });
   await signInEditor(page);
   await page.goto(`/countries/DE/versions/${VERSION_2022}`);
-  await page.getByRole('link', { name: 'Edit this constitution' }).click();
+  await page.getByRole('button', { name: 'Edit this constitution' }).click();
   await expect(page.locator('#editor-entry .editor-entry-list li')).toHaveCount(1);
   await expect(page.locator('#editor-entry').getByRole('link', { name: 'Continue your open session' })).toHaveAttribute('href', /001001/);
   await expect(page.locator('#editor-entry').getByRole('button', { name: 'Correct this text' })).toHaveCount(0);

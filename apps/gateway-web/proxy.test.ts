@@ -42,6 +42,20 @@ describe('Next request proxy security and routing', () => {
     expect(response.headers.get('location')).toBe('https://atlas.example/');
   });
 
+  it.each(['closed', 'unavailable'])('protects the reader comparison API when anonymous browsing is %s', async state => {
+    if (state === 'closed') vi.mocked(requestAnonymousBrowsingPolicy).mockResolvedValue({ allowed: false });
+    else vi.mocked(requestAnonymousBrowsingPolicy).mockRejectedValue(new Error('offline'));
+    const response = await proxy(request('/api/reader/compare?from=a&to=b'));
+    expect(response.status).toBe(403); expect(await response.json()).toEqual({ code: 'browsing_requires_sign_in' });
+    expect(response.headers.get('cache-control')).toBe('private, no-store');
+  });
+
+  it('allows an authenticated comparison when anonymous browsing is closed', async () => {
+    vi.mocked(requestAnonymousBrowsingPolicy).mockResolvedValue({ allowed: false });
+    vi.mocked(fetchWithTimeout).mockResolvedValue(new Response('{}', { status: 200 }));
+    expect((await proxy(request('/api/reader/compare', { cookie: 'ca_session=reader-token' }))).status).toBe(200);
+  });
+
   it('redirects authenticated legacy links only after the identity check', async () => {
     vi.mocked(requestAnonymousBrowsingPolicy).mockResolvedValue({ allowed: false });
     vi.mocked(fetchWithTimeout).mockResolvedValue(new Response('{}', { status: 200 }));

@@ -9,6 +9,7 @@ test('the reader source block opens a source correction with protected unsaved i
   await expect(page.getByRole('button', { name: 'Edit source information' })).toHaveCount(0);
   await signInEditor(page);
   await page.goto(href);
+  await page.getByRole('button', { name: 'Details', exact: true }).click();
   await page.getByRole('button', { name: 'Edit source information' }).click();
   await expect(page).toHaveURL(/scope=sources/);
   await expect(page.getByRole('heading', { name: 'Edit source information' })).toBeVisible();

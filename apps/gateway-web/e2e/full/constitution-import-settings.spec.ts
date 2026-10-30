@@ -2,7 +2,7 @@ import { expect, test, type APIRequestContext } from '../fixtures/consent';
 import type { Locator, Page } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
 import { adminHeaders, roleHeaders } from './api-fixtures';
-import { startFromViewer } from './auth';
+import { startFromViewer, showFullReaderText } from './auth';
 
 test.use({ actionTimeout: 20_000 });
 
@@ -235,7 +235,7 @@ test('constitution configuration governs MCP imports, review previews and the pu
       const publicUrl = `/countries/XA/versions/${prepared.versionId}`;
       await reader.goto(publicUrl);
       await reader.reload();
-      await reader.getByRole('group', { name: 'Detail level', exact: true }).getByRole('button').last().click();
+      await showFullReaderText(reader);
       await expect(reader.locator('.constitution-concat')).toHaveText('Every person is free. Every person is equal.');
       await expect(reader.locator('.constitution-concat sup.num')).toHaveCount(0);
       await expect(reader.getByText('The following rights are guaranteed.', { exact: true })).toBeVisible();
@@ -265,9 +265,9 @@ test('constitution configuration governs MCP imports, review previews and the pu
       await expect(select(article, 'label-placement')).toHaveValue('after_title');
       await expect(paragraph.getByRole('checkbox', { name: 'Show literal legal label', exact: true })).toBeChecked();
       await reader.reload();
-      await reader.getByRole('group', { name: 'Detail level', exact: true }).getByRole('button').last().click();
+      await showFullReaderText(reader);
       await expect(reader.locator('.constitution-concat sup.num')).toHaveText(['(a)', '(b)']);
-      await expect(reader.getByText('Provision Protected rights I', { exact: true }).first()).toBeVisible();
+      await expect(reader.getByRole('heading', { name: 'Provision Protected rights I', exact: true, level: 2 })).toBeVisible();
       expect(await json(await request.get(`/api/content/versions/${prepared.versionId}/content`))).toEqual(contentBefore);
       await startFromViewer(page, 'XA', prepared.versionId, 'editorial_correction');
       await page.getByRole('button', { name: 'Show article navigation', exact: true }).click();

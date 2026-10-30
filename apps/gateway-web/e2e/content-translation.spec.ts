@@ -24,10 +24,12 @@ test.describe('German device language', () => {
     await page.getByRole('button', { name: 'Diesen Inhalt übersetzen' }).click();
     await expect(page.getByRole('button', { name: 'Original anzeigen' })).toBeVisible();
     await expect(page.locator('.content-translation [lang="de"]').getByText(/\[de\]/).first()).toBeVisible();
-    const articleToggle = page.locator('.content-translation .article-toggle').first();
-    const initialExpanded = await articleToggle.getAttribute('aria-expanded');
+    await page.getByRole('button', { name: 'Leseeinstellungen' }).click();
+    await page.getByRole('combobox', { name: 'Detailgrad' }).selectOption({ label: 'Übersicht' });
+    await page.keyboard.press('Escape');
+    const articleToggle = page.locator('h2 button').first();
     await articleToggle.click();
-    await expect(articleToggle).toHaveAttribute('aria-expanded', initialExpanded === 'true' ? 'false' : 'true');
+    await expect(articleToggle).toHaveAttribute('aria-expanded', 'true');
     await page.getByRole('button', { name: 'Original anzeigen' }).click();
     await expect(page.locator('.content-translation > div[lang="en"]')).toBeVisible();
     await expect(page.locator('.content-translation').getByText(/\[de\]/)).toHaveCount(0);

@@ -6,6 +6,7 @@ import { FootnoteMarker, FootnoteProvider } from './Footnotes';
 import { OrderedContentTree } from './ConstitutionText';
 import { TranslationProvider } from './TranslationProvider';
 import { footnoteItems } from '../../lib/footnotes';
+import { findReaderText } from '../../lib/reader-search';
 import type { OrderedEntry } from '../../lib/api';
 
 let host: HTMLDivElement, root: Root;
@@ -130,4 +131,20 @@ it('retains focus on the navigation link when a pending destination refreshes th
   expect(document.activeElement).toBe(link);
   await act(async()=>fireEvent.click(link));expect(navigate).toHaveBeenCalledOnce();
   await act(async()=>finish());expect(queryByRole(document.body,'dialog')).toBeNull();
+});
+
+it('keeps authored words linked to notes searchable without searching generated marker glyphs or changing the source', async () => {
+  const entries: OrderedEntry[] = [
+    { type: 'text', occurrenceId: 'wording', text: 'Die Freyheit jedes Bürgers.', references: [
+      { logicalId: 'word-mark', start: 4, end: 12, target: { type: 'footnote', footnoteId: 'note' } },
+      { logicalId: 'glyph-mark', start: 26, end: 26, target: { type: 'footnote', footnoteId: 'note' } },
+    ] },
+    { type: 'text', logicalId: 'note', occurrenceId: 'note-entry', format: 'footnote', footnoteLabel: '[a]', text: 'Source note.' },
+  ];
+  await act(async () => root.render(<OrderedContentTree entries={entries} hideFootnotes />));
+  const original = host.innerHTML;
+  expect(findReaderText(host, 'Freyheit').map(match => match.range.toString())).toEqual(['Freyheit']);
+  expect(findReaderText(host, 'Die Freyheit jedes').map(match => match.range.toString())).toEqual(['Die Freyheit jedes']);
+  expect(findReaderText(host, '[a]')).toHaveLength(0);
+  expect(host.innerHTML).toBe(original);
 });

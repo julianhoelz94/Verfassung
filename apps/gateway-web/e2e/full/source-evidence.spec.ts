@@ -23,6 +23,7 @@ test('source corrections are reviewed, attributed and published without changing
   await page.goto(readerHref);
   await expect(page.getByRole('button', { name: 'Edit source information' })).toHaveCount(0);
   await signIn(page, 'editor'); await page.goto(readerHref);
+  await page.getByRole('button', { name: 'Details', exact: true }).click();
   await page.getByRole('button', { name: 'Edit source information' }).click();
   await expect(page.getByRole('heading', { name: 'Edit source information' })).toBeVisible();
   await expect(page.getByLabel('Source description', { exact: true })).toHaveValue([original.dateWording, original.coverage, original.statusWording, original.attribution].join('\n\n'));
@@ -76,9 +77,9 @@ test('source corrections are reviewed, attributed and published without changing
   expect(successorContent.roots.map((root: { revisionId: string }) => root.revisionId)).toEqual(content.roots.map((root: { revisionId: string }) => root.revisionId));
   expect((await json(await request.get(`/api/catalog/versions/${version.id}`))).sourceEvidence).toEqual(original);
   await page.getByRole('link', { name: 'Open published correction' }).click();
+  await page.getByRole('button', { name: 'Details', exact: true }).click();
   await expect(page.getByText('Archive operator, official source', { exact: true })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Official source', exact: true })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Official text', exact: true })).toHaveAttribute('href', 'https://example.org/constitution');
-  await page.getByRole('button', { name: 'Full text', exact: true }).click();
   await expect(page.getByText('Unchanged constitutional text.', { exact: true })).toBeVisible();
 });

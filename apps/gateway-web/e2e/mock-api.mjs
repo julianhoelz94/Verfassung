@@ -1,4 +1,5 @@
 import QRCode from 'qrcode';
+import { continuousReaderOutline, continuousReaderUnits } from './fixtures/continuous-reader.mjs';
 import { reviewFixtures, testTotp, MFA_TEST_SECRET } from './fixtures/ui-review.mjs';
 import { createHash } from 'node:crypto';
 import { createServer } from 'node:http';
@@ -207,6 +208,8 @@ let stepUpFresh = true;
 let visualRoles = false;
 let sprint50Content = false;
 let denseUi = false;
+let continuousReader = false;
+let authoredFootnoteWords = false;
 let historyUnavailable = { lifecycle: false, amendments: false };
 let legalPages = {};
 let imprintDetailsState;
@@ -218,6 +221,8 @@ const WIKI_IMAGE_ID = '01900000-0000-4000-8000-000000000736';
 const WIKI_IMAGE = { documentId: WIKI_IMAGE_ID, revision: 2, alt: 'A historic flag', caption: 'Historic flag', credit: 'Archive', sourceUrl: 'https://example.org/flag', rights: 'Public domain', placement: 'before_body' };
 
 function resetMockState() {
+  continuousReader = false;
+  authoredFootnoteWords = false;
   mockAmendments.clear();
   mockAmendments.set(amendment.id, amendment);
   mockAmendments.set(amendmentDraft.id, amendmentDraft);
@@ -356,6 +361,11 @@ const server = createServer(async (req, res) => {
     resetMockState();
     empty(res, 204);
     return;
+  }
+  if (method === 'POST' && pathname === '/__continuous_reader') {
+    continuousReader = true; sprint50Content = true;
+    authoredFootnoteWords = Boolean((await readBody(req)).authoredFootnoteWords);
+    json(res, 200, { ok: true }); return;
   }
   if (method === 'POST' && pathname === '/__history_unavailable') {
     historyUnavailable = { ...historyUnavailable, ...await readBody(req) };
@@ -565,7 +575,7 @@ const server = createServer(async (req, res) => {
     return;
   }
   if (method === 'GET' && /^\/api\/catalog\/versions\/[^/]+\/reader-settings$/.test(pathname)) {
-    json(res, 200, germany.constitutions[0].contentOutline);
+    json(res, 200, continuousReader ? continuousReaderOutline : germany.constitutions[0].contentOutline);
     return;
   }
   const outlineMatch = pathname.match(/^\/api\/catalog\/constitutions\/([^/]+)\/content-outline$/);
@@ -605,7 +615,12 @@ const server = createServer(async (req, res) => {
   }
   const units = pathname.match(/^\/api\/content\/versions\/([^/]+)\/units(?:\/([^/]+))?$/);
   if (method === 'GET' && units) {
-    const items = articlesFor(units[1], true).map(mockUnit);
+    const items = continuousReader ? continuousReaderUnits(units[1]) : articlesFor(units[1], true).map(mockUnit);
+    if (continuousReader && authoredFootnoteWords) {
+      const entry = items[0].content[0].node.content[1].node.content[0];
+      entry.text = 'Die Freyheit jedes Bürgers ist unverletzlich.';
+      entry.references[0].start = 4; entry.references[0].end = 12;
+    }
     if (units[2]) {
       const item = items.find((unit) => unit.id === units[2]);
       json(res, item ? 200 : 404, item ?? { error: 'Not found' });

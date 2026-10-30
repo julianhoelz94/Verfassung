@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { selectedScenarios, irregularRoots, irregularOutline, rootsFor } from './definitions.mjs';
+import { namespace, selectedScenarios, irregularRoots, irregularOutline, rootsFor } from './definitions.mjs';
 import { payloadFor, ensurePublished, readerPath } from './content.mjs';
 import { editorial, importWorkflow, setupWorkflow, historyScenario } from './workflows.mjs';
 import { archiveScenario, contextScenario, comparisonScenario } from './catalog.mjs';
@@ -15,10 +15,22 @@ async function searchScenario(ctx, scenario) {
   const german = await ensurePublished(ctx, `${scenario.key}-de`, { ...source.payload, roots: rootsFor(scenario.key, count, 'de'), versionLabel: 'Deutsche Fassung', languageCode: 'de', effectiveDate: '2001-01-01' }, source.versionId);
   return { ...source, germanVersionId: german.versionId, expectedHits: count, href: `/search?q=Explorationneedle&versionId=${source.versionId}`, state: 'published' };
 }
+export async function prepareScenarioJournal(ctx) {
+  const actor = await ctx.api('GET', 'identity/me');
+  const journal = journalAt(ctx.runtimeDir, `${ctx.baseUrl.origin}|${actor.id}`);
+  if (ctx.deploymentEnvironment && ctx.profile !== 'compact' && !journal.existed) {
+    let country;
+    try { country = await ctx.api('GET', 'catalog/countries/XA'); } catch (error) { if (error.status !== 404) throw error; }
+    assert(!country?.constitutions.some(item => item.slug.startsWith(`${namespace}-`)), 'Exploration fixtures already exist on this deployment. Restore its saved fixture journal before selecting extended or scale; no setup proposal will be recreated.');
+  }
+  // Persist even an empty checkpoint before the first scenario write, so a
+  // failed first upload can resume on a fresh deployment runner.
+  if (ctx.profile !== 'compact' && !ctx.verifyOnly && !journal.existed) journal.save();
+  return journal;
+}
 export async function runScenarios(ctx) {
   const started = performance.now();
-  const actor = await ctx.api('GET', 'identity/me');
-  ctx.journal = journalAt(ctx.runtimeDir, `${ctx.baseUrl.origin}|${actor.id}`);
+  ctx.journal = await prepareScenarioJournal(ctx);
   const results = {};
   let authenticatedAt = Date.now();
   for (const scenario of selectedScenarios(ctx.profile)) {

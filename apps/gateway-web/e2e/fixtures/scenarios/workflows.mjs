@@ -92,9 +92,21 @@ export async function setupWorkflow(ctx, scenario) {
   // The setup API has no list/idempotency endpoint. Keep the returned proposal ID
   // in the origin/deployment-scoped runtime journal, outside Playwright output.
   if (!known && ctx.verifyOnly) throw new Error(`${scenario.key}: retain the runtime journal to verify the pending setup proposal`);
+  if (known && !known.proposalId) throw new Error(`${scenario.key}: proposal creation was interrupted before its ID was recorded; inspect the pending proposal and recover its ID in the journal before retrying`);
   if (!known) {
     const payload = payloadFor(scenario);
-    const proposal = await ctx.api('POST', 'ingestion/import-setup-proposals', { isoCode: payload.isoCode, countryName: payload.countryName, constitutionSlug: payload.constitutionSlug, constitutionTitle: payload.constitutionTitle, languageCode: payload.languageCode, sourceUrl: payload.sourceUrl, outline: payload.outline, sampleRoots: payload.roots }, ctx.editorToken);
+    ctx.journal.data.scenarios[scenario.key] = { creating: true };
+    ctx.journal.save();
+    let proposal;
+    try {
+      proposal = await ctx.api('POST', 'ingestion/import-setup-proposals', { isoCode: payload.isoCode, countryName: payload.countryName, constitutionSlug: payload.constitutionSlug, constitutionTitle: payload.constitutionTitle, languageCode: payload.languageCode, sourceUrl: payload.sourceUrl, outline: payload.outline, sampleRoots: payload.roots }, ctx.editorToken);
+    } catch (error) {
+      if ([400, 401, 403, 404, 405, 409, 415, 422, 429].includes(error.status)) {
+        delete ctx.journal.data.scenarios[scenario.key];
+        ctx.journal.save();
+      }
+      throw error;
+    }
     ctx.journal.data.scenarios[scenario.key] = { proposalId: proposal.id, complete: true };
     ctx.journal.save();
   }

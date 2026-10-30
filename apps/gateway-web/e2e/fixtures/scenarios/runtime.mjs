@@ -44,10 +44,10 @@ export function linkRoots(roots, source) {
 export function journalAt(directory, origin) {
   mkdirSync(directory, { recursive: true });
   const path = join(directory, `scenario-journal-${digest(origin).slice(0, 16)}.json`);
-  let data;
-  try { data = JSON.parse(readFileSync(path, 'utf8')); } catch (error) { if (error.code !== 'ENOENT') throw error; data = { origin, scenarios: {} }; }
+  let data, existed = true;
+  try { data = JSON.parse(readFileSync(path, 'utf8')); } catch (error) { if (error.code !== 'ENOENT') throw error; existed = false; data = { origin, scenarios: {} }; }
   assert.equal(data.origin, origin, 'Fixture journal origin');
-  return { data, save() { writeFileSync(`${path}.tmp`, `${JSON.stringify(data, null, 2)}\n`, { mode: 0o600 }); renameSync(`${path}.tmp`, path); } };
+  return { data, existed, save() { writeFileSync(`${path}.tmp`, `${JSON.stringify(data, null, 2)}\n`, { mode: 0o600 }); renameSync(`${path}.tmp`, path); } };
 }
 // A completed scenario is a starting point for people. Never replay its writes.
 // Before each seed step, require the exact last observed state; human changes stop

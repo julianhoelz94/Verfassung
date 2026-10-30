@@ -289,7 +289,7 @@ const ids = { constitutions: {}, versions: {}, amendments: {} };
 await ensureVersions(ids);
 await ensureAmendments(ids);
 await verifyTotals(ids);
-await runScenarios({ api, raw, pause, token, editorToken, viewerToken, reviewerToken, publisherToken, verifyOnly, profile, baseUrl, ids, runtimeDir: join(fixtureDir, '.runtime'), refreshTokens: async () => { await authenticate(); return { token, editorToken, viewerToken, reviewerToken, publisherToken }; } });
+await runScenarios({ api, raw, pause, token, editorToken, viewerToken, reviewerToken, publisherToken, verifyOnly, profile, baseUrl, deploymentEnvironment: process.env.PREPOPULATE_DEPLOYMENT_ENVIRONMENT, ids, runtimeDir: join(fixtureDir, '.runtime'), refreshTokens: async () => { await authenticate(); return { token, editorToken, viewerToken, reviewerToken, publisherToken }; } });
 const resultPath = join(fixtureDir, '.runtime', 'prepopulate-ids.json');
 mkdirSync(dirname(resultPath), { recursive: true });
 writeFileSync(resultPath, `${JSON.stringify(ids, null, 2)}\n`);

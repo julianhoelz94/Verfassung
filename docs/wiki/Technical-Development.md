@@ -62,6 +62,13 @@ An editor-only account can be supplied when practicing strict role separation.
 Credentials are never written to the generated catalog or ID map. Public source
 files are synthetic local PDF/HTML/PNG bytes and do not require external downloads.
 
+For a Coolify deployment, select a published release under **Actions → Deploy →
+Run workflow**, enable prepopulate and choose its fixture profile. Deployment
+defaults to compact; extended/scale require editor and viewer account secrets too.
+The deployment run saves exploration links and a journal for later retries. See
+[[Manual deployment|Manual-Deployment#optional-npm-prepopulate]] for setup, exact
+GitHub environment secret names, journal retention and recovery.
+
 ## Verify a change
 
 Run from the repository root:

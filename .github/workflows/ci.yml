@@ -488,6 +488,33 @@ jobs:
           npm run prepopulate
           cmp /tmp/prepopulate-first-ids.json e2e/fixtures/generated/.runtime/prepopulate-ids.json
           npm run prepopulate -- --verify-only
+      - name: Checkpoint fixture journals for a fresh runner
+        id: fixture-checkpoint
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: fixture-seed-journal-roundtrip
+          path: apps/gateway-web/e2e/fixtures/generated/.runtime/scenario-journal-*.json
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 90
+      - name: Remove the local journal before restoring its artifact
+        working-directory: apps/gateway-web
+        run: |
+          mkdir -p "$RUNNER_TEMP/fixture-state-before"
+          mv e2e/fixtures/generated/.runtime/scenario-journal-*.json "$RUNNER_TEMP/fixture-state-before/"
+      - name: Restore fixture journals from their artifact
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          artifact-ids: ${{ steps.fixture-checkpoint.outputs.artifact-id }}
+          merge-multiple: true
+          path: apps/gateway-web/e2e/fixtures/generated/.runtime
+      - name: Verify restored fixture journals and API state
+        working-directory: apps/gateway-web
+        run: |
+          for saved in "$RUNNER_TEMP/fixture-state-before"/scenario-journal-*.json; do
+            cmp "$saved" "e2e/fixtures/generated/.runtime/$(basename "$saved")"
+          done
+          npm run prepopulate -- --verify-only
       - name: Full-stack browser journeys
         working-directory: apps/gateway-web
         run: npm run test:e2e:full

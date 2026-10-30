@@ -363,14 +363,32 @@ class RuntimeTests(unittest.TestCase):
         workflow = yaml.load((ROOT / ".github/workflows/deploy.yml").read_text(), Loader=yaml.BaseLoader)
         self.assertEqual(set(workflow["on"]), {"workflow_dispatch"})
         inputs = workflow["on"]["workflow_dispatch"]["inputs"]
-        self.assertEqual(set(inputs), {"environment", "prepopulate"})
+        self.assertEqual(set(inputs), {"environment", "prepopulate", "prepopulate_profile"})
         self.assertEqual(inputs["prepopulate"]["default"], "false")
+        self.assertEqual(inputs["prepopulate_profile"]["default"], "compact")
+        self.assertEqual(inputs["prepopulate_profile"]["options"], ["compact", "extended", "scale"])
         self.assertEqual(set(workflow["jobs"]), {"authorize", "build-image", "candidate-images", "deploy"})
         for job in workflow["jobs"].values():
             self.assertNotIn("uses", job)
         steps = workflow["jobs"]["deploy"]["steps"]
-        populate = next(step for step in steps if step.get("run") == "npm run prepopulate")
+        populate = next(step for step in steps if step.get("id") == "prepopulate")
         self.assertEqual(populate["if"], "inputs.prepopulate")
+        self.assertIn('--profile "$PREPOPULATE_PROFILE" --verify-only', populate["run"])
+        self.assertEqual(populate["env"]["PREPOPULATE_PROFILE"], "${{ inputs.prepopulate_profile || 'compact' }}")
+        for role in ("EDITOR", "VIEWER"):
+            for field in ("EMAIL", "PASSWORD", "TOTP_SECRET"):
+                self.assertIn(f"PREPOPULATE_{role}_{field}", populate["env"])
+        restore = next(step for step in steps if step.get("name") == "Restore the deployment fixture journal")
+        self.assertEqual(restore["with"]["merge-multiple"], "true")
+        self.assertEqual(restore["with"]["artifact-ids"], "${{ steps.fixture-state.outputs.artifact-id }}")
+        save = next(step for step in steps if step.get("name") == "Save the deployment fixture journal for retries")
+        self.assertIn("always()", save["if"])
+        self.assertIn("inputs.prepopulate", save["if"])
+        self.assertIn("steps.prepopulate.outcome", save["if"])
+        self.assertEqual(save["with"]["name"], "prepopulate-state-${{ inputs.environment }}")
+        deploy = next(step for step in steps if "scripts/cd/deploy.py" in step.get("run", ""))
+        self.assertLess(steps.index(deploy), steps.index(populate))
+        self.assertLess(steps.index(populate), steps.index(save))
 
     def test_release_commit_is_used_for_ci_build_collection_and_deployment(self):
         workflow = yaml.load((ROOT / ".github/workflows/deploy.yml").read_text(), Loader=yaml.BaseLoader)
@@ -400,7 +418,7 @@ class RuntimeTests(unittest.TestCase):
                         self.assertIsNone(directory)
                         self.assertIn("python3 scripts/cd/", command)
                         self.assertNotIn("$GITHUB_SHA", command)
-        populate = next(step for step in jobs["deploy"]["steps"] if step.get("run") == "npm run prepopulate")
+        populate = next(step for step in jobs["deploy"]["steps"] if step.get("id") == "prepopulate")
         self.assertEqual(populate["working-directory"], "apps/gateway-web")
 
 

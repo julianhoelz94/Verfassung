@@ -5,6 +5,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { scenarios, selectedScenarios, parseOptions, irregularRoots, irregularOutline } from './definitions.mjs';
 import { seedWorkflow, journalAt, allPages, comparableRoots } from './runtime.mjs';
+import { prepareScenarioJournal } from './index.mjs';
+import { setupWorkflow } from './workflows.mjs';
 
 // Contracts: ADR 0002/0005, the fixture plan, and the rich-content import rules.
 test('profiles retain baseline mode, include their dependencies and reject mistyped flags', () => {
@@ -100,4 +102,51 @@ test('pagination verifies records past 200 and fails if an endpoint ignores offs
   const api = async (_method, path) => { calls++; const query = new URL(path, 'http://local').searchParams; return records.slice(Number(query.get('offset')), Number(query.get('offset')) + Number(query.get('limit'))); };
   assert.equal((await allPages(api, 'content/articles?includeBody=true')).length, 225); assert.equal(calls, 3);
   await assert.rejects(allPages(async () => records.slice(0, 100), 'content/articles'), /repeated a page/);
+});
+
+test('deployed exploration fixtures need their target journal before any scenario can be seeded again', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'atlas-deployed-fixtures-'));
+  try {
+    let existing = true;
+    const ctx = { profile: 'extended', deploymentEnvironment: 'test', baseUrl: new URL('https://example.test'), runtimeDir: directory,
+      api: async (method, path) => {
+        assert.equal(method, 'GET', 'Journal preflight must not perform a domain write');
+        return path === 'identity/me' ? { id: 'admin-one' } : { constitutions: existing ? [{ slug: 'atlas-explore-v1-reader-lab' }] : [] };
+      } };
+    await assert.rejects(prepareScenarioJournal(ctx), /Restore its saved fixture journal/);
+    existing = false;
+    const first = await prepareScenarioJournal(ctx);
+    assert.equal(first.existed, false);
+    existing = true;
+    assert.equal((await prepareScenarioJournal(ctx)).existed, true, 'Even a failed first seed retains an empty checkpoint');
+    await assert.rejects(prepareScenarioJournal({ ...ctx, api: async (method, path) => path === 'identity/me' ? { id: 'different-deployment' } : { constitutions: [{ slug: 'atlas-explore-v1-reader-lab' }] } }), /Restore/);
+  } finally { rmSync(directory, { recursive: true, force: true }); }
+});
+
+test('a lost setup-proposal response is never automatically submitted twice', async () => {
+  const journal = { data: { scenarios: {} }, save() {} };
+  let posts = 0;
+  const ctx = { journal, api: async method => { assert.equal(method, 'POST'); posts++; throw new Error('response lost after creation'); } };
+  const scenario = scenarios.find(item => item.key === 'setup-proposal');
+  await assert.rejects(setupWorkflow(ctx, scenario), /response lost/);
+  await assert.rejects(setupWorkflow(ctx, scenario), /proposal creation was interrupted/);
+  assert.equal(posts, 1, 'Retry must not create a duplicate pending proposal');
+});
+
+test('a rejected setup request can be retried after credentials or permissions are corrected', async () => {
+  const journal = { data: { scenarios: {} }, save() {} };
+  let forbidden = true, created = 0;
+  const scenario = scenarios.find(item => item.key === 'setup-proposal');
+  const ctx = { journal, api: async method => {
+    if (method === 'POST') {
+      if (forbidden) throw Object.assign(new Error('Forbidden'), { status: 403 });
+      created++; return { id: 'proposal' };
+    }
+    return { status: 'proposed', payload: { constitutionSlug: 'atlas-explore-v1-setup-proposal' } };
+  } };
+  await assert.rejects(setupWorkflow(ctx, scenario), /Forbidden/);
+  assert.equal(journal.data.scenarios[scenario.key], undefined);
+  forbidden = false;
+  assert.equal((await setupWorkflow(ctx, scenario)).proposalId, 'proposal');
+  assert.equal(created, 1);
 });

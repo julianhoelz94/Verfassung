@@ -17,6 +17,15 @@ on:
         type: boolean
         required: false
         default: false
+      prepopulate_profile:
+        description: Fixture set to upload when prepopulate is enabled
+        type: choice
+        required: false
+        default: compact
+        options:
+          - compact
+          - extended
+          - scale
 
 permissions:
   contents: read
@@ -147,6 +156,7 @@ jobs:
     permissions:
       contents: read
       id-token: write
+      actions: read
     env:
       SOURCE_SHA: ${{ needs.authorize.outputs.source-sha }}
       DEPLOYMENT_ENVIRONMENT: ${{ inputs.environment }}
@@ -173,12 +183,20 @@ jobs:
           TS_AUDIENCE: ${{ vars.TS_AUDIENCE }}
           TS_TAGS: ${{ vars.TS_TAGS }}
           PREPOPULATE: ${{ inputs.prepopulate }}
+          PREPOPULATE_PROFILE: ${{ inputs.prepopulate_profile || 'compact' }}
           PREPOPULATE_ADMIN_EMAIL: ${{ secrets.PREPOPULATE_ADMIN_EMAIL }}
           PREPOPULATE_ADMIN_PASSWORD: ${{ secrets.PREPOPULATE_ADMIN_PASSWORD }}
+          PREPOPULATE_TOTP_SECRET: ${{ secrets.PREPOPULATE_TOTP_SECRET }}
           PREPOPULATE_REVIEWER_EMAIL: ${{ secrets.PREPOPULATE_REVIEWER_EMAIL }}
           PREPOPULATE_REVIEWER_PASSWORD: ${{ secrets.PREPOPULATE_REVIEWER_PASSWORD }}
           PREPOPULATE_PUBLISHER_EMAIL: ${{ secrets.PREPOPULATE_PUBLISHER_EMAIL }}
           PREPOPULATE_PUBLISHER_PASSWORD: ${{ secrets.PREPOPULATE_PUBLISHER_PASSWORD }}
+          PREPOPULATE_PUBLISHER_TOTP_SECRET: ${{ secrets.PREPOPULATE_PUBLISHER_TOTP_SECRET }}
+          PREPOPULATE_EDITOR_EMAIL: ${{ secrets.PREPOPULATE_EDITOR_EMAIL }}
+          PREPOPULATE_EDITOR_PASSWORD: ${{ secrets.PREPOPULATE_EDITOR_PASSWORD }}
+          PREPOPULATE_EDITOR_TOTP_SECRET: ${{ secrets.PREPOPULATE_EDITOR_TOTP_SECRET }}
+          PREPOPULATE_VIEWER_EMAIL: ${{ secrets.PREPOPULATE_VIEWER_EMAIL }}
+          PREPOPULATE_VIEWER_PASSWORD: ${{ secrets.PREPOPULATE_VIEWER_PASSWORD }}
         run: |
           for setting in COOLIFY_URL COOLIFY_PROJECT_UUID COOLIFY_SERVER_UUID PUBLIC_BASE_URL \
             COOLIFY_CONFIG_TOKEN COOLIFY_DEPLOY_TOKEN TS_CLIENT_ID TS_AUDIENCE TS_TAGS; do
@@ -187,16 +205,23 @@ jobs:
               exit 1
             fi
           done
-          if [ "$PREPOPULATE" = true ]; then
-            for setting in PREPOPULATE_ADMIN_EMAIL PREPOPULATE_ADMIN_PASSWORD \
-              PREPOPULATE_REVIEWER_EMAIL PREPOPULATE_REVIEWER_PASSWORD \
-              PREPOPULATE_PUBLISHER_EMAIL PREPOPULATE_PUBLISHER_PASSWORD; do
-              if [ -z "${!setting}" ]; then
-                echo "::error::Missing environment secret: $setting"
-                exit 1
-              fi
-            done
-          fi
+          python3 scripts/cd/prepopulate.py
+      - name: Locate the selected environment's saved fixture journal
+        id: fixture-state
+        if: inputs.prepopulate && (inputs.prepopulate_profile || 'compact') != 'compact'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/cd/prepopulate.py --find-state
+      - name: Restore the deployment fixture journal
+        if: inputs.prepopulate && steps.fixture-state.outputs.state-found == 'true'
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ steps.fixture-state.outputs.run-id }}
+          artifact-ids: ${{ steps.fixture-state.outputs.artifact-id }}
+          merge-multiple: true
+          path: apps/gateway-web/e2e/fixtures/generated/.runtime
       - name: Join Tailscale with an ephemeral OIDC identity
         uses: tailscale/github-action@99a8333667fff04fdd6cffb46dfd409f8329a7bf # v4
         with:
@@ -212,11 +237,13 @@ jobs:
         with:
           node-version: '22'
       - name: Prepopulate the selected environment after successful deployment
+        id: prepopulate
         if: inputs.prepopulate
         working-directory: apps/gateway-web
         env:
           PREPOPULATE_DEPLOYMENT_ENVIRONMENT: ${{ inputs.environment }}
           PREPOPULATE_BASE_URL: ${{ inputs.environment == 'prod' && 'https://verfassungen.julianhoelz.de' || 'https://tst.verfassungen.julianhoelz.de' }}
+          PREPOPULATE_PROFILE: ${{ inputs.prepopulate_profile || 'compact' }}
           PREPOPULATE_ADMIN_EMAIL: ${{ secrets.PREPOPULATE_ADMIN_EMAIL }}
           PREPOPULATE_ADMIN_PASSWORD: ${{ secrets.PREPOPULATE_ADMIN_PASSWORD }}
           PREPOPULATE_TOTP_SECRET: ${{ secrets.PREPOPULATE_TOTP_SECRET }}
@@ -226,4 +253,35 @@ jobs:
           PREPOPULATE_PUBLISHER_EMAIL: ${{ secrets.PREPOPULATE_PUBLISHER_EMAIL }}
           PREPOPULATE_PUBLISHER_PASSWORD: ${{ secrets.PREPOPULATE_PUBLISHER_PASSWORD }}
           PREPOPULATE_PUBLISHER_TOTP_SECRET: ${{ secrets.PREPOPULATE_PUBLISHER_TOTP_SECRET }}
-        run: npm run prepopulate
+          PREPOPULATE_EDITOR_EMAIL: ${{ secrets.PREPOPULATE_EDITOR_EMAIL }}
+          PREPOPULATE_EDITOR_PASSWORD: ${{ secrets.PREPOPULATE_EDITOR_PASSWORD }}
+          PREPOPULATE_EDITOR_TOTP_SECRET: ${{ secrets.PREPOPULATE_EDITOR_TOTP_SECRET }}
+          PREPOPULATE_VIEWER_EMAIL: ${{ secrets.PREPOPULATE_VIEWER_EMAIL }}
+          PREPOPULATE_VIEWER_PASSWORD: ${{ secrets.PREPOPULATE_VIEWER_PASSWORD }}
+          PREPOPULATE_VIEWER_TOTP_SECRET: ${{ secrets.PREPOPULATE_VIEWER_TOTP_SECRET }}
+        run: |
+          npm run prepopulate -- --profile "$PREPOPULATE_PROFILE"
+          npm run prepopulate -- --profile "$PREPOPULATE_PROFILE" --verify-only
+      - name: Save the deployment fixture journal for retries
+        if: always() && inputs.prepopulate && (inputs.prepopulate_profile || 'compact') != 'compact' && (steps.prepopulate.outcome == 'success' || steps.prepopulate.outcome == 'failure')
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: prepopulate-state-${{ inputs.environment }}
+          path: apps/gateway-web/e2e/fixtures/generated/.runtime/scenario-journal-*.json
+          include-hidden-files: true
+          if-no-files-found: ignore
+          overwrite: true
+          retention-days: 90
+      - name: Upload fixture exploration links
+        if: always() && inputs.prepopulate && (steps.prepopulate.outcome == 'success' || steps.prepopulate.outcome == 'failure')
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: prepopulate-guide-${{ inputs.environment }}
+          path: |
+            apps/gateway-web/e2e/fixtures/generated/.runtime/scenario-guide.md
+            apps/gateway-web/e2e/fixtures/generated/.runtime/scenario-index.json
+            apps/gateway-web/e2e/fixtures/generated/.runtime/prepopulate-ids.json
+          include-hidden-files: true
+          if-no-files-found: ignore
+          overwrite: true
+          retention-days: 90

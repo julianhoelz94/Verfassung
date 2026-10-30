@@ -77,11 +77,6 @@
       "path": "services/ingestion-service/src/test/kotlin/ImportApiTest.kt",
       "function": "directBatchAndChunkedImportsRequireMarkersAndAllowSharedNotes",
       "score": 21
-    },
-    {
-      "path": "services/platform/src/main/kotlin/com/constitutionatlas/platform/HierarchicalDiff.kt",
-      "function": "compare",
-      "score": 92
     }
   ],
   "file_entries": [
@@ -104,10 +99,6 @@
     {
       "path": "services/editor-service/src/main/kotlin/com/constitutionatlas/editor/service/StructuredDraftEngine.kt",
       "score": 189
-    },
-    {
-      "path": "services/platform/src/main/kotlin/com/constitutionatlas/platform/HierarchicalDiff.kt",
-      "score": 115
     }
   ]
 }

@@ -25,14 +25,13 @@ Classes, objects, and top-level functions in one file share its budget.
 This follows detekt's named-function metric; constructor/property initializers
 and property accessors outside those functions are not scored separately.
 
-After synchronizing with `main` at `4d07d6a` and cleaning up import validation
-and export read-back, the file baseline contains six production files:
-`StructuredDraftEngine` (189), `EditorService` (179), `AmendmentService` (116),
-`CatalogWriteService` (116), `HierarchicalDiff` (115), and `OrderedContentService`
-(102). `ImportValidator`, `ImportExportService` and their focused helpers meet
-both budgets. These are
-measured findings, not automatic exemptions for future files with similar names.
-Editor-service refactoring remains deferred until the new editor is ready.
+After synchronizing with `main` at `4d07d6a` and cleaning up import validation,
+export read-back and shared hierarchical diffing, the file baseline contains five
+production files: `StructuredDraftEngine` (189), `EditorService` (179),
+`AmendmentService` (116), `CatalogWriteService` (116), and `OrderedContentService`
+(102). The completed packages and their focused helpers meet both budgets.
+These are measured findings, not automatic exemptions for future files with
+similar names. All editor code is now included in cleanup and normal CI gates.
 
 Extracting helpers within one file does not remove their control flow from this
 budget. Reducing nesting can still legitimately lower the total. When a file
@@ -55,11 +54,11 @@ debt. Kotlin's `all.html` / `all.xml` show all over-limit functions and files;
 TypeScript's `summary.md` distinguishes baseline exceptions from new violations;
 `summary.json` includes all analyzed function scores.
 
-`EditorPage` in `apps/gateway-web/app/editor/page.tsx` is temporarily deferred
-while the page is under construction. Its current score remains in reports with
-status `deferred`; body changes do not invalidate that specific exemption. Other
-functions in the file and other editor files remain subject to the normal gate.
-Remove this named exemption when construction finishes.
+There are no construction exemptions. `EditorPage` in
+`apps/gateway-web/app/editor/page.tsx` is included with its current score of 165
+as ordinary existing debt. Its reviewed token fingerprint must remain unchanged;
+editing that over-limit function fails the same gate as other TypeScript code.
+Editor-service methods and files retain their normal Kotlin score caps.
 
 ## Run locally
 
@@ -109,7 +108,7 @@ repository-relative path. CI never grants new exceptions automatically.
 TypeScript exceptions are tied to function token
 fingerprints (ignoring whitespace and comments), so code changes to an over-limit
 function require reducing its complexity or explicitly reviewing a new exception.
-The named unfinished editor page is the sole construction exemption.
+Editor functions follow these same rules; no page has a special bypass.
 
 Prefer early returns, named domain operations, smaller validation steps, and
 components with focused responsibilities. Preserve behavior and add regression

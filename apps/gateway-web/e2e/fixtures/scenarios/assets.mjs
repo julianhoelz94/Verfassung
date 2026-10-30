@@ -22,7 +22,7 @@ function pngBytes() {
 }
 export const assets = {
   pdf: { name: 'synthetic-source.pdf', type: 'application/pdf', bytes: pdfBytes() },
-  html: { name: 'synthetic-archive.html', type: 'text/html', bytes: Buffer.from('<!doctype html><html lang="en"><meta charset="utf-8"><title>Synthetic archive capture</title><h1>Authored comparison</h1><p>Freedom in two fictional constitutions. The source records no counterpart for the second topic.</p></html>\n') },
+  html: { name: 'synthetic-archive.html', type: 'application/octet-stream', bytes: Buffer.from('<!doctype html><html lang="en"><meta charset="utf-8"><title>Synthetic archive capture</title><h1>Authored comparison</h1><p>Freedom in two fictional constitutions. The source records no counterpart for the second topic.</p></html>\n') },
   image: { name: 'synthetic-flag.png', type: 'image/png', bytes: pngBytes() },
 };
 export async function documentFixture(ctx, key, assetKey, targetId) {
@@ -46,6 +46,7 @@ export async function documentFixture(ctx, key, assetKey, targetId) {
   assert(upload, `${key}: uploaded file revision missing`);
   const response = await ctx.raw('GET', `document/documents/${record.id}/revisions/${upload.revision}/file`, undefined, true);
   assert.equal(response.status, 200, `${key}: file response`);
+  assert.equal(response.headers.get('content-type')?.split(';')[0], asset.type, `${key}: supported attachment MIME type`);
   assert.equal(digest(Buffer.from(await response.arrayBuffer())), digest(asset.bytes), `${key}: exact captured bytes`);
   if (targetId) await attach(ctx, 'constitution', targetId, record.id, upload.id);
   return { ...record, pinnedRevision: upload.revision, pinnedRevisionId: upload.id, href: `/documents/${record.id}?revision=${upload.revision}` };

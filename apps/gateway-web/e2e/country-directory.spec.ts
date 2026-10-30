@@ -15,6 +15,28 @@ test.beforeEach(async ({ request }) => {
   expect((await request.post(`${mockOrigin}/__country_directory`, { data: {} })).ok()).toBeTruthy();
 });
 
+for (const width of [390, 820, 1440]) test(`viewer and directory menu controls share one alignment at ${width}px`, async ({ page }) => {
+  await page.setViewportSize({ width, height: 900 });
+  await signInAdmin(page);
+  await page.goto('/countries/DE');
+  const directoryHeight = (await page.getByRole('navigation', { name: 'Country tools' }).boundingBox())!.height;
+  await page.goto('/countries/DE/versions/01900000-0000-4000-8000-000000000004');
+  const toolbar = page.getByRole('toolbar', { name: 'Reading options' });
+  const contents = (await toolbar.getByRole('button', { name: 'Hide table of contents' }).boundingBox())!;
+  expect((await toolbar.boundingBox())!.height).toBe(directoryHeight);
+  for (const name of ['Find in text', 'Compare', 'Wiki', 'Edit this constitution', 'Details', 'Reading preferences']) {
+    const bounds = (await toolbar.getByRole('button', { name, exact: true }).boundingBox())!;
+    expect(Math.abs(bounds.y - contents.y), name).toBeLessThan(1);
+    expect(bounds.height, name).toBe(contents.height);
+  }
+  for (const name of ['Details', 'Reading preferences']) {
+    await toolbar.getByRole('button', { name, exact: true }).click();
+    expect((await toolbar.boundingBox())!.height).toBe(directoryHeight);
+    await page.keyboard.press('Escape');
+    await expect(toolbar.getByRole('button', { name, exact: true })).toBeFocused();
+  }
+});
+
 for (const width of [390, 820, 1440]) test(`country directory preserves controls and ownership at ${width}px`, async ({ page }) => {
   await page.setViewportSize({ width, height: 1000 });
   await page.goto('/countries/DE');

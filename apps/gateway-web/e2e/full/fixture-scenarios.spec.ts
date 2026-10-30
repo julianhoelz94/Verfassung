@@ -19,16 +19,23 @@ test('non-standard structures retain authored order, skipped levels and shared n
   expect(article.content.filter((entry: { node?: { kind: string } }) => entry.node).map((entry: { node: { kind: string } }) => entry.node.kind)).toContain('sentence');
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(fixture.href);
-  await page.getByRole('button', { name: 'Full text', exact: true }).click();
   await expect(page.getByText('An untitled and unnumbered preamble opens the instrument.', { exact: true })).toBeVisible();
   await expect(page.getByText('This sentence skips the optional paragraph level.', { exact: true })).toBeVisible();
   await expect(page.getByText('Unnumbered text between provisions.', { exact: true })).toBeVisible();
   await expect(page.getByRole('table', { name: 'Exploration duties' })).toBeVisible();
+  await page.getByRole('button', { name: 'Find in text', exact: true }).click();
+  await page.getByRole('searchbox', { name: 'Find in constitution', exact: true }).fill('skips the optional paragraph level');
+  await expect(page.getByRole('status').filter({ hasText: '1 of 1 matches' })).toBeVisible();
+  await page.getByRole('button', { name: 'Close search', exact: true }).click();
   const markers = page.getByRole('button', { name: /^Show footnote / });
   await expect(markers).toHaveCount(2);
   await markers.first().click();
   await expect(page.getByRole('dialog')).toContainText('Shared editorial note for two articles.');
-  await page.keyboard.press('Escape');
+  await page.getByRole('link', { name: 'Go to footnote', exact: true }).click();
+  const note = page.getByRole('note').filter({ hasText: 'Shared editorial note for two articles.' });
+  await note.getByRole('button', { name: /Back to references/ }).click();
+  await page.getByRole('menu', { name: 'Choose a footnote reference' }).getByRole('menuitem', { name: /Reference 2/ }).click();
+  await expect(markers.last()).toBeInViewport();
   await markers.last().click();
   await expect(page.getByRole('dialog')).toContainText('Shared editorial note for two articles.');
   await page.keyboard.press('Escape');
@@ -49,8 +56,14 @@ test('the irregular successor retains moved identities, additions and historical
   await expect(page.getByRole('region', { name: 'Revised', exact: true }).getByText('This untitled clause changes parent in the successor.', { exact: true })).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath('fixture-irregular-compare.png'), fullPage: true });
   await page.goto(fixture.href);
-  await page.getByRole('button', { name: 'Full text', exact: true }).click();
   await expect(page.getByText('This clause is removed in the successor.', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Compare', exact: true }).click();
+  const comparison = page.getByRole('region', { name: 'Compare publications', exact: true });
+  await comparison.getByRole('combobox', { name: 'From', exact: true }).selectOption(fixture.versionId!);
+  await comparison.getByRole('combobox', { name: 'To', exact: true }).selectOption(fixture.revisedVersionId!);
+  await expect(comparison.getByRole('link', { name: 'Go to changed passage' }).first()).toBeVisible();
+  await expect(comparison.locator('ins').first()).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath('fixture-irregular-reader-compare.png'), fullPage: true });
 });
 
 test('seeded queues expose saved work while unpublished import content stays private', async ({ page, request }) => {
@@ -67,7 +80,8 @@ test('seeded queues expose saved work while unpublished import content stays pri
 
 test('historical regions, captured documents and curated counterparts are available after prepopulation', async ({ page }) => {
   await page.goto(scenarios['historical-region'].href);
-  await expect(page.getByRole('note').filter({ has: page.getByRole('heading', { name: 'Archival source' }) })).toContainText('Date as described by the source: nach 1849');
+  await page.getByRole('button', { name: 'Details', exact: true }).click();
+  await expect(page.getByRole('note').filter({ hasText: 'Date as described by the source: nach 1849' })).toBeVisible();
   await page.goto(scenarios['documents-context'].documents!.pdf.href);
   await expect(page.getByRole('link', { name: 'Download synthetic-source.pdf' })).toBeVisible();
   await page.goto(scenarios['curated-comparison'].href.replace('topic=0', 'topic=1'));

@@ -5,10 +5,32 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { scenarios, selectedScenarios, parseOptions, irregularRoots, irregularOutline } from './definitions.mjs';
 import { seedWorkflow, journalAt, allPages, comparableRoots } from './runtime.mjs';
-import { prepareScenarioJournal } from './index.mjs';
+import { prepareScenarioJournal, verifyScenarioAccess } from './index.mjs';
 import { setupWorkflow } from './workflows.mjs';
 
 // Contracts: ADR 0002/0005, the fixture plan, and the rich-content import rules.
+test('CD checks private-work access anonymously without issuing a privileged negative-test write', async () => {
+  const calls = [];
+  const ctx = { deploymentEnvironment: 'test', reviewerToken: 'admin-token', viewerToken: false,
+    raw: async (...args) => { calls.push(args); return { status: 401 }; } };
+  await verifyScenarioAccess(ctx, { sessionId: 'private' }, 'source');
+  assert.deepEqual(calls, [['GET', 'editor/edit-sessions/private', undefined, false]]);
+  await assert.rejects(verifyScenarioAccess({ ...ctx, raw: async () => ({ status: 200 }) }, { sessionId: 'private' }, 'source'), /Anonymous/);
+});
+
+test('CI keeps real viewer and reviewer permission checks, with no writes during verify-only', async () => {
+  const calls = [];
+  const ctx = { viewerToken: 'viewer-token', reviewerToken: 'review-token',
+    raw: async (...args) => { calls.push(args); return { status: 403 }; } };
+  await verifyScenarioAccess(ctx, { sessionId: 'private' }, 'source');
+  assert.deepEqual(calls, [['GET', 'editor/edit-sessions/private', undefined, 'viewer-token'], ['POST', 'editor/edit-sessions', { versionId: 'source' }, 'review-token']]);
+  calls.length = 0;
+  await verifyScenarioAccess({ ...ctx, verifyOnly: true }, { sessionId: 'private' }, 'source');
+  assert.equal(calls.length, 1);
+  await assert.rejects(verifyScenarioAccess({ ...ctx, raw: async () => ({ status: 200 }) }, { sessionId: 'private' }, 'source'), /Viewer/);
+  await assert.rejects(verifyScenarioAccess({ ...ctx, raw: async method => ({ status: method === 'GET' ? 403 : 200 }) }, { sessionId: 'private' }, 'source'), /Reviewer-only/);
+});
+
 test('profiles retain baseline mode, include their dependencies and reject mistyped flags', () => {
   assert.equal(selectedScenarios('compact').length, 0);
   assert(selectedScenarios('extended').some(s => s.kind === 'archive'));

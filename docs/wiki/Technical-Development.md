@@ -55,7 +55,7 @@ no listing endpoint. Journals are scoped by origin and administrator identity, s
 new disposable database starts a new fixture setup. `--verify-only` authenticates
 and reads records, but refuses domain writes and reindex requests.
 
-Use `PREPOPULATE_EDITOR_*`, `PREPOPULATE_REVIEWER_*`,
+For local/CI runs, use `PREPOPULATE_EDITOR_*`, `PREPOPULATE_REVIEWER_*`,
 `PREPOPULATE_PUBLISHER_*` and `PREPOPULATE_VIEWER_*` to choose accounts. Local/CI
 seed credentials are the fallback; the standard editor seed holds several roles.
 An editor-only account can be supplied when practicing strict role separation.
@@ -64,7 +64,8 @@ files are synthetic local PDF/HTML/PNG bytes and do not require external downloa
 
 For a Coolify deployment, select a published release under **Actions → Deploy →
 Run workflow**, enable prepopulate and choose its fixture profile. Deployment
-defaults to compact; extended/scale require editor and viewer account secrets too.
+defaults to compact. All deployment profiles use the existing administrator and
+require only its email, current password and TOTP setup key in GitHub environment secrets.
 The deployment run saves exploration links and a journal for later retries. See
 [[Manual deployment|Manual-Deployment#optional-npm-prepopulate]] for setup, exact
 GitHub environment secret names, journal retention and recovery.

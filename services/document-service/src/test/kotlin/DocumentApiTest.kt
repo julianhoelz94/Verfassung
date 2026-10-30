@@ -224,39 +224,41 @@ class DocumentApiTest {
 
     @Test
     fun wikiImageStaysPrivateUntilItsRevisionIsPublished() {
-        val (id, _) = create()
-        val png = java.util.Base64.getDecoder().decode(
-            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/GZkAAAAASUVORK5CYII=",
-        )
-        val uploaded = mvc.perform(
-            multipart("/documents/$id/file")
-                .file(MockMultipartFile("file", "flag.png", "image/png", png))
-                .param("expectedRevision", "1")
-                .header("Authorization", EDITOR),
-        ).andExpect(status().isOk).andReturn()
-        val pinnedId = mapper.readTree(uploaded.response.contentAsString)["revision"]["id"].asText()
-        val target = UUID.randomUUID()
-        val scope = UUID.randomUUID()
-        mvc.post("/links/country_wiki/$target") {
-            header("Authorization", EDITOR)
-            contentType = MediaType.APPLICATION_JSON
-            content = """{"documentId":"$id","revisionId":"$pinnedId","scopeRevisionId":"$scope"}"""
-        }.andExpect { status { isOk() } }
-        mvc.get("/documents/$id/revisions/2/file").andExpect { status { isNotFound() } }
-        Mockito.`when`(targets.isPublic("country_wiki", target, scope)).thenReturn(true)
-        Mockito.`when`(targets.isWikiImagePublic("country_wiki", target, scope, UUID.fromString(id), 2)).thenReturn(true)
-        mvc.get("/documents/$id/revisions/2/file").andExpect {
-            status { isOk() }
-            header { string("Content-Disposition", org.hamcrest.Matchers.containsString("inline")) }
+        for (targetType in listOf("country_wiki", "constitution_wiki", "jurisdiction_wiki")) {
+            val (id, _) = create()
+            val png = java.util.Base64.getDecoder().decode(
+                "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/GZkAAAAASUVORK5CYII=",
+            )
+            val uploaded = mvc.perform(
+                multipart("/documents/$id/file")
+                    .file(MockMultipartFile("file", "flag.png", "image/png", png))
+                    .param("expectedRevision", "1")
+                    .header("Authorization", EDITOR),
+            ).andExpect(status().isOk).andReturn()
+            val pinnedId = mapper.readTree(uploaded.response.contentAsString)["revision"]["id"].asText()
+            val target = UUID.randomUUID()
+            val scope = UUID.randomUUID()
+            mvc.post("/links/$targetType/$target") {
+                header("Authorization", EDITOR)
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"documentId":"$id","revisionId":"$pinnedId","scopeRevisionId":"$scope"}"""
+            }.andExpect { status { isOk() } }
+            mvc.get("/documents/$id/revisions/2/file").andExpect { status { isNotFound() } }
+            Mockito.`when`(targets.isPublic("$targetType", target, scope)).thenReturn(true)
+            Mockito.`when`(targets.isWikiImagePublic("$targetType", target, scope, UUID.fromString(id), 2)).thenReturn(true)
+            mvc.get("/documents/$id/revisions/2/file").andExpect {
+                status { isOk() }
+                header { string("Content-Disposition", org.hamcrest.Matchers.containsString("inline")) }
+            }
+            mvc.perform(
+                multipart("/documents/$id/file")
+                    .file(MockMultipartFile("file", "replacement.png", "image/png", png))
+                    .param("expectedRevision", "2")
+                    .header("Authorization", EDITOR),
+            ).andExpect(status().isOk)
+            mvc.get("/documents/$id/revisions/3/file").andExpect { status { isNotFound() } }
+            mvc.get("/documents/$id/revisions/2/file").andExpect { status { isOk() } }
         }
-        mvc.perform(
-            multipart("/documents/$id/file")
-                .file(MockMultipartFile("file", "replacement.png", "image/png", png))
-                .param("expectedRevision", "2")
-                .header("Authorization", EDITOR),
-        ).andExpect(status().isOk)
-        mvc.get("/documents/$id/revisions/3/file").andExpect { status { isNotFound() } }
-        mvc.get("/documents/$id/revisions/2/file").andExpect { status { isOk() } }
     }
 
     @Test

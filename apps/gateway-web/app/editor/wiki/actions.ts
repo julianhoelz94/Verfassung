@@ -1,19 +1,21 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { publishWikiPage, saveWikiDraft, type WikiImage } from '../../../lib/api';
+import { publishWikiPage, saveWikiDraft, type WikiImage, type WikiTargetType } from '../../../lib/api';
 import { attachDocument, createDocument, getDocument, uploadDocument } from '../../../lib/document-api';
 import { requireSessionBearer } from '../../../lib/session';
 import { safeReturnTo } from '../../../lib/return-to';
+import { wikiEditPath, wikiPublicPath } from '../../../lib/wiki-routing';
 
 function target(form: FormData) {
   const targetType = String(form.get('targetType'));
   const targetId = String(form.get('targetId'));
-  const code = String(form.get('code'));
-  if ((targetType !== 'country' && targetType !== 'constitution') || !/^[0-9a-f-]{36}$/i.test(targetId) || !/^[A-Za-z]{2}$/.test(code)) {
+  const code = String(form.get('code') ?? '');
+  const jurisdictionId = String(form.get('jurisdictionId') ?? '');
+  if (!['country', 'constitution', 'jurisdiction'].includes(targetType) || !/^[0-9a-f-]{36}$/i.test(targetId) || (code && !/^[A-Za-z]{2}$/.test(code)) || (jurisdictionId && !/^[0-9a-f-]{36}$/i.test(jurisdictionId)) || (targetType === 'country' && !code) || (targetType === 'constitution' && !code && !jurisdictionId)) {
     throw new Error('Invalid wiki target');
   }
-  return { targetType, targetId, code } as { targetType: 'country' | 'constitution'; targetId: string; code: string };
+  return { targetType: targetType as WikiTargetType, targetId, code, jurisdictionId };
 }
 
 function editHref(targetType: string, targetId: string, code: string, status: string, form: FormData) {
@@ -25,11 +27,11 @@ function editHref(targetType: string, targetId: string, code: string, status: st
       return url.pathname + url.search;
     }
   }
-  return `/editor/wiki/${targetType}/${targetId}?code=${encodeURIComponent(code)}&${status}=1`;
+  return wikiEditPath({ targetType: targetType as WikiTargetType, targetId, code, jurisdictionId: String(form.get('jurisdictionId') ?? '') }, { [status]: '1' });
 }
 
 export async function saveWikiAction(form: FormData): Promise<string> {
-  const { targetType, targetId, code } = target(form);
+  const { targetType, targetId, code, jurisdictionId } = target(form);
   const authorization = await requireSessionBearer();
   try {
     const images = (JSON.parse(String(form.get('images') ?? '[]')) as WikiImage[])
@@ -85,7 +87,7 @@ export async function saveWikiAction(form: FormData): Promise<string> {
     for (const image of images) {
       const doc = await getDocument(image.documentId, image.revision, authorization);
       await attachDocument(
-        targetType === 'country' ? 'country_wiki' : 'constitution_wiki',
+        draft.targetType === 'country' ? 'country_wiki' : draft.targetType === 'jurisdiction' ? 'jurisdiction_wiki' : 'constitution_wiki',
         targetId,
         image.documentId,
         doc.revision.id,
@@ -96,19 +98,18 @@ export async function saveWikiAction(form: FormData): Promise<string> {
   } catch {
     return editHref(targetType, targetId, code, 'error', form);
   }
-  revalidatePath(`/countries/${code}`);
+  revalidatePath(wikiPublicPath({ targetType, targetId, code, jurisdictionId }));
   return editHref(targetType, targetId, code, 'saved', form);
 }
 
 export async function publishWikiAction(form: FormData): Promise<string> {
-  const { targetType, targetId, code } = target(form);
+  const { targetType, targetId, code, jurisdictionId } = target(form);
   const authorization = await requireSessionBearer();
   try {
     await publishWikiPage(targetType, targetId, String(form.get('revisionId') ?? ''), authorization);
   } catch {
     return editHref(targetType, targetId, code, 'error', form);
   }
-  revalidatePath(`/countries/${code}`);
-  if (targetType === 'constitution') revalidatePath(`/countries/${code}/constitutions/${targetId}`);
+  revalidatePath(wikiPublicPath({ targetType, targetId, code, jurisdictionId }));
   return editHref(targetType, targetId, code, 'published', form);
 }

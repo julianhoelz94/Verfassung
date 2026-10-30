@@ -22,7 +22,7 @@ class WikiMediaClient(
     override fun requirePinnedImages(targetType: String, targetId: UUID, revisionId: UUID, images: List<WikiImage>, authorization: String?) {
         if (images.isEmpty()) return
         require(authorization != null) { "Authorization is required" }
-        val target = if (targetType == "country") "country_wiki" else "constitution_wiki"
+        val target = "${targetType}_wiki"
         val links = documents.get()
             .uri("/links/$target/$targetId?scopeRevisionId=$revisionId")
             .header("Authorization", authorization)

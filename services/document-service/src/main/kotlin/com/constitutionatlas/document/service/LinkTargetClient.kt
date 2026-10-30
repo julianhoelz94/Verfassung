@@ -10,6 +10,8 @@ import org.springframework.web.client.RestClientResponseException
 import tools.jackson.databind.JsonNode
 import java.util.UUID
 
+internal val wikiLinkTypes = setOf("country_wiki", "constitution_wiki", "jurisdiction_wiki")
+
 interface LinkTargetClient {
     fun requireTarget(targetType: String, targetId: UUID, authorization: String?)
     fun isPublic(targetType: String, targetId: UUID, scopeRevisionId: UUID?): Boolean
@@ -35,6 +37,7 @@ class RestLinkTargetClient(
             "amendment" -> amendment to "/amendments/$targetId"
             "country_wiki" -> catalog to "/wiki/country/$targetId/draft"
             "constitution_wiki" -> catalog to "/wiki/constitution/$targetId/draft"
+            "jurisdiction_wiki" -> catalog to "/wiki/jurisdiction/$targetId/draft"
             else -> throw IllegalArgumentException("Unsupported link target")
         }
         try {
@@ -67,8 +70,8 @@ class RestLinkTargetClient(
                         owner?.path("publishedRevisionId")?.scalarText() == scopeRevisionId.toString()
                     }
                 }
-                "country_wiki", "constitution_wiki" -> {
-                    val kind = if (targetType == "country_wiki") "country" else "constitution"
+                "country_wiki", "constitution_wiki", "jurisdiction_wiki" -> {
+                    val kind = targetType.removeSuffix("_wiki")
                     val page = catalog.get().uri("/wiki/$kind/$targetId").retrieve().body(JsonNode::class.java)
                     scopeRevisionId != null && page?.path("id")?.scalarText() == scopeRevisionId.toString()
                 }
@@ -107,7 +110,8 @@ class RestLinkTargetClient(
 
     override fun requireWikiRevision(targetType: String, targetId: UUID, scopeRevisionId: UUID, authorization: String?) {
         require(authorization != null) { "Authorization is required" }
-        val kind = if (targetType == "country_wiki") "country" else "constitution"
+        require(targetType in wikiLinkTypes) { "Unsupported wiki link target" }
+        val kind = targetType.removeSuffix("_wiki")
         val draft = catalog.get().uri("/wiki/$kind/$targetId/draft")
             .header("Authorization", authorization).retrieve().body(JsonNode::class.java)
             ?: throw NotFoundException("Wiki draft not found")
@@ -118,7 +122,8 @@ class RestLinkTargetClient(
 
     override fun isWikiImagePublic(targetType: String, targetId: UUID, scopeRevisionId: UUID, documentId: UUID, revision: Int): Boolean =
         runCatching {
-            val kind = if (targetType == "country_wiki") "country" else "constitution"
+            require(targetType in wikiLinkTypes) { "Unsupported wiki link target" }
+            val kind = targetType.removeSuffix("_wiki")
             val page = catalog.get().uri("/wiki/$kind/$targetId/revisions/$scopeRevisionId").retrieve().body(JsonNode::class.java)
             page?.path("id")?.scalarText() == scopeRevisionId.toString() &&
                 page.path("images").any { image ->

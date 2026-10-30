@@ -12,7 +12,7 @@ test('visitor reads a published constitution and an article through the real sta
   await page.goto('/');
   await page.getByRole('link', { name: 'Atlas Testland' }).click();
   await expect(page.getByRole('heading', { name: 'Atlas Testland', level: 1, exact: true })).toBeVisible();
-  const charter = page.locator('section.card').filter({ has: page.getByRole('heading', { name: 'Atlas Test Charter' }) });
+  const charter = page.getByRole('article', { name: 'Atlas Test Charter', exact: true });
   await charter.getByRole('link', { name: 'Read latest' }).click();
   await expect(page).toHaveURL(new RegExp(`/countries/XA/versions/${ids.versions['xa-2024']}$`));
   const articles = await (await request.get(`/api/content/versions/${ids.versions['xa-2024']}/articles`)).json();
@@ -23,8 +23,9 @@ test('visitor reads a published constitution and an article through the real sta
 
 test('visitor compares legal versions and reads the source document timeline', async ({ page }) => {
   await page.goto('/countries/XA');
-  const charter = page.locator('section.card').filter({ has: page.getByRole('heading', { name: 'Atlas Test Charter' }) });
-  await charter.getByRole('link', { name: 'Compare', exact: true }).click();
+  const charter = page.getByRole('article', { name: 'Atlas Test Charter', exact: true });
+  await charter.locator('summary').filter({ hasText: 'Compare versions' }).click();
+  await charter.getByRole('button', { name: 'Compare', exact: true }).click();
   await expect(page.getByRole('heading', { name: /side by side/ })).toBeVisible();
   await expect(page.locator('ins.diff-add, del.diff-remove').first()).toBeVisible();
   await page.goto('/countries/XA/timeline');

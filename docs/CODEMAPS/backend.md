@@ -19,6 +19,8 @@ Paths below are **service paths**. Public: prefix `/api/<short>`.
 | POST | `/countries`, `/countries/{iso}/constitutions`, `/constitutions/{id}/versions` |
 | POST | `/versions/{id}/publish` |
 
+`WikiService`/`WikiRepository` own jurisdiction and constitution wikis. `/wiki/{country|jurisdiction|constitution}/{id}` serves only a published revision; `/draft` and `/history` require editorial access, saves require a writer and publication a publisher. Country and jurisdiction routes for an existing country share the same legacy wiki identity, revisions and pinned media. Catalog V33 adds regional/historical wiki targets.
+
 Tests: `CatalogApiTest.kt`. Fresh databases are populated through API fixtures; historical seed migrations remain unchanged. Versions: two axes (`legalVersionId`, `currentVersionId`, legal vs editorial predecessors). Public list is one row per legal identity with `currentVersionId` = editorial tip; `latestVersionId` is the editorial tip of the legal tip. `409` is `not_legal_tip` / `not_editorial_tip`. `hopKind` `initial`/`legal`/`editorial_correction` (`legal_amendment`/`official_errata` accepted as `legal` aliases until ED-7).
 
 ## content — `services/content-service`
@@ -37,7 +39,7 @@ Ordered immutable revisions and version roots are the current write model. Legac
 
 ## document — `services/document-service`
 
-`DocumentController` → `DocumentService` → `DocumentRepository`. Writes require an identity role (`editor`, `publisher`, or `admin`); lifecycle and link events are append-only. `LinkTargetClient` verifies constitution, version, and amendment IDs through the owning services. Document lists and revision history require editorial access. Public metadata and file reads require an active link to a public target and expose only its pinned revision. Amendment links inherit through draft revision ancestry; the published revision determines the public link set and cannot be edited.
+`DocumentController` → `DocumentService` → `DocumentRepository`. Country, constitution and jurisdiction wiki image links require their exact wiki revision (`country_wiki`, `constitution_wiki`, `jurisdiction_wiki`); V8 adds jurisdiction image scopes. Published-image reads retain the existing immutable document/revision checks. Writes require an identity role (`editor`, `publisher`, or `admin`); lifecycle and link events are append-only. `LinkTargetClient` verifies constitution, version, and amendment IDs through the owning services. Document lists and revision history require editorial access. Public metadata and file reads require an active link to a public target and expose only its pinned revision. Amendment links inherit through draft revision ancestry; the published revision determines the public link set and cannot be edited.
 
 | Method | Path |
 | --- | --- |

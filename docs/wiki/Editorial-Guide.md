@@ -97,7 +97,7 @@ The workspace provides direct links to **Documents**, **Legal changes** and **Te
 
 - Use **Legal changes** to draft and link an amendment or other legal change to exact affected provisions. Review the source and target links before publication.
 - Use **Documents** to add source files, create file revisions, and link them to constitutions or legal changes. A file revision is distinct from a constitutional text revision.
-- Use the country or constitution page's edit action to draft contextual background and pictures. Save the private draft, then have a publisher inspect its preview and publish that page revision separately from constitutional text.
+- On country, regional and historical-jurisdiction pages, open **Wiki → Edit wiki**. It opens a named workspace for that jurisdiction, with summary, text, sources, pictures and revision history. Save the private draft; **Review wiki** lets Reviewers/Publishers inspect it, and an authorized Publisher/Admin publishes the selected revision. **View public page** returns with Wiki open. Constitution wikis keep their existing editor entry point. Wiki publication remains separate from constitutional text.
 - Use **Lifecycle** on a constitution to record adoption, commencement, suspension, restoration, repeal, and provision events. Check effective dates and the public constitution timeline after recording an event.
 
 

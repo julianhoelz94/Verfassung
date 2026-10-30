@@ -38,6 +38,7 @@ export const renderCountryHistory = cache(async (code: string, on?: string, even
     return <CollectionPage width="content" className="country-history"><ServiceUnavailable service={ui.services.catalog} retryHref={`/countries/${code}/timeline`} /></CollectionPage>;
   }
   if (!country) notFound();
+  country = { ...country, constitutions: country.constitutions.filter(constitution => publicVersions(constitution.versions).length > 0) };
   const [lifecycle, amendmentGroups] = await Promise.all([
     loadConstitutionHistory(country, query.on, eventFilter).then(value => ({ value, failed: false })).catch(() => ({ value: null, failed: true })),
     Promise.allSettled(country.constitutions.map(constitution => listConstitutionAmendments(constitution.id))),

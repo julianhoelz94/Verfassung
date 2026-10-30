@@ -19,6 +19,9 @@ import { ReaderComparison } from './ReaderComparison';
 import { ReaderIcon, type ReaderIconName } from './ReaderIcon';
 import { ReaderArticle } from './ReaderArticle';
 import styles from './VersionReader.module.css';
+import { WikiPanel } from './WikiPanel';
+import { PageBreadcrumbs, PageChromeSurface, PageContentsBody, PageContentsLayout, PageContentsNavigation, PageMenuBar, PageMenuFrame } from './layout/PageChrome';
+import { useKeepContentsVisible, usePageChromeMetrics } from './layout/usePageChromeMetrics';
 import { ReaderActions, ReaderDocument } from './ReaderActions';
 import { readerActionIndex, type ReaderActionIndex } from '../../lib/reader-actions';
 
@@ -64,33 +67,14 @@ function ReaderSurface({ code, jurisdictionId, versionId, articles, outline, can
   const [depth, setDepth] = useState(initialDepth === 'summary' ? 1 : max);
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => new Set());
   const [current, setCurrent] = useState(articles[0]?.id ?? '');
-  const [readingArea, setReadingArea] = useState({ top: 124, bottom: 0 });
+  const readingArea = usePageChromeMetrics(viewer, sticky, navigation);
+  useKeepContentsVisible(navigation, current, preferences.navigation);
   const unitsByLogicalId = useMemo(() => orderedTargets(articles), [articles]);
   const articlesByNumber = useMemo(() => Object.fromEntries(articles.map(article => [article.articleNumber, article.id])), [articles]);
   const sentenceKinds = useMemo(() => new Set(outline?.kinds.filter(kind => kind.segmentation === 'sentence' && !kind.mayHoldChildren).map(kind => kind.kindCode)), [outline]);
   const flowing = preferences.presentation === 'flowing' || (preferences.presentation === 'source' && outline?.kinds.some(kind => sentenceKinds.has(kind.kindCode) && kind.presentation === 'concatenated'));
   function readerHref(id: string) { return jurisdictionId ? `/jurisdictions/${jurisdictionId}/versions/${id}` : `/countries/${code}/versions/${id}`; }
 
-  useLayoutEffect(() => {
-    const root = viewer.current, bar = sticky.current, header = document.querySelector<HTMLElement>('.topbar');
-    if (!root || !bar) return;
-    function measure() {
-      const headerHeight = header?.getBoundingClientRect().height ?? 0;
-      const navigationHeight = window.innerWidth <= 680 ? navigation.current?.getBoundingClientRect().height ?? 0 : 0;
-      root!.style.setProperty('--reader-header-height', headerHeight + 'px');
-      const height = bar!.getBoundingClientRect().height;
-      root!.style.setProperty('--reader-sticky-height', height + 'px');
-      root!.style.setProperty('--reader-navigation-height', navigationHeight + 'px');
-      const top = Math.min(headerHeight + height + navigationHeight + 24, window.innerHeight - 1);
-      const bottom = Math.max(0, Math.min(window.innerHeight * .45, window.innerHeight - top - 1));
-      setReadingArea(previous => previous.top === top && previous.bottom === bottom ? previous : { top, bottom });
-    }
-    measure();
-    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
-    observer?.observe(bar); if (navigation.current) observer?.observe(navigation.current); if (header) observer?.observe(header);
-    window.addEventListener('resize', measure);
-    return () => { observer?.disconnect(); window.removeEventListener('resize', measure); };
-  }, []);
   useLayoutEffect(() => {
     const previous = anchor.current; anchor.current = null;
     if (previous?.element.isConnected) window.scrollBy?.(0, previous.element.getBoundingClientRect().top - previous.top);
@@ -106,13 +90,6 @@ function ReaderSurface({ code, jurisdictionId, versionId, articles, outline, can
     for (const article of articles) { const node = document.getElementById(article.id); if (node) observer.observe(node); }
     return () => observer.disconnect();
   }, [articles, readingArea]);
-  useEffect(() => {
-    const list = navigation.current?.querySelector('nav'), selected = list?.querySelector<HTMLElement>('[aria-current="true"]');
-    if (!preferences.navigation || !list || !selected) return;
-    const item = selected.getBoundingClientRect(), area = list.getBoundingClientRect();
-    if (item.top < area.top) list.scrollTop += item.top - area.top;
-    else if (item.bottom > area.bottom) list.scrollTop += item.bottom - area.bottom;
-  }, [current, preferences.navigation]);
   useEffect(() => {
     function reveal() {
       let target: string;
@@ -166,10 +143,10 @@ function ReaderSurface({ code, jurisdictionId, versionId, articles, outline, can
   function renderNode(node: OrderedNode, element: OrderedNodeElement) {
     return cloneElement(element, { tabIndex: -1, className: [element.props.className, sentenceKinds.has(node.kind) ? styles.sentence : undefined].filter(Boolean).join(' ') });
   }
-  return <ReaderActions index={actionIndex}><div className={styles.viewer} ref={viewer} style={{ '--constitution-font-size': preferences.size + 'px' } as React.CSSProperties}>
-    {breadcrumbs ? <div className={styles.breadcrumbs}>{breadcrumbs}</div> : null}
-    <div className={styles.sticky} ref={sticky}>
-      <div className={styles.toolbar} role="toolbar" aria-label={t(ui.accessibility.readingOptions)}>
+  return <ReaderActions index={actionIndex}><PageChromeSurface className={styles.viewer} ref={viewer} style={{ '--constitution-font-size': preferences.size + 'px' } as React.CSSProperties}>
+    {breadcrumbs ? <PageBreadcrumbs>{breadcrumbs}</PageBreadcrumbs> : null}
+    <PageMenuFrame ref={sticky}>
+      <PageMenuBar role="toolbar" label={t(ui.accessibility.readingOptions)}>
         <button type="button" className={styles.tool} aria-label={t(preferences.navigation ? copy.hideContents : copy.showContents)} aria-expanded={preferences.navigation} aria-controls="reader-contents" onClick={() => updatePreferences({ navigation: !preferences.navigation })}><ReaderIcon name="contents" /><span className={styles.toolName}>{t(copy.contents)}</span></button>
         <span className={styles.divider} aria-hidden="true" />
         {tool('search', 'search', t(copy.find))}
@@ -185,15 +162,19 @@ function ReaderSurface({ code, jurisdictionId, versionId, articles, outline, can
             <label>{t(copy.detailLevel)}<select aria-label={t(copy.detailLevel)} value={depth} onChange={event => { setDepth(Number(event.target.value)); setExpanded(new Set()); }}>{labels.map((label, i) => <option key={i} value={i + 1}>{label}</option>)}</select></label>
           </div>
         </details>
-      </div>
+      </PageMenuBar>
       {panel === 'search' ? <div className={styles.search} id="reader-search"><input type="search" ref={searchInput} aria-label={t(copy.findLabel)} placeholder={t(copy.findPlaceholder)} value={query} onChange={event => setQuery(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); goMatch(event.shiftKey ? -1 : 1); } }} /><output aria-live="polite">{query ? matchCount ? `${matchIndex + 1} ${t(copy.of)} ${matchCount} ${t(copy.matches)}` : t(copy.noMatches) : t(copy.enterQuery)}</output><button type="button" className={styles.tool} aria-label={t(copy.previousMatch)} disabled={!matchCount} onClick={() => goMatch(-1)}><ReaderIcon name="up" /></button><button type="button" className={styles.tool} aria-label={t(copy.nextMatch)} disabled={!matchCount} onClick={() => goMatch(1)}><ReaderIcon name="down" /></button><button type="button" className={styles.tool} aria-label={t(copy.closeSearch)} onClick={() => { setPanel(null); setQuery(''); }}><ReaderIcon name="close" /></button></div> : null}
       {context ? <section id="reader-compare" hidden={panel !== 'compare'} aria-label={t(copy.compareVersions)}><ReaderComparison constitutionId={context.constitutionId} publications={context.publications} viewedVersionId={versionId} readerHref={readerHref} comparisonHref={context.comparisonHref} active={panel === 'compare'} /></section> : null}
-      {context && panel === 'wiki' ? <section className={styles.wiki} id="reader-wiki" aria-label={t(copy.wiki)}><div className={styles.wikiHead}><div className={styles.eyebrow}>{t(copy.context)}</div><button type="button" className={styles.tool} aria-label={t(copy.closeWiki)} onClick={() => { setPanel(null); viewer.current?.querySelector<HTMLElement>('[data-reader-trigger="wiki"]')?.focus({ preventScroll: true }); }}><ReaderIcon name="close" /></button></div><h2>{t(copy.about)}</h2><div className={styles.wikiContent}>{wiki ?? <p>{t(context.wikiState === 'unavailable' ? copy.wikiUnavailable : copy.noWiki)}</p>}</div><div className={styles.wikiActions}>{context.overviewHref ? <a href={context.overviewHref}>{t(copy.fullWiki)}</a> : null}{context.editWikiHref ? <a href={context.editWikiHref}>{t(copy.editWiki)}</a> : null}</div></section> : null}
       {panel === 'edit' ? <section className={styles.editorial} id="reader-edit">{editorial}</section> : null}
-    </div>
-    <div className={styles.layout} data-navigation={preferences.navigation}>
-      <aside ref={navigation} className={styles.navigation} hidden={!preferences.navigation} id="reader-contents"><nav className={styles.toc} aria-label={t(copy.contents)}><h2 className={styles.eyebrow}>{t(copy.inConstitution)}</h2><ol>{articles.map(article => <li key={article.id}><a href={'#unit-' + article.id} aria-current={current === article.id ? 'true' : undefined} onClick={() => setCurrent(article.id)}>{articleHeading(outline, { ...article, title: '' }) || articleHeading(outline, article)}{article.title ? <span>{article.title}</span> : null}</a></li>)}</ol>{notes.length ? <><hr /><a href="#reader-footnotes">{t(copy.footnotes)}<span>{notes.length}</span></a></> : null}</nav></aside>
-      <section className={styles.main}><ReaderDocument className={styles.document} ref={documentRef} data-boundaries={flowing && preferences.boundaries}>
+    </PageMenuFrame>
+    {context && panel === 'wiki' ? <WikiPanel id="reader-wiki" title={t(copy.about)} onClose={() => { setPanel(null); viewer.current?.querySelector<HTMLElement>('[data-reader-trigger="wiki"]')?.focus({ preventScroll: true }); }} actions={<>{context.overviewHref ? <a href={context.overviewHref}>{t(copy.fullWiki)}</a> : null}{context.editWikiHref ? <a href={context.editWikiHref}>{t(copy.editWiki)}</a> : null}</>}>{wiki ?? <p>{t(context.wikiState === 'unavailable' ? copy.wikiUnavailable : copy.noWiki)}</p>}</WikiPanel> : null}
+    <PageContentsLayout expanded={preferences.navigation} navigationId="reader-contents" navigationRef={navigation} navigation={
+      <PageContentsNavigation label={t(copy.contents)} title={t(copy.inConstitution)} currentId={current} onSelect={setCurrent}
+        items={articles.map(article => ({ id: article.id, href: '#unit-' + article.id, label: articleHeading(outline, { ...article, title: '' }) || articleHeading(outline, article), description: article.title }))}>
+        {notes.length ? <><hr /><a href="#reader-footnotes">{t(copy.footnotes)}<span>{notes.length}</span></a></> : null}
+      </PageContentsNavigation>
+    }>
+      <PageContentsBody><ReaderDocument className={styles.document} ref={documentRef} data-boundaries={flowing && preferences.boundaries}>
         <header className={styles.title} data-reader-chrome>{context ? <><div className={styles.eyebrow}>{context.jurisdictionName}</div><h1>{context.title}</h1><p>{context.versionLabel}{language ? ' · ' + language : ''}</p><span className={styles.status}><ReaderIcon name="check" />{t(copy.published)} · {t(copy.readingView)}</span></> : null}{notices}</header>
         <ol className={[styles.articles, 'version-articles'].join(' ')} lang={language}>{articles.map(article => {
           const shown = expanded.has(article.id) ? max : depth, includeText = shown >= max;
@@ -205,9 +186,9 @@ function ReaderSurface({ code, jurisdictionId, versionId, articles, outline, can
         })}</ol>
         {endnotes.length ? <section id="reader-footnotes" aria-label={t(copy.footnotes)}><ConstitutionFootnotes entries={endnotes} outline={outline} indexedBacklinks={backlinks} /></section> : null}
         <footer className={styles.footer} data-reader-chrome>{footer ?? <span>{articles.length} <T value={articles.length === 1 ? ui.remainingStatus.unitSingular : ui.remainingStatus.unitPlural} /></span>}<a className={styles.textAction} href={articles[0] ? '#unit-' + articles[0].id : '#main-content'}><ReaderIcon name="up" />{t(copy.backBeginning)}</a></footer>
-      </ReaderDocument></section>
-    </div>
-  </div></ReaderActions>;
+      </ReaderDocument></PageContentsBody>
+    </PageContentsLayout>
+  </PageChromeSurface></ReaderActions>;
 }
 
 function containsOccurrence(entries: import('../../lib/api').OrderedEntry[], target: string): boolean {

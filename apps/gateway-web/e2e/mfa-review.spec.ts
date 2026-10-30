@@ -74,7 +74,7 @@ test('legal versions stay prominent while text corrections require deliberate in
   await expect(page.locator('.chip-row').getByText('2022', { exact: true })).toBeVisible();
   await expect(page.getByText('2022-1', { exact: true })).toHaveCount(0);
   await expect(page.getByText('2022-2', { exact: true })).toHaveCount(0);
-  await expect(page.getByRole('navigation', { name: 'Country navigation' }).getByRole('link', { name: 'History', exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'National constitutional history', exact: true })).toBeVisible();
   await page.goto(`/countries/DE/versions/${REVIEW_CURRENT}`);
   await expect(page.locator('.snapshot-notice')).toHaveCount(0);
   await page.goto(`/countries/DE/versions/${REVIEW_CORRECTION}`);

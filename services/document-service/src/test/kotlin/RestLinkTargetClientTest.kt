@@ -76,64 +76,70 @@ class RestLinkTargetClientTest {
 
     @Test
     fun wikiVisibilityRequiresTheRequestedPublishedRevision() {
-        val target = UUID.randomUUID()
-        val scope = UUID.randomUUID()
-        val path = "/wiki/country/$target"
-        val responses = mutableMapOf(path to """{"id":"$scope"}""")
-        withResponses(responses) { client, _ ->
-            assertThat(client.isPublic("country_wiki", target, scope)).isTrue()
-            assertThat(client.isPublic("country_wiki", target, UUID.randomUUID())).isFalse()
-            responses[path] = """{"id":[]}"""
-            assertThat(client.isPublic("country_wiki", target, scope)).isFalse()
-            responses.remove(path)
-            assertThat(client.isPublic("country_wiki", target, scope)).isFalse()
+        for (kind in listOf("country", "constitution", "jurisdiction")) {
+            val target = UUID.randomUUID()
+            val scope = UUID.randomUUID()
+            val path = "/wiki/$kind/$target"
+            val responses = mutableMapOf(path to """{"id":"$scope"}""")
+            withResponses(responses) { client, _ ->
+                assertThat(client.isPublic("${kind}_wiki", target, scope)).isTrue()
+                assertThat(client.isPublic("${kind}_wiki", target, UUID.randomUUID())).isFalse()
+                responses[path] = """{"id":[]}"""
+                assertThat(client.isPublic("${kind}_wiki", target, scope)).isFalse()
+                responses.remove(path)
+                assertThat(client.isPublic("${kind}_wiki", target, scope)).isFalse()
+            }
         }
     }
 
     @Test
     fun wikiImageWritesRequireTheCurrentUnpublishedDraftAndForwardAuthorization() {
-        val target = UUID.randomUUID()
-        val scope = UUID.randomUUID()
-        val publicPath = "/wiki/constitution/$target"
-        val draftPath = "$publicPath/draft"
-        val responses = mutableMapOf(
-            draftPath to """{"id":"$scope"}""",
-            publicPath to """{"id":"${UUID.randomUUID()}"}""",
-        )
-        withResponses(responses) { client, calls ->
-            client.requireWikiRevision("constitution_wiki", target, scope, "Bearer editor")
-            assertThat(calls).contains(draftPath to "Bearer editor", publicPath to null)
-            responses[publicPath] = """{"id":"$scope"}"""
-            val published = assertThrows(IllegalArgumentException::class.java) {
-                client.requireWikiRevision("constitution_wiki", target, scope, "Bearer editor")
+        for (kind in listOf("country", "constitution", "jurisdiction")) {
+            val target = UUID.randomUUID()
+            val scope = UUID.randomUUID()
+            val publicPath = "/wiki/$kind/$target"
+            val draftPath = "$publicPath/draft"
+            val responses = mutableMapOf(
+                draftPath to """{"id":"$scope"}""",
+                publicPath to """{"id":"${UUID.randomUUID()}"}""",
+            )
+            withResponses(responses) { client, calls ->
+                client.requireWikiRevision("${kind}_wiki", target, scope, "Bearer editor")
+                assertThat(calls).contains(draftPath to "Bearer editor", publicPath to null)
+                responses[publicPath] = """{"id":"$scope"}"""
+                val published = assertThrows(IllegalArgumentException::class.java) {
+                    client.requireWikiRevision("${kind}_wiki", target, scope, "Bearer editor")
+                }
+                assertThat(published.message).contains("Published wiki image links are immutable")
+                responses[draftPath] = """{"id":{}}"""
+                val malformed = assertThrows(IllegalArgumentException::class.java) {
+                    client.requireWikiRevision("${kind}_wiki", target, scope, "Bearer editor")
+                }
+                assertThat(malformed.message).contains("Only the current wiki draft")
             }
-            assertThat(published.message).contains("Published wiki image links are immutable")
-            responses[draftPath] = """{"id":{}}"""
-            val malformed = assertThrows(IllegalArgumentException::class.java) {
-                client.requireWikiRevision("constitution_wiki", target, scope, "Bearer editor")
-            }
-            assertThat(malformed.message).contains("Only the current wiki draft")
         }
     }
 
     @Test
     fun publicWikiImagesMustMatchBothDocumentIdentityAndRevision() {
-        val target = UUID.randomUUID()
-        val scope = UUID.randomUUID()
-        val document = UUID.randomUUID()
-        val path = "/wiki/country/$target/revisions/$scope"
-        val responses = mutableMapOf(path to """{"id":"$scope","images":[{"documentId":"${UUID.randomUUID()}","revision":3},{"documentId":"$document","revision":3}]}""")
-        withResponses(responses) { client, _ ->
-            assertThat(client.isWikiImagePublic("country_wiki", target, scope, document, 3)).isTrue()
-            assertThat(client.isWikiImagePublic("country_wiki", target, scope, document, 4)).isFalse()
-            for (image in listOf("""{"documentId":"$document","revision":{}}""", """{"documentId":[],"revision":3}""")) {
-                responses[path] = """{"id":"$scope","images":[$image]}"""
-                assertThat(client.isWikiImagePublic("country_wiki", target, scope, document, 3)).isFalse()
+        for (kind in listOf("country", "constitution", "jurisdiction")) {
+            val target = UUID.randomUUID()
+            val scope = UUID.randomUUID()
+            val document = UUID.randomUUID()
+            val path = "/wiki/$kind/$target/revisions/$scope"
+            val responses = mutableMapOf(path to """{"id":"$scope","images":[{"documentId":"${UUID.randomUUID()}","revision":3},{"documentId":"$document","revision":3}]}""")
+            withResponses(responses) { client, _ ->
+                assertThat(client.isWikiImagePublic("${kind}_wiki", target, scope, document, 3)).isTrue()
+                assertThat(client.isWikiImagePublic("${kind}_wiki", target, scope, document, 4)).isFalse()
+                for (image in listOf("""{"documentId":"$document","revision":{}}""", """{"documentId":[],"revision":3}""")) {
+                    responses[path] = """{"id":"$scope","images":[$image]}"""
+                    assertThat(client.isWikiImagePublic("${kind}_wiki", target, scope, document, 3)).isFalse()
+                }
+                responses[path] = """{"id":[],"images":[{"documentId":"$document","revision":3}]}"""
+                assertThat(client.isWikiImagePublic("${kind}_wiki", target, scope, document, 3)).isFalse()
+                responses.remove(path)
+                assertThat(client.isWikiImagePublic("${kind}_wiki", target, scope, document, 3)).isFalse()
             }
-            responses[path] = """{"id":[],"images":[{"documentId":"$document","revision":3}]}"""
-            assertThat(client.isWikiImagePublic("country_wiki", target, scope, document, 3)).isFalse()
-            responses.remove(path)
-            assertThat(client.isWikiImagePublic("country_wiki", target, scope, document, 3)).isFalse()
         }
     }
 

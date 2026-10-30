@@ -17,6 +17,7 @@ const requests: { path: string; method: string; body: unknown; authorization: st
 let status = 200;
 let impact = 'reversible';
 let responseBody: unknown;
+let wikiCanonicalType: string | undefined;
 const documentRecord = { id: 'document', currentRevision: 3, revision: { id: 'document-r3', revision: 3, title: 'Official source' } };
 const kinds = [{ kindCode: 'article', displayLabel: 'Article', presentation: 'section', showLabel: true, showTitle: true, showKind: true, titlePolicy: 'optional', labelPolicy: 'required', root: true, allowedChildKinds: [] }];
 const structureForm = () => form({ constitutionId: id, settingsRevisionId: 'settings-r2', outline: JSON.stringify(kinds) });
@@ -24,6 +25,7 @@ const wikiForm = (extra: Record<string, string> = {}) => form({ targetType: 'con
 const payload = { isoCode: 'XA', countryName: 'Test Republic', constitutionSlug: 'charter', constitutionTitle: 'Charter', versionLabel: '1949', articles: [{ articleNumber: '1', body: 'Authored text' }] };
 beforeEach(() => {
   requests.length = 0; status = 200; impact = 'reversible'; responseBody = undefined;
+  wikiCanonicalType = undefined;
   vi.mocked(currentUser).mockResolvedValue({ id: 'author', email: 'author@example.test', roles: ['admin'], stepUpFresh: true });
   vi.mocked(requireSessionBearer).mockResolvedValue('Bearer writer-session');
   vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
@@ -37,7 +39,7 @@ beforeEach(() => {
       const revision = Number(url.searchParams.get('revision') ?? documentRecord.currentRevision);
       return json((init?.method ?? 'GET') === 'GET' ? { ...documentRecord, id: requestedId, revision: { ...documentRecord.revision, id: `${requestedId}-r${revision}`, revision } } : documentRecord, status);
     }
-    return json({ id: 'saved-draft', ...documentRecord, ...(url.pathname.includes('/wiki/') ? { id: 'wiki-r2' } : {}) }, status);
+    return json({ id: 'saved-draft', ...documentRecord, ...(url.pathname.includes('/wiki/') ? { id: 'wiki-r2', targetType: wikiCanonicalType ?? url.pathname.split('/wiki/')[1].split('/')[0] } : {}) }, status);
   });
 });
 afterEach(() => { vi.restoreAllMocks(); vi.clearAllMocks(); });
@@ -121,6 +123,22 @@ describe('structure changes use preflight and revision guards', () => {
 });
 
 describe('contextual pages separate draft and publication', () => {
+  it('saves and publishes a jurisdiction wiki without inventing a country code', async () => {
+    const data = wikiForm({ targetType: 'jurisdiction', code: '' });
+    expect(await wiki.saveWikiAction(data)).toBe(`/editor/wiki/jurisdiction/${id}?saved=1`);
+    expect(requests[0]).toMatchObject({ method: 'PUT', path: `/api/catalog/wiki/jurisdiction/${id}/draft`, authorization: 'Bearer writer-session' });
+    expect(revalidatePath).toHaveBeenCalledWith(`/jurisdictions/${id}`);
+    requests.length = 0;
+    data.set('revisionId', 'wiki-r2');
+    expect(await wiki.publishWikiAction(data)).toBe(`/editor/wiki/jurisdiction/${id}?published=1`);
+    expect(requests[0]).toMatchObject({ method: 'POST', path: `/api/catalog/wiki/jurisdiction/${id}/publish`, body: { revisionId: 'wiki-r2' } });
+  });
+  it('pins images to the canonical wiki identity returned for a legacy country alias', async () => {
+    wikiCanonicalType = 'country';
+    const data = wikiForm({ targetType: 'jurisdiction', code: '', images: JSON.stringify([{ documentId: 'seal', revision: 2, alt: 'Seal' }]) });
+    expect(await wiki.saveWikiAction(data)).toContain('saved=1');
+    expect(requests[2]).toMatchObject({ path: `/api/document/links/country_wiki/${id}`, body: { documentId: 'seal', revisionId: 'seal-r2', scopeRevisionId: 'wiki-r2' } });
+  });
   it('saves authored content with its revision guard and normalized source URLs', async () => {
     expect(await wiki.saveWikiAction(wikiForm())).toContain('saved=1'); expect(requests[0]).toMatchObject({ method: 'PUT', path: `/api/catalog/wiki/constitution/${id}/draft`, body: { expectedRevisionId: 'wiki-r1', summary: 'Summary', body: 'Authored body', images: [], sourceUrls: ['https://archive.example/a', 'https://archive.example/b'] } }); expect(requests).toHaveLength(1);
   });

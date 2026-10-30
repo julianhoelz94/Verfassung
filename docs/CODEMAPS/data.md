@@ -21,6 +21,8 @@ columns and indexes; historical seed/compatibility migrations must remain availa
 
 Catalog V25/V26 add `jurisdictions` with stable IDs, sibling-unique slugs, optional codes, historical status and optional existence dates. Existing countries retain their UUIDs as root jurisdictions. Constitutions, slug aliases and succession are scoped to `jurisdiction_id`; nullable `country_id` preserves legacy national-owner reads. Historical codes may be reused without merging identities.
 
+Catalog V33 extends contextual wiki ownership to jurisdictions, including historical regions. Root-country jurisdiction requests resolve to the existing country wiki identity and revision chain. Document V8 permits jurisdiction-wiki image links only with an owning wiki revision scope; private drafts never make their images public.
+
 A logical content ID identifies a unit across revisions; a revision ID identifies
 immutable content; an occurrence ID pins its position in a version. Authored labels
 are display text and cannot replace those identities. Reusing a revision during

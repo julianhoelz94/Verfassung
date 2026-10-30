@@ -12,6 +12,16 @@
 ![Länderseite mit verfügbaren Verfassungen und Fassungen](https://raw.githubusercontent.com/wiki/julianhoelz94/Verfassung/media/reading-country-de.png)
 *Zuerst die Verfassung, dann die rechtliche Fassung wählen.*
 
+Die Länderseite gliedert sich in **Nationale Verfassungen**, **Historische nationale Verfassungen** und **Regionale Verfassungen**. Regionen behalten ihren belegten Gebietskontext, auch bei untergeordneten und früheren Gebieten. Eine Verfassung wird bei erfasstem Status „aufgehoben“ historisch eingeordnet. Unbekannte, ausgesetzte und noch nicht in Kraft getretene Verfassungen behalten ihre ausdrückliche Statusangabe.
+
+Mit **Inhalt** blenden Sie die Navigation neben dem Verzeichnis ein oder aus. Sie führt zu nationalen und historischen Gruppen, Regionen und einzelnen Verfassungen und markiert die aktuelle Position. Auf schmalen Bildschirmen steht sie über der Liste. Die durchgehende Menüleiste bleibt beim Scrollen erreichbar, wie in der Verfassungsansicht.
+
+Der Regionsname und **Region öffnen** führen zur eigenen Gebietsseite, auch bei früheren Gebieten. Übergeordnete Gebiete, historischer Status und erfasste Datumsangaben werden getrennt gezeigt. Regionale Seiten verwenden dasselbe Menü und einblendbare Inhaltsverzeichnis wie Länderseiten.
+
+Jede Verfassung bietet dieselben Werkzeuge: **Neueste Fassung lesen**, verfügbare Fassungen, **Fassungsverlauf**, **Fassungen vergleichen** und **Über diese Verfassung**. Der Fassungsverlauf zeigt öffentliche rechtliche Fassungen mit erfassten Datumsangaben. Leselinks öffnen deren aktuelle veröffentlichte Transkription. Ein Vergleich benötigt mindestens zwei Fassungen derselben Verfassung; bei nur einer Fassung bleibt die Schaltfläche mit einer Erklärung sichtbar. „Neueste verfügbare Fassung“ beschreibt den Katalogbestand und belegt keine heutige Rechtsgeltung.
+
+**Über diese Verfassung** öffnet Hintergrund, Geltungsdaten, Quellen, zugehörige Dokumente und Lesewerkzeuge. **Wiki** in der Länderwerkzeugleiste öffnet Ländertext, Bilder, Quellenangaben und Übersetzungswerkzeuge. **Nationale Verfassungsgeschichte** neben der nationalen Abschnittsüberschrift verbindet aktuelle und historische nationale Verfassungen mit erfassten Ereignissen. Regionale Verfassungen bieten ihre eigenen Geltungsereignisse und den Link **Änderungsgeschichte** auf ihrer Verfassungsübersicht. Länder- und Regionalmenüs enthalten **Inhalt** und **Wiki**. Im Wiki sehen Redakteure/Admins **Wiki bearbeiten** und Prüfer/Herausgeber **Wiki prüfen**. Entwürfe bleiben privat, bis ein berechtigter Herausgeber/Admin die ausgewählte Revision veröffentlicht.
+
 ![Verfassungstext mit Inhaltsverzeichnis](https://raw.githubusercontent.com/wiki/julianhoelz94/Verfassung/media/reading-text-de.png)
 *Das Inhaltsverzeichnis führt durch den ausgewählten Text.*
 
@@ -34,7 +44,7 @@ Zeigen Sie auf eine Fußnotenmarke oder fokussieren Sie sie für eine Vorschau. 
 | Verfassungsgeschichte | **Geschichte**: Annahme, Inkrafttreten, weitere Verfassungsereignisse und Rechtsänderungen auf einem Zeitstrahl. |
 | Rechtsänderungen | **Geschichte**, bei Bedarf nach **Verfassungsänderungen** filtern. |
 
-Länder- und Verfassungsseiten bieten **Übersicht** und **Geschichte**. In der Leseansicht stehen diese Verknüpfungen unter **Details**. Geschichte zeigt Verfassungsereignisse und Verfassungsänderungen in gemeinsamer Datumsreihenfolge. Kennzeichnungen unterscheiden die Ereignisarten; **Ereignisse anzeigen** filtert bei Bedarf denselben Zeitstrahl. Kleine Marker kennzeichnen die Meilensteine direkt auf der zentrierten Zeitlinie. Zeigen Sie auf einen Marker oder fokussieren Sie ihn mit der Tastatur für die Beschriftung; wählen Sie ihn für die Details aus. Auf Touchscreens tippen Sie auf den Marker. Escape schließt die Beschriftung. Die Ereignisse sind nach Jahren gruppiert. Nutzen Sie **Zum Jahr springen**, die Vor-/Zurück-Schaltflächen oder die chronologische Liste. Die Pfeiltasten wechseln zwischen Meilensteinen; Pos1/Ende wählen den ersten/letzten. Ungefähre Datumsangaben bleiben gekennzeichnet, und Einträge ohne Datum stehen getrennt.
+Der nationale Abschnitt bietet **Nationale Verfassungsgeschichte**. In der Leseansicht stehen Länderübersicht und Geschichte unter **Details**. Geschichte zeigt Verfassungsereignisse und Verfassungsänderungen in gemeinsamer Datumsreihenfolge. Kennzeichnungen unterscheiden die Ereignisarten; **Ereignisse anzeigen** filtert bei Bedarf denselben Zeitstrahl. Kleine Marker kennzeichnen die Meilensteine direkt auf der zentrierten Zeitlinie. Zeigen Sie auf einen Marker oder fokussieren Sie ihn mit der Tastatur für die Beschriftung; wählen Sie ihn für die Details aus. Auf Touchscreens tippen Sie auf den Marker. Escape schließt die Beschriftung. Die Ereignisse sind nach Jahren gruppiert. Nutzen Sie **Zum Jahr springen**, die Vor-/Zurück-Schaltflächen oder die chronologische Liste. Die Pfeiltasten wechseln zwischen Meilensteinen; Pos1/Ende wählen den ersten/letzten. Ungefähre Datumsangaben bleiben gekennzeichnet, und Einträge ohne Datum stehen getrennt.
 
 Die Suchfilter bieten Gebiet, Land, Fassung und Gültigkeitsdatum. Lange Listen besitzen eine Optionssuche. Beim Gebiets- oder Länderwechsel werden unpassende Filter mit einem Hinweis zurückgesetzt. **Filter anwenden** aktualisiert die Adresse. Entfernen Sie einen aktiven Filter oder wählen Sie **Filter zurücksetzen**, um die Suche zu erweitern. Auf kleineren Bildschirmen öffnen Sie **Filter** über den Treffern. Ein Gebiet erfasst seine eigenen Verfassungen; untergeordnete Gebiete wählen Sie gesondert. Gespeicherte Filter für unbekannte oder ältere Fassungen bleiben sichtbar und erweitern die Suche nicht unbemerkt.
 
@@ -65,6 +75,8 @@ Verwenden Sie die Adresse der geöffneten Version oder Einheit als dauerhaften L
 ## Sprache und Inhaltsübersetzung
 
 Unter [[Konto → Sprache der Website|Account-Guide-de#sprache-und-inhaltsübersetzung]] ändern Sie die Sprache oder fordern eine Inhaltsübersetzung an. Redaktionelle Sprachfassungen und maschinelle Übersetzungen sind getrennt; prüfen Sie den genauen Wortlaut am Original.
+
+Auf Wiki-Seiten übersetzt das Sprachsymbol **A / 文** oben rechts den Artikel. Beim Darüberfahren oder Fokussieren erscheint die Beschriftung. Nach der Übersetzung bietet der Rückgängig-Pfeil **Original anzeigen** an. Besucher gelangen über dasselbe Symbol zur Anmeldung.
 
 ## Angaben zur Website und Datenschutz
 

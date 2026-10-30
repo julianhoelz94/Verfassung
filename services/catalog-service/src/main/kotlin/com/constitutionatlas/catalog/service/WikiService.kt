@@ -13,29 +13,29 @@ import java.util.UUID
 @Service
 class WikiService(private val repo: WikiRepository, private val media: WikiMedia) {
     fun published(targetType: String, targetId: UUID): WikiPageRevision? {
-        requireTarget(targetType, targetId)
-        return repo.published(targetType, targetId)
+        val kind = requireTarget(targetType, targetId)
+        return repo.published(kind, targetId)
     }
 
     fun draft(targetType: String, targetId: UUID): WikiPageRevision? {
-        requireTarget(targetType, targetId)
-        return repo.latest(targetType, targetId)
+        val kind = requireTarget(targetType, targetId)
+        return repo.latest(kind, targetId)
     }
 
     fun history(targetType: String, targetId: UUID, limit: Int = 25, offset: Int = 0): List<WikiPageRevision> {
-        requireTarget(targetType, targetId)
+        val kind = requireTarget(targetType, targetId)
         require(limit in 1..100 && offset >= 0) { "History page must have a limit of 1–100 and non-negative offset" }
-        return repo.history(targetType, targetId, limit, offset)
+        return repo.history(kind, targetId, limit, offset)
     }
 
     fun publishedRevision(targetType: String, targetId: UUID, revisionId: UUID): WikiPageRevision? {
-        requireTarget(targetType, targetId)
-        return repo.publishedRevision(targetType, targetId, revisionId)
+        val kind = requireTarget(targetType, targetId)
+        return repo.publishedRevision(kind, targetId, revisionId)
     }
 
     @Transactional
     fun save(targetType: String, targetId: UUID, request: SaveWikiPage, actorId: UUID): WikiPageRevision {
-        requireTarget(targetType, targetId)
+        val kind = requireTarget(targetType, targetId)
         require(request.summary.isNotBlank() && request.summary.length <= 500) { "Summary must be 1–500 characters" }
         require(request.body.length <= 20000) { "Body must be at most 20,000 characters" }
         require(request.images.size <= 30) { "Page may contain at most 30 images" }
@@ -52,30 +52,32 @@ class WikiService(private val repo: WikiRepository, private val media: WikiMedia
             require(image.rights == null || image.rights.length <= 500) { "Image rights text is too long" }
             require(image.sourceUrl == null || image.sourceUrl.startsWith("https://") || image.sourceUrl.startsWith("http://")) { "Image source URL must be HTTP(S)" }
         }
-        val pageId = repo.ensurePage(targetType, targetId)
+        val pageId = repo.ensurePage(kind, targetId)
         repo.lockPage(pageId)
-        val current = repo.latest(targetType, targetId)
+        val current = repo.latest(kind, targetId)
         if (current?.id != request.expectedRevisionId) {
             throw ConflictException("Wiki page changed; reload before saving", "wiki_revision_conflict")
         }
         val id = repo.append(pageId, current?.id, request.summary.trim(), request.body.trim(), request.images, request.sourceUrls.distinct(), actorId)
-        return repo.revision(targetType, targetId, id)!!
+        return repo.revision(kind, targetId, id)!!
     }
 
     @Transactional
     fun publish(targetType: String, targetId: UUID, revisionId: UUID, authorization: String? = null): WikiPageRevision {
-        requireTarget(targetType, targetId)
-        val pageId = repo.pageId(targetType, targetId) ?: throw NotFoundException("Wiki page not found")
+        val kind = requireTarget(targetType, targetId)
+        val pageId = repo.pageId(kind, targetId) ?: throw NotFoundException("Wiki page not found")
         repo.lockPage(pageId)
-        val latest = repo.latest(targetType, targetId) ?: throw NotFoundException("Wiki draft not found")
+        val latest = repo.latest(kind, targetId) ?: throw NotFoundException("Wiki draft not found")
         if (latest.id != revisionId) throw ConflictException("Only the latest wiki revision can be published", "wiki_revision_conflict")
-        media.requirePinnedImages(targetType, targetId, revisionId, latest.images, authorization)
+        media.requirePinnedImages(kind, targetId, revisionId, latest.images, authorization)
         repo.publish(pageId, revisionId)
-        return repo.revision(targetType, targetId, revisionId)!!
+        return repo.revision(kind, targetId, revisionId)!!
     }
 
-    private fun requireTarget(targetType: String, targetId: UUID) {
-        require(targetType in setOf("country", "constitution")) { "Invalid wiki target type" }
+    private fun requireTarget(targetType: String, targetId: UUID): String {
+        require(targetType in setOf("country", "constitution", "jurisdiction")) { "Invalid wiki target type" }
         if (!repo.targetExists(targetType, targetId)) throw NotFoundException("Wiki target not found")
+        // Existing country pages retain their identity and pinned media through either route.
+        return if (targetType == "jurisdiction" && repo.targetExists("country", targetId)) "country" else targetType
     }
 }

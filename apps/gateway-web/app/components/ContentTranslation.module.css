@@ -1,0 +1,13 @@
+.wiki { display:flow-root; }
+.toolbar { float:inline-end;display:inline-flex;margin-inline-start:12px;margin-block-end:8px; }
+.toolbar[data-slotted='true'] { float:none;margin:0; }
+.control { position:relative;display:inline-flex; }
+.button { composes:tool from './layout/PageChrome.module.css';width:36px;height:36px;padding:8px; }
+.button .icon { width:18px;height:18px; }
+.tooltip { position:absolute;inset-inline-end:0;top:calc(100% + 6px);z-index:var(--z-menu);width:max-content;max-width:min(260px,calc(100vw - 32px));padding:6px 10px;border:1px solid var(--color-line);border-radius:5px;background:var(--color-surface);color:var(--color-ink);box-shadow:var(--shadow-2);font:400 var(--text-xs)/1.5 var(--font-ui);visibility:hidden;opacity:0;pointer-events:none; }
+.control:hover .tooltip,.control:focus-within .tooltip { visibility:visible;opacity:1; }
+.error { color:var(--color-danger);font:400 var(--text-sm)/1.5 var(--font-ui); }
+.busy { animation:translation-spin 1s linear infinite; }
+@keyframes translation-spin { to { transform:rotate(360deg); } }
+@media(pointer:coarse) { .button { width:44px;height:44px; } }
+@media(prefers-reduced-motion:reduce) { .busy { animation:none; } }

@@ -3,6 +3,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { mount, click, button } from '../../test/dom';
 import { translateContentAction } from '../content-translation/actions';
 import { ContentTranslation } from './ContentTranslation';
+import { WikiPanel } from './WikiPanel';
+import { getByRole } from '@testing-library/dom';
 vi.mock('next/navigation', () => ({ usePathname: () => '/countries/XA' }));
 vi.mock('../content-translation/actions', () => ({ translateContentAction: vi.fn() }));
 let view: Awaited<ReturnType<typeof mount>>;
@@ -44,6 +46,27 @@ describe('content translation preserves consent and the source', () => {
   });
   it('does not send content already authored in the selected language', async () => {
     await show({ alwaysTranslate: true, sourceLanguage: 'en-GB' }); expect(translateContentAction).not.toHaveBeenCalled(); expect(view.host.querySelector('button')).toBeNull();
+  });
+  it('places the compact Wiki control in its header and restores the exact source', async () => {
+    vi.mocked(translateContentAction).mockResolvedValue(['Translated wording']);
+    view = await mount(<WikiPanel id="wiki" title="About this place" onClose={vi.fn()}><ContentTranslation compact sourceLanguage="de" authenticated enabled alwaysTranslate={false}>{content}</ContentTranslation></WikiPanel>);
+    const control = getByRole(view.host, 'button', { name: 'Translate this content', exact: true });
+    expect(control.textContent).toBe('');
+    expect(control.parentElement?.querySelector('[role=tooltip]')?.textContent).toBe('Translate this content');
+    expect(control.compareDocumentPosition(view.host.querySelector('h2')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    await click(control);
+    expect(view.host.querySelector('[data-translate-content]')?.textContent).toBe(' Translated wording ');
+    await click(getByRole(view.host, 'button', { name: 'Show original', exact: true }));
+    expect(view.host.querySelector('[data-translate-content]')?.textContent).toBe(' Original wording ');
+    expect(translateContentAction).toHaveBeenCalledTimes(1);
+  });
+  it('offers an accessible compact sign-in link without sending anonymous Wiki text', async () => {
+    view = await mount(<ContentTranslation compact sourceLanguage="auto" authenticated={false} enabled alwaysTranslate={false}>{content}</ContentTranslation>);
+    const link = view.host.querySelector('a');
+    expect(link?.getAttribute('aria-label')).toBe('Log in to translate this content.');
+    expect(link?.getAttribute('href')).toBe('/login');
+    expect(link?.textContent).toBe('');
+    expect(translateContentAction).not.toHaveBeenCalled();
   });
   it('splits more than 128 distinct passages into bounded batches without losing their order', async () => {
     vi.mocked(translateContentAction).mockImplementation(async texts => texts.map(text => `translated ${text}`));

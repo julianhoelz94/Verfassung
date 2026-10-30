@@ -82,6 +82,10 @@ Unter **Über** finden Sie die Quellen- und Prüfgrundsätze, im **Impressum** d
 
 ## Text und dauerhafte Links kopieren
 
+Artikel-, Satz- und andere Textstellenlinks öffnen denselben Verfassungsbetrachter an der gewünschten Stelle. Bestehende Artikel- und Einheitenadressen funktionieren weiterhin, auch mit Absatz- und Satzankern. Quelleninformationen stehen unter **Details**, damit der Text im Mittelpunkt bleibt.
+
 Öffnen Sie per Rechtsklick auf den Verfassungstext das Kopiermenü. Es bietet die angeklickte Einheit und ihre übergeordneten Einheiten: etwa Satz, Absatz, Artikel und Verfassung. Ein Absatz ohne ausgewählten Satz bietet keinen Satzlink. **Dauerhaften Link kopieren** bleibt an den angezeigten veröffentlichten Textstand gebunden. **Originaltext kopieren** übernimmt den gespeicherten Wortlaut mit wörtlichen Marken, Tabellen und Zeilenumbrüchen, ohne Bedienelemente. Auch bei einer Übersetzung wird der veröffentlichte Originaltext kopiert.
 
-Mit der Tastatur öffnet Umschalt+F10 das Menü an einer fokussierten Textstelle. Pfeiltasten wechseln zwischen Einträgen; Eingabe oder Leertaste wählt sie, Escape schließt das Menü. **Kopieren** in der Werkzeugleiste bietet denselben Zugang auf Touchscreens und für die ausgewählte Textstelle oder den aktuellen Artikel. Falls die Zwischenablage nicht zugänglich ist, erscheint ein markierbares Kopierfeld. Zusätzliche Linksymbole im Text entfallen.
+Mit der Tastatur öffnet Umschalt+F10 das Menü an einer fokussierten Textstelle. Pfeiltasten wechseln zwischen Einträgen; Eingabe oder Leertaste wählt sie, Escape schließt das Menü. Eine Trennlinie gliedert das kompakte Menü in dauerhafte Links und Originaltext. Falls die Zwischenablage nicht zugänglich ist, erscheint ein markierbares Kopierfeld. Zusätzliche Linksymbole im Text entfallen.
+
+Jede Fußnote hat genau einen **↑**-Rücksprung. Beim Darüberfahren oder Fokussieren erscheint seine Beschriftung. Bei einem einzelnen Verweis springt er direkt zurück; bei mehreren Verweisen öffnet er ein Menü mit den Verweisstellen.

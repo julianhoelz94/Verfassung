@@ -82,7 +82,7 @@ export function SiteHeader({ user, identityUnavailable = false, needsReviewCount
   ] : [] : menuSections(user, false, needsReviewCount, anonymousBrowsingAllowed);
   const versionId = versionIdFromPath(pathname);
   const country = versionId ? countryFromPath(pathname) : undefined;
-  const continuousReader = Boolean(versionId && !pathname.includes('/articles/') && !pathname.includes('/units/'));
+  const continuousReader = Boolean(versionId);
   return (
     <header className="topbar">
       <div className="topbar-inner">

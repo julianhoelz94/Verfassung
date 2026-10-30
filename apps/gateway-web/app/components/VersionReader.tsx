@@ -19,7 +19,7 @@ import { ReaderComparison } from './ReaderComparison';
 import { ReaderIcon, type ReaderIconName } from './ReaderIcon';
 import { ReaderArticle } from './ReaderArticle';
 import styles from './VersionReader.module.css';
-import { ReaderActions, ReaderCopyButton, ReaderDocument } from './ReaderActions';
+import { ReaderActions, ReaderDocument } from './ReaderActions';
 import { readerActionIndex, type ReaderActionIndex } from '../../lib/reader-actions';
 
 export type ReaderContext = {
@@ -33,6 +33,7 @@ export type VersionReaderProps = {
   changeByArticle?: Record<string, string>; unchangedSinceLabel?: string; initialDepth?: 'summary' | 'full';
   context?: ReaderContext; breadcrumbs?: ReactNode; wiki?: ReactNode; details?: ReactNode;
   editorial?: ReactNode; notices?: ReactNode; footer?: ReactNode;
+  initialPassage?: { id: string; legacyId?: string };
 };
 
 export function VersionReader(props: VersionReaderProps) {
@@ -46,7 +47,7 @@ export function VersionReader(props: VersionReaderProps) {
 
 function ReaderSurface({ code, jurisdictionId, versionId, articles, outline, canEditTitles = false, language,
   changeByArticle = {}, unchangedSinceLabel, initialDepth = 'full', context, breadcrumbs, wiki, details, editorial,
-  notices, footer, notes, endnotes, backlinks, actionIndex }: VersionReaderProps & {
+  notices, footer, notes, endnotes, backlinks, actionIndex, initialPassage }: VersionReaderProps & {
     actionIndex: ReaderActionIndex; notes: FootnoteItem[]; endnotes: ReturnType<typeof footnoteEntries>; backlinks: ReturnType<typeof footnoteBacklinks>;
   }) {
   const t = useTranslation();
@@ -63,7 +64,7 @@ function ReaderSurface({ code, jurisdictionId, versionId, articles, outline, can
   const [depth, setDepth] = useState(initialDepth === 'summary' ? 1 : max);
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => new Set());
   const [current, setCurrent] = useState(articles[0]?.id ?? '');
-  const [stickyHeight, setStickyHeight] = useState(54);
+  const [readingArea, setReadingArea] = useState({ top: 124, bottom: 0 });
   const unitsByLogicalId = useMemo(() => orderedTargets(articles), [articles]);
   const articlesByNumber = useMemo(() => Object.fromEntries(articles.map(article => [article.articleNumber, article.id])), [articles]);
   const sentenceKinds = useMemo(() => new Set(outline?.kinds.filter(kind => kind.segmentation === 'sentence' && !kind.mayHoldChildren).map(kind => kind.kindCode)), [outline]);
@@ -74,11 +75,15 @@ function ReaderSurface({ code, jurisdictionId, versionId, articles, outline, can
     const root = viewer.current, bar = sticky.current, header = document.querySelector<HTMLElement>('.topbar');
     if (!root || !bar) return;
     function measure() {
-      root!.style.setProperty('--reader-header-height', (header?.getBoundingClientRect().height ?? 0) + 'px');
+      const headerHeight = header?.getBoundingClientRect().height ?? 0;
+      const navigationHeight = window.innerWidth <= 680 ? navigation.current?.getBoundingClientRect().height ?? 0 : 0;
+      root!.style.setProperty('--reader-header-height', headerHeight + 'px');
       const height = bar!.getBoundingClientRect().height;
       root!.style.setProperty('--reader-sticky-height', height + 'px');
-      root!.style.setProperty('--reader-navigation-height', (window.innerWidth <= 680 ? navigation.current?.getBoundingClientRect().height ?? 0 : 0) + 'px');
-      setStickyHeight(height);
+      root!.style.setProperty('--reader-navigation-height', navigationHeight + 'px');
+      const top = Math.min(headerHeight + height + navigationHeight + 24, window.innerHeight - 1);
+      const bottom = Math.max(0, Math.min(window.innerHeight * .45, window.innerHeight - top - 1));
+      setReadingArea(previous => previous.top === top && previous.bottom === bottom ? previous : { top, bottom });
     }
     measure();
     const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
@@ -92,13 +97,15 @@ function ReaderSurface({ code, jurisdictionId, versionId, articles, outline, can
   }, [preferences]);
   useEffect(() => {
     if (typeof IntersectionObserver === 'undefined') return;
+    const visible = new Set<Element>();
     const observer = new IntersectionObserver(entries => {
-      const visible = entries.filter(entry => entry.isIntersecting).sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
-      if (visible[0]) setCurrent(visible[0].target.id);
-    }, { rootMargin: `-${stickyHeight + 70}px 0px -45% 0px`, threshold: [0, .1, .5] });
+      for (const entry of entries) { if (entry.isIntersecting) visible.add(entry.target); else visible.delete(entry.target); }
+      const first = [...visible].sort((a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top)[0];
+      if (first) setCurrent(first.id);
+    }, { rootMargin: `-${readingArea.top}px 0px -${readingArea.bottom}px 0px`, threshold: [0, .1, .5] });
     for (const article of articles) { const node = document.getElementById(article.id); if (node) observer.observe(node); }
     return () => observer.disconnect();
-  }, [articles, stickyHeight]);
+  }, [articles, readingArea]);
   useEffect(() => {
     const list = navigation.current?.querySelector('nav'), selected = list?.querySelector<HTMLElement>('[aria-current="true"]');
     if (!preferences.navigation || !list || !selected) return;
@@ -110,6 +117,7 @@ function ReaderSurface({ code, jurisdictionId, versionId, articles, outline, can
     function reveal() {
       let target: string;
       try { target = decodeURIComponent(location.hash.slice(1)); } catch { return; }
+      if (!target || target === initialPassage?.legacyId) target = initialPassage?.id ?? target;
       if (!target) return;
       const article = articles.find(article => target === article.id || target === 'unit-' + article.id || containsOccurrence(article.content ?? [], target));
       if (article) { setCurrent(article.id); setExpanded(old => old.has(article.id) ? old : new Set([...old, article.id])); }
@@ -117,7 +125,7 @@ function ReaderSurface({ code, jurisdictionId, versionId, articles, outline, can
     }
     reveal(); window.addEventListener('hashchange', reveal);
     return () => window.removeEventListener('hashchange', reveal);
-  }, [articles]);
+  }, [articles, initialPassage]);
   useEffect(() => {
     if (panel === 'search') searchInput.current?.focus({ preventScroll: true });
   }, [panel]);
@@ -158,7 +166,7 @@ function ReaderSurface({ code, jurisdictionId, versionId, articles, outline, can
   function renderNode(node: OrderedNode, element: OrderedNodeElement) {
     return cloneElement(element, { tabIndex: -1, className: [element.props.className, sentenceKinds.has(node.kind) ? styles.sentence : undefined].filter(Boolean).join(' ') });
   }
-  return <ReaderActions index={actionIndex} currentId={current}><div className={styles.viewer} ref={viewer} style={{ '--constitution-font-size': preferences.size + 'px' } as React.CSSProperties}>
+  return <ReaderActions index={actionIndex}><div className={styles.viewer} ref={viewer} style={{ '--constitution-font-size': preferences.size + 'px' } as React.CSSProperties}>
     {breadcrumbs ? <div className={styles.breadcrumbs}>{breadcrumbs}</div> : null}
     <div className={styles.sticky} ref={sticky}>
       <div className={styles.toolbar} role="toolbar" aria-label={t(ui.accessibility.readingOptions)}>
@@ -167,7 +175,6 @@ function ReaderSurface({ code, jurisdictionId, versionId, articles, outline, can
         {tool('search', 'search', t(copy.find))}
         {context ? tool('compare', 'compare', t(copy.compare)) : null}
         {context ? tool('wiki', 'wiki', t(copy.wiki)) : null}
-        <ReaderCopyButton className={styles.tool} labelClassName={styles.toolName} />
         <span className={styles.spacer} />
         {editorial ? <button type="button" className={styles.tool} aria-label={t(ui.countries.code.versions.versionid.page.editThisConstitution)} aria-expanded={panel === 'edit'} data-reader-trigger="edit" aria-controls={panel === 'edit' ? 'reader-edit' : undefined} onClick={() => togglePanel('edit')}><ReaderIcon name="edit" /><span className={styles.toolName}>{t(copy.edit)}</span></button> : null}
         {details ? <details className={styles.menuWrap} data-reader-menu open={menu === 'details'}><summary role="button" className={styles.tool} aria-label={t(copy.details)} aria-expanded={menu === 'details'} data-reader-trigger="details" onClick={event => { event.preventDefault(); setMenu(menu === 'details' ? null : 'details'); }}><ReaderIcon name="details" /><span className={styles.toolName}>{t(copy.details)}</span></summary><div className={styles.menu}>{details}</div></details> : null}
@@ -193,7 +200,7 @@ function ReaderSurface({ code, jurisdictionId, versionId, articles, outline, can
           const nodes = clipNodes(article.children ?? [], outline, shown), open = nodes.length > 0 || includeText;
           const permalink = code ? `/countries/${code}/versions/${versionId}/${article.kind && article.kind !== 'article' ? 'units' : 'articles'}/${article.id}#article-${article.articleNumber}` : `/versions/${versionId}/units/${article.id}`;
           return <ReaderArticle id={article.id} key={article.id} heading={articleHeading(outline, article)} headingContent={<ConstitutionArticleHeading article={article} outline={outline} />} expanded={open} onToggle={depth < max ? () => setExpanded(old => { const next = new Set(old); if (next.has(article.id)) next.delete(article.id); else next.add(article.id); return next; }) : undefined}
-            metadata={<><a href={permalink}>{t({ en: 'Open passage', de: 'Textstelle öffnen' })}</a>{code && article.kind === 'article' ? <a href={`/countries/${code}/articles/${encodeURIComponent(article.articleNumber)}`}><T value={ui.components.versionreader.historyOf} /> {article.articleNumber}</a> : null}{changeByArticle[article.articleNumber] ? <Badge tone={changeTypeTone(changeByArticle[article.articleNumber])}><T value={changeTypeMessage(changeByArticle[article.articleNumber])} /></Badge> : <span>{unchangedSinceLabel ? `${t(ui.readerDynamic.unchangedSince)} ${unchangedSinceLabel}` : t(ui.readerDynamic.unchanged)}</span>}</>}>
+            metadata={<><a href={permalink}>{t({ en: 'Open passage', de: 'Textstelle öffnen' })}</a>{code && article.kind === 'article' ? <a href={`/countries/${code}/articles/${encodeURIComponent(article.articleNumber)}`}><T value={ui.components.versionreader.historyOf} /> {articleHeading(outline, { ...article, title: '' })}</a> : null}{changeByArticle[article.articleNumber] ? <Badge tone={changeTypeTone(changeByArticle[article.articleNumber])}><T value={changeTypeMessage(changeByArticle[article.articleNumber])} /></Badge> : <span>{unchangedSinceLabel ? `${t(ui.readerDynamic.unchangedSince)} ${unchangedSinceLabel}` : t(ui.readerDynamic.unchanged)}</span>}</>}>
             {open ? <ConstitutionText article={article} entries={article.content == null ? undefined : clipOrderedEntries(article.content, shownOutline, shown)} nodes={nodes} body={includeText && !nodes.length ? article.body : null} showHeading={false} rootAnchor={false} outline={shownOutline} lang={language} canEditTitles={canEditTitles} returnTo={readerHref(versionId)} crossRefs={{ code, versionId, articlesByNumber, unitsByLogicalId, footnotes: notes }} hideFootnotes renderNode={renderNode} /> : null}
           </ReaderArticle>;
         })}</ol>

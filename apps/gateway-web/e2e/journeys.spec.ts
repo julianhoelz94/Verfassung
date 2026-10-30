@@ -25,6 +25,7 @@ test('browse from countries to an article', async ({ page }) => {
   await page.getByRole('link', { name: 'Open passage', exact: true }).first().click();
   await expect(page.getByRole('heading', { name: /Human dignity/ })).toBeVisible();
   await expect(page).toHaveURL(new RegExp(`/countries/DE/versions/${VERSION_2022}/articles/${ARTICLE_1}`));
+  await page.getByRole('button', { name: /^Details · Article 1/ }).first().click();
   await expect(page.getByRole('link', { name: 'History of Article 1' })).toBeVisible();
   await page.getByRole('link', { name: 'History of Article 1' }).click();
   await expect(page.getByRole('heading', { name: 'History of Article 1' })).toBeVisible();

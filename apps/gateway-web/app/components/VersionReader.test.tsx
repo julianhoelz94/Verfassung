@@ -45,6 +45,18 @@ it('opens a pinned unit when navigation changes only the fragment', async () => 
   expect(host.textContent).toContain('Exact historical source note.');
 });
 
+it.each([
+  ['', 'second'], ['#article-2', 'second'], ['#second-body', 'second'], ['#root', 'root'],
+])('opens the requested passage while preserving an explicit fragment %s', async (hash, expected) => {
+  window.history.replaceState({}, '', '/countries/DE/versions/old-snapshot/articles/second' + hash);
+  const source: ArticleSummary[] = [...articles, { ...articles[0], id: 'second', articleNumber: '2',
+    content: [{ type: 'text', occurrenceId: 'second-body', text: 'Second article body.' }] }];
+  await act(async () => root.render(<VersionReader code="DE" versionId="old-snapshot" articles={source} outline={outline}
+    initialPassage={{ id: 'second', legacyId: 'article-2' }} />));
+  expect(host.querySelector('nav [aria-current="true"]')?.getAttribute('href')).toBe('#unit-' + expected);
+  expect(host.querySelector('#second-body')?.textContent).toBe('Second article body.');
+});
+
 it('keeps the regional reader text in the server response when JavaScript is disabled', () => {
   const html = renderToStaticMarkup(<VersionReader jurisdictionId="region" versionId="old-snapshot" articles={articles} outline={outline} initialDepth="full" />);
   expect(html).toContain('Exact historical source note.');

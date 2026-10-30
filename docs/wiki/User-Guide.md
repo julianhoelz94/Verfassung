@@ -88,6 +88,10 @@ Use **About** for source and verification policy, **Impressum** for the publishe
 
 ## Copy text and permanent links
 
+Article, sentence and other passage links open the same constitution reader at the target passage. Existing article and unit URLs continue to work, including paragraph and sentence fragments. Source information stays in **Details** so the text remains in focus.
+
 Right-click the constitution text to open the copy menu. It offers the clicked unit and its ancestors, such as sentence, paragraph, article and constitution. Clicking a paragraph does not invent a sentence target. **Copy permalink** stays pinned to the published snapshot being read. **Copy original text** includes stored wording, literal note labels, tables and authored breaks, without interface controls. It copies the published original even when a translation is displayed.
 
-Shift+F10 opens the menu on a focused passage. Arrow keys move between items; Enter or Space selects one, and Escape dismisses it. **Copy** in the toolbar provides the same access on touchscreens and for selected text or the current article. If clipboard access is unavailable, a selectable copy field appears. Separate permalink icons are no longer needed in the text.
+Shift+F10 opens the menu on a focused passage. Arrow keys move between items; Enter or Space selects one, and Escape dismisses it. The compact menu separates permalink actions from original-text actions with a divider. If clipboard access is unavailable, a selectable copy field appears. Separate permalink icons are no longer needed in the text.
+
+Each footnote has one **↑** return control. Hover over it or focus it to see its label. It jumps straight to a single reference; for shared notes it opens a menu of reference locations.

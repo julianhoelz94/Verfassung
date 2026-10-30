@@ -15,6 +15,7 @@ import Compare, { generateMetadata as compareMetadata } from './countries/[code]
 import Timeline from './countries/[code]/timeline/page';
 import ArticleHistory from './countries/[code]/articles/[articleNumber]/page';
 import ArticlePage, { generateMetadata as articleMetadata } from './countries/[code]/versions/[versionId]/articles/[articleId]/page';
+import UnitPage from './countries/[code]/versions/[versionId]/units/[unitId]/page';
 
 vi.mock('../lib/api', async originalModule => ({ ...await originalModule<typeof import('../lib/api')>(), getCountry: vi.fn(), getWikiPage: vi.fn(), listCountries: vi.fn(), listArticlePage: vi.fn(), listConstitutionAmendments: vi.fn(), listAllUnits: vi.fn(), getVersion: vi.fn(), getReaderOutline: vi.fn(), listAmendments: vi.fn(), getConstitutionLifecycle: vi.fn(), getProvisionLifecycle: vi.fn(), resolveUnit: vi.fn(), listAllArticles: vi.fn(), listAmendmentsByArticle: vi.fn(), getUnit: vi.fn() }));
 vi.mock('../lib/document-api', () => ({ listDocumentLinks: vi.fn() }));
@@ -170,13 +171,38 @@ describe('history and unavailable resources', () => {
 describe('article permalinks and legal-edition history', () => {
   const articleProps = () => ({ params: Promise.resolve({ code: 'XA', versionId: 'law-1949', articleId: 'old-1' }), searchParams: Promise.resolve({}) });
   const historyProps = () => ({ params: Promise.resolve({ code: 'XA', articleNumber: '1' }) });
+  const passageRoutes = [
+    ['article', () => ArticlePage(articleProps())],
+    ['unit', () => UnitPage({ params: Promise.resolve({ code: 'XA', versionId: 'law-1949', unitId: 'old-1' }) })],
+  ] as const;
+  it('renders unit permalinks through the same reader with the complete pinned document', async () => {
+    const output = await render(passageRoutes[1][1]());
+    expect(output).toContain('Some citizens may vote.');
+    expect(output).not.toContain('Every adult citizen may vote.');
+    expect(output).toContain('role="toolbar"');
+    expect(output).toContain('data-reader-document');
+    expect(output).not.toContain('aria-label="Source and trust"');
+    expect(api.listAllUnits).toHaveBeenCalledWith('law-1949', true);
+  });
+  it.each(passageRoutes)('rejects missing %s permalinks instead of silently opening another passage', async (_name, page) => {
+    vi.mocked(api.getUnit).mockResolvedValue(null);
+    await expect(page()).rejects.toThrow('not-found');
+  });
+  it.each(passageRoutes)('does not expose a draft through a %s permalink', async (_name, page) => {
+    vi.mocked(api.getVersion).mockResolvedValue({ ...original, constitutionId: 'charter', publicationStatus: 'draft' });
+    await expect(page()).rejects.toThrow('not-found');
+  });
+  it.each(passageRoutes)('shows a retry state when a %s permalink cannot load its passage', async (_name, page) => {
+    vi.mocked(api.getUnit).mockRejectedValue(new api.ApiUnavailableError('content'));
+    expect(await render(page())).toContain('role="status"');
+  });
   it('renders the requested historical unit with a stable snapshot permalink', async () => {
     const output = await render(ArticlePage(articleProps())); expect(output).toContain('Some citizens may vote.'); expect(output).toContain('/countries/XA/versions/law-1949/articles/old-1'); expect(output).toContain('/versions/correction-1949');
     expect((await articleMetadata(articleProps())).alternates?.canonical).toContain('/versions/law-1949/articles/old-1');
   });
-  it('rejects a unit returned from a different snapshot rather than presenting it at the requested permalink', async () => {
+  it.each(passageRoutes)('rejects a unit from another snapshot at a %s permalink', async (_name, page) => {
     vi.mocked(api.getUnit).mockResolvedValue({ ...article('new-1', '1', 'Different legal wording.'), title: 'Different provision', body: 'Different legal wording.' });
-    await expect(ArticlePage(articleProps())).rejects.toThrow('not-found');
+    await expect(page()).rejects.toThrow('not-found');
   });
   it('shows each legal edition using its current editorial transcription in article history', async () => {
     const output = await render(ArticleHistory(historyProps())); expect(output).toContain('Some citizens may vote.'); expect(output).toContain('Every adult citizen may vote.'); expect(api.listAllArticles).toHaveBeenCalledWith('correction-1949', true); expect(api.listAllArticles).toHaveBeenCalledWith('law-1956', true); expect(output).toContain('/compare?from=law-1949');

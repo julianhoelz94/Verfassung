@@ -1,9 +1,9 @@
 'use client';
-import { useEffect, useLayoutEffect, useRef } from 'react';
+import { Fragment, useEffect, useLayoutEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import styles from './ReaderMenu.module.css';
 export type ReaderMenuItem = { id: string; label: string; description?: string; group?: string; href?: string; onSelect?: () => void };
-export function ReaderMenu({ title, items, position, origin, onClose }: { title: string; items: ReaderMenuItem[]; position: { x: number; y: number }; origin?: HTMLElement | null; onClose: (restoreFocus: boolean) => void }) {
+export function ReaderMenu({ title, items, position, origin, onClose, compact = false }: { title: string; items: ReaderMenuItem[]; position: { x: number; y: number }; origin?: HTMLElement | null; onClose: (restoreFocus: boolean) => void; compact?: boolean }) {
   const menu = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
     function place() {
@@ -20,12 +20,12 @@ export function ReaderMenu({ title, items, position, origin, onClose }: { title:
     document.addEventListener('pointerdown',outside,true);window.addEventListener('wheel',scroll,true);window.addEventListener('touchmove',scroll,true);
     return()=>{document.removeEventListener('pointerdown',outside,true);window.removeEventListener('wheel',scroll,true);window.removeEventListener('touchmove',scroll,true);};
   },[onClose]);
-  return createPortal(<div ref={menu} className={styles.menu} role="menu" aria-label={title} data-reader-menu onKeyDown={event=>{
+  return createPortal(<div ref={menu} className={[styles.menu,compact?styles.compact:''].join(' ')} role="menu" aria-label={title} data-reader-menu onKeyDown={event=>{
     if(event.key==='Escape'){event.preventDefault();event.stopPropagation();onClose(true);origin?.focus({preventScroll:true});return;}
     if(event.key===' '&&event.target instanceof HTMLElement&&event.target.matches('[role=menuitem]')){event.preventDefault();event.target.click();return;}
     if(event.key==='Tab'){onClose(true);origin?.focus({preventScroll:true});return;}
     const options=[...menu.current!.querySelectorAll<HTMLElement>('[role="menuitem"]')],at=options.indexOf(document.activeElement as HTMLElement);
     const next=event.key==='ArrowDown'?(at+1)%options.length:event.key==='ArrowUp'?(at-1+options.length)%options.length:event.key==='Home'?0:event.key==='End'?options.length-1:-1;
     if(next>=0){event.preventDefault();event.stopPropagation();options[next]?.focus({preventScroll:true});options[next]?.scrollIntoView?.({block:'nearest'});}
-  }}>{items.map((item,i)=><div key={item.id} role="none">{item.group&&item.group!==items[i-1]?.group?<p className={styles.group}>{item.group}</p>:null}{item.href?<a role="menuitem" className={styles.item} href={item.href} onClick={()=>{item.onSelect?.();onClose(false);}}>{item.label}{item.description?<small>{item.description}</small>:null}</a>:<button role="menuitem" type="button" className={styles.item} onClick={item.onSelect}>{item.label}{item.description?<small>{item.description}</small>:null}</button>}</div>)}</div>,document.querySelector('main')??document.body);
+  }}>{items.map((item,i)=><Fragment key={item.id}>{item.group&&item.group!==items[i-1]?.group?<>{i>0?<div role="separator" className={styles.separator}/>:null}<p className={styles.group} role="presentation">{item.group}</p></>:null}<div role="none">{item.href?<a role="menuitem" className={styles.item} href={item.href} onClick={()=>{item.onSelect?.();onClose(false);}}>{item.label}{item.description?<small title={item.description}>{item.description}</small>:null}</a>:<button role="menuitem" type="button" className={styles.item} onClick={item.onSelect}>{item.label}{item.description?<small title={item.description}>{item.description}</small>:null}</button>}</div></Fragment>)}</div>,document.querySelector('main')??document.body);
 }

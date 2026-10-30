@@ -11,7 +11,7 @@ test.beforeEach(async({request,context})=>{
 });
 test('right-click copies exact published sentence, paragraph, article and constitution scopes',async({page},info)=>{
  await page.goto(href);await page.locator(selector(sentence.occurrenceId)).click({button:'right'});
- let menu=page.getByRole('menu',{name:'Copy text or permalink'});await expect(menu.getByRole('menuitem')).toHaveCount(8);
+ let menu=page.getByRole('menu',{name:'Copy text or permalink'});await expect(menu.getByRole('menuitem')).toHaveCount(8);await expect(menu.getByRole('separator')).toHaveCount(1);expect((await menu.boundingBox())!.width).toBeLessThanOrEqual(272);expect((await menu.boundingBox())!.height).toBeLessThan(360);await expect(page.getByRole('toolbar').getByRole('button',{name:'Copy text or permalink'})).toHaveCount(0);
  await menu.getByRole('menuitem',{name:/^Sentence/}).first().click();await expect(page.getByRole('status',{name:''}).filter({hasText:'Permalink copied'})).toBeVisible();
  const copied=await page.evaluate(()=>navigator.clipboard.readText());expect(copied).toBe(new URL(href+'#'+sentence.occurrenceId,page.url()).href);
  await page.goto(copied);await expect(page.locator(selector(sentence.occurrenceId))).toBeInViewport();
@@ -20,7 +20,7 @@ test('right-click copies exact published sentence, paragraph, article and consti
  expect(await page.evaluate(()=>navigator.clipboard.readText())).toContain('(1)\nEvery person has equal rights. These rights bind public authority.');
  await page.locator(selector('unit-'+units[0].id)).click({button:'right'});await expect(page.getByRole('menuitem')).toHaveCount(4);await page.getByRole('menuitem',{name:/^Article/}).last().click();
  expect(await page.evaluate(()=>navigator.clipboard.readText())).toContain('Article 1 — Equal standing');
- await page.getByRole('button',{name:'Copy text or permalink'}).click();await page.getByRole('menuitem',{name:/^Constitution/}).last().click();
+ await page.locator('[data-reader-document] h1').click({button:'right'});await page.getByRole('menuitem',{name:/^Constitution/}).last().click();
  const text=await page.evaluate(()=>navigator.clipboard.readText());expect(text).toContain('The legislature meets in public.\nThe executive remains accountable.');expect(text).toContain('Public body\tAccountability');expect(text).toContain('* A constitution-wide source note.');expect(text).not.toContain('Open passage');
  await expect(page.locator('a[aria-label^="Passage link"]')).toHaveCount(0);
  await page.locator(selector(sentence.occurrenceId)).click({button:'right'});await page.screenshot({path:info.outputPath('reader-context-menu.png')});
@@ -35,14 +35,16 @@ test('keyboard menu stays within a short viewport and restores focus',async({pag
  const menu=page.getByRole('menu');await expect(menu).toBeVisible();const box=(await menu.boundingBox())!;expect(box.y).toBeGreaterThanOrEqual(11);expect(box.y+box.height).toBeLessThanOrEqual(309);
  await page.keyboard.press('End');await expect(menu.getByRole('menuitem').last()).toBeFocused();await page.keyboard.press('Escape');await expect(menu).toHaveCount(0);await expect(target).toBeFocused();
 });
-test('touch readers can use the toolbar and clipboard failures expose a selected manual copy field',async({page})=>{
- await page.setViewportSize({width:390,height:844});await page.goto(href+'?clipboard=blocked');await page.getByRole('button',{name:'Copy text or permalink'}).click();await page.getByRole('menuitem',{name:/^Article/}).last().click();
+test('clipboard failures expose a selected manual copy field on a narrow screen',async({page})=>{
+ await page.setViewportSize({width:390,height:844});await page.goto(href+'?clipboard=blocked');const target=page.locator(selector('unit-'+units[0].id));await target.click({button:'right'});await page.getByRole('menuitem',{name:/^Article/}).last().click();
  const dialog=page.getByRole('dialog',{name:'Copy original text'});await expect(dialog.getByRole('textbox')).toContainText('Every person has equal rights.');await expect(dialog.getByRole('textbox')).toBeFocused();
- await page.keyboard.press('Escape');await expect(dialog).toHaveCount(0);await expect(page.getByRole('button',{name:'Copy text or permalink'})).toBeFocused();
+ await page.keyboard.press('Escape');await expect(dialog).toHaveCount(0);await expect(target).toBeFocused();
 });
 test('one shared footnote return control opens distinct destinations and preserves source labels',async({page},info)=>{
  await page.goto(href);await page.locator('#reader-footnotes').scrollIntoViewIfNeeded();const note=page.getByRole('note');
- await expect(note).toContainText('*');const back=note.getByRole('button',{name:'Back to references (2) ↑',exact:true});await expect(back).toHaveCount(1);await back.click();
+ await expect(note).toContainText('*');const back=note.getByRole('button',{name:'Back to references (2)',exact:true});await expect(back).toHaveCount(1);await expect(back).toHaveText('↑');
+ await expect(page.getByRole('tooltip')).toHaveCount(0);await back.hover();await expect(page.getByRole('tooltip',{name:'Back to references (2)'})).toBeVisible();
+ await page.getByRole('heading',{name:'Footnotes',exact:true}).hover();await expect(page.getByRole('tooltip')).toHaveCount(0);await back.focus();await expect(page.getByRole('tooltip')).toBeVisible();await page.keyboard.press('Escape');await expect(page.getByRole('tooltip')).toHaveCount(0);await expect(back).toBeFocused();await page.keyboard.press('Enter');
  const menu=page.getByRole('menu',{name:'Choose a footnote reference'});await expect(menu.getByRole('menuitem')).toHaveCount(2);await expect(menu.getByRole('menuitem').first()).toContainText('Article 1');await expect(menu.getByRole('menuitem').last()).toContainText('Article 20');
  await page.screenshot({path:info.outputPath('footnote-reference-menu.png')});await menu.getByRole('menuitem').first().click();await expect(page.getByRole('button',{name:'Show footnote *'}).first()).toBeInViewport();
 });

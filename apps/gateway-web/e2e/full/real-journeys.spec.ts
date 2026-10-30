@@ -46,7 +46,10 @@ test('visitor reads historical article context, provenance, and site guidance', 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(`/countries/XA/versions/${ids.versions['xa-2020']}/articles/${articles[0].id}`);
   await expect(page.getByRole('heading', { name: /Human dignity/ })).toBeVisible();
-  await expect(page.getByRole('complementary', { name: 'Source and trust' })).toBeVisible();
+  await page.getByRole('button', { name: 'Details', exact: true }).click();
+  await expect(page.getByText('Verification', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Details', exact: true }).click();
+  await page.getByRole('button', { name: /^Details · Article 1/ }).first().click();
   await page.getByRole('link', { name: 'History of Article 1' }).click();
   await expect(page.getByRole('heading', { name: 'History of Article 1' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Compare with previous' }).first()).toBeVisible();

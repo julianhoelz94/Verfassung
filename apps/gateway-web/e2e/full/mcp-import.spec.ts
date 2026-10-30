@@ -239,7 +239,7 @@ test('MCP setup display controls persist and render the same source through revi
     try {
       const reader = await anonymous.newPage();
       await reader.goto(`/countries/XA/versions/${prepared.versionId}/units/${before.roots[0].occurrenceId}`);
-      await expect(reader.getByRole('heading', { name: 'Artikel · I · Rights', exact: true })).toBeVisible();
+      await expect(reader.getByRole('heading', { name: 'Artikel I — Rights', exact: true })).toBeVisible();
       await assertRendered(reader);
       await reader.reload();
       await assertRendered(reader);

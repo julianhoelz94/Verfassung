@@ -4,7 +4,7 @@ import { SnapshotNotice } from '../../../../components/SnapshotNotice';
 import { T } from '../../../../components/TranslationProvider';
 import { ui } from '../../../../../lib/messages';
 import { currentLocale } from '../../../../../lib/server-locale';
-import { PageMain } from '../../../../components/PageMain';
+import { FullWidthPage } from '../../../../components/layout/PageChrome';
 import { ReaderPage } from '../../../../components/layout/templates';
 import { Breadcrumbs } from '../../../../components/Breadcrumbs';
 import { ServiceUnavailable } from '../../../../components/StatusMessage';
@@ -22,7 +22,6 @@ import { VersionDocuments } from '../../../../components/VersionDocuments';
 import { currentUser } from '../../../../../lib/session';
 import { EditorEntry } from './EditorEntry';
 import { migrationUi } from '../../../../../lib/migration-messages';
-import styles from '../../../../components/VersionReader.module.css';
 
 export async function CountryConstitutionReader({ code, versionId, error, initialPassage }: {
   code: string; versionId: string; error?: string; initialPassage?: { id: string; legacyId?: string };
@@ -49,7 +48,7 @@ export async function CountryConstitutionReader({ code, versionId, error, initia
   for (const amendment of amendments ?? []) for (const change of amendment.changes) if (change.articleNumber && !changeByArticle[change.articleNumber]) changeByArticle[change.articleNumber] = change.changeType;
   const publications = line.map(item => ({ id: item.id, snapshotId: snapshotVersionId(item), versionLabel: item.versionLabel, effectiveDate: item.effectiveDate }));
   if (!publications.some(item => item.snapshotId === params.versionId)) publications.splice(Math.max(0, index), 0, { id: version.id, snapshotId: params.versionId, versionLabel: version.versionLabel + ' · ' + params.versionId.slice(0, 8), effectiveDate: version.effectiveDate });
-  return <PageMain width="content" className={styles.page} data-template="reader"><ContentTranslationRegion sourceLanguage={snapshot.languageCode}>
+  return <FullWidthPage template="reader"><ContentTranslationRegion sourceLanguage={snapshot.languageCode}>
     <VersionReader initialPassage={initialPassage} code={country.isoCode} versionId={params.versionId} articles={articles} outline={outline ?? constitution.contentOutline}
       language={snapshot.languageCode} changeByArticle={changeByArticle} unchangedSinceLabel={previous?.versionLabel}
       context={{ constitutionId: constitution.id, title: constitution.title, jurisdictionName: country.name, versionLabel: version.versionLabel,
@@ -67,5 +66,5 @@ export async function CountryConstitutionReader({ code, versionId, error, initia
       footer={<Pager previous={previous ? { href: `/countries/${country.isoCode}/versions/${snapshotVersionId(previous)}`, label: `← ${previous.versionLabel}` } : undefined}
         next={next ? { href: `/countries/${country.isoCode}/versions/${snapshotVersionId(next)}`, label: `${next.versionLabel} →` } : undefined} />}
     />
-  </ContentTranslationRegion></PageMain>;
+  </ContentTranslationRegion></FullWidthPage>;
 }

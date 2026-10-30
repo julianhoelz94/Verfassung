@@ -18,6 +18,7 @@ export function countryDirectoryFixtures(country) {
   const municipal = { id: '07300000-0000-4000-8000-000000000005', title: 'Municipal Charter', slug: 'municipal', lifecycleStatus: 'suspended', versions: [version('07200000-0000-4000-8000-000000000007', '2010', '2010-01-01')] };
   const hidden = { ...regional, id: '07300000-0000-4000-8000-000000000099', title: 'PRIVATE CONSTITUTION', versions: [privateVersion] };
   const countryData = { ...country, constitutions: [...country.constitutions, national, hidden] };
+  const lifecycle = new Map([regional, historic, national, provincial, municipal].map(constitution => [constitution.id, [{ id: `07800000-0000-4000-8000-${constitution.id.slice(-12)}`, constitutionId: constitution.id, eventType: constitution.lifecycleStatus === 'repealed' ? 'repealed' : 'commenced', eventDate: constitution.versions[0].effectiveDate, dateCertainty: 'exact', sourceUrl: null, note: `Recorded event for ${constitution.title}` }]]));
   const regions = new Map([
     [root.id, { jurisdiction: root, ancestors: [], children: [region, former], constitutions: countryData.constitutions }],
     [region.id, { jurisdiction: region, ancestors: [root], children: [city], constitutions: [regional, historic, hidden] }],
@@ -37,7 +38,7 @@ export function countryDirectoryFixtures(country) {
     const logicalId = '07400000-0000-4000-8000-000000000001';
     return [{ id: '07500000-0000-4000-8000-' + snapshot.id.slice(-12), logicalId, versionId: snapshot.id, kind: 'article', articleNumber: '1', label: '1', title: 'Regional rights', sortOrder: 1, body: text, children: [], content: [{ type: 'text', logicalId: '07400000-0000-4000-8000-000000000002', revisionId: snapshot.id, occurrenceId: '07600000-0000-4000-8000-' + snapshot.id.slice(-12), text }] }];
   }
-  return { region, former, city, regional, historic, national, regionOld, regionNew, correction,
+  return { region, former, city, regional, historic, national, regionOld, regionNew, correction, nationalEvents: lifecycle.get(national.id),
     response(pathname, unavailable = []) {
       if (pathname === '/api/catalog/countries/DE') return { status: 200, body: countryData };
       const jurisdictionMatch = /^\/api\/catalog\/jurisdictions\/([^/]+)$/.exec(pathname);
@@ -49,7 +50,10 @@ export function countryDirectoryFixtures(country) {
         const items = units(versions.get(unitsMatch[1]));
         return { status: 200, body: unitsMatch[2] ? items[0] : items };
       }
-      if (/^\/api\/catalog\/constitutions\/07300000-[^/]+\/lifecycle-events$/.test(pathname)) return { status: 200, body: [] };
+      const eventsMatch = /^\/api\/catalog\/constitutions\/([^/]+)\/lifecycle-events$/.exec(pathname);
+      if (eventsMatch && lifecycle.has(eventsMatch[1])) return { status: 200, body: lifecycle.get(eventsMatch[1]) };
+      const registerMatch = /^\/api\/amendment\/constitutions\/([^/]+)\/amendment-register$/.exec(pathname);
+      if (registerMatch && (lifecycle.has(registerMatch[1]) || country.constitutions.some(constitution => constitution.id === registerMatch[1]))) return { status: 200, body: { constitutionId: registerMatch[1], items: [], total: 0, offset: 0, limit: 20 } };
       return undefined;
     },
   };

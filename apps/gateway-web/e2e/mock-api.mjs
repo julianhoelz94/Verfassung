@@ -511,6 +511,7 @@ const server = createServer(async (req, res) => {
 
   if (sprint50Content && method === 'GET' && pathname === '/api/catalog/countries/DE/constitution-lifecycle') {
     json(res, 200, [
+      ...(directoryScenario?.nationalEvents ?? []),
       { id: '01900000-0000-4000-8000-000000000731', constitutionId: CONSTITUTION_ID, eventType: 'adopted', eventDate: '1949-05-08', dateCertainty: 'approximate', sourceUrl: 'https://example.org/adoption', note: 'Postwar drafting' },
       { id: '01900000-0000-4000-8000-000000000732', constitutionId: CONSTITUTION_ID, eventType: 'commenced', eventDate: '1949-05-23', dateCertainty: 'exact', sourceUrl: null, note: null },
     ]);

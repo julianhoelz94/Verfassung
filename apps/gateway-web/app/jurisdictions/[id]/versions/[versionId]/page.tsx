@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation';
-import { PageMain } from '../../../../components/PageMain';
+import { FullWidthPage } from '../../../../components/layout/PageChrome';
 import { ReaderPage } from '../../../../components/layout/templates';
 import { Pager } from '../../../../components/ui';
 import { Breadcrumbs } from '../../../../components/Breadcrumbs';
@@ -21,7 +21,6 @@ import { publicSnapshotContext, publicVersions, snapshotVersionId } from '../../
 import { orderVersions } from '../../../../../lib/compare';
 import { currentLocale } from '../../../../../lib/server-locale';
 import { currentUser } from '../../../../../lib/session';
-import styles from '../../../../components/VersionReader.module.css';
 
 export default async function JurisdictionVersionPage({ params }: { params: Promise<{ id: string; versionId: string }> }) {
   const { id, versionId } = await params, href = `/jurisdictions/${id}/versions/${versionId}`, locale = await currentLocale();
@@ -40,7 +39,7 @@ export default async function JurisdictionVersionPage({ params }: { params: Prom
   for (const amendment of amendments ?? []) for (const change of amendment.changes) if (change.articleNumber && !changeByArticle[change.articleNumber]) changeByArticle[change.articleNumber] = change.changeType;
   const publications = line.map(item => ({ id: item.id, snapshotId: snapshotVersionId(item), versionLabel: item.versionLabel, effectiveDate: item.effectiveDate }));
   if (!publications.some(item => item.snapshotId === versionId)) publications.splice(Math.max(0, index), 0, { id: version.id, snapshotId: versionId, versionLabel: version.versionLabel + ' · ' + versionId.slice(0, 8), effectiveDate: version.effectiveDate });
-  return <PageMain width="content" className={styles.page} data-template="reader"><ContentTranslationRegion sourceLanguage={snapshot.languageCode}>
+  return <FullWidthPage template="reader"><ContentTranslationRegion sourceLanguage={snapshot.languageCode}>
     <VersionReader jurisdictionId={id} versionId={versionId} articles={articles} outline={outline ?? constitution.contentOutline} language={snapshot.languageCode}
       changeByArticle={changeByArticle} unchangedSinceLabel={previous?.versionLabel}
       context={{ constitutionId: constitution.id, title: constitution.title, jurisdictionName: detail.jurisdiction.name, versionLabel: version.versionLabel, publications,
@@ -53,5 +52,5 @@ export default async function JurisdictionVersionPage({ params }: { params: Prom
       notices={<SnapshotNotice jurisdictionId={id} viewedId={versionId} currentId={snapshotVersionId(version)} />}
       footer={<Pager previous={previous ? { href: `/jurisdictions/${id}/versions/${snapshotVersionId(previous)}`, label: `← ${previous.versionLabel}` } : undefined} next={next ? { href: `/jurisdictions/${id}/versions/${snapshotVersionId(next)}`, label: `${next.versionLabel} →` } : undefined} />}
     />
-  </ContentTranslationRegion></PageMain>;
+  </ContentTranslationRegion></FullWidthPage>;
 }

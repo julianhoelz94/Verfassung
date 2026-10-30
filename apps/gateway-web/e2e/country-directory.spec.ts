@@ -18,6 +18,10 @@ test.beforeEach(async ({ request }) => {
 for (const width of [390, 820, 1440]) test(`country directory preserves controls and ownership at ${width}px`, async ({ page }) => {
   await page.setViewportSize({ width, height: 1000 });
   await page.goto('/countries/DE');
+  const countryMenu = await page.getByRole('navigation', { name: 'Country tools' }).boundingBox();
+  expect(countryMenu?.x).toBeCloseTo(0, 0);
+  expect(countryMenu?.width).toBe(await page.evaluate(() => document.documentElement.clientWidth));
+  await expect(page.getByRole('navigation', { name: 'Contents', exact: true })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'National constitutions', exact: true })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Regional constitutions', exact: true })).toBeVisible();
   await expect(page.locator('#historical-national')).toContainText('Archived National Charter');
@@ -51,6 +55,31 @@ for (const width of [390, 820, 1440]) test(`country directory preserves controls
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   const duplicateIds = await page.locator('[id]').evaluateAll(elements => { const ids = elements.map(element => element.id); return ids.filter((id, index) => ids.indexOf(id) !== index); });
   expect(duplicateIds).toEqual([]);
+  await regional.getByRole('link', { name: 'Read latest', exact: true }).click();
+  const readerMenu = await page.getByRole('toolbar', { name: 'Reading options' }).boundingBox();
+  expect(readerMenu?.x).toBeCloseTo(0, 0);
+  expect(readerMenu?.width).toBe(countryMenu?.width);
+});
+
+for (const width of [390, 1440]) test(`country contents navigate and collapse without losing the entry at ${width}px`, async ({ page }) => {
+  await page.setViewportSize({ width, height: 1000 });
+  await page.goto('/countries/DE');
+  const contents = page.getByRole('navigation', { name: 'Contents', exact: true });
+  await expect(contents.getByRole('link', { name: 'Historical national constitutions', exact: true })).toBeVisible();
+  await contents.getByRole('link', { name: 'Nested City', exact: true }).click();
+  await expect(page).toHaveURL(/#region-07100000-0000-4000-8000-000000000003$/);
+  const heading = page.getByRole('heading', { name: 'Nested City', exact: true });
+  await expect(heading).toBeInViewport();
+  await expect(contents.getByRole('link', { name: 'Nested City', exact: true })).toHaveAttribute('aria-current', 'true');
+  await page.getByRole('button', { name: 'Hide table of contents' }).click();
+  await expect(contents).toHaveCount(0);
+  await expect(heading).toBeInViewport();
+  await page.getByRole('button', { name: 'Show table of contents' }).focus();
+  await page.keyboard.press('Enter');
+  await expect(contents).toBeVisible();
+  await contents.getByRole('link', { name: 'Archived National Charter', exact: true }).click();
+  await expect(page.getByRole('article', { name: 'Archived National Charter' })).toBeInViewport();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
 
 test('regional reading, comparison and overview retain the current published snapshot', async ({ page }) => {
@@ -95,6 +124,9 @@ test('regional directories retain historical constitutions and nested-region nav
   await page.goto('/countries/DE');
   await page.getByRole('heading', { name: 'Example Region', exact: true }).getByRole('link').click();
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Example Region');
+  await expect(page.getByRole('navigation', { name: 'Regional tools' })).toBeVisible();
+  const contents = page.getByRole('navigation', { name: 'Contents', exact: true });
+  await expect(contents.getByRole('link', { name: 'Earlier Regional Constitution', exact: true })).toBeVisible();
   const historic = page.getByRole('article', { name: 'Earlier Regional Constitution', exact: true });
   await expect(historic.getByRole('link', { name: 'Read latest' })).toBeVisible();
   await expect(historic.getByRole('button', { name: 'Compare versions' })).toBeDisabled();
@@ -103,6 +135,42 @@ test('regional directories retain historical constitutions and nested-region nav
   await page.getByRole('link', { name: 'Nested City', exact: true }).click();
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Nested City');
   await expect(page.getByRole('article', { name: 'Municipal Charter' })).toContainText('Suspended');
+});
+
+test('former jurisdictions have explicit regional pages with the shared menu and contents', async ({ page }) => {
+  await page.goto('/countries/DE');
+  const former = page.getByRole('region', { name: 'Former Province', exact: true });
+  await expect(former).toContainText('Until January 1, 1950');
+  await expect(former).not.toContainText('Not recorded');
+  await former.getByRole('link', { name: 'Open regional page', exact: true }).click();
+  await expect(page).toHaveURL(`/jurisdictions/${formerId}`);
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Former Province');
+  await expect(page.getByRole('navigation', { name: 'Regional tools' })).toBeVisible();
+  await expect(page.getByRole('navigation', { name: 'Contents', exact: true }).getByRole('link', { name: 'Former Provincial Charter', exact: true })).toBeVisible();
+  await expect(page.getByRole('main')).toContainText('Historical jurisdiction · Until January 1, 1950');
+});
+
+test('national and individual history links state their scope and include historical and regional records', async ({ page }) => {
+  await page.goto('/countries/DE');
+  await expect(page.getByRole('navigation', { name: 'Country tools' }).getByRole('link')).toHaveCount(0);
+  await page.getByRole('link', { name: 'National constitutional history', exact: true }).click();
+  await expect(page.getByRole('main')).toContainText('Archived National Charter');
+  await expect(page.getByRole('main')).not.toContainText('PRIVATE CONSTITUTION');
+  await expect(page.getByRole('main')).not.toContainText('Example Regional Constitution');
+  for (const [owner, constitutionId, title] of [
+    ['countries/DE', '07300000-0000-4000-8000-000000000003', 'Archived National Charter'],
+    [`jurisdictions/${regionId}`, regionalConstitution, 'Example Regional Constitution'],
+    [`jurisdictions/${regionId}`, '07300000-0000-4000-8000-000000000002', 'Earlier Regional Constitution'],
+    [`jurisdictions/${formerId}`, '07300000-0000-4000-8000-000000000004', 'Former Provincial Charter'],
+  ]) {
+    await page.goto(`/${owner}/constitutions/${constitutionId}`);
+    const history = page.getByRole('region', { name: 'Constitutional history', exact: true });
+    await expect(history).toContainText(`Recorded event for ${title}`);
+    await expect(history.getByRole('link', { name: 'Amendment history' })).toHaveAttribute('href', `/constitutions/${constitutionId}/amendments`);
+    await history.getByRole('link', { name: 'Amendment history' }).click();
+    await expect(page.getByRole('heading', { name: 'Amendment register', exact: true })).toBeVisible();
+    await expect(page.getByText('No published amendments match these filters.')).toBeVisible();
+  }
 });
 
 test('partial regional failure keeps national and other regional collections readable', async ({ page, request }) => {

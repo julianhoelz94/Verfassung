@@ -1,3 +1,6 @@
+import { payloadFor } from './scenarios/content.mjs';
+import { irregularRoots, irregularOutline, rootsFor } from './scenarios/definitions.mjs';
+import { scenarios, namespace as scenarioNamespace } from './scenarios/definitions.mjs';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { dirname, join } from 'node:path';
@@ -38,7 +41,7 @@ const definitions = [
   },
 ];
 
-const manifest = { schemaVersion: 2, namespace: 'atlas-e2e', expected: { countries: 3, constitutions: 3, versions: 7, articles: 66, amendments: 3 }, countries: [] };
+const manifest = { schemaVersion: 3, namespace: 'atlas-e2e', expected: { countries: 3, constitutions: 3, versions: 7, articles: 66, amendments: 3 }, countries: [] };
 function id(name) {
   const hex = createHash('sha256').update(`atlas-e2e:${name}`).digest('hex');
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-8${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
@@ -130,5 +133,10 @@ for (const version of versionEntries) {
 if (articleCount !== manifest.expected.articles || manifest.amendments.length !== manifest.expected.amendments) {
   throw new Error('Fixture article or amendment count is invalid');
 }
+manifest.scenarioNamespace = scenarioNamespace;
+manifest.profiles = { compact: [], extended: scenarios.filter(s => s.profile === 'extended').map(s => s.key), scale: scenarios.map(s => s.key) };
+manifest.scenarios = scenarios;
 writeFileSync(join(output, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`);
+writeFileSync(join(output, 'scenario-payloads.json'), `${JSON.stringify(scenarios.map(s => ({ key: s.key, profile: s.profile, payload: payloadFor(s, s.kind === 'content' || s.kind === 'archive' ? irregularRoots(s.key) : rootsFor(s.key, s.kind === 'scale' ? 225 : s.kind === 'search' ? 30 : 2), s.kind === 'content' || s.kind === 'archive' ? { outline: irregularOutline } : {}), ...(s.kind === 'content' ? { successorRoots: irregularRoots(s.key, true) } : {}) })), null, 2)}\n`);
+writeFileSync(join(output, 'scenario-catalog.md'), ['# Fixture scenario catalog', '', 'Run prepopulate with --profile extended (the local default) or --profile scale.', 'Resolved links are written to .runtime/scenario-guide.md after upload.', '', '| Scenario | Role | Action | Expected result |', '| --- | --- | --- | --- |', ...scenarios.map(s => `| ${s.key} | ${s.role} | ${s.action} | ${s.expected} |`), ''].join('\n'));
 console.log(`Generated ${manifest.expected.versions} constitution version JSON files and manifest in ${output}`);

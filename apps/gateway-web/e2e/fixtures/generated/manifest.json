@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "namespace": "atlas-e2e",
   "expected": {
     "countries": 3,
@@ -96,6 +96,305 @@
       "enactedOn": "2023-04-05",
       "effectiveOn": "2023-05-05",
       "articleNumber": "1"
+    }
+  ],
+  "scenarioNamespace": "atlas-explore-v1",
+  "profiles": {
+    "compact": [],
+    "extended": [
+      "reader-lab",
+      "history-lab",
+      "editor-draft",
+      "editor-review",
+      "editor-approved",
+      "editor-published",
+      "editor-archived",
+      "source-returned",
+      "import-outline",
+      "import-review",
+      "import-approved",
+      "import-rejected",
+      "setup-proposal",
+      "amendment-review",
+      "amendment-published",
+      "amendment-withdrawn",
+      "amendment-stale",
+      "documents-context",
+      "historical-region",
+      "curated-comparison",
+      "search-pagination"
+    ],
+    "scale": [
+      "reader-lab",
+      "history-lab",
+      "editor-draft",
+      "editor-review",
+      "editor-approved",
+      "editor-published",
+      "editor-archived",
+      "source-returned",
+      "import-outline",
+      "import-review",
+      "import-approved",
+      "import-rejected",
+      "setup-proposal",
+      "amendment-review",
+      "amendment-published",
+      "amendment-withdrawn",
+      "amendment-stale",
+      "documents-context",
+      "historical-region",
+      "curated-comparison",
+      "search-pagination",
+      "scale-pagination"
+    ]
+  },
+  "scenarios": [
+    {
+      "key": "reader-lab",
+      "kind": "content",
+      "title": "Non-standard layouts, shared footnotes and tables",
+      "role": "viewer",
+      "action": "Open both articles, follow the two [a] markers, inspect the table and compare the versions.",
+      "expected": "Mixed roots, skipped levels, interleaved text, literal labels and structural moves survive publication.",
+      "profile": "extended",
+      "dependencies": [],
+      "intendedState": "reader-lab"
+    },
+    {
+      "key": "history-lab",
+      "kind": "history",
+      "title": "Legal versions and text corrections",
+      "role": "viewer",
+      "action": "Open the original and both corrections, then compare with the next legal version.",
+      "expected": "Old snapshots retain their text; corrections share one legal identity.",
+      "profile": "extended",
+      "dependencies": [],
+      "intendedState": "history-lab"
+    },
+    {
+      "key": "editor-draft",
+      "kind": "editor",
+      "title": "Editorial work: draft",
+      "role": "editor",
+      "action": "Open the saved session and continue its editorial workflow.",
+      "expected": "The session begins in draft; later manual progress is preserved.",
+      "profile": "extended",
+      "dependencies": [],
+      "intendedState": "draft"
+    },
+    {
+      "key": "editor-review",
+      "kind": "editor",
+      "title": "Editorial work: review",
+      "role": "reviewer",
+      "action": "Open the saved session and continue its editorial workflow.",
+      "expected": "The session begins in review; later manual progress is preserved.",
+      "profile": "extended",
+      "dependencies": [],
+      "intendedState": "review"
+    },
+    {
+      "key": "editor-approved",
+      "kind": "editor",
+      "title": "Editorial work: approved",
+      "role": "publisher",
+      "action": "Open the saved session and continue its editorial workflow.",
+      "expected": "The session begins in approved; later manual progress is preserved.",
+      "profile": "extended",
+      "dependencies": [],
+      "intendedState": "approved"
+    },
+    {
+      "key": "editor-published",
+      "kind": "editor",
+      "title": "Editorial work: published",
+      "role": "editor",
+      "action": "Open the saved session and continue its editorial workflow.",
+      "expected": "The session begins in published; later manual progress is preserved.",
+      "profile": "extended",
+      "dependencies": [],
+      "intendedState": "published"
+    },
+    {
+      "key": "editor-archived",
+      "kind": "editor",
+      "title": "Editorial work: archived",
+      "role": "editor",
+      "action": "Open the saved session and continue its editorial workflow.",
+      "expected": "The session begins in archived; later manual progress is preserved.",
+      "profile": "extended",
+      "dependencies": [],
+      "intendedState": "archived"
+    },
+    {
+      "key": "source-returned",
+      "kind": "source",
+      "title": "Source correction with requested changes",
+      "role": "editor",
+      "action": "Read the reviewer feedback, revise the source description and submit it again.",
+      "expected": "The reason and review history remain separate from constitutional text.",
+      "profile": "extended",
+      "dependencies": [],
+      "intendedState": "source-returned"
+    },
+    {
+      "key": "import-outline",
+      "kind": "import",
+      "title": "Import: outline",
+      "role": "editor",
+      "action": "Inspect the import preview, structure and review decision.",
+      "expected": "The import starts at outline; unpublished text is private.",
+      "profile": "extended",
+      "dependencies": [],
+      "intendedState": "outline"
+    },
+    {
+      "key": "import-review",
+      "kind": "import",
+      "title": "Import: review",
+      "role": "reviewer",
+      "action": "Inspect the import preview, structure and review decision.",
+      "expected": "The import starts at review; unpublished text is private.",
+      "profile": "extended",
+      "dependencies": [],
+      "intendedState": "review"
+    },
+    {
+      "key": "import-approved",
+      "kind": "import",
+      "title": "Import: approved",
+      "role": "publisher",
+      "action": "Inspect the import preview, structure and review decision.",
+      "expected": "The import starts at approved; unpublished text is private.",
+      "profile": "extended",
+      "dependencies": [],
+      "intendedState": "approved"
+    },
+    {
+      "key": "import-rejected",
+      "kind": "import",
+      "title": "Import: rejected",
+      "role": "editor",
+      "action": "Inspect the import preview, structure and review decision.",
+      "expected": "The import starts at rejected; unpublished text is private.",
+      "profile": "extended",
+      "dependencies": [],
+      "intendedState": "rejected"
+    },
+    {
+      "key": "setup-proposal",
+      "kind": "setup",
+      "title": "Structure awaiting confirmation",
+      "role": "admin",
+      "action": "Review the representative sample and confirm the structure.",
+      "expected": "Confirmation enables upload without publishing constitutional text.",
+      "profile": "extended",
+      "dependencies": [],
+      "intendedState": "setup-proposal"
+    },
+    {
+      "key": "amendment-review",
+      "kind": "amendment",
+      "title": "Amendment evidence: review",
+      "role": "reviewer",
+      "action": "Inspect exact affected passages, diff decisions and revision history.",
+      "expected": "The legal record is review; published evidence retains exact snapshot pins.",
+      "profile": "extended",
+      "dependencies": [],
+      "intendedState": "review"
+    },
+    {
+      "key": "amendment-published",
+      "kind": "amendment",
+      "title": "Amendment evidence: published",
+      "role": "publisher",
+      "action": "Inspect exact affected passages, diff decisions and revision history.",
+      "expected": "The legal record is published; published evidence retains exact snapshot pins.",
+      "profile": "extended",
+      "dependencies": [],
+      "intendedState": "published"
+    },
+    {
+      "key": "amendment-withdrawn",
+      "kind": "amendment",
+      "title": "Amendment evidence: withdrawn",
+      "role": "publisher",
+      "action": "Inspect exact affected passages, diff decisions and revision history.",
+      "expected": "The legal record is withdrawn; published evidence retains exact snapshot pins.",
+      "profile": "extended",
+      "dependencies": [],
+      "intendedState": "withdrawn"
+    },
+    {
+      "key": "amendment-stale",
+      "kind": "amendment",
+      "title": "Amendment evidence: stale",
+      "role": "publisher",
+      "action": "Inspect exact affected passages, diff decisions and revision history.",
+      "expected": "The legal record is stale; published evidence retains exact snapshot pins.",
+      "profile": "extended",
+      "dependencies": [],
+      "intendedState": "stale"
+    },
+    {
+      "key": "documents-context",
+      "kind": "context",
+      "title": "Files, pictures and context drafts",
+      "role": "editor",
+      "action": "Download source files, inspect their revisions and open the unpublished context draft.",
+      "expected": "Published context, document revisions and legal text have independent histories.",
+      "profile": "extended",
+      "dependencies": [],
+      "intendedState": "documents-context"
+    },
+    {
+      "key": "historical-region",
+      "kind": "archive",
+      "title": "Regional archive and lifecycle",
+      "role": "viewer",
+      "action": "Browse the historical jurisdiction, annotations, lifecycle and legacy link.",
+      "expected": "Unknown dates stay unknown; source wording and literal labels remain intact.",
+      "profile": "extended",
+      "dependencies": [],
+      "intendedState": "historical-region"
+    },
+    {
+      "key": "curated-comparison",
+      "kind": "comparison",
+      "title": "Curated comparison with a missing counterpart",
+      "role": "viewer",
+      "action": "Select each topic and inspect its authored correspondences.",
+      "expected": "A missing counterpart is explicit and columns pin different constitutions.",
+      "profile": "extended",
+      "dependencies": [
+        "reader-lab",
+        "historical-region",
+        "documents-context"
+      ],
+      "intendedState": "curated-comparison"
+    },
+    {
+      "key": "search-pagination",
+      "kind": "search",
+      "title": "Search across pages and languages",
+      "role": "viewer",
+      "action": "Search Explorationneedle, paginate, then filter to the German version.",
+      "expected": "Results preserve their jurisdiction and exact version context.",
+      "profile": "extended",
+      "dependencies": [],
+      "intendedState": "search-pagination"
+    },
+    {
+      "key": "scale-pagination",
+      "kind": "scale",
+      "title": "225 provisions across API pages",
+      "role": "viewer",
+      "action": "Read and search provisions beyond the first 200.",
+      "expected": "Upload and verification follow every page without truncation.",
+      "profile": "scale",
+      "dependencies": [],
+      "intendedState": "scale-pagination"
     }
   ]
 }

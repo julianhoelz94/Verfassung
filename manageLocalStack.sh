@@ -302,7 +302,7 @@ Usage: $0 <command> [args]
 Commands:
   --start [--no-build] [--no-prepopulate]
                            Build and start the stack, then prepopulate it
-  --only-prepopulate [--verify-only]
+  --only-prepopulate [--verify-only] [--profile compact|extended|scale]
                            Upload/verify fixtures in a container against the running stack
   --rebuild [--no-prepopulate] <service...>
                            Rebuild services, recreate containers, then prepopulate

@@ -21,6 +21,47 @@ cp env/local-stack.env.example env/local-stack.env  # once; keep secrets out of 
 
 The script builds images serially, checks all nine service health endpoints and uploads deterministic API fixtures. A daemon-wide lock prevents overlapping builds. `--reset` removes database volumes. Full build/fixture and backup/restore details: [[Local stack reference|Local-Stack-Reference]].
 
+## Explore the fixture scenarios
+
+Local prepopulation defaults to the **extended** profile. It preserves the original
+XA/XB/XC baseline and adds separate fictional instruments for non-standard layouts,
+text history, editorial queues, import review, amendment evidence, documents,
+context pages, historical jurisdictions, lifecycle events, curated comparisons and
+paginated multilingual search.
+
+```bash
+./manageLocalStack.sh --only-prepopulate --profile extended
+./manageLocalStack.sh --only-prepopulate --profile extended --verify-only
+./manageLocalStack.sh --only-prepopulate --profile compact
+./manageLocalStack.sh --only-prepopulate --profile scale
+```
+
+`scale` additionally imports 225-provision snapshots. `compact` loads only the
+original baseline. Deployment prepopulation defaults to `compact`; an expanded
+profile must be selected explicitly. The same flags work with `npm run prepopulate
+-- --profile extended` from `apps/gateway-web`.
+
+After uploading, open
+`apps/gateway-web/e2e/fixtures/generated/.runtime/scenario-guide.md` for links,
+roles, suggested actions, expected outcomes and current states. The checked-in
+[scenario catalog](https://github.com/julianhoelz94/Verfassung/blob/main/apps/gateway-web/e2e/fixtures/generated/scenario-catalog.md)
+lists the examples without runtime identifiers.
+
+Feel free to edit, approve, publish or archive these examples. Completed fixture
+setup is not replayed. The journal checks the last observed state before resuming
+an interrupted seed; changed work is preserved and reported. Keep `.runtime` when
+continuing an existing stack, especially pending structure proposals whose API has
+no listing endpoint. Journals are scoped by origin and administrator identity, so a
+new disposable database starts a new fixture setup. `--verify-only` authenticates
+and reads records, but refuses domain writes and reindex requests.
+
+Use `PREPOPULATE_EDITOR_*`, `PREPOPULATE_REVIEWER_*`,
+`PREPOPULATE_PUBLISHER_*` and `PREPOPULATE_VIEWER_*` to choose accounts. Local/CI
+seed credentials are the fallback; the standard editor seed holds several roles.
+An editor-only account can be supplied when practicing strict role separation.
+Credentials are never written to the generated catalog or ID map. Public source
+files are synthetic local PDF/HTML/PNG bytes and do not require external downloads.
+
 ## Verify a change
 
 Run from the repository root:

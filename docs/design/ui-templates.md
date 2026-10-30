@@ -64,3 +64,7 @@ Alignment is part of the layout contract. `Inline align="end"` aligns form contr
 Use the established 640px and 1024px breakpoints. Keep `min-width: 0`, flexible tracks and wrapping action rows so long German text and nested editors reflow. Add an exception only for a distinct content requirement, scoped to that component.
 
 Run gateway tests, typecheck, lint, build and the browser suite. `e2e/templates.spec.ts` verifies that one changed gap token produces the same measured gap across the three settings templates at 320/820/1440px in both languages. `ui-review.spec.ts` visits all route/state fixtures, checks overflow/landmarks/axe, and captures EN/DE at 390/820/1440px. Inspect snapshot changes using the pinned Playwright Linux image before committing baselines. A successful screenshot alone does not verify save/review/publication behavior; retain the existing journey and real-stack checks.
+
+## Country directory hierarchy
+
+Country and jurisdiction directories use `PageMain` with `data-template="collection"` and the scoped `CountryDirectory` surface. Their compact toolbar and unboxed white content area follow the continuous reader. Major collection headings use uppercase sans-serif labels with a divider; jurisdiction names use medium-weight sans-serif; all constitution entry titles use the same larger regular serif face. Historical grouping and regional ownership do not remove or compress reading actions. Native disclosures expose comparison, public legal-version history and existing national editorial tools.

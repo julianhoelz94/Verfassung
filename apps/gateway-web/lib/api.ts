@@ -406,6 +406,13 @@ export function getConstitutionLifecycle(isoCode: string): Promise<ConstitutionL
   );
 }
 
+export function getConstitutionEvents(constitutionId: string): Promise<ConstitutionLifecycleEvent[] | null> {
+  return readJson<ConstitutionLifecycleEvent[]>(
+    `${catalogBaseUrl()}/constitutions/${encodeURIComponent(constitutionId)}/lifecycle-events`,
+    'catalog',
+  );
+}
+
 export function appendConstitutionLifecycle(
   constitutionId: string,
   payload: { eventType: ConstitutionLifecycleEvent['eventType']; eventDate: string; dateCertainty?: ConstitutionLifecycleEvent['dateCertainty']; sourceUrl?: string; note?: string },

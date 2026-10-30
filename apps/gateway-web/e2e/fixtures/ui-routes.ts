@@ -25,6 +25,8 @@ export const uiRoutes = [
   { entry: '/constitutions/[id]/amendments', path: `/constitutions/${constitution}/amendments` },
   { entry: '/jurisdictions', path: '/jurisdictions' },
   { entry: '/jurisdictions/[id]', path: '/jurisdictions/01900000-0000-4000-8000-000000000001' },
+  { entry: '/jurisdictions/[id]/compare', path: '/jurisdictions/01900000-0000-4000-8000-000000000001/compare' },
+  { entry: '/jurisdictions/[id]/constitutions/[constitutionId]', path: `/jurisdictions/01900000-0000-4000-8000-000000000001/constitutions/${constitution}` },
   { entry: '/jurisdictions/[id]/versions/[versionId]', path: `/jurisdictions/01900000-0000-4000-8000-000000000001/versions/${version}` },
   { entry: '/legacy', path: '/legacy' },
   { entry: '/versions/[versionId]/annotations', path: `/versions/${version}/annotations` },

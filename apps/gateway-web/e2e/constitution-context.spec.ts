@@ -10,6 +10,7 @@ test.beforeEach(async ({ request }) => {
 
 test('visitor reads sourced country and constitution context with dated lifecycle', async ({ page }) => {
   await page.goto('/countries/DE');
+  await page.getByRole('button', { name: 'Background', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'About Germany' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Source 1' })).toHaveAttribute('href', 'https://example.org/country-history');
   await expect(page.getByRole('heading', { name: 'History' })).toBeVisible();
@@ -17,7 +18,7 @@ test('visitor reads sourced country and constitution context with dated lifecycl
   expect(await page.getByRole('img', { name: 'A historic flag' }).evaluate((image) =>
     Boolean(image.compareDocumentPosition(document.querySelector('.wiki-body h3')!) & Node.DOCUMENT_POSITION_FOLLOWING),
   )).toBeTruthy();
-  await page.getByRole('navigation', { name: 'Country navigation' }).getByRole('link', { name: 'History', exact: true }).click();
+  await page.getByRole('navigation', { name: 'Country tools' }).getByRole('link', { name: 'Constitutional history', exact: true }).click();
   await expect(page.locator('.history-details').getByText('Circa 1949-05-08')).toBeVisible();
   await page.getByLabel('Date', { exact: true }).fill('1949-05-10');
   await page.getByRole('button', { name: 'Show status' }).click();

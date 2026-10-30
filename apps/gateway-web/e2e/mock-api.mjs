@@ -1,4 +1,5 @@
 import QRCode from 'qrcode';
+import { countryDirectoryFixtures } from './fixtures/country-directory.mjs';
 import { continuousReaderOutline, continuousReaderUnits } from './fixtures/continuous-reader.mjs';
 import { reviewFixtures, testTotp, MFA_TEST_SECRET } from './fixtures/ui-review.mjs';
 import { createHash } from 'node:crypto';
@@ -207,6 +208,8 @@ let forceEnrollment = false;
 let stepUpFresh = true;
 let visualRoles = false;
 let sprint50Content = false;
+let directoryScenario;
+let directoryUnavailable = [];
 let denseUi = false;
 let continuousReader = false;
 let authoredFootnoteWords = false;
@@ -221,6 +224,8 @@ const WIKI_IMAGE_ID = '01900000-0000-4000-8000-000000000736';
 const WIKI_IMAGE = { documentId: WIKI_IMAGE_ID, revision: 2, alt: 'A historic flag', caption: 'Historic flag', credit: 'Archive', sourceUrl: 'https://example.org/flag', rights: 'Public domain', placement: 'before_body' };
 
 function resetMockState() {
+  directoryScenario = undefined;
+  directoryUnavailable = [];
   continuousReader = false;
   authoredFootnoteWords = false;
   mockAmendments.clear();
@@ -361,6 +366,24 @@ const server = createServer(async (req, res) => {
     resetMockState();
     empty(res, 204);
     return;
+  }
+  if (method === 'POST' && pathname === '/__country_directory') {
+    directoryScenario = countryDirectoryFixtures(germany);
+    directoryUnavailable = (await readBody(req)).unavailable ?? [];
+    json(res, 200, { ok: true }); return;
+  }
+  if (method === 'GET' && directoryScenario) {
+    const response = directoryScenario.response(pathname, directoryUnavailable);
+    if (response) { json(res, response.status, response.body); return; }
+  }
+  if (method === 'GET' && pathname === `/api/catalog/jurisdictions/${germany.id}`) {
+    json(res, 200, { jurisdiction: { id: germany.id, parentId: null, name: germany.name, slug: 'de', kind: 'country', code: 'DE', historical: false }, ancestors: [], children: [], constitutions: germany.constitutions }); return;
+  }
+  if (method === 'GET' && pathname === `/api/catalog/constitutions/${CONSTITUTION_ID}/lifecycle-events`) {
+    json(res, 200, sprint50Content ? [
+      { id: '01900000-0000-4000-8000-000000000731', constitutionId: CONSTITUTION_ID, eventType: 'adopted', eventDate: '1949-05-08', dateCertainty: 'approximate', sourceUrl: 'https://example.org/adoption', note: 'Postwar drafting' },
+      { id: '01900000-0000-4000-8000-000000000732', constitutionId: CONSTITUTION_ID, eventType: 'commenced', eventDate: '1949-05-23', dateCertainty: 'exact', sourceUrl: null, note: null },
+    ] : []); return;
   }
   if (method === 'POST' && pathname === '/__continuous_reader') {
     continuousReader = true; sprint50Content = true;

@@ -1,4 +1,4 @@
-FROM eclipse-temurin:21-jre
+FROM eclipse-temurin:24-jre
 WORKDIR /app
 COPY --chmod=644 build/libs/app.jar app.jar
 EXPOSE 8080

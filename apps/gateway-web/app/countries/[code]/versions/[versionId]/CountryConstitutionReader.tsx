@@ -53,7 +53,7 @@ export async function CountryConstitutionReader({ code, versionId, error, initia
         publications, overviewHref: `/countries/${country.isoCode}/constitutions/${constitution.id}`, comparisonHref: `/countries/${country.isoCode}/compare`,
         wikiState: wiki ? 'published' : wikiUnavailable ? 'unavailable' : 'empty', editWikiHref: canEdit ? `/editor/wiki/constitution/${constitution.id}?code=${country.isoCode}` : undefined }}
       breadcrumbs={<Breadcrumbs items={[{ href: '/', label: <T value={ui.nav.countries} /> }, { href: `/countries/${country.isoCode}`, label: country.name }, { label: constitution.title }]} />}
-      wiki={wiki ? <ContentTranslationRegion sourceLanguage="auto"><WikiContent page={wiki} /></ContentTranslationRegion> : undefined}
+      wiki={wiki ? <ContentTranslationRegion sourceLanguage="auto" compact><WikiContent page={wiki} /></ContentTranslationRegion> : undefined}
       details={<ReaderDetails constitution={constitution} jurisdictionName={country.name} version={version} snapshot={snapshot} locale={locale} sourceEvidence={snapshot.sourceEvidence} canEditSource={canEdit && snapshotVersionId(version) === params.versionId}>
         <CountryNavigation code={country.isoCode} active="reading" /><p><a href={`/constitutions/${constitution.id}/amendments`}><T value={migrationUi.amendmentRegister} /></a></p>
         <VersionDocuments compact constitutionId={constitution.id} versionId={params.versionId} legalVersionId={snapshot.legalVersionId ?? snapshot.id} />

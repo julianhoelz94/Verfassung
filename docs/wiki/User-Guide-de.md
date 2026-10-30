@@ -76,6 +76,8 @@ Verwenden Sie die Adresse der geöffneten Version oder Einheit als dauerhaften L
 
 Unter [[Konto → Sprache der Website|Account-Guide-de#sprache-und-inhaltsübersetzung]] ändern Sie die Sprache oder fordern eine Inhaltsübersetzung an. Redaktionelle Sprachfassungen und maschinelle Übersetzungen sind getrennt; prüfen Sie den genauen Wortlaut am Original.
 
+Auf Wiki-Seiten übersetzt das Sprachsymbol **A / 文** oben rechts den Artikel. Beim Darüberfahren oder Fokussieren erscheint die Beschriftung. Nach der Übersetzung bietet der Rückgängig-Pfeil **Original anzeigen** an. Besucher gelangen über dasselbe Symbol zur Anmeldung.
+
 ## Angaben zur Website und Datenschutz
 
 Unter **Über** finden Sie die Quellen- und Prüfgrundsätze, im **Impressum** die veröffentlichten Angaben zum Betreiber und unter **Datenschutzerklärung** die veröffentlichte Datenschutzerklärung. Beim ersten Besuch kann der Hinweis zu notwendigen Cookies geschlossen werden; er enthält Links zu den rechtlichen Seiten. Für redaktionelle Funktionen und Kontofunktionen ist eine Anmeldung erforderlich. Veröffentlichte Texte sind öffentlich lesbar, wenn anonymes Lesen erlaubt ist.

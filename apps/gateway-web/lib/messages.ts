@@ -298,6 +298,7 @@ export const ui = {
   contentTranslation: {
     title: { en: 'Content translation', de: 'Inhaltsübersetzung' },
     translate: { en: 'Translate this content', de: 'Diesen Inhalt übersetzen' },
+    translating: { en: 'Translating…', de: 'Wird übersetzt…' },
     showOriginal: { en: 'Show original', de: 'Original anzeigen' },
     loginRequired: { en: 'Log in to translate this content.', de: 'Melden Sie sich an, um diesen Inhalt zu übersetzen.' },
     unavailable: { en: 'Content translation is currently unavailable.', de: 'Die Inhaltsübersetzung ist derzeit nicht verfügbar.' },

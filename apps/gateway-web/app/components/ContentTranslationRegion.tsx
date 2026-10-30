@@ -4,13 +4,14 @@ import { SESSION_COOKIE } from '../../lib/session';
 import { ContentTranslation } from './ContentTranslation';
 import type { ReactNode } from 'react';
 
-export async function ContentTranslationRegion({ children, sourceLanguage }: { children: ReactNode; sourceLanguage: string }) {
+export async function ContentTranslationRegion({ children, sourceLanguage, compact = false }: { children: ReactNode; sourceLanguage: string; compact?: boolean }) {
   const token = (await cookies()).get(SESSION_COOKIE)?.value;
   const [availability, userSettings] = await Promise.all([
     translationAvailability().catch(() => ({ enabled: false })),
     token ? translationUserSettings(token).catch(() => null) : Promise.resolve(null),
   ]);
   return <ContentTranslation
+    compact={compact}
     sourceLanguage={sourceLanguage}
     authenticated={Boolean(token && userSettings)}
     enabled={availability.enabled}

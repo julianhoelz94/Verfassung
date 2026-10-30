@@ -34,6 +34,20 @@ for (const width of [390, 1440]) test(`all wikis share the constitution design a
     const wiki = page.getByRole('region', { name: 'Wiki', exact: true });
     await expect(wiki.getByRole('heading', { name: title, exact: true })).toBeVisible();
     await expect(wiki.getByText('Context & history', { exact: true })).toBeVisible();
+    const translate = wiki.getByRole('button', { name: 'Translate this content', exact: true });
+    await expect(translate).toHaveText('');
+    const translateBounds = (await translate.boundingBox())!, closeBounds = (await wiki.getByRole('button', { name: 'Close Wiki' }).boundingBox())!;
+    expect(translateBounds.width).toBeLessThanOrEqual(44);
+    expect(Math.abs(translateBounds.y - closeBounds.y)).toBeLessThan(2);
+    expect(translateBounds.x + translateBounds.width).toBeLessThanOrEqual(closeBounds.x);
+    const legalText = type === 'constitution' ? await page.locator('.version-articles').textContent() : null;
+    await translate.focus();
+    await expect(wiki.getByRole('tooltip')).toHaveText('Translate this content');
+    await translate.click();
+    await expect(wiki.getByText('[en] Shared Wiki design', { exact: true })).toBeVisible();
+    if (legalText) await expect(page.locator('.version-articles')).toHaveText(legalText);
+    await wiki.getByRole('button', { name: 'Show original', exact: true }).click();
+    await expect(wiki.getByText('Shared Wiki design', { exact: true })).toBeVisible();
     const metrics = await wiki.evaluate(element => {
       const typography = getComputedStyle(element.querySelector('p')!);
       const scrollContainers: string[] = [];

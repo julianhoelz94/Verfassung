@@ -11,6 +11,6 @@ export function directoryWikiPanel({ targetType, targetId, name, code, page, una
   return {
     title: <><T value={ui.countries.code.page.about} /> {name}</>,
     actions: canEdit || canReview ? <a href={wikiEditPath({ targetType, targetId, code })}><T value={canEdit ? directoryUi.editWiki : directoryUi.reviewWiki} /></a> : undefined,
-    children: unavailable ? <p role="status"><T value={directoryUi.wikiUnavailable} /></p> : page ? <ContentTranslationRegion sourceLanguage="auto"><WikiContent page={page} /></ContentTranslationRegion> : <p><T value={directoryUi.noWiki} /></p>,
+    children: unavailable ? <p role="status"><T value={directoryUi.wikiUnavailable} /></p> : page ? <ContentTranslationRegion sourceLanguage="auto" compact><WikiContent page={page} /></ContentTranslationRegion> : <p><T value={directoryUi.noWiki} /></p>,
   };
 }

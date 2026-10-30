@@ -82,6 +82,8 @@ Use the address of the opened version or unit as a permalink. Save the version I
 
 Use [[Account → Website language|Account-Guide#choose-a-language-or-translate-content]] to change the interface language or request content translation. Authored texts and machine translations are distinct; always check the source for exact wording.
 
+On Wiki pages, the **A / 文** language icon in the upper-right corner translates the article. Hover or focus it to see its label. After translation, the undo icon offers **Show original**. Visitors use the same icon to sign in before translating.
+
 ## Site information and privacy
 
 Use **About** for source and verification policy, **Impressum** for the published operator details, and **Datenschutzerklärung** for the published privacy notice. On a first visit, the informational necessary-cookie notice can be dismissed and links to the legal pages. The editorial and account functions require sign-in; published texts are available to public readers when anonymous browsing is allowed.

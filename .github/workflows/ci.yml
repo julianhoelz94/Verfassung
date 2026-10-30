@@ -491,6 +491,18 @@ jobs:
       - name: Full-stack browser journeys
         working-directory: apps/gateway-web
         run: npm run test:e2e:full
+      - name: Upload fixture exploration guide and acceptance views
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: fixture-scenarios
+          path: |
+            apps/gateway-web/e2e/fixtures/generated/.runtime/scenario-guide.md
+            apps/gateway-web/e2e/fixtures/generated/.runtime/scenario-index.json
+            apps/gateway-web/test-results/**/fixture-irregular-*.png
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 7
       - name: Upload migration coverage
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

@@ -159,7 +159,7 @@
       "expected": "Mixed roots, skipped levels, interleaved text, literal labels and structural moves survive publication.",
       "profile": "extended",
       "dependencies": [],
-      "intendedState": "reader-lab"
+      "intendedState": "published"
     },
     {
       "key": "history-lab",
@@ -170,7 +170,7 @@
       "expected": "Old snapshots retain their text; corrections share one legal identity.",
       "profile": "extended",
       "dependencies": [],
-      "intendedState": "history-lab"
+      "intendedState": "published"
     },
     {
       "key": "editor-draft",
@@ -236,7 +236,7 @@
       "expected": "The reason and review history remain separate from constitutional text.",
       "profile": "extended",
       "dependencies": [],
-      "intendedState": "source-returned"
+      "intendedState": "returned"
     },
     {
       "key": "import-outline",
@@ -291,7 +291,7 @@
       "expected": "Confirmation enables upload without publishing constitutional text.",
       "profile": "extended",
       "dependencies": [],
-      "intendedState": "setup-proposal"
+      "intendedState": "proposed"
     },
     {
       "key": "amendment-review",
@@ -346,7 +346,7 @@
       "expected": "Published context, document revisions and legal text have independent histories.",
       "profile": "extended",
       "dependencies": [],
-      "intendedState": "documents-context"
+      "intendedState": "draft"
     },
     {
       "key": "historical-region",
@@ -357,7 +357,7 @@
       "expected": "Unknown dates stay unknown; source wording and literal labels remain intact.",
       "profile": "extended",
       "dependencies": [],
-      "intendedState": "historical-region"
+      "intendedState": "published"
     },
     {
       "key": "curated-comparison",
@@ -372,7 +372,7 @@
         "historical-region",
         "documents-context"
       ],
-      "intendedState": "curated-comparison"
+      "intendedState": "published"
     },
     {
       "key": "search-pagination",
@@ -383,7 +383,7 @@
       "expected": "Results preserve their jurisdiction and exact version context.",
       "profile": "extended",
       "dependencies": [],
-      "intendedState": "search-pagination"
+      "intendedState": "published"
     },
     {
       "key": "scale-pagination",
@@ -394,7 +394,7 @@
       "expected": "Upload and verification follow every page without truncation.",
       "profile": "scale",
       "dependencies": [],
-      "intendedState": "scale-pagination"
+      "intendedState": "published"
     }
   ]
 }

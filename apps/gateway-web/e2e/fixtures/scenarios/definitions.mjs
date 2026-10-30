@@ -76,7 +76,7 @@ const descriptions = [
 ];
 export const scenarios = descriptions.map(([key, kind, title, role, action, expected]) => ({ key, kind, title, role, action, expected,
   profile: kind === 'scale' ? 'scale' : 'extended', dependencies: kind === 'comparison' ? ['reader-lab', 'historical-region', 'documents-context'] : [],
-  intendedState: key.replace(/^(editor|import|amendment)-/, ''),
+  intendedState: ['editor', 'import', 'amendment'].includes(kind) ? key.replace(/^(editor|import|amendment)-/, '') : kind === 'setup' ? 'proposed' : kind === 'source' ? 'returned' : kind === 'context' ? 'draft' : 'published',
 }));
 export function selectedScenarios(profile) {
   if (!['compact', 'extended', 'scale'].includes(profile)) throw new Error(`Unknown fixture profile '${profile}'; use compact, extended or scale`);

@@ -39,7 +39,7 @@ export async function amendmentScenario(ctx, scenario) {
   if (scenario.intendedState === 'withdrawn') steps.push(current => ctx.api('POST', `amendment/amendments/${current.id}/withdraw`, {}, ctx.publisherToken));
   if (scenario.intendedState === 'stale') steps.push(async () => {
     await editorial(ctx, { ...scenario, key: `${scenario.key}-correction` }, source, 'published');
-    await ctx.api('POST', `amendment/constitutions/${source.constitutionId}/amendments/refresh-review-status`, {}, ctx.publisherToken);
+    await ctx.api('POST', `amendment/constitutions/${source.constitutionId}/amendments/refresh-review-status`, { legalVersionId: source.versionId }, ctx.publisherToken);
   });
   const result = await seedWorkflow({ key: scenario.key, observe, steps, journal: ctx.journal, verifyOnly: ctx.verifyOnly });
   const value = result.value; assert(value, `${scenario.key}: missing legal record`);

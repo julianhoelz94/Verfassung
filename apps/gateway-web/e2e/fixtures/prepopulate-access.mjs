@@ -65,3 +65,8 @@ export async function authenticateFixtures(api, env, extended = false) {
   }
   return { token: await login('ADMIN'), reviewerToken: await login('REVIEWER'), publisherToken: await login('PUBLISHER'), ...(extended ? { editorToken: await login('EDITOR'), viewerToken: await login('VIEWER') } : {}) };
 }
+
+export async function requireCompletedFixtureSetup(api) {
+  const setup = await api('GET', 'identity/setup/status');
+  if (setup.completed !== true) throw new Error('Complete the site setup wizard and create fixture accounts before running prepopulate.');
+}

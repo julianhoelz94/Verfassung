@@ -29,7 +29,7 @@ export async function archiveScenario(ctx, scenario) {
     }
   }
   const provisionPath = `catalog/constitutions/${source.constitutionId}/provision-events`;
-  for (const [eventType, eventDate] of [['deferred', '1849-06-01'], ['commenced', '1851-01-01'], ['suspended', '1860-01-01'], ['restored', '1861-01-01']]) {
+  for (const [eventType, eventDate] of [['deferred', '1849-06-01'], ['commenced', '1851-01-01'], ['suspended', '1855-01-01'], ['restored', '1856-01-01']]) {
     const events = await ctx.api('GET', provisionPath);
     if (!events.some(e => e.eventType === eventType && e.eventDate === eventDate)) {
       assert(!ctx.verifyOnly, `Missing provision ${eventType}`);

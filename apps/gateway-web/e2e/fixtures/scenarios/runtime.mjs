@@ -66,6 +66,7 @@ export async function seedWorkflow({ key, observe, steps, journal, verifyOnly })
     await steps[state.next](current);
     current = await observe();
     state.next++;
+    state.resourceId = current?.id ?? current?.session?.id ?? state.resourceId;
     state.fingerprint = digest(current);
     journal.save();
   }

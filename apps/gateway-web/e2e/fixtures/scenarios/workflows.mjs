@@ -1,13 +1,15 @@
 import assert from 'node:assert/strict';
-import { allPages, seedWorkflow, assertSubset, comparableRoots } from './runtime.mjs';
+import { allPages, seedWorkflow, assertSubset } from './runtime.mjs';
 import { payloadFor, ensurePublished, findImport } from './content.mjs';
 import { namespace, rootsFor } from './definitions.mjs';
 
 export async function editorial(ctx, scenario, source, state, sourceOnly = false) {
   const observe = async () => {
-    const rows = [...await allPages(ctx.api, `editor/edit-sessions?versionId=${source.versionId}`), ...await allPages(ctx.api, `editor/edit-sessions?versionId=${source.versionId}&archived=true`)];
+    const active = await allPages(ctx.api, `editor/edit-sessions?versionId=${source.versionId}`);
+    const archived = await allPages(ctx.api, `editor/edit-sessions?versionId=${source.versionId}&archived=true`);
+    const rows = [...new Map([...active, ...archived].map(row => [row.id, row])).values()];
     assert(rows.length <= 1, `${scenario.key}: multiple sessions need manual inspection`);
-    return rows[0] ? ctx.api('GET', `editor/edit-sessions/${rows[0].id}`) : null;
+    return rows[0] ? { ...await ctx.api('GET', `editor/edit-sessions/${rows[0].id}`), fixtureArchived: archived.some(row => row.id === rows[0].id) } : null;
   };
   const sessionPath = current => `editor/edit-sessions/${current.session.id}`;
   const changedBody = `Saved draft for ${scenario.key}. This unpublished exploration text is private.`;
@@ -42,6 +44,7 @@ export async function editorial(ctx, scenario, source, state, sourceOnly = false
   if (!result.preserved) {
     const statuses = { draft: 'open', review: 'reviewing', approved: 'approved', published: 'published', archived: 'published', returned: 'open' };
     assert.equal(value.session.status, statuses[state], `${scenario.key}: initial workflow state`);
+    assert.equal(value.fixtureArchived, state === 'archived', `${scenario.key}: archive state`);
     if (sourceOnly) assert.equal(value.sourceEvidenceRevisions[0].evidence.description, `Revised source description for ${scenario.key}.`);
     else assert.equal(value.drafts[0].body, changedBody, `${scenario.key}: saved draft`);
   }
@@ -55,7 +58,7 @@ export async function editorial(ctx, scenario, source, state, sourceOnly = false
       assert.deepEqual(content.roots.map(r => r.revisionId), source.snapshot.roots.map(r => r.revisionId), 'Source-only correction reuses text revisions');
     }
   }
-  return { ...result, sessionId: value.session.id, versionId: value.newVersionId ?? source.versionId, href: `/editor?sessionId=${value.session.id}`, state: value.session.status };
+  return { ...result, sessionId: value.session.id, versionId: value.newVersionId ?? source.versionId, href: `/editor?sessionId=${value.session.id}`, state: value.fixtureArchived ? 'archived' : value.session.status };
 }
 export async function importWorkflow(ctx, scenario, state) {
   const payload = payloadFor(scenario);
@@ -85,21 +88,19 @@ export async function importWorkflow(ctx, scenario, state) {
 }
 export async function setupWorkflow(ctx, scenario) {
   const known = ctx.journal.data.scenarios[scenario.key];
-  const observe = () => known?.proposalId ? ctx.api('GET', `ingestion/import-setup-proposals/${known.proposalId}`) : Promise.resolve(null);
   // The setup API has no list/idempotency endpoint. Keep the returned proposal ID
   // in the origin/deployment-scoped runtime journal, outside Playwright output.
   if (!known && ctx.verifyOnly) throw new Error(`${scenario.key}: retain the runtime journal to verify the pending setup proposal`);
   if (!known) {
     const payload = payloadFor(scenario);
-    const { versionLabel, effectiveDate, roots, sourceEvidence, ...base } = payload;
-    const proposal = await ctx.api('POST', 'ingestion/import-setup-proposals', { ...base, sampleRoots: roots }, ctx.editorToken);
+    const proposal = await ctx.api('POST', 'ingestion/import-setup-proposals', { isoCode: payload.isoCode, countryName: payload.countryName, constitutionSlug: payload.constitutionSlug, constitutionTitle: payload.constitutionTitle, languageCode: payload.languageCode, sourceUrl: payload.sourceUrl, outline: payload.outline, sampleRoots: payload.roots }, ctx.editorToken);
     ctx.journal.data.scenarios[scenario.key] = { proposalId: proposal.id, complete: true };
     ctx.journal.save();
   }
   const proposalId = ctx.journal.data.scenarios[scenario.key].proposalId;
   const value = await ctx.api('GET', `ingestion/import-setup-proposals/${proposalId}`);
   assert.equal(value.payload.constitutionSlug, `${namespace}-${scenario.key}`);
-  return { value, proposalId, href: `/admin/import/setup/${proposalId}`, state: value.status, preserved: value.status !== 'pending_confirmation' };
+  return { value, proposalId, href: `/admin/import/setup/${proposalId}`, state: value.status, preserved: value.status !== 'proposed' };
 }
 export async function historyScenario(ctx, scenario) {
   const base = await ensurePublished(ctx, `${scenario.key}-original`, payloadFor(scenario));

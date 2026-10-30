@@ -30,7 +30,7 @@ export async function ensurePublished(ctx, key, payload, predecessor, hopKind = 
   assert(existing, `${key}: published snapshot missing`);
   const version = await ctx.api('GET', `catalog/versions/${existing.id}`, undefined, false);
   assertSubset(version, { versionLabel: payload.versionLabel, effectiveDate: payload.effectiveDate ?? null, languageCode: payload.languageCode,
-    predecessorVersionId: predecessor ?? null, hopKind: predecessor ? hopKind : 'initial' }, `${key} version`);
+    sourceUrl: payload.sourceUrl, sourceEvidence: payload.sourceEvidence, predecessorVersionId: predecessor ?? null, hopKind: predecessor ? hopKind : 'initial' }, `${key} version`);
   const snapshot = await ctx.api('GET', `content/versions/${existing.id}/content`, undefined, false);
   assert.deepEqual(comparableRoots(snapshot.roots), comparableRoots(payload.roots), `${key}: exact published ordered content`);
   const exported = await ctx.api('GET', `content/versions/${existing.id}/export`, undefined, false);

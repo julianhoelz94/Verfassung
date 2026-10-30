@@ -8,7 +8,7 @@ const index = JSON.parse(readFileSync(join(__dirname, '../fixtures/generated/.ru
 const scenarios = index.scenarios;
 test.skip(index.profile === 'compact', 'Exploration scenarios require the extended or scale profile');
 
-test('non-standard structures retain authored order, skipped levels and shared notes in the real reader', async ({ page, request }) => {
+test('non-standard structures retain authored order, skipped levels and shared notes in the real reader', async ({ page, request }, testInfo) => {
   const fixture = scenarios['reader-lab'];
   const response = await request.get(`/api/content/versions/${fixture.versionId}/content`);
   expect(response.ok()).toBeTruthy();
@@ -31,11 +31,13 @@ test('non-standard structures retain authored order, skipped levels and shared n
   await page.keyboard.press('Escape');
   await markers.last().click();
   await expect(page.getByRole('dialog')).toContainText('Shared editorial note for two articles.');
+  await page.keyboard.press('Escape');
+  await page.screenshot({ path: testInfo.outputPath('fixture-irregular-reader-mobile.png'), fullPage: true });
   const exported = await (await request.get(`/api/content/versions/${fixture.versionId}/export`)).json();
   expect(exported.roots.at(-1).content.at(-1).footnoteLabel).toBe('[a]');
 });
 
-test('the irregular successor retains moved identities, additions and historical links', async ({ page, request }) => {
+test('the irregular successor retains moved identities, additions and historical links', async ({ page, request }, testInfo) => {
   const fixture = scenarios['reader-lab'];
   const before = await (await request.get(`/api/content/versions/${fixture.versionId}/content`)).json();
   const after = await (await request.get(`/api/content/versions/${fixture.revisedVersionId}/content`)).json();
@@ -44,6 +46,7 @@ test('the irregular successor retains moved identities, additions and historical
   expect(after.roots[2].content.some((entry: { node?: { logicalId: string } }) => entry.node?.logicalId === moved.logicalId)).toBe(true);
   await page.goto(`/countries/XA/compare?from=${fixture.versionId}&to=${fixture.revisedVersionId}&all=1`);
   await expect(page.getByText('Exploration duties', { exact: true }).first()).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath('fixture-irregular-compare.png'), fullPage: true });
   await page.goto(fixture.href);
   await page.getByRole('button', { name: 'Full text', exact: true }).click();
   await expect(page.getByText('This clause is removed in the successor.', { exact: true })).toBeVisible();

@@ -2,7 +2,7 @@ import { parseOptions } from './scenarios/definitions.mjs';
 import { runScenarios } from './scenarios/index.mjs';
 import { allPages } from './scenarios/runtime.mjs';
 import { fixtureVersion, publishFixture } from './prepopulate-import.mjs';
-import { authenticateFixtures, prepopulateTarget } from './prepopulate-access.mjs';
+import { authenticateFixtures, prepopulateTarget, requireCompletedFixtureSetup } from './prepopulate-access.mjs';
 import { readFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -283,10 +283,7 @@ async function verifyTotals(ids) {
 }
 
 await waitForStack();
-if (process.env.PREPOPULATE_DEPLOYMENT_ENVIRONMENT) {
-  const setup = await api('GET', 'identity/setup/status');
-  if (setup.completed !== true) throw new Error('Deployment succeeded. Complete the site setup wizard and create fixture accounts before running prepopulate.');
-}
+await requireCompletedFixtureSetup(api);
 await authenticate();
 const ids = { constitutions: {}, versions: {}, amendments: {} };
 await ensureVersions(ids);

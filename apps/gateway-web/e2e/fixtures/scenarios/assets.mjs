@@ -28,6 +28,8 @@ export const assets = {
 export async function documentFixture(ctx, key, assetKey, targetId) {
   const asset = assets[assetKey]; const title = `Atlas exploration ${key}`;
   const observe = async () => {
+    const knownId = ctx.journal.data.scenarios[`document:${key}`]?.resourceId;
+    if (knownId) return ctx.api('GET', `document/documents/${knownId}`);
     const records = await ctx.api('GET', `document/documents?q=${encodeURIComponent(title)}`);
     const matches = records.filter(record => record.revision.sourceUrl === `https://example.org/${namespace}/${key}`);
     assert(matches.length <= 1, `${key}: duplicate documents`);

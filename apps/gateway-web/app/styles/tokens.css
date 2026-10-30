@@ -1,38 +1,42 @@
 /* Runtime source of truth. See docs/design/ui-templates.md. */
 :root {
   /* Colour — ink and paper */
-  --color-ink: #16201f;
-  --color-ink-2: #4b5654;
-  --color-ink-3: #5f6967;
-  --color-paper: #f7f5f0;
+  --color-ink: #25332f;
+  --color-ink-2: #626e67;
+  --color-ink-3: #626e67;
+  --color-paper: #faf9f6;
   --color-surface: #ffffff;
-  --color-surface-2: #f1eee7;
-  --color-line: #e2ded6;
-  --color-line-strong: #c9c3b8;
+  --color-surface-2: #f1f3ef;
+  --color-line: #dce2da;
+  --color-line-strong: #839286;
 
   /* Colour — brand */
-  --color-accent: #0f5e5e;
-  --color-accent-strong: #0a4747;
-  --color-accent-soft: #e3f0ee;
+  --color-accent: #355a47;
+  --color-accent-strong: #294837;
+  --color-accent-soft: #eef3ed;
   --color-on-accent: #ffffff;
 
   /* Colour — semantic (background / foreground pairs, AA on each other) */
-  --color-added-bg: #e6f6ec;
-  --color-added-fg: #14532d;
-  --color-removed-bg: #fbe9e9;
-  --color-removed-fg: #7f1d1d;
-  --color-changed-bg: #fff4d6;
-  --color-changed-fg: #713f12;
-  --color-info-bg: #e8f1fb;
-  --color-info-fg: #1e3a8a;
-  --color-danger: #b42318;
-  --color-success: #1a7f4b;
-  --color-focus: #d97706;
+  --color-added-bg: #edf3eb;
+  --color-added-fg: #355a47;
+  --color-removed-bg: #f5ecea;
+  --color-removed-fg: #824b45;
+  --color-changed-bg: #f6f0dc;
+  --color-changed-fg: #735c2d;
+  --color-info-bg: #edf1f3;
+  --color-info-fg: #455d6b;
+  --color-danger: #984b43;
+  --color-success: #355a47;
+  --color-focus: #a66a24;
+  --color-backdrop: rgb(37 51 47 / 0.35);
 
   /* Typography */
   --font-ui: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-  --font-text: 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, 'Times New Roman', serif;
+  --font-text: Georgia, 'Times New Roman', serif;
+  --font-heading: var(--font-text);
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --weight-heading: 400;
+  --weight-ui-emphasis: 500;
   --text-xs: 0.8125rem;
   --text-sm: 0.875rem;
   --text-base: 1rem;
@@ -43,7 +47,7 @@
   --text-3xl: clamp(1.875rem, 1.3rem + 2.2vw, 2.75rem);
   --leading-tight: 1.2;
   --leading-normal: 1.5;
-  --leading-reading: 1.65;
+  --leading-reading: 1.85;
 
   /* Spacing (4px base) */
   --space-1: 4px;
@@ -60,13 +64,16 @@
   --radius-md: 10px;
   --radius-lg: 16px;
   --radius-pill: 999px;
-  --shadow-1: 0 1px 2px rgba(22, 32, 31, 0.06), 0 1px 1px rgba(22, 32, 31, 0.04);
-  --shadow-2: 0 6px 20px rgba(22, 32, 31, 0.1);
+  --shadow-1: 0 1px 2px rgb(37 51 47 / 0.035);
+  --shadow-2: 0 8px 28px rgb(37 51 47 / 0.12);
 
   /* Layout */
   --control-min: 44px;
   --topbar-h: 56px;
   --measure: 68ch;
+  --constitution-measure: 42.5rem;
+  --constitution-font-size: var(--text-md);
+  --constitution-anchor-offset: calc(var(--topbar-h) + 5rem);
   --content-max: 1280px;
   --sidebar-w: 280px;
   --gutter: clamp(16px, 4vw, 32px);

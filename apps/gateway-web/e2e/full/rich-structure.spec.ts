@@ -21,7 +21,7 @@ test('mixed roots and rich entries survive API publication and read on a narrow 
   await expect(page.getByRole('cell', { name: 'Biennial' })).toBeVisible();
   await expect(page.getByRole('cell', { name: 'Applies nationally' })).toHaveAttribute('colspan', '2');
   await page.goto(`/countries/XC/versions/${version}/articles/${article.occurrenceId}`);
-  await expect(page.getByRole('link', { name: 'Appendix A' })).toHaveAttribute('href', new RegExp(`/versions/${version}/units/${appendix.occurrenceId}`));
+  await expect(page.locator('[data-reader-document]').getByRole('link', { name: 'Appendix A' })).toHaveAttribute('href', new RegExp(`/versions/${version}/units/${appendix.occurrenceId}`));
   await expect(page.getByRole('link', { name: 'Source', exact: true })).toHaveAttribute('href', 'https://example.org/atlas-e2e/revised-source');
   const marker = page.getByRole('button', { name: 'Show footnote 1', exact: true });
   const markerSize = await marker.boundingBox();
@@ -31,9 +31,9 @@ test('mixed roots and rich entries survive API publication and read on a narrow 
   expect(await page.evaluate(() => window.scrollY)).toBe(position);
   const drawer = page.getByRole('dialog', { name: 'Footnote 1', exact: true });
   await expect(drawer).toContainText('The revised source note.');
-  await expect(drawer.getByRole('link', { name: 'Go to footnote', exact: true })).toHaveAttribute('href', new RegExp(`/versions/${version}#fn-`));
+  await expect(drawer.getByRole('link', { name: 'Go to footnote', exact: true })).toHaveAttribute('href', /^#fn-/);
   await drawer.getByRole('link', { name: 'Go to footnote', exact: true }).click();
-  await expect(page).toHaveURL(new RegExp(`/versions/${version}#fn-`));
+  await expect(page).toHaveURL(new RegExp(`/versions/${version}/articles/${article.occurrenceId}#fn-`));
   await expect(page.getByRole('note').filter({ hasText: 'The revised source note.' })).toBeVisible();
 });
 

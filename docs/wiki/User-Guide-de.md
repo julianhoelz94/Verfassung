@@ -6,8 +6,8 @@
 
 1. Öffnen Sie **Länder** und wählen Sie ein Land.
 2. Wählen Sie die Verfassung und die benötigte rechtliche Fassung.
-3. Springen Sie über das Inhaltsverzeichnis zur Vorschrift. Öffnen Sie deren Überschrift oder wählen Sie **Full text**, um den Wortlaut einzublenden.
-4. Beachten Sie Datum und Status.
+3. Lesen Sie den fortlaufenden Text oder springen Sie über das Inhaltsverzeichnis zur Vorschrift. Werkzeugleiste und eingeblendeter Inhalt bleiben beim Scrollen erreichbar.
+4. Öffnen Sie **Details** für die genaue Fassung, Quellen, Prüfstatus und zugehörige Dokumente.
 
 ![Länderseite mit verfügbaren Verfassungen und Fassungen](https://raw.githubusercontent.com/wiki/julianhoelz94/Verfassung/media/reading-country-de.png)
 *Zuerst die Verfassung, dann die rechtliche Fassung wählen.*
@@ -15,16 +15,26 @@
 ![Verfassungstext mit Inhaltsverzeichnis](https://raw.githubusercontent.com/wiki/julianhoelz94/Verfassung/media/reading-text-de.png)
 *Das Inhaltsverzeichnis führt durch den ausgewählten Text.*
 
+## Werkzeuge der Leseansicht
+
+**Inhalt** blendet das Inhaltsverzeichnis aus oder wieder ein und merkt sich die Auswahl. Lange Listen besitzen einen eigenen Scrollbereich. **Im Text suchen** findet auch Ausdrücke über Formatierungsgrenzen hinweg. Pfeile oder Eingabe/Umschalt+Eingabe wechseln zwischen Treffern.
+
+**Vergleichen** öffnet einen Bereich unter der Werkzeugleiste. Wählen Sie Veröffentlichungen mit **Von** und **Bis** oder tauschen Sie sie. Einfügungen und Streichungen zeigen die ausgewählten Texte. Wechseln Sie zwischen Änderungen oder wählen Sie **Zur geänderten Stelle**. **Vollständigen Vergleich öffnen** zeigt die Fassungen nebeneinander. **Wiki** öffnet die veröffentlichte Einführung mit historischem Hintergrund im selben Bereich. Es ist jeweils ein Bereich geöffnet.
+
+**Leseeinstellungen** verändert Textgröße, die konfigurierte Satzdarstellung und den Detailgrad. **Übersicht** bietet aufklappbare Überschriften; zu Beginn ist der **Volltext** sichtbar. Wortlaut, Formatierungen, ursprüngliche Zeilenumbrüche und dauerhafte Textidentitäten bleiben erhalten.
+
+Zeigen Sie auf eine Fußnotenmarke oder fokussieren Sie sie für eine Vorschau. Ein Klick öffnet die schwebende Fußnote am unteren Bildschirmrand und erhält die Leseposition. **×**, Escape oder ein Klick außerhalb schließt sie. **Zur Fußnote** springt ausdrücklich zur Anmerkung am Textende; Die gespeicherte Fußnotenmarke bleibt unverändert. Bei einem Verweis führt der Rücklink direkt zur Textstelle. Bei mehreren Verweisen öffnet ein einziger Rücklink eine Auswahl der verweisenden Passagen.
+
 ## Suchen, vergleichen und Geschichte verfolgen
 
 | Aufgabe | Einstieg |
 | --- | --- |
 | Eine Passage finden | **Suche**, Begriff eingeben und Treffer öffnen. |
-| Zwei Fassungen vergleichen | **Vergleichen** beim Land, dann zwei Fassungen wählen. |
+| Zwei Fassungen vergleichen | **Vergleichen** in der Leseansicht oder beim Land. |
 | Verfassungsgeschichte | **Geschichte**: Annahme, Inkrafttreten, weitere Verfassungsereignisse und Rechtsänderungen auf einem Zeitstrahl. |
 | Rechtsänderungen | **Geschichte**, bei Bedarf nach **Verfassungsänderungen** filtern. |
 
-Länder-, Verfassungs- und Leseseiten verwenden dieselbe Navigation mit **Übersicht** und **Geschichte**. Geschichte zeigt Verfassungsereignisse und Verfassungsänderungen in gemeinsamer Datumsreihenfolge. Kennzeichnungen unterscheiden die Ereignisarten; **Ereignisse anzeigen** filtert bei Bedarf denselben Zeitstrahl. Kleine Marker kennzeichnen die Meilensteine direkt auf der zentrierten Zeitlinie. Zeigen Sie auf einen Marker oder fokussieren Sie ihn mit der Tastatur für die Beschriftung; wählen Sie ihn für die Details aus. Auf Touchscreens tippen Sie auf den Marker. Escape schließt die Beschriftung. Die Ereignisse sind nach Jahren gruppiert. Nutzen Sie **Zum Jahr springen**, die Vor-/Zurück-Schaltflächen oder die chronologische Liste. Die Pfeiltasten wechseln zwischen Meilensteinen; Pos1/Ende wählen den ersten/letzten. Ungefähre Datumsangaben bleiben gekennzeichnet, und Einträge ohne Datum stehen getrennt.
+Länder- und Verfassungsseiten bieten **Übersicht** und **Geschichte**. In der Leseansicht stehen diese Verknüpfungen unter **Details**. Geschichte zeigt Verfassungsereignisse und Verfassungsänderungen in gemeinsamer Datumsreihenfolge. Kennzeichnungen unterscheiden die Ereignisarten; **Ereignisse anzeigen** filtert bei Bedarf denselben Zeitstrahl. Kleine Marker kennzeichnen die Meilensteine direkt auf der zentrierten Zeitlinie. Zeigen Sie auf einen Marker oder fokussieren Sie ihn mit der Tastatur für die Beschriftung; wählen Sie ihn für die Details aus. Auf Touchscreens tippen Sie auf den Marker. Escape schließt die Beschriftung. Die Ereignisse sind nach Jahren gruppiert. Nutzen Sie **Zum Jahr springen**, die Vor-/Zurück-Schaltflächen oder die chronologische Liste. Die Pfeiltasten wechseln zwischen Meilensteinen; Pos1/Ende wählen den ersten/letzten. Ungefähre Datumsangaben bleiben gekennzeichnet, und Einträge ohne Datum stehen getrennt.
 
 Die Suchfilter bieten Gebiet, Land, Fassung und Gültigkeitsdatum. Lange Listen besitzen eine Optionssuche. Beim Gebiets- oder Länderwechsel werden unpassende Filter mit einem Hinweis zurückgesetzt. **Filter anwenden** aktualisiert die Adresse. Entfernen Sie einen aktiven Filter oder wählen Sie **Filter zurücksetzen**, um die Suche zu erweitern. Auf kleineren Bildschirmen öffnen Sie **Filter** über den Treffern. Ein Gebiet erfasst seine eigenen Verfassungen; untergeordnete Gebiete wählen Sie gesondert. Gespeicherte Filter für unbekannte oder ältere Fassungen bleiben sichtbar und erweitern die Suche nicht unbemerkt.
 
@@ -69,3 +79,13 @@ Unter **Über** finden Sie die Quellen- und Prüfgrundsätze, im **Impressum** d
 </details>
 
 [[Konto|Account-Guide-de]] · [[Dokumentationsstart|Home]] · [[English|User-Guide]]
+
+## Text und dauerhafte Links kopieren
+
+Artikel-, Satz- und andere Textstellenlinks öffnen denselben Verfassungsbetrachter an der gewünschten Stelle. Bestehende Artikel- und Einheitenadressen funktionieren weiterhin, auch mit Absatz- und Satzankern. Quelleninformationen stehen unter **Details**, damit der Text im Mittelpunkt bleibt.
+
+Öffnen Sie per Rechtsklick auf den Verfassungstext das Kopiermenü. Es bietet die angeklickte Einheit und ihre übergeordneten Einheiten: etwa Satz, Absatz, Artikel und Verfassung. Ein Absatz ohne ausgewählten Satz bietet keinen Satzlink. **Dauerhaften Link kopieren** bleibt an den angezeigten veröffentlichten Textstand gebunden. **Originaltext kopieren** übernimmt den gespeicherten Wortlaut mit wörtlichen Marken, Tabellen und Zeilenumbrüchen, ohne Bedienelemente. Auch bei einer Übersetzung wird der veröffentlichte Originaltext kopiert.
+
+Mit der Tastatur öffnet Umschalt+F10 das Menü an einer fokussierten Textstelle. Pfeiltasten wechseln zwischen Einträgen; Eingabe oder Leertaste wählt sie, Escape schließt das Menü. Eine Trennlinie gliedert das kompakte Menü in dauerhafte Links und Originaltext. Falls die Zwischenablage nicht zugänglich ist, erscheint ein markierbares Kopierfeld. Zusätzliche Linksymbole im Text entfallen.
+
+Jede Fußnote hat genau einen **↑**-Rücksprung. Beim Darüberfahren oder Fokussieren erscheint seine Beschriftung. Bei einem einzelnen Verweis springt er direkt zurück; bei mehreren Verweisen öffnet er ein Menü mit den Verweisstellen.

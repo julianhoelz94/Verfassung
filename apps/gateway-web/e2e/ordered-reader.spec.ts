@@ -35,8 +35,12 @@ test('global unit permalink redirects to the exact version and text occurrence',
   await expect(page.locator(`[id="${entry.occurrenceId}"]`)).toHaveText(entry.text);
 });
 
-test('version overview reveals body only after its root is expanded', async ({ page }) => {
+test('the continuous reader shows full text and offers an expandable overview', async ({ page }) => {
   await page.goto(`/countries/DE/versions/${VERSION_2022}`);
+  await expect(page.getByText('Human dignity shall be inviolable.', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Reading preferences' }).click();
+  await page.getByRole('combobox', { name: 'Detail level' }).selectOption({ label: 'Overview' });
+  await page.keyboard.press('Escape');
   const root = page.getByRole('button', { name: /Article 1.*Human dignity/ }).first();
   await expect(root).toHaveAttribute('aria-expanded', 'false');
   await expect(page.getByText('Human dignity shall be inviolable.', { exact: true })).toHaveCount(0);

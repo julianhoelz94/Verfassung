@@ -20,8 +20,3 @@ export function LocalizedTableRegion({ caption, id, children }: { caption?: stri
   const t = useTranslation();
   return <div className="legal-table-scroll" id={id} role="region" aria-label={caption || t(ui.remainingStatus.legalTable)} tabIndex={0}>{children}</div>;
 }
-
-export function LocalizedFootnoteBacklink({ href, index }: { href: string; index: number }) {
-  const t = useTranslation();
-  return <a href={href} aria-label={`${t(ui.editorDefaults.footnoteReference)} ${index}`}>{t({ en: 'Back to reference', de: 'Zurück zum Verweis' })}{index > 1 ? ` ${index}` : ''} ↑</a>;
-}

@@ -6,8 +6,8 @@
 
 1. Open **Countries** and select a country.
 2. Choose its constitution and the legal version you need.
-3. Follow the table of contents to a provision. Open its heading or choose **Full text** to show the wording.
-4. Check its effective date and status.
+3. Read the continuous document or follow the table of contents to a provision. The toolbar and visible contents stay accessible as you scroll.
+4. Open **Details** to inspect the exact publication, source, verification and related documents.
 
 ![Country page with constitutions and legal versions](https://raw.githubusercontent.com/wiki/julianhoelz94/Verfassung/media/reading-country-en.png)
 *Choose the constitution first, then its legal version.*
@@ -15,16 +15,26 @@
 ![Constitution reader with the table of contents](https://raw.githubusercontent.com/wiki/julianhoelz94/Verfassung/media/reading-text-en.png)
 *Move through the text while keeping its version context.*
 
+## Reader controls
+
+**Contents** hides or restores the navigation and remembers your choice. Its own scroll area keeps long lists usable. **Find in text** searches this document, including phrases across inline formatting; use the arrows or Enter/Shift+Enter to move between matches.
+
+**Compare** expands below the toolbar. Select the two publications with **From** and **To**, or swap them. Insertions and deletions show the actual selected texts. Move between changes or choose **Go to changed passage**; **Open full comparison** opens the complete side-by-side view. **Wiki** opens the published introduction and historical context in the same space. Only one of these panels is open at a time.
+
+**Reading preferences** changes text size, configured sentence layout and detail level. **Overview** offers collapsible headings; **Full text** is the initial view. These preferences leave the published wording, formatting, source line breaks and permanent text identities intact.
+
+Hover over or focus a footnote marker for a preview. Select it to open the floating bottom drawer without moving your reading position. Close it with **×**, Escape or an outside click. **Go to footnote** explicitly jumps to the note at the document's end; The stored footnote label remains unchanged. A single reference has a direct return link. For multiple references, one return link opens a choice of the referring passages.
+
 ## Search, compare or follow history
 
 | Task | Start here |
 | --- | --- |
 | Find a passage | **Search**, enter a term and open a result. |
-| Compare texts | A country's **Compare** page, then select two versions. |
+| Compare texts | The reader’s **Compare** panel, or a country’s **Compare** page. |
 | Constitutional history | **History**: adoption, commencement, lifecycle events and legal changes in one timeline. |
 | Changes in law | **History**, optionally filter to **Amendments**. |
 
-Country, constitution and reading pages share **Overview** and **History** navigation. History combines constitution events and amendments in date order. Event labels identify each type; **Show events** optionally filters the same timeline. The centered horizontal line uses small markers for milestones. Hover over a marker or focus it with the keyboard to reveal its label; select it to show the details. On a touch screen, tap a marker. Escape closes the label. Events are grouped by year, with **Jump to year**, previous/next controls and a chronological list. Arrow keys move between milestones; Home/End select the first/last. Approximate dates stay marked and undated records appear separately.
+Country and constitution pages offer **Overview** and **History** navigation; the reader includes these links under **Details**. History combines constitution events and amendments in date order. Event labels identify each type; **Show events** optionally filters the same timeline. The centered horizontal line uses small markers for milestones. Hover over a marker or focus it with the keyboard to reveal its label; select it to show the details. On a touch screen, tap a marker. Escape closes the label. Events are grouped by year, with **Jump to year**, previous/next controls and a chronological list. Arrow keys move between milestones; Home/End select the first/last. Approximate dates stay marked and undated records appear separately.
 
 Search filters use jurisdiction, country, version and effective-date controls. Long lists offer an option search. Changing jurisdiction or country clears incompatible filters and explains the adjustment. **Apply filters** updates the address; remove an applied filter chip or choose **Clear filters** to broaden the search. On smaller screens, open **Filters** above the results. A jurisdiction selection searches that jurisdiction's own constitutions; choose descendants separately. Saved unknown or retired version filters remain visible rather than silently broadening the search.
 
@@ -75,3 +85,13 @@ Use **About** for source and verification policy, **Impressum** for the publishe
 </details>
 
 [[Account guide|Account-Guide]] · [[Documentation home|Home]] · [[Deutsch|User-Guide-de]]
+
+## Copy text and permanent links
+
+Article, sentence and other passage links open the same constitution reader at the target passage. Existing article and unit URLs continue to work, including paragraph and sentence fragments. Source information stays in **Details** so the text remains in focus.
+
+Right-click the constitution text to open the copy menu. It offers the clicked unit and its ancestors, such as sentence, paragraph, article and constitution. Clicking a paragraph does not invent a sentence target. **Copy permalink** stays pinned to the published snapshot being read. **Copy original text** includes stored wording, literal note labels, tables and authored breaks, without interface controls. It copies the published original even when a translation is displayed.
+
+Shift+F10 opens the menu on a focused passage. Arrow keys move between items; Enter or Space selects one, and Escape dismisses it. The compact menu separates permalink actions from original-text actions with a divider. If clipboard access is unavailable, a selectable copy field appears. Separate permalink icons are no longer needed in the text.
+
+Each footnote has one **↑** return control. Hover over it or focus it to see its label. It jumps straight to a single reference; for shared notes it opens a menu of reference locations.

@@ -22,7 +22,10 @@
   margin: 0 0 var(--space-1);
 }
 .title {
-  font-weight: 700;
+  font-family: var(--font-heading);
+  font-weight: var(--weight-heading);
+  letter-spacing: -0.025em;
+  line-height: var(--leading-tight);
   margin: 0;
 }
 

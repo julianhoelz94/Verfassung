@@ -27,7 +27,7 @@ export async function proxy(request: NextRequest) {
     }
   }
 
-  if (path.startsWith('/constitutions/') || path.startsWith('/comparisons') || path === '/legacy' || path === '/search' || path === '/jurisdictions' || path.startsWith('/jurisdictions/') || path.startsWith('/countries/') || path.startsWith('/documents/') || path.startsWith('/versions/')) {
+  if (path.startsWith('/api/reader/') || path.startsWith('/constitutions/') || path.startsWith('/comparisons') || path === '/legacy' || path === '/search' || path === '/jurisdictions' || path.startsWith('/jurisdictions/') || path.startsWith('/countries/') || path.startsWith('/documents/') || path.startsWith('/versions/')) {
     const policy = await requestAnonymousBrowsingPolicy().catch(() => null);
     if (!policy?.allowed) {
       const token = request.cookies.get('ca_session')?.value;
@@ -40,7 +40,9 @@ export async function proxy(request: NextRequest) {
           authenticated = response.ok;
         } catch { /* A failed identity check cannot open browsing. */ }
       }
-      if (!authenticated) return NextResponse.redirect(new URL('/', request.url));
+      if (!authenticated) return path.startsWith('/api/reader/')
+        ? NextResponse.json({ code: 'browsing_requires_sign_in' }, { status: 403, headers: { 'Cache-Control': 'private, no-store' } })
+        : NextResponse.redirect(new URL('/', request.url));
     }
   }
   // An HTTP redirect preserves fragments on saved constitution-history URLs.

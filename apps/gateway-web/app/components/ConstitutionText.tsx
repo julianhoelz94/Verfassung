@@ -4,7 +4,7 @@ import { linkifyReferences, type CrossRefContext } from '../../lib/crossrefs';
 import { articleHeading, effectiveDisplayKind, groupNodes, kindByCode, nodeHeading } from '../../lib/outline';
 import { orderedText } from '../../lib/ordered-content';
 import { NodeTitleForm } from './NodeTitleForm';
-import { LocalizedTitle, LocalizedTableRegion, LocalizedFootnoteBacklink } from './LocalizedRegion';
+import { LocalizedTitle, LocalizedTableRegion } from './LocalizedRegion';
 import { ui } from '../../lib/messages';
 import { migrationUi } from '../../lib/migration-messages';
 import { T } from './TranslationProvider';
@@ -12,6 +12,7 @@ import { FootnoteMarker, FootnoteProvider } from './Footnotes';
 import { footnoteItems, type FootnoteItem } from '../../lib/footnotes';
 import { InlineText } from './InlineText';
 import documentStyles from './ConstitutionDocument.module.css';
+import { FootnoteBacklinks } from './FootnoteBacklinks';
 
 export type ConstitutionCrossRefs = Omit<CrossRefContext, 'kindLabel'> & { unitsByLogicalId?: Record<string, { rootId: string; occurrenceId: string }>; footnotes?: FootnoteItem[] };
 
@@ -32,6 +33,7 @@ type ConstitutionTextProps = {
   lang?: string;
   crossRefs?: ConstitutionCrossRefs;
   hideFootnotes?: boolean;
+  renderNode?: (node: OrderedNode, element: OrderedNodeElement) => ReactNode;
 };
 
 /** Keep configured heading order while giving an article's descriptive title less emphasis. */
@@ -60,6 +62,7 @@ export function ConstitutionText({
   lang,
   crossRefs,
   hideFootnotes = false,
+  renderNode,
 }: ConstitutionTextProps) {
   const Heading = headingLevel;
   const children = nodes ?? (article && 'children' in article ? article.children : undefined);
@@ -77,14 +80,14 @@ export function ConstitutionText({
   return (
     <div className={`constitution-text text-column ${documentStyles.text}${showHeading && article ? ' ' + documentStyles.article : ''}`} lang={lang} id={rootAnchor && article && 'id' in article && typeof article.id === 'string' ? article.id : undefined}>
       {showHeading && article && rootHeading ? (
-        <Heading id={`${headingIdPrefix}-${article.articleNumber}`}>
+        <Heading className={documentStyles.articleHeading} id={`${headingIdPrefix}-${article.articleNumber}`}>
           <ConstitutionArticleHeading article={{ ...article, kind: 'kind' in article ? article.kind : undefined }} outline={outline} />
         </Heading>
       ) : null}
       {article && rootKind?.showLabel && rootKind.labelPlacement === 'inline' ? <span className="num">{article.articleNumber}</span> : null}
       {article && rootKind?.showLabel && rootKind.labelPlacement === 'superscript' ? <sup className="num">{article.articleNumber}</sup> : null}
       {entries !== undefined || article?.content != null ? (
-        <OrderedContentTree entries={entries ?? article?.content ?? []} outline={outline} withRefs={withRefs} canEditTitles={canEditTitles} returnTo={returnTo} crossRefs={crossRefs} hideFootnotes={hideFootnotes} />
+        <OrderedContentTree entries={entries ?? article?.content ?? []} outline={outline} withRefs={withRefs} canEditTitles={canEditTitles} returnTo={returnTo} crossRefs={crossRefs} hideFootnotes={hideFootnotes} renderNode={renderNode} />
       ) : children && children.length > 0 ? (
         <NodeTree
           nodes={children}
@@ -123,7 +126,7 @@ export function NodeTree({
             {group.nodes.map((node, nodeIndex) => {
               const kind = effectiveDisplayKind(kindByCode(outline, node.kind));
               const label = node.label ?? node.number;
-              return <span key={node.id}>{nodeIndex > 0 ? ' ' : null}
+              return <span key={node.id} id={node.id} tabIndex={-1}>{nodeIndex > 0 ? ' ' : null}
                 {kind?.showLabel && label && kind.labelPlacement === 'superscript' ? <sup className="num">{label}</sup> : null}
                 {kind?.showLabel && label && kind.labelPlacement === 'inline' ? <span className="num">{label}</span> : null}
                 {withRefs(node.body?.trim() ?? '')}
@@ -162,7 +165,7 @@ function SectionNode({
   const heading = nodeHeading(kind, node);
   const label = node.label ?? node.number ?? kind?.displayLabel ?? node.kind;
   return (
-    <section className={`node-block node-kind-${node.kind}`}>
+    <section id={node.id} tabIndex={-1} className={`node-block node-kind-${node.kind}`}>
       {heading ? <p className="node-heading">{heading}</p> : null}
       {canEditTitles && returnTo ? (
         <NodeTitleForm nodeId={node.id} title={node.title} label={label} returnTo={returnTo} />
@@ -299,7 +302,7 @@ export function OrderedContentTree({ entries, outline, withRefs = (text) => text
     const entry = group.entries[0]!;
     if (entry.type === 'text' && entry.format === 'table' && entry.table) return <LocalizedTableRegion key={entry.occurrenceId ?? entry.logicalId ?? index} id={entry.occurrenceId ? `${idPrefix}${entry.occurrenceId}` : undefined} caption={entry.table.caption}><table className="legal-table">{entry.table.caption ? <caption>{renderTableCaption ? renderTableCaption(entry) : entry.table.caption}</caption> : null}<tbody>{entry.table.rows.map(row => <tr key={row.logicalId}>{row.cells.map(cell => cell.header ? <th key={cell.logicalId} id={`${idPrefix}cell-${cell.logicalId}`} scope="col" rowSpan={cell.rowSpan ?? 1} colSpan={cell.colSpan ?? 1}>{renderTableCell ? renderTableCell(cell, entry) : cell.text}</th> : <td key={cell.logicalId} id={`${idPrefix}cell-${cell.logicalId}`} headers={cell.headers?.map(id => `${idPrefix}cell-${id}`).join(' ') || undefined} rowSpan={cell.rowSpan ?? 1} colSpan={cell.colSpan ?? 1}>{renderTableCell ? renderTableCell(cell, entry) : cell.text}</td>)}</tr>)}</tbody></table></LocalizedTableRegion>;
     if (entry.type === 'text' && entry.format === 'footnote') {
-      const element = <aside id={entry.occurrenceId ? `${idPrefix}fn-${entry.occurrenceId}` : undefined} className={`legal-footnote ${documentStyles.note}`} role="note"><span className={documentStyles.noteLabel}>{entry.footnoteLabel ?? '*'}</span><div className={documentStyles.noteBody}>{entry.annotation ? <p className={documentStyles.annotation}><strong><T value={entry.annotation.kind === 'editorial' ? migrationUi.editorial : entry.annotation.kind === 'amendment' ? migrationUi.amendment : migrationUi.sourceAnnotation} /></strong>{entry.annotation.attribution ? <> · {entry.annotation.attribution}</> : null}{entry.annotation.sourceUrl?.startsWith('https://') ? <> · <a href={entry.annotation.sourceUrl}><T value={migrationUi.source} /></a></> : null}</p> : null}<span id={entry.occurrenceId ? idPrefix + entry.occurrenceId : undefined}>{renderText ? renderText(entry) : richText(entry)}</span> {(entry.logicalId ? backlinks.get(entry.logicalId) : undefined)?.map((id, linkIndex) => <LocalizedFootnoteBacklink key={id} href={`#${backlinkIdPrefix ?? idPrefix}ref-${id}`} index={linkIndex + 1} />)}</div>{footnoteActions ? <span className={documentStyles.noteActions}>{footnoteActions(entry)}</span> : null}</aside>;
+      const element = <aside id={entry.occurrenceId ? `${idPrefix}fn-${entry.occurrenceId}` : undefined} className={`legal-footnote ${documentStyles.note}`} role="note"><span className={documentStyles.noteLabel}>{entry.footnoteLabel ?? '*'}</span><div className={documentStyles.noteBody}>{entry.annotation ? <p className={documentStyles.annotation}><strong><T value={entry.annotation.kind === 'editorial' ? migrationUi.editorial : entry.annotation.kind === 'amendment' ? migrationUi.amendment : migrationUi.sourceAnnotation} /></strong>{entry.annotation.attribution ? <> · {entry.annotation.attribution}</> : null}{entry.annotation.sourceUrl?.startsWith('https://') ? <> · <a href={entry.annotation.sourceUrl}><T value={migrationUi.source} /></a></> : null}</p> : null}<span id={entry.occurrenceId ? idPrefix + entry.occurrenceId : undefined}>{renderText ? renderText(entry) : richText(entry)}</span> {entry.logicalId ? <FootnoteBacklinks noteId={entry.logicalId} referenceIds={backlinks.get(entry.logicalId) ?? []} idPrefix={backlinkIdPrefix ?? idPrefix} /> : null}</div>{footnoteActions ? <span className={documentStyles.noteActions}>{footnoteActions(entry)}</span> : null}</aside>;
       return <Fragment key={entry.occurrenceId ?? entry.logicalId ?? index}>{renderFootnote ? renderFootnote(entry, element) : element}</Fragment>;
     }
     if (entry.type === 'text') return <p key={entry.occurrenceId ?? entry.logicalId ?? index} className="constitution-body">{group.entries.map((part, partIndex) => <span key={part.occurrenceId ?? part.logicalId ?? partIndex} id={part.occurrenceId ? `${idPrefix}${part.occurrenceId}` : undefined}><AuthoredBreaks count={part.lineBreaksBefore} structuralBreak={suppressLeadingBreaks && index === 0 && partIndex === 0} />{renderText && !part.references?.length ? renderText(part) : richText(part)}</span>)}</p>;

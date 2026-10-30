@@ -27,7 +27,7 @@
 
 .label {
   display: block;
-  font-weight: 600;
+  font-weight: var(--weight-ui-emphasis);
 }
 
 .description {

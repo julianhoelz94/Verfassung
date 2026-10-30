@@ -42,7 +42,7 @@ for (const story of roles) {
     await expect(page.getByRole('heading', { name: 'Editor', exact: true, level: 1 })).toBeVisible();
     const source = await publishedVersion(request);
     await page.goto(`/countries/${source.countryIso}/versions/${source.versionId}`);
-    await expect(page.getByRole('link', { name: 'Edit this constitution' })).toHaveCount(story.canEdit ? 1 : 0);
+    await expect(page.getByRole('button', { name: 'Edit this constitution' })).toHaveCount(story.canEdit ? 1 : 0);
     await page.goto('/admin/constitutions');
     if (story.admin) {
       await expect(page.getByRole('heading', { name: 'Constitutions', exact: true })).toBeVisible();

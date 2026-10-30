@@ -65,7 +65,9 @@ describe('reader presentation', () => {
     const linked = renderToStaticMarkup(createElement(ConstitutionFootnotes, { entries: [note], idPrefix: 'editor-', backlinkIdPrefix: '', indexedBacklinks: new Map([['note', ['marker']]]) }));
     expect(linked).toContain('id="editor-fn-note"');
     expect(linked).toContain('href="#ref-marker"');
-    expect(linked).toContain('Back to reference ↑');
+    expect(linked).toContain('aria-label="Back to reference"');
+    expect(linked).toContain('<span aria-hidden="true">↑</span>');
+    expect(linked.replace(/<[^>]*>/g, '')).not.toContain('Back to reference');
     const pending = renderToStaticMarkup(createElement(ConstitutionFootnotes, { entries: [note], idPrefix: 'editor-' }));
     expect(pending).not.toContain('Back to reference');
   });
@@ -76,7 +78,7 @@ describe('reader presentation', () => {
     ];
     const html = renderToStaticMarkup(createElement(TranslationProvider, { locale: 'de' }, createElement(OrderedContentTree, { entries: content, indexedBacklinks: new Map([['note', ['reference']]]) })));
     expect(html).toContain('aria-label="Rechtstabelle"');
-    expect(html).toContain('aria-label="Zurück zum Fußnotenverweis 1"');
+    expect(html).toContain('aria-label="Zurück zum Verweis"');
     expect(html).toContain('Original heading');
     expect(html).toContain('Original source note');
   });

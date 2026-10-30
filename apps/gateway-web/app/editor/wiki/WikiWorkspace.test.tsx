@@ -1,11 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { getWikiDraft, getWikiHistory, getWikiPage } from '../../../lib/api';
+import { getCountry, getWikiDraft, getWikiHistory, getWikiPage } from '../../../lib/api';
+import { getJurisdiction } from '../../../lib/migration-api';
 import { currentUser } from '../../../lib/session';
 import { ConstitutionWikiPanel, WikiWorkspace } from './WikiWorkspace';
 
 vi.mock('../../../lib/session', () => ({ currentUser: vi.fn(), requireSessionBearer: vi.fn().mockResolvedValue('Bearer staff') }));
-vi.mock('../../../lib/api', () => ({ getWikiDraft: vi.fn(), getWikiHistory: vi.fn(), getWikiPage: vi.fn() }));
+vi.mock('../../../lib/api', () => ({ getCountry: vi.fn(), getWikiDraft: vi.fn(), getWikiHistory: vi.fn(), getWikiPage: vi.fn() }));
+vi.mock('../../../lib/migration-api', () => ({ getJurisdiction: vi.fn() }));
 vi.mock('../../../lib/server-locale', () => ({ currentLocale: vi.fn().mockResolvedValue('en') }));
 vi.mock('next/navigation', () => ({ redirect: (url: string) => { throw new Error('redirect:'+url); }, notFound: () => { throw new Error('not-found'); } }));
 vi.mock('./actions', () => ({ saveWikiAction: vi.fn(), publishWikiAction: vi.fn() }));
@@ -18,6 +20,8 @@ beforeEach(() => {
   vi.mocked(currentUser).mockResolvedValue({ id: 'editor', email: 'editor@example.test', roles: ['editor'] });
   vi.mocked(getWikiDraft).mockResolvedValue(current as Awaited<ReturnType<typeof getWikiDraft>>);
   vi.mocked(getWikiPage).mockResolvedValue(null); vi.mocked(getWikiHistory).mockResolvedValue([]);
+  vi.mocked(getCountry).mockResolvedValue({ id: constitutionId, isoCode: 'XA', name: 'Example country', constitutions: [] });
+  vi.mocked(getJurisdiction).mockResolvedValue({ jurisdiction: { id: constitutionId, name: 'Former region', slug: 'former-region', kind: 'region', parentId: null, code: null, historical: true, existedFrom: null, existedUntil: '1900-01-01' }, ancestors: [], children: [], constitutions: [] });
 });
 
 describe('embedded constitution Wiki', () => {
@@ -59,5 +63,26 @@ describe('embedded constitution Wiki', () => {
     vi.mocked(getWikiDraft).mockClear();
     await expect(WikiWorkspace({ targetType: 'version', targetId: constitutionId, query: { code: 'XA' } })).rejects.toThrow('not-found');
     expect(getWikiDraft).not.toHaveBeenCalled();
+  });
+  it('opens a named wiki workspace for a historical jurisdiction without requiring a country code', async () => {
+    const html = renderToStaticMarkup(await WikiWorkspace({ targetType: 'jurisdiction', targetId: constitutionId, query: {} }));
+    const host = document.createElement('div'); host.innerHTML = html;
+    expect(host.querySelector('h1')?.textContent).toBe('Edit wiki · Former region');
+    expect(host.querySelector('[name=targetType]')?.getAttribute('value')).toBe('jurisdiction');
+    expect(host.querySelector('a[href*="?wiki=1"]')?.getAttribute('href')).toBe(`/jurisdictions/${constitutionId}?wiki=1`);
+    expect(getWikiDraft).toHaveBeenLastCalledWith('jurisdiction', constitutionId, 'Bearer staff');
+  });
+  it('preserves a country wiki owner and rejects a conflicting country id', async () => {
+    const html = renderToStaticMarkup(await WikiWorkspace({ targetType: 'country', targetId: constitutionId, query: { code: 'XA' } }));
+    expect(html).toContain('Edit wiki · Example country');
+    expect(html).toContain('/countries/XA?wiki=1');
+    await expect(WikiWorkspace({ targetType: 'country', targetId: 'different-country', query: { code: 'XA' } })).rejects.toThrow('not-found');
+  });
+  it('lets a reviewer inspect a jurisdiction draft without save or publish controls', async () => {
+    vi.mocked(currentUser).mockResolvedValue({ id: 'reviewer', email: 'reviewer@example.test', roles: ['reviewer'] });
+    const html = renderToStaticMarkup(await WikiWorkspace({ targetType: 'jurisdiction', targetId: constitutionId, query: {} }));
+    expect(html).toContain('Review wiki · Former region');
+    expect(html).toContain('A paragraph about the constitution.');
+    expect(html).not.toContain('Save Wiki draft'); expect(html).not.toContain('Publish page');
   });
 });

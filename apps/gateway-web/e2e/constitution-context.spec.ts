@@ -10,7 +10,7 @@ test.beforeEach(async ({ request }) => {
 
 test('visitor reads sourced country and constitution context with dated lifecycle', async ({ page }) => {
   await page.goto('/countries/DE');
-  await page.getByRole('button', { name: 'Background', exact: true }).click();
+  await page.getByRole('button', { name: 'Wiki', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'About Germany' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Source 1' })).toHaveAttribute('href', 'https://example.org/country-history');
   await expect(page.getByRole('heading', { name: 'History' })).toBeVisible();

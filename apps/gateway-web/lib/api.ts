@@ -142,9 +142,11 @@ export type WikiImage = {
   placement?: 'before_body' | 'after_body';
 };
 
+export type WikiTargetType = 'country' | 'constitution' | 'jurisdiction';
+
 export type WikiPageRevision = {
   id: string;
-  targetType: 'country' | 'constitution';
+  targetType: WikiTargetType;
   targetId: string;
   predecessorId: string | null;
   summary: string;
@@ -469,19 +471,19 @@ export function appendProvisionLifecycle(
   );
 }
 
-export function getWikiPage(targetType: 'country' | 'constitution', targetId: string): Promise<WikiPageRevision | null> {
+export function getWikiPage(targetType: WikiTargetType, targetId: string): Promise<WikiPageRevision | null> {
   return readJson<WikiPageRevision>(`${catalogBaseUrl()}/wiki/${targetType}/${encodeURIComponent(targetId)}`, 'catalog');
 }
 
-export function getWikiDraft(targetType: 'country' | 'constitution', targetId: string, authorization: string): Promise<WikiPageRevision | null> {
+export function getWikiDraft(targetType: WikiTargetType, targetId: string, authorization: string): Promise<WikiPageRevision | null> {
   return readJson<WikiPageRevision>(`${catalogBaseUrl()}/wiki/${targetType}/${encodeURIComponent(targetId)}/draft`, 'catalog', authorization);
 }
 
-export async function getWikiHistory(targetType: 'country' | 'constitution', targetId: string, authorization: string, page = 0): Promise<WikiPageRevision[]> {
+export async function getWikiHistory(targetType: WikiTargetType, targetId: string, authorization: string, page = 0): Promise<WikiPageRevision[]> {
   return (await readJson<WikiPageRevision[]>(`${catalogBaseUrl()}/wiki/${targetType}/${encodeURIComponent(targetId)}/history?limit=26&offset=${page * 25}`, 'catalog', authorization)) ?? [];
 }
 
-export function saveWikiDraft(targetType: 'country' | 'constitution', targetId: string, payload: {
+export function saveWikiDraft(targetType: WikiTargetType, targetId: string, payload: {
   expectedRevisionId: string | null;
   summary: string;
   body: string;
@@ -491,7 +493,7 @@ export function saveWikiDraft(targetType: 'country' | 'constitution', targetId: 
   return sendJson<WikiPageRevision>(`${catalogBaseUrl()}/wiki/${targetType}/${encodeURIComponent(targetId)}/draft`, 'catalog', 'PUT', payload, authorization);
 }
 
-export function publishWikiPage(targetType: 'country' | 'constitution', targetId: string, revisionId: string, authorization: string): Promise<WikiPageRevision> {
+export function publishWikiPage(targetType: WikiTargetType, targetId: string, revisionId: string, authorization: string): Promise<WikiPageRevision> {
   return sendJson<WikiPageRevision>(`${catalogBaseUrl()}/wiki/${targetType}/${encodeURIComponent(targetId)}/publish`, 'catalog', 'POST', { revisionId }, authorization);
 }
 

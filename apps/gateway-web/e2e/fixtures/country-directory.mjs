@@ -32,6 +32,27 @@ export function countryDirectoryFixtures(country) {
       versions.set(value.id, { ...value, constitutionId: constitution.id, jurisdictionId: owner, countryCode: owner ? null : 'DE', publicationStatus: 'published' });
     }
   }
+  let wikiSequence = 1;
+  const wikiRecords = new Map();
+  const wikiId = () => '07900000-0000-4000-8000-' + String(wikiSequence++).padStart(12, '0');
+  function addWiki(type, id, summary, body, sourceUrls = []) {
+    const page = summary ? { id: wikiId(), targetType: type, targetId: id, predecessorId: null, summary, body, sourceUrls, images: [], createdAt: '2022-01-01T00:00:00Z', createdBy: '01900000-0000-4000-8000-000000000101', publishedAt: '2022-01-02T00:00:00Z' } : null;
+    wikiRecords.set(type + ':' + id, { published: page, revisions: page ? [page] : [] });
+  }
+  addWiki('country', country.id, 'A federal republic', '# History\n\nHistorical context', ['https://example.org/country-history']);
+  addWiki('jurisdiction', region.id, 'Regional constitutional context', 'Published background for Example Region.', ['https://example.org/regional-history']);
+  addWiki('jurisdiction', former.id, 'A former province', 'Published background for the former province.', ['https://example.org/former-province']);
+  addWiki('jurisdiction', city.id);
+  for (const constitution of [...country.constitutions, national, regional, historic, provincial, municipal]) {
+    addWiki('constitution', constitution.id, constitution === country.constitutions[0] ? 'The Basic Law' : undefined, 'Constitutional context', ['https://example.org/basic-law']);
+  }
+  function wikiMatch(pathname) {
+    const match = /^\/api\/catalog\/wiki\/(country|constitution|jurisdiction)\/([^/]+)(?:\/(draft|history|publish))?$/.exec(pathname);
+    if (!match) return null;
+    const kind = match[1] === 'jurisdiction' && match[2] === country.id ? 'country' : match[1];
+    const record = wikiRecords.get(kind + ':' + match[2]);
+    return record ? { record, kind, targetId: match[2], action: match[3] } : null;
+  }
   function units(snapshot) {
     const corrected = snapshot.id === correction.id;
     const text = snapshot.id === regionOld.id ? 'Regional rights are protected.' : corrected ? 'Regional rights are protected equally. Corrected spelling.' : 'Regional rights are protected equally.';
@@ -39,6 +60,29 @@ export function countryDirectoryFixtures(country) {
     return [{ id: '07500000-0000-4000-8000-' + snapshot.id.slice(-12), logicalId, versionId: snapshot.id, kind: 'article', articleNumber: '1', label: '1', title: 'Regional rights', sortOrder: 1, body: text, children: [], content: [{ type: 'text', logicalId: '07400000-0000-4000-8000-000000000002', revisionId: snapshot.id, occurrenceId: '07600000-0000-4000-8000-' + snapshot.id.slice(-12), text }] }];
   }
   return { region, former, city, regional, historic, national, regionOld, regionNew, correction, nationalEvents: lifecycle.get(national.id),
+    matchesWiki: pathname => Boolean(wikiMatch(pathname)),
+    wikiResponse(method, pathname, payload, authorized) {
+      const match = wikiMatch(pathname);
+      if (!match) return undefined;
+      const { record, kind, targetId, action } = match;
+      if (method === 'GET' && !action) return { status: 200, body: record.published };
+      if (!authorized) return { status: 401, body: { error: 'Unauthorized' } };
+      const latest = record.revisions[0] ?? null;
+      if (method === 'GET' && action === 'draft') return { status: 200, body: latest };
+      if (method === 'GET' && action === 'history') return { status: 200, body: record.revisions };
+      if (method === 'PUT' && action === 'draft') {
+        if (payload.expectedRevisionId !== (latest?.id ?? null)) return { status: 409, body: { error: 'wiki_revision_conflict' } };
+        const next = { ...latest, ...payload, id: wikiId(), targetType: kind, targetId, predecessorId: latest?.id ?? null, images: payload.images ?? [], sourceUrls: payload.sourceUrls ?? [], createdAt: '2026-01-01T00:00:00Z', createdBy: '01900000-0000-4000-8000-000000000101', publishedAt: null };
+        record.revisions.unshift(next);
+        return { status: 200, body: next };
+      }
+      if (method === 'POST' && action === 'publish') {
+        if (!latest || payload.revisionId !== latest.id) return { status: 409, body: { error: 'wiki_revision_conflict' } };
+        latest.publishedAt = '2026-01-02T00:00:00Z'; record.published = latest;
+        return { status: 200, body: latest };
+      }
+      return { status: 405, body: { error: 'Method not allowed' } };
+    },
     response(pathname, unavailable = []) {
       if (pathname === '/api/catalog/countries/DE') return { status: 200, body: countryData };
       const jurisdictionMatch = /^\/api\/catalog\/jurisdictions\/([^/]+)$/.exec(pathname);

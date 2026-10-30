@@ -182,20 +182,47 @@ test('partial regional failure keeps national and other regional collections rea
   await expect(page.getByText('No regional constitutions are published yet.')).toHaveCount(0);
 });
 
-test('background and authorized country tools remain discoverable', async ({ page }) => {
+test('Wiki and authorized country tools remain discoverable', async ({ page }) => {
   await page.goto('/countries/DE');
   await expect(page.getByRole('heading', { name: 'About Germany' })).toBeHidden();
-  await page.getByRole('button', { name: 'Background', exact: true }).click();
+  await page.getByRole('button', { name: 'Wiki', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'About Germany' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Source 1' })).toHaveAttribute('href', 'https://example.org/country-history');
-  await expect(page.getByRole('link', { name: 'Edit country page' })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'Edit wiki' })).toHaveCount(0);
   await signInAdmin(page);
   await page.goto('/countries/DE');
-  await page.getByRole('button', { name: 'Background', exact: true }).click();
-  await expect(page.getByRole('link', { name: 'Edit country page' })).toBeVisible();
+  await page.getByRole('button', { name: 'Wiki', exact: true }).click();
+  await expect(page.getByRole('link', { name: 'Edit wiki' })).toBeVisible();
   const national = page.getByRole('article', { name: 'Basic Law for the Federal Republic of Germany' });
   await national.getByText('Structure and editorial details', { exact: true }).click();
   await expect(national.getByRole('link', { name: 'Record lifecycle event' })).toBeVisible();
+});
+
+test('country and regional Wiki panels expose an explicit editor and keep drafts private until publication', async ({ page, request }) => {
+  await signInAdmin(page);
+  for (const [path, type, id, name] of [
+    ['/countries/DE', 'country', '01900000-0000-4000-8000-000000000001', 'Germany'],
+    [`/jurisdictions/${regionId}`, 'jurisdiction', regionId, 'Example Region'],
+    [`/jurisdictions/${formerId}`, 'jurisdiction', formerId, 'Former Province'],
+    ['/jurisdictions/07100000-0000-4000-8000-000000000003', 'jurisdiction', '07100000-0000-4000-8000-000000000003', 'Nested City'],
+  ]) {
+    await page.goto(path);
+    await page.getByRole('button', { name: 'Wiki', exact: true }).click();
+    await page.getByRole('link', { name: 'Edit wiki', exact: true }).click();
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText(`Edit wiki · ${name}`);
+    await page.getByLabel('Short description', { exact: true }).fill(`Updated wiki for ${name}`);
+    await page.getByLabel('Page text', { exact: true }).fill(`Private draft for ${name}`);
+    await page.getByRole('button', { name: 'Save Wiki draft', exact: true }).click();
+    await expect(page.getByRole('status').filter({ hasText: 'Draft saved' })).toBeVisible();
+    const publicBefore = await (await request.get(`${mockOrigin}/api/catalog/wiki/${type}/${id}`)).json();
+    expect(publicBefore?.body).not.toBe(`Private draft for ${name}`);
+    expect((await request.get(`${mockOrigin}/api/catalog/wiki/${type}/${id}/draft`)).status()).toBe(401);
+    await page.getByRole('button', { name: 'Publish page', exact: true }).click();
+    await expect(page.getByRole('status').filter({ hasText: 'Page published' })).toBeVisible();
+    await page.getByRole('link', { name: 'View public page', exact: true }).click();
+    await expect(page).toHaveURL(`${path}?wiki=1`);
+    await expect(page.getByRole('region', { name: 'Wiki', exact: true })).toContainText(`Private draft for ${name}`);
+  }
 });
 
 test.describe('German country directory', () => {

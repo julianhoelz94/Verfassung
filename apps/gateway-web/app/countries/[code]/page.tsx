@@ -18,14 +18,11 @@ import { ServiceUnavailable } from '../../components/StatusMessage';
 import { ConstitutionGroups } from '../../components/ConstitutionGroups';
 import { ConstitutionDirectoryFrame } from '../../components/ConstitutionDirectoryFrame';
 import type { PageContentsItem } from '../../components/layout/PageChrome';
-import { ContentTranslationRegion } from '../../components/ContentTranslationRegion';
-import { WikiImages } from '../../components/WikiImages';
-import { WikiBody } from '../../components/WikiBody';
-import { WikiSources } from '../../components/WikiSources';
 import { T } from '../../components/TranslationProvider';
+import { DirectoryWiki } from '../../components/DirectoryWiki';
 import styles from '../../components/CountryDirectory.module.css';
 
-type Props = { params: Promise<{ code: string }> };
+type Props = { params: Promise<{ code: string }>; searchParams?: Promise<{ wiki?: string }> };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { code } = await params;
@@ -33,16 +30,18 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return country ? pageMetadata({ title: atlasTitle(country.name), description: metaDescription(`Browse constitutions and versions for ${country.name}.`), path: `/countries/${country.isoCode}` }) : { title: atlasTitle('Country') };
 }
 
-export default async function CountryPage({ params }: Props) {
+export default async function CountryPage({ params, searchParams }: Props) {
   const { code } = await params;
   let country: CountryDetail | null;
   try { country = await getCountry(code); } catch {
     return <CollectionPage width="content"><ServiceUnavailable service={ui.services.catalog} retryHref={`/countries/${code}`} /></CollectionPage>;
   }
   if (!country) notFound();
-  const [wiki, collections, user, locale] = await Promise.all([
-    getWikiPage('country', country.id).catch(() => null), loadRegionalCollections(country.id), currentUser(), currentLocale(),
+  const [wikiResult, collections, user, locale] = await Promise.all([
+    getWikiPage('country', country.id).then(page => ({ page, unavailable: false })).catch(() => ({ page: null, unavailable: true })), loadRegionalCollections(country.id), currentUser(), currentLocale(),
   ]);
+  const wiki = wikiResult.page;
+  const query = await searchParams;
   const editorial = Boolean(user && canVisitEditor(user.roles));
   const publisher = Boolean(user?.roles.some(role => role === 'publisher' || role === 'admin'));
   const owner = countryOwner(country);
@@ -59,14 +58,10 @@ export default async function CountryPage({ params }: Props) {
     { id: 'national-constitutions', href: '#national-constitutions', label: message(locale, directoryUi.national), children: constitutionItems(country.constitutions, 'historical-national') },
     { id: 'regional-constitutions', href: '#regional-constitutions', label: message(locale, directoryUi.regional), children: collections.regions.map(({ detail }) => ({ id: `region-${detail.jurisdiction.id}`, href: `#region-${detail.jurisdiction.id}`, label: detail.jurisdiction.name, children: constitutionItems(detail.constitutions, `historical-${detail.jurisdiction.id}`, true) })) },
   ];
-  const background = wiki || editorial ? <>
-    <h2><T value={ui.countries.code.page.about} /> {country.name}</h2>
-    {wiki ? <><ContentTranslationRegion sourceLanguage="auto"><p data-translate-content>{wiki.summary}</p><WikiImages images={wiki.images.filter(image => image.placement === 'before_body')} /><WikiBody body={wiki.body} /></ContentTranslationRegion><WikiImages images={wiki.images.filter(image => image.placement !== 'before_body')} /><WikiSources sourceUrls={wiki.sourceUrls ?? []} /></> : null}
-    {editorial ? <p><a href={`/editor/wiki/country/${country.id}?code=${country.isoCode}`}><T value={ui.countries.code.page.editCountryPage} /></a></p> : null}
-  </> : undefined;
+  const background = <DirectoryWiki targetType="country" targetId={country.id} name={country.name} code={country.isoCode} page={wiki} unavailable={wikiResult.unavailable} canEdit={user?.roles.some(role => role === 'editor' || role === 'admin')} canReview={user?.roles.some(role => role === 'publisher' || role === 'reviewer')} />;
   return <FullWidthPage template="collection"><div className={styles.directory}>
     <PageBreadcrumbs><Breadcrumbs items={[{ href: '/', label: message(locale, ui.nav.countries) }, { label: country.name }]} /></PageBreadcrumbs>
-    <ConstitutionDirectoryFrame background={background} contents={contents}>
+    <ConstitutionDirectoryFrame background={background} contents={contents} wikiOpen={query?.wiki === '1'}>
       <header className={styles.header}><p className={styles.eyebrow}><T value={directoryUi.country} /> · {country.isoCode}</p><h1>{country.name}</h1>
         <p className={styles.meta}><span>{allConstitutions.length} <T value={allConstitutions.length === 1 ? ui.remainingStatus.constitutionSingular : ui.remainingStatus.constitutionPlural} /></span><span>{versionCount} <T value={versionCount === 1 ? ui.remainingStatus.versionSingular : ui.remainingStatus.versionPlural} /></span><span>{collections.regions.length} <T value={collections.regions.length === 1 ? directoryUi.regionSingular : directoryUi.regionPlural} /></span></p>
         {wiki?.summary ? <p className={styles.summary}>{wiki.summary}</p> : null}

@@ -38,6 +38,8 @@ Das Entfernen eines Zeichens erhält den Fußnotentext. Vor dem Speichern benöt
 
 **Wiki** bearbeitet die Hintergrundseite unabhängig vom Verfassungstext. Kurzbeschreibung und Seitentext bleiben sichtbar; Quellen, Bilder und Revisionsgeschichte öffnen sich bei Bedarf. Der Wiki-Entwurf wird getrennt gespeichert und durch einen Herausgeber veröffentlicht. **Details** bearbeitet den Titel und unter Erweitert den URL-Namen; alte Adressen bleiben als Aliase erhalten. Fakten zur Fassung sind schreibgeschützt. Quellenkorrekturen, Struktureinstellungen und Lebenszyklusereignisse behalten ihre eigenen Arbeitsabläufe. Speichern Sie offene Text- und Veröffentlichungsangaben vor einem Wechsel in einen solchen Ablauf.
 
+Auf Länder-, Regional- und historischen Gebietsseiten öffnen Sie **Wiki → Wiki bearbeiten**. Der benannte Arbeitsbereich enthält Kurzbeschreibung, Text, Quellen, Bilder und Revisionsgeschichte. Der gespeicherte Entwurf bleibt privat. **Wiki prüfen** ermöglicht Prüfern/Herausgebern die Vorschau; ein berechtigter Herausgeber/Admin veröffentlicht die ausgewählte Revision. **Öffentliche Seite ansehen** führt mit geöffnetem Wiki zurück. Verfassungs-Wikis behalten ihren Einstieg im Verfassungseditor. Wiki und Verfassungstext werden getrennt veröffentlicht.
+
 ## 2. Prüfen
 
 **Erforderlich: Prüfer oder Administrator.**

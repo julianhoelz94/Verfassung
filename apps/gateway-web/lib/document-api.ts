@@ -30,7 +30,7 @@ export type DocumentLink = {
 
 export type DocumentLinkEvent = {
   id: string;
-  targetType: 'constitution' | 'version' | 'amendment' | 'country_wiki' | 'constitution_wiki';
+  targetType: 'constitution' | 'version' | 'amendment' | 'country_wiki' | 'constitution_wiki' | 'jurisdiction_wiki';
   targetId: string;
   documentId: string;
   revisionId: string | null;
@@ -101,19 +101,19 @@ function scopeQuery(scopeRevisionId?: string | null): string {
   return scopeRevisionId ? `?scopeRevisionId=${encodeURIComponent(scopeRevisionId)}` : '';
 }
 
-export function listDocumentLinks(targetType: 'constitution' | 'version' | 'amendment' | 'country_wiki' | 'constitution_wiki', targetId: string, scopeRevisionId?: string | null, authorization?: string): Promise<DocumentLink[]> {
+export function listDocumentLinks(targetType: 'constitution' | 'version' | 'amendment' | 'country_wiki' | 'constitution_wiki' | 'jurisdiction_wiki', targetId: string, scopeRevisionId?: string | null, authorization?: string): Promise<DocumentLink[]> {
   return request(`/links/${targetType}/${encodeURIComponent(targetId)}${scopeQuery(scopeRevisionId)}`, authorization ? { headers: { Authorization: authorization } } : {});
 }
 
-export function listDocumentLinkEvents(targetType: 'constitution' | 'version' | 'amendment' | 'country_wiki' | 'constitution_wiki', targetId: string, authorization: string, scopeRevisionId?: string | null): Promise<DocumentLinkEvent[]> {
+export function listDocumentLinkEvents(targetType: 'constitution' | 'version' | 'amendment' | 'country_wiki' | 'constitution_wiki' | 'jurisdiction_wiki', targetId: string, authorization: string, scopeRevisionId?: string | null): Promise<DocumentLinkEvent[]> {
   return request(`/links/${targetType}/${encodeURIComponent(targetId)}/events${scopeQuery(scopeRevisionId)}`, { headers: { Authorization: authorization } });
 }
 
-export function attachDocument(targetType: 'constitution' | 'version' | 'amendment' | 'country_wiki' | 'constitution_wiki', targetId: string, documentId: string, revisionId: string | null, authorization: string, scopeRevisionId?: string | null): Promise<DocumentLink[]> {
+export function attachDocument(targetType: 'constitution' | 'version' | 'amendment' | 'country_wiki' | 'constitution_wiki' | 'jurisdiction_wiki', targetId: string, documentId: string, revisionId: string | null, authorization: string, scopeRevisionId?: string | null): Promise<DocumentLink[]> {
   return request(`/links/${targetType}/${encodeURIComponent(targetId)}`, json(authorization, 'POST', { documentId, revisionId, scopeRevisionId }));
 }
 
-export function detachDocument(targetType: 'constitution' | 'version' | 'amendment' | 'country_wiki' | 'constitution_wiki', targetId: string, documentId: string, authorization: string, scopeRevisionId?: string | null): Promise<DocumentLink[]> {
+export function detachDocument(targetType: 'constitution' | 'version' | 'amendment' | 'country_wiki' | 'constitution_wiki' | 'jurisdiction_wiki', targetId: string, documentId: string, authorization: string, scopeRevisionId?: string | null): Promise<DocumentLink[]> {
   return request(`/links/${targetType}/${encodeURIComponent(targetId)}/${encodeURIComponent(documentId)}${scopeQuery(scopeRevisionId)}`, {
     method: 'DELETE', headers: { Authorization: authorization },
   });

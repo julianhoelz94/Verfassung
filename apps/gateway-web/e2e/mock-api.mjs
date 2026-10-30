@@ -372,6 +372,11 @@ const server = createServer(async (req, res) => {
     directoryUnavailable = (await readBody(req)).unavailable ?? [];
     json(res, 200, { ok: true }); return;
   }
+  if (directoryScenario?.matchesWiki(pathname)) {
+    const payload = method === 'PUT' || method === 'POST' ? await readBody(req) : null;
+    const response = directoryScenario.wikiResponse(method, pathname, payload, Boolean(req.headers.authorization));
+    json(res, response.status, response.body); return;
+  }
   if (method === 'GET' && directoryScenario) {
     const response = directoryScenario.response(pathname, directoryUnavailable);
     if (response) { json(res, response.status, response.body); return; }

@@ -58,7 +58,7 @@ class DocumentService(
                     currentLinks("amendment", link.targetId, publishedScope).any { current ->
                         current.documentId == documentId && current.document.revision.id == revisionId
                     }
-            } else if (link.targetType in setOf("country_wiki", "constitution_wiki")) {
+            } else if (link.targetType in wikiLinkTypes) {
                 val revision = repository.revisionById(link.revisionId ?: return@any false)?.revision ?: return@any false
                 link.revisionId == revisionId &&
                     link.scopeRevisionId != null &&
@@ -76,7 +76,7 @@ class DocumentService(
 
     fun publicLinks(targetType: String, targetId: UUID, scopeRevisionId: UUID?): List<DocumentLinkDto> =
         currentLinks(targetType, targetId, scopeRevisionId).filter { link ->
-            if (targetType in setOf("country_wiki", "constitution_wiki")) {
+            if (targetType in wikiLinkTypes) {
                 scopeRevisionId != null &&
                     targetClient.isWikiImagePublic(targetType, targetId, scopeRevisionId, link.documentId, link.document.revision.revision)
             } else {
@@ -205,14 +205,14 @@ class DocumentService(
     }
 
     private fun validateTarget(targetType: String) {
-        require(targetType in setOf("constitution", "version", "amendment", "country_wiki", "constitution_wiki")) { "Unsupported link target" }
+        require(targetType in setOf("constitution", "version", "amendment") || targetType in wikiLinkTypes) { "Unsupported link target" }
     }
 
     private fun validateScope(targetType: String, targetId: UUID, scopeRevisionId: UUID?, authorization: String?) {
         if (targetType == "amendment") {
             require(scopeRevisionId != null) { "Amendment revision is required" }
             targetClient.requireAmendmentRevision(targetId, scopeRevisionId, authorization, false)
-        } else if (targetType in setOf("country_wiki", "constitution_wiki")) {
+        } else if (targetType in wikiLinkTypes) {
             require(scopeRevisionId != null) { "Wiki revision is required" }
             targetClient.requireWikiRevision(targetType, targetId, scopeRevisionId, authorization)
         } else {

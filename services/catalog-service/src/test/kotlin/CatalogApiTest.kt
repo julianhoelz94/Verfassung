@@ -805,6 +805,73 @@ class CatalogApiTest {
     }
 
     @Test
+    fun currentAndHistoricalJurisdictionWikisKeepDraftsPrivateAndPublishedRevisionsStable() {
+        for (historical in listOf(false, true)) {
+            val response = mockMvc.post("/jurisdictions") {
+                header("Authorization", TOKEN)
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"slug":"wiki-region-${UUID.randomUUID()}","name":"Wiki region","kind":"region","historical":$historical}"""
+            }.andExpect { status { isCreated() } }.andReturn().response
+            val id = UUID.fromString(objectMapper.readTree(response.contentAsString)["id"].asText())
+            val path = "/wiki/jurisdiction/$id"
+            val saved = mockMvc.put("$path/draft") {
+                header("Authorization", TOKEN)
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"summary":"Regional context","body":"Unpublished regional history"}"""
+            }.andExpect { status { isOk() } }.andReturn().response
+            val draftId = objectMapper.readTree(saved.contentAsString)["id"].asText()
+            assertThat(mockMvc.get(path).andReturn().response.contentAsString).doesNotContain("Unpublished regional history")
+            mockMvc.get("$path/draft").andExpect { status { isUnauthorized() } }
+            mockMvc.post("$path/publish") {
+                header("Authorization", TOKEN)
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"revisionId":"$draftId"}"""
+            }.andExpect { status { isForbidden() } }
+            mockMvc.post("$path/publish") {
+                header("Authorization", PUBLISHER_TOKEN)
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"revisionId":"$draftId"}"""
+            }.andExpect { status { isOk() } }
+            mockMvc.get(path).andExpect {
+                status { isOk() }
+                jsonPath("$.targetType") { value("jurisdiction") }
+                jsonPath("$.body") { value("Unpublished regional history") }
+            }
+            val next = wiki.save("jurisdiction", id, com.constitutionatlas.catalog.api.SaveWikiPage(UUID.fromString(draftId), "Pending correction", "Private next draft"), editor.id)
+            assertThat(wiki.published("jurisdiction", id)?.id.toString()).isEqualTo(draftId)
+            assertThat(wiki.publishedRevision("jurisdiction", id, next.id)).isNull()
+            assertThat(wiki.history("jurisdiction", id).map { it.id }).containsExactly(next.id, UUID.fromString(draftId))
+            org.junit.jupiter.api.Assertions.assertThrows(com.constitutionatlas.catalog.ConflictException::class.java) {
+                wiki.publish("jurisdiction", id, UUID.fromString(draftId), PUBLISHER_TOKEN)
+            }
+        }
+        val missingId = UUID.randomUUID()
+        mockMvc.put("/wiki/jurisdiction/$missingId/draft") {
+            header("Authorization", TOKEN)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"summary":"Missing region","body":"Must not be stored"}"""
+        }.andExpect { status { isNotFound() } }
+        assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM wiki_pages WHERE target_id = ?", Int::class.java, missingId)).isZero()
+    }
+
+    @Test
+    fun jurisdictionAndLegacyCountryWikiRoutesShareOneIdentity() {
+        val country = writes.createCountry(com.constitutionatlas.catalog.api.CreateCountryRequest(uniqueCountryCode(), "Wiki country alias"))
+        val first = wiki.save("country", country.id, com.constitutionatlas.catalog.api.SaveWikiPage(summary = "Existing country wiki", body = "Existing text"), editor.id)
+        wiki.publish("country", country.id, first.id)
+        assertThat(wiki.published("jurisdiction", country.id)?.id).isEqualTo(first.id)
+        val next = wiki.save("jurisdiction", country.id, com.constitutionatlas.catalog.api.SaveWikiPage(first.id, "Revised country wiki", "New draft"), editor.id)
+        assertThat(next.targetType).isEqualTo("country")
+        assertThat(next.predecessorId).isEqualTo(first.id)
+        assertThat(wiki.history("country", country.id).map { it.id }).containsExactly(next.id, first.id)
+        assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM wiki_pages WHERE target_id = ?", Int::class.java, country.id)).isEqualTo(1)
+        assertThat(wiki.publishedRevision("jurisdiction", country.id, first.id)?.body).isEqualTo("Existing text")
+        wiki.publish("jurisdiction", country.id, next.id)
+        assertThat(wiki.published("country", country.id)?.id).isEqualTo(next.id)
+        assertThat(wiki.publishedRevision("country", country.id, first.id)?.body).isEqualTo("Existing text")
+    }
+
+    @Test
     fun wikiPublicationRequiresPinnedImages() {
         val countryCode = uniqueCountryCode()
         val country = writes.createCountry(com.constitutionatlas.catalog.api.CreateCountryRequest(countryCode, "Image country"))

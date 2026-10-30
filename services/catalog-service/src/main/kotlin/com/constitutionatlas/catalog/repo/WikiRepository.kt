@@ -11,7 +11,12 @@ import java.util.UUID
 @Repository
 class WikiRepository(private val jdbc: JdbcTemplate, private val mapper: ObjectMapper) {
     fun targetExists(targetType: String, targetId: UUID): Boolean {
-        val table = if (targetType == "country") "countries" else "constitutions"
+        val table = when (targetType) {
+            "country" -> "countries"
+            "constitution" -> "constitutions"
+            "jurisdiction" -> "jurisdictions"
+            else -> throw IllegalArgumentException("Invalid wiki target type")
+        }
         return (jdbc.queryForObject("SELECT COUNT(*) FROM $table WHERE id = ?", Int::class.java, targetId) ?: 0) > 0
     }
 

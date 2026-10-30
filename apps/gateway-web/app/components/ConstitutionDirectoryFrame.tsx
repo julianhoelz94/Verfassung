@@ -15,10 +15,10 @@ function flatten(items: PageContentsItem[]): PageContentsItem[] {
   return items.flatMap(item => [item, ...flatten(item.children ?? [])]);
 }
 
-export function ConstitutionDirectoryFrame({ background, contents, children, toolsLabel = directoryUi.tools }: {
-  background?: ReactNode; contents: PageContentsItem[]; children: ReactNode; toolsLabel?: UiMessage;
+export function ConstitutionDirectoryFrame({ background, contents, children, toolsLabel = directoryUi.tools, wikiOpen = false }: {
+  background?: ReactNode; contents: PageContentsItem[]; children: ReactNode; toolsLabel?: UiMessage; wikiOpen?: boolean;
 }) {
-  const [open, setOpen] = useState(false), [expanded, setExpanded] = useState(true);
+  const [open, setOpen] = useState(wikiOpen), [expanded, setExpanded] = useState(true);
   const [current, setCurrent] = useState(contents[0]?.id);
   const surface = useRef<HTMLDivElement>(null), menu = useRef<HTMLDivElement>(null), navigation = useRef<HTMLElement>(null);
   const backgroundButton = useRef<HTMLButtonElement>(null), anchor = useRef<{ element: HTMLElement; top: number } | null>(null);

@@ -45,7 +45,8 @@ test('the irregular successor retains moved identities, additions and historical
   const moved = before.roots.at(-1).content.find((entry: { node?: { kind: string } }) => entry.node?.kind === 'clause').node;
   expect(after.roots[2].content.some((entry: { node?: { logicalId: string } }) => entry.node?.logicalId === moved.logicalId)).toBe(true);
   await page.goto(`/countries/XA/compare?from=${fixture.versionId}&to=${fixture.revisedVersionId}&all=1`);
-  await expect(page.getByText('Exploration duties', { exact: true }).first()).toBeVisible();
+  await page.getByRole('tab', { name: 'Original', exact: true }).click();
+  await expect(page.getByRole('table', { name: 'Exploration duties' })).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath('fixture-irregular-compare.png'), fullPage: true });
   await page.goto(fixture.href);
   await page.getByRole('button', { name: 'Full text', exact: true }).click();
@@ -71,4 +72,15 @@ test('historical regions, captured documents and curated counterparts are availa
   await expect(page.getByRole('link', { name: 'Download synthetic-source.pdf' })).toBeVisible();
   await page.goto(scenarios['curated-comparison'].href.replace('topic=0', 'topic=1'));
   await expect(page.getByText('No counterpart recorded in this source comparison.', { exact: true })).toBeVisible();
+});
+
+
+test('a saved irregular draft can be reopened in the continuous constitution editor', async ({ page }, testInfo) => {
+  await signIn(page, 'editor');
+  await page.goto(scenarios['layout-draft'].href);
+  await page.getByRole('button', { name: 'Editor view', exact: true }).click();
+  await page.getByRole('combobox', { name: 'Editor view', exact: true }).selectOption('constitution');
+  await expect(page.locator('#draft-form input[name="scope"]')).toHaveValue('constitution');
+  await expect(page.locator('[data-editor-workspace]')).toContainText('Saved draft: parent wording around a child sentence.');
+  await page.screenshot({ path: testInfo.outputPath('fixture-irregular-editor.png'), fullPage: true });
 });

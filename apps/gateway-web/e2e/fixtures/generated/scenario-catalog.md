@@ -6,6 +6,7 @@ Resolved links are written to .runtime/scenario-guide.md after upload.
 | Scenario | Role | Action | Expected result |
 | --- | --- | --- | --- |
 | reader-lab | viewer | Open both articles, follow the two [a] markers, inspect the table and compare the versions. | Mixed roots, skipped levels, interleaved text, literal labels and structural moves survive publication. |
+| layout-draft | editor | Open Editor view, choose the whole constitution, inspect the saved splits, merge, formatting and moved root, then continue editing. | The saved mixed hierarchy retains shared notes and leaves the published source unchanged. |
 | history-lab | viewer | Open the original and both corrections, then compare with the next legal version. | Old snapshots retain their text; corrections share one legal identity. |
 | editor-draft | editor | Open the saved session and continue its editorial workflow. | The session begins in draft; later manual progress is preserved. |
 | editor-review | reviewer | Open the saved session and continue its editorial workflow. | The session begins in review; later manual progress is preserved. |

@@ -5,6 +5,7 @@ import { selectedScenarios, irregularRoots, irregularOutline, rootsFor } from '.
 import { payloadFor, ensurePublished, readerPath } from './content.mjs';
 import { editorial, importWorkflow, setupWorkflow, historyScenario } from './workflows.mjs';
 import { archiveScenario, contextScenario, comparisonScenario } from './catalog.mjs';
+import { structuredScenario } from './structured.mjs';
 import { amendmentScenario } from './amendments.mjs';
 import { journalAt } from './runtime.mjs';
 
@@ -31,6 +32,7 @@ export async function runScenarios(ctx) {
         const next = await ensurePublished(ctx, `${scenario.key}-revised`, { ...source.payload, versionLabel: 'Revised', effectiveDate: '2004-01-01', roots: irregularRoots(scenario.key, true) }, source.versionId);
         result = { ...source, revisedVersionId: next.versionId, href: readerPath(source), state: 'published' }; break;
       }
+      case 'structured': result = await structuredScenario(ctx, scenario); break;
       case 'history': result = await historyScenario(ctx, scenario); break;
       case 'editor': case 'source': {
         const source = await ensurePublished(ctx, scenario.key, payloadFor(scenario));

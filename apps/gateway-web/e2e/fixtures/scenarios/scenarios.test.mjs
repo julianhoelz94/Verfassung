@@ -35,6 +35,14 @@ test('non-standard layouts contain mixed roots, skipped levels, interleaved text
   const note = roots.at(-1).content.at(-1);
   assert.equal(note.format, 'footnote'); assert.equal(note.footnoteLabel, '[a]');
   assert.equal(note.annotation.kind, 'editorial');
+  const table = roots.at(-1).content.find(entry => entry.format === 'table').table;
+  assert.equal(table.rows[1].cells[0].rowSpan, 2);
+  assert.equal(table.rows[2].cells.length, 1);
+  assert.equal(table.rows.at(-1).cells[0].colSpan, 2);
+  const explicit = roots[1].content.find(entry => entry.text === 'See Schedule A and the source.');
+  assert.equal(explicit.references[0].target.logicalId, roots.at(-1).logicalId);
+  assert.equal(explicit.text.slice(explicit.references[0].start, explicit.references[0].end), 'Schedule A');
+  assert.equal(explicit.text.slice(explicit.references[1].start, explicit.references[1].end), 'source');
   const markers = roots.flatMap(root => root.content.flatMap(entry => entry.references ?? [])).filter(ref => ref.target.footnoteId === note.logicalId);
   assert.equal(markers.length, 2); assert.notEqual(markers[0].logicalId, markers[1].logicalId);
   assert(irregularOutline.kinds.find(kind => kind.kindCode === 'article').allowedChildKinds.includes('sentence'));

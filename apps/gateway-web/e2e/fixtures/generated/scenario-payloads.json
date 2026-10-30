@@ -204,6 +204,31 @@
               }
             },
             {
+              "type": "text",
+              "logicalId": "93b9e351-59e8-4cd5-8d12-ef4d51318a4e",
+              "text": "See Schedule A and the source.",
+              "references": [
+                {
+                  "logicalId": "8b978a17-67a6-4b35-8d74-1c5bfe536638",
+                  "start": 4,
+                  "end": 14,
+                  "target": {
+                    "type": "unit",
+                    "logicalId": "63f337df-991c-4c9c-8bb1-3abbb0d149b3"
+                  }
+                },
+                {
+                  "logicalId": "b8985781-2159-4a53-8600-f9294370e0a1",
+                  "start": 23,
+                  "end": 29,
+                  "target": {
+                    "type": "external",
+                    "url": "https://example.org/atlas-explore/source"
+                  }
+                }
+              ]
+            },
+            {
               "type": "child",
               "node": {
                 "logicalId": "f11f4085-91a3-4dd7-8a72-29da486f31ef",
@@ -314,6 +339,7 @@
                       {
                         "logicalId": "ae6cfdd8-c6c0-4e2f-8722-ca91e72b4884",
                         "text": "Civic duty 1",
+                        "rowSpan": 2,
                         "headers": [
                           "7cd64274-94d6-4665-81fe-9d7cf65c42f9"
                         ]
@@ -330,13 +356,6 @@
                   {
                     "logicalId": "76dfb00d-1f47-4460-8b44-f05528f12d9a",
                     "cells": [
-                      {
-                        "logicalId": "5d99143e-d24f-446e-87a0-7b7224ebb79e",
-                        "text": "Civic duty 2",
-                        "headers": [
-                          "7cd64274-94d6-4665-81fe-9d7cf65c42f9"
-                        ]
-                      },
                       {
                         "logicalId": "8bcefd6c-fc9e-4652-8b96-f7437ddfd4c9",
                         "text": "Annual",
@@ -688,6 +707,31 @@
             }
           },
           {
+            "type": "text",
+            "logicalId": "93b9e351-59e8-4cd5-8d12-ef4d51318a4e",
+            "text": "See Schedule A and the source.",
+            "references": [
+              {
+                "logicalId": "8b978a17-67a6-4b35-8d74-1c5bfe536638",
+                "start": 4,
+                "end": 14,
+                "target": {
+                  "type": "unit",
+                  "logicalId": "63f337df-991c-4c9c-8bb1-3abbb0d149b3"
+                }
+              },
+              {
+                "logicalId": "b8985781-2159-4a53-8600-f9294370e0a1",
+                "start": 23,
+                "end": 29,
+                "target": {
+                  "type": "external",
+                  "url": "https://example.org/atlas-explore/source"
+                }
+              }
+            ]
+          },
+          {
             "type": "child",
             "node": {
               "logicalId": "d342764e-8f5b-412a-8573-0d31eab19353",
@@ -744,6 +788,7 @@
                     {
                       "logicalId": "ae6cfdd8-c6c0-4e2f-8722-ca91e72b4884",
                       "text": "Civic duty 1",
+                      "rowSpan": 2,
                       "headers": [
                         "7cd64274-94d6-4665-81fe-9d7cf65c42f9"
                       ]
@@ -760,13 +805,6 @@
                 {
                   "logicalId": "76dfb00d-1f47-4460-8b44-f05528f12d9a",
                   "cells": [
-                    {
-                      "logicalId": "5d99143e-d24f-446e-87a0-7b7224ebb79e",
-                      "text": "Civic duty 2",
-                      "headers": [
-                        "7cd64274-94d6-4665-81fe-9d7cf65c42f9"
-                      ]
-                    },
                     {
                       "logicalId": "8bcefd6c-fc9e-4652-8b96-f7437ddfd4c9",
                       "text": "Annual",
@@ -938,6 +976,536 @@
         ]
       }
     ]
+  },
+  {
+    "key": "layout-draft",
+    "profile": "extended",
+    "payload": {
+      "isoCode": "XA",
+      "countryName": "Atlas Testland",
+      "constitutionSlug": "atlas-explore-v1-layout-draft",
+      "constitutionTitle": "Saved draft with a non-standard layout",
+      "versionLabel": "Original",
+      "effectiveDate": "2000-01-01",
+      "languageCode": "en",
+      "sourceUrl": "https://example.org/atlas-explore-v1/layout-draft",
+      "sourceEvidence": {
+        "description": "Synthetic source for Saved draft with a non-standard layout.",
+        "dateWording": "1 January 2000",
+        "datePrecision": "day",
+        "attribution": "Constitution Atlas fixture generator"
+      },
+      "outline": {
+        "kinds": [
+          {
+            "kindCode": "preamble",
+            "displayLabel": "Preamble",
+            "root": true,
+            "allowedChildKinds": [],
+            "labelPolicy": "optional",
+            "titlePolicy": "optional"
+          },
+          {
+            "kindCode": "article",
+            "displayLabel": "Article",
+            "root": true,
+            "allowedChildKinds": [
+              "paragraph",
+              "sentence",
+              "clause"
+            ],
+            "allowTextAlongsideChildren": true,
+            "titlePolicy": "optional",
+            "showTitle": true
+          },
+          {
+            "kindCode": "paragraph",
+            "displayLabel": "Paragraph",
+            "root": false,
+            "allowedChildKinds": [
+              "sentence"
+            ],
+            "allowTextAlongsideChildren": true,
+            "titlePolicy": "optional"
+          },
+          {
+            "kindCode": "sentence",
+            "displayLabel": "Sentence",
+            "root": false,
+            "allowedChildKinds": [],
+            "presentation": "concatenated",
+            "showLabel": false
+          },
+          {
+            "kindCode": "appendix",
+            "displayLabel": "Schedule",
+            "root": true,
+            "allowedChildKinds": [
+              "clause"
+            ],
+            "allowTextAlongsideChildren": true,
+            "titlePolicy": "optional",
+            "showTitle": true
+          },
+          {
+            "kindCode": "clause",
+            "displayLabel": "Clause",
+            "root": false,
+            "allowedChildKinds": [],
+            "labelPolicy": "optional",
+            "titlePolicy": "optional"
+          }
+        ]
+      },
+      "roots": [
+        {
+          "logicalId": "290f5761-c168-454b-840c-51422521b76b",
+          "kind": "preamble",
+          "label": null,
+          "title": null,
+          "content": [
+            {
+              "type": "text",
+              "logicalId": "b7b080e3-1564-46e5-8576-d0e653e5445c",
+              "text": "An untitled and unnumbered preamble opens the instrument."
+            }
+          ]
+        },
+        {
+          "logicalId": "38f6ddd8-0dcc-482c-8bcc-4e070aca1029",
+          "kind": "article",
+          "label": "Art. I a",
+          "title": null,
+          "content": [
+            {
+              "type": "text",
+              "logicalId": "d000dff2-f119-4c8a-81cb-a6f869682f2e",
+              "text": "Freedom [a] belongs to every person in provision 1.",
+              "references": [
+                {
+                  "logicalId": "60f5ceb9-360f-4574-8580-b4aaa2e3315b",
+                  "start": 8,
+                  "end": 11,
+                  "target": {
+                    "type": "footnote",
+                    "footnoteId": "cbac6698-4c08-446f-8300-a8cf116b41a2"
+                  }
+                }
+              ],
+              "marks": [
+                {
+                  "type": "bold",
+                  "start": 0,
+                  "end": 7
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "logicalId": "db1e0b1e-d23d-4dc2-821d-b48d3aee56d2",
+              "text": "A separate line retains its authored spacing.",
+              "lineBreaksBefore": 1,
+              "marks": [
+                {
+                  "type": "italic",
+                  "start": 2,
+                  "end": 10
+                },
+                {
+                  "type": "underline",
+                  "start": 11,
+                  "end": 15
+                },
+                {
+                  "type": "strikethrough",
+                  "start": 16,
+                  "end": 23
+                }
+              ]
+            },
+            {
+              "type": "child",
+              "node": {
+                "logicalId": "94220f2f-10af-4e0d-8c63-ea85a1959915",
+                "kind": "paragraph",
+                "label": "(1)",
+                "title": null,
+                "content": [
+                  {
+                    "type": "text",
+                    "logicalId": "31b08890-20d1-4390-80a5-b76ec14c1605",
+                    "text": "Parent text before a child sentence."
+                  },
+                  {
+                    "type": "child",
+                    "node": {
+                      "logicalId": "5b275b0d-8b6d-4a76-8587-114ac140a7e7",
+                      "kind": "sentence",
+                      "label": "1",
+                      "title": null,
+                      "content": [
+                        {
+                          "type": "text",
+                          "logicalId": "3a431594-a798-4981-83ae-899097d86491",
+                          "text": "A nested sentence preserves its own identity."
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "type": "text",
+                    "logicalId": "26ad5532-73b4-4661-8322-a3fc3a1ad0e0",
+                    "text": "Parent text after its child."
+                  }
+                ]
+              }
+            },
+            {
+              "type": "text",
+              "logicalId": "13390089-1e95-401b-81b8-5eca864056da",
+              "text": "Unnumbered text between provisions."
+            },
+            {
+              "type": "child",
+              "node": {
+                "logicalId": "8fe5f822-3259-4767-8a50-7c57267a08fa",
+                "kind": "sentence",
+                "label": null,
+                "title": null,
+                "content": [
+                  {
+                    "type": "text",
+                    "logicalId": "820dba73-f30d-4197-8e51-5e38cf3ffc3b",
+                    "text": "This sentence skips the optional paragraph level."
+                  }
+                ]
+              }
+            },
+            {
+              "type": "text",
+              "logicalId": "f4d54489-9cc1-4244-8c97-56bcba8e4b65",
+              "text": "See Schedule A and the source.",
+              "references": [
+                {
+                  "logicalId": "1bb64d59-ee06-47aa-885d-af2f7e6c03aa",
+                  "start": 4,
+                  "end": 14,
+                  "target": {
+                    "type": "unit",
+                    "logicalId": "7c910da8-dbb6-4a20-8778-28ed974086a9"
+                  }
+                },
+                {
+                  "logicalId": "f57a00b6-a7c7-40e7-8516-3a448bd8ba23",
+                  "start": 23,
+                  "end": 29,
+                  "target": {
+                    "type": "external",
+                    "url": "https://example.org/atlas-explore/source"
+                  }
+                }
+              ]
+            },
+            {
+              "type": "child",
+              "node": {
+                "logicalId": "3d7717d4-4ff4-4b9d-82c0-23eb940c747d",
+                "kind": "clause",
+                "label": "bis",
+                "title": null,
+                "content": [
+                  {
+                    "type": "text",
+                    "logicalId": "00232eed-ba31-433f-8545-bec685892998",
+                    "text": "This clause is removed in the successor."
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "logicalId": "8ae7ef2c-c4be-489f-8368-a2dc81159e93",
+          "kind": "article",
+          "label": null,
+          "title": "Unnumbered supplementary rights",
+          "content": [
+            {
+              "type": "text",
+              "logicalId": "465f9e96-068b-4e28-8377-4e426f7e3851",
+              "text": "Freedom [a] belongs to every person in provision 2.",
+              "references": [
+                {
+                  "logicalId": "7c550b73-c836-4331-8104-d014d269baab",
+                  "start": 8,
+                  "end": 11,
+                  "target": {
+                    "type": "footnote",
+                    "footnoteId": "cbac6698-4c08-446f-8300-a8cf116b41a2"
+                  }
+                }
+              ],
+              "marks": [
+                {
+                  "type": "bold",
+                  "start": 0,
+                  "end": 7
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "logicalId": "28a900a1-20ce-4815-818b-bd3df60ae6c5",
+              "text": "A separate line retains its authored spacing.",
+              "lineBreaksBefore": 2,
+              "marks": [
+                {
+                  "type": "italic",
+                  "start": 2,
+                  "end": 10
+                },
+                {
+                  "type": "underline",
+                  "start": 11,
+                  "end": 15
+                },
+                {
+                  "type": "strikethrough",
+                  "start": 16,
+                  "end": 23
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "logicalId": "7c910da8-dbb6-4a20-8778-28ed974086a9",
+          "kind": "appendix",
+          "label": "Schedule A",
+          "title": null,
+          "content": [
+            {
+              "type": "text",
+              "logicalId": "6eb6ca09-78ac-4d1f-8939-d391204cfa29",
+              "text": "A schedule follows a different hierarchy."
+            },
+            {
+              "type": "text",
+              "logicalId": "d5e6f7a8-fd5e-4bde-8143-49fb1e0af9f5",
+              "format": "table",
+              "table": {
+                "caption": "Exploration duties",
+                "rows": [
+                  {
+                    "logicalId": "c9f21c41-d176-4f68-8ebf-a233090e2384",
+                    "cells": [
+                      {
+                        "logicalId": "fcbab04a-931b-47d1-863e-71aab7b86bed",
+                        "text": "Duty",
+                        "header": true
+                      },
+                      {
+                        "logicalId": "002545d3-c9ac-4f0a-87be-6f6560cfdd10",
+                        "text": "Period",
+                        "header": true
+                      }
+                    ]
+                  },
+                  {
+                    "logicalId": "79362dc5-1dad-44cc-8d71-11d1409059ba",
+                    "cells": [
+                      {
+                        "logicalId": "8ac75c23-e54c-4583-8475-f81c26368535",
+                        "text": "Civic duty 1",
+                        "rowSpan": 2,
+                        "headers": [
+                          "fcbab04a-931b-47d1-863e-71aab7b86bed"
+                        ]
+                      },
+                      {
+                        "logicalId": "eb1da051-31ba-47f0-8c8f-0519f9f8fe7f",
+                        "text": "Annual",
+                        "headers": [
+                          "002545d3-c9ac-4f0a-87be-6f6560cfdd10"
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "logicalId": "3dc62841-3bc8-4c15-804b-b4873b49cd05",
+                    "cells": [
+                      {
+                        "logicalId": "33c54759-4775-44d3-898c-d9a440ecfd5a",
+                        "text": "Annual",
+                        "headers": [
+                          "002545d3-c9ac-4f0a-87be-6f6560cfdd10"
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "logicalId": "6735b7b6-9ffa-492a-8fdb-419a22deab3a",
+                    "cells": [
+                      {
+                        "logicalId": "9414535e-400f-4093-8e3a-34041f64a800",
+                        "text": "Civic duty 3",
+                        "headers": [
+                          "fcbab04a-931b-47d1-863e-71aab7b86bed"
+                        ]
+                      },
+                      {
+                        "logicalId": "3e6bd9be-4261-4fc1-81df-23dcf7916241",
+                        "text": "Annual",
+                        "headers": [
+                          "002545d3-c9ac-4f0a-87be-6f6560cfdd10"
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "logicalId": "1e622697-39f6-4795-8cc9-edd8431e5ae6",
+                    "cells": [
+                      {
+                        "logicalId": "06d13415-9cd1-47f4-8fc5-c3a485b1a645",
+                        "text": "Civic duty 4",
+                        "headers": [
+                          "fcbab04a-931b-47d1-863e-71aab7b86bed"
+                        ]
+                      },
+                      {
+                        "logicalId": "c0f130a9-27a3-46d8-8645-e47a8ea8c42a",
+                        "text": "Annual",
+                        "headers": [
+                          "002545d3-c9ac-4f0a-87be-6f6560cfdd10"
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "logicalId": "ae748519-6f9e-4254-8509-3b7891146790",
+                    "cells": [
+                      {
+                        "logicalId": "bbd564d8-47dc-424e-8eca-197a2ef79c36",
+                        "text": "Civic duty 5",
+                        "headers": [
+                          "fcbab04a-931b-47d1-863e-71aab7b86bed"
+                        ]
+                      },
+                      {
+                        "logicalId": "fcabd9f3-45e9-454e-8c98-faa5f2ce801d",
+                        "text": "Annual",
+                        "headers": [
+                          "002545d3-c9ac-4f0a-87be-6f6560cfdd10"
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "logicalId": "2bdc5c71-c729-4ebe-89ef-657b1b95a011",
+                    "cells": [
+                      {
+                        "logicalId": "46dc0abd-9dc9-44bc-8416-e5ddde78b549",
+                        "text": "Civic duty 6",
+                        "headers": [
+                          "fcbab04a-931b-47d1-863e-71aab7b86bed"
+                        ]
+                      },
+                      {
+                        "logicalId": "66148601-6798-4012-8cf4-3776a9b60b75",
+                        "text": "Annual",
+                        "headers": [
+                          "002545d3-c9ac-4f0a-87be-6f6560cfdd10"
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "logicalId": "9c0ea03b-7b61-4293-8ac8-4c23049612e6",
+                    "cells": [
+                      {
+                        "logicalId": "5c40f69a-2848-4ba7-868c-7d57a0caacaa",
+                        "text": "Civic duty 7",
+                        "headers": [
+                          "fcbab04a-931b-47d1-863e-71aab7b86bed"
+                        ]
+                      },
+                      {
+                        "logicalId": "ec3b4869-84b1-4df2-8015-c8f3faf0ae6c",
+                        "text": "Annual",
+                        "headers": [
+                          "002545d3-c9ac-4f0a-87be-6f6560cfdd10"
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "logicalId": "f2bbcc99-fe61-426f-8d92-64f0cb3c2e11",
+                    "cells": [
+                      {
+                        "logicalId": "d792b745-6e18-4679-87a1-2a3d498cd663",
+                        "text": "Civic duty 8",
+                        "headers": [
+                          "fcbab04a-931b-47d1-863e-71aab7b86bed"
+                        ]
+                      },
+                      {
+                        "logicalId": "fd9df730-d6d5-4631-8632-7c84769ab039",
+                        "text": "Annual",
+                        "headers": [
+                          "002545d3-c9ac-4f0a-87be-6f6560cfdd10"
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "logicalId": "d973caf6-984c-403f-89fc-5fba7049ba50",
+                    "cells": [
+                      {
+                        "logicalId": "fe3a9b7f-66ba-432e-8599-029e1172ee01",
+                        "text": "Applies to everyone",
+                        "colSpan": 2
+                      }
+                    ]
+                  }
+                ]
+              }
+            },
+            {
+              "type": "child",
+              "node": {
+                "logicalId": "ba7bde49-ed00-45a2-8288-39ba1dfa62bc",
+                "kind": "clause",
+                "label": null,
+                "title": null,
+                "content": [
+                  {
+                    "type": "text",
+                    "logicalId": "1e343a8c-1a72-4109-8d8f-aa0f63333a0c",
+                    "text": "This untitled clause changes parent in the successor."
+                  }
+                ]
+              }
+            },
+            {
+              "type": "text",
+              "logicalId": "cbac6698-4c08-446f-8300-a8cf116b41a2",
+              "text": "Shared editorial note for two articles.",
+              "format": "footnote",
+              "footnoteLabel": "[a]",
+              "annotation": {
+                "kind": "editorial",
+                "attribution": "Constitution Atlas synthetic fixtures",
+                "sourceUrl": "https://example.org/atlas-explore/note",
+                "anchorLogicalIds": [
+                  "d000dff2-f119-4c8a-81cb-a6f869682f2e",
+                  "465f9e96-068b-4e28-8377-4e426f7e3851"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
   },
   {
     "key": "history-lab",
@@ -2130,6 +2698,31 @@
               }
             },
             {
+              "type": "text",
+              "logicalId": "94b26d64-d591-41a4-87cd-8bfd9bd260c5",
+              "text": "See Schedule A and the source.",
+              "references": [
+                {
+                  "logicalId": "4ea5f482-e7b4-4fa8-8c96-cbd94cdd12d2",
+                  "start": 4,
+                  "end": 14,
+                  "target": {
+                    "type": "unit",
+                    "logicalId": "90e82ad2-4119-4a91-8aff-e05c84e9f5a8"
+                  }
+                },
+                {
+                  "logicalId": "b0fbb3d9-a1cf-433e-8e31-a84d50eb5d14",
+                  "start": 23,
+                  "end": 29,
+                  "target": {
+                    "type": "external",
+                    "url": "https://example.org/atlas-explore/source"
+                  }
+                }
+              ]
+            },
+            {
               "type": "child",
               "node": {
                 "logicalId": "257e7373-6fb7-4e16-88ac-8ccfb75b3cb7",
@@ -2240,6 +2833,7 @@
                       {
                         "logicalId": "cc145ada-10ca-487f-8d51-fdb850d293e7",
                         "text": "Civic duty 1",
+                        "rowSpan": 2,
                         "headers": [
                           "41511b91-438f-4848-8767-fe70762535a2"
                         ]
@@ -2256,13 +2850,6 @@
                   {
                     "logicalId": "de543aad-9ef9-4bd4-8af2-7f3d387f15a3",
                     "cells": [
-                      {
-                        "logicalId": "b87d4cb0-c180-461a-82ac-c373df359ea8",
-                        "text": "Civic duty 2",
-                        "headers": [
-                          "41511b91-438f-4848-8767-fe70762535a2"
-                        ]
-                      },
                       {
                         "logicalId": "1828620d-8b09-498c-8ddd-f597c7ce912d",
                         "text": "Annual",

@@ -103,6 +103,7 @@
     "compact": [],
     "extended": [
       "reader-lab",
+      "layout-draft",
       "history-lab",
       "editor-draft",
       "editor-review",
@@ -126,6 +127,7 @@
     ],
     "scale": [
       "reader-lab",
+      "layout-draft",
       "history-lab",
       "editor-draft",
       "editor-review",
@@ -160,6 +162,17 @@
       "profile": "extended",
       "dependencies": [],
       "intendedState": "published"
+    },
+    {
+      "key": "layout-draft",
+      "kind": "structured",
+      "title": "Saved draft with a non-standard layout",
+      "role": "editor",
+      "action": "Open Editor view, choose the whole constitution, inspect the saved splits, merge, formatting and moved root, then continue editing.",
+      "expected": "The saved mixed hierarchy retains shared notes and leaves the published source unchanged.",
+      "profile": "extended",
+      "dependencies": [],
+      "intendedState": "draft"
     },
     {
       "key": "history-lab",

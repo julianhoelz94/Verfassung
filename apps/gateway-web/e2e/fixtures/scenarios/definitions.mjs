@@ -24,7 +24,7 @@ export function richRoots(key, changed = false) {
   roots[1].content.push({ type: 'text', logicalId: stableId(`${key}:table`), format: 'table', table: { caption: 'Exploration duties', rows: [
     { logicalId: stableId(`${key}:header`), cells: [{ logicalId: stableId(`${key}:duty`), text: 'Duty', header: true }, { logicalId: stableId(`${key}:period`), text: 'Period', header: true }] },
     ...Array.from({ length: 8 }, (_, i) => ({ logicalId: stableId(`${key}:row:${i}`), cells: [
-      { logicalId: stableId(`${key}:duty:${i}`), text: `Civic duty ${i + 1}`, headers: [stableId(`${key}:duty`)] },
+      ...(i === 1 ? [] : [{ logicalId: stableId(`${key}:duty:${i}`), text: `Civic duty ${i + 1}`, ...(i === 0 ? { rowSpan: 2 } : {}), headers: [stableId(`${key}:duty`)] }]),
       { logicalId: stableId(`${key}:period:${i}`), text: changed && i === 0 ? 'Biennial' : 'Annual', headers: [stableId(`${key}:period`)] },
     ] })),
     { logicalId: stableId(`${key}:span`), cells: [{ logicalId: stableId(`${key}:span:cell`), text: 'Applies to everyone', colSpan: 2 }] },
@@ -51,6 +51,7 @@ export function irregularRoots(key, changed = false) {
   first.content.push(child('paragraph', 'paragraph', '(1)', [text('parent-wording', 'Parent text before a child sentence.'), child('sentence-nested', 'sentence', '1', [text('nested-wording', 'A nested sentence preserves its own identity.')]), text('parent-after', 'Parent text after its child.')]));
   first.content.push(text('between', 'Unnumbered text between provisions.'));
   first.content.push(child('sentence-direct', 'sentence', null, [text('direct-wording', 'This sentence skips the optional paragraph level.')]));
+  first.content.push({ ...text('source-links', 'See Schedule A and the source.'), references: [{ logicalId: stableId(`${key}:schedule-ref`), start: 4, end: 14, target: { type: 'unit', logicalId: stableId(`${key}:appendix`) } }, { logicalId: stableId(`${key}:source-ref`), start: 23, end: 29, target: { type: 'external', url: 'https://example.org/atlas-explore/source' } }] });
   const removed = child('removed-clause', 'clause', 'bis', [text('removed-wording', 'This clause is removed in the successor.')]);
   if (!changed) first.content.push(removed);
   second.label = null; second.title = 'Unnumbered supplementary rights';
@@ -62,6 +63,7 @@ export function irregularRoots(key, changed = false) {
 }
 const descriptions = [
   ['reader-lab', 'content', 'Non-standard layouts, shared footnotes and tables', 'viewer', 'Open both articles, follow the two [a] markers, inspect the table and compare the versions.', 'Mixed roots, skipped levels, interleaved text, literal labels and structural moves survive publication.'],
+  ['layout-draft', 'structured', 'Saved draft with a non-standard layout', 'editor', 'Open Editor view, choose the whole constitution, inspect the saved splits, merge, formatting and moved root, then continue editing.', 'The saved mixed hierarchy retains shared notes and leaves the published source unchanged.'],
   ['history-lab', 'history', 'Legal versions and text corrections', 'viewer', 'Open the original and both corrections, then compare with the next legal version.', 'Old snapshots retain their text; corrections share one legal identity.'],
   ...['draft', 'review', 'approved', 'published', 'archived'].map(state => [`editor-${state}`, 'editor', `Editorial work: ${state}`, state === 'review' ? 'reviewer' : state === 'approved' ? 'publisher' : 'editor', 'Open the saved session and continue its editorial workflow.', `The session begins in ${state}; later manual progress is preserved.`]),
   ['source-returned', 'source', 'Source correction with requested changes', 'editor', 'Read the reviewer feedback, revise the source description and submit it again.', 'The reason and review history remain separate from constitutional text.'],
@@ -76,7 +78,7 @@ const descriptions = [
 ];
 export const scenarios = descriptions.map(([key, kind, title, role, action, expected]) => ({ key, kind, title, role, action, expected,
   profile: kind === 'scale' ? 'scale' : 'extended', dependencies: kind === 'comparison' ? ['reader-lab', 'historical-region', 'documents-context'] : [],
-  intendedState: ['editor', 'import', 'amendment'].includes(kind) ? key.replace(/^(editor|import|amendment)-/, '') : kind === 'setup' ? 'proposed' : kind === 'source' ? 'returned' : kind === 'context' ? 'draft' : 'published',
+  intendedState: ['editor', 'import', 'amendment'].includes(kind) ? key.replace(/^(editor|import|amendment)-/, '') : kind === 'setup' ? 'proposed' : kind === 'source' ? 'returned' : ['context', 'structured'].includes(kind) ? 'draft' : 'published',
 }));
 export function selectedScenarios(profile) {
   if (!['compact', 'extended', 'scale'].includes(profile)) throw new Error(`Unknown fixture profile '${profile}'; use compact, extended or scale`);

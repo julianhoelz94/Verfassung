@@ -542,6 +542,11 @@ jobs:
           path: test-results/recovery-report.json
           if-no-files-found: warn
           retention-days: 7
+      - name: Verify optional scale fixtures after browser journeys
+        working-directory: apps/gateway-web
+        run: |
+          npm run prepopulate -- --profile scale
+          npm run prepopulate -- --profile scale --verify-only
       - name: Verify local HTTPS authentication and deployment persistence
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         shell: bash

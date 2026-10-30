@@ -68,3 +68,7 @@ examples, or `scale` to include 225-provision snapshots. Resolved URLs and curre
 workflow states are in the ignored `.runtime/scenario-guide.md` and
 `.runtime/scenario-index.json`. Mutable workflows use separate constitutions;
 ordinary reruns preserve their progress instead of resetting them.
+
+The full-stack job uploads and verifies the optional scale profile after ordinary
+browser journeys and recovery checks, so pagination beyond 200 provisions is
+proved against real APIs without expanding every preceding journey's baseline.

@@ -12,10 +12,11 @@ export async function editorial(ctx, scenario, source, state, sourceOnly = false
     return rows[0] ? { ...await ctx.api('GET', `editor/edit-sessions/${rows[0].id}`), fixtureArchived: archived.some(row => row.id === rows[0].id) } : null;
   };
   const sessionPath = current => `editor/edit-sessions/${current.session.id}`;
+  const sourceDescription = `# Synthetic archive\n\nRevised source description for ${scenario.key}.\n\n- Fictional source excerpt\n\n[Source record](https://example.org/atlas-explore/source)`;
   const changedBody = `Saved draft for ${scenario.key}. This unpublished exploration text is private.`;
   const steps = [async () => ctx.api('POST', 'editor/edit-sessions', { versionId: source.versionId, hopKind: 'editorial_correction' }, ctx.editorToken), async current => {
     const path = sessionPath(current);
-    if (sourceOnly) await ctx.api('POST', `${path}/source-evidence`, { expectedRevision: 0, evidence: { description: `Revised source description for ${scenario.key}.` }, reason: `Fixture source correction: ${scenario.key}` }, ctx.editorToken);
+    if (sourceOnly) await ctx.api('POST', `${path}/source-evidence`, { expectedRevision: 0, evidence: { description: sourceDescription }, reason: `Fixture source correction: ${scenario.key}` }, ctx.editorToken);
     else {
       const articles = await allPages(ctx.api, `content/versions/${source.versionId}/articles?includeBody=true`);
       await ctx.api('POST', `${path}/saves`, { articleId: articles[0].id, title: articles[0].title, body: changedBody }, ctx.editorToken);
@@ -45,7 +46,7 @@ export async function editorial(ctx, scenario, source, state, sourceOnly = false
     const statuses = { draft: 'open', review: 'reviewing', approved: 'approved', published: 'published', archived: 'published', returned: 'open' };
     assert.equal(value.session.status, statuses[state], `${scenario.key}: initial workflow state`);
     assert.equal(value.fixtureArchived, state === 'archived', `${scenario.key}: archive state`);
-    if (sourceOnly) assert.equal(value.sourceEvidenceRevisions[0].evidence.description, `Revised source description for ${scenario.key}.`);
+    if (sourceOnly) assert.equal(value.sourceEvidenceRevisions[0].evidence.description, sourceDescription);
     else assert.equal(value.drafts[0].body, changedBody, `${scenario.key}: saved draft`);
   }
   const unchanged = await ctx.api('GET', `content/versions/${source.versionId}/content`, undefined, false);

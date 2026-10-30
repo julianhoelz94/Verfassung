@@ -67,6 +67,16 @@ outage detection. `scripts/operations/check.py` supplies read-only operational
 checks; see `docs/operations/recovery-and-monitoring.md`. Audit runtime credentials
 are separate from Flyway owner credentials in canonical and generated Compose.
 
+## Cognitive complexity
+
+The required `cognitive-complexity` job runs root `./gradlew cognitiveComplexity`
+(detekt) and `npm run check --prefix scripts/complexity` (ESLint/SonarJS). The limit
+is 20 per function with reviewed baselines for existing debt and a temporary named
+exemption for the unfinished editor page. Kotlin score increases also fail. Reports are uploaded
+as `cognitive-complexity`. See [policy and local commands](../cognitive-complexity.md).
+Kotlin files additionally have a maximum total cognitive complexity of 100 via
+the custom detekt rule in `tools/detekt-rules/`; reviewed file-score increases fail.
+
 ## Code coverage
 
 Every CI run publishes whole-repository and new-code line coverage. New or changed executable production lines require at least 80%; whole-repository coverage requires at least 80% and `scripts/code_coverage/minimums.json` sets component regression floors. `coverage` merges JVM execution probes and source-mapped JS/Python inputs, rejects stale/incomplete artifacts, and is required by `ci-status`. Shared JVM setup: `gradle/coverage-conventions.gradle`. Aggregation and regression tests: `scripts/code_coverage/`. Policy and reproduction: `docs/wiki/Technical-Development.md` and `docs/design/sprint-67-ci-code-coverage.md`, with the follow-up inventory in `docs/design/specification-test-coverage.md`. Browser acceptance checks remain separate.

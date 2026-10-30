@@ -110,6 +110,8 @@ Source: `client/RestIndexSource.kt`.
 ## ingestion — `services/ingestion-service`
 
 `ImportController` → `ImportService` + `ImportValidator` → `ImportJobRepository`  
+`ImportValidator` delegates metadata, outline policy, ordered traversal, legacy compatibility and rich-content checks to focused validation helpers in `service/`; public diagnostics retain their encounter order.
+`ImportExportController` → `ImportExportService` authorizes read-back; `ImportExportRecords`, `ImportExportFidelity` and `ImportExportCounts` own pagination, directional fidelity checks and manifest counts.
 `POST /import-jobs`, `GET /import-jobs/{id}` and confirm-outline/prepare/approve/reject/publish commands. Batch, resumable upload and setup-proposal controllers are separate. Uploads stage content; preparation writes draft Catalog/Content data. Approval and publication are separate actions with reviewer/admin and publisher/admin checks respectively, and publication requires fresh MFA. One account may perform all steps if it has the required roles. `ImportPublicationDelivery` retries audit/search side effects.
 
 ## audit — `services/audit-service`
@@ -136,3 +138,9 @@ See [implementation notes](../design/sprint-40-implementation.md) and [ADR 0006]
 Shared HTTP DTOs and flattening rules: `services/platform/.../OrderedContent.kt`, [traversal contract](../design/ordered-content-traversal.md). Content serves version-scoped `/units`, ordered `/content`, and lossless `/export`; legacy article URLs remain aliases. Reader/setup use `OrderedContentTree`; comparison, search, and amendment quotations traverse canonical entries.
 
 Structured publication: `OrderedSuccessorPlan` reuses unchanged revisions and copies changed ancestor paths. `StructuredPublicationService` verifies draft/source/settings pins. Catalog successor reservations, content publish receipts, and amendment creation attempts make retries reuse their resources. Completed successor roots are sealed before catalog publication; publish responses retain logical-unit to occurrence mappings and source pins.
+
+Shared comparison enters `services/platform/.../HierarchicalDiff.kt`. Its internal
+`HierarchicalDiffIndex`, `Matching`, `Text`, `Ordering` and `Comparison` files own
+lookup views, lineage matching, text findings, stable ordering and finding
+identity. Amendment and Editor use the same API and algorithm version; Editor
+sets `skipSharedRevision=false` for in-memory preview changes.

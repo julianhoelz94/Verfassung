@@ -1,0 +1,16 @@
+# Only cognitive complexity is enabled. Other detekt rules are intentionally
+# outside this check; formatting continues to be enforced by Spotless.
+complexity:
+  active: true
+  CognitiveComplexMethod:
+    active: true
+    # detekt reports scores >= threshold; 21 therefore permits a maximum of 20,
+    # matching SonarJS's rule, which reports scores > its configured maximum.
+    threshold: 21
+
+repository-complexity:
+  active: true
+  CognitiveComplexFile:
+    active: true
+    # Inclusive budget: 100 passes, 101 fails. All contained named functions count.
+    maximum: 100

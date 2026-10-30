@@ -1,0 +1,26 @@
+<?xml version="1.0" ?>
+<SmellBaseline>
+  <ManuallySuppressedIssues/>
+  <CurrentIssues>
+    <ID>CognitiveComplexFile:AmendmentService.kt$com.constitutionatlas.amendment.service.AmendmentService.kt</ID>
+    <ID>CognitiveComplexFile:CatalogWriteService.kt$com.constitutionatlas.catalog.service.CatalogWriteService.kt</ID>
+    <ID>CognitiveComplexFile:EditorService.kt$com.constitutionatlas.editor.service.EditorService.kt</ID>
+    <ID>CognitiveComplexFile:OrderedContentService.kt$com.constitutionatlas.content.service.OrderedContentService.kt</ID>
+    <ID>CognitiveComplexFile:StructuredDraftEngine.kt$com.constitutionatlas.editor.service.StructuredDraftEngine.kt</ID>
+    <ID>CognitiveComplexMethod:AmendmentDiff.kt$AmendmentDiff$fun diff(source: List&lt;FlatNode&gt;, target: List&lt;FlatNode&gt;): List&lt;NodeChange&gt;</ID>
+    <ID>CognitiveComplexMethod:AmendmentService.kt$AmendmentService$private fun linkedChanges(tip: AmendmentDto, sourceVersionId: UUID?, targetVersionId: UUID): List&lt;AmendmentChangeWriteRequest&gt;</ID>
+    <ID>CognitiveComplexMethod:AmendmentService.kt$AmendmentService$private fun validateChangeRefs( constitutionId: UUID, sourceVersionId: UUID?, targetVersionId: UUID?, changes: List&lt;AmendmentChangeWriteRequest&gt;, allowDraftTarget: Boolean = false, ): List&lt;AmendmentChangeWriteRequest&gt;</ID>
+    <ID>CognitiveComplexMethod:CatalogWriteService.kt$CatalogWriteService$@Transactional fun createDraftVersion(constitutionId: UUID, request: CreateVersionRequest): VersionCreated</ID>
+    <ID>CognitiveComplexMethod:CatalogWriteService.kt$CatalogWriteService.Companion$fun normalizeOutline(kinds: List&lt;OutlineKindWrite&gt;): List&lt;OutlineKindWrite&gt;</ID>
+    <ID>CognitiveComplexMethod:EditorService.kt$EditorService$@Transactional fun publish(authorization: String?, sessionId: UUID, request: PublishRequest): DraftPreviewDto</ID>
+    <ID>CognitiveComplexMethod:ImportApiTest.kt$ImportApiTest$@Test fun directBatchAndChunkedImportsRequireMarkersAndAllowSharedNotes()</ID>
+    <ID>CognitiveComplexMethod:ImportService.kt$ImportService$@Transactional fun importVersion(authorization: String?, submittedBy: UUID, request: ImportRequest, batchId: UUID? = null, idempotencyKey: String? = null, expectedChecksum: String? = null): ImportJobDto</ID>
+    <ID>CognitiveComplexMethod:MigrationService.kt$MigrationService$fun prepare(run: UUID, itemId: UUID, actor: Actor, authorization: String?): MigrationItem</ID>
+    <ID>CognitiveComplexMethod:OrderedContentService.kt$OrderedContentService$@Transactional fun save(version: UUID, request: OrderedSnapshotWrite): OrderedSnapshot</ID>
+    <ID>CognitiveComplexMethod:OrderedContentService.kt$OrderedContentService$fun validate(roots: List&lt;OrderedNode&gt;, settings: StructuralSettings)</ID>
+    <ID>CognitiveComplexMethod:SettingsUsageClient.kt$SettingsUsageClient$fun inspect(versions: List&lt;UUID&gt;, proposed: List&lt;OutlineKindWrite&gt;, authorization: String?): SettingsUsage</ID>
+    <ID>CognitiveComplexMethod:SetupProposalService.kt$SetupProposalService$fun confirm(authorization: String?, id: UUID, actorId: UUID, admin: Boolean, revision: Long): SetupProposalDto</ID>
+    <ID>CognitiveComplexMethod:SetupProposalService.kt$SetupProposalService$private fun validate(request: SetupProposalRequest)</ID>
+    <ID>CognitiveComplexMethod:StructuredDraftEngine.kt$StructuredDraftEngine$fun replay(source: List&lt;DraftNode&gt;, operations: List&lt;DraftOperation&gt;, settings: DraftSettings, enforceEndnotes: Boolean = true): List&lt;DraftNode&gt;</ID>
+  </CurrentIssues>
+</SmellBaseline>

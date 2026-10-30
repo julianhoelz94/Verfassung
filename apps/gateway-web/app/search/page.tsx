@@ -13,13 +13,15 @@ import {
   searchArticles,
   searchFacets,
   type SearchFacets,
+  type SearchFilters as SearchRequestFilters,
   type SearchHit,
 } from '../../lib/api';
 import { FormattedDate } from '../../lib/format-date';
 import { atlasTitle, metaDescription, pageMetadata } from '../../lib/page-meta';
 import { SEARCH_PAGE_SIZE, parseSearchOffset, searchUrl } from '../../lib/search-url';
 import { migrationUi } from '../../lib/migration-messages';
-import { normalizeSearchSelection } from '../../lib/search-filters';
+import { normalizeSearchSelection, type SearchSelection } from '../../lib/search-filters';
+import type { Locale } from '../../lib/locale';
 
 type SearchPageProps = {
   searchParams: Promise<{
@@ -49,6 +51,50 @@ export async function generateMetadata(props: SearchPageProps): Promise<Metadata
 
 const EMPTY_FACETS: SearchFacets = { countries: [], versions: [], dates: [] };
 
+type SearchResults = {
+  hits: SearchHit[];
+  total: number;
+  limit: number;
+  error: string | null;
+};
+
+/**
+ * Loads a normalized query without contacting search for an empty keyword.
+ * Failed requests carry a localized error so the page cannot present an outage
+ * as a successful empty result or offer pagination for unavailable results.
+ */
+async function loadSearchResults(query: string, filters: SearchRequestFilters, locale: Locale): Promise<SearchResults> {
+  const empty: SearchResults = { hits: [], total: 0, limit: SEARCH_PAGE_SIZE, error: null };
+  if (!query) return empty;
+  try {
+    const page = await searchArticles(query, filters);
+    return {
+      hits: page?.hits ?? [],
+      total: page?.total ?? 0,
+      limit: page?.limit ?? SEARCH_PAGE_SIZE,
+      error: null,
+    };
+  } catch {
+    return { ...empty, error: message(locale, ui.errors.searchUnavailable) };
+  }
+}
+
+/**
+ * Labels the normalized selection while retaining filters absent from optional
+ * facet discovery. These keys also drive removal links, so unknown pinned values
+ * remain visible and removable when the facet index is unavailable.
+ */
+function activeSearchFilters(facets: SearchFacets, selection: SearchSelection & { effectiveDate: string }, locale: Locale) {
+  const { country, jurisdictionId, versionId, effectiveDate } = selection;
+  const selectedVersion = facets.versions.find(version => version.id === versionId);
+  return [
+    ...(jurisdictionId ? [{ key: 'jurisdictionId' as const, label: facets.jurisdictions?.find(item => item.id === jurisdictionId)?.name ?? jurisdictionId }] : []),
+    ...(country ? [{ key: 'country' as const, label: facets.countries.find(facet => facet.code === country)?.countryName || country }] : []),
+    ...(versionId ? [{ key: 'versionId' as const, label: selectedVersion ? `${selectedVersion.constitutionTitle} · ${selectedVersion.label}` : message(locale, usability.unlistedVersion) }] : []),
+    ...(effectiveDate ? [{ key: 'effectiveDate' as const, label: effectiveDate }] : []),
+  ];
+}
+
 export default async function SearchPage(props: SearchPageProps) {
   const locale = await currentLocale();
   const searchParams = await props.searchParams;
@@ -58,11 +104,7 @@ export default async function SearchPage(props: SearchPageProps) {
   const requestedVersion = searchParams.versionId?.trim() ?? '';
   const effectiveDate = searchParams.effectiveDate?.trim() ?? '';
   let offset = parseSearchOffset(searchParams.offset);
-  let hits: SearchHit[] = [];
-  let total = 0;
-  let limit = SEARCH_PAGE_SIZE;
   let facets: SearchFacets = EMPTY_FACETS;
-  let error: string | null = null;
   try {
     facets = (await searchFacets()) ?? EMPTY_FACETS;
   } catch {
@@ -71,26 +113,6 @@ export default async function SearchPage(props: SearchPageProps) {
   const { country, jurisdictionId, versionId } = normalizeSearchSelection(facets, { country: requestedCountry, jurisdictionId: requestedJurisdiction, versionId: requestedVersion });
   const adjusted = country !== requestedCountry || jurisdictionId !== requestedJurisdiction || versionId !== requestedVersion;
   if (adjusted) offset = 0;
-  const selectedVersion = facets.versions.find(version => version.id === versionId);
-  if (query) {
-    try {
-      const page = await searchArticles(query, {
-        country: country || undefined,
-        jurisdictionId: jurisdictionId || undefined,
-        versionId: versionId || undefined,
-        effectiveDate: effectiveDate || undefined,
-        limit: SEARCH_PAGE_SIZE,
-        offset,
-      });
-      hits = page?.hits ?? [];
-      total = page?.total ?? 0;
-      limit = page?.limit ?? SEARCH_PAGE_SIZE;
-    } catch (e) {
-      error = message(locale, ui.errors.searchUnavailable);
-      hits = [];
-      total = 0;
-    }
-  }
   const urlParams = {
     q: query,
     country: country || undefined,
@@ -98,13 +120,15 @@ export default async function SearchPage(props: SearchPageProps) {
     versionId: versionId || undefined,
     effectiveDate: effectiveDate || undefined,
   };
-
-  const activeFilters = [
-    ...(jurisdictionId ? [{ key: 'jurisdictionId' as const, label: facets.jurisdictions?.find(item => item.id === jurisdictionId)?.name ?? jurisdictionId }] : []),
-    ...(country ? [{ key: 'country' as const, label: facets.countries.find(facet => facet.code === country)?.countryName || country }] : []),
-    ...(versionId ? [{ key: 'versionId' as const, label: selectedVersion ? `${selectedVersion.constitutionTitle} · ${selectedVersion.label}` : message(locale, usability.unlistedVersion) }] : []),
-    ...(effectiveDate ? [{ key: 'effectiveDate' as const, label: effectiveDate }] : []),
-  ];
+  const { hits, total, limit, error } = await loadSearchResults(query, {
+    country: urlParams.country,
+    jurisdictionId: urlParams.jurisdictionId,
+    versionId: urlParams.versionId,
+    effectiveDate: urlParams.effectiveDate,
+    limit: SEARCH_PAGE_SIZE,
+    offset,
+  }, locale);
+  const activeFilters = activeSearchFilters(facets, { country, jurisdictionId, versionId, effectiveDate }, locale);
 
   return (
     <CollectionPage width="content" header={<PageHeader

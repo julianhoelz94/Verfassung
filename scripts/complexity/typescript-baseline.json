@@ -1,0 +1,321 @@
+{
+  "version": 1,
+  "limit": 20,
+  "entries": [
+    {
+      "path": "apps/gateway-web/app/account/page.tsx",
+      "function": "AccountPage",
+      "hash": "1795dee68446a682d9af71c037ddc2e6a036c5853442c292ba86bd729d9a21d2",
+      "score": 51,
+      "count": 1
+    },
+    {
+      "path": "apps/gateway-web/app/admin/constitutions/OutlineEditor.tsx",
+      "function": "OutlineEditor",
+      "hash": "c7ceed13c55fafb1ad585440390b444e96138dc610a382fe9bb33891d4fcffd1",
+      "score": 51,
+      "count": 1
+    },
+    {
+      "path": "apps/gateway-web/app/admin/constitutions/OutlineEditor.tsx",
+      "function": "<anonymous>",
+      "hash": "7ea0a3dab25837060e8be13c688b00846062519ef4ef8c4db583b762b586ec25",
+      "score": 25,
+      "count": 1
+    },
+    {
+      "path": "apps/gateway-web/app/admin/import/page.tsx",
+      "function": "AdminImportPage",
+      "hash": "dc3651155bd74957202f2e46f77d4bc2dc7e2bf17922e1f31858388c93e98ad3",
+      "score": 25,
+      "count": 1
+    },
+    {
+      "path": "apps/gateway-web/app/admin/import/setup/SetupProposalReview.tsx",
+      "function": "SetupProposalReview",
+      "hash": "c99b91c3f27f5999b67757611bf05abb15ed21bbb4f85449811d0162905405bb",
+      "score": 56,
+      "count": 1
+    },
+    {
+      "path": "apps/gateway-web/app/admin/import/setup/actions.ts",
+      "function": "reviewSetupAction",
+      "hash": "1b110b7168b79f54ec7c978e05dae17425e0194ca03d6dc49173d65286566591",
+      "score": 21,
+      "count": 1
+    },
+    {
+      "path": "apps/gateway-web/app/admin/legal/[key]/page.tsx",
+      "function": "AdminLegalPage",
+      "hash": "6175eceb4956118249b10afbe4a8e056b82819fb08fd24d43f5d30a7a3ea2e97",
+      "score": 30,
+      "count": 1
+    },
+    {
+      "path": "apps/gateway-web/app/admin/migrations/[id]/page.tsx",
+      "function": "MigrationReviewPage",
+      "hash": "411e8be7fcb8726dfecaa20399f4e562015615dac395bedc5be08db34599a18d",
+      "score": 49,
+      "count": 1
+    },
+    {
+      "path": "apps/gateway-web/app/api/edge-rate-limit/route.ts",
+      "function": "GET",
+      "hash": "61466ddb364eafd403a81f5ac91ca323e44d1ab79de623dc45f300dbbe095e9c",
+      "score": 26,
+      "count": 1
+    },
+    {
+      "path": "apps/gateway-web/app/components/ConstitutionText.tsx",
+      "function": "ConstitutionText",
+      "hash": "9e2dda05cfa0b9e81c90914e60d37b50ec9e6cfce479448639a7e73f50611902",
+      "score": 28,
+      "count": 1
+    },
+    {
+      "path": "apps/gateway-web/app/components/ConstitutionText.tsx",
+      "function": "richText",
+      "hash": "2894262db053aedacf5d1672b6b7c2d0d26e78bfb042ba86b0d33345da036eec",
+      "score": 49,
+      "count": 1
+    },
+    {
+      "path": "apps/gateway-web/app/components/ConstitutionText.tsx",
+      "function": "<anonymous>",
+      "hash": "44c7928aa264a8a4ec0a2c860b36284a07a2f5a29959fa9af703ab061ad6ae74",
+      "score": 57,
+      "count": 1
+    },
+    {
+      "path": "apps/gateway-web/app/components/DiffConstitutionText.tsx",
+      "function": "pair",
+      "hash": "857f39673bbd8755011a8aa487abb0bdab7095615c89b1ea7d84c1efbf839691",
+      "score": 29,
+      "count": 1
+    },
+    {
+      "path": "apps/gateway-web/app/components/SiteHeader.tsx",
+      "function": "<anonymous>",
+      "hash": "045109abaa1260c9c37c77db6682188eb193ae202f1bad60c69ec83255ba43bd",
+      "score": 21,
+      "count": 1
+    },
+    {
+      "path": "apps/gateway-web/app/countries/[code]/compare/page.tsx",
+      "function": "ComparePage",
+      "hash": "ab81a21ebc41e21db9f3625fabb96ad7843c655e0995174114ff47d2529d23b2",
+      "score": 47,
+      "count": 1
+    },
+    {
+      "path": "apps/gateway-web/app/countries/[code]/versions/[versionId]/page.tsx",
+      "function": "VersionPage",
+      "hash": "4d44b15fc757cb14b7e7c39d54c7021cbfca80c534e5096cc4bc2abf6de77ff9",
+      "score": 31,
+      "count": 1
+    },
+    {
+      "path": "apps/gateway-web/app/editor/ChangeOverview.tsx",
+      "function": "richPreview",
+      "hash": "cdb8aef873feda7041604f525c760068f393d3a8909931455da0d01b2faee12a",
+      "score": 24,
+      "count": 1
+    },
+    {
+      "path": "apps/gateway-web/app/editor/ConstitutionDetailsWorkspace.tsx",
+      "function": "ConstitutionDetailsWorkspace",
+      "hash": "9424d63b8b7b5df9ebd0527e49d456eab0166f0961ba968574c70db88192db6f",
+      "score": 43,
+      "count": 1
+    },
+    {
+      "path": "apps/gateway-web/app/editor/ContinuousCanvas.tsx",
+      "function": "dispatchTransaction",
+      "hash": "6f2ed0dff14c698d9d8b62decf2bb9e6545c63a58f30713679c050612da9f116",
+      "score": 32,
+      "count": 1
+    },
+    {
+      "path": "apps/gateway-web/app/editor/DiffReviewQueue.tsx",
+      "function": "DiffReviewQueue",
+      "hash": "1efc7ddf0516953e3e5ffc844839f1272a9dc9d30fb03565ec6600f039049b05",
+      "score": 35,
+      "count": 1
+    },
+    {
+      "path": "apps/gateway-web/app/editor/EditorLanding.tsx",
+      "function": "EditorLanding",
+      "hash": "9bdfd8f1bf18f6ccc78363eb6aaa88069c7b9909bce57df0c7ffddabea9e0f4a",
+      "score": 55,
+      "count": 1
+    },
+    {
+      "path": "apps/gateway-web/app/editor/ImportReview.tsx",
+      "function": "ImportReview",
+      "hash": "b09d98e2db2c910fd0c14c9521d62bfe5269c57ac7b02cf8355c0adce1bc30e9",
+      "score": 44,
+      "count": 1
+    },
+    {
+      "path": "apps/gateway-web/app/editor/PublishForm.tsx",
+      "function": "PublishForm",
+      "hash": "d88f9f4ac797e41bf8c338f4a990590584b38e2ecfd75052c84302a8c3f971df",
+      "score": 29,
+      "count": 1
+    },
+    {
+      "path": "apps/gateway-web/app/editor/StructuredEditor.tsx",
+      "function": "StructuredEditor",
+      "hash": "4823dd006a7159e8578b9831129248c40ab2ed20883eaf52c86d6c4c04ba401d",
+      "score": 148,
+      "count": 1
+    },
+    {
+      "path": "apps/gateway-web/app/editor/StructuredEditor.tsx",
+      "function": "<anonymous>",
+      "hash": "fafd92ad4f50a87f3df3e662ec93ca3d026fe7934a5ffe0ee8bf4dc70c18ebfa",
+      "score": 94,
+      "count": 1
+    },
+    {
+      "path": "apps/gateway-web/app/editor/StructuredEditor.tsx",
+      "function": "renderNode",
+      "hash": "57add6171ae2c385c7fc6cdeeaaee286d10e62c23c10a2eeb1157bc86d5b11bf",
+      "score": 40,
+      "count": 1
+    },
+    {
+      "path": "apps/gateway-web/app/editor/amendments/[id]/page.tsx",
+      "function": "AmendmentDetailPage",
+      "hash": "9139a99db392de856a5c1e42c960bcf0619c03ab92dad0b53059e8e5570e1e1d",
+      "score": 32,
+      "count": 1
+    },
+    {
+      "path": "apps/gateway-web/app/editor/command/route.ts",
+      "function": "POST",
+      "hash": "77b22c02c1aa8bb942c1f7e1c69ecc1dd620b7f147ba3dff47f4a719714d80c2",
+      "score": 88,
+      "count": 1
+    },
+    {
+      "path": "apps/gateway-web/app/editor/page.tsx",
+      "function": "EditorPage",
+      "hash": "d7b54a9c3e1ed6f8fa4a2442afe280bfd0de723fd1a5bba97fcbeaba1a7e3019",
+      "score": 165,
+      "count": 1
+    },
+    {
+      "path": "apps/gateway-web/app/editor/wiki/WikiWorkspace.tsx",
+      "function": "WikiWorkspace",
+      "hash": "9ef2a3ed5825569d986c93fa3483b2a7277348fe101ed2418628064529064363",
+      "score": 29,
+      "count": 1
+    },
+    {
+      "path": "apps/gateway-web/app/login/mfa/page.tsx",
+      "function": "MfaPage",
+      "hash": "e4219cfacf159d63d60240e6f0e85a25f5898cbdb1409ea6f8a46a6cdbcbd4ae",
+      "score": 26,
+      "count": 1
+    },
+    {
+      "path": "apps/gateway-web/app/login/page.tsx",
+      "function": "LoginPage",
+      "hash": "753db11fbc5e15bc17bcfc1d4dc4f540fdd08cdc39d562949826582b3cfd145d",
+      "score": 21,
+      "count": 1
+    },
+    {
+      "path": "apps/gateway-web/app/page.tsx",
+      "function": "Page",
+      "hash": "a72323ec959d2a1350290b550767b2f5dc13cc14e42274f57a441e18aa3c4a4b",
+      "score": 22,
+      "count": 1
+    },
+    {
+      "path": "apps/gateway-web/e2e/fixtures/prepopulate.mjs",
+      "function": "ensureVersions",
+      "hash": "4b7017da1b8abfa70ee95581ed7e0ab74f70c27e033d594b25680d5dcd8e13ff",
+      "score": 40,
+      "count": 1
+    },
+    {
+      "path": "apps/gateway-web/e2e/fixtures/ui-review.mjs",
+      "function": "response",
+      "hash": "d2ffd83f1b840565c2c3e8715cbdafad02d8e72d8146d7cb9bd6762a17fcdc28",
+      "score": 94,
+      "count": 1
+    },
+    {
+      "path": "apps/gateway-web/e2e/full/legacy-migration.spec.ts",
+      "function": "<anonymous>",
+      "hash": "08be3d9092d7fb246f5cc616ee769473eeee7c57ed7a4fb9592b42b0fbafaf73",
+      "score": 30,
+      "count": 1
+    },
+    {
+      "path": "apps/gateway-web/e2e/mock-api.mjs",
+      "function": "<anonymous>",
+      "hash": "a8d9ff17684a717226d36722eeb944d225d86b28e477abc4024afd1befb50ebf",
+      "score": 493,
+      "count": 1
+    },
+    {
+      "path": "apps/gateway-web/e2e/templates.spec.ts",
+      "function": "<anonymous>",
+      "hash": "649f6a22ce37a7cbc1edc734e6fbad782854ade10a7e61c142a8bd68b9e11a7b",
+      "score": 26,
+      "count": 1
+    },
+    {
+      "path": "apps/gateway-web/e2e/ui-review.spec.ts",
+      "function": "<anonymous>",
+      "hash": "383c55b97999486ca784e534a4bb9ceaec644ce5525a0d9fda962f9af768fb58",
+      "score": 33,
+      "count": 1
+    },
+    {
+      "path": "apps/gateway-web/lib/continuous-editor.ts",
+      "function": "delimitSentences",
+      "hash": "531b4ff2f85711cc2e76bc1ce6545ff59abee48791131557e8ef6ee544e61a65",
+      "score": 24,
+      "count": 1
+    },
+    {
+      "path": "apps/gateway-web/lib/ingestion-api.ts",
+      "function": "transitionImportJob",
+      "hash": "7318039080c1249165b8b4cca81332896bf2be8d76f3a4d04ef866385014fe6c",
+      "score": 26,
+      "count": 1
+    },
+    {
+      "path": "apps/gateway-web/lib/outline-preview.ts",
+      "function": "node",
+      "hash": "a1c05fb74274a62b68680bb4dd4801896f2fde5492bdbdb86fe3eeed094f988a",
+      "score": 21,
+      "count": 1
+    },
+    {
+      "path": "apps/gateway-web/lib/structured-editor.ts",
+      "function": "walk",
+      "hash": "10cd35fd48aa8979849bc82ffaab58d40b4dd679ccc14b12bdadf4192c4e3386",
+      "score": 26,
+      "count": 1
+    },
+    {
+      "path": "apps/gateway-web/proxy.ts",
+      "function": "proxy",
+      "hash": "ed578398a8164e961872ada2c6ae0841bf99268d4e6a1c7a12fc9a4d8e2b8f7e",
+      "score": 45,
+      "count": 1
+    },
+    {
+      "path": "services/mcp-server/src/server.ts",
+      "function": "runLogged",
+      "hash": "e27cd65b5dffa22482a54aa19428def4d4e911496d5ebae042c6ad296cce06a3",
+      "score": 43,
+      "count": 1
+    }
+  ]
+}

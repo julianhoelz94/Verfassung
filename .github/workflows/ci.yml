@@ -14,6 +14,42 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  cognitive-complexity:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22'
+      - name: Install cognitive complexity tools
+        run: npm ci --prefix scripts/complexity
+      - name: Verify TypeScript complexity gate
+        run: npm test --prefix scripts/complexity
+      - name: Verify Kotlin complexity gate
+        run: |
+          python3 -m unittest discover -s scripts/complexity -p 'test_kotlin_scores.py'
+          python3 scripts/complexity/test_kotlin.py
+          python3 scripts/complexity/test_kotlin_files.py
+      - name: Check Kotlin cognitive complexity
+        run: ./gradlew cognitiveComplexity
+      - name: Check TypeScript and JavaScript cognitive complexity
+        if: ${{ !cancelled() }}
+        run: npm run check --prefix scripts/complexity
+      - name: Upload cognitive complexity reports
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: cognitive-complexity
+          path: build/reports/complexity/
+          if-no-files-found: error
+          retention-days: 30
+
   backend-services:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -670,6 +706,7 @@ jobs:
   ci-status:
     if: always()
     needs:
+      - cognitive-complexity
       - coverage
       - python-coverage
       - backend-services

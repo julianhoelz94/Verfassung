@@ -79,6 +79,40 @@ Edit [docs/wiki](https://github.com/julianhoelz94/Verfassung/tree/main/docs/wiki
 
 Production deployment remains [[pending|Deployment-Information]] until a site CD workflow and verified production procedure exist. The static video player does not deploy the application.
 
+## Cognitive complexity in CI
+
+The required `cognitive-complexity` job checks Kotlin with detekt and
+TypeScript/JavaScript with ESLint and SonarJS. The limit is **20 per function**;
+existing debt is recorded in reviewed baselines. These tools are free and need no
+Sonar server. The downloadable `cognitive-complexity` artifact includes locations
+and scores for over-limit functions, including existing debt. Tests are included.
+Kotlin exceptions also have reviewed maximum scores, so an increase in an existing
+function fails CI. All editor code follows the normal gates: the editor page's
+existing debt is tied to its reviewed token fingerprint, and body changes to an
+over-limit function fail. There are no construction exemptions.
+Kotlin files also have a total cognitive-complexity budget of **100**, computed
+with detekt's file metric. Functions below 20 contribute to the total. Existing
+over-budget files are baselined and cannot exceed their reviewed maxima. This
+encourages extraction into focused classes and modules as part of cleanup.
+
+Import validation demonstrates this boundary: `ImportValidator` retains its public
+entry points and delegates metadata, outline, ordered-content, legacy and rich-content
+checks to focused classes with KDoc. Contract tests preserve diagnostic codes,
+messages and order, exact legacy text projections and complete-document references.
+Export read-back similarly separates record pagination, fidelity checks and resource
+counts. Tests retain exact snapshot hashes, cursor error precedence, downstream
+authorization, Unicode chunks and explicit completeness reporting.
+Shared hierarchical diffing similarly separates indexing, ancestry matching,
+text comparison, sibling/finding ordering and stable finding generation. Both
+amendment and editor review flows retain exact finding keys and fingerprints;
+editor previews continue to compare in-memory content even when revision IDs
+are shared.
+
+From the repository root, run `npm ci --prefix scripts/complexity`,
+`./gradlew cognitiveComplexity`, and `npm run check --prefix scripts/complexity`.
+See the [complexity policy](https://github.com/julianhoelz94/Verfassung/blob/main/docs/cognitive-complexity.md)
+for baseline behavior, limitations, and cleanup guidance.
+
 ## Code coverage in CI
 
 Every CI run publishes **whole-repository line coverage** and **new-code line

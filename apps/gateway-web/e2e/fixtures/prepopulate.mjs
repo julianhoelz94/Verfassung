@@ -1,35 +1,44 @@
+import { parseOptions } from './scenarios/definitions.mjs';
+import { runScenarios } from './scenarios/index.mjs';
+import { allPages } from './scenarios/runtime.mjs';
 import { fixtureVersion, publishFixture } from './prepopulate-import.mjs';
-import { authenticateFixtures, prepopulateTarget } from './prepopulate-access.mjs';
+import { authenticateFixtures, prepopulateTarget, requireCompletedFixtureSetup } from './prepopulate-access.mjs';
 import { readFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const fixtureDir = join(dirname(fileURLToPath(import.meta.url)), 'generated');
 const manifest = JSON.parse(readFileSync(join(fixtureDir, 'manifest.json'), 'utf8'));
-const verifyOnly = process.argv.includes('--verify-only');
+const { verifyOnly, profile } = parseOptions(process.argv.slice(2));
 const baseUrl = prepopulateTarget(process.env);
 const endpoint = (path) => new URL(`/api/${path}`, baseUrl).toString();
 const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 let token;
 let reviewerToken;
 let publisherToken;
+let editorToken;
+let viewerToken;
 const publicVersions = {};
 
-async function api(method, path, body, authenticated = method === 'GET' && Boolean(token), extraHeaders = {}) {
-  const response = await fetch(endpoint(path), {
+async function raw(method, path, body, authenticated = method === 'GET' && Boolean(token), extraHeaders = {}) {
+  if (verifyOnly && method !== 'GET' && !['identity/login', 'identity/login/mfa'].includes(path)) throw new Error(`Verify-only refused ${method} ${path}`);
+  const form = body instanceof FormData;
+  return fetch(endpoint(path), {
     method,
-    headers: { ...extraHeaders, Accept: 'application/json', ...(body === undefined ? {} : { 'Content-Type': 'application/json' }), ...(authenticated ? { Authorization: `Bearer ${authenticated === true ? token : authenticated}` } : {}) },
-    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-    signal: AbortSignal.timeout(30000),
+    headers: { ...extraHeaders, Accept: 'application/json', ...(body === undefined || form ? {} : { 'Content-Type': 'application/json' }), ...(authenticated ? { Authorization: `Bearer ${authenticated === true ? token : authenticated}` } : {}) },
+    ...(body === undefined ? {} : { body: form ? body : JSON.stringify(body) }),
+    signal: AbortSignal.timeout(60000),
   });
+}
+async function api(method, path, body, authenticated = method === 'GET' && Boolean(token), extraHeaders = {}) {
+  const response = await raw(method, path, body, authenticated, extraHeaders);
   const text = await response.text();
-  const value = text ? JSON.parse(text) : null;
-  if (!response.ok) throw new Error(`${method} ${path}: HTTP ${response.status} ${text.slice(0, 1000)}`);
-  return value;
+  if (!response.ok) { const error = new Error(`${method} ${path}: HTTP ${response.status} ${text.slice(0, 1000)}`); error.status = response.status; throw error; }
+  return text ? JSON.parse(text) : null;
 }
 
 async function authenticate() {
-  ({ token, reviewerToken, publisherToken } = await authenticateFixtures(api, process.env));
+  ({ token, reviewerToken, publisherToken, editorToken, viewerToken } = await authenticateFixtures(api, process.env, profile !== 'compact'));
 }
 
 async function waitForStack() {
@@ -60,7 +69,7 @@ function comparableNodes(nodes) {
 }
 
 async function verifyArticles(versionId, payload) {
-  const articles = await api('GET', `content/versions/${versionId}/articles?includeBody=true&limit=200`);
+  const articles = await allPages(api, `content/versions/${versionId}/articles?includeBody=true`);
   if (payload.roots?.length) {
     assertEqual(articles.length, payload.roots.length, `${payload.isoCode}/${payload.versionLabel} root count`);
     payload.roots.forEach((root, index) => {
@@ -249,7 +258,7 @@ async function verifyTotals(ids) {
   assertEqual(Object.keys(ids.versions).length, manifest.expected.versions, 'fixture versions');
   assertEqual(Object.keys(ids.amendments).length, manifest.expected.amendments, 'fixture amendments');
   let articleCount = 0;
-  for (const versionId of Object.values(ids.versions)) articleCount += (await api('GET', `content/versions/${versionId}/articles?limit=200`)).length;
+  for (const versionId of Object.values(ids.versions)) articleCount += (await allPages(api, `content/versions/${versionId}/articles`)).length;
   assertEqual(articleCount, manifest.expected.articles, 'fixture article snapshots');
   if (!verifyOnly) await api('POST', 'search/reindex', undefined, true);
   for (const country of manifest.countries) {
@@ -274,16 +283,14 @@ async function verifyTotals(ids) {
 }
 
 await waitForStack();
-if (process.env.PREPOPULATE_DEPLOYMENT_ENVIRONMENT) {
-  const setup = await api('GET', 'identity/setup/status');
-  if (setup.completed !== true) throw new Error('Deployment succeeded. Complete the site setup wizard and create fixture accounts before running prepopulate.');
-}
+await requireCompletedFixtureSetup(api);
 await authenticate();
 const ids = { constitutions: {}, versions: {}, amendments: {} };
 await ensureVersions(ids);
 await ensureAmendments(ids);
 await verifyTotals(ids);
+await runScenarios({ api, raw, pause, token, editorToken, viewerToken, reviewerToken, publisherToken, verifyOnly, profile, baseUrl, deploymentEnvironment: process.env.PREPOPULATE_DEPLOYMENT_ENVIRONMENT, ids, runtimeDir: join(fixtureDir, '.runtime'), refreshTokens: async () => { await authenticate(); return { token, editorToken, viewerToken, reviewerToken, publisherToken }; } });
 const resultPath = join(fixtureDir, '.runtime', 'prepopulate-ids.json');
 mkdirSync(dirname(resultPath), { recursive: true });
 writeFileSync(resultPath, `${JSON.stringify(ids, null, 2)}\n`);
-console.log(`Prepopulation ${verifyOnly ? 'verified' : 'uploaded and verified'}: ${JSON.stringify(manifest.expected)}`);
+console.log(`Prepopulation ${profile} baseline ${verifyOnly ? 'verified' : 'uploaded and verified'}: ${JSON.stringify(manifest.expected)}`);

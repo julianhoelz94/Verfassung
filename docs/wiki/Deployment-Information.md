@@ -5,7 +5,7 @@
 The complete preparation instructions are available here:
 
 - [[Coolify server setup|Coolify-Server-Setup]] — fresh Ubuntu, private Tailscale administration, public HTTPS, GitHub credentials and host backup.
-- [[Manual deployment|Manual-Deployment]] — required settings, manual test/prod selection, automatic application configuration, Let's Encrypt and optional prepopulate.
+- [[Manual deployment|Manual-Deployment]] — required settings, manual test/prod selection, automatic application configuration, Let's Encrypt and optional prepopulate with compact, extended and scale profiles, account secrets and saved retry journals.
 
 These pages are generated from the repository's canonical guides so the Wiki and repository instructions stay aligned. Their availability does not establish that a remote deployment has succeeded.
 

@@ -24,7 +24,7 @@ The journeys in the table below use `mock-api.mjs` and verify UI behavior agains
 | Publisher confirms stale quotes after a historical correction | `full/amendments.spec.ts`: real stale quote review |
 | Editor, reviewer, and publisher release a legal successor with a source document | `full/zz-legal-successor.spec.ts`: real legal successor publication |
 
-The fixture verifier checks 2 countries, 2 constitutions, 5 published versions, 60 article snapshots, 3 amendments, nested content, predecessor links, revision history, source documents, and indexed search hits. A second upload and `--verify-only` pass prove idempotence. Detailed UI states beyond these journeys remain in the faster mock suite.
+The compact fixture verifier checks 3 countries, 3 constitutions, 7 published versions, 66 top-level content snapshots, 3 amendments, nested content, predecessor links, revision history, source documents, and indexed search hits. A second upload and `--verify-only` pass prove idempotence. Detailed UI states beyond these journeys remain in the faster mock suite.
 
 | Stories | Playwright journey | Durable outcome or permission assertion |
 | --- | --- | --- |
@@ -49,3 +49,27 @@ The fixture verifier checks 2 countries, 2 constitutions, 5 published versions, 
 | Shared 3 | `login-stories.spec.ts` invalid and valid MFA journeys | Rejects an invalid authenticator code without a session and accepts a valid challenge for sensitive roles. |
 
 The mock API is reset before each test and holds mutable workflow state during a journey. Mutation tests assert later mock reads or mock public outcomes instead of only checking a success message.
+
+## Prepopulated exploration scenarios
+
+The local default `extended` profile also creates the named scenarios listed in
+[`generated/scenario-catalog.md`](fixtures/generated/scenario-catalog.md).
+`full/fixture-scenarios.spec.ts` verifies non-standard layouts (mixed roots,
+skipped levels, untitled/unnumbered units and interleaved parent text), shared
+literal footnotes, structural moves, saved review work, private import exclusion,
+regional source wording, captured source downloads and missing comparison counterparts.
+The uploader additionally asserts exact ordered content/export/lineage, pinned
+settings, immutable sources, document bytes and search pages through real APIs.
+`scenarios/scenarios.test.mjs` covers deterministic layout contracts, profile
+selection, pagination, interrupted seeding and preservation of manual edits.
+
+Use `compact` for only the original XA/XB/XC records, `extended` for the interactive
+examples, or `scale` to include 225-provision snapshots. Resolved URLs and current
+workflow states are in the ignored `.runtime/scenario-guide.md` and
+`.runtime/scenario-index.json`. Mutable workflows use separate constitutions;
+ordinary reruns preserve their progress instead of resetting them.
+
+The full-stack job uploads and verifies the optional scale profile after ordinary
+browser and documentation journeys, then includes it in the recovery read-back.
+Pagination beyond 200 provisions is proved against real APIs without expanding
+every preceding journey's baseline.

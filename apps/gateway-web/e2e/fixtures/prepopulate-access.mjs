@@ -45,7 +45,7 @@ function totp(secret) {
   return String((digest.readUInt32BE(offset) & 0x7fffffff) % 1000000).padStart(6, '0');
 }
 
-export async function authenticateFixtures(api, env) {
+export async function authenticateFixtures(api, env, extended = false) {
   const password = env.PREPOPULATE_ADMIN_PASSWORD || env.CI_ADMIN_PASSWORD || env.LOCAL_ADMIN_PASSWORD;
   const secret = env.PREPOPULATE_TOTP_SECRET || env.IDENTITY_SEED_TOTP_SECRET || (env.LOCAL_ADMIN_EMAIL ? 'CAATLASMFASEED22' : undefined);
   const remote = Boolean(env.PREPOPULATE_DEPLOYMENT_ENVIRONMENT);
@@ -63,5 +63,10 @@ export async function authenticateFixtures(api, env) {
     if (!session.token) throw new Error(`Prepopulate ${role.toLowerCase()} login returned no session token`);
     return session.token;
   }
-  return { token: await login('ADMIN'), reviewerToken: await login('REVIEWER'), publisherToken: await login('PUBLISHER') };
+  return { token: await login('ADMIN'), reviewerToken: await login('REVIEWER'), publisherToken: await login('PUBLISHER'), ...(extended ? { editorToken: await login('EDITOR'), viewerToken: await login('VIEWER') } : {}) };
+}
+
+export async function requireCompletedFixtureSetup(api) {
+  const setup = await api('GET', 'identity/setup/status');
+  if (setup.completed !== true) throw new Error('Complete the site setup wizard and create fixture accounts before running prepopulate.');
 }

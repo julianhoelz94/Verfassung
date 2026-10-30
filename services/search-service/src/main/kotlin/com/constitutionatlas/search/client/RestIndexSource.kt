@@ -56,20 +56,15 @@ class RestIndexSource(
         var offset = 0
         val articles = mutableListOf<IndexableArticle>()
         while (true) {
-            val summaries = content.get()
-                .uri("/versions/{id}/units?offset={offset}&limit={limit}", version.currentVersionId ?: version.id, offset, pageSize)
+            val page = content.get()
+                .uri("/versions/{id}/units?offset={offset}&limit={limit}&includeBody=true", version.currentVersionId ?: version.id, offset, pageSize)
                 .retrieve()
-                .body(object : ParameterizedTypeReference<List<ArticleSummaryWire>>() {})
+                .body(object : ParameterizedTypeReference<List<ArticleWire>>() {})
                 .orEmpty()
-            if (summaries.isEmpty()) {
+            if (page.isEmpty()) {
                 break
             }
-            for (summary in summaries) {
-                val detail = content.get()
-                    .uri("/versions/{version}/units/{id}", version.currentVersionId ?: version.id, summary.id)
-                    .retrieve()
-                    .body(ArticleDetailWire::class.java)
-                    ?: continue
+            for (detail in page) {
                 articles += IndexableArticle(
                     articleId = detail.id,
                     versionId = detail.versionId,
@@ -87,7 +82,7 @@ class RestIndexSource(
                     historical = jurisdiction.historical,
                 )
             }
-            if (summaries.size < pageSize) {
+            if (page.size < pageSize) {
                 break
             }
             offset += pageSize
@@ -120,12 +115,7 @@ class RestIndexSource(
     private data class VersionOwnershipWire(val jurisdictionId: UUID, val countryCode: String? = null)
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    private data class ArticleSummaryWire(
-        val id: UUID,
-    )
-
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    private data class ArticleDetailWire(
+    private data class ArticleWire(
         val id: UUID,
         val versionId: UUID,
         val articleNumber: String,

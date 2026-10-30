@@ -1,19 +1,22 @@
 package com.constitutionatlas.editor.client
 
 import com.constitutionatlas.editor.DownstreamException
-import com.constitutionatlas.platform.timedRestClient
+import com.constitutionatlas.platform.timedRestClientBuilder
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.web.client.RestClient
 import org.springframework.web.client.RestClientException
+import java.time.Duration
 
 class RestSearchIndexClient(
     searchUrl: String,
     private val bearerToken: String? = null,
 ) : SearchIndexClient {
-    private val client: RestClient = timedRestClient(searchUrl)
+    // Rebuilds traverse the published corpus; timing out early leaves the rebuild
+    // running while the outbox submits another copy on its next attempt.
+    private val client: RestClient = timedRestClientBuilder(searchUrl, Duration.ofSeconds(60)).build()
 
     override fun reindex() {
         try {

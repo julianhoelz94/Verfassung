@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { prepopulateTarget, authenticateFixtures } from './prepopulate-access.mjs';
+import { prepopulateTarget, authenticateFixtures, requireCompletedFixtureSetup } from './prepopulate-access.mjs';
 
 const remote = {
   PREPOPULATE_DEPLOYMENT_ENVIRONMENT: 'test',
@@ -47,4 +47,12 @@ test('existing CI credentials still work without deployment variables', async ()
   });
   assert.equal(tokens.reviewerToken, 'ci-reviewer@example.local');
   assert.equal(tokens.publisherToken, 'ci-publisher@example.local');
+});
+
+
+test('all fixture targets require completed deployment setup before non-admin logins', async () => {
+  const calls = [];
+  await requireCompletedFixtureSetup(async (method, path) => { calls.push([method, path]); return { completed: true }; });
+  assert.deepEqual(calls, [['GET', 'identity/setup/status']]);
+  await assert.rejects(requireCompletedFixtureSetup(async () => ({ completed: false })), /Complete the site setup wizard/);
 });

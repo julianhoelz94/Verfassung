@@ -442,7 +442,7 @@ jobs:
       IDENTITY_SEED_TOTP_SECRET: CAATLASMFASEED22
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: full-stack-service-jars
           path: .
@@ -503,7 +503,7 @@ jobs:
           mkdir -p "$RUNNER_TEMP/fixture-state-before"
           mv e2e/fixtures/generated/.runtime/scenario-journal-*.json "$RUNNER_TEMP/fixture-state-before/"
       - name: Restore fixture journals from their artifact
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           artifact-ids: ${{ steps.fixture-checkpoint.outputs.artifact-id }}
           merge-multiple: true
@@ -634,19 +634,19 @@ jobs:
         run: python -m coverage run --parallel-mode scripts/code_coverage/run_python.py
       - name: Include real recovery execution in Python coverage
         if: needs.full-stack-e2e.result == 'success'
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: python-recovery-execution
           path: .
       - name: Include real publication execution in Python coverage
         if: needs.publish-journey.result == 'success'
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: python-publication-execution
           path: .
       - name: Include real transport execution in Python coverage
         if: needs.gateway-image.result == 'success'
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: python-transport-execution
           path: .
@@ -681,7 +681,7 @@ jobs:
           java-version: '21'
       - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
       - name: Download this run's coverage inputs
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: coverage-input-*
           path: coverage/inputs

@@ -783,6 +783,30 @@ class IdentityApiTest {
     }
 
     @Test
+    fun managedEditorCredentialAuthenticatesWithoutHumanRolesAndRotatesWithoutCreatingUsers() {
+        val users = com.constitutionatlas.identity.repo.IdentityRepository(jdbcTemplate)
+        val setup = com.constitutionatlas.identity.setup.SetupRepository(jdbcTemplate)
+        val originalUsers = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM users", Int::class.java)
+        val initial = UUID.randomUUID().toString().replace("-", "").repeat(2)
+        fun register(value: String) = com.constitutionatlas.identity.service.EditorCredentialBootstrap(users, setup, value).run(DefaultApplicationArguments())
+        register(initial)
+        register(initial)
+        mockMvc.get("/me") { header("Authorization", "Bearer $initial") }.andExpect {
+            status { isOk() }
+            jsonPath("$.email") { value("service:managed-editor") }
+            jsonPath("$.roles.length()") { value(0) }
+            jsonPath("$.scopes") { value(org.hamcrest.Matchers.containsInAnyOrder("catalog:write", "catalog:publish", "content:write", "amendment:write", "amendment:publish", "audit:append", "search:reindex")) }
+        }
+        val rotated = UUID.randomUUID().toString().replace("-", "").repeat(2)
+        register(rotated)
+        mockMvc.get("/me") { header("Authorization", "Bearer $initial") }.andExpect { status { isUnauthorized() } }
+        mockMvc.get("/me") { header("Authorization", "Bearer $rotated") }.andExpect { status { isOk() } }
+        mockMvc.get("/users") { header("Authorization", "Bearer $rotated") }.andExpect { status { isUnauthorized() } }
+        check(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM service_tokens WHERE name = 'managed-editor' AND revoked_at IS NULL", Int::class.java) == 1)
+        check(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM users", Int::class.java) == originalUsers)
+    }
+
+    @Test
     fun managedIngestionCredentialsAuthenticateWithOnlyTheirOwnScopeAndRotate() {
         val users = com.constitutionatlas.identity.repo.IdentityRepository(jdbcTemplate)
         val setup = com.constitutionatlas.identity.setup.SetupRepository(jdbcTemplate)

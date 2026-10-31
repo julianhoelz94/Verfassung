@@ -132,12 +132,14 @@ class CoolifyTests(unittest.TestCase):
     def test_production_credentials_are_independent_and_rotated_without_demo_seeding(self):
         first = {item["key"]: item["value"] for item in deploy.env_payload(manifest())["data"]}
         second = {item["key"]: item["value"] for item in deploy.env_payload(manifest())["data"]}
-        credentials = [first["INGESTION_" + purpose + "_TOKEN"] for purpose in ("PUBLISH", "AUDIT", "SEARCH")]
-        self.assertEqual(len(set(credentials)), 3)
+        names = ["INGESTION_" + purpose + "_TOKEN" for purpose in ("PUBLISH", "AUDIT", "SEARCH")] + ["EDITOR_SERVICE_TOKEN"]
+        credentials = [first[name] for name in names]
+        self.assertEqual(len(set(credentials)), 4)
         self.assertTrue(all(deploy.re.fullmatch(r"[A-Za-z0-9_-]{64}", value) for value in credentials))
         self.assertEqual(first["IDENTITY_SEED_MODE"], "off")
         self.assertNotIn("IDENTITY_SEED_INGESTION_PUBLISH_TOKEN", first)
-        self.assertNotEqual(first["INGESTION_PUBLISH_TOKEN"], second["INGESTION_PUBLISH_TOKEN"])
+        for name in names:
+            self.assertNotEqual(first[name], second[name])
 
     def test_private_origin_prevents_sending_credentials_to_public_hosts(self):
         for value in ["https://example.com", "http://100.64.0.1:8000/api/v1", "http://user@coolify:8000", "file://coolify"]:
@@ -343,6 +345,21 @@ class CoolifyTests(unittest.TestCase):
 
 
 class RuntimeTests(unittest.TestCase):
+    def test_cd_provisions_editor_authentication_without_any_additional_operator_secret(self):
+        document = yaml.safe_load(render_compose.render(ROOT))
+        identity = document["services"]["identity-service"]["environment"]
+        editor = document["services"]["editor-service"]["environment"]
+        self.assertEqual(identity["EDITOR_MANAGED_CREDENTIALS"], "true")
+        self.assertEqual(identity["EDITOR_SERVICE_TOKEN"], editor["EDITOR_SERVICE_TOKEN"])
+        self.assertIn(":?", editor["EDITOR_SERVICE_TOKEN"])
+        with patch.dict(os.environ, {}, clear=True):
+            generated = {item["key"]: item["value"] for item in deploy.env_payload(manifest())["data"]}
+        self.assertRegex(generated["EDITOR_SERVICE_TOKEN"], r"^[A-Za-z0-9_-]{64}$")
+        for name, service in document["services"].items():
+            if name not in {"identity-service", "editor-service"}:
+                self.assertNotIn("EDITOR_SERVICE_TOKEN", service.get("environment", {}))
+        self.assertNotIn("EDITOR_SERVICE_TOKEN", deploy.SHARED_VARIABLES)
+
     def test_runtime_has_no_host_ports_builds_or_checkout_mounts(self):
         document = yaml.safe_load(render_compose.render(ROOT))
         self.assertEqual(document["services"]["gateway-web"]["environment"]["DEPLOYED_TAG"], "${DEPLOYED_TAG:-}")

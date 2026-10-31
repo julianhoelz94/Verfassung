@@ -61,8 +61,14 @@ export async function authenticateFixtures(api, env, extended = false) {
     return session.token;
   }
   const token = await login('ADMIN');
-  // CD uses the existing administrator. CI retains actual restricted-role accounts.
-  if (remote) return { token, reviewerToken: token, publisherToken: token, ...(extended ? { editorToken: token, viewerToken: false } : {}) };
+  // Every CD workflow stage uses this existing administrator. Internal service
+  // credentials are provisioned by deployment, never supplied to this script.
+  if (remote) {
+    const actor = await api('GET', 'identity/me', undefined, token);
+    if (!actor.roles?.includes('admin')) throw new Error('The configured prepopulate account must have the admin role.');
+    return { token, reviewerToken: token, publisherToken: token, ...(extended ? { editorToken: token, viewerToken: false } : {}) };
+  }
+  // Local/CI permission scenarios retain actual restricted-role accounts.
   return { token, reviewerToken: await login('REVIEWER'), publisherToken: await login('PUBLISHER'), ...(extended ? { editorToken: await login('EDITOR'), viewerToken: await login('VIEWER') } : {}) };
 }
 

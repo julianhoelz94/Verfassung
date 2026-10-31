@@ -10,6 +10,9 @@ spring:
       read-timeout: 5s
 identity:
   internal:
+    editor-credentials:
+      enabled: ${EDITOR_MANAGED_CREDENTIALS:false}
+      token: ${EDITOR_SERVICE_TOKEN:}
     ingestion-credentials:
       enabled: ${INGESTION_MANAGED_CREDENTIALS:false}
       publish: ${INGESTION_PUBLISH_TOKEN:}

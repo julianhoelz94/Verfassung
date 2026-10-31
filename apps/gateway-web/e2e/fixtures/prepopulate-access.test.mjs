@@ -26,8 +26,9 @@ test('localhost fixture behavior remains opt in', () => {
 
 test('CD authenticates the existing admin once and uses that session for every publication stage', async () => {
   const calls = [];
-  const api = async (method, path, body) => {
-    calls.push({ path, body });
+  const api = async (method, path, body, actor) => {
+    calls.push({ path, body, actor });
+    if (path === 'identity/me') return { roles: ['admin'] };
     if (path.endsWith('/mfa')) return { token: body.challengeToken };
     return { mfaRequired: true, challengeToken: body.email };
   };
@@ -36,9 +37,10 @@ test('CD authenticates the existing admin once and uses that session for every p
   assert.equal(tokens.token, remote.PREPOPULATE_ADMIN_EMAIL);
   assert.equal(tokens.reviewerToken, tokens.token);
   assert.equal(tokens.publisherToken, tokens.token);
-  assert.deepEqual(calls.map(call => call.path), ['identity/login', 'identity/login/mfa']);
+  assert.deepEqual(calls.map(call => call.path), ['identity/login', 'identity/login/mfa', 'identity/me']);
   assert.equal(calls[0].body.password, 'admin-password');
   assert.match(calls[1].body.code, /^\d{6}$/);
+  assert.equal(calls[2].actor, tokens.token);
   await assert.rejects(authenticateFixtures(api, { ...remote, PREPOPULATE_TOTP_SECRET: '' }), /admin.*TOTP/);
 });
 
@@ -94,11 +96,25 @@ test('extended CD scenarios use the admin for editing and no authenticated viewe
   const calls = [];
   const tokens = await authenticateFixtures(async (method, path, body) => {
     calls.push(path);
+    if (path === 'identity/me') return { roles: ['admin'] };
     return { token: body.email };
   }, remote, true);
   assert.equal(tokens.editorToken, tokens.token);
   assert.equal(tokens.reviewerToken, tokens.token);
   assert.equal(tokens.publisherToken, tokens.token);
   assert.equal(tokens.viewerToken, false);
-  assert.deepEqual(calls, ['identity/login']);
+  assert.deepEqual(calls, ['identity/login', 'identity/me']);
+});
+
+test('CD refuses a non-admin account before creating any fixture data', async () => {
+  for (const roles of [[], ['editor', 'reviewer', 'publisher'], undefined]) {
+    const calls = [];
+    await assert.rejects(authenticateFixtures(async (method, path, body, token) => {
+      calls.push([method, path]);
+      if (path === 'identity/login') return { token: 'session-token' };
+      assert.equal(token, 'session-token');
+      return { roles };
+    }, remote, true), /admin role/);
+    assert.deepEqual(calls, [['POST', 'identity/login'], ['GET', 'identity/me']]);
+  }
 });

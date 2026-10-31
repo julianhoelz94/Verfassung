@@ -241,11 +241,12 @@ def env_payload(manifest):
         "CADDY_EXPOSE_API_DOCS": "true",
     })
     values.update({key: "{{environment." + key + "}}" for key in SHARED_VARIABLES})
-    # The production identity bootstrap registers these hashes with one narrow
-    # scope each. Both services receive the same release-specific credentials;
-    # demo seeding remains off. Never print/persist this payload in release logs.
+    # Identity registers only the backend's required scopes. These credentials
+    # support publication and durable background delivery independently of the
+    # prepopulate administrator session; demo seeding remains off. Never log them.
     values.update({"INGESTION_" + purpose + "_TOKEN": secrets.token_urlsafe(48)
                    for purpose in ("PUBLISH", "AUDIT", "SEARCH")})
+    values["EDITOR_SERVICE_TOKEN"] = secrets.token_urlsafe(48)
     # Coolify invokes Compose's build phase even for an image-only stack. Compose
     # must resolve every required input then as well as during container startup.
     return {"data": [{"key": key, "value": value, "is_preview": False,

@@ -247,6 +247,7 @@ def env_payload(manifest):
     values.update({"INGESTION_" + purpose + "_TOKEN": secrets.token_urlsafe(48)
                    for purpose in ("PUBLISH", "AUDIT", "SEARCH")})
     values["EDITOR_SERVICE_TOKEN"] = secrets.token_urlsafe(48)
+    values["IDENTITY_AUDIT_TOKEN"] = secrets.token_urlsafe(48)
     # Coolify invokes Compose's build phase even for an image-only stack. Compose
     # must resolve every required input then as well as during container startup.
     return {"data": [{"key": key, "value": value, "is_preview": False,

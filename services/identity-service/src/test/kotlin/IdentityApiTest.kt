@@ -783,6 +783,23 @@ class IdentityApiTest {
     }
 
     @Test
+    fun managedIdentityAuditCredentialCanOnlyAppendAuditEventsAndHasNoHumanRole() {
+        val users = com.constitutionatlas.identity.repo.IdentityRepository(jdbcTemplate)
+        val setup = com.constitutionatlas.identity.setup.SetupRepository(jdbcTemplate)
+        val originalUsers = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM users", Int::class.java)
+        val token = UUID.randomUUID().toString().replace("-", "").repeat(2)
+        com.constitutionatlas.identity.service.IdentityAuditCredentialBootstrap(users, setup, token).run(DefaultApplicationArguments())
+        mockMvc.get("/me") { header("Authorization", "Bearer $token") }.andExpect {
+            status { isOk() }
+            jsonPath("$.roles.length()") { value(0) }
+            jsonPath("$.scopes.length()") { value(1) }
+            jsonPath("$.scopes[0]") { value("audit:append") }
+        }
+        mockMvc.get("/users") { header("Authorization", "Bearer $token") }.andExpect { status { isUnauthorized() } }
+        check(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM users", Int::class.java) == originalUsers)
+    }
+
+    @Test
     fun managedEditorCredentialAuthenticatesWithoutHumanRolesAndRotatesWithoutCreatingUsers() {
         val users = com.constitutionatlas.identity.repo.IdentityRepository(jdbcTemplate)
         val setup = com.constitutionatlas.identity.setup.SetupRepository(jdbcTemplate)

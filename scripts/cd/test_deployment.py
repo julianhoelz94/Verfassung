@@ -132,9 +132,9 @@ class CoolifyTests(unittest.TestCase):
     def test_production_credentials_are_independent_and_rotated_without_demo_seeding(self):
         first = {item["key"]: item["value"] for item in deploy.env_payload(manifest())["data"]}
         second = {item["key"]: item["value"] for item in deploy.env_payload(manifest())["data"]}
-        names = ["INGESTION_" + purpose + "_TOKEN" for purpose in ("PUBLISH", "AUDIT", "SEARCH")] + ["EDITOR_SERVICE_TOKEN"]
+        names = ["INGESTION_" + purpose + "_TOKEN" for purpose in ("PUBLISH", "AUDIT", "SEARCH")] + ["EDITOR_SERVICE_TOKEN", "IDENTITY_AUDIT_TOKEN"]
         credentials = [first[name] for name in names]
-        self.assertEqual(len(set(credentials)), 4)
+        self.assertEqual(len(set(credentials)), 5)
         self.assertTrue(all(deploy.re.fullmatch(r"[A-Za-z0-9_-]{64}", value) for value in credentials))
         self.assertEqual(first["IDENTITY_SEED_MODE"], "off")
         self.assertNotIn("IDENTITY_SEED_INGESTION_PUBLISH_TOKEN", first)
@@ -359,6 +359,10 @@ class RuntimeTests(unittest.TestCase):
             if name not in {"identity-service", "editor-service"}:
                 self.assertNotIn("EDITOR_SERVICE_TOKEN", service.get("environment", {}))
         self.assertNotIn("EDITOR_SERVICE_TOKEN", deploy.SHARED_VARIABLES)
+        self.assertEqual(identity["IDENTITY_MANAGED_AUDIT_CREDENTIAL"], "true")
+        self.assertEqual(identity["AUDIT_API_BEARER"], "${IDENTITY_AUDIT_TOKEN:?Deploy using the manual deployment workflow}")
+        self.assertNotIn("IDENTITY_AUDIT_TOKEN", deploy.SHARED_VARIABLES)
+        self.assertNotEqual(generated["IDENTITY_AUDIT_TOKEN"], generated["EDITOR_SERVICE_TOKEN"])
 
     def test_runtime_has_no_host_ports_builds_or_checkout_mounts(self):
         document = yaml.safe_load(render_compose.render(ROOT))

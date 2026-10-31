@@ -10,6 +10,8 @@ spring:
       read-timeout: 5s
 identity:
   internal:
+    audit-credentials:
+      enabled: ${IDENTITY_MANAGED_AUDIT_CREDENTIAL:false}
     editor-credentials:
       enabled: ${EDITOR_MANAGED_CREDENTIALS:false}
       token: ${EDITOR_SERVICE_TOKEN:}

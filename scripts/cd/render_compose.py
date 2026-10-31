@@ -52,6 +52,8 @@ def render(root):
                 "PROD_ADMIN_PASSWORD": "${PROD_ADMIN_PASSWORD:?Set the bootstrap admin password}",
                 "INGESTION_MANAGED_CREDENTIALS": "true",
                 "EDITOR_MANAGED_CREDENTIALS": "true",
+                "IDENTITY_MANAGED_AUDIT_CREDENTIAL": "true",
+                "AUDIT_API_BEARER": "${IDENTITY_AUDIT_TOKEN:?Deploy using the manual deployment workflow}",
             })
         if name in {"identity-service", "editor-service"}:
             environment["EDITOR_SERVICE_TOKEN"] = "${EDITOR_SERVICE_TOKEN:?Deploy using the manual deployment workflow}"

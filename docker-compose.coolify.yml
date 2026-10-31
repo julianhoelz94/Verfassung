@@ -179,7 +179,10 @@ services:
       SERVER_FORWARD_HEADERS_STRATEGY: framework
       IDENTITY_MFA_ENCRYPTION_KEY: ${IDENTITY_MFA_ENCRYPTION_KEY:?Set the persistent encryption key}
       AUDIT_API_URL: http://audit-service:8080
-      AUDIT_API_BEARER: ${AUDIT_API_BEARER:-}
+      AUDIT_API_BEARER: ${IDENTITY_AUDIT_TOKEN:?Deploy using the manual deployment workflow}
+      IDENTITY_MANAGED_AUDIT_CREDENTIAL: 'true'
+      EDITOR_MANAGED_CREDENTIALS: 'true'
+      EDITOR_SERVICE_TOKEN: ${EDITOR_SERVICE_TOKEN:?Deploy using the manual deployment workflow}
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:?Set the public HTTPS origin}
       PROD_EDITOR_EMAIL: ${PROD_EDITOR_EMAIL:-}
       PROD_EDITOR_PASSWORD: ${PROD_EDITOR_PASSWORD:-}
@@ -247,7 +250,7 @@ services:
       CATALOG_API_URL: http://catalog-service:8080
       AMENDMENT_API_URL: http://amendment-service:8080
       SEARCH_API_URL: http://search-service:8080
-      EDITOR_SERVICE_TOKEN: ${EDITOR_SERVICE_TOKEN:-}
+      EDITOR_SERVICE_TOKEN: ${EDITOR_SERVICE_TOKEN:?Deploy using the manual deployment workflow}
     depends_on:
       editor-db:
         condition: service_healthy

@@ -162,6 +162,12 @@ From the repository root, run `npm ci --prefix scripts/complexity`,
 See the [complexity policy](https://github.com/julianhoelz94/Verfassung/blob/main/docs/cognitive-complexity.md)
 for baseline behavior, limitations, and cleanup guidance.
 
+Editor interaction now separates state/commands, plain rendering and ordered
+canvas planning without changing focus, history or authored text. Content and
+Catalog likewise separate persistence phases, immutable revision writes, outline
+normalization and impact checks while retaining their existing transactions and
+public APIs. The completed Batch 2–4 exceptions are removed under the same budgets.
+
 ## Code coverage in CI
 
 Every CI run publishes **whole-repository line coverage** and **new-code line

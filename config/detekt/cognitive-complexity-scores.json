@@ -19,31 +19,6 @@
       "score": 53
     },
     {
-      "path": "services/catalog-service/src/main/kotlin/com/constitutionatlas/catalog/client/SettingsUsageClient.kt",
-      "function": "inspect",
-      "score": 33
-    },
-    {
-      "path": "services/catalog-service/src/main/kotlin/com/constitutionatlas/catalog/service/CatalogWriteService.kt",
-      "function": "createDraftVersion",
-      "score": 33
-    },
-    {
-      "path": "services/catalog-service/src/main/kotlin/com/constitutionatlas/catalog/service/CatalogWriteService.kt",
-      "function": "normalizeOutline",
-      "score": 50
-    },
-    {
-      "path": "services/content-service/src/main/kotlin/com/constitutionatlas/content/service/OrderedContentService.kt",
-      "function": "save",
-      "score": 58
-    },
-    {
-      "path": "services/content-service/src/main/kotlin/com/constitutionatlas/content/service/OrderedContentService.kt",
-      "function": "validate",
-      "score": 24
-    },
-    {
       "path": "services/ingestion-service/src/main/kotlin/com/constitutionatlas/ingestion/service/ImportService.kt",
       "function": "importVersion",
       "score": 22
@@ -73,14 +48,6 @@
     {
       "path": "services/amendment-service/src/main/kotlin/com/constitutionatlas/amendment/service/AmendmentService.kt",
       "score": 116
-    },
-    {
-      "path": "services/catalog-service/src/main/kotlin/com/constitutionatlas/catalog/service/CatalogWriteService.kt",
-      "score": 116
-    },
-    {
-      "path": "services/content-service/src/main/kotlin/com/constitutionatlas/content/service/OrderedContentService.kt",
-      "score": 102
     }
   ]
 }

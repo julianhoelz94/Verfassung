@@ -60,7 +60,11 @@ is verified in PR CI; actual media capture/publication runs after merge.
 
 ## Compact structured editing
 
-The active canvas is app/editor/StructuredEditor.tsx with ContinuousCanvas.tsx (ProseMirror), compact-editor.module.css and lib/continuous-editor.ts. EditorWorkspace.tsx owns hideable navigation and workflow disclosure; ChangeOverview.tsx presents readable differences. The authenticated editor/view projection returns a pinned global note/reference index, lazy root bodies, or the full body only for explicit Preview.
+The active canvas is app/editor/StructuredEditor.tsx with ContinuousCanvas.tsx (ProseMirror), compact-editor.module.css and lib/continuous-editor.ts. `structured-editor-model.tsx` owns the existing state/command/effect lifecycle;
+`structured-editor-presentation.tsx` uses plain render helpers to preserve React
+tree identity, and `structured-canvas-reconciliation.ts` plans ordered operations.
+Canvas transaction phases and pure segmentation/local replay helpers remain
+behind their existing public exports. EditorWorkspace.tsx owns hideable navigation and workflow disclosure; ChangeOverview.tsx presents readable differences. The authenticated editor/view projection returns a pinned global note/reference index, lazy root bodies, or the full body only for explicit Preview.
 
 Shared app/components/Footnotes.tsx and InlineText.tsx render note drawers and structured marks in editing, reading and comparison. lib/footnotes.ts indexes a pinned version once; lib/draft-footnotes.ts indexes draft notes before lazy projection. Readers use lib/ordered-content.ts for node and text-entry targets. Continuous national/regional readers compose VersionReader, ReaderArticle, ReaderComparison and ReaderDetails with route-owned Wiki and editorial slots. Country version, article and unit routes share `countries/[code]/versions/[versionId]/CountryConstitutionReader.tsx`; passage routes validate the unit and supply an initial target. An explicit paragraph/sentence hash takes precedence, and legacy article hashes resolve to the same article in the shared reader. lib/reader.ts handles comparison/presentation, reader-search.ts uses DOM ranges and CSS highlights, and reader-preferences.ts persists local reading choices. app/api/reader/compare/route.ts verifies same-constitution published snapshots before loading text; proxy.ts and Caddy retain browsing policy and quotas.
 
@@ -86,3 +90,10 @@ Country and regional constitution overview routes share `ConstitutionOverview`; 
 `app/editor/command/route.ts`; request/error utilities and amendment, draft,
 source-evidence and publication handlers in that directory preserve native
 redirects, JSON modes and trusted-origin guards.
+
+## Outline editing and preview
+
+`admin/constitutions/OutlineEditor.tsx` composes focused creation/review/layer
+components; `outline-editor-model.ts` owns pure layer updates and authoring checks.
+`lib/outline-preview.ts` retains deterministic example identity, sample wording,
+cycle handling and translation ordering. Catalog remains the write authority.

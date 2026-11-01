@@ -10,7 +10,7 @@ structured replay under the limits, removing their cleanup baseline entries.
 All editor changes follow the same normal gates as other code.
 
 The original assessment below used a target of 15 and remains a historical
-comparison, not the active cleanup scope. The current inventory follows Batch 1 below.
+comparison, not the active cleanup scope. The current inventory follows Batches 2–4 below.
 
 The pilot starts from fetched `main` revision `bee7b4b` (2026-10-28), including
 Kotlin 2.4 / Spring Boot 4.1, Next.js 16 / React 19, and the specification-derived
@@ -255,9 +255,101 @@ rebased branch. Kotlin debt was unchanged. TypeScript's **45 → 52** reviewed
 exceptions reflect only newer `main`; every changed-source path was verified
 byte-for-byte against `f927cad`. Cleanup then removes exactly two Kotlin method,
 two Kotlin file and two TypeScript exceptions. Limits and waiver policy are
-unchanged. Remaining debt is **13 Kotlin method exceptions, 3 Kotlin file
+unchanged. After Batch 1 the remaining debt was **13 Kotlin method exceptions, 3 Kotlin file
 exceptions and 50 TypeScript exceptions**: **55 production functions and 8
 test/fixture functions**. Other lower-priority work remains outside Batch 1.
+
+## Batches 2–4: editor interaction, Content and Catalog/outline
+
+These three batches continue from `d17ac66`, after fetching unchanged `main`
+**`f927cad`**. No source/dependency updates or additional baseline allowances
+were needed before cleanup. The 14 production targets are:
+
+| Batch | Responsibility | Before | After |
+| --- | --- | ---: | ---: |
+| 2 | `StructuredEditor` | 148 | 0 |
+| 2 | Ordered canvas reconciliation callback | 94 | replacement planner helpers ≤12 |
+| 2 | `renderNode` | 40 | 2 |
+| 2 | Canvas `dispatchTransaction` | 32 | 14 |
+| 2 | `delimitSentences` | 24 | 16 |
+| 2 | Local operation replay `walk` | 26 | 2 |
+| 3 | `OrderedContentService.save` | 58 | 0 |
+| 3 | `OrderedContentService.validate` | 24 | 0 |
+| 4 | `CatalogWriteService.createDraftVersion` | 33 | 0 |
+| 4 | `CatalogWriteService.normalizeOutline` | 50 | 0 |
+| 4 | `SettingsUsageClient.inspect` | 33 | 3 |
+| 4 | `OutlineEditor` | 51 | 11 |
+| 4 | Outline review block | 25 | replacement components ≤13 |
+| 4 | Outline preview `node` | 21 | 1 |
+
+All changed/new functions meet **20**. New Kotlin helpers have KDoc and meet
+**100 per file**; TypeScript helpers have JSDoc. Bounds in the table describe
+responsibilities split across replacement helpers, rather than assigning one
+score to an entire helper group.
+
+Batch 2 keeps the editor's existing command/effect bodies, React tree identity,
+ref/effect order, undo/coalescing, selection, lazy loading, notes/markers, rich
+formatting and exact text behavior. State/model, plain rendering and ordered
+canvas planning are separated. Canvas callbacks keep anchor capture, rejection
+rollback and canonical acknowledgement ordering. Original 63 helper/controller
+tests passed before editing; the refactored suite adds two controller contracts.
+All 71 editor acceptance tests and six new ordered planner contracts pass.
+An isolated pure-function check matched **5,000 exact sentence slices** and
+**5,000 complete local replay results/errors** against the original functions.
+Independent planner verification also matched **10,000 exact callback/planner
+cases**: roots, raw emitted order, coalesced operations and errors (7,829 successes
+and 2,171 identical failures), including merge/split/move/note/reference cases.
+
+Batch 3 preserves Content's public API/constructor and transaction ownership,
+including all repeated receipt, seal and lock checks in their original order.
+Immutable writes retain UUID/member lookup, current-then-source membership,
+node/text insertion and final validation order. The service file falls from
+**102 to 20**, with helpers **17, 16 and 21** (combined **74**, previously 102).
+The full service check, Spotless and coverage pass: **63 tests**, including
+**14 original-first contracts**. Independent isolated comparison matched
+**600 saves** (results/errors and globally ordered repository/Catalog/receipt
+calls, normalizing generated UUIDs); a separate check matched **4,000 validation
+outcomes** including full rich error detail order. Coverage is **236/239 lines**
+across the four production files.
+
+Batch 4 preserves Catalog's historical request hashes, reservation fast paths,
+chain-tip/source/settings checks and transaction boundary. Normalization keeps
+exact defaults, Unicode delimiter policy, graph validation and error precedence.
+The Catalog writer file falls from **116 to 30**; version creation, outline
+normalization and impact helpers score **28, 27 and 20**, with client file **3**
+and maximum helper function **16**. The full Catalog check, Spotless and coverage
+pass: **86 tests**, including **14 original-first contracts**, with **93.42%**
+service line coverage. Isolated checks matched **4,000 normalization results/errors**
+and **260 version-creation results/errors/ordered repository traces** (generated
+version UUIDs normalized).
+
+Outline editing keeps its DOM/forms, focus, controlled state, rename/root/child
+rules and payloads. Preview generation preserves path-local cycle handling,
+identity/order, exact sample wording and translation-call order. All **58 focused
+tests** pass, including **15 contracts also verified against the original code**.
+A seeded check matched **1,500 graphs / 5,946 exact preview/translation results**.
+
+Combined verification passes **1,280 gateway Vitest tests**, **31 Node tests**,
+typecheck, lint and production build. Content and Catalog full checks pass
+**63 and 86 tests** respectively; **13 policy tests**, both repository complexity
+gates, hygiene and Wiki checks pass. Separate review and independent verification
+found no blockers. No threshold or construction-waiver changes were needed.
+
+Exactly **five Kotlin method, two Kotlin file and nine TypeScript exceptions**
+are removed, with no new waivers or budget changes. Remaining debt is **8 Kotlin
+method exceptions, 1 Kotlin file exception and 41 TypeScript exceptions**:
+**41 production functions and 8 test/fixture functions**. Only
+`AmendmentService.kt` remains over the Kotlin file budget (116).
+
+The remaining batches retain the agreed responsibilities:
+
+| Batch | Scope | Remaining functions |
+| --- | --- | ---: |
+| 5 | Amendment references/diff/linking and review/publication UI | 7 |
+| 6 | Import, migration, setup and associated admin/review workflows | 10 |
+| 7 | Public reader, rich text, translation and comparison | 12 |
+| 8 | Account/site/supporting workspaces, proxy/rate limits and MCP logging | 12 |
+| 9 | Test infrastructure, mock API and fixture/journey helpers | 8 |
 
 ## Original assessment at a maximum of 15
 

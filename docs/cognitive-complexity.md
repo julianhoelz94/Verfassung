@@ -25,11 +25,10 @@ Classes, objects, and top-level functions in one file share its budget.
 This follows detekt's named-function metric; constructor/property initializers
 and property accessors outside those functions are not scored separately.
 
-After rebasing onto `main` at `f927cad` and completing Batch 1, the file
-baseline contains three production files: `AmendmentService` (116),
-`CatalogWriteService` (116), and `OrderedContentService` (102). Editor publishing,
-structured replay and their focused helpers now meet both budgets, alongside the
-earlier ingestion and shared-diff packages. Existing debt is measured per source
+After Batches 1–4, based on `main` at `f927cad`, only `AmendmentService.kt` remains
+in the Kotlin file baseline, at 116. Content persistence, Catalog/outline,
+editor publishing/replay and their helpers meet both budgets, alongside the
+earlier ingestion and shared-diff work. Existing debt is measured per source
 path; it grants no exemptions to future similarly named files.
 
 Extracting helpers within one file does not remove their control flow from this

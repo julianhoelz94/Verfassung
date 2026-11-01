@@ -31,42 +31,160 @@ export function applyOperation(roots: DraftNode[], op: DraftOperation): DraftNod
     }
     return retained.map(insert);
   }
+  /** Descendants are replayed first; duplicate node/entry targets retain their original traversal semantics. */
   function walk(node: DraftNode): DraftNode {
-    let content = node.content.map(entry => entry.node ? { ...entry, node: walk(entry.node) } : entry);
-    let result = { ...node, content };
-    if (node.logicalId === op.targetId) {
-      if (op.type === 'set_metadata') result = { ...result, title: op.title, label: op.label, draftId: op.id };
-      if (op.type === 'insert_text' || op.type === 'insert_child') {
-        const entry: DraftEntry = op.type === 'insert_text' ? { type: 'text', ...op.parts![0], draftId: op.id } : { type: 'child', node: markInserted(op.node!, op.id) };
-        content = [...content.slice(0, op.position), entry, ...content.slice(op.position)];
-        result = { ...result, content, draftId: op.id };
-      }
-    }
-    const index = content.findIndex(entry => entry.logicalId === op.targetId || entry.node?.logicalId === op.targetId);
-    if (index >= 0) {
-      const entry = content[index];
-      if (op.type === 'replace_text') content = content.map((item, i) => i === index ? { ...item, text: op.text, draftId: op.id, ...(op.format === undefined ? {} : { format: op.format, table: op.table, footnoteLabel: op.footnoteLabel, references: op.references ?? [], marks: op.marks ?? [], lineBreaksBefore:op.lineBreaksBefore??item.lineBreaksBefore??0, annotation: op.annotation }) } : item);
-      if (op.type === 'remove') content = content.filter((_, i) => i !== index);
-      if (op.type === 'split_text') {
-        if (entry.type !== 'text' || (entry.format && entry.format !== 'plain') || entry.table || op.parts!.map(part => part.text).join('') !== entry.text) throw new Error('Split must preserve plain text exactly.');
-        let offset = 0;
-        const parts = op.parts!.map((part,index) => { const rich = sliceBlock({ nodeId: node.logicalId, textId: entry.logicalId!, text: entry.text!, marks: entry.marks ?? [], references: entry.references ?? [] }, offset, offset + part.text.length); offset += part.text.length; return { type: 'text' as const, ...part, ...rich, lineBreaksBefore:index?part.lineBreaksBefore??0:entry.lineBreaksBefore??0, draftId: op.id }; });
-        content = [...content.slice(0, index), ...parts, ...content.slice(index + 1)];
-      }
-      if (op.type === 'merge_text') {
-        const adjacent = content.slice(index, index + op.mergeIds!.length);
-        if (adjacent.some((item, i) => item.type !== 'text' || (item.format && item.format !== 'plain') || item.table || item.logicalId !== op.mergeIds![i])) throw new Error('Merge cannot cross a child boundary or rich entry.');
-        let offset = 0; const marks: NonNullable<DraftEntry['marks']> = [], references: NonNullable<DraftEntry['references']> = [];
-        adjacent.forEach(item => { marks.push(...(item.marks ?? []).map(mark => ({ ...mark, start: mark.start + offset, end: mark.end + offset }))); references.push(...(item.references ?? []).map(reference => ({ ...reference, start: reference.start + offset, end: reference.end + offset }))); offset += (item.text ?? '').length; });
-        content = [...content.slice(0, index), { type: 'text', ...op.parts![0], lineBreaksBefore:entry.lineBreaksBefore??0, marks: normalizeMarks(marks), references, draftId: op.id }, ...content.slice(index + adjacent.length)];
-      }
-      if (content !== result.content) result = { ...result, content, draftId: op.id };
-    }
-    return result;
+    const mappedContent = node.content.map(entry => entry.node ? { ...entry, node: walk(entry.node) } : entry);
+    const result = applyNodeEdit({ ...node, content: mappedContent }, op);
+    const index = result.content.findIndex(entry => entry.logicalId === op.targetId || entry.node?.logicalId === op.targetId);
+    if (index < 0) return result;
+    const content = applyEntryEdit(node, result.content, index, op);
+    return content !== result.content ? { ...result, content, draftId: op.id } : result;
   }
   const mapped = roots.map(walk);
   return remapDraftTargets(op.type === 'remove' ? mapped.filter(node => node.logicalId !== op.targetId) : mapped, op);
 }
+/** Metadata and insertion target the owning node before any matching entry is edited. */
+function applyNodeEdit(node: DraftNode, op: DraftOperation): DraftNode {
+  if (node.logicalId !== op.targetId) return node;
+  let result = node;
+  if (op.type === 'set_metadata')
+    result = { ...result, title: op.title, label: op.label, draftId: op.id };
+  if (op.type === 'insert_text' || op.type === 'insert_child') {
+    const entry: DraftEntry =
+      op.type === 'insert_text'
+        ? { type: 'text', ...op.parts![0], draftId: op.id }
+        : { type: 'child', node: markInserted(op.node!, op.id) };
+    const content = result.content;
+    result = {
+      ...result,
+      content: [...content.slice(0, op.position), entry, ...content.slice(op.position)],
+      draftId: op.id,
+    };
+  }
+  return result;
+}
+
+/** Entry edits return the original array when the operation does not apply, preserving draft-token decisions. */
+function applyEntryEdit(
+  node: DraftNode,
+  content: DraftEntry[],
+  index: number,
+  op: DraftOperation,
+): DraftEntry[] {
+  if (op.type === 'replace_text')
+    return content.map((item, i) =>
+      i === index
+        ? {
+            ...item,
+            text: op.text,
+            draftId: op.id,
+            ...(op.format === undefined
+              ? {}
+              : {
+                  format: op.format,
+                  table: op.table,
+                  footnoteLabel: op.footnoteLabel,
+                  references: op.references ?? [],
+                  marks: op.marks ?? [],
+                  lineBreaksBefore: op.lineBreaksBefore ?? item.lineBreaksBefore ?? 0,
+                  annotation: op.annotation,
+                }),
+          }
+        : item,
+    );
+  if (op.type === 'remove') return content.filter((_, i) => i !== index);
+  if (op.type === 'split_text') return splitEntry(node, content, index, op);
+  if (op.type === 'merge_text') return mergeEntries(content, index, op);
+  return content;
+}
+
+/** Plain splits preserve exact wording and slice marks/references at the existing UTF-16 boundaries. */
+function splitEntry(
+  node: DraftNode,
+  content: DraftEntry[],
+  index: number,
+  op: DraftOperation,
+): DraftEntry[] {
+  const entry = content[index];
+  if (
+    entry.type !== 'text' ||
+    (entry.format && entry.format !== 'plain') ||
+    entry.table ||
+    op.parts!.map((part) => part.text).join('') !== entry.text
+  )
+    throw new Error('Split must preserve plain text exactly.');
+  let offset = 0;
+  const parts = op.parts!.map((part, partIndex) => {
+    const rich = sliceBlock(
+      {
+        nodeId: node.logicalId,
+        textId: entry.logicalId!,
+        text: entry.text!,
+        marks: entry.marks ?? [],
+        references: entry.references ?? [],
+      },
+      offset,
+      offset + part.text.length,
+    );
+    offset += part.text.length;
+    return {
+      type: 'text' as const,
+      ...part,
+      ...rich,
+      lineBreaksBefore: partIndex ? (part.lineBreaksBefore ?? 0) : (entry.lineBreaksBefore ?? 0),
+      draftId: op.id,
+    };
+  });
+  return [...content.slice(0, index), ...parts, ...content.slice(index + 1)];
+}
+
+/** Merge validates adjacency first, then offsets existing rich spans and retains the first entry's separator. */
+function mergeEntries(content: DraftEntry[], index: number, op: DraftOperation): DraftEntry[] {
+  const adjacent = content.slice(index, index + op.mergeIds!.length);
+  if (
+    adjacent.some(
+      (item, i) =>
+        item.type !== 'text' ||
+        (item.format && item.format !== 'plain') ||
+        item.table ||
+        item.logicalId !== op.mergeIds![i],
+    )
+  )
+    throw new Error('Merge cannot cross a child boundary or rich entry.');
+  let offset = 0;
+  const marks: NonNullable<DraftEntry['marks']> = [],
+    references: NonNullable<DraftEntry['references']> = [];
+  adjacent.forEach((item) => {
+    marks.push(
+      ...(item.marks ?? []).map((mark) => ({
+        ...mark,
+        start: mark.start + offset,
+        end: mark.end + offset,
+      })),
+    );
+    references.push(
+      ...(item.references ?? []).map((reference) => ({
+        ...reference,
+        start: reference.start + offset,
+        end: reference.end + offset,
+      })),
+    );
+    offset += (item.text ?? '').length;
+  });
+  return [
+    ...content.slice(0, index),
+    {
+      type: 'text',
+      ...op.parts![0],
+      lineBreaksBefore: content[index].lineBreaksBefore ?? 0,
+      marks: normalizeMarks(marks),
+      references,
+      draftId: op.id,
+    },
+    ...content.slice(index + adjacent.length),
+  ];
+}
+
 export function remapDraftTargets(roots: DraftNode[], op: DraftOperation): DraftNode[] {
   const replacements = new Map<string, string[]>();
   if (op.type === 'remove' && op.replacementId) replacements.set(op.targetId, [op.replacementId]);

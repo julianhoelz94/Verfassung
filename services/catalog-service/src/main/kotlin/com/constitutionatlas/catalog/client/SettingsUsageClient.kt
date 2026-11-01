@@ -21,6 +21,7 @@ class SettingsUsageClient(
     private val content = timedRestClient(contentUrl)
     private val editor = timedRestClient(editorUrl)
 
+    /** Reads each persisted version before its authorized drafts, retaining transport and policy failure precedence. */
     fun inspect(versions: List<UUID>, proposed: List<OutlineKindWrite>, authorization: String?): SettingsUsage {
         val violations = mutableListOf<SettingsViolation>()
         val draftIds = mutableListOf<UUID>()
@@ -30,31 +31,7 @@ class SettingsUsageClient(
                 authorization?.let { request.header("Authorization", it) }
                 val snapshot = request.retrieve().body(JsonNode::class.java)
                     ?: throw ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Content impact unavailable")
-                val byCode = proposed.associateBy { it.kindCode }
-                fun walk(node: JsonNode, parent: OutlineKindWrite?) {
-                    val logical = node.path("logicalId").scalarText().takeIf { it.isNotEmpty() }?.let(UUID::fromString)
-                    fun violation(field: String, message: String) {
-                        violations += SettingsViolation(version, logical, field, message)
-                    }
-                    val code = node.path("kind").scalarText()
-                    val level = byCode[code]
-                    if (level == null || (parent == null && level.root != true) || (parent != null && code !in parent.allowedChildKinds.orEmpty())) {
-                        violation("kind", "Stored '$code' is not allowed ${if (parent == null) "at the root" else "under '${parent.kindCode}'"}")
-                        return
-                    }
-                    val title = node.path("title").takeUnless { it.isNull }?.scalarText().orEmpty()
-                    val label = node.path("label").takeUnless { it.isNull }?.scalarText().orEmpty()
-                    if ((level.titlePolicy == "required" && title.isBlank()) || (level.titlePolicy == "none" && title.isNotEmpty())) violation("title", "Stored title violates the proposed authoring policy")
-                    if ((level.labelPolicy == "required" && label.isBlank()) || (level.labelPolicy == "none" && label.isNotEmpty())) violation("label", "Stored literal label violates the proposed policy")
-                    node.path("content").forEach { entry ->
-                        if (entry.path("type").scalarText() == "child") {
-                            walk(entry.path("node"), level)
-                        } else if (level.allowedChildKinds.orEmpty().isNotEmpty() && !level.allowTextAlongsideChildren) {
-                            violation("content", "Stored parent text requires permission alongside children")
-                        }
-                    }
-                }
-                snapshot.path("roots").forEach { walk(it, null) }
+                violations += SettingsImpactRules(version, proposed).inspect(snapshot)
                 if (authorization != null) {
                     val sessions = editor.get().uri("/edit-sessions?versionId={id}", version).header("Authorization", authorization).retrieve().body(JsonNode::class.java)
                         ?: throw ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Draft impact unavailable")

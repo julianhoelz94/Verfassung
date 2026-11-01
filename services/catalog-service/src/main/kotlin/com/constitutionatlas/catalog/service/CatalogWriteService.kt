@@ -33,6 +33,8 @@ class CatalogWriteService(
     private val jurisdictions: JurisdictionRepository,
     private val creationReceipts: com.constitutionatlas.catalog.repo.ConstitutionCreationRepository,
 ) {
+    private val versions = CatalogVersionCreation(catalogRepository, settingsRepository, publishAttempts)
+
     @Transactional
     fun createCountry(request: CreateCountryRequest): CountrySummary {
         val iso = request.isoCode.trim().uppercase()
@@ -106,141 +108,9 @@ class CatalogWriteService(
         return response
     }
 
-    private fun legacySourceRequestHash(request: CreateVersionRequest): String? {
-        val source = request.sourceEvidence?.takeIf { it.description == null } ?: return null
-        // Preserve reservation hashes from before SourceEvidence gained description.
-        val evidence = "SourceEvidence(dateWording=${source.dateWording}, datePrecision=${source.datePrecision}, coverage=${source.coverage}, statusWording=${source.statusWording}, attribution=${source.attribution})"
-        val original = "CreateVersionRequest(versionLabel=${request.versionLabel}, effectiveDate=${request.effectiveDate}, languageCode=${request.languageCode}, sourceUrl=${request.sourceUrl}, gazetteReference=${request.gazetteReference}, predecessorVersionId=${request.predecessorVersionId}, hopKind=${request.hopKind}, publicationComment=${request.publicationComment}, structuralSettingsRevisionId=${request.structuralSettingsRevisionId}, publishAttemptId=${request.publishAttemptId}, importJobId=${request.importJobId}, sourceEvidence=$evidence)"
-        return java.security.MessageDigest.getInstance("SHA-256").digest(original.toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it) }
-    }
-
-    private fun inheritedSourceRequestHash(request: CreateVersionRequest): String? {
-        val evidence = request.sourceEvidence ?: return null
-        if (request.hopKind != "editorial_correction") return null
-        val predecessor = request.predecessorVersionId?.let(catalogRepository::findVersion) ?: return null
-        if (predecessor.publicationStatus != "published" || predecessor.sourceEvidence != evidence) return null
-        // Older Editor requests omitted the override; Catalog inherited this same evidence.
-        return java.security.MessageDigest.getInstance("SHA-256").digest(request.copy(sourceEvidence = null).toString().toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it) }
-    }
-
+    /** Creates or replays a draft reservation inside this service's existing transaction. */
     @Transactional
-    fun createDraftVersion(constitutionId: UUID, request: CreateVersionRequest): VersionCreated {
-        if (!catalogRepository.constitutionExists(constitutionId)) {
-            throw NotFoundException("Unknown constitution '$constitutionId'")
-        }
-        publishAttempts.lock(constitutionId)
-        val requestHash = java.security.MessageDigest.getInstance("SHA-256").digest(request.toString().toByteArray()).joinToString("") { "%02x".format(it) }
-        request.publishAttemptId?.let { attempt ->
-            publishAttempts.find(attempt)?.let { reservation ->
-                if (reservation.constitutionId != constitutionId || (reservation.requestHash != requestHash && reservation.requestHash != legacySourceRequestHash(request) && reservation.requestHash != inheritedSourceRequestHash(request))) throw ConflictException("Publish attempt payload changed", "publish_attempt_mismatch")
-                return catalogRepository.findVersionCreated(reservation.versionId) ?: throw NotFoundException("Reserved version missing")
-            }
-        }
-        val label = request.versionLabel.trim()
-        if (catalogRepository.versionLabelExists(constitutionId, label)) {
-            throw ConflictException("Version '$label' already exists")
-        }
-
-        val predecessorId = request.predecessorVersionId
-        val id = UUID.randomUUID()
-        val hopKind: String
-        val listing: String
-        val legalVersionId: UUID
-        val legalPredecessorId: UUID?
-        val editorialPredecessorId: UUID?
-
-        if (predecessorId == null) {
-            if (catalogRepository.listAllVersionIds(constitutionId).isNotEmpty()) {
-                throw ConflictException(
-                    "predecessorVersionId is required to append to an existing chain",
-                    "not_legal_tip",
-                )
-            }
-            hopKind = "initial"
-            listing = "public"
-            legalVersionId = id
-            legalPredecessorId = null
-            editorialPredecessorId = null
-        } else {
-            val hop = canonicalizeHopKind(request.hopKind)
-            hopKind = hop
-            listing = if (hopKind == "editorial_correction") "staff" else "public"
-            val predecessor = catalogRepository.findVersion(predecessorId)
-            if (predecessor == null || predecessor.constitutionId != constitutionId) {
-                throw ConflictException("Unknown predecessor version", "unknown_predecessor")
-            }
-            val predecessorLegalId = predecessor.legalVersionId
-                ?: throw ConflictException("Unknown predecessor version", "unknown_predecessor")
-            when (hopKind) {
-                "editorial_correction" -> {
-                    val editorialTip = catalogRepository.findEditorialTipId(predecessorLegalId)
-                    if (predecessorId != editorialTip) {
-                        throw ConflictException(
-                            "Predecessor is not the editorial tip of this legal version",
-                            "not_editorial_tip",
-                        )
-                    }
-                    legalVersionId = predecessorLegalId
-                    legalPredecessorId = null
-                    editorialPredecessorId = predecessorId
-                }
-                "legal" -> {
-                    val legalTipEditorial = catalogRepository.findLegalTipEditorialTipId(constitutionId)
-                    if (predecessorId != legalTipEditorial) {
-                        throw ConflictException(
-                            "Predecessor is not the editorial tip of the current legal tip",
-                            "not_legal_tip",
-                        )
-                    }
-                    legalVersionId = id
-                    legalPredecessorId = predecessorId
-                    editorialPredecessorId = null
-                }
-                else -> throw IllegalArgumentException("hopKind must be one of: legal, editorial_correction")
-            }
-        }
-
-        try {
-            catalogRepository.insertDraftVersion(
-                id,
-                constitutionId,
-                label,
-                request.effectiveDate,
-                request.languageCode,
-                request.sourceUrl,
-                request.gazetteReference,
-                request.publicationComment?.trim()?.ifBlank { null },
-                predecessorId,
-                hopKind,
-                listing,
-                legalVersionId,
-                legalPredecessorId,
-                editorialPredecessorId,
-                (request.sourceEvidence ?: if (hopKind == "editorial_correction") predecessorId?.let { catalogRepository.findVersion(it)?.sourceEvidence } else null)?.also { it.validate() },
-            )
-        } catch (ex: DataIntegrityViolationException) {
-            if (hopKind == "editorial_correction") {
-                throw ConflictException(
-                    "Predecessor is not the editorial tip of this legal version",
-                    "not_editorial_tip",
-                )
-            }
-            if (predecessorId != null) {
-                throw ConflictException(
-                    "Predecessor is not the editorial tip of the current legal tip",
-                    "not_legal_tip",
-                )
-            }
-            throw ex
-        }
-
-        request.importJobId?.let { catalogRepository.holdImportedVersion(id, it) }
-        request.structuralSettingsRevisionId?.let { settingsRepository.find(constitutionId, it) }
-        settingsRepository.pin(id, constitutionId, predecessorId, request.structuralSettingsRevisionId)
-        request.publishAttemptId?.let { publishAttempts.insert(it, constitutionId, id, requestHash) }
-        return catalogRepository.findVersionCreated(id)
-            ?: VersionCreated(id, constitutionId, label, "draft", predecessorId, hopKind, listing, legalVersionId)
-    }
+    fun createDraftVersion(constitutionId: UUID, request: CreateVersionRequest): VersionCreated = versions.create(constitutionId, request)
 
     fun publishAttempt(id: UUID): VersionCreated {
         val reservation = publishAttempts.find(id) ?: throw NotFoundException("Unknown publish attempt")
@@ -294,8 +164,6 @@ class CatalogWriteService(
     }
 
     companion object {
-        private val KIND_CODE = Regex("^[a-z][a-z0-9_-]{0,31}$")
-
         fun canonicalizeHopKind(raw: String?): String {
             val hop = raw?.trim()
             if (hop.isNullOrBlank()) {
@@ -308,87 +176,7 @@ class CatalogWriteService(
             }
         }
 
-        fun normalizeOutline(kinds: List<OutlineKindWrite>): List<OutlineKindWrite> {
-            if (kinds.isEmpty()) {
-                throw IllegalArgumentException("outline must have at least one layer")
-            }
-            val normalized = kinds.mapIndexed { index, kind ->
-                val code = kind.kindCode.trim().lowercase()
-                val label = kind.displayLabel.trim()
-                val presentation = kind.presentation.trim().lowercase()
-                if (!KIND_CODE.matches(code)) {
-                    throw IllegalArgumentException("kindCode '$code' must be a lowercase slug")
-                }
-                if (label.isBlank()) {
-                    throw IllegalArgumentException("displayLabel is required for layer ${index + 1}")
-                }
-                if (presentation != "section" && presentation != "concatenated") {
-                    throw IllegalArgumentException("presentation must be section or concatenated")
-                }
-                val children = kind.allowedChildKinds?.map { it.trim().lowercase() }
-                    ?: kinds.getOrNull(index + 1)?.let { listOf(it.kindCode.trim().lowercase()) }.orEmpty()
-                if (code == "sentence" && children.isNotEmpty()) throw IllegalArgumentException("sentence cannot have child units")
-                if (children.isEmpty() && kind.allowTextAlongsideChildren) throw IllegalArgumentException("a leaf has no child units")
-                if (kind.titlePolicy !in setOf("none", "optional", "required") ||
-                    kind.labelPolicy !in setOf("none", "optional", "required")
-                ) {
-                    throw IllegalArgumentException("titlePolicy and labelPolicy must be none, optional or required")
-                }
-                if (kind.showTitle && kind.titlePolicy == "none") {
-                    throw IllegalArgumentException("public title display requires editor title permission")
-                }
-                if (kind.showLabel && kind.labelPolicy == "none") {
-                    throw IllegalArgumentException("public label display requires literal label permission")
-                }
-                if (kind.labelPlacement !in setOf("before_title", "after_title", "inline", "superscript")) {
-                    throw IllegalArgumentException("labelPlacement must be before_title, after_title, inline or superscript")
-                }
-                if (kind.labelPlacement == "superscript" && children.isNotEmpty()) throw IllegalArgumentException("superscript labels are only available on a leaf")
-                if (kind.segmentation !in setOf("plain", "sentence") ||
-                    (kind.segmentation == "sentence" && (children.isNotEmpty() || kind.labelPolicy == "required" || kind.titlePolicy == "required"))
-                ) {
-                    throw IllegalArgumentException("automatic sentence creation requires a leaf with optional or disallowed labels and titles")
-                }
-                if (kind.sentenceDelimiters.size > 16 ||
-                    kind.sentenceDelimiters.distinct().size != kind.sentenceDelimiters.size ||
-                    kind.sentenceDelimiters.any { delimiter ->
-                        delimiter.isEmpty() ||
-                            delimiter.codePointCount(0, delimiter.length) > 8 ||
-                            !delimiter.matches(Regex("[\\p{P}\\p{S}]+"))
-                    } ||
-                    (kind.segmentation == "sentence" && kind.sentenceDelimiters.isEmpty())
-                ) {
-                    throw IllegalArgumentException("sentenceDelimiters must contain up to 16 unique punctuation sequences of 1 to 8 characters; automatic sentence creation requires at least one")
-                }
-                kind.copy(
-                    kindCode = code,
-                    displayLabel = label,
-                    presentation = presentation,
-                    root = kind.root ?: (index == 0),
-                    allowedChildKinds = children,
-                )
-            }
-            if (normalized.map { it.kindCode }.toSet().size != normalized.size) {
-                throw IllegalArgumentException("kindCode values must be unique")
-            }
-            val byCode = normalized.associateBy { it.kindCode }
-            if (normalized.none { it.root == true }) throw IllegalArgumentException("outline needs a root kind")
-            normalized.forEach { kind ->
-                val children = kind.allowedChildKinds.orEmpty()
-                if (children.size != children.distinct().size) throw IllegalArgumentException("duplicate child kind for '${kind.kindCode}'")
-                children.forEach { child ->
-                    if (child !in byCode) throw IllegalArgumentException("unknown child kind '$child' for '${kind.kindCode}'")
-                }
-            }
-            val visited = mutableSetOf<String>()
-            fun visit(code: String, path: Set<String>) {
-                if (code in path) throw IllegalArgumentException("outline cycle at '$code'")
-                if (!visited.add(code)) return
-                byCode.getValue(code).allowedChildKinds.orEmpty().forEach { visit(it, path + code) }
-            }
-            normalized.filter { it.root == true }.forEach { visit(it.kindCode, emptySet()) }
-            if (visited.size != normalized.size) throw IllegalArgumentException("every kind must be reachable from a root")
-            return normalized
-        }
+        /** Normalizes authored layers and validates graph reachability with stable rejection precedence. */
+        fun normalizeOutline(kinds: List<OutlineKindWrite>): List<OutlineKindWrite> = CatalogOutlineNormalization.normalize(kinds)
     }
 }

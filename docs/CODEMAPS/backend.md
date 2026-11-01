@@ -9,6 +9,11 @@ Paths below are **service paths**. Public: prefix `/api/<short>`.
 
 `api/CatalogController.kt` → `CatalogQueryService` / `CatalogWriteService` → `CatalogRepository`
 
+`CatalogVersionCreation` retains creation/reservation phases inside the writer's
+transaction; `CatalogOutlineNormalization` owns authoring defaults and graph checks.
+`SettingsUsageClient` delegates deterministic stored-content policy checks to
+`SettingsImpactRules` while retaining downstream request/error ordering.
+
 | Method | Path |
 | --- | --- |
 | GET | `/countries`, `/countries/{isoCode}` |
@@ -34,6 +39,10 @@ Tests: `CatalogApiTest.kt`. Fresh databases are populated through API fixtures; 
 | GET | `/articles/{id}` |
 | PATCH | `/articles/{id}`, `/nodes/{id}` |
 | POST | `/versions/{id}/restructure` |
+
+`OrderedContentService.save` keeps its transaction and delegates to
+`OrderedContentWrite`, `OrderedRevisionWriter` and `OrderedSnapshotValidation` for
+receipt/lock phases, immutable node/text storage and final snapshot validation.
 
 Ordered immutable revisions and version roots are the current write model. Legacy `content_nodes` and the `articles` view are maintained by compatibility/migration code; see ADR 0006 and the data map.
 

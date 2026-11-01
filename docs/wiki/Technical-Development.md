@@ -136,9 +136,9 @@ existing debt is recorded in reviewed baselines. These tools are free and need n
 Sonar server. The downloadable `cognitive-complexity` artifact includes locations
 and scores for over-limit functions, including existing debt. Tests are included.
 Kotlin exceptions also have reviewed maximum scores, so an increase in an existing
-function fails CI. All editor code follows the normal gates: the editor page's
-existing debt is tied to its reviewed token fingerprint, and body changes to an
-over-limit function fail. There are no construction exemptions.
+function fails CI. All editor code follows the normal gates. The editor page,
+command route, publishing entry point and structured replay now meet the limits;
+their cleanup exceptions are removed. There are no construction exemptions.
 Kotlin files also have a total cognitive-complexity budget of **100**, computed
 with detekt's file metric. Functions below 20 contribute to the total. Existing
 over-budget files are baselined and cannot exceed their reviewed maxima. This

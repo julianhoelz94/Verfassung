@@ -92,6 +92,11 @@ Bearer `Authorization`. Tests: `IdentityApiTest.kt`.
 ## editor — `services/editor-service`
 
 `EditorController` → `EditorService` → `EditorRepository`  
+Publication stays inside `EditorService.publish`'s transaction; plain
+`EditorPublication*` helpers own reviewed request rules, source/content handling,
+amendment selection and durable delivery/bookkeeping. Structured replay enters
+`StructuredDraftEngine`, with `DraftReplayStep/Tree/Text/Validation` helpers for
+ordered operations and final pinned-outline/rich validation.
 Clients: identity, catalog, content, amendment, search, audit. Publish copies onto a new catalog version (ADR 0002), writes editor `outbox_events` (ADR 0003), and a scheduler delivers `search.reindex-requested`.
 
 Flow: `POST /edit-sessions` → `/saves` → `/review` → `/approval` → `/publish` (body: `hopKind`, optional `amendmentId`; ED-7 adds Wikipedia `comment` and change-record payload).  

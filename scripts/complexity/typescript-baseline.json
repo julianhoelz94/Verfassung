@@ -66,9 +66,16 @@
       "count": 1
     },
     {
+      "path": "apps/gateway-web/app/components/ConstitutionEntry.tsx",
+      "function": "ConstitutionEntry",
+      "hash": "cc290f19aed229b6c4855a2074adc4c0d74b44de3f4a35b21bc123466e76bb59",
+      "score": 21,
+      "count": 1
+    },
+    {
       "path": "apps/gateway-web/app/components/ConstitutionText.tsx",
       "function": "ConstitutionText",
-      "hash": "9e2dda05cfa0b9e81c90914e60d37b50ec9e6cfce479448639a7e73f50611902",
+      "hash": "b3c51be35196603d4549b66edfd6ffce08d6b2b502e42ef6c0a7aa49d9818342",
       "score": 28,
       "count": 1
     },
@@ -82,8 +89,15 @@
     {
       "path": "apps/gateway-web/app/components/ConstitutionText.tsx",
       "function": "<anonymous>",
-      "hash": "44c7928aa264a8a4ec0a2c860b36284a07a2f5a29959fa9af703ab061ad6ae74",
+      "hash": "cef9bd3a5d6a51c0c1f108e64a351788d8a8ee325fbfa3ae3d9d19c9455301e3",
       "score": 57,
+      "count": 1
+    },
+    {
+      "path": "apps/gateway-web/app/components/ContentTranslation.tsx",
+      "function": "ContentTranslationBody",
+      "hash": "7508ca52aec9c24fa742d33fd8169609e8e403df30270107e0c7ffdba1e1be82",
+      "score": 46,
       "count": 1
     },
     {
@@ -94,6 +108,13 @@
       "count": 1
     },
     {
+      "path": "apps/gateway-web/app/components/ReaderComparison.tsx",
+      "function": "ReaderComparison",
+      "hash": "0a3e1993fe311116eb6b5559b2b12a9e5d05a283f5a163dee5704ea52680cbaa",
+      "score": 42,
+      "count": 1
+    },
+    {
       "path": "apps/gateway-web/app/components/SiteHeader.tsx",
       "function": "<anonymous>",
       "hash": "045109abaa1260c9c37c77db6682188eb193ae202f1bad60c69ec83255ba43bd",
@@ -101,17 +122,31 @@
       "count": 1
     },
     {
-      "path": "apps/gateway-web/app/countries/[code]/compare/page.tsx",
-      "function": "ComparePage",
-      "hash": "ab81a21ebc41e21db9f3625fabb96ad7843c655e0995174114ff47d2529d23b2",
-      "score": 47,
+      "path": "apps/gateway-web/app/components/VersionReader.tsx",
+      "function": "ReaderSurface",
+      "hash": "d51ab64211d29e351e9eb622950bc2e202fe7ab8108137dab8a26bde7527bbd1",
+      "score": 36,
       "count": 1
     },
     {
-      "path": "apps/gateway-web/app/countries/[code]/versions/[versionId]/page.tsx",
-      "function": "VersionPage",
-      "hash": "4d44b15fc757cb14b7e7c39d54c7021cbfca80c534e5096cc4bc2abf6de77ff9",
-      "score": 31,
+      "path": "apps/gateway-web/app/components/WikiEditorTemplate.tsx",
+      "function": "WikiEditorTemplate",
+      "hash": "220a7fd8cc259c1e9c01b6fc79463c2de01ffe45b8d160e881e632a872afaa06",
+      "score": 27,
+      "count": 1
+    },
+    {
+      "path": "apps/gateway-web/app/countries/[code]/compare/ConstitutionComparison.tsx",
+      "function": "ComparePage",
+      "hash": "531b7a802ee4d4ef30ddfe6956b05e7caf707fd62bcb187b3b424137c86769fb",
+      "score": 51,
+      "count": 1
+    },
+    {
+      "path": "apps/gateway-web/app/countries/[code]/versions/[versionId]/CountryConstitutionReader.tsx",
+      "function": "CountryConstitutionReader",
+      "hash": "91b88e3d392f12330152b3665e8494580bbcd3e429e3a86a1cd5bdace162231f",
+      "score": 22,
       "count": 1
     },
     {
@@ -166,7 +201,7 @@
     {
       "path": "apps/gateway-web/app/editor/StructuredEditor.tsx",
       "function": "StructuredEditor",
-      "hash": "4823dd006a7159e8578b9831129248c40ab2ed20883eaf52c86d6c4c04ba401d",
+      "hash": "984ecf81da2792c7110ff006d7975eda56b1190b9ed9fae98076e47d4e3488fc",
       "score": 148,
       "count": 1
     },
@@ -189,27 +224,6 @@
       "function": "AmendmentDetailPage",
       "hash": "9139a99db392de856a5c1e42c960bcf0619c03ab92dad0b53059e8e5570e1e1d",
       "score": 32,
-      "count": 1
-    },
-    {
-      "path": "apps/gateway-web/app/editor/command/route.ts",
-      "function": "POST",
-      "hash": "77b22c02c1aa8bb942c1f7e1c69ecc1dd620b7f147ba3dff47f4a719714d80c2",
-      "score": 88,
-      "count": 1
-    },
-    {
-      "path": "apps/gateway-web/app/editor/page.tsx",
-      "function": "EditorPage",
-      "hash": "d7b54a9c3e1ed6f8fa4a2442afe280bfd0de723fd1a5bba97fcbeaba1a7e3019",
-      "score": 165,
-      "count": 1
-    },
-    {
-      "path": "apps/gateway-web/app/editor/wiki/WikiWorkspace.tsx",
-      "function": "WikiWorkspace",
-      "hash": "9ef2a3ed5825569d986c93fa3483b2a7277348fe101ed2418628064529064363",
-      "score": 29,
       "count": 1
     },
     {
@@ -241,6 +255,13 @@
       "count": 1
     },
     {
+      "path": "apps/gateway-web/e2e/fixtures/scenarios/index.mjs",
+      "function": "runScenarios",
+      "hash": "88cb7a9b681fed6bb0189d3fcc6043f7c135437817d57f1e105fc08bd27c68cf",
+      "score": 34,
+      "count": 1
+    },
+    {
       "path": "apps/gateway-web/e2e/fixtures/ui-review.mjs",
       "function": "response",
       "hash": "d2ffd83f1b840565c2c3e8715cbdafad02d8e72d8146d7cb9bd6762a17fcdc28",
@@ -250,15 +271,15 @@
     {
       "path": "apps/gateway-web/e2e/full/legacy-migration.spec.ts",
       "function": "<anonymous>",
-      "hash": "08be3d9092d7fb246f5cc616ee769473eeee7c57ed7a4fb9592b42b0fbafaf73",
-      "score": 30,
+      "hash": "73c1119877593760641057ae94d785af46c40ca391b0253d0d60c3e52546aa94",
+      "score": 36,
       "count": 1
     },
     {
       "path": "apps/gateway-web/e2e/mock-api.mjs",
       "function": "<anonymous>",
-      "hash": "a8d9ff17684a717226d36722eeb944d225d86b28e477abc4024afd1befb50ebf",
-      "score": 493,
+      "hash": "bdf41344b294242501ccdeef046337a9f076779a94546583b29a28ae797e30e8",
+      "score": 517,
       "count": 1
     },
     {
@@ -297,6 +318,20 @@
       "count": 1
     },
     {
+      "path": "apps/gateway-web/lib/reader-actions.ts",
+      "function": "originalEntriesText",
+      "hash": "65e31e680ab26ce1d0bc0370286a20be805b328c88d7fa9996b00652fe83ab0b",
+      "score": 26,
+      "count": 1
+    },
+    {
+      "path": "apps/gateway-web/lib/reader-search.ts",
+      "function": "findReaderText",
+      "hash": "0fc64092f44e07469e8af1601b12b3ba81fa6a3abf5113f2eb2fc00345b9c79f",
+      "score": 21,
+      "count": 1
+    },
+    {
       "path": "apps/gateway-web/lib/structured-editor.ts",
       "function": "walk",
       "hash": "10cd35fd48aa8979849bc82ffaab58d40b4dd679ccc14b12bdadf4192c4e3386",
@@ -306,8 +341,8 @@
     {
       "path": "apps/gateway-web/proxy.ts",
       "function": "proxy",
-      "hash": "ed578398a8164e961872ada2c6ae0841bf99268d4e6a1c7a12fc9a4d8e2b8f7e",
-      "score": 45,
+      "hash": "ac13e5c5864b9022bf897f6e3eaab754b1d449bf9ee5700c5d3125444294000e",
+      "score": 49,
       "count": 1
     },
     {

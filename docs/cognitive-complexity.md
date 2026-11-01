@@ -25,13 +25,12 @@ Classes, objects, and top-level functions in one file share its budget.
 This follows detekt's named-function metric; constructor/property initializers
 and property accessors outside those functions are not scored separately.
 
-After synchronizing with `main` at `4d07d6a` and cleaning up import validation,
-export read-back and shared hierarchical diffing, the file baseline contains five
-production files: `StructuredDraftEngine` (189), `EditorService` (179),
-`AmendmentService` (116), `CatalogWriteService` (116), and `OrderedContentService`
-(102). The completed packages and their focused helpers meet both budgets.
-These are measured findings, not automatic exemptions for future files with
-similar names. All editor code is now included in cleanup and normal CI gates.
+After rebasing onto `main` at `f927cad` and completing Batch 1, the file
+baseline contains three production files: `AmendmentService` (116),
+`CatalogWriteService` (116), and `OrderedContentService` (102). Editor publishing,
+structured replay and their focused helpers now meet both budgets, alongside the
+earlier ingestion and shared-diff packages. Existing debt is measured per source
+path; it grants no exemptions to future similarly named files.
 
 Extracting helpers within one file does not remove their control flow from this
 budget. Reducing nesting can still legitimately lower the total. When a file
@@ -54,11 +53,10 @@ debt. Kotlin's `all.html` / `all.xml` show all over-limit functions and files;
 TypeScript's `summary.md` distinguishes baseline exceptions from new violations;
 `summary.json` includes all analyzed function scores.
 
-There are no construction exemptions. `EditorPage` in
-`apps/gateway-web/app/editor/page.tsx` is included with its current score of 165
-as ordinary existing debt. Its reviewed token fingerprint must remain unchanged;
-editing that over-limit function fails the same gate as other TypeScript code.
-Editor-service methods and files retain their normal Kotlin score caps.
+There are no construction exemptions. `EditorPage` and its command handler
+now meet the function budget, and their baseline entries are removed. Editor
+publishing and replay meet both Kotlin budgets. All future editor changes follow
+the same gates as the rest of the repository.
 
 ## Run locally
 

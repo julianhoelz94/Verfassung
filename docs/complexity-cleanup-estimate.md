@@ -5,13 +5,12 @@
 The agreed maximum is **20 per function** and **100 per Kotlin file**.
 All editor code is back in scope as of 2026-10-30; there are no construction
 exemptions. The earlier editor deferrals described in the package history below
-have ended. EditorPage's existing score of 165 is now recorded under the same
-token-fingerprint baseline rules as other TypeScript functions. Kotlin's existing
-editor method/file score caps remain enforced.
+have ended. Batch 1 now brings the editor page, command route, publishing and
+structured replay under the limits, removing their cleanup baseline entries.
+All editor changes follow the same normal gates as other code.
 
 The original assessment below used a target of 15 and remains a historical
-comparison, not the active cleanup scope. The current inventory follows work
-package 4 below.
+comparison, not the active cleanup scope. The current inventory follows Batch 1 below.
 
 The pilot starts from fetched `main` revision `bee7b4b` (2026-10-28), including
 Kotlin 2.4 / Spring Boot 4.1, Next.js 16 / React 19, and the specification-derived
@@ -189,11 +188,76 @@ unchanged existing-debt entry is added (score **165**); no editor source or othe
 TypeScript baseline changes are included. Its body can no longer change while
 retaining a construction waiver. Policy tests exercise that normal enforcement.
 
-The current inventory is **15 Kotlin method exceptions, 5 Kotlin file exceptions
+At the end of work package 4 the inventory was **15 Kotlin method exceptions, 5 Kotlin file exceptions
 and 45 TypeScript/JavaScript exceptions**, with **no deferred functions**.
 All **53 production functions and 7 test/fixture functions** are now in scope,
 including editor publishing, structured replay and EditorPage. Those editor
 workflow packages can proceed under the same function/file budgets.
+
+## Batch 1: complete the priority-hotspot tranche
+
+The earlier plan named six production priorities without numbered batch boundaries.
+Batch 1 groups those six hotspots; import validation and shared diffing were already
+completed in work packages 2 and 4. The remaining four editor hotspots are now
+refactored on fetched `main` **`f927cad`** (2026-11-01), including its latest
+source-evidence review and compact editor changes.
+
+| Priority hotspot | Before cleanup | After | Result |
+| --- | ---: | ---: | --- |
+| `ImportValidator.validate` | 114 | 2 | Completed in work package 2 |
+| `HierarchicalDiff.compare` | 92 | 0 | Completed in work package 4 |
+| `EditorService.publish` | 102 | 2 | Publication phases extracted within the existing transaction |
+| `StructuredDraftEngine.replay` | 155 | 0 | Operation dispatch, tree/text edits and final validation separated |
+| Gateway `EditorPage` | 165 | 10 | Route/auth, session state and unchanged rendering separated |
+| Gateway command `POST` | 88 | 3 | Explicit command dispatch and focused request/error/operation handlers |
+
+All six priority functions meet **20**. All new Kotlin files meet **100**; the
+largest publication helper function scores **10**, replay helper **19**, page
+helper **15** and command helper **5**. New Kotlin classes/helpers have KDoc;
+TypeScript helpers have JSDoc explaining their contracts.
+
+Publication keeps authentication, locking, visibility, evidence revision, retry
+and status checks in the existing `@Transactional` service entry. Plain internal
+helpers execute in that same transaction and preserve preparation, reservation,
+request validation, source-tip checks, amendment selection, successor writes,
+link/refresh retries, outbox and audit ordering. The existing public constructor
+and API are unchanged. `EditorService.kt` falls from **179 to 55**; its helper
+files score **9, 37, 32, 27 and 7** (combined **167**, previously 179).
+An isolated 90-scenario publication comparison matched public results/errors and
+globally ordered repository/downstream calls against the original service, across
+legacy/structured, legal/correction, reserved retries and link/refresh failures.
+Generated legacy UUIDs and timestamps were normalized for that comparison.
+
+Replay retains operation order, exact rich text, identity/lineage and error
+precedence. Final outline/rich validation still runs after all operations, so
+intermediate incomplete states remain valid where they were before. Its facade
+file scores **0**, with helpers **35, 47, 35 and 19** (combined **136**, previously
+189). An independent isolated check compared **2,400 scenarios / 12,000 complete
+public results and errors** against the original replay, validation and marker
+APIs, including both endnote modes, conflict codes and rich-error detail order.
+All results matched.
+
+The page preserves existing role gates, fetch/selection order, source-only routing,
+global note context, actions and rendered UI. Command dispatch preserves trusted
+origins, native form parsing, expected revisions, MFA, JSON/redirect mode and exact
+error precedence. Page contracts passed against both the original and refactored
+page; command contracts likewise first passed against the original route.
+
+Combined local verification passes: **91 editor-service tests** (including **12
+new publication-request and 8 replay contracts**), **1,257 gateway Vitest tests**
+(including **9 new page and 27 command contracts**), **31 Node tests** and **13
+complexity-policy tests**. Gateway typecheck, lint and production build pass;
+editor Spotless and coverage reports pass. Both full complexity gates report
+zero new violations or score increases. Repository hygiene and Wiki checks pass.
+
+Before source edits, baselines were synchronized from an immutable snapshot of the
+rebased branch. Kotlin debt was unchanged. TypeScript's **45 → 52** reviewed
+exceptions reflect only newer `main`; every changed-source path was verified
+byte-for-byte against `f927cad`. Cleanup then removes exactly two Kotlin method,
+two Kotlin file and two TypeScript exceptions. Limits and waiver policy are
+unchanged. Remaining debt is **13 Kotlin method exceptions, 3 Kotlin file
+exceptions and 50 TypeScript exceptions**: **55 production functions and 8
+test/fixture functions**. Other lower-priority work remains outside Batch 1.
 
 ## Original assessment at a maximum of 15
 

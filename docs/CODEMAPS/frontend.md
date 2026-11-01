@@ -77,3 +77,12 @@ Contextual reader copying is owned by `lib/reader-actions.ts` and `ReaderActions
 Country and regional constitution overview routes share `ConstitutionOverview`; comparison routes share `countries/[code]/compare/ConstitutionComparison.tsx`. `CompareForm` accepts an owner action URL and an instance-specific ID prefix. Regional routes remain under `/jurisdictions/[id]`, and comparisons preserve exact published snapshots when changing the unchanged-passage filter.
 
 `WikiPanel` owns the context heading, close control and actions shared by constitution, country and regional wikis. It sits after the sticky menu in normal page flow, without an internal scroll area. `directoryWikiPanel` in `DirectoryWiki` supplies published country/jurisdiction context with explicit Edit/Review wiki entry points. `WikiContent` shares summary, body, image placement, source rendering and typography across public wikis, editor previews and revision history. `WikiEditorTemplate` owns the editing fields, pictures, review/publication and history layout for both embedded and standalone editors. `WikiWorkspace` loads and authorizes all three wiki target types, then supplies data and commands to that template. `lib/wiki-routing.ts` preserves jurisdiction context and returns public directory links with `?wiki=1`. Wiki saves use the canonical target returned by Catalog for pinned media and never publish the draft as a side effect.
+
+## Editor route orchestration
+
+`app/editor/page.tsx` retains authentication, role gates and workspace routing.
+`editor-page-state.ts` loads and derives the selected session state, while
+`EditorSessionView.tsx` renders the existing page sections. Command POSTs enter
+`app/editor/command/route.ts`; request/error utilities and amendment, draft,
+source-evidence and publication handlers in that directory preserve native
+redirects, JSON modes and trusted-origin guards.

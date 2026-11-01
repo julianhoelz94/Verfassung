@@ -10,38 +10,10 @@
       "count": 1
     },
     {
-      "path": "apps/gateway-web/app/admin/import/page.tsx",
-      "function": "AdminImportPage",
-      "hash": "dc3651155bd74957202f2e46f77d4bc2dc7e2bf17922e1f31858388c93e98ad3",
-      "score": 25,
-      "count": 1
-    },
-    {
-      "path": "apps/gateway-web/app/admin/import/setup/SetupProposalReview.tsx",
-      "function": "SetupProposalReview",
-      "hash": "c99b91c3f27f5999b67757611bf05abb15ed21bbb4f85449811d0162905405bb",
-      "score": 56,
-      "count": 1
-    },
-    {
-      "path": "apps/gateway-web/app/admin/import/setup/actions.ts",
-      "function": "reviewSetupAction",
-      "hash": "1b110b7168b79f54ec7c978e05dae17425e0194ca03d6dc49173d65286566591",
-      "score": 21,
-      "count": 1
-    },
-    {
       "path": "apps/gateway-web/app/admin/legal/[key]/page.tsx",
       "function": "AdminLegalPage",
       "hash": "6175eceb4956118249b10afbe4a8e056b82819fb08fd24d43f5d30a7a3ea2e97",
       "score": 30,
-      "count": 1
-    },
-    {
-      "path": "apps/gateway-web/app/admin/migrations/[id]/page.tsx",
-      "function": "MigrationReviewPage",
-      "hash": "411e8be7fcb8726dfecaa20399f4e562015615dac395bedc5be08db34599a18d",
-      "score": 49,
       "count": 1
     },
     {
@@ -136,13 +108,6 @@
       "count": 1
     },
     {
-      "path": "apps/gateway-web/app/editor/ChangeOverview.tsx",
-      "function": "richPreview",
-      "hash": "cdb8aef873feda7041604f525c760068f393d3a8909931455da0d01b2faee12a",
-      "score": 24,
-      "count": 1
-    },
-    {
       "path": "apps/gateway-web/app/editor/ConstitutionDetailsWorkspace.tsx",
       "function": "ConstitutionDetailsWorkspace",
       "hash": "9424d63b8b7b5df9ebd0527e49d456eab0166f0961ba968574c70db88192db6f",
@@ -150,38 +115,10 @@
       "count": 1
     },
     {
-      "path": "apps/gateway-web/app/editor/DiffReviewQueue.tsx",
-      "function": "DiffReviewQueue",
-      "hash": "1efc7ddf0516953e3e5ffc844839f1272a9dc9d30fb03565ec6600f039049b05",
-      "score": 35,
-      "count": 1
-    },
-    {
       "path": "apps/gateway-web/app/editor/EditorLanding.tsx",
       "function": "EditorLanding",
       "hash": "9bdfd8f1bf18f6ccc78363eb6aaa88069c7b9909bce57df0c7ffddabea9e0f4a",
       "score": 55,
-      "count": 1
-    },
-    {
-      "path": "apps/gateway-web/app/editor/ImportReview.tsx",
-      "function": "ImportReview",
-      "hash": "b09d98e2db2c910fd0c14c9521d62bfe5269c57ac7b02cf8355c0adce1bc30e9",
-      "score": 44,
-      "count": 1
-    },
-    {
-      "path": "apps/gateway-web/app/editor/PublishForm.tsx",
-      "function": "PublishForm",
-      "hash": "d88f9f4ac797e41bf8c338f4a990590584b38e2ecfd75052c84302a8c3f971df",
-      "score": 29,
-      "count": 1
-    },
-    {
-      "path": "apps/gateway-web/app/editor/amendments/[id]/page.tsx",
-      "function": "AmendmentDetailPage",
-      "hash": "9139a99db392de856a5c1e42c960bcf0619c03ab92dad0b53059e8e5570e1e1d",
-      "score": 32,
       "count": 1
     },
     {
@@ -252,13 +189,6 @@
       "function": "<anonymous>",
       "hash": "383c55b97999486ca784e534a4bb9ceaec644ce5525a0d9fda962f9af768fb58",
       "score": 33,
-      "count": 1
-    },
-    {
-      "path": "apps/gateway-web/lib/ingestion-api.ts",
-      "function": "transitionImportJob",
-      "hash": "7318039080c1249165b8b4cca81332896bf2be8d76f3a4d04ef866385014fe6c",
-      "score": 26,
       "count": 1
     },
     {

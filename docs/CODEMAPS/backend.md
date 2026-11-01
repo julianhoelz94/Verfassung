@@ -66,6 +66,12 @@ Tests: `DocumentApiTest.kt`, `ImprintWorkflowTest.kt`. Migration: `scripts/migra
 `AmendmentController` → `AmendmentService` → `AmendmentRepository`  
 Clients: identity (mutating Bearer), content (`includeBody=true` trees), catalog (`GET /versions/{id}` for live editorial tips). Public reads use the published revision (AMD-7). `POST /transitions` returns 410; write via create/revision/publish/link-target. `POST /amendments/suggest` diffs two content trees and returns change rows without inserting. **ADR 0005 / AMD-11:** change records (no `kind`); `comment` + `documents`; pins + `needs_review`; `POST /constitutions/{id}/amendments/refresh-review-status`.
 
+`AmendmentChangeReferences` and `AmendmentReferenceResolver` validate request-local
+selections and trusted snapshot projections. `AmendmentLinkedChanges` and
+`AmendmentChangeProjection` retain target-link selection and row projections;
+`AmendmentDiffMatching` owns the existing legacy diff phases. Service transactions
+and public entry points remain in `AmendmentService`.
+
 | Method | Path |
 | --- | --- |
 | GET | `/constitutions/{id}/amendments` (published; `?status=all` staff; `?reviewStatus=needs_review` staff) |
@@ -129,6 +135,12 @@ Source: `client/RestIndexSource.kt`.
 `ImportValidator` delegates metadata, outline policy, ordered traversal, legacy compatibility and rich-content checks to focused validation helpers in `service/`; public diagnostics retain their encounter order.
 `ImportExportController` → `ImportExportService` authorizes read-back; `ImportExportRecords`, `ImportExportFidelity` and `ImportExportCounts` own pagination, directional fidelity checks and manifest counts.
 `POST /import-jobs`, `GET /import-jobs/{id}` and confirm-outline/prepare/approve/reject/publish commands. Batch, resumable upload and setup-proposal controllers are separate. Uploads stage content; preparation writes draft Catalog/Content data. Approval and publication are separate actions with reviewer/admin and publisher/admin checks respectively, and publication requires fresh MFA. One account may perform all steps if it has the required roles. `ImportPublicationDelivery` retries audit/search side effects.
+
+`ImportStagingIdentity` owns historical checksums and scoped retry receipts.
+`MigrationResourcePreparation` prepares claimed resources using the original run
+view and dependency pins. `SetupProposalValidation`/`SetupSampleValidation` retain
+ordered setup checks, and `SetupConstitutionCreation` performs Catalog creation
+inside the existing confirmation/recovery workflow.
 
 ## audit — `services/audit-service`
 

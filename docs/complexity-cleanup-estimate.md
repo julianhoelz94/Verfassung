@@ -10,7 +10,7 @@ structured replay under the limits, removing their cleanup baseline entries.
 All editor changes follow the same normal gates as other code.
 
 The original assessment below used a target of 15 and remains a historical
-comparison, not the active cleanup scope. The current inventory follows Batches 2–4 below.
+comparison, not the active cleanup scope. The current inventory follows Batches 5–6 below.
 
 The pilot starts from fetched `main` revision `bee7b4b` (2026-10-28), including
 Kotlin 2.4 / Spring Boot 4.1, Next.js 16 / React 19, and the specification-derived
@@ -336,17 +336,92 @@ gates, hygiene and Wiki checks pass. Separate review and independent verificatio
 found no blockers. No threshold or construction-waiver changes were needed.
 
 Exactly **five Kotlin method, two Kotlin file and nine TypeScript exceptions**
-are removed, with no new waivers or budget changes. Remaining debt is **8 Kotlin
+are removed, with no new waivers or budget changes. At the end of Batches 2–4,
+remaining debt was **8 Kotlin
 method exceptions, 1 Kotlin file exception and 41 TypeScript exceptions**:
 **41 production functions and 8 test/fixture functions**. Only
-`AmendmentService.kt` remains over the Kotlin file budget (116).
+`AmendmentService.kt` remained over the Kotlin file budget (116).
+
+## Batches 5–6: amendment and ingestion workflows
+
+Fetched `main` remains **`f927cad`**. These batches complete the next **17
+production functions**, preserving existing public behavior and transaction
+boundaries. They remove seven Kotlin method exceptions, ten TypeScript exceptions
+and the last Kotlin file exception without adding allowances or changing limits.
+
+| Batch | Function | Before | After |
+| --- | --- | ---: | ---: |
+| 5 | `AmendmentService.validateChangeRefs` | 53 | 0 |
+| 5 | `AmendmentService.linkedChanges` | 22 | 0 |
+| 5 | `AmendmentDiff.diff` | 28 | 0 |
+| 5 | `DiffReviewQueue` | 35 | 0 |
+| 5 | `PublishForm` | 29 | 20 |
+| 5 | `AmendmentDetailPage` | 32 | 15 |
+| 5 | `ChangeOverview.richPreview` | 24 | 3 |
+| 6 | `ImportService.importVersion` | 22 | 5 |
+| 6 | `MigrationService.prepare` | 22 | 7 |
+| 6 | `SetupProposalService.confirm` | 21 | 11 |
+| 6 | `SetupProposalService.validate` | 41 | 0 |
+| 6 | `AdminImportPage` | 25 | 16 |
+| 6 | `SetupProposalReview` | 56 | 8 |
+| 6 | `reviewSetupAction` | 21 | 6 |
+| 6 | `MigrationReviewPage` | 49 | 10 |
+| 6 | `ImportReview` | 44 | 15 |
+| 6 | `transitionImportJob` | 26 | 5 |
+
+Amendment reference validation now separates request-local duplicate selection,
+snapshot resolution, trusted projections and linked-target changes. Legacy diff
+matching retains its original phases and output order. `AmendmentService.kt`
+falls from **116 to 38** and `AmendmentDiff.kt` from **44 to 16**; the five new
+helper files score at most **26**, with a largest helper function of **9**.
+Constructors, authorization, transaction ownership and error precedence remain
+unchanged. The full service check, Spotless and JaCoCo pass **78 tests**, including
+**13 new contracts verified against original code first**. Service line coverage
+is **90.05%**, with **174/176 helper lines covered**. A seeded comparison matches
+**10,000 complete diff results**; independent public creation checks match
+**448 results/errors and globally ordered downstream/repository calls**.
+
+Import staging retains historical payload checksums, scoped idempotency receipts,
+rich validation and insert-race precedence. Migration preparation retains claimed
+item handling, the original run view, declared dependencies and resource pins.
+Setup validation separates metadata/outline checks from sample-tree checks;
+Catalog creation stays inside the existing confirmation/recovery workflow.
+Service file scores fall **93 to 76**, **57 to 42** and **72 to 19** respectively.
+The five new helper files score **8/11/8/21/17**, with maximum function **13**.
+All new Kotlin helpers and functions have KDoc. Full Ingestion checks, Spotless
+and JaCoCo pass **136 tests**, including **9 original-first contracts**. Service
+line coverage is **88.59%**, with **137/144 helper lines covered**. Independent
+checks match **4,200 setup validation outcomes** and **54 confirmation/recovery
+results/errors and ordered repository/Catalog/authentication traces**.
+
+Review/publication UI keeps React tree identity, state/effect order, decision
+resets, focus navigation, unload guards and exact payloads. Amendment details
+retain ordered loading and notices. Import/setup/migration UI preserves forms,
+role/read gates, error/redirect precedence, selection and evidence ordering.
+New TypeScript helpers have JSDoc and meet 20. Focused checks pass **49 Batch 5
+tests** and **60 Batch 6 tests**, including **44 new contracts also verified on
+the original implementation**. A seeded UI comparison matches **1,200 exact
+rendered outputs and ordered client traces**, **1,000 setup-action outcomes and
+request-order traces**, and **400 import-transition results/errors and payloads**.
+An independent comparison matches **2,768 exact Batch 5 rendered outputs** in
+English and German, including whitespace; **109 combined focused UI tests** pass.
+
+Combined gateway verification passes **1,324 Vitest tests** and **31 Node tests**
+with coverage enabled, plus typecheck, lint and production build. Both repository
+complexity gates pass with no new violations or score increases, alongside **13
+TypeScript policy tests**, **14 Kotlin score-policy tests**, repository hygiene
+and Wiki checks. Separate read-only review and independent verification found no
+blockers.
+
+Remaining debt is **32 functions: 24 production and 8 test/fixture functions**.
+There are **31 TypeScript exceptions and one Kotlin test exception**; no Kotlin
+production function or Kotlin file exceptions remain. The function limit of 20
+and Kotlin file limit of 100 continue to apply to all new helpers.
 
 The remaining batches retain the agreed responsibilities:
 
 | Batch | Scope | Remaining functions |
 | --- | --- | ---: |
-| 5 | Amendment references/diff/linking and review/publication UI | 7 |
-| 6 | Import, migration, setup and associated admin/review workflows | 10 |
 | 7 | Public reader, rich text, translation and comparison | 12 |
 | 8 | Account/site/supporting workspaces, proxy/rate limits and MCP logging | 12 |
 | 9 | Test infrastructure, mock API and fixture/journey helpers | 8 |

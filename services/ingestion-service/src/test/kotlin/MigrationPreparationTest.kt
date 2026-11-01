@@ -157,6 +157,54 @@ class MigrationPreparationTest {
         Mockito.verifyNoMoreInteractions(imports)
     }
 
+    @Test
+    fun unresolvedDependenciesBlockBeforeClaimingOrLoadingPayload() {
+        val waiting = prepared("capture", "{}").copy(state = "staged")
+        val item = staged("document_link", tree("{}"), listOf(waiting))
+
+        assertEquals(item, service.prepare(run, item.id, actor, authorization))
+
+        Mockito.verify(repository).block(item.id, "Unresolved dependencies: capture")
+        Mockito.verify(repository, Mockito.never()).claim(item.id, actor.id)
+        Mockito.verify(repository, Mockito.never()).payload(item.id)
+        Mockito.verifyNoInteractions(domains, imports)
+    }
+
+    @Test
+    fun successfulCaptureFinishesBeforeScrubbingAndNeverMutatesItsStagedBytes() {
+        val document = UUID.randomUUID()
+        val revision = UUID.randomUUID()
+        val payload = tree("""{"fileSha256":"source-digest","base64":"ZXhhY3Q="}""")
+        val original = payload.deepCopy()
+        val item = staged("citation", payload)
+        val expected = (payload.deepCopy() as tools.jackson.databind.node.ObjectNode).put("attemptId", item.id.toString())
+        Mockito.`when`(domains.capture(expected, authorization)).thenReturn(tree("""{"id":"$document","revision":{"id":"$revision","revision":3}}"""))
+
+        service.prepare(run, item.id, actor, authorization)
+
+        val order = Mockito.inOrder(domains, repository)
+        order.verify(domains).capture(expected, authorization)
+        order.verify(repository).finishAttempt(item.id, 1, "prepared", tree("""{"documentId":"$document","revisionId":"$revision","revision":3,"fileSha256":"source-digest"}"""))
+        order.verify(repository).scrubCapture(item.id)
+        assertEquals(original, payload)
+    }
+
+    @Test
+    fun scrubFailureRecordsTheOriginalResultAsFailedAfterSuccessfulPreparation() {
+        val payload = tree("""{"fileSha256":"source-digest"}""")
+        val item = staged("document", payload, result = tree("""{"previous":"evidence"}"""))
+        val expected = (payload.deepCopy() as tools.jackson.databind.node.ObjectNode).put("attemptId", item.id.toString())
+        Mockito.`when`(domains.capture(expected, authorization)).thenReturn(tree("""{"id":"captured","revision":{"id":"revision","revision":1}}"""))
+        Mockito.doThrow(IllegalStateException("cleanup failed")).`when`(repository).scrubCapture(item.id)
+
+        assertEquals(item, service.prepare(run, item.id, actor, authorization))
+
+        val order = Mockito.inOrder(repository)
+        order.verify(repository).finishAttempt(item.id, 1, "prepared", tree("""{"documentId":"captured","revisionId":"revision","revision":1,"fileSha256":"source-digest"}"""))
+        order.verify(repository).scrubCapture(item.id)
+        order.verify(repository).finishAttempt(item.id, 1, "failed", item.result, "cleanup failed")
+    }
+
     private fun staged(kind: String, payload: JsonNode, dependencies: List<MigrationItem> = emptyList(), result: JsonNode = tree("{}")): MigrationItem {
         val item = MigrationItem(UUID.randomUUID(), "item", kind, "hash", dependencies.map { it.sourceKey }, "staged", result, 0, null)
         Mockito.`when`(repository.owner(run)).thenReturn(actor.id)

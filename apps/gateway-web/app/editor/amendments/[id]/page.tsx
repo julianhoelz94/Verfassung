@@ -8,8 +8,22 @@ import { notFound, redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { WorkspacePage } from '../../../components/layout/templates';
 import { Alert, PageHeader } from '../../../components/ui';
-import { getCountry, getVersion, listAllArticles, listAllUnits, listConstitutionVersions, listCountries, type ArticleSummary, type VersionSummary } from '../../../../lib/api';
-import { amendmentErrorMessage, getAmendment, getAmendmentDiffReview, listRevisions } from '../../../../lib/amendment-editor-api';
+import {
+  getCountry,
+  getVersion,
+  listAllArticles,
+  listAllUnits,
+  listConstitutionVersions,
+  listCountries,
+  type ArticleSummary,
+  type VersionSummary,
+} from '../../../../lib/api';
+import {
+  amendmentErrorMessage,
+  getAmendment,
+  getAmendmentDiffReview,
+  listRevisions,
+} from '../../../../lib/amendment-editor-api';
 import { canVisitEditor } from '../../../../lib/nav';
 import { SESSION_COOKIE, currentUser } from '../../../../lib/session';
 import { AmendmentEditorLayout } from '../AmendmentEditorLayout';
@@ -46,14 +60,21 @@ async function resolveConstitutionId(
   }
   try {
     const countries = (await listCountries()) ?? [];
-    const country = countries[0] ? await getCountry(countries[0].isoCode) : null;
+    const country = countries[0]
+      ? await getCountry(countries[0].isoCode)
+      : null;
     return country?.constitutions[0]?.id ?? null;
   } catch {
     return null;
   }
 }
 
-async function loadContentByVersion(versions: VersionSummary[]): Promise<{ articlesByVersion: Record<string, string[]>; unitTreesByVersion: Record<string, ArticleSummary[]> }> {
+async function loadContentByVersion(
+  versions: VersionSummary[],
+): Promise<{
+  articlesByVersion: Record<string, string[]>;
+  unitTreesByVersion: Record<string, ArticleSummary[]>;
+}> {
   const entries = await Promise.all(
     versions.map(async (version) => {
       try {
@@ -66,24 +87,115 @@ async function loadContentByVersion(versions: VersionSummary[]): Promise<{ artic
   );
   const content = Object.fromEntries(entries);
   return {
-    articlesByVersion: Object.fromEntries(Object.entries(content).map(([versionId, articles]) => [versionId, articles.map((article) => article.articleNumber)])),
+    articlesByVersion: Object.fromEntries(
+      Object.entries(content).map(([versionId, articles]) => [
+        versionId,
+        articles.map((article) => article.articleNumber),
+      ]),
+    ),
     unitTreesByVersion: content,
   };
 }
 
-export default async function AmendmentDetailPage(props: AmendmentDetailPageProps) {
+/** Load draft pairing and published quote snapshots in the original request order. */
+async function loadAmendmentReviews(
+  id: string,
+  isNew: boolean,
+  sessionToken: string | undefined,
+  amendment: Awaited<ReturnType<typeof getAmendment>>,
+  versions: VersionSummary[],
+) {
+  const revisions = !isNew && sessionToken ? await listRevisions(id) : null;
+  const tipRevision = revisions?.at(-1);
+  const hasDraftTip =
+    amendment?.status === 'draft' ||
+    Boolean(tipRevision && tipRevision.id !== amendment?.publishedRevisionId);
+  const pairToReview =
+    !isNew &&
+    hasDraftTip &&
+    amendment?.sourceVersionId &&
+    amendment.targetVersionId;
+  const pairDetails = pairToReview
+    ? await Promise.all([
+        getVersion(amendment.sourceVersionId!, `Bearer ${sessionToken}`),
+        getVersion(amendment.targetVersionId!, `Bearer ${sessionToken}`),
+      ])
+    : null;
+  const pairPublished =
+    pairDetails?.every(
+      (version) => version?.publicationStatus === 'published',
+    ) ?? false;
+  const diffReview =
+    pairToReview && pairPublished ? await getAmendmentDiffReview(id) : null;
+  const diffReviewUnavailable = pairToReview && !pairPublished;
+  const publishedRevision =
+    revisions?.find(
+      (revision) => revision.id === amendment?.publishedRevisionId,
+    ) ?? null;
+  const quotedVersionIds = publishedRevision
+    ? [
+        publishedRevision.sourceVersionId,
+        publishedRevision.targetVersionId,
+      ].filter((versionId): versionId is string => Boolean(versionId))
+    : [];
+  const reviewVersionIds = [
+    ...new Set(
+      quotedVersionIds.flatMap((versionId) =>
+        [
+          versionId,
+          versions.find((version) => version.id === versionId)
+            ?.currentVersionId,
+        ].filter((id): id is string => Boolean(id)),
+      ),
+    ),
+  ];
+  const reviewContentEntries = await Promise.all(
+    reviewVersionIds.map(async (versionId) => {
+      const articles = await listAllArticles(versionId, true).catch(() => []);
+      return [
+        versionId,
+        articles.map(
+          (article) =>
+            `Article ${article.articleNumber}: ${article.body ?? article.title}`,
+        ),
+      ] as const;
+    }),
+  );
+  const reviewContentByVersion = Object.fromEntries(reviewContentEntries);
+
+  return {
+    revisions,
+    tipRevision,
+    diffReview,
+    diffReviewUnavailable,
+    publishedRevision,
+    reviewContentByVersion,
+  };
+}
+
+export default async function AmendmentDetailPage(
+  props: AmendmentDetailPageProps,
+) {
   const locale = await currentLocale();
   const { id } = await props.params;
   const searchParams = await props.searchParams;
   const user = await currentUser();
   if (!user) {
-    redirect(loginHref(`/editor/amendments/${encodeURIComponent(id)}`, searchParams));
+    redirect(
+      loginHref(`/editor/amendments/${encodeURIComponent(id)}`, searchParams),
+    );
   }
   if (!canVisitEditor(user.roles)) {
     return (
-      <WorkspacePage width="content" header={<PageHeader title={<T value={ui.attrs.editorAmendmentsIdPagePageHeaderTitle} />} meta={<SignedInSummary email={user.email} noEditorialRole />} />}>
-
-      </WorkspacePage>
+      <WorkspacePage
+        width="content"
+        header={
+          <PageHeader
+            title={<T value={ui.attrs.editorAmendmentsIdPagePageHeaderTitle} />}
+            meta={<SignedInSummary email={user.email} noEditorialRole />}
+          />
+        }
+      ></WorkspacePage>
     );
   }
 
@@ -98,75 +210,155 @@ export default async function AmendmentDetailPage(props: AmendmentDetailPageProp
     notFound();
   }
 
-  const constitutionId = await resolveConstitutionId(amendment?.constitutionId, searchParams.constitutionId);
+  const constitutionId = await resolveConstitutionId(
+    amendment?.constitutionId,
+    searchParams.constitutionId,
+  );
   if (!constitutionId) {
     return (
-      <WorkspacePage width="content" header={<PageHeader title={<T value={ui.attrs.editorAmendmentsIdPagePageHeaderTitle2} />} />}>
-
-        <Alert tone="error"><T value={ui.editor.amendments.id.page.noConstitutionIsAvailableForThisForm} /></Alert>
+      <WorkspacePage
+        width="content"
+        header={
+          <PageHeader
+            title={
+              <T value={ui.attrs.editorAmendmentsIdPagePageHeaderTitle2} />
+            }
+          />
+        }
+      >
+        <Alert tone="error">
+          <T
+            value={
+              ui.editor.amendments.id.page.noConstitutionIsAvailableForThisForm
+            }
+          />
+        </Alert>
       </WorkspacePage>
     );
   }
 
-  const versions =
-    sessionToken
-      ? (await listConstitutionVersions(constitutionId, {
-          listing: 'all',
-          authorization: `Bearer ${sessionToken}`,
-        })) ?? []
-      : [];
-  const { articlesByVersion, unitTreesByVersion } = await loadContentByVersion(versions);
-  const contentAvailable = Object.values(articlesByVersion).some((articles) => articles.length > 0);
-  const latestVersionId = versions.find((version) => version.latestPublished)?.id ?? versions.at(-1)?.id ?? null;
-
-  const revisions = !isNew && sessionToken ? await listRevisions(id) : null;
-  const tipRevision = revisions?.at(-1);
-  const hasDraftTip = amendment?.status === 'draft' || Boolean(tipRevision && tipRevision.id !== amendment?.publishedRevisionId);
-  const pairToReview = !isNew && hasDraftTip && amendment?.sourceVersionId && amendment.targetVersionId;
-  const pairDetails = pairToReview ? await Promise.all([
-    getVersion(amendment.sourceVersionId!, `Bearer ${sessionToken}`),
-    getVersion(amendment.targetVersionId!, `Bearer ${sessionToken}`),
-  ]) : null;
-  const pairPublished = pairDetails?.every((version) => version?.publicationStatus === 'published') ?? false;
-  const diffReview = pairToReview && pairPublished ? await getAmendmentDiffReview(id) : null;
-  const diffReviewUnavailable = pairToReview && !pairPublished;
-  const publishedRevision = revisions?.find((revision) => revision.id === amendment?.publishedRevisionId) ?? null;
-  const quotedVersionIds = publishedRevision
-    ? [publishedRevision.sourceVersionId, publishedRevision.targetVersionId].filter((versionId): versionId is string => Boolean(versionId))
+  const versions = sessionToken
+    ? ((await listConstitutionVersions(constitutionId, {
+        listing: 'all',
+        authorization: `Bearer ${sessionToken}`,
+      })) ?? [])
     : [];
-  const reviewVersionIds = [...new Set(quotedVersionIds.flatMap((versionId) => [versionId, versions.find((version) => version.id === versionId)?.currentVersionId].filter((id): id is string => Boolean(id))))];
-  const reviewContentEntries = await Promise.all(reviewVersionIds.map(async (versionId) => {
-    const articles = await listAllArticles(versionId, true).catch(() => []);
-    return [versionId, articles.map((article) => `Article ${article.articleNumber}: ${article.body ?? article.title}`)] as const;
-  }));
-  const reviewContentByVersion = Object.fromEntries(reviewContentEntries);
+  const { articlesByVersion, unitTreesByVersion } =
+    await loadContentByVersion(versions);
+  const contentAvailable = Object.values(articlesByVersion).some(
+    (articles) => articles.length > 0,
+  );
+  const latestVersionId =
+    versions.find((version) => version.latestPublished)?.id ??
+    versions.at(-1)?.id ??
+    null;
+
+  const {
+    revisions,
+    tipRevision,
+    diffReview,
+    diffReviewUnavailable,
+    publishedRevision,
+    reviewContentByVersion,
+  } = await loadAmendmentReviews(id, isNew, sessionToken, amendment, versions);
 
   const canSave = canEdit;
-  const canPublishLaw = canPublish && amendment?.status !== 'withdrawn' && !isNew;
+  const canPublishLaw =
+    canPublish && amendment?.status !== 'withdrawn' && !isNew;
   const canWithdraw = canPublish && amendment?.status === 'published';
   const canRestore = canEdit;
 
   const errorMessage = amendmentErrorMessage(searchParams.error, locale);
-  const title = isNew ? message(locale, ui.remainingStatus.newAmendingLaw) : (amendment?.title ?? message(locale, ui.remainingStatus.amendingLaw));
+  const title = isNew
+    ? message(locale, ui.remainingStatus.newAmendingLaw)
+    : (amendment?.title ?? message(locale, ui.remainingStatus.amendingLaw));
+
+  /** Preserve status and error notice order without adding a component boundary. */
+  function notices() {
+    return (
+      <>
+        {amendment?.reviewStatus === 'needs_review' ? (
+          <Alert tone="info">
+            <T
+              value={
+                ui.editor.amendments.id.page.needsReviewQuotesOrDocumentPinsAre
+              }
+            />
+          </Alert>
+        ) : null}
+        {errorMessage ? <Alert tone="error">{errorMessage}</Alert> : null}
+        {searchParams.documentError ? (
+          <Alert tone="error">
+            <T
+              value={
+                ui.editor.amendments.id.page.theDocumentLinkCouldNotBeChanged
+              }
+            />
+          </Alert>
+        ) : null}
+        {searchParams.saved ? (
+          <Alert tone="success">
+            <T value={ui.editor.amendments.id.page.draftSaved} />
+          </Alert>
+        ) : null}
+        {searchParams.published ? (
+          <Alert tone="success">
+            <T value={ui.editor.amendments.id.page.amendingLawPublished} />
+          </Alert>
+        ) : null}
+        {searchParams.confirmed ? (
+          <Alert tone="success">
+            <T
+              value={
+                ui.editor.amendments.id.page
+                  .quotesConfirmedAndTheLegalChangeRepublished
+              }
+            />
+          </Alert>
+        ) : null}
+        {searchParams.withdrawn ? (
+          <Alert tone="success">
+            <T value={ui.editor.amendments.id.page.amendingLawWithdrawn} />
+          </Alert>
+        ) : null}
+        {diffReviewUnavailable ? (
+          <Alert tone="info">
+            <T
+              value={
+                ui.editor.amendments.id.page
+                  .differenceReviewRequiresTwoPublishedSnapshotsPublish
+              }
+            />
+          </Alert>
+        ) : null}
+      </>
+    );
+  }
 
   return (
-    <WorkspacePage width="content" header={<PageHeader
+    <WorkspacePage
+      width="content"
+      header={
+        <PageHeader
           breadcrumbs={[
-          { href: '/editor/amendments', label: <T value={ui.nav.legalChanges} /> },
-          { label: isNew ? <T value={ui.remainingStatus.new} /> : amendment?.title ?? id.slice(0, 8) },
-        ]}
-        title={title}
-        meta={<SignedInSummary email={user.email} roles={user.roles} />}
-      />}>
-
-      {amendment?.reviewStatus === 'needs_review' ? <Alert tone="info"><T value={ui.editor.amendments.id.page.needsReviewQuotesOrDocumentPinsAre} /></Alert> : null}
-      {errorMessage ? <Alert tone="error">{errorMessage}</Alert> : null}
-      {searchParams.documentError ? <Alert tone="error"><T value={ui.editor.amendments.id.page.theDocumentLinkCouldNotBeChanged} /></Alert> : null}
-      {searchParams.saved ? <Alert tone="success"><T value={ui.editor.amendments.id.page.draftSaved} /></Alert> : null}
-      {searchParams.published ? <Alert tone="success"><T value={ui.editor.amendments.id.page.amendingLawPublished} /></Alert> : null}
-      {searchParams.confirmed ? <Alert tone="success"><T value={ui.editor.amendments.id.page.quotesConfirmedAndTheLegalChangeRepublished} /></Alert> : null}
-      {searchParams.withdrawn ? <Alert tone="success"><T value={ui.editor.amendments.id.page.amendingLawWithdrawn} /></Alert> : null}
-      {diffReviewUnavailable ? <Alert tone="info"><T value={ui.editor.amendments.id.page.differenceReviewRequiresTwoPublishedSnapshotsPublish} /></Alert> : null}
+            {
+              href: '/editor/amendments',
+              label: <T value={ui.nav.legalChanges} />,
+            },
+            {
+              label: isNew ? (
+                <T value={ui.remainingStatus.new} />
+              ) : (
+                (amendment?.title ?? id.slice(0, 8))
+              ),
+            },
+          ]}
+          title={title}
+          meta={<SignedInSummary email={user.email} roles={user.roles} />}
+        />
+      }
+    >
+      {notices()}
       {amendment?.reviewStatus === 'needs_review' ? (
         <QuoteReviewPanel
           amendment={amendment}
@@ -190,7 +382,9 @@ export default async function AmendmentDetailPage(props: AmendmentDetailPageProp
           readOnly={readOnly}
           contentAvailable={contentAvailable}
           diffReview={diffReview}
-          canReviewDiff={canEdit || hasRole(user.roles, 'reviewer') || canPublish}
+          canReviewDiff={
+            canEdit || hasRole(user.roles, 'reviewer') || canPublish
+          }
           canAcknowledgeDiff={hasRole(user.roles, 'reviewer') || canPublish}
         />
       ) : (
@@ -210,11 +404,25 @@ export default async function AmendmentDetailPage(props: AmendmentDetailPageProp
           canRestore={canRestore}
           contentAvailable={contentAvailable}
           diffReview={diffReview}
-          canReviewDiff={canEdit || hasRole(user.roles, 'reviewer') || canPublish}
+          canReviewDiff={
+            canEdit || hasRole(user.roles, 'reviewer') || canPublish
+          }
           canAcknowledgeDiff={hasRole(user.roles, 'reviewer') || canPublish}
         />
       )}
-      {!isNew && tipRevision ? <DocumentLinks targetType="amendment" targetId={id} scopeRevisionId={tipRevision.id} returnTo={`/editor/amendments/${id}`} canEdit={canEdit && amendment?.status !== 'withdrawn' && tipRevision.id !== amendment?.publishedRevisionId} /> : null}
+      {!isNew && tipRevision ? (
+        <DocumentLinks
+          targetType="amendment"
+          targetId={id}
+          scopeRevisionId={tipRevision.id}
+          returnTo={`/editor/amendments/${id}`}
+          canEdit={
+            canEdit &&
+            amendment?.status !== 'withdrawn' &&
+            tipRevision.id !== amendment?.publishedRevisionId
+          }
+        />
+      ) : null}
     </WorkspacePage>
   );
 }

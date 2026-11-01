@@ -97,3 +97,18 @@ redirects, JSON modes and trusted-origin guards.
 components; `outline-editor-model.ts` owns pure layer updates and authoring checks.
 `lib/outline-preview.ts` retains deterministic example identity, sample wording,
 cycle handling and translation ordering. Catalog remains the write authority.
+
+## Amendment and import workflow decomposition
+
+`editor/DiffReviewQueue.tsx` separates its model hook from plain rendering helpers
+to preserve state, focus and decision ordering. `editor/PublishForm.tsx` retains the
+existing publication form and delegates focused request/details sections;
+`editor/amendments/[id]/page.tsx` separates ordered review loading from notices and
+body rendering. `editor/ChangeOverview.tsx` owns the unchanged rich preview descriptions.
+
+`admin/import/page.tsx`, `admin/import/setup/SetupProposalReview.tsx` and
+`admin/migrations/[id]/page.tsx` retain route authorization/loading and compose
+focused presentation helpers. Setup actions separate intent validation and
+display-save sequencing; `editor/ImportReview.tsx`
+separates workflow, status and source sections. `lib/ingestion-api.ts` retains the
+public transition client and delegates its existing error-code precedence.

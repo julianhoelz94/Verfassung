@@ -168,6 +168,15 @@ Catalog likewise separate persistence phases, immutable revision writes, outline
 normalization and impact checks while retaining their existing transactions and
 public APIs. The completed Batch 2–4 exceptions are removed under the same budgets.
 
+Batches 5–6 separate amendment reference resolution, linked change projections and
+legacy diff matching, plus import staging identities, migration resource
+preparation and setup validation/creation. Review, publication and import/setup
+screens use focused helpers while preserving their existing forms and workflows.
+New Kotlin helpers have KDoc documenting ordering, snapshot pins and retry rules.
+These batches remove 17 function exceptions and the last Kotlin file exception;
+all Kotlin files now meet 100. The remaining 32 function exceptions belong to
+reader/site work and test infrastructure in Batches 7–9.
+
 ## Code coverage in CI
 
 Every CI run publishes **whole-repository line coverage** and **new-code line

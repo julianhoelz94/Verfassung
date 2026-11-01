@@ -19,7 +19,6 @@ import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.client.RestClientResponseException
 import org.springframework.web.server.ResponseStatusException
 import tools.jackson.databind.ObjectMapper
-import java.security.MessageDigest
 import java.util.UUID
 
 @Service
@@ -34,19 +33,9 @@ class ImportService(
 
     @Transactional
     fun importVersion(authorization: String?, submittedBy: UUID, request: ImportRequest, batchId: UUID? = null, idempotencyKey: String? = null, expectedChecksum: String? = null): ImportJobDto {
-        if (idempotencyKey != null && idempotencyKey.length !in 8..128) throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Idempotency key must contain 8 to 128 characters")
-        val checksum = MessageDigest.getInstance("SHA-256").digest(objectMapper.writeValueAsBytes(request)).joinToString("") { "%02x".format(it) }
-        if (expectedChecksum != null && !checksum.equals(expectedChecksum, ignoreCase = true)) {
-            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Payload checksum mismatch")
-        }
-        if (idempotencyKey != null) {
-            val previous = if (batchId == null) importJobRepository.findDirectItem(submittedBy, idempotencyKey) else importJobRepository.findBatchItem(batchId, idempotencyKey)
-            previous?.let { (existing, previousChecksum) ->
-                if (previousChecksum != checksum) throw ResponseStatusException(HttpStatus.CONFLICT, "Idempotency key was used for different content")
-                requireCurrentRichRules(request)
-                return existing
-            }
-        }
+        val identity = ImportStagingIdentity(importJobRepository, objectMapper)
+        val checksum = identity.checksum(request, idempotencyKey, expectedChecksum)
+        identity.existing(request, submittedBy, batchId, idempotencyKey, checksum)?.let { return it }
         val needsOutline = request.roots.isNotEmpty() || request.articles.any { it.nodes.isNotEmpty() }
         val pinnedOutline = if (needsOutline && request.constitutionId != null && request.settingsRevisionId != null) {
             DownstreamAuth.withAuthorization(authorization) { catalogClient.settingsOutline(request.constitutionId, request.settingsRevisionId) }
@@ -55,18 +44,7 @@ class ImportService(
         }
         val validation = ImportValidator.validate(request, pinnedOutline)
         val jobId = importJobRepository.insertPending(request, submittedBy, batchId, idempotencyKey, checksum) ?: run {
-            val existing = if (idempotencyKey == null) {
-                null
-            } else if (batchId == null) {
-                importJobRepository.findDirectItem(submittedBy, idempotencyKey)
-            } else {
-                importJobRepository.findBatchItem(batchId, idempotencyKey)
-            }
-            if (existing?.second == checksum) {
-                requireCurrentRichRules(request)
-                return existing.first
-            }
-            throw ResponseStatusException(HttpStatus.CONFLICT, "Idempotency key was used for different content")
+            return identity.existing(request, submittedBy, batchId, idempotencyKey, checksum) ?: identity.conflict()
         }
         importJobRepository.stage(jobId, "request", request)
         if (validation.isNotEmpty()) {
@@ -162,7 +140,7 @@ class ImportService(
     }
 
     private fun requireCurrentRichRules(request: ImportRequest) {
-        com.constitutionatlas.platform.OrderedContentRules.requireValid(ImportValidator.richContentValidationErrors(request.roots))
+        ImportStagingIdentity(importJobRepository, objectMapper).requireCurrentRichRules(request)
     }
 
     private fun reviewReason(reason: String): String = reason.trim().also {

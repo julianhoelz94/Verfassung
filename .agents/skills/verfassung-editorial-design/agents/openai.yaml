@@ -1,0 +1,4 @@
+interface:
+  display_name: "Verfassung Editorial Design"
+  short_description: "Redesign pages with shared viewer and editor styling"
+  default_prompt: "Use $verfassung-editorial-design to redesign this Constitution Atlas page with the viewer and editor design language and reusable shared templates."

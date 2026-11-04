@@ -5,6 +5,7 @@ import { uiRoutes, uiStates } from './fixtures/ui-routes';
 
 const mock = `http://127.0.0.1:${process.env.E2E_MOCK_PORT ?? 4010}`;
 const sizes = [390, 820, 1440];
+const snapshotEntries = process.env.E2E_SNAPSHOT_ENTRY?.split(',');
 const axePath = path.join(process.cwd(), 'node_modules/axe-core/axe.min.js');
 
 test('the review inventory includes every page entry point', () => {
@@ -34,7 +35,7 @@ for (const locale of ['en', 'de']) for (const width of sizes) {
     const staffPage = await staffContext.newPage();
     const evidence: Array<{ route: string; status: number | undefined; heading: string | null }> = [];
     try {
-      for (const route of [...uiRoutes, ...uiStates]) await test.step(route.entry, async () => {
+      for (const route of [...uiRoutes, ...uiStates].filter(route => !snapshotEntries || snapshotEntries.includes(route.entry))) await test.step(route.entry, async () => {
         if ('setup' in route && route.setup) {
           await request.post(`${mock}/__sprint59_setup`, { data: { completed: false } });
           await publicPage.goto('/impressum');
@@ -73,7 +74,7 @@ for (const locale of ['en', 'de']) for (const width of sizes) {
           });
           expect(violations, `${locale} ${route.path}`).toEqual([]);
         }
-        if ('snapshot' in route && route.snapshot && process.platform === 'linux' && process.env.E2E_SKIP_VISUAL !== 'true' && (!process.env.E2E_SNAPSHOT_ENTRY || process.env.E2E_SNAPSHOT_ENTRY === route.entry)) {
+        if ('snapshot' in route && route.snapshot && process.platform === 'linux' && process.env.E2E_SKIP_VISUAL !== 'true' && (!snapshotEntries || snapshotEntries.includes(route.entry))) {
           const name = route.entry.replace(/\//g, '-').replace(/[\[\]]/g, '').replace(/^-/, '');
           await expect.soft(page).toHaveScreenshot(`review-${name}-${locale}-${width}.png`, { fullPage: true, timeout: 15_000 });
         }

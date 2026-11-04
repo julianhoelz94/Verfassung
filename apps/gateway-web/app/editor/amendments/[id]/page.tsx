@@ -16,6 +16,7 @@ import { AmendmentEditorLayout } from '../AmendmentEditorLayout';
 import { AmendmentForm } from '../AmendmentForm';
 import { QuoteReviewPanel } from '../QuoteReviewPanel';
 import { DocumentLinks } from '../../documents/DocumentLinks';
+import styles from '../amendment-workspace.module.css';
 
 type AmendmentDetailPageProps = {
   params: Promise<{ id: string }>;
@@ -27,6 +28,8 @@ type AmendmentDetailPageProps = {
     error?: string;
     confirmed?: string;
     documentError?: string;
+    view?: string;
+    passage?: string;
   }>;
 };
 
@@ -115,6 +118,7 @@ export default async function AmendmentDetailPage(props: AmendmentDetailPageProp
           authorization: `Bearer ${sessionToken}`,
         })) ?? []
       : [];
+  const readerOwners = Object.fromEntries(await Promise.all(versions.map(async version => [version.id, await getVersion(version.id, `Bearer ${sessionToken}`).catch(() => null)])));
   const { articlesByVersion, unitTreesByVersion } = await loadContentByVersion(versions);
   const contentAvailable = Object.values(articlesByVersion).some((articles) => articles.length > 0);
   const latestVersionId = versions.find((version) => version.latestPublished)?.id ?? versions.at(-1)?.id ?? null;
@@ -150,7 +154,7 @@ export default async function AmendmentDetailPage(props: AmendmentDetailPageProp
   const title = isNew ? message(locale, ui.remainingStatus.newAmendingLaw) : (amendment?.title ?? message(locale, ui.remainingStatus.amendingLaw));
 
   return (
-    <WorkspacePage width="content" header={<PageHeader
+    <WorkspacePage width="content" className={styles.page} header={<PageHeader
           breadcrumbs={[
           { href: '/editor/amendments', label: <T value={ui.nav.legalChanges} /> },
           { label: isNew ? <T value={ui.remainingStatus.new} /> : amendment?.title ?? id.slice(0, 8) },
@@ -167,15 +171,6 @@ export default async function AmendmentDetailPage(props: AmendmentDetailPageProp
       {searchParams.confirmed ? <Alert tone="success"><T value={ui.editor.amendments.id.page.quotesConfirmedAndTheLegalChangeRepublished} /></Alert> : null}
       {searchParams.withdrawn ? <Alert tone="success"><T value={ui.editor.amendments.id.page.amendingLawWithdrawn} /></Alert> : null}
       {diffReviewUnavailable ? <Alert tone="info"><T value={ui.editor.amendments.id.page.differenceReviewRequiresTwoPublishedSnapshotsPublish} /></Alert> : null}
-      {amendment?.reviewStatus === 'needs_review' ? (
-        <QuoteReviewPanel
-          amendment={amendment}
-          publishedRevision={publishedRevision}
-          versions={versions}
-          canConfirm={canPublishLaw}
-          contentByVersion={reviewContentByVersion}
-        />
-      ) : null}
       {isNew || !amendment ? (
         <AmendmentForm
           amendmentId="new"
@@ -188,6 +183,9 @@ export default async function AmendmentDetailPage(props: AmendmentDetailPageProp
           canSave={canSave}
           canWithdraw={false}
           readOnly={readOnly}
+          readerOwners={Object.fromEntries(Object.entries(readerOwners).filter((entry): entry is [string, NonNullable<typeof entry[1]>] => entry[1] !== null))}
+          documentsPanel={!isNew && tipRevision ? <DocumentLinks targetType="amendment" targetId={id} scopeRevisionId={tipRevision.id} returnTo={`/editor/amendments/${id}`} canEdit={canEdit && amendment?.status !== 'withdrawn' && tipRevision.id !== amendment?.publishedRevisionId} /> : undefined}
+          quoteReviewPanel={amendment?.reviewStatus === 'needs_review' ? <QuoteReviewPanel amendment={amendment} publishedRevision={publishedRevision} versions={versions} canConfirm={canPublishLaw} contentByVersion={reviewContentByVersion} /> : undefined}
           contentAvailable={contentAvailable}
           diffReview={diffReview}
           canReviewDiff={canEdit || hasRole(user.roles, 'reviewer') || canPublish}
@@ -208,13 +206,15 @@ export default async function AmendmentDetailPage(props: AmendmentDetailPageProp
           canWithdraw={canWithdraw}
           readOnly={readOnly}
           canRestore={canRestore}
+          readerOwners={Object.fromEntries(Object.entries(readerOwners).filter((entry): entry is [string, NonNullable<typeof entry[1]>] => entry[1] !== null))}
+          documentsPanel={!isNew && tipRevision ? <DocumentLinks targetType="amendment" targetId={id} scopeRevisionId={tipRevision.id} returnTo={`/editor/amendments/${id}`} canEdit={canEdit && amendment?.status !== 'withdrawn' && tipRevision.id !== amendment?.publishedRevisionId} /> : undefined}
+          quoteReviewPanel={amendment?.reviewStatus === 'needs_review' ? <QuoteReviewPanel amendment={amendment} publishedRevision={publishedRevision} versions={versions} canConfirm={canPublishLaw} contentByVersion={reviewContentByVersion} /> : undefined}
           contentAvailable={contentAvailable}
           diffReview={diffReview}
           canReviewDiff={canEdit || hasRole(user.roles, 'reviewer') || canPublish}
           canAcknowledgeDiff={hasRole(user.roles, 'reviewer') || canPublish}
         />
       )}
-      {!isNew && tipRevision ? <DocumentLinks targetType="amendment" targetId={id} scopeRevisionId={tipRevision.id} returnTo={`/editor/amendments/${id}`} canEdit={canEdit && amendment?.status !== 'withdrawn' && tipRevision.id !== amendment?.publishedRevisionId} /> : null}
     </WorkspacePage>
   );
 }

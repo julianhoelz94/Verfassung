@@ -148,9 +148,7 @@ class DocumentService(
 
     @Transactional
     fun attach(targetType: String, targetId: UUID, request: LinkRequest, actor: Actor, authorization: String?): List<DocumentLinkDto> {
-        validateTarget(targetType)
-        validateScope(targetType, targetId, request.scopeRevisionId, authorization)
-        targetClient.requireTarget(targetType, targetId, authorization)
+        requireEditableTarget(targetType, targetId, request.scopeRevisionId, authorization)
         val document = get(request.documentId)
         require(document.status == "active") { "Cannot attach an archived document" }
         require(request.revisionId != null) { "A pinned document revision is required" }
@@ -164,9 +162,7 @@ class DocumentService(
 
     @Transactional
     fun detach(targetType: String, targetId: UUID, scopeRevisionId: UUID?, documentId: UUID, actor: Actor, authorization: String?): List<DocumentLinkDto> {
-        validateTarget(targetType)
-        validateScope(targetType, targetId, scopeRevisionId, authorization)
-        targetClient.requireTarget(targetType, targetId, authorization)
+        requireEditableTarget(targetType, targetId, scopeRevisionId, authorization)
         if (currentLinks(targetType, targetId, scopeRevisionId, authorization).none { it.documentId == documentId }) {
             throw NotFoundException("Document link not found")
         }
@@ -202,6 +198,12 @@ class DocumentService(
             val uri = runCatching { URI(it) }.getOrNull()
             require(uri?.scheme in setOf("http", "https") && !uri?.host.isNullOrBlank()) { "sourceUrl must be an HTTP URL" }
         }
+    }
+
+    fun requireEditableTarget(targetType: String, targetId: UUID, scopeRevisionId: UUID?, authorization: String?) {
+        validateTarget(targetType)
+        validateScope(targetType, targetId, scopeRevisionId, authorization)
+        targetClient.requireTarget(targetType, targetId, authorization)
     }
 
     private fun validateTarget(targetType: String) {

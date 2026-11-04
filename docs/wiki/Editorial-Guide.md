@@ -38,6 +38,16 @@ Removing a marker keeps the note. Every note needs at least one marker before sa
 
 **Wiki** edits the constitution's context page independently of its legal text. Short description and page text stay visible; Sources, Pictures and revision history open on demand. Save the Wiki draft separately; a publisher reviews and publishes it. **Details** edits the title and, under Advanced, the URL slug while retaining old aliases. Version facts remain read-only. Archival source corrections, structural settings and lifecycle events retain their own workflows. Pending text and publication details must be saved before leaving through one of these workflows.
 
+### Documents and legal amendments
+
+**Documents** in the constitution editor opens the central document library controls in place. **Upload new document** and **Choose existing document** have the same visual weight. Upload a PDF or text file (up to 20 MB), enter its title, and choose **Upload and attach**. Alternatively, supply a source URL and choose **Create and attach**. One submission creates the central record and links its pinned revision. Existing records can be searched and attached at a selected revision; **Detach** removes the link while retaining the library record. Text, comments and unfinished inputs stay in the workspace while these controls are open. Document history opens separately.
+
+A legal amendment has **one before constitution and one after constitution**, selected above **Affected passages**. **Find affected passages** uses this pair across the whole constitution; unchanged articles do not each require review. The public amendment comment remains visible above the affected passages. Passage notes describe individual changes. **Correct passage mapping** selects exact locations within the amendment's shared pair; it does not choose another pair for that article. Source formatting and exact snapshot identities are available on demand.
+
+The amendment menu provides **Details**, **Review**, **Documents**, **History** and **Publication**. **Review** retains detected differences, saved progress, filters, linked change rows, exclusions and reviewer acknowledgements. Save a changed constitution pair before reviewing it. **History** inspects past revisions without replacing the current unsaved form; restoring creates a new draft. Save a new amendment before attaching managed documents. Published amendment attachments retain immutable document pins; edit attachments on the current unpublished draft. **Older source references** shows earlier inline URL/file references separately.
+
+**Save draft** never publishes. **Publication** has a separate confirmation and command; unresolved differences or unsaved form changes block the publication button. Quote confirmation and withdrawal also remain explicit publication actions. Document attachments follow their target's visibility rules; adding evidence to a publicly readable constitution can make that pinned document readable without creating another constitution version.
+
 ## 2. Review
 
 **Requires: Reviewer or Admin.**

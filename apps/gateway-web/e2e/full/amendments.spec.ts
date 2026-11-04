@@ -1,3 +1,4 @@
+import { amendmentTask, publishLaw, withdrawLaw } from '../amendment-helpers';
 import { expect, test, type APIRequestContext, type Page } from '../fixtures/consent';
 import { signIn, signOut, startFromViewer } from './auth';
 import { adminHeaders, createIsolatedConstitution } from './api-fixtures';
@@ -60,6 +61,7 @@ test('guided review saves progress and gates publication for a changed snapshot 
   expect(findings.candidates.length).toBeGreaterThan(0);
   await signIn(page, 'admin');
   await page.goto(`/editor/amendments/${id}`);
+  await amendmentTask(page, 'Review');
   const review = page.getByRole('region', { name: 'Review differences' });
   await expect(review.getByText(`Reviewed 0 of ${findings.candidates.length}`)).toBeVisible();
   await expect(review.getByText(`Difference 1 of ${findings.candidates.length}`)).toBeVisible();
@@ -71,8 +73,9 @@ test('guided review saves progress and gates publication for a changed snapshot 
   }
   await expect(review.getByText(`Reviewed ${findings.candidates.length} of ${findings.candidates.length}`)).toBeVisible();
   await page.reload();
+  await amendmentTask(page, 'Review');
   await expect(page.getByRole('region', { name: 'Review differences' }).getByText(`Reviewed ${findings.candidates.length} of ${findings.candidates.length}`)).toBeVisible();
-  await page.getByRole('button', { name: 'Publish law' }).click();
+  await publishLaw(page);
   await expect(page.getByText('Amending law published.')).toBeVisible();
 });
 
@@ -82,22 +85,24 @@ test('editor restores a real change-record revision and publisher republishes it
   const amendmentId = await createPublishedRecord(request, `Journey restoration ${Date.now()}`, pair.constitutionId, pair.sourceVersionId, pair.targetVersionId, true);
   await signIn(page, 'editor');
   await page.goto(`/editor/amendments/${amendmentId}`);
+  await amendmentTask(page, 'History');
   const history = page.getByRole('complementary', { name: 'Revision history' });
   await expect(history.locator('button.revision-item')).toHaveCount(2);
   await history.locator('button.revision-item').first().click();
-  await expect(page.getByText('Viewing a past revision read-only.')).toBeVisible();
+  await expect(page.getByText('Inspecting an older revision. Your current draft remains in the workspace.')).toBeVisible();
   await history.getByRole('button', { name: 'Restore as new draft' }).click();
   await expect(page.getByText('Draft saved.')).toBeVisible();
   await reviewSnapshotDiff(request, amendmentId, await adminHeaders(request));
   await page.reload();
-  await expect(page.getByLabel('Title', { exact: true })).toHaveValue(/Journey restoration/);
+  await expect(page.locator('#amendment-title')).toHaveValue(/Journey restoration/);
   await signOut(page);
 
   await signIn(page, 'publisher');
   await page.goto(`/editor/amendments/${amendmentId}`);
-  await page.getByRole('button', { name: 'Publish law' }).click();
+  await publishLaw(page);
   await expect(page.getByText('Amending law published.')).toBeVisible();
   await page.reload();
+  await amendmentTask(page, 'History');
   await expect(page.getByRole('complementary', { name: 'Revision history' }).locator('button.revision-item')).toHaveCount(3);
 });
 
@@ -128,6 +133,7 @@ test('publisher reviews stale quotes after a historical transcription correction
   await page.getByRole('button', { name: 'Publish transcription' }).click();
   await expect(page.getByText(/Published as version/)).toBeVisible();
   await page.goto(`/editor/amendments/${amendmentId}`);
+  await amendmentTask(page, 'Publication');
   await expect(page.getByRole('heading', { name: 'Flagged record review' })).toBeVisible();
   await page.getByRole('button', { name: 'Confirm live quotes and republish' }).click();
   await expect(page.getByText('Quotes confirmed and the legal change republished.')).toBeVisible();
@@ -141,7 +147,7 @@ test('publisher withdraws an incorrect real legal-change record', async ({ page,
   const amendmentId = await createPublishedRecord(request, title, pair.constitutionId, pair.sourceVersionId, pair.targetVersionId);
   await signIn(page, 'publisher');
   await page.goto(`/editor/amendments/${amendmentId}`);
-  await page.getByRole('button', { name: 'Withdraw' }).click();
+  await withdrawLaw(page);
   await expect(page.getByText('Amending law withdrawn.')).toBeVisible();
   await signOut(page);
   await page.goto(`/countries/${pair.countryIso}/timeline`);

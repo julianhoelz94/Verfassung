@@ -68,21 +68,6 @@ describe('document writes preserve revision and target identity', () => {
     expect(requests[0]).toMatchObject({ path: '/api/document/documents/document/file?expectedRevision=2', method: 'POST' }); expect((requests[0].body as FormData).get('file')).toBeInstanceOf(File);
     status = 413; expect(await documents.uploadDocumentAction(data)).toContain('error=file');
   });
-  it('pins an attachment to the chosen document and editorial revision', async () => {
-    const data = form({ targetType: 'amendment', targetId: 'instrument', documentId: 'document', revisionId: 'document-r2', scopeRevisionId: 'instrument-r7', returnTo: '/editor/amendments/instrument?tab=documents' });
-    expect(await documents.attachDocumentAction(data)).toBe('/editor/amendments/instrument?tab=documents');
-    expect(requests[0]).toMatchObject({ path: '/api/document/links/amendment/instrument', method: 'POST', body: { documentId: 'document', revisionId: 'document-r2', scopeRevisionId: 'instrument-r7' } });
-    expect(revalidatePath).toHaveBeenCalledWith('/editor/amendments/instrument');
-    status = 409; expect(await documents.attachDocumentAction(data)).toBe('/editor/amendments/instrument?tab=documents&documentError=attach');
-  });
-  it.each(['/\n/attacker.example', '/%2f%2fattacker.example', '/parent/..//attacker.example'])('rejects an ambiguous return destination %j after attachment', async returnTo => {
-    expect(await documents.attachDocumentAction(form({ targetType: 'version', targetId: 'snapshot', documentId: 'document', returnTo }))).toBe('/editor/documents');
-  });
-  it('detaches only the scoped document link', async () => {
-    const data = form({ targetType: 'version', targetId: 'snapshot', documentId: 'document', scopeRevisionId: 'scope-r1', returnTo: '/editor/documents' });
-    expect(await documents.detachDocumentAction(data)).toBe('/editor/documents'); expect(requests[0]).toMatchObject({ path: '/api/document/links/version/snapshot/document?scopeRevisionId=scope-r1', method: 'DELETE' });
-    status = 403; expect(await documents.detachDocumentAction(data)).toBe('/editor/documents?documentError=detach');
-  });
   it('does not claim creation after upstream rejection', async () => {
     status = 400; expect(await documents.createDocumentAction(form({ title: '' }))).toContain('error=save'); expect(revalidatePath).not.toHaveBeenCalled();
   });

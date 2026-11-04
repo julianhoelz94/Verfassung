@@ -39,4 +39,16 @@ describe('treeUnits', () => {
     expect(units[1]).toMatchObject({ versionId: 'version-1', logicalId: 'parent-text', revisionId: 'parent-revision' });
     expect(units[1]?.deepLink).toBeUndefined();
   });
+  it('keeps nested wording and table cells available in exact passage comparisons', () => {
+    const roots: ArticleSummary[] = [{id:'root',versionId:'v',logicalId:'article',revisionId:'article-r',articleNumber:'1',title:'Rights',sortOrder:1,content:[
+      {type:'child',node:{logicalId:'paragraph',revisionId:'paragraph-r',occurrenceId:'paragraph-o',kind:'paragraph',label:'(1)',title:null,content:[
+        {type:'child',node:{logicalId:'sentence',revisionId:'sentence-r',occurrenceId:'sentence-o',kind:'sentence',label:null,title:null,content:[{type:'text',text:'Literal nested wording.'}]}},
+        {type:'text',logicalId:'table',revisionId:'table-r',occurrenceId:'table-o',format:'table',lineBreaksBefore:1,table:{caption:'Official table',rows:[{logicalId:'row',cells:[{logicalId:'cell-1',text:'Civic duty'},{logicalId:'cell-2',text:'Required'}]}]}},
+      ]}},
+    ]}];
+    const units=treeUnits('v',roots);
+    expect(units.find(unit=>unit.logicalId==='paragraph')?.text).toBe('Literal nested wording.\nOfficial table\nCivic duty\tRequired');
+    expect(units.find(unit=>unit.logicalId==='table')?.text).toBe('\nOfficial table\nCivic duty\tRequired');
+  });
+
 });

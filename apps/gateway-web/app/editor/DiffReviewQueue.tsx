@@ -6,7 +6,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { DiffReviewState, ReviewCandidate, ReviewDecisionInput, ReviewRef } from '../../lib/diff-review';
 import { decisionReadyForReview, decisionResolved } from '../../lib/diff-review';
-import { diffText, segsForSide } from '../../lib/text-diff';
+import { PassageComparison } from './PassageComparison';
+import { passageReaderHref, type ReaderOwner } from '../../lib/reader-links';
 import { saveDiffDecisionAction, refreshDiffReviewAction, type ReviewTarget } from './diff-review-actions';
 import { Button } from '../components/ui';
 import { Stack, Inline } from '../components/layout/Layout';
@@ -19,6 +20,9 @@ type Props = {
   canDecide: boolean;
   canAcknowledge: boolean;
   onAddRow?: (candidate: ReviewCandidate) => void;
+  onCorrectPairing?: () => void;
+  onReviewChange?: (review: DiffReviewState) => void;
+  readerOwners?: Record<string, ReaderOwner>;
 };
 
 function label(ref: ReviewRef): string {
@@ -48,7 +52,7 @@ function wording(refs: ReviewRef[]): string {
   return refs.map((ref) => ref.excerpt ?? '').filter(Boolean).join('\n');
 }
 
-export function DiffReviewQueue({ target, initial, rows, canDecide, canAcknowledge, onAddRow }: Props) {
+export function DiffReviewQueue({ target, initial, rows, canDecide, canAcknowledge, onAddRow, onCorrectPairing, onReviewChange, readerOwners }: Props) {
   const t = useTranslation();
   const statusText = (status: string) => t(reviewLabel(status));
   const router = useRouter();
@@ -100,9 +104,6 @@ export function DiffReviewQueue({ target, initial, rows, canDecide, canAcknowled
   }, {});
   const sourceText = selected ? wording(selected.beforeRefs) : '';
   const targetText = selected ? wording(selected.afterRefs) : '';
-  const spans = selected ? sourceText.length + targetText.length < 8000 ? diffText(sourceText, targetText) : [
-    { type: 'remove' as const, text: sourceText }, { type: 'add' as const, text: targetText },
-  ] : [];
 
   function choose(key: string) {
     focusAfterNavigation.current = true;
@@ -115,7 +116,7 @@ export function DiffReviewQueue({ target, initial, rows, canDecide, canAcknowled
     try {
       const result = await saveDiffDecisionAction(target, review, input);
       if ('error' in result) { setMessage(result.error); return; }
-      setReview(result.review);
+      setReview(result.review); onReviewChange?.(result.review);
       const byKey = new Map(result.review.decisions.map((decision) => [decision.key, decision]));
       const next = result.review.candidates.find((candidate) => !decisionReadyForReview(candidate, byKey.get(candidate.key)))
         ?? (canAcknowledge ? result.review.candidates.find((candidate) => !decisionResolved(candidate, byKey.get(candidate.key))) : undefined);
@@ -135,7 +136,7 @@ export function DiffReviewQueue({ target, initial, rows, canDecide, canAcknowled
       const result = await refreshDiffReviewAction(target);
       if ('error' in result) { setMessage(result.error); return; }
       const previousTotal = review.candidates.length;
-      setReview(result.review);
+      setReview(result.review); onReviewChange?.(result.review);
       setMessage(result.review.candidates.length > previousTotal
         ? `${result.review.candidates.length - previousTotal} deeper differences were added after the pairing changed.`
         : t(ui.state.reviewRefreshed));
@@ -160,6 +161,7 @@ export function DiffReviewQueue({ target, initial, rows, canDecide, canAcknowled
       {readyForReview !== resolved ? <p>{readyForReview} <T value={ui.editor.diffreviewqueue.of} />{" "}{review.candidates.length} <T value={ui.editor.diffreviewqueue.readyForReviewerHandoff} /></p> : null}
     </div>
     {review.candidates.length === 0 ? <p role="status"><T value={ui.editor.diffreviewqueue.noDifferencesFoundForThePinnedSnapshots} /></p> : <>
+      <details><summary>{t({en:'Filters and progress',de:'Filter und Fortschritt'})}</summary>
       <Inline align="end" className="form-row" aria-label={t(ui.accessibility.differenceFilters)}>
         <label><T value={ui.editor.diffreviewqueue.level} />{" "}<select value={level} onChange={(event) => setLevel(event.target.value)}><option value="all"><T value={ui.editor.diffreviewqueue.all} /></option>{levels.map((value) => <option key={value} value={value}><T value={ui.editor.diffreviewqueue.level} />{" "}{value}</option>)}</select></label>
         <label><T value={ui.editor.diffreviewqueue.type} />{" "}<select value={facet} onChange={(event) => setFacet(event.target.value)}><option value="all"><T value={ui.editor.diffreviewqueue.all} /></option>{[...new Set(review.candidates.map((candidate) => candidate.facet))].sort().map((value) => <option key={value} value={value}>{statusText(value)}</option>)}</select></label>
@@ -177,18 +179,21 @@ export function DiffReviewQueue({ target, initial, rows, canDecide, canAcknowled
         const open = branchCandidates.filter((candidate) => !decisionResolved(candidate, decisions.get(candidate.key))).length;
         return <li key={branch}><button type="button" onClick={() => setScope(branch)}>{branch}: {open} <T value={ui.editor.diffreviewqueue.open2} /></button></li>;
       })}</ul> : null}
+      </details>
       {selected ? <Stack elementRef={activeRef} className="diff-review-active" tabIndex={-1} aria-live="polite">
         <p className="muted"><T value={ui.editor.diffreviewqueue.difference} />{" "}{review.candidates.findIndex((candidate) => candidate.key === selected.key) + 1} <T value={ui.editor.diffreviewqueue.of} />{" "}{review.candidates.length} · {statusText(selectedDecision?.status ?? 'open')}</p>
         <h3>{statusText(selected.facet)} · {label(selected.afterRefs[0] ?? selected.beforeRefs[0])}</h3>
         <p><T value={ui.editor.diffreviewqueue.level} />{" "}{selected.level}{selected.ambiguous ? <T value={ui.reviewLabels.ambiguousPairing} /> : ''}</p>
-        <div className="diff-review-sides">
-          <div><h4><T value={ui.editor.diffreviewqueue.before} /></h4><p>{selected.beforeRefs.map(label).join('; ') || t(ui.reviewLabels.noSourceUnit)}</p><p className="diff-review-text">{segsForSide(spans, 'from').map((seg, index) => seg.type === 'remove' ? <del key={index}>{seg.text}</del> : <span key={index}>{seg.text}</span>)}</p>{selected.beforeRefs.map((ref) => <code key={`${ref.logicalId}-${ref.occurrenceId}`}>{ref.versionId ?? t(ui.workflow.draft)} · {ref.logicalId}</code>)}</div>
-          <div><h4><T value={ui.editor.diffreviewqueue.after} /></h4><p>{selected.afterRefs.map(label).join('; ') || t(ui.reviewLabels.noTargetUnit)}</p><p className="diff-review-text">{segsForSide(spans, 'to').map((seg, index) => seg.type === 'add' ? <ins key={index}>{seg.text}</ins> : <span key={index}>{seg.text}</span>)}</p>{selected.afterRefs.map((ref) => <code key={`${ref.logicalId}-${ref.occurrenceId}`}>{ref.versionId ?? t(ui.workflow.draft)} · {ref.logicalId}</code>)}</div>
-        </div>
+        <PassageComparison before={{text:sourceText,label:selected.beforeRefs.map(label).join('; ') || t(ui.reviewLabels.noSourceUnit),
+          identity:selected.beforeRefs.map(ref=>[ref.versionId,ref.logicalId,ref.occurrenceId,ref.revisionId].filter(Boolean).join(' · ')).join('\n'),
+          href:selected.beforeRefs.length===1&&selected.beforeRefs[0].versionId&&selected.beforeRefs[0].occurrenceId ? passageReaderHref(readerOwners?.[selected.beforeRefs[0].versionId],selected.beforeRefs[0].versionId,selected.beforeRefs[0].occurrenceId) : undefined}}
+          after={{text:targetText,label:selected.afterRefs.map(label).join('; ') || t(ui.reviewLabels.noTargetUnit),
+          identity:selected.afterRefs.map(ref=>[ref.versionId,ref.logicalId,ref.occurrenceId,ref.revisionId].filter(Boolean).join(' · ')).join('\n'),
+          href:selected.afterRefs.length===1&&selected.afterRefs[0].versionId&&selected.afterRefs[0].occurrenceId ? passageReaderHref(readerOwners?.[selected.afterRefs[0].versionId],selected.afterRefs[0].versionId,selected.afterRefs[0].occurrenceId) : undefined}}/>
         <div className="action-bar"><Button type="button" disabled={selectedIndex <= 0} onClick={() => navigation(selectedIndex - 1)}><T value={ui.editor.diffreviewqueue.previous} /></Button><Button type="button" disabled={selectedIndex >= visible.length - 1} onClick={() => navigation(selectedIndex + 1)}><T value={ui.editor.diffreviewqueue.next} /></Button><Button type="button" onClick={() => { const next = visible.find((candidate) => !decisionReadyForReview(candidate, decisions.get(candidate.key)) && candidate.key !== selected.key) ?? (canAcknowledge ? visible.find((candidate) => !decisionResolved(candidate, decisions.get(candidate.key)) && candidate.key !== selected.key) : undefined); if (next) choose(next.key); }}><T value={ui.editor.diffreviewqueue.nextUnreviewed} /></Button></div>
         {canDecide ? <Stack>
           {onAddRow ? <Button type="button" onClick={() => { onAddRow(selected); setMessage(t(ui.state.changeRowAdded)); }}><T value={ui.editor.diffreviewqueue.createChangeRowFromThisDifference} /></Button> : null}
-          <Button type="button" onClick={() => { document.querySelector<HTMLElement>('#editor-change-record, #amendment-changes-title')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); setMessage(t(ui.state.correctPairing)); }}><T value={ui.editor.diffreviewqueue.correctPairingInChangeRecord} /></Button>
+          <Button type="button" onClick={() => { onCorrectPairing?.(); document.querySelector<HTMLElement>('#editor-change-record, #amendment-changes-title')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); setMessage(t(ui.state.correctPairing)); }}><T value={ui.editor.diffreviewqueue.correctPairingInChangeRecord} /></Button>
           <label><T value={ui.editor.diffreviewqueue.linkToSavedChangeRows} />{" "}<select multiple value={linkedIds} onChange={(event) => setLinkedIds([...event.target.selectedOptions].map((option) => option.value))}>{rows.map((row) => <option key={row.id} value={row.id}>{row.label}</option>)}</select></label>
           {selected.ambiguous && canAcknowledge ? <label className="choice-row"><input type="checkbox" checked={acknowledge} onChange={(event) => setAcknowledge(event.target.checked)} /> <T value={ui.editor.diffreviewqueue.confirmTheMultiRowPairingAsReviewer} /></label> : null}
           <Button type="button" disabled={pending || linkedIds.length === 0 || selected.ambiguous && linkedIds.length < 2} onClick={() => save({ key: selected.key, fingerprint: selected.fingerprint, status: 'linked', linkedIds, reviewerAcknowledged: selected.ambiguous && canAcknowledge && acknowledge })}><T value={ui.editor.diffreviewqueue.linkSelectedRowsAndNext} /></Button>

@@ -1,0 +1,61 @@
+import { test, expect } from './fixtures/consent';
+import { signInEditor, signInAdmin, VERSION_1949, VERSION_2022 } from './helpers';
+import path from 'node:path';
+
+const mock=`http://127.0.0.1:${process.env.E2E_MOCK_PORT ?? 4010}`;
+const law='01900000-0000-4000-8000-000000000302';
+test.beforeEach(async({request})=>{await request.post(mock+'/__reset');await request.post(mock+'/__editor_documents');});
+
+test('one constitution pair, draft context, and one-step reusable documents',async({page,request},testInfo)=>{
+  await signInAdmin(page);await page.goto('/editor/amendments/'+law);
+  const menu=page.getByRole('navigation',{name:'Amendment workspace'});
+  await page.getByLabel('Public amendment comment').fill('Unsaved amendment rationale stays here.');
+  await page.getByRole('button',{name:'Choose constitution versions',exact:true}).click();
+  await page.getByLabel('Before constitution').selectOption(VERSION_1949);
+  await page.getByLabel('After constitution').selectOption(VERSION_2022);
+  await page.getByRole('button',{name:'Use this pair'}).click();
+  await expect(page.locator('input[name="sourceVersionId"]')).toHaveValue(VERSION_1949);
+  await expect(page.locator('input[name="targetVersionId"]')).toHaveValue(VERSION_2022);
+  expect(await page.locator('#amendment-source-version').count()).toBe(1);
+  await menu.getByRole('button',{name:'Documents',exact:true}).click();
+  const upload=page.getByRole('button',{name:'Upload new document',exact:true}),choose=page.getByRole('button',{name:'Choose existing document',exact:true});
+  await page.mouse.move(0,0);
+  const style=(button:typeof upload)=>button.evaluate(element=>{const s=getComputedStyle(element);return [s.backgroundColor,s.border,s.height,s.borderRadius,s.font];});
+  expect(await style(upload)).toEqual(await style(choose));
+  await upload.click();await page.getByLabel('File',{exact:true}).setInputFiles({name:'evidence.txt',mimeType:'text/plain',buffer:Buffer.from('Original evidence')});
+  await page.getByRole('textbox',{name:'Title',exact:true}).fill('New legislation evidence');
+  const response=page.waitForResponse(r=>r.url().endsWith('/editor/documents/command')&&r.request().method()==='POST');
+  await page.getByRole('button',{name:'Upload and attach',exact:true}).click();expect((await response).ok()).toBeTruthy();
+  await expect(page.getByRole('link',{name:'New legislation evidence',exact:true})).toBeVisible();
+  await expect(page).toHaveURL(new RegExp('/editor/amendments/'+law));
+  await menu.getByRole('button',{name:'Affected passages',exact:true}).click();await expect(page.getByLabel('Public amendment comment')).toHaveValue('Unsaved amendment rationale stays here.');
+  await menu.getByRole('button',{name:'Details',exact:true}).click();await page.getByRole('textbox',{name:'Title',exact:true}).fill('Saved workspace draft');
+  await page.route('**/editor/command',route=>route.fulfill({status:400,json:{key:'save_failed'}}),{times:1});
+  await page.getByRole('button',{name:'Save draft',exact:true}).click();await expect(page.getByRole('alert').filter({hasText:'Could not save draft.'})).toBeVisible();
+  await expect(page.getByRole('textbox',{name:'Title',exact:true})).toHaveValue('Saved workspace draft');
+  await page.getByRole('button',{name:'Save draft',exact:true}).click();await expect(page.getByText('Draft saved.',{exact:true})).toBeVisible();
+  await expect(page.getByLabel('Public amendment comment')).toHaveValue('Unsaved amendment rationale stays here.');
+  await page.getByRole('navigation',{name:'Amendment workspace'}).getByRole('button',{name:'Documents',exact:true}).click();await expect(page.getByRole('link',{name:'New legislation evidence',exact:true})).toBeVisible();
+  const docs=await (await request.get(mock+'/api/document/documents')).json();expect(docs).toHaveLength(1);
+  await page.goto('/admin/constitutions/01900000-0000-4000-8000-000000000002');
+  await page.getByRole('button',{name:'Choose existing document',exact:true}).click();
+  await page.getByLabel('Document',{exact:true}).selectOption(docs[0].id);await page.getByRole('button',{name:'Attach document',exact:true}).click();
+  await expect(page.getByRole('link',{name:'New legislation evidence',exact:true})).toBeVisible();
+  expect(await (await request.get(mock+'/api/document/documents')).json()).toHaveLength(1);
+  await page.screenshot({path:testInfo.outputPath('shared-documents.png'),fullPage:true});
+});
+
+test('mobile task views retain edits, keyboard navigation, and accessible upload controls',async({page},testInfo)=>{
+  await page.setViewportSize({width:390,height:844});await signInEditor(page);await page.goto('/editor/amendments/'+law);
+  const menu=page.getByRole('navigation',{name:'Amendment workspace'});
+  await page.getByLabel('Public amendment comment').fill('Mobile draft rationale');
+  await menu.getByRole('button',{name:'History',exact:true}).click();
+  await page.locator('.revision-panel-desktop .revision-item').first().click();
+  await menu.getByRole('button',{name:'Affected passages',exact:true}).click();await expect(page.getByLabel('Public amendment comment')).toHaveValue('Mobile draft rationale');
+  await page.goBack();await expect(menu.getByRole('button',{name:'History',exact:true})).toHaveAttribute('aria-pressed','true');
+  await menu.getByRole('button',{name:'Documents',exact:true}).click();await page.getByRole('button',{name:'Upload new document',exact:true}).click();
+  await page.addScriptTag({path:path.join(process.cwd(),'node_modules/axe-core/axe.min.js')});
+  const violations=await page.evaluate(async()=>{const result=await (window as unknown as {axe:{run:(element:HTMLElement)=>Promise<{violations:{id:string}[]}>}}).axe.run(document.body);return result.violations.map(item=>item.id);});expect(violations).toEqual([]);
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  await page.screenshot({path:testInfo.outputPath('amendment-mobile.png'),fullPage:true});
+});

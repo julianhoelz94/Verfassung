@@ -34,6 +34,8 @@ import java.util.UUID
 class DocumentApiTest {
     @Autowired lateinit var mvc: MockMvc
 
+    @Autowired lateinit var jdbc: org.springframework.jdbc.core.JdbcTemplate
+
     @Autowired lateinit var mapper: ObjectMapper
 
     @MockitoBean lateinit var identity: IdentityClient
@@ -51,6 +53,84 @@ class DocumentApiTest {
         Mockito.`when`(identity.authenticate(EDITOR)).thenReturn(editor)
         Mockito.`when`(identity.authenticate(VIEWER)).thenReturn(viewer)
         Mockito.`when`(identity.authenticate(ADMIN)).thenReturn(admin)
+    }
+
+    @Test
+    fun editorUploadCreatesOnePinnedRecordAndReplaysWithoutDuplicates() {
+        val target = UUID.randomUUID()
+        val operation = UUID.randomUUID()
+        val title = "Editor evidence $operation"
+        val metadata = """{"operationId":"$operation","title":"$title","sourceUrl":"https://example.org/law"}"""
+        fun upload(body: String = metadata) = mvc.perform(
+            multipart("/links/constitution/$target/documents")
+                .file(MockMultipartFile("metadata", "metadata.json", "application/json", body.toByteArray()))
+                .file(MockMultipartFile("file", "law.txt", "text/plain", "Original law text".toByteArray()))
+                .header("Authorization", EDITOR),
+        )
+        val first = mapper.readTree(upload().andExpect(status().isCreated).andReturn().response.contentAsString)
+        val id = first.path("id").asText()
+        val revision = first.path("revision").path("revision").asInt()
+        val pin = first.path("revision").path("id").asText()
+        upload().andExpect(status().isCreated).andExpect(jsonPath("$.id").value(id))
+        upload(metadata.replace(title, "Changed evidence")).andExpect(status().isConflict)
+        org.junit.jupiter.api.Assertions.assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM documents WHERE id = ?::uuid", Int::class.java, id))
+        org.junit.jupiter.api.Assertions.assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM document_link_events WHERE document_id = ?::uuid", Int::class.java, id))
+        mvc.get("/links/constitution/$target") { header("Authorization", EDITOR) }.andExpect {
+            status { isOk() }
+            jsonPath("$[0].revisionId") { value(pin) }
+        }
+        val file = mvc.get("/documents/$id/revisions/$revision/file") { header("Authorization", EDITOR) }.andExpect { status { isOk() } }.andReturn().response
+        org.junit.jupiter.api.Assertions.assertArrayEquals("Original law text".toByteArray(), file.contentAsByteArray)
+        mvc.get("/documents/$id").andExpect { status { isNotFound() } }
+        mvc.put("/documents/$id") {
+            header("Authorization", EDITOR)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"title":"Later revision","expectedRevision":$revision}"""
+        }.andExpect { status { isOk() } }
+        upload().andExpect(jsonPath("$.revision.id").value(pin))
+    }
+
+    @Test
+    fun editorUploadRejectsInvalidFilesScopesAndRolesWithoutPartialRecords() {
+        val target = UUID.randomUUID()
+        val title = "Rejected editor upload ${UUID.randomUUID()}"
+        fun upload(type: String, authorization: String?, fileType: String? = null) = mvc.perform(
+            multipart("/links/$type/$target/documents")
+                .file(MockMultipartFile("metadata", "metadata.json", "application/json", """{"operationId":"${UUID.randomUUID()}","title":"$title","sourceUrl":"https://example.org/source"}""".toByteArray()))
+                .apply { if (fileType != null) file(MockMultipartFile("file", "invalid.svg", fileType, "invalid".toByteArray())) }
+                .apply { if (authorization != null) header("Authorization", authorization) },
+        )
+        upload("constitution", null).andExpect(status().isUnauthorized)
+        upload("constitution", VIEWER).andExpect(status().isForbidden)
+        upload("amendment", EDITOR).andExpect(status().isBadRequest)
+        upload("constitution", EDITOR, "image/svg+xml").andExpect(status().isBadRequest)
+        org.junit.jupiter.api.Assertions.assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM document_revisions WHERE title = ?", Int::class.java, title))
+        org.junit.jupiter.api.Assertions.assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM document_link_events WHERE target_id = ?", Int::class.java, target))
+        upload("constitution", EDITOR).andExpect(status().isCreated)
+    }
+
+    @Test
+    fun concurrentEditorUploadRetriesCreateOnlyOneLibraryRecord() {
+        val target = UUID.randomUUID()
+        val operation = UUID.randomUUID()
+        val body = """{"operationId":"$operation","title":"Concurrent law $operation","sourceUrl":"https://example.org/source"}"""
+        val pool = java.util.concurrent.Executors.newFixedThreadPool(2)
+        try {
+            val tasks = (1..2).map {
+                pool.submit<String> {
+                    val result = mvc.perform(
+                        multipart("/links/constitution/$target/documents")
+                            .file(MockMultipartFile("metadata", "metadata.json", "application/json", body.toByteArray()))
+                            .header("Authorization", EDITOR),
+                    ).andExpect(status().isCreated).andReturn()
+                    mapper.readTree(result.response.contentAsString).path("id").asText()
+                }
+            }
+            org.junit.jupiter.api.Assertions.assertEquals(tasks[0].get(), tasks[1].get())
+            org.junit.jupiter.api.Assertions.assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM document_link_events WHERE target_id = ?", Int::class.java, target))
+        } finally {
+            pool.shutdownNow()
+        }
     }
 
     @Test

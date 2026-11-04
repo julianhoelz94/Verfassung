@@ -1,146 +1,45 @@
 'use client';
 
-import { T } from '../../components/TranslationProvider';
-import { ui } from '../../../lib/messages';
-import { useMemo, useState } from 'react';
-import type { Amendment, ArticleSummary, VersionSummary } from '../../../lib/api';
+import { useMemo, useState, type ComponentProps } from 'react';
+import type { Amendment } from '../../../lib/api';
 import type { AmendmentRevision } from '../../../lib/amendment-editor-api';
-import type { DiffReviewState } from '../../../lib/diff-review';
-import { Alert, Button } from '../../components/ui';
+import { useTranslation } from '../../components/TranslationProvider';
+import { Alert } from '../../components/ui';
+import { Stack } from '../../components/layout/Layout';
 import { AmendmentForm } from './AmendmentForm';
 import { AmendmentRevisionPanel } from './AmendmentRevisionPanel';
-import { WorkspaceLayout } from '../../components/layout/templates';
-import surfaceStyles from '../../components/surfaces.module.css';
+import { PassageComparison, type PassageSide } from '../PassageComparison';
+import { AmendmentRevisionDocuments } from './AmendmentRevisionDocuments';
+import { passageReaderHref } from '../../../lib/reader-links';
+import { changeTypeMessage } from '../../../lib/ui-labels';
+import { treeUnits } from './AmendmentChangesTable';
 
-type AmendmentEditorLayoutProps = {
-  amendmentId: string;
-  constitutionId: string;
-  amendment: Amendment;
-  revisions: AmendmentRevision[] | null;
-  versions: VersionSummary[];
-  articlesByVersion: Record<string, string[]>;
-  unitTreesByVersion: Record<string, ArticleSummary[]>;
-  latestVersionId?: string | null;
-  canSave: boolean;
-  canPublish: boolean;
-  canWithdraw: boolean;
-  readOnly: boolean;
-  canRestore: boolean;
-  contentAvailable: boolean;
-  diffReview?: DiffReviewState | null;
-  canReviewDiff?: boolean;
-  canAcknowledgeDiff?: boolean;
-};
+type Props = Omit<ComponentProps<typeof AmendmentForm>, 'historyPanel'> & { amendment: Amendment; revisions: AmendmentRevision[] | null; canRestore: boolean };
 
-function revisionToAmendment(revision: AmendmentRevision, base: Amendment): Amendment {
-  return {
-    ...base,
-    title: revision.title,
-    summary: revision.summary ?? '',
-    enactedOn: revision.enactedOn ?? null,
-    effectiveOn: revision.effectiveOn ?? null,
-    sourceReference: revision.sourceReference ?? null,
-    sourceVersionId: revision.sourceVersionId ?? null,
-    targetVersionId: revision.targetVersionId ?? null,
-    comment: revision.comment ?? base.comment ?? null,
-    documents: revision.documents ?? base.documents ?? [],
-    changes: revision.changes.map((change, index) => ({
-      id: `revision-${index}`,
-      articleId: null,
-      articleNumber: change.articleNumber ?? null,
-      changeType: change.changeType,
-      note: change.note ?? null,
-      beforeRef: change.beforeRef ?? null,
-      afterRef: change.afterRef ?? null,
-      linkReviewReason: change.linkReviewReason ?? null,
-      legacyLinkUnresolved: change.legacyLinkUnresolved ?? false,
-    })),
-  };
-}
-
-export function AmendmentEditorLayout({
-  amendmentId,
-  constitutionId,
-  amendment,
-  revisions,
-  versions,
-  articlesByVersion,
-  unitTreesByVersion,
-  latestVersionId,
-  canSave,
-  canPublish,
-  canWithdraw,
-  readOnly,
-  canRestore,
-  contentAvailable,
-  diffReview,
-  canReviewDiff,
-  canAcknowledgeDiff,
-}: AmendmentEditorLayoutProps) {
-  const [selectedRevisionId, setSelectedRevisionId] = useState<string | null>(null);
-
-  const orderedRevisions = useMemo(
-    () =>
-      revisions
-        ? [...revisions].sort((a, b) => {
-            const dateCmp = a.createdAt.localeCompare(b.createdAt);
-            if (dateCmp !== 0) {
-              return dateCmp;
-            }
-            return a.id.localeCompare(b.id);
-          })
-        : [],
-    [revisions],
-  );
-
-  const selectedRevision =
-    selectedRevisionId === null
-      ? null
-      : orderedRevisions.find((revision) => revision.id === selectedRevisionId) ?? null;
-  const viewingPast = selectedRevision !== null;
-  const displayAmendment =
-    selectedRevision !== null ? revisionToAmendment(selectedRevision, amendment) : amendment;
-
-  return (
-    <WorkspaceLayout variant="amendment">
-      <section className={["panel amendment-main", surfaceStyles.panel].join(' ')}>
-        {viewingPast ? (
-          <Alert tone="info"><T value={ui.editor.amendments.amendmenteditorlayout.viewingAPastRevisionReadOnlyRestore} /></Alert>
-        ) : null}
-        <AmendmentForm
-          key={selectedRevision?.id ?? 'current'}
-          amendmentId={amendmentId}
-          constitutionId={constitutionId}
-          amendment={displayAmendment}
-          versions={versions}
-          articlesByVersion={articlesByVersion}
-          unitTreesByVersion={unitTreesByVersion}
-          latestVersionId={latestVersionId}
-          canSave={canSave && !viewingPast}
-          canWithdraw={canWithdraw && !viewingPast}
-          readOnly={readOnly || viewingPast}
-          contentAvailable={contentAvailable}
-          diffReview={!viewingPast ? diffReview : null}
-          canReviewDiff={canReviewDiff}
-          canAcknowledgeDiff={canAcknowledgeDiff}
-        />
-        {canPublish && !viewingPast ? (
-          <form action="/editor/command" method="post" className="action-bar"><input type="hidden" name="command" value="amendment-publish" />
-            <input type="hidden" name="amendmentId" value={amendmentId} />
-            <Button><T value={ui.editor.amendments.amendmenteditorlayout.publishLaw} /></Button>
-          </form>
-        ) : null}
-      </section>
-      {revisions && revisions.length > 0 ? (
-        <AmendmentRevisionPanel
-          amendmentId={amendmentId}
-          amendment={amendment}
-          revisions={orderedRevisions}
-          selectedRevisionId={selectedRevisionId}
-          onSelectRevision={setSelectedRevisionId}
-          canRestore={canRestore}
-        />
-      ) : null}
-    </WorkspaceLayout>
-  );
+/** History is a task view: the current form stays mounted while an older revision is inspected. */
+export function AmendmentEditorLayout({ revisions, canRestore, ...props }: Props) {
+  const [selectedId, setSelectedId] = useState<string | null>(null), t = useTranslation();
+  const ordered = useMemo(() => [...(revisions ?? [])].sort((a,b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id)), [revisions]);
+  const selected = ordered.find(revision => revision.id===selectedId);
+  function text(ref: AmendmentRevision['changes'][number]['beforeRef']) {
+    return ref?.text ?? (ref?.versionId ? treeUnits(ref.versionId, props.unitTreesByVersion[ref.versionId] ?? [],t).find(unit => unit.logicalId===ref.logicalId && (!ref.occurrenceId || unit.occurrenceId===ref.occurrenceId))?.text : '') ?? '';
+  }
+  function side(ref: AmendmentRevision['changes'][number]['beforeRef']): PassageSide {
+    const root=ref?.rootOccurrenceId ?? ref?.occurrenceId;
+    return {text:text(ref),label:ref?.breadcrumbs?.join(' › ') || ref?.label || undefined,identity:ref?[ref.versionId,ref.logicalId,ref.occurrenceId,ref.revisionId].filter(Boolean).join(' · '):undefined,
+      href:ref?.versionId&&root?passageReaderHref(props.readerOwners?.[ref.versionId],ref.versionId,root,ref.occurrenceId):undefined};
+  }
+  return <AmendmentForm {...props} historyPanel={<Stack>
+    {ordered.length ? <AmendmentRevisionPanel amendmentId={props.amendmentId} amendment={props.amendment} revisions={ordered} selectedRevisionId={selectedId} onSelectRevision={setSelectedId} canRestore={canRestore}/> : <p>{t({en:'No saved revisions yet.',de:'Noch keine gespeicherten Revisionen.'})}</p>}
+    {selected ? <Stack><Alert tone="info">{t({en:'Inspecting an older revision. Your current draft remains in the workspace.',de:'Ältere Revision wird angezeigt. Dein aktueller Entwurf bleibt im Arbeitsbereich erhalten.'})}</Alert>
+      <h2>{selected.title}</h2>
+      <p>{props.versions.find(version=>version.id===selected.sourceVersionId)?.versionLabel ?? '—'} → {props.versions.find(version=>version.id===selected.targetVersionId)?.versionLabel ?? '—'}</p>
+      <p>{selected.comment}</p><p>{selected.summary}</p>
+      <details><summary>{t({en:'Revision details',de:'Revisionsangaben'})}</summary><dl><dt>{t({en:'Citation',de:'Fundstelle'})}</dt><dd>{selected.sourceReference || '—'}</dd><dt>{t({en:'Enacted date',de:'Beschlossen am'})}</dt><dd>{selected.enactedOn || '—'}</dd><dt>{t({en:'Effective date',de:'Gültig ab'})}</dt><dd>{selected.effectiveOn || '—'}</dd></dl>
+        {selected.documents?.length ? <ul>{selected.documents.map((document,index)=><li key={index}>{document.url?<a href={document.url} target="_blank" rel="noreferrer">{document.label||document.url}</a>:document.label||document.fileId}</li>)}</ul>:null}
+      </details>
+      {selected.changes.map((change,index) => <section key={index}><h3>{change.articleNumber || String(index+1)} · {t(changeTypeMessage(change.changeType))}</h3><PassageComparison before={side(change.beforeRef)} after={side(change.afterRef)}/><p>{change.note}</p>{change.linkReviewReason?<p>{change.linkReviewReason}</p>:null}{change.pendingAfterLogicalId?<code>{change.pendingAfterLogicalId}</code>:null}</section>)}
+      <AmendmentRevisionDocuments amendmentId={props.amendmentId} revisionId={selected.id}/>
+    </Stack>:null}
+  </Stack>}/>;
 }

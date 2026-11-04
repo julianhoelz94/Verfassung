@@ -1,3 +1,4 @@
+import { editorDocuments } from './fixtures/editor-documents.mjs';
 import QRCode from 'qrcode';
 import { countryDirectoryFixtures } from './fixtures/country-directory.mjs';
 import { continuousReaderOutline, continuousReaderUnits } from './fixtures/continuous-reader.mjs';
@@ -360,6 +361,7 @@ function preview() {
 
 resetMockState();
 
+let editorDocumentScenario;
 const server = createServer(async (req, res) => {
   const url = new URL(req.url ?? '/', `http://127.0.0.1:${port}`);
   const { pathname, searchParams } = url;
@@ -370,7 +372,10 @@ const server = createServer(async (req, res) => {
     return;
   }
 
+  if (method === 'POST' && pathname === '/__editor_documents') { editorDocumentScenario=editorDocuments();json(res,200,{});return; }
+  if (editorDocumentScenario) { const response=await editorDocumentScenario(req,method,url);if(response){json(res,response.status,await response.json());return;} }
   if (method === 'POST' && pathname === '/__reset') {
+    editorDocumentScenario=undefined;
     resetMockState();
     empty(res, 204);
     return;

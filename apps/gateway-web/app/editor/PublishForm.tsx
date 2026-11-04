@@ -1,5 +1,7 @@
 'use client';
 
+import { passageReaderHref, type ReaderOwner } from '../../lib/reader-links';
+
 import { changeTypeMessage } from '../../lib/ui-labels';
 
 import { T, useTranslation } from '../components/TranslationProvider';
@@ -61,6 +63,7 @@ function isEmptyChange(change: ChangeRecordChange): boolean {
 }
 
 type PublishFormProps = {
+  readerOwner?: ReaderOwner;
   sessionId: string;
   versionId: string;
   articleId: string;
@@ -77,7 +80,7 @@ type PublishFormProps = {
   sourceEvidenceRevision?: number;
 };
 
-export function PublishForm({ sessionId, versionId, articleId, hopKind, status, canEdit, canPublish, record, comment, structuredDraft, outline, diffReview, canReviewDiff = false, sourceEvidenceRevision }: PublishFormProps) {
+export function PublishForm({ sessionId, versionId, articleId, hopKind, status, canEdit, canPublish, record, comment, structuredDraft, outline, diffReview, canReviewDiff = false, sourceEvidenceRevision, readerOwner }: PublishFormProps) {
   const t = useTranslation();
   const { setDetailsDirty } = useDraftState();
   const unsaved = useRef(false);
@@ -112,7 +115,7 @@ export function PublishForm({ sessionId, versionId, articleId, hopKind, status, 
     const label = unit?.display ?? `${t(ui.editorDynamic.unit)} ${change.articleNumber}`.trim();
     const rootOccurrenceId = ref?.rootOccurrenceId ?? unit?.ref.rootOccurrenceId;
     const href = side === 'before' && rootOccurrenceId && ref?.versionId
-      ? `/versions/${encodeURIComponent(ref.versionId)}/units/${encodeURIComponent(rootOccurrenceId)}${ref.occurrenceId ? `?occurrenceId=${encodeURIComponent(ref.occurrenceId)}` : ''}`
+      ? passageReaderHref(readerOwner, ref.versionId, rootOccurrenceId, ref.occurrenceId)
       : side === 'after' && unit ? `/editor?sessionId=${encodeURIComponent(sessionId)}&versionId=${encodeURIComponent(versionId)}&selectedNode=${encodeURIComponent(logicalId)}` : undefined;
     return href ? <a href={href}>{label}</a> : label;
   }

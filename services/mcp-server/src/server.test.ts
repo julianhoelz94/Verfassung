@@ -418,6 +418,9 @@ test('MCP import key stages a pending job and never publishes', async () => {
     const result = await callTool('stage_constitution_import', { payload }, 'Bearer ca_mcp_editor');
     assert.equal(result.isError, undefined);
     assert.equal(result.structuredContent?.status, 'pending_review');
+    const review = new URL(String(result.structuredContent?.reviewUrl));
+    assert.equal(review.pathname, '/editor');
+    assert.equal(review.searchParams.get('importJobId'), '01900000-0000-4000-8000-000000000001');
     assert.deepEqual(calls.map(call => call.method), ['GET', 'POST']);
     assert.match(calls[1].idempotencyKey ?? '', /^ca-mcp-[a-f0-9]{64}$/);
     await callTool('stage_constitution_import', { payload }, 'Bearer ca_mcp_editor');

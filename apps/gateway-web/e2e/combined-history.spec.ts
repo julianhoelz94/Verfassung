@@ -31,9 +31,9 @@ test('one chronology interleaves lifecycle and amendment events and filters with
   await expect(page.locator('.history-details > li')).toHaveCount(3);
 });
 
-test('old constitution timeline links retain date and selected event in the unified history', async ({ page }) => {
+test('direct history links retain date and selected event', async ({ page }) => {
   const fragment = '#history-event-01900000-0000-4000-8000-000000000732';
-  await page.goto(`/countries/DE/constitution-timeline?on=1949-05-10${fragment}`);
+  await page.goto(`/countries/DE/timeline?on=1949-05-10${fragment}`);
   await expect(page).toHaveURL(`/countries/DE/timeline?on=1949-05-10${fragment}`);
   await expect(page.locator('#constitution-timeline-date')).toHaveValue('1949-05-10');
   await expect(page.locator('[data-event-index="1"]')).toHaveAttribute('aria-pressed', 'true');

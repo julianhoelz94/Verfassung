@@ -24,7 +24,7 @@ describe('structured legal publish readiness', () => {
     { logicalId: 'paragraph-logical', occurrenceId: 'paragraph-occurrence', unitKind: 'node' as const, label: 'Article 1 Rights › Paragraph 2' },
     { logicalId: 'text-logical', occurrenceId: 'text-occurrence', unitKind: 'text_entry' as const, label: 'Everyone has equal rights.' },
   ])('opens the containing article and focuses the nested $unitKind source passage', ({ logicalId, occurrenceId, unitKind, label }) => {
-    const markup = renderToStaticMarkup(<PublishForm
+    const markup = renderToStaticMarkup(<PublishForm readerOwner={{ countryCode: 'DE' }}
       sessionId="session" versionId="source" articleId="article-occurrence" hopKind="legal"
       status="reviewing" canEdit={false} canPublish={false}
       structuredDraft={{ ...structuredDraft, sourceRoots: [sourceRoot], roots: [sourceRoot] }}
@@ -35,10 +35,11 @@ describe('structured legal publish readiness', () => {
         pendingAfterLogicalId: logicalId,
       }] }} />);
     const document = new DOMParser().parseFromString(markup, 'text/html');
-    const source = document.querySelector<HTMLAnchorElement>('a[href^="/versions/"]')!;
+    const source = document.querySelector<HTMLAnchorElement>('a[href^="/countries/DE/versions/"]')!;
     const destination = new URL(source.getAttribute('href')!, 'https://atlas.example');
-    expect(destination.pathname).toBe('/versions/historical-version/units/article-occurrence');
-    expect(destination.searchParams.get('occurrenceId')).toBe(occurrenceId);
+    expect(destination.pathname).toBe('/countries/DE/versions/historical-version');
+    expect(destination.hash).toBe('#' + occurrenceId);
+    expect(destination.search).toBe('');
     expect(source.textContent).toContain(label);
     const draft = document.querySelector<HTMLAnchorElement>('a[href^="/editor?"]')!;
     const draftDestination = new URL(draft.getAttribute('href')!, 'https://atlas.example');
@@ -47,7 +48,7 @@ describe('structured legal publish readiness', () => {
   });
 
   it('recovers the root from loaded source content when an older saved reference omits it', () => {
-    const markup = renderToStaticMarkup(<PublishForm
+    const markup = renderToStaticMarkup(<PublishForm readerOwner={{ countryCode: 'DE' }}
       sessionId="session" versionId="source" articleId="article-occurrence" hopKind="legal"
       status="reviewing" canEdit={false} canPublish={false}
       structuredDraft={{ ...structuredDraft, sourceRoots: [sourceRoot], roots: [sourceRoot] }}
@@ -56,11 +57,11 @@ describe('structured legal publish readiness', () => {
         beforeRef: { versionId: 'source', logicalId: 'paragraph-logical', occurrenceId: 'paragraph-occurrence' },
       }] }} />);
     const document = new DOMParser().parseFromString(markup, 'text/html');
-    expect(document.querySelector('a')?.getAttribute('href')).toBe('/versions/source/units/article-occurrence?occurrenceId=paragraph-occurrence');
+    expect(document.querySelector('a')?.getAttribute('href')).toBe('/countries/DE/versions/source#paragraph-occurrence');
   });
 
   it('leaves an unresolved nested source reference as readable text instead of a broken root link', () => {
-    const markup = renderToStaticMarkup(<PublishForm
+    const markup = renderToStaticMarkup(<PublishForm readerOwner={{ countryCode: 'DE' }}
       sessionId="session" versionId="source" articleId="article-occurrence" hopKind="legal"
       status="reviewing" canEdit={false} canPublish={false}
       record={{ title: 'Law', comment: 'Removed paragraph', documents: [], changes: [{
@@ -68,14 +69,14 @@ describe('structured legal publish readiness', () => {
         beforeRef: { versionId: 'source', logicalId: 'paragraph-logical', occurrenceId: 'paragraph-occurrence' },
       }] }} />);
     const document = new DOMParser().parseFromString(markup, 'text/html');
-    expect(document.querySelector('a[href^="/versions/"]')).toBeNull();
+    expect(document.querySelector('a[href^="/countries/DE/versions/"]')).toBeNull();
     expect(document.body.textContent).toContain('1');
     expect(document.body.textContent).not.toContain('paragraph-logical');
   });
 
   it('shows readable passage labels rather than internal identities during review', () => {
     const root = { logicalId: 'internal-unit-id', kind: 'article', label: '1', title: 'Human dignity', content: [] };
-    const markup = renderToStaticMarkup(<PublishForm sessionId="session" versionId="source" articleId="article" hopKind="legal"
+    const markup = renderToStaticMarkup(<PublishForm readerOwner={{ countryCode: 'DE' }} sessionId="session" versionId="source" articleId="article" hopKind="legal"
       status="reviewing" canEdit={false} canPublish={false}
       structuredDraft={{ ...structuredDraft, sourceRoots: [root], roots: [root] }}
       outline={{ kinds: [{ kindCode: 'article', displayLabel: 'Article' }] }}
@@ -85,7 +86,7 @@ describe('structured legal publish readiness', () => {
     expect(markup).toContain('selectedNode=internal-unit-id');
   });
   it('retains a saved pending draft target outside the first 100 picker options', () => {
-    const markup = renderToStaticMarkup(<PublishForm
+    const markup = renderToStaticMarkup(<PublishForm readerOwner={{ countryCode: 'DE' }}
       sessionId="session" versionId="source" articleId="article" hopKind="legal"
       status="open" canEdit canPublish={false}
       structuredDraft={{ ...structuredDraft, roots: Array.from({ length: 101 }, (_, index) => ({ logicalId: `unit-${index}`, kind: 'article', label: String(index), content: [] })) }}
@@ -101,7 +102,7 @@ describe('structured legal publish readiness', () => {
     const host = document.createElement('div');
     const root = createRoot(host);
     try {
-      await act(async () => root.render(<PublishForm
+      await act(async () => root.render(<PublishForm readerOwner={{ countryCode: 'DE' }}
         sessionId="session" versionId="source" articleId="article" hopKind="legal"
         status="open" canEdit canPublish={false} structuredDraft={structuredDraft}
         record={{ title: 'Law', comment: 'Change', documents: [], changes: [{
@@ -119,7 +120,7 @@ describe('structured legal publish readiness', () => {
   });
 
   it('accepts a saved draft after selection when the target ref is still pending publication', () => {
-    const markup = renderToStaticMarkup(<PublishForm
+    const markup = renderToStaticMarkup(<PublishForm readerOwner={{ countryCode: 'DE' }}
       sessionId="session" versionId="source" articleId="article" hopKind="legal"
       status="approved" canEdit={false} canPublish={true} structuredDraft={structuredDraft}
       record={{ title: 'Law', comment: 'Changed sentence', documents: [], changes: [{

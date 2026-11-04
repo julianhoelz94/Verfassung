@@ -1,6 +1,7 @@
 package com.constitutionatlas.amendment.service
 
 import com.constitutionatlas.amendment.ConflictException
+import com.constitutionatlas.amendment.api.AmendmentChangeDto
 import com.constitutionatlas.amendment.api.AmendmentChangeWriteRequest
 import com.constitutionatlas.amendment.api.AmendmentDocumentDto
 import com.constitutionatlas.amendment.api.AmendmentDto
@@ -23,6 +24,7 @@ import com.constitutionatlas.amendment.repo.RevisionInsert
 import com.constitutionatlas.platform.Actor
 import com.constitutionatlas.platform.HierarchicalDiff
 import com.constitutionatlas.platform.NotFoundException
+import com.constitutionatlas.platform.readerPassageHref
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -42,38 +44,39 @@ class AmendmentService(
     private val diffReview: AmendmentDiffReviewService,
 ) {
     fun listForVersion(versionId: UUID, sourceVersionId: UUID?): List<AmendmentDto> =
-        amendmentRepository.listForTargetVersion(versionId, sourceVersionId)
+        amendmentRepository.listForTargetVersion(versionId, sourceVersionId).readerLinks()
 
     fun listForConstitution(constitutionId: UUID): List<AmendmentDto> =
-        amendmentRepository.listPublishedForConstitution(constitutionId)
+        amendmentRepository.listPublishedForConstitution(constitutionId).readerLinks()
 
     fun listStaffForConstitution(
         constitutionId: UUID,
         status: String? = null,
         reviewStatus: String? = null,
     ): List<AmendmentDto> =
-        amendmentRepository.listStaffForConstitution(constitutionId, status, reviewStatus)
+        amendmentRepository.listStaffForConstitution(constitutionId, status, reviewStatus).readerLinks()
 
     fun getPublishedAmendment(id: UUID): AmendmentDto =
-        amendmentRepository.getPublishedAmendment(id)
+        amendmentRepository.getPublishedAmendment(id)?.readerLinks()
             ?: throw NotFoundException("amendment not found")
 
     fun getStaffAmendment(id: UUID): AmendmentDto {
         val tipRevisionId =
             amendmentRepository.findTipRevisionId(id)
                 ?: throw NotFoundException("amendment not found")
-        return amendmentRepository.getAmendmentDtoForRevision(id, tipRevisionId, includeStaff = true)
+        return amendmentRepository.getAmendmentDtoForRevision(id, tipRevisionId, includeStaff = true)?.readerLinks()
             ?: throw NotFoundException("amendment not found")
     }
 
     fun listForArticle(constitutionId: UUID, articleNumber: String): List<AmendmentDto> =
-        amendmentRepository.listForArticle(constitutionId, articleNumber)
+        amendmentRepository.listForArticle(constitutionId, articleNumber).readerLinks()
 
     fun listRevisions(amendmentId: UUID): List<AmendmentRevisionDto> {
         if (!amendmentRepository.amendmentExists(amendmentId)) {
             throw NotFoundException("amendment not found")
         }
-        return amendmentRepository.listRevisions(amendmentId)
+        val link = referenceLinker()
+        return amendmentRepository.listRevisions(amendmentId).map { it.copy(changes = it.changes.readerLinks(link)) }
     }
 
     @Transactional
@@ -83,7 +86,7 @@ class AmendmentService(
             publishAttempts.lock(attempt)
             publishAttempts.find(attempt)?.let { existing ->
                 if (existing.constitutionId != constitutionId || existing.requestHash != requestHash) throw ConflictException("Publish attempt payload changed")
-                return amendmentRepository.getAmendmentDtoForRevision(existing.amendmentId, existing.revisionId, includeStaff = true) ?: throw NotFoundException("Reserved change record missing")
+                return amendmentRepository.getAmendmentDtoForRevision(existing.amendmentId, existing.revisionId, includeStaff = true)?.readerLinks() ?: throw NotFoundException("Reserved change record missing")
             }
         }
         rejectKind(request.kind)
@@ -118,7 +121,7 @@ class AmendmentService(
         )
         amendmentRepository.insertChanges(revisionId, changes)
         request.publishAttemptId?.let { publishAttempts.insert(it, constitutionId, amendmentId, revisionId, requestHash) }
-        return amendmentRepository.getAmendmentDtoForRevision(amendmentId, revisionId, includeStaff = true)
+        return amendmentRepository.getAmendmentDtoForRevision(amendmentId, revisionId, includeStaff = true)?.readerLinks()
             ?: throw IllegalStateException("created amendment not readable")
     }
 
@@ -161,7 +164,7 @@ class AmendmentService(
             throw ConflictException("revision would branch the chain")
         }
         amendmentRepository.insertChanges(revisionId, changes)
-        return amendmentRepository.getAmendmentDtoForRevision(amendmentId, revisionId, includeStaff = true)
+        return amendmentRepository.getAmendmentDtoForRevision(amendmentId, revisionId, includeStaff = true)?.readerLinks()
             ?: throw IllegalStateException("appended revision not readable")
     }
 
@@ -215,7 +218,7 @@ class AmendmentService(
         } catch (ex: DataIntegrityViolationException) {
             throw pinConflict(ex)
         }
-        return amendmentRepository.getPublishedAmendment(amendmentId)
+        return amendmentRepository.getPublishedAmendment(amendmentId)?.readerLinks()
             ?: throw IllegalStateException("published amendment not readable")
     }
 
@@ -279,7 +282,7 @@ class AmendmentService(
         val tipRevisionId =
             amendmentRepository.findTipRevisionId(amendmentId)
                 ?: throw IllegalStateException("amendment has no revisions")
-        return amendmentRepository.getAmendmentDtoForRevision(amendmentId, tipRevisionId, includeStaff = true)
+        return amendmentRepository.getAmendmentDtoForRevision(amendmentId, tipRevisionId, includeStaff = true)?.readerLinks()
             ?: throw IllegalStateException("withdrawn amendment not readable")
     }
 
@@ -387,6 +390,7 @@ class AmendmentService(
         if (request.sourceVersionId == request.targetVersionId) {
             throw IllegalArgumentException("sourceVersionId and targetVersionId must differ")
         }
+        val link = referenceLinker()
         val sourceTree = contentClient.listArticles(request.sourceVersionId)
         val targetTree = contentClient.listArticles(request.targetVersionId)
         val hierarchical = AmendmentDiff.hierarchical(request.sourceVersionId, sourceTree, request.targetVersionId, targetTree, contentClient.settingsRevisionId(request.sourceVersionId), contentClient.settingsRevisionId(request.targetVersionId))
@@ -400,8 +404,8 @@ class AmendmentService(
                     note = noteFor(change),
                     nodeId = change.node.id,
                     articleId = change.node.articleId,
-                    beforeRef = change.before?.let { toRef(request.sourceVersionId, it) },
-                    afterRef = if (change.type == "removed") null else toRef(request.targetVersionId, change.node),
+                    beforeRef = change.before?.let { toRef(request.sourceVersionId, it, link) },
+                    afterRef = if (change.type == "removed") null else toRef(request.targetVersionId, change.node, link),
                     ambiguous = change.ambiguous,
                 )
             },
@@ -513,7 +517,33 @@ class AmendmentService(
         }
     }
 
-    private fun toRef(versionId: UUID, node: FlatNode): AmendmentUnitRefDto? {
+    private fun referenceLinker(): (AmendmentUnitRefDto) -> String? {
+        val owners = mutableMapOf<UUID, CatalogVersionRef?>()
+        return { ref ->
+            val versionId = ref.versionId
+            val occurrence = ref.occurrenceId ?: ref.rootOccurrenceId
+            if (versionId == null || occurrence == null) {
+                null
+            } else {
+                if (!owners.containsKey(versionId)) owners[versionId] = catalogClient.getVersion(versionId)
+                val owner = owners[versionId]
+                readerPassageHref(owner?.countryCode, owner?.jurisdictionId, versionId, occurrence)
+            }
+        }
+    }
+
+    private fun List<AmendmentChangeDto>.readerLinks(link: (AmendmentUnitRefDto) -> String?): List<AmendmentChangeDto> = map { change ->
+        change.copy(beforeRef = change.beforeRef?.let { it.copy(deepLink = link(it)) }, afterRef = change.afterRef?.let { it.copy(deepLink = link(it)) })
+    }
+
+    private fun List<AmendmentDto>.readerLinks(): List<AmendmentDto> {
+        val link = referenceLinker()
+        return map { it.copy(changes = it.changes.readerLinks(link)) }
+    }
+
+    private fun AmendmentDto.readerLinks(): AmendmentDto = copy(changes = changes.readerLinks(referenceLinker()))
+
+    private fun toRef(versionId: UUID, node: FlatNode, link: ((AmendmentUnitRefDto) -> String?)? = null): AmendmentUnitRefDto? {
         val logicalId = node.logicalId ?: return null
         val revisionId = node.revisionId ?: return null
         return AmendmentUnitRefDto(
@@ -526,7 +556,7 @@ class AmendmentService(
             kind = node.kind,
             label = node.number ?: node.label ?: node.kind,
             text = node.body,
-            deepLink = "/versions/$versionId/units/${node.articleId}?occurrenceId=${node.id}",
+            deepLink = link?.invoke(AmendmentUnitRefDto(versionId = versionId, occurrenceId = node.id)),
         )
     }
 

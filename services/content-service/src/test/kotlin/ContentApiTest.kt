@@ -94,7 +94,7 @@ class ContentApiTest {
     fun draftContentRequiresStaffEvenWhenVersionIdIsKnown() {
         val version = UUID.fromString("01900000-0000-4000-8000-000000000004")
         Mockito.`when`(catalogClient.getVersion(version)).thenReturn(
-            CatalogVersion(version, "draft", constitutionId = UUID.fromString("01900000-0000-4000-8000-000000000002")),
+            CatalogVersion(version, "draft", constitutionId = UUID.fromString("01900000-0000-4000-8000-000000000002"), countryCode = "DE"),
         )
         contentReadPaths(version).forEach { path ->
             listOf<String?>(null, VIEWER_TOKEN).forEach { authorization ->
@@ -109,7 +109,7 @@ class ContentApiTest {
     @Test
     fun publishedEditorialSnapshotContentStaysPublicAndUnchangedAfterTheTipMoves() {
         val version = UUID.fromString("01900000-0000-4000-8000-000000000004")
-        val published = CatalogVersion(version, "published", constitutionId = UUID.fromString("01900000-0000-4000-8000-000000000002"), listing = "staff", currentVersionId = version)
+        val published = CatalogVersion(version, "published", constitutionId = UUID.fromString("01900000-0000-4000-8000-000000000002"), listing = "staff", currentVersionId = version, countryCode = "DE")
         Mockito.`when`(catalogClient.getVersion(version)).thenReturn(published)
         val publishedBodies = contentReadPaths(version).associateWith { path ->
             mockMvc.springGet(path).andExpect { status { isOk() } }.andReturn().response.contentAsString

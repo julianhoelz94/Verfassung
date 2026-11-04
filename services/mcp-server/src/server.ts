@@ -263,7 +263,7 @@ export function createServer(authorization?: string): McpServer {
     requireConfirmedUpload(payload);
     const retryKey = idempotencyKey ?? `ca-mcp-${createHash('sha256').update(JSON.stringify(payload)).digest('hex')}`;
     const job = await postJson<{ id: string; status: string; errors: unknown[] }>('ingestion', '/import-jobs', payload, authorization!, retryKey);
-    return { jobId: job.id, status: job.status, errors: job.errors, reviewUrl: `${(process.env.PUBLIC_BASE_URL ?? 'http://localhost').replace(/\/$/, '')}/admin/import/${job.id}` };
+    return { jobId: job.id, status: job.status, errors: job.errors, reviewUrl: `${(process.env.PUBLIC_BASE_URL ?? 'http://localhost').replace(/\/$/, '')}/editor?importJobId=${encodeURIComponent(job.id)}` };
   }));
 
   server.registerTool('create_import_batch', {
@@ -289,7 +289,7 @@ export function createServer(authorization?: string): McpServer {
     requireDirectUploadSize(payload);
     requireConfirmedUpload(payload);
     const item = await postJson<{ id: string; status: string; errors: unknown[] }>('ingestion', `/import-batches/${batchId}/items`, { idempotencyKey, payload, checksumSha256 }, authorization!);
-    return { batchId, itemId: item.id, status: item.status, errors: item.errors, reviewUrl: `${(process.env.PUBLIC_BASE_URL ?? 'http://localhost').replace(/\/$/, '')}/admin/import/${item.id}` };
+    return { batchId, itemId: item.id, status: item.status, errors: item.errors, reviewUrl: `${(process.env.PUBLIC_BASE_URL ?? 'http://localhost').replace(/\/$/, '')}/editor?importJobId=${encodeURIComponent(item.id)}` };
   }));
 
   server.registerTool('get_import_batch', {
@@ -356,7 +356,7 @@ export function createServer(authorization?: string): McpServer {
   }, ({ uploadId }) => run('complete_import_upload', async () => {
     await requireImportKey();
     const upload = await postJson<{ itemId?: string; status: string; migrationRunId?: string }>('ingestion', `/import-uploads/${uploadId}/complete`, {}, authorization!);
-    return { ...upload, reviewUrl: upload.migrationRunId ? `${(process.env.PUBLIC_BASE_URL ?? 'http://localhost').replace(/\/$/, '')}/admin/migrations/${upload.migrationRunId}` : upload.itemId ? `${(process.env.PUBLIC_BASE_URL ?? 'http://localhost').replace(/\/$/, '')}/admin/import/${upload.itemId}` : null };
+    return { ...upload, reviewUrl: upload.migrationRunId ? `${(process.env.PUBLIC_BASE_URL ?? 'http://localhost').replace(/\/$/, '')}/admin/migrations/${upload.migrationRunId}` : upload.itemId ? `${(process.env.PUBLIC_BASE_URL ?? 'http://localhost').replace(/\/$/, '')}/editor?importJobId=${encodeURIComponent(upload.itemId)}` : null };
   }));
 
   server.registerTool('get_import_job', {

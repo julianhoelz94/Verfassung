@@ -15,7 +15,7 @@ Scoped CSS Modules own page, header, surface, field and template styles. See
 
 | Area | Entry points |
 | --- | --- |
-| Public discovery/reading | `app/page.tsx`, `search/`, `countries/[code]/`, `versions/[versionId]/units/[unitId]/` |
+| Public discovery/reading | `app/page.tsx`, `search/`, `countries/[code]/`, `jurisdictions/` |
 | Reader/compare/history | `countries/[code]/versions/`, `compare/`, `timeline/`; shared `components/ConstitutionText`, `VersionReader`, ordered content/diff components |
 | Context/documents/legal | `countries/[code]/` and `countries/[code]/constitutions/[constitutionId]/` context, `documents/`, `impressum/`, `datenschutz/`, `about/` |
 | Authentication/account | `login/`, `register/`, `reset/`, `invite/`, `account/`, `logout/` |
@@ -77,3 +77,5 @@ Contextual reader copying is owned by `lib/reader-actions.ts` and `ReaderActions
 Country and regional constitution overview routes share `ConstitutionOverview`; comparison routes share `countries/[code]/compare/ConstitutionComparison.tsx`. `CompareForm` accepts an owner action URL and an instance-specific ID prefix. Regional routes remain under `/jurisdictions/[id]`, and comparisons preserve exact published snapshots when changing the unchanged-passage filter.
 
 `WikiPanel` owns the context heading, close control and actions shared by constitution, country and regional wikis. It sits after the sticky menu in normal page flow, without an internal scroll area. `directoryWikiPanel` in `DirectoryWiki` supplies published country/jurisdiction context with explicit Edit/Review wiki entry points. `WikiContent` shares summary, body, image placement, source rendering and typography across public wikis, editor previews and revision history. `WikiEditorTemplate` owns the editing fields, pictures, review/publication and history layout for both embedded and standalone editors. `WikiWorkspace` loads and authorizes all three wiki target types, then supplies data and commands to that template. `lib/wiki-routing.ts` preserves jurisdiction context and returns public directory links with `?wiki=1`. Wiki saves use the canonical target returned by Catalog for pinned media and never publish the draft as a side effect.
+
+Pre-launch routing aliases (`/legacy`, country `constitution-timeline`, `/admin/import/[jobId]`, generic `/versions/[versionId]/units/[unitId]`) are retired. Their source and former behavior live in `archive/legacy-routing/`, outside every build context. Passage links point directly to the owning country/jurisdiction reader with an occurrence fragment.

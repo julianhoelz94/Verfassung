@@ -10,7 +10,7 @@ import { ui } from '../../../../lib/messages';
 import { FormattedDate } from '../../../../lib/format-date';
 
 function passageHref(ref: AmendmentUnitRef | null | undefined) {
-  return ref?.versionId && ref.rootOccurrenceId ? `/versions/${ref.versionId}/units/${ref.rootOccurrenceId}${ref.occurrenceId ? `?occurrenceId=${ref.occurrenceId}` : ''}` : null;
+  return ref?.deepLink ?? null;
 }
 export default async function AmendmentRegister({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ q?: string; unit?: string; from?: string; until?: string; dateKind?: string; offset?: string }> }) {
   const { id } = await params;

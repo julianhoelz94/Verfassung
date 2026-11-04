@@ -205,8 +205,8 @@ test('recorded amending law appears on the public timeline', async ({ page }) =>
   await expect(page.getByRole('heading', { name: 'History', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'E2E amending law', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'E2E amending law', exact: true })).toBeVisible();
-  await expect(page.getByRole('link', { name: /Before unit/ })).toHaveAttribute('href', new RegExp(`/versions/${VERSION_1949}/units/`));
-  await expect(page.getByRole('link', { name: /After unit/ })).toHaveAttribute('href', new RegExp(`/versions/${VERSION_2022}/units/`));
+  await expect(page.getByRole('link', { name: /Before unit/ })).toHaveAttribute('href', new RegExp(`/countries/DE/versions/${VERSION_1949}#`));
+  await expect(page.getByRole('link', { name: /After unit/ })).toHaveAttribute('href', new RegExp(`/countries/DE/versions/${VERSION_2022}#`));
 });
 
 test('publisher confirms stale old-law quotes without changing the public comment', async ({ page }) => {

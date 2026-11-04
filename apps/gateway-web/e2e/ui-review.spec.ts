@@ -45,7 +45,7 @@ for (const locale of ['en', 'de']) for (const width of sizes) {
         const page = 'staff' in route && route.staff ? staffPage : publicPage;
         const response = await page.goto(route.path);
         expect(response?.status(), route.path).toBeLessThan(400);
-        const expectedPath = route.entry === '/admin/import/[jobId]' ? '/editor' : route.entry === '/countries/[code]/constitution-timeline' ? '/countries/DE/timeline' : route.entry === '/versions/[versionId]/units/[unitId]' ? `/countries/DE${route.path}` : new URL(route.path, baseURL).pathname;
+        const expectedPath = new URL(route.path, baseURL).pathname;
         await expect.poll(() => new URL(page.url()).pathname, { message: `Unexpected redirect for ${route.path}` }).toBe(expectedPath);
         await expect(page.locator('h1')).toHaveCount(1);
         await expect(page.locator('h1')).toBeVisible();
@@ -96,7 +96,7 @@ for (const locale of ['en', 'de']) test(`secondary controls work by keyboard wit
   await context.addInitScript(() => localStorage.setItem('ca_cookie_notice_v1', 'dismissed'));
   const page = await context.newPage();
   try {
-    for (const path of ['/admin/import?mode=new', '/account', '/admin/legal/datenschutz', '/countries/DE/constitution-timeline?on=2026-01-01']) {
+    for (const path of ['/admin/import?mode=new', '/account', '/admin/legal/datenschutz', '/countries/DE/timeline?on=2026-01-01']) {
       await page.goto(path);
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), path).toBeTruthy();
     }

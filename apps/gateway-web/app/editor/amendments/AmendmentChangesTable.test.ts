@@ -22,7 +22,7 @@ it('preserves a pending unit target when an amendment draft is reopened and save
 });
 
 describe('treeUnits', () => {
-  it('exposes exact node and parent-text identities with snapshot permalinks', () => {
+  it('exposes exact pinned identities without serializing an obsolete browser alias', () => {
     const roots: ArticleSummary[] = [{
       id: 'root-occurrence', versionId: 'version-1', articleNumber: '46a', title: 'Rights', sortOrder: 1,
       kind: 'article', logicalId: 'root-logical', revisionId: 'root-revision', body: 'Before. Between.',
@@ -36,6 +36,7 @@ describe('treeUnits', () => {
     expect(units.map((unit) => unit.logicalId)).toEqual(['root-logical', 'parent-text', 'sentence', 'sentence-text']);
     expect(units[1]).toMatchObject({ unitKind: 'text_entry', occurrenceId: 'parent-occurrence', rootOccurrenceId: 'root-occurrence' });
     expect(units[2]?.breadcrumbs).toEqual(['Article 46a Rights', 'Sentence (2a)']);
-    expect(units[1]?.deepLink).toBe('/versions/version-1/units/root-occurrence?occurrenceId=parent-occurrence');
+    expect(units[1]).toMatchObject({ versionId: 'version-1', logicalId: 'parent-text', revisionId: 'parent-revision' });
+    expect(units[1]?.deepLink).toBeUndefined();
   });
 });

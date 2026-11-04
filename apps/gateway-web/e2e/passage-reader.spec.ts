@@ -39,9 +39,9 @@ for (const width of [390, 820, 1440]) test(`article, paragraph and sentence link
   await page.screenshot({ path: info.outputPath(`passage-reader-${width}.png`) });
 });
 
-test('owner-neutral sentence permalinks retain their exact target and snapshot', async ({ page }) => {
-  await page.goto(`/versions/${VERSION_2022}/units/${article.id}?occurrenceId=${sentence.occurrenceId}`);
-  await expect(page).toHaveURL(new RegExp(`/countries/DE/versions/${VERSION_2022}/units/${article.id}#${sentence.occurrenceId}$`));
+test('direct sentence citations retain their exact target and snapshot', async ({ page }) => {
+  await page.goto(`/countries/DE/versions/${VERSION_2022}#${sentence.occurrenceId}`);
+  await expect(page).toHaveURL(new RegExp(`/countries/DE/versions/${VERSION_2022}#${sentence.occurrenceId}$`));
   await expect(page.locator(target(sentence.occurrenceId))).toBeInViewport();
   await expect(page.getByRole('toolbar')).toBeVisible();
 });

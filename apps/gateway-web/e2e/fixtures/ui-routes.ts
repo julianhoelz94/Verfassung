@@ -16,7 +16,6 @@ export const uiRoutes = [
   { entry: '/admin/constitutions', path: '/admin/constitutions', staff: true },
   { entry: '/admin/constitutions/[id]', path: `/admin/constitutions/${constitution}`, staff: true, snapshot: true },
   { entry: '/admin/import', path: '/admin/import', staff: true, snapshot: true },
-  { entry: '/admin/import/[jobId]', path: '/admin/import/01900000-0000-4000-8000-000000000701', staff: true },
   { entry: '/admin/import/setup/[proposalId]', path: `/admin/import/setup/${proposal}`, staff: true, snapshot: true },
   { entry: '/admin/migrations', path: '/admin/migrations', staff: true },
   { entry: '/admin/migrations/[id]', path: '/admin/migrations/01900000-0000-4000-8000-000000000850', staff: true },
@@ -28,7 +27,6 @@ export const uiRoutes = [
   { entry: '/jurisdictions/[id]/compare', path: '/jurisdictions/01900000-0000-4000-8000-000000000001/compare' },
   { entry: '/jurisdictions/[id]/constitutions/[constitutionId]', path: `/jurisdictions/01900000-0000-4000-8000-000000000001/constitutions/${constitution}` },
   { entry: '/jurisdictions/[id]/versions/[versionId]', path: `/jurisdictions/01900000-0000-4000-8000-000000000001/versions/${version}` },
-  { entry: '/legacy', path: '/legacy' },
   { entry: '/versions/[versionId]/annotations', path: `/versions/${version}/annotations` },
   { entry: '/admin/legal/[key]', path: '/admin/legal/impressum', staff: true, snapshot: true },
   { entry: '/admin/settings', path: '/admin/settings', staff: true, snapshot: true },
@@ -36,7 +34,6 @@ export const uiRoutes = [
   { entry: '/countries/[code]', path: country },
   { entry: '/countries/[code]/articles/[articleNumber]', path: `${country}/articles/1` },
   { entry: '/countries/[code]/compare', path: `${country}/compare` },
-  { entry: '/countries/[code]/constitution-timeline', path: `${country}/constitution-timeline?on=2026-01-01`, snapshot: true },
   { entry: '/countries/[code]/constitutions/[constitutionId]', path: `${country}/constitutions/${constitution}`, snapshot: true },
   { entry: '/countries/[code]/timeline', path: `${country}/timeline?on=2026-01-01` },
   { entry: '/countries/[code]/versions/[versionId]', path: `${country}/versions/${version}` },
@@ -62,12 +59,12 @@ export const uiRoutes = [
   { entry: '/register/confirm', path: '/register/confirm?token=review-confirmation' },
   { entry: '/reset', path: '/reset?token=e2e-reset-token' },
   { entry: '/search', path: '/search?q=dignity' },
-  { entry: '/versions/[versionId]/units/[unitId]', path: `/versions/${version}/units/${article}` },
   { entry: '/setup', path: '/setup', staff: true, setup: true, snapshot: true },
 ] satisfies Array<{ entry: string; path: string; staff?: boolean; challenged?: boolean; setup?: boolean; snapshot?: boolean }>;
 
 // Query and dynamic variants that share an entry point but expose another task.
 export const uiStates = [
+  { entry: 'import-review', path: '/editor?importJobId=01900000-0000-4000-8000-000000000701', staff: true },
   { entry: 'import-new-structure', path: '/admin/import?mode=new', staff: true, snapshot: true },
   { entry: 'legal-privacy-de', path: '/admin/legal/datenschutz', staff: true },
   { entry: 'legal-privacy-en', path: '/admin/legal/datenschutz_en', staff: true },

@@ -1,7 +1,9 @@
+import { passageReaderHref } from './reader-links';
 import { createElement, Fragment, type ReactNode } from 'react';
 
 export type CrossRefContext = {
   code?: string;
+  jurisdictionId?: string;
   versionId: string;
   articlesByNumber: Record<string, string>;
   kindLabel: string;
@@ -30,14 +32,15 @@ export function linkifyReferences(text: string, context: CrossRefContext): React
       parts.push(text.slice(lastIndex, match.index));
     }
     const articleId = number ? articleIdFor(context.articlesByNumber, number) : undefined;
-    if (articleId) {
+    const href = articleId ? passageReaderHref(context, context.versionId, articleId) : undefined;
+    if (href) {
       parts.push(
         createElement(
           'a',
           {
             key: `${match.index}-${number}`,
             className: 'xref',
-            href: context.code ? `/countries/${context.code}/versions/${context.versionId}/articles/${articleId}` : `/versions/${context.versionId}/units/${articleId}`,
+            href,
           },
           match[0],
         ),

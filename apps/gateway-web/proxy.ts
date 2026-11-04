@@ -27,7 +27,7 @@ export async function proxy(request: NextRequest) {
     }
   }
 
-  if (path.startsWith('/api/reader/') || path.startsWith('/constitutions/') || path.startsWith('/comparisons') || path === '/legacy' || path === '/search' || path === '/jurisdictions' || path.startsWith('/jurisdictions/') || path.startsWith('/countries/') || path.startsWith('/documents/') || path.startsWith('/versions/')) {
+  if (path.startsWith('/api/reader/') || path.startsWith('/constitutions/') || path.startsWith('/comparisons') || path === '/search' || path === '/jurisdictions' || path.startsWith('/jurisdictions/') || path.startsWith('/countries/') || path.startsWith('/documents/') || path.startsWith('/versions/')) {
     const policy = await requestAnonymousBrowsingPolicy().catch(() => null);
     if (!policy?.allowed) {
       const token = request.cookies.get('ca_session')?.value;
@@ -45,14 +45,6 @@ export async function proxy(request: NextRequest) {
         : NextResponse.redirect(new URL('/', request.url));
     }
   }
-  // An HTTP redirect preserves fragments on saved constitution-history URLs.
-  // Keep this after the setup and anonymous-access gates.
-  if (/^\/countries\/[^/]+\/constitution-timeline$/.test(path)) {
-    const destination = request.nextUrl.clone();
-    destination.pathname = path.replace(/constitution-timeline$/, 'timeline');
-    return NextResponse.redirect(destination);
-  }
-
   const nonce = Buffer.from(crypto.randomUUID()).toString('base64');
   const isDev = process.env.NODE_ENV === 'development';
   // Next.js inline runtime scripts take the nonce. Styles still need 'unsafe-inline'

@@ -20,3 +20,6 @@ apps/gateway-web/lib/*
 **/.kotlin
 **/*.env
 **/*.log
+
+# Inert source backups must never enter a deployment build context.
+archive/

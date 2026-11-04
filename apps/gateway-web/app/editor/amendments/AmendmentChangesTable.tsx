@@ -62,7 +62,6 @@ export function treeUnits(versionId: string, roots: ArticleSummary[], t: (value:
         result.push({
           versionId, logicalId: node.logicalId, occurrenceId: node.occurrenceId, rootOccurrenceId, revisionId: node.revisionId,
           unitKind: 'node', kind: node.kind, label: node.label ?? node.title ?? node.kind, breadcrumbs, text,
-          deepLink: `/versions/${encodeURIComponent(versionId)}/units/${encodeURIComponent(rootOccurrenceId)}?occurrenceId=${encodeURIComponent(node.occurrenceId)}`,
           display: `${breadcrumbs.join(' › ')}${text ? ` — ${text.slice(0, 120)}` : ''}`,
         });
         visitEntries(node.content, breadcrumbs, rootOccurrenceId);
@@ -72,7 +71,6 @@ export function treeUnits(versionId: string, roots: ArticleSummary[], t: (value:
         result.push({
           versionId, logicalId: entry.logicalId, occurrenceId: entry.occurrenceId, rootOccurrenceId, revisionId: entry.revisionId,
           unitKind: 'text_entry', kind: 'parent_text', label: t(ui.remainingStatus.parentText), breadcrumbs, text,
-          deepLink: `/versions/${encodeURIComponent(versionId)}/units/${encodeURIComponent(rootOccurrenceId)}?occurrenceId=${encodeURIComponent(entry.occurrenceId)}`,
           display: `${breadcrumbs.join(' › ')} — ${text.slice(0, 120)}`,
         });
       }
@@ -86,7 +84,6 @@ export function treeUnits(versionId: string, roots: ArticleSummary[], t: (value:
     result.push({
       versionId, logicalId: root.logicalId, occurrenceId: root.id, rootOccurrenceId, revisionId: root.revisionId,
       unitKind: 'node', kind: root.kind ?? 'article', label: root.articleNumber, breadcrumbs: [label], text,
-      deepLink: `/versions/${encodeURIComponent(versionId)}/units/${encodeURIComponent(rootOccurrenceId)}?occurrenceId=${encodeURIComponent(root.id)}`,
       display: `${label}${text ? ` — ${text.slice(0, 120)}` : ''}`,
     });
     visitEntries(root.content, [label], rootOccurrenceId);

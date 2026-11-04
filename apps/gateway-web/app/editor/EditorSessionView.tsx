@@ -13,7 +13,7 @@ import {
 } from '../components/ui';
 import { ArticleEditor } from './ArticleEditor';
 import { EditorDraftState, SubmitReviewButton } from './EditorDraftState';
-import { nodes } from '../../lib/structured-editor';
+import { findUnitRoot } from '../../lib/structured-editor';
 import { StructuredEditor } from './StructuredEditor';
 import { PublishForm } from './PublishForm';
 import { LegacyPublishForm } from './LegacyPublishForm';
@@ -495,24 +495,8 @@ function reviewChanges(state: EditorSessionState) {
   const { preview, structured, differences } = state;
   if (!structured) return [];
   return differences.map((difference) => {
-    const sourceRoot = structured.sourceRoots.find((root) =>
-      nodes([root]).some(
-        (node) =>
-          node.logicalId === difference.logicalId ||
-          node.content.some(
-            (entry) => entry.logicalId === difference.logicalId,
-          ),
-      ),
-    );
-    const targetRoot = structured.roots.find((root) =>
-      nodes([root]).some(
-        (node) =>
-          node.logicalId === difference.logicalId ||
-          node.content.some(
-            (entry) => entry.logicalId === difference.logicalId,
-          ),
-      ),
-    );
+    const sourceRoot = findUnitRoot(structured.sourceRoots, difference.logicalId);
+    const targetRoot = findUnitRoot(structured.roots, difference.logicalId);
     const targetOccurrence =
       targetRoot && preview.unitMapping?.[targetRoot.logicalId];
     return {

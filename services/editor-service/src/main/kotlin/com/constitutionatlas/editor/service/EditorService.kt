@@ -2,7 +2,6 @@ package com.constitutionatlas.editor.service
 
 import com.constitutionatlas.editor.ConflictException
 import com.constitutionatlas.editor.StepUpRequiredException
-import com.constitutionatlas.editor.api.ChangeRecordRequest
 import com.constitutionatlas.editor.api.CreateSessionRequest
 import com.constitutionatlas.editor.api.DraftPreviewDto
 import com.constitutionatlas.editor.api.EditSessionDto
@@ -62,7 +61,7 @@ class EditorService(
     fun createSession(authorization: String?, request: CreateSessionRequest): EditSessionDto {
         val actor = actor(authorization)
         requireEdit(actor)
-        val hopKind = normalizeHopKind(request.hopKind)
+        val hopKind = EditorPublicationRules.normalizeHopKind(request.hopKind)
         val existing = editorRepository.findOpenSession(actor.id, request.versionId, hopKind)
         val id = existing ?: editorRepository.insertSession(actor.id, request.versionId, hopKind)
         val session = editorRepository.findSession(id) ?: throw NotFoundException("Session missing after insert")
@@ -137,7 +136,7 @@ class EditorService(
         requireStatus(session, EditSessionStatus.OPEN)
         if (editorRepository.hasStructuredDraft(sessionId)) throw ConflictException("Use targeted structured saves for this session", "mixed_draft_formats")
         val original = contentClient.listArticles(session.versionId).find { it.id == request.articleId }
-        if (original != null && (mixedContent(original.content) || (original.children.isNotEmpty() && request.body != null && request.body != original.body))) {
+        if (original != null && (EditorPublicationRules.mixedContent(original.content) || (original.children.isNotEmpty() && request.body != null && request.body != original.body))) {
             throw ConflictException("Use targeted structured changes to preserve child units and parent text", "structured_draft_required")
         }
         val payload = mapOf(
@@ -254,7 +253,7 @@ class EditorService(
         when (session.hopKind) {
             "legal" -> {
                 val record = request.changeRecord ?: throw IllegalArgumentException("changeRecord is required")
-                validateChangeRecord(record)
+                EditorPublicationRules.validateChangeRecord(record)
                 require(record.changes.mapNotNull { it.id }.distinct().size == record.changes.mapNotNull { it.id }.size) { "Change row IDs must be unique" }
                 editorRepository.recordChangeRecord(sessionId, record)
                 if (editorRepository.hasStructuredDraft(sessionId)) structuredDiffReview.recheckInvalidLinks(sessionId)
@@ -285,8 +284,6 @@ class EditorService(
         publication.publish(authorization, session, request, actor, structured)
         return previewDto(session.id)
     }
-
-    private fun mixedContent(content: tools.jackson.databind.JsonNode?): Boolean = EditorPublicationRules.mixedContent(content)
 
     private fun requireEdit(actor: Actor) {
         if (!actor.canEdit()) {
@@ -362,8 +359,4 @@ class EditorService(
             sourceEvidenceDecisions = sourceEvidence.decisions(sessionId),
         )
     }
-
-    private fun normalizeHopKind(raw: String?): String = EditorPublicationRules.normalizeHopKind(raw)
-
-    private fun validateChangeRecord(record: ChangeRecordRequest) = EditorPublicationRules.validateChangeRecord(record)
 }

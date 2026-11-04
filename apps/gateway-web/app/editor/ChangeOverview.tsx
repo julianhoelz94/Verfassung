@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import type { ContentOutline, OrderedEntry } from '../../lib/api';
 import {
   nodes,
+  findUnitRoot,
   type DraftDifference,
   type DraftNode,
 } from '../../lib/structured-editor';
@@ -67,15 +68,7 @@ export function ChangeOverview({
       [...roots, ...sourceRoots].find(
         (root) => root.logicalId === difference.rootId,
       ) ??
-      [...roots, ...sourceRoots].find((root) =>
-        nodes([root]).some(
-          (node) =>
-            node.logicalId === difference.logicalId ||
-            node.content.some(
-              (entry) => entry.logicalId === difference.logicalId,
-            ),
-        ),
-      )
+      findUnitRoot([...roots, ...sourceRoots], difference.logicalId)
     );
   }
   function entry(roots: DraftNode[], id: string) {

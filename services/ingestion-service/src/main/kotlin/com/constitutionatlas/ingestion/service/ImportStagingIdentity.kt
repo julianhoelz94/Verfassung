@@ -3,7 +3,6 @@ package com.constitutionatlas.ingestion.service
 import com.constitutionatlas.ingestion.api.ImportJobDto
 import com.constitutionatlas.ingestion.api.ImportRequest
 import com.constitutionatlas.ingestion.repo.ImportJobRepository
-import com.constitutionatlas.platform.OrderedContentRules
 import org.springframework.http.HttpStatus
 import org.springframework.web.server.ResponseStatusException
 import tools.jackson.databind.ObjectMapper
@@ -28,13 +27,8 @@ internal class ImportStagingIdentity(private val repository: ImportJobRepository
         val previous = if (batchId == null) repository.findDirectItem(submittedBy, key) else repository.findBatchItem(batchId, key)
         previous ?: return null
         if (previous.second != checksum) conflict()
-        requireCurrentRichRules(request)
+        ImportRichContentValidation.requireValid(request.roots)
         return previous.first
-    }
-
-    /** Keep historical receipt reuse and preparation subject to the same current rich-content policy. */
-    fun requireCurrentRichRules(request: ImportRequest) {
-        OrderedContentRules.requireValid(ImportValidator.richContentValidationErrors(request.roots))
     }
 
     /** An insert race without a matching scoped receipt is always a content conflict. */

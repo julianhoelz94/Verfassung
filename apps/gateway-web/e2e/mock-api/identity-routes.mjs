@@ -1,3 +1,4 @@
+import { exactRoute } from "./route.mjs";
 import {
   MFA_CHALLENGE,
   MFA_CODE,
@@ -15,13 +16,11 @@ import {
   userForEmail,
 } from "./state.mjs";
 
-/** Match the login gate before consuming request bytes or mutating state. */
-export function handleLogin(context) {
-  const { pathname, method } = context;
-  if (method === "POST" && pathname === "/api/identity/login")
-    return handleLoginResponse(context);
-  return false;
-}
+export const handleLogin = exactRoute(
+  "POST",
+  "/api/identity/login",
+  handleLoginResponse,
+);
 
 /** Keep credential, forced enrollment, MFA and direct-login precedence. */
 async function handleLoginResponse(context) {
@@ -64,13 +63,11 @@ async function handleLoginResponse(context) {
   return true;
 }
 
-/** Match the complete mfa gate before consuming request bytes or mutating state. */
-export function handleCompleteMfa(context) {
-  const { pathname, method } = context;
-  if (method === "POST" && pathname === "/api/identity/login/mfa")
-    return handleCompleteMfaResponse(context);
-  return false;
-}
+export const handleCompleteMfa = exactRoute(
+  "POST",
+  "/api/identity/login/mfa",
+  handleCompleteMfaResponse,
+);
 
 /** Consume recovery codes only after the challenge pin matches. */
 async function handleCompleteMfaResponse(context) {
@@ -106,13 +103,11 @@ export function handleRequestPasswordReset(context) {
   return true;
 }
 
-/** Match the confirm password reset gate before consuming request bytes or mutating state. */
-export function handleConfirmPasswordReset(context) {
-  const { pathname, method } = context;
-  if (method === "POST" && pathname === "/api/identity/password/reset/confirm")
-    return handleConfirmPasswordResetResponse(context);
-  return false;
-}
+export const handleConfirmPasswordReset = exactRoute(
+  "POST",
+  "/api/identity/password/reset/confirm",
+  handleConfirmPasswordResetResponse,
+);
 
 /** Validate the reset pin before replacing the viewer password. */
 async function handleConfirmPasswordResetResponse(context) {
@@ -128,13 +123,11 @@ async function handleConfirmPasswordResetResponse(context) {
   return true;
 }
 
-/** Match the accept invite gate before consuming request bytes or mutating state. */
-export function handleAcceptInvite(context) {
-  const { pathname, method } = context;
-  if (method === "POST" && pathname === "/api/identity/invites/accept")
-    return handleAcceptInviteResponse(context);
-  return false;
-}
+export const handleAcceptInvite = exactRoute(
+  "POST",
+  "/api/identity/invites/accept",
+  handleAcceptInviteResponse,
+);
 
 /** Validate the invite pin before creating viewer credentials. */
 async function handleAcceptInviteResponse(context) {
@@ -153,13 +146,11 @@ async function handleAcceptInviteResponse(context) {
   return true;
 }
 
-/** Match the change password gate before consuming request bytes or mutating state. */
-export function handleChangePassword(context) {
-  const { pathname, method } = context;
-  if (method === "POST" && pathname === "/api/identity/password/change")
-    return handleChangePasswordResponse(context);
-  return false;
-}
+export const handleChangePassword = exactRoute(
+  "POST",
+  "/api/identity/password/change",
+  handleChangePasswordResponse,
+);
 
 /** Check the current user password before replacing its credential. */
 async function handleChangePasswordResponse(context) {
@@ -178,13 +169,11 @@ async function handleChangePasswordResponse(context) {
   return true;
 }
 
-/** Match the start enrollment gate before consuming request bytes or mutating state. */
-export function handleStartEnrollment(context) {
-  const { pathname, method } = context;
-  if (method === "POST" && pathname === "/api/identity/mfa/enroll/start")
-    return handleStartEnrollmentResponse(context);
-  return false;
-}
+export const handleStartEnrollment = exactRoute(
+  "POST",
+  "/api/identity/mfa/enroll/start",
+  handleStartEnrollmentResponse,
+);
 
 /** Retain the exact OTP URI and lazily generated QR image. */
 async function handleStartEnrollmentResponse(context) {
@@ -200,13 +189,11 @@ async function handleStartEnrollmentResponse(context) {
   return true;
 }
 
-/** Match the confirm enrollment gate before consuming request bytes or mutating state. */
-export function handleConfirmEnrollment(context) {
-  const { pathname, method } = context;
-  if (method === "POST" && pathname === "/api/identity/mfa/enroll/confirm")
-    return handleConfirmEnrollmentResponse(context);
-  return false;
-}
+export const handleConfirmEnrollment = exactRoute(
+  "POST",
+  "/api/identity/mfa/enroll/confirm",
+  handleConfirmEnrollmentResponse,
+);
 
 /** Validate the code before enabling MFA and replacing recovery codes. */
 async function handleConfirmEnrollmentResponse(context) {
@@ -284,13 +271,11 @@ export function handleCurrentIdentity(context) {
   return true;
 }
 
-/** Match the set language gate before consuming request bytes or mutating state. */
-export function handleSetLanguage(context) {
-  const { pathname, method } = context;
-  if (method === "PUT" && pathname === "/api/identity/me/language")
-    return handleSetLanguageResponse(context);
-  return false;
-}
+export const handleSetLanguage = exactRoute(
+  "PUT",
+  "/api/identity/me/language",
+  handleSetLanguageResponse,
+);
 
 /** Authenticate before validating and storing language preference. */
 async function handleSetLanguageResponse(context) {
@@ -580,13 +565,11 @@ export function handleUsers(context) {
   return true;
 }
 
-/** Match the invite user gate before consuming request bytes or mutating state. */
-export function handleInviteUser(context) {
-  const { pathname, method } = context;
-  if (method === "POST" && pathname === "/api/identity/users/invites")
-    return handleInviteUserResponse(context);
-  return false;
-}
+export const handleInviteUser = exactRoute(
+  "POST",
+  "/api/identity/users/invites",
+  handleInviteUserResponse,
+);
 
 /** Append deterministic managed invitations without changing caller role behavior. */
 async function handleInviteUserResponse(context) {
@@ -664,13 +647,11 @@ export function handleServiceTokens(context) {
   return true;
 }
 
-/** Match the create service token gate before consuming request bytes or mutating state. */
-export function handleCreateServiceToken(context) {
-  const { pathname, method } = context;
-  if (method === "POST" && pathname === "/api/identity/service-tokens")
-    return handleCreateServiceTokenResponse(context);
-  return false;
-}
+export const handleCreateServiceToken = exactRoute(
+  "POST",
+  "/api/identity/service-tokens",
+  handleCreateServiceTokenResponse,
+);
 
 /** Append deterministic service tokens and expose the secret only in creation output. */
 async function handleCreateServiceTokenResponse(context) {
@@ -728,13 +709,11 @@ export function handleLogout(context) {
   return true;
 }
 
-/** Match the step up gate before consuming request bytes or mutating state. */
-export function handleStepUp(context) {
-  const { pathname, method } = context;
-  if (method === "POST" && pathname === "/api/identity/mfa/step-up")
-    return handleStepUpResponse(context);
-  return false;
-}
+export const handleStepUp = exactRoute(
+  "POST",
+  "/api/identity/mfa/step-up",
+  handleStepUpResponse,
+);
 
 /** Validate token and code before synchronizing freshness projections. */
 async function handleStepUpResponse(context) {

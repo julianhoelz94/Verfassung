@@ -601,6 +601,62 @@ There are **zero remaining function or Kotlin file exceptions**. All scanned
 Kotlin and TypeScript/JavaScript functions, including tests, fixtures and tooling,
 now meet 20, and all Kotlin files meet 100.
 
+## Full PR review after Batch 9
+
+A fresh review compared all **188 original PR files** with `main` at `f927cad`,
+then rechecked the corrections independently. Coverage was split across domain
+backends (47 files), Editor/shared diff/MCP (22), gateway editor/outline (37),
+remaining gateway UI/security (36), and CI/fixtures/configuration/documentation
+(46). Generated dependency metadata was checked separately from handwritten logic.
+
+The review corrected these concrete issues:
+
+| Finding | Origin | Correction |
+| --- | --- | --- |
+| The new TypeScript complexity checker rejected valid CR-only or Unicode-line-separated files while mapping diagnostics | Introduced by the CI implementation | Use ESLint's source-coordinate map instead of assuming LF-only line boundaries; verify all five JavaScript line terminators and unchanged 20/21 enforcement |
+| A new Catalog HTTP contract shared a mutable request trace between server and test threads without synchronized reads | Introduced by the test helper | Use `CopyOnWriteArrayList` and remove the redundant synchronized writer block |
+| Extracted legacy hierarchy validation copied every descendant diagnostic list while unwinding | Introduced allocation regression | Restore one depth-first accumulator, preserving raw-kind diagnostics and their order |
+| Translation chunks could split a valid UTF-16 surrogate pair or exceed 10,000 units at an inclusive space boundary | Pre-existing defects retained in the refactored path | Keep valid pairs intact, cap the space search and preserve exact authored text/order; three public-request regressions fail on both original main and the pre-review head, then pass with the corrections |
+
+The translation correction intentionally changes only the defective boundary
+cases; it performs no text normalization. Independent checks cover **517 inputs
+and 1,073 chunks**, including astral/CJK/combining text, lone-surrogate input and
+whitespace boundaries. All 470 previously safe chunk lists remain unchanged.
+
+Duplication and boilerplate were reduced where responsibilities coincide:
+
+- Editor unit/root ownership lookup is shared across four consumers; outline
+  metadata options share one definition. The outline-preview builder and its
+  five-to-eight-argument forwarding methods were replaced with local content
+  closures and focused label helpers.
+- Repeated replay insertion validators and node lookups share documented helpers;
+  three private forwarding methods and a redundant field assignment were removed.
+- Rich import validation calls its existing validation owner directly rather than
+  allocating a staging helper to reach a stateless check.
+- Account error notices share one safe message selector/alert; comparison sides
+  share reference construction. A one-use eight-argument copy-spacing wrapper was
+  removed while its caller remains within the complexity limit.
+- Twenty identical literal method/path mock gates use one small matcher. Regex
+  and state-dependent gates remain explicit, and selected response/context/Promise
+  identity, thrown errors, synchronous misses and lazy body reads are preserved.
+
+Independent correction probes match **38,400 editor ownership/navigation cases**,
+**2,400 adversarial Kotlin replay outcomes**, **3,000 outline outputs and 9,034
+detail/translation traces**, and **6,640 HTTP cases** against their original/reference
+implementations. Direct
+route checks cover **233 matching/miss/return/Promise/thenable/error cases**. These
+targeted probes use isolated deterministic fixtures where stated, rather than
+claiming complete live-stack coverage.
+
+Combined local verification passes **1,370 Vitest tests**, **40 Node tests**,
+coverage, typecheck, lint and production build. Changed backend checks pass
+**136 Ingestion, 86 Catalog and 93 Editor tests**, with Spotless and JaCoCo;
+Editor line coverage is **86.41%**. The **14 TypeScript policy tests** and **14
+Kotlin score-policy tests** pass. Both complexity gates remain clean: **7,072
+TypeScript/JavaScript functions**, zero exceptions or violations, and zero Kotlin
+method/file exceptions. No budgets, baselines, dependencies, assertions or visual
+baselines were weakened. Browser and final CI results are recorded in draft PR #219.
+
 ## Original assessment at a maximum of 15
 
 Assessment date: 2026-10-28. Source revision: `5c359b1`, before application

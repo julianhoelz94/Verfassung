@@ -116,7 +116,7 @@ class ImportService(
 
     fun prepare(authorization: String?, jobId: UUID, actorId: UUID): ImportJobDto {
         val request = importJobRepository.request(jobId) ?: throw com.constitutionatlas.platform.NotFoundException("Unknown import job")
-        requireCurrentRichRules(request)
+        ImportRichContentValidation.requireValid(request.roots)
         DownstreamAuth.withAuthorization(authorization) {
             val existing = findSelectedConstitution(request)
             if (existing == null && !importJobRepository.isOutlineConfirmed(jobId)) {
@@ -137,10 +137,6 @@ class ImportService(
             importJobRepository.preparationFailed(jobId, attempt, ex.message ?: "draft preparation failed")
         }
         return importJobRepository.find(jobId)!!
-    }
-
-    private fun requireCurrentRichRules(request: ImportRequest) {
-        ImportStagingIdentity(importJobRepository, objectMapper).requireCurrentRichRules(request)
     }
 
     private fun reviewReason(reason: String): String = reason.trim().also {

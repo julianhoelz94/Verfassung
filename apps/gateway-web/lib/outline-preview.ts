@@ -86,86 +86,58 @@ export function outlineExample(
   outline: ContentOutline,
   t: Translate = english,
 ): OrderedNode[] {
-  return new OutlineExampleBuilder(outline, t).roots();
-}
-
-/** Path-local cycle guards allow the same child kind on independent branches. */
-class OutlineExampleBuilder {
-  constructor(
-    private readonly outline: ContentOutline,
-    private readonly t: Translate,
-  ) {}
-
-  /** Only explicitly rooted kinds become examples, in their existing outline order. */
-  roots(): OrderedNode[] {
-    return this.outline.kinds
-      .filter((kind) => kind.root)
-      .map((kind, index) =>
-        this.node(kind.kindCode, `sample-${index}`, index, new Set()),
-      )
-      .filter((item): item is OrderedNode => Boolean(item));
-  }
-
-  /** Containers never join running text, even if their display presentation is concatenated. */
-  private isRunningLeaf(kindCode: string): boolean {
-    const kind = kindByCode(this.outline, kindCode);
+  /** Containers never join running text, even when their presentation is concatenated. */
+  function isRunningLeaf(kindCode: string): boolean {
+    const kind = kindByCode(outline, kindCode);
     return (
       effectiveDisplayKind(kind)?.presentation === "concatenated" &&
       !kind?.allowedChildKinds?.length
     );
   }
 
-  /** Node identities, metadata and sibling numbering retain the original preview contract. */
-  private node(
+  /** Each node owns its content builders; sibling branches receive independent cycle guards. */
+  function node(
     kindCode: string,
     path: string,
     sibling: number,
     ancestors: Set<string>,
   ): OrderedNode | null {
-    const kind = kindByCode(this.outline, kindCode);
+    const kind = kindByCode(outline, kindCode);
     if (!kind || ancestors.has(kindCode)) return null;
-    const content = this.content(kind, path, sibling, ancestors);
-    return {
-      logicalId: path,
-      revisionId: path,
-      occurrenceId: path,
-      kind: kind.kindCode,
-      label: this.label(kind, sibling),
-      title: this.title(kind, sibling),
-      content,
-    };
-  }
-
-  /** Authored label policies and root status take precedence over sibling numbering. */
-  private label(kind: OutlineKind, sibling: number): string | null {
-    return kind.labelPolicy === "none"
-      ? null
-      : kind.root
-        ? "46a"
-        : sibling === 0
-          ? "(1)"
-          : sibling === 1
-            ? "(2a)"
-            : `(${sibling + 1})`;
-  }
-
-  /** Optional titles are demonstrated on the first sibling only, using supplied translation. */
-  private title(kind: OutlineKind, sibling: number): string | null {
-    return kind.titlePolicy === "none" ||
-      (kind.titlePolicy === "optional" && sibling > 0)
-      ? null
-      : `${kind.displayLabel} ${this.t(ui.remainingStatus.example)}`;
-  }
-
-  /** Preserves before/between/after slots and the first running pair's contribution to sibling indices. */
-  private content(
-    kind: OutlineKind,
-    path: string,
-    sibling: number,
-    ancestors: Set<string>,
-  ): OrderedEntry[] {
     const children = kind.allowedChildKinds ?? [];
     const content: OrderedEntry[] = [];
+
+    /** Slots retain exact wording and deterministic logical/occurrence identities. */
+    function text(position: string, words: string) {
+      content.push({
+        type: "text",
+        logicalId: `${path}-${position}`,
+        occurrenceId: `${path}-${position}`,
+        text: words,
+      });
+    }
+
+    /** Reuse the node's path and ancestry without forwarding mutable content between helpers. */
+    function child(code: string, suffix: string, index: number) {
+      const result = node(
+        code,
+        `${path}-${suffix}`,
+        index,
+        new Set([...ancestors, kindCode]),
+      );
+      if (result) content.push({ type: "child", node: result });
+    }
+
+    /** Demonstrate a pair only for running text leaves beneath mixed-content parents. */
+    function childRun(code: string, suffix: string, index: number): number {
+      child(code, suffix, index);
+      if (kind!.allowTextAlongsideChildren && isRunningLeaf(code)) {
+        child(code, `${suffix}-next`, index + 1);
+        return 2;
+      }
+      return 1;
+    }
+
     if (!children.length) {
       const sentences = [
         ui.remainingStatus.sampleEqualProtection,
@@ -173,113 +145,54 @@ class OutlineExampleBuilder {
         ui.outlinePreview.sampleDignity,
         ui.outlinePreview.sampleLegalProtection,
       ];
-      this.text(
-        content,
-        path,
-        "text",
-        this.t(sentences[sibling % sentences.length]!),
-      );
+      text("text", t(sentences[sibling % sentences.length]!));
     } else {
       if (kind.allowTextAlongsideChildren)
-        this.text(
-          content,
-          path,
-          "before",
-          this.t(ui.remainingStatus.sampleFollowingRights),
-        );
-      const firstRunSize = this.childRun(
-        content,
-        kind,
-        path,
-        children[0]!,
-        "a",
-        0,
-        ancestors,
-      );
+        text("before", t(ui.remainingStatus.sampleFollowingRights));
+      const firstRunSize = childRun(children[0]!, "a", 0);
       if (kind.allowTextAlongsideChildren)
-        this.text(
-          content,
-          path,
-          "between",
-          this.t(ui.remainingStatus.sampleRightsEveryone),
-        );
-      this.childRun(
-        content,
-        kind,
-        path,
-        children[1] ?? children[0]!,
-        "b",
-        firstRunSize,
-        ancestors,
-      );
+        text("between", t(ui.remainingStatus.sampleRightsEveryone));
+      childRun(children[1] ?? children[0]!, "b", firstRunSize);
       if (kind.allowTextAlongsideChildren)
-        this.text(
-          content,
-          path,
-          "after",
-          this.t(ui.remainingStatus.sampleUpholdGuarantees),
-        );
+        text("after", t(ui.remainingStatus.sampleUpholdGuarantees));
     }
-    return content;
+    return {
+      logicalId: path,
+      revisionId: path,
+      occurrenceId: path,
+      kind: kind.kindCode,
+      label: outlineNodeLabel(kind, sibling),
+      title: outlineNodeTitle(kind, sibling, t),
+      content,
+    };
   }
+  return outline.kinds
+    .filter((kind) => kind.root)
+    .map((kind, index) => node(kind.kindCode, `sample-${index}`, index, new Set()))
+    .filter((item): item is OrderedNode => Boolean(item));
+}
 
-  /** Text slots use deterministic path-derived logical and occurrence IDs. */
-  private text(
-    content: OrderedEntry[],
-    path: string,
-    position: string,
-    words: string,
-  ) {
-    content.push({
-      type: "text",
-      logicalId: `${path}-${position}`,
-      occurrenceId: `${path}-${position}`,
-      text: words,
-    });
-  }
+/** Authored label policy and root status take precedence over sibling numbering. */
+function outlineNodeLabel(kind: OutlineKind, sibling: number): string | null {
+  return kind.labelPolicy === "none"
+    ? null
+    : kind.root
+      ? "46a"
+      : sibling === 0
+        ? "(1)"
+        : sibling === 1
+          ? "(2a)"
+          : `(${sibling + 1})`;
+}
 
-  /** Duplicate only running text leaves under mixed-content parents, not whole containers. */
-  private childRun(
-    content: OrderedEntry[],
-    kind: OutlineKind,
-    path: string,
-    code: string,
-    suffix: string,
-    index: number,
-    ancestors: Set<string>,
-  ): number {
-    this.child(content, kind.kindCode, path, code, suffix, index, ancestors);
-    if (kind.allowTextAlongsideChildren && this.isRunningLeaf(code)) {
-      this.child(
-        content,
-        kind.kindCode,
-        path,
-        code,
-        `${suffix}-next`,
-        index + 1,
-        ancestors,
-      );
-      return 2;
-    }
-    return 1;
-  }
-
-  /** Each child receives its own ancestor set so cycles stop locally without suppressing sibling reuse. */
-  private child(
-    content: OrderedEntry[],
-    kindCode: string,
-    path: string,
-    code: string,
-    suffix: string,
-    index: number,
-    ancestors: Set<string>,
-  ) {
-    const result = this.node(
-      code,
-      `${path}-${suffix}`,
-      index,
-      new Set([...ancestors, kindCode]),
-    );
-    if (result) content.push({ type: "child", node: result });
-  }
+/** Optional titles appear on the first sibling only, after its content has been built. */
+function outlineNodeTitle(
+  kind: OutlineKind,
+  sibling: number,
+  t: Translate,
+): string | null {
+  return kind.titlePolicy === "none" ||
+    (kind.titlePolicy === "optional" && sibling > 0)
+    ? null
+    : `${kind.displayLabel} ${t(ui.remainingStatus.example)}`;
 }

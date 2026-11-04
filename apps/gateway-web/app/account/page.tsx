@@ -317,55 +317,24 @@ async function accountEnrollment(user: NonNullable<Awaited<ReturnType<typeof cur
 
 /** Retains account feedback precedence and the independent successful-action notices. */
 function accountNotices(searchParams: Awaited<AccountPageProps['searchParams']>) {
-  return (
-        <>
-          {searchParams.error === 'mfa' ? (
-            <Alert tone="error">
-              <T value={ui.account.page.authenticatorActionFailedCheckTheCodeAnd} />
-            </Alert>
-          ) : searchParams.error === 'oauth' ? (
-            <Alert tone="error">
-              <T value={ui.account.page.theChatClientConnectionCouldNotBe} />
-            </Alert>
-          ) : searchParams.error === 'key' ? (
-            <Alert tone="error">
-              <T value={ui.account.page.theMcpKeyCouldNotBeChanged} />
-            </Alert>
-          ) : searchParams.error === 'language' ? (
-            <Alert tone="error">
-              <T value={ui.account.page.languagePreferenceCouldNotBeSaved} />
-            </Alert>
-          ) : searchParams.error ? (
-            <Alert tone="error">
-              <T value={passwordCopy.failed} />
-            </Alert>
-          ) : null}
+  return <>
+    {searchParams.error ? <Alert tone="error"><T value={accountErrorMessage(searchParams.error)} /></Alert> : null}
+    {searchParams.saved ? <Alert tone="success"><T value={ui.account.page.passwordUpdated} /></Alert> : null}
+    {searchParams.mfaRevoked ? <Alert tone="success"><T value={ui.account.page.authenticatorEnrollmentWasRevoked} /></Alert> : null}
+    {searchParams.languageSaved ? <Alert tone="success"><T value={ui.account.page.languagePreferenceSaved} /></Alert> : null}
+    {searchParams.translationSaved ? <Alert tone="success"><T value={ui.admin.settings.page.settingsSaved} /></Alert> : null}
+  </>;
+}
 
-          {searchParams.saved ? (
-            <Alert tone="success">
-              <T value={ui.account.page.passwordUpdated} />
-            </Alert>
-          ) : null}
-
-          {searchParams.mfaRevoked ? (
-            <Alert tone="success">
-              <T value={ui.account.page.authenticatorEnrollmentWasRevoked} />
-            </Alert>
-          ) : null}
-
-          {searchParams.languageSaved ? (
-            <Alert tone="success">
-              <T value={ui.account.page.languagePreferenceSaved} />
-            </Alert>
-          ) : null}
-
-          {searchParams.translationSaved ? (
-            <Alert tone="success">
-              <T value={ui.admin.settings.page.settingsSaved} />
-            </Alert>
-          ) : null}
-        </>
-  );
+/** Selects safe account feedback while unknown error codes retain the password-action fallback. */
+function accountErrorMessage(error: string): UiMessage {
+  switch (error) {
+    case 'mfa': return ui.account.page.authenticatorActionFailedCheckTheCodeAnd;
+    case 'oauth': return ui.account.page.theChatClientConnectionCouldNotBe;
+    case 'key': return ui.account.page.theMcpKeyCouldNotBeChanged;
+    case 'language': return ui.account.page.languagePreferenceCouldNotBeSaved;
+    default: return passwordCopy.failed;
+  }
 }
 
 type AuthenticatorPresentation = Awaited<ReturnType<typeof accountEnrollment>> & {

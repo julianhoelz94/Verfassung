@@ -138,6 +138,8 @@ credential precedence and response headers.
 retains route precedence; domain `*-routes.mjs` modules handle selected requests,
 and `state.mjs` owns shared fixtures, reset behavior and HTTP/body helpers. Early
 scenario interception and synchronous fallthrough remain explicit.
+`route.mjs` shares only literal method/path gates, preserving synchronous misses
+and selected response/context/Promise identity; stateful and regex gates stay explicit.
 
 `e2e/fixtures/ui-review.mjs` owns fixture-instance UI state, responses and setup
 proposal writes. `prepopulate.mjs` separates version preparation/publication checks;

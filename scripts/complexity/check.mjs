@@ -26,9 +26,11 @@ function functionName(node) {
 // and line shifts, but deliberately invalidate an exception when its code changes.
 export function analyzeSource(source, path) {
   const functions = [];
+  let sourceCode;
   const inventory = {
     meta: { schema: [] },
     create(context) {
+      sourceCode = context.sourceCode;
       return {
         ':function'(node) {
           const tokens = context.sourceCode.getTokens(node).map(token => [token.type, token.value]);
@@ -59,15 +61,14 @@ export function analyzeSource(source, path) {
     rules: { 'sonarjs/cognitive-complexity': ['error', 0], 'inventory/functions': 'error' },
   }], { filename: path, allowInlineConfig: false });
   const errors = [];
-  const lines = source.split('\n');
   for (const message of messages) {
     if (message.ruleId !== 'sonarjs/cognitive-complexity') {
       errors.push({ path, line: message.line ?? 1, message: message.message });
       continue;
     }
     const score = /from (\d+) to/.exec(message.message)?.[1];
-    const offset = lines.slice(0, message.line - 1).reduce((sum, line) => sum + line.length + 1, 0)
-      + message.column - 1;
+    // ESLint's line map also handles CR and Unicode line separators.
+    const offset = sourceCode.getIndexFromLoc({ line: message.line, column: message.column - 1 });
     const fn = functions.filter(item => item.start <= offset && offset < item.end)
       .sort((a, b) => (a.end - a.start) - (b.end - b.start))[0];
     if (!fn || score === undefined) throw new Error(`Unrecognized SonarJS diagnostic in ${path}: ${message.message}`);

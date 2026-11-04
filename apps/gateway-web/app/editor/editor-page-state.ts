@@ -19,7 +19,7 @@ import {
 } from '../../lib/editor-api';
 import { decisionReadyForReview } from '../../lib/diff-review';
 import { requireSessionBearer, type SessionUser } from '../../lib/session';
-import { draftDifferences, nodes } from '../../lib/structured-editor';
+import { draftDifferences, findUnitRoot, nodes } from '../../lib/structured-editor';
 import { message, ui } from '../../lib/messages';
 import { workflowUi } from '../../lib/workflow-messages';
 import type { Locale } from '../../lib/locale';
@@ -117,15 +117,7 @@ function articleSelection(
   searchParams: EditorSearchParams,
 ) {
   const selectionRoot = searchParams.selectedNode
-    ? structured?.roots.find((root) =>
-        nodes([root]).some(
-          (node) =>
-            node.logicalId === searchParams.selectedNode ||
-            node.content.some(
-              (entry) => entry.logicalId === searchParams.selectedNode,
-            ),
-        ),
-      )
+    ? structured && findUnitRoot(structured.roots, searchParams.selectedNode)
     : undefined;
   const selectedId =
     (selectionRoot

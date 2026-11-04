@@ -1,3 +1,4 @@
+import { exactRoute } from "./route.mjs";
 import {
   CONSTITUTION_ID,
   amendment,
@@ -154,13 +155,11 @@ export function handleDiffReview(context) {
   return true;
 }
 
-/** Match the suggest amendments gate before consuming request bytes or mutating state. */
-export function handleSuggestAmendments(context) {
-  const { pathname, method } = context;
-  if (method === "POST" && pathname === "/api/amendment/amendments/suggest")
-    return handleSuggestAmendmentsResponse(context);
-  return false;
-}
+export const handleSuggestAmendments = exactRoute(
+  "POST",
+  "/api/amendment/amendments/suggest",
+  handleSuggestAmendmentsResponse,
+);
 
 /** Require both versions before returning the fixed suggested change projection. */
 async function handleSuggestAmendmentsResponse(context) {

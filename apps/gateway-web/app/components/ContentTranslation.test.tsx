@@ -82,6 +82,23 @@ describe('content translation preserves consent and the source', () => {
     for (const [texts] of vi.mocked(translateContentAction).mock.calls) { expect(texts.length).toBeLessThanOrEqual(128); expect(texts.reduce((sum, text) => sum + text.length, 0)).toBeLessThanOrEqual(20000); expect(texts.every(text => text.length <= 10000)).toBe(true); }
     expect(view.host.textContent).toContain('translated(10000)translated(10000)translated(3000)');
   });
+  it.each([
+    ['astral character across the chunk boundary', 'x'.repeat(9999) + '😀 tail'],
+    ['astral character ending at the chunk boundary', 'x'.repeat(9998) + '😀 tail'],
+    ['space at the first excluded position', 'x'.repeat(10000) + ' tail'],
+  ])('preserves exact request text and the UTF-16 limit with %s', async (_description, authored) => {
+    vi.mocked(translateContentAction).mockResolvedValue([]);
+    const source = ` \n${authored}\n `;
+    await show({}, <p data-translate-content>{source}</p>);
+    await click(button(view.host, 'Translate this content'));
+    const parts = vi.mocked(translateContentAction).mock.calls.flatMap(([texts]) => texts);
+    expect(parts.join('')).toBe(authored);
+    expect(parts.every(part => part.length <= 10000)).toBe(true);
+    expect(parts.every(part => !/\p{Surrogate}/u.test(part))).toBe(true);
+    expect(view.host.querySelector('p')?.textContent).toBe(source);
+    await click(button(view.host, 'Show original'));
+    expect(view.host.querySelector('p')?.textContent).toBe(source);
+  });
 });
 
 it('keeps source parts omitted by the provider and restores exact original source', async () => {

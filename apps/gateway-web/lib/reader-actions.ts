@@ -24,7 +24,10 @@ export function originalEntriesText(entries: OrderedEntry[], outline?: ContentOu
     const kind = entry.node ? effectiveDisplayKind(kindByCode(outline, entry.node.kind)) : undefined;
     const value = originalEntryText(entry, outline, noteLabels);
     const breaks = entry.node ? '' : '\n'.repeat(entry.lineBreaksBefore ?? 0);
-    const separator = originalEntrySeparator(result, value, breaks, child, previousChild, block, previousBlock, kind?.presentation);
+    const needsSeparator = Boolean(result && value && !breaks && !/\s$/u.test(result) && !/^\s/u.test(value) &&
+      (child || previousChild || block || previousBlock));
+    const separator = !needsSeparator ? '' : block || previousBlock ? '\n'
+      : child && kind?.presentation !== 'concatenated' ? '\n\n' : ' ';
     result += breaks + separator + value; previousChild = child; previousBlock = block;
   }
   return result;
@@ -35,13 +38,6 @@ function originalEntryText(entry: OrderedEntry, outline?: ContentOutline, noteLa
   if (entry.format === 'table' && entry.table) return [entry.table.caption, ...entry.table.rows.map(row => row.cells.map(cell => cell.text).join('\t'))].filter(value => value != null && value !== '').join('\n');
   if (entry.format === 'footnote') return (entry.footnoteLabel ?? '*') + ' ' + (entry.text ?? '');
   return textWithNoteMarks(entry, noteLabels);
-}
-
-/** Add only missing boundary whitespace; explicit authored breaks and either-side whitespace win. */
-function originalEntrySeparator(result: string, value: string, breaks: string, child: boolean, previousChild: boolean, block: boolean, previousBlock: boolean, presentation?: string): string {
-  if (!result || !value || breaks || /\s$/u.test(result) || /^\s/u.test(value) || !(child || previousChild || block || previousBlock)) return '';
-  if (block || previousBlock) return '\n';
-  return child && presentation !== 'concatenated' ? '\n\n' : ' ';
 }
 
 function textWithNoteMarks(entry: OrderedEntry, labels?: Map<string, string>): string {

@@ -145,13 +145,16 @@ function translationNodes(root: HTMLElement): Text[] {
   return nodes;
 }
 
-/** Bound chunks in UTF-16 units, retaining the historical inclusive space boundary and literal reconstruction. */
+/** Limit chunks to 10,000 UTF-16 units without splitting valid surrogate pairs or changing authored text. */
 function splitTranslationText(text: string): string[] {
   const parts: string[] = [];
   let rest = text;
   while (rest.length > 10_000) {
-    const boundary = rest.lastIndexOf(' ', 10_000);
-    const end = boundary > 5_000 ? boundary + 1 : 10_000;
+    const boundary = rest.lastIndexOf(' ', 9_999);
+    let end = boundary > 5_000 ? boundary + 1 : 10_000;
+    const before = rest.charCodeAt(end - 1);
+    const after = rest.charCodeAt(end);
+    if (before >= 0xd800 && before <= 0xdbff && after >= 0xdc00 && after <= 0xdfff) end--;
     parts.push(rest.slice(0, end));
     rest = rest.slice(end);
   }

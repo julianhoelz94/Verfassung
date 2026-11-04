@@ -1,3 +1,4 @@
+import { exactRoute } from "./route.mjs";
 import {
   CONSTITUTION_ID,
   WIKI_IMAGE,
@@ -293,16 +294,11 @@ export function handleCountry(context) {
   return true;
 }
 
-/** Match the create constitution gate before consuming request bytes or mutating state. */
-export function handleCreateConstitution(context) {
-  const { pathname, method } = context;
-  if (
-    method === "POST" &&
-    pathname === "/api/catalog/countries/DE/constitutions"
-  )
-    return handleCreateConstitutionResponse(context);
-  return false;
-}
+export const handleCreateConstitution = exactRoute(
+  "POST",
+  "/api/catalog/countries/DE/constitutions",
+  handleCreateConstitutionResponse,
+);
 
 /** Append the deterministic created constitution with the submitted outline. */
 async function handleCreateConstitutionResponse(context) {

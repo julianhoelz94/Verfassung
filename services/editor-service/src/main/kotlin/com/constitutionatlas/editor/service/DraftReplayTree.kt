@@ -11,16 +11,7 @@ internal object DraftReplayTree {
     fun insertRoot(step: DraftReplayStep) {
         require(step.foundNode != null && step.roots.any { it.logicalId == step.operation.targetId }) { "Root insertion requires a source root" }
         val child = step.operation.node ?: throw IllegalArgumentException("New root is required")
-
-        /** Inserted root freshness includes every nested entry. */
-        fun fresh(node: DraftNode) {
-            require(node.revisionId == null && node.draftId == null) { "Inserted roots cannot claim revisions" }
-            node.content.forEach { entry ->
-                require(entry.revisionId == null && entry.draftId == null) { "Inserted entries cannot claim revisions" }
-                entry.node?.let(::fresh)
-            }
-        }
-        fresh(child)
+        requireFreshTree(child, "Inserted roots cannot claim revisions", "Inserted entries cannot claim revisions")
         val position = step.operation.position ?: throw IllegalArgumentException("Root position is required")
         require(position in 0..step.roots.size) { "Invalid root position" }
         step.roots = step.roots.take(position) + markInserted(child, step.operation.id) + step.roots.drop(position)
@@ -49,16 +40,7 @@ internal object DraftReplayTree {
             DraftEntry("text", logicalId = part.logicalId, draftId = step.operation.id, text = part.text, format = part.format, table = part.table, footnoteLabel = part.footnoteLabel, references = part.references, annotation = part.annotation, marks = part.marks, lineBreaksBefore = part.lineBreaksBefore)
         } else {
             val child = step.operation.node ?: throw IllegalArgumentException("insert_child requires a node")
-
-            /** Child insertion rejects stored or draft tokens recursively. */
-            fun newNode(node: DraftNode) {
-                require(node.revisionId == null && node.draftId == null) { "Inserted nodes cannot claim source revisions" }
-                node.content.forEach { entry ->
-                    require(entry.revisionId == null && entry.draftId == null) { "Inserted text cannot claim source revisions" }
-                    entry.node?.let(::newNode)
-                }
-            }
-            newNode(child)
+            requireFreshTree(child, "Inserted nodes cannot claim source revisions", "Inserted text cannot claim source revisions")
             DraftEntry("child", node = markInserted(child, step.operation.id))
         }
         step.updateNodes { node -> if (node.logicalId == step.operation.targetId) node.copy(draftId = step.operation.id, content = insert(node.content, entry, step.operation.position)) else node }
@@ -67,14 +49,7 @@ internal object DraftReplayTree {
     /** Checks replacement kind before deletion and replacement survival afterwards, then remaps references. */
     fun remove(step: DraftReplayStep) {
         step.operation.replacementId?.let { replacement ->
-            var successor: DraftNode? = null
-
-            /** Retains the last matching replacement when the pre-validation tree has duplicates. */
-            fun findReplacement(node: DraftNode) {
-                if (node.logicalId == replacement) successor = node
-                node.content.mapNotNull { it.node }.forEach(::findReplacement)
-            }
-            step.roots.forEach(::findReplacement)
+            val successor = step.findNode(replacement)
             require(replacement != step.operation.targetId && step.foundNode != null && successor?.kind == step.foundNode!!.kind) { "A removed unit's replacement must be a distinct surviving unit of the same kind" }
         }
         step.roots = step.roots.filter { it.logicalId != step.operation.targetId }
@@ -83,15 +58,7 @@ internal object DraftReplayTree {
             if (entries.size == node.content.size) node else node.copy(content = entries, draftId = step.operation.id)
         }
         step.operation.replacementId?.let { replacement ->
-            var survives = false
-
-            /** Confirms the replacement was not removed with its ancestor subtree. */
-            fun findSurvivor(node: DraftNode) {
-                if (node.logicalId == replacement) survives = true
-                node.content.mapNotNull { it.node }.forEach(::findSurvivor)
-            }
-            step.roots.forEach(::findSurvivor)
-            require(survives) { "The replacement cannot be inside the removed subtree" }
+            require(step.findNode(replacement) != null) { "The replacement cannot be inside the removed subtree" }
             step.remapTargets(mapOf(step.operation.targetId to listOf(replacement)))
         }
     }
@@ -101,14 +68,7 @@ internal object DraftReplayTree {
         val moving = step.foundEntry ?: throw IllegalArgumentException("Move requires an entry under a parent")
         val destination = step.operation.destinationParentId ?: throw IllegalArgumentException("Move requires an explicit destination parent")
         require(destination != step.operation.targetId) { "A node cannot contain itself" }
-        var destinationNode: DraftNode? = null
-
-        /** Destination lookup retains the original last-match traversal semantics. */
-        fun findDestination(node: DraftNode) {
-            if (node.logicalId == destination) destinationNode = node
-            node.content.mapNotNull { it.node }.forEach(::findDestination)
-        }
-        step.roots.forEach(::findDestination)
+        val destinationNode = step.findNode(destination)
         val destinationToken = destinationNode?.let { it.draftId ?: it.revisionId }
         if (destinationToken != step.operation.destinationRevisionId) throw ConflictException("Stale destination parent", "stale_draft_unit")
         step.updateNodes { node ->
@@ -125,6 +85,15 @@ internal object DraftReplayTree {
             }
         }
         require(inserted) { "Move destination cannot be inside the moved subtree" }
+    }
+
+    /** Checks parents and wrappers before descendants, retaining root/child-specific rejection text. */
+    private fun requireFreshTree(node: DraftNode, nodeMessage: String, entryMessage: String) {
+        require(node.revisionId == null && node.draftId == null) { nodeMessage }
+        node.content.forEach { entry ->
+            require(entry.revisionId == null && entry.draftId == null) { entryMessage }
+            entry.node?.let { requireFreshTree(it, nodeMessage, entryMessage) }
+        }
     }
 
     /** New nodes and text receive this operation token, preserving entry-wrapper fields. */

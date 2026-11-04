@@ -49,13 +49,13 @@ internal object LegacyImportValidation {
     private fun hierarchyErrors(articles: List<ImportArticle>, outline: ImportOutlineValidation): List<Pair<String, String>> = buildList {
         if ("article" !in outline.rootKinds) add("ROOT_KIND" to "Article format requires an article root; use roots for this outline")
         articles.forEachIndexed { articleIndex, article ->
-            article.nodes.forEachIndexed { index, node -> addAll(nodeErrors(node, "article", "articles[$articleIndex].nodes[$index]", outline)) }
+            article.nodes.forEachIndexed { index, node -> collectNodeErrors(node, "article", "articles[$articleIndex].nodes[$index]", outline, this) }
         }
     }
 
-    /** Normalize a child's membership test but retain its raw kind as the next parent and in messages. */
-    private fun nodeErrors(node: ImportNode, parent: String, path: String, outline: ImportOutlineValidation): List<Pair<String, String>> = buildList {
-        if (node.kind.trim().lowercase() !in outline.children(parent)) add("HIERARCHY_KIND" to "$path: '${node.kind}' is not allowed under '$parent'")
-        node.children.forEachIndexed { index, child -> addAll(nodeErrors(child, node.kind, "$path.children[$index]", outline)) }
+    /** Append depth-first diagnostics once, retaining raw parent kinds and avoiding subtree-list copies. */
+    private fun collectNodeErrors(node: ImportNode, parent: String, path: String, outline: ImportOutlineValidation, errors: MutableList<Pair<String, String>>) {
+        if (node.kind.trim().lowercase() !in outline.children(parent)) errors += "HIERARCHY_KIND" to "$path: '${node.kind}' is not allowed under '$parent'"
+        node.children.forEachIndexed { index, child -> collectNodeErrors(child, node.kind, "$path.children[$index]", outline, errors) }
     }
 }

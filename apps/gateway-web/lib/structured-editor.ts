@@ -10,6 +10,16 @@ export function token(unit: DraftNode | DraftEntry): string { return unit.draftI
 export function nodes(roots: DraftNode[]): DraftNode[] { return roots.flatMap(node => [node, ...nodes(node.content.flatMap(entry => entry.node ? [entry.node] : []))]); }
 export function findNode(roots: DraftNode[], id: string): DraftNode | undefined { return nodes(roots).find(node => node.logicalId === id); }
 
+/** Resolve a node identity or the node directly owning a text entry, retaining draft preorder. */
+export function findUnitNode(roots: DraftNode[], id: string): DraftNode | undefined {
+  return nodes(roots).find(node => node.logicalId === id || node.content.some(entry => entry.logicalId === id));
+}
+
+/** Locate the first top-level root containing a node or text identity without changing snapshot priority. */
+export function findUnitRoot(roots: DraftNode[], id: string): DraftNode | undefined {
+  return roots.find(root => findUnitNode([root], id));
+}
+
 /** Local replay of the targeted command contract. Server replay remains authoritative. */
 export function applyOperation(roots: DraftNode[], op: DraftOperation): DraftNode[] {
   const invalidLayout=(value:number|undefined)=>value!==undefined&&(!Number.isInteger(value)||value<0||value>16);

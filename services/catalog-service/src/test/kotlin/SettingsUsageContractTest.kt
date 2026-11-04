@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test
 import org.springframework.web.server.ResponseStatusException
 import java.net.InetSocketAddress
 import java.util.UUID
+import java.util.concurrent.CopyOnWriteArrayList
 
 class SettingsUsageContractTest {
     private val version = UUID(0, 1)
@@ -75,11 +76,11 @@ class SettingsUsageContractTest {
 
     /** Real loopback HTTP preserves request order, credential forwarding and exception conversion. */
     private fun serve(content: String, sessions: String = "[]", contentStatus: Int = 200, inspect: (SettingsUsageClient, List<String>) -> Unit) {
-        val requests = mutableListOf<String>()
+        val requests = CopyOnWriteArrayList<String>()
         val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
         server.createContext("/") { exchange ->
             val path = exchange.requestURI.path
-            synchronized(requests) { requests += path }
+            requests += path
             val isContent = path.startsWith("/versions/")
             val body = (if (isContent) content else sessions).toByteArray()
             val status = if (isContent) contentStatus else 200

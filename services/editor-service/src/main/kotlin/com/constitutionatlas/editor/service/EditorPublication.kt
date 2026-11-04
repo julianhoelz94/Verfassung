@@ -13,8 +13,7 @@ import com.constitutionatlas.platform.Actor
 import org.slf4j.Logger
 
 /** Publication phases execute synchronously inside EditorService.publish's existing transaction. */
-internal class EditorPublication(editorRepository: EditorRepository, private val structuredPublication: StructuredPublicationService, private val structuredPublishJobs: StructuredPublishJobRepository, private val structuredDiffReview: StructuredDiffReviewService, sourceEvidence: SourceEvidenceRepository, private val catalogClient: CatalogClient, contentClient: ContentClient, amendmentClient: AmendmentClient, amendmentActions: AmendmentActions, auditClient: AuditClient, log: Logger) {
-    private val editorRepository = editorRepository
+internal class EditorPublication(private val editorRepository: EditorRepository, private val structuredPublication: StructuredPublicationService, private val structuredPublishJobs: StructuredPublishJobRepository, private val structuredDiffReview: StructuredDiffReviewService, sourceEvidence: SourceEvidenceRepository, private val catalogClient: CatalogClient, contentClient: ContentClient, amendmentClient: AmendmentClient, amendmentActions: AmendmentActions, auditClient: AuditClient, log: Logger) {
     private val requests = EditorPublicationRequest(editorRepository, sourceEvidence)
     private val content = EditorPublicationContent(catalogClient, contentClient, structuredPublication, sourceEvidence)
     private val amendments = EditorPublicationAmendment(amendmentClient, editorRepository, structuredPublishJobs)

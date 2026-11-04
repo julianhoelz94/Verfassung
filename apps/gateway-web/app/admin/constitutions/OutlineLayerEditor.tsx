@@ -157,6 +157,19 @@ function LayerStructure({ layer, index, layers, update }: LevelProps) {
   );
 }
 
+/** Title and label policies share the same persisted values, order and translated labels. */
+function metadataPolicyOptions() {
+  return ([
+    ["none", ui.admin.constitutions.outlineeditor.notAllowed],
+    ["optional", ui.admin.constitutions.outlineeditor.optional],
+    ["required", ui.admin.constitutions.outlineeditor.required],
+  ] as const).map(([value, label]) => (
+    <option key={value} value={value}>
+      <T value={label} />
+    </option>
+  ));
+}
+
 /** Editorial metadata and sentence settings keep their current values and disabling rules. */
 function LayerPermissions({ layer, index, update }: LevelProps) {
   return (
@@ -239,15 +252,7 @@ function LayerPermissions({ layer, index, update }: LevelProps) {
             })
           }
         >
-          <option value="none">
-            <T value={ui.admin.constitutions.outlineeditor.notAllowed} />
-          </option>
-          <option value="optional">
-            <T value={ui.admin.constitutions.outlineeditor.optional} />
-          </option>
-          <option value="required">
-            <T value={ui.admin.constitutions.outlineeditor.required} />
-          </option>
+          {metadataPolicyOptions()}
         </Select>
         <Select
           label={
@@ -269,15 +274,7 @@ function LayerPermissions({ layer, index, update }: LevelProps) {
             })
           }
         >
-          <option value="none">
-            <T value={ui.admin.constitutions.outlineeditor.notAllowed} />
-          </option>
-          <option value="optional">
-            <T value={ui.admin.constitutions.outlineeditor.optional} />
-          </option>
-          <option value="required">
-            <T value={ui.admin.constitutions.outlineeditor.required} />
-          </option>
+          {metadataPolicyOptions()}
         </Select>
         <p className="muted">
           <T

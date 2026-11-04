@@ -4,10 +4,30 @@ import { once } from "node:events";
 import { createServer } from "node:net";
 import { after, before, beforeEach, test } from "node:test";
 import { fileURLToPath } from "node:url";
+import { exactRoute } from "./mock-api/route.mjs";
 
 let child;
 let origin;
 const authorization = "Bearer e2e-session-token";
+
+test("exact route misses are synchronous and selected responses remain lazy", () => {
+  const selected = { method: "POST", pathname: "/selected" };
+  const pending = Promise.resolve(true);
+  let calls = 0;
+  const route = exactRoute("POST", "/selected", (context) => {
+    assert.equal(context, selected);
+    calls += 1;
+    return pending;
+  });
+  assert.equal(route({ ...selected, method: "GET" }), false);
+  assert.equal(route({ ...selected, pathname: "/selected/" }), false);
+  assert.equal(calls, 0);
+  assert.equal(route(selected), pending);
+  assert.equal(calls, 1);
+  const failure = new Error("response failed");
+  const failing = exactRoute("POST", "/selected", () => { throw failure; });
+  assert.throws(() => failing(selected), (error) => error === failure);
+});
 
 /** Reserve a temporary loopback port without relying on fixed browser-suite ports. */
 async function availablePort() {

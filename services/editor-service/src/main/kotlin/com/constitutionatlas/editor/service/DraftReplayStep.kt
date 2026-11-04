@@ -55,6 +55,19 @@ internal class DraftReplayStep(var roots: List<DraftNode>, val operation: DraftO
         }
     }
 
+    /** Node-only lookup retains the last preorder match, including temporarily repeated identities. */
+    fun findNode(logicalId: UUID): DraftNode? {
+        var found: DraftNode? = null
+
+        /** Do not short-circuit: later occurrences determine replacement kinds and destination tokens. */
+        fun visit(node: DraftNode) {
+            if (node.logicalId == logicalId) found = node
+            node.content.mapNotNull { it.node }.forEach(::visit)
+        }
+        roots.forEach(::visit)
+        return found
+    }
+
     /** Applies a transform postorder after copying child contents, exactly once for each node occurrence. */
     fun updateNodes(transform: (DraftNode) -> DraftNode) {
         roots = roots.map { map(it, transform) }

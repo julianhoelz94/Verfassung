@@ -24,6 +24,19 @@ test('SonarJS scores nesting and reports zero-score functions', () => {
   assert.deepEqual(functions.map(fn => [fn.function, fn.score]), [['example', 21], ['simple', 0]]);
 });
 
+test('maps diagnostics for every JavaScript line terminator to the correct function', () => {
+  const source = `// A leading line also shifts the first function.\nfunction first(value) { if (value) return 1; return 0; }\n${complex}\nconst simple = () => 1;`;
+  for (const separator of ['\n', '\r\n', '\r', '\u2028', '\u2029']) {
+    const functions = analyze(source.replaceAll('\n', separator));
+    assert.deepEqual(functions.map(fn => [fn.function, fn.score]), [
+      ['first', 1], ['example', 21], ['simple', 0],
+    ]);
+    assert.deepEqual(applyBaseline(functions, makeBaseline([])).map(fn => fn.status), [
+      'pass', 'violation', 'pass',
+    ]);
+  }
+});
+
 test('limit is inclusive at 20, and 21 fails without a baseline', () => {
   for (const score of [20, 21]) {
     const functions = analyze(`function branches(x: number) { ${'if (x) x--;'.repeat(score)} }`);

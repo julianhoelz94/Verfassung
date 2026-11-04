@@ -1,3 +1,4 @@
+import { exactRoute } from "./route.mjs";
 import {
   EDITORIAL_VERSION_ID,
   SESSION_ID,
@@ -67,13 +68,11 @@ export function handleSessions(context) {
   return true;
 }
 
-/** Match the create session gate before consuming request bytes or mutating state. */
-export function handleCreateSession(context) {
-  const { pathname, method } = context;
-  if (method === "POST" && pathname === "/api/editor/edit-sessions")
-    return handleCreateSessionResponse(context);
-  return false;
-}
+export const handleCreateSession = exactRoute(
+  "POST",
+  "/api/editor/edit-sessions",
+  handleCreateSessionResponse,
+);
 
 /** Replace the active session using the existing deterministic identity and defaults. */
 async function handleCreateSessionResponse(context) {

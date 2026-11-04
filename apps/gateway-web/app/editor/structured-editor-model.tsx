@@ -15,6 +15,8 @@ import {
   applyOperation,
   draftDifferences,
   findNode,
+  findUnitNode,
+  findUnitRoot,
   nodes,
   remapDraftTargets,
   scopedNodes,
@@ -1579,26 +1581,12 @@ export function useStructuredEditorModel({
     try {
       const ownerId =
         difference.rootId ??
-        roots.find((root) =>
-          nodes([root]).some(
-            (node) =>
-              node.logicalId === difference.logicalId ||
-              node.content.some(
-                (entry) => entry.logicalId === difference.logicalId,
-              ),
-          ),
-        )?.logicalId;
+        findUnitRoot(roots, difference.logicalId)?.logicalId;
       const current = ownerId ? await ensureRoot(ownerId) : rootsRef.current,
         owner = ownerId
           ? current.find((root) => root.logicalId === ownerId)
           : undefined;
-      const unit = nodes(current).find(
-        (node) =>
-          node.logicalId === difference.logicalId ||
-          node.content.some(
-            (entry) => entry.logicalId === difference.logicalId,
-          ),
-      );
+      const unit = findUnitNode(current, difference.logicalId);
       select(difference.logicalId);
       if (!unit) {
         setMode("changes");
@@ -1635,13 +1623,7 @@ export function useStructuredEditorModel({
   /** Builds snapshot-pinned source/target passage links from logical-to-occurrence mappings. */
   function differenceReference(id: string, target: boolean) {
     const list = target ? roots : sourceRoots,
-      owner = list.find((root) =>
-        nodes([root]).some(
-          (node) =>
-            node.logicalId === id ||
-            node.content.some((entry) => entry.logicalId === id),
-        ),
-      );
+      owner = findUnitRoot(list, id);
     const unit =
       owner &&
       (findNode([owner], id) ??

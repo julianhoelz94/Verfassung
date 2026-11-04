@@ -1,3 +1,4 @@
+import { exactRoute } from "./route.mjs";
 import { json, mockState, readBody } from "./state.mjs";
 
 /** Retain status, owner, archive and pagination filtering order. */
@@ -20,13 +21,11 @@ export function handleImportJobs(context) {
   return true;
 }
 
-/** Match the stage import gate before consuming request bytes or mutating state. */
-export function handleStageImport(context) {
-  const { pathname, method } = context;
-  if (method === "POST" && pathname === "/api/ingestion/import-jobs")
-    return handleStageImportResponse(context);
-  return false;
-}
+export const handleStageImport = exactRoute(
+  "POST",
+  "/api/ingestion/import-jobs",
+  handleStageImportResponse,
+);
 
 /** Replace the deterministic import job with its submitted payload and owner. */
 async function handleStageImportResponse(context) {

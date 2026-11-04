@@ -1,3 +1,4 @@
+import { exactRoute } from "./route.mjs";
 import {
   countryDirectoryFixtures,
   editorState,
@@ -28,13 +29,11 @@ export function handleReset(context) {
   return true;
 }
 
-/** Match the country directory gate before consuming request bytes or mutating state. */
-export function handleCountryDirectory(context) {
-  const { pathname, method } = context;
-  if (method === "POST" && pathname === "/__country_directory")
-    return handleCountryDirectoryResponse(context);
-  return false;
-}
+export const handleCountryDirectory = exactRoute(
+  "POST",
+  "/__country_directory",
+  handleCountryDirectoryResponse,
+);
 
 /** Install regional directory data before later Catalog handlers. */
 async function handleCountryDirectoryResponse(context) {
@@ -85,13 +84,11 @@ export function handleDirectoryRead(context) {
   return false;
 }
 
-/** Match the continuous reader gate before consuming request bytes or mutating state. */
-export function handleContinuousReader(context) {
-  const { pathname, method } = context;
-  if (method === "POST" && pathname === "/__continuous_reader")
-    return handleContinuousReaderResponse(context);
-  return false;
-}
+export const handleContinuousReader = exactRoute(
+  "POST",
+  "/__continuous_reader",
+  handleContinuousReaderResponse,
+);
 
 /** Enable ordered reader fixtures and authored footnote wording lazily. */
 async function handleContinuousReaderResponse(context) {
@@ -106,13 +103,11 @@ async function handleContinuousReaderResponse(context) {
   return true;
 }
 
-/** Match the unavailable history gate before consuming request bytes or mutating state. */
-export function handleUnavailableHistory(context) {
-  const { pathname, method } = context;
-  if (method === "POST" && pathname === "/__history_unavailable")
-    return handleUnavailableHistoryResponse(context);
-  return false;
-}
+export const handleUnavailableHistory = exactRoute(
+  "POST",
+  "/__history_unavailable",
+  handleUnavailableHistoryResponse,
+);
 
 /** Merge requested history failures without resetting other flags. */
 async function handleUnavailableHistoryResponse(context) {
@@ -164,13 +159,11 @@ export function handleDenseContent(context) {
   return true;
 }
 
-/** Match the import publication error gate before consuming request bytes or mutating state. */
-export function handleImportPublicationError(context) {
-  const { pathname, method } = context;
-  if (method === "POST" && pathname === "/__import_publication_error")
-    return handleImportPublicationErrorResponse(context);
-  return false;
-}
+export const handleImportPublicationError = exactRoute(
+  "POST",
+  "/__import_publication_error",
+  handleImportPublicationErrorResponse,
+);
 
 /** Set the next import publication failure without consuming the import. */
 async function handleImportPublicationErrorResponse(context) {
@@ -229,13 +222,11 @@ async function handleUiReviewOverrideResponse(context) {
   return false;
 }
 
-/** Match the seed editor sessions gate before consuming request bytes or mutating state. */
-export function handleSeedEditorSessions(context) {
-  const { pathname, method } = context;
-  if (method === "POST" && pathname === "/__editor_sessions")
-    return handleSeedEditorSessionsResponse(context);
-  return false;
-}
+export const handleSeedEditorSessions = exactRoute(
+  "POST",
+  "/__editor_sessions",
+  handleSeedEditorSessionsResponse,
+);
 
 /** Replace seeded editor session summaries and availability flags. */
 async function handleSeedEditorSessionsResponse(context) {

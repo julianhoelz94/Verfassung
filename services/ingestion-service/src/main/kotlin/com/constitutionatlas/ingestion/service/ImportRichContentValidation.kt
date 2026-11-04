@@ -8,6 +8,11 @@ import com.constitutionatlas.platform.OrderedValidationError
 
 /** Import-specific payload checks and the shared complete-document rich-content validation pass. */
 internal object ImportRichContentValidation {
+    /** Applies current complete-document rules to both receipt retries and preparation. */
+    fun requireValid(roots: List<OrderedNodeWrite>) {
+        OrderedContentRules.requireValid(documentErrors(roots))
+    }
+
     /** Annotation checks apply to every entry; format and table checks apply only to text entries. */
     fun entryErrors(entry: OrderedEntryWrite, path: String): List<Pair<String, String>> = buildList {
         runCatching { entry.annotation?.validate() }.exceptionOrNull()?.let { add("ANNOTATION" to (it.message ?: "Invalid annotation")) }

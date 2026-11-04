@@ -96,6 +96,38 @@ class StructuredReplayContractTest {
     }
 
     @Test
+    fun `inserted trees preserve distinct diagnostics and wrapper revision precedence`() {
+        val source = node(1)
+        val invalidChild = DraftEntry("child", node = node(3))
+        val inserted = node(2, listOf(invalidChild)).copy(revisionId = null)
+        for ((type, nodeMessage, entryMessage) in listOf(
+            Triple("insert_root", "Inserted roots cannot claim revisions", "Inserted entries cannot claim revisions"),
+            Triple("insert_child", "Inserted nodes cannot claim source revisions", "Inserted text cannot claim source revisions"),
+        )) {
+            val insert = operation(type, source.logicalId, source.revisionId!!).copy(node = inserted)
+            val nested = assertThrows(IllegalArgumentException::class.java) { StructuredDraftEngine.replay(listOf(source), listOf(insert), settings) }
+            assertEquals(nodeMessage, nested.message)
+            val wrapper = inserted.copy(content = listOf(invalidChild.copy(revisionId = id(999))))
+            val claimed = assertThrows(IllegalArgumentException::class.java) { StructuredDraftEngine.replay(listOf(source), listOf(insert.copy(node = wrapper)), settings) }
+            assertEquals(entryMessage, claimed.message)
+        }
+    }
+
+    @Test
+    fun `destination lookup uses the last duplicate before later operations repair the tree`() {
+        val moving = node(2)
+        val firstDestination = node(3)
+        val lastDestination = firstDestination.copy(revisionId = id(903))
+        val source = node(1, listOf(DraftEntry("child", node = moving), DraftEntry("child", node = firstDestination)))
+        val move = operation("move", moving.logicalId, moving.revisionId!!).copy(destinationParentId = firstDestination.logicalId, destinationRevisionId = firstDestination.revisionId, position = 0)
+        val stale = assertThrows(ConflictException::class.java) { StructuredDraftEngine.replay(listOf(source, lastDestination), listOf(move), settings) }
+        assertEquals("Stale destination parent", stale.message)
+        val remove = operation("remove", firstDestination.logicalId, move.id).copy(id = id(501))
+        val result = StructuredDraftEngine.replay(listOf(source, lastDestination), listOf(move.copy(destinationRevisionId = lastDestination.revisionId), remove), settings)
+        assertEquals(listOf(source.copy(content = emptyList(), draftId = remove.id)), result)
+    }
+
+    @Test
     fun `final outline validation runs after the entire batch including zero operations`() {
         val required = settings.copy(outline = DraftOutline(listOf(settings.outline.kinds.single().copy(labelPolicy = "required"))))
         val source = node(1).copy(label = "Original")

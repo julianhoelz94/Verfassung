@@ -191,6 +191,15 @@ have JSDoc or Kotlin KDoc. All scanned Kotlin and TypeScript/JavaScript function
 including tests and fixtures, now meet 20; all Kotlin files meet 100. The reviewed
 baseline files are empty, with no allowances or threshold changes.
 
+A complete follow-up review checked the CI implementation and all nine cleanup
+batches against `main`. It corrected diagnostic mapping for valid JavaScript line
+terminators, made a cross-thread test trace safe, restored single-pass import-error
+collection and fixed pre-existing Unicode/length boundaries in translation chunks.
+Repeated ownership/traversal, validation, form and literal-route logic now share
+focused helpers. Regression checks preserve exact text and request ordering, and
+both complexity budgets remain enforced with empty exception lists. See the
+[detailed findings and verification](https://github.com/julianhoelz94/Verfassung/blob/main/docs/complexity-cleanup-estimate.md).
+
 ## Code coverage in CI
 
 Every CI run publishes **whole-repository line coverage** and **new-code line

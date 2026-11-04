@@ -350,8 +350,8 @@ async function comparisonPageModel(props: ComparePageProps) {
     const pinned = [fromDetail, toDetail].find(snapshot => snapshot && (snapshot.legalVersionId ?? snapshot.id) === (version.legalVersionId ?? version.id));
     return { ...version, id: pinned?.id ?? snapshotVersionId(version) };
   });
-  const fromCrossRefs = { ...(params.id ? { jurisdictionId: params.id } : { code: params.code }), versionId: fromReaderId, articlesByNumber: Object.fromEntries(fromArticles.map(item => [item.articleNumber, item.id])), unitsByLogicalId: orderedTargets(fromArticles), footnotes: footnoteItems(fromArticles.flatMap(item => item.content ?? []), routeBase + '/versions/' + fromReaderId) };
-  const toCrossRefs = { ...(params.id ? { jurisdictionId: params.id } : { code: params.code }), versionId: toReaderId, articlesByNumber: Object.fromEntries(toArticles.map(item => [item.articleNumber, item.id])), unitsByLogicalId: orderedTargets(toArticles), footnotes: footnoteItems(toArticles.flatMap(item => item.content ?? []), routeBase + '/versions/' + toReaderId) };
+  const fromCrossRefs = comparisonReferences(params, routeBase, fromReaderId, fromArticles);
+  const toCrossRefs = comparisonReferences(params, routeBase, toReaderId, toArticles);
   const rows = alignArticles(fromArticles, toArticles).map(({ key, left, right }) => {
     const number = right?.articleNumber ?? left?.articleNumber ?? '';
     const kind = netArticleKind(left, right, recorded.get(number) ?? []);
@@ -473,4 +473,15 @@ function recordedChanges(lawHops: LawHop[]): Map<string, string[]> {
     }
   }
   return recorded;
+}
+
+/** Builds both snapshot reference indexes with the same owner, authored targets and pinned note URLs. */
+function comparisonReferences(params: Awaited<ComparePageProps['params']>, routeBase: string, versionId: string, articles: ArticleSummary[]) {
+  return {
+    ...(params.id ? { jurisdictionId: params.id } : { code: params.code }),
+    versionId,
+    articlesByNumber: Object.fromEntries(articles.map(item => [item.articleNumber, item.id])),
+    unitsByLogicalId: orderedTargets(articles),
+    footnotes: footnoteItems(articles.flatMap(item => item.content ?? []), routeBase + '/versions/' + versionId),
+  };
 }

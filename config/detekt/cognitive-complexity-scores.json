@@ -2,12 +2,6 @@
   "version": 2,
   "limit": 20,
   "file_limit": 100,
-  "entries": [
-    {
-      "path": "services/ingestion-service/src/test/kotlin/ImportApiTest.kt",
-      "function": "directBatchAndChunkedImportsRequireMarkersAndAllowSharedNotes",
-      "score": 21
-    }
-  ],
+  "entries": [],
   "file_entries": []
 }

@@ -25,18 +25,20 @@ Classes, objects, and top-level functions in one file share its budget.
 This follows detekt's named-function metric; constructor/property initializers
 and property accessors outside those functions are not scored separately.
 
-After Batches 1–8, based on `main` at `f927cad`, all production functions meet 20
-and all Kotlin files meet 100. Only eight test/fixture function exceptions remain
-for Batch 9: seven TypeScript/JavaScript functions and one Kotlin test function.
-There are no production-function or Kotlin file exceptions.
+After Batches 1–9, based on `main` at `f927cad`, all scanned Kotlin and
+TypeScript/JavaScript functions, including tests and fixtures, meet 20. All Kotlin
+files meet 100. Both reviewed function baselines and the Kotlin file baseline are
+empty: no production, test or fixture exceptions remain.
 
 Amendment references, linking and diff matching now join content persistence,
 Catalog/outline, editor publishing/replay, ingestion and shared diffing under both
 budgets. Import staging, migration preparation and setup validation/creation use
 documented helpers under the same limits. Reader/rendering, translation,
 comparison, account/workspace, proxy/rate-limit and MCP logging helpers follow the
-same function budget. Existing test debt is measured per source path; it grants
-no exemptions to future similarly named files.
+same function budget. Mock API routes, fixture prepopulation/scenarios and browser
+test helpers use documented responsibilities while preserving their HTTP/state,
+request ordering, registrations and assertions. Baseline identities retain full
+source paths; similarly named future files receive no exemptions.
 
 Extracting helpers within one file does not remove their control flow from this
 budget. Reducing nesting can still legitimately lower the total. When a file
@@ -94,8 +96,10 @@ for rejecting invalid Kotlin; TypeScript parser errors fail the complexity check
 
 ## Existing debt and cleanup
 
-The initial baselines accept existing violations so adopting the check does not
-require an unrelated application rewrite. CI **never regenerates baselines**.
+The initial baselines accepted existing violations so adopting the check did not
+require an immediate application rewrite. Cleanup has now removed every exception.
+The empty baseline files retain their reviewed formats and manual exception
+workflow. CI **never regenerates baselines**.
 
 Kotlin combines detekt's native identifiers (file, declaration, and signature)
 with reviewed maximum scores in `config/detekt/cognitive-complexity-scores.json`.

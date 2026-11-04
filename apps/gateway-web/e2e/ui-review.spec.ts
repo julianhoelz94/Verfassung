@@ -1,4 +1,4 @@
-import { test, expect } from './fixtures/consent';
+import { test, expect, type Page, type APIRequestContext } from './fixtures/consent';
 import { readdirSync } from 'node:fs';
 import path from 'node:path';
 import { uiRoutes, uiStates } from './fixtures/ui-routes';
@@ -35,48 +35,15 @@ for (const locale of ['en', 'de']) for (const width of sizes) {
     const evidence: Array<{ route: string; status: number | undefined; heading: string | null }> = [];
     try {
       for (const route of [...uiRoutes, ...uiStates]) await test.step(route.entry, async () => {
-        if ('setup' in route && route.setup) {
-          await request.post(`${mock}/__sprint59_setup`, { data: { completed: false } });
-          await publicPage.goto('/impressum');
-          await expect(publicPage.locator('.topbar').getByRole('link', { name: locale === 'en' ? 'Log in' : 'Einloggen', exact: true })).toBeVisible();
-          await expect(publicPage.locator('.nav-primary a')).toHaveCount(0);
-        }
-        if ('session' in route && route.session) expect((await request.post(`${mock}/api/editor/edit-sessions`, { data: { versionId: '01900000-0000-4000-8000-000000000804', hopKind: 'editorial_correction' } })).ok()).toBeTruthy();
+        await prepareReviewRoute(route, publicPage, request, locale);
         const page = 'staff' in route && route.staff ? staffPage : publicPage;
         const response = await page.goto(route.path);
         expect(response?.status(), route.path).toBeLessThan(400);
-        const expectedPath = route.entry === '/admin/import/[jobId]' ? '/editor' : route.entry === '/countries/[code]/constitution-timeline' ? '/countries/DE/timeline' : route.entry === '/versions/[versionId]/units/[unitId]' ? `/countries/DE${route.path}` : new URL(route.path, baseURL).pathname;
+        const expectedPath = reviewDestination(route, baseURL);
         await expect.poll(() => new URL(page.url()).pathname, { message: `Unexpected redirect for ${route.path}` }).toBe(expectedPath);
-        await expect(page.locator('h1')).toHaveCount(1);
-        await expect(page.locator('h1')).toBeVisible();
-        await expect(page.locator('main')).toHaveAttribute('id', 'main-content');
-        await expect(page.locator('main')).toHaveAttribute('data-template', /^(focused|settings|collection|reader|workspace)$/);
-        const heading = await page.locator('h1').textContent();
-        expect(heading).not.toMatch(/Something went wrong|Etwas ist schief|not found|nicht gefunden/i);
-        await expect(page.getByRole('alert').filter({ hasText: /could not be loaded|could not be retrieved|temporarily unavailable|konnte[n]? nicht geladen|vorübergehend nicht verfügbar/i })).toHaveCount(0);
-        if (route.entry === '/admin/settings') await expect(page.locator('#smtpHost')).toBeVisible();
-        if (route.entry === '/admin/import/setup/[proposalId]') await expect(page.getByRole('heading', { name: locale === 'en' ? 'Your confirmation is required' : 'Ihre Bestätigung ist erforderlich' })).toBeVisible();
-        if (route.entry === '/editor/lifecycle/[constitutionId]') await expect(page.locator('input[name="logicalUnitIds"]').first()).toBeVisible();
-        if (route.entry === '/setup') {
-          await expect(page.getByRole('button', { name: locale === 'en' ? 'Finish setup and open the site' : 'Einrichtung abschließen und Website öffnen' })).toBeDisabled();
-          await expect(page.getByRole('button', { name: locale === 'en' ? 'Account menu' : 'Kontomenü' })).toBeVisible();
-          await expect(page.locator('.nav-primary a')).toHaveCount(0);
-        }
-        if (route.entry === 'import-new-structure') await expect(page.locator('#proposalFile')).toBeVisible();
-        if (route.entry === 'editor-active-correction') await expect(page.getByRole('button', { name: locale === 'en' ? 'Save draft' : 'Entwurf speichern', exact: true })).toBeVisible();
-        expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), `Page overflow at ${route.path}`).toBeTruthy();
-        if (width === 390 || width === 1440) {
-          await page.addScriptTag({ path: axePath });
-          const violations = await page.evaluate(async () => {
-            // @ts-expect-error axe is injected for the audit
-            return (await window.axe.run(document)).violations.map(({ id, nodes }) => ({ id, targets: nodes.map(node => node.target) }));
-          });
-          expect(violations, `${locale} ${route.path}`).toEqual([]);
-        }
-        if ('snapshot' in route && route.snapshot && process.platform === 'linux' && process.env.E2E_SKIP_VISUAL !== 'true' && (!process.env.E2E_SNAPSHOT_ENTRY || process.env.E2E_SNAPSHOT_ENTRY === route.entry)) {
-          const name = route.entry.replace(/\//g, '-').replace(/[\[\]]/g, '').replace(/^-/, '');
-          await expect.soft(page).toHaveScreenshot(`review-${name}-${locale}-${width}.png`, { fullPage: true, timeout: 15_000 });
-        }
+        const heading = await assertReviewPage(page, route, locale);
+        await auditReviewAccessibility(page, route, locale, width);
+        await captureReviewSnapshot(page, route, locale, width);
         evidence.push({ route: route.entry, status: response?.status(), heading });
         if ('setup' in route && route.setup) await request.post(`${mock}/__sprint59_setup`, { data: { completed: true } });
       });
@@ -114,3 +81,69 @@ for (const locale of ['en', 'de']) test(`secondary controls work by keyboard wit
     await expect(editor).toBeHidden();
   } finally { await context.close(); }
 });
+
+type ReviewRoute = (typeof uiRoutes)[number] | (typeof uiStates)[number];
+
+/** Stage setup/session variants before selecting or navigating either browser context. */
+async function prepareReviewRoute(route: ReviewRoute, publicPage: Page, request: APIRequestContext, locale: string) {
+  if ('setup' in route && route.setup) {
+    await request.post(`${mock}/__sprint59_setup`, { data: { completed: false } });
+    await publicPage.goto('/impressum');
+    await expect(publicPage.locator('.topbar').getByRole('link', { name: locale === 'en' ? 'Log in' : 'Einloggen', exact: true })).toBeVisible();
+    await expect(publicPage.locator('.nav-primary a')).toHaveCount(0);
+  }
+  if ('session' in route && route.session) expect((await request.post(`${mock}/api/editor/edit-sessions`, { data: { versionId: '01900000-0000-4000-8000-000000000804', hopKind: 'editorial_correction' } })).ok()).toBeTruthy();
+}
+
+/** Preserve the three canonical redirects before using the route's ordinary pathname. */
+function reviewDestination(route: ReviewRoute, baseURL: string) {
+  return route.entry === '/admin/import/[jobId]' ? '/editor' : route.entry === '/countries/[code]/constitution-timeline' ? '/countries/DE/timeline' : route.entry === '/versions/[versionId]/units/[unitId]' ? `/countries/DE${route.path}` : new URL(route.path, baseURL).pathname;
+}
+
+/** Assert shared page landmarks, availability, task controls and overflow before audits. */
+async function assertReviewPage(page: Page, route: ReviewRoute, locale: string) {
+  await expect(page.locator('h1')).toHaveCount(1);
+  await expect(page.locator('h1')).toBeVisible();
+  await expect(page.locator('main')).toHaveAttribute('id', 'main-content');
+  await expect(page.locator('main')).toHaveAttribute('data-template', /^(focused|settings|collection|reader|workspace)$/);
+  const heading = await page.locator('h1').textContent();
+  expect(heading).not.toMatch(/Something went wrong|Etwas ist schief|not found|nicht gefunden/i);
+  await expect(page.getByRole('alert').filter({ hasText: /could not be loaded|could not be retrieved|temporarily unavailable|konnte[n]? nicht geladen|vorübergehend nicht verfügbar/i })).toHaveCount(0);
+  await assertReviewControls(page, route, locale);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), `Page overflow at ${route.path}`).toBeTruthy();
+  return heading;
+}
+
+/** Keep task-specific controls and setup safety assertions on their original route variants. */
+async function assertReviewControls(page: Page, route: ReviewRoute, locale: string) {
+  if (route.entry === '/admin/settings') await expect(page.locator('#smtpHost')).toBeVisible();
+  if (route.entry === '/admin/import/setup/[proposalId]') await expect(page.getByRole('heading', { name: locale === 'en' ? 'Your confirmation is required' : 'Ihre Bestätigung ist erforderlich' })).toBeVisible();
+  if (route.entry === '/editor/lifecycle/[constitutionId]') await expect(page.locator('input[name="logicalUnitIds"]').first()).toBeVisible();
+  if (route.entry === '/setup') {
+    await expect(page.getByRole('button', { name: locale === 'en' ? 'Finish setup and open the site' : 'Einrichtung abschließen und Website öffnen' })).toBeDisabled();
+    await expect(page.getByRole('button', { name: locale === 'en' ? 'Account menu' : 'Kontomenü' })).toBeVisible();
+    await expect(page.locator('.nav-primary a')).toHaveCount(0);
+  }
+  if (route.entry === 'import-new-structure') await expect(page.locator('#proposalFile')).toBeVisible();
+  if (route.entry === 'editor-active-correction') await expect(page.getByRole('button', { name: locale === 'en' ? 'Save draft' : 'Entwurf speichern', exact: true })).toBeVisible();
+}
+
+/** Run the same axe audit only at narrow and wide review widths, retaining exact violations. */
+async function auditReviewAccessibility(page: Page, route: ReviewRoute, locale: string, width: number) {
+  if (width === 390 || width === 1440) {
+    await page.addScriptTag({ path: axePath });
+    const violations = await page.evaluate(async () => {
+      // @ts-expect-error axe is injected for the audit
+      return (await window.axe.run(document)).violations.map(({ id, nodes }) => ({ id, targets: nodes.map(node => node.target) }));
+    });
+    expect(violations, `${locale} ${route.path}`).toEqual([]);
+  }
+}
+
+/** Keep opt-in Linux snapshots, filtering, soft assertions, names and timeouts unchanged. */
+async function captureReviewSnapshot(page: Page, route: ReviewRoute, locale: string, width: number) {
+  if ('snapshot' in route && route.snapshot && process.platform === 'linux' && process.env.E2E_SKIP_VISUAL !== 'true' && (!process.env.E2E_SNAPSHOT_ENTRY || process.env.E2E_SNAPSHOT_ENTRY === route.entry)) {
+    const name = route.entry.replace(/\//g, '-').replace(/[\[\]]/g, '').replace(/^-/, '');
+    await expect.soft(page).toHaveScreenshot(`review-${name}-${locale}-${width}.png`, { fullPage: true, timeout: 15_000 });
+  }
+}

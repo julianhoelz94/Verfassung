@@ -101,7 +101,8 @@ test('offline archive package preserves evidence through review, publication and
       const result = await json(await request.post(`/api/ingestion/migration-runs/${run.id}/items/${item.id}/prepare`, { headers: admin }));
       expect(result.state, result.error ?? '').toBe('prepared'); return result;
     };
-    for (const source of captured) {
+    /** Exercises interrupted receipt and exact duplicate chunks before the caller prepares evidence. */
+    async function stageCapturedDocument(source: { file: string; bytes: Buffer; sha256: string }) {
       const item = { sourceKey: `capture:${source.file}`, kind: 'document', dependencies: [], payload: {
         title: source.file, sourceUrl: `https://verfassungen.de/${source.file}`, fileName: source.file,
         fileBase64: source.bytes.toString('base64'), fileSha256: source.sha256,
@@ -125,6 +126,10 @@ test('offline archive package preserves evidence through review, publication and
         const completed = await mcp(request, importer, 'complete_import_upload', { uploadId: upload.id });
         expect(completed.migrationRunId).toBe(run.id); staged = { id: completed.itemId };
       } else staged = await stage(item.sourceKey, item.kind, item.payload);
+      return staged;
+    }
+    for (const source of captured) {
+      const staged = await stageCapturedDocument(source);
       expect((await request.post(`/api/ingestion/migration-runs/${run.id}/items/${staged.id}/prepare`, { headers: { Authorization: `Bearer ${importer}` } })).status()).toBe(403);
       const document = await prepare(staged);
       const file = await request.get(`/api/document/documents/${document.result.documentId}/revisions/${document.result.revision}/file`, { headers: admin });
@@ -251,7 +256,8 @@ test('offline archive package preserves evidence through review, publication and
     const resolved = await json(await request.get(`/api/catalog/legacy-resolve?url=${encodeURIComponent(oldUrl)}`));
     expect(resolved.targetUrl).toContain(versionId); expect(resolved.targetUrl).toContain('#');
     await json(await request.post('/api/search/reindex', { headers: admin }));
-    for (const locale of ['en', 'de']) {
+    /** Verifies each locale against the pinned original, correction, comparison and amendment snapshots. */
+    async function verifyArchiveReader(locale: string) {
       const context = await browser.newContext({ baseURL: String(testInfo.project.use.baseURL), locale, viewport: { width: locale === 'de' ? 390 : 1280, height: 900 } });
       await context.addInitScript(() => localStorage.setItem('ca_cookie_notice_v1', 'dismissed'));
       const reader = await context.newPage();
@@ -317,6 +323,9 @@ test('offline archive package preserves evidence through review, publication and
       await expect(reader.locator('#register-from')).toHaveValue('1850-01-01');
       expect(await reader.locator('html').evaluate(element => element.scrollWidth <= window.innerWidth)).toBe(true);
       await context.close();
+    }
+    for (const locale of ['en', 'de']) {
+      await verifyArchiveReader(locale);
     }
     await page.goto(oldUrl); await expect(page).toHaveURL(new RegExp(versionId));
     await expect(page.locator(':target')).toContainText(manifest.annotationText);

@@ -131,3 +131,18 @@ selection and form sections without adding React boundaries around their state.
 `proxy.ts` separates request admission while retaining setup, browsing, credential
 and CSP ordering; `api/edge-rate-limit/route.ts` keeps the existing quota keys,
 credential precedence and response headers.
+
+## Fixture and browser-test helpers
+
+`e2e/mock-api.mjs` remains the mock server entry point. `e2e/mock-api/routes.mjs`
+retains route precedence; domain `*-routes.mjs` modules handle selected requests,
+and `state.mjs` owns shared fixtures, reset behavior and HTTP/body helpers. Early
+scenario interception and synchronous fallthrough remain explicit.
+
+`e2e/fixtures/ui-review.mjs` owns fixture-instance UI state, responses and setup
+proposal writes. `prepopulate.mjs` separates version preparation/publication checks;
+`scenarios/index.mjs` retains dependency dispatch, access/search verification and
+journal/guide ordering. Browser helpers in `templates.spec.ts`, `ui-review.spec.ts`
+and `full/legacy-migration.spec.ts` preserve assertions and test registration.
+`e2e/mock-api-contract.test.mjs` supplies focused real-HTTP contracts in the gateway
+Node test commands; UI response contracts run through Vitest.

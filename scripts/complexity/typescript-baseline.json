@@ -1,55 +1,5 @@
 {
   "version": 1,
   "limit": 20,
-  "entries": [
-    {
-      "path": "apps/gateway-web/e2e/fixtures/prepopulate.mjs",
-      "function": "ensureVersions",
-      "hash": "4b7017da1b8abfa70ee95581ed7e0ab74f70c27e033d594b25680d5dcd8e13ff",
-      "score": 40,
-      "count": 1
-    },
-    {
-      "path": "apps/gateway-web/e2e/fixtures/scenarios/index.mjs",
-      "function": "runScenarios",
-      "hash": "88cb7a9b681fed6bb0189d3fcc6043f7c135437817d57f1e105fc08bd27c68cf",
-      "score": 34,
-      "count": 1
-    },
-    {
-      "path": "apps/gateway-web/e2e/fixtures/ui-review.mjs",
-      "function": "response",
-      "hash": "d2ffd83f1b840565c2c3e8715cbdafad02d8e72d8146d7cb9bd6762a17fcdc28",
-      "score": 94,
-      "count": 1
-    },
-    {
-      "path": "apps/gateway-web/e2e/full/legacy-migration.spec.ts",
-      "function": "<anonymous>",
-      "hash": "73c1119877593760641057ae94d785af46c40ca391b0253d0d60c3e52546aa94",
-      "score": 36,
-      "count": 1
-    },
-    {
-      "path": "apps/gateway-web/e2e/mock-api.mjs",
-      "function": "<anonymous>",
-      "hash": "bdf41344b294242501ccdeef046337a9f076779a94546583b29a28ae797e30e8",
-      "score": 517,
-      "count": 1
-    },
-    {
-      "path": "apps/gateway-web/e2e/templates.spec.ts",
-      "function": "<anonymous>",
-      "hash": "649f6a22ce37a7cbc1edc734e6fbad782854ade10a7e61c142a8bd68b9e11a7b",
-      "score": 26,
-      "count": 1
-    },
-    {
-      "path": "apps/gateway-web/e2e/ui-review.spec.ts",
-      "function": "<anonymous>",
-      "hash": "383c55b97999486ca784e534a4bb9ceaec644ce5525a0d9fda962f9af768fb58",
-      "score": 33,
-      "count": 1
-    }
-  ]
+  "entries": []
 }

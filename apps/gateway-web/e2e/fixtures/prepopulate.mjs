@@ -143,48 +143,70 @@ function linkPredecessors(roots, source) {
   return roots.map(link);
 }
 
+/** Visit fixture snapshots in manifest order so predecessor pins are available to successors. */
 async function ensureVersions(ids) {
   for (const country of manifest.countries) {
     for (const version of country.versions) {
-      const payload = fixture(version.file);
-      let detail = await countryDetail(country.isoCode);
-      let constitution = detail?.constitutions.find((item) => item.slug === country.constitutionSlug);
-      let existing = fixtureVersion(constitution?.versions, payload.versionLabel);
-      if (!existing && !verifyOnly) {
-        const pin = constitution ? await api('GET', `catalog/constitutions/${constitution.id}/settings`) : null;
-        const source = version.predecessor && payload.roots?.length ? await api('GET', `content/versions/${ids.versions[version.predecessor]}/content`) : null;
-        const request = { ...payload, ...(source ? { roots: linkPredecessors(payload.roots, source) } : {}), ...(pin ? { outline: undefined, constitutionId: constitution.id, settingsRevisionId: pin.id } : {}),
-          ...(version.predecessor ? { predecessorVersionId: ids.versions[version.predecessor], hopKind: 'legal' } : {}) };
-        const result = await publishFixture({ api, pause, reviewerToken, publisherToken }, version, payload, request, Boolean(pin));
-        detail = await countryDetail(country.isoCode);
-        constitution = detail?.constitutions.find((item) => item.slug === country.constitutionSlug);
-        existing = fixtureVersion(constitution?.versions, payload.versionLabel);
-        assertEqual(existing?.id, result.versionId, `${version.key} imported identity`);
-      }
-      if (!existing || !constitution) throw new Error(`Missing ${version.key} after import`);
-      assertEqual(detail.name, payload.countryName, `${version.key} country name`);
-      assertFields(constitution, { slug: payload.constitutionSlug, title: payload.constitutionTitle }, ['slug', 'title'], `${version.key} constitution`);
-      assertFields(existing, payload, ['versionLabel', 'effectiveDate', 'languageCode', 'sourceUrl', 'gazetteReference'], `${version.key} version`);
-      assertEqual(existing.predecessorVersionId ?? null, version.predecessor ? ids.versions[version.predecessor] : null, `${version.key} predecessor`);
-      assertEqual(existing.hopKind, version.predecessor ? 'legal' : 'initial', `${version.key} hop kind`);
-      const actualOutline = constitution.contentOutline.kinds.map((kind) => ({
-        kindCode: kind.kindCode, displayLabel: kind.displayLabel, presentation: kind.presentation,
-        showLabel: kind.showLabel, showTitle: kind.showTitle, showKind: kind.showKind,
-        ...(payload.roots?.length ? { root: kind.root, allowedChildKinds: kind.allowedChildKinds } : {}),
-      }));
-      const expectedOutline = payload.outline.kinds.map((kind) => ({
-        kindCode: kind.kindCode, displayLabel: kind.displayLabel, presentation: kind.presentation ?? 'section',
-        showLabel: kind.showLabel ?? true, showTitle: kind.showTitle ?? false, showKind: kind.showKind ?? false,
-        ...(payload.roots?.length ? { root: kind.root, allowedChildKinds: kind.allowedChildKinds } : {}),
-      }));
-      assertEqual(JSON.stringify(actualOutline), JSON.stringify(expectedOutline), `${version.key} outline`);
-      ids.constitutions[country.isoCode] = constitution.id;
-      ids.versions[version.key] = existing.id;
-      publicVersions[version.key] = existing.currentVersionId ?? existing.id;
-      await verifyArticles(existing.id, payload);
-      await verifyRoots(existing.id, payload, version.predecessor ? ids.versions[version.predecessor] : null);
+      await ensureVersion(country, version, ids);
     }
   }
+}
+
+/** Resolve or publish one snapshot, then retain its identities before verifying article/root fidelity. */
+async function ensureVersion(country, version, ids) {
+  const payload = fixture(version.file);
+  let detail = await countryDetail(country.isoCode);
+  let constitution = detail?.constitutions.find((item) => item.slug === country.constitutionSlug);
+  let existing = fixtureVersion(constitution?.versions, payload.versionLabel);
+  if (!existing && !verifyOnly) {
+    ({ detail, constitution, existing } = await importMissingFixtureVersion(country, version, payload, ids, constitution));
+  }
+  if (!existing || !constitution) throw new Error(`Missing ${version.key} after import`);
+  verifyFixtureVersion(detail, constitution, existing, payload, version, ids);
+  ids.constitutions[country.isoCode] = constitution.id;
+  ids.versions[version.key] = existing.id;
+  publicVersions[version.key] = existing.currentVersionId ?? existing.id;
+  await verifyArticles(existing.id, payload);
+  await verifyRoots(existing.id, payload, version.predecessor ? ids.versions[version.predecessor] : null);
+}
+
+/** Load settings before predecessor content and confirm the published identity before common checks. */
+async function importMissingFixtureVersion(country, version, payload, ids, constitution) {
+  const pin = constitution ? await api('GET', `catalog/constitutions/${constitution.id}/settings`) : null;
+  const source = version.predecessor && payload.roots?.length ? await api('GET', `content/versions/${ids.versions[version.predecessor]}/content`) : null;
+  const request = { ...payload, ...(source ? { roots: linkPredecessors(payload.roots, source) } : {}), ...(pin ? { outline: undefined, constitutionId: constitution.id, settingsRevisionId: pin.id } : {}),
+    ...(version.predecessor ? { predecessorVersionId: ids.versions[version.predecessor], hopKind: 'legal' } : {}) };
+  const result = await publishFixture({ api, pause, reviewerToken, publisherToken }, version, payload, request, Boolean(pin));
+  const detail = await countryDetail(country.isoCode);
+  constitution = detail?.constitutions.find((item) => item.slug === country.constitutionSlug);
+  const existing = fixtureVersion(constitution?.versions, payload.versionLabel);
+  assertEqual(existing?.id, result.versionId, `${version.key} imported identity`);
+  return { detail, constitution, existing };
+}
+
+/** Check metadata and lineage before outlines, retaining the original first-failure diagnostics. */
+function verifyFixtureVersion(detail, constitution, existing, payload, version, ids) {
+  assertEqual(detail.name, payload.countryName, `${version.key} country name`);
+  assertFields(constitution, { slug: payload.constitutionSlug, title: payload.constitutionTitle }, ['slug', 'title'], `${version.key} constitution`);
+  assertFields(existing, payload, ['versionLabel', 'effectiveDate', 'languageCode', 'sourceUrl', 'gazetteReference'], `${version.key} version`);
+  assertEqual(existing.predecessorVersionId ?? null, version.predecessor ? ids.versions[version.predecessor] : null, `${version.key} predecessor`);
+  assertEqual(existing.hopKind, version.predecessor ? 'legal' : 'initial', `${version.key} hop kind`);
+  verifyFixtureOutline(constitution, payload, version.key);
+}
+
+/** Ordered roots retain graph fields; legacy outlines retain their historical display defaults. */
+function verifyFixtureOutline(constitution, payload, key) {
+  const actualOutline = constitution.contentOutline.kinds.map((kind) => ({
+    kindCode: kind.kindCode, displayLabel: kind.displayLabel, presentation: kind.presentation,
+    showLabel: kind.showLabel, showTitle: kind.showTitle, showKind: kind.showKind,
+    ...(payload.roots?.length ? { root: kind.root, allowedChildKinds: kind.allowedChildKinds } : {}),
+  }));
+  const expectedOutline = payload.outline.kinds.map((kind) => ({
+    kindCode: kind.kindCode, displayLabel: kind.displayLabel, presentation: kind.presentation ?? 'section',
+    showLabel: kind.showLabel ?? true, showTitle: kind.showTitle ?? false, showKind: kind.showKind ?? false,
+    ...(payload.roots?.length ? { root: kind.root, allowedChildKinds: kind.allowedChildKinds } : {}),
+  }));
+  assertEqual(JSON.stringify(actualOutline), JSON.stringify(expectedOutline), `${key} outline`);
 }
 
 function amendmentPayload(record, ids) {

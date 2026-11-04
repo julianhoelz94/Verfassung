@@ -2,6 +2,5 @@
 <SmellBaseline>
   <ManuallySuppressedIssues/>
   <CurrentIssues>
-    <ID>CognitiveComplexMethod:ImportApiTest.kt$ImportApiTest$@Test fun directBatchAndChunkedImportsRequireMarkersAndAllowSharedNotes()</ID>
   </CurrentIssues>
 </SmellBaseline>

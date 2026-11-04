@@ -46,69 +46,127 @@ export function reviewFixtures(germany) {
   const migration = { id: '01900000-0000-4000-8000-000000000850', ownerId: revision.createdBy, manifest: { runKey: 'ui-review', title: 'Source archive review', sources: [{ sourceKey: 'missing', url: 'https://example.org/archive', aliases: [], disposition: 'unavailable', reason: 'Source is explicitly unavailable in this review state.' }] }, items: [], coverage: { sources: 1, staged: 0, prepared: 0, unavailable: 1, excluded: 0 } };
   const comparison = { id: '01900000-0000-4000-8000-000000000851', state: 'published', needsReview: false, definition: { title: 'Authored archive comparison', attribution: 'UI verification fixture', sourceUrl: 'https://example.org/comparison', sourceDocumentId: REVIEW_DOCUMENT, sourceDocumentRevision: 1,
     columns: [{ constitutionId: constitution.id, versionId: REVIEW_CURRENT, label: 'First constitution' }, { constitutionId: '01900000-0000-4000-8000-000000000857', versionId: legal.id, label: 'Second constitution' }], topics: [{ title: 'Equality', passages: [{ column: 0, logicalId: archiveRoot.logicalId }], missingColumns: [1] }] } };
+  /** Apply setup toggles in their historical order, including managed registration state. */
+  async function configureSetup(req, readBody) {
+    const body = await readBody(req);
+    setup.status.completed = body.completed;
+    setup.required = setup.status.completed ? [] : ['operator-details'];
+    if (typeof body.mailEnabled === 'boolean') settings.mailEnabled = body.mailEnabled;
+    if (typeof body.mailDeferred === 'boolean') setup.preferences.mailDeferred = body.mailDeferred;
+    if (typeof body.managedRegistration === 'boolean') {
+      managedRegistration = body.managedRegistration;
+      setup.settings = managedRegistration ? [{ key: 'selfRegistrationEnabled', group: 'access', source: 'environment', optional: true, configured: true, editable: false }] : [];
+      if (managedRegistration) settings.selfRegistrationEnabled = true;
+    }
+    return { ok: true };
+  }
+
+  /** Retain the public browse/archive route priority and the exact shared fixture objects. */
+  function browseResponse(pathname) {
+    if (pathname === '/api/catalog/jurisdictions') return [jurisdiction];
+    if (pathname === `/api/catalog/jurisdictions/${germany.id}`) return { jurisdiction, ancestors: [], children: [], constitutions: country.constitutions };
+    if (pathname === `/api/content/versions/${REVIEW_CURRENT}/content`) return { versionId: REVIEW_CURRENT, generation: 1, settingsRevisionId: null, roots: [archiveRoot] };
+    if (pathname === '/api/ingestion/migration-runs') return [{ id: migration.id, title: migration.manifest.title, coverage: migration.coverage }];
+    if (pathname === `/api/ingestion/migration-runs/${migration.id}`) return migration;
+    if (pathname === '/api/catalog/curated-comparisons') return [{ id: comparison.id, title: comparison.definition.title, state: comparison.state, needsReview: false }];
+    if (pathname === `/api/catalog/curated-comparisons/${comparison.id}`) return comparison;
+    if (pathname === `/api/amendment/constitutions/${constitution.id}/amendment-register`) return { constitutionId: constitution.id, items: [], total: 0, offset: 0, limit: 25 };
+  }
+
+  /** Read current identity/setup aliases, computing registration from the latest shared state. */
+  function identityResponse(pathname) {
+    if (pathname === '/api/identity/setup/status') return setup.status;
+    if (pathname === '/api/identity/site/languages') return languages;
+    if (pathname === '/api/identity/setup') return setup;
+    if (pathname === '/api/identity/admin/settings') return settings;
+    if (pathname === '/api/identity/registration/status') return { enabled: settings.selfRegistrationEnabled && settings.mailEnabled && !setup.preferences.mailDeferred };
+    if (pathname === '/api/identity/oauth/clients/ui-review-client') return { client_name: 'UI review client' };
+  }
+
+  /** Expose the pinned document revision and its unchanged synthetic event history. */
+  function documentResponse(pathname) {
+    if (pathname === '/api/document/documents') return [document];
+    if (pathname === `/api/document/documents/${REVIEW_DOCUMENT}`) return document;
+    if (pathname === `/api/document/documents/${REVIEW_DOCUMENT}/revisions`) return [revision];
+    if (pathname === `/api/document/documents/${REVIEW_DOCUMENT}/events`) return [{ id: 'created', eventType: 'created', occurredAt: revision.createdAt }];
+  }
+
+  /** Read the proposal and staged job, parsing status only for the exact collection route. */
+  function importResponse(req, pathname) {
+    if (pathname === '/api/ingestion/import-jobs') return !new URL(req.url, 'http://mock').searchParams.get('status') || new URL(req.url, 'http://mock').searchParams.get('status') === job.status ? [job] : [];
+    if (pathname === `/api/ingestion/import-jobs/${REVIEW_JOB}`) return job;
+    if (pathname === `/api/ingestion/import-jobs/${REVIEW_JOB}/payload`) return { isoCode: 'DE', countryName: 'Germany', constitutionId: constitution.id, settingsRevisionId: '01900000-0000-4000-8000-000000000901', constitutionTitle: 'UI review charter', versionLabel: '2026', articles: [{ articleNumber: '1', title: 'Rights', body: 'All people are equal.' }] };
+    if (pathname === `/api/ingestion/import-jobs/${REVIEW_JOB}/decisions`) return [];
+    if (pathname === `/api/ingestion/import-setup-proposals/${REVIEW_PROPOSAL}`) return proposal;
+  }
+
+  /** Undefined alone means this opt-in fixture did not handle the request. */
+  function readReview(req, pathname) {
+    const browse = browseResponse(pathname);
+    if (browse !== undefined) return browse;
+    const identity = identityResponse(pathname);
+    if (identity !== undefined) return identity;
+    const document = documentResponse(pathname);
+    if (document !== undefined) return document;
+    return importResponse(req, pathname);
+  }
+
+  /** Replace preferences before updating the shared language projection. */
+  async function updateSetup(req, readBody) {
+    setup.preferences = await readBody(req);
+    languages.enabled = setup.preferences.enabledLanguages;
+    languages.defaultLanguage = setup.preferences.defaultLanguage;
+    return setup;
+  }
+
+  /** Preserve secret-set state, environment-owned registration and mail-deferred precedence. */
+  async function updateSettings(req, readBody) {
+    const { smtpPassword, ...values } = await readBody(req);
+    settings = { ...settings, ...values, smtpPasswordSet: Boolean(smtpPassword) || settings.smtpPasswordSet };
+    if (managedRegistration) settings.selfRegistrationEnabled = true;
+    if (settings.mailEnabled) setup.preferences.mailDeferred = false;
+    return settings;
+  }
+
+  /** Start a fresh proposal without retaining display overrides from the previous request. */
+  async function createProposal(req, readBody) {
+    proposal = { ...proposal, payload: await readBody(req), revision: 1, previousPayload: null, status: 'proposed', requestedChanges: null, changesRequested: false };
+    displayOverrides = {};
+    return proposal;
+  }
+
+  /** Check revision/status before reading the body; unknown action suffixes still consume it. */
+  async function updateProposal(req, method, pathname, readBody) {
+    const expected = Number(String(req.headers['if-match']).replaceAll('"', ''));
+    if (expected !== proposal.revision || proposal.status !== 'proposed') return Response.json({ error: 'Proposal changed' }, { status: 409 });
+    const body = await readBody(req);
+    if (method === 'PUT') {
+      proposal.previousPayload = structuredClone(proposal.payload);
+      proposal.payload = { ...body, outline: { kinds: body.outline.kinds.map(kind => ({ ...kind, ...displayOverrides[kind.kindCode] })) } };
+      proposal.changesRequested = false;
+      proposal.revision++;
+    } else if (pathname.endsWith('/display')) {
+      for (const kind of body.kinds) displayOverrides[kind.kindCode] = kind;
+      proposal.payload.outline.kinds = proposal.payload.outline.kinds.map(kind => ({ ...kind, ...displayOverrides[kind.kindCode] }));
+      proposal.revision++;
+    } else if (pathname.endsWith('/request-changes')) {
+      proposal.requestedChanges = body.message; proposal.changesRequested = true; proposal.revision++;
+    } else if (pathname.endsWith('/confirm')) {
+      if (proposal.changesRequested) return Response.json({ error: 'Changes requested' }, { status: 409 });
+      proposal.status = 'confirmed'; proposal.constitutionId = constitution.id; proposal.settingsRevisionId = '01900000-0000-4000-8000-000000000901'; proposal.confirmedBy = revision.createdBy;
+    } else if (pathname.endsWith('/withdraw')) proposal.status = 'withdrawn';
+    return proposal;
+  }
+
   return { country, corrections, async response(req, method, pathname, readBody) {
-    if (method === 'POST' && pathname === '/__sprint59_setup') {
-      const body = await readBody(req);
-      setup.status.completed = body.completed;
-      setup.required = setup.status.completed ? [] : ['operator-details'];
-      if (typeof body.mailEnabled === 'boolean') settings.mailEnabled = body.mailEnabled;
-      if (typeof body.mailDeferred === 'boolean') setup.preferences.mailDeferred = body.mailDeferred;
-      if (typeof body.managedRegistration === 'boolean') {
-        managedRegistration = body.managedRegistration;
-        setup.settings = managedRegistration ? [{ key: 'selfRegistrationEnabled', group: 'access', source: 'environment', optional: true, configured: true, editable: false }] : [];
-        if (managedRegistration) settings.selfRegistrationEnabled = true;
-      }
-      return { ok: true };
-    }
-    if (method === 'GET') {
-      if (pathname === '/api/catalog/jurisdictions') return [jurisdiction];
-      if (pathname === `/api/catalog/jurisdictions/${germany.id}`) return { jurisdiction, ancestors: [], children: [], constitutions: country.constitutions };
-      if (pathname === `/api/content/versions/${REVIEW_CURRENT}/content`) return { versionId: REVIEW_CURRENT, generation: 1, settingsRevisionId: null, roots: [archiveRoot] };
-      if (pathname === '/api/ingestion/migration-runs') return [{ id: migration.id, title: migration.manifest.title, coverage: migration.coverage }];
-      if (pathname === `/api/ingestion/migration-runs/${migration.id}`) return migration;
-      if (pathname === '/api/catalog/curated-comparisons') return [{ id: comparison.id, title: comparison.definition.title, state: comparison.state, needsReview: false }];
-      if (pathname === `/api/catalog/curated-comparisons/${comparison.id}`) return comparison;
-      if (pathname === `/api/amendment/constitutions/${constitution.id}/amendment-register`) return { constitutionId: constitution.id, items: [], total: 0, offset: 0, limit: 25 };
-      if (pathname === '/api/identity/setup/status') return setup.status;
-      if (pathname === '/api/identity/site/languages') return languages;
-      if (pathname === '/api/identity/setup') return setup;
-      if (pathname === '/api/identity/admin/settings') return settings;
-      if (pathname === '/api/identity/registration/status') return { enabled: settings.selfRegistrationEnabled && settings.mailEnabled && !setup.preferences.mailDeferred };
-      if (pathname === '/api/identity/oauth/clients/ui-review-client') return { client_name: 'UI review client' };
-      if (pathname === '/api/document/documents') return [document];
-      if (pathname === `/api/document/documents/${REVIEW_DOCUMENT}`) return document;
-      if (pathname === `/api/document/documents/${REVIEW_DOCUMENT}/revisions`) return [revision];
-      if (pathname === `/api/document/documents/${REVIEW_DOCUMENT}/events`) return [{ id: 'created', eventType: 'created', occurredAt: revision.createdAt }];
-      if (pathname === '/api/ingestion/import-jobs') return !new URL(req.url, 'http://mock').searchParams.get('status') || new URL(req.url, 'http://mock').searchParams.get('status') === job.status ? [job] : [];
-      if (pathname === `/api/ingestion/import-jobs/${REVIEW_JOB}`) return job;
-      if (pathname === `/api/ingestion/import-jobs/${REVIEW_JOB}/payload`) return { isoCode: 'DE', countryName: 'Germany', constitutionId: constitution.id, settingsRevisionId: '01900000-0000-4000-8000-000000000901', constitutionTitle: 'UI review charter', versionLabel: '2026', articles: [{ articleNumber: '1', title: 'Rights', body: 'All people are equal.' }] };
-      if (pathname === `/api/ingestion/import-jobs/${REVIEW_JOB}/decisions`) return [];
-      if (pathname === `/api/ingestion/import-setup-proposals/${REVIEW_PROPOSAL}`) return proposal;
-    }
-    if (method === 'PUT' && pathname === '/api/identity/setup') { setup.preferences = await readBody(req); languages.enabled = setup.preferences.enabledLanguages; languages.defaultLanguage = setup.preferences.defaultLanguage; return setup; }
-    if (method === 'PUT' && pathname === '/api/identity/admin/settings') { const { smtpPassword, ...values } = await readBody(req); settings = { ...settings, ...values, smtpPasswordSet: Boolean(smtpPassword) || settings.smtpPasswordSet }; if (managedRegistration) settings.selfRegistrationEnabled = true; if (settings.mailEnabled) setup.preferences.mailDeferred = false; return settings; }
-    if (method === 'POST' && pathname === '/api/ingestion/import-setup-proposals') { proposal = { ...proposal, payload: await readBody(req), revision: 1, previousPayload: null, status: 'proposed', requestedChanges: null, changesRequested: false }; displayOverrides = {}; return proposal; }
+    if (method === 'POST' && pathname === '/__sprint59_setup') return configureSetup(req, readBody);
+    if (method === 'GET') return readReview(req, pathname);
+    if (method === 'PUT' && pathname === '/api/identity/setup') return updateSetup(req, readBody);
+    if (method === 'PUT' && pathname === '/api/identity/admin/settings') return updateSettings(req, readBody);
+    if (method === 'POST' && pathname === '/api/ingestion/import-setup-proposals') return createProposal(req, readBody);
     const proposalPath = `/api/ingestion/import-setup-proposals/${REVIEW_PROPOSAL}`;
     if ((method === 'PUT' && pathname === proposalPath) || (method === 'POST' && pathname.startsWith(`${proposalPath}/`))) {
-      const expected = Number(String(req.headers['if-match']).replaceAll('"', ''));
-      if (expected !== proposal.revision || proposal.status !== 'proposed') return Response.json({ error: 'Proposal changed' }, { status: 409 });
-      const body = await readBody(req);
-      if (method === 'PUT') {
-        proposal.previousPayload = structuredClone(proposal.payload);
-        proposal.payload = { ...body, outline: { kinds: body.outline.kinds.map(kind => ({ ...kind, ...displayOverrides[kind.kindCode] })) } };
-        proposal.changesRequested = false;
-        proposal.revision++;
-      } else if (pathname.endsWith('/display')) {
-        for (const kind of body.kinds) displayOverrides[kind.kindCode] = kind;
-        proposal.payload.outline.kinds = proposal.payload.outline.kinds.map(kind => ({ ...kind, ...displayOverrides[kind.kindCode] }));
-        proposal.revision++;
-      } else if (pathname.endsWith('/request-changes')) {
-        proposal.requestedChanges = body.message; proposal.changesRequested = true; proposal.revision++;
-      } else if (pathname.endsWith('/confirm')) {
-        if (proposal.changesRequested) return Response.json({ error: 'Changes requested' }, { status: 409 });
-        proposal.status = 'confirmed'; proposal.constitutionId = constitution.id; proposal.settingsRevisionId = '01900000-0000-4000-8000-000000000901'; proposal.confirmedBy = revision.createdBy;
-      } else if (pathname.endsWith('/withdraw')) proposal.status = 'withdrawn';
-      return proposal;
+      return updateProposal(req, method, pathname, readBody);
     }
     return undefined;
   } };

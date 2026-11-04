@@ -181,8 +181,15 @@ Batches 7–8 complete the remaining 24 production functions: rich rendering,
 reader/search/translation/comparison, account and supporting workspaces,
 proxy/rate-limit handling and existing MCP request logging. Documented helpers
 retain exact authored text, forms, state/focus, loading order and security policy.
-All production functions now meet 20, with no production exceptions. The eight
-remaining test/fixture exceptions are tracked in Batch 9 under the same limits.
+All production functions meet 20, with no production exceptions. At that point,
+eight test/fixture exceptions remained for Batch 9 under the same limits.
+
+Batch 9 completes mock API dispatch, UI review fixtures, prepopulation/scenarios
+and browser/import test helpers. Routing/state behavior, fixture payloads, request
+and journal order, test registration and assertions remain intact. New test helpers
+have JSDoc or Kotlin KDoc. All scanned Kotlin and TypeScript/JavaScript functions,
+including tests and fixtures, now meet 20; all Kotlin files meet 100. The reviewed
+baseline files are empty, with no allowances or threshold changes.
 
 ## Code coverage in CI
 

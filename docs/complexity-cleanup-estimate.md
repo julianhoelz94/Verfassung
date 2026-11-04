@@ -10,7 +10,7 @@ structured replay under the limits, removing their cleanup baseline entries.
 All editor changes follow the same normal gates as other code.
 
 The original assessment below used a target of 15 and remains a historical
-comparison, not the active cleanup scope. The current inventory follows Batches 7–8 below.
+comparison, not the active cleanup scope. The completed inventory follows Batch 9 below.
 
 The pilot starts from fetched `main` revision `bee7b4b` (2026-10-28), including
 Kotlin 2.4 / Spring Boot 4.1, Next.js 16 / React 19, and the specification-derived
@@ -515,15 +515,91 @@ preferences, comparison, responsive layout and accessibility. The temporary loca
 configuration uses installed Chromium 154 without changing repository configuration
 or visual baselines; GitHub CI supplies the pinned visual and full-stack checks.
 
-Remaining debt is **eight test/fixture functions**: seven TypeScript/JavaScript
-functions and one Kotlin test function. **All production functions meet 20 and
-all Kotlin files meet 100**, with no production-function or Kotlin file exceptions.
+At the end of Batches 7–8, remaining debt was **eight test/fixture functions**:
+seven TypeScript/JavaScript functions and one Kotlin test function. All production
+functions met 20 and all Kotlin files met 100.
 
-The remaining batches retain the agreed responsibilities:
+## Batch 9: test infrastructure and remaining fixtures
 
-| Batch | Scope | Remaining functions |
-| --- | --- | ---: |
-| 9 | Test infrastructure, mock API and fixture/journey helpers | 8 |
+Fetched `main` remains **`f927cad`**. This batch completes all eight remaining
+findings without weakening assertions, changing fixture behavior or introducing
+new allowances. The seven TypeScript/JavaScript and one Kotlin method exceptions
+are removed; the reviewed baseline files remain valid and empty. Limits remain
+**20 per function** and **100 per Kotlin file**.
+
+| Function | Before | After |
+| --- | ---: | ---: |
+| Mock API request callback | 517 | `serveMockRequest` 5; route helpers ≤14 |
+| UI-review fixture `response` | 94 | 12 |
+| Prepopulation `ensureVersions` | 40 | 3 |
+| Scenario `runScenarios` | 34 | 13 |
+| Legacy migration journey callback | 36 | 12 |
+| Template journey callback | 26 | 14 |
+| UI route-audit callback | 33 | 4 |
+| `directBatchAndChunkedImportsRequireMarkersAndAllowSharedNotes` | 21 | 7 |
+
+The mock API entry point now dispatches through **98 route gates in their original
+order**. Nine domain modules separate scenario, Catalog, Content, Search, Identity,
+Editor, Amendment, legal and ingestion responses; `state.mjs` preserves fixture
+initialization, replaced state and retained collections, serialization and body
+reading. Synchronous misses do not read bodies or introduce an awaited miss.
+Selected asynchronous responses retain their request/state/error ordering. All
+218 owned mock-module/test functions score at most **14** and have documented
+responsibilities. A persistent black-box HTTP contract suite is included in both
+gateway `test` and `test:coverage` commands.
+
+UI review separates read/setup/proposal response responsibilities while preserving
+undefined fallthrough, fixture-instance aliases/state, lazy body reads and revision errors.
+Its **eight original-first public contracts** pass. A seeded check matches
+**49,600 response/state/error/body-read comparisons across 400 worlds**. The UI
+test extraction retains **nine registrations** and matches **63 callback traces**
+across seven modes: **95,250 events and 321 exact soft screenshot assertions**.
+Those traces use browser doubles to isolate orchestration; real-browser and pinned
+visual checks remain separate. All owned functions/tests score at most **14**.
+
+Prepopulation and scenario helpers preserve API/credential/ID ordering, version
+and publication checks, token refresh, checkpoints, permission/search verification
+and exact guide/index output. New helpers score at most **6**. The existing fixture
+Node suite passes **29 tests**, including **two original-first compact contracts**.
+Isolated comparisons match **3,000 prepopulation result/error/call/ID worlds** and
+**2,000 scenario orchestration/error/context/guide/index worlds**. These use
+deterministic API/domain stubs to isolate orchestration, rather than claiming a
+full-stack run.
+
+Template and legacy migration helpers preserve all **113 original assertion
+expressions** and **three extracted bodies** token-for-token, plus the original
+two template locale registrations and one legacy registration. Independent
+registration checks preserve **all 154 mocked tests across 28 files** and the
+single legacy full-stack test, including names, order and project identities.
+The shared-note ingestion test retains its direct, batch and chunked calls and
+assertions; its new assertion helper scores **8**, with KDoc. `ImportApiTest.kt`
+falls **31 to 25**, with maximum named-function score **8**. Full Ingestion checks,
+Spotless and JaCoCo pass **136 tests**, with no failures or skips and unchanged
+**88.59%** service line coverage.
+
+Combined gateway verification passes **1,367 Vitest tests** and **39 Node tests**
+with coverage enabled, typecheck, lint and production build. The **16 new
+original-first contracts** comprise eight UI fixture cases, two compact scenario
+cases and six real-HTTP mock-server cases. Both complexity gates pass with **zero
+exceptions, violations or analysis errors**: TypeScript scans **7,098 functions**;
+Kotlin reports zero over-limit methods and files. **13 TypeScript policy tests**,
+**14 Kotlin score-policy tests**, repository hygiene and Wiki checks pass.
+
+Independent HTTP verification matches **6,640 exact original/refactored cases**
+across route families and stateful reset, authentication, editor, import, legal,
+settings and malformed/streamed requests. Status, body bytes and response headers
+match; only the transport `Date` header is omitted, with application clocks fixed
+equally and no dynamic-ID normalization. Source hashes bind the result to the
+frozen modules. Independent review confirms all 98 ordered predicates, 25 regex
+bindings, 28 mutable initial bindings and 10 shared/reset/body/serializer helpers;
+95 route bodies are AST-identical after state/return-convention normalization, with
+the three legal/editor/import phase extractions manually reviewed. No blockers
+remain in the frozen source, assertions, helper documentation or baseline removals.
+
+All new Kotlin helpers have KDoc and JavaScript/TypeScript helpers have JSDoc.
+There are **zero remaining function or Kotlin file exceptions**. All scanned
+Kotlin and TypeScript/JavaScript functions, including tests, fixtures and tooling,
+now meet 20, and all Kotlin files meet 100.
 
 ## Original assessment at a maximum of 15
 

@@ -587,27 +587,30 @@ class ImportApiTest {
                 }.andExpect { status { isCreated() } }.andReturn().response.contentAsString,
             )
             val chunked = assembleChunkedPayload(payload, "shared-note-$count")
-            for (id in listOf(direct, batched, chunked)) {
-                mockMvc.get("/import-jobs/$id") { header("Authorization", TOKEN) }.andExpect {
-                    status { isOk() }
-                    jsonPath("$.status") { value(if (count == 0) "failed" else "pending_review") }
-                    if (count == 0) {
-                        jsonPath("$.errors[0].code") { value("FOOTNOTE_MARK_CARDINALITY") }
-                    } else {
-                        jsonPath("$.errors.length()") { value(0) }
-                    }
-                }
-                if (count == 0) {
-                    mockMvc.post("/import-jobs/$id/prepare") { header("Authorization", TOKEN) }.andExpect {
-                        status { isBadRequest() }
-                        jsonPath("$.code") { value("FOOTNOTE_MARK_CARDINALITY") }
-                        jsonPath("$.path") { value("roots[0].content[0]") }
-                        jsonPath("$.logicalId") { value(note.toString()) }
-                    }
-                }
-            }
+            for (id in listOf(direct, batched, chunked)) verifySharedNoteImportStatus(id, count, note)
         }
         Mockito.verifyNoInteractions(catalogClient, contentClient)
+    }
+
+    /** Checks each upload mode before requiring the original structured preparation rejection. */
+    private fun verifySharedNoteImportStatus(id: String, count: Int, note: UUID) {
+        mockMvc.get("/import-jobs/$id") { header("Authorization", TOKEN) }.andExpect {
+            status { isOk() }
+            jsonPath("$.status") { value(if (count == 0) "failed" else "pending_review") }
+            if (count == 0) {
+                jsonPath("$.errors[0].code") { value("FOOTNOTE_MARK_CARDINALITY") }
+            } else {
+                jsonPath("$.errors.length()") { value(0) }
+            }
+        }
+        if (count == 0) {
+            mockMvc.post("/import-jobs/$id/prepare") { header("Authorization", TOKEN) }.andExpect {
+                status { isBadRequest() }
+                jsonPath("$.code") { value("FOOTNOTE_MARK_CARDINALITY") }
+                jsonPath("$.path") { value("roots[0].content[0]") }
+                jsonPath("$.logicalId") { value(note.toString()) }
+            }
+        }
     }
 
     @Test

@@ -10,7 +10,7 @@ structured replay under the limits, removing their cleanup baseline entries.
 All editor changes follow the same normal gates as other code.
 
 The original assessment below used a target of 15 and remains a historical
-comparison, not the active cleanup scope. The current inventory follows Batches 5–6 below.
+comparison, not the active cleanup scope. The current inventory follows Batches 7–8 below.
 
 The pilot starts from fetched `main` revision `bee7b4b` (2026-10-28), including
 Kotlin 2.4 / Spring Boot 4.1, Next.js 16 / React 19, and the specification-derived
@@ -413,17 +413,116 @@ TypeScript policy tests**, **14 Kotlin score-policy tests**, repository hygiene
 and Wiki checks. Separate read-only review and independent verification found no
 blockers.
 
-Remaining debt is **32 functions: 24 production and 8 test/fixture functions**.
-There are **31 TypeScript exceptions and one Kotlin test exception**; no Kotlin
-production function or Kotlin file exceptions remain. The function limit of 20
-and Kotlin file limit of 100 continue to apply to all new helpers.
+At the end of Batches 5–6, remaining debt was **32 functions: 24 production and
+8 test/fixture functions**: **31 TypeScript exceptions and one Kotlin test
+exception**, with no Kotlin production-function or file exceptions.
+
+## Batches 7–8: remaining production functions
+
+Fetched `main` remains **`f927cad`** (2026-11-04). These batches complete the
+remaining **24 production functions**, preserving public behavior and removing
+exactly their 24 TypeScript baseline entries. No new allowances, threshold changes
+or dependencies are introduced. Kotlin baselines are unchanged.
+
+| Batch | Function | Before | After |
+| --- | --- | ---: | ---: |
+| 7 | `ConstitutionText` | 28 | 19 |
+| 7 | `richText` | 49 | 7 |
+| 7 | Ordered-group render callback | 57 | Dispatcher 6; new group helpers ≤17 |
+| 7 | `DiffConstitutionText.pair` | 29 | 19 |
+| 7 | `ConstitutionEntry` | 21 | 14 |
+| 7 | `ContentTranslationBody` | 46 | 0 |
+| 7 | `ReaderComparison` | 42 | 5 |
+| 7 | `ReaderSurface` | 36 | 0 |
+| 7 | `ComparePage` | 51 | 1 |
+| 7 | `CountryConstitutionReader` | 22 | 14 |
+| 7 | `originalEntriesText` | 26 | 5 |
+| 7 | `findReaderText` | 21 | 7 |
+| 8 | `AccountPage` | 51 | 14 |
+| 8 | `AdminLegalPage` | 30 | 20 |
+| 8 | `SiteHeader` menu callback | 21 | Render helper 15 |
+| 8 | `WikiEditorTemplate` | 27 | 20 |
+| 8 | `ConstitutionDetailsWorkspace` | 43 | 0 |
+| 8 | `EditorLanding` | 55 | 11 |
+| 8 | `MfaPage` | 26 | 11 |
+| 8 | `LoginPage` | 21 | 16 |
+| 8 | Home `Page` | 22 | 10 |
+| 8 | Gateway `proxy` | 49 | 10 |
+| 8 | Edge rate-limit `GET` | 26 | 19 |
+| 8 | MCP `runLogged` | 43 | 6 |
+
+Rich rendering separates body projection, ordered-group dispatch, authored marks,
+reference slices and links. Exact text/whitespace, callback order, keys, note and
+table behavior, legacy/ordered precedence and React tree boundaries remain intact.
+Diff pairing retains stable reservations and global-identity precedence. All
+**47 focused tests** pass, including **11 new contracts verified on original code**.
+An isolated check matches **8,000 exact markup/error comparisons** and **2,000
+callback traces**; all ordered renders succeed rather than comparing only errors.
+Scoped rich-rendering line coverage is **87.86%**.
+
+Reader helpers separate ordered copy text, Unicode DOM ranges, translation text
+selection/splitting/batches/application, comparison loading and reader state from
+plain presentation. Model helpers score at most **17**, presentation helpers
+**16**, and every owned function and test is at most **19**. The **56 focused
+tests**, including **10 original-first contracts**, retain exact separators/note
+labels, UTF-16 range boundaries, translation omission/language scopes and malformed
+or same-legal comparison responses. Public exports, snapshot pins, optional-service
+errors, roles, loading/effect order, history and focus remain unchanged.
+A seeded check matches **4,000 exact copied-text results** without input mutation,
+**12,000 DOM search-range comparisons** across 1,500 trees (text, block, endpoint
+node and UTF-16 offset), **384 entry/comparison rendered outputs** and **64 reader
+rendered outputs** on the frozen source.
+
+Account, legal, header, Wiki/editor workspaces, login/MFA and home pages retain
+their exact DOM/forms, React slots, state/effects, credential/role checks and
+ordered reads. The **74 focused tests** pass on original and refactored code,
+including **six new legal contracts**. An isolated comparison matches **2,304
+exact rendered outputs/errors and ordered-read traces** across all nine surfaces
+in English and German. Eighteen new named workspace helpers score at most **19**.
+
+Proxy and edge helpers retain canonical/raw-path distinctions, setup/browsing/admin
+policy, credentials, CSP/nonce ordering, quotas, clocks and response headers. Their
+**47 focused tests** pass, including **eight new original-first contracts**.
+Independent checks match **4,680 proxy cases** and **11,880 edge cases**, including
+exact status/body/headers and globally ordered setup/policy/identity/quota calls.
+MCP logging retains its broad failure boundary around action, metrics, resource
+selection, actor lookup, audit and serialization; errors keep their safe details
+and retry mapping. All **49 MCP tests**, including **11 new original-first public
+logging contracts**, pass with build and coverage. MCP line coverage is **80.95%**
+(867/1,071); logging helpers cover **20/20 lines** and their entry point **15/15**.
+An isolated check matches **2,014 logging results/errors and exact ordered traces**,
+including throwing metrics, actors, logs, property getters and serialization.
+
+All new helpers have JSDoc. Separate review has found no blockers in the frozen
+sources, all **46 new contracts**, baseline removals and helper ownership.
+Independent verification passes **196 focused tests** across 18 files and
+**1,404 exact country-reader/comparison route-element/prop results, errors and
+ordered-load traces** on the final sources. These route comparisons use stable
+child-component stubs to isolate orchestration.
+
+Combined gateway checks pass **1,359 Vitest tests** and **31 Node tests** with
+coverage, typecheck, lint and production build. Both repository complexity gates
+pass: TypeScript scans **6,885 functions**, with only seven accepted test/fixture
+exceptions; Kotlin retains its one test exception and zero file exceptions.
+There are no new violations, analysis errors or score increases. **13 TypeScript
+policy tests**, **14 Kotlin score-policy tests**, repository hygiene and Wiki checks
+pass. Separate review and independent verification report no blockers.
+
+Actual production-build browser verification passes **28 Chromium journeys** with
+zero failures or retries: all five login roles and access denials, password and
+MFA/recovery, translation, reader copy/manual fallback/focus/footnotes, search,
+preferences, comparison, responsive layout and accessibility. The temporary local
+configuration uses installed Chromium 154 without changing repository configuration
+or visual baselines; GitHub CI supplies the pinned visual and full-stack checks.
+
+Remaining debt is **eight test/fixture functions**: seven TypeScript/JavaScript
+functions and one Kotlin test function. **All production functions meet 20 and
+all Kotlin files meet 100**, with no production-function or Kotlin file exceptions.
 
 The remaining batches retain the agreed responsibilities:
 
 | Batch | Scope | Remaining functions |
 | --- | --- | ---: |
-| 7 | Public reader, rich text, translation and comparison | 12 |
-| 8 | Account/site/supporting workspaces, proxy/rate limits and MCP logging | 12 |
 | 9 | Test infrastructure, mock API and fixture/journey helpers | 8 |
 
 ## Original assessment at a maximum of 15

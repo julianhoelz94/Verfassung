@@ -33,9 +33,7 @@ export default async function AdminLegalPage({
   const imprintDetails = key.startsWith('impressum') ? await adminImprintDetails(bearer) : null;
   const imprintDraftIncomplete = key.startsWith('impressum') && !imprintDetails?.draft;
   const paramsMessage = await searchParams;
-  const errorMessage = Object.prototype.hasOwnProperty.call(ui.legal.errors, paramsMessage.error ?? '')
-    ? ui.legal.errors[paramsMessage.error as keyof typeof ui.legal.errors]
-    : ui.admin.legal.key.page.theLegalPageCouldNotBeSaved;
+  const errorMessage = legalErrorMessage(paramsMessage.error);
   const locale = await currentLocale();
   const title = message(locale, key.startsWith('impressum') ? ui.legal.imprint : ui.legal.privacyNotice);
   return (
@@ -74,29 +72,7 @@ export default async function AdminLegalPage({
           <Button variant="primary"><T value={ui.admin.legal.key.page.saveDraft} /></Button>
         </NavigatingActionForm>
       </Card>
-      <Card>
-        <h2><T value={ui.admin.legal.key.page.publication} /></h2>
-        <p><T value={ui.legal.reviewSavedDraft} /></p>
-        <p><T value={ui.admin.legal.key.page.publishedRevision} />{" "}{state?.published?.revision ?? message(locale, ui.legal.none)}<T value={ui.admin.legal.key.page.draftRevision} />{" "}{state?.draft?.revision ?? message(locale, ui.legal.none)}.</p>
-        {state?.draft ? (
-          <NavigatingActionForm action={publishLegalPageAction}>
-            <input type="hidden" name="key" value={key} />
-            <input type="hidden" name="expectedRevision" value={state.draft.revision} />
-            {key.startsWith('impressum') ? <input type="hidden" name="expectedContactRevision" value={imprintDetails?.draft?.revision ?? 0} /> : null}
-            <details open>
-              <summary><T value={ui.legal.savedPreview} /></summary>
-              <pre className="legal-page-content">{state.draft.content}</pre>
-              {imprintDetails?.draft ? <address>
-                {imprintDetails.draft.name}<br />{imprintDetails.draft.streetAddress}<br />
-                {imprintDetails.draft.postalCode} {imprintDetails.draft.city}<br />
-                {imprintDetails.draft.country}<br />{imprintDetails.draft.email}
-              </address> : null}
-            </details>
-            {imprintDraftIncomplete ? <p><T value={ui.legal.errors.contact_required} /></p> : null}
-            <Button variant="primary" disabled={imprintDraftIncomplete}><T value={key.startsWith('impressum') ? ui.legal.publishImprint : ui.admin.legal.key.page.publishReviewedText} /></Button>
-          </NavigatingActionForm>
-        ) : null}
-      </Card>
+      {renderLegalPublication({ key, state, imprintDetails, imprintDraftIncomplete, locale })}
       {revisions.length > 0 ? (
         <Card>
           <h2><T value={ui.admin.legal.key.page.revisionHistory} /></h2>
@@ -120,4 +96,44 @@ export default async function AdminLegalPage({
       ) : null}
     </WorkspacePage>
   );
+}
+
+/** Retains pinned draft/contact revisions and the original saved-preview publication guard. */
+function renderLegalPublication({ key, state, imprintDetails, imprintDraftIncomplete, locale }: {
+  key: string; state: Awaited<ReturnType<typeof adminLegalPage>>;
+  imprintDetails: Awaited<ReturnType<typeof adminImprintDetails>>;
+  imprintDraftIncomplete: boolean; locale: Awaited<ReturnType<typeof currentLocale>>;
+}) {
+  return (
+      <Card>
+        <h2><T value={ui.admin.legal.key.page.publication} /></h2>
+        <p><T value={ui.legal.reviewSavedDraft} /></p>
+        <p><T value={ui.admin.legal.key.page.publishedRevision} />{" "}{state?.published?.revision ?? message(locale, ui.legal.none)}<T value={ui.admin.legal.key.page.draftRevision} />{" "}{state?.draft?.revision ?? message(locale, ui.legal.none)}.</p>
+        {state?.draft ? (
+          <NavigatingActionForm action={publishLegalPageAction}>
+            <input type="hidden" name="key" value={key} />
+            <input type="hidden" name="expectedRevision" value={state.draft.revision} />
+            {key.startsWith('impressum') ? <input type="hidden" name="expectedContactRevision" value={imprintDetails?.draft?.revision ?? 0} /> : null}
+            <details open>
+              <summary><T value={ui.legal.savedPreview} /></summary>
+              <pre className="legal-page-content">{state.draft.content}</pre>
+              {imprintDetails?.draft ? <address>
+                {imprintDetails.draft.name}<br />{imprintDetails.draft.streetAddress}<br />
+                {imprintDetails.draft.postalCode} {imprintDetails.draft.city}<br />
+                {imprintDetails.draft.country}<br />{imprintDetails.draft.email}
+              </address> : null}
+            </details>
+            {imprintDraftIncomplete ? <p><T value={ui.legal.errors.contact_required} /></p> : null}
+            <Button variant="primary" disabled={imprintDraftIncomplete}><T value={key.startsWith('impressum') ? ui.legal.publishImprint : ui.admin.legal.key.page.publishReviewedText} /></Button>
+          </NavigatingActionForm>
+        ) : null}
+      </Card>
+  );
+}
+
+/** Maps only own known legal error keys, retaining the generic save failure for unknown values. */
+function legalErrorMessage(error: string | undefined) {
+  return Object.prototype.hasOwnProperty.call(ui.legal.errors, error ?? '')
+    ? ui.legal.errors[error as keyof typeof ui.legal.errors]
+    : ui.admin.legal.key.page.theLegalPageCouldNotBeSaved;
 }

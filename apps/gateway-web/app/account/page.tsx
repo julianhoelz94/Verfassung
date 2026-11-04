@@ -57,20 +57,7 @@ export default async function AccountPage(props: AccountPageProps) {
   // The enrollment challenge lives in the httpOnly `ca_mfa_challenge` cookie set by
   // `startMfaEnrollAction`; `?enroll=1` only marks that enrollment was requested.
   const enrollRequested = searchParams.enroll === '1';
-  let enrollSecret: string | null = null;
-  let enrollQr: string | null = null;
-  let enrollChallenge: string | null = enrollRequested ? ((await mfaChallengeToken()) ?? null) : null;
-  if (!user.mfaEnabled && enrollChallenge) {
-    const token = (await cookies()).get(SESSION_COOKIE)?.value;
-    try {
-      const started = await requestStartMfaEnroll(enrollChallenge, token, undefined, await identityRequestFetch());
-      enrollSecret = started.secret;
-      enrollQr = started.qrDataUrl;
-      enrollChallenge = started.challengeToken;
-    } catch {
-      enrollSecret = null;
-    }
-  }
+  const { enrollSecret, enrollQr, enrollChallenge } = await accountEnrollment(user, enrollRequested);
   const sessionToken = (await cookies()).get(SESSION_COOKIE)?.value;
   const mcpKeys = sessionToken ? await requestMcpKeys(sessionToken).catch(() => []) : [];
   const oauthGrants = sessionToken ? await requestOAuthGrants(sessionToken).catch(() => []) : [];
@@ -100,53 +87,7 @@ export default async function AccountPage(props: AccountPageProps) {
         </nav>
       }
       notices={
-        <>
-          {searchParams.error === 'mfa' ? (
-            <Alert tone="error">
-              <T value={ui.account.page.authenticatorActionFailedCheckTheCodeAnd} />
-            </Alert>
-          ) : searchParams.error === 'oauth' ? (
-            <Alert tone="error">
-              <T value={ui.account.page.theChatClientConnectionCouldNotBe} />
-            </Alert>
-          ) : searchParams.error === 'key' ? (
-            <Alert tone="error">
-              <T value={ui.account.page.theMcpKeyCouldNotBeChanged} />
-            </Alert>
-          ) : searchParams.error === 'language' ? (
-            <Alert tone="error">
-              <T value={ui.account.page.languagePreferenceCouldNotBeSaved} />
-            </Alert>
-          ) : searchParams.error ? (
-            <Alert tone="error">
-              <T value={passwordCopy.failed} />
-            </Alert>
-          ) : null}
-
-          {searchParams.saved ? (
-            <Alert tone="success">
-              <T value={ui.account.page.passwordUpdated} />
-            </Alert>
-          ) : null}
-
-          {searchParams.mfaRevoked ? (
-            <Alert tone="success">
-              <T value={ui.account.page.authenticatorEnrollmentWasRevoked} />
-            </Alert>
-          ) : null}
-
-          {searchParams.languageSaved ? (
-            <Alert tone="success">
-              <T value={ui.account.page.languagePreferenceSaved} />
-            </Alert>
-          ) : null}
-
-          {searchParams.translationSaved ? (
-            <Alert tone="success">
-              <T value={ui.admin.settings.page.settingsSaved} />
-            </Alert>
-          ) : null}
-        </>
+        accountNotices(searchParams)
       }
     >
       <Card id="preferences">
@@ -216,56 +157,7 @@ export default async function AccountPage(props: AccountPageProps) {
               <T value={ui.account.page.adminAndPublisherAccountsMustEnrollAn} />
             </p>
           ) : null}
-          {enrollRequested && enrollChallenge && enrollSecret ? (
-            <>
-              <MfaSetup
-                secret={enrollSecret}
-                qrDataUrl={enrollQr}
-                qrLabel={message(locale, ui.accessibility.authenticatorQr)}
-              />
-              <ConfirmEnrollForm challengeToken={enrollChallenge} />
-            </>
-          ) : user.mfaEnabled ? (
-            <>
-              <p>
-                <T
-                  value={
-                    user.stepUpFresh ? reviewUi.authenticatorConfirmed : ui.account.page.authenticatorAppIsEnrolled
-                  }
-                />
-              </p>
-              {user.mfaRequired ? (
-                <p className="muted">
-                  <T value={ui.account.page.authenticatorEnrollmentIsRequiredForThisAccount} />
-                </p>
-              ) : (
-                <Disclosure summary={<T value={reviewUi.removeAuthenticator} />}>
-                  <Stack as="form" action={revokeMfaAction}>
-                    <Input
-                      label={<T value={ui.attrs.accountPageInputLabelAuthenticatorCode} />}
-                      id="revokeCode"
-                      name="code"
-                      inputMode="numeric"
-                      required
-                    />
-                    <Button>
-                      <T value={reviewUi.removeAuthenticator} />
-                    </Button>
-                  </Stack>
-                </Disclosure>
-              )}
-              <RegenerateRecoveryForm />
-            </>
-          ) : (
-            <>
-              {enrollRequested ? (
-                <Alert tone="error">
-                  <T value={ui.account.page.enrollmentCouldNotBeStartedTryAgain} />
-                </Alert>
-              ) : null}
-              <StartMfaEnrollForm />
-            </>
-          )}
+          {authenticatorForms({ enrollRequested, enrollChallenge, enrollSecret, enrollQr, user, locale })}
         </section>
         <section className="account-section" aria-labelledby="password-title">
           <h3 id="password-title">
@@ -402,4 +294,136 @@ export default async function AccountPage(props: AccountPageProps) {
       </Card>
     </SettingsPage>
   );
+}
+
+/** Resumes only a cookie-backed enrollment, preserving the credential-read and failure boundaries. */
+async function accountEnrollment(user: NonNullable<Awaited<ReturnType<typeof currentUser>>>, enrollRequested: boolean) {
+  let enrollSecret: string | null = null;
+  let enrollQr: string | null = null;
+  let enrollChallenge: string | null = enrollRequested ? ((await mfaChallengeToken()) ?? null) : null;
+  if (!user.mfaEnabled && enrollChallenge) {
+    const token = (await cookies()).get(SESSION_COOKIE)?.value;
+    try {
+      const started = await requestStartMfaEnroll(enrollChallenge, token, undefined, await identityRequestFetch());
+      enrollSecret = started.secret;
+      enrollQr = started.qrDataUrl;
+      enrollChallenge = started.challengeToken;
+    } catch {
+      enrollSecret = null;
+    }
+  }
+  return { enrollSecret, enrollQr, enrollChallenge };
+}
+
+/** Retains account feedback precedence and the independent successful-action notices. */
+function accountNotices(searchParams: Awaited<AccountPageProps['searchParams']>) {
+  return (
+        <>
+          {searchParams.error === 'mfa' ? (
+            <Alert tone="error">
+              <T value={ui.account.page.authenticatorActionFailedCheckTheCodeAnd} />
+            </Alert>
+          ) : searchParams.error === 'oauth' ? (
+            <Alert tone="error">
+              <T value={ui.account.page.theChatClientConnectionCouldNotBe} />
+            </Alert>
+          ) : searchParams.error === 'key' ? (
+            <Alert tone="error">
+              <T value={ui.account.page.theMcpKeyCouldNotBeChanged} />
+            </Alert>
+          ) : searchParams.error === 'language' ? (
+            <Alert tone="error">
+              <T value={ui.account.page.languagePreferenceCouldNotBeSaved} />
+            </Alert>
+          ) : searchParams.error ? (
+            <Alert tone="error">
+              <T value={passwordCopy.failed} />
+            </Alert>
+          ) : null}
+
+          {searchParams.saved ? (
+            <Alert tone="success">
+              <T value={ui.account.page.passwordUpdated} />
+            </Alert>
+          ) : null}
+
+          {searchParams.mfaRevoked ? (
+            <Alert tone="success">
+              <T value={ui.account.page.authenticatorEnrollmentWasRevoked} />
+            </Alert>
+          ) : null}
+
+          {searchParams.languageSaved ? (
+            <Alert tone="success">
+              <T value={ui.account.page.languagePreferenceSaved} />
+            </Alert>
+          ) : null}
+
+          {searchParams.translationSaved ? (
+            <Alert tone="success">
+              <T value={ui.admin.settings.page.settingsSaved} />
+            </Alert>
+          ) : null}
+        </>
+  );
+}
+
+type AuthenticatorPresentation = Awaited<ReturnType<typeof accountEnrollment>> & {
+  enrollRequested: boolean;
+  user: NonNullable<Awaited<ReturnType<typeof currentUser>>>;
+  locale: Awaited<ReturnType<typeof currentLocale>>;
+};
+
+/** Renders enrollment, required-authenticator protection and recovery forms in their original slots. */
+function authenticatorForms({ enrollRequested, enrollChallenge, enrollSecret, enrollQr, user, locale }: AuthenticatorPresentation) {
+  return (enrollRequested && enrollChallenge && enrollSecret ? (
+            <>
+              <MfaSetup
+                secret={enrollSecret}
+                qrDataUrl={enrollQr}
+                qrLabel={message(locale, ui.accessibility.authenticatorQr)}
+              />
+              <ConfirmEnrollForm challengeToken={enrollChallenge} />
+            </>
+          ) : user.mfaEnabled ? (
+            <>
+              <p>
+                <T
+                  value={
+                    user.stepUpFresh ? reviewUi.authenticatorConfirmed : ui.account.page.authenticatorAppIsEnrolled
+                  }
+                />
+              </p>
+              {user.mfaRequired ? (
+                <p className="muted">
+                  <T value={ui.account.page.authenticatorEnrollmentIsRequiredForThisAccount} />
+                </p>
+              ) : (
+                <Disclosure summary={<T value={reviewUi.removeAuthenticator} />}>
+                  <Stack as="form" action={revokeMfaAction}>
+                    <Input
+                      label={<T value={ui.attrs.accountPageInputLabelAuthenticatorCode} />}
+                      id="revokeCode"
+                      name="code"
+                      inputMode="numeric"
+                      required
+                    />
+                    <Button>
+                      <T value={reviewUi.removeAuthenticator} />
+                    </Button>
+                  </Stack>
+                </Disclosure>
+              )}
+              <RegenerateRecoveryForm />
+            </>
+          ) : (
+            <>
+              {enrollRequested ? (
+                <Alert tone="error">
+                  <T value={ui.account.page.enrollmentCouldNotBeStartedTryAgain} />
+                </Alert>
+              ) : null}
+              <StartMfaEnrollForm />
+            </>
+          ));
 }

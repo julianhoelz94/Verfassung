@@ -43,11 +43,7 @@ export default async function LoginPage(props: LoginPageProps) {
       {searchParams.error ? (
         <Alert tone="error">
           <span id="login-error">
-            <T value={searchParams.error === 'unavailable'
-              ? ui.loginFeedback.unavailable
-              : searchParams.error === 'rate-limit'
-                ? ui.loginFeedback.rateLimit
-                : ui.loginFeedback.invalid} />
+            <T value={loginErrorMessage(searchParams.error)} />
           </span>
         </Alert>
       ) : null}
@@ -90,4 +86,10 @@ export default async function LoginPage(props: LoginPageProps) {
       </details> : null}
     </FocusedPage>
   );
+}
+
+/** Selects the existing password-login feedback without exposing unknown upstream errors. */
+function loginErrorMessage(error: string) {
+  return error === 'unavailable' ? ui.loginFeedback.unavailable
+    : error === 'rate-limit' ? ui.loginFeedback.rateLimit : ui.loginFeedback.invalid;
 }

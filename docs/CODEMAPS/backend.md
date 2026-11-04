@@ -147,6 +147,14 @@ inside the existing confirmation/recovery workflow.
 `POST /events` append; `GET /events?entityType&entityId`  
 PUT/PATCH/DELETE → 405; DB rules block update/delete.
 
+## Existing MCP request logging — `services/mcp-server`
+
+`src/server.ts` retains registered tool handlers and their authorization paths.
+`runLogged` observes the action, writes its audit outcome and serializes the public
+response inside the original shared failure boundary. Focused helpers preserve
+resource-identity precedence, safe error details and cursor/HTTP error mapping;
+metrics, clocks and actor lookup keep their original evaluation order.
+
 ## Shared conventions
 
 - HTTP clients use platform `timedRestClient` / `timedRestClientBuilder` (2 s connect, 5 s read by default; publication delivery explicitly allows 60 s). Authentication interceptors remain owned by each service.

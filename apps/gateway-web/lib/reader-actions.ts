@@ -22,16 +22,28 @@ export function originalEntriesText(entries: OrderedEntry[], outline?: ContentOu
   for (const entry of entries) {
     const child = Boolean(entry.node), block = entry.format === 'footnote' || entry.format === 'table';
     const kind = entry.node ? effectiveDisplayKind(kindByCode(outline, entry.node.kind)) : undefined;
-    const value = entry.node ? [headingFor(entry.node.kind, entry.node.label, entry.node.title, outline), originalEntriesText(entry.node.content, outline, noteLabels)].filter(Boolean).join('\n')
-      : entry.format === 'table' && entry.table ? [entry.table.caption, ...entry.table.rows.map(row => row.cells.map(cell => cell.text).join('\t'))].filter(value => value != null && value !== '').join('\n')
-      : entry.format === 'footnote' ? (entry.footnoteLabel ?? '*') + ' ' + (entry.text ?? '') : textWithNoteMarks(entry, noteLabels);
+    const value = originalEntryText(entry, outline, noteLabels);
     const breaks = entry.node ? '' : '\n'.repeat(entry.lineBreaksBefore ?? 0);
-    const separator = result && value && !breaks && !/\s$/u.test(result) && !/^\s/u.test(value) && (child || previousChild || block || previousBlock)
-      ? block || previousBlock ? '\n' : child && kind?.presentation !== 'concatenated' ? '\n\n' : ' ' : '';
+    const separator = originalEntrySeparator(result, value, breaks, child, previousChild, block, previousBlock, kind?.presentation);
     result += breaks + separator + value; previousChild = child; previousBlock = block;
   }
   return result;
 }
+/** Render one authored entry before deciding spacing; child headings and table cells keep exact text. */
+function originalEntryText(entry: OrderedEntry, outline?: ContentOutline, noteLabels?: Map<string, string>): string {
+  if (entry.node) return [headingFor(entry.node.kind, entry.node.label, entry.node.title, outline), originalEntriesText(entry.node.content, outline, noteLabels)].filter(Boolean).join('\n');
+  if (entry.format === 'table' && entry.table) return [entry.table.caption, ...entry.table.rows.map(row => row.cells.map(cell => cell.text).join('\t'))].filter(value => value != null && value !== '').join('\n');
+  if (entry.format === 'footnote') return (entry.footnoteLabel ?? '*') + ' ' + (entry.text ?? '');
+  return textWithNoteMarks(entry, noteLabels);
+}
+
+/** Add only missing boundary whitespace; explicit authored breaks and either-side whitespace win. */
+function originalEntrySeparator(result: string, value: string, breaks: string, child: boolean, previousChild: boolean, block: boolean, previousBlock: boolean, presentation?: string): string {
+  if (!result || !value || breaks || /\s$/u.test(result) || /^\s/u.test(value) || !(child || previousChild || block || previousBlock)) return '';
+  if (block || previousBlock) return '\n';
+  return child && presentation !== 'concatenated' ? '\n\n' : ' ';
+}
+
 function textWithNoteMarks(entry: OrderedEntry, labels?: Map<string, string>): string {
   const source = entry.text ?? ''; let result = '', cursor = 0;
   for (const reference of [...(entry.references ?? [])].sort((a,b) => a.start-b.start)) {

@@ -174,8 +174,15 @@ preparation and setup validation/creation. Review, publication and import/setup
 screens use focused helpers while preserving their existing forms and workflows.
 New Kotlin helpers have KDoc documenting ordering, snapshot pins and retry rules.
 These batches remove 17 function exceptions and the last Kotlin file exception;
-all Kotlin files now meet 100. The remaining 32 function exceptions belong to
+all Kotlin files meet 100. At that point, 32 function exceptions remained for
 reader/site work and test infrastructure in Batches 7–9.
+
+Batches 7–8 complete the remaining 24 production functions: rich rendering,
+reader/search/translation/comparison, account and supporting workspaces,
+proxy/rate-limit handling and existing MCP request logging. Documented helpers
+retain exact authored text, forms, state/focus, loading order and security policy.
+All production functions now meet 20, with no production exceptions. The eight
+remaining test/fixture exceptions are tracked in Batch 9 under the same limits.
 
 ## Code coverage in CI
 

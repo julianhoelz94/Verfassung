@@ -112,3 +112,22 @@ focused presentation helpers. Setup actions separate intent validation and
 display-save sequencing; `editor/ImportReview.tsx`
 separates workflow, status and source sections. `lib/ingestion-api.ts` retains the
 public transition client and delegates its existing error-code precedence.
+
+## Reader, account and request helper boundaries
+
+`components/ConstitutionText.tsx` separates body projection, ordered-group rendering,
+rich marks and reference links while retaining the existing renderer exports.
+`DiffConstitutionText.tsx` keeps stable/global pairing phases and rendered comparison order.
+`ContentTranslation.tsx` separates DOM text selection, splitting, ordered batches
+and application of translated values. `VersionReader.tsx` keeps state/effects in
+its model hook and uses plain render helpers for the reader surface and controls.
+`lib/reader-actions.ts` and `lib/reader-search.ts` preserve exact copied text and
+UTF-16 DOM-range offsets. Country reader and comparison routes retain ordered
+loading, snapshot pins and optional-service error boundaries.
+
+Account, legal, login/MFA, home, header and Wiki/editor workspaces retain their
+existing route and component owners. Focused helpers separate loading, policy,
+selection and form sections without adding React boundaries around their state.
+`proxy.ts` separates request admission while retaining setup, browsing, credential
+and CSP ordering; `api/edge-rate-limit/route.ts` keeps the existing quota keys,
+credential precedence and response headers.

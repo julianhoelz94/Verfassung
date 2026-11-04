@@ -61,36 +61,7 @@ export default async function Page() {
     );
   }
 
-  let versionCount = 0;
-  let articleCount = 0;
-  let amendmentCount = 0;
-  const articlesByCountry = new Map<string, number>();
-  const recent: RecentChange[] = [];
-  for (const country of details) {
-    for (const constitution of country.constitutions) {
-      versionCount += publicVersions(constitution.versions).length;
-      const tipId = chainTipId(constitution);
-      if (!tipId) {
-        continue;
-      }
-      try {
-        const page = await listArticlePage(tipId, 0, 1);
-        const total = page?.total ?? 0;
-        articleCount += total;
-        articlesByCountry.set(country.isoCode, (articlesByCountry.get(country.isoCode) ?? 0) + total);
-      } catch {
-        /* content is optional on the home stats */
-      }
-      try {
-        const amendments = (await listConstitutionAmendments(constitution.id)) ?? [];
-        amendmentCount += amendments.length;
-        recent.push(...recentChangesFromAmendments(country, constitution, amendments));
-      } catch {
-        /* amendment service down: skip recently changed */
-      }
-    }
-  }
-  const recentTop = newestChanges(recent, 5);
+  const { versionCount, articleCount, amendmentCount, articlesByCountry, recentTop } = await loadHomepageStatistics(details);
 
   return (
     <CollectionPage width="content">
@@ -205,4 +176,40 @@ export default async function Page() {
       ) : null}
     </CollectionPage>
   );
+}
+
+/** Reads each public tip's content then amendments in encounter order; either service may fail independently. */
+async function loadHomepageStatistics(details: CountryDetail[]) {
+  let versionCount = 0;
+  let articleCount = 0;
+  let amendmentCount = 0;
+  const articlesByCountry = new Map<string, number>();
+  const recent: RecentChange[] = [];
+  for (const country of details) {
+    for (const constitution of country.constitutions) {
+      versionCount += publicVersions(constitution.versions).length;
+      const tipId = chainTipId(constitution);
+      if (!tipId) {
+        continue;
+      }
+      try {
+        const page = await listArticlePage(tipId, 0, 1);
+        const total = page?.total ?? 0;
+        articleCount += total;
+        articlesByCountry.set(country.isoCode, (articlesByCountry.get(country.isoCode) ?? 0) + total);
+      } catch {
+        /* content is optional on the home stats */
+      }
+      try {
+        const amendments = (await listConstitutionAmendments(constitution.id)) ?? [];
+        amendmentCount += amendments.length;
+        recent.push(...recentChangesFromAmendments(country, constitution, amendments));
+      } catch {
+        /* amendment service down: skip recently changed */
+      }
+    }
+  }
+  const recentTop = newestChanges(recent, 5);
+
+  return { versionCount, articleCount, amendmentCount, articlesByCountry, recentTop };
 }

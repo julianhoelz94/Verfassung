@@ -1,5 +1,6 @@
 package com.constitutionatlas.amendment.service
 
+import com.constitutionatlas.amendment.CatalogUnavailableException
 import com.constitutionatlas.amendment.ConflictException
 import com.constitutionatlas.amendment.api.AmendmentChangeDto
 import com.constitutionatlas.amendment.api.AmendmentChangeWriteRequest
@@ -525,7 +526,14 @@ class AmendmentService(
             if (versionId == null || occurrence == null) {
                 null
             } else {
-                if (!owners.containsKey(versionId)) owners[versionId] = catalogClient.getVersion(versionId)
+                if (!owners.containsKey(versionId)) {
+                    owners[versionId] = try {
+                        catalogClient.getVersion(versionId)
+                    } catch (_: CatalogUnavailableException) {
+                        // Link enrichment must not make saved amendment content depend on Catalog availability.
+                        null
+                    }
+                }
                 val owner = owners[versionId]
                 readerPassageHref(owner?.countryCode, owner?.jurisdictionId, versionId, occurrence)
             }

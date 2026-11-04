@@ -39,4 +39,6 @@ Verified locally on 4 November 2026:
 - Layout: EN/DE at 390/820/1440px with axe and overflow checks; 24 affected Linux screenshot baselines refreshed in the pinned Playwright image. The final amendment rendering was checked again after clarifying missing-reference and historical-reference displays.
 - Complete gateway browser suite: 156 passed, with two platform-specific visual suites skipped on macOS; the affected screenshot matrices were separately verified in the pinned Linux image.
 
-The local stack uses an isolated Compose project, `verfassung-amendment-workspace`, with fixture data at `http://localhost:18080`. The primary checkout and its unrelated edits are preserved. No production deployment or remote Git push is part of this task.
+The local stack uses an isolated Compose project, `verfassung-amendment-workspace`, with fixture data at `http://localhost:18080`. The primary checkout and its unrelated edits are preserved. Production deployment is separate from this implementation.
+
+The follow-up review in PR #231 also checks the previously approved routing retirement. Review found that optional reader-link enrichment could fail amendment reads during a Catalog outage. That lookup now omits unavailable links while preserving saved amendment content and exact reference identities; a regression test also verifies failed lookups are bounded to one per version.

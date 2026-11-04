@@ -1,3 +1,4 @@
+import com.constitutionatlas.amendment.CatalogUnavailableException
 import com.constitutionatlas.amendment.api.AmendmentChangeDto
 import com.constitutionatlas.amendment.api.AmendmentDto
 import com.constitutionatlas.amendment.api.AmendmentUnitRefDto
@@ -14,6 +15,25 @@ import org.mockito.Mockito
 import java.util.UUID
 
 class AmendmentReaderLinksTest {
+    @Test
+    fun `catalog outage omits optional links while preserving saved amendment references`() {
+        val repository = Mockito.mock(AmendmentRepository::class.java)
+        val catalog = Mockito.mock(CatalogClient::class.java)
+        val service = AmendmentService(repository, Mockito.mock(ContentClient::class.java), catalog, Mockito.mock(ChangeRecordPublishAttemptRepository::class.java), Mockito.mock(AmendmentDiffReviewService::class.java))
+        val constitution = UUID.randomUUID()
+        val version = UUID.randomUUID()
+        val before = AmendmentUnitRefDto(versionId = version, logicalId = UUID.randomUUID(), revisionId = UUID.randomUUID(), occurrenceId = UUID.randomUUID(), deepLink = "/obsolete-link")
+        val change = AmendmentChangeDto(UUID.randomUUID(), articleId = null, articleNumber = "1", changeType = "removed", note = "Original note", nodeId = null, changedOn = null, effectiveOn = null, amendingLawCitationId = null, beforeRef = before)
+        val record = AmendmentDto(UUID.randomUUID(), constitution, "published", title = "Amendment", comment = "Original comment", enactedOn = null, effectiveOn = null, sourceVersionId = version, targetVersionId = null, changes = listOf(change, change.copy(id = UUID.randomUUID())))
+        Mockito.`when`(repository.listPublishedForConstitution(constitution)).thenReturn(listOf(record))
+        Mockito.`when`(catalog.getVersion(version)).thenThrow(CatalogUnavailableException("Catalog temporarily unavailable"))
+
+        val actual = service.listForConstitution(constitution).single()
+
+        assertThat(actual).isEqualTo(record.copy(changes = record.changes.map { it.copy(beforeRef = before.copy(deepLink = null)) }))
+        Mockito.verify(catalog, Mockito.times(1)).getVersion(version)
+    }
+
     @Test
     fun `published change records expose direct snapshot links with bounded owner lookups`() {
         val repository = Mockito.mock(AmendmentRepository::class.java)

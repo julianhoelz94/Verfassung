@@ -42,3 +42,5 @@ Verified locally on 4 November 2026:
 The local stack uses an isolated Compose project, `verfassung-amendment-workspace`, with fixture data at `http://localhost:18080`. The primary checkout and its unrelated edits are preserved. Production deployment is separate from this implementation.
 
 The follow-up review in PR #231 also checks the previously approved routing retirement. Review found that optional reader-link enrichment could fail amendment reads during a Catalog outage. That lookup now omits unavailable links while preserving saved amendment content and exact reference identities; a regression test also verifies failed lookups are bounded to one per version.
+
+Follow-up verification adds nine component regression tests for external-law retries, one-step file uploads, historical revision pins, read-only evidence, empty-source rejection, amendment-wide pairs, curated passage preservation and failed saves. The gateway suite now has 1,230 passing Vitest tests. The real-stack migration journey verifies the preserved mapping API and exact direct reader target, and asserts that the retired hostname no longer redirects.

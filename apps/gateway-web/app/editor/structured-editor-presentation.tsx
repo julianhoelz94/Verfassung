@@ -3,6 +3,7 @@
 import {
   Bold,
   BookOpen,
+  FileText,
   ChevronLeft,
   ChevronRight,
   Eye,
@@ -121,6 +122,7 @@ export function renderStructuredEditor(model: StructuredEditorModel) {
     createNode,
     currentRoot,
     detailsPanel,
+    documentsPanel,
     differenceReference,
     differences,
     editable,
@@ -914,6 +916,14 @@ export function renderStructuredEditor(model: StructuredEditorModel) {
             <span className={styles.viewLabel}>
               {copy("Details", "Details")}
             </span>
+          </button>
+        ) : null}
+        {documentsPanel ? (
+          <button type="button" aria-label={copy("Documents", "Dokumente")}
+            title={copy("Documents", "Dokumente")} aria-pressed={mode === "documents"}
+            disabled={Boolean(noteEdit || markerMove)} onClick={() => {setMode("documents"); setPanel("");}}>
+            <FileText size={17} aria-hidden="true" />
+            <span className={styles.viewLabel}>{copy("Documents", "Dokumente")}</span>
           </button>
         ) : null}
         {canManageStructure ? (
@@ -1920,7 +1930,7 @@ export function renderStructuredEditor(model: StructuredEditorModel) {
           method="post"
           id="draft-form"
           className={styles.textForm}
-          hidden={mode === "wiki" || mode === "details"}
+          hidden={mode === "wiki" || mode === "details" || mode === "documents"}
           onSubmit={(event) => {
             if (noteProblems.length) {
               event.preventDefault();
@@ -2004,6 +2014,7 @@ export function renderStructuredEditor(model: StructuredEditorModel) {
             : null}
           {editable ? renderFooter() : null}
         </form>
+        {documentsPanel ? <div hidden={mode !== "documents"} data-editor-panel="documents">{documentsPanel}</div> : null}
         {wikiPanel ? (
           <div hidden={mode !== "wiki"} data-editor-panel="wiki">
             {wikiPanel}

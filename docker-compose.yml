@@ -12,7 +12,6 @@ services:
       - CADDY_BIND_ADDRESS=${CADDY_BIND_ADDRESS:-127.0.0.1}
       - ACME_TEST_DIRECTORY=${ACME_TEST_DIRECTORY:-}
       - CADDY_EXPOSE_API_DOCS=${CADDY_EXPOSE_API_DOCS:-true}
-      - ATLAS_LEGACY_HOST=${ATLAS_LEGACY_HOST:-legacy.localhost}
     volumes:
       - caddy-data:/data
       - caddy-config:/config

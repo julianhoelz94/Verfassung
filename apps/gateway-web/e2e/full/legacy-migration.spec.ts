@@ -25,7 +25,7 @@ async function mcp(request: APIRequestContext, key: string, name: string, args: 
   return body.result.structuredContent;
 }
 
-test('offline archive package preserves evidence through review, publication and legacy links', async ({ page, request, browser }, testInfo) => {
+test('offline archive package preserves evidence through review, publication and direct reader links', async ({ page, request, browser }, testInfo) => {
   test.setTimeout(300_000);
   const admin = await adminHeaders(request);
   const reviewer = await roleHeaders(request, 'reviewer');
@@ -327,7 +327,11 @@ test('offline archive package preserves evidence through review, publication and
     for (const locale of ['en', 'de']) {
       await verifyArchiveReader(locale);
     }
-    await page.goto(oldUrl); await expect(page).toHaveURL(new RegExp(versionId));
+    const retired = await request.get(oldUrl, { maxRedirects: 0 });
+    expect(retired.status()).toBe(404);
+    expect(retired.headers().location).toBeUndefined();
+    expect(resolved.targetUrl).toMatch(new RegExp(`^/jurisdictions/${jurisdiction.id}/versions/${versionId}#fn-`));
+    await page.goto(resolved.targetUrl); await expect(page).toHaveURL(new URL(resolved.targetUrl, String(testInfo.project.use.baseURL)).href);
     await expect(page.locator(':target')).toContainText(manifest.annotationText);
     const finalRun = await mcp(request, importer, 'get_migration_run', { runId: run.id });
     expect(finalRun.coverage).toMatchObject({ sources: 9, unavailable: 1, excluded: 1, published: 2, blocked: 0 });

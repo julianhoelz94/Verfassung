@@ -5,7 +5,7 @@ import com.constitutionatlas.amendment.api.AmendmentChangeWriteRequest
 import com.constitutionatlas.amendment.api.AmendmentUnitRefDto
 import java.util.UUID
 
-/** Shared display/write projections retain historical metadata and exact snapshot link formats. */
+/** Shared display/write projections retain historical metadata and immutable snapshot pins. */
 internal object AmendmentChangeProjection {
     /** Uses the original number, label, then kind fallback without changing authored text. */
     fun noteFor(change: NodeChange): String {
@@ -17,8 +17,11 @@ internal object AmendmentChangeProjection {
         }
     }
 
-    /** Legacy units without immutable logical and revision pins cannot produce an exact reference. */
-    fun toRef(versionId: UUID, node: FlatNode): AmendmentUnitRefDto? {
+    /**
+     * Legacy units without immutable logical and revision pins cannot produce an exact reference.
+     * Reader links are supplied only by the Catalog-aware response projection.
+     */
+    fun toRef(versionId: UUID, node: FlatNode, link: ((AmendmentUnitRefDto) -> String?)? = null): AmendmentUnitRefDto? {
         val logicalId = node.logicalId ?: return null
         val revisionId = node.revisionId ?: return null
         return AmendmentUnitRefDto(
@@ -31,7 +34,7 @@ internal object AmendmentChangeProjection {
             kind = node.kind,
             label = node.number ?: node.label ?: node.kind,
             text = node.body,
-            deepLink = "/versions/$versionId/units/${node.articleId}?occurrenceId=${node.id}",
+            deepLink = link?.invoke(AmendmentUnitRefDto(versionId = versionId, occurrenceId = node.id)),
         )
     }
 

@@ -1,4 +1,4 @@
-import { act } from 'react';
+import { act, type ComponentProps } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { fireEvent } from '@testing-library/dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -31,8 +31,8 @@ describe('guided difference review', () => {
     actions.refresh.mockReset(); actions.save.mockReset();
   });
   afterEach(async () => { await act(async () => root.unmount()); host.remove(); });
-  async function mount(review: DiffReviewState, canAcknowledge = true) {
-    await act(async () => root.render(<DiffReviewQueue target={{ kind: 'amendment', id: 'amendment' }} initial={review} rows={[]} canDecide canAcknowledge={canAcknowledge} />));
+  async function mount(review: DiffReviewState, canAcknowledge = true, extras: Partial<ComponentProps<typeof DiffReviewQueue>> = {}) {
+    await act(async () => root.render(<DiffReviewQueue target={{ kind: 'amendment', id: 'amendment' }} initial={review} rows={[]} canDecide canAcknowledge={canAcknowledge} {...extras} />));
   }
   function button(name: string): HTMLButtonElement {
     const found = [...host.querySelectorAll('button')].find((item) => item.textContent === name);
@@ -100,6 +100,24 @@ describe('guided difference review', () => {
     expect(actions.save).toHaveBeenCalled();
     expect(host.textContent).toContain('Reviewed 1 of 1');
     expect(host.textContent).toContain('Decision saved.');
+  });
+
+  it('keeps the unified workspace synchronized and links findings to the owning reader', async () => {
+    const initial = state([candidate('eight', 'Article 8', 'Old', 'New')]);
+    const saved = { ...initial, decisions: [{ ...initial.decisions[0], status: 'excluded_with_reason' as const, reason: 'Separate record' }] };
+    const onReviewChange = vi.fn(), onCorrectPairing = vi.fn();
+    actions.save.mockResolvedValue({ review: saved });
+    actions.refresh.mockResolvedValue({ review: initial });
+    await mount(initial, false, { onReviewChange, onCorrectPairing, readerOwners: { version: { jurisdictionId: 'region' } } });
+    expect(host.querySelectorAll('a[href="/jurisdictions/region/versions/version#eight"]')).toHaveLength(2);
+    expect([...host.querySelectorAll('summary')].some(item => item.textContent === 'Filters and progress')).toBe(true);
+    await act(async () => button('Correct pairing in change record').click());
+    expect(onCorrectPairing).toHaveBeenCalledOnce();
+    await act(async () => fireEvent.change(host.querySelector('textarea')!, { target: { value: 'Separate record' } }));
+    await act(async () => button('Exclude with reason and next').click());
+    expect(onReviewChange).toHaveBeenLastCalledWith(saved);
+    await act(async () => button('Refresh').click());
+    expect(onReviewChange).toHaveBeenLastCalledWith(initial);
   });
 
   it('shows an accessible zero-difference state', async () => {

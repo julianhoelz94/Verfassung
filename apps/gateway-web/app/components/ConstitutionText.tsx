@@ -1,3 +1,4 @@
+import { passageReaderHref } from "../../lib/reader-links";
 import {
   Fragment,
   type HTMLAttributes,
@@ -524,9 +525,7 @@ export function OrderedContentTree({
     )
       return `#${idPrefix}fn-${notes.get(target.footnoteId)}`;
     if (unit && crossRefs)
-      return crossRefs.code
-        ? `/countries/${crossRefs.code}/versions/${crossRefs.versionId}/units/${unit.rootId}#${unit.occurrenceId}`
-        : `/versions/${crossRefs.versionId}/units/${unit.rootId}?occurrenceId=${unit.occurrenceId}`;
+      return passageReaderHref(crossRefs, crossRefs.versionId, unit.rootId, unit.occurrenceId);
     return unit ? `#${idPrefix}${unit.occurrenceId}` : undefined;
   }
 

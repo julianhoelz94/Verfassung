@@ -30,6 +30,7 @@ import { AmendmentEditorLayout } from '../AmendmentEditorLayout';
 import { AmendmentForm } from '../AmendmentForm';
 import { QuoteReviewPanel } from '../QuoteReviewPanel';
 import { DocumentLinks } from '../../documents/DocumentLinks';
+import styles from '../amendment-workspace.module.css';
 
 type AmendmentDetailPageProps = {
   params: Promise<{ id: string }>;
@@ -41,6 +42,8 @@ type AmendmentDetailPageProps = {
     error?: string;
     confirmed?: string;
     documentError?: string;
+    view?: string;
+    passage?: string;
   }>;
 };
 
@@ -262,6 +265,15 @@ export default async function AmendmentDetailPage(
     reviewContentByVersion,
   } = await loadAmendmentReviews(id, isNew, sessionToken, amendment, versions);
 
+  const readerOwners = Object.fromEntries(
+    (await Promise.all(versions.map(async version => [
+      version.id,
+      await getVersion(version.id, `Bearer ${sessionToken}`).catch(() => null),
+    ] as const))).filter(
+      (entry): entry is [string, NonNullable<typeof entry[1]>] => entry[1] !== null,
+    ),
+  );
+
   const canSave = canEdit;
   const canPublishLaw =
     canPublish && amendment?.status !== 'withdrawn' && !isNew;
@@ -335,9 +347,33 @@ export default async function AmendmentDetailPage(
     );
   }
 
+  const quoteReviewPanel = amendment?.reviewStatus === 'needs_review' ? (
+        <QuoteReviewPanel
+          amendment={amendment}
+          publishedRevision={publishedRevision}
+          versions={versions}
+          canConfirm={canPublishLaw}
+          contentByVersion={reviewContentByVersion}
+        />
+      ) : null;
+  const documentsPanel = !isNew && tipRevision ? (
+        <DocumentLinks
+          targetType="amendment"
+          targetId={id}
+          scopeRevisionId={tipRevision.id}
+          returnTo={`/editor/amendments/${id}`}
+          canEdit={
+            canEdit &&
+            amendment?.status !== 'withdrawn' &&
+            tipRevision.id !== amendment?.publishedRevisionId
+          }
+        />
+      ) : null;
+
   return (
     <WorkspacePage
       width="content"
+      className={styles.page}
       header={
         <PageHeader
           breadcrumbs={[
@@ -359,15 +395,6 @@ export default async function AmendmentDetailPage(
       }
     >
       {notices()}
-      {amendment?.reviewStatus === 'needs_review' ? (
-        <QuoteReviewPanel
-          amendment={amendment}
-          publishedRevision={publishedRevision}
-          versions={versions}
-          canConfirm={canPublishLaw}
-          contentByVersion={reviewContentByVersion}
-        />
-      ) : null}
       {isNew || !amendment ? (
         <AmendmentForm
           amendmentId="new"
@@ -380,6 +407,9 @@ export default async function AmendmentDetailPage(
           canSave={canSave}
           canWithdraw={false}
           readOnly={readOnly}
+          readerOwners={readerOwners}
+          documentsPanel={documentsPanel}
+          quoteReviewPanel={quoteReviewPanel}
           contentAvailable={contentAvailable}
           diffReview={diffReview}
           canReviewDiff={
@@ -402,6 +432,9 @@ export default async function AmendmentDetailPage(
           canWithdraw={canWithdraw}
           readOnly={readOnly}
           canRestore={canRestore}
+          readerOwners={readerOwners}
+          documentsPanel={documentsPanel}
+          quoteReviewPanel={quoteReviewPanel}
           contentAvailable={contentAvailable}
           diffReview={diffReview}
           canReviewDiff={
@@ -410,19 +443,7 @@ export default async function AmendmentDetailPage(
           canAcknowledgeDiff={hasRole(user.roles, 'reviewer') || canPublish}
         />
       )}
-      {!isNew && tipRevision ? (
-        <DocumentLinks
-          targetType="amendment"
-          targetId={id}
-          scopeRevisionId={tipRevision.id}
-          returnTo={`/editor/amendments/${id}`}
-          canEdit={
-            canEdit &&
-            amendment?.status !== 'withdrawn' &&
-            tipRevision.id !== amendment?.publishedRevisionId
-          }
-        />
-      ) : null}
+
     </WorkspacePage>
   );
 }

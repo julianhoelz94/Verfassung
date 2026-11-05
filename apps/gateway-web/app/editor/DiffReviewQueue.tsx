@@ -14,7 +14,8 @@ import {
   decisionReadyForReview,
   decisionResolved,
 } from '../../lib/diff-review';
-import { diffText, segsForSide } from '../../lib/text-diff';
+import { PassageComparison } from './PassageComparison';
+import { passageReaderHref, type ReaderOwner } from '../../lib/reader-links';
 import {
   saveDiffDecisionAction,
   refreshDiffReviewAction,
@@ -31,6 +32,9 @@ type Props = {
   canDecide: boolean;
   canAcknowledge: boolean;
   onAddRow?: (candidate: ReviewCandidate) => void;
+  onCorrectPairing?: () => void;
+  onReviewChange?: (review: DiffReviewState) => void;
+  readerOwners?: Record<string, ReaderOwner>;
 };
 
 function label(ref: ReviewRef): string {
@@ -77,6 +81,26 @@ function wording(refs: ReviewRef[]): string {
     .join('\n');
 }
 
+/** Projects pinned identity and the canonical passage URL for one side of a finding. */
+function reviewSide(
+  refs: ReviewRef[],
+  placeholder: string,
+  owners?: Record<string, ReaderOwner>,
+) {
+  const single = refs.length === 1 ? refs[0] : undefined;
+  return {
+    text: wording(refs),
+    label: refs.map(label).join('; ') || placeholder,
+    identity: refs.map(ref =>
+      [ref.versionId, ref.logicalId, ref.occurrenceId, ref.revisionId]
+        .filter(Boolean).join(' · '),
+    ).join('\n'),
+    href: single?.versionId && single.occurrenceId
+      ? passageReaderHref(owners?.[single.versionId], single.versionId, single.occurrenceId)
+      : undefined,
+  };
+}
+
 /** Keep state, render-phase decision resets and navigation effects in their original order. */
 function useDiffReviewQueue({
   target,
@@ -85,6 +109,9 @@ function useDiffReviewQueue({
   canDecide,
   canAcknowledge,
   onAddRow,
+  onCorrectPairing,
+  onReviewChange,
+  readerOwners,
 }: Props) {
   const t = useTranslation();
   const statusText = (status: string) => t(reviewLabel(status));
@@ -180,16 +207,6 @@ function useDiffReviewQueue({
     },
     {},
   );
-  const sourceText = selected ? wording(selected.beforeRefs) : '';
-  const targetText = selected ? wording(selected.afterRefs) : '';
-  const spans = selected
-    ? sourceText.length + targetText.length < 8000
-      ? diffText(sourceText, targetText)
-      : [
-          { type: 'remove' as const, text: sourceText },
-          { type: 'add' as const, text: targetText },
-        ]
-    : [];
 
   function choose(key: string) {
     focusAfterNavigation.current = true;
@@ -206,6 +223,7 @@ function useDiffReviewQueue({
         return;
       }
       setReview(result.review);
+      onReviewChange?.(result.review);
       const byKey = new Map(
         result.review.decisions.map((decision) => [decision.key, decision]),
       );
@@ -240,6 +258,7 @@ function useDiffReviewQueue({
       }
       const previousTotal = review.candidates.length;
       setReview(result.review);
+      onReviewChange?.(result.review);
       setMessage(
         result.review.candidates.length > previousTotal
           ? `${result.review.candidates.length - previousTotal} deeper differences were added after the pairing changed.`
@@ -279,6 +298,8 @@ function useDiffReviewQueue({
     canDecide,
     canAcknowledge,
     onAddRow,
+    onCorrectPairing,
+    readerOwners,
     t,
     statusText,
     review,
@@ -310,7 +331,6 @@ function useDiffReviewQueue({
     readyForReview,
     levels,
     counts,
-    spans,
     save,
     refresh,
     navigation,
@@ -326,6 +346,8 @@ function renderDiffReviewQueue(model: ReturnType<typeof useDiffReviewQueue>) {
     canDecide,
     canAcknowledge,
     onAddRow,
+    onCorrectPairing,
+    readerOwners,
     t,
     statusText,
     review,
@@ -357,7 +379,6 @@ function renderDiffReviewQueue(model: ReturnType<typeof useDiffReviewQueue>) {
     readyForReview,
     levels,
     counts,
-    spans,
     save,
     refresh,
     navigation,
@@ -392,54 +413,10 @@ function renderDiffReviewQueue(model: ReturnType<typeof useDiffReviewQueue>) {
             ''
           )}
         </p>
-        <div className="diff-review-sides">
-          <div>
-            <h4>
-              <T value={ui.editor.diffreviewqueue.before} />
-            </h4>
-            <p>
-              {selected.beforeRefs.map(label).join('; ') ||
-                t(ui.reviewLabels.noSourceUnit)}
-            </p>
-            <p className="diff-review-text">
-              {segsForSide(spans, 'from').map((seg, index) =>
-                seg.type === 'remove' ? (
-                  <del key={index}>{seg.text}</del>
-                ) : (
-                  <span key={index}>{seg.text}</span>
-                ),
-              )}
-            </p>
-            {selected.beforeRefs.map((ref) => (
-              <code key={`${ref.logicalId}-${ref.occurrenceId}`}>
-                {ref.versionId ?? t(ui.workflow.draft)} · {ref.logicalId}
-              </code>
-            ))}
-          </div>
-          <div>
-            <h4>
-              <T value={ui.editor.diffreviewqueue.after} />
-            </h4>
-            <p>
-              {selected.afterRefs.map(label).join('; ') ||
-                t(ui.reviewLabels.noTargetUnit)}
-            </p>
-            <p className="diff-review-text">
-              {segsForSide(spans, 'to').map((seg, index) =>
-                seg.type === 'add' ? (
-                  <ins key={index}>{seg.text}</ins>
-                ) : (
-                  <span key={index}>{seg.text}</span>
-                ),
-              )}
-            </p>
-            {selected.afterRefs.map((ref) => (
-              <code key={`${ref.logicalId}-${ref.occurrenceId}`}>
-                {ref.versionId ?? t(ui.workflow.draft)} · {ref.logicalId}
-              </code>
-            ))}
-          </div>
-        </div>
+        <PassageComparison
+          before={reviewSide(selected.beforeRefs, t(ui.reviewLabels.noSourceUnit), readerOwners)}
+          after={reviewSide(selected.afterRefs, t(ui.reviewLabels.noTargetUnit), readerOwners)}
+        />
         <div className="action-bar">
           <Button
             type="button"
@@ -479,6 +456,7 @@ function renderDiffReviewQueue(model: ReturnType<typeof useDiffReviewQueue>) {
             <Button
               type="button"
               onClick={() => {
+                onCorrectPairing?.();
                 document
                   .querySelector<HTMLElement>(
                     '#editor-change-record, #amendment-changes-title',
@@ -659,6 +637,8 @@ function renderDiffReviewQueue(model: ReturnType<typeof useDiffReviewQueue>) {
         </p>
       ) : (
         <>
+          <details>
+            <summary>{t({en: 'Filters and progress', de: 'Filter und Fortschritt'})}</summary>
           <Inline
             align="end"
             className="form-row"
@@ -792,6 +772,7 @@ function renderDiffReviewQueue(model: ReturnType<typeof useDiffReviewQueue>) {
               })}
             </ul>
           ) : null}
+          </details>
           {selected ? (
             activeCandidate(selected)
           ) : (

@@ -15,14 +15,6 @@ export async function proxy(request: NextRequest) {
     const admission = await browsingAdmission(request, path);
     if (admission) return admission;
   }
-  // An HTTP redirect preserves fragments on saved constitution-history URLs.
-  // Keep this after the setup and anonymous-access gates.
-  if (/^\/countries\/[^/]+\/constitution-timeline$/.test(path)) {
-    const destination = request.nextUrl.clone();
-    destination.pathname = path.replace(/constitution-timeline$/, 'timeline');
-    return NextResponse.redirect(destination);
-  }
-
   const nonce = Buffer.from(crypto.randomUUID()).toString('base64');
   const isDev = process.env.NODE_ENV === 'development';
   // Next.js inline runtime scripts take the nonce. Styles still need 'unsafe-inline'
@@ -56,7 +48,7 @@ export async function proxy(request: NextRequest) {
   return response;
 }
 
-/** Keep deployment admission before browsing, legacy redirects and nonce generation. */
+/** Keep deployment admission before browsing and nonce generation. */
 async function setupAdmission(request: NextRequest, path: string): Promise<NextResponse | null> {
   let setup;
   try { setup = await setupStatus(); } catch {
@@ -84,7 +76,7 @@ async function isSetupAdministrator(request: NextRequest): Promise<boolean> {
 
 /** These existing public surfaces share the anonymous browsing policy, including reader APIs. */
 function requiresBrowsingAdmission(path: string): boolean {
-  return path.startsWith('/api/reader/') || path.startsWith('/constitutions/') || path.startsWith('/comparisons') || path === '/legacy' || path === '/search' || path === '/jurisdictions' || path.startsWith('/jurisdictions/') || path.startsWith('/countries/') || path.startsWith('/documents/') || path.startsWith('/versions/');
+  return path.startsWith('/api/reader/') || path.startsWith('/constitutions/') || path.startsWith('/comparisons') || path === '/search' || path === '/jurisdictions' || path.startsWith('/jurisdictions/') || path.startsWith('/countries/') || path.startsWith('/documents/') || path.startsWith('/versions/');
 }
 
 /** Unavailable policy requires a verified session; denied API reads retain their private JSON response. */

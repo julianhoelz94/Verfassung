@@ -190,7 +190,7 @@ test('constitution configuration governs MCP imports, review previews and the pu
     const staged = await stage({});
     expect(staged.status).toBe('pending_review');
     expect(staged.errors).toEqual([]);
-    await page.goto(`/admin/import/${staged.jobId}`);
+    await page.goto(`/editor?importJobId=${staged.jobId}`);
     await page.getByRole('button', { name: 'Prepare unpublished draft', exact: true }).click();
     const preview = page.locator('.card').filter({ has: page.getByRole('heading', { name: 'Prepared draft as readers will see it', exact: true }) });
     await expect(preview.locator('.node-kind-article > .node-heading')).toHaveText('Provision Protected rights I');
@@ -214,7 +214,7 @@ test('constitution configuration governs MCP imports, review previews and the pu
     await expect(article.getByRole('checkbox', { name: 'Show editorial title', exact: true })).not.toBeChecked();
     await expect(select(article, 'label-placement')).toHaveValue('inline');
     await expect(paragraph.getByRole('checkbox', { name: 'Show literal legal label', exact: true })).not.toBeChecked();
-    await page.goto(`/admin/import/${staged.jobId}`);
+    await page.goto(`/editor?importJobId=${staged.jobId}`);
     await expect(preview.locator('.node-kind-article > .node-heading')).toHaveCount(0);
     await expect(preview.locator('.node-kind-article > span.num')).toHaveText('I');
     await expect(preview.locator('.constitution-concat')).toHaveText('Every person is free. Every person is equal.');

@@ -1,5 +1,7 @@
 'use client';
 
+import { passageReaderHref, type ReaderOwner } from '../../lib/reader-links';
+
 import { changeTypeMessage } from '../../lib/ui-labels';
 
 import { T, useTranslation } from '../components/TranslationProvider';
@@ -146,6 +148,7 @@ function isEmptyChange(change: ChangeRecordChange): boolean {
 }
 
 type PublishFormProps = {
+  readerOwner?: ReaderOwner;
   sessionId: string;
   versionId: string;
   articleId: string;
@@ -193,6 +196,7 @@ function publicationReady(
 }
 
 export function PublishForm({
+  readerOwner,
   sessionId,
   versionId,
   articleId,
@@ -276,7 +280,7 @@ export function PublishForm({
       ref?.rootOccurrenceId ?? unit?.ref.rootOccurrenceId;
     const href =
       side === 'before' && rootOccurrenceId && ref?.versionId
-        ? `/versions/${encodeURIComponent(ref.versionId)}/units/${encodeURIComponent(rootOccurrenceId)}${ref.occurrenceId ? `?occurrenceId=${encodeURIComponent(ref.occurrenceId)}` : ''}`
+        ? passageReaderHref(readerOwner, ref.versionId, rootOccurrenceId, ref.occurrenceId)
         : side === 'after' && unit
           ? `/editor?sessionId=${encodeURIComponent(sessionId)}&versionId=${encodeURIComponent(versionId)}&selectedNode=${encodeURIComponent(logicalId)}`
           : undefined;

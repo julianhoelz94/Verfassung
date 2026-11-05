@@ -1,5 +1,7 @@
 import {
   handleHealth,
+  handleEditorDocumentsSetup,
+  handleEditorDocumentsOverride,
   handleReset,
   handleCountryDirectory,
   handleDirectoryWiki,
@@ -112,6 +114,8 @@ import {
 /** Exact original source order, including early Catalog exceptions and scenario interception. */
 export const routes = [
   handleHealth,
+  handleEditorDocumentsSetup,
+  handleEditorDocumentsOverride,
   handleReset,
   handleCountryDirectory,
   handleDirectoryWiki,

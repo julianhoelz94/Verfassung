@@ -15,7 +15,7 @@ Scoped CSS Modules own page, header, surface, field and template styles. See
 
 | Area | Entry points |
 | --- | --- |
-| Public discovery/reading | `app/page.tsx`, `search/`, `countries/[code]/`, `versions/[versionId]/units/[unitId]/` |
+| Public discovery/reading | `app/page.tsx`, `search/`, `countries/[code]/`, `jurisdictions/` |
 | Reader/compare/history | `countries/[code]/versions/`, `compare/`, `timeline/`; shared `components/ConstitutionText`, `VersionReader`, ordered content/diff components |
 | Context/documents/legal | `countries/[code]/` and `countries/[code]/constitutions/[constitutionId]/` context, `documents/`, `impressum/`, `datenschutz/`, `about/` |
 | Authentication/account | `login/`, `register/`, `reset/`, `invite/`, `account/`, `logout/` |
@@ -148,3 +148,10 @@ journal/guide ordering. Browser helpers in `templates.spec.ts`, `ui-review.spec.
 and `full/legacy-migration.spec.ts` preserve assertions and test registration.
 `e2e/mock-api-contract.test.mjs` supplies focused real-HTTP contracts in the gateway
 Node test commands; UI response contracts run through Vitest.
+Pre-launch routing aliases (`/legacy`, country `constitution-timeline`, `/admin/import/[jobId]`, generic `/versions/[versionId]/units/[unitId]`) are retired. Their source and former behavior live in `archive/legacy-routing/`, outside every build context. Passage links point directly to the owning country/jurisdiction reader with an occurrence fragment.
+
+## Amendment workspace and document evidence
+
+`editor/amendments/AmendmentForm` owns task navigation, the single constitution-wide version pair, visible public comment and the mounted draft form. `AmendmentChangesTable` navigates recorded passages; `editor/PassageComparison` shares bounded wording comparison with DiffReviewQueue. Source formatting uses OrderedContentTree inside ConstitutionDocument. AmendmentEditorLayout keeps historical inspection separate from the current form; revision attachments are loaded read-only.
+
+`editor/documents/DocumentManagerTemplate` owns the shared upload/select interface in constitution configuration, continuous editing and amendments. DocumentLinks loads authorized initial data; DocumentManager updates attachment state without navigation. The gateway endpoint is `/editor/documents/command` (GET history links, POST document commands); `/api/editor/*` belongs to editor-service through Caddy. Document-service owns the transactional create/upload/attach endpoint and actor-scoped retry receipt. Saving an amendment uses the existing command endpoint with a JSON outcome so rejected saves retain entered values; native POST redirects remain supported.

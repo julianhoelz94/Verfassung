@@ -1,3 +1,5 @@
+import { DocumentLinks } from './documents/DocumentLinks';
+import { passageReaderHref } from '../../lib/reader-links';
 import { statusMessage } from '../../lib/ui-labels';
 import { message, ui } from '../../lib/messages';
 import { T } from '../components/TranslationProvider';
@@ -166,6 +168,7 @@ function EditorPublishControls({ state }: { state: EditorSessionState }) {
     <>
       {session.hopKind && searchParams.sessionId && versionId && selectedId ? (
         <PublishForm
+          readerOwner={state.sourceVersion ?? undefined}
           sessionId={searchParams.sessionId}
           versionId={versionId}
           articleId={selectedId}
@@ -322,6 +325,7 @@ function editorDocumentBody(state: EditorSessionState) {
   ) {
     return (
       <StructuredEditor
+        readerOwner={state.sourceVersion ?? undefined}
         initialTab={initialTab(searchParams.tab)}
         wikiPanel={
           selectedCountry ? (
@@ -333,6 +337,10 @@ function editorDocumentBody(state: EditorSessionState) {
               status={wikiStatus(searchParams.wikiStatus)}
             />
           ) : undefined
+        }
+        documentsPanel={
+          <DocumentLinks targetType="constitution" targetId={selectedConstitution.id}
+            returnTo={editorReturnTo} canEdit={canEdit || canPublish} />
         }
         detailsPanel={
           <ConstitutionDetailsWorkspace
@@ -486,6 +494,10 @@ function EditorDocumentSection({ state }: { state: EditorSessionState }) {
       </p>
       {editorDocumentBody(state)}
       <EditorSectionTitles state={state} />
+      {!structured && state.selectedConstitution ? (
+        <DocumentLinks targetType="constitution" targetId={state.selectedConstitution.id}
+          returnTo={state.editorReturnTo} canEdit={state.canEdit || state.canPublish} />
+      ) : null}
       <EditorSessionActions state={state} />
     </section>
   );
@@ -509,11 +521,11 @@ function reviewChanges(state: EditorSessionState) {
         : undefined,
       rootId: (targetRoot ?? sourceRoot)?.logicalId,
       sourceLink: sourceRoot?.occurrenceId
-        ? `/versions/${structured.sourceVersionId}/units/${sourceRoot.occurrenceId}`
+        ? passageReaderHref(state.sourceVersion, structured.sourceVersionId, sourceRoot.occurrenceId)
         : undefined,
       targetLink:
         preview.newVersionId && targetOccurrence
-          ? `/versions/${preview.newVersionId}/units/${targetOccurrence}`
+          ? passageReaderHref(state.sourceVersion, preview.newVersionId, targetOccurrence)
           : undefined,
     };
   });
@@ -534,6 +546,7 @@ function selectedPreview(structured: Structured, selectedRootId: string) {
 }
 /** Unknown tab query values retain the default editing tab. */
 function initialTab(tab?: string) {
+  if (tab === 'documents') return 'documents';
   return tab === 'wiki' ? 'wiki' : tab === 'details' ? 'details' : undefined;
 }
 /** Wiki command-result values remain a closed set before reaching the workspace. */

@@ -161,3 +161,19 @@ describe('draft, review and legal-change command boundaries', () => {
     const upstream = vi.fn<typeof fetch>(); vi.stubGlobal('fetch', upstream); const response = await POST(request('load', {}, { 'x-forwarded-host': 'atlas.example', 'x-forwarded-proto': 'https' })); expect(response.headers.get('location')).toContain('https://atlas.example/editor?'); expect(upstream).not.toHaveBeenCalled();
   });
 });
+
+describe('amendment saves keep failures in the workspace', () => {
+  function amendmentRequest(title = 'Draft title') {
+    return new NextRequest('http://localhost/editor/command', { method:'POST',headers:{origin:'http://localhost',host:'localhost',accept:'application/json'},body:new URLSearchParams({command:'amendment-save',amendmentId:'amendment',constitutionId:'constitution',title,comment:'Public comment',changesJson:'[]',documentsJson:'[]'}) });
+  }
+  it('returns a persisted destination only after a successful append',async()=>{
+    const fetchMock=vi.fn<typeof fetch>().mockResolvedValue(Response.json({id:'revision'}));vi.stubGlobal('fetch',fetchMock);
+    const response=await POST(amendmentRequest());expect(response.status).toBe(200);expect(await response.json()).toEqual({destination:'/editor/amendments/amendment?saved=1'});expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+  it('returns validation or service errors without redirecting or publishing',async()=>{
+    const fetchMock=vi.fn<typeof fetch>().mockResolvedValue(Response.json({error:'Invalid'}, {status:400}));vi.stubGlobal('fetch',fetchMock);
+    const invalid=await POST(amendmentRequest(''));expect(invalid.status).toBe(400);expect(await invalid.json()).toEqual({key:'title'});expect(fetchMock).not.toHaveBeenCalled();
+    const rejected=await POST(amendmentRequest());expect(rejected.status).toBe(400);expect(rejected.headers.get('location')).toBeNull();expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(String(fetchMock.mock.calls[0][0])).not.toContain('publish');
+  });
+});

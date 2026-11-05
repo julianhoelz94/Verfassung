@@ -1,3 +1,4 @@
+import { hasTrustedOrigin } from '../../../lib/request-origin';
 import { NextRequest, NextResponse } from 'next/server';
 import { AmendmentApiError } from '../../../lib/amendment-editor-api';
 import { EditorApiError } from '../../../lib/editor-api';
@@ -5,7 +6,7 @@ import * as amendment from './amendment-handlers';
 import * as draft from './draft-handlers';
 import * as source from './source-handlers';
 import * as publication from './publication-handlers';
-import { commandContext, editorPath, hasTrustedOrigin, redirectTo, value, type CommandContext } from './request';
+import { commandContext, editorPath, redirectTo, value, type CommandContext } from './request';
 
 type CommandHandler = (context: CommandContext) => Promise<NextResponse> | NextResponse;
 
@@ -52,7 +53,10 @@ function commandFailure(context: CommandContext, error: unknown): NextResponse {
 }
 
 /** New amendment errors retain constitution context; existing records retain only their selected identity. */
-function amendmentFailure({ request, form }: CommandContext, error: AmendmentApiError): NextResponse {
+function amendmentFailure({ request, form, command }: CommandContext, error: AmendmentApiError): NextResponse {
+  if (command === 'amendment-save' && request.headers.get('accept')?.includes('application/json')) {
+    return NextResponse.json({ key: error.key }, { status: 400 });
+  }
   const id = value(form, 'amendmentId');
   const detail = id && id !== 'new' ? id : 'new';
   const params = new URLSearchParams({ error: error.key });

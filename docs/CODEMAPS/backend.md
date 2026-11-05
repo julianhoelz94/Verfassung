@@ -69,6 +69,8 @@ Clients: identity (mutating Bearer), content (`includeBody=true` trees), catalog
 `AmendmentChangeReferences` and `AmendmentReferenceResolver` validate request-local
 selections and trusted snapshot projections. `AmendmentLinkedChanges` and
 `AmendmentChangeProjection` retain target-link selection and row projections;
+`AmendmentReaderLinks` caches optional Catalog owner reads per request when
+enriching results with canonical country/jurisdiction reader anchors;
 `AmendmentDiffMatching` owns the existing legacy diff phases. Service transactions
 and public entry points remain in `AmendmentService`.
 

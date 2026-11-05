@@ -159,6 +159,12 @@ export function reviewFixtures(germany) {
   }
 
   return { country, corrections, async response(req, method, pathname, readBody) {
+    if (method === 'POST' && pathname === '/__sprint59_import') {
+      const state = await readBody(req);
+      job.versionId = state.prepared ? REVIEW_CURRENT : null;
+      job.status = state.status ?? 'pending_review';
+      return job;
+    }
     if (method === 'POST' && pathname === '/__sprint59_setup') return configureSetup(req, readBody);
     if (method === 'GET') return readReview(req, pathname);
     if (method === 'PUT' && pathname === '/api/identity/setup') return updateSetup(req, readBody);

@@ -17,6 +17,18 @@ async function get(fixture: ReturnType<typeof reviewFixtures>, pathname: string,
 }
 
 describe('UI review fixture public request contracts', () => {
+  test('stages import preparation and status in the shared job projection', async () => {
+    const fixture = reviewFixtures(country);
+    const staged = request(fixture, 'POST', '/__sprint59_import', { prepared: true, status: 'approved' });
+    expect((await staged.result).versionId).toBe(REVIEW_CURRENT);
+    expect(staged.reads()).toBe(1);
+    expect((await get(fixture, `/api/ingestion/import-jobs/${REVIEW_JOB}`)).status).toBe('approved');
+    expect(await get(fixture, '/api/ingestion/import-jobs', '/api/ingestion/import-jobs?status=approved')).toHaveLength(1);
+    await request(fixture, 'POST', '/__sprint59_import', {}).result;
+    expect((await get(fixture, `/api/ingestion/import-jobs/${REVIEW_JOB}`)).versionId).toBeNull();
+    expect((await get(fixture, `/api/ingestion/import-jobs/${REVIEW_JOB}`)).status).toBe('pending_review');
+  });
+
   test('keeps source versions intact while publishing the review correction tip', async () => {
     const input = structuredClone(country);
     const fixture = reviewFixtures(input);

@@ -85,7 +85,7 @@ export async function importWorkflow(ctx, scenario, state) {
     const search = await ctx.api('GET', `search/search?q=Explorationneedle&versionId=${job.versionId}`, undefined, false);
     assert.equal(search.total, 0, `${scenario.key}: unpublished search exclusion`);
   }
-  return { ...result, jobId: job.id, versionId: job.versionId, href: `/admin/import/${job.id}`, state: job.status };
+  return { ...result, jobId: job.id, versionId: job.versionId, href: `/editor?importJobId=${encodeURIComponent(job.id)}`, state: job.status };
 }
 export async function setupWorkflow(ctx, scenario) {
   const known = ctx.journal.data.scenarios[scenario.key];

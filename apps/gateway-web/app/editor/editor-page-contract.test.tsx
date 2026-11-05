@@ -47,6 +47,7 @@ vi.mock('./StructuredEditor', () => ({
     return <p>Structured root {props.rootId}</p>;
   },
 }));
+vi.mock('./documents/DocumentLinks', () => ({ DocumentLinks: () => null }));
 vi.mock('./wiki/WikiWorkspace', () => ({ ConstitutionWikiPanel: () => null }));
 vi.mock('./ConstitutionDetailsWorkspace', () => ({
   ConstitutionDetailsWorkspace: () => null,
@@ -223,8 +224,8 @@ describe('editor page session contracts', () => {
     preview.unitMapping = { 'logical-1': 'published-occurrence' };
     await render();
     expect(structuredProps?.review?.[0]).toMatchObject({
-      sourceLink: `/versions/${original.id}/units/occurrence-1`,
-      targetLink: '/versions/published/units/published-occurrence',
+      sourceLink: `/countries/XA/versions/${original.id}#occurrence-1`,
+      targetLink: '/countries/XA/versions/published#published-occurrence',
       rootId: 'logical-1',
     });
   });

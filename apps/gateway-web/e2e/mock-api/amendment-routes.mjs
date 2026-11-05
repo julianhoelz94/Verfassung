@@ -9,6 +9,14 @@ import {
   readBody,
 } from "./state.mjs";
 
+/** Model server-derived reader links rather than trusting submitted URLs. */
+function amendmentReaderLinks(changes = []) {
+  const reference = ref => ref?.versionId && (ref.occurrenceId || ref.rootOccurrenceId)
+    ? { ...ref, deepLink: `/countries/DE/versions/${encodeURIComponent(ref.versionId)}#${encodeURIComponent(ref.occurrenceId || ref.rootOccurrenceId)}` }
+    : ref;
+  return changes.map(change => ({ ...change, beforeRef: reference(change.beforeRef), afterRef: reference(change.afterRef) }));
+}
+
 /** Retain the version-scoped published amendment fixture. */
 export function handleVersionAmendments(context) {
   const { method, pathname, res } = context;
@@ -95,7 +103,7 @@ async function handleCreateAmendmentResponse(
     sourceReference: body.sourceReference ?? null,
     sourceVersionId: body.sourceVersionId ?? null,
     targetVersionId: body.targetVersionId ?? null,
-    changes: body.changes ?? [],
+    changes: amendmentReaderLinks(body.changes),
   };
   mockAmendments.set(created.id, created);
   json(res, 201, created);
@@ -208,6 +216,7 @@ async function handleReviseAmendmentResponse(context, amendmentRevisionMatch) {
   const updated = {
     ...existing,
     ...body,
+    changes: amendmentReaderLinks(body.changes ?? existing.changes),
     id: existing.id,
     status: existing.status,
     constitutionId: existing.constitutionId,

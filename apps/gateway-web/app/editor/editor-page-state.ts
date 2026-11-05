@@ -103,6 +103,7 @@ async function loadCatalogContext(versionId: string) {
   return {
     versionId,
     staffAuthorization,
+    sourceVersion,
     selectedCountry,
     selectedConstitution,
     selectedVersion,
@@ -377,6 +378,7 @@ export async function loadEditorSession(
     selectedCountry,
     selectedConstitution,
     selectedVersion,
+    sourceVersion: catalog.sourceVersion,
     displayOutline,
     settings: catalog.settings,
     locale,

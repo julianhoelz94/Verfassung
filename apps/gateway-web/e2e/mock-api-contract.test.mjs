@@ -330,3 +330,39 @@ test("import failure and archive state remain observable until reset replaces th
   await request("/__reset", "POST");
   assert.equal((await request(path)).status, 404);
 });
+
+test("document scenario overrides review fixtures, retains upload receipts and resets", async () => {
+  await request("/__sprint59_content", "POST");
+  assert.equal((await request("/api/document/documents")).body.length, 1);
+  await request("/__editor_documents", "POST");
+  assert.deepEqual((await request("/api/document/documents")).body, []);
+  const path = "/api/document/links/constitution/test/documents";
+  const upload = async () => {
+    const body = new FormData();
+    body.set("metadata", new Blob([JSON.stringify({ operationId: "upload", title: "Evidence" })], { type: "application/json" }));
+    body.set("file", new Blob(["Source evidence"], { type: "text/plain" }), "source.txt");
+    const result = await fetch(`${origin}${path}`, { method: "POST", body });
+    assert.equal(result.status, 201);
+    return result.json();
+  };
+  const document = await upload();
+  assert.equal(document.revision.title, "Evidence");
+  assert.equal(document.revision.fileName, "source.txt");
+  assert.deepEqual(await upload(), document);
+  assert.equal((await request("/api/document/links/constitution/test")).body.length, 1);
+  assert.equal((await request("/health", "POST")).status, 200);
+  assert.equal((await request("/__reset", "POST")).status, 204);
+  assert.deepEqual((await request("/api/document/documents")).body, []);
+});
+
+test("amendment writes derive published reader links for creates and retained revisions", async () => {
+  const path = "/api/amendment/constitutions/01900000-0000-4000-8000-000000000002/amendments";
+  const changes = [{ beforeRef: { versionId: "before", occurrenceId: "article 1", deepLink: "/submitted" }, afterRef: { versionId: "after", rootOccurrenceId: "root" } }];
+  const created = await request(path, "POST", { changes });
+  assert.equal(created.status, 201);
+  assert.equal(created.body.changes[0].beforeRef.deepLink, "/countries/DE/versions/before#article%201");
+  assert.equal(created.body.changes[0].afterRef.deepLink, "/countries/DE/versions/after#root");
+  const revised = await request(`/api/amendment/amendments/${created.body.id}/revisions`, "POST", { title: "Updated title" });
+  assert.equal(revised.status, 200);
+  assert.deepEqual(revised.body.changes, created.body.changes);
+});

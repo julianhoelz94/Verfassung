@@ -17,20 +17,20 @@ function html(text: string, context: CrossRefContext = en): string {
 describe('linkifyReferences', () => {
   it('links an English Article number that exists', () => {
     const markup = html('See Article 1 for dignity.');
-    expect(markup).toContain('href="/countries/DE/versions/v1/articles/id-1"');
+    expect(markup).toContain('href="/countries/DE/versions/v1#id-1"');
     expect(markup).toContain('Article 1');
   });
 
   it('keeps historical jurisdiction references pinned without inventing a country route', () => {
-    const markup = html('See Article 1.', { ...en, code: undefined });
-    expect(markup).toContain('href="/versions/v1/units/id-1"');
+    const markup = html('See Article 1.', { ...en, code: undefined, jurisdictionId: 'historical-region' });
+    expect(markup).toContain('href="/jurisdictions/historical-region/versions/v1#id-1"');
     expect(markup).not.toContain('/countries/');
   });
 
   it('links two English references in one string', () => {
     const markup = html('Read Article 1 then Article 20.');
-    expect(markup).toContain('articles/id-1');
-    expect(markup).toContain('articles/id-20');
+    expect(markup).toContain('versions/v1#id-1');
+    expect(markup).toContain('versions/v1#id-20');
   });
 
   it('leaves a non-existent number as plain text', () => {
@@ -46,8 +46,8 @@ describe('linkifyReferences', () => {
 
   it('links German Art. and Artikel when the outline label is Artikel', () => {
     const de = { ...en, kindLabel: 'Artikel' };
-    expect(html('Siehe Art. 1.', de)).toContain('articles/id-1');
-    expect(html('Artikel 16a gilt.', de)).toContain('articles/id-16a');
+    expect(html('Siehe Art. 1.', de)).toContain('versions/v1#id-1');
+    expect(html('Artikel 16a gilt.', de)).toContain('versions/v1#id-16a');
     expect(html('Artikel 99 fehlt.', de)).not.toContain('href=');
   });
 });

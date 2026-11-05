@@ -1,4 +1,4 @@
-import type { NextResponse } from 'next/server';
+import { NextResponse, type NextRequest } from 'next/server';
 import { readWriteBody } from '../../../lib/amendment-form';
 import { appendRevision, confirmAmendmentQuotes, createAmendment, publishAmendment, withdrawAmendment } from '../../../lib/amendment-editor-api';
 import { redirectTo, value, type CommandContext } from './request';
@@ -11,10 +11,17 @@ export async function saveAmendment({ request, form }: CommandContext): Promise<
   if (!id || id === 'new') {
     if (!constitutionId) return redirectTo(request, '/editor/amendments?error=invalid');
     const created = await createAmendment(constitutionId, body);
-    return redirectTo(request, `/editor/amendments/${encodeURIComponent(created.id)}?saved=1`);
+    return savedAmendmentResponse(request, created.id);
   }
   await appendRevision(id, body);
-  return redirectTo(request, `/editor/amendments/${encodeURIComponent(id)}?saved=1`);
+  return savedAmendmentResponse(request, id);
+}
+
+/** JSON saves keep the mounted form on errors; native submissions retain their redirect destination. */
+function savedAmendmentResponse(request: NextRequest, id: string): NextResponse {
+  const destination = `/editor/amendments/${encodeURIComponent(id)}?saved=1`;
+  return request.headers.get('accept')?.includes('application/json')
+    ? NextResponse.json({ destination }) : redirectTo(request, destination);
 }
 
 /** A transition can target only an existing selected record and returns its specific outcome flag. */

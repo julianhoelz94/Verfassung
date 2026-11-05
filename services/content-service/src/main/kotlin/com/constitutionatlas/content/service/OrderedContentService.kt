@@ -1,5 +1,6 @@
 package com.constitutionatlas.content.service
 
+import com.constitutionatlas.content.CatalogUnavailableException
 import com.constitutionatlas.content.api.OrderedNode
 import com.constitutionatlas.content.api.OrderedNodeWrite
 import com.constitutionatlas.content.api.OrderedSnapshot
@@ -10,6 +11,7 @@ import com.constitutionatlas.content.client.StructuralSettings
 import com.constitutionatlas.content.repo.OrderedContentRepository
 import com.constitutionatlas.platform.NotFoundException
 import com.constitutionatlas.platform.OrderedContentRules
+import com.constitutionatlas.platform.readerPassageHref
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
@@ -97,13 +99,16 @@ class OrderedContentService(
 
     @Transactional
     fun resolve(version: UUID, logical: UUID): ResolvedContent {
-        val constitutionId = catalog.getVersion(version)?.constitutionId ?: throw NotFoundException("Version '$version' not found")
+        val metadata = catalog.getVersion(version) ?: throw NotFoundException("Version '$version' not found")
+        val constitutionId = metadata.constitutionId ?: throw NotFoundException("Version '$version' not found")
+        fun link(occurrence: UUID): String = readerPassageHref(metadata.countryCode, metadata.jurisdictionId, version, occurrence)
+            ?: throw CatalogUnavailableException("Catalog did not supply a reader location")
         val snapshot = get(version)
         fun label(node: OrderedNode): String = listOfNotNull(node.kind, node.label, node.title).joinToString(" ")
         fun walk(node: OrderedNode, path: List<UUID>, pathLabels: List<String>, root: UUID, rootLabel: String?): ResolvedContent? {
-            if (node.logicalId == logical) return ResolvedContent(version, constitutionId, logical, node.revisionId, node.occurrenceId, root, path.lastOrNull(), path, pathLabels + label(node), node.kind, rootLabel, plainText(node), "/versions/$version/units/$root?occurrenceId=${node.occurrenceId}")
+            if (node.logicalId == logical) return ResolvedContent(version, constitutionId, logical, node.revisionId, node.occurrenceId, root, path.lastOrNull(), path, pathLabels + label(node), node.kind, rootLabel, plainText(node), link(node.occurrenceId))
             node.content.forEach { entry ->
-                if (entry.logicalId == logical) return ResolvedContent(version, constitutionId, logical, entry.revisionId!!, entry.occurrenceId!!, root, node.logicalId, path + node.logicalId, pathLabels + label(node) + "Parent text", "parent_text", rootLabel, entry.text!!, "/versions/$version/units/$root?occurrenceId=${entry.occurrenceId}")
+                if (entry.logicalId == logical) return ResolvedContent(version, constitutionId, logical, entry.revisionId!!, entry.occurrenceId!!, root, node.logicalId, path + node.logicalId, pathLabels + label(node) + "Parent text", "parent_text", rootLabel, entry.text!!, link(entry.occurrenceId!!))
                 entry.node?.let { walk(it, path + node.logicalId, pathLabels + label(node), root, rootLabel)?.let { found -> return found } }
             }
             return null

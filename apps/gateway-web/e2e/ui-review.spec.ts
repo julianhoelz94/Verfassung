@@ -5,6 +5,7 @@ import { uiRoutes, uiStates } from './fixtures/ui-routes';
 
 const mock = `http://127.0.0.1:${process.env.E2E_MOCK_PORT ?? 4010}`;
 const sizes = [390, 820, 1440];
+const snapshotEntries = process.env.E2E_SNAPSHOT_ENTRY?.split(',');
 const axePath = path.join(process.cwd(), 'node_modules/axe-core/axe.min.js');
 
 test('the review inventory includes every page entry point', () => {
@@ -34,12 +35,12 @@ for (const locale of ['en', 'de']) for (const width of sizes) {
     const staffPage = await staffContext.newPage();
     const evidence: Array<{ route: string; status: number | undefined; heading: string | null }> = [];
     try {
-      for (const route of [...uiRoutes, ...uiStates]) await test.step(route.entry, async () => {
+      for (const route of [...uiRoutes, ...uiStates].filter(route => !snapshotEntries || snapshotEntries.includes(route.entry))) await test.step(route.entry, async () => {
         await prepareReviewRoute(route, publicPage, request, locale);
         const page = 'staff' in route && route.staff ? staffPage : publicPage;
         const response = await page.goto(route.path);
         expect(response?.status(), route.path).toBeLessThan(400);
-        const expectedPath = reviewDestination(route, baseURL);
+        const expectedPath = new URL(route.path, baseURL).pathname;
         await expect.poll(() => new URL(page.url()).pathname, { message: `Unexpected redirect for ${route.path}` }).toBe(expectedPath);
         const heading = await assertReviewPage(page, route, locale);
         await auditReviewAccessibility(page, route, locale, width);
@@ -63,7 +64,7 @@ for (const locale of ['en', 'de']) test(`secondary controls work by keyboard wit
   await context.addInitScript(() => localStorage.setItem('ca_cookie_notice_v1', 'dismissed'));
   const page = await context.newPage();
   try {
-    for (const path of ['/admin/import?mode=new', '/account', '/admin/legal/datenschutz', '/countries/DE/constitution-timeline?on=2026-01-01']) {
+    for (const path of ['/admin/import?mode=new', '/account', '/admin/legal/datenschutz', '/countries/DE/timeline?on=2026-01-01']) {
       await page.goto(path);
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), path).toBeTruthy();
     }
@@ -93,11 +94,6 @@ async function prepareReviewRoute(route: ReviewRoute, publicPage: Page, request:
     await expect(publicPage.locator('.nav-primary a')).toHaveCount(0);
   }
   if ('session' in route && route.session) expect((await request.post(`${mock}/api/editor/edit-sessions`, { data: { versionId: '01900000-0000-4000-8000-000000000804', hopKind: 'editorial_correction' } })).ok()).toBeTruthy();
-}
-
-/** Preserve the three canonical redirects before using the route's ordinary pathname. */
-function reviewDestination(route: ReviewRoute, baseURL: string) {
-  return route.entry === '/admin/import/[jobId]' ? '/editor' : route.entry === '/countries/[code]/constitution-timeline' ? '/countries/DE/timeline' : route.entry === '/versions/[versionId]/units/[unitId]' ? `/countries/DE${route.path}` : new URL(route.path, baseURL).pathname;
 }
 
 /** Assert shared page landmarks, availability, task controls and overflow before audits. */
@@ -142,7 +138,7 @@ async function auditReviewAccessibility(page: Page, route: ReviewRoute, locale: 
 
 /** Keep opt-in Linux snapshots, filtering, soft assertions, names and timeouts unchanged. */
 async function captureReviewSnapshot(page: Page, route: ReviewRoute, locale: string, width: number) {
-  if ('snapshot' in route && route.snapshot && process.platform === 'linux' && process.env.E2E_SKIP_VISUAL !== 'true' && (!process.env.E2E_SNAPSHOT_ENTRY || process.env.E2E_SNAPSHOT_ENTRY === route.entry)) {
+  if ('snapshot' in route && route.snapshot && process.platform === 'linux' && process.env.E2E_SKIP_VISUAL !== 'true' && (!snapshotEntries || snapshotEntries.includes(route.entry))) {
     const name = route.entry.replace(/\//g, '-').replace(/[\[\]]/g, '').replace(/^-/, '');
     await expect.soft(page).toHaveScreenshot(`review-${name}-${locale}-${width}.png`, { fullPage: true, timeout: 15_000 });
   }

@@ -1,4 +1,5 @@
 "use client";
+import { passageReaderHref, type ReaderOwner } from "../../lib/reader-links";
 import { reconcileCanvasOperations } from "./structured-canvas-reconciliation";
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
@@ -85,7 +86,9 @@ export type IndexedNote = {
 };
 
 export type StructuredEditorProps = {
-  initialTab?: "wiki" | "details";
+  readerOwner?: ReaderOwner;
+  initialTab?: "wiki" | "details" | "documents";
+  documentsPanel?: React.ReactNode;
   wikiPanel?: React.ReactNode;
   detailsPanel?: React.ReactNode;
   review?: ReviewDifference[];
@@ -104,6 +107,8 @@ export type StructuredEditorProps = {
 };
 /** Owns the editor's existing state, refs and ordered commands without adding a React boundary. */
 export function useStructuredEditorModel({
+  readerOwner,
+  documentsPanel,
   initialTab,
   wikiPanel,
   detailsPanel,
@@ -141,8 +146,8 @@ export function useStructuredEditorModel({
   const [selection, setSelection] = useState(selectedNode ?? rootId),
     [panel, setPanel] = useState(""),
     [mode, setMode] = useState<
-      "edit" | "changes" | "preview" | "wiki" | "details"
-    >(initialEditorMode(initialTab, wikiPanel, detailsPanel, editable));
+      "edit" | "changes" | "preview" | "wiki" | "details" | "documents"
+    >(initialEditorMode(initialTab, wikiPanel, detailsPanel, documentsPanel, editable));
 
   const [noteHistory, setNoteHistory] = useState<NoteDraft[]>([]),
     [noteFuture, setNoteFuture] = useState<NoteDraft[]>([]),
@@ -1636,11 +1641,7 @@ export function useStructuredEditorModel({
         : owner?.occurrenceId,
       occurrence = target ? unitMapping?.[id] : unit?.occurrenceId;
     return version && rootOccurrence
-      ? "/versions/" +
-          encodeURIComponent(version) +
-          "/units/" +
-          encodeURIComponent(rootOccurrence) +
-          (occurrence ? "?occurrenceId=" + encodeURIComponent(occurrence) : "")
+      ? passageReaderHref(readerOwner, version, rootOccurrence, occurrence)
       : undefined;
   }
   return {
@@ -1666,6 +1667,7 @@ export function useStructuredEditorModel({
     createNode,
     currentRoot,
     detailsPanel,
+    documentsPanel,
     differenceReference,
     differences,
     editable,
@@ -1757,8 +1759,10 @@ function initialEditorMode(
   initialTab: StructuredEditorProps["initialTab"],
   wikiPanel: React.ReactNode,
   detailsPanel: React.ReactNode,
+  documentsPanel: React.ReactNode,
   editable: boolean,
-): "edit" | "changes" | "preview" | "wiki" | "details" {
+): "edit" | "changes" | "preview" | "wiki" | "details" | "documents" {
+  if (initialTab === "documents" && documentsPanel) return "documents";
   return initialTab === "wiki" && wikiPanel
     ? "wiki"
     : initialTab === "details" && detailsPanel

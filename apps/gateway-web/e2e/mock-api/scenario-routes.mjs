@@ -1,3 +1,4 @@
+import { editorDocuments } from "../fixtures/editor-documents.mjs";
 import { exactRoute } from "./route.mjs";
 import {
   countryDirectoryFixtures,
@@ -17,6 +18,29 @@ export function handleHealth(context) {
   const { pathname, res } = context;
   if (!(pathname === "/health")) return false;
   json(res, 200, { ok: true });
+  return true;
+}
+
+/** Install a fresh document store before other scenario overrides. */
+export function handleEditorDocumentsSetup(context) {
+  const { pathname, method, res } = context;
+  if (!(method === "POST" && pathname === "/__editor_documents")) return false;
+  mockState.editorDocumentScenario = editorDocuments();
+  json(res, 200, {});
+  return true;
+}
+
+/** Keep synchronous misses and delegate only while the document scenario is enabled. */
+export function handleEditorDocumentsOverride(context) {
+  if (!mockState.editorDocumentScenario) return false;
+  return handleEditorDocumentsResponse(context);
+}
+
+/** Let recognized document endpoints override later UI-review and domain routes. */
+async function handleEditorDocumentsResponse({ req, res, method, url }) {
+  const response = await mockState.editorDocumentScenario(req, method, url);
+  if (!response) return false;
+  json(res, response.status, await response.json());
   return true;
 }
 

@@ -29,6 +29,8 @@ data class CatalogVersion(
     val constitutionId: UUID? = null,
     val listing: String = "public",
     val currentVersionId: UUID? = null,
+    val countryCode: String? = null,
+    val jurisdictionId: UUID? = null,
 )
 
 data class StructuralLevel(

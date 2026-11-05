@@ -183,12 +183,15 @@ describe("constitution rendering contracts", () => {
       },
     });
     expect(html).toContain(
-      'href="/countries/DE/versions/version/units/snapshot-root#snapshot-occ"',
+      'href="/countries/DE/versions/version#snapshot-occ"',
     );
     expect(html).not.toContain('href="#local-target-occ"');
   });
 
-  it("uses the jurisdiction-neutral snapshot route without a country code", () => {
+  it.each([
+    { owner: { jurisdictionId: "region" }, expected: 'href="/jurisdictions/region/versions/version#occ"' },
+    { owner: {}, expected: 'class="xref-unavailable"' },
+  ])("uses the owning reader or marks ownerless targets unavailable: $expected", ({ owner, expected }) => {
     const entry = text("t", "link", {
       references: [
         {
@@ -202,14 +205,14 @@ describe("constitution rendering contracts", () => {
     const html = render({
       entries: [entry],
       crossRefs: {
+        ...owner,
         versionId: "version",
         articlesByNumber: {},
         unitsByLogicalId: { target: { rootId: "root", occurrenceId: "occ" } },
       },
     });
-    expect(html).toContain(
-      'href="/versions/version/units/root?occurrenceId=occ"',
-    );
+    expect(html).toContain(expected);
+    expect(html).not.toContain('/versions/version/units/');
   });
 
   it("uses local occurrence anchors and retains unavailable formatted references", () => {

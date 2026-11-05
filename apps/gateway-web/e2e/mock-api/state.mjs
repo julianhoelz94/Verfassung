@@ -275,6 +275,7 @@ const editorState = {
 
 /** Mutable replacements remain request-visible after every reset, login and write. */
 export const mockState = {
+  editorDocumentScenario: undefined,
   pendingMfaEmail: identityMe.email,
   currentUser: { ...identityMe },
   importJobs: new Map(),
@@ -335,6 +336,7 @@ const WIKI_IMAGE = {
 
 /** Replace request-visible collections and flags while retaining fixture, version and editor aliases. */
 function resetMockState() {
+  mockState.editorDocumentScenario = undefined;
   mockState.directoryScenario = undefined;
   mockState.directoryUnavailable = [];
   mockState.continuousReader = false;

@@ -657,6 +657,24 @@ TypeScript/JavaScript functions**, zero exceptions or violations, and zero Kotli
 method/file exceptions. No budgets, baselines, dependencies, assertions or visual
 baselines were weakened. Browser and final CI results are recorded in draft PR #219.
 
+## Reconciliation with the amendment workspace update
+
+Before merging PR #219, the branch incorporated main revision `a22cc30` (PR #231).
+The resolutions preserve the new Documents tab with mounted draft state, bounded
+passage comparison and review callbacks, JSON amendment-save outcomes, direct
+country/jurisdiction reader links, document fixture interception and retired-route
+404 behavior. Amendment reader enrichment now uses the documented request-local
+`AmendmentReaderLinks` cache behind the existing projection/service boundary.
+
+The rewritten amendment form introduced on main scored **35**; plain local render
+helpers reduce it to **15** without adding React component boundaries. The complete
+Kotlin and TypeScript/JavaScript complexity gates pass with **zero exceptions**;
+the maximum remains **20 per function** and **100 per Kotlin file**. Focused merge
+regressions cover document-tab draft preservation, review callback/link behavior,
+mock document retries/reset and canonical renderer links. Independent review and
+verification found no remaining merge-adaptation blocker. PR #219 records the
+final full regression and CI results.
+
 ## Original assessment at a maximum of 15
 
 Assessment date: 2026-10-28. Source revision: `5c359b1`, before application

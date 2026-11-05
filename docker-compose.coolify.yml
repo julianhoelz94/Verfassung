@@ -8,7 +8,6 @@ services:
       TLS_TRUSTED_PROXIES: ${TLS_TRUSTED_PROXIES:?Set the actual Coolify proxy CIDRs}
       CADDY_BIND_ADDRESS: 0.0.0.0
       CADDY_EXPOSE_API_DOCS: 'true'
-      ATLAS_LEGACY_HOST: ${ATLAS_LEGACY_HOST:-legacy.localhost}
     volumes:
     - caddy-data:/data
     - caddy-config:/config

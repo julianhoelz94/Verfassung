@@ -100,6 +100,42 @@ export function AmendmentForm({ amendmentId, constitutionId, amendment, versions
     } catch {setSaveError(copy('Saving could not be confirmed. Your edits are still here. Check the saved history before submitting again.','Das Speichern konnte nicht bestätigt werden. Deine Eingaben bleiben erhalten. Prüfe den gespeicherten Verlauf vor einem erneuten Versuch.'));}
     finally {saving.current=false;setSavePending(false);}
   }
+  /** Saved publication status and local unsaved changes remain visible across tasks. */
+  function renderStatus(): ReactNode {
+    if (!amendment?.status) return null;
+    return <Inline><Badge tone={amendment.status==='published'?'added':amendment.status==='withdrawn'?'removed':'changed'}><T value={statusMessage(amendment.status)} /></Badge>{dirty?<span className={styles.muted}>{copy('Unsaved changes','Ungespeicherte Änderungen')}</span>:null}</Inline>;
+  }
+
+  /** Keep the saved-review identity and permissions while the draft form stays mounted. */
+  function renderReview(): ReactNode {
+    return <section hidden={view!=='review'} id="amendment-view-review">
+        {pairChanged ? <Alert tone="info">{copy('Save the new constitution pair before reviewing its differences.','Speichere das neue Verfassungspaar, bevor du seine Unterschiede prüfst.')}</Alert> : diffReview ? <DiffReviewQueue key={diffReview.revisionId} target={{kind:'amendment',id:amendmentId}} initial={diffReview} onReviewChange={setReview} readerOwners={readerOwners}
+          rows={(amendment?.changes ?? []).map((change,index) => ({id:change.id,label:`${index+1}. ${t(changeTypeMessage(change.changeType))} ${change.articleNumber ?? ''} ${change.note ?? ''}`.trim()}))}
+          canDecide={(canReviewDiff&&!readOnly)||canAcknowledgeDiff} canAcknowledge={canAcknowledgeDiff} onCorrectPairing={() => go('passages')} onAddRow={!readOnly?addCandidateRow:undefined}/> : <Alert tone="info">{copy('Save a draft with two published constitution snapshots to review detected differences.','Speichere einen Entwurf mit zwei veröffentlichten Verfassungsständen, um erkannte Unterschiede zu prüfen.')}</Alert>}
+      </section>;
+  }
+
+  /** Render current attachments separately from older source references. */
+  function renderDocuments(): ReactNode {
+    return <Stack hidden={view!=='documents'} id="amendment-view-documents">
+        {documentsPanel ?? <Alert tone="info">{copy('Save this amendment first, then upload or choose documents here.','Speichere diese Änderung zuerst. Danach kannst du hier Dokumente hochladen oder auswählen.')}</Alert>}
+        {amendment?.documents?.length ? <details><summary>{copy('Older source references','Ältere Quellenverweise')}</summary><ul>{amendment.documents.map((document,index) => <li key={index}>{document.url?<a href={document.url} target="_blank" rel="noreferrer">{document.label||document.url}</a>:document.label||document.fileId}</li>)}</ul></details>:null}
+      </Stack>;
+  }
+
+  /** Publication always targets the saved amendment and remains blocked by unsaved or unresolved changes. */
+  function renderPublication(): ReactNode {
+    return <Stack hidden={view!=='publication'} id="amendment-view-publication">
+        <h2>{labels.publication}</h2>
+        <p>{copy('Save the draft and resolve the detected differences before publication. Publishing makes the current saved draft public.','Speichere den Entwurf und kläre die erkannten Unterschiede vor der Veröffentlichung. Der aktuelle gespeicherte Entwurf wird dadurch öffentlich.')}</p>
+        {dirty?<Alert tone="info">{copy('Save your changes before publishing.','Speichere deine Änderungen vor der Veröffentlichung.')}</Alert>:null}
+        {unresolved?<Alert tone="info">{unresolved} {copy('differences still need review or acknowledgement.','Unterschiede benötigen noch Prüfung oder Bestätigung.')}</Alert>:null}
+        {quoteReviewPanel}
+        {canPublish ? <form action="/editor/command" method="post"><input type="hidden" name="command" value="amendment-publish"/><input type="hidden" name="amendmentId" value={amendmentId}/><Stack><label><input type="checkbox" required/> {copy('I confirm this revision is ready for publication.','Ich bestätige, dass diese Revision bereit zur Veröffentlichung ist.')}</label><Button disabled={dirty||unresolved>0}>{copy('Publish law','Änderungsgesetz veröffentlichen')}</Button></Stack></form>:<p className={styles.muted}>{copy('Publication requires a publisher and a saved amendment.','Die Veröffentlichung erfordert eine gespeicherte Änderung und die Veröffentlichungsrolle.')}</p>}
+        {canWithdraw ? <details><summary>{copy('Withdraw published law','Veröffentlichtes Änderungsgesetz zurückziehen')}</summary><form action="/editor/command" method="post"><input type="hidden" name="command" value="amendment-withdraw"/><input type="hidden" name="amendmentId" value={amendmentId}/><Stack><label><input type="checkbox" required/> {copy('Confirm withdrawal from public view.','Rücknahme aus der öffentlichen Ansicht bestätigen.')}</label><Button>{copy('Withdraw','Zurückziehen')}</Button></Stack></form></details>:null}
+      </Stack>;
+  }
+
   const pair = <Stack className={styles.pair} gap="field"><div className={styles.heading}><h2>{copy('Constitution versions','Verfassungsfassungen')}</h2>{!readOnly ? <Button type="button" size="sm" onClick={() => {setPairSource(sourceVersionId);setPairTarget(targetVersionId);dialog.current?.showModal();}}>{copy('Choose constitution versions','Verfassungsfassungen wählen')}</Button>:null}</div>
     <p className={styles.muted}>{copy('One before and one after for the whole constitution. Only affected passages need review.','Ein Vorher und ein Nachher für die gesamte Verfassung. Nur betroffene Passagen müssen geprüft werden.')}</p>
     <div className={styles.pairLabels}><div><span>{copy('Before','Vorher')}</span>{versionLabel(sourceVersionId)}</div><div><span>{copy('After','Nachher')}</span>{versionLabel(targetVersionId)}</div></div></Stack>;
@@ -110,7 +146,7 @@ export function AmendmentForm({ amendmentId, constitutionId, amendment, versions
     </PageMenuBar></PageMenuFrame>
     <Stack className={styles.body} gap="card">
       {saveError?<Alert tone="error">{saveError}</Alert>:null}
-      {amendment?.status ? <Inline><Badge tone={amendment.status==='published'?'added':amendment.status==='withdrawn'?'removed':'changed'}><T value={statusMessage(amendment.status)} /></Badge>{dirty?<span className={styles.muted}>{copy('Unsaved changes','Ungespeicherte Änderungen')}</span>:null}</Inline>:null}
+      {renderStatus()}
       <Stack as="form" id="amendment-draft-form" elementRef={form} action="/editor/command" method="post" hidden={view!=='details'&&view!=='passages'} onInput={() => setDirty(true)} onSubmit={saveDraft} onInvalidCapture={(event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault(); const field=event.target as HTMLElement; const next=field.closest('[data-amendment-task="details"]')?'details':'passages'; go(next);
         for(const details of Array.from(field.closest('[data-amendment-task]')?.querySelectorAll('details') ?? [])) if(details.contains(field))details.open=true;
@@ -135,25 +171,10 @@ export function AmendmentForm({ amendmentId, constitutionId, amendment, versions
           <AmendmentChangesTable initialRows={changeRows} articleNumbers={articleNumbers} unitTreesByVersion={unitTreesByVersion} readerOwners={readerOwners} navigationRef={navigation} sourceVersionId={sourceVersionId} targetVersionId={targetVersionId} readOnly={readOnly} onRowsChange={rows => {setChangeRows(rows);setDirty(true);}}/>
         </Stack>
       </Stack>
-      <section hidden={view!=='review'} id="amendment-view-review">
-        {pairChanged ? <Alert tone="info">{copy('Save the new constitution pair before reviewing its differences.','Speichere das neue Verfassungspaar, bevor du seine Unterschiede prüfst.')}</Alert> : diffReview ? <DiffReviewQueue key={diffReview.revisionId} target={{kind:'amendment',id:amendmentId}} initial={diffReview} onReviewChange={setReview} readerOwners={readerOwners}
-          rows={(amendment?.changes ?? []).map((change,index) => ({id:change.id,label:`${index+1}. ${t(changeTypeMessage(change.changeType))} ${change.articleNumber ?? ''} ${change.note ?? ''}`.trim()}))}
-          canDecide={(canReviewDiff&&!readOnly)||canAcknowledgeDiff} canAcknowledge={canAcknowledgeDiff} onCorrectPairing={() => go('passages')} onAddRow={!readOnly?addCandidateRow:undefined}/> : <Alert tone="info">{copy('Save a draft with two published constitution snapshots to review detected differences.','Speichere einen Entwurf mit zwei veröffentlichten Verfassungsständen, um erkannte Unterschiede zu prüfen.')}</Alert>}
-      </section>
-      <Stack hidden={view!=='documents'} id="amendment-view-documents">
-        {documentsPanel ?? <Alert tone="info">{copy('Save this amendment first, then upload or choose documents here.','Speichere diese Änderung zuerst. Danach kannst du hier Dokumente hochladen oder auswählen.')}</Alert>}
-        {amendment?.documents?.length ? <details><summary>{copy('Older source references','Ältere Quellenverweise')}</summary><ul>{amendment.documents.map((document,index) => <li key={index}>{document.url?<a href={document.url} target="_blank" rel="noreferrer">{document.label||document.url}</a>:document.label||document.fileId}</li>)}</ul></details>:null}
-      </Stack>
+      {renderReview()}
+      {renderDocuments()}
       <Stack hidden={view!=='history'} id="amendment-view-history" className={styles.history}>{historyPanel ?? <p>{copy('No saved revisions yet.','Noch keine gespeicherten Revisionen.')}</p>}</Stack>
-      <Stack hidden={view!=='publication'} id="amendment-view-publication">
-        <h2>{labels.publication}</h2>
-        <p>{copy('Save the draft and resolve the detected differences before publication. Publishing makes the current saved draft public.','Speichere den Entwurf und kläre die erkannten Unterschiede vor der Veröffentlichung. Der aktuelle gespeicherte Entwurf wird dadurch öffentlich.')}</p>
-        {dirty?<Alert tone="info">{copy('Save your changes before publishing.','Speichere deine Änderungen vor der Veröffentlichung.')}</Alert>:null}
-        {unresolved?<Alert tone="info">{unresolved} {copy('differences still need review or acknowledgement.','Unterschiede benötigen noch Prüfung oder Bestätigung.')}</Alert>:null}
-        {quoteReviewPanel}
-        {canPublish ? <form action="/editor/command" method="post"><input type="hidden" name="command" value="amendment-publish"/><input type="hidden" name="amendmentId" value={amendmentId}/><Stack><label><input type="checkbox" required/> {copy('I confirm this revision is ready for publication.','Ich bestätige, dass diese Revision bereit zur Veröffentlichung ist.')}</label><Button disabled={dirty||unresolved>0}>{copy('Publish law','Änderungsgesetz veröffentlichen')}</Button></Stack></form>:<p className={styles.muted}>{copy('Publication requires a publisher and a saved amendment.','Die Veröffentlichung erfordert eine gespeicherte Änderung und die Veröffentlichungsrolle.')}</p>}
-        {canWithdraw ? <details><summary>{copy('Withdraw published law','Veröffentlichtes Änderungsgesetz zurückziehen')}</summary><form action="/editor/command" method="post"><input type="hidden" name="command" value="amendment-withdraw"/><input type="hidden" name="amendmentId" value={amendmentId}/><Stack><label><input type="checkbox" required/> {copy('Confirm withdrawal from public view.','Rücknahme aus der öffentlichen Ansicht bestätigen.')}</label><Button>{copy('Withdraw','Zurückziehen')}</Button></Stack></form></details>:null}
-      </Stack>
+      {renderPublication()}
     </Stack>
     <dialog ref={dialog} className={['dialog',styles.dialog].join(' ')} aria-labelledby="amendment-pair-title"><Stack>
       <h2 id="amendment-pair-title">{copy('Choose constitution versions','Verfassungsfassungen wählen')}</h2><p>{copy('This pair applies to the whole amendment. Existing mappings stay visible for correction.','Dieses Paar gilt für die gesamte Änderung. Bestehende Zuordnungen bleiben zur Korrektur sichtbar.')}</p>

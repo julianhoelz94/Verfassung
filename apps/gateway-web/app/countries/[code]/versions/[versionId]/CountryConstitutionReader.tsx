@@ -13,7 +13,7 @@ import { VersionReader } from '../../../../components/VersionReader';
 import { ReaderDetails } from '../../../../components/ReaderDetails';
 import { ContentTranslationRegion } from '../../../../components/ContentTranslationRegion';
 import { WikiContent } from '../../../../components/WikiContent';
-import { listAllUnits, listAmendments, getCountry, getReaderOutline, getVersion, getWikiPage } from '../../../../../lib/api';
+import { listAllUnits, listAmendments, getCountry, getReaderOutline, getVersion, getWikiPage, type Amendment, type VersionSummary } from '../../../../../lib/api';
 import { orderVersions } from '../../../../../lib/compare';
 import { publicSnapshotContext, snapshotVersionId, publicVersions } from '../../../../../lib/reading';
 import { VersionDocuments } from '../../../../components/VersionDocuments';
@@ -37,15 +37,13 @@ export async function CountryConstitutionReader({ code, versionId, error, initia
   const canEdit = Boolean(user?.roles.some(role => role === 'editor' || role === 'admin'));
   const canReview = Boolean(user?.roles.some(role => role === 'reviewer' || role === 'admin'));
   const canPublish = Boolean(user?.roles.some(role => role === 'publisher' || role === 'admin'));
-  const changeByArticle: Record<string, string> = {};
   const [wikiResult, amendments] = await Promise.all([
     getWikiPage('constitution', constitution.id).then(wiki => ({ wiki, unavailable: false })).catch(() => ({ wiki: null, unavailable: true })),
     listAmendments(params.versionId).catch(() => []),
   ]);
   const { wiki, unavailable: wikiUnavailable } = wikiResult;
-  for (const amendment of amendments ?? []) for (const change of amendment.changes) if (change.articleNumber && !changeByArticle[change.articleNumber]) changeByArticle[change.articleNumber] = change.changeType;
-  const publications = line.map(item => ({ id: item.id, snapshotId: snapshotVersionId(item), versionLabel: item.versionLabel, effectiveDate: item.effectiveDate }));
-  if (!publications.some(item => item.snapshotId === params.versionId)) publications.splice(Math.max(0, index), 0, { id: version.id, snapshotId: params.versionId, versionLabel: version.versionLabel + ' · ' + params.versionId.slice(0, 8), effectiveDate: version.effectiveDate });
+  const changeByArticle = firstArticleChanges(amendments);
+  const publications = readerPublications(line, index, version, params.versionId);
   return <FullWidthPage template="reader"><ContentTranslationRegion sourceLanguage={snapshot.languageCode}>
     <VersionReader initialPassage={initialPassage} code={country.isoCode} versionId={params.versionId} articles={articles} outline={outline ?? constitution.contentOutline}
       language={snapshot.languageCode} changeByArticle={changeByArticle} unchangedSinceLabel={previous?.versionLabel}
@@ -65,4 +63,18 @@ export async function CountryConstitutionReader({ code, versionId, error, initia
         next={next ? { href: `/countries/${country.isoCode}/versions/${snapshotVersionId(next)}`, label: `${next.versionLabel} →` } : undefined} />}
     />
   </ContentTranslationRegion></FullWidthPage>;
+}
+
+/** The first encountered amendment change remains the badge source for each article. */
+function firstArticleChanges(amendments: Amendment[] | null): Record<string, string> {
+  const result: Record<string, string> = {};
+  for (const amendment of amendments ?? []) for (const change of amendment.changes) if (change.articleNumber && !result[change.articleNumber]) result[change.articleNumber] = change.changeType;
+  return result;
+}
+
+/** Insert an explicitly viewed historical transcription at the original legal-version position. */
+function readerPublications(line: VersionSummary[], index: number, version: VersionSummary, versionId: string) {
+  const publications = line.map(item => ({ id: item.id, snapshotId: snapshotVersionId(item), versionLabel: item.versionLabel, effectiveDate: item.effectiveDate }));
+  if (!publications.some(item => item.snapshotId === versionId)) publications.splice(Math.max(0, index), 0, { id: version.id, snapshotId: versionId, versionLabel: version.versionLabel + ' · ' + versionId.slice(0, 8), effectiveDate: version.effectiveDate });
+  return publications;
 }

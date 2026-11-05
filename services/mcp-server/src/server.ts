@@ -68,21 +68,46 @@ export function setupHandoff(proposal: { id: string; status: string; revision: n
   return { revision: proposal.revision, previewUrl, nextAction, instructions };
 }
 
+/** Observe the action, audit its outcome and serialize it inside the same failure boundary. */
 async function runLogged<T extends Record<string, unknown>>(tool: string, action: () => Promise<T>, actorId: () => string | undefined) {
   const started = Date.now();
   try {
     const value = await action();
     observeTool(tool, 'ok', Date.now() - started);
-    const resourceId = value.jobId ?? value.itemId ?? value.batchId ?? value.proposalId ?? value.constitutionId ?? value.uploadId ?? value.id;
+    const resourceId = toolResourceId(value);
     console.info(JSON.stringify({ event: 'mcp_tool', tool, actorId: actorId(), resourceId, outcome: 'ok', elapsedMs: Date.now() - started }));
     return json(value);
   } catch (error) {
     observeTool(tool, 'error', Date.now() - started);
     const status = error instanceof UpstreamError ? error.status : error instanceof CursorError ? 400 : 503;
     console.warn(JSON.stringify({ event: 'mcp_tool', tool, actorId: actorId(), outcome: 'error', status, elapsedMs: Date.now() - started }));
-    const message = error instanceof UpstreamError || error instanceof CursorError ? error.message : 'The requested data could not be loaded.';
-    const code = error instanceof CursorError ? 'invalid_cursor' : status === 401 ? 'unauthenticated' : status === 403 ? 'forbidden' : status === 404 ? 'not_found' : status === 409 ? 'conflict' : status === 413 ? 'payload_too_large' : status === 400 ? 'invalid_input' : 'upstream_unavailable';
-    return { content: [{ type: 'text' as const, text: message }], structuredContent: { code, status, message, retryable: status === 429 || status >= 500 }, isError: true };
+    return toolErrorResponse(error, status);
+  }
+}
+
+/** Keep the historical resource priority and retain defined falsy identities in audit records. */
+function toolResourceId(value: Record<string, unknown>): unknown {
+  return value.jobId ?? value.itemId ?? value.batchId ?? value.proposalId ?? value.constitutionId ?? value.uploadId ?? value.id;
+}
+
+/** Construct safe public details only after the error audit, preserving message and retry rules. */
+function toolErrorResponse(error: unknown, status: number) {
+  const message = error instanceof UpstreamError || error instanceof CursorError ? error.message : 'The requested data could not be loaded.';
+  const code = toolErrorCode(error, status);
+  return { content: [{ type: 'text' as const, text: message }], structuredContent: { code, status, message, retryable: status === 429 || status >= 500 }, isError: true };
+}
+
+/** Cursor diagnostics override HTTP mapping; other unlisted statuses retain the upstream fallback. */
+function toolErrorCode(error: unknown, status: number): string {
+  if (error instanceof CursorError) return 'invalid_cursor';
+  switch (status) {
+    case 401: return 'unauthenticated';
+    case 403: return 'forbidden';
+    case 404: return 'not_found';
+    case 409: return 'conflict';
+    case 413: return 'payload_too_large';
+    case 400: return 'invalid_input';
+    default: return 'upstream_unavailable';
   }
 }
 

@@ -60,7 +60,11 @@ is verified in PR CI; actual media capture/publication runs after merge.
 
 ## Compact structured editing
 
-The active canvas is app/editor/StructuredEditor.tsx with ContinuousCanvas.tsx (ProseMirror), compact-editor.module.css and lib/continuous-editor.ts. EditorWorkspace.tsx owns hideable navigation and workflow disclosure; ChangeOverview.tsx presents readable differences. The authenticated editor/view projection returns a pinned global note/reference index, lazy root bodies, or the full body only for explicit Preview.
+The active canvas is app/editor/StructuredEditor.tsx with ContinuousCanvas.tsx (ProseMirror), compact-editor.module.css and lib/continuous-editor.ts. `structured-editor-model.tsx` owns the existing state/command/effect lifecycle;
+`structured-editor-presentation.tsx` uses plain render helpers to preserve React
+tree identity, and `structured-canvas-reconciliation.ts` plans ordered operations.
+Canvas transaction phases and pure segmentation/local replay helpers remain
+behind their existing public exports. EditorWorkspace.tsx owns hideable navigation and workflow disclosure; ChangeOverview.tsx presents readable differences. The authenticated editor/view projection returns a pinned global note/reference index, lazy root bodies, or the full body only for explicit Preview.
 
 Shared app/components/Footnotes.tsx and InlineText.tsx render note drawers and structured marks in editing, reading and comparison. lib/footnotes.ts indexes a pinned version once; lib/draft-footnotes.ts indexes draft notes before lazy projection. Readers use lib/ordered-content.ts for node and text-entry targets. Continuous national/regional readers compose VersionReader, ReaderArticle, ReaderComparison and ReaderDetails with route-owned Wiki and editorial slots. Country version, article and unit routes share `countries/[code]/versions/[versionId]/CountryConstitutionReader.tsx`; passage routes validate the unit and supply an initial target. An explicit paragraph/sentence hash takes precedence, and legacy article hashes resolve to the same article in the shared reader. lib/reader.ts handles comparison/presentation, reader-search.ts uses DOM ranges and CSS highlights, and reader-preferences.ts persists local reading choices. app/api/reader/compare/route.ts verifies same-constitution published snapshots before loading text; proxy.ts and Caddy retain browsing policy and quotas.
 
@@ -78,6 +82,72 @@ Country and regional constitution overview routes share `ConstitutionOverview`; 
 
 `WikiPanel` owns the context heading, close control and actions shared by constitution, country and regional wikis. It sits after the sticky menu in normal page flow, without an internal scroll area. `directoryWikiPanel` in `DirectoryWiki` supplies published country/jurisdiction context with explicit Edit/Review wiki entry points. `WikiContent` shares summary, body, image placement, source rendering and typography across public wikis, editor previews and revision history. `WikiEditorTemplate` owns the editing fields, pictures, review/publication and history layout for both embedded and standalone editors. `WikiWorkspace` loads and authorizes all three wiki target types, then supplies data and commands to that template. `lib/wiki-routing.ts` preserves jurisdiction context and returns public directory links with `?wiki=1`. Wiki saves use the canonical target returned by Catalog for pinned media and never publish the draft as a side effect.
 
+## Editor route orchestration
+
+`app/editor/page.tsx` retains authentication, role gates and workspace routing.
+`editor-page-state.ts` loads and derives the selected session state, while
+`EditorSessionView.tsx` renders the existing page sections. Command POSTs enter
+`app/editor/command/route.ts`; request/error utilities and amendment, draft,
+source-evidence and publication handlers in that directory preserve native
+redirects, JSON modes and trusted-origin guards.
+
+## Outline editing and preview
+
+`admin/constitutions/OutlineEditor.tsx` composes focused creation/review/layer
+components; `outline-editor-model.ts` owns pure layer updates and authoring checks.
+`lib/outline-preview.ts` retains deterministic example identity, sample wording,
+cycle handling and translation ordering. Catalog remains the write authority.
+
+## Amendment and import workflow decomposition
+
+`editor/DiffReviewQueue.tsx` separates its model hook from plain rendering helpers
+to preserve state, focus and decision ordering. `editor/PublishForm.tsx` retains the
+existing publication form and delegates focused request/details sections;
+`editor/amendments/[id]/page.tsx` separates ordered review loading from notices and
+body rendering. `editor/ChangeOverview.tsx` owns the unchanged rich preview descriptions.
+
+`admin/import/page.tsx`, `admin/import/setup/SetupProposalReview.tsx` and
+`admin/migrations/[id]/page.tsx` retain route authorization/loading and compose
+focused presentation helpers. Setup actions separate intent validation and
+display-save sequencing; `editor/ImportReview.tsx`
+separates workflow, status and source sections. `lib/ingestion-api.ts` retains the
+public transition client and delegates its existing error-code precedence.
+
+## Reader, account and request helper boundaries
+
+`components/ConstitutionText.tsx` separates body projection, ordered-group rendering,
+rich marks and reference links while retaining the existing renderer exports.
+`DiffConstitutionText.tsx` keeps stable/global pairing phases and rendered comparison order.
+`ContentTranslation.tsx` separates DOM text selection, splitting, ordered batches
+and application of translated values. `VersionReader.tsx` keeps state/effects in
+its model hook and uses plain render helpers for the reader surface and controls.
+`lib/reader-actions.ts` and `lib/reader-search.ts` preserve exact copied text and
+UTF-16 DOM-range offsets. Country reader and comparison routes retain ordered
+loading, snapshot pins and optional-service error boundaries.
+
+Account, legal, login/MFA, home, header and Wiki/editor workspaces retain their
+existing route and component owners. Focused helpers separate loading, policy,
+selection and form sections without adding React boundaries around their state.
+`proxy.ts` separates request admission while retaining setup, browsing, credential
+and CSP ordering; `api/edge-rate-limit/route.ts` keeps the existing quota keys,
+credential precedence and response headers.
+
+## Fixture and browser-test helpers
+
+`e2e/mock-api.mjs` remains the mock server entry point. `e2e/mock-api/routes.mjs`
+retains route precedence; domain `*-routes.mjs` modules handle selected requests,
+and `state.mjs` owns shared fixtures, reset behavior and HTTP/body helpers. Early
+scenario interception and synchronous fallthrough remain explicit.
+`route.mjs` shares only literal method/path gates, preserving synchronous misses
+and selected response/context/Promise identity; stateful and regex gates stay explicit.
+
+`e2e/fixtures/ui-review.mjs` owns fixture-instance UI state, responses and setup
+proposal writes. `prepopulate.mjs` separates version preparation/publication checks;
+`scenarios/index.mjs` retains dependency dispatch, access/search verification and
+journal/guide ordering. Browser helpers in `templates.spec.ts`, `ui-review.spec.ts`
+and `full/legacy-migration.spec.ts` preserve assertions and test registration.
+`e2e/mock-api-contract.test.mjs` supplies focused real-HTTP contracts in the gateway
+Node test commands; UI response contracts run through Vitest.
 Pre-launch routing aliases (`/legacy`, country `constitution-timeline`, `/admin/import/[jobId]`, generic `/versions/[versionId]/units/[unitId]`) are retired. Their source and former behavior live in `archive/legacy-routing/`, outside every build context. Passage links point directly to the owning country/jurisdiction reader with an occurrence fragment.
 
 ## Amendment workspace and document evidence

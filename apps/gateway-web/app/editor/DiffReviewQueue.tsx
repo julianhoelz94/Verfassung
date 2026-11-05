@@ -4,11 +4,23 @@ import { T, useTranslation } from '../components/TranslationProvider';
 import { ui, type UiMessage } from '../../lib/messages';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import type { DiffReviewState, ReviewCandidate, ReviewDecisionInput, ReviewRef } from '../../lib/diff-review';
-import { decisionReadyForReview, decisionResolved } from '../../lib/diff-review';
+import type {
+  DiffReviewState,
+  ReviewCandidate,
+  ReviewDecisionInput,
+  ReviewRef,
+} from '../../lib/diff-review';
+import {
+  decisionReadyForReview,
+  decisionResolved,
+} from '../../lib/diff-review';
 import { PassageComparison } from './PassageComparison';
 import { passageReaderHref, type ReaderOwner } from '../../lib/reader-links';
-import { saveDiffDecisionAction, refreshDiffReviewAction, type ReviewTarget } from './diff-review-actions';
+import {
+  saveDiffDecisionAction,
+  refreshDiffReviewAction,
+  type ReviewTarget,
+} from './diff-review-actions';
 import { Button } from '../components/ui';
 import { Stack, Inline } from '../components/layout/Layout';
 import surfaceStyles from '../components/surfaces.module.css';
@@ -31,33 +43,85 @@ function label(ref: ReviewRef): string {
 
 function reviewLabel(status: string): UiMessage {
   switch (status) {
-    case 'open': return ui.reviewLabels.open;
-    case 'linked': return ui.reviewLabels.linked;
-    case 'excluded_with_reason': return ui.reviewLabels.excluded;
-    case 'needs_recheck': return ui.reviewLabels.needsRecheck;
-    case 'move': return ui.reviewLabels.move;
-    case 'split': return ui.reviewLabels.split;
-    case 'merge': return ui.reviewLabels.merge;
-    case 'metadata': return ui.reviewLabels.metadata;
-    case 'text_changed': return ui.reviewLabels.textChanged;
-    case 'text_added': return ui.reviewLabels.textAdded;
-    case 'text_removed': return ui.reviewLabels.textRemoved;
-    case 'added': return ui.remainingStatus.added;
-    case 'removed': return ui.remainingStatus.removed;
-    default: return ui.remainingStatus.unknown;
+    case 'open':
+      return ui.reviewLabels.open;
+    case 'linked':
+      return ui.reviewLabels.linked;
+    case 'excluded_with_reason':
+      return ui.reviewLabels.excluded;
+    case 'needs_recheck':
+      return ui.reviewLabels.needsRecheck;
+    case 'move':
+      return ui.reviewLabels.move;
+    case 'split':
+      return ui.reviewLabels.split;
+    case 'merge':
+      return ui.reviewLabels.merge;
+    case 'metadata':
+      return ui.reviewLabels.metadata;
+    case 'text_changed':
+      return ui.reviewLabels.textChanged;
+    case 'text_added':
+      return ui.reviewLabels.textAdded;
+    case 'text_removed':
+      return ui.reviewLabels.textRemoved;
+    case 'added':
+      return ui.remainingStatus.added;
+    case 'removed':
+      return ui.remainingStatus.removed;
+    default:
+      return ui.remainingStatus.unknown;
   }
 }
 
 function wording(refs: ReviewRef[]): string {
-  return refs.map((ref) => ref.excerpt ?? '').filter(Boolean).join('\n');
+  return refs
+    .map((ref) => ref.excerpt ?? '')
+    .filter(Boolean)
+    .join('\n');
 }
 
-export function DiffReviewQueue({ target, initial, rows, canDecide, canAcknowledge, onAddRow, onCorrectPairing, onReviewChange, readerOwners }: Props) {
+/** Projects pinned identity and the canonical passage URL for one side of a finding. */
+function reviewSide(
+  refs: ReviewRef[],
+  placeholder: string,
+  owners?: Record<string, ReaderOwner>,
+) {
+  const single = refs.length === 1 ? refs[0] : undefined;
+  return {
+    text: wording(refs),
+    label: refs.map(label).join('; ') || placeholder,
+    identity: refs.map(ref =>
+      [ref.versionId, ref.logicalId, ref.occurrenceId, ref.revisionId]
+        .filter(Boolean).join(' · '),
+    ).join('\n'),
+    href: single?.versionId && single.occurrenceId
+      ? passageReaderHref(owners?.[single.versionId], single.versionId, single.occurrenceId)
+      : undefined,
+  };
+}
+
+/** Keep state, render-phase decision resets and navigation effects in their original order. */
+function useDiffReviewQueue({
+  target,
+  initial,
+  rows,
+  canDecide,
+  canAcknowledge,
+  onAddRow,
+  onCorrectPairing,
+  onReviewChange,
+  readerOwners,
+}: Props) {
   const t = useTranslation();
   const statusText = (status: string) => t(reviewLabel(status));
   const router = useRouter();
   const [review, setReview] = useState(initial);
-  const [selectedKey, setSelectedKey] = useState(initial.candidates[(initial.currentPosition ?? 1) - 1]?.key ?? initial.candidates[0]?.key ?? '');
+  const [selectedKey, setSelectedKey] = useState(
+    initial.candidates[(initial.currentPosition ?? 1) - 1]?.key ??
+      initial.candidates[0]?.key ??
+      '',
+  );
   const [level, setLevel] = useState('all');
   const [facet, setFacet] = useState('all');
   const [status, setStatus] = useState('all');
@@ -69,23 +133,55 @@ export function DiffReviewQueue({ target, initial, rows, canDecide, canAcknowled
   const [pending, setPending] = useState(false);
   const activeRef = useRef<HTMLDivElement>(null);
   const focusAfterNavigation = useRef(false);
-  const decisions = useMemo(() => new Map(review.decisions.map((decision) => [decision.key, decision])), [review.decisions]);
-  const scopes = useMemo(() => [...new Set(review.candidates.map((candidate) => (candidate.afterRefs[0] ?? candidate.beforeRefs[0])?.path[0]).filter(Boolean))] as string[], [review.candidates]);
+  const decisions = useMemo(
+    () => new Map(review.decisions.map((decision) => [decision.key, decision])),
+    [review.decisions],
+  );
+  const scopes = useMemo(
+    () =>
+      [
+        ...new Set(
+          review.candidates
+            .map(
+              (candidate) =>
+                (candidate.afterRefs[0] ?? candidate.beforeRefs[0])?.path[0],
+            )
+            .filter(Boolean),
+        ),
+      ] as string[],
+    [review.candidates],
+  );
   const visible = review.candidates.filter((candidate) => {
     const decision = decisions.get(candidate.key);
-    return (level === 'all' || String(candidate.level) === level) &&
+    return (
+      (level === 'all' || String(candidate.level) === level) &&
       (facet === 'all' || candidate.facet === facet) &&
       (status === 'all' || (decision?.status ?? 'open') === status) &&
-      (scope === 'all' || (candidate.afterRefs[0] ?? candidate.beforeRefs[0])?.path[0] === scope);
+      (scope === 'all' ||
+        (candidate.afterRefs[0] ?? candidate.beforeRefs[0])?.path[0] === scope)
+    );
   });
-  const selected = visible.find((candidate) => candidate.key === selectedKey) ?? visible[0];
-  const selectedIndex = selected ? visible.findIndex((candidate) => candidate.key === selected.key) : -1;
+  const selected =
+    visible.find((candidate) => candidate.key === selectedKey) ?? visible[0];
+  const selectedIndex = selected
+    ? visible.findIndex((candidate) => candidate.key === selected.key)
+    : -1;
   const selectedDecision = selected ? decisions.get(selected.key) : undefined;
-  const [editingDecision, setEditingDecision] = useState<{ key?: string; decision?: typeof selectedDecision }>({});
-  if (editingDecision.key !== selected?.key || editingDecision.decision !== selectedDecision) {
+  const [editingDecision, setEditingDecision] = useState<{
+    key?: string;
+    decision?: typeof selectedDecision;
+  }>({});
+  if (
+    editingDecision.key !== selected?.key ||
+    editingDecision.decision !== selectedDecision
+  ) {
     setEditingDecision({ key: selected?.key, decision: selectedDecision });
-    setLinkedIds(selectedDecision?.linkedChangeIds ?? selectedDecision?.linkedRowIds ?? []);
-    setReason(selectedDecision?.reason ?? selectedDecision?.exclusionReason ?? '');
+    setLinkedIds(
+      selectedDecision?.linkedChangeIds ?? selectedDecision?.linkedRowIds ?? [],
+    );
+    setReason(
+      selectedDecision?.reason ?? selectedDecision?.exclusionReason ?? '',
+    );
     setAcknowledge(selectedDecision?.reviewerAcknowledged ?? false);
   }
   useEffect(() => {
@@ -94,16 +190,23 @@ export function DiffReviewQueue({ target, initial, rows, canDecide, canAcknowled
       focusAfterNavigation.current = false;
     }
   }, [selected?.key]);
-  const resolved = review.candidates.filter((candidate) => decisionResolved(candidate, decisions.get(candidate.key))).length;
-  const readyForReview = review.candidates.filter((candidate) => decisionReadyForReview(candidate, decisions.get(candidate.key))).length;
-  const levels = [...new Set(review.candidates.map((candidate) => candidate.level))].sort((a, b) => a - b);
-  const counts = review.candidates.reduce<Record<string, number>>((result, candidate) => {
-    const value = decisions.get(candidate.key)?.status ?? 'open';
-    result[value] = (result[value] ?? 0) + 1;
-    return result;
-  }, {});
-  const sourceText = selected ? wording(selected.beforeRefs) : '';
-  const targetText = selected ? wording(selected.afterRefs) : '';
+  const resolved = review.candidates.filter((candidate) =>
+    decisionResolved(candidate, decisions.get(candidate.key)),
+  ).length;
+  const readyForReview = review.candidates.filter((candidate) =>
+    decisionReadyForReview(candidate, decisions.get(candidate.key)),
+  ).length;
+  const levels = [
+    ...new Set(review.candidates.map((candidate) => candidate.level)),
+  ].sort((a, b) => a - b);
+  const counts = review.candidates.reduce<Record<string, number>>(
+    (result, candidate) => {
+      const value = decisions.get(candidate.key)?.status ?? 'open';
+      result[value] = (result[value] ?? 0) + 1;
+      return result;
+    },
+    {},
+  );
 
   function choose(key: string) {
     focusAfterNavigation.current = true;
@@ -115,11 +218,26 @@ export function DiffReviewQueue({ target, initial, rows, canDecide, canAcknowled
     setPending(true);
     try {
       const result = await saveDiffDecisionAction(target, review, input);
-      if ('error' in result) { setMessage(result.error); return; }
-      setReview(result.review); onReviewChange?.(result.review);
-      const byKey = new Map(result.review.decisions.map((decision) => [decision.key, decision]));
-      const next = result.review.candidates.find((candidate) => !decisionReadyForReview(candidate, byKey.get(candidate.key)))
-        ?? (canAcknowledge ? result.review.candidates.find((candidate) => !decisionResolved(candidate, byKey.get(candidate.key))) : undefined);
+      if ('error' in result) {
+        setMessage(result.error);
+        return;
+      }
+      setReview(result.review);
+      onReviewChange?.(result.review);
+      const byKey = new Map(
+        result.review.decisions.map((decision) => [decision.key, decision]),
+      );
+      const next =
+        result.review.candidates.find(
+          (candidate) =>
+            !decisionReadyForReview(candidate, byKey.get(candidate.key)),
+        ) ??
+        (canAcknowledge
+          ? result.review.candidates.find(
+              (candidate) =>
+                !decisionResolved(candidate, byKey.get(candidate.key)),
+            )
+          : undefined);
       choose(next?.key ?? input.key);
       setMessage(t(ui.state.decisionSaved));
       router.refresh();
@@ -134,12 +252,18 @@ export function DiffReviewQueue({ target, initial, rows, canDecide, canAcknowled
     setPending(true);
     try {
       const result = await refreshDiffReviewAction(target);
-      if ('error' in result) { setMessage(result.error); return; }
+      if ('error' in result) {
+        setMessage(result.error);
+        return;
+      }
       const previousTotal = review.candidates.length;
-      setReview(result.review); onReviewChange?.(result.review);
-      setMessage(result.review.candidates.length > previousTotal
-        ? `${result.review.candidates.length - previousTotal} deeper differences were added after the pairing changed.`
-        : t(ui.state.reviewRefreshed));
+      setReview(result.review);
+      onReviewChange?.(result.review);
+      setMessage(
+        result.review.candidates.length > previousTotal
+          ? `${result.review.candidates.length - previousTotal} deeper differences were added after the pairing changed.`
+          : t(ui.state.reviewRefreshed),
+      );
       router.refresh();
     } catch {
       setMessage(t(ui.state.reviewRefreshFailed));
@@ -148,61 +272,524 @@ export function DiffReviewQueue({ target, initial, rows, canDecide, canAcknowled
     }
   }
 
-  const navigation = (index: number) => index >= 0 && index < visible.length && choose(visible[index].key);
-  return <Stack as="section" className={["panel diff-review", surfaceStyles.panel].join(' ')} aria-labelledby={`diff-review-${target.id}`}>
-    <div className="section-header"><div><h2 className="section-title" id={`diff-review-${target.id}`}><T value={ui.editor.diffreviewqueue.reviewDifferences} /></h2>
-      <p className="muted"><T value={ui.editor.diffreviewqueue.reviewEachActionableDifferenceBeforePublication} /></p></div>
-      <Button type="button" size="sm" disabled={pending} onClick={refresh}><T value={ui.editor.diffreviewqueue.refresh} /></Button>
-    </div>
-    <div className="diff-review-progress" aria-live="polite">
-      <strong><T value={ui.editor.diffreviewqueue.reviewed} />{" "}{resolved} <T value={ui.editor.diffreviewqueue.of} />{" "}{review.candidates.length}</strong>
-      <progress value={resolved} max={Math.max(1, review.candidates.length)} aria-label={`Reviewed ${resolved} of ${review.candidates.length} differences`} />
-      <p>{counts.linked ?? 0} <T value={ui.editor.diffreviewqueue.linked} />{" "}{counts.excluded_with_reason ?? 0} <T value={ui.editor.diffreviewqueue.excluded} />{" "}{counts.open ?? 0} <T value={ui.editor.diffreviewqueue.open} />{" "}{counts.needs_recheck ?? 0} <T value={ui.editor.diffreviewqueue.needRecheck} /></p>
-      {readyForReview !== resolved ? <p>{readyForReview} <T value={ui.editor.diffreviewqueue.of} />{" "}{review.candidates.length} <T value={ui.editor.diffreviewqueue.readyForReviewerHandoff} /></p> : null}
-    </div>
-    {review.candidates.length === 0 ? <p role="status"><T value={ui.editor.diffreviewqueue.noDifferencesFoundForThePinnedSnapshots} /></p> : <>
-      <details><summary>{t({en:'Filters and progress',de:'Filter und Fortschritt'})}</summary>
-      <Inline align="end" className="form-row" aria-label={t(ui.accessibility.differenceFilters)}>
-        <label><T value={ui.editor.diffreviewqueue.level} />{" "}<select value={level} onChange={(event) => setLevel(event.target.value)}><option value="all"><T value={ui.editor.diffreviewqueue.all} /></option>{levels.map((value) => <option key={value} value={value}><T value={ui.editor.diffreviewqueue.level} />{" "}{value}</option>)}</select></label>
-        <label><T value={ui.editor.diffreviewqueue.type} />{" "}<select value={facet} onChange={(event) => setFacet(event.target.value)}><option value="all"><T value={ui.editor.diffreviewqueue.all} /></option>{[...new Set(review.candidates.map((candidate) => candidate.facet))].sort().map((value) => <option key={value} value={value}>{statusText(value)}</option>)}</select></label>
-        <label><T value={ui.editor.diffreviewqueue.status} />{" "}<select value={status} onChange={(event) => setStatus(event.target.value)}><option value="all"><T value={ui.editor.diffreviewqueue.all} /></option>{['open', 'linked', 'excluded_with_reason', 'needs_recheck'].map((value) => <option key={value} value={value}>{statusText(value)}</option>)}</select></label>
-        <label><T value={ui.editor.diffreviewqueue.scope} />{" "}<select value={scope} onChange={(event) => setScope(event.target.value)}><option value="all"><T value={ui.editor.diffreviewqueue.all} /></option>{scopes.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
-      </Inline>
-      <p className="muted"><T value={ui.editor.diffreviewqueue.showing} />{" "}{visible.length} <T value={ui.editor.diffreviewqueue.of} />{" "}{review.candidates.length} <T value={ui.editor.diffreviewqueue.differences} /></p>
-      <ul className="diff-review-levels" aria-label={t(ui.accessibility.progressByLevel)}>{levels.map((value) => {
-        const atLevel = review.candidates.filter((candidate) => candidate.level === value);
-        const done = atLevel.filter((candidate) => decisionResolved(candidate, decisions.get(candidate.key))).length;
-        return <li key={value}><button type="button" onClick={() => setLevel(String(value))}><T value={ui.editor.diffreviewqueue.level} />{" "}{value}: {done} <T value={ui.editor.diffreviewqueue.of} />{" "}{atLevel.length} <T value={ui.editor.diffreviewqueue.reviewed2} /></button></li>;
-      })}</ul>
-      {scopes.length > 1 ? <ul className="diff-review-branches">{scopes.map((branch) => {
-        const branchCandidates = review.candidates.filter((candidate) => (candidate.afterRefs[0] ?? candidate.beforeRefs[0])?.path[0] === branch);
-        const open = branchCandidates.filter((candidate) => !decisionResolved(candidate, decisions.get(candidate.key))).length;
-        return <li key={branch}><button type="button" onClick={() => setScope(branch)}>{branch}: {open} <T value={ui.editor.diffreviewqueue.open2} /></button></li>;
-      })}</ul> : null}
-      </details>
-      {selected ? <Stack elementRef={activeRef} className="diff-review-active" tabIndex={-1} aria-live="polite">
-        <p className="muted"><T value={ui.editor.diffreviewqueue.difference} />{" "}{review.candidates.findIndex((candidate) => candidate.key === selected.key) + 1} <T value={ui.editor.diffreviewqueue.of} />{" "}{review.candidates.length} · {statusText(selectedDecision?.status ?? 'open')}</p>
-        <h3>{statusText(selected.facet)} · {label(selected.afterRefs[0] ?? selected.beforeRefs[0])}</h3>
-        <p><T value={ui.editor.diffreviewqueue.level} />{" "}{selected.level}{selected.ambiguous ? <T value={ui.reviewLabels.ambiguousPairing} /> : ''}</p>
-        <PassageComparison before={{text:sourceText,label:selected.beforeRefs.map(label).join('; ') || t(ui.reviewLabels.noSourceUnit),
-          identity:selected.beforeRefs.map(ref=>[ref.versionId,ref.logicalId,ref.occurrenceId,ref.revisionId].filter(Boolean).join(' · ')).join('\n'),
-          href:selected.beforeRefs.length===1&&selected.beforeRefs[0].versionId&&selected.beforeRefs[0].occurrenceId ? passageReaderHref(readerOwners?.[selected.beforeRefs[0].versionId],selected.beforeRefs[0].versionId,selected.beforeRefs[0].occurrenceId) : undefined}}
-          after={{text:targetText,label:selected.afterRefs.map(label).join('; ') || t(ui.reviewLabels.noTargetUnit),
-          identity:selected.afterRefs.map(ref=>[ref.versionId,ref.logicalId,ref.occurrenceId,ref.revisionId].filter(Boolean).join(' · ')).join('\n'),
-          href:selected.afterRefs.length===1&&selected.afterRefs[0].versionId&&selected.afterRefs[0].occurrenceId ? passageReaderHref(readerOwners?.[selected.afterRefs[0].versionId],selected.afterRefs[0].versionId,selected.afterRefs[0].occurrenceId) : undefined}}/>
-        <div className="action-bar"><Button type="button" disabled={selectedIndex <= 0} onClick={() => navigation(selectedIndex - 1)}><T value={ui.editor.diffreviewqueue.previous} /></Button><Button type="button" disabled={selectedIndex >= visible.length - 1} onClick={() => navigation(selectedIndex + 1)}><T value={ui.editor.diffreviewqueue.next} /></Button><Button type="button" onClick={() => { const next = visible.find((candidate) => !decisionReadyForReview(candidate, decisions.get(candidate.key)) && candidate.key !== selected.key) ?? (canAcknowledge ? visible.find((candidate) => !decisionResolved(candidate, decisions.get(candidate.key)) && candidate.key !== selected.key) : undefined); if (next) choose(next.key); }}><T value={ui.editor.diffreviewqueue.nextUnreviewed} /></Button></div>
-        {canDecide ? <Stack>
-          {onAddRow ? <Button type="button" onClick={() => { onAddRow(selected); setMessage(t(ui.state.changeRowAdded)); }}><T value={ui.editor.diffreviewqueue.createChangeRowFromThisDifference} /></Button> : null}
-          <Button type="button" onClick={() => { onCorrectPairing?.(); document.querySelector<HTMLElement>('#editor-change-record, #amendment-changes-title')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); setMessage(t(ui.state.correctPairing)); }}><T value={ui.editor.diffreviewqueue.correctPairingInChangeRecord} /></Button>
-          <label><T value={ui.editor.diffreviewqueue.linkToSavedChangeRows} />{" "}<select multiple value={linkedIds} onChange={(event) => setLinkedIds([...event.target.selectedOptions].map((option) => option.value))}>{rows.map((row) => <option key={row.id} value={row.id}>{row.label}</option>)}</select></label>
-          {selected.ambiguous && canAcknowledge ? <label className="choice-row"><input type="checkbox" checked={acknowledge} onChange={(event) => setAcknowledge(event.target.checked)} /> <T value={ui.editor.diffreviewqueue.confirmTheMultiRowPairingAsReviewer} /></label> : null}
-          <Button type="button" disabled={pending || linkedIds.length === 0 || selected.ambiguous && linkedIds.length < 2} onClick={() => save({ key: selected.key, fingerprint: selected.fingerprint, status: 'linked', linkedIds, reviewerAcknowledged: selected.ambiguous && canAcknowledge && acknowledge })}><T value={ui.editor.diffreviewqueue.linkSelectedRowsAndNext} /></Button>
-          <label><T value={ui.editor.diffreviewqueue.reasonForExclusion} />{" "}<textarea value={reason} onChange={(event) => setReason(event.target.value)} rows={3} /></label>
-          {canAcknowledge ? <label className="choice-row"><input type="checkbox" checked={acknowledge} onChange={(event) => setAcknowledge(event.target.checked)} /> <T value={ui.editor.diffreviewqueue.acknowledgeThisExclusionForPublication} /></label> : <p className="muted"><T value={ui.editor.diffreviewqueue.aReviewerMustAcknowledgeAnExclusionBefore} /></p>}
-          <Button type="button" disabled={pending || !reason.trim()} onClick={() => save({ key: selected.key, fingerprint: selected.fingerprint, status: 'excluded_with_reason', exclusionReason: reason.trim(), reviewerAcknowledged: acknowledge })}><T value={ui.editor.diffreviewqueue.excludeWithReasonAndNext} /></Button>
-        </Stack> : null}
-      </Stack> : <p><T value={ui.editor.diffreviewqueue.noDifferencesMatchTheseFilters} /></p>}
-    </>}
-    {message ? <p role="status">{message}</p> : null}
-  </Stack>;
+  /** Prioritize unsaved decisions before returning to reviewer acknowledgements. */
+  function nextUnreviewed() {
+    const next =
+      visible.find(
+        (candidate) =>
+          !decisionReadyForReview(candidate, decisions.get(candidate.key)) &&
+          candidate.key !== selected?.key,
+      ) ??
+      (canAcknowledge
+        ? visible.find(
+            (candidate) =>
+              !decisionResolved(candidate, decisions.get(candidate.key)) &&
+              candidate.key !== selected?.key,
+          )
+        : undefined);
+    if (next) choose(next.key);
+  }
+
+  const navigation = (index: number) =>
+    index >= 0 && index < visible.length && choose(visible[index].key);
+  return {
+    target,
+    rows,
+    canDecide,
+    canAcknowledge,
+    onAddRow,
+    onCorrectPairing,
+    readerOwners,
+    t,
+    statusText,
+    review,
+    selected,
+    selectedIndex,
+    selectedDecision,
+    level,
+    setLevel,
+    facet,
+    setFacet,
+    status,
+    setStatus,
+    scope,
+    setScope,
+    linkedIds,
+    setLinkedIds,
+    reason,
+    setReason,
+    acknowledge,
+    setAcknowledge,
+    message,
+    setMessage,
+    pending,
+    activeRef,
+    decisions,
+    scopes,
+    visible,
+    resolved,
+    readyForReview,
+    levels,
+    counts,
+    save,
+    refresh,
+    navigation,
+    nextUnreviewed,
+  };
+}
+
+/** Render plain functions in place so the focused finding retains its React identity. */
+function renderDiffReviewQueue(model: ReturnType<typeof useDiffReviewQueue>) {
+  const {
+    target,
+    rows,
+    canDecide,
+    canAcknowledge,
+    onAddRow,
+    onCorrectPairing,
+    readerOwners,
+    t,
+    statusText,
+    review,
+    selected,
+    selectedIndex,
+    selectedDecision,
+    level,
+    setLevel,
+    facet,
+    setFacet,
+    status,
+    setStatus,
+    scope,
+    setScope,
+    linkedIds,
+    setLinkedIds,
+    reason,
+    setReason,
+    acknowledge,
+    setAcknowledge,
+    message,
+    setMessage,
+    pending,
+    activeRef,
+    decisions,
+    scopes,
+    visible,
+    resolved,
+    readyForReview,
+    levels,
+    counts,
+    save,
+    refresh,
+    navigation,
+    nextUnreviewed,
+  } = model;
+  /** Render the active finding in place so navigation keeps the same focus target. */
+  function activeCandidate(selected: ReviewCandidate) {
+    return (
+      <Stack
+        elementRef={activeRef}
+        className="diff-review-active"
+        tabIndex={-1}
+        aria-live="polite"
+      >
+        <p className="muted">
+          <T value={ui.editor.diffreviewqueue.difference} />{' '}
+          {review.candidates.findIndex(
+            (candidate) => candidate.key === selected.key,
+          ) + 1}{' '}
+          <T value={ui.editor.diffreviewqueue.of} /> {review.candidates.length}{' '}
+          · {statusText(selectedDecision?.status ?? 'open')}
+        </p>
+        <h3>
+          {statusText(selected.facet)} ·{' '}
+          {label(selected.afterRefs[0] ?? selected.beforeRefs[0])}
+        </h3>
+        <p>
+          <T value={ui.editor.diffreviewqueue.level} /> {selected.level}
+          {selected.ambiguous ? (
+            <T value={ui.reviewLabels.ambiguousPairing} />
+          ) : (
+            ''
+          )}
+        </p>
+        <PassageComparison
+          before={reviewSide(selected.beforeRefs, t(ui.reviewLabels.noSourceUnit), readerOwners)}
+          after={reviewSide(selected.afterRefs, t(ui.reviewLabels.noTargetUnit), readerOwners)}
+        />
+        <div className="action-bar">
+          <Button
+            type="button"
+            disabled={selectedIndex <= 0}
+            onClick={() => navigation(selectedIndex - 1)}
+          >
+            <T value={ui.editor.diffreviewqueue.previous} />
+          </Button>
+          <Button
+            type="button"
+            disabled={selectedIndex >= visible.length - 1}
+            onClick={() => navigation(selectedIndex + 1)}
+          >
+            <T value={ui.editor.diffreviewqueue.next} />
+          </Button>
+          <Button type="button" onClick={nextUnreviewed}>
+            <T value={ui.editor.diffreviewqueue.nextUnreviewed} />
+          </Button>
+        </div>
+        {canDecide ? (
+          <Stack>
+            {onAddRow ? (
+              <Button
+                type="button"
+                onClick={() => {
+                  onAddRow(selected);
+                  setMessage(t(ui.state.changeRowAdded));
+                }}
+              >
+                <T
+                  value={
+                    ui.editor.diffreviewqueue.createChangeRowFromThisDifference
+                  }
+                />
+              </Button>
+            ) : null}
+            <Button
+              type="button"
+              onClick={() => {
+                onCorrectPairing?.();
+                document
+                  .querySelector<HTMLElement>(
+                    '#editor-change-record, #amendment-changes-title',
+                  )
+                  ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                setMessage(t(ui.state.correctPairing));
+              }}
+            >
+              <T
+                value={ui.editor.diffreviewqueue.correctPairingInChangeRecord}
+              />
+            </Button>
+            <label>
+              <T value={ui.editor.diffreviewqueue.linkToSavedChangeRows} />{' '}
+              <select
+                multiple
+                value={linkedIds}
+                onChange={(event) =>
+                  setLinkedIds(
+                    [...event.target.selectedOptions].map(
+                      (option) => option.value,
+                    ),
+                  )
+                }
+              >
+                {rows.map((row) => (
+                  <option key={row.id} value={row.id}>
+                    {row.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {selected.ambiguous && canAcknowledge ? (
+              <label className="choice-row">
+                <input
+                  type="checkbox"
+                  checked={acknowledge}
+                  onChange={(event) => setAcknowledge(event.target.checked)}
+                />{' '}
+                <T
+                  value={
+                    ui.editor.diffreviewqueue
+                      .confirmTheMultiRowPairingAsReviewer
+                  }
+                />
+              </label>
+            ) : null}
+            <Button
+              type="button"
+              disabled={
+                pending ||
+                linkedIds.length === 0 ||
+                (selected.ambiguous && linkedIds.length < 2)
+              }
+              onClick={() =>
+                save({
+                  key: selected.key,
+                  fingerprint: selected.fingerprint,
+                  status: 'linked',
+                  linkedIds,
+                  reviewerAcknowledged:
+                    selected.ambiguous && canAcknowledge && acknowledge,
+                })
+              }
+            >
+              <T value={ui.editor.diffreviewqueue.linkSelectedRowsAndNext} />
+            </Button>
+            <label>
+              <T value={ui.editor.diffreviewqueue.reasonForExclusion} />{' '}
+              <textarea
+                value={reason}
+                onChange={(event) => setReason(event.target.value)}
+                rows={3}
+              />
+            </label>
+            {canAcknowledge ? (
+              <label className="choice-row">
+                <input
+                  type="checkbox"
+                  checked={acknowledge}
+                  onChange={(event) => setAcknowledge(event.target.checked)}
+                />{' '}
+                <T
+                  value={
+                    ui.editor.diffreviewqueue
+                      .acknowledgeThisExclusionForPublication
+                  }
+                />
+              </label>
+            ) : (
+              <p className="muted">
+                <T
+                  value={
+                    ui.editor.diffreviewqueue
+                      .aReviewerMustAcknowledgeAnExclusionBefore
+                  }
+                />
+              </p>
+            )}
+            <Button
+              type="button"
+              disabled={pending || !reason.trim()}
+              onClick={() =>
+                save({
+                  key: selected.key,
+                  fingerprint: selected.fingerprint,
+                  status: 'excluded_with_reason',
+                  exclusionReason: reason.trim(),
+                  reviewerAcknowledged: acknowledge,
+                })
+              }
+            >
+              <T value={ui.editor.diffreviewqueue.excludeWithReasonAndNext} />
+            </Button>
+          </Stack>
+        ) : null}
+      </Stack>
+    );
+  }
+
+  return (
+    <Stack
+      as="section"
+      className={['panel diff-review', surfaceStyles.panel].join(' ')}
+      aria-labelledby={`diff-review-${target.id}`}
+    >
+      <div className="section-header">
+        <div>
+          <h2 className="section-title" id={`diff-review-${target.id}`}>
+            <T value={ui.editor.diffreviewqueue.reviewDifferences} />
+          </h2>
+          <p className="muted">
+            <T
+              value={
+                ui.editor.diffreviewqueue
+                  .reviewEachActionableDifferenceBeforePublication
+              }
+            />
+          </p>
+        </div>
+        <Button type="button" size="sm" disabled={pending} onClick={refresh}>
+          <T value={ui.editor.diffreviewqueue.refresh} />
+        </Button>
+      </div>
+      <div className="diff-review-progress" aria-live="polite">
+        <strong>
+          <T value={ui.editor.diffreviewqueue.reviewed} /> {resolved}{' '}
+          <T value={ui.editor.diffreviewqueue.of} /> {review.candidates.length}
+        </strong>
+        <progress
+          value={resolved}
+          max={Math.max(1, review.candidates.length)}
+          aria-label={`Reviewed ${resolved} of ${review.candidates.length} differences`}
+        />
+        <p>
+          {counts.linked ?? 0} <T value={ui.editor.diffreviewqueue.linked} />{' '}
+          {counts.excluded_with_reason ?? 0}{' '}
+          <T value={ui.editor.diffreviewqueue.excluded} /> {counts.open ?? 0}{' '}
+          <T value={ui.editor.diffreviewqueue.open} />{' '}
+          {counts.needs_recheck ?? 0}{' '}
+          <T value={ui.editor.diffreviewqueue.needRecheck} />
+        </p>
+        {readyForReview !== resolved ? (
+          <p>
+            {readyForReview} <T value={ui.editor.diffreviewqueue.of} />{' '}
+            {review.candidates.length}{' '}
+            <T value={ui.editor.diffreviewqueue.readyForReviewerHandoff} />
+          </p>
+        ) : null}
+      </div>
+      {review.candidates.length === 0 ? (
+        <p role="status">
+          <T
+            value={
+              ui.editor.diffreviewqueue.noDifferencesFoundForThePinnedSnapshots
+            }
+          />
+        </p>
+      ) : (
+        <>
+          <details>
+            <summary>{t({en: 'Filters and progress', de: 'Filter und Fortschritt'})}</summary>
+          <Inline
+            align="end"
+            className="form-row"
+            aria-label={t(ui.accessibility.differenceFilters)}
+          >
+            <label>
+              <T value={ui.editor.diffreviewqueue.level} />{' '}
+              <select
+                value={level}
+                onChange={(event) => setLevel(event.target.value)}
+              >
+                <option value="all">
+                  <T value={ui.editor.diffreviewqueue.all} />
+                </option>
+                {levels.map((value) => (
+                  <option key={value} value={value}>
+                    <T value={ui.editor.diffreviewqueue.level} /> {value}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              <T value={ui.editor.diffreviewqueue.type} />{' '}
+              <select
+                value={facet}
+                onChange={(event) => setFacet(event.target.value)}
+              >
+                <option value="all">
+                  <T value={ui.editor.diffreviewqueue.all} />
+                </option>
+                {[
+                  ...new Set(
+                    review.candidates.map((candidate) => candidate.facet),
+                  ),
+                ]
+                  .sort()
+                  .map((value) => (
+                    <option key={value} value={value}>
+                      {statusText(value)}
+                    </option>
+                  ))}
+              </select>
+            </label>
+            <label>
+              <T value={ui.editor.diffreviewqueue.status} />{' '}
+              <select
+                value={status}
+                onChange={(event) => setStatus(event.target.value)}
+              >
+                <option value="all">
+                  <T value={ui.editor.diffreviewqueue.all} />
+                </option>
+                {[
+                  'open',
+                  'linked',
+                  'excluded_with_reason',
+                  'needs_recheck',
+                ].map((value) => (
+                  <option key={value} value={value}>
+                    {statusText(value)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              <T value={ui.editor.diffreviewqueue.scope} />{' '}
+              <select
+                value={scope}
+                onChange={(event) => setScope(event.target.value)}
+              >
+                <option value="all">
+                  <T value={ui.editor.diffreviewqueue.all} />
+                </option>
+                {scopes.map((value) => (
+                  <option key={value} value={value}>
+                    {value}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </Inline>
+          <p className="muted">
+            <T value={ui.editor.diffreviewqueue.showing} /> {visible.length}{' '}
+            <T value={ui.editor.diffreviewqueue.of} />{' '}
+            {review.candidates.length}{' '}
+            <T value={ui.editor.diffreviewqueue.differences} />
+          </p>
+          <ul
+            className="diff-review-levels"
+            aria-label={t(ui.accessibility.progressByLevel)}
+          >
+            {levels.map((value) => {
+              const atLevel = review.candidates.filter(
+                (candidate) => candidate.level === value,
+              );
+              const done = atLevel.filter((candidate) =>
+                decisionResolved(candidate, decisions.get(candidate.key)),
+              ).length;
+              return (
+                <li key={value}>
+                  <button type="button" onClick={() => setLevel(String(value))}>
+                    <T value={ui.editor.diffreviewqueue.level} /> {value}:{' '}
+                    {done} <T value={ui.editor.diffreviewqueue.of} />{' '}
+                    {atLevel.length}{' '}
+                    <T value={ui.editor.diffreviewqueue.reviewed2} />
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+          {scopes.length > 1 ? (
+            <ul className="diff-review-branches">
+              {scopes.map((branch) => {
+                const branchCandidates = review.candidates.filter(
+                  (candidate) =>
+                    (candidate.afterRefs[0] ?? candidate.beforeRefs[0])
+                      ?.path[0] === branch,
+                );
+                const open = branchCandidates.filter(
+                  (candidate) =>
+                    !decisionResolved(candidate, decisions.get(candidate.key)),
+                ).length;
+                return (
+                  <li key={branch}>
+                    <button type="button" onClick={() => setScope(branch)}>
+                      {branch}: {open}{' '}
+                      <T value={ui.editor.diffreviewqueue.open2} />
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : null}
+          </details>
+          {selected ? (
+            activeCandidate(selected)
+          ) : (
+            <p>
+              <T
+                value={ui.editor.diffreviewqueue.noDifferencesMatchTheseFilters}
+              />
+            </p>
+          )}
+        </>
+      )}
+      {message ? <p role="status">{message}</p> : null}
+    </Stack>
+  );
+}
+
+/** Retain the public queue while separating lifecycle and presentation responsibilities. */
+export function DiffReviewQueue(props: Props) {
+  return renderDiffReviewQueue(useDiffReviewQueue(props));
 }

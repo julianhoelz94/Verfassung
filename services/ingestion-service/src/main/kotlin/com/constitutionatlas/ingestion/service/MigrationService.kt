@@ -133,72 +133,7 @@ class MigrationService(private val repository: MigrationRepository, private val 
         val attempt = repository.claim(itemId, actor.id) ?: throw org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.CONFLICT, "Resource preparation is already running; reload before retrying")
         try {
             val payload = repository.payload(itemId)
-            fun dependency(key: String): JsonNode {
-                require(key in item.dependencies) { "Relationship target must be an explicit dependency" }
-                return items.firstOrNull { it.sourceKey == key && it.state == "prepared" }?.result ?: throw org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.CONFLICT, "Relationship target is unresolved")
-            }
-            val result: JsonNode = when (item.kind) {
-                "snapshot" -> {
-                    val jobId = UUID.fromString(item.result.path("jobId").scalarText())
-                    var job = imports.getJob(jobId) ?: throw NotFoundException("Staged snapshot job is missing")
-                    if (job.versionId == null || job.status == "failed") job = imports.prepare(authorization, jobId, actor.id)
-                    if (job.versionId == null || job.status == "failed") throw org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.CONFLICT, "Snapshot preparation failed: ${job.errors.joinToString { it.message }}")
-                    val request = mapper.treeToValue(payload, ImportRequest::class.java)
-                    mapper.valueToTree(mapOf("jobId" to job.id, "versionId" to job.versionId, "constitutionId" to request.constitutionId, "status" to job.status))
-                }
-                "document", "citation" -> {
-                    val request = (payload as ObjectNode).deepCopy().put("attemptId", itemId.toString())
-                    val document = domains.capture(request, authorization)
-                    mapper.valueToTree(mapOf("documentId" to document.path("id"), "revisionId" to document.path("revision").path("id"), "revision" to document.path("revision").path("revision"), "fileSha256" to payload.path("fileSha256")))
-                }
-                "amendment" -> {
-                    val constitution = UUID.fromString(payload.path("constitutionId").scalarText())
-                    val record = (payload.path("record") as ObjectNode).deepCopy().put("publishAttemptId", itemId.toString())
-                    val amendment = domains.amendment(constitution, record, authorization)
-                    require(!amendment.path("revisionId").isMissingNode && !amendment.path("revisionId").isNull) { "Prepared amendment has no revision pin" }
-                    mapper.valueToTree(mapOf("amendmentId" to amendment.path("id"), "scopeRevisionId" to amendment.path("revisionId"), "status" to amendment.path("status")))
-                }
-                "document_link" -> {
-                    val request = mapper.treeToValue(payload, DocumentRelationshipPayload::class.java)
-                    require(request.targetType in setOf("constitution", "version", "amendment")) { "Unsupported relationship target" }
-                    val document = dependency(request.documentKey)
-                    val target = dependency(request.targetKey)
-                    val targetId = UUID.fromString(target.path("${request.targetType}Id").scalarText())
-                    val scope = if (request.targetType == "amendment") target.path("scopeRevisionId").scalarText().also { UUID.fromString(it) } else null
-                    domains.documentLink(request.targetType, targetId, mapOf("documentId" to document.path("documentId").scalarText(), "revisionId" to document.path("revisionId").scalarText(), "scopeRevisionId" to scope), authorization)
-                    mapper.valueToTree(mapOf("targetType" to request.targetType, "targetId" to targetId, "documentId" to document.path("documentId"), "revisionId" to document.path("revisionId")))
-                }
-                "legacy_mapping" -> {
-                    val mapping = (payload as ObjectNode).deepCopy()
-                    mapping.remove("targetKey")?.scalarText()?.let { key -> mapping.put("versionId", dependency(key).path("versionId").scalarText()) }
-                    mapping.remove("documentKey")?.scalarText()?.let { key ->
-                        val document = dependency(key)
-                        mapping.set("documentId", document.path("documentId"))
-                        mapping.set("documentRevision", document.path("revision"))
-                    }
-                    domains.legacyMapping(mapping, authorization)
-                }
-                "comparison" -> {
-                    val definition = (payload as ObjectNode).deepCopy().put("attemptId", itemId.toString())
-                    definition.remove("sourceDocumentKey")?.scalarText()?.let { key ->
-                        val document = dependency(key)
-                        definition.set("sourceDocumentId", document.path("documentId"))
-                        definition.set("sourceDocumentRevision", document.path("revision"))
-                    }
-                    definition.path("columns").forEach { column ->
-                        if (column is ObjectNode) {
-                            column.remove("versionKey")?.scalarText()?.let { key ->
-                                val snapshot = dependency(key)
-                                column.set("versionId", snapshot.path("versionId"))
-                                column.set("constitutionId", snapshot.path("constitutionId"))
-                            }
-                        }
-                    }
-                    val comparison = domains.comparison(definition, authorization)
-                    mapper.valueToTree(mapOf("comparisonId" to comparison.path("id"), "status" to comparison.path("state")))
-                }
-                else -> throw IllegalArgumentException("Unsupported resource kind")
-            }
+            val result = MigrationResourcePreparation(imports, domains, mapper, item, items).prepare(payload, actor, authorization)
             repository.finishAttempt(itemId, attempt, "prepared", result)
             if (item.kind in setOf("document", "citation")) repository.scrubCapture(itemId)
         } catch (ex: RuntimeException) {

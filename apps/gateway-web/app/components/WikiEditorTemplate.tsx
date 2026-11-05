@@ -113,7 +113,14 @@ export function WikiEditorTemplate({ owner, title, publicHref, locale, draft, pu
         </WikiDraftForm>
       ) : null}
       {canReview && !canPublish && draftPreview ? <section>{draftPreview}</section> : null}
-      {history.length > 0 || historyPage > 0 ? (
+      {renderWikiHistory({ history, historyPage, historyHref, locale })}
+    </section>;
+  return embedded ? body : <WorkspacePage width="content" header={<PageHeader title={title} actions={<a className="btn btn-sm" href={publicHref}><T value={ui.editor.wiki.targettype.targetid.page.viewPublicPage} /></a>} />}>{body}</WorkspacePage>;
+}
+
+/** Keeps the 25-revision display, date fallbacks and caller-owned pagination targets unchanged. */
+function renderWikiHistory({ history, historyPage, historyHref, locale }: Pick<WikiEditorTemplateProps, 'history' | 'historyPage' | 'historyHref' | 'locale'>) {
+  return (history.length > 0 || historyPage > 0 ? (
         <details className={styles.disclosure} aria-label={message(locale, ui.accessibility.pageRevisionHistory)}>
           <summary><T value={ui.editor.wiki.targettype.targetid.page.pageRevisionHistory} /></summary><div>
           {history.length === 0 ? <p><T value={ui.editor.wiki.targettype.targetid.page.noRevisionsOnThisPage} /></p> : null}
@@ -132,7 +139,5 @@ export function WikiEditorTemplate({ owner, title, publicHref, locale, draft, pu
             {history.length > 25 ? <a href={historyHref(historyPage + 1)}><T value={ui.editor.wiki.targettype.targetid.page.olderRevisions} /></a> : null}
           </nav>
         </div></details>
-      ) : null}
-    </section>;
-  return embedded ? body : <WorkspacePage width="content" header={<PageHeader title={title} actions={<a className="btn btn-sm" href={publicHref}><T value={ui.editor.wiki.targettype.targetid.page.viewPublicPage} /></a>} />}>{body}</WorkspacePage>;
+      ) : null);
 }

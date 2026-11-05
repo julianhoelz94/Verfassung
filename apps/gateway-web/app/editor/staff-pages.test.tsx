@@ -104,3 +104,39 @@ describe('legal-change lists and staff history', () => {
     const output = await html(Amendment({ ...search({ constitutionId: 'charter' }), params: Promise.resolve({ id: 'new' }) })); expect(output).toContain('name="title"'); expect(amendments.getAmendment).not.toHaveBeenCalled(); expect(output).not.toContain('value="publish"');
   });
 });
+
+describe('amendment detail loading contracts', () => {
+  it('finishes authentication before loading protected amendment data', async () => {
+    vi.mocked(currentUser).mockResolvedValue(null);
+    await expect(Amendment({ params: Promise.resolve({ id: 'private/id' }), searchParams: Promise.resolve({ saved: 'yes' }) })).rejects.toThrow('next=%2Feditor%2Famendments%2Fprivate%252Fid%3Fsaved%3Dyes');
+    expect(cookies).not.toHaveBeenCalled();
+    expect(amendments.getAmendment).not.toHaveBeenCalled();
+    expect(api.listConstitutionVersions).not.toHaveBeenCalled();
+  });
+
+  it('checks both published pair snapshots before loading a draft difference review', async () => {
+    vi.mocked(amendments.listRevisions).mockResolvedValue([
+      { id: 'instrument-r1', title: 'Published', changes: [], createdAt: '1956-01-01', sourceVersionId: original.id, targetVersionId: nextLaw.id },
+      { id: 'instrument-r2', title: 'Draft', changes: [], createdAt: '1956-01-02', sourceVersionId: original.id, targetVersionId: nextLaw.id },
+    ]);
+    vi.mocked(api.getVersion).mockResolvedValueOnce({ ...original, constitutionId: 'charter', publicationStatus: 'published' }).mockResolvedValueOnce({ ...nextLaw, constitutionId: 'charter', publicationStatus: 'draft' });
+    const output = await html(Amendment(detail()));
+    expect(output).toContain('Difference review requires two published snapshots.');
+    expect(amendments.getAmendmentDiffReview).not.toHaveBeenCalled();
+    expect(api.getVersion).toHaveBeenNthCalledWith(1, correction.id, 'Bearer staff-session');
+    expect(api.getVersion).toHaveBeenNthCalledWith(2, nextLaw.id, 'Bearer staff-session');
+    expect(vi.mocked(api.listAllUnits).mock.invocationCallOrder[2]).toBeLessThan(vi.mocked(amendments.listRevisions).mock.invocationCallOrder[0]);
+    expect(vi.mocked(amendments.listRevisions).mock.invocationCallOrder[0]).toBeLessThan(vi.mocked(api.getVersion).mock.invocationCallOrder[0]);
+  });
+
+  it('retains the constitutional form when one version content request fails', async () => {
+    vi.mocked(api.listAllUnits).mockRejectedValueOnce(new Error('missing first snapshot'));
+    const output = await html(Amendment(detail()));
+    expect(output).toContain('Voting reform');
+    expect(output).toContain('name="title"');
+    expect(api.listAllUnits).toHaveBeenCalledTimes(3);
+    expect(api.listAllArticles).toHaveBeenCalledWith(original.id, true);
+    expect(api.listAllArticles).toHaveBeenCalledWith(correction.id, true);
+    expect(api.listAllArticles).toHaveBeenCalledWith(nextLaw.id, true);
+  });
+});

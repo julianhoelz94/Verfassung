@@ -39,10 +39,7 @@ export function ReaderComparison({ constitutionId, publications, viewedVersionId
   }, [constitutionId, from, to, key, retry, active]);
   if (publications.length < 2) return <p className={styles.empty}>{t(copy.needPublications)}</p>;
   const changes = result?.key === key ? result.changes : null, change = changes?.[selected];
-  const targetVersion = change?.toRoot ? to : from, targetRoot = change?.toRoot ?? change?.fromRoot;
-  const targetHref = targetRoot ? (targetVersion === viewedVersionId ? '' : readerHref(targetVersion)) + '#unit-' + targetRoot : undefined;
-  const distinctLegalPublications = publications.find(item => item.snapshotId === from)?.id !== publications.find(item => item.snapshotId === to)?.id;
-  const fullHref = comparisonHref && distinctLegalPublications ? comparisonHref + '?' + new URLSearchParams({ from, to }) : undefined;
+  const { targetHref, fullHref } = comparisonLinks(change, from, to, viewedVersionId, readerHref, publications, comparisonHref);
   const options = publications.map(item => <option key={item.snapshotId} value={item.snapshotId}>{item.versionLabel}{item.effectiveDate ? ' · ' + formatDate(item.effectiveDate, locale) : ''}</option>);
   return <div className={styles.comparison}>
     <h2 className={styles.eyebrow}>{t(copy.compareVersions)}</h2>
@@ -52,15 +49,43 @@ export function ReaderComparison({ constitutionId, publications, viewedVersionId
       <label>{t(copy.to)}<select aria-label={t(copy.to)} value={to} onChange={event => { setTo(event.target.value); setFailed(false); setSelected(0); }}>{options}</select></label>
     </div>
     <div aria-live="polite" aria-busy={from !== to && !changes && !failed}>
-      {from === to ? <><h3>{t(copy.noDifferences)}</h3><p>{t(copy.samePublication)}</p></> : failed ? <p role="alert">{t(copy.compareUnavailable)} <button type="button" className={styles.tool} onClick={() => { setFailed(false); setRetry(value => value + 1); }}>{t(copy.retry)}</button></p> : !changes ? <p>{t(copy.loadingComparison)}</p> : !change ? <h3>{t(copy.noDifferences)}</h3> : <>
+      {comparisonResult({ from, to, changes, change, failed, selected, setSelected, setFailed, setRetry, targetHref, t })}
+    </div>
+    {fullHref ? <a className={styles.fullComparison} href={fullHref}>{t(copy.fullComparison)}</a> : null}
+  </div>;
+}
+
+/** Preserve snapshot passage links and suppress full comparison only when both snapshots share legal identity. */
+function comparisonLinks(change: ReaderChange | undefined, from: string, to: string, viewedVersionId: string, readerHref: (versionId: string) => string, publications: ReaderPublication[], comparisonHref?: string) {
+  const targetVersion = change?.toRoot ? to : from, targetRoot = change?.toRoot ?? change?.fromRoot;
+  const targetHref = targetRoot ? (targetVersion === viewedVersionId ? '' : readerHref(targetVersion)) + '#unit-' + targetRoot : undefined;
+  const distinctLegalPublications = publications.find(item => item.snapshotId === from)?.id !== publications.find(item => item.snapshotId === to)?.id;
+  const fullHref = comparisonHref && distinctLegalPublications ? comparisonHref + '?' + new URLSearchParams({ from, to }) : undefined;
+  return { targetHref, fullHref };
+}
+
+type ComparisonResult = {
+  from: string; to: string; changes: ReaderChange[] | null; change: ReaderChange | undefined;
+  failed: boolean; selected: number; setSelected: React.Dispatch<React.SetStateAction<number>>;
+  setFailed: React.Dispatch<React.SetStateAction<boolean>>; setRetry: React.Dispatch<React.SetStateAction<number>>;
+  targetHref: string | undefined; t: ReturnType<typeof useTranslation>;
+};
+
+/** Render the existing same/error/loading/empty precedence before showing one selected change. */
+function comparisonResult(model: ComparisonResult) {
+  const { from, to, failed, changes, change, t, setFailed, setRetry } = model;
+  return from === to ? <><h3>{t(copy.noDifferences)}</h3><p>{t(copy.samePublication)}</p></> : failed ? <p role="alert">{t(copy.compareUnavailable)} <button type="button" className={styles.tool} onClick={() => { setFailed(false); setRetry(value => value + 1); }}>{t(copy.retry)}</button></p> : !changes ? <p>{t(copy.loadingComparison)}</p> : !change ? <h3>{t(copy.noDifferences)}</h3> : activeComparisonChange(model);
+}
+
+/** Keep selected-change controls, source segments and passage navigation in their original tree positions. */
+function activeComparisonChange({ changes, change, selected, setSelected, targetHref, t }: ComparisonResult) {
+  if (!change || !changes) return null;
+  return <>
         <div className={styles.changeHeading}><h3>{change.label}</h3><span>{selected + 1} {t(copy.of)} {changes.length} · {t(copy[change.kind === 'added' ? 'addition' : change.kind === 'removed' ? 'removal' : 'change'])}</span>
           <button type="button" className={styles.tool} disabled={!selected} aria-label={t(copy.previousChange)} onClick={() => setSelected(value => value - 1)}><ReaderIcon name="up" /></button>
           <button type="button" className={styles.tool} disabled={selected >= changes.length - 1} aria-label={t(copy.nextChange)} onClick={() => setSelected(value => value + 1)}><ReaderIcon name="down" /></button>
         </div>
         {change.presentationOnly ? <p>{t(copy.structureChanged)}</p> : <p className={styles.diff}>{change.segments.map((segment, i) => segment.type === 'add' ? <ins key={i}>{segment.text}</ins> : segment.type === 'remove' ? <del key={i}>{segment.text}</del> : <span key={i}>{segment.text}</span>)}</p>}
         {targetHref ? <a className={styles.textAction} href={targetHref}><ReaderIcon name="arrow" />{t(copy.changedPassage)}</a> : null}
-      </>}
-    </div>
-    {fullHref ? <a className={styles.fullComparison} href={fullHref}>{t(copy.fullComparison)}</a> : null}
-  </div>;
+      </>;
 }

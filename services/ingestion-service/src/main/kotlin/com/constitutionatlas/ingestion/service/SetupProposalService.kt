@@ -77,26 +77,9 @@ class SetupProposalService(
             if (latest.status == "confirming") throw com.constitutionatlas.ingestion.api.ImportPublicationException(HttpStatus.CONFLICT, "setup_confirmation_running")
             throw ResponseStatusException(HttpStatus.CONFLICT, "Setup proposal is not ready to confirm")
         }
-        val proposal = claim.proposal
         try {
             DownstreamAuth.withAuthorization(authorization) {
-                val request = proposal.payload
-                val iso = request.isoCode.trim().uppercase()
-                if (request.jurisdictionId == null && catalog.getCountry(iso) == null) catalog.createCountry(iso, request.countryName.trim())
-                val result = if (proposal.constitutionId == null) {
-                    // Catalog commits constitution, reviewed outline and the creation receipt together.
-                    // A lost response can replay only this operation and cannot adopt an unrelated slug.
-                    catalog.createSetupConstitution(claim.operationId, request)
-                } else {
-                    // Before recoverable setup, a successful remote create was recorded separately.
-                    // Only that persisted identity permits reconciliation of an older partial setup.
-                    val existing = findSelected(request) ?: throw ResponseStatusException(HttpStatus.CONFLICT, "Recorded setup constitution is missing")
-                    if (existing.id != proposal.constitutionId || existing.title != request.constitutionTitle.trim()) {
-                        throw ResponseStatusException(HttpStatus.CONFLICT, "Recorded setup constitution no longer matches the reviewed resource")
-                    }
-                    catalog.replaceOutline(existing.id, request.outline.kinds)
-                    com.constitutionatlas.ingestion.client.DownstreamSetupConstitution(existing.id, catalog.currentSettingsRevisionId(existing.id))
-                }
+                val result = SetupConstitutionCreation(catalog).create(claim)
                 if (!proposals.confirm(id, claim.attempt, result.id, result.settingsRevisionId, actorId)) stale()
             }
         } catch (ex: com.constitutionatlas.ingestion.client.SetupCreationRejectedException) {
@@ -138,52 +121,9 @@ class SetupProposalService(
         }
     }
 
-    private fun findSelected(request: SetupProposalRequest) = request.jurisdictionId?.let {
-        catalog.getJurisdiction(it)
-        catalog.findJurisdictionConstitution(it, request.constitutionSlug.trim())
-    } ?: if (request.jurisdictionId == null) catalog.findConstitution(request.isoCode.trim().uppercase(), request.constitutionSlug.trim()) else null
+    /** Keep discovery identical for proposed and previously recorded setup resources. */
+    private fun findSelected(request: SetupProposalRequest) = SetupConstitutionCreation(catalog).findSelected(request)
 
-    private fun validate(request: SetupProposalRequest) {
-        fun invalid(field: String, message: String): Nothing = throw ResponseStatusException(HttpStatus.BAD_REQUEST, "$field: $message")
-        if (request.jurisdictionId == null && !request.isoCode.matches(Regex("[A-Za-z]{2}"))) invalid("isoCode", "use a two-letter country code")
-        if (request.jurisdictionId == null && request.countryName.isBlank()) invalid("countryName", "required")
-        if (!request.constitutionSlug.matches(Regex("[a-z0-9][a-z0-9-]{0,119}"))) invalid("constitutionSlug", "use lowercase letters, digits and hyphens")
-        if (request.constitutionTitle.isBlank()) invalid("constitutionTitle", "required")
-        if (!request.languageCode.matches(Regex("[a-z]{2,3}(-[A-Za-z0-9]{2,8})*"))) invalid("languageCode", "invalid language tag")
-        if (request.sourceUrl.isNullOrBlank() && request.gazetteReference.isNullOrBlank()) invalid("source", "sourceUrl or gazetteReference is required")
-        if (request.sourceUrl != null && !request.sourceUrl.startsWith("https://")) invalid("sourceUrl", "use an HTTPS source")
-        if (request.jurisdictionId != null && request.isoCode.isNotBlank()) invalid("jurisdictionId", "use jurisdictionId or isoCode, not both")
-        val kinds = request.outline.kinds
-        if (kinds.size !in 1..32) invalid("outline.kinds", "provide 1 to 32 kinds")
-        if (kinds.any { !it.kindCode.matches(Regex("[a-z][a-z0-9_-]{0,31}")) || it.displayLabel.isBlank() }) invalid("outline.kinds", "each level needs a valid code and label")
-        if (kinds.any { it.presentation !in setOf("section", "concatenated") || it.labelPlacement !in setOf("before_title", "after_title", "inline", "superscript") }) invalid("outline.kinds", "invalid display setting")
-        ImportValidator.outlineSentenceErrors(kinds).firstOrNull()?.let { invalid("outline.kinds", it.second) }
-        if (kinds.map { it.kindCode }.toSet().size != kinds.size) invalid("outline.kinds", "kind codes must be unique")
-        if (request.sampleRoots.size !in 1..20) invalid("sampleRoots", "provide 1 to 20 representative roots")
-        if (mapper.writeValueAsBytes(request).size > 64 * 1024) invalid("sampleRoots", "proposal exceeds 64 KiB")
-        val byCode = kinds.associateBy { it.kindCode }
-        val roots = kinds.filter { it.root == true }.map { it.kindCode }.toSet().ifEmpty { setOfNotNull(kinds.firstOrNull()?.kindCode) }
-        fun children(code: String): List<String> = byCode[code]?.let { level ->
-            level.allowedChildKinds ?: kinds.getOrNull(kinds.indexOf(level) + 1)?.let { listOf(it.kindCode) }.orEmpty()
-        }.orEmpty()
-        kinds.forEach { kind ->
-            if (kind.showTitle && kind.titlePolicy == "none") invalid("outline.kinds", "title display requires title permission")
-            if (kind.showLabel && kind.labelPolicy == "none") invalid("outline.kinds", "label display requires label permission")
-            if (kind.labelPlacement == "superscript" && children(kind.kindCode).isNotEmpty()) invalid("outline.kinds", "superscript labels require a leaf kind")
-        }
-        fun visit(node: com.constitutionatlas.platform.OrderedNodeWrite, parent: String?, path: String) {
-            val kind = node.kind.orEmpty()
-            if (kind !in byCode) invalid(path, "unknown kind '$kind'")
-            if (parent == null && kind !in roots) invalid(path, "kind '$kind' is not an allowed root")
-            if (parent != null && kind !in children(parent)) invalid(path, "kind '$kind' is not allowed under '$parent'")
-            if (node.content.orEmpty().any { it.type == "text" } && children(kind).isNotEmpty() && byCode[kind]?.allowTextAlongsideChildren != true) {
-                invalid(path, "text alongside child units is not allowed in '$kind'")
-            }
-            node.content.orEmpty().forEachIndexed { index, entry ->
-                com.constitutionatlas.platform.OrderedContentRules.lineBreakErrors(entry.lineBreaksBefore, entry.type, "$path.content[$index].lineBreaksBefore", entry.logicalId).firstOrNull()?.let { invalid(it.path, it.detail) }
-                entry.node?.let { visit(it, kind, "$path.content[$index].node") }
-            }
-        }
-        request.sampleRoots.forEachIndexed { index, root -> visit(root, null, "sampleRoots[$index]") }
-    }
+    /** Apply ordered validation before any proposal persistence or Catalog discovery. */
+    private fun validate(request: SetupProposalRequest) = SetupProposalValidation(mapper).validate(request)
 }

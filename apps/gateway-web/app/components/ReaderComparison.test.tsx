@@ -64,3 +64,21 @@ it('recovers when a previously failed panel is reopened after the service become
   respond();await view.render(<ReaderComparison {...props} active />);
   expect(view.host.querySelector('[role=alert]')).toBeNull();expect(view.host.querySelector('ins')?.textContent).toBe('people');
 });
+
+it('keeps snapshot comparisons available while suppressing full legal comparison for one legal identity', async () => {
+  respond([]);
+  view = await mount(<ReaderComparison {...props} publications={publications.map(item => ({ ...item, id: 'same-legal' }))} />);
+  expect(fetch).toHaveBeenCalledOnce();
+  expect(view.host.querySelector('a')).toBeNull();
+  expect(view.host.textContent).toContain('No differences');
+});
+
+it('rejects a non-array response without storing it as a cached comparison', async () => {
+  vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => ({ from: 'a', to: 'b', changes: {} }) })));
+  view = await mount(<ReaderComparison {...props} />);
+  expect(getByRole(view.host, 'alert')).toBeTruthy();
+  respond([]);
+  await click(control('Try again'));
+  expect(view.host.querySelector('[role=alert]')).toBeNull();
+  expect(view.host.textContent).toContain('No differences');
+});

@@ -20,22 +20,13 @@ export async function GET(request: NextRequest) {
   // Include canonical API paths so they cannot bypass the documentation setting.
   let documentationPath: string;
   try {
-    const decoded = decodeURIComponent(path).replace(/\\/g, '/').split('/')
-      .map((segment) => segment.split(';')[0]).join('/').replace(/\/{2,}/g, '/');
-    const normalized = new URL('http://internal');
-    normalized.pathname = decoded;
-    documentationPath = normalized.pathname;
+    documentationPath = normalizedDocumentationPath(path);
   } catch {
     return new NextResponse(null, { status: 400 });
   }
-  const documentationRequest = documentationPath.startsWith('/api/docs/') ||
-    /^\/api\/(catalog|content|amendment|identity|editor|search|ingestion|audit|document)\/(swagger-ui(?:\.html)?|v3\/api-docs(?:\.yaml)?)(?:\/|$)/.test(documentationPath);
-  if (documentationRequest) {
-    try {
-      if (!(await requestSwaggerAccessPolicy()).enabled) return new NextResponse(null, { status: 404 });
-    } catch {
-      return NextResponse.json({ code: 'swagger_policy_unavailable' }, { status: 503 });
-    }
+  if (isDocumentationRequest(documentationPath)) {
+    const admission = await documentationAdmission();
+    if (admission) return admission;
   }
   try {
     const { completed } = await setupStatus();
@@ -48,18 +39,7 @@ export async function GET(request: NextRequest) {
   } catch { return NextResponse.json({ code: 'setup_unavailable' }, { status: 503 }); }
   const token = request.cookies.get(SESSION_COOKIE)?.value;
   const credential = token ? `Bearer ${token}` : request.headers.get('authorization');
-  if (credential) {
-    try {
-      const response = await fetchWithTimeout(`${identityBaseUrl()}/me`, {
-        headers: { Authorization: credential },
-        cache: 'no-store',
-        signal: AbortSignal.timeout(2000),
-      });
-      if (response.ok) return new NextResponse(null, { status: 204 });
-    } catch {
-      // Failed validation receives the anonymous quota, never an auth bypass.
-    }
-  }
+  if (credential && await hasVerifiedCredential(credential)) return new NextResponse(null, { status: 204 });
   let policy;
   try {
     policy = await requestAnonymousBrowsingPolicy();
@@ -78,17 +58,60 @@ export async function GET(request: NextRequest) {
   const ip = request.headers.get('x-atlas-client-ip') || 'unknown';
   const retryAfter = anonymousApiLimit(ip, policy);
   if (retryAfter !== null) {
-    const headers = { 'Retry-After': String(retryAfter), 'Cache-Control': 'no-store' };
-    if (request.headers.get('accept')?.includes('text/html')) {
-      return new NextResponse(
-        `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Too many requests</title><main style="max-width:36rem;margin:3rem auto;padding:1rem;font:1rem system-ui"><h1>Too many requests</h1><p>Anonymous API access is temporarily limited. Try again in ${retryAfter} seconds.</p><p>Public pages remain available. <a href="/">Browse constitutions</a> or <a href="/login">sign in</a> for unrestricted API access.</p></main></html>`,
-        { status: 429, headers: { ...headers, 'Content-Type': 'text/html; charset=utf-8' } },
-      );
-    }
-    return NextResponse.json(
-      { code: 'anonymous_rate_limit', detail: 'Too many anonymous API requests. Sign in or retry later.' },
-      { status: 429, headers },
-    );
+    return quotaExceeded(request, retryAfter);
   }
   return new NextResponse(null, { status: 204 });
+}
+
+/** Match Spring's decoded, matrix-free path independently of raw URI guards and API aliasing. */
+function normalizedDocumentationPath(path: string): string {
+  const decoded = decodeURIComponent(path).replace(/\\/g, '/').split('/')
+    .map((segment) => segment.split(';')[0]).join('/').replace(/\/{2,}/g, '/');
+  const normalized = new URL('http://internal');
+  normalized.pathname = decoded;
+  return normalized.pathname;
+}
+
+/** Documentation policy covers both interactive aliases and canonical service documentation routes. */
+function isDocumentationRequest(path: string): boolean {
+  return path.startsWith('/api/docs/') ||
+    /^\/api\/(catalog|content|amendment|identity|editor|search|ingestion|audit|document)\/(swagger-ui(?:\.html)?|v3\/api-docs(?:\.yaml)?)(?:\/|$)/.test(path);
+}
+
+/** Failed credential validation receives the anonymous quota rather than bypassing admission. */
+async function hasVerifiedCredential(credential: string): Promise<boolean> {
+  try {
+    const response = await fetchWithTimeout(`${identityBaseUrl()}/me`, {
+      headers: { Authorization: credential },
+      cache: 'no-store',
+      signal: AbortSignal.timeout(2000),
+    });
+    return response.ok;
+  } catch { /* Failed validation receives the anonymous quota, never an auth bypass. */ }
+  return false;
+}
+
+/** Disabled documentation stays hidden even from authenticated callers; unavailable policy fails closed. */
+async function documentationAdmission(): Promise<NextResponse | null> {
+  try {
+    if (!(await requestSwaggerAccessPolicy()).enabled) return new NextResponse(null, { status: 404 });
+  } catch {
+    return NextResponse.json({ code: 'swagger_policy_unavailable' }, { status: 503 });
+  }
+  return null;
+}
+
+/** Preserve exact browser/JSON quota responses and retry/cache headers after accounting the request. */
+function quotaExceeded(request: NextRequest, retryAfter: number): NextResponse {
+  const headers = { 'Retry-After': String(retryAfter), 'Cache-Control': 'no-store' };
+  if (request.headers.get('accept')?.includes('text/html')) {
+    return new NextResponse(
+      `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Too many requests</title><main style="max-width:36rem;margin:3rem auto;padding:1rem;font:1rem system-ui"><h1>Too many requests</h1><p>Anonymous API access is temporarily limited. Try again in ${retryAfter} seconds.</p><p>Public pages remain available. <a href="/">Browse constitutions</a> or <a href="/login">sign in</a> for unrestricted API access.</p></main></html>`,
+      { status: 429, headers: { ...headers, 'Content-Type': 'text/html; charset=utf-8' } },
+    );
+  }
+  return NextResponse.json(
+    { code: 'anonymous_rate_limit', detail: 'Too many anonymous API requests. Sign in or retry later.' },
+    { status: 429, headers },
+  );
 }

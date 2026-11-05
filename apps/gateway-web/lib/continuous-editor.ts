@@ -8,28 +8,57 @@ export function canvasSignature(blocks:readonly CanvasBlock[]):string{return JSO
 const abbreviations = new Set(['dr', 'prof', 'mr', 'mrs', 'ms', 'sr', 'jr', 'st', 'art', 'abs', 'nr', 'z', 'b', 'bzw', 'usw', 'vgl', 'ca', 'etc', 'e', 'g', 'i']);
 
 /** Exact slices: whitespace belongs to the preceding sentence and is never synthesized. */
-export function delimitSentences(text: string, delimiters: readonly string[] = ['.', '!', '?']): string[] {
+export function delimitSentences(
+  text: string,
+  delimiters: readonly string[] = ['.', '!', '?'],
+): string[] {
   const tokens = [...new Set(delimiters)].filter(Boolean).sort((a, b) => b.length - a.length);
-  const result: string[] = []; let start = 0;
-  for (let index = 0; index < text.length;) {
-    const delimiter = tokens.find(token => text.startsWith(token, index));
-    if (!delimiter) { index++; continue; }
-    let end = index + delimiter.length;
-    if (delimiter === '.') {
-      const before = text.slice(start, index);
-      const word = before.match(/[\p{L}]+$/u)?.[0] ?? '';
-      const token = before.match(/\S+$/u)?.[0] ?? '';
-      if ((/\d/u.test(text[index - 1] ?? '') && /\d/u.test(text[end] ?? '')) || abbreviations.has(word.toLowerCase()) || /^[A-ZÄÖÜ]$/u.test(word) || /(?:https?:\/\/|www\.|@)/iu.test(token)) { index = end; continue; }
+  const result: string[] = [];
+  let start = 0;
+  for (let index = 0; index < text.length; ) {
+    const delimiter = tokens.find((token) => text.startsWith(token, index));
+    if (!delimiter) {
+      index++;
+      continue;
     }
-    while (tokens.some(token => text.startsWith(token, end))) end += tokens.find(token => text.startsWith(token, end))!.length;
-    while (/["'”’“‘»›)\]}]/u.test(text[end] ?? '') && end < text.length) end++;
-    if (delimiter === '.' && end < text.length && !/\s/u.test(text[end])) { index = end; continue; }
+    let end = index + delimiter.length;
+    if (delimiter === '.' && isProtectedPeriod(text, start, index, end)) {
+      index = end;
+      continue;
+    }
+    end = delimiterRunEnd(text, end, tokens);
+    if (delimiter === '.' && end < text.length && !/\s/u.test(text[end])) {
+      index = end;
+      continue;
+    }
     while (end < text.length && /\s/u.test(text[end])) end++;
     if (end > start) result.push(text.slice(start, end));
-    start = end; index = end;
+    start = end;
+    index = end;
   }
   if (start < text.length) result.push(text.slice(start));
   return result.length ? result : [text];
+}
+
+/** Repeated delimiters and closing quotes/brackets belong to the same exact sentence slice. */
+function delimiterRunEnd(text: string, end: number, tokens: readonly string[]): number {
+  while (tokens.some((token) => text.startsWith(token, end)))
+    end += tokens.find((token) => text.startsWith(token, end))!.length;
+  while (/["'”’“‘»›)\]}]/u.test(text[end] ?? '') && end < text.length) end++;
+  return end;
+}
+
+/** Decimal points, known abbreviations, initials and URL/email tokens do not end a sentence. */
+function isProtectedPeriod(text: string, start: number, index: number, end: number): boolean {
+  const before = text.slice(start, index);
+  const word = before.match(/[\p{L}]+$/u)?.[0] ?? '';
+  const token = before.match(/\S+$/u)?.[0] ?? '';
+  return (
+    (/\d/u.test(text[index - 1] ?? '') && /\d/u.test(text[end] ?? '')) ||
+    abbreviations.has(word.toLowerCase()) ||
+    /^[A-ZÄÖÜ]$/u.test(word) ||
+    /(?:https?:\/\/|www\.|@)/iu.test(token)
+  );
 }
 
 export function simpleUnit(node: DraftNode): CanvasUnit | null {

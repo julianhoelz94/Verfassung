@@ -50,6 +50,20 @@ export default async function MfaPage(props: MfaPageProps) {
     }
   }
 
+  return renderMfaChallenge({ locale, setup, searchParams, next, user, enroll, secret, qrDataUrl });
+}
+
+type MfaPresentation = {
+  locale: Awaited<ReturnType<typeof currentLocale>>;
+  setup: Awaited<ReturnType<typeof setupStatus>>;
+  searchParams: Awaited<MfaPageProps['searchParams']>;
+  next: ReturnType<typeof safeLoginReturnTo>;
+  user: Awaited<ReturnType<typeof currentUser>>;
+  enroll: boolean; secret: string | null; qrDataUrl: string | null;
+};
+
+/** Keeps enrollment and challenge forms at their original positions and carries the safe return target. */
+function renderMfaChallenge({ locale, setup, searchParams, next, user, enroll, secret, qrDataUrl }: MfaPresentation) {
   return (
     <FocusedPage width="reading" header={<PageHeader
         title={message(locale, enroll ? ui.loginFeedback.setupAuthenticator : ui.loginFeedback.authenticatorCode)}

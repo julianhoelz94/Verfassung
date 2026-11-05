@@ -90,67 +90,8 @@ internal object AmendmentDiff {
             listOf(root) + (article.content?.let { flattenOrdered(it, article.id, article.articleNumber, article.legacyIdentity, article.articleNumber) } ?: flattenChildren(article.children, article.id, article.articleNumber))
         }
 
-    fun diff(source: List<FlatNode>, target: List<FlatNode>): List<NodeChange> {
-        val sourceById = source.associateBy { it.id }
-        val unmatchedSource = source.map { it.id }.toMutableSet()
-        val unmatchedTarget = mutableListOf<FlatNode>()
-        val ambiguousTargetIds = mutableSetOf<UUID>()
-        val pairs = mutableListOf<Pair<FlatNode, FlatNode>>()
-
-        for (node in target) {
-            val predecessor = node.predecessorId
-            if (predecessor != null && predecessor in unmatchedSource && predecessor in sourceById) {
-                pairs += sourceById.getValue(predecessor) to node
-                unmatchedSource.remove(predecessor)
-            } else {
-                unmatchedTarget += node
-            }
-        }
-
-        val stillUnmatched = mutableListOf<FlatNode>()
-        for (node in unmatchedTarget) {
-            val key = identityKey(node)
-            val matches = source.filter { candidate ->
-                candidate.id in unmatchedSource && (if (node.logicalId != null) candidate.logicalId == node.logicalId else candidate.logicalId == null && identityKey(candidate) == key)
-            }
-            val match = matches.singleOrNull()
-            if (match != null) {
-                pairs += match to node
-                unmatchedSource.remove(match.id)
-            } else {
-                if (matches.size > 1) ambiguousTargetIds += node.id
-                stillUnmatched += node
-            }
-        }
-
-        val addedTargets = mutableListOf<FlatNode>()
-        for (node in stillUnmatched) {
-            val match = source.firstOrNull { candidate ->
-                candidate.id in unmatchedSource && node.legacyIdentity && candidate.legacyIdentity && legacyKey(candidate) == legacyKey(node)
-            }
-            if (match != null) {
-                pairs += match to node
-                unmatchedSource.remove(match.id)
-            } else {
-                addedTargets += node
-            }
-        }
-        val added = addedTargets.map { NodeChange("added", it, ambiguous = it.id in ambiguousTargetIds) }
-        val removed = source.filter { it.id in unmatchedSource }.map { NodeChange("removed", it, before = it) }
-        val changed =
-            pairs
-                .filter { (from, to) ->
-                    if (from.logicalId != null && from.logicalId == to.logicalId && from.revisionId != null && from.revisionId == to.revisionId) {
-                        false
-                    } else if (from.logicalId != null && from.logicalId == to.logicalId && from.revisionId != null && to.revisionId != null) {
-                        true
-                    } else {
-                        textOf(from) != textOf(to)
-                    }
-                }
-                .map { (from, to) -> NodeChange("changed", to, before = from) }
-        return added + changed + removed
-    }
+    /** Retains legacy pairing precedence and output order in a request-local matching context. */
+    fun diff(source: List<FlatNode>, target: List<FlatNode>): List<NodeChange> = AmendmentDiffMatching(source).compare(target)
 
     private fun flattenOrdered(entries: List<com.constitutionatlas.platform.OrderedEntry>, articleId: UUID, articleNumber: String, legacyIdentity: Boolean, path: String): List<FlatNode> = entries.flatMapIndexed { index, entry ->
         val node = entry.node
@@ -182,12 +123,4 @@ internal object AmendmentDiff {
                 )
             listOf(flat) + flattenChildren(node.children, articleId, articleNumber)
         }
-
-    private fun legacyKey(node: FlatNode): String = "${node.articleNumber}\u0000${node.legacyPath ?: identityKey(node)}"
-
-    private fun identityKey(node: FlatNode): String =
-        "${node.kind}\u0000${(node.number ?: node.label ?: "").lowercase()}"
-
-    private fun textOf(node: FlatNode): String =
-        "${node.title.orEmpty()}\u0000${node.body.orEmpty()}"
 }

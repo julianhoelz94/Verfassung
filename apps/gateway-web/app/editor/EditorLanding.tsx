@@ -64,8 +64,7 @@ export async function EditorLanding({ userId, email, roles, status, workStatus, 
   const canEdit = roles.includes('editor') || roles.includes('admin');
   const canReview = roles.includes('reviewer') || roles.includes('admin');
   const canPublish = roles.includes('publisher') || roles.includes('admin');
-  const queue = status === 'reviewing' && canReview ? 'reviewing' : status === 'approved' && canPublish ? 'approved' :
-    !canEdit && canReview ? 'reviewing' : !canEdit && canPublish ? 'approved' : null;
+  const queue = editorialQueue(status, canEdit, canReview, canPublish);
   const selectedStatus = validWorkStatus(workStatus);
   let sessions: EditSessionSummary[] = [];
   let rows: SessionRow[] = [];
@@ -96,6 +95,20 @@ export async function EditorLanding({ userId, email, roles, status, workStatus, 
   const heading = localize(locale, queue === 'reviewing' ? ui.nav.reviewQueue : queue === 'approved' ? ui.nav.readyToPublish : workflowUi.myWork);
   const message = editorErrorMessage(error, locale);
 
+  return renderEditorLanding({ locale, canEdit, canReview, canPublish, queue, selectedStatus, rows, countries, heading, message, unavailable, importsUnavailable, email, archived });
+}
+
+type LandingPresentation = {
+  locale: Locale; canEdit: boolean; canReview: boolean; canPublish: boolean;
+  queue: 'reviewing' | 'approved' | null; selectedStatus: ReturnType<typeof validWorkStatus>;
+  rows: SessionRow[]; countries: string[]; heading: string;
+  message: ReturnType<typeof editorErrorMessage>; unavailable: boolean; importsUnavailable: boolean;
+  email: string; archived: boolean;
+};
+
+/** Preserves queue navigation, filters and ordered availability notices around the existing work list. */
+function renderEditorLanding(model: LandingPresentation) {
+  const { locale, canEdit, canReview, canPublish, queue, selectedStatus, heading, message, unavailable, importsUnavailable, email, archived } = model;
   return <CollectionPage width="content" header={<PageHeader title={<T value={ui.attrs.editorEditorlandingPageHeaderTitleEditor} />} eyebrow={heading} meta={`${localize(locale, ui.remainingStatus.signedInAs)} ${email}.`} />}>
 
     <nav className="section-nav" aria-label={localize(locale, ui.nav.editorial)}>
@@ -125,7 +138,14 @@ export async function EditorLanding({ userId, email, roles, status, workStatus, 
     {message ? <Alert tone="error">{message}</Alert> : null}
     {unavailable ? <Alert tone="error"><T value={ui.editor.editorlanding.editSessionsAreTemporarilyUnavailableTryAgain} /></Alert> : null}
     {importsUnavailable ? <Alert tone="error"><T value={ui.importReview.unavailable} /></Alert> : null}
-    {rows.length === 0 ?
+    {renderWorkRows(model)}
+    {queue && canEdit ? <p><a href="/editor?mine=1"><T value={workflowUi.myWork} /></a></p> : null}
+  </CollectionPage>;
+}
+
+/** Retains empty-state precedence and country/constitution grouping, row keys and work command targets. */
+function renderWorkRows({ rows, unavailable, importsUnavailable, queue, selectedStatus, archived, countries, locale }: LandingPresentation) {
+  return (rows.length === 0 ?
       unavailable || importsUnavailable ? null : <p className="muted">{queue ? <T value={queue === 'reviewing' ? ui.editorDynamic.noReviewSessions : ui.editorDynamic.noPublishSessions} /> : <><T value={selectedStatus || archived ? workflowUi.noMatchingWork : workflowUi.noWork} />{" "}<Link href="/"><T value={ui.editor.editorlanding.browseCountries} /></Link> <T value={ui.editor.editorlanding.andChooseAConstitutionToStartEditing} /></>}</p> :
       countries.map((country) => <section key={country} className="editor-session-country">
         <h2>{country}</h2>
@@ -141,7 +161,11 @@ export async function EditorLanding({ userId, email, roles, status, workStatus, 
                 </Inline>
               </li>)}</ul>
           </section>)}
-      </section>)}
-    {queue && canEdit ? <p><a href="/editor?mine=1"><T value={workflowUi.myWork} /></a></p> : null}
-  </CollectionPage>;
+      </section>));
+}
+
+/** Selects the authorized review/publication queue before any session or import reads. */
+function editorialQueue(status: string | undefined, canEdit: boolean, canReview: boolean, canPublish: boolean): 'reviewing' | 'approved' | null {
+  return status === 'reviewing' && canReview ? 'reviewing' : status === 'approved' && canPublish ? 'approved' :
+    !canEdit && canReview ? 'reviewing' : !canEdit && canPublish ? 'approved' : null;
 }

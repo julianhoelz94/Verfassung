@@ -1,188 +1,73 @@
 import { hasTrustedOrigin } from '../../../lib/request-origin';
 import { NextRequest, NextResponse } from 'next/server';
-import { readWriteBody } from '../../../lib/amendment-form';
-import { readPublishChanges } from '../../../lib/publish-details';
-import { AmendmentApiError, appendRevision, confirmAmendmentQuotes, createAmendment, publishAmendment, withdrawAmendment } from '../../../lib/amendment-editor-api';
-import {
-  EditorApiError,
-  approveReview,
-  openSession,
-  publishSession,
-  saveDraft,
-  saveStructuredDraft,
-  savePublishDetails,
-  submitReview,
-  saveSourceEvidence,
-  requestSourceEvidenceChanges,
-} from '../../../lib/editor-api';
-import type { SourceEvidence } from '../../../lib/api';
+import { AmendmentApiError } from '../../../lib/amendment-editor-api';
+import { EditorApiError } from '../../../lib/editor-api';
+import * as amendment from './amendment-handlers';
+import * as draft from './draft-handlers';
+import * as source from './source-handlers';
+import * as publication from './publication-handlers';
+import { commandContext, editorPath, redirectTo, value, type CommandContext } from './request';
 
-function value(form: FormData, key: string): string {
-  return String(form.get(key) ?? '').trim();
-}
+type CommandHandler = (context: CommandContext) => Promise<NextResponse> | NextResponse;
 
-function editorPath(form: FormData, extra: Record<string, string> = {}): string {
-  const params = new URLSearchParams();
-  for (const key of ['versionId', 'sessionId', 'articleId', 'scope', 'selectedNode']) {
-    const entry = value(form, key);
-    if (entry) params.set(key, entry);
-  }
-  for (const [key, entry] of Object.entries(extra)) params.set(key, entry);
-  return `/editor?${params.toString()}`;
-}
+// Explicit keys prevent unknown command names from resolving inherited object properties.
+const handlers = new Map<string, CommandHandler>([
+  ['amendment-save', amendment.saveAmendment],
+  ['amendment-withdraw', amendment.withdraw],
+  ['amendment-publish', amendment.publish],
+  ['amendment-confirm', amendment.confirm],
+  ['open', draft.open],
+  ['open-sources', context => draft.open(context, true)],
+  ['source-evidence', source.save],
+  ['source-evidence-changes', source.requestChanges],
+  ['load', draft.load],
+  ['structured-save', draft.saveStructured],
+  ['save', draft.save],
+  ['details', publication.details],
+  ['review', publication.review],
+  ['approve', publication.approve],
+  ['publish', publication.publish],
+]);
 
-function redirectTo(request: NextRequest, path: string): NextResponse {
-  const origin = request.headers.get('origin');
-  if (origin) return NextResponse.redirect(new URL(path, origin), 303);
-  const host = request.headers.get('x-forwarded-host')?.split(',')[0]?.trim() ?? request.headers.get('host');
-  const protocol = request.headers.get('x-forwarded-proto')?.split(',')[0]?.trim() ?? request.nextUrl.protocol.replace(':', '');
-  return NextResponse.redirect(new URL(path, host ? `${protocol}://${host}` : request.url), 303);
-}
-
-
+/** Trusted-origin and native body parsing precede command dispatch and its known-error translation. */
 export async function POST(request: NextRequest): Promise<NextResponse> {
-  if (!hasTrustedOrigin(request)) {
-    return new NextResponse('Forbidden', { status: 403 });
-  }
-  const form = await request.formData();
-  const command = request.nextUrl.searchParams.get('command') ?? value(form, 'command');
-  const sessionId = value(form, 'sessionId');
-  const sourceRevision = value(form, 'sourceEvidenceRevision');
-  const sourceEvidenceRevision = sourceRevision && /^\d+$/.test(sourceRevision) && Number.isSafeInteger(Number(sourceRevision)) ? Number(sourceRevision) : undefined;
+  if (!hasTrustedOrigin(request)) return new NextResponse('Forbidden', { status: 403 });
+  const context = commandContext(request, await request.formData());
   try {
-    if (command === 'amendment-save') {
-      const id = value(form, 'amendmentId');
-      const constitutionId = value(form, 'constitutionId');
-      const body = readWriteBody(form);
-      if (!id || id === 'new') {
-        if (!constitutionId) return redirectTo(request, '/editor/amendments?error=invalid');
-        const created = await createAmendment(constitutionId, body);
-        const destination = `/editor/amendments/${encodeURIComponent(created.id)}?saved=1`;
-        return request.headers.get('accept')?.includes('application/json') ? NextResponse.json({destination}) : redirectTo(request, destination);
-      }
-      await appendRevision(id, body);
-      const destination = `/editor/amendments/${encodeURIComponent(id)}?saved=1`;
-      return request.headers.get('accept')?.includes('application/json') ? NextResponse.json({destination}) : redirectTo(request, destination);
-    }
-    if (command === 'amendment-withdraw') {
-      const id = value(form, 'amendmentId');
-      if (!id || id === 'new') return redirectTo(request, '/editor/amendments?error=invalid');
-      await withdrawAmendment(id);
-      return redirectTo(request, `/editor/amendments/${encodeURIComponent(id)}?withdrawn=1`);
-    }
-    if (command === 'amendment-publish' || command === 'amendment-confirm') {
-      const id = value(form, 'amendmentId');
-      if (!id || id === 'new') return redirectTo(request, '/editor/amendments?error=invalid');
-      if (command === 'amendment-publish') await publishAmendment(id);
-      else await confirmAmendmentQuotes(id);
-      return redirectTo(request, `/editor/amendments/${encodeURIComponent(id)}?${command === 'amendment-publish' ? 'published' : 'confirmed'}=1`);
-    }
-    if (command === 'open' || command === 'open-sources') {
-      const hopKind = command === 'open-sources' ? 'editorial_correction' : value(form, 'hopKind');
-      if (hopKind !== 'legal' && hopKind !== 'editorial_correction') {
-        return redirectTo(request, '/editor?error=invalid');
-      }
-      const versionId = value(form, 'versionId');
-      const session = await openSession(versionId, hopKind);
-      return redirectTo(request, `/editor?versionId=${encodeURIComponent(versionId)}&sessionId=${encodeURIComponent(session.id)}${command === 'open-sources' ? '&scope=sources' : ''}`);
-    }
-    if (command === 'source-evidence' || command === 'source-evidence-changes') {
-      const rawRevision = value(form, 'expectedRevision');
-      if (!/^\d+$/.test(rawRevision) || !Number.isSafeInteger(Number(rawRevision))) throw new EditorApiError('source_evidence_invalid');
-      const revision = Number(rawRevision);
-      if (command === 'source-evidence-changes') {
-        await requestSourceEvidenceChanges(sessionId, revision, value(form, 'reason'));
-        return redirectTo(request, editorPath(form));
-      }
-      const evidence: SourceEvidence = {
-        description: value(form, 'description'), datePrecision: 'unknown',
-      };
-      const preview = await saveSourceEvidence(sessionId, revision, evidence, value(form, 'reason'));
-      if (request.headers.get('accept')?.includes('application/json')) return NextResponse.json(preview);
-      return redirectTo(request, editorPath(form, { saved: '1' }));
-    }
-    if (command === 'load') {
-      if (!sessionId) return redirectTo(request, '/editor?error=session_id');
-      return redirectTo(request, editorPath(form));
-    }
-    if (command === 'structured-save') {
-      let payload;
-      try { payload = JSON.parse(String(form.get('structuredDraft') ?? '')); } catch { return redirectTo(request, editorPath(form, { error: 'invalid' })); }
-      if (!payload || !Number.isSafeInteger(payload.expectedGeneration) || !Array.isArray(payload.operations)) return redirectTo(request, editorPath(form, { error: 'invalid' }));
-      await saveStructuredDraft(sessionId, payload);
-      return redirectTo(request, editorPath(form, { saved: '1' }));
-    }
-    if (command === 'save') {
-      await saveDraft(sessionId, value(form, 'articleId'), value(form, 'title'), value(form, 'body'));
-      return redirectTo(request, editorPath(form, { saved: '1' }));
-    }
-    if (command === 'details') {
-      const details = value(form, 'hopKind') === 'legal' ? {
-        changeRecord: {
-          title: value(form, 'recordTitle'),
-          comment: value(form, 'recordComment'),
-          documents: [{ url: value(form, 'documentUrl'), label: value(form, 'documentLabel') || undefined }],
-          changes: readPublishChanges(String(form.get('changesJson') ?? '[]')),
-        },
-      } : { comment: value(form, 'comment') };
-      await savePublishDetails(sessionId, details);
-      return redirectTo(request, editorPath(form, { detailsSaved: '1' }));
-    }
-    if (command === 'review') {
-      await submitReview(sessionId, sourceEvidenceRevision);
-      return redirectTo(request, editorPath(form, { reviewed: '1' }));
-    }
-    if (command === 'approve') {
-      await approveReview(sessionId, sourceEvidenceRevision);
-      return redirectTo(request, editorPath(form, { approved: '1' }));
-    }
-    if (command === 'publish') {
-      const hopKind = value(form, 'hopKind');
-      if (hopKind !== 'legal' && hopKind !== 'editorial_correction') {
-        return redirectTo(request, editorPath(form, { error: 'invalid' }));
-      }
-      const inlineTitle = value(form, 'recordTitle');
-      const normalizedChanges = readPublishChanges(String(form.get('changesJson') ?? '[]'));
-      const preview = await publishSession(sessionId, {
-        hopKind,
-        sourceEvidenceRevision,
-        amendmentId: value(form, 'amendmentId') || undefined,
-        comment: value(form, 'comment') || undefined,
-        changeRecord: inlineTitle ? {
-          title: inlineTitle,
-          comment: value(form, 'recordComment'),
-          documents: [{ url: value(form, 'documentUrl') }],
-          changes: normalizedChanges,
-        } : undefined,
-      });
-      const extra: Record<string, string> = { published: '1' };
-      if (preview.newVersionLabel) extra.newVersionLabel = preview.newVersionLabel;
-      if (preview.newVersionId) extra.newVersionId = preview.newVersionId;
-      if (hopKind === 'legal' && (preview.changeRecord?.title || inlineTitle)) {
-        extra.amendmentTitle = preview.changeRecord?.title || inlineTitle;
-      }
-      if (preview.amendmentStatus === 'failed' || preview.amendmentStatus === 'pending') extra.amendmentPending = '1';
-      return redirectTo(request, editorPath(form, extra));
-    }
-    return redirectTo(request, editorPath(form, { error: 'invalid' }));
+    const handler = handlers.get(context.command);
+    if (!handler) return redirectTo(request, editorPath(context.form, { error: 'invalid' }));
+    return await handler(context);
   } catch (error) {
-    if (error instanceof AmendmentApiError) {
-      if (command === 'amendment-save' && request.headers.get('accept')?.includes('application/json')) return NextResponse.json({key:error.key},{status:400});
-      const id = value(form, 'amendmentId');
-      const detail = id && id !== 'new' ? id : 'new';
-      const params = new URLSearchParams({ error: error.key });
-      if (detail === 'new' && value(form, 'constitutionId')) params.set('constitutionId', value(form, 'constitutionId'));
-      return redirectTo(request, `/editor/amendments/${encodeURIComponent(detail)}?${params}`);
-    }
-    if (error instanceof EditorApiError && error.code === 'step_up_required') {
-      return redirectTo(request, `/account/step-up?returnTo=${encodeURIComponent(editorPath(form))}`);
-    }
-    if (error instanceof EditorApiError) {
-      if (command === 'source-evidence' && request.headers.get('accept')?.includes('application/json')) {
-        return NextResponse.json({ key: error.key === 'invalid' ? 'source_evidence_invalid' : error.key }, { status: 400 });
-      }
-      return redirectTo(request, editorPath(form, { error: error.key }));
-    }
-    throw error;
+    return commandFailure(context, error);
   }
+}
+
+/** Known amendment errors take precedence; authentication step-up redirects precede JSON form errors. */
+function commandFailure(context: CommandContext, error: unknown): NextResponse {
+  if (error instanceof AmendmentApiError) return amendmentFailure(context, error);
+  if (error instanceof EditorApiError && error.code === 'step_up_required') {
+    return redirectTo(context.request, `/account/step-up?returnTo=${encodeURIComponent(editorPath(context.form))}`);
+  }
+  if (error instanceof EditorApiError) return editorFailure(context, error);
+  throw error;
+}
+
+/** New amendment errors retain constitution context; existing records retain only their selected identity. */
+function amendmentFailure({ request, form, command }: CommandContext, error: AmendmentApiError): NextResponse {
+  if (command === 'amendment-save' && request.headers.get('accept')?.includes('application/json')) {
+    return NextResponse.json({ key: error.key }, { status: 400 });
+  }
+  const id = value(form, 'amendmentId');
+  const detail = id && id !== 'new' ? id : 'new';
+  const params = new URLSearchParams({ error: error.key });
+  if (detail === 'new' && value(form, 'constitutionId')) params.set('constitutionId', value(form, 'constitutionId'));
+  return redirectTo(request, `/editor/amendments/${encodeURIComponent(detail)}?${params}`);
+}
+
+/** Only source-evidence saves return JSON errors; other editor commands preserve native navigation. */
+function editorFailure({ request, form, command }: CommandContext, error: EditorApiError): NextResponse {
+  if (command === 'source-evidence' && request.headers.get('accept')?.includes('application/json')) {
+    return NextResponse.json({ key: error.key === 'invalid' ? 'source_evidence_invalid' : error.key }, { status: 400 });
+  }
+  return redirectTo(request, editorPath(form, { error: error.key }));
 }

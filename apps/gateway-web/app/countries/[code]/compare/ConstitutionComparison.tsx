@@ -98,158 +98,15 @@ function columnBadge(kind: CompareKind, side: 'from' | 'to'): { tone: 'added' | 
 }
 
 export default async function ComparePage(props: ComparePageProps) {
-  const locale = await currentLocale();
-  const params = await props.params;
-  const searchParams = await props.searchParams;
-  let context;
-  let country: CountryDetail | null = null;
-  let error: string | null = null;
-  try {
-    context = await loadConstitutionCollection(params);
-    country = context?.collection ?? null;
-  } catch (e) {
-    error = e instanceof ApiUnavailableError ? e.message : 'Catalog is unavailable';
-  }
+  const model = await comparisonPageModel(props);
+  if (model.errorPage) return model.errorPage;
+  return renderComparisonPage(model);
+}
 
-  if (error) {
-    return (
-      <ReaderPage width="content">
-        <ServiceUnavailable service={ui.services.catalog} retryHref={`${params.id ? `/jurisdictions/${encodeURIComponent(params.id)}` : `/countries/${encodeURIComponent(params.code ?? "")}`}/compare`} />
-      </ReaderPage>
-    );
-  }
+type ComparisonPageModel = Exclude<Awaited<ReturnType<typeof comparisonPageModel>>, { errorPage: unknown }>;
 
-  if (!country || !context) {
-    notFound();
-  }
-  const routeBase = context.owner.href;
-
-  const explicitSnapshots = await Promise.all(
-    [searchParams.from, searchParams.to]
-      .filter((id): id is string => Boolean(id))
-      .map((id) => getVersion(id)),
-  );
-  const explicitConstitutionId = explicitSnapshots.find((version) => version)?.constitutionId;
-  const constitution =
-    country.constitutions.find((item) => item.id === explicitConstitutionId) ??
-    country.constitutions.find((item) =>
-      item.versions.some((version) => version.id === searchParams.from || version.id === searchParams.to),
-    ) ?? country.constitutions[0];
-  const versions = orderVersions(publicVersions(constitution?.versions ?? []));
-  const fromDetail = explicitSnapshots.find((version) => version?.id === searchParams.from);
-  const toDetail = explicitSnapshots.find((version) => version?.id === searchParams.to);
-  const fromPublic = searchParams.from ? publicVersionForSnapshot(constitution?.versions ?? [], fromDetail?.legalVersionId ?? searchParams.from) : undefined;
-  const toPublic = searchParams.to ? publicVersionForSnapshot(constitution?.versions ?? [], toDetail?.legalVersionId ?? searchParams.to) : undefined;
-  const fromId = fromPublic?.id ?? searchParams.from ?? versions[0]?.id;
-  const toId = toPublic?.id ?? searchParams.to ?? versions[versions.length - 1]?.id;
-  const showAll = searchParams.all === '1';
-  const user = await currentUser();
-  const showReviewWarnings = Boolean(user && canVisitEditor(user.roles));
-  const selectedError = compareRequestError(country.constitutions, fromId, toId, locale);
-  const path = fromId && toId && constitution && !selectedError ? versionPath(versions, fromId, toId) : null;
-
-  let fromArticles: ArticleSummary[] = [];
-  let toArticles: ArticleSummary[] = [];
-  let lawHops: LawHop[] = [];
-  let fromOutline: ContentOutline | undefined;
-  let toOutline: ContentOutline | undefined;
-  let loadError: string | null = selectedError;
-
-  if (path && path.length >= 2 && !selectedError && constitution) {
-    try {
-      const fromSnapshot = fromDetail?.constitutionId === constitution.id ? fromDetail.id : snapshotVersionId(path[0]);
-      const toSnapshot = toDetail?.constitutionId === constitution.id ? toDetail.id : snapshotVersionId(path[path.length - 1]);
-      [fromOutline, toOutline] = await Promise.all([getReaderOutline(fromSnapshot), getReaderOutline(toSnapshot)]).then((outlines) => outlines.map((outline) => outline ?? undefined));
-      const [fromList, toList, constitutionAmendments] = await Promise.all([
-        listAllUnits(
-          fromDetail?.constitutionId === constitution.id
-            ? fromDetail.id
-            : snapshotVersionId(path[0]),
-          true,
-        ),
-        listAllUnits(
-          toDetail?.constitutionId === constitution.id
-            ? toDetail.id
-            : snapshotVersionId(path[path.length - 1]),
-          true,
-        ),
-        listConstitutionAmendments(
-          constitution.id,
-          showReviewWarnings ? { status: 'all', authorization: await requireSessionBearer() } : undefined,
-        ),
-      ]);
-      const pins = [...new Set((constitutionAmendments ?? []).flatMap((amendment) => [amendment.sourceVersionId, amendment.targetVersionId]).filter((id): id is string => Boolean(id)))];
-      const pinDetails = await Promise.all(pins.map((id) => getVersion(id)));
-      const legalPinIds = new Map(
-        pinDetails
-          .filter((version): version is NonNullable<typeof version> => version != null)
-          .map((version) => [
-            version.id,
-            versions.find((publicVersion) => publicVersion.legalVersionId === (version.legalVersionId ?? version.id))?.id ?? version.id,
-          ]),
-      );
-      const between = amendmentsBetween(
-        (constitutionAmendments ?? []).map((amendment) => ({
-          ...amendment,
-          sourceVersionId: amendment.sourceVersionId ? legalPinIds.get(amendment.sourceVersionId) ?? amendment.sourceVersionId : null,
-          targetVersionId: amendment.targetVersionId ? legalPinIds.get(amendment.targetVersionId) ?? amendment.targetVersionId : null,
-        })),
-        fromId!, toId!, versions,
-      );
-      lawHops = between.map((amendment) => ({
-        amendment,
-        source: amendment.sourceVersionId
-          ? versions.find((version) => version.id === amendment.sourceVersionId)
-          : undefined,
-        target: amendment.targetVersionId
-          ? versions.find((version) => version.id === amendment.targetVersionId)
-          : undefined,
-      }));
-      fromArticles = fromList;
-      toArticles = toList;
-      loadError = null;
-    } catch (e) {
-      loadError = message(locale, ui.errors.servicesUnavailable);
-    }
-  }
-
-  const recorded = new Map<string, string[]>();
-  for (const hop of lawHops) {
-    for (const change of hop.amendment.changes) {
-      if (change.articleNumber) {
-        const types = recorded.get(change.articleNumber) ?? [];
-        types.push(change.changeType);
-        recorded.set(change.articleNumber, types);
-      }
-    }
-  }
-
-  const fromVersion = path?.[0];
-  const toVersion = path?.[path.length - 1];
-  const fromReaderId = fromDetail?.id ?? (fromVersion ? snapshotVersionId(fromVersion) : fromId ?? '');
-  const toReaderId = toDetail?.id ?? (toVersion ? snapshotVersionId(toVersion) : toId ?? '');
-  const formVersions = versions.map(version => {
-    const pinned = [fromDetail, toDetail].find(snapshot => snapshot && (snapshot.legalVersionId ?? snapshot.id) === (version.legalVersionId ?? version.id));
-    return { ...version, id: pinned?.id ?? snapshotVersionId(version) };
-  });
-  const fromCrossRefs = { ...(params.id ? { jurisdictionId: params.id } : { code: params.code }), versionId: fromReaderId, articlesByNumber: Object.fromEntries(fromArticles.map(item => [item.articleNumber, item.id])), unitsByLogicalId: orderedTargets(fromArticles), footnotes: footnoteItems(fromArticles.flatMap(item => item.content ?? []), routeBase + '/versions/' + fromReaderId) };
-  const toCrossRefs = { ...(params.id ? { jurisdictionId: params.id } : { code: params.code }), versionId: toReaderId, articlesByNumber: Object.fromEntries(toArticles.map(item => [item.articleNumber, item.id])), unitsByLogicalId: orderedTargets(toArticles), footnotes: footnoteItems(toArticles.flatMap(item => item.content ?? []), routeBase + '/versions/' + toReaderId) };
-  const rows = alignArticles(fromArticles, toArticles).map(({ key, left, right }) => {
-    const number = right?.articleNumber ?? left?.articleNumber ?? '';
-    const kind = netArticleKind(left, right, recorded.get(number) ?? []);
-    return { key, number, left, right, kind, rowId: compareRowId(right?.logicalId ?? left?.logicalId ?? number) };
-  });
-  const visible = showAll ? rows : rows.filter((row) => row.kind !== 'same');
-  const changedCount = rows.filter((row) => row.kind === 'changed').length;
-  const addedCount = rows.filter((row) => row.kind === 'added').length;
-  const removedCount = rows.filter((row) => row.kind === 'removed').length;
-  const compareQuery =
-    fromReaderId && toReaderId
-      ? `from=${encodeURIComponent(fromReaderId)}&to=${encodeURIComponent(toReaderId)}`
-      : '';
-  const showAllHref = `${routeBase}/compare?${compareQuery}&all=1`;
-  const hideUnchangedHref = `${routeBase}/compare?${compareQuery}`;
-
+/** Render the existing comparison form, warning precedence, law records and side-by-side source slots. */
+function renderComparisonPage({ locale, params, country, constitution, routeBase, formVersions, fromReaderId, toReaderId, showAll, loadError, path, fromVersion, toVersion, changedCount, addedCount, removedCount, lawHops, hideUnchangedHref, showAllHref, rows, showReviewWarnings, visible, fromOutline, toOutline, fromCrossRefs, toCrossRefs }: ComparisonPageModel) {
   return (
     <ReaderPage width="content" header={<PageHeader
         breadcrumbs={[
@@ -438,4 +295,193 @@ export default async function ComparePage(props: ComparePageProps) {
       ) : null}
     </ReaderPage>
   );
+}
+
+/** Preserve catalog/request/role/content evaluation order while assembling the comparison view. */
+async function comparisonPageModel(props: ComparePageProps) {
+  const locale = await currentLocale();
+  const params = await props.params;
+  const searchParams = await props.searchParams;
+  let context;
+  let country: CountryDetail | null = null;
+  let error: string | null = null;
+  try {
+    context = await loadConstitutionCollection(params);
+    country = context?.collection ?? null;
+  } catch (e) {
+    error = e instanceof ApiUnavailableError ? e.message : 'Catalog is unavailable';
+  }
+
+  if (error) {
+    return { errorPage: (
+      <ReaderPage width="content">
+        <ServiceUnavailable service={ui.services.catalog} retryHref={`${params.id ? `/jurisdictions/${encodeURIComponent(params.id)}` : `/countries/${encodeURIComponent(params.code ?? "")}`}/compare`} />
+      </ReaderPage>
+    ) };
+  }
+
+  if (!country || !context) {
+    notFound();
+  }
+  const routeBase = context.owner.href;
+
+  const explicitSnapshots = await Promise.all(
+    [searchParams.from, searchParams.to]
+      .filter((id): id is string => Boolean(id))
+      .map((id) => getVersion(id)),
+  );
+  const selection = selectedComparison(country, explicitSnapshots, searchParams);
+  const { constitution, versions, fromDetail, toDetail, fromId, toId } = selection;
+  const showAll = searchParams.all === '1';
+  const user = await currentUser();
+  const showReviewWarnings = Boolean(user && canVisitEditor(user.roles));
+  const selectedError = compareRequestError(country.constitutions, fromId, toId, locale);
+  const path = fromId && toId && constitution && !selectedError ? versionPath(versions, fromId, toId) : null;
+
+  const { fromArticles, toArticles, lawHops, fromOutline, toOutline, loadError } = await comparisonContent(path, selectedError, selection, locale, showReviewWarnings);
+
+  const recorded = recordedChanges(lawHops);
+
+  const fromVersion = path?.[0];
+  const toVersion = path?.[path.length - 1];
+  const fromReaderId = fromDetail?.id ?? (fromVersion ? snapshotVersionId(fromVersion) : fromId ?? '');
+  const toReaderId = toDetail?.id ?? (toVersion ? snapshotVersionId(toVersion) : toId ?? '');
+  const formVersions = versions.map(version => {
+    const pinned = [fromDetail, toDetail].find(snapshot => snapshot && (snapshot.legalVersionId ?? snapshot.id) === (version.legalVersionId ?? version.id));
+    return { ...version, id: pinned?.id ?? snapshotVersionId(version) };
+  });
+  const fromCrossRefs = comparisonReferences(params, routeBase, fromReaderId, fromArticles);
+  const toCrossRefs = comparisonReferences(params, routeBase, toReaderId, toArticles);
+  const rows = alignArticles(fromArticles, toArticles).map(({ key, left, right }) => {
+    const number = right?.articleNumber ?? left?.articleNumber ?? '';
+    const kind = netArticleKind(left, right, recorded.get(number) ?? []);
+    return { key, number, left, right, kind, rowId: compareRowId(right?.logicalId ?? left?.logicalId ?? number) };
+  });
+  const visible = showAll ? rows : rows.filter((row) => row.kind !== 'same');
+  const changedCount = rows.filter((row) => row.kind === 'changed').length;
+  const addedCount = rows.filter((row) => row.kind === 'added').length;
+  const removedCount = rows.filter((row) => row.kind === 'removed').length;
+  const compareQuery =
+    fromReaderId && toReaderId
+      ? `from=${encodeURIComponent(fromReaderId)}&to=${encodeURIComponent(toReaderId)}`
+      : '';
+  const showAllHref = `${routeBase}/compare?${compareQuery}&all=1`;
+  const hideUnchangedHref = `${routeBase}/compare?${compareQuery}`;
+
+  return { locale, params, country, constitution, routeBase, formVersions, fromReaderId, toReaderId, showAll, loadError, path, fromVersion, toVersion, changedCount, addedCount, removedCount, lawHops, hideUnchangedHref, showAllHref, rows, showReviewWarnings, visible, fromOutline, toOutline, fromCrossRefs, toCrossRefs };
+}
+
+/** Resolve explicit snapshot ownership and public legal selections before reading caller roles or content. */
+function selectedComparison(country: CountryDetail, explicitSnapshots: Awaited<ReturnType<typeof getVersion>>[], searchParams: Awaited<ComparePageProps['searchParams']>) {
+  const explicitConstitutionId = explicitSnapshots.find((version) => version)?.constitutionId;
+  const constitution =
+    country.constitutions.find((item) => item.id === explicitConstitutionId) ??
+    country.constitutions.find((item) =>
+      item.versions.some((version) => version.id === searchParams.from || version.id === searchParams.to),
+    ) ?? country.constitutions[0];
+  const versions = orderVersions(publicVersions(constitution?.versions ?? []));
+  const fromDetail = explicitSnapshots.find((version) => version?.id === searchParams.from);
+  const toDetail = explicitSnapshots.find((version) => version?.id === searchParams.to);
+  const fromPublic = searchParams.from ? publicVersionForSnapshot(constitution?.versions ?? [], fromDetail?.legalVersionId ?? searchParams.from) : undefined;
+  const toPublic = searchParams.to ? publicVersionForSnapshot(constitution?.versions ?? [], toDetail?.legalVersionId ?? searchParams.to) : undefined;
+  const fromId = fromPublic?.id ?? searchParams.from ?? versions[0]?.id;
+  const toId = toPublic?.id ?? searchParams.to ?? versions[versions.length - 1]?.id;
+  return { constitution, versions, fromDetail, toDetail, fromId, toId };
+}
+
+/** Load outlines first, then content and authorized amendment pins, retaining one shared failure boundary. */
+async function comparisonContent(path: VersionSummary[] | null, selectedError: string | null, selection: ReturnType<typeof selectedComparison>, locale: Awaited<ReturnType<typeof currentLocale>>, showReviewWarnings: boolean) {
+  const { constitution, versions, fromDetail, toDetail, fromId, toId } = selection;
+  let fromArticles: ArticleSummary[] = [];
+  let toArticles: ArticleSummary[] = [];
+  let lawHops: LawHop[] = [];
+  let fromOutline: ContentOutline | undefined;
+  let toOutline: ContentOutline | undefined;
+  let loadError: string | null = selectedError;
+
+  if (path && path.length >= 2 && !selectedError && constitution) {
+    try {
+      const fromSnapshot = fromDetail?.constitutionId === constitution.id ? fromDetail.id : snapshotVersionId(path[0]);
+      const toSnapshot = toDetail?.constitutionId === constitution.id ? toDetail.id : snapshotVersionId(path[path.length - 1]);
+      [fromOutline, toOutline] = await Promise.all([getReaderOutline(fromSnapshot), getReaderOutline(toSnapshot)]).then((outlines) => outlines.map((outline) => outline ?? undefined));
+      const [fromList, toList, constitutionAmendments] = await Promise.all([
+        listAllUnits(
+          fromDetail?.constitutionId === constitution.id
+            ? fromDetail.id
+            : snapshotVersionId(path[0]),
+          true,
+        ),
+        listAllUnits(
+          toDetail?.constitutionId === constitution.id
+            ? toDetail.id
+            : snapshotVersionId(path[path.length - 1]),
+          true,
+        ),
+        listConstitutionAmendments(
+          constitution.id,
+          showReviewWarnings ? { status: 'all', authorization: await requireSessionBearer() } : undefined,
+        ),
+      ]);
+      const pins = [...new Set((constitutionAmendments ?? []).flatMap((amendment) => [amendment.sourceVersionId, amendment.targetVersionId]).filter((id): id is string => Boolean(id)))];
+      const pinDetails = await Promise.all(pins.map((id) => getVersion(id)));
+      const legalPinIds = new Map(
+        pinDetails
+          .filter((version): version is NonNullable<typeof version> => version != null)
+          .map((version) => [
+            version.id,
+            versions.find((publicVersion) => publicVersion.legalVersionId === (version.legalVersionId ?? version.id))?.id ?? version.id,
+          ]),
+      );
+      const between = amendmentsBetween(
+        (constitutionAmendments ?? []).map((amendment) => ({
+          ...amendment,
+          sourceVersionId: amendment.sourceVersionId ? legalPinIds.get(amendment.sourceVersionId) ?? amendment.sourceVersionId : null,
+          targetVersionId: amendment.targetVersionId ? legalPinIds.get(amendment.targetVersionId) ?? amendment.targetVersionId : null,
+        })),
+        fromId!, toId!, versions,
+      );
+      lawHops = between.map((amendment) => ({
+        amendment,
+        source: amendment.sourceVersionId
+          ? versions.find((version) => version.id === amendment.sourceVersionId)
+          : undefined,
+        target: amendment.targetVersionId
+          ? versions.find((version) => version.id === amendment.targetVersionId)
+          : undefined,
+      }));
+      fromArticles = fromList;
+      toArticles = toList;
+      loadError = null;
+    } catch (e) {
+      loadError = message(locale, ui.errors.servicesUnavailable);
+    }
+  }
+
+  return { fromArticles, toArticles, lawHops, fromOutline, toOutline, loadError };
+}
+
+/** Retain every recorded change type in amendment encounter order for net article classification. */
+function recordedChanges(lawHops: LawHop[]): Map<string, string[]> {
+  const recorded = new Map<string, string[]>();
+  for (const hop of lawHops) {
+    for (const change of hop.amendment.changes) {
+      if (change.articleNumber) {
+        const types = recorded.get(change.articleNumber) ?? [];
+        types.push(change.changeType);
+        recorded.set(change.articleNumber, types);
+      }
+    }
+  }
+  return recorded;
+}
+
+/** Builds both snapshot reference indexes with the same owner, authored targets and pinned note URLs. */
+function comparisonReferences(params: Awaited<ComparePageProps['params']>, routeBase: string, versionId: string, articles: ArticleSummary[]) {
+  return {
+    ...(params.id ? { jurisdictionId: params.id } : { code: params.code }),
+    versionId,
+    articlesByNumber: Object.fromEntries(articles.map(item => [item.articleNumber, item.id])),
+    unitsByLogicalId: orderedTargets(articles),
+    footnotes: footnoteItems(articles.flatMap(item => item.content ?? []), routeBase + '/versions/' + versionId),
+  };
 }

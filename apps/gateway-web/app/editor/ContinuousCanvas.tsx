@@ -91,6 +91,218 @@ function restoreParsedIdentities(transaction:Transaction, previous:ProseNode):Tr
   return transaction;
 }
 
+/** Restore parsed identities before mapping zero-width anchors through the transaction's exact association rules. */
+function preserveTransactionAnchors(incoming: Transaction, previousDoc: ProseNode): Transaction {
+  let transaction = incoming;
+  transaction = restoreParsedIdentities(transaction, previousDoc);
+  const anchors = new Map<number, OrderedInlineReference[]>(),
+    previousAnchorIds = new Set<string>();
+  previousDoc.forEach((node) =>
+    (node.attrs.anchors as OrderedInlineReference[]).forEach((reference) =>
+      previousAnchorIds.add(reference.logicalId),
+    ),
+  );
+  const retainedAnchors = new Map<string, Set<string>>();
+  transaction.doc.forEach((node) =>
+    retainedAnchors.set(
+      node.attrs.nodeId,
+      new Set(
+        (node.attrs.anchors as OrderedInlineReference[]).map((reference) => reference.logicalId),
+      ),
+    ),
+  );
+  transaction.doc.forEach((node, offset) => {
+    const added = (node.attrs.anchors as OrderedInlineReference[]).filter(
+      (reference) => !previousAnchorIds.has(reference.logicalId),
+    );
+    if (added.length) anchors.set(offset, added);
+  });
+  previousDoc.forEach((node, offset) =>
+    (node.attrs.anchors as OrderedInlineReference[]).forEach((reference) => {
+      if (
+        retainedAnchors.has(node.attrs.nodeId) &&
+        !retainedAnchors.get(node.attrs.nodeId)!.has(reference.logicalId)
+      )
+        return;
+      const anchorPosition = offset + 1 + reference.start,
+        mapped = transaction.mapping.mapResult(
+          anchorPosition,
+          transaction.getMeta('separator-at') === anchorPosition ? -1 : 1,
+        );
+      if (mapped.deletedAcross) return;
+      const point = transaction.doc.resolve(
+        Math.max(1, Math.min(transaction.doc.content.size - 1, mapped.pos)),
+      );
+      if (!point.depth) return;
+      const target = point.before(1),
+        list = anchors.get(target) ?? [];
+      list.push({ ...reference, start: point.parentOffset, end: point.parentOffset });
+      anchors.set(target, list);
+    }),
+  );
+  transaction.doc.forEach((node, offset) => {
+    transaction = transaction.setNodeMarkup(offset, undefined, {
+      ...node.attrs,
+      anchors: anchors.get(offset) ?? [],
+    });
+  });
+  return transaction;
+}
+
+/** Automatic boundary edits preserve flat selection and stored marks while applying the historical split policy. */
+function segmentCanvasState(
+  state: EditorState,
+  transaction: Transaction,
+  previousDoc: ProseNode,
+  units: CanvasUnit[],
+  delimiters: readonly string[],
+): EditorState {
+  const originalBlocks = blocksOf(previousDoc),
+    blocks = blocksOf(state.doc);
+  const terminal = (text: string) =>
+    delimiters.some((delimiter) =>
+      text
+        .trimEnd()
+        .replace(/["'”’“‘»›)\]}]+$/u, '')
+        .endsWith(delimiter),
+    );
+  for (let index = 0; index + 1 < blocks.length; index++) {
+    const before = originalBlocks.find((block) => block.nodeId === blocks[index].nodeId),
+      next = state.doc.child(index + 1);
+    if (before && terminal(before.text) && !terminal(blocks[index].text) && !next.attrs.protected) {
+      const first = blocks[index],
+        second = blocks[index + 1],
+        gap = sentenceSeparator(first, second),
+        offset = first.text.length + gap.length;
+      blocks.splice(index, 2, {
+        ...first,
+        text: first.text + gap + second.text,
+        marks: normalizeMarks([
+          ...first.marks,
+          ...second.marks.map((mark) => ({
+            ...mark,
+            start: mark.start + offset,
+            end: mark.end + offset,
+          })),
+        ]),
+        references: [
+          ...first.references,
+          ...second.references.map((reference) => ({
+            ...reference,
+            start: reference.start + offset,
+            end: reference.end + offset,
+          })),
+        ],
+      });
+    }
+  }
+  const segmented = blocks.flatMap((block) => {
+    const before = originalBlocks.find((previous) => previous.nodeId === block.nodeId);
+    if (!transaction.getMeta('segment-all') && (!before || before.text === block.text))
+      return [block];
+    const previousText = before?.text ?? '';
+    let prefix = 0,
+      suffix = 0;
+    while (
+      prefix < previousText.length &&
+      prefix < block.text.length &&
+      previousText[prefix] === block.text[prefix]
+    )
+      prefix++;
+    while (
+      suffix < previousText.length - prefix &&
+      suffix < block.text.length - prefix &&
+      previousText[previousText.length - 1 - suffix] === block.text[block.text.length - 1 - suffix]
+    )
+      suffix++;
+    const changedEnd = block.text.length - suffix;
+    const parts = segmentBlock(block, delimiters);
+    let offset = 0;
+    const cuts: number[] = [];
+    for (const part of parts.slice(0, -1)) {
+      offset += part.text.length;
+      const punctuationEnd = offset - (part.text.length - part.text.trimEnd().length),
+        extendsTerminal =
+          prefix === previousText.length &&
+          punctuationEnd <= prefix &&
+          previousText.slice(punctuationEnd).trim() === '';
+      if (
+        transaction.getMeta('segment-all') ||
+        offset === prefix ||
+        extendsTerminal ||
+        (punctuationEnd > prefix && punctuationEnd <= changedEnd)
+      )
+        cuts.push(offset);
+    }
+    const boundaries = [0, ...cuts, block.text.length];
+    return boundaries
+      .slice(1)
+      .map((end, index) => ({
+        nodeId: index ? crypto.randomUUID() : block.nodeId,
+        textId: index ? crypto.randomUUID() : block.textId,
+        lineBreaksBefore: index ? 0 : (block.lineBreaksBefore ?? 0),
+        ...sliceBlock(block, boundaries[index], end),
+      }));
+  });
+  if (canvasSignature(segmented) !== canvasSignature(blocksOf(state.doc))) {
+    const from = flatPosition(state.doc, state.selection.from),
+      to = flatPosition(state.doc, state.selection.to),
+      marks = state.storedMarks;
+    const doc = documentOf(segmented, units);
+    const update = state.tr.replaceWith(0, state.doc.content.size, doc.content);
+    update.setSelection(
+      TextSelection.create(
+        update.doc,
+        documentPosition(update.doc, from),
+        documentPosition(update.doc, to),
+      ),
+    );
+    if (marks) update.setStoredMarks(marks);
+    state = state.apply(update);
+  }
+  return state;
+}
+
+/** Apply accepted rich targets immediately, retaining transient whitespace that the parent canonicalized away. */
+function reconcileCanonicalDocument(
+  view: EditorView,
+  state: EditorState,
+  canonical: CanvasBlock[],
+  blocks: CanvasBlock[],
+  automatic: boolean,
+  units: CanvasUnit[],
+): void {
+  const visible = canonical.map((accepted) => {
+    const raw = blocks.find((block) => block.textId === accepted.textId);
+    if (!automatic || !raw || raw.text.trim() !== accepted.text) return accepted;
+    const targets = new Map(
+      accepted.references.map((reference) => [reference.logicalId, reference.target]),
+    );
+    return {
+      ...raw,
+      references: raw.references.map((reference) => ({
+        ...reference,
+        target: targets.get(reference.logicalId) ?? reference.target,
+      })),
+    };
+  });
+  const doc = documentOf(visible, units);
+  if (!doc.eq(state.doc)) {
+    const from = flatPosition(state.doc, state.selection.from),
+      to = flatPosition(state.doc, state.selection.to),
+      update = state.tr.replaceWith(0, state.doc.content.size, doc.content);
+    update.setSelection(
+      TextSelection.create(
+        update.doc,
+        documentPosition(update.doc, from),
+        documentPosition(update.doc, to),
+      ),
+    );
+    if (state.storedMarks) update.setStoredMarks(state.storedMarks);
+    view.updateState(state.apply(update));
+  }
+}
+
 export type CanvasController = { endAnchor:()=>{textId:string;nodeId:string;start:number;end:number}; isAlive: () => boolean; format: (type: OrderedTextMark['type']) => void; focus: (position?: { textId: string; start: number; end?: number }) => void; segment: () => void; split: () => void; merge: () => void; addReference: (target: OrderedInlineReference['target']) => boolean; selection: () => { textId: string; nodeId: string; start: number; end: number }; activeMarks: () => string[] };
 export type CanvasMarkerContext={noteId:string;referenceId:string;textId:string;nodeId:string;anchor:{x:number;y:number;trigger?:HTMLElement}};
 export type CanvasTextContext={selected:boolean;canSplit:boolean;canMerge:boolean;anchor:CanvasMarkerContext['anchor']};
@@ -174,41 +386,11 @@ export function ContinuousCanvas(props: Props) {
         let transaction = incoming;
         if(!latest.current.editable&&transaction.docChanged){view.updateState(view.state);return;}
         if (transaction.docChanged) {
-          transaction=restoreParsedIdentities(transaction,view.state.doc);
-          const anchors = new Map<number, OrderedInlineReference[]>(), previousAnchorIds = new Set<string>();
-          view.state.doc.forEach(node => (node.attrs.anchors as OrderedInlineReference[]).forEach(reference => previousAnchorIds.add(reference.logicalId)));
-          const retainedAnchors = new Map<string, Set<string>>(); transaction.doc.forEach(node => retainedAnchors.set(node.attrs.nodeId, new Set((node.attrs.anchors as OrderedInlineReference[]).map(reference => reference.logicalId))));
-          transaction.doc.forEach((node, offset) => { const added = (node.attrs.anchors as OrderedInlineReference[]).filter(reference => !previousAnchorIds.has(reference.logicalId)); if (added.length) anchors.set(offset, added); });
-          view.state.doc.forEach((node, offset) => (node.attrs.anchors as OrderedInlineReference[]).forEach(reference => {
-            if (retainedAnchors.has(node.attrs.nodeId) && !retainedAnchors.get(node.attrs.nodeId)!.has(reference.logicalId)) return;
-            const anchorPosition=offset+1+reference.start, mapped = transaction.mapping.mapResult(anchorPosition, transaction.getMeta('separator-at') === anchorPosition ? -1 : 1); if (mapped.deletedAcross) return;
-            const point = transaction.doc.resolve(Math.max(1, Math.min(transaction.doc.content.size - 1, mapped.pos)));
-            if (!point.depth) return; const target = point.before(1), list = anchors.get(target) ?? [];
-            list.push({ ...reference, start: point.parentOffset, end: point.parentOffset }); anchors.set(target, list);
-          }));
-          transaction.doc.forEach((node, offset) => { transaction = transaction.setNodeMarkup(offset, undefined, { ...node.attrs, anchors: anchors.get(offset) ?? [] }); });
+          transaction = preserveTransactionAnchors(transaction, view.state.doc);
         }
         let state = view.state.apply(transaction);
         if ((transaction.docChanged || transaction.getMeta('segment') || transaction.getMeta('segment-all')) && latest.current.editable && latest.current.automatic && !composing.current && !transaction.getMeta('manual-boundary')) {
-          const originalBlocks = blocksOf(view.state.doc), blocks = blocksOf(state.doc);
-          const terminal = (text: string) => latest.current.delimiters.some(delimiter => text.trimEnd().replace(/["'”’“‘»›)\]}]+$/u, '').endsWith(delimiter));
-          for (let index = 0; index + 1 < blocks.length; index++) {
-            const before = originalBlocks.find(block => block.nodeId === blocks[index].nodeId), next = state.doc.child(index + 1);
-            if (before && terminal(before.text) && !terminal(blocks[index].text) && !next.attrs.protected) { const first = blocks[index], second = blocks[index + 1], gap=sentenceSeparator(first,second), offset = first.text.length+gap.length; blocks.splice(index, 2, { ...first, text: first.text + gap + second.text, marks: normalizeMarks([...first.marks, ...second.marks.map(mark => ({ ...mark, start: mark.start + offset, end: mark.end + offset }))]), references: [...first.references, ...second.references.map(reference => ({ ...reference, start: reference.start + offset, end: reference.end + offset }))] }); }
-          }
-          const segmented = blocks.flatMap(block => {
-            const before = originalBlocks.find(previous => previous.nodeId === block.nodeId); if (!transaction.getMeta('segment-all') && (!before || before.text === block.text)) return [block];
-            const previousText=before?.text ?? ''; let prefix = 0, suffix = 0; while (prefix < previousText.length && prefix < block.text.length && previousText[prefix] === block.text[prefix]) prefix++; while (suffix < previousText.length - prefix && suffix < block.text.length - prefix && previousText[previousText.length-1-suffix] === block.text[block.text.length-1-suffix]) suffix++; const changedEnd = block.text.length-suffix;
-            const parts = segmentBlock(block, latest.current.delimiters); let offset=0; const cuts:number[]=[]; for (const part of parts.slice(0,-1)) { offset+=part.text.length; const punctuationEnd=offset-(part.text.length-part.text.trimEnd().length), extendsTerminal=prefix===previousText.length&&punctuationEnd<=prefix&&previousText.slice(punctuationEnd).trim()===''; if (transaction.getMeta('segment-all') || offset === prefix || extendsTerminal || punctuationEnd > prefix && punctuationEnd <= changedEnd) cuts.push(offset); }
-            const boundaries=[0,...cuts,block.text.length]; return boundaries.slice(1).map((end,index)=>({ nodeId:index ? crypto.randomUUID() : block.nodeId, textId:index ? crypto.randomUUID() : block.textId,lineBreaksBefore:index?0:block.lineBreaksBefore??0,...sliceBlock(block,boundaries[index],end) }));
-          });
-          if (canvasSignature(segmented) !== canvasSignature(blocksOf(state.doc))) {
-            const from = flatPosition(state.doc, state.selection.from), to = flatPosition(state.doc, state.selection.to), marks = state.storedMarks;
-            const doc = documentOf(segmented, latest.current.units);
-            const update = state.tr.replaceWith(0, state.doc.content.size, doc.content);
-            update.setSelection(TextSelection.create(update.doc, documentPosition(update.doc, from), documentPosition(update.doc, to))); if (marks) update.setStoredMarks(marks);
-            state = state.apply(update);
-          }
+          state = segmentCanvasState(state, transaction, view.state.doc, latest.current.units, latest.current.delimiters);
         }
         view.updateState(state); activate();
         if (transaction.docChanged || transaction.getMeta('segment') || transaction.getMeta('segment-all')) {
@@ -221,9 +403,7 @@ export function ContinuousCanvas(props: Props) {
             // Reconciliation may retarget links after a merge. Commit that
             // accepted rich state now, before a later keystroke can race its
             // React acknowledgement and restore an obsolete target.
-            const visible=canonical.map(accepted=>{const raw=blocks.find(block=>block.textId===accepted.textId);if(!latest.current.automatic||!raw||raw.text.trim()!==accepted.text)return accepted;const targets=new Map(accepted.references.map(reference=>[reference.logicalId,reference.target]));return {...raw,references:raw.references.map(reference=>({...reference,target:targets.get(reference.logicalId)??reference.target}))};});
-            const doc=documentOf(visible,latest.current.units);
-            if(!doc.eq(state.doc)){const from=flatPosition(state.doc,state.selection.from),to=flatPosition(state.doc,state.selection.to),update=state.tr.replaceWith(0,state.doc.content.size,doc.content);update.setSelection(TextSelection.create(update.doc,documentPosition(update.doc,from),documentPosition(update.doc,to)));if(state.storedMarks)update.setStoredMarks(state.storedMarks);view.updateState(state.apply(update));}
+            reconcileCanonicalDocument(view, state, canonical, blocks, latest.current.automatic, latest.current.units);
           }
         }
         updateFootnoteHitTargets();

@@ -48,10 +48,15 @@ export function ConstitutionEntry({ constitution, owner, headingLevel = 3, edito
       <a className={styles.tool} href={constitutionHref(owner, constitution.id)}><Info aria-hidden="true" /><T value={directoryUi.about} /></a>
     </div>
     {!canCompare ? <p className={styles.availability} id={`${id}-compare-note`}><T value={ordered.length ? directoryUi.compareUnavailable : directoryUi.noVersions} /></p> : null}
-    {canEdit || canRecordLifecycle || constitution.contentOutline?.kinds.length ? <details className={styles.details}><summary><T value={directoryUi.editorial} /></summary>
+    {editorialDetails(constitution, canEdit, canRecordLifecycle, correctionContext)}
+  </article>;
+}
+
+/** Preserve editorial disclosure and link order independently from public reading/version actions. */
+function editorialDetails(constitution: ConstitutionSummary, canEdit: boolean, canRecordLifecycle: boolean, correctionContext: string) {
+  return canEdit || canRecordLifecycle || constitution.contentOutline?.kinds.length ? <details className={styles.details}><summary><T value={directoryUi.editorial} /></summary>
       {constitution.contentOutline?.kinds.length ? <p><T value={ui.countries.code.page.structure} /> {constitution.contentOutline.kinds.map(kind => kind.displayLabel).join(' → ')}</p> : null}
       {canEdit ? <><p><a href={`/editor/wiki/constitution/${constitution.id}${correctionContext}`}><T value={ui.countries.code.page.editConstitutionPage} /></a></p><p><a href={`/editor/history?constitutionId=${encodeURIComponent(constitution.id)}`}><T value={reviewUi.textCorrections} /></a></p></> : null}
       {canRecordLifecycle ? <p><a href={`/editor/lifecycle/${constitution.id}${correctionContext}`}><T value={ui.countries.code.page.recordLifecycleEvent} /></a></p> : null}
-    </details> : null}
-  </article>;
+    </details> : null;
 }

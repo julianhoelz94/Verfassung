@@ -6,6 +6,21 @@ export function findReaderText(container: HTMLElement, query: string): ReaderMat
   if (!needle) return [];
   const pattern = new RegExp(needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'giu');
   const document = container.ownerDocument;
+  const groups = readerTextGroups(container);
+  const results: ReaderMatch[] = [];
+  for (const [element, nodes] of groups) {
+    for (const match of nodes.map(node => node.data).join('').matchAll(pattern)) {
+      const start = match.index!, end = start + match[0].length;
+      const range = readerTextRange(document, nodes, start, end);
+      if (range) results.push({ range, element });
+    }
+  }
+  return results;
+}
+
+/** Group eligible source text in first-seen block order without rewriting any authored DOM. */
+function readerTextGroups(container: HTMLElement): Map<HTMLElement, Text[]> {
+  const document = container.ownerDocument;
   const groups = new Map<HTMLElement, Text[]>();
   const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, {
     acceptNode(node) {
@@ -20,10 +35,11 @@ export function findReaderText(container: HTMLElement, query: string): ReaderMat
     const block = node.parentElement?.closest<HTMLElement>('h2, h3, p, .legal-footnote, caption, td, th') ?? container;
     groups.set(block, [...(groups.get(block) ?? []), node]);
   }
-  const results: ReaderMatch[] = [];
-  for (const [element, nodes] of groups) {
-    for (const match of nodes.map(node => node.data).join('').matchAll(pattern)) {
-      const start = match.index!, end = start + match[0].length;
+  return groups;
+}
+
+/** Translate UTF-16 match offsets into the same first-start and first-end text-node range. */
+function readerTextRange(document: Document, nodes: Text[], start: number, end: number): Range | undefined {
       const range = document.createRange();
       let offset = 0, started = false;
       for (const node of nodes) {
@@ -31,10 +47,7 @@ export function findReaderText(container: HTMLElement, query: string): ReaderMat
         if (started && end <= offset + node.length) { range.setEnd(node, end - offset); break; }
         offset += node.length;
       }
-      if (started) results.push({ range, element });
-    }
-  }
-  return results;
+  return started ? range : undefined;
 }
 
 type HighlightRegistry = { set(name: string, highlight: unknown): void; delete(name: string): void };

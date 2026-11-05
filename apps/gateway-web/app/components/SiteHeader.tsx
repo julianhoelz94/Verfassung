@@ -44,30 +44,7 @@ function MenuSectionList({
   const query = useSearchParams().toString();
   return (
     <>
-      {sections.map(section => {
-        const links = <>{section.links.map(link => (
-          <a key={link.href} href={link.href} aria-current={isCurrentNavHref(pathname, link.href, query) ? 'page' : undefined}>
-            {link.message ? t(link.message) : link.label}{link.badgeCount ? <Badge tone="changed">{link.badgeCount}</Badge> : null}
-          </a>
-        ))}</>;
-        const className = section.phoneOnly ? 'menu-group nav-dup' : 'menu-group';
-        if (section.id === 'editorial' || section.id === 'admin' || section.id === 'primary') {
-          const active = section.id === 'editorial' ? pathname.startsWith('/editor') : section.id === 'admin' ? pathname.startsWith('/admin') : !pathname.startsWith('/editor') && !pathname.startsWith('/admin') && !pathname.startsWith('/account');
-          const count = section.links.reduce((sum, link) => sum + (link.badgeCount ?? 0), 0);
-          return <details key={section.id} className={`${className} menu-section`} open={active}>
-            <summary>{section.id === 'primary' ? t(usability.browse) : section.headingMessage ? t(section.headingMessage) : section.heading}{count ? <Badge tone="changed">{count}</Badge> : null}</summary>
-            {links}
-          </details>;
-        }
-        return <div key={section.id} className={className}>
-          {section.identity ? <div className="menu-user"><div>{section.identity.email}</div></div> : null}
-          {section.heading ? <div className="menu-label">{section.headingMessage ? t(section.headingMessage) : section.heading}</div> : null}
-          {links}
-          {section.id === 'account' && user ? <NavigatingActionForm action={logoutAction}>
-            <button type="submit"><T value={ui.components.siteheader.signOut} /></button>
-          </NavigatingActionForm> : null}
-        </div>;
-      })}
+      {sections.map(section => renderMenuSection(section, pathname, user, t, query))}
     </>
   );
 }
@@ -153,4 +130,38 @@ export function SiteHeader({ user, identityUnavailable = false, needsReviewCount
       ) : null}
     </header>
   );
+}
+
+/** Keeps the existing disclosure groups active for their route family. */
+function sectionActive(id: string, pathname: string): boolean {
+  if (id === 'editorial') return pathname.startsWith('/editor');
+  if (id === 'admin') return pathname.startsWith('/admin');
+  return !pathname.startsWith('/editor') && !pathname.startsWith('/admin') && !pathname.startsWith('/account');
+}
+
+/** Renders one menu entry in place, retaining keyed disclosure and account form identity. */
+function renderMenuSection(section: MenuSection, pathname: string, user: NavUser | null, t: ReturnType<typeof useTranslation>, query: string) {
+
+        const links = <>{section.links.map(link => (
+          <a key={link.href} href={link.href} aria-current={isCurrentNavHref(pathname, link.href, query) ? 'page' : undefined}>
+            {link.message ? t(link.message) : link.label}{link.badgeCount ? <Badge tone="changed">{link.badgeCount}</Badge> : null}
+          </a>
+        ))}</>;
+        const className = section.phoneOnly ? 'menu-group nav-dup' : 'menu-group';
+        if (section.id === 'editorial' || section.id === 'admin' || section.id === 'primary') {
+          const active = sectionActive(section.id, pathname);
+          const count = section.links.reduce((sum, link) => sum + (link.badgeCount ?? 0), 0);
+          return <details key={section.id} className={`${className} menu-section`} open={active}>
+            <summary>{section.id === 'primary' ? t(usability.browse) : section.headingMessage ? t(section.headingMessage) : section.heading}{count ? <Badge tone="changed">{count}</Badge> : null}</summary>
+            {links}
+          </details>;
+        }
+        return <div key={section.id} className={className}>
+          {section.identity ? <div className="menu-user"><div>{section.identity.email}</div></div> : null}
+          {section.heading ? <div className="menu-label">{section.headingMessage ? t(section.headingMessage) : section.heading}</div> : null}
+          {links}
+          {section.id === 'account' && user ? <NavigatingActionForm action={logoutAction}>
+            <button type="submit"><T value={ui.components.siteheader.signOut} /></button>
+          </NavigatingActionForm> : null}
+        </div>;
 }

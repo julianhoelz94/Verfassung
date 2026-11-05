@@ -48,7 +48,8 @@ export function VersionReader(props: VersionReaderProps) {
   return <FootnoteProvider notes={notes}><ReaderSurface {...props} notes={notes} endnotes={endnotes} backlinks={backlinks} actionIndex={actionIndex} /></FootnoteProvider>;
 }
 
-function ReaderSurface({ code, jurisdictionId, versionId, articles, outline, canEditTitles = false, language,
+/** Own the existing reader hooks, effects and commands without changing their execution order. */
+function useReaderSurface({ code, jurisdictionId, versionId, articles, outline, canEditTitles = false, language,
   changeByArticle = {}, unchangedSinceLabel, initialDepth = 'full', context, breadcrumbs, wiki, details, editorial,
   notices, footer, notes, endnotes, backlinks, actionIndex, initialPassage }: VersionReaderProps & {
     actionIndex: ReaderActionIndex; notes: FootnoteItem[]; endnotes: ReturnType<typeof footnoteEntries>; backlinks: ReturnType<typeof footnoteBacklinks>;
@@ -143,31 +144,28 @@ function ReaderSurface({ code, jurisdictionId, versionId, articles, outline, can
   function renderNode(node: OrderedNode, element: OrderedNodeElement) {
     return cloneElement(element, { tabIndex: -1, className: [element.props.className, sentenceKinds.has(node.kind) ? styles.sentence : undefined].filter(Boolean).join(' ') });
   }
+  return { code, versionId, articles, outline, canEditTitles, language, changeByArticle, unchangedSinceLabel, context, breadcrumbs, wiki, details, editorial, notices, footer, notes, endnotes, backlinks, actionIndex, t, viewer, sticky, documentRef, searchInput, navigation, preferences, panel, setPanel, menu, setMenu, query, setQuery, matchCount, matchIndex, shownOutline, max, labels, depth, setDepth, expanded, setExpanded, current, setCurrent, unitsByLogicalId, articlesByNumber, sentenceKinds, flowing, readerHref, updatePreferences, togglePanel, goMatch, tool, renderNode };
+}
+
+type ReaderSurfaceModel = ReturnType<typeof useReaderSurface>;
+
+/** Preserve the original ReaderSurface boundary and call presentation helpers without adding React components. */
+function ReaderSurface(props: Parameters<typeof useReaderSurface>[0]) {
+  return renderReaderSurface(useReaderSurface(props));
+}
+
+/** Keep the reader shell, slots and document in their existing DOM and React positions. */
+function renderReaderSurface(model: ReaderSurfaceModel) {
+  const { code, versionId, articles, outline, canEditTitles, language, changeByArticle, unchangedSinceLabel, context, breadcrumbs, editorial, notices, footer, notes, endnotes, backlinks, actionIndex, t, viewer, sticky, documentRef, searchInput, navigation, preferences, panel, setPanel, query, setQuery, matchCount, matchIndex, shownOutline, max, depth, expanded, setExpanded, current, setCurrent, unitsByLogicalId, articlesByNumber, flowing, readerHref, goMatch, renderNode } = model;
   return <ReaderActions index={actionIndex}><PageChromeSurface className={styles.viewer} ref={viewer} style={{ '--constitution-font-size': preferences.size + 'px' } as React.CSSProperties}>
     {breadcrumbs ? <PageBreadcrumbs>{breadcrumbs}</PageBreadcrumbs> : null}
     <PageMenuFrame ref={sticky}>
-      <PageMenuBar role="toolbar" label={t(ui.accessibility.readingOptions)}>
-        <button type="button" className={styles.tool} aria-label={t(preferences.navigation ? copy.hideContents : copy.showContents)} aria-expanded={preferences.navigation} aria-controls="reader-contents" onClick={() => updatePreferences({ navigation: !preferences.navigation })}><ReaderIcon name="contents" /><span className={styles.toolName}>{t(copy.contents)}</span></button>
-        <span className={styles.divider} aria-hidden="true" />
-        {tool('search', 'search', t(copy.find))}
-        {context ? tool('compare', 'compare', t(copy.compare)) : null}
-        {context ? tool('wiki', 'wiki', t(copy.wiki)) : null}
-        <span className={styles.spacer} />
-        {editorial ? <button type="button" className={styles.tool} aria-label={t(ui.countries.code.versions.versionid.page.editThisConstitution)} aria-expanded={panel === 'edit'} data-reader-trigger="edit" aria-controls={panel === 'edit' ? 'reader-edit' : undefined} onClick={() => togglePanel('edit')}><ReaderIcon name="edit" /><span className={styles.toolName}>{t(copy.edit)}</span></button> : null}
-        {details ? <details className={styles.menuWrap} data-reader-menu open={menu === 'details'}><summary role="button" className={styles.tool} aria-label={t(copy.details)} aria-expanded={menu === 'details'} data-reader-trigger="details" onClick={event => { event.preventDefault(); setMenu(menu === 'details' ? null : 'details'); }}><ReaderIcon name="details" /><span className={styles.toolName}>{t(copy.details)}</span></summary><div className={styles.menu}>{details}</div></details> : null}
-        <details className={styles.menuWrap} data-reader-menu open={menu === 'preferences'}><summary role="button" className={styles.tool} aria-label={t(copy.preferences)} aria-expanded={menu === 'preferences'} data-reader-trigger="preferences" onClick={event => { event.preventDefault(); setMenu(menu === 'preferences' ? null : 'preferences'); }}><ReaderIcon name="settings" /></summary>
-          <div className={styles.menu}><h2>{t(copy.preferences)}</h2>
-            <label>{t(copy.textSize)}<select value={preferences.size} onChange={event => updatePreferences({ size: event.target.value as ReaderPreferences['size'] })}><option value="16">{t(copy.small)}</option><option value="17">{t(copy.standard)}</option><option value="20">{t(copy.large)}</option></select></label>
-            {sentenceKinds.size ? <><label>{t(copy.presentation)}<select value={preferences.presentation} onChange={event => updatePreferences({ presentation: event.target.value as ReaderPreferences['presentation'] })}><option value="source">{t(copy.originalLayout)}</option><option value="flowing">{t(copy.flowing)}</option><option value="lines">{t(copy.lines)}</option></select></label>{flowing ? <label className={styles.check}><input type="checkbox" checked={preferences.boundaries} onChange={event => updatePreferences({ boundaries: event.target.checked })} />{t(copy.boundaries)}</label> : null}</> : null}
-            <label>{t(copy.detailLevel)}<select aria-label={t(copy.detailLevel)} value={depth} onChange={event => { setDepth(Number(event.target.value)); setExpanded(new Set()); }}>{labels.map((label, i) => <option key={i} value={i + 1}>{label}</option>)}</select></label>
-          </div>
-        </details>
-      </PageMenuBar>
+      {readerToolbar(model)}
       {panel === 'search' ? <div className={styles.search} id="reader-search"><input type="search" ref={searchInput} aria-label={t(copy.findLabel)} placeholder={t(copy.findPlaceholder)} value={query} onChange={event => setQuery(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); goMatch(event.shiftKey ? -1 : 1); } }} /><output aria-live="polite">{query ? matchCount ? `${matchIndex + 1} ${t(copy.of)} ${matchCount} ${t(copy.matches)}` : t(copy.noMatches) : t(copy.enterQuery)}</output><button type="button" className={styles.tool} aria-label={t(copy.previousMatch)} disabled={!matchCount} onClick={() => goMatch(-1)}><ReaderIcon name="up" /></button><button type="button" className={styles.tool} aria-label={t(copy.nextMatch)} disabled={!matchCount} onClick={() => goMatch(1)}><ReaderIcon name="down" /></button><button type="button" className={styles.tool} aria-label={t(copy.closeSearch)} onClick={() => { setPanel(null); setQuery(''); }}><ReaderIcon name="close" /></button></div> : null}
       {context ? <section id="reader-compare" hidden={panel !== 'compare'} aria-label={t(copy.compareVersions)}><ReaderComparison constitutionId={context.constitutionId} publications={context.publications} viewedVersionId={versionId} readerHref={readerHref} comparisonHref={context.comparisonHref} active={panel === 'compare'} /></section> : null}
       {panel === 'edit' ? <section className={styles.editorial} id="reader-edit">{editorial}</section> : null}
     </PageMenuFrame>
-    {context && panel === 'wiki' ? <WikiPanel id="reader-wiki" title={t(copy.about)} onClose={() => { setPanel(null); viewer.current?.querySelector<HTMLElement>('[data-reader-trigger="wiki"]')?.focus({ preventScroll: true }); }} actions={<>{context.overviewHref ? <a href={context.overviewHref}>{t(copy.fullWiki)}</a> : null}{context.editWikiHref ? <a href={context.editWikiHref}>{t(copy.editWiki)}</a> : null}</>}>{wiki ?? <p>{t(context.wikiState === 'unavailable' ? copy.wikiUnavailable : copy.noWiki)}</p>}</WikiPanel> : null}
+    {readerWiki(model)}
     <PageContentsLayout expanded={preferences.navigation} navigationId="reader-contents" navigationRef={navigation} navigation={
       <PageContentsNavigation label={t(copy.contents)} title={t(copy.inConstitution)} currentId={current} onSelect={setCurrent}
         items={articles.map(article => ({ id: article.id, href: '#unit-' + article.id, label: articleHeading(outline, { ...article, title: '' }) || articleHeading(outline, article), description: article.title }))}>
@@ -189,6 +187,33 @@ function ReaderSurface({ code, jurisdictionId, versionId, articles, outline, can
       </ReaderDocument></PageContentsBody>
     </PageContentsLayout>
   </PageChromeSurface></ReaderActions>;
+}
+
+/** Render menu controls and preference selectors using the same model callbacks and native details elements. */
+function readerToolbar(model: ReaderSurfaceModel) {
+  const { t, preferences, updatePreferences, tool, context, editorial, panel, togglePanel, details, menu, setMenu, sentenceKinds, flowing, depth, setDepth, setExpanded, labels } = model;
+  return <PageMenuBar role="toolbar" label={t(ui.accessibility.readingOptions)}>
+        <button type="button" className={styles.tool} aria-label={t(preferences.navigation ? copy.hideContents : copy.showContents)} aria-expanded={preferences.navigation} aria-controls="reader-contents" onClick={() => updatePreferences({ navigation: !preferences.navigation })}><ReaderIcon name="contents" /><span className={styles.toolName}>{t(copy.contents)}</span></button>
+        <span className={styles.divider} aria-hidden="true" />
+        {tool('search', 'search', t(copy.find))}
+        {context ? tool('compare', 'compare', t(copy.compare)) : null}
+        {context ? tool('wiki', 'wiki', t(copy.wiki)) : null}
+        <span className={styles.spacer} />
+        {editorial ? <button type="button" className={styles.tool} aria-label={t(ui.countries.code.versions.versionid.page.editThisConstitution)} aria-expanded={panel === 'edit'} data-reader-trigger="edit" aria-controls={panel === 'edit' ? 'reader-edit' : undefined} onClick={() => togglePanel('edit')}><ReaderIcon name="edit" /><span className={styles.toolName}>{t(copy.edit)}</span></button> : null}
+        {details ? <details className={styles.menuWrap} data-reader-menu open={menu === 'details'}><summary role="button" className={styles.tool} aria-label={t(copy.details)} aria-expanded={menu === 'details'} data-reader-trigger="details" onClick={event => { event.preventDefault(); setMenu(menu === 'details' ? null : 'details'); }}><ReaderIcon name="details" /><span className={styles.toolName}>{t(copy.details)}</span></summary><div className={styles.menu}>{details}</div></details> : null}
+        <details className={styles.menuWrap} data-reader-menu open={menu === 'preferences'}><summary role="button" className={styles.tool} aria-label={t(copy.preferences)} aria-expanded={menu === 'preferences'} data-reader-trigger="preferences" onClick={event => { event.preventDefault(); setMenu(menu === 'preferences' ? null : 'preferences'); }}><ReaderIcon name="settings" /></summary>
+          <div className={styles.menu}><h2>{t(copy.preferences)}</h2>
+            <label>{t(copy.textSize)}<select value={preferences.size} onChange={event => updatePreferences({ size: event.target.value as ReaderPreferences['size'] })}><option value="16">{t(copy.small)}</option><option value="17">{t(copy.standard)}</option><option value="20">{t(copy.large)}</option></select></label>
+            {sentenceKinds.size ? <><label>{t(copy.presentation)}<select value={preferences.presentation} onChange={event => updatePreferences({ presentation: event.target.value as ReaderPreferences['presentation'] })}><option value="source">{t(copy.originalLayout)}</option><option value="flowing">{t(copy.flowing)}</option><option value="lines">{t(copy.lines)}</option></select></label>{flowing ? <label className={styles.check}><input type="checkbox" checked={preferences.boundaries} onChange={event => updatePreferences({ boundaries: event.target.checked })} />{t(copy.boundaries)}</label> : null}</> : null}
+            <label>{t(copy.detailLevel)}<select aria-label={t(copy.detailLevel)} value={depth} onChange={event => { setDepth(Number(event.target.value)); setExpanded(new Set()); }}>{labels.map((label, i) => <option key={i} value={i + 1}>{label}</option>)}</select></label>
+          </div>
+        </details>
+      </PageMenuBar>;
+}
+
+/** Keep the Wiki panel optional and restore focus through the original reader trigger after closing. */
+function readerWiki({ context, panel, t, setPanel, viewer, wiki }: ReaderSurfaceModel) {
+  return context && panel === 'wiki' ? <WikiPanel id="reader-wiki" title={t(copy.about)} onClose={() => { setPanel(null); viewer.current?.querySelector<HTMLElement>('[data-reader-trigger="wiki"]')?.focus({ preventScroll: true }); }} actions={<>{context.overviewHref ? <a href={context.overviewHref}>{t(copy.fullWiki)}</a> : null}{context.editWikiHref ? <a href={context.editWikiHref}>{t(copy.editWiki)}</a> : null}</>}>{wiki ?? <p>{t(context.wikiState === 'unavailable' ? copy.wikiUnavailable : copy.noWiki)}</p>}</WikiPanel> : null;
 }
 
 function containsOccurrence(entries: import('../../lib/api').OrderedEntry[], target: string): boolean {

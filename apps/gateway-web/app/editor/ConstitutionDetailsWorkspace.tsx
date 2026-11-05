@@ -13,7 +13,13 @@ import styles from './ConstitutionDetailsWorkspace.module.css';
 
 type Props = { constitutionId: string; versionId: string; code?: string; canEdit: boolean; canManageStructure: boolean; canPublish: boolean };
 
-export function ConstitutionDetailsWorkspace({ constitutionId, versionId, code, canEdit, canManageStructure, canPublish }: Props) {
+/** Keeps state/effects in their original order and renders the same workspace tree. */
+export function ConstitutionDetailsWorkspace(props: Props) {
+  return renderConstitutionDetails(useConstitutionDetailsWorkspace(props));
+}
+
+/** Owns metadata reads, abort/unload guards and optimistic-revision writes for one mounted workspace. */
+function useConstitutionDetailsWorkspace({ constitutionId, versionId, code, canEdit, canManageStructure, canPublish }: Props) {
   const t = useTranslation(), copy = (en: string, de: string) => t({ en, de }), router = useRouter();
   const { textDirty, detailsDirty } = useDraftState();
   const sessionDirty = textDirty || detailsDirty;
@@ -52,6 +58,12 @@ export function ConstitutionDetailsWorkspace({ constitutionId, versionId, code, 
     } catch { setError('save_failed'); } finally { setSaving(false); }
   }
   const link = (href: string, label: string) => <a href={href} aria-disabled={blocked || undefined} onClick={guardNavigation}>{label}</a>;
+  return { constitutionId, versionId, code, canEdit, canManageStructure, canPublish, t, copy, textDirty, detailsDirty, sessionDirty, data, title, setTitle, slug, setSlug, loading, saving, error, saved, setSaved, attempt, setAttempt, setLoading, setError, dirty, blocked, feedback, save, link };
+}
+
+/** Renders in place so metadata fields, details disclosures and their focus stay mounted. */
+function renderConstitutionDetails(model: ReturnType<typeof useConstitutionDetailsWorkspace>) {
+  const { copy, textDirty, detailsDirty, data, loading, error, attempt, setAttempt, setLoading, setError, dirty, feedback } = model;
   return <section className={styles.workspace} aria-label={copy('Constitution details', 'Verfassungsangaben')}>
     <h2>{copy('Details', 'Angaben')}</h2>
     {loading ? <p role="status">{copy('Loading details…', 'Angaben werden geladen…')}</p> : null}
@@ -59,6 +71,17 @@ export function ConstitutionDetailsWorkspace({ constitutionId, versionId, code, 
     {!textDirty && detailsDirty ? <p role="status" className={styles.muted}>{copy('Save the publication details before changing these details or opening another workflow.', 'Speichere die Veröffentlichungsangaben, bevor du diese Angaben änderst oder einen anderen Ablauf öffnest.')}</p> : null}
     {feedback ? <div role="alert" className={styles.error}><p>{feedback}</p>{error === 'load_failed' || error === 'stale_metadata' ? <button type="button" className="btn btn-sm" onClick={() => { if (!dirty || window.confirm(copy('Reload the saved details and discard your unsaved title and slug?', 'Gespeicherte Angaben neu laden und deine ungespeicherten Eingaben für Titel und URL-Namen verwerfen?'))) { setLoading(true); setError(''); setAttempt(attempt + 1); } }}>{copy('Reload saved details', 'Gespeicherte Angaben neu laden')}</button> : null}</div> : null}
     {data ? <>
+      {renderMetadataForm({ ...model, data })}
+      {renderPublishedDetails({ ...model, data })}
+      {dirty ? <p className={styles.muted}>{copy('Save the constitution details before opening another workflow.', 'Speichere die Verfassungsangaben, bevor du einen anderen Ablauf öffnest.')}</p> : null}
+    </> : null}
+  </section>;
+}
+
+/** Keeps the controlled identity fields and save status inside the original form and disclosure. */
+function renderMetadataForm(model: ReturnType<typeof useConstitutionDetailsWorkspace> & { data: ConstitutionDetails }) {
+  const { copy, title, slug, canEdit, sessionDirty, loading, saving, save, setTitle, setSlug, setSaved, dirty, saved } = model;
+  return (
       <details name="constitution-editor-details" open><summary>{copy('Constitution', 'Verfassung')}</summary><div className={styles.section}>
         <form onSubmit={event => { event.preventDefault(); void save(); }}>
           <label className={styles.field}>{copy('Title', 'Titel')}<input value={title} maxLength={200} required disabled={!canEdit || sessionDirty || loading || saving} onChange={event => { setTitle(event.target.value); setSaved(false); }} /></label>
@@ -66,6 +89,13 @@ export function ConstitutionDetailsWorkspace({ constitutionId, versionId, code, 
           {canEdit ? <div className={styles.actions}><button className="btn btn-primary" disabled={!dirty || sessionDirty || loading || saving}>{saving ? copy('Saving…', 'Wird gespeichert…') : copy('Save constitution details', 'Verfassungsangaben speichern')}</button><span role="status" className={styles.muted}>{saved ? copy('Constitution details saved.', 'Verfassungsangaben gespeichert.') : dirty ? copy('Unsaved changes', 'Ungespeicherte Änderungen') : ''}</span></div> : null}
         </form>
       </div></details>
+  );
+}
+
+/** Presents pinned version facts, source, outline and lifecycle without permitting direct version mutation. */
+function renderPublishedDetails(model: ReturnType<typeof useConstitutionDetailsWorkspace> & { data: ConstitutionDetails }) {
+  const { copy, data, canEdit, blocked, versionId, canManageStructure, link, constitutionId, canPublish, code, t } = model;
+  return <>
       <details name="constitution-editor-details"><summary>{copy('Version', 'Textversion')}</summary><div className={styles.section}>
         <dl><dt>{copy('Version', 'Textversion')}</dt><dd>{data.version.versionLabel}</dd><dt>{copy('Effective date', 'Geltungsdatum')}</dt><dd>{data.version.effectiveDate ?? '—'}</dd><dt>{copy('Language', 'Sprache')}</dt><dd>{data.version.languageCode}</dd><dt>{copy('Gazette reference', 'Fundstelle')}</dt><dd>{data.versionFacts?.gazetteReference ?? '—'}</dd>{httpUrl(data.versionFacts?.sourceUrl) ? <><dt>{copy('Source', 'Quelle')}</dt><dd><a href={httpUrl(data.versionFacts?.sourceUrl)!} target="_blank" rel="noreferrer">{data.versionFacts?.sourceUrl}</a></dd></> : null}</dl>
         <p className={styles.muted}>{copy('Version facts belong to the published record. Corrections use the relevant editorial workflow.', 'Angaben zur Textversion gehören zum veröffentlichten Stand. Korrekturen erfolgen im zugehörigen Redaktionsablauf.')}</p>
@@ -85,7 +115,5 @@ export function ConstitutionDetailsWorkspace({ constitutionId, versionId, code, 
         <p className={styles.muted}>{copy('Publishers record dated events; status is derived from the history.', 'Veröffentlichende erfassen datierte Ereignisse; der Status ergibt sich aus diesem Verlauf.')}</p>
         {canPublish && code ? link('/editor/lifecycle/' + encodeURIComponent(constitutionId) + '?' + new URLSearchParams({ code, versionId }), copy('Record lifecycle event', 'Geltungsereignis erfassen')) : null}
       </div></details>
-      {dirty ? <p className={styles.muted}>{copy('Save the constitution details before opening another workflow.', 'Speichere die Verfassungsangaben, bevor du einen anderen Ablauf öffnest.')}</p> : null}
-    </> : null}
-  </section>;
+  </>;
 }

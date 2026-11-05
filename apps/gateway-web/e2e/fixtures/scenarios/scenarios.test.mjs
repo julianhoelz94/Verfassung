@@ -1,14 +1,47 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { scenarios, selectedScenarios, parseOptions, irregularRoots, irregularOutline } from './definitions.mjs';
 import { seedWorkflow, journalAt, allPages, comparableRoots } from './runtime.mjs';
-import { prepareScenarioJournal, verifyScenarioAccess } from './index.mjs';
+import { prepareScenarioJournal, runScenarios, verifyScenarioAccess } from './index.mjs';
 import { setupWorkflow } from './workflows.mjs';
 
 // Contracts: ADR 0002/0005, the fixture plan, and the rich-content import rules.
+test('compact scenarios write an empty exploration index without issuing domain writes', async (t) => {
+  const directory = mkdtempSync(join(tmpdir(), 'atlas-compact-scenarios-'));
+  t.mock.method(console, 'log', () => {});
+  const calls = [];
+  const ctx = { profile: 'compact', baseUrl: new URL('https://example.test/base'), runtimeDir: directory,
+    ids: { scenarios: { stale: { id: 'old' } } },
+    api: async (...args) => { calls.push(args); return { id: 'fixture-actor' }; } };
+  try {
+    await runScenarios(ctx);
+    assert.deepEqual(calls, [['GET', 'identity/me']]);
+    assert.deepEqual(ctx.ids.scenarios, {});
+    assert.deepEqual(JSON.parse(readFileSync(join(directory, 'scenario-index.json'), 'utf8')),
+      { profile: 'compact', origin: 'https://example.test', scenarios: {} });
+    assert.match(readFileSync(join(directory, 'scenario-guide.md'), 'utf8'), /# Fixture scenarios \(compact\)/);
+    assert.deepEqual(readdirSync(directory).sort(), ['scenario-guide.md', 'scenario-index.json']);
+  } finally { rmSync(directory, { recursive: true, force: true }); }
+});
+
+test('compact deployment verification retains the administrator guide without creating a seed checkpoint', async (t) => {
+  const directory = mkdtempSync(join(tmpdir(), 'atlas-compact-deployment-'));
+  t.mock.method(console, 'log', () => {});
+  const calls = [];
+  const ctx = { profile: 'compact', verifyOnly: true, deploymentEnvironment: 'test',
+    baseUrl: new URL('https://example.test'), runtimeDir: directory, ids: {},
+    api: async (...args) => { calls.push(args); return { id: 'fixture-admin' }; } };
+  try {
+    await runScenarios(ctx);
+    assert.deepEqual(calls, [['GET', 'identity/me']]);
+    assert.match(readFileSync(join(directory, 'scenario-guide.md'), 'utf8'), /CD uses the existing administrator/);
+    assert.deepEqual(readdirSync(directory).sort(), ['scenario-guide.md', 'scenario-index.json']);
+  } finally { rmSync(directory, { recursive: true, force: true }); }
+});
+
 test('CD checks private-work access anonymously without issuing a privileged negative-test write', async () => {
   const calls = [];
   const ctx = { deploymentEnvironment: 'test', reviewerToken: 'admin-token', viewerToken: false,

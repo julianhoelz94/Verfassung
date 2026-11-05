@@ -30,10 +30,11 @@ test('document revisions link from both editors and appear on public readers wit
   expect((await request.get(`/api/document/documents/${documentId}/revisions`)).status()).toBe(401);
 
   await page.goto(`/admin/constitutions/${fixture.constitutionId}`);
+  await page.getByRole('button', { name: 'Choose existing document', exact: true }).click();
   await page.getByLabel('Search documents').fill(`${title} revised`);
-  await page.getByLabel('Select a document').selectOption(documentId);
-  await page.getByRole('button', { name: 'Attach' }).click();
-  await expect(page.getByRole('heading', { name: 'Linked documents' })).toBeVisible();
+  await page.getByLabel('Document', { exact: true }).selectOption(documentId);
+  await page.getByRole('button', { name: 'Attach document' }).click();
+  await expect(page.getByRole('heading', { name: 'Documents', exact: true })).toBeVisible();
   await expect.poll(async () => {
     const response = await request.get(`/api/document/links/constitution/${fixture.constitutionId}`, { headers });
     expect(response.ok()).toBeTruthy();
@@ -41,15 +42,16 @@ test('document revisions link from both editors and appear on public readers wit
   }).toBe(true);
   await expect(page.getByRole('link', { name: `${title} revised` })).toBeVisible({ timeout: 15_000 });
   const linkedDocument = page.getByRole('listitem').filter({ has: page.getByRole('link', { name: `${title} revised`, exact: true }) });
-  await linkedDocument.getByRole('button', { name: 'Detach', exact: true }).click();
+  await linkedDocument.getByRole('button', { name: /^Detach:/ }).click();
   await expect.poll(async () => {
     const response = await request.get(`/api/document/links/constitution/${fixture.constitutionId}`, { headers });
     expect(response.ok()).toBeTruthy();
     return (await response.json()).some((link: { documentId: string }) => link.documentId === documentId);
   }).toBe(false);
   await expect(page.getByRole('link', { name: `${title} revised`, exact: true })).toHaveCount(0);
-  await page.getByLabel('Select a document').selectOption(documentId);
-  await page.getByRole('button', { name: 'Attach' }).click();
+  await page.getByRole('button', { name: 'Choose existing document', exact: true }).click();
+  await page.getByLabel('Document', { exact: true }).selectOption(documentId);
+  await page.getByRole('button', { name: 'Attach document' }).click();
   await expect(page.getByRole('link', { name: `${title} revised`, exact: true })).toBeVisible({ timeout: 15_000 });
   await page.goto(`/countries/${fixture.countryIso}/versions/${fixture.targetVersionId}`);
   await page.getByRole('button', { name: 'Details', exact: true }).click();
@@ -64,11 +66,12 @@ test('document revisions link from both editors and appear on public readers wit
   } });
   expect(created.ok(), await created.text()).toBeTruthy();
   const amendmentId = (await created.json()).id;
-  await page.goto(`/editor/amendments/${amendmentId}`);
+  await page.goto(`/editor/amendments/${amendmentId}?view=documents`);
+  await page.getByRole('button', { name: 'Choose existing document', exact: true }).click();
   await page.getByLabel('Search documents').fill(`${title} revised`);
-  await page.getByLabel('Select a document').selectOption(documentId);
-  const attachment = page.waitForResponse((response) => response.request().method() === 'POST' && response.url().includes(`/editor/amendments/${amendmentId}`));
-  await page.getByRole('button', { name: 'Attach' }).click();
+  await page.getByLabel('Document', { exact: true }).selectOption(documentId);
+  const attachment = page.waitForResponse((response) => response.request().method() === 'POST' && response.url().includes('/editor/documents/command'));
+  await page.getByRole('button', { name: 'Attach document' }).click();
   expect((await attachment).status()).toBe(200);
   await expect(page.getByRole('link', { name: `${title} revised` })).toBeVisible({ timeout: 15_000 });
   const savedRevision = await request.post(`/api/amendment/amendments/${amendmentId}/revisions`, { headers, data: {

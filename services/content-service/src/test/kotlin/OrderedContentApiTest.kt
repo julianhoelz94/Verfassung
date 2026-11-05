@@ -517,7 +517,7 @@ class OrderedContentApiTest {
     }
 
     private fun version(id: UUID, constitution: UUID, parentText: Boolean = true) {
-        Mockito.`when`(catalog.getVersion(id)).thenReturn(CatalogVersion(id, "draft", constitution))
+        Mockito.`when`(catalog.getVersion(id)).thenReturn(CatalogVersion(id, "draft", constitution, countryCode = "DE"))
         Mockito.`when`(catalog.getSettings(id)).thenReturn(
             StructuralSettings(
                 UUID.randomUUID(),
@@ -565,7 +565,7 @@ class OrderedContentApiTest {
         val text = first.content.single()
         val nodesBefore = count("content_node_revisions")
         val textsBefore = count("content_text_revisions")
-        Mockito.`when`(catalog.getVersion(sourceId)).thenReturn(CatalogVersion(sourceId, "published", constitution))
+        Mockito.`when`(catalog.getVersion(sourceId)).thenReturn(CatalogVersion(sourceId, "published", constitution, countryCode = "DE"))
         val target = content.save(
             targetId,
             OrderedSnapshotWrite(
@@ -619,8 +619,13 @@ class OrderedContentApiTest {
         assertThat(content.plainText(target.roots.single())).isEqualTo("Before. Changed. Between. Second. After.")
         val resolved = content.resolve(targetId, text.logicalId!!)
         assertThat(resolved.text).isEqualTo("Changed.")
+        assertThat(resolved.deepLink).isEqualTo("/countries/DE/versions/$targetId#${resolved.occurrenceId}")
         assertThat(resolved.breadcrumbs).containsExactly(root.logicalId, first.logicalId)
         assertThat(content.resolve(sourceId, text.logicalId!!).text).isEqualTo("First.")
+        val jurisdiction = UUID.randomUUID()
+        Mockito.`when`(catalog.getVersion(sourceId)).thenReturn(CatalogVersion(sourceId, "published", constitution, jurisdictionId = jurisdiction))
+        val regional = content.resolve(sourceId, text.logicalId!!)
+        assertThat(regional.deepLink).isEqualTo("/jurisdictions/$jurisdiction/versions/$sourceId#${regional.occurrenceId}")
         assertThrows(VersionPublishedException::class.java) { content.save(sourceId, OrderedSnapshotWrite(source.generation, roots = emptyList())) }
         assertThrows(DataAccessException::class.java) { jdbc.update("UPDATE content_text_revisions SET text = 'mutated' WHERE id = ?", text.revisionId) }
         assertThrows(DataAccessException::class.java) { jdbc.update("INSERT INTO content_revision_entries(parent_revision_id, position, text_revision_id) VALUES (?, 99, ?)", root.revisionId, text.revisionId) }
@@ -655,7 +660,7 @@ class OrderedContentApiTest {
         val text = sentence.content.single()
         val nodeCount = count("content_node_revisions")
         val textCount = count("content_text_revisions")
-        Mockito.`when`(catalog.getVersion(sourceId)).thenReturn(CatalogVersion(sourceId, "published", constitution))
+        Mockito.`when`(catalog.getVersion(sourceId)).thenReturn(CatalogVersion(sourceId, "published", constitution, countryCode = "DE"))
         val target = content.save(
             targetId,
             OrderedSnapshotWrite(

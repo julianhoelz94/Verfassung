@@ -1,6 +1,6 @@
 import { fetchWithTimeout } from './fetch-with-timeout';
-import { ui } from './messages';
-import type { Locale } from './locale';
+import { AMENDMENT_ERROR_MESSAGES, type AmendmentErrorKey } from './amendment-messages';
+export { AMENDMENT_ERROR_MESSAGES, amendmentErrorMessage, type AmendmentErrorKey } from './amendment-messages';
 import { cookies } from 'next/headers';
 import type { Amendment, AmendmentUnitRef } from './api';
 import { amendmentBaseUrl } from './api';
@@ -49,30 +49,6 @@ export type SuggestChangesBody = {
   sourceVersionId: string;
   targetVersionId: string;
 };
-
-export const AMENDMENT_ERROR_MESSAGES = {
-  sign_in: ui.errors.signIn,
-  forbidden: ui.errors.forbidden,
-  not_found: ui.errors.amendmentNotFound,
-  invalid: ui.errors.amendmentSaveFailed,
-  create_failed: ui.errors.createAmendmentFailed,
-  save_failed: ui.errors.saveDraftFailed,
-  publish_failed: ui.errors.publishAmendmentFailed,
-  withdraw_failed: ui.errors.withdrawAmendmentFailed,
-  title: ui.errors.titleRequired,
-  failed: ui.errors.amendmentFailed,
-} as const;
-
-export type AmendmentErrorKey = keyof typeof AMENDMENT_ERROR_MESSAGES;
-
-export function amendmentErrorMessage(key: string | undefined, locale: Locale = 'en'): string | null {
-  if (!key) {
-    return null;
-  }
-  return (Object.hasOwn(AMENDMENT_ERROR_MESSAGES, key)
-    ? AMENDMENT_ERROR_MESSAGES[key as AmendmentErrorKey]
-    : AMENDMENT_ERROR_MESSAGES.failed)[locale];
-}
 
 export class AmendmentApiError extends Error {
   constructor(

@@ -101,11 +101,6 @@ export function AmendmentRevisionPanel({
 
   return (
     <>
-      <details className={["panel panel-side revision-panel-phone", surfaceStyles.panel].join(' ')}>
-        <summary className="panel-title"><T value={ui.editor.amendments.amendmentrevisionpanel.revisionHistory} /></summary>
-        {list}
-        {restoreForm}
-      </details>
       <aside className={["panel panel-side revision-panel-desktop", surfaceStyles.panel].join(' ')} aria-label={t(ui.accessibility.revisionHistory)}>
         <p className="panel-title"><T value={ui.editor.amendments.amendmentrevisionpanel.revisionHistory} /></p>
         {list}

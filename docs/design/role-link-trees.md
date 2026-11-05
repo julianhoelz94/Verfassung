@@ -158,7 +158,7 @@ Constitution Atlas
 │   │   ├── → New constitution
 │   │   └── Constitution → Outline editor   /admin/constitutions/[id]
 │   └── Import                              /admin/import   (UI-21)
-│       └── Job                             /admin/import/[jobId]
+│       └── Job                             /editor?importJobId=[jobId]
 ├── API docs                                /api-docs   (GW-2; footer link as well)
 └── ● admin@example.org  [admin]
     ├── Editorial

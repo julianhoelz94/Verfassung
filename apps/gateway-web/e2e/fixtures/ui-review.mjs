@@ -47,6 +47,12 @@ export function reviewFixtures(germany) {
   const comparison = { id: '01900000-0000-4000-8000-000000000851', state: 'published', needsReview: false, definition: { title: 'Authored archive comparison', attribution: 'UI verification fixture', sourceUrl: 'https://example.org/comparison', sourceDocumentId: REVIEW_DOCUMENT, sourceDocumentRevision: 1,
     columns: [{ constitutionId: constitution.id, versionId: REVIEW_CURRENT, label: 'First constitution' }, { constitutionId: '01900000-0000-4000-8000-000000000857', versionId: legal.id, label: 'Second constitution' }], topics: [{ title: 'Equality', passages: [{ column: 0, logicalId: archiveRoot.logicalId }], missingColumns: [1] }] } };
   return { country, corrections, async response(req, method, pathname, readBody) {
+    if (method === 'POST' && pathname === '/__sprint59_import') {
+      const state = await readBody(req);
+      job.versionId = state.prepared ? REVIEW_CURRENT : null;
+      job.status = state.status ?? 'pending_review';
+      return job;
+    }
     if (method === 'POST' && pathname === '/__sprint59_setup') {
       const body = await readBody(req);
       setup.status.completed = body.completed;

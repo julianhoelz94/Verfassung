@@ -1,3 +1,5 @@
+import { DocumentLinks } from './documents/DocumentLinks';
+import { passageReaderHref } from '../../lib/reader-links';
 import { statusMessage } from '../../lib/ui-labels';
 import { SignedInSummary } from '../components/SignedInSummary';
 import { currentLocale } from '../../lib/server-locale';
@@ -274,6 +276,7 @@ export default async function EditorPage(props: EditorPageProps) {
             </dl>
             {session.hopKind && searchParams.sessionId && versionId && selectedId ? (
               <PublishForm
+                readerOwner={sourceVersion ?? undefined}
                 sessionId={searchParams.sessionId}
                 versionId={versionId}
                 articleId={selectedId}
@@ -300,11 +303,13 @@ export default async function EditorPage(props: EditorPageProps) {
               {selected ? `${kindLabel(selected.kind)} ${selected.articleNumber}` : message(locale, ui.editorDynamic.unit)}
             </p>
             {structured && selectedRoot && settings && versionId && selected && selectedConstitution ? <StructuredEditor
-              initialTab={searchParams.tab === 'wiki' ? 'wiki' : searchParams.tab === 'details' ? 'details' : undefined}
+              readerOwner={sourceVersion ?? undefined}
+              initialTab={searchParams.tab === 'documents' ? 'documents' : searchParams.tab === 'wiki' ? 'wiki' : searchParams.tab === 'details' ? 'details' : undefined}
               wikiPanel={selectedCountry ? <ConstitutionWikiPanel constitutionId={selectedConstitution.id} code={selectedCountry.isoCode} returnTo={editorReturnTo} historyPage={searchParams.wikiHistoryPage} status={searchParams.wikiStatus === 'saved' || searchParams.wikiStatus === 'published' || searchParams.wikiStatus === 'error' ? searchParams.wikiStatus : undefined} /> : undefined}
+              documentsPanel={<DocumentLinks targetType="constitution" targetId={selectedConstitution.id} returnTo={editorReturnTo} canEdit={canEdit || canPublish} />}
               detailsPanel={<ConstitutionDetailsWorkspace constitutionId={selectedConstitution.id} versionId={versionId} code={selectedCountry?.isoCode} canEdit={canEdit} canManageStructure={user.roles.includes('admin')} canPublish={canPublish} />}
               key={`${session.id}:${structured.generation}:${selectedRoot.logicalId}`}
-              review={differences.map(difference => { const sourceRoot = structured.sourceRoots.find(root => nodes([root]).some(node => node.logicalId === difference.logicalId || node.content.some(entry => entry.logicalId === difference.logicalId))); const targetRoot = structured.roots.find(root => nodes([root]).some(node => node.logicalId === difference.logicalId || node.content.some(entry => entry.logicalId === difference.logicalId))); const targetOccurrence = targetRoot && preview.unitMapping?.[targetRoot.logicalId]; return { ...difference, beforeText: ["rich", "inserted", "removed"].includes(difference.field) ? changeExcerpt(structured.sourceRoots, difference.logicalId) : undefined, afterText: ["rich", "inserted", "removed"].includes(difference.field) ? changeExcerpt(structured.roots, difference.logicalId) : undefined, rootId: (targetRoot ?? sourceRoot)?.logicalId, sourceLink: sourceRoot?.occurrenceId ? `/versions/${structured.sourceVersionId}/units/${sourceRoot.occurrenceId}` : undefined, targetLink: preview.newVersionId && targetOccurrence ? `/versions/${preview.newVersionId}/units/${targetOccurrence}` : undefined }; })} preview={{ ...structured, footnotes: indexDraftFootnotes(structured.roots), footnoteReferences: indexDraftFootnoteReferences(structured.roots), roots: structured.roots.map(root => root.logicalId === selectedRoot.logicalId ? root : { ...root, content: [] }), sourceRoots: structured.sourceRoots.map(root => root.logicalId === selectedRoot.logicalId ? root : { ...root, content: [] }) }} outline={settings.outline} rootId={selectedRoot.logicalId} versionId={versionId} articleId={selected.id} constitutionId={selectedConstitution.id} canManageStructure={user.roles.includes('admin')} publishedVersionId={preview.newVersionId} unitMapping={preview.unitMapping} editable={canSave && session.actorId === user.id} scope={searchParams.scope} selectedNode={searchParams.selectedNode}
+              review={differences.map(difference => { const sourceRoot = structured.sourceRoots.find(root => nodes([root]).some(node => node.logicalId === difference.logicalId || node.content.some(entry => entry.logicalId === difference.logicalId))); const targetRoot = structured.roots.find(root => nodes([root]).some(node => node.logicalId === difference.logicalId || node.content.some(entry => entry.logicalId === difference.logicalId))); const targetOccurrence = targetRoot && preview.unitMapping?.[targetRoot.logicalId]; return { ...difference, beforeText: ["rich", "inserted", "removed"].includes(difference.field) ? changeExcerpt(structured.sourceRoots, difference.logicalId) : undefined, afterText: ["rich", "inserted", "removed"].includes(difference.field) ? changeExcerpt(structured.roots, difference.logicalId) : undefined, rootId: (targetRoot ?? sourceRoot)?.logicalId, sourceLink: sourceRoot?.occurrenceId ? passageReaderHref(sourceVersion, structured.sourceVersionId, sourceRoot.occurrenceId) : undefined, targetLink: preview.newVersionId && targetOccurrence ? passageReaderHref(sourceVersion, preview.newVersionId, targetOccurrence) : undefined }; })} preview={{ ...structured, footnotes: indexDraftFootnotes(structured.roots), footnoteReferences: indexDraftFootnoteReferences(structured.roots), roots: structured.roots.map(root => root.logicalId === selectedRoot.logicalId ? root : { ...root, content: [] }), sourceRoots: structured.sourceRoots.map(root => root.logicalId === selectedRoot.logicalId ? root : { ...root, content: [] }) }} outline={settings.outline} rootId={selectedRoot.logicalId} versionId={versionId} articleId={selected.id} constitutionId={selectedConstitution.id} canManageStructure={user.roles.includes('admin')} publishedVersionId={preview.newVersionId} unitMapping={preview.unitMapping} editable={canSave && session.actorId === user.id} scope={searchParams.scope} selectedNode={searchParams.selectedNode}
             /> : canSave && selected && versionId && searchParams.sessionId ? (
               <ArticleEditor
                 sessionId={searchParams.sessionId}
@@ -340,6 +345,7 @@ export default async function EditorPage(props: EditorPageProps) {
                 />
               </details>
             ) : null}
+            {!structured && selectedConstitution ? <DocumentLinks targetType="constitution" targetId={selectedConstitution.id} returnTo={editorReturnTo} canEdit={canEdit || canPublish} /> : null}
             <div className="action-bar">
               {canEdit && session.status === 'open' ? (
                 <a className="btn" href="/editor">

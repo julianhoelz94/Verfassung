@@ -1,0 +1,71 @@
+<div id="atlas-amendment-mobile" class="viz-dotted-background">
+  <div class="atlas-mobile-label">Editorial documents · Mobile mock · Sample data</div>
+  <iframe title="Interactive mobile editorial document workflow" sandbox="allow-scripts" scrolling="yes"></iframe>
+  <script type="application/octet-stream" data-atlas-source>__ATLAS_MOBILE_PAYLOAD__</script>
+</div>
+<style>
+  #atlas-amendment-mobile { display:flex;flex-direction:column;align-items:center;gap:12px;max-width:100%;padding-block:12px; }
+  #atlas-amendment-mobile .atlas-mobile-label { font:400 13px/1.5 system-ui,sans-serif;color:light-dark(#626e67,#bdc9c0);padding-inline:12px;text-align:center; }
+  #atlas-amendment-mobile iframe { display:block;width:min(392px,100%);height:844px;border:1px solid light-dark(#dce2da,#626e67);border-radius:16px;background:#faf9f6;box-sizing:border-box; }
+</style>
+<script>
+(() => {
+  const root = document.getElementById('atlas-amendment-mobile');
+  const phone = root.querySelector('iframe');
+  const payload = root.querySelector('[data-atlas-source]').textContent.trim();
+  const documentSource = new TextDecoder().decode(Uint8Array.from(atob(payload), c => c.charCodeAt(0)));
+  let savedModel = window.openai?.widgetState?.privateContent?.savedModel ?? null;
+  let currentSnapshot = JSON.stringify(savedModel);
+
+  function initializeStorage(initial) {
+    window.ATLAS_MOCK_VIEW = 'documents';
+    const key = 'amendment-workspace-mock';
+    const values = new Map(initial ? [[key, JSON.stringify(initial)]] : []);
+    const storage = {
+      getItem(name) { return values.get(name) ?? null; },
+      setItem(name, value) {
+        values.set(name, String(value));
+        if (name === key) parent.postMessage({ type:'atlas-mobile-saved', model:JSON.parse(value) }, '*');
+      },
+      removeItem(name) {
+        values.delete(name);
+        if (name === key) parent.postMessage({ type:'atlas-mobile-saved', model:null }, '*');
+      },
+    };
+    Object.defineProperty(window, 'localStorage', { configurable:true, value:storage });
+  }
+
+  function render() {
+    const initial = JSON.stringify(savedModel).replace(/</g, '\\u003c');
+    const bootstrap = '<script>(' + initializeStorage.toString() + ')(' + initial + ');<' + '/script>';
+    phone.srcdoc = documentSource.replace('<script>', bootstrap + '<script>');
+  }
+
+  window.addEventListener('message', event => {
+    if (event.source !== phone.contentWindow || event.data?.type !== 'atlas-mobile-saved') return;
+    const model = event.data.model;
+    if (model !== null && (typeof model !== 'object' || !Array.isArray(model.changes))) return;
+    const snapshot = JSON.stringify(model);
+    if (snapshot.length > 12000) return;
+    savedModel = model;
+    currentSnapshot = snapshot;
+    if (window.openai?.setWidgetState) {
+      window.openai.setWidgetState({
+        modelContent:{ preview:'mobile document workflow', editor:model?.mockEditor??'amendment', title:model?.title ?? null, affectedPassages:model?.changes?.length ?? 3 },
+        privateContent:{ savedModel:model },
+      }).catch(() => {});
+    }
+  });
+
+  window.addEventListener('openai:set_globals', event => {
+    const incoming = event.detail?.globals?.widgetState?.privateContent?.savedModel ?? null;
+    const snapshot = JSON.stringify(incoming);
+    if (snapshot === currentSnapshot) return;
+    savedModel = incoming;
+    currentSnapshot = snapshot;
+    render();
+  });
+
+  render();
+})();
+</script>

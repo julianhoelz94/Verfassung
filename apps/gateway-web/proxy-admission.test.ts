@@ -38,7 +38,7 @@ describe('deployment and browsing admission', () => {
     vi.mocked(fetch).mockRejectedValue(new Error('offline'));
     expect((await proxy(request('/setup', 'unverified-session'))).headers.get('location')).toBe('https://atlas.example/login');
   });
-  it.each(['/countries/XA', '/constitutions/charter', '/comparisons', '/legacy', '/search?q=rights', '/jurisdictions/XA', '/documents/source', '/versions/snapshot'])('requires verified sign-in when public browsing is disabled: %s', async path => {
+  it.each(['/countries/XA', '/constitutions/charter', '/comparisons', '/search?q=rights', '/jurisdictions/XA', '/documents/source', '/versions/snapshot'])('requires verified sign-in when public browsing is disabled: %s', async path => {
     vi.mocked(requestAnonymousBrowsingPolicy).mockResolvedValue({ allowed: false, serverDefault: false, override: null });
     expect((await proxy(request(path))).headers.get('location')).toBe('https://atlas.example/');
     expect((await proxy(request(path, 'verified-session'))).status).toBe(200);

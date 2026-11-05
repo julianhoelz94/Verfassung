@@ -1,3 +1,4 @@
+import { passageReaderHref } from '../../lib/reader-links';
 import { Fragment, type HTMLAttributes, type ReactElement, type ReactNode, type RefAttributes } from 'react';
 import type { ArticleDetail, ArticleSummary, ContentNode, ContentOutline, OrderedEntry, OrderedInlineReference, OrderedNode, OrderedTableCell } from '../../lib/api';
 import { linkifyReferences, type CrossRefContext } from '../../lib/crossrefs';
@@ -267,7 +268,7 @@ export function OrderedContentTree({ entries, outline, withRefs = (text) => text
       if (ref.start > previous) result.push(renderTextSlice ? <Fragment key={'text-' + previous}>{renderTextSlice(entry, previous, ref.start)}</Fragment> : <InlineText key={'text-' + previous} text={value} marks={entry.marks} start={previous} end={ref.start} render={withRefs} />);
       const target = ref.target;
       const unit = target.logicalId ? crossRefs?.unitsByLogicalId?.[target.logicalId] ?? targets.get(target.logicalId) : undefined;
-      const href = target.type === 'external' ? target.url ?? undefined : target.type === 'footnote' && target.footnoteId && notes.get(target.footnoteId) ? `#${idPrefix}fn-${notes.get(target.footnoteId)}` : unit && crossRefs ? crossRefs.code ? `/countries/${crossRefs.code}/versions/${crossRefs.versionId}/units/${unit.rootId}#${unit.occurrenceId}` : `/versions/${crossRefs.versionId}/units/${unit.rootId}?occurrenceId=${unit.occurrenceId}` : unit ? `#${idPrefix}${unit.occurrenceId}` : undefined;
+      const href = target.type === 'external' ? target.url ?? undefined : target.type === 'footnote' && target.footnoteId && notes.get(target.footnoteId) ? `#${idPrefix}fn-${notes.get(target.footnoteId)}` : unit && crossRefs ? passageReaderHref(crossRefs, crossRefs.versionId, unit.rootId, unit.occurrenceId) : unit ? `#${idPrefix}${unit.occurrenceId}` : undefined;
       const label = value.slice(ref.start, ref.end);
       const formatted = <InlineText text={value} marks={entry.marks} start={ref.start} end={ref.end} />;
       result.push(renderReference ? <span key={ref.logicalId} id={idPrefix + 'ref-' + ref.logicalId}>{renderReference(ref, label, href, entry)}</span> : target.type === 'footnote' && target.footnoteId ? <FootnoteMarker key={ref.logicalId} noteId={target.footnoteId} referenceId={idPrefix + 'ref-' + ref.logicalId}>{label ? formatted : undefined}</FootnoteMarker> : href ? <a key={ref.logicalId} id={idPrefix + 'ref-' + ref.logicalId} className="xref" href={href}>{formatted}</a> : <LocalizedTitle key={ref.logicalId} className="xref-unavailable" label={ui.accessibilityDynamic.referenceUnavailable}>{formatted}</LocalizedTitle>);

@@ -1,3 +1,4 @@
+import { editorDocuments } from './fixtures/editor-documents.mjs';
 import QRCode from 'qrcode';
 import { countryDirectoryFixtures } from './fixtures/country-directory.mjs';
 import { continuousReaderOutline, continuousReaderUnits } from './fixtures/continuous-reader.mjs';
@@ -116,6 +117,14 @@ function to1949(article) {
 }
 
 const CONSTITUTION_ID = '01900000-0000-4000-8000-000000000002';
+
+// The mock models Amendment's derived response links, not caller-supplied URLs.
+function amendmentReaderLinks(changes = []) {
+  const reference = ref => ref?.versionId && (ref.occurrenceId || ref.rootOccurrenceId)
+    ? { ...ref, deepLink: `/countries/DE/versions/${encodeURIComponent(ref.versionId)}#${encodeURIComponent(ref.occurrenceId || ref.rootOccurrenceId)}` }
+    : ref;
+  return changes.map(change => ({ ...change, beforeRef: reference(change.beforeRef), afterRef: reference(change.afterRef) }));
+}
 
 const amendment = {
   id: '01900000-0000-4000-8000-000000000301',
@@ -352,6 +361,7 @@ function preview() {
 
 resetMockState();
 
+let editorDocumentScenario;
 const server = createServer(async (req, res) => {
   const url = new URL(req.url ?? '/', `http://127.0.0.1:${port}`);
   const { pathname, searchParams } = url;
@@ -362,7 +372,10 @@ const server = createServer(async (req, res) => {
     return;
   }
 
+  if (method === 'POST' && pathname === '/__editor_documents') { editorDocumentScenario=editorDocuments();json(res,200,{});return; }
+  if (editorDocumentScenario) { const response=await editorDocumentScenario(req,method,url);if(response){json(res,response.status,await response.json());return;} }
   if (method === 'POST' && pathname === '/__reset') {
+    editorDocumentScenario=undefined;
     resetMockState();
     empty(res, 204);
     return;
@@ -733,7 +746,7 @@ const server = createServer(async (req, res) => {
       sourceReference: body.sourceReference ?? null,
       sourceVersionId: body.sourceVersionId ?? null,
       targetVersionId: body.targetVersionId ?? null,
-      changes: body.changes ?? [],
+      changes: amendmentReaderLinks(body.changes),
     };
     mockAmendments.set(created.id, created);
     json(res, 201, created);
@@ -794,6 +807,7 @@ const server = createServer(async (req, res) => {
     const updated = {
       ...existing,
       ...body,
+      changes: amendmentReaderLinks(body.changes ?? existing.changes),
       id: existing.id,
       status: existing.status,
       constitutionId: existing.constitutionId,

@@ -23,14 +23,14 @@ test('generic unit page renders ordered hierarchy and every text occurrence anch
   for (const entry of texts) await expect(page.locator(`[id="${entry.occurrenceId}"]`)).toHaveText(entry.text);
 });
 
-test('global unit permalink redirects to the exact version and text occurrence', async ({ page, request }) => {
+test('direct reader citation opens the exact version and text occurrence', async ({ page, request }) => {
   const units = await (await request.get(`${mockOrigin}/api/content/versions/${VERSION_2022}/units?includeBody=true`)).json();
   const unit = units[0];
   let entry = unit.content[0];
   while (entry.node) entry = entry.node.content[0];
   expect(entry.occurrenceId).toBeTruthy();
-  await page.goto(`/versions/${VERSION_2022}/units/${unit.id}?occurrenceId=${entry.occurrenceId}`);
-  await expect(page).toHaveURL(`/countries/DE/versions/${VERSION_2022}/units/${unit.id}#${entry.occurrenceId}`);
+  await page.goto(`/countries/DE/versions/${VERSION_2022}#${entry.occurrenceId}`);
+  await expect(page).toHaveURL(`/countries/DE/versions/${VERSION_2022}#${entry.occurrenceId}`);
   await expect(page.locator(`[id="${entry.occurrenceId}"]`)).toBeVisible();
   await expect(page.locator(`[id="${entry.occurrenceId}"]`)).toHaveText(entry.text);
 });

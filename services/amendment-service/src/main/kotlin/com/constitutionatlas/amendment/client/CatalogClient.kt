@@ -23,6 +23,8 @@ data class CatalogVersionRef(
     val legalVersionId: UUID? = null,
     val currentVersionId: UUID? = null,
     val publicationStatus: String? = null,
+    val countryCode: String? = null,
+    val jurisdictionId: UUID? = null,
 )
 
 interface CatalogClient {

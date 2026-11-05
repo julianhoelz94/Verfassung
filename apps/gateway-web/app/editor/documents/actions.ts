@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { currentUser, requireSessionBearer } from '../../../lib/session';
-import { attachDocument, createDocument, detachDocument, reviseDocument, uploadDocument } from '../../../lib/document-api';
+import { createDocument, reviseDocument, uploadDocument } from '../../../lib/document-api';
 import { safeReturnTo } from '../../../lib/return-to';
 
 async function writer(): Promise<string> {
@@ -64,32 +64,4 @@ export async function uploadDocumentAction(form: FormData): Promise<string> {
   }
   revalidatePath(`/editor/documents/${id}`);
   return `/editor/documents/${encodeURIComponent(id)}?saved=1`;
-}
-
-export async function attachDocumentAction(form: FormData): Promise<string> {
-  const authorization = await writer();
-  const targetType = String(form.get('targetType')) as 'constitution' | 'version' | 'amendment';
-  const targetId = String(form.get('targetId'));
-  const returnTo = safeReturnPath(form.get('returnTo'));
-  try {
-    await attachDocument(targetType, targetId, String(form.get('documentId')), String(form.get('revisionId') || '') || null, authorization, String(form.get('scopeRevisionId') || '') || null);
-  } catch {
-    return `${returnTo}${returnTo.includes('?') ? '&' : '?'}documentError=attach`;
-  }
-  revalidatePath(returnTo.split('?')[0]);
-  return returnTo;
-}
-
-export async function detachDocumentAction(form: FormData): Promise<string> {
-  const authorization = await writer();
-  const targetType = String(form.get('targetType')) as 'constitution' | 'version' | 'amendment';
-  const targetId = String(form.get('targetId'));
-  const returnTo = safeReturnPath(form.get('returnTo'));
-  try {
-    await detachDocument(targetType, targetId, String(form.get('documentId')), authorization, String(form.get('scopeRevisionId') || '') || null);
-  } catch {
-    return `${returnTo}${returnTo.includes('?') ? '&' : '?'}documentError=detach`;
-  }
-  revalidatePath(returnTo.split('?')[0]);
-  return returnTo;
 }

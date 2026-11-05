@@ -39,7 +39,7 @@ Transport checks include `python3 -m unittest discover -s infra/caddy -p 'test_*
 
 ## Controlled legacy archive aliases
 
-Set `ATLAS_LEGACY_HOST` to a hostname controlled by the operator. Catalog's `ARCHIVE_LEGACY_HOSTS` comma-separated allowlist must include each accepted source hostname (default `www.verfassungen.de,verfassungen.de,legacy.localhost`). Mappings accept exact archive paths, query strings and fragments; they resolve only to validated local published snapshots or publicly linked pinned document revisions. External URLs are never redirect targets.
+Browser legacy-host routing and the old URL resolver page have been retired; their source is retained in `archive/legacy-routing/`. Catalog's `ARCHIVE_LEGACY_HOSTS` comma-separated allowlist must include each accepted source hostname (default `www.verfassungen.de,verfassungen.de,legacy.localhost`). Mappings accept exact archive paths, query strings and fragments; they resolve only to validated local published snapshots or publicly linked pinned document revisions. External URLs are never redirect targets.
 
 For managed HTTPS, point the alias at the same edge and make its HTTP-01 challenge reachable before enabling it. Caddy includes the explicit alias in certificate management and preserves path/query during HTTP→HTTPS redirection. The browser resolver carries fragments to Catalog because HTTP servers do not receive fragments. API/assets keep normal routing. An unset alias does not add a wildcard; local development uses `legacy.localhost`. Site deployment instructions remain pending.
 

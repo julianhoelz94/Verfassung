@@ -1738,18 +1738,6 @@ button.article-toggle:disabled::after {
   min-width: 0;
 }
 
-.amendment-review-layout {
-  display: grid;
-  gap: var(--space-4);
-  align-items: start;
-}
-
-@media (min-width: 1400px) {
-  .amendment-review-layout {
-    grid-template-columns: minmax(0, 1fr) minmax(20rem, .9fr);
-  }
-}
-
 .diff-review-progress {
   display: grid;
   gap: var(--space-2);
@@ -1797,35 +1785,6 @@ button.article-toggle:disabled::after {
   cursor: pointer;
 }
 
-.diff-review-sides {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
-  gap: var(--space-3);
-}
-
-.diff-review-sides > div {
-  min-width: 0;
-  border: 1px solid var(--color-line-strong);
-  border-radius: var(--radius-sm, .25rem);
-  padding: var(--space-3);
-}
-
-.diff-review-sides code {
-  display: block;
-  overflow-wrap: anywhere;
-  margin-top: var(--space-2);
-}
-
-.diff-review-text {
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
-
-.diff-review-text del,
-.diff-review-text ins {
-  padding: .05em .12em;
-}
-
 .quote-review-grid {
   display: grid;
   grid-template-columns: 1fr;
@@ -1841,24 +1800,6 @@ button.article-toggle:disabled::after {
 @media (min-width: 1024px) {
   .quote-review-grid {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr) minmax(0, 1fr);
-  }
-}
-
-.revision-panel-phone {
-  display: block;
-}
-
-.revision-panel-desktop {
-  display: none;
-}
-
-@media (min-width: 1024px) {
-  .revision-panel-phone {
-    display: none;
-  }
-
-  .revision-panel-desktop {
-    display: block;
   }
 }
 

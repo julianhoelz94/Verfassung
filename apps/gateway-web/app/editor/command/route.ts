@@ -1,3 +1,4 @@
+import { hasTrustedOrigin } from '../../../lib/request-origin';
 import { NextRequest, NextResponse } from 'next/server';
 import { readWriteBody } from '../../../lib/amendment-form';
 import { readPublishChanges } from '../../../lib/publish-details';
@@ -38,18 +39,6 @@ function redirectTo(request: NextRequest, path: string): NextResponse {
   return NextResponse.redirect(new URL(path, host ? `${protocol}://${host}` : request.url), 303);
 }
 
-function hasTrustedOrigin(request: NextRequest): boolean {
-  const origin = request.headers.get('origin');
-  if (!origin) return true;
-  try {
-    const originUrl = new URL(origin);
-    const host = request.headers.get('x-forwarded-host')?.split(',')[0]?.trim() ?? request.headers.get('host');
-    const protocol = request.headers.get('x-forwarded-proto')?.split(',')[0]?.trim() ?? request.nextUrl.protocol.replace(':', '');
-    return Boolean(host) && originUrl.host === host && originUrl.protocol === `${protocol}:`;
-  } catch {
-    return false;
-  }
-}
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   if (!hasTrustedOrigin(request)) {
@@ -68,10 +57,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       if (!id || id === 'new') {
         if (!constitutionId) return redirectTo(request, '/editor/amendments?error=invalid');
         const created = await createAmendment(constitutionId, body);
-        return redirectTo(request, `/editor/amendments/${encodeURIComponent(created.id)}?saved=1`);
+        const destination = `/editor/amendments/${encodeURIComponent(created.id)}?saved=1`;
+        return request.headers.get('accept')?.includes('application/json') ? NextResponse.json({destination}) : redirectTo(request, destination);
       }
       await appendRevision(id, body);
-      return redirectTo(request, `/editor/amendments/${encodeURIComponent(id)}?saved=1`);
+      const destination = `/editor/amendments/${encodeURIComponent(id)}?saved=1`;
+      return request.headers.get('accept')?.includes('application/json') ? NextResponse.json({destination}) : redirectTo(request, destination);
     }
     if (command === 'amendment-withdraw') {
       const id = value(form, 'amendmentId');
@@ -176,6 +167,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return redirectTo(request, editorPath(form, { error: 'invalid' }));
   } catch (error) {
     if (error instanceof AmendmentApiError) {
+      if (command === 'amendment-save' && request.headers.get('accept')?.includes('application/json')) return NextResponse.json({key:error.key},{status:400});
       const id = value(form, 'amendmentId');
       const detail = id && id !== 'new' ? id : 'new';
       const params = new URLSearchParams({ error: error.key });

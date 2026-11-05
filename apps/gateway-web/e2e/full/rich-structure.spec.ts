@@ -16,12 +16,12 @@ test('mixed roots and rich entries survive API publication and read on a narrow 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(`/countries/XC/versions/${version}/units/${preamble.occurrenceId}`);
   await expect(page.getByText('We establish this charter.')).toBeVisible();
-  await page.goto(`/countries/XC/versions/${version}/units/${appendix.occurrenceId}`);
+  await page.goto(`/countries/XC/versions/${version}#${appendix.occurrenceId}`);
   await expect(page.getByRole('table', { name: 'Civic duties' })).toBeVisible();
   await expect(page.getByRole('cell', { name: 'Biennial' })).toBeVisible();
   await expect(page.getByRole('cell', { name: 'Applies nationally' })).toHaveAttribute('colspan', '2');
   await page.goto(`/countries/XC/versions/${version}/articles/${article.occurrenceId}`);
-  await expect(page.locator('[data-reader-document]').getByRole('link', { name: 'Appendix A' })).toHaveAttribute('href', new RegExp(`/versions/${version}/units/${appendix.occurrenceId}`));
+  await expect(page.locator('[data-reader-document]').getByRole('link', { name: 'Appendix A' })).toHaveAttribute('href', new RegExp(`/versions/${version}#${appendix.occurrenceId}`));
   await expect(page.getByRole('link', { name: 'Source', exact: true })).toHaveAttribute('href', 'https://example.org/atlas-e2e/revised-source');
   const marker = page.getByRole('button', { name: 'Show footnote 1', exact: true });
   const markerSize = await marker.boundingBox();

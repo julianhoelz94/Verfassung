@@ -623,7 +623,6 @@ class AmendmentRepository(
             revisionId = rs.getObject("${side}_revision_id", UUID::class.java),
             unitKind = rs.getString("${side}_unit_kind"),
             articleNumber = rs.getString("article_number"),
-            deepLink = "/versions/$versionId/units/$rootOccurrenceId?occurrenceId=$occurrenceId",
         )
     }
 

@@ -1,0 +1,55 @@
+{
+  "sourceCommit": "f927cad418fdcd9b2ae308a93ddf300b09295cb0",
+  "files": [
+    {
+      "originalPath": "apps/gateway-web/app/legacy/page.tsx",
+      "backupPath": "source/apps/gateway-web/app/legacy/page.tsx.txt",
+      "sha256": "b73943c82fd1f344e28e6f2a33507ef514018bd459bea41c7f9b11bc5da9b421"
+    },
+    {
+      "originalPath": "apps/gateway-web/app/legacy/LegacyResolver.tsx",
+      "backupPath": "source/apps/gateway-web/app/legacy/LegacyResolver.tsx.txt",
+      "sha256": "d48bfe4c04eddc1bb243cc9984856c15a57888faadff7eaef2c597369bb75cd2"
+    },
+    {
+      "originalPath": "apps/gateway-web/app/countries/[code]/constitution-timeline/page.tsx",
+      "backupPath": "source/apps/gateway-web/app/countries/[code]/constitution-timeline/page.tsx.txt",
+      "sha256": "57359889ba26ad9a6c758c039f3ff3a749687361a2662a7b5dfbc8ab74cb9b7a"
+    },
+    {
+      "originalPath": "apps/gateway-web/app/admin/import/[jobId]/page.tsx",
+      "backupPath": "source/apps/gateway-web/app/admin/import/[jobId]/page.tsx.txt",
+      "sha256": "87eda12e795e56b05e74166ca944c9690a01102121b5a1a4383391673e8a41c6"
+    },
+    {
+      "originalPath": "apps/gateway-web/app/versions/[versionId]/units/[unitId]/page.tsx",
+      "backupPath": "source/apps/gateway-web/app/versions/[versionId]/units/[unitId]/page.tsx.txt",
+      "sha256": "4d30e70d68ac269ef45d6ac7963cb263f54274f981d145981ac1b70d47d9ef0a"
+    },
+    {
+      "originalPath": "apps/gateway-web/proxy.ts",
+      "backupPath": "source/apps/gateway-web/proxy.ts.txt",
+      "sha256": "3e62d2af40a30439269bf83133740a62506fde194253e262c51ca065b2aaa6e7"
+    },
+    {
+      "originalPath": "infra/caddy/Caddyfile",
+      "backupPath": "source/infra/caddy/Caddyfile.txt",
+      "sha256": "ba23a45e25e6a7d689fe53a3b31f38d0630bf5e4e0e26b1b5aedd2501846bfe0"
+    },
+    {
+      "originalPath": "infra/caddy/transport.py",
+      "backupPath": "source/infra/caddy/transport.py.txt",
+      "sha256": "cdcb325538740216e6e3781a33ea279d96150eda1f778fa921668771071bf828"
+    },
+    {
+      "originalPath": "infra/caddy/test_transport.py",
+      "backupPath": "source/infra/caddy/test_transport.py.txt",
+      "sha256": "51bc6ae50a9483ed61dede43953e05264214f4221551576a6ce8c6c8f00c9c62"
+    },
+    {
+      "originalPath": "apps/gateway-web/e2e/combined-history.spec.ts",
+      "backupPath": "source/apps/gateway-web/e2e/combined-history.spec.ts.txt",
+      "sha256": "bdad1a97aac6e0107f1d24461fcafe93ea221684408df6ff25061089cc71e8b5"
+    }
+  ]
+}

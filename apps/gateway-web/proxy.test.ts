@@ -30,15 +30,15 @@ describe('Next request proxy security and routing', () => {
     expect(requestAnonymousBrowsingPolicy).not.toHaveBeenCalled();
   });
 
-  it('requires setup before a public reader or its legacy redirect can run', async () => {
+  it('requires setup before a public reader can run', async () => {
     vi.mocked(setupStatus).mockResolvedValue({ completed: false } as Awaited<ReturnType<typeof setupStatus>>);
-    const response = await proxy(request('/countries/DE/constitution-timeline'));
+    const response = await proxy(request('/countries/DE/timeline'));
     expect(response.headers.get('location')).toBe('https://atlas.example/login');
   });
 
-  it('preserves anonymous browsing restrictions on legacy history links', async () => {
+  it('preserves anonymous browsing restrictions on history links', async () => {
     vi.mocked(requestAnonymousBrowsingPolicy).mockResolvedValue({ allowed: false });
-    const response = await proxy(request('/countries/DE/constitution-timeline'));
+    const response = await proxy(request('/countries/DE/timeline'));
     expect(response.headers.get('location')).toBe('https://atlas.example/');
   });
 
@@ -56,14 +56,15 @@ describe('Next request proxy security and routing', () => {
     expect((await proxy(request('/api/reader/compare', { cookie: 'ca_session=reader-token' }))).status).toBe(200);
   });
 
-  it('redirects authenticated legacy links only after the identity check', async () => {
+  it('allows authenticated history only after the identity check', async () => {
     vi.mocked(requestAnonymousBrowsingPolicy).mockResolvedValue({ allowed: false });
     vi.mocked(fetchWithTimeout).mockResolvedValue(new Response('{}', { status: 200 }));
-    const response = await proxy(request('/countries/DE/constitution-timeline?on=1949-05-23', { cookie: 'ca_session=reader-token' }));
+    const response = await proxy(request('/countries/DE/timeline?on=1949-05-23', { cookie: 'ca_session=reader-token' }));
     expect(fetchWithTimeout).toHaveBeenCalledWith(expect.stringMatching(/\/me$/), expect.objectContaining({
       headers: { Authorization: 'Bearer reader-token' }, cache: 'no-store',
     }));
-    expect(response.headers.get('location')).toBe('https://atlas.example/countries/DE/timeline?on=1949-05-23');
+    expect(response.headers.get('location')).toBeNull();
+    expect(response.status).toBe(200);
   });
 
   it('forwards a fresh nonce and discards a spoofed history route header', async () => {

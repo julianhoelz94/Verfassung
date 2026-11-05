@@ -1,0 +1,195 @@
+import { createRequire } from 'node:module';
+import { mkdir, writeFile } from 'node:fs/promises';
+import path from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import assert from 'node:assert/strict';
+
+const here = path.dirname(fileURLToPath(import.meta.url));
+const gateway = path.resolve(here, '../../../../apps/gateway-web');
+const require = createRequire(path.join(gateway, 'package.json'));
+const { chromium } = require('playwright');
+const output = path.resolve(process.argv[2] ?? '/private/tmp/amendment-workspace-check');
+await mkdir(output, { recursive: true });
+const browser = await chromium.launch({ headless: true });
+const evidence = [];
+const errors = [], network = [];
+try {
+ const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+ const page = await context.newPage();
+ page.on('pageerror', error => errors.push(error.message));
+ page.on('request', request => { if (/^https?:/.test(request.url())) network.push(request.url()); });
+ const url = pathToFileURL(path.join(here, 'mock.html')).href;
+ await page.goto(url);
+ await page.getByRole('heading', { level: 1 }).waitFor();
+ await page.getByRole('button', { name: 'Reset', exact: true }).click();
+ assert.equal(await page.locator('main[data-template="workspace"]').count(), 1);
+ assert.equal(await page.locator('[data-constitution-document]').count(), 2);
+ assert.equal(await page.getByLabel('Passage note', { exact: true }).isVisible(), true);
+ await page.getByLabel('Passage note', { exact: true }).fill('Visible public comment for Article 8.');
+ await page.getByRole('button', { name: 'Next', exact: true }).click();
+ await page.getByRole('button', { name: 'Previous', exact: true }).click();
+ assert.equal(await page.getByLabel('Passage note', { exact: true }).inputValue(), 'Visible public comment for Article 8.');
+ await page.getByRole('button', { name: 'Reset', exact: true }).click();
+ await page.screenshot({ path: path.join(output, 'amendment-workspace-desktop.png'), fullPage: true });
+ await page.getByRole('button', { name: 'Next', exact: true }).click();
+ assert.match(await page.locator('#active-passage').innerText(), /Article 12/);
+ await page.getByRole('button', { name: 'Toggle change navigation' }).click();
+ await page.getByRole('navigation', { name: 'Affected passages', exact: true }).getByRole('link').filter({ hasText: 'Article 20' }).click();
+ assert.match(await page.locator('#active-passage').innerText(), /Article 20/);
+ await page.locator('summary').filter({ hasText: /^Exact references$/ }).click();
+ await page.getByRole('button', { name: 'Correct passage mapping', exact: true }).click();
+ await page.getByRole('dialog').waitFor();
+ await page.keyboard.press('Escape');
+ assert.equal(await page.locator('dialog[open]').count(), 0);
+ evidence.push('Change navigation, shared comparison, passage dialog and Escape');
+ assert.equal(await page.getByRole('region', { name: 'Constitution versions', exact: true }).count(), 1);
+ assert.equal(await page.getByLabel('Public amendment comment', { exact: true }).isVisible(), true);
+ await page.getByRole('button', { name: 'Choose constitution versions', exact: true }).click();
+ const versionDialog = page.getByRole('dialog');
+ await versionDialog.getByLabel('Before constitution', { exact: true }).selectOption('2024 · editorial 3');
+ await versionDialog.getByRole('button', { name: 'Apply versions', exact: true }).click();
+ assert.match(await page.getByRole('region', { name: 'Constitution versions', exact: true }).innerText(), /2024 · editorial 3/);
+ await page.getByRole('button', { name: 'Previous', exact: true }).click();
+ assert.match(await page.getByRole('region', { name: 'Constitution versions', exact: true }).innerText(), /2024 · editorial 3/);
+ await page.getByRole('button', { name: 'Choose constitution versions', exact: true }).click();
+ await versionDialog.getByLabel('After constitution', { exact: true }).selectOption('2024 · editorial 3');
+ assert.equal(await versionDialog.getByRole('button', { name: 'Apply versions', exact: true }).isDisabled(), true);
+ await page.keyboard.press('Escape');
+ await page.getByRole('button', { name: 'Reset', exact: true }).click();
+ evidence.push('One constitution-wide version pair across passages, global public comment and invalid-pair rejection');
+
+
+ await page.getByRole('button', { name: 'Details', exact: true }).click();
+ await page.getByLabel('Summary', { exact: true }).fill('Saved example summary.');
+ await page.getByRole('button', { name: 'Save draft', exact: true }).click();
+ await page.reload();
+ await page.getByRole('button', { name: 'Details', exact: true }).click();
+ assert.equal(await page.getByLabel('Summary', { exact: true }).inputValue(), 'Saved example summary.');
+ await page.getByLabel('Mock role').selectOption('reviewer');
+ assert.equal(await page.getByRole('button', { name: 'Save draft', exact: true }).isDisabled(), true);
+ assert.equal(await page.getByLabel('Title', { exact: true }).isDisabled(), true);
+ await page.getByLabel('Mock role').selectOption('all');
+ evidence.push('Draft save/reopen and reviewer read-only fields');
+
+ await page.getByRole('button', { name: 'Reset', exact: true }).click();
+ await page.getByRole('button', { name: 'Publication', exact: true }).click();
+ assert.equal(await page.getByRole('button', { name: 'Publish amendment', exact: true }).isDisabled(), true);
+ await page.getByRole('button', { name: /^Review 1$/ }).click();
+ await page.screenshot({ path: path.join(output, 'amendment-workspace-review.png'), fullPage: true });
+ await page.getByRole('button', { name: 'Exclude with reason', exact: true }).click();
+ assert.equal(await page.getByRole('dialog').getByRole('button', { name: 'Exclude with reason', exact: true }).isDisabled(), true);
+ await page.getByRole('dialog').getByLabel('Reason for exclusion', { exact: true }).fill('Heading correction only; not a legal wording change.');
+ await page.getByRole('dialog').getByRole('button', { name: 'Exclude with reason', exact: true }).click();
+ await page.getByRole('button', { name: 'Publication', exact: true }).click();
+ assert.equal(await page.getByRole('button', { name: 'Publish amendment', exact: true }).isDisabled(), true);
+ await page.getByRole('button', { name: /^Review 1$/ }).click();
+ await page.getByRole('button', { name: 'Exclude with reason', exact: true }).click();
+ await page.getByRole('dialog').getByLabel('Acknowledge exclusion for publication').check();
+ await page.getByRole('dialog').getByRole('button', { name: 'Exclude with reason', exact: true }).click();
+ await page.getByRole('button', { name: 'Save draft', exact: true }).click();
+ await page.getByRole('button', { name: 'Publication', exact: true }).click();
+ assert.equal(await page.getByRole('button', { name: 'Publish amendment', exact: true }).isEnabled(), true);
+ evidence.push('Publication gate rejects unresolved/unacknowledged exclusions and allows a saved resolved draft');
+
+ await page.getByRole('button', { name: 'Reset', exact: true }).click();
+ await page.getByRole('button', { name: /^Review 1$/ }).click();
+ await page.getByText('Filters · All', { exact: true }).click();
+ await page.getByLabel('Type', { exact: true }).selectOption('changed');
+ assert.match(await page.locator('#active-passage').innerText(), /Article 8/);
+ await page.getByLabel('Scope', { exact: true }).selectOption('12');
+ await page.getByText('No differences match these filters.', { exact: true }).waitFor();
+ evidence.push('Combined review filters and explicit empty result');
+
+ await page.getByRole('button', { name: 'Reset', exact: true }).click();
+ await page.getByRole('button', { name: /^Documents 1$/ }).click();
+ await page.getByRole('button', { name: 'Upload new document', exact: true }).click();
+ await page.screenshot({ path: path.join(output, 'amendment-workspace-documents.png'), fullPage: true });
+ await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+ await page.getByRole('button', { name: 'Choose existing document', exact: true }).click();
+ await page.getByLabel('Document', { exact: true }).selectOption({ label:'Amendment act · explanatory memorandum' });
+ await page.getByRole('button', { name: 'Attach document', exact: true }).click();
+ assert.equal(await page.getByRole('button', { name: /^Documents 2$/ }).count(), 1);
+ await page.getByRole('button', { name: /^Detach:/ }).last().click();
+ assert.equal(await page.getByRole('button', { name: /^Documents 1$/ }).count(), 1);
+ await page.getByRole('button', { name: 'History', exact: true }).click();
+ await page.getByText('Revision 2', { exact: true }).locator('..').locator('..').getByRole('button', { name: 'View', exact: true }).click();
+ assert.equal(await page.getByRole('button', { name: 'Save draft', exact: true }).isDisabled(), true);
+ await page.getByRole('button', { name: 'Return to current draft', exact: true }).click();
+ assert.equal(await page.getByRole('button', { name: 'Save draft', exact: true }).isEnabled(), true);
+ evidence.push('Document attach/detach and read-only history inspection');
+ await page.getByRole('button', { name: 'Reset', exact: true }).click();
+ await page.getByLabel('Public amendment comment', { exact: true }).fill('Unsaved amendment explanation.');
+ await page.getByRole('button', { name: /^Documents 1$/ }).click();
+ await page.getByRole('button', { name: 'Upload new document', exact: true }).click();
+ await page.getByLabel('File', { exact: true }).setInputFiles({name:'new-amending-law.pdf',mimeType:'application/pdf',buffer:Buffer.from('Fictional mock file')});
+ await page.getByLabel('Title', { exact: true }).fill('New amending law');
+ await page.getByLabel('Source URL', { exact: true }).fill('https://example.org/new-law');
+ await page.getByRole('button', { name: 'Upload and attach', exact: true }).click();
+ assert.equal(await page.getByRole('button', { name: /^Documents 2$/ }).count(), 1);
+ await page.getByRole('button', { name: 'Affected passages', exact: true }).click();
+ assert.equal(await page.getByLabel('Public amendment comment', { exact: true }).inputValue(),'Unsaved amendment explanation.');
+ await page.getByLabel('Mock editor').selectOption('constitution');
+ await page.getByRole('button', { name: 'Choose existing document', exact: true }).click();
+ await page.getByLabel('Document', { exact: true }).selectOption({label:'New amending law'});
+ await page.getByRole('button', { name: 'Attach document', exact: true }).click();
+ assert.equal(await page.getByRole('button', { name: /^Documents 2$/ }).count(), 1);
+ await page.getByRole('button', { name:'Text',exact:true }).click();
+ await page.getByLabel('Constitution text', {exact:true}).fill('Unsaved constitution wording.');
+ await page.getByRole('button', {name:/^Documents 2$/}).click();
+ await page.getByRole('button', {name:'Upload new document',exact:true}).click();
+ await page.getByLabel('File',{exact:true}).setInputFiles({name:'constitution-scan.pdf',mimeType:'application/pdf',buffer:Buffer.from('Fictional constitution scan')});
+ await page.getByLabel('Title',{exact:true}).fill('New constitution scan');
+ await page.screenshot({path:path.join(output,'constitution-editor-upload.png'),fullPage:true});
+ await page.getByRole('button',{name:'Upload and attach',exact:true}).click();
+ await page.getByRole('button',{name:'Text',exact:true}).click();
+ assert.equal(await page.getByLabel('Constitution text',{exact:true}).inputValue(),'Unsaved constitution wording.');
+ await page.getByRole('button',{name:'Save draft',exact:true}).click();
+ await page.reload();
+ await page.getByRole('button',{name:'Text',exact:true}).click();
+ assert.equal(await page.getByLabel('Constitution text',{exact:true}).inputValue(),'Unsaved constitution wording.');
+ await page.getByLabel('Mock editor').selectOption('amendment');
+ await page.getByRole('button',{name:'Choose existing document',exact:true}).click();
+ await page.getByLabel('Document',{exact:true}).selectOption({label:'New constitution scan'});
+ evidence.push('Shared one-step upload in both editor contexts, cross-editor central-library reuse and unsaved draft preservation');
+ await page.getByRole('button',{name:'Reset',exact:true}).click();
+
+
+ for (const scenario of ['regional','historical','published','stale','ambiguous','unpinned','unavailable','withdrawn','new']) {
+  await page.getByLabel('Mock scenario').selectOption(scenario);
+  if (scenario === 'unavailable') { await page.locator('summary').filter({ hasText: /^Exact references$/ }).click(); assert.equal(await page.getByRole('button', { name:'Correct passage mapping', exact:true }).isDisabled(), true); }
+  if (scenario === 'withdrawn') assert.equal(await page.getByRole('button', { name:'Save draft', exact:true }).isDisabled(), true);
+  if (scenario === 'new') assert.equal(await page.getByLabel('Title', { exact:true }).isVisible(), true);
+  assert.equal(await page.locator('h1').count(), 1);
+ }
+ evidence.push('Nine entity, workflow and unavailable-content scenarios render');
+
+ for (const lang of ['en', 'de']) for (const width of [320,390,820,1440]) {
+  await page.setViewportSize({ width, height: 900 });
+  await page.getByRole('button', { name: 'Reset', exact: true }).click();
+  await page.getByLabel('Mock language').selectOption(lang);
+  await page.waitForTimeout(50);
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), true, `${lang}/${width} overflow`);
+  await page.addScriptTag({ path: path.join(gateway, 'node_modules/axe-core/axe.min.js') });
+  const violations = await page.evaluate(async () => (await window.axe.run(document)).violations.map(v => ({ id:v.id, targets:v.nodes.map(n=>n.target) })));
+  assert.deepEqual(violations, [], `${lang}/${width} accessibility`);
+  if (lang === 'de' && width === 390) await page.screenshot({ path: path.join(output, 'amendment-workspace-mobile-de.png'), fullPage: true });
+  evidence.push(`${lang}/${width}: no horizontal overflow or axe violations`);
+ }
+ for (const lang of ['en','de']) for (const editor of ['amendment','constitution']) {
+  await page.setViewportSize({width:390,height:844});
+  await page.getByRole('button',{name:'Reset',exact:true}).click();
+  await page.getByLabel('Mock language').selectOption(lang);
+  await page.getByLabel('Mock editor').selectOption(editor);
+  await page.getByRole('button',{name:lang==='en'?'Upload new document':'Neues Dokument hochladen',exact:true}).click();
+  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true,`${lang}/${editor} upload overflow`);
+  await page.addScriptTag({path:path.join(gateway,'node_modules/axe-core/axe.min.js')});
+  const issues=await page.evaluate(async()=>(await window.axe.run(document)).violations.map(v=>v.id));
+  assert.deepEqual(issues,[],`${lang}/${editor} upload accessibility`);
+  await page.screenshot({path:path.join(output,`document-upload-${editor}-${lang}-mobile.png`),fullPage:true});
+ }
+ evidence.push('Both shared upload panels pass narrow EN/DE layout and accessibility checks');
+ assert.deepEqual(errors, []);
+ assert.deepEqual(network, []);
+ await writeFile(path.join(output, 'verification.json'), JSON.stringify({ evidence, pageErrors:errors, httpRequests:network }, null, 2));
+ console.log(JSON.stringify({ passed:evidence.length, output, evidence }, null, 2));
+} finally { await browser.close(); }

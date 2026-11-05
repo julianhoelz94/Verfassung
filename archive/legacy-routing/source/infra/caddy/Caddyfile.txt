@@ -1,0 +1,217 @@
+# Swagger UI loads config from a root-absolute /v3/api-docs/swagger-config URL.
+# After strip_prefix the service would emit that host-root path, which Caddy
+# sends to gateway-web (404 HTML → "Failed to load remote configuration.").
+# X-Forwarded-Prefix makes springdoc prefix those URLs with /api/docs/<service>.
+(docs_upstream) {
+	uri strip_prefix /api/docs/{args[0]}
+	reverse_proxy {args[1]}:8080 {
+		header_up X-Forwarded-Prefix /api/docs/{args[0]}
+		header_up X-Atlas-Client-IP {client_ip}
+		header_up X-Forwarded-For {client_ip}
+	}
+}
+
+(atlas_routes) {
+	encode gzip
+
+	# Baseline browser hardening for every response (UI and API). A Content-Security-Policy
+	# for the Next.js UI is set in gateway proxy (SEC-2). Swagger stays exempt below.
+	header {
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy strict-origin-when-cross-origin
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		-Server
+		defer
+	}
+
+	# Deployments expose public OpenAPI/Swagger by default; an explicit opt-out returns 404.
+	@docs_closed {
+		path /api/docs/*
+		expression `{env.CADDY_EXPOSE_API_DOCS} != "true"`
+	}
+	respond @docs_closed 404
+	# Springdoc is also reachable through each service's canonical API prefix.
+	# Cover matrix parameters, which Spring ignores when matching resource paths.
+	@canonical_docs_closed {
+		path_regexp canonical_docs ^/api/(catalog|content|amendment|identity|editor|search|ingestion|audit|document)(;[^/]*)?/+(swagger-ui([.]html)?(;[^/]*)?(/.*)?|v3(;[^/]*)?/+api-docs([.]yaml)?(;[^/]*)?(/.*)?)$
+		expression `{env.CADDY_EXPOSE_API_DOCS} != "true"`
+	}
+	respond @canonical_docs_closed 404
+
+
+	# Anonymous API requests share one edge quota across services. Validated account
+	# sessions and bearer credentials are exempt. The gateway also gates public pages
+	# when anonymous browsing is disabled.
+	@api_request {
+		path /api/reader* /api/catalog* /api/content* /api/amendment* /api/audit* /api/search* /api/ingestion* /api/document* /api/identity* /api/editor* /api/docs/* /oauth/token* /oauth/register* /oauth/revoke*
+	}
+	route @api_request {
+		forward_auth gateway-web:3000 {
+			uri /api/edge-rate-limit
+			header_up X-Atlas-Client-IP {client_ip}
+			header_up X-Forwarded-For {client_ip}
+			header_up X-Atlas-Edge-Check 1
+			header_up X-Atlas-Original-URI {uri}
+			header_up X-Atlas-Original-Method {method}
+		}
+	}
+
+	# Mutating catalog/content/amendment/audit/search/ingestion routes need an
+	# Authorization header. Caddy does not validate the token; identity /me (GOV-6) does.
+	@missing_write_auth {
+		method POST PUT PATCH DELETE
+		header !Authorization
+		path /api/reader* /api/catalog* /api/content* /api/amendment* /api/audit* /api/search* /api/ingestion* /api/document* /api/docs/catalog* /api/docs/content* /api/docs/amendment* /api/docs/audit* /api/docs/search* /api/docs/ingestion* /api/docs/document*
+	}
+	route @missing_write_auth {
+		respond 401
+	}
+
+
+	route /.well-known/oauth-protected-resource/mcp {
+		reverse_proxy mcp-server:8080
+	}
+
+	route /.well-known/oauth-authorization-server {
+		reverse_proxy identity-service:8080
+	}
+
+	route /oauth/token* {
+		reverse_proxy identity-service:8080
+	}
+	route /oauth/register* {
+		reverse_proxy identity-service:8080 {
+			header_up X-Atlas-Client-IP {client_ip}
+			header_up X-Forwarded-For {client_ip}
+		}
+	}
+	route /oauth/revoke* {
+		reverse_proxy identity-service:8080
+	}
+
+	route /api/docs/catalog* {
+		import docs_upstream catalog catalog-service
+	}
+
+	route /api/docs/content* {
+		import docs_upstream content content-service
+	}
+
+	route /api/docs/amendment* {
+		import docs_upstream amendment amendment-service
+	}
+
+	route /api/docs/identity* {
+		import docs_upstream identity identity-service
+	}
+
+	route /api/docs/editor* {
+		import docs_upstream editor editor-service
+	}
+
+	route /api/docs/search* {
+		import docs_upstream search search-service
+	}
+
+	route /api/docs/ingestion* {
+		import docs_upstream ingestion ingestion-service
+	}
+
+	route /api/docs/audit* {
+		import docs_upstream audit audit-service
+	}
+
+	route /api/docs/document* {
+		import docs_upstream document document-service
+	}
+
+	route /api/catalog* {
+		uri strip_prefix /api/catalog
+		reverse_proxy catalog-service:8080
+	}
+
+	route /api/content* {
+		uri strip_prefix /api/content
+		reverse_proxy content-service:8080
+	}
+
+	route /api/amendment* {
+		uri strip_prefix /api/amendment
+		reverse_proxy amendment-service:8080
+	}
+
+	route /api/ingestion* {
+		uri strip_prefix /api/ingestion
+		reverse_proxy ingestion-service:8080
+	}
+
+	route /api/identity* {
+		uri strip_prefix /api/identity
+		reverse_proxy identity-service:8080 {
+			header_up X-Atlas-Client-IP {client_ip}
+			header_up X-Forwarded-For {client_ip}
+		}
+	}
+
+	route /api/editor* {
+		uri strip_prefix /api/editor
+		reverse_proxy editor-service:8080
+	}
+
+	route /api/audit* {
+		uri strip_prefix /api/audit
+		reverse_proxy audit-service:8080
+	}
+
+	route /api/document* {
+		uri strip_prefix /api/document
+		reverse_proxy document-service:8080
+	}
+
+	route /api/search* {
+		uri strip_prefix /api/search
+		reverse_proxy search-service:8080
+	}
+
+	route /mcp* {
+		reverse_proxy mcp-server:8080 {
+			header_up X-Atlas-Client-IP {client_ip}
+			header_up X-Forwarded-For {client_ip}
+		}
+	}
+
+	# A configured legacy host keeps its browser URL and fragment until the exact
+	# mapping resolves. APIs and Next assets keep their normal routes.
+	@legacy_page {
+		host {$ATLAS_LEGACY_HOST:legacy.localhost}
+		not path /api/* /_next/* /legacy*
+	}
+	route @legacy_page {
+		rewrite * /legacy
+		reverse_proxy gateway-web:3000 {
+			header_up Host {$ATLAS_CANONICAL_HOST}
+			header_up X-Forwarded-Host {$ATLAS_CANONICAL_HOST}
+			header_up -X-Atlas-Edge-Check
+			header_up X-Atlas-Client-IP {client_ip}
+			header_up X-Forwarded-For {client_ip}
+			header_up -X-Atlas-Original-URI
+			header_up -X-Atlas-Original-Method
+		}
+	}
+
+	route {
+		# Pin Host so Next.js server actions cannot follow a client-controlled Host (GHSA-89xv-2m56-2m9x).
+		reverse_proxy gateway-web:3000 {
+			header_up Host {$ATLAS_CANONICAL_HOST}
+			header_up X-Forwarded-Host {$ATLAS_CANONICAL_HOST}
+			# Only the internal forward_auth request may carry the edge-check marker.
+			# Pin the peer separately for gateway Identity requests.
+			header_up -X-Atlas-Edge-Check
+			header_up X-Atlas-Client-IP {client_ip}
+			header_up X-Forwarded-For {client_ip}
+			header_up -X-Atlas-Original-URI
+			header_up -X-Atlas-Original-Method
+		}
+	}
+}

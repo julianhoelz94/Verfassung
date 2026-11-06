@@ -111,7 +111,7 @@ No library change creates a legal version or rewrites a published citation.
 
 - Document-service `check`: 57 tests passed, including the V9 upgrade, real
   PostgreSQL library/BibTeX/attachment operations and existing service regressions.
-- Gateway `lint`, production `build` and test suite passed: 1,431 Vitest tests and
+- Gateway `lint`, production `build` and test suite passed: 1,432 Vitest tests and
   42 Node tests. The original reviewer/verifier pass was followed by a focused review of the
   drawer and export changes; confirmed public-metadata and archived-export defects
   were corrected. Kotlin and TypeScript complexity gates pass without exceptions.
@@ -127,5 +127,8 @@ No library change creates a legal version or rewrites a published citation.
   switch; no golden baseline was changed. These journeys use synthetic API
   fixtures, while service tests exercise actual Postgres. A forced run of the two screenshot tests with system Chromium did execute,
   but the pixel comparisons failed with the unpinned browser. Baselines remain
-  untouched. A complete deployed-stack journey and a passing pinned screenshot
-  comparison remain unverified.
+  untouched. Subsequently, the pinned CI visual suite passed all 29 tests and
+  the deployed-stack browser suite passed all 58 journeys. Recovery discovery was
+  updated to recognize primary-file manifests as well as legacy inline bytes;
+  its SQL was checked against PostgreSQL 16 and the operations tests cover both
+  storage layouts and public/private candidate selection.

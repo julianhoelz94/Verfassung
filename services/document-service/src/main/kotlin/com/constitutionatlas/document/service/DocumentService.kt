@@ -3,12 +3,12 @@ package com.constitutionatlas.document.service
 import com.constitutionatlas.document.api.BibliographyDto
 import com.constitutionatlas.document.api.DocumentConflictException
 import com.constitutionatlas.document.api.DocumentDto
-import com.constitutionatlas.document.api.DocumentRevisionDto
 import com.constitutionatlas.document.api.DocumentLinkDto
+import com.constitutionatlas.document.api.DocumentRevisionDto
 import com.constitutionatlas.document.api.LinkRequest
+import com.constitutionatlas.document.api.ReviseMaterialRequest
 import com.constitutionatlas.document.api.SaveDocumentRequest
 import com.constitutionatlas.document.repo.DocumentFileRepository
-import com.constitutionatlas.document.api.ReviseMaterialRequest
 import com.constitutionatlas.document.repo.DocumentRepository
 import com.constitutionatlas.platform.Actor
 import com.constitutionatlas.platform.ForbiddenException

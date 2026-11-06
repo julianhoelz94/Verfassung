@@ -95,13 +95,11 @@ export function indexPassages(
       const node = entry.node,
         id = node?.logicalId ?? entry.logicalId;
       if (!id) continue;
+      const segment = node
+        ? [node.kind, node.label, node.title].filter(Boolean).join(" ")
+        : "";
       const label = node
-        ? [
-            ...path,
-            [node.kind, node.label, node.title].filter(Boolean).join(" "),
-          ]
-            .filter(Boolean)
-            .join(" › ")
+        ? [...path, segment].filter(Boolean).join(" › ")
         : path.join(" › ") +
           (items.filter((item) => !item.node).length > 1
             ? " · Text " + (position + 1)
@@ -115,7 +113,7 @@ export function indexPassages(
         order: result.size,
         entry,
       });
-      if (node) entries(node.content, [...parents, id], [...path, label]);
+      if (node) entries(node.content, [...parents, id], [...path, segment]);
     }
   }
   for (const article of articles) {

@@ -59,9 +59,12 @@ class RestLinkTargetClient(
                 "amendment_material", "change_material" -> {
                     val owner = amendment.get().uri("/amendments/$targetId").retrieve().body(JsonNode::class.java)
                     val published = !owner?.path("publishedRevisionId")?.scalarText().isNullOrBlank()
-                    published && if (targetType == "amendment_material") scopeRevisionId == null else {
-                        scopeRevisionId != null && owner?.path("changes")?.any { it.path("id").scalarText() == scopeRevisionId.toString() } == true
-                    }
+                    published &&
+                        if (targetType == "amendment_material") {
+                            scopeRevisionId == null
+                        } else {
+                            scopeRevisionId != null && owner?.path("changes")?.any { it.path("id").scalarText() == scopeRevisionId.toString() } == true
+                        }
                 }
                 "lifecycle_material" -> {
                     val events = catalog.get().uri("/constitutions/$targetId/lifecycle-events").retrieve().body(JsonNode::class.java)

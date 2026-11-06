@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Amendment, ArticleSummary, OrderedEntry } from "./api";
-import { consolidatePassages } from "./consolidated-comparison";
+import { consolidatePassages, indexPassages } from "./consolidated-comparison";
 const text = (id: string, value: string, revision = "a"): OrderedEntry => ({
   type: "text",
   logicalId: id,
@@ -43,6 +43,36 @@ const act = (
 });
 
 describe("consolidated legal comparison", () => {
+  it("keeps nested passage breadcrumbs ordered without repeating ancestors", () => {
+    const nested: OrderedEntry = {
+      type: "child",
+      node: {
+        logicalId: "paragraph",
+        revisionId: "paragraph-revision",
+        occurrenceId: "paragraph-occurrence",
+        title: null,
+        kind: "paragraph",
+        label: "1",
+        content: [
+          {
+            type: "child",
+            node: {
+              logicalId: "sentence",
+              revisionId: "sentence-revision",
+              occurrenceId: "sentence-occurrence",
+              title: null,
+              kind: "sentence",
+              label: "2",
+              content: [text("words", "Before")],
+            },
+          },
+        ],
+      },
+    };
+    expect(indexPassages([article([nested])]).get("words")?.label).toBe(
+      "8 · Assembly › paragraph 1 › sentence 2",
+    );
+  });
   it("shows a passage once using endpoint wording and retains both contributing acts", () => {
     const rows = consolidatePassages(
       [article([text("assembly", "Citizens may assemble.")])],

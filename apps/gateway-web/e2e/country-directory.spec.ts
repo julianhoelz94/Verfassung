@@ -287,10 +287,10 @@ test('country directory screenshots at phone, tablet and desktop widths', async 
     await request.post(`${mockOrigin}/__country_directory`, { data: {} });
     await page.goto('/countries/DE');
     await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
-    await expect(page).toHaveScreenshot(`country-directory-${suffix}.png`, { fullPage: true });
+    await expect.soft(page).toHaveScreenshot(`country-directory-${suffix}.png`, { fullPage: true });
     await request.post(`${mockOrigin}/__reset`);
     await page.goto('/countries/DE');
     await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
-    await expect(page).toHaveScreenshot(`country-${suffix}.png`, { fullPage: true });
+    await expect.soft(page).toHaveScreenshot(`country-${suffix}.png`, { fullPage: true });
   }
 });

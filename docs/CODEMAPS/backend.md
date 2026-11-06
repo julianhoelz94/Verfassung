@@ -196,3 +196,7 @@ Shared comparison enters `services/platform/.../HierarchicalDiff.kt`. Its intern
 lookup views, lineage matching, text findings, stable ordering and finding
 identity. Amendment and Editor use the same API and algorithm version; Editor
 sets `skipSharedRevision=false` for in-memory preview changes.
+
+## Record commentary and lifecycle evidence
+
+Catalog's `PUT /constitutions/{id}/lifecycle-events/{eventId}/evidence` appends an optimistic, attributed evidence revision through `LifecycleService` and `LifecycleRepository`; it requires Catalog publisher access. Event type/date remain immutable. Document material targets are `amendment_material` (amendment ID, no scope), `change_material` (amendment ID, exact published change ID as scope), and `lifecycle_material` (constitution ID, exact event ID as scope). Public reads verify the owning published record through HTTP. Material link writes require Editor/Admin for amendment/change scopes, Publisher/Admin for lifecycle scopes. `PUT /links/{targetType}/{targetId}/{documentId}/material` atomically appends a document revision and replaces that scope's pin after optimistic checks; official amendment evidence keeps its separate immutable published pins.

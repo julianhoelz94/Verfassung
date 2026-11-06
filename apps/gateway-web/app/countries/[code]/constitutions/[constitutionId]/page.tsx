@@ -1,1 +1,1 @@
-export { ConstitutionOverview as default } from '../../../../components/ConstitutionOverview';
+export { ConstitutionHistoryPage as default } from '../../../../components/history/ConstitutionHistoryPage';

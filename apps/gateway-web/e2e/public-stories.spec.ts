@@ -24,8 +24,9 @@ test('visitor follows the country, legal version, article and history', async ({
   await expect(page.getByRole('heading', { name: /Personal freedoms/ })).toBeVisible();
   await page.getByRole('navigation', { name: 'Contents', exact: true }).getByRole('link', { name: /^Article 1 / }).click();
   await page.getByRole('button', { name: /^Details · Article 1/ }).first().click();
-  await page.getByRole('link', { name: 'History of Article 1' }).click();
-  await expect(page.getByRole('link', { name: 'Compare with previous' })).toBeVisible();
+  await page.getByRole('link',{name:'History of this passage',exact:true}).first().click();
+  await expect(page.getByRole('heading',{name:'History of this passage',exact:true})).toBeVisible();
+  await expect(page.getByRole('link',{name:'← Back to viewer',exact:true})).toBeVisible();
 });
 
 test('visitor reads the site scope, sources and accessibility statement', async ({ page }) => {
@@ -58,14 +59,13 @@ test('visitor filters search and result retains its version', async ({ page }) =
   await expect(page).toHaveURL(new RegExp(`/versions/${VERSION_2022}/articles/${ARTICLE_1}$`));
 });
 
-test('visitor compares versions and changes the article scope', async ({ page }) => {
+test('visitor compares consolidated passages and can include reversed changes',async({page})=>{
   await page.goto(`/countries/DE/compare?from=${VERSION_1949}&to=${VERSION_2022}`);
-  await expect(page.getByRole('heading', { name: /side by side/ })).toBeVisible();
-  await expect(page.locator('ins.diff-add, del.diff-remove').first()).toBeVisible();
-  await page.getByRole('link', { name: /Show all/ }).click();
-  await expect(page.getByText('All passages are shown.')).toBeVisible();
-  await page.getByRole('link', { name: 'Only changed' }).click();
-  await expect(page.getByText('Only changed passages are shown.')).toBeVisible();
+  await expect(page.getByRole('heading',{name:'1949 → 2022',exact:true})).toBeVisible();
+  await expect(page.locator('ins.diff-add,del.diff-remove').first()).toBeVisible();
+  const reversed=page.getByRole('checkbox',{name:/Include changes later reversed/});
+  await reversed.check();await page.getByRole('button',{name:'Filter',exact:true}).click();await expect(page).toHaveURL(/reversed=1/);await expect(reversed).toBeChecked();
+  await reversed.uncheck();await page.getByRole('button',{name:'Filter',exact:true}).click();await expect(reversed).not.toBeChecked();
 });
 
 test('visitor reads the legal timeline and its source context', async ({ page }) => {
@@ -76,7 +76,8 @@ test('visitor reads the legal timeline and its source context', async ({ page })
   await expect(sourceDocument).toHaveAttribute('href', 'https://example.gov/update-article-1.pdf');
   await expect(change.getByRole('link', { name: /Compare with previous/ })).toHaveAttribute('href', new RegExp(`from=${VERSION_1949}&to=${VERSION_2022}`));
   await change.getByRole('link', { name: /Compare with previous/ }).click();
-  await expect(page.getByText('Update to Article 1')).toBeVisible();
+  await page.locator('summary').filter({hasText:'Records with unresolved passage mappings'}).click();
+  await expect(page.getByRole('link',{name:'Update to Article 1',exact:true})).toBeVisible();
 });
 
 test('visitor can reach provenance on narrow screens', async ({ page }) => {

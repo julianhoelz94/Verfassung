@@ -131,7 +131,7 @@ class DocumentController(
         @PathVariable targetId: UUID,
         @RequestHeader(value = "Authorization", required = false) authorization: String?,
         @RequestBody request: LinkRequest,
-    ): List<DocumentLinkDto> = service.attach(targetType, targetId, request, service.requireWriter(authorization), authorization)
+    ): List<DocumentLinkDto> = service.attach(targetType, targetId, request, service.requireLinkWriter(targetType, authorization), authorization)
 
     @DeleteMapping("/links/{targetType}/{targetId}/{documentId}")
     fun detach(
@@ -140,5 +140,14 @@ class DocumentController(
         @PathVariable documentId: UUID,
         @RequestParam(required = false) scopeRevisionId: UUID?,
         @RequestHeader(value = "Authorization", required = false) authorization: String?,
-    ): List<DocumentLinkDto> = service.detach(targetType, targetId, scopeRevisionId, documentId, service.requireWriter(authorization), authorization)
+    ): List<DocumentLinkDto> = service.detach(targetType, targetId, scopeRevisionId, documentId, service.requireLinkWriter(targetType, authorization), authorization)
+
+    @PutMapping("/links/{targetType}/{targetId}/{documentId}/material")
+    fun reviseMaterial(
+        @PathVariable targetType: String,
+        @PathVariable targetId: UUID,
+        @PathVariable documentId: UUID,
+        @RequestHeader(value = "Authorization", required = false) authorization: String?,
+        @RequestBody request: ReviseMaterialRequest,
+    ): List<DocumentLinkDto> = service.reviseMaterial(targetType, targetId, documentId, request, service.requireLinkWriter(targetType, authorization), authorization)
 }

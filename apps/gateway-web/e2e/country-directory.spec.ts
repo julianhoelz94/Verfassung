@@ -58,14 +58,13 @@ for (const width of [390, 820, 1440]) test(`country directory preserves controls
     await expect(entry.getByRole('link', { name: 'Read latest', exact: true })).toBeVisible();
     await expect(entry.getByText('Available versions', { exact: true })).toBeVisible();
     await expect(entry.getByText('Compare versions', { exact: true })).toBeVisible();
-    await expect(entry.locator('summary').filter({ hasText: /^Version history/ })).toBeVisible();
-    await expect(entry.getByRole('link', { name: 'About this constitution', exact: true })).toBeVisible();
+    await expect(entry.getByRole('link',{name:'History',exact:true})).toBeVisible();
+    await expect(entry.getByRole('link',{name:'Wiki',exact:true})).toBeVisible();
   }
   const regional = page.getByRole('article', { name: 'Example Regional Constitution', exact: true });
   await expect(regional.getByRole('link', { name: 'Read latest' })).toHaveAttribute('href', `/jurisdictions/${regionId}/versions/${correctionId}`);
   await expect(regional.getByRole('link', { name: '2020', exact: true })).toHaveAttribute('href', `/jurisdictions/${regionId}/versions/${correctionId}`);
-  await regional.locator('summary').filter({ hasText: /^Version history/ }).click();
-  await expect(regional.getByRole('link', { name: 'Read', exact: true }).last()).toHaveAttribute('href', `/jurisdictions/${regionId}/versions/${correctionId}`);
+  await expect(regional.getByRole('link',{name:'History',exact:true})).toHaveAttribute('href',`/jurisdictions/${regionId}/constitutions/${regionalConstitution}`);
   await regional.getByText('Compare versions', { exact: true }).click();
   await expect(regional.getByRole('combobox', { name: 'From', exact: true })).toBeVisible();
   await expect(regional.getByRole('combobox', { name: 'To', exact: true })).toHaveValue(correctionId);
@@ -113,10 +112,11 @@ test('regional reading, comparison and overview retain the current published sna
   await expect(page.getByText(/Corrected spelling/)).toBeVisible();
   await page.getByRole('button', { name: 'Wiki', exact: true }).click();
   const wiki = page.getByRole('region', { name: 'Wiki', exact: true });
-  await expect(wiki.getByRole('link', { name: 'Open constitution overview', exact: true })).toHaveAttribute('href', `/jurisdictions/${regionId}/constitutions/${regionalConstitution}`);
+  const fullWikiHref=await wiki.getByRole('link',{name:'Open constitution Wiki',exact:true}).getAttribute('href');
+  const fullWikiUrl=new URL(fullWikiHref!,page.url());expect(fullWikiUrl.pathname).toBe(`/jurisdictions/${regionId}/constitutions/${regionalConstitution}`);expect(fullWikiUrl.searchParams.get('view')).toBe('wiki');expect(fullWikiUrl.searchParams.get('viewed')).toContain(correctionId);
   await wiki.getByRole('link', { name: 'Edit constitution page', exact: true }).click();
   await expect(page).toHaveURL(`/editor/wiki/constitution/${regionalConstitution}?jurisdictionId=${regionId}`);
-  await expect(page.getByRole('link', { name: 'View public page', exact: true })).toHaveAttribute('href', `/jurisdictions/${regionId}/constitutions/${regionalConstitution}`);
+  await expect(page.getByRole('link', { name: 'View public page', exact: true })).toHaveAttribute('href', `/jurisdictions/${regionId}/constitutions/${regionalConstitution}?view=wiki`);
   await page.goto(`/jurisdictions/${regionId}/versions/${correctionId}`);
   await page.getByRole('button', { name: 'Compare', exact: true }).click();
   await expect(page.getByRole('link', { name: 'Open full comparison', exact: true })).toHaveAttribute('href', `/jurisdictions/${regionId}/compare?from=${oldId}&to=${correctionId}`);
@@ -126,18 +126,19 @@ test('regional reading, comparison and overview retain the current published sna
   await expect(regional.getByRole('combobox', { name: 'To', exact: true })).toHaveValue(correctionId);
   await regional.getByRole('button', { name: 'Compare', exact: true }).click();
   await expect(page).toHaveURL(new RegExp(`/jurisdictions/${regionId}/compare\\?from=${oldId}&to=${correctionId}$`));
-  await expect(page.getByRole('heading', { name: /side by side/ })).toBeVisible();
-  await expect(page.locator('.compare-col-to')).toContainText('Corrected spelling.');
-  await expect(page.getByRole('combobox', { name: 'To', exact: true })).toHaveValue(correctionId);
-  await page.getByRole('link', { name: /Show all/ }).click();
-  await expect(page).toHaveURL(new RegExp(`to=${correctionId}&all=1$`));
-  await expect(page.locator('.compare-col-to')).toContainText('Corrected spelling.');
+  await expect(page.getByRole('heading', { name: '2000 → 2020', exact:true })).toBeVisible();
+  await expect(page.locator('main')).toContainText('Corrected spelling.');
+  await expect(page.getByRole('combobox',{name:'Ending version',exact:true})).toHaveValue(correctionId);
+  await page.getByRole('checkbox',{name:/Include changes later reversed/}).check();
+  await page.getByRole('button',{name:'Filter',exact:true}).click();
+  await expect(page).toHaveURL(/reversed=1/);
+  await expect(page.locator('main')).toContainText('Corrected spelling.');
   await page.goto('/countries/DE');
-  await regional.getByRole('link', { name: 'About this constitution' }).click();
-  await expect(page).toHaveURL(`/jurisdictions/${regionId}/constitutions/${regionalConstitution}`);
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Example Regional Constitution');
-  await expect(page.getByRole('link', { name: 'Read latest' })).toHaveAttribute('href', `/jurisdictions/${regionId}/versions/${correctionId}`);
-  await expect(page.getByRole('link', { name: 'Earlier Regional Constitution' })).toHaveAttribute('href', `/jurisdictions/${regionId}/constitutions/07300000-0000-4000-8000-000000000002`);
+  await regional.getByRole('link',{name:'Wiki',exact:true}).click();
+  await expect(page).toHaveURL(`/jurisdictions/${regionId}/constitutions/${regionalConstitution}?view=wiki`);
+  await expect(page.getByRole('heading',{name:'About this constitution',exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'Details',exact:true}).click();
+  await expect(page.getByRole('link',{name:'Earlier Regional Constitution',exact:true})).toHaveAttribute('href',`/jurisdictions/${regionId}/constitutions/07300000-0000-4000-8000-000000000002`);
 });
 
 test('wrong-region and cross-constitution selections never render a comparison', async ({ page }) => {
@@ -162,8 +163,7 @@ test('regional directories retain historical constitutions and nested-region nav
   const historic = page.getByRole('article', { name: 'Earlier Regional Constitution', exact: true });
   await expect(historic.getByRole('link', { name: 'Read latest' })).toBeVisible();
   await expect(historic.getByRole('button', { name: 'Compare versions' })).toBeDisabled();
-  await historic.getByText('Version history (1)', { exact: true }).click();
-  await expect(historic.getByRole('link', { name: 'Read', exact: true })).toHaveAttribute('href', `/jurisdictions/${regionId}/versions/07200000-0000-4000-8000-000000000004`);
+  await expect(historic.getByRole('link', { name: 'Read latest', exact: true })).toHaveAttribute('href', `/jurisdictions/${regionId}/versions/07200000-0000-4000-8000-000000000004`);
   await page.getByRole('link', { name: 'Nested City', exact: true }).click();
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Nested City');
   await expect(page.getByRole('article', { name: 'Municipal Charter' })).toContainText('Suspended');
@@ -196,12 +196,10 @@ test('national and individual history links state their scope and include histor
     [`jurisdictions/${formerId}`, '07300000-0000-4000-8000-000000000004', 'Former Provincial Charter'],
   ]) {
     await page.goto(`/${owner}/constitutions/${constitutionId}`);
-    const history = page.getByRole('region', { name: 'Constitutional history', exact: true });
-    await expect(history).toContainText(`Recorded event for ${title}`);
-    await expect(history.getByRole('link', { name: 'Amendment history' })).toHaveAttribute('href', `/constitutions/${constitutionId}/amendments`);
-    await history.getByRole('link', { name: 'Amendment history' }).click();
-    await expect(page.getByRole('heading', { name: 'Amendment register', exact: true })).toBeVisible();
-    await expect(page.getByText('No published amendments match these filters.')).toBeVisible();
+    await expect(page.locator('main')).toContainText(`Recorded event for ${title}`);
+    await page.getByRole('link',{name:/^Amendments/}).click();
+    await expect(page.getByRole('heading',{name:'A constitution, over time.',exact:true})).toBeVisible();
+    await expect(page.getByText('No published events match these filters.',{exact:true})).toBeVisible();
   }
 });
 
@@ -269,10 +267,10 @@ test('German country chrome and headings preserve reading controls', async ({ pa
 
 test('directory and expanded reading controls are keyboard accessible and pass axe', async ({ page }) => {
   await page.goto('/countries/DE');
-  const versionHistory = page.getByRole('article', { name: 'Example Regional Constitution', exact: true }).locator('summary').filter({ hasText: /^Version history/ });
-  await versionHistory.focus();
-  await page.keyboard.press('Enter');
-  await expect(versionHistory.locator('..').getByRole('link', { name: 'Read', exact: true })).toHaveCount(2);
+  const historyLink=page.getByRole('article',{name:'Example Regional Constitution',exact:true}).getByRole('link',{name:'History',exact:true});
+  await historyLink.focus();await page.keyboard.press('Enter');
+  await expect(page).toHaveURL(`/jurisdictions/${regionId}/constitutions/${regionalConstitution}`);
+  await expect(page.getByRole('heading',{name:'A constitution, over time.',exact:true})).toBeVisible();
   await page.addScriptTag({ path: path.join(process.cwd(), 'node_modules/axe-core/axe.min.js') });
   const violations = await page.evaluate(async () => {
     // @ts-expect-error axe is injected for the browser acceptance check.
@@ -289,10 +287,10 @@ test('country directory screenshots at phone, tablet and desktop widths', async 
     await request.post(`${mockOrigin}/__country_directory`, { data: {} });
     await page.goto('/countries/DE');
     await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
-    await expect(page).toHaveScreenshot(`country-directory-${suffix}.png`, { fullPage: true });
+    await expect.soft(page).toHaveScreenshot(`country-directory-${suffix}.png`, { fullPage: true });
     await request.post(`${mockOrigin}/__reset`);
     await page.goto('/countries/DE');
     await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
-    await expect(page).toHaveScreenshot(`country-${suffix}.png`, { fullPage: true });
+    await expect.soft(page).toHaveScreenshot(`country-${suffix}.png`, { fullPage: true });
   }
 });

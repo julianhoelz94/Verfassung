@@ -26,7 +26,8 @@ test('visitor compares legal versions and reads the source document timeline', a
   const charter = page.getByRole('article', { name: 'Atlas Test Charter', exact: true });
   await charter.locator('summary').filter({ hasText: 'Compare versions' }).click();
   await charter.getByRole('button', { name: 'Compare', exact: true }).click();
-  await expect(page.getByRole('heading', { name: /side by side/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '2022 → 2024', exact: true })).toBeVisible();
+  await expect(page).toHaveURL(new RegExp(`from=${ids.versions['xa-2022']}.*to=${ids.versions['xa-2024']}`));
   await expect(page.locator('ins.diff-add, del.diff-remove').first()).toBeVisible();
   await page.goto('/countries/XA/timeline');
   await expect(page.getByRole('heading', { name: 'History', exact: true })).toBeVisible();
@@ -50,10 +51,13 @@ test('visitor reads historical article context, provenance, and site guidance', 
   await page.getByRole('button', { name: 'Details', exact: true }).click();
   await expect(page.getByText('Verification', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Details', exact: true }).click();
-  await page.getByRole('button', { name: /^Details · Article 1/ }).first().click();
-  await page.getByRole('link', { name: 'History of Article 1' }).click();
-  await expect(page.getByRole('heading', { name: 'History of Article 1' })).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Compare with previous' }).first()).toBeVisible();
+  await page.getByRole('link', { name: 'History of this passage', exact: true }).first().click();
+  await expect(page.getByRole('heading', { name: 'History of this passage', exact: true })).toBeVisible();
+  await expect(page).toHaveURL(new RegExp(`passage=.*sourceVersion=${ids.versions['xa-2020']}`));
+  const back = page.getByRole('link', { name: '← Back to viewer', exact: true });
+  await expect(back).toHaveAttribute('href', `/countries/XA/versions/${ids.versions['xa-2020']}#unit-${articles[0].id}`);
+  await back.click();
+  await expect(page.getByRole('heading', { name: /Human dignity/ })).toBeVisible();
   await page.goto('/about');
   await expect(page.getByRole('heading', { name: 'Sources' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Accessibility' })).toBeVisible();

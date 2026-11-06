@@ -44,8 +44,8 @@ class EditorDocumentService(
         actor: Actor,
         authorization: String?,
     ): DocumentDto {
-        require(targetType in setOf("constitution", "version", "amendment")) { "Unsupported editor target" }
-        require(bytes != null || !request.sourceUrl.isNullOrBlank()) { "A file or source URL is required" }
+        require(targetType in setOf("constitution", "version", "amendment") || targetType in materialLinkTypes) { "Unsupported editor target" }
+        require(bytes != null || !request.sourceUrl.isNullOrBlank() || (targetType in materialLinkTypes && !request.description.isNullOrBlank())) { "A file, source URL or commentary is required" }
         require((request.description?.length ?: 0) <= 10000 && (request.sourceUrl?.length ?: 0) <= 2048) { "Document metadata is too long" }
         documents.requireEditableTarget(targetType, targetId, request.scopeRevisionId, authorization)
         val hash = digest(mapper.writeValueAsBytes(listOf(targetType, targetId, request, fileName, contentType, bytes?.let(::digest))))

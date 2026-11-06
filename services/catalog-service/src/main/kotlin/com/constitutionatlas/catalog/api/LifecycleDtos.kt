@@ -11,6 +11,7 @@ data class LifecycleEvent(
     val sourceUrl: String?,
     val note: String?,
     val dateCertainty: String = "exact",
+    val evidenceRevisionId: UUID? = null,
 )
 
 data class CreateLifecycleEvent(
@@ -20,3 +21,5 @@ data class CreateLifecycleEvent(
     val note: String? = null,
     val dateCertainty: String = "exact",
 )
+
+data class ReviseLifecycleEvidence(val note: String? = null, val sourceUrl: String? = null, val expectedRevisionId: UUID? = null)

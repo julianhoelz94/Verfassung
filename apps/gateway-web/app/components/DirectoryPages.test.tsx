@@ -3,18 +3,19 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeEach, expect, it, vi } from 'vitest';
 import CountryPage from '../countries/[code]/page';
 import JurisdictionPage from '../jurisdictions/[id]/page';
-import { ConstitutionOverview } from './ConstitutionOverview';
-import { getCountry, getConstitutionEvents, getWikiPage, type ConstitutionSummary, type VersionSummary } from '../../lib/api';
+import { ConstitutionHistoryPage as ConstitutionOverview } from './history/ConstitutionHistoryPage';
+import { getCountry, getConstitutionEvents, getWikiPage, listConstitutionAmendments, type ConstitutionSummary, type VersionSummary } from '../../lib/api';
 import { getJurisdiction, type JurisdictionDetail } from '../../lib/migration-api';
 import { listDocumentLinks } from '../../lib/document-api';
 import { currentUser } from '../../lib/session';
 
-vi.mock('../../lib/api', () => ({ getCountry: vi.fn(), getConstitutionEvents: vi.fn(), getWikiPage: vi.fn() }));
+vi.mock('../../lib/api', () => ({ getCountry: vi.fn(), getConstitutionEvents: vi.fn(), listConstitutionAmendments: vi.fn(), getWikiPage: vi.fn() }));
 vi.mock('../../lib/migration-api', () => ({ getJurisdiction: vi.fn() }));
 vi.mock('../../lib/document-api', () => ({ listDocumentLinks: vi.fn() }));
 vi.mock('../../lib/session', () => ({ currentUser: vi.fn() }));
 vi.mock('../../lib/server-locale', () => ({ currentLocale: vi.fn().mockResolvedValue('en') }));
 vi.mock('next/navigation', () => ({ notFound: () => { throw new Error('not-found'); } }));
+vi.mock('./VersionDocuments', () => ({VersionDocuments: () => null}));
 vi.mock('./ContentTranslationRegion', () => ({ ContentTranslationRegion: ({ children }: { children: ReactNode }) => children }));
 
 const version: VersionSummary = { id: 'published-snapshot', versionLabel: '1900', effectiveDate: '1900-01-01', languageCode: 'en', sourceUrl: null, gazetteReference: null, provenance: 'official', verificationState: 'verified', verifiedBy: null, verifiedAt: null, latestPublished: true };
@@ -28,6 +29,7 @@ beforeEach(() => {
   vi.mocked(getJurisdiction).mockImplementation(async id => id === 'province' ? region : { ...region, jurisdiction: region.ancestors[0], ancestors: [], children: [region.jurisdiction], constitutions: [charter] });
   vi.mocked(getWikiPage).mockResolvedValue(null);
   vi.mocked(getConstitutionEvents).mockResolvedValue([]);
+  vi.mocked(listConstitutionAmendments).mockResolvedValue([]);
   vi.mocked(listDocumentLinks).mockResolvedValue([]);
   vi.mocked(currentUser).mockResolvedValue(null);
 });
@@ -64,18 +66,18 @@ it('lets publishers discover review without presenting an editing action', async
 
 it('keeps an individual regional overview, its lifecycle and reading links scoped to its owner', async () => {
   vi.mocked(getConstitutionEvents).mockResolvedValue([{ id: 'event', constitutionId: 'charter', eventType: 'repealed', eventDate: '1950-01-01', dateCertainty: 'exact', note: 'Recorded repeal', sourceUrl: 'https://example.org/repeal' }]);
-  const page = markup(await ConstitutionOverview({ params: Promise.resolve({ id: 'province', constitutionId: 'charter' }) }));
-  expect(page.querySelector('h1')?.textContent).toBe('Provincial Charter');
+  const page = markup(await ConstitutionOverview({ params: Promise.resolve({ id: 'province', constitutionId: 'charter' }), searchParams:Promise.resolve({}) }));
+  expect(page.querySelector('h1')?.textContent).toBe('A constitution, over time.');
   expect(page.querySelector('a[href="/jurisdictions/province/versions/published-snapshot"]')).not.toBeNull();
-  expect(page.querySelector('a[href="/constitutions/charter/amendments"]')).not.toBeNull();
-  expect(page.querySelector('a[href="https://example.org/repeal"]')).not.toBeNull();
+  expect(page.querySelector('a[href="/jurisdictions/province/constitutions/charter?kind=amendment"]')).not.toBeNull();
+  expect(page.querySelector('a[href^="/jurisdictions/province/constitutions/charter/events/event"]')).not.toBeNull();
   expect(page.querySelector('a[href="/jurisdictions/province/timeline"]')).toBeNull();
   expect(page.textContent).toContain('Recorded repeal');
 });
 
 it('rejects a constitution belonging to another region and distinguishes catalog failure from absence', async () => {
-  await expect(ConstitutionOverview({ params: Promise.resolve({ id: 'province', constitutionId: 'elsewhere' }) })).rejects.toThrow('not-found');
+  await expect(ConstitutionOverview({ params: Promise.resolve({ id: 'province', constitutionId: 'elsewhere' }), searchParams:Promise.resolve({}) })).rejects.toThrow('not-found');
   vi.mocked(getJurisdiction).mockRejectedValue(new Error('catalog offline'));
-  const failed = markup(await ConstitutionOverview({ params: Promise.resolve({ id: 'province', constitutionId: 'charter' }) }));
+  const failed = markup(await ConstitutionOverview({ params: Promise.resolve({ id: 'province', constitutionId: 'charter' }), searchParams:Promise.resolve({}) }));
   expect(failed.querySelector('a[href="/jurisdictions/province/constitutions/charter"]')).not.toBeNull();
 });

@@ -1,4 +1,4 @@
-import { BookOpen, GitCompareArrows, History, Info } from 'lucide-react';
+import { BookOpen, GitCompareArrows, History, NotebookText } from 'lucide-react';
 import type { ConstitutionSummary } from '../../lib/api';
 import { constitutionHref, constitutionReading, type ConstitutionOwner } from '../../lib/country-directory';
 import { directoryUi } from '../../lib/country-directory-messages';
@@ -6,7 +6,6 @@ import { lifecycleStatusMessage } from '../../lib/lifecycle-label';
 import { ui } from '../../lib/messages';
 import { snapshotVersionId } from '../../lib/reading';
 import { orderVersions } from '../../lib/compare';
-import { FormattedDate } from '../../lib/format-date';
 import { reviewUi } from '../../lib/ui-review-messages';
 import { CompareForm } from '../countries/[code]/CompareForm';
 import { T } from './TranslationProvider';
@@ -41,11 +40,8 @@ export function ConstitutionEntry({ constitution, owner, headingLevel = 3, edito
         <summary className={styles.tool}><GitCompareArrows aria-hidden="true" /><T value={ui.countries.code.page.compareVersions} /></summary>
         <div className={styles.panel}><CompareForm code={owner.countryCode ?? ''} actionHref={`${owner.href}/compare`} idPrefix={id} versions={ordered.map(version => ({ ...version, id: snapshotVersionId(version) }))} fromId={snapshotVersionId(ordered[ordered.length - 2])} toId={snapshotVersionId(ordered[ordered.length - 1])} variant="inline" /></div>
       </details> : <button className={styles.tool} disabled aria-describedby={`${id}-compare-note`}><GitCompareArrows aria-hidden="true" /><T value={ui.countries.code.page.compareVersions} /></button>}
-      <details className={styles.disclosure}>
-        <summary className={styles.tool}><History aria-hidden="true" /><T value={directoryUi.versionHistory} /> ({ordered.length})</summary>
-        <div className={styles.panel}><ul className={styles.versionList}>{ordered.map(version => <li key={version.id}><span>{version.versionLabel}{version.effectiveDate ? <small><T value={directoryUi.effective} /> · <FormattedDate value={version.effectiveDate} /></small> : null}</span><a href={`${owner.href}/versions/${snapshotVersionId(version)}`}><T value={directoryUi.readVersion} /></a></li>)}</ul>{!ordered.length ? <p><T value={directoryUi.noVersions} /></p> : null}</div>
-      </details>
-      <a className={styles.tool} href={constitutionHref(owner, constitution.id)}><Info aria-hidden="true" /><T value={directoryUi.about} /></a>
+      <a className={styles.tool} href={constitutionHref(owner,constitution.id)}><History aria-hidden="true" /><T value={{en:'History',de:'Geschichte'}} /></a>
+      <a className={styles.tool} href={constitutionHref(owner,constitution.id)+'?view=wiki'}><NotebookText aria-hidden="true" />Wiki</a>
     </div>
     {!canCompare ? <p className={styles.availability} id={`${id}-compare-note`}><T value={ordered.length ? directoryUi.compareUnavailable : directoryUi.noVersions} /></p> : null}
     {editorialDetails(constitution, canEdit, canRecordLifecycle, correctionContext)}

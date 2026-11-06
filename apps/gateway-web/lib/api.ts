@@ -104,6 +104,7 @@ export type ConstitutionLifecycleEvent = {
   sourceUrl: string | null;
   note: string | null;
   dateCertainty: 'exact' | 'approximate';
+  evidenceRevisionId?: string | null;
 };
 
 export type ProvisionLifecycleEvent = {
@@ -121,6 +122,9 @@ export type ResolvedUnit = {
   logicalId: string;
   pathLabels: string[];
   deepLink: string;
+  breadcrumbs?: string[];
+  occurrenceId?: string;
+  rootOccurrenceId?: string;
 };
 
 export type ExportedUnit = {
@@ -807,4 +811,12 @@ export type OrderedEntry = { type: 'text' | 'child'; node?: OrderedNode | null; 
 
 export function getVersionSettings(versionId: string, authorization?: string): Promise<SettingsRevision | null> {
   return readJson<SettingsRevision>(`${catalogBaseUrl()}/versions/${encodeURIComponent(versionId)}/settings`, 'catalog', authorization);
+}
+
+export function reviseLifecycleEvidence(constitutionId:string,eventId:string,body:{note:string;sourceUrl:string;expectedRevisionId:string|null},authorization:string):Promise<ConstitutionLifecycleEvent> {
+  return sendJson(`${catalogBaseUrl()}/constitutions/${encodeURIComponent(constitutionId)}/lifecycle-events/${encodeURIComponent(eventId)}/evidence`,'catalog','PUT',body,authorization);
+}
+
+export function getConstitutionProvisionEvents(constitutionId:string):Promise<ProvisionLifecycleEvent[]|null> {
+  return readJson(`${catalogBaseUrl()}/constitutions/${encodeURIComponent(constitutionId)}/provision-events`,'catalog');
 }

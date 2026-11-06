@@ -11,6 +11,7 @@ import tools.jackson.databind.JsonNode
 import java.util.UUID
 
 internal val wikiLinkTypes = setOf("country_wiki", "constitution_wiki", "jurisdiction_wiki")
+internal val materialLinkTypes = setOf("amendment_material", "change_material", "lifecycle_material")
 
 interface LinkTargetClient {
     fun requireTarget(targetType: String, targetId: UUID, authorization: String?)
@@ -35,6 +36,8 @@ class RestLinkTargetClient(
             "constitution" -> catalog to "/constitutions/$targetId/metadata"
             "version" -> catalog to "/versions/$targetId"
             "amendment" -> amendment to "/amendments/$targetId"
+            "amendment_material", "change_material" -> amendment to "/amendments/$targetId"
+            "lifecycle_material" -> catalog to "/constitutions/$targetId/lifecycle-events"
             "country_wiki" -> catalog to "/wiki/country/$targetId/draft"
             "constitution_wiki" -> catalog to "/wiki/constitution/$targetId/draft"
             "jurisdiction_wiki" -> catalog to "/wiki/jurisdiction/$targetId/draft"
@@ -53,6 +56,20 @@ class RestLinkTargetClient(
     override fun isPublic(targetType: String, targetId: UUID, scopeRevisionId: UUID?): Boolean =
         runCatching {
             when (targetType) {
+                "amendment_material", "change_material" -> {
+                    val owner = amendment.get().uri("/amendments/$targetId").retrieve().body(JsonNode::class.java)
+                    val published = !owner?.path("publishedRevisionId")?.scalarText().isNullOrBlank()
+                    published &&
+                        if (targetType == "amendment_material") {
+                            scopeRevisionId == null
+                        } else {
+                            scopeRevisionId != null && owner?.path("changes")?.any { it.path("id").scalarText() == scopeRevisionId.toString() } == true
+                        }
+                }
+                "lifecycle_material" -> {
+                    val events = catalog.get().uri("/constitutions/$targetId/lifecycle-events").retrieve().body(JsonNode::class.java)
+                    scopeRevisionId != null && events?.any { it.path("id").scalarText() == scopeRevisionId.toString() } == true
+                }
                 "constitution" -> {
                     val versions = catalog.get().uri("/constitutions/$targetId/versions").retrieve().body(JsonNode::class.java)
                     versions?.isArray == true && versions.size() > 0

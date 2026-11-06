@@ -40,7 +40,7 @@ export function handleEmptyDocuments(context) {
     !(
       method === "GET" &&
       (pathname === "/api/document/documents" ||
-        /^\/api\/document\/links\/(constitution|version|amendment)\/[^/]+(?:\/events)?$/.test(
+        /^\/api\/document\/links\/(constitution|version|amendment|amendment_material|change_material|lifecycle_material)\/[^/]+(?:\/events)?$/.test(
           pathname,
         ))
     )

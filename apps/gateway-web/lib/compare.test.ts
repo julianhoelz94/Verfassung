@@ -398,3 +398,9 @@ it('reserves stable identities before a renumbered legacy label collision', () =
   expect(pairs[0]?.left).toBeUndefined();
   expect(pairs[1]?.left).toBe(source);
 });
+
+it('follows legal predecessors even when dates or labels suggest a different order',()=>{
+ const first={...v('a','Z','2000-01-01'),predecessorVersionId:null},middle={...v('b','Y',null),predecessorVersionId:'a'},last={...v('c','X','1900-01-01'),predecessorVersionId:'b'};
+ expect(versionPath([last,first,middle],'a','c')?.map(v=>v.id)).toEqual(['a','b','c']);
+ expect(versionPath([first,last],'a','c')).toBeNull();
+});

@@ -6,7 +6,7 @@ export function wikiPublicPath({ targetType, targetId, code, jurisdictionId }: W
   if (targetType === 'jurisdiction') return `/jurisdictions/${encodeURIComponent(targetId)}`;
   if (targetType === 'country') return `/countries/${encodeURIComponent(code ?? '')}`;
   const owner = jurisdictionId ? `/jurisdictions/${encodeURIComponent(jurisdictionId)}` : `/countries/${encodeURIComponent(code ?? '')}`;
-  return `${owner}/constitutions/${encodeURIComponent(targetId)}`;
+  return `${owner}/constitutions/${encodeURIComponent(targetId)}?view=wiki`;
 }
 
 export function wikiEditPath(owner: WikiOwner, extra: Record<string, string> = {}): string {

@@ -1,3 +1,4 @@
+import { DocumentView } from "../DocumentViewOptions";
 import type {
   Amendment,
   ArticleSummary,
@@ -513,16 +514,18 @@ function comparisonColumn(
       <p className={styles.eyebrow}>{version.versionLabel}</p>
       <p>{passage?.label}</p>
       {(from ? left : right) ? (
-        <DiffConstitutionText
-          left={left}
-          right={right}
-          side={side}
-          outline={outline}
-          oppositeOutline={oppositeOutline}
-          showHeading={false}
-          crossRefs={references}
-          footnotes={references.footnotes}
-        />
+        <DocumentView scope="reader" controls={false}>
+          <DiffConstitutionText
+            left={left}
+            right={right}
+            side={side}
+            outline={outline}
+            oppositeOutline={oppositeOutline}
+            showHeading={false}
+            crossRefs={references}
+            footnotes={references.footnotes}
+          />
+        </DocumentView>
       ) : (
         <p>{model.t("Not present", "Nicht vorhanden")}</p>
       )}

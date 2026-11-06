@@ -1,4 +1,5 @@
 "use client";
+import { HierarchyViewOptions } from "../DocumentViewOptions";
 
 import {
   useEffect,
@@ -19,7 +20,10 @@ import {
 import { usePageChromeMetrics } from "../layout/usePageChromeMetrics";
 import { ReaderIcon } from "../ReaderIcon";
 import { useTranslation } from "../TranslationProvider";
-import { readReaderPreferences } from "../../../lib/reader";
+import {
+  readReaderPreferences,
+  type ReaderPreferences,
+} from "../../../lib/reader";
 import {
   readerPreferenceSnapshot,
   serverReaderPreferenceSnapshot,
@@ -206,24 +210,10 @@ export function ConstitutionViewer({
               )}
             </>
           ) : panel === "preferences" ? (
-            <label>
-              {t({ en: "Text size", de: "Textgröße" })}
-              <select
-                value={preferences.size}
-                onChange={(event) =>
-                  saveReaderPreferences({
-                    ...preferences,
-                    size: event.target.value as typeof preferences.size,
-                  })
-                }
-              >
-                <option value="16">{t({ en: "Small", de: "Klein" })}</option>
-                <option value="17">
-                  {t({ en: "Standard", de: "Standard" })}
-                </option>
-                <option value="20">{t({ en: "Large", de: "Groß" })}</option>
-              </select>
-            </label>
+            <ReadingPreferences
+              preferences={preferences}
+              hierarchy={mode === "compare"}
+            />
           ) : (
             details
           )}
@@ -238,5 +228,43 @@ export function ConstitutionViewer({
         <PageContentsBody className={styles.body}>{children}</PageContentsBody>
       </PageContentsLayout>
     </PageChromeSurface>
+  );
+}
+
+function ReadingPreferences({
+  preferences,
+  hierarchy,
+}: {
+  preferences: ReaderPreferences;
+  hierarchy: boolean;
+}) {
+  const t = useTranslation();
+  return (
+    <>
+      {hierarchy ? (
+        <HierarchyViewOptions
+          value={preferences}
+          onChange={(patch) =>
+            saveReaderPreferences({ ...preferences, ...patch })
+          }
+        />
+      ) : null}
+      <label>
+        {t({ en: "Text size", de: "Textgröße" })}
+        <select
+          value={preferences.size}
+          onChange={(event) =>
+            saveReaderPreferences({
+              ...preferences,
+              size: event.target.value as typeof preferences.size,
+            })
+          }
+        >
+          <option value="16">{t({ en: "Small", de: "Klein" })}</option>
+          <option value="17">{t({ en: "Standard", de: "Standard" })}</option>
+          <option value="20">{t({ en: "Large", de: "Groß" })}</option>
+        </select>
+      </label>
+    </>
   );
 }

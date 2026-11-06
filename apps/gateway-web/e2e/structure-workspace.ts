@@ -1,16 +1,24 @@
-import type { Page } from '@playwright/test';
+import type { Page } from "@playwright/test";
 
 export async function openStructureTask(page: Page, name: string) {
-  await page.getByRole('navigation', { name: 'Structure', exact: true })
-    .getByRole('button', { name, exact: true }).click();
+  await page
+    .getByRole("navigation", { name: "Structure", exact: true })
+    .getByRole("button", { name, exact: true })
+    .click();
 }
 
 /** The same level picker serves desktop navigation and the mobile disclosure. */
 export async function selectStructureLevel(page: Page, name: string) {
-  const levels = page.getByRole('complementary', { name: 'Levels', exact: true });
+  const levels = page.getByRole("complementary", {
+    name: "Levels",
+    exact: true,
+  });
   if (!(await levels.isVisible())) {
-    await page.getByRole('button', { name: /^Levels ·/ }).click();
+    await page.getByRole("button", { name: /^Levels ·/ }).click();
   }
-  await levels.locator('button[aria-current]')
-    .filter({ has: page.getByText(name, { exact: true }) }).first().click();
+  await levels
+    .locator("button[aria-current]")
+    .filter({ has: page.getByText(name, { exact: true }) })
+    .first()
+    .click();
 }

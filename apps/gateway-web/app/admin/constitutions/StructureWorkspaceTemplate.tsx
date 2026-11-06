@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { TriangleAlert, MoreHorizontal } from "lucide-react";
 import { structureUi as copy } from "../../../lib/structure-workspace";
 import { ui, type UiMessage } from "../../../lib/messages";
@@ -15,7 +15,12 @@ import { useTranslation } from "../../components/TranslationProvider";
 import { Button, Select } from "../../components/ui";
 import { HelpTooltip } from "../../components/HelpTooltip";
 import { SettingInfo } from "../../components/SettingInfo";
-import { PageMenuBar } from "../../components/layout/PageChrome";
+import {
+  PageChromeSurface,
+  PageMenuBar,
+  PageMenuFrame,
+} from "../../components/layout/PageChrome";
+import { usePageChromeMetrics } from "../../components/layout/usePageChromeMetrics";
 import { ReaderMenu, type ReaderMenuItem } from "../../components/ReaderMenu";
 import { OutlineLayerEditor, type LayerSection } from "./OutlineLayerEditor";
 import { OutlineReaderPreview } from "./OutlineReaderPreview";
@@ -47,9 +52,13 @@ export function StructureWorkspaceTemplate({
   children: ReactNode;
 }) {
   const t = useTranslation();
+  const root = useRef<HTMLDivElement>(null);
+  const menu = useRef<HTMLDivElement>(null);
+  const navigation = useRef<HTMLElement>(null);
+  usePageChromeMetrics(root, menu, navigation);
   return (
-    <div>
-      <div className={styles.tasks}>
+    <PageChromeSurface ref={root}>
+      <PageMenuFrame ref={menu} className={styles.tasks} hidden={!tabs.length && !primary}>
         <PageMenuBar as="nav" label={t(copy.structure)}>
           {tabs.map((tab) => (
             <Button
@@ -64,9 +73,9 @@ export function StructureWorkspaceTemplate({
           ))}
           {primary}
         </PageMenuBar>
-      </div>
+      </PageMenuFrame>
       <div className={styles.body}>{children}</div>
-    </div>
+    </PageChromeSurface>
   );
 }
 

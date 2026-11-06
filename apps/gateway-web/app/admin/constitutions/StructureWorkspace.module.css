@@ -1,9 +1,5 @@
 .tasks {
   margin-block: var(--gap-card);
-  position: sticky;
-  top: var(--page-header-height, 0px);
-  z-index: 3;
-  background: var(--color-surface);
 }
 .tasks :global(.btn-primary) {
   margin-inline-start: auto;

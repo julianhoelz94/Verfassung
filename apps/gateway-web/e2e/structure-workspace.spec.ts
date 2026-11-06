@@ -11,6 +11,23 @@ test.beforeEach(async ({ request }) => {
   expect((await request.post(`${mock}/__reset`)).ok()).toBeTruthy();
 });
 
+test('the structure task bar stays below the actual site header while scrolling', async ({ page }) => {
+  await signInAdmin(page);
+  for (const width of [1440, 390]) {
+    await page.setViewportSize({ width, height: 700 });
+    await page.goto(`/admin/constitutions/${constitution}`);
+    const tasks = page.getByRole('navigation', { name: 'Structure', exact: true });
+    await page.evaluate(() => scrollTo(0, document.body.scrollHeight));
+    await expect.poll(async () => {
+      const menu = await tasks.boundingBox();
+      const header = await page.locator('.topbar').boundingBox();
+      return menu!.y - (header!.y + header!.height);
+    }).toBeGreaterThanOrEqual(-1);
+    await tasks.getByRole('button', { name: 'Preview', exact: true }).click();
+    await expect(page.getByRole('region', { name: 'Reader preview', exact: true }).filter({ visible: true })).toBeVisible();
+  }
+});
+
 test('one structure workspace retains native help, explicit placement and save review', async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
   await signInAdmin(page);
@@ -48,6 +65,7 @@ for (const locale of ['en', 'de']) test(`creation and import share the responsiv
   await page.setExtraHTTPHeaders({ 'Accept-Language': locale });
   const de = locale === 'de';
   await page.goto('/admin/constitutions');
+  await expect(page.getByRole('navigation', { name: de ? 'Struktur' : 'Structure', exact: true })).toHaveCount(0);
   await page.getByLabel(de ? 'Verfassungstitel' : 'Constitution title').fill('Example charter');
   await page.getByRole('button', { name: de ? 'Weiter zur Strukturierung' : 'Continue to structure', exact: true }).click();
   await expect(page.getByRole('button', { name: de ? 'Vorlage verwenden' : 'Use this template', exact: true })).toBeVisible();

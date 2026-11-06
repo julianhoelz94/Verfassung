@@ -52,8 +52,8 @@ test('the irregular successor retains moved identities, additions and historical
   const moved = before.roots.at(-1).content.find((entry: { node?: { kind: string } }) => entry.node?.kind === 'clause').node;
   expect(after.roots[2].content.some((entry: { node?: { logicalId: string } }) => entry.node?.logicalId === moved.logicalId)).toBe(true);
   await page.goto(`/countries/XA/compare?from=${fixture.versionId}&to=${fixture.revisedVersionId}&all=1`);
-  await expect(page.getByRole('region', { name: 'Original', exact: true }).getByRole('table', { name: 'Exploration duties' })).toBeVisible();
-  await expect(page.getByRole('region', { name: 'Revised', exact: true }).getByText('This untitled clause changes parent in the successor.', { exact: true })).toBeVisible();
+  await expect(page.getByRole('group', { name: /^Original ·/ }).getByRole('table', { name: 'Exploration duties' })).toBeVisible();
+  await expect(page.getByRole('group', { name: /^Revised ·/ }).getByText('This untitled clause changes parent in the successor.', { exact: true })).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath('fixture-irregular-compare.png'), fullPage: true });
   await page.goto(fixture.href);
   await expect(page.getByText('This clause is removed in the successor.', { exact: true })).toBeVisible();

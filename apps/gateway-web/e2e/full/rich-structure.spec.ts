@@ -41,11 +41,11 @@ test('rich table, note and reference changes appear in compare and search', asyn
   const from = ids.versions['xc-2020'];
   const to = ids.versions['xc-2024'];
   await page.goto(`/countries/XC/compare?from=${from}&to=${to}&all=1`);
-  await page.getByRole('tab', { name: '2020', exact: true }).click();
-  await expect(page.getByText('Annual', { exact: true }).first()).toBeVisible();
-  await page.getByRole('tab', { name: '2024', exact: true }).click();
-  await expect(page.getByText('Biennial', { exact: true }).first()).toBeVisible();
-  await expect(page.getByRole('table', { name: 'Civic duties' })).toBeVisible();
+  const before = page.getByRole('group', { name: /^2020 ·/ });
+  const after = page.getByRole('group', { name: /^2024 ·/ });
+  await expect(before.getByRole('table', { name: 'Civic duties' }).getByRole('cell', { name: 'Annual', exact: true })).toBeVisible();
+  await expect(after.getByRole('table', { name: 'Civic duties' }).getByRole('cell', { name: 'Biennial', exact: true })).toBeVisible();
+  await expect(page.getByRole('table', { name: 'Civic duties' })).toHaveCount(2);
   const search = await (await request.get(`/api/search/search?q=Biennial&country=XC&versionId=${to}`)).json();
   expect(search.total).toBe(1);
   await page.goto('/search');

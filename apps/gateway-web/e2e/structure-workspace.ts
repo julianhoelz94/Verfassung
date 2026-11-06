@@ -1,4 +1,5 @@
 import type { Page } from "@playwright/test";
+import { expect } from "./fixtures/consent";
 
 export async function openStructureTask(page: Page, name: string) {
   await page
@@ -17,8 +18,12 @@ export async function selectStructureLevel(
     name: "Levels",
     exact: true,
   });
+  const toggle = page.getByRole("button", { name: /^Levels ·/ });
+  // A streamed server page can still be loading after navigation returns.
+  // Wait for either responsive picker before deciding which one to use.
+  await expect(levels.or(toggle).filter({ visible: true }).first()).toBeVisible();
   if (!(await levels.isVisible())) {
-    await page.getByRole("button", { name: /^Levels ·/ }).click();
+    await toggle.click();
   }
   await levels
     .locator("button[aria-current]")

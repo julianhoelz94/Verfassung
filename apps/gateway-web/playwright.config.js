@@ -41,6 +41,7 @@ module.exports = defineConfig({
     baseURL: process.env.E2E_BASE_URL ?? `http://127.0.0.1:${webPort}`,
     trace: 'on-first-retry',
     ...devices['Desktop Chrome'],
+    launchOptions: process.env.PLAYWRIGHT_EXECUTABLE_PATH ? { executablePath: process.env.PLAYWRIGHT_EXECUTABLE_PATH } : undefined,
   },
   webServer: process.env.E2E_REMOTE
     ? undefined

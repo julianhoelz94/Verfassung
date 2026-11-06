@@ -37,7 +37,7 @@ export const readerUi = {
   about: { en: 'About this constitution', de: 'Über diese Verfassung' },
   noWiki: { en: 'An introduction has not been published for this constitution yet.', de: 'Für diese Verfassung wurde noch keine Einführung veröffentlicht.' },
   wikiUnavailable: { en: 'The introduction is temporarily unavailable.', de: 'Die Einführung ist vorübergehend nicht verfügbar.' },
-  fullWiki: { en: 'Open constitution overview', de: 'Verfassungsübersicht öffnen' },
+  fullWiki: { en: 'Open constitution Wiki', de: 'Verfassungs-Wiki öffnen' },
   editWiki: { en: 'Edit constitution page', de: 'Verfassungsseite bearbeiten' },
   details: { en: 'Details', de: 'Details' },
   constitution: { en: 'Constitution', de: 'Verfassung' },

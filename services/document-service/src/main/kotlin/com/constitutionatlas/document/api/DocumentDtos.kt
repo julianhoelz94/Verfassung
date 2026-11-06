@@ -53,6 +53,15 @@ data class LinkRequest(
     val scopeRevisionId: UUID? = null,
 )
 
+data class ReviseMaterialRequest(
+    val title: String,
+    val description: String? = null,
+    val sourceUrl: String? = null,
+    val expectedRevision: Int,
+    val expectedLinkedRevisionId: UUID,
+    val scopeRevisionId: UUID? = null,
+)
+
 data class DocumentLinkDto(
     val documentId: UUID,
     val revisionId: UUID?,

@@ -1,0 +1,330 @@
+.viewer {
+  background: var(--color-paper);
+}
+.body {
+  min-height: 65vh;
+}
+.body h1 {
+  font: 400 clamp(2rem, 4.2vw, 3.6rem) / 1.15 var(--font-text);
+  margin: 20px 0;
+  letter-spacing: -0.025em;
+}
+.body h2 {
+  font: 400 clamp(1.6rem, 2.5vw, 2.1rem) / 1.25 var(--font-text);
+}
+.tool {
+  composes: tool from "../layout/PageChrome.module.css";
+}
+.tool[aria-current],
+.tool[aria-expanded="true"] {
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+  box-shadow: inset 0 -2px var(--color-accent);
+}
+.spacer {
+  flex: 1;
+}
+.panel {
+  position: relative;
+  padding: 25px var(--gutter);
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-line);
+}
+.close {
+  float: right;
+}
+.eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: var(--text-xs);
+  color: var(--color-ink-2);
+}
+.lede {
+  color: var(--color-ink-2);
+  font-size: 1.1rem;
+  line-height: 1.7;
+}
+.context,
+.picker {
+  margin: 28px 0;
+  padding: 20px 24px;
+  border: 1px solid var(--color-line);
+  border-radius: 7px;
+  background: var(--color-accent-soft);
+}
+.context {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.context p {
+  margin: 4px 0;
+}
+.context a {
+  margin-left: auto;
+}
+.stats {
+  display: flex;
+  gap: 30px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin: 35px 0;
+  padding: 20px 0;
+  border-bottom: 1px solid var(--color-line);
+}
+.stats strong {
+  display: block;
+  font: 400 1.8rem var(--font-text);
+}
+.stats small {
+  color: var(--color-ink-2);
+}
+.stats a {
+  margin-left: auto;
+}
+.picker summary {
+  cursor: pointer;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+.picker summary span {
+  margin-left: auto;
+}
+.picker form {
+  margin-top: 20px;
+}
+.picker select {
+  width: 100%;
+}
+.range {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 20px;
+}
+.range label {
+  display: grid;
+  gap: 8px;
+}
+.filters {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin: 25px 0;
+  flex-wrap: wrap;
+}
+.filters input[type="search"] {
+  flex: 1;
+  min-width: 100px;
+}
+.timeline {
+  display: grid;
+  gap: 24px;
+}
+.event {
+  padding: 26px;
+  border: 1px solid var(--color-line);
+  border-radius: 7px;
+  background: var(--color-surface);
+  scroll-margin-top: var(--page-anchor-offset);
+}
+.event[data-kind="amendment"] {
+  background: var(--color-accent-soft);
+}
+.event[aria-current="true"] {
+  border-color: var(--color-accent);
+  box-shadow: inset 3px 0 var(--color-accent);
+}
+.event h2 {
+  margin: 16px 0;
+}
+.event p {
+  line-height: 1.7;
+}
+.meta {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  flex-wrap: wrap;
+  color: var(--color-ink-2);
+  font-size: var(--text-xs);
+}
+.badge {
+  border-radius: 4px;
+  background: var(--color-accent-soft);
+  padding: 5px 9px;
+  color: var(--color-accent);
+}
+.reading {
+  background: var(--color-accent);
+  color: var(--color-surface);
+  padding: 5px 9px;
+  border-radius: 4px;
+}
+.action {
+  display: flex;
+  justify-content: flex-end;
+  gap: 15px;
+  margin-top: 24px;
+}
+.nav {
+  display: grid;
+  gap: 10px;
+  position: sticky;
+  top: var(--page-anchor-offset);
+}
+.nav a {
+  display: block;
+  padding: 12px;
+  color: var(--color-ink);
+  text-decoration: none;
+  border-radius: 5px;
+}
+.nav a[aria-current] {
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+}
+.nav small {
+  display: block;
+  color: var(--color-ink-2);
+  margin-top: 4px;
+}
+.comment {
+  border-left: 2px solid var(--color-accent);
+  padding: 0 0 0 22px;
+  margin: 35px 0;
+  font: 400 1.45rem/1.65 var(--font-text);
+  white-space: pre-wrap;
+}
+.change {
+  margin: 36px 0;
+  padding-top: 28px;
+  border-top: 1px solid var(--color-line);
+  scroll-margin-top: var(--page-anchor-offset);
+}
+.columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  border: 1px solid var(--color-line);
+  border-radius: 7px;
+  overflow: hidden;
+}
+.columns > section {
+  padding: 24px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.columns > section + section {
+  border-left: 1px solid var(--color-line);
+  background: var(--color-accent-soft);
+}
+.words {
+  font: 400 var(--constitution-font-size, 20px) / 1.9 var(--font-text);
+  white-space: pre-wrap;
+}
+.words del {
+  background: #f2dfd8;
+  color: #804638;
+}
+.words ins {
+  background: #e1edce;
+  color: #36572c;
+  text-decoration: none;
+}
+.materials {
+  margin: 24px 0;
+}
+.materials article {
+  padding: 18px 0;
+  border-bottom: 1px solid var(--color-line);
+}
+.materials p {
+  white-space: pre-wrap;
+}
+.materialForm {
+  display: grid;
+  gap: 12px;
+  padding: 20px;
+  border: 1px solid var(--color-line);
+}
+.materialForm label {
+  display: grid;
+  gap: 6px;
+}
+.materialForm textarea {
+  min-height: 100px;
+}
+.provenance {
+  margin: 20px 0;
+}
+.provenance > summary {
+  cursor: pointer;
+}
+.provenance ol {
+  padding-left: 22px;
+}
+.provenance li {
+  padding: 14px 0;
+}
+.missing {
+  border-left: 3px solid #947735;
+  padding: 12px 18px;
+}
+@media (max-width: 680px) {
+  .tool {
+    padding: 8px;
+    font-size: var(--text-xs);
+    gap: 5px;
+  }
+  .columns {
+    grid-template-columns: 1fr;
+  }
+  .columns > section + section {
+    border-left: 0;
+    border-top: 1px solid var(--color-line);
+  }
+  .range {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  .stats {
+    gap: 18px;
+  }
+  .context {
+    padding: 16px;
+  }
+  .context a {
+    margin-left: 0;
+  }
+  .event {
+    padding: 20px;
+  }
+}
+
+.picker > summary::after,
+.provenance > summary::after {
+  content: "⌄";
+  margin-left: auto;
+}
+.provenance > summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.picker[open] > summary::after,
+.provenance[open] > summary::after {
+  transform: rotate(180deg);
+}
+.context > a {
+  padding: 10px 15px;
+  border: 1px solid var(--color-line);
+  border-radius: 5px;
+  background: var(--color-surface);
+  text-decoration: none;
+}
+.picker form button {
+  background: var(--color-accent);
+  color: var(--color-surface);
+  border-color: var(--color-accent);
+}

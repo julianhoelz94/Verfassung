@@ -30,6 +30,9 @@ export type BibtexPreview = { entries: BibtexPreviewEntry[]; warnings: string[] 
 export type BibtexDecision = { index: number; action: 'create' | 'skip' | 'update' | 'link'; citationKey?: string; documentId?: string; expectedRevision?: number };
 export type BibtexImportRequest = { operationId: string; content: string; folderId?: string; decisions: BibtexDecision[] };
 
+export type MaterialTarget = 'amendment_material' | 'change_material' | 'lifecycle_material';
+export type DocumentTarget = 'constitution' | 'version' | 'amendment' | 'country_wiki' | 'constitution_wiki' | 'jurisdiction_wiki' | MaterialTarget;
+
 export type DocumentRevision = {
   id: string;
   documentId: string;
@@ -64,7 +67,7 @@ export type DocumentLink = {
 
 export type DocumentLinkEvent = {
   id: string;
-  targetType: 'constitution' | 'version' | 'amendment' | 'country_wiki' | 'constitution_wiki' | 'jurisdiction_wiki';
+  targetType: DocumentTarget;
   targetId: string;
   documentId: string;
   revisionId: string | null;
@@ -136,7 +139,7 @@ export function uploadDocument(id: string, expectedRevision: number, file: File,
   });
 }
 
-export function createLinkedDocument(targetType: 'constitution' | 'version' | 'amendment', targetId: string, metadata: {
+export function createLinkedDocument(targetType: 'constitution' | 'version' | 'amendment' | MaterialTarget, targetId: string, metadata: {
   operationId: string; title: string; description: string; sourceUrl: string; scopeRevisionId: string | null;
 }, file: File | null, authorization: string): Promise<DocumentRecord> {
   const body = new FormData();
@@ -151,19 +154,19 @@ function scopeQuery(scopeRevisionId?: string | null): string {
   return scopeRevisionId ? `?scopeRevisionId=${encodeURIComponent(scopeRevisionId)}` : '';
 }
 
-export function listDocumentLinks(targetType: 'constitution' | 'version' | 'amendment' | 'country_wiki' | 'constitution_wiki' | 'jurisdiction_wiki', targetId: string, scopeRevisionId?: string | null, authorization?: string): Promise<DocumentLink[]> {
+export function listDocumentLinks(targetType: DocumentTarget, targetId: string, scopeRevisionId?: string | null, authorization?: string): Promise<DocumentLink[]> {
   return request(`/links/${targetType}/${encodeURIComponent(targetId)}${scopeQuery(scopeRevisionId)}`, authorization ? { headers: { Authorization: authorization } } : {});
 }
 
-export function listDocumentLinkEvents(targetType: 'constitution' | 'version' | 'amendment' | 'country_wiki' | 'constitution_wiki' | 'jurisdiction_wiki', targetId: string, authorization: string, scopeRevisionId?: string | null): Promise<DocumentLinkEvent[]> {
+export function listDocumentLinkEvents(targetType: DocumentTarget, targetId: string, authorization: string, scopeRevisionId?: string | null): Promise<DocumentLinkEvent[]> {
   return request(`/links/${targetType}/${encodeURIComponent(targetId)}/events${scopeQuery(scopeRevisionId)}`, { headers: { Authorization: authorization } });
 }
 
-export function attachDocument(targetType: 'constitution' | 'version' | 'amendment' | 'country_wiki' | 'constitution_wiki' | 'jurisdiction_wiki', targetId: string, documentId: string, revisionId: string | null, authorization: string, scopeRevisionId?: string | null): Promise<DocumentLink[]> {
+export function attachDocument(targetType: DocumentTarget, targetId: string, documentId: string, revisionId: string | null, authorization: string, scopeRevisionId?: string | null): Promise<DocumentLink[]> {
   return request(`/links/${targetType}/${encodeURIComponent(targetId)}`, json(authorization, 'POST', { documentId, revisionId, scopeRevisionId }));
 }
 
-export function detachDocument(targetType: 'constitution' | 'version' | 'amendment' | 'country_wiki' | 'constitution_wiki' | 'jurisdiction_wiki', targetId: string, documentId: string, authorization: string, scopeRevisionId?: string | null): Promise<DocumentLink[]> {
+export function detachDocument(targetType: DocumentTarget, targetId: string, documentId: string, authorization: string, scopeRevisionId?: string | null): Promise<DocumentLink[]> {
   return request(`/links/${targetType}/${encodeURIComponent(targetId)}/${encodeURIComponent(documentId)}${scopeQuery(scopeRevisionId)}`, {
     method: 'DELETE', headers: { Authorization: authorization },
   });
@@ -241,4 +244,8 @@ export async function readDocumentDownload(options: { folderId?: string; documen
   }
   try { return await fetchWithTimeout(`${base()}${path}`, { headers: { Authorization: authorization }, cache: 'no-store' }); }
   catch { throw new ApiUnavailableError('document'); }
+}
+
+export function reviseMaterial(targetType: MaterialTarget, targetId: string, documentId: string, body: { title: string; description: string; sourceUrl: string; expectedRevision: number; expectedLinkedRevisionId: string; scopeRevisionId: string | null }, authorization: string): Promise<DocumentLink[]> {
+  return request(`/links/${targetType}/${encodeURIComponent(targetId)}/${encodeURIComponent(documentId)}/material`, json(authorization, 'PUT', body));
 }

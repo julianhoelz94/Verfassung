@@ -5,7 +5,7 @@ export function editorDocuments() {
   const documents = new Map(), attachments = new Map(), receipts = new Map();
   return async function response(req, method, url) {
     const path = url.pathname;
-    const link = path.match(/^\/api\/document\/links\/(constitution|version|amendment)\/([^/]+)(?:\/(documents|events|[^/]+))?$/);
+    const link = path.match(/^\/api\/document\/links\/(constitution|version|amendment|amendment_material|change_material|lifecycle_material)\/([^/]+)(?:\/(documents|events|[^/]+))?$/);
     if (path === '/api/document/documents' && method === 'GET') return Response.json([...documents.values()]);
     const revision = path.match(/^\/api\/document\/documents\/([^/]+)\/(revisions|events)$/);
     if (revision && method === 'GET') return Response.json(revision[2] === 'revisions' ? [documents.get(revision[1])?.revision].filter(Boolean) : []);

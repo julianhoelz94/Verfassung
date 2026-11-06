@@ -65,3 +65,9 @@
 }
 
 @media(pointer:coarse) { .articleActions { opacity:1; } }
+
+.passageHistory { margin:18px 0 4px;font:400 var(--text-xs)/1.5 var(--font-ui); }.passageHistory a { display:inline-flex;gap:8px;align-items:center;color:var(--color-accent);text-decoration:none; }
+
+.viewer .readerMenu { flex-wrap:nowrap; }
+@media(max-width:1050px) { .contextToolName { display:none; } }
+@media(max-width:680px) { .viewer .readerMenu { overflow-x:auto;scrollbar-width:none; } }

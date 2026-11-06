@@ -717,6 +717,24 @@ class CatalogApiTest {
     }
 
     @Test
+    fun lifecycleEvidenceRevisionsRequirePublisherAndPreserveTheLegalEvent() {
+        val code = uniqueCountryCode()
+        writes.createCountry(com.constitutionatlas.catalog.api.CreateCountryRequest(code, "Evidence country"))
+        val constitution = writes.createConstitution(code, com.constitutionatlas.catalog.api.CreateConstitutionRequest("evidence", "Evidence constitution"))
+        val event = lifecycle.append(constitution.id, com.constitutionatlas.catalog.api.CreateLifecycleEvent("adopted", java.time.LocalDate.parse("2000-01-01"), note = "Original note"), publisher.id)
+        val path = "/constitutions/${constitution.id}/lifecycle-events/${event.id}/evidence"
+        val body = """{"note":"Corrected context","sourceUrl":"https://example.org/source","expectedRevisionId":null}"""
+        mockMvc.put(path) { header("Authorization", TOKEN); contentType = MediaType.APPLICATION_JSON; content = body }.andExpect { status { isForbidden() } }
+        mockMvc.put(path) { header("Authorization", PUBLISHER_TOKEN); contentType = MediaType.APPLICATION_JSON; content = body }.andExpect {
+            status { isOk() }; jsonPath("$.note") { value("Corrected context") }; jsonPath("$.eventType") { value("adopted") }; jsonPath("$.eventDate") { value("2000-01-01") }; jsonPath("$.evidenceRevisionId") { isNotEmpty() }
+        }
+        mockMvc.put(path) { header("Authorization", PUBLISHER_TOKEN); contentType = MediaType.APPLICATION_JSON; content = body }.andExpect { status { isConflict() } }
+        assertThat(jdbcTemplate.queryForObject("SELECT note FROM constitution_lifecycle_events WHERE id = ?", String::class.java, event.id)).isEqualTo("Original note")
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM lifecycle_evidence_revisions WHERE event_id = ?", Int::class.java, event.id)).isEqualTo(1)
+        mockMvc.get("/countries/$code/constitution-lifecycle").andExpect { status { isOk() }; jsonPath("$[0].note") { value("Corrected context") } }
+    }
+
+    @Test
     fun lifecycleWritesRequirePublisherAndReadsArePublic() {
         val countryCode = uniqueCountryCode()
         writes.createCountry(com.constitutionatlas.catalog.api.CreateCountryRequest(countryCode, "Timeline country"))

@@ -6,6 +6,7 @@ Choose a task and go straight to its instructions.
 | --- | --- |
 | Find, read, search or compare constitutions | [[Reading guide|User-Guide]] |
 | Sign in, secure my account or choose a language | [[Account guide|Account-Guide]] |
+| Understand roles and their permissions | [[Roles and access|Roles-and-Access]] |
 | Edit, review or publish content | [[Editorial guide|Editorial-Guide]] |
 | Set up the website or manage users and settings | [[Administrator guide|Admin-Guide]] |
 | Run the project locally | [[Development and operations|Technical-Development]] |

@@ -3,10 +3,12 @@ package com.constitutionatlas.document.service
 import com.constitutionatlas.document.api.BibliographyDto
 import com.constitutionatlas.document.api.DocumentConflictException
 import com.constitutionatlas.document.api.DocumentDto
+import com.constitutionatlas.document.api.DocumentRevisionDto
 import com.constitutionatlas.document.api.DocumentLinkDto
 import com.constitutionatlas.document.api.LinkRequest
 import com.constitutionatlas.document.api.SaveDocumentRequest
 import com.constitutionatlas.document.repo.DocumentFileRepository
+import com.constitutionatlas.document.api.ReviseMaterialRequest
 import com.constitutionatlas.document.repo.DocumentRepository
 import com.constitutionatlas.platform.Actor
 import com.constitutionatlas.platform.ForbiddenException
@@ -29,6 +31,14 @@ class DocumentService(
         if (actor.roles.none { it in setOf("editor", "admin") }) {
             throw ForbiddenException("Document writes require editor or admin")
         }
+        return actor
+    }
+
+    /** Lifecycle publication access permits only the validated event's independent materials. */
+    fun requireLinkWriter(targetType: String, authorization: String?): Actor {
+        if (targetType != "lifecycle_material") return requireWriter(authorization)
+        val actor = identityClient.authenticate(authorization)
+        if (actor.roles.none { it == "publisher" || it == "admin" }) throw ForbiddenException("Lifecycle materials require publisher or admin")
         return actor
     }
 
@@ -119,17 +129,19 @@ class DocumentService(
         if (current.status != "active" || !repository.advance(id, expected)) {
             throw DocumentConflictException("Document revision changed or document is archived")
         }
-        val key = request.citationKey?.trim() ?: current.citationKey
+        appendMetadataRevision(id, expected + 1, request, current.revision, actor)
+        return get(id)
+    }
+
+    private fun appendMetadataRevision(id: UUID, number: Int, request: SaveDocumentRequest, source: DocumentRevisionDto, actor: Actor): UUID {
+        val key = request.citationKey?.trim() ?: source.citationKey
         if (!repository.claimKey(id, key)) throw DocumentConflictException("Citation key is already in use", "citation_key_conflict")
         val revisionId = UUID.randomUUID()
-        repository.insertRevision(
-            revisionId, id, expected + 1, request.title.trim(), request.description?.trim(),
-            request.sourceUrl?.trim(), null, null, null, actor.id,
-        )
-        files.copy(current.revision.id, revisionId)
-        repository.updateMetadata(id, revisionId, key, request.bibliography ?: current.revision.bibliography)
+        repository.insertRevision(revisionId, id, number, request.title.trim(), request.description?.trim(), request.sourceUrl?.trim(), null, null, null, actor.id)
+        files.copy(source.id, revisionId)
+        repository.updateMetadata(id, revisionId, key, request.bibliography ?: source.bibliography)
         repository.event(id, "revised", actor.id, revisionId)
-        return get(id)
+        return revisionId
     }
 
     @Transactional
@@ -183,6 +195,26 @@ class DocumentService(
         return currentLinks(targetType, targetId, scopeRevisionId, authorization)
     }
 
+    /** Independent commentary revisions never change the published legal record or its evidence pins. */
+    @Transactional
+    fun reviseMaterial(targetType: String, targetId: UUID, documentId: UUID, request: ReviseMaterialRequest, actor: Actor, authorization: String?): List<DocumentLinkDto> {
+        require(targetType in materialLinkTypes) { "Unsupported material target" }
+        requireEditableTarget(targetType, targetId, request.scopeRevisionId, authorization)
+        repository.lockDocument(documentId)
+        val link = currentLinks(targetType, targetId, request.scopeRevisionId, authorization).find { it.documentId == documentId }
+            ?: throw NotFoundException("Material not found")
+        if (link.revisionId != request.expectedLinkedRevisionId) throw DocumentConflictException("Material changed; reload before saving")
+        require((request.description?.length ?: 0) <= 10000) { "Commentary is too long" }
+        if (link.document.revision.revision != request.expectedRevision) throw DocumentConflictException("Material revision changed; reload before saving")
+        val current = get(documentId)
+        val edit = SaveDocumentRequest(request.title, request.description, request.sourceUrl, citationKey = current.citationKey)
+        validate(edit)
+        if (!repository.advance(documentId, current.currentRevision)) throw DocumentConflictException("Document is archived")
+        val revision = appendMetadataRevision(documentId, current.currentRevision + 1, edit, link.document.revision, actor)
+        repository.linkEvent(targetType, targetId, request.scopeRevisionId, documentId, revision, "attach", actor.id)
+        return currentLinks(targetType, targetId, request.scopeRevisionId, authorization)
+    }
+
     /** Replay ancestor scopes first; the selected revision overrides inherited attachment events. */
     fun currentLinks(targetType: String, targetId: UUID, scopeRevisionId: UUID?, authorization: String? = null): List<DocumentLinkDto> {
         validateTarget(targetType)
@@ -228,16 +260,23 @@ class DocumentService(
 
     fun requireEditableTarget(targetType: String, targetId: UUID, scopeRevisionId: UUID?, authorization: String?) {
         validateTarget(targetType)
+        if (targetType in materialLinkTypes) {
+            val actor = identityClient.authenticate(authorization)
+            val role = if (targetType == "lifecycle_material") "publisher" else "editor"
+            if (actor.roles.none { it == role || it == "admin" }) throw ForbiddenException("Record materials require $role or admin")
+        }
         validateScope(targetType, targetId, scopeRevisionId, authorization)
         targetClient.requireTarget(targetType, targetId, authorization)
     }
 
     private fun validateTarget(targetType: String) {
-        require(targetType in setOf("constitution", "version", "amendment") || targetType in wikiLinkTypes) { "Unsupported link target" }
+        require(targetType in setOf("constitution", "version", "amendment") || targetType in wikiLinkTypes || targetType in materialLinkTypes) { "Unsupported link target" }
     }
 
     private fun validateScope(targetType: String, targetId: UUID, scopeRevisionId: UUID?, authorization: String?) {
-        if (targetType == "amendment") {
+        if (targetType in materialLinkTypes) {
+            require(targetClient.isPublic(targetType, targetId, scopeRevisionId)) { "Published record material target not found" }
+        } else if (targetType == "amendment") {
             require(scopeRevisionId != null) { "Amendment revision is required" }
             targetClient.requireAmendmentRevision(targetId, scopeRevisionId, authorization, false)
         } else if (targetType in wikiLinkTypes) {

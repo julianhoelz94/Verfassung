@@ -55,7 +55,7 @@ test('comparison uses explicit publication selectors, real diffs, swaps and shar
   await page.screenshot({path:testInfo.outputPath('reader-comparison.png')});
   await page.getByRole('button',{name:'Wiki',exact:true}).click(); await expect(panel).toBeHidden();
   const wiki=page.getByRole('region',{name:'Wiki',exact:true}); await expect(wiki.getByRole('heading',{name:'About this constitution'})).toBeVisible();
-  await expect(wiki.getByRole('link',{name:'Open constitution overview'})).toBeVisible();
+  await expect(wiki.getByRole('link',{name:'Open constitution Wiki'})).toBeVisible();
   await page.getByRole('button',{name:'Compare',exact:true}).click(); await expect(wiki).toHaveCount(0);
   await expect(panel.getByRole('combobox',{name:'From',exact:true})).toHaveValue(VERSION_2022);
   await panel.getByRole('combobox',{name:'To',exact:true}).selectOption(VERSION_2022); await expect(panel.getByText('No differences',{exact:true})).toBeVisible();

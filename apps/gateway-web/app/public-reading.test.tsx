@@ -17,7 +17,7 @@ import ArticleHistory from './countries/[code]/articles/[articleNumber]/page';
 import ArticlePage, { generateMetadata as articleMetadata } from './countries/[code]/versions/[versionId]/articles/[articleId]/page';
 import UnitPage from './countries/[code]/versions/[versionId]/units/[unitId]/page';
 
-vi.mock('../lib/api', async originalModule => ({ ...await originalModule<typeof import('../lib/api')>(), getCountry: vi.fn(), getWikiPage: vi.fn(), listCountries: vi.fn(), listArticlePage: vi.fn(), listConstitutionAmendments: vi.fn(), listAllUnits: vi.fn(), getVersion: vi.fn(), getReaderOutline: vi.fn(), listAmendments: vi.fn(), getConstitutionLifecycle: vi.fn(), getProvisionLifecycle: vi.fn(), resolveUnit: vi.fn(), listAllArticles: vi.fn(), listAmendmentsByArticle: vi.fn(), getUnit: vi.fn() }));
+vi.mock('../lib/api', async originalModule => ({ ...await originalModule<typeof import('../lib/api')>(), getCountry: vi.fn(), getWikiPage: vi.fn(), listCountries: vi.fn(), listArticlePage: vi.fn(), listConstitutionAmendments: vi.fn(), listAllUnits: vi.fn(), getVersion: vi.fn(), getReaderOutline: vi.fn(), listAmendments: vi.fn(), getConstitutionEvents: vi.fn(), getConstitutionLifecycle: vi.fn(), getProvisionLifecycle: vi.fn(), resolveUnit: vi.fn(), listAllArticles: vi.fn(), listAmendmentsByArticle: vi.fn(), getUnit: vi.fn() }));
 vi.mock('../lib/document-api', () => ({ listDocumentLinks: vi.fn() }));
 vi.mock('../lib/session', () => ({ currentUser: vi.fn(), requireSessionBearer: async () => 'Bearer staff-session' }));
 vi.mock('../lib/server-locale', () => ({ currentLocale: async () => 'en' }));
@@ -25,6 +25,7 @@ vi.mock('../lib/anonymous-browsing-policy', () => ({ requestAnonymousBrowsingPol
 vi.mock('next/navigation', () => ({ notFound: () => { throw new Error('not-found'); }, useRouter: () => ({ refresh: vi.fn() }) }));
 // These async child boundaries have their own tests; React 18 static markup cannot await them.
 vi.mock('./components/ContentTranslationRegion', () => ({ ContentTranslationRegion: ({ children }: { children: ReactNode }) => children }));
+vi.mock('./components/history/ComparisonEvidence', () => ({ComparisonEvidence: () => null}));
 vi.mock('./components/VersionDocuments', () => ({ VersionDocuments: () => null }));
 vi.mock('./components/AmendmentUnitLinks', () => ({ AmendmentUnitLinks: () => null }));
 let country = countryFixture();
@@ -55,7 +56,7 @@ beforeEach(() => {
   vi.mocked(api.listAmendmentsByArticle).mockResolvedValue([instrument]);
   vi.mocked(api.getUnit).mockResolvedValue({ ...article('old-1', '1', 'Some citizens may vote.'), title: 'Historical provision', body: 'Some citizens may vote.' });
   vi.mocked(api.getConstitutionLifecycle).mockResolvedValue([{ id: 'commencement', constitutionId: 'charter', eventType: 'commenced', eventDate: '1949-05-23', sourceUrl: 'https://archive.example/charter', note: 'Original commencement', dateCertainty: 'exact' }]);
-  vi.mocked(api.getProvisionLifecycle).mockResolvedValue([]);
+  vi.mocked(api.getProvisionLifecycle).mockResolvedValue([]);vi.mocked(api.getConstitutionEvents).mockResolvedValue([]);
 });
 afterEach(async () => { if (mounted) await act(async () => mounted!.unmount()); mounted = undefined; vi.clearAllMocks(); vi.unstubAllGlobals(); });
 
@@ -117,25 +118,25 @@ describe('published snapshots and comparison', () => {
     const html = await render(Compare(compareProps()));
     expect(api.listAllUnits).toHaveBeenCalledWith('law-1949', true); expect(api.listAllUnits).toHaveBeenCalledWith('law-1956', true);
     const text = new DOMParser().parseFromString(html, 'text/html').body.textContent; expect(text).toContain('Some citizens'); expect(text).toContain('Every adult'); expect(html).toContain('New guarantee.'); expect(html).toContain('Repealed guarantee.'); expect(html).not.toContain('Unchanged guarantee.');
-    expect(html).toContain('all=1'); expect(html).not.toContain('Needs review');
+    expect(html).toContain('Include changes later reversed'); expect(html).not.toContain('Needs review');
   });
-  it('shows unchanged passages only when explicitly requested', async () => {
-    expect(await render(Compare(compareProps(original.id, nextLaw.id, '1')))).toContain('Unchanged guarantee.');
+  it('keeps unchanged endpoint passages out of the consolidated change list', async () => {
+    expect(await render(Compare(compareProps(original.id, nextLaw.id, '1')))).not.toContain('Unchanged guarantee.');
   });
   it('defaults comparison to the current editorial tips of the legal editions', async () => {
     await Compare({ params: params(), searchParams: Promise.resolve({}) });
     expect(api.listAllUnits).toHaveBeenCalledWith('correction-1949', true); expect(api.listAllUnits).toHaveBeenCalledWith('law-1956', true);
   });
-  it('preserves the staff quote-review warning without exposing draft records to anonymous reads', async () => {
+  it('uses published amendment provenance even for signed-in staff', async () => {
     vi.mocked(currentUser).mockResolvedValue({ id: 'reviewer', email: 'reviewer@example.test', roles: ['reviewer'] });
-    const html = await render(Compare(compareProps())); expect(html).toContain('Needs review');
-    expect(api.listConstitutionAmendments).toHaveBeenCalledWith('charter', { status: 'all', authorization: 'Bearer staff-session' });
+    const html = await render(Compare(compareProps())); expect(html).not.toContain('Needs review');
+    expect(api.listConstitutionAmendments).toHaveBeenCalledWith('charter');
   });
   it('does not load passage data for an invalid comparison pair', async () => {
     const html = await render(Compare(compareProps(original.id, original.id))); expect(html).toContain('role="alert"'); expect(api.listAllUnits).not.toHaveBeenCalled();
   });
   it('shows recovery instead of a misleading empty comparison when content fails', async () => {
-    vi.mocked(api.listAllUnits).mockRejectedValue(new Error('offline')); const html = await render(Compare(compareProps())); expect(html).toContain('role="alert"'); expect(html).not.toContain('compare-summary');
+    vi.mocked(api.listAllUnits).mockRejectedValue(new Error('offline')); const html = await render(Compare(compareProps())); expect(html).toContain('role="status"'); expect(html).not.toContain('compare-summary');
   });
 });
 

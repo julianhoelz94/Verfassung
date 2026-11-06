@@ -25,7 +25,7 @@ class EditorDocumentController(private val service: EditorDocumentService, priva
         @RequestPart metadata: CreateLinkedDocumentRequest,
         @RequestPart(required = false) file: MultipartFile?,
     ): DocumentDto {
-        val actor = documents.requireWriter(authorization)
+        val actor = documents.requireLinkWriter(targetType, authorization)
         return service.create(targetType, targetId, metadata, file?.originalFilename, file?.contentType, file?.bytes, actor, authorization)
     }
 }

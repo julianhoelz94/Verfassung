@@ -1,4 +1,4 @@
-import { loginHref } from '../../../../lib/return-to';
+import { safeReturnTo, loginHref } from '../../../../lib/return-to';
 import { SignedInSummary } from '../../../components/SignedInSummary';
 import { T } from '../../../components/TranslationProvider';
 import { ui } from '../../../../lib/messages';
@@ -44,6 +44,7 @@ type AmendmentDetailPageProps = {
     documentError?: string;
     view?: string;
     passage?: string;
+    returnTo?: string;
   }>;
 };
 
@@ -274,6 +275,7 @@ export default async function AmendmentDetailPage(
     ),
   );
 
+  const publicReturnTo=amendmentPublicReturn(searchParams.returnTo,constitutionId,id,Boolean(amendment?.publishedRevisionId)&&amendment?.status!=='withdrawn',readerOwners);
   const canSave = canEdit;
   const canPublishLaw =
     canPublish && amendment?.status !== 'withdrawn' && !isNew;
@@ -418,7 +420,8 @@ export default async function AmendmentDetailPage(
           canAcknowledgeDiff={hasRole(user.roles, 'reviewer') || canPublish}
         />
       ) : (
-        <AmendmentEditorLayout
+        <>{publicReturnTo ? <p><a href={publicReturnTo}><T value={{en:'Return to public amendment',de:'Zurück zur öffentlichen Änderung'}} /></a></p> : null}
+      <AmendmentEditorLayout
           amendmentId={id}
           constitutionId={constitutionId}
           amendment={amendment}
@@ -441,9 +444,18 @@ export default async function AmendmentDetailPage(
             canEdit || hasRole(user.roles, 'reviewer') || canPublish
           }
           canAcknowledgeDiff={hasRole(user.roles, 'reviewer') || canPublish}
-        />
+        /></>
       )}
 
     </WorkspacePage>
   );
+}
+
+function amendmentPublicReturn(returnTo:string|undefined,constitutionId:string,amendmentId:string,published:boolean,owners:Record<string,NonNullable<Awaited<ReturnType<typeof getVersion>>>>):string|undefined {
+  if(returnTo)return safeReturnTo(returnTo,'/editor/amendments');
+  if(!published)return undefined;
+  const version=Object.values(owners).find(version=>version.constitutionId===constitutionId);
+  if(!version)return undefined;
+  const owner=version.countryCode?`/countries/${encodeURIComponent(version.countryCode)}`:version.jurisdictionId?`/jurisdictions/${encodeURIComponent(version.jurisdictionId)}`:undefined;
+  return owner?`${owner}/constitutions/${constitutionId}/amendments/${amendmentId}`:undefined;
 }

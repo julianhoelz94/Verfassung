@@ -66,6 +66,10 @@ class DocumentRepository(private val jdbc: JdbcTemplate, private val mapper: Obj
         jdbc.update("INSERT INTO documents (id, created_by, citation_key) VALUES (?, ?, ?)", id, actorId, citationKey)
     }
 
+    fun lockDocument(id: UUID) {
+        jdbc.query("SELECT id FROM documents WHERE id = ? FOR UPDATE", { rs, _ -> rs.getObject("id", UUID::class.java) }, id)
+    }
+
     fun advance(id: UUID, expected: Int): Boolean =
         jdbc.update(
             "UPDATE documents SET current_revision = current_revision + 1 WHERE id = ? AND current_revision = ? AND status = 'active'",

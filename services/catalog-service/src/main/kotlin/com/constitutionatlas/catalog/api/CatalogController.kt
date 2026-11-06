@@ -86,6 +86,14 @@ class CatalogController(
     fun publicWiki(@PathVariable targetType: String, @PathVariable targetId: UUID): WikiPageRevision? =
         wikiService.published(targetType, targetId)
 
+    @PutMapping("/constitutions/{constitutionId}/lifecycle-events/{eventId}/evidence")
+    fun reviseLifecycleEvidence(
+        @PathVariable constitutionId: UUID,
+        @PathVariable eventId: UUID,
+        @RequestHeader(value = "Authorization", required = false) authorization: String?,
+        @RequestBody request: ReviseLifecycleEvidence,
+    ): LifecycleEvent = lifecycleService.reviseEvidence(constitutionId, eventId, request, writeAccess.requireCatalogPublisher(authorization).id)
+
     @GetMapping("/wiki/{targetType}/{targetId}/revisions/{revisionId}")
     fun publicWikiRevision(
         @PathVariable targetType: String,

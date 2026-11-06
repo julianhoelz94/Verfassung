@@ -16,6 +16,16 @@ class LifecycleService(
     private val catalog: CatalogRepository,
     private val lifecycle: LifecycleRepository,
 ) {
+    @org.springframework.transaction.annotation.Transactional
+    fun reviseEvidence(constitutionId: UUID, eventId: UUID, request: com.constitutionatlas.catalog.api.ReviseLifecycleEvidence, actorId: UUID): com.constitutionatlas.catalog.api.LifecycleEvent {
+        require((request.note?.length ?: 0) <= 10000) { "Event note is too long" }
+        val source = request.sourceUrl?.trim()?.takeIf { it.isNotEmpty() }
+        if (source != null) {
+            val uri = runCatching { java.net.URI(source) }.getOrNull()
+            require(source.length <= 2048 && uri?.scheme in setOf("https", "http") && !uri?.host.isNullOrBlank()) { "Source must be an HTTP(S) URL" }
+        }
+        return lifecycle.reviseEvidence(constitutionId, eventId, request.note?.trim(), source, request.expectedRevisionId, actorId)
+    }
     fun events(constitutionId: UUID): List<LifecycleEvent> {
         if (!catalog.constitutionExists(constitutionId)) throw NotFoundException("Unknown constitution '$constitutionId'")
         return lifecycle.events(constitutionId)

@@ -101,6 +101,7 @@ export function ConstitutionViewer({
       <PageBreadcrumbs>{breadcrumbs}</PageBreadcrumbs>
       <PageMenuFrame ref={menu}>
         <PageMenuBar
+          className={styles.menu}
           as="nav"
           label={t({ en: "Constitution viewer", de: "Verfassungsansicht" })}
         >
@@ -148,13 +149,16 @@ export function ConstitutionViewer({
           <span className={styles.spacer} />
           <button
             className={styles.tool}
+            aria-label={t({ en: "Details", de: "Details" })}
             data-viewer-trigger="details"
             aria-expanded={panel === "details"}
             aria-controls="constitution-details"
             onClick={() => setPanel(panel === "details" ? null : "details")}
           >
             <ReaderIcon name="details" />
-            {t({ en: "Details", de: "Details" })}
+            <span className={styles.detailLabel}>
+              {t({ en: "Details", de: "Details" })}
+            </span>
           </button>
           <button
             className={styles.tool}

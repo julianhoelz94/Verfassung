@@ -26,7 +26,8 @@ module.exports = defineConfig({
   testIgnore: /e2e\/full\//,
   fullyParallel: false,
   forbidOnly: Boolean(process.env.CI),
-  retries: process.env.CI ? 2 : 0,
+  // Baseline differences are deterministic; keep retries for behavior-only CI runs.
+  retries: process.env.CI && process.env.E2E_SKIP_VISUAL === 'true' ? 2 : 0,
   workers: 1,
   reporter: process.env.CI ? [['github'], ['html', { open: 'never' }]] : 'list',
   timeout: 60_000,

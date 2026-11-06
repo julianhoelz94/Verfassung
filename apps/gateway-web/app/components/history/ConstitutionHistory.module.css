@@ -1,6 +1,20 @@
 .viewer {
   background: var(--color-paper);
 }
+.viewer .menu {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.menu::-webkit-scrollbar {
+  display: none;
+}
+.menu > .tool {
+  flex-shrink: 0;
+}
+.body a svg {
+  vertical-align: middle;
+}
 .body {
   min-height: 65vh;
 }
@@ -272,6 +286,9 @@
   padding: 12px 18px;
 }
 @media (max-width: 680px) {
+  .detailLabel {
+    display: none;
+  }
   .tool {
     padding: 8px;
     font-size: var(--text-xs);

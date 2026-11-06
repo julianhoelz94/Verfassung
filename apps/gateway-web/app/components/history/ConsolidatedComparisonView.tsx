@@ -1,3 +1,4 @@
+import { ReaderIcon } from "../ReaderIcon";
 import { DocumentView } from "../DocumentViewOptions";
 import type {
   Amendment,
@@ -539,7 +540,10 @@ function comparisonColumn(
       )}
       {href ? (
         <p>
-          <a href={href}>{model.t("Open passage", "Passage öffnen")} ↗</a>
+          <a href={href}>
+            {model.t("Open passage", "Passage öffnen")}{" "}
+            <ReaderIcon name="external" />
+          </a>
         </p>
       ) : null}
     </section>

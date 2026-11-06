@@ -1,3 +1,4 @@
+import { ReaderIcon } from "../ReaderIcon";
 import type { AmendmentChange } from "../../../lib/api";
 import { diffText } from "../../../lib/text-diff";
 import { T } from "../TranslationProvider";
@@ -70,7 +71,7 @@ export function PassageChange({
                       }
                     >
                       <T value={{ en: "Open passage", de: "Passage öffnen" }} />{" "}
-                      ↗
+                      <ReaderIcon name="external" />
                     </a>
                   </>
                 ) : null}

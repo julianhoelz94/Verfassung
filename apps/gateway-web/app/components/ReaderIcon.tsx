@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react';
 
-export type ReaderIconName = 'book' | 'contents' | 'search' | 'compare' | 'wiki' | 'history' | 'details' | 'settings' | 'up' | 'down' | 'close' | 'swap' | 'check' | 'link' | 'arrow' | 'edit';
+export type ReaderIconName = 'book' | 'contents' | 'search' | 'compare' | 'wiki' | 'history' | 'details' | 'settings' | 'up' | 'down' | 'close' | 'swap' | 'check' | 'link' | 'arrow' | 'edit' | 'external';
 const paths: Record<ReaderIconName, ReactNode> = {
+  external: <path d="M15 3h6v6m0-6L10 14M11 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-6" />,
   history: <><path d="M3 3v6h6M3 9a9 9 0 1 1 0 6M12 7v5l3 2" /></>,
   book: <><path d="M12 7c-3-3-7-3-9-2v15c2-1 6-1 9 2 3-3 7-3 9-2V5c-2-1-6-1-9 2Z" /><path d="M12 7v15" /></>,
   contents: <><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M9 3v18" /></>,

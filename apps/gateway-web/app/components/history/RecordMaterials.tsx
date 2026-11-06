@@ -1,3 +1,4 @@
+import { ReaderIcon } from "../ReaderIcon";
 import { randomUUID } from "node:crypto";
 import {
   listDocumentLinks,
@@ -108,7 +109,8 @@ export async function RecordMaterials({
           {link.document.revision.sourceUrl ? (
             <p>
               <a href={link.document.revision.sourceUrl}>
-                <T value={{ en: "Open source", de: "Quelle öffnen" }} /> ↗
+                <T value={{ en: "Open source", de: "Quelle öffnen" }} />{" "}
+                <ReaderIcon name="external" />
               </a>
             </p>
           ) : null}

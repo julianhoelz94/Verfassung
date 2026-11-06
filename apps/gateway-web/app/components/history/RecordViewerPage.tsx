@@ -1,3 +1,4 @@
+import { ReaderIcon } from "../ReaderIcon";
 import { notFound } from "next/navigation";
 import {
   historyHref,
@@ -418,7 +419,8 @@ export async function LifecycleViewerPage({
           {event.sourceUrl ? (
             <p>
               <a href={event.sourceUrl}>
-                <T value={{ en: "Source document", de: "Quelldokument" }} /> ↗
+                <T value={{ en: "Source document", de: "Quelldokument" }} />{" "}
+                <ReaderIcon name="external" />
               </a>
             </p>
           ) : null}

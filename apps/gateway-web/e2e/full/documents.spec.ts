@@ -11,29 +11,35 @@ test('document revisions link from both editors and appear on public readers wit
 
   await signIn(page, 'admin');
   await page.goto('/editor/documents/new');
-  await page.getByLabel('Title').fill(title);
-  await page.getByLabel('Source URL').fill('https://example.org/sprint-48-document');
-  await page.getByRole('button', { name: 'Create document' }).click();
-  await expect(page).toHaveURL(/\/editor\/documents\/[^/?]+\?created=1/, { timeout: 15_000 });
-  await expect(page.getByText('Document created.')).toBeVisible();
-  const documentId = new URL(page.url()).pathname.split('/').at(-1)!;
-  await page.getByLabel('Title').fill(`${title} revised`);
-  await page.getByRole('button', { name: 'Save revision' }).click();
-  await expect(page.getByRole('heading', { name: `${title} revised`, exact: true })).toBeVisible({ timeout: 15_000 });
-  await expect(page.getByText('Document revision saved.')).toBeVisible();
-  await page.getByLabel('PDF or text file, up to 20 MB').setInputFiles({ name: 'source.txt', mimeType: 'text/plain', buffer: Buffer.from('Official source file') });
-  await page.getByRole('button', { name: 'Upload file' }).click();
-  await expect(page.getByRole('link', { name: 'Download source.txt' })).toBeVisible();
-  await page.getByText('Document details and revisions', { exact: true }).click();
-  await expect(page.getByRole('link', { name: /Revision 1:/ })).toBeVisible();
+  await expect(page).toHaveURL(/\/documents\?new=1/);
+  const details = page.getByRole('dialog');
+  await details.getByLabel('Title', { exact: true }).fill(title);
+  await details.getByLabel('Source URL', { exact: true }).fill('https://example.org/sprint-48-document');
+  await details.getByRole('button', { name: 'Create document', exact: true }).click();
+  await expect.poll(() => new URL(page.url()).searchParams.has('documentId')).toBe(true);
+  const documentId = new URL(page.url()).searchParams.get('documentId')!;
+  await expect(details.getByRole('button', { name: 'Save revision', exact: true })).toBeVisible();
+  await details.getByLabel('Title', { exact: true }).fill(`${title} revised`);
+  await details.getByRole('button', { name: 'Save revision', exact: true }).click();
+  await expect(details.getByRole('heading', { name: `${title} revised`, exact: true })).toBeVisible({ timeout: 15_000 });
+  await expect(details.getByText('Revision 2', { exact: true })).toBeVisible();
+  await details.getByRole('button', { name: 'Files', exact: true }).click();
+  await details.getByLabel('Choose file', { exact: true }).setInputFiles({ name: 'source.txt', mimeType: 'text/plain', buffer: Buffer.from('Official source file') });
+  await details.getByRole('button', { name: 'Add attachment', exact: true }).click();
+  await expect(details.getByText('source.txt', { exact: true })).toBeVisible();
+  await expect(details.getByRole('link', { name: 'Download', exact: true })).toBeVisible();
+  await details.getByRole('button', { name: 'History', exact: true }).click();
+  await expect(details.getByText(`Revision 1: ${title}`, { exact: true })).toBeVisible();
   expect((await request.get(`/api/document/documents/${documentId}`)).status()).toBe(404);
   expect((await request.get(`/api/document/documents/${documentId}/revisions`)).status()).toBe(401);
 
   await page.goto(`/admin/constitutions/${fixture.constitutionId}`);
   await page.getByRole('button', { name: 'Choose existing document', exact: true }).click();
   await page.getByLabel('Search documents').fill(`${title} revised`);
+  await page.getByRole('button', { name: 'Search library', exact: true }).click();
   await page.getByLabel('Document', { exact: true }).selectOption(documentId);
-  await page.getByRole('button', { name: 'Attach document' }).click();
+  await expect(page.getByRole('button', { name: 'Attach document', exact: true })).toBeEnabled();
+  await page.getByRole('button', { name: 'Attach document', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Documents', exact: true })).toBeVisible();
   await expect.poll(async () => {
     const response = await request.get(`/api/document/links/constitution/${fixture.constitutionId}`, { headers });
@@ -51,7 +57,8 @@ test('document revisions link from both editors and appear on public readers wit
   await expect(page.getByRole('link', { name: `${title} revised`, exact: true })).toHaveCount(0);
   await page.getByRole('button', { name: 'Choose existing document', exact: true }).click();
   await page.getByLabel('Document', { exact: true }).selectOption(documentId);
-  await page.getByRole('button', { name: 'Attach document' }).click();
+  await expect(page.getByRole('button', { name: 'Attach document', exact: true })).toBeEnabled();
+  await page.getByRole('button', { name: 'Attach document', exact: true }).click();
   await expect(page.getByRole('link', { name: `${title} revised`, exact: true })).toBeVisible({ timeout: 15_000 });
   await page.goto(`/countries/${fixture.countryIso}/versions/${fixture.targetVersionId}`);
   await page.getByRole('button', { name: 'Details', exact: true }).click();
@@ -69,9 +76,11 @@ test('document revisions link from both editors and appear on public readers wit
   await page.goto(`/editor/amendments/${amendmentId}?view=documents`);
   await page.getByRole('button', { name: 'Choose existing document', exact: true }).click();
   await page.getByLabel('Search documents').fill(`${title} revised`);
+  await page.getByRole('button', { name: 'Search library', exact: true }).click();
   await page.getByLabel('Document', { exact: true }).selectOption(documentId);
   const attachment = page.waitForResponse((response) => response.request().method() === 'POST' && response.url().includes('/editor/documents/command'));
-  await page.getByRole('button', { name: 'Attach document' }).click();
+  await expect(page.getByRole('button', { name: 'Attach document', exact: true })).toBeEnabled();
+  await page.getByRole('button', { name: 'Attach document', exact: true }).click();
   expect((await attachment).status()).toBe(200);
   await expect(page.getByRole('link', { name: `${title} revised` })).toBeVisible({ timeout: 15_000 });
   const savedRevision = await request.post(`/api/amendment/amendments/${amendmentId}/revisions`, { headers, data: {

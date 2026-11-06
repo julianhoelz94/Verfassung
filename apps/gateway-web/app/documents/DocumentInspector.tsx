@@ -21,7 +21,7 @@ const labels = {
     noTags: 'No tags assigned.', allDocuments: 'Tag changes keep this document in All documents and preserve its cited revision.', addTag: 'Add tag', availableTags: 'Available tags', noAvailableTags: 'Every available tag is already assigned.', folder: 'Project folder',
     loading: 'Loading…', loadFailed: 'Could not load this information. Try again.', retry: 'Try again', noUsage: 'This document is not linked to another record.', noHistory: 'No earlier revisions.', lifecycle: 'Activity', at: 'at', publicPage: 'Open citation page', privateHistory: 'Files from earlier revisions are available below.', referenceDetails: 'Reference details', recordId: 'Record identifier', openLegalChange: 'Open legal change',
     types: { misc: 'Other', article: 'Journal article', book: 'Book', inbook: 'Book section', incollection: 'Chapter in collection', inproceedings: 'Conference paper', techreport: 'Report', online: 'Webpage', legislation: 'Legislation', treaty: 'Treaty', phdthesis: 'Doctoral thesis', mastersthesis: 'Master’s thesis', manual: 'Manual', unpublished: 'Unpublished' },
-    targetTypes: { constitution: 'Constitution', version: 'Constitution version', amendment: 'Legal change', country_wiki: 'Country wiki', constitution_wiki: 'Constitution wiki', jurisdiction_wiki: 'Jurisdiction wiki' },
+    targetTypes: { constitution: 'Constitution', version: 'Constitution version', amendment: 'Legal change', country_wiki: 'Country wiki', constitution_wiki: 'Constitution wiki', jurisdiction_wiki: 'Jurisdiction wiki', amendment_material: 'Amendment commentary', change_material: 'Changed-passage commentary', lifecycle_material: 'Lifecycle-event commentary' },
     renameTag: 'Rename tag', tagName: 'Tag name', saveTag: 'Save tag name',
     events: { created: 'Document created', revised: 'Metadata updated', file_uploaded: 'Primary file replaced', attachment_added: 'File added', attachment_removed: 'File removed', primary_attachment_changed: 'Primary file changed', tag_added: 'Tag added', tag_removed: 'Tag removed', archived: 'Document archived' },
     eventFallback: 'Document changed',
@@ -38,7 +38,7 @@ const labels = {
     noTags: 'Keine Schlagwörter zugewiesen.', allDocuments: 'Schlagwortänderungen behalten das Dokument unter Alle Dokumente und ändern seine zitierte Revision nicht.', addTag: 'Schlagwort hinzufügen', availableTags: 'Verfügbare Schlagwörter', noAvailableTags: 'Alle verfügbaren Schlagwörter sind bereits zugewiesen.', folder: 'Projektordner',
     loading: 'Wird geladen…', loadFailed: 'Diese Informationen konnten nicht geladen werden. Versuchen Sie es erneut.', retry: 'Erneut versuchen', noUsage: 'Dieses Dokument ist noch nicht mit einem anderen Datensatz verknüpft.', noHistory: 'Keine früheren Revisionen.', lifecycle: 'Aktivitäten', at: 'um', publicPage: 'Zitierseite öffnen', privateHistory: 'Dateien früherer Revisionen sind unten verfügbar.', referenceDetails: 'Verweisdetails', recordId: 'Datensatzkennung', openLegalChange: 'Rechtsänderung öffnen',
     types: { misc: 'Sonstiges', article: 'Zeitschriftenartikel', book: 'Buch', inbook: 'Buchabschnitt', incollection: 'Sammelbandbeitrag', inproceedings: 'Konferenzbeitrag', techreport: 'Bericht', online: 'Webseite', legislation: 'Rechtsvorschrift', treaty: 'Vertrag', phdthesis: 'Dissertation', mastersthesis: 'Masterarbeit', manual: 'Handbuch', unpublished: 'Unveröffentlicht' },
-    targetTypes: { constitution: 'Verfassung', version: 'Verfassungsfassung', amendment: 'Rechtsänderung', country_wiki: 'Länderwiki', constitution_wiki: 'Verfassungswiki', jurisdiction_wiki: 'Gebietswiki' },
+    targetTypes: { constitution: 'Verfassung', version: 'Verfassungsfassung', amendment: 'Rechtsänderung', country_wiki: 'Länderwiki', constitution_wiki: 'Verfassungswiki', jurisdiction_wiki: 'Gebietswiki', amendment_material: 'Änderungskommentar', change_material: 'Kommentar zu einer Änderungspassage', lifecycle_material: 'Ereigniskommentar' },
     renameTag: 'Schlagwort umbenennen', tagName: 'Schlagwortname', saveTag: 'Schlagwortnamen speichern',
     events: { created: 'Dokument erstellt', revised: 'Literaturangaben aktualisiert', file_uploaded: 'Hauptdatei ersetzt', attachment_added: 'Datei hinzugefügt', attachment_removed: 'Datei entfernt', primary_attachment_changed: 'Hauptdatei geändert', tag_added: 'Schlagwort hinzugefügt', tag_removed: 'Schlagwort entfernt', archived: 'Dokument archiviert' },
     eventFallback: 'Dokument geändert',
@@ -105,7 +105,7 @@ function downloadHref(documentId: string, revision: number, attachmentId?: strin
 }
 
 function usageHref(usage: DocumentLinkEvent): string | undefined {
-  if (usage.targetType === 'amendment') return `/editor/amendments/${encodeURIComponent(usage.targetId)}`;
+  if (['amendment','amendment_material','change_material'].includes(usage.targetType)) return `/editor/amendments/${encodeURIComponent(usage.targetId)}`;
   return undefined;
 }
 

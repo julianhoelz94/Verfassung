@@ -511,6 +511,115 @@ class DocumentApiTest {
         Mockito.verify(targets, Mockito.times(2)).requireTarget("constitution", target, EDITOR)
     }
 
+    @Test
+    fun materialWritesEnforceTheEntityRoleAndKeepPublicRevisionPins() {
+        val publisherToken = "Bearer material-publisher"
+        val reviewerToken = "Bearer material-reviewer"
+        Mockito.`when`(identity.authenticate(publisherToken)).thenReturn(Actor(UUID.randomUUID(), "publisher@example.test", listOf("publisher")))
+        Mockito.`when`(identity.authenticate(reviewerToken)).thenReturn(Actor(UUID.randomUUID(), "reviewer@example.test", listOf("reviewer")))
+        for (type in listOf("amendment_material", "change_material", "lifecycle_material")) {
+            val target = UUID.randomUUID()
+            val scope = if (type == "amendment_material") null else UUID.randomUUID()
+            val scopeJson = scope?.let { "\"$it\"" } ?: "null"
+            val (document, pin) = create()
+            Mockito.`when`(targets.isPublic(type, target, scope)).thenReturn(true)
+            val path = "/links/$type/$target"
+            val body = """{"documentId":"$document","revisionId":"$pin","scopeRevisionId":$scopeJson}"""
+            val allowed = if (type == "lifecycle_material") publisherToken else EDITOR
+            val denied = if (type == "lifecycle_material") EDITOR else publisherToken
+            for (token in listOf(VIEWER, reviewerToken, denied)) {
+                mvc.post(path) {
+                    header("Authorization", token)
+                    contentType = MediaType.APPLICATION_JSON
+                    content = body
+                }.andExpect { status { isForbidden() } }
+            }
+            mvc.post(path) {
+                contentType = MediaType.APPLICATION_JSON
+                content = body
+            }.andExpect { status { isUnauthorized() } }
+            mvc.post(path) {
+                header("Authorization", allowed)
+                contentType = MediaType.APPLICATION_JSON
+                content = body
+            }.andExpect { status { isOk() } }
+            val scopeQuery = scope?.let { "?scopeRevisionId=$it" } ?: ""
+            mvc.get(path + scopeQuery).andExpect {
+                status { isOk() }
+                jsonPath("$[0].revisionId") { value(pin) }
+            }
+            val edit = """{"title":"Updated scoped note","description":"Background for this exact change","expectedRevision":1,"expectedLinkedRevisionId":"$pin","scopeRevisionId":$scopeJson}"""
+            mvc.put("$path/$document/material") {
+                header("Authorization", allowed)
+                contentType = MediaType.APPLICATION_JSON
+                content = edit
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$[0].document.revision.description") { value("Background for this exact change") }
+            }
+            mvc.put("$path/$document/material") {
+                header("Authorization", allowed)
+                contentType = MediaType.APPLICATION_JSON
+                content = edit
+            }.andExpect { status { isConflict() } }
+            mvc.get("/documents/$document?revision=1") { header("Authorization", EDITOR) }.andExpect {
+                status { isOk() }
+                jsonPath("$.revision.id") { value(pin) }
+            }
+            mvc.delete("$path/$document$scopeQuery") { header("Authorization", allowed) }.andExpect { status { isOk() } }
+            mvc.get(path + scopeQuery).andExpect {
+                status { isOk() }
+                jsonPath("$.length()") { value(0) }
+            }
+            Mockito.`when`(targets.isPublic(type, target, scope)).thenReturn(false)
+            mvc.get(path + scopeQuery).andExpect { status { isNotFound() } }
+        }
+    }
+
+    @Test
+    fun sharedMaterialsCanBeRevisedIndependentlyWithoutChangingAnotherScopePin() {
+        val target = UUID.randomUUID()
+        val scopes = listOf(UUID.randomUUID(), UUID.randomUUID())
+        val (document, pin) = create()
+        for (scope in scopes) {
+            Mockito.`when`(targets.isPublic("change_material", target, scope)).thenReturn(true)
+            mvc.post("/links/change_material/$target") {
+                header("Authorization", EDITOR)
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"documentId":"$document","revisionId":"$pin","scopeRevisionId":"$scope"}"""
+            }.andExpect { status { isOk() } }
+        }
+        for ((index, scope) in scopes.withIndex()) {
+            mvc.put("/links/change_material/$target/$document/material") {
+                header("Authorization", EDITOR)
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"title":"Scope ${index + 1}","description":"Independent context","expectedRevision":1,"expectedLinkedRevisionId":"$pin","scopeRevisionId":"$scope"}"""
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$[0].document.revision.title") { value("Scope ${index + 1}") }
+            }
+        }
+        for ((index, scope) in scopes.withIndex()) {
+            mvc.get("/links/change_material/$target?scopeRevisionId=$scope").andExpect {
+                status { isOk() }
+                jsonPath("$[0].document.revision.title") { value("Scope ${index + 1}") }
+                jsonPath("$[0].document.revision.revision") { value(index + 2) }
+            }
+        }
+    }
+
+    @Test
+    fun commentaryOnlyCreationIsAtomicAndAcceptsNoFileOrSourceUrl() {
+        val target = UUID.randomUUID()
+        Mockito.`when`(targets.isPublic("amendment_material", target, null)).thenReturn(true)
+        val metadata = MockMultipartFile("metadata", "metadata.json", "application/json", """{"operationId":"${UUID.randomUUID()}","title":"Commentary","description":"An amendment-specific explanation."}""".toByteArray())
+        mvc.perform(multipart("/links/amendment_material/$target/documents").file(metadata).header("Authorization", EDITOR)).andExpect(status().isCreated).andExpect(jsonPath("$.revision.description").value("An amendment-specific explanation."))
+        mvc.get("/links/amendment_material/$target").andExpect {
+            status { isOk() }
+            jsonPath("$.length()") { value(1) }
+        }
+    }
+
     companion object {
         private const val EDITOR = "Bearer editor"
         private const val VIEWER = "Bearer viewer"

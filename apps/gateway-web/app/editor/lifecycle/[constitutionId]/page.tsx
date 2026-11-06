@@ -1,3 +1,5 @@
+import { safeReturnTo } from '../../../../lib/return-to';
+import { loadConstitutionCollection } from '../../../../lib/country-directory';
 import { loginHref } from '../../../../lib/return-to';
 import { reviewUi } from '../../../../lib/ui-review-messages';
 import { T } from '../../../components/TranslationProvider';
@@ -5,16 +7,16 @@ import { ui, type UiMessage } from '../../../../lib/messages';
 import { notFound, redirect } from 'next/navigation';
 import { WorkspacePage } from '../../../components/layout/templates';
 import { PageHeader } from '../../../components/ui';
-import { getConstitutionLifecycle, getCountry, getExportedUnits, getProvisionLifecycle, type ConstitutionLifecycleEvent, type ExportedUnit } from '../../../../lib/api';
+import { getConstitutionEvents, getExportedUnits, getConstitutionProvisionEvents, type ConstitutionLifecycleEvent, type ExportedUnit } from '../../../../lib/api';
 import { publicVersions } from '../../../../lib/reading';
 import { currentUser } from '../../../../lib/session';
-import { appendLifecycleAction, appendProvisionAction } from '../actions';
+import { reviseLifecycleEvidenceAction, appendLifecycleAction, appendProvisionAction } from '../actions';
 import { Stack } from '../../../components/layout/Layout';
 import surfaceStyles from '../../../components/surfaces.module.css';
 
 type Props = {
   params: Promise<{ constitutionId: string }>;
-  searchParams: Promise<{ code?: string; versionId?: string; error?: string; saved?: string }>;
+  searchParams: Promise<{ code?: string; jurisdictionId?: string; eventId?: string; returnTo?: string; versionId?: string; error?: string; saved?: string }>;
 };
 
 function flatten(roots: ExportedUnit[]): Array<{ id: string; label: string; depth: number }> {
@@ -46,35 +48,31 @@ export default async function LifecycleEditor({ params, searchParams }: Props) {
   const user = await currentUser();
   if (!user) redirect(loginHref(`/editor/lifecycle/${encodeURIComponent(constitutionId)}`, query));
   if (!user.roles.some((role) => role === 'publisher' || role === 'admin')) notFound();
-  const country = await getCountry(code);
-  const constitution = country?.constitutions.find((item) => item.id === constitutionId);
-  if (!country || !constitution) notFound();
-  const events = (await getConstitutionLifecycle(code) ?? []).filter((event) => event.constitutionId === constitutionId);
-  const provisionEvents = (await getProvisionLifecycle(code) ?? []).filter((event) => event.constitutionId === constitutionId);
+  const context = await loadConstitutionCollection(query.jurisdictionId ? {id:query.jurisdictionId} : {code});
+  const country=context?.collection;
+  const constitution=country?.constitutions.find(item=>item.id===constitutionId);
+  if(!country||!constitution)notFound();
+  const events=(await getConstitutionEvents(constitutionId)??[]);
+  const selectedEvent=events.find(event=>event.id===query.eventId);
+  const provisionEvents = (await getConstitutionProvisionEvents(constitutionId) ?? []);
   const versions = publicVersions(constitution.versions);
   const selectedVersion = versions.find((version) => version.id === query.versionId || version.currentVersionId === query.versionId) ?? versions.at(-1);
   const sourceVersionId = selectedVersion?.currentVersionId ?? selectedVersion?.id;
   const units = sourceVersionId ? flatten((await getExportedUnits(sourceVersionId).catch(() => null))?.roots ?? []) : [];
   const last = events.at(-1);
-  const allowed: ConstitutionLifecycleEvent['eventType'][] = !last
-    ? ['adopted']
-    : last.eventType === 'adopted'
-      ? ['commenced', 'repealed']
-      : last.eventType === 'suspended'
-        ? ['restored', 'repealed']
-        : last.eventType === 'repealed'
-          ? []
-          : ['suspended', 'repealed'];
+  const allowed=nextEventTypes(last);
   return (
     <WorkspacePage width="content" header={<PageHeader
         title={<><T value={reviewUi.lifecycle} /> · {constitution.title}</>}
         breadcrumbs={[
           { href: '/', label: <T value={ui.nav.countries} /> },
-          { href: `/countries/${code}`, label: country.name },
+          { href: context?.owner.href??'/', label: country.name },
           { label: <T value={ui.remainingStatus.lifecycle} /> },
         ]}
       />}>
 
+      {query.returnTo ? <p><a href={safeReturnTo(query.returnTo, '/editor')}><T value={{en:'Return to event',de:'Zurück zum Ereignis'}} /></a></p> : null}
+      <LifecycleEvidenceForm event={selectedEvent} constitutionId={constitutionId} returnTo={query.returnTo} code={code}/>
       {query.saved ? <p role="status"><T value={ui.editor.lifecycle.constitutionid.page.lifecycleEventRecorded} /></p> : null}
       {query.error ? <p role="alert"><T value={ui.editor.lifecycle.constitutionid.page.theEventCouldNotBeRecordedCheck} /></p> : null}
       <ol>
@@ -98,7 +96,7 @@ export default async function LifecycleEditor({ params, searchParams }: Props) {
       {allowed.length > 0 ? (
         <Stack as="form" action={appendLifecycleAction} className={["card", surfaceStyles.card].join(' ')}>
           <input type="hidden" name="constitutionId" value={constitutionId} />
-          <input type="hidden" name="code" value={code.toLowerCase()} />
+          <input type="hidden" name="code" value={code.toLowerCase()} /><input type="hidden" name="jurisdictionId" value={query.jurisdictionId??''} />
           <label htmlFor="event-type"><T value={ui.editor.lifecycle.constitutionid.page.event} /></label>
           <select id="event-type" name="eventType" required>
             {allowed.map((kind) => <option key={kind} value={kind}>{<T value={labels[kind]} />}</option>)}
@@ -122,7 +120,7 @@ export default async function LifecycleEditor({ params, searchParams }: Props) {
         <section className={["card", surfaceStyles.card].join(' ')}>
           <h2><T value={ui.editor.lifecycle.constitutionid.page.recordAProvisionEvent} /></h2>
           <Stack as="form" method="get" className="form-section">
-            <input type="hidden" name="code" value={code} />
+            <input type="hidden" name="code" value={code} /><input type="hidden" name="jurisdictionId" value={query.jurisdictionId??''} />
             <label htmlFor="scope-version"><T value={ui.editor.lifecycle.constitutionid.page.sourceVersion} /></label>
             <select id="scope-version" name="versionId" defaultValue={sourceVersionId}>
               {versions.map((version) => (
@@ -133,7 +131,7 @@ export default async function LifecycleEditor({ params, searchParams }: Props) {
           </Stack>
           <Stack as="form" action={appendProvisionAction}>
             <input type="hidden" name="constitutionId" value={constitutionId} />
-            <input type="hidden" name="code" value={code.toLowerCase()} />
+            <input type="hidden" name="code" value={code.toLowerCase()} /><input type="hidden" name="jurisdictionId" value={query.jurisdictionId??''} />
             <input type="hidden" name="sourceVersionId" value={sourceVersionId} />
             <label htmlFor="provision-event-type"><T value={ui.editor.lifecycle.constitutionid.page.event} /></label>
             <select id="provision-event-type" name="eventType" required>
@@ -162,4 +160,26 @@ export default async function LifecycleEditor({ params, searchParams }: Props) {
       ) : null}
     </WorkspacePage>
   );
+}
+
+function LifecycleEvidenceForm({event:selectedEvent,constitutionId,returnTo,code}: {event:ConstitutionLifecycleEvent|undefined;constitutionId:string;returnTo?:string;code:string}) {
+  if(!selectedEvent)return null;
+  return <form action={reviseLifecycleEvidenceAction}>
+        <h2><T value={{en:'Edit event evidence',de:'Ereignisbelege bearbeiten'}} /></h2>
+        <p>{selectedEvent.eventDate} · <T value={labels[selectedEvent.eventType]} /></p>
+        <input type="hidden" name="constitutionId" value={constitutionId}/><input type="hidden" name="eventId" value={selectedEvent.id}/><input type="hidden" name="expectedRevisionId" value={selectedEvent.evidenceRevisionId??''}/><input type="hidden" name="returnTo" value={safeReturnTo(returnTo??'',`/editor/lifecycle/${constitutionId}?code=${code}`)}/>
+        <label><T value={{en:'Event note',de:'Ereignisnotiz'}} /><textarea name="note" maxLength={10000} defaultValue={selectedEvent.note??''}/></label>
+        <label><T value={{en:'Source URL',de:'Quellen-URL'}} /><input name="sourceUrl" type="url" maxLength={2048} defaultValue={selectedEvent.sourceUrl??''}/></label>
+        <p><T value={{en:'Save a new evidence revision. The event type and legal date remain fixed.',de:'Eine neue Belegrevision speichern. Ereignisart und rechtliches Datum bleiben fest.'}} /></p><button><T value={{en:'Save event evidence',de:'Ereignisbelege speichern'}} /></button>
+      </form>;
+}
+
+function nextEventTypes(last:ConstitutionLifecycleEvent|undefined):ConstitutionLifecycleEvent['eventType'][] {
+  if(!last)return ['adopted'];
+  switch(last.eventType) {
+    case 'adopted':return ['commenced','repealed'];
+    case 'suspended':return ['restored','repealed'];
+    case 'repealed':return [];
+    default:return ['suspended','repealed'];
+  }
 }

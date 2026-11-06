@@ -8,6 +8,6 @@ it('keeps historical jurisdictions on their own page even when a country code is
 
 it('keeps regional constitution wikis within their jurisdiction context', () => {
   const owner = { targetType: 'constitution' as const, targetId: 'charter', jurisdictionId: 'region' };
-  expect(wikiPublicPath(owner)).toBe('/jurisdictions/region/constitutions/charter');
+  expect(wikiPublicPath(owner)).toBe('/jurisdictions/region/constitutions/charter?view=wiki');
   expect(wikiEditPath(owner, { historyPage: '2' })).toBe('/editor/wiki/constitution/charter?jurisdictionId=region&historyPage=2');
 });

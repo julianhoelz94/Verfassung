@@ -25,9 +25,11 @@ test('visitor reads sourced country and constitution context with dated lifecycl
   await page.getByText('All constitution statuses').click();
   await expect(page.getByText('uncertain (last event date is approximate)')).toBeVisible();
   await page.getByRole('link', { name: 'Basic Law for the Federal Republic of Germany' }).first().click();
+  await page.getByRole('button',{name:'Wiki',exact:true}).click();
   await expect(page.getByRole('heading', { name: 'About this constitution' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Source 1' })).toHaveAttribute('href', 'https://example.org/basic-law');
-  await expect(page.getByRole('heading', { name: 'Lifecycle dates' })).toBeVisible();
+  await page.getByRole('button',{name:'Wiki',exact:true}).click();
+  await expect(page.getByRole('heading',{name:'A constitution, over time.',exact:true})).toBeVisible();
 });
 
 test('staff can review a structured wiki draft, picture, and revision history', async ({ page }) => {

@@ -17,6 +17,8 @@ editorial roles.
 | `admin` | yes | yes | yes | yes | yes |
 | `viewer` | no | no | no | no | no |
 
+Lifecycle events, their evidence revisions and lifecycle commentary/materials require publisher/admin. Independent commentary/materials on an amendment or its exact changed passage require editor/admin. Document-library write access alone does not grant permission to alter these scoped links. See [Roles and access](wiki/Roles-and-Access.md) for the user-facing capability matrix.
+
 Flow: `open` → save → submit (`reviewing`) → approve (`approved`) → publish (`published`).
 
 Imports use the same editor review and publication queues. Ingestion-service enforces their role checks: editor/admin prepares, reviewer/admin approves or rejects with a reason, and publisher/admin publishes the exact approved draft with fresh MFA. The same account may perform all steps when it has the required roles; approval and publication remain separate decisions.

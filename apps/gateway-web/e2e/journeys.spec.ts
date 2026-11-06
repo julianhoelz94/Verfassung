@@ -27,10 +27,9 @@ test('browse from countries to an article', async ({ page }) => {
   await expect(page).toHaveURL(new RegExp(`/countries/DE/versions/${VERSION_2022}#unit-${ARTICLE_1}$`));
   await page.getByRole('button', { name: /^Details · Article 1/ }).first().click();
   await expect(page.getByRole('link', { name: 'Open passage', exact: true })).toHaveCount(0);
-  await expect(page.getByRole('link', { name: 'History of Article 1' })).toBeVisible();
-  await page.getByRole('link', { name: 'History of Article 1' }).click();
-  await expect(page.getByRole('heading', { name: 'History of Article 1' })).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Compare with previous' })).toBeVisible();
+  await page.getByRole('link',{name:'History of this passage',exact:true}).first().click();
+  await expect(page.getByRole('heading',{name:'History of this passage',exact:true})).toBeVisible();
+  await expect(page.getByRole('link',{name:'← Back to viewer',exact:true})).toHaveAttribute('href',new RegExp(`/versions/${VERSION_2022}#unit-${ARTICLE_1}`));
 });
 
 test('search finds a published article', async ({ page }) => {
@@ -44,8 +43,8 @@ test('linear compare shows a structured change', async ({ page }) => {
   await page.goto('/countries/DE');
   await page.locator('summary').filter({ hasText: 'Compare versions' }).click();
   await page.getByRole('button', { name: 'Compare' }).click();
-  await expect(page.getByRole('heading', { name: /side by side/ })).toBeVisible();
-  await expect(page.locator('.compare-article h2 .badge').first()).toHaveText('Changed');
+  await expect(page.getByRole('heading',{name:'1949 → 2022',exact:true})).toBeVisible();
+  await expect(page.getByRole('link',{name:'Compare',exact:true})).toHaveAttribute('aria-current','page');
   await expect(page.locator('ins.diff-add, del.diff-remove').first()).toBeVisible();
 });
 

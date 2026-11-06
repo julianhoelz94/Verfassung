@@ -9,6 +9,29 @@ import java.util.concurrent.CopyOnWriteArrayList
 
 class RestLinkTargetClientTest {
     @Test
+    fun recordMaterialsFollowPublishedOwnersAndExactChangeOrEventScopes() {
+        val amendment = UUID.randomUUID()
+        val change = UUID.randomUUID()
+        val constitution = UUID.randomUUID()
+        val event = UUID.randomUUID()
+        val responses = mutableMapOf(
+            "/amendments/$amendment" to """{"publishedRevisionId":"${UUID.randomUUID()}","changes":[{"id":"$change"}]}""",
+            "/constitutions/$constitution/lifecycle-events" to """[{"id":"$event"}]""",
+        )
+        withResponses(responses) { client, _ ->
+            assertThat(client.isPublic("amendment_material", amendment, null)).isTrue()
+            assertThat(client.isPublic("amendment_material", amendment, change)).isFalse()
+            assertThat(client.isPublic("change_material", amendment, change)).isTrue()
+            assertThat(client.isPublic("change_material", amendment, UUID.randomUUID())).isFalse()
+            assertThat(client.isPublic("lifecycle_material", constitution, event)).isTrue()
+            assertThat(client.isPublic("lifecycle_material", constitution, UUID.randomUUID())).isFalse()
+            responses["/amendments/$amendment"] = """{"changes":[{"id":"$change"}]}"""
+            assertThat(client.isPublic("amendment_material", amendment, null)).isFalse()
+            assertThat(client.isPublic("change_material", amendment, change)).isFalse()
+        }
+    }
+
+    @Test
     fun publishedEditorialSnapshotsKeepPublicDocumentLinksAfterAnotherCorrection() {
         val versionId = UUID.randomUUID()
         val currentId = UUID.randomUUID()

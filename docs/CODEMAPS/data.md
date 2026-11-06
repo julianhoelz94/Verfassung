@@ -51,3 +51,5 @@ sequence of per-database operations, not a distributed transaction. See the Wiki
 Local Stack Reference for the explicit restore command.
 
 Catalog V32 adds sentence_delimiters to current outline kinds; immutable settings revision JSON includes sentenceDelimiters with defaults for historical revisions. Text formatting remains in existing rich-content JSON as validated UTF-16 marks. Endnotes remain ordered footnote text entries at the constitution tail; there is no new notes table or migration of historical snapshots.
+
+Catalog V34 adds append-only `lifecycle_evidence_revisions`, retaining event type/date and original source data. Document V13 adds independently managed record material link targets to the existing append-only link log. Change/event scopes are verified with their owning service; they are opaque IDs without cross-service foreign keys. Document metadata/file revisions retain author and time; replacing a material pin leaves previous revisions available to staff.

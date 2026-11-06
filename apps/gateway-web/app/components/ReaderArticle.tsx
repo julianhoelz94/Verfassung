@@ -5,8 +5,8 @@ import { ReaderIcon } from './ReaderIcon';
 import styles from './VersionReader.module.css';
 import documentStyles from './ConstitutionDocument.module.css';
 
-export function ReaderArticle({ id, heading, headingContent, expanded, onToggle, metadata, children }: {
-  id: string; heading: string; headingContent?: ReactNode; expanded?: boolean; onToggle?: () => void; metadata: ReactNode; children: ReactNode;
+export function ReaderArticle({ id, heading, headingContent, expanded, onToggle, metadata, children, historyHref }: {
+  id: string; heading: string; headingContent?: ReactNode; expanded?: boolean; onToggle?: () => void; metadata: ReactNode; children: ReactNode; historyHref?: string;
 }) {
   const t = useTranslation();
   return <li className={documentStyles.article} id={id}><div className={[documentStyles.articleHeader, styles.articleHead].join(' ')}>
@@ -14,5 +14,5 @@ export function ReaderArticle({ id, heading, headingContent, expanded, onToggle,
     <div className={styles.articleActions} data-reader-chrome>
       <details className={styles.articleMenu}><summary role="button" className={styles.tool} aria-label={t(copy.details) + ' · ' + heading}><ReaderIcon name="details" /></summary><div className={styles.articlePopover}>{metadata}</div></details>
     </div>
-  </div><div id={'reader-body-' + id} hidden={onToggle ? !expanded : undefined}>{children}</div></li>;
+  </div><div id={'reader-body-' + id} hidden={onToggle ? !expanded : undefined}>{children}{historyHref?<p className={styles.passageHistory}><a href={historyHref}><ReaderIcon name="history" />{t({en:'History of this passage',de:'Geschichte dieser Passage'})}</a></p>:null}</div></li>;
 }

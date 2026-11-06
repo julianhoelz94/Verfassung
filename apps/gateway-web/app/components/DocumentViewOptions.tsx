@@ -65,7 +65,9 @@ export function DocumentView({
   scope,
   className,
   children,
+  controls = true,
 }: {
+  controls?: boolean;
   scope: PreferenceScope;
   className?: string;
   children: ReactNode;
@@ -86,15 +88,17 @@ export function DocumentView({
   }, [stored]);
   return (
     <div className={className}>
-      <details className={styles.menu}>
-        <summary>{t(copy.view)}</summary>
-        <HierarchyViewOptions
-          value={preferences}
-          onChange={(patch) =>
-            saveReaderPreferences({ ...preferences, ...patch }, scope)
-          }
-        />
-      </details>
+      {controls ? (
+        <details className={styles.menu}>
+          <summary>{t(copy.view)}</summary>
+          <HierarchyViewOptions
+            value={preferences}
+            onChange={(patch) =>
+              saveReaderPreferences({ ...preferences, ...patch }, scope)
+            }
+          />
+        </details>
+      ) : null}
       <ConstitutionDocument
         indentation={preferences.indentation}
         guides={preferences.guides}

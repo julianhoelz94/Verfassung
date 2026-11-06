@@ -13,6 +13,20 @@ export const COMPARE_KIND_LABEL: Record<CompareKind, UiMessage> = {
 };
 
 export function orderVersions(versions: VersionSummary[]): VersionSummary[] {
+  if (versions.some(version => version.predecessorVersionId !== undefined)) {
+    const aliases = new Map(versions.flatMap(version => [version.id, version.legalVersionId, version.currentVersionId].filter((id): id is string => Boolean(id)).map(id => [id, version] as const)));
+    const roots = versions.filter(version => !version.predecessorVersionId);
+    if (roots.length === 1) {
+      const line: VersionSummary[] = [], seen = new Set<string>();
+      let current: VersionSummary | undefined = roots[0];
+      while (current && !seen.has(current.id)) {
+        line.push(current); seen.add(current.id);
+        const successors = versions.filter(version => version.predecessorVersionId && aliases.get(version.predecessorVersionId)?.id === current!.id);
+        current = successors.length === 1 ? successors[0] : undefined;
+      }
+      if (line.length === versions.length) return line;
+    }
+  }
   return [...versions].sort((a, b) => {
     const dateCmp = (a.effectiveDate ?? '').localeCompare(b.effectiveDate ?? '');
     if (dateCmp !== 0) {
@@ -68,6 +82,19 @@ export function versionPath(
   fromId: string,
   toId: string,
 ): VersionSummary[] | null {
+  if (versions.some(version => version.predecessorVersionId !== undefined)) {
+    const aliases = new Map(versions.flatMap(version => [version.id, version.legalVersionId, version.currentVersionId].filter((id): id is string => Boolean(id)).map(id => [id, version] as const)));
+    const from = aliases.get(fromId), to = aliases.get(toId);
+    if (!from || !to || from.id === to.id) return null;
+    const path: VersionSummary[] = [], seen = new Set<string>();
+    let current: VersionSummary | undefined = to;
+    while (current && !seen.has(current.id)) {
+      seen.add(current.id); path.unshift(current);
+      if (current.id === from.id) return path;
+      current = current.predecessorVersionId ? aliases.get(current.predecessorVersionId) : undefined;
+    }
+    return null;
+  }
   const ordered = orderVersions(versions);
   const fromIndex = ordered.findIndex((version) => version.id === fromId);
   const toIndex = ordered.findIndex((version) => version.id === toId);

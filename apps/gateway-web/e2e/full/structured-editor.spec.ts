@@ -188,7 +188,7 @@ for (const hop of ['editorial_correction', 'legal'] as const) {
       await page.goto(`/countries/XA/compare?from=${version.id}&to=${targetId}&all=1`);
       await expect(page.locator('main').last()).toContainText('Original wording.');
       await expect(page.locator('main').last()).toContainText('Changed wording.');
-      await expect(page.locator('main').last()).toContainText('Between.');
+      await expect(page.locator('main').last()).not.toContainText('Between.');
     }
   });
 }

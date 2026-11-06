@@ -115,8 +115,8 @@ for (const locale of ['en', 'de'] as const) {
         await expect(page.getByRole('heading', { level:1 })).toBeVisible();
         await shot(page, 'reading-text', page.getByRole('toolbar'));
         await page.goto(`/countries/${source.countryIso}/compare`);
-        await expect(page.locator('#compare-from')).toBeVisible();
-        await expect(page.locator('#compare-to')).toBeVisible();
+        await expect(page.locator('select[name=from]')).toBeVisible();
+        await expect(page.locator('select[name=to]')).toBeVisible();
         await shot(page, 'reading-compare');
       } finally { await publicContext.close(); }
       const admin = await authenticated(browser, 'admin', locale);

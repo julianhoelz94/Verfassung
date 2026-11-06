@@ -50,7 +50,9 @@ export function constitutionHistory(
         }))
       : []),
     ...amendments
-      .filter((a) => a.changes.some((c) => passageMatches(c, scope)))
+      .filter(
+        (a) => !scope.size || a.changes.some((c) => passageMatches(c, scope)),
+      )
       .map((a) => ({
         id: a.id,
         kind: "amendment" as const,

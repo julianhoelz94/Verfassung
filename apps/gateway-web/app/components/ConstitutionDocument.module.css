@@ -29,9 +29,9 @@
 }
 
 .articleTitle {
-  margin-inline-start: .75rem;
+  margin-inline-start: 0.75rem;
   color: var(--color-ink-3);
-  font: 400 var(--text-sm)/1.5 var(--font-ui);
+  font: 400 var(--text-sm) / 1.5 var(--font-ui);
 }
 
 .headingSeparator {
@@ -51,7 +51,7 @@
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: .75rem;
+  gap: 0.75rem;
   margin-block-end: 1rem;
 }
 
@@ -75,7 +75,7 @@
   font-family: var(--font-ui);
   font-size: var(--text-sm);
   font-weight: 400;
-  margin-inline-end: .45rem;
+  margin-inline-end: 0.45rem;
 }
 
 .text :global(.num + .node-tree) {
@@ -90,12 +90,12 @@
   font-family: var(--font-ui);
   font-size: var(--text-sm);
   font-weight: var(--weight-heading);
-  margin-block-end: .4rem;
+  margin-block-end: 0.4rem;
 }
 
 .article :global(.article-foot) {
   color: var(--color-ink-3);
-  margin-block-start: .75rem;
+  margin-block-start: 0.75rem;
   font-size: var(--text-sm);
 }
 
@@ -109,21 +109,21 @@
 
 .notes > h2 {
   margin: 0 0 1.125rem;
-  font: 400 var(--text-xl)/1.4 var(--font-text);
+  font: 400 var(--text-xl) / 1.4 var(--font-text);
 }
 
 .note {
   display: flex;
   align-items: baseline;
-  gap: .75rem;
+  gap: 0.75rem;
   margin: 0 0 1.25rem;
-  font: 400 var(--text-sm)/1.65 var(--font-ui);
+  font: 400 var(--text-sm) / 1.65 var(--font-ui);
   scroll-margin-top: var(--constitution-anchor-offset);
 }
 
 .noteLabel {
   flex: 0 0 auto;
-  min-width: .875rem;
+  min-width: 0.875rem;
   color: var(--color-accent-strong);
 }
 
@@ -135,7 +135,7 @@
 }
 
 .annotation {
-  margin: 0 0 .35rem;
+  margin: 0 0 0.35rem;
   color: var(--color-ink-3);
 }
 
@@ -145,7 +145,7 @@
 
 .noteBody > a {
   display: inline-block;
-  margin-block-start: .35rem;
+  margin-block-start: 0.35rem;
   margin-inline-start: 0;
 }
 
@@ -164,8 +164,37 @@
 }
 
 @media print {
-  .document, .text, .notes { max-width: none; }
-  .noteActions { display: none; }
-  .article { break-inside: auto; }
-  .article > h1, .article > h2, .article > h3 { break-after: avoid; }
+  .document,
+  .text,
+  .notes {
+    max-width: none;
+  }
+  .noteActions {
+    display: none;
+  }
+  .article {
+    break-inside: auto;
+  }
+  .article > h1,
+  .article > h2,
+  .article > h3 {
+    break-after: avoid;
+  }
+}
+
+/* Each child guide begins at its parent's text start, including joined leaf runs. */
+.document[data-hierarchy-indentation="true"] :global(.node-tree > .node-block),
+.document[data-hierarchy-indentation="true"]
+  :global(.node-tree > .constitution-concat),
+.document[data-hierarchy-indentation="true"] :global([data-hierarchy-node]) {
+  margin-inline-start: 0;
+  padding-inline-start: var(--constitution-hierarchy-inset);
+  border-inline-start: 1px solid transparent;
+  min-width: 0;
+}
+.document[data-hierarchy-guides="true"] :global(.node-tree > .node-block),
+.document[data-hierarchy-guides="true"]
+  :global(.node-tree > .constitution-concat),
+.document[data-hierarchy-guides="true"] :global([data-hierarchy-node]) {
+  border-inline-start-color: var(--color-line-strong);
 }

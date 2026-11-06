@@ -107,3 +107,5 @@ Right-click the constitution text to open the copy menu. It offers the clicked u
 Shift+F10 opens the menu on a focused passage. Arrow keys move between items; Enter or Space selects one, and Escape dismisses it. The compact menu separates permalink actions from original-text actions with a divider. If clipboard access is unavailable, a selectable copy field appears. Separate permalink icons are no longer needed in the text.
 
 Each footnote has one **↑** return control. Hover over it or focus it to see its label. It jumps straight to a single reference; for shared notes it opens a menu of reference locations.
+
+In **Reading preferences**, **Show indentation** and **Show hierarchy guides** control the hierarchy layout. The guide option appears only while indentation is enabled and remembers its last choice. Editor Preview shares these saved reading choices; the editor working view has its own display preferences. These controls preserve the wording.

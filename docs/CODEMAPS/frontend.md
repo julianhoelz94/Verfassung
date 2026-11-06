@@ -70,7 +70,7 @@ Shared app/components/Footnotes.tsx and InlineText.tsx render note drawers and s
 
 Contextual reader copying is owned by `lib/reader-actions.ts` and `ReaderActions.tsx`/`ReaderMenu.tsx`: actual source ancestry, original published text, and snapshot-pinned links. `FootnoteBacklinks.tsx` renders one return control, with a destination chooser for shared notes, while preserving authored note labels.
 
-`ConstitutionDocument.tsx` and `ConstitutionDocument.module.css` own the document design shared by the public reader and editor Preview: type, measure, article headings/spacing, labels, tables and notes. Its defaults are defined once by the constitution tokens in `app/styles/tokens.css`. Use `ConstitutionText`, `ConstitutionArticleHeading` and `ConstitutionFootnotes` inside that surface. Keep toolbar/editor-shell rules in their host modules. Reading preferences supply `--constitution-font-size`; hosts may supply `--constitution-anchor-offset` for their sticky controls. Do not duplicate document typography in a host stylesheet.
+`ConstitutionDocument.tsx` and `ConstitutionDocument.module.css` own the document design shared by the public reader and editor Preview: type, measure, article headings/spacing, labels, tables and notes. Its defaults are defined once by the constitution tokens in `app/styles/tokens.css`. Use `ConstitutionText`, `ConstitutionArticleHeading` and `ConstitutionFootnotes` inside that surface. Keep toolbar/editor-shell rules in their host modules. Reading preferences supply `--constitution-font-size`; hosts may supply `--constitution-anchor-offset` for their sticky controls. Do not duplicate document typography in a host stylesheet. The same surface owns shallow hierarchy indentation and guide lines through `--constitution-hierarchy-inset`. `DocumentViewOptions.tsx` supplies shared conditional controls; `lib/reader-preferences.ts` keeps reader/Preview choices together and working-editor choices separate.
 
 ## Country and regional directories
 
@@ -93,10 +93,16 @@ redirects, JSON modes and trusted-origin guards.
 
 ## Outline editing and preview
 
-`admin/constitutions/OutlineEditor.tsx` composes focused creation/review/layer
-components; `outline-editor-model.ts` owns pure layer updates and authoring checks.
-`lib/outline-preview.ts` retains deterministic example identity, sample wording,
-cycle handling and translation ordering. Catalog remains the write authority.
+`admin/constitutions/StructureWorkspaceTemplate.tsx` shares task navigation,
+hierarchy, selected-level fields, presets and reader preview across creation,
+existing settings and import setup approval. `OutlineEditor.tsx` retains creation
+and Catalog impact/save commands; `admin/import/setup/SetupProposalReview.tsx`
+retains display-only adjustments and Ingestion review commands. Workflow hosts
+provide documents, source/identity and history. `outline-editor-model.ts` owns
+graph updates, reachability/cycle checks and authoring validation.
+`lib/constitution-templates.ts` supplies five editable preset graphs;
+`lib/outline-preview.ts` builds modular examples without changing source samples.
+Catalog remains the write authority. See `docs/design/constitution-structure-workspace.md`.
 
 ## Amendment and import workflow decomposition
 

@@ -47,7 +47,7 @@ import { ui } from "../../lib/messages";
 
 import { EditorNavigationToggle } from "./EditorWorkspace";
 
-import { ConstitutionDocument } from "../components/ConstitutionDocument";
+import { DocumentView } from "../components/DocumentViewOptions";
 
 import {
   ConstitutionArticleHeading,
@@ -283,7 +283,11 @@ export function renderStructuredEditor(model: StructuredEditorModel) {
     const own = simpleUnit(node);
     if (own)
       return (
-        <section key={node.logicalId} data-editor-unit={node.logicalId}>
+        <section
+          key={node.logicalId}
+          data-editor-unit={node.logicalId}
+          data-hierarchy-node
+        >
           {heading}
           {canvas(
             [own],
@@ -301,6 +305,7 @@ export function renderStructuredEditor(model: StructuredEditorModel) {
       <section
         key={node.logicalId}
         data-editor-unit={node.logicalId}
+        data-hierarchy-node
         className={styles.unit}
       >
         {heading}
@@ -394,7 +399,11 @@ export function renderStructuredEditor(model: StructuredEditorModel) {
         index++;
       }
       items.push(
-        <div key={first.node.logicalId} className={styles.paragraph}>
+        <div
+          key={first.node.logicalId}
+          className={styles.paragraph}
+          data-hierarchy-node
+        >
           {canvas(units, node.logicalId)}
         </div>,
       );
@@ -692,7 +701,11 @@ export function renderStructuredEditor(model: StructuredEditorModel) {
       }
       items.push(
         units.length > 1 ? (
-          <section key={node.logicalId} data-editor-unit={node.logicalId}>
+          <section
+            key={node.logicalId}
+            data-editor-unit={node.logicalId}
+            data-hierarchy-node
+          >
             {canvas(units, parent?.logicalId ?? null)}
           </section>
         ) : (
@@ -919,11 +932,21 @@ export function renderStructuredEditor(model: StructuredEditorModel) {
           </button>
         ) : null}
         {documentsPanel ? (
-          <button type="button" aria-label={copy("Documents", "Dokumente")}
-            title={copy("Documents", "Dokumente")} aria-pressed={mode === "documents"}
-            disabled={Boolean(noteEdit || markerMove)} onClick={() => {setMode("documents"); setPanel("");}}>
+          <button
+            type="button"
+            aria-label={copy("Documents", "Dokumente")}
+            title={copy("Documents", "Dokumente")}
+            aria-pressed={mode === "documents"}
+            disabled={Boolean(noteEdit || markerMove)}
+            onClick={() => {
+              setMode("documents");
+              setPanel("");
+            }}
+          >
             <FileText size={17} aria-hidden="true" />
-            <span className={styles.viewLabel}>{copy("Documents", "Dokumente")}</span>
+            <span className={styles.viewLabel}>
+              {copy("Documents", "Dokumente")}
+            </span>
           </button>
         ) : null}
         {canManageStructure ? (
@@ -1634,36 +1657,34 @@ export function renderStructuredEditor(model: StructuredEditorModel) {
   /** Uses the shared legal-text renderer for exact ordered preview content. */
   function renderPreviewDocument() {
     return (
-      <div className={styles.document}>
-        <ConstitutionDocument>
-          {focusedNodes.map((node) => (
-            <ConstitutionText
-              key={node.logicalId}
-              headingLevel="h2"
-              article={{
-                articleNumber: node.label ?? "",
-                title: node.title ?? "",
-                kind: node.kind,
-                body: "",
-                content: readerNode(node).content,
-              }}
-              outline={outline}
-              hideFootnotes
-              crossRefs={{
-                versionId,
-                articlesByNumber: {},
-                footnotes: notes.map((note) => ({
-                  logicalId: note.entry.logicalId!,
-                  label: note.entry.footnoteLabel ?? "*",
-                  text: note.entry.text ?? "",
-                  marks: note.entry.marks,
-                  href: "#editor-fn-" + note.entry.logicalId,
-                })),
-              }}
-            />
-          ))}
-        </ConstitutionDocument>
-      </div>
+      <DocumentView scope="reader" className={styles.document}>
+        {focusedNodes.map((node) => (
+          <ConstitutionText
+            key={node.logicalId}
+            headingLevel="h2"
+            article={{
+              articleNumber: node.label ?? "",
+              title: node.title ?? "",
+              kind: node.kind,
+              body: "",
+              content: readerNode(node).content,
+            }}
+            outline={outline}
+            hideFootnotes
+            crossRefs={{
+              versionId,
+              articlesByNumber: {},
+              footnotes: notes.map((note) => ({
+                logicalId: note.entry.logicalId!,
+                label: note.entry.footnoteLabel ?? "*",
+                text: note.entry.text ?? "",
+                marks: note.entry.marks,
+                href: "#editor-fn-" + note.entry.logicalId,
+              })),
+            }}
+          />
+        ))}
+      </DocumentView>
     );
   }
 
@@ -2007,14 +2028,20 @@ export function renderStructuredEditor(model: StructuredEditorModel) {
           ) : mode === "preview" ? (
             renderPreviewDocument()
           ) : (
-            <div className={styles.document}>{renderFocusedNodes()}</div>
+            <DocumentView scope="editor" className={styles.document}>
+              {renderFocusedNodes()}
+            </DocumentView>
           )}
           {mode !== "changes" && (visibleNotes.length || noteEdit)
             ? renderEndnotes()
             : null}
           {editable ? renderFooter() : null}
         </form>
-        {documentsPanel ? <div hidden={mode !== "documents"} data-editor-panel="documents">{documentsPanel}</div> : null}
+        {documentsPanel ? (
+          <div hidden={mode !== "documents"} data-editor-panel="documents">
+            {documentsPanel}
+          </div>
+        ) : null}
         {wikiPanel ? (
           <div hidden={mode !== "wiki"} data-editor-panel="wiki">
             {wikiPanel}

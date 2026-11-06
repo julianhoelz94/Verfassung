@@ -74,6 +74,7 @@ for (const locale of ['en', 'de'])
     await request.post(`${mock}/__reset`);
     await request.post(`${mock}/__sprint59_content`);
     await signInAdmin(page);
+    await request.put(`${mock}/api/identity/me/language`, { headers: { Authorization: 'Bearer e2e-session-token' }, data: { languagePreference: locale } });
     await page.setExtraHTTPHeaders({ 'Accept-Language': locale });
     for (const width of [320, 820, 1440]) {
       await page.setViewportSize({ width, height: 900 });
@@ -117,6 +118,7 @@ for (const locale of ['en', 'de'])
     });
     expect(passkeyGap).toBeCloseTo(16, 0);
     await page.goto('/admin/constitutions/01900000-0000-4000-8000-000000000002');
+    await page.getByRole('region', { name: 'Article ' + (locale === 'de' ? 'Struktur' : 'Structure'), exact: true }).getByRole('button', { name: locale === 'de' ? 'Bearbeitung' : 'Editing', exact: true }).click();
     await expect(page.locator('select[name="label-policy-0"]')).toBeVisible();
     const outlineGap = await page.locator('select[name="label-policy-0"]').evaluate((input) => {
       const field = input.closest('.field')!;

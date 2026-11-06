@@ -1,5 +1,8 @@
 /* Runtime source of truth. See docs/design/ui-templates.md. */
 :root {
+  --color-warning: #8a4b09;
+  --color-warning-bg: #fff2de;
+  --constitution-hierarchy-inset: 0.375rem;
   /* Colour — ink and paper */
   --color-ink: #25332f;
   --color-ink-2: #626e67;
@@ -31,8 +34,10 @@
   --color-backdrop: rgb(37 51 47 / 0.35);
 
   /* Typography */
-  --font-ui: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-  --font-text: Georgia, 'Times New Roman', serif;
+  --font-ui:
+    system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial,
+    sans-serif;
+  --font-text: Georgia, "Times New Roman", serif;
   --font-heading: var(--font-text);
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   --weight-heading: 400;
@@ -88,4 +93,10 @@
   --gap-card: var(--space-5);
   --gap-section: var(--space-6);
   --surface-padding: clamp(var(--space-5), 3vw, var(--space-6));
+}
+
+@media (max-width: 640px) {
+  :root {
+    --constitution-hierarchy-inset: 0.3125rem;
+  }
 }

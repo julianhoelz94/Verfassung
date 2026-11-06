@@ -153,6 +153,9 @@ export function outlineExample(
       if (kind.allowTextAlongsideChildren)
         text("between", t(ui.remainingStatus.sampleRightsEveryone));
       childRun(children[1] ?? children[0]!, "b", firstRunSize);
+      children
+        .slice(2)
+        .forEach((code, index) => childRun(code, `extra-${index}`, 0));
       if (kind.allowTextAlongsideChildren)
         text("after", t(ui.remainingStatus.sampleUpholdGuarantees));
     }
@@ -168,7 +171,7 @@ export function outlineExample(
   }
   return outline.kinds
     .filter((kind) => kind.root)
-    .map((kind, index) => node(kind.kindCode, `sample-${index}`, index, new Set()))
+    .map((kind, index) => node(kind.kindCode, `sample-${index}`, 0, new Set()))
     .filter((item): item is OrderedNode => Boolean(item));
 }
 

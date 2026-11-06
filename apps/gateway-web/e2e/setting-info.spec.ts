@@ -24,7 +24,8 @@ test('constitution setup explains whether settings can be changed later', async 
 
   await page.getByLabel('Constitution title').fill('Test charter');
   await page.getByRole('button', { name: 'Continue to structure' }).click();
-  await page.locator('.field').filter({ has: page.getByLabel('Label', { exact: true }) }).getByRole('button', { name: 'Setting information' }).first().click();
+  await page.getByRole('button', { name: 'Use this template', exact: true }).click();
+  await page.locator('.field').filter({ has: page.getByLabel('Reader-facing name', { exact: true }) }).getByRole('button', { name: 'Setting information' }).first().click();
   await expect(page.getByRole('note')).toContainText('Can be changed later after an impact check.');
 });
 
@@ -34,6 +35,7 @@ test('setting information stays inside a narrow viewport', async ({ page }) => {
   await page.goto('/admin/constitutions');
   await page.getByLabel('Constitution title').fill('Test charter');
   await page.getByRole('button', { name: 'Continue to structure' }).click();
+  await page.getByRole('button', { name: 'Use this template', exact: true }).click();
   await page.getByRole('button', { name: 'Setting information' }).last().click();
   const bounds = await page.getByRole('note').boundingBox();
   expect(bounds).not.toBeNull();

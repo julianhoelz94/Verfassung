@@ -1,6 +1,7 @@
 import { exactRoute } from "./route.mjs";
 import {
   EDITORIAL_VERSION_ID,
+  continuousReaderUnits,
   SESSION_ID,
   VERSION_1949,
   VERSION_2022,
@@ -144,6 +145,16 @@ async function handleManageSessionResponse(context, managedSession) {
 /** Expose only the active session preview and its historical missing-session response. */
 export function handleSession(context) {
   const { method, pathname, res } = context;
+  if (method === "GET" && mockState.continuousReader && pathname === `/api/editor/edit-sessions/${editorState.session?.id}/structured-draft`) {
+    const roots = continuousReaderUnits(editorState.session.versionId).map(unit => ({
+      logicalId: unit.logicalId, revisionId: unit.revisionId, occurrenceId: unit.id,
+      kind: unit.kind, label: unit.articleNumber, title: unit.title, content: unit.content,
+    }));
+    json(res, 200, { sessionId: editorState.session.id, sourceVersionId: editorState.session.versionId,
+      sourceGeneration: 1, generation: 1, settingsRevisionId: "01900000-0000-4000-8000-000000000901",
+      roots, sourceRoots: structuredClone(roots), operations: [] });
+    return true;
+  }
   const editorSession = pathname.match(
     /^\/api\/editor\/edit-sessions\/([^/]+)$/,
   );

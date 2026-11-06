@@ -38,6 +38,7 @@ test('one constitution pair, draft context, and one-step reusable documents',asy
   await page.getByRole('navigation',{name:'Amendment workspace'}).getByRole('button',{name:'Documents',exact:true}).click();await expect(page.getByRole('link',{name:'New legislation evidence',exact:true})).toBeVisible();
   const docs=await (await request.get(mock+'/api/document/documents')).json();expect(docs).toHaveLength(1);
   await page.goto('/admin/constitutions/01900000-0000-4000-8000-000000000002');
+  await page.getByRole('navigation',{name:'Structure',exact:true}).getByRole('button',{name:'Documents',exact:true}).click();
   await page.getByRole('button',{name:'Choose existing document',exact:true}).click();
   await page.getByLabel('Search documents',{exact:true}).fill(docs[0].revision.title);await page.getByRole('option',{name:/^New legislation evidence/}).click();await page.getByRole('button',{name:'Attach document',exact:true}).click();
   await expect(page.getByRole('link',{name:'New legislation evidence',exact:true})).toBeVisible();

@@ -16,13 +16,14 @@ const copy = {
 };
 type Open = (element: Element, point?: {x:number;y:number}) => void;
 const Actions=createContext<Open>(()=>{});
-export function ReaderDocument(props: HTMLAttributes<HTMLDivElement> & RefAttributes<HTMLDivElement>) {
+export function ReaderDocument(props: HTMLAttributes<HTMLDivElement> & RefAttributes<HTMLDivElement> & { indentation?: boolean; guides?: boolean },
+) {
   const open=useContext(Actions);
-  return <ConstitutionDocument {...props} data-reader-document tabIndex={-1} onContextMenu={event=>{
+  return <ConstitutionDocument {...props} data-reader-document tabIndex={-1} onContextMenu={(event) =>{
     const target=event.target instanceof Element?event.target:null;
     if(!target||target.closest('a,button,input,textarea,select,[contenteditable=true],[role=note]')||(target.closest('[data-reader-chrome]')&&!target.closest('h1')))return;
     event.preventDefault();open(target,{x:event.clientX,y:event.clientY});
-  }} onKeyDown={event=>{
+  }} onKeyDown={(event) =>{
     if(event.key!=='ContextMenu'&&!(event.key==='F10'&&event.shiftKey))return;
     const target=event.target instanceof Element?event.target:null;
     if(!target||target.closest('a,button,input,textarea,select,[contenteditable=true]'))return;
@@ -38,7 +39,7 @@ export function ReaderActions({index,children}:{index:ReaderActionIndex;children
     const anchor=target.closest<HTMLElement>('[tabindex],button,a[href]')??(target instanceof HTMLElement?target:null),box=anchor?.getBoundingClientRect();
     setFeedback('');setOpened({choices:passageChoices(index,target),position:point??{x:box?.left??16,y:box?.bottom??100},origin:anchor});
   },[index]);
-  const close=useCallback((restore:boolean)=>{setOpened(previous=>{if(restore)previous?.origin?.focus({preventScroll:true});return null;});},[]);
+  const close=useCallback((restore:boolean)=>{setOpened((previous) =>{if(restore)previous?.origin?.focus({preventScroll:true});return null;});},[]);
   useEffect(()=>{if(!feedback)return;const timer=setTimeout(()=>setFeedback(''),3500);return()=>clearTimeout(timer);},[feedback]);
   useEffect(()=>{if(!fallback)return;field.current?.focus({preventScroll:true});field.current?.select();},[fallback]);
   async function perform(passage:Passage,type:'link'|'text'){
@@ -48,9 +49,9 @@ export function ReaderActions({index,children}:{index:ReaderActionIndex;children
     catch{setFallback({value,title:t(type==='link'?copy.link:copy.text),origin});}
   }
   function dismissFallback(){const origin=fallback?.origin;setFallback(null);origin?.focus({preventScroll:true});}
-  return <Actions.Provider value={open}>{children}{opened?<ReaderMenu compact title={t(copy.actions)} position={opened.position} origin={opened.origin} onClose={close} items={(['link','text'] as const).flatMap(type=>opened.choices.map(passage=>({id:type+':'+passage.id,group:t(copy[type]),label:passage.kindLabel??t(copy[passage.kind]),description:passage.label,onSelect:()=>{void perform(passage,type);}})))} />:null}
+  return <Actions.Provider value={open}>{children}{opened?<ReaderMenu compact title={t(copy.actions)} position={opened.position} origin={opened.origin} onClose={close} items={(['link','text'] as const).flatMap((type) =>opened.choices.map((passage) =>({id:type+':'+passage.id,group:t(copy[type]),label:passage.kindLabel??t(copy[passage.kind]),description:passage.label,onSelect:()=>{void perform(passage,type);}})))} />:null}
     {feedback?createPortal(<div role="status" className={styles.feedback}>{feedback}</div>,document.body):null}
-    {fallback?createPortal(<section role="dialog" aria-modal="false" aria-labelledby={id} className={styles.fallback} onKeyDown={event=>{
+    {fallback?createPortal(<section role="dialog" aria-modal="false" aria-labelledby={id} className={styles.fallback} onKeyDown={(event) =>{
       if(event.key==='Escape'){event.preventDefault();event.stopPropagation();dismissFallback();}
       if(event.key==='Tab'){event.preventDefault();(document.activeElement===field.current?fallbackClose.current:field.current)?.focus();}
     }}><h2 id={id}>{fallback.title}</h2><p>{t(copy.manual)}</p><textarea ref={field} readOnly value={fallback.value} aria-label={fallback.title} /><button ref={fallbackClose} type="button" onClick={dismissFallback}>{t(copy.close)}</button></section>,document.body):null}

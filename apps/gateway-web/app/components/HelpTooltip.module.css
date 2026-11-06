@@ -1,0 +1,29 @@
+.trigger {
+  display: inline;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: inherit;
+  vertical-align: baseline;
+  min-height: 0;
+}
+.trigger:hover {
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 4px;
+}
+.tooltip {
+  position: fixed;
+  z-index: 200;
+  max-width: min(300px, calc(100vw - 16px));
+  padding: var(--gap-control);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  border: 1px solid var(--color-line);
+  border-radius: 4px;
+  box-shadow: var(--shadow-2);
+  font: 400 var(--text-sm) / 1.5 var(--font-ui);
+  overflow-wrap: anywhere;
+}

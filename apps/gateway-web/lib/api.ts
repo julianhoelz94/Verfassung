@@ -773,6 +773,17 @@ export async function getConstitutionSettings(id: string, authorization?: string
   if (!settings) throw new ApiUnavailableError('catalog');
   return settings;
 }
+export function getConstitutionSettingsRevision(
+  id: string,
+  revisionId: string,
+  authorization?: string,
+): Promise<SettingsRevision | null> {
+  return readJson<SettingsRevision>(
+    `${catalogBaseUrl()}/constitutions/${encodeURIComponent(id)}/settings/${encodeURIComponent(revisionId)}`,
+    "catalog",
+    authorization,
+  );
+}
 export function preflightSettings(id: string, kinds: OutlineKindWrite[], authorization: string): Promise<SettingsImpact> {
   return sendJson<SettingsImpact>(`${catalogBaseUrl()}/constitutions/${encodeURIComponent(id)}/settings/preflight`, 'catalog', 'POST', { kinds }, authorization);
 }

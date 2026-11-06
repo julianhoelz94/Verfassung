@@ -85,40 +85,64 @@ export function effectiveDisplayKind(kind: OutlineKind | undefined): OutlineKind
   return { ...kind, showKind: !runningText && kind.showKind, showTitle, showLabel, labelPlacement };
 }
 
+export type HeadingPart = {
+  part: "kind" | "label" | "title" | "separator";
+  text: string;
+};
+/** One heading composition serves plain reader text and annotated setup previews. */
+export function nodeHeadingParts(
+  kind: OutlineKind | undefined,
+  node: Pick<ContentNode, "kind" | "label" | "number" | "title">,
+): HeadingPart[] {
+  const effective = effectiveDisplayKind(kind),
+    label = node.label ?? node.number;
+  const name = !kind
+    ? node.kind
+    : effective?.showKind
+      ? effective.displayLabel
+      : null;
+  const number =
+    !kind ||
+    (effective?.showLabel &&
+      !["inline", "superscript"].includes(
+        effective.labelPlacement ?? "before_title",
+      ))
+      ? label
+      : null;
+  const title = !kind || effective?.showTitle ? node.title : null;
+  const values: HeadingPart[] = [];
+  function append(
+    part: HeadingPart["part"],
+    text: string | null | undefined,
+    separator = " ",
+  ) {
+    if (!text) return;
+    if (values.length) values.push({ part: "separator", text: separator });
+    values.push({ part, text });
+  }
+  append("kind", name);
+  if (
+    effective?.labelPlacement === "after_title" &&
+    effective.showLabel &&
+    title
+  ) {
+    append("title", title);
+    append("label", label);
+  } else {
+    append("label", number);
+    append("title", title, kind ? " — " : " ");
+  }
+  return values;
+}
+
 export function nodeHeading(
   kind: OutlineKind | undefined,
   node: Pick<ContentNode, 'kind' | 'label' | 'number' | 'title'>,
 ): string | null {
-  if (!kind) {
-    const fallback = [node.kind, node.label ?? node.number, node.title].filter(Boolean).join(' ');
-    return fallback || null;
-  }
-  kind = effectiveDisplayKind(kind);
-  if (!kind) return null;
-  const parts: string[] = [];
-  if (kind.showKind) {
-    parts.push(kind.displayLabel);
-  }
-  if (kind.showLabel && kind.labelPlacement !== 'inline' && kind.labelPlacement !== 'superscript') {
-    const label = node.label ?? node.number;
-    if (label) {
-      parts.push(label);
-    }
-  }
-  if (kind.showTitle && node.title) {
-    parts.push(node.title);
-  }
-  if (kind.labelPlacement === 'after_title' && kind.showLabel && kind.showTitle && node.title) {
-    return [kind.showKind ? kind.displayLabel : null, node.title, node.label ?? node.number].filter(Boolean).join(' ');
-  }
-  if (parts.length === 0) {
-    return null;
-  }
-  if (kind.showTitle && node.title && parts.length > 1) {
-    const title = parts.pop() as string;
-    return `${parts.join(' ')} — ${title}`;
-  }
-  return parts.join(' ');
+  return (
+    nodeHeadingParts(kind, node)
+      .map((part) => part.text).join("") || null
+  );
 }
 
 export function articleHeading(

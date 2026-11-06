@@ -156,6 +156,6 @@ it("retains outline order and absent label/title policies without mutating setti
   const roots = outlineExample(settings);
   expect(roots.map((node) => node.kind)).toEqual(["first", "second"]);
   expect(roots[0]).toMatchObject({ label: null, title: null });
-  expect(roots[1].title).toBeNull();
+  expect(roots[1].title).toBe("second example");
   expect(JSON.stringify(settings)).toBe(original);
 });

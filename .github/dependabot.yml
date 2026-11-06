@@ -4,6 +4,9 @@ updates:
     directory: /
     schedule:
       interval: weekly
+      day: monday
+      time: '03:00'
+      timezone: Europe/Berlin
     groups:
       ci-actions:
         patterns: ['*']
@@ -11,6 +14,9 @@ updates:
     directory: /apps/gateway-web
     schedule:
       interval: weekly
+      day: monday
+      time: '03:00'
+      timezone: Europe/Berlin
     groups:
       react:
         patterns: [react, react-dom, '@types/react', '@types/react-dom']
@@ -20,6 +26,9 @@ updates:
     directory: /services/mcp-server
     schedule:
       interval: weekly
+      day: monday
+      time: '03:00'
+      timezone: Europe/Berlin
     groups:
       mcp-sdk:
         patterns: ['@modelcontextprotocol/*', zod]
@@ -27,6 +36,9 @@ updates:
     directory: /scripts/complexity
     schedule:
       interval: weekly
+      day: monday
+      time: '03:00'
+      timezone: Europe/Berlin
   - package-ecosystem: docker
     directories:
       - /infra/caddy
@@ -44,6 +56,9 @@ updates:
       - /infra/local-stack
     schedule:
       interval: weekly
+      day: monday
+      time: '03:00'
+      timezone: Europe/Berlin
     groups:
       node-runtime:
         patterns: [node]
@@ -65,6 +80,9 @@ updates:
       - /services/platform
     schedule:
       interval: weekly
+      day: monday
+      time: '03:00'
+      timezone: Europe/Berlin
     groups:
       backend-framework:
         patterns:

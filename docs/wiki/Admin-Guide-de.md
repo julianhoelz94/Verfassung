@@ -30,6 +30,12 @@ Aufeinanderfolgende Satzeinheiten mit Fließtextdarstellung werden verbunden. Ni
 
 Wurde die Bestätigung einer Importstruktur unterbrochen, wählen Sie beim selben Vorschlag **Bestätigung fortsetzen**. Die geprüfte Revision bleibt währenddessen festgeschrieben; Anzeigeeinstellungen und Änderungswünsche können nicht bearbeitet werden. Läuft noch ein anderer Versuch, laden Sie die Seite neu oder versuchen es nach zwei Minuten erneut. Die Wiederaufnahme verwendet dieselbe angelegte Verfassung und geprüfte Gliederung. Sie bestätigt keine neuere Client-Revision und veröffentlicht noch keinen importierten Text.
 
+Die gemeinsame Strukturansicht bietet fünf anpassbare Vorlagen nach Deutschland, Frankreich, Indien, Südafrika und Spanien. Wähle unter **Ebenen** eine Art und bearbeite **Struktur / Bearbeitung / Darstellung**. Rechtsklick, **⋯** oder Umschalt+F10 öffnen das Ebenenmenü: Unterebene hinzufügen, zwischen dem benannten Eltern-Kind-Paar einfügen, eine vorhandene Art verbinden oder eine oberste Ebene hinzufügen. Orange markierte Arten sind mit keiner obersten Ebene verbunden. Verbinde sie, erlaube sie auf der obersten Ebene oder entferne sie vor dem Speichern.
+
+**Nummern / Kennzeichen** sind unveränderte Textwerte wie `46a` oder `(2a)`. **Überschriften** sind individuelle Titel neben Art-Bezeichnung und Wortlaut. Infopunkte und Hinweise in der Vorschau erklären diese Felder. Der Beispieltext zeigt alle konfigurierten Arten; bei Importen bleibt das Quellbeispiel separat auswählbar.
+
+Vor dem Speichern bestehender Einstellungen ist **Auswirkungen prüfen** erforderlich. **Verlauf** übernimmt vorherige Einstellungen als ungespeicherten Entwurf zur erneuten Prüfung. **Dokumente** bietet den gemeinsamen Upload und die Dokumentauswahl; bei neuen Verfassungen nach deren Erstellung. In der Importfreigabe bleiben Struktur und Bearbeitungsregeln schreibgeschützt. **Änderungen anfordern** gibt Korrekturen an den Importeur zurück. Die Bestätigung erstellt Einstellungen, ohne den vollständigen Text zu importieren oder zu veröffentlichen.
+
 ## Erste Einrichtung
 
 Eine Rollenänderung oder Kontosperre widerruft Sitzungen, offene Einrichtungsabfragen und persönliche MCP/OAuth-Zugangsdaten. Die Sperre eines eingeladenen Kontos macht auch die Einladung ungültig. Eine erneute Aktivierung stellt widerrufene Zugangsdaten nicht wieder her. Automatisierungs-Tokens werden weiterhin separat ausgetauscht oder widerrufen.

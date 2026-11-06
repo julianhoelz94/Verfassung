@@ -1,5 +1,6 @@
 import type { OutlineKindWrite, ContentOutline } from "../../../lib/api";
 import { ui, type UiMessage } from "../../../lib/messages";
+import { structureUi } from "../../../lib/structure-workspace";
 
 /** A controlled outline level, including UI-only identity and raw delimiter input. */
 export type OutlineLayer = OutlineKindWrite & {
@@ -94,80 +95,6 @@ export function updateOutlineLayers(
   });
 }
 
-/** Inserts structural levels above a terminal sentence, otherwise after and below the last level. */
-export function appendOutlineLayer(
-  current: Layer[],
-  displayLabel: string,
-): Layer[] {
-  const added: Layer = {
-    kindCode: `layer-${current.length + 1}`,
-    displayLabel,
-    presentation: "section",
-    showLabel: true,
-    showTitle: true,
-    showKind: false,
-    root: false,
-    allowedChildKinds: [],
-    existing: false,
-  };
-  const leaf = current[current.length - 1];
-  if (leaf?.kindCode === "sentence") {
-    const parent = current[current.length - 2];
-    return [
-      ...current.slice(0, -2),
-      ...(parent
-        ? [
-            {
-              ...parent,
-              allowedChildKinds: parent.allowedChildKinds?.map((code) =>
-                code === "sentence" ? added.kindCode : code,
-              ),
-            },
-          ]
-        : []),
-      { ...added, allowedChildKinds: ["sentence"] },
-      leaf,
-    ];
-  }
-  return [
-    ...current.slice(0, -1),
-    ...(leaf
-      ? [
-          {
-            ...leaf,
-            allowedChildKinds: [
-              ...(leaf.allowedChildKinds ?? []),
-              added.kindCode,
-            ],
-            segmentation: "plain" as const,
-          },
-        ]
-      : []),
-    added,
-  ];
-}
-
-/** A separately rooted kind never becomes an implicit child of the existing last level. */
-export function appendOutlineRoot(
-  current: Layer[],
-  displayLabel: string,
-): Layer[] {
-  return [
-    ...current,
-    {
-      kindCode: `root-${current.length + 1}`,
-      displayLabel,
-      presentation: "section",
-      showLabel: false,
-      showTitle: true,
-      showKind: true,
-      root: true,
-      allowedChildKinds: [],
-      existing: false,
-    },
-  ];
-}
-
 /** Removes every inbound reference to a deleted kind and clears parent-text permission on new leaves. */
 export function removeOutlineLayer(current: Layer[], index: number): Layer[] {
   return current
@@ -221,7 +148,7 @@ export function outlineValidationError(layers: Layer[]): UiMessage | null {
     return ui.remainingStatus.outlineMissingChild;
   return layers.some(invalidSentenceSettings)
     ? sentenceSettingsCopy.invalid
-    : null;
+    : outlineGraphProblem(layers);
 }
 
 /** Automatic leaves require optional metadata and 1–16 unique Unicode punctuation/symbol sequences. */
@@ -233,13 +160,144 @@ function invalidSentenceSettings(layer: Layer): boolean {
         layer.allowedChildKinds?.length ||
         layer.labelPolicy === "required" ||
         layer.titlePolicy === "required")) ||
-    delimiters.length > 16 ||
-    new Set(delimiters).size !== delimiters.length ||
-    delimiters.some(
-      (delimiter) =>
-        !delimiter ||
-        [...delimiter].length > 8 ||
-        !/^[\p{P}\p{S}]+$/u.test(delimiter),
-    ),
+      delimiters.length > 16 ||
+      new Set(delimiters).size !== delimiters.length ||
+      delimiters.some(
+        (delimiter) =>
+          !delimiter ||
+          [...delimiter].length > 8 ||
+          !/^[\p{P}\p{S}]+$/u.test(delimiter),
+      ),
   );
+}
+
+export type OutlineBranch = {
+  index: number;
+  parent: number | null;
+  path: string;
+  unplaced: boolean;
+  children: OutlineBranch[];
+};
+/** Traverse relationships, including multiple allowed paths; never infer hierarchy from array position. */
+export function outlineBranches(layers: Layer[]): OutlineBranch[] {
+  const reached = new Set<number>(), rootReachable = new Set<number>();
+  function branch(
+    index: number,
+    parent: number | null,
+    path: number[],
+    unplaced: boolean,
+  ): OutlineBranch | null {
+    if (path.includes(index)) return null;
+    reached.add(index);
+    const next = [...path, index];
+    return {
+      index,
+      parent,
+      path: next.join("-"),
+      unplaced: unplaced && !rootReachable.has(index),
+      children: (layers[index].allowedChildKinds ?? []).flatMap((code) => {
+        const child = layers.findIndex((layer) => layer.kindCode === code);
+        const result = child < 0 ? null : branch(child, index, next, unplaced);
+        return result ? [result] : [];
+      }),
+    };
+  }
+  const roots = layers.flatMap((layer, index) => {
+    const item = layer.root ? branch(index, null, [], false) : null;
+    return item ? [item] : [];
+  });
+  reached.forEach(index => rootReachable.add(index));
+  layers.forEach((_, index) => {
+    if (!reached.has(index)) {
+      const item = branch(index, null, [], true);
+      if (item) roots.push(item);
+    }
+  });
+  return roots;
+}
+export function outlineGraphProblem(layers: Layer[]): UiMessage | null {
+  const visiting = new Set<string>(),
+    visited = new Set<string>();
+  function cycle(code: string): boolean {
+    if (visiting.has(code)) return true;
+    if (visited.has(code)) return false;
+    visiting.add(code);
+    const loop = layers
+      .find((layer) => layer.kindCode === code)
+      ?.allowedChildKinds?.some(cycle);
+    visiting.delete(code);
+    visited.add(code);
+    return Boolean(loop);
+  }
+  if (layers.some((layer) => cycle(layer.kindCode))) return structureUi.cycle;
+  return outlineBranches(layers).some((branch) => branch.unplaced)
+    ? structureUi.unreachable
+    : null;
+}
+export function outlineParentChoices(layers: Layer[], index: number): number[] {
+  const descendants = new Set<string>();
+  function visit(code: string) {
+    if (descendants.has(code)) return;
+    descendants.add(code);
+    layers
+      .find((layer) => layer.kindCode === code)
+      ?.allowedChildKinds?.forEach(visit);
+  }
+  visit(layers[index].kindCode);
+  const connected = new Set<number>();
+  function collect(branch: OutlineBranch) {
+    if (!branch.unplaced) connected.add(branch.index);
+    branch.children.forEach(collect);
+  }
+  outlineBranches(layers).forEach(collect);
+  return layers.flatMap((layer, parent) =>
+    connected.has(parent) &&
+    !descendants.has(layer.kindCode) &&
+    !layer.allowedChildKinds?.includes(layers[index].kindCode)
+      ? [parent]
+      : [],
+  );
+}
+export function placeOutlineLayer(
+  layers: Layer[],
+  name: string,
+  placement: "root" | "child" | "between",
+  index: number,
+  parent: number | null,
+): Layer[] {
+  const codes = new Set(layers.map((layer) => layer.kindCode));
+  let suffix = layers.length + 1;
+  while (codes.has(`layer-${suffix}`)) suffix++;
+  const added: Layer = {
+    kindCode: `layer-${suffix}`,
+    displayLabel: name,
+    presentation: "section",
+    showKind: true,
+    showLabel: true,
+    showTitle: true,
+    root: placement === "root",
+    allowedChildKinds: placement === "between" ? [layers[index].kindCode] : [],
+    allowTextAlongsideChildren: false,
+    titlePolicy: "optional",
+    labelPolicy: "optional",
+    segmentation: "plain",
+    labelPlacement: "before_title",
+    sentenceDelimiters: [".", "!", "?"],
+    existing: false,
+  };
+  let result = layers;
+  if (placement === "child")
+    result = updateOutlineLayers(layers, index, {
+      allowedChildKinds: [
+        ...(layers[index].allowedChildKinds ?? []),
+        added.kindCode,
+      ],
+    });
+  if (placement === "between" && parent !== null)
+    result = updateOutlineLayers(layers, parent, {
+      allowedChildKinds: layers[parent].allowedChildKinds?.map((code) =>
+        code === layers[index].kindCode ? added.kindCode : code,
+      ),
+    });
+  return [...result, added];
 }

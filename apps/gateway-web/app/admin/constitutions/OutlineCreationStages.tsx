@@ -3,9 +3,7 @@ import { T, useTranslation } from "../../components/TranslationProvider";
 import { ui, type UiMessage } from "../../../lib/messages";
 import type { SettingsImpact } from "../../../lib/api";
 import { effectiveDisplayKind, type OutlineKind } from "../../../lib/outline";
-import type { ConstitutionTemplate } from "../../../lib/constitution-templates";
 import { Alert, Button } from "../../components/ui";
-import { SettingInfo } from "../../components/SettingInfo";
 import { Inline } from "../../components/layout/Layout";
 import surfaceStyles from "../../components/surfaces.module.css";
 import type { OutlineLayer } from "./outline-editor-model";
@@ -13,13 +11,11 @@ import type { OutlineLayer } from "./outline-editor-model";
 type CreationProps = {
   guidedCreation: boolean;
   step: number;
-  template: ConstitutionTemplate;
   basicsSummary: string;
   layers: OutlineLayer[];
   serializedOutline: string;
   children?: ReactNode;
   advance: () => void;
-  chooseTemplate: (template: ConstitutionTemplate) => void;
 };
 type LayerProps = { layer: OutlineLayer; index: number };
 type FeedbackProps = {
@@ -47,13 +43,11 @@ type SubmitProps = {
 export function OutlineCreationHeader({
   guidedCreation,
   step,
-  template,
   basicsSummary,
   layers,
   serializedOutline,
   children,
   advance,
-  chooseTemplate,
 }: CreationProps) {
   const t = useTranslation();
   return (
@@ -88,62 +82,6 @@ export function OutlineCreationHeader({
           </Button>
         </Inline>
       ) : null}
-      {guidedCreation && step === 2 ? (
-        <section aria-label={t(ui.accessibility.startingStructure)}>
-          <h2 className="setting-inline">
-            <T value={ui.admin.constitutions.outlineeditor.startingStructure} />{" "}
-            <SettingInfo
-              label={
-                <T
-                  value={ui.admin.constitutions.outlineeditor.startingStructure}
-                />
-              }
-              description={<T value={ui.help.initialStructureHelp} />}
-              changeability="review"
-            />
-          </h2>
-          <p className="muted">
-            <T
-              value={
-                ui.admin.constitutions.outlineeditor
-                  .chooseAStartingPointThenAdjustEvery
-              }
-            />
-          </p>
-          <div className="creation-templates">
-            {(
-              [
-                [
-                  "articles",
-                  ui.outlineDynamic.articlesOnly,
-                  ui.outlineDynamic.articlesOnlyDetail,
-                ],
-                [
-                  "sections",
-                  ui.outlineDynamic.articlesSections,
-                  ui.outlineDynamic.articlesSectionsDetail,
-                ],
-                [
-                  "sentences",
-                  ui.outlineDynamic.articlesParagraphsSentences,
-                  ui.outlineDynamic.articlesParagraphsSentencesDetail,
-                ],
-              ] as const
-            ).map(([id, title, detail]) => (
-              <button
-                key={id}
-                type="button"
-                className="creation-template"
-                aria-pressed={template === id}
-                onClick={() => chooseTemplate(id)}
-              >
-                <strong>{t(title)}</strong>
-                <span>{t(detail)}</span>
-              </button>
-            ))}
-          </div>
-        </section>
-      ) : null}
       {guidedCreation && step === 3 ? (
         <section
           className={["card", surfaceStyles.card].join(" ")}
@@ -155,7 +93,7 @@ export function OutlineCreationHeader({
             />
           </h2>
           <p>{basicsSummary}</p>
-          <p>{layers.map((layer) => layer.displayLabel).join(" → ")}</p>
+          <p>{layers.map((layer) => layer.displayLabel).join(" · ")}</p>
           <p>
             <T
               value={

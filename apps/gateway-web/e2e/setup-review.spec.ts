@@ -1,10 +1,14 @@
 import path from 'node:path';
-import { expect, test } from './fixtures/consent';
+import { expect, test, type Page } from './fixtures/consent';
 import { signInAdmin } from './helpers';
 
 const mockOrigin = `http://127.0.0.1:${process.env.E2E_MOCK_PORT ?? 4010}`;
 const proposalId = '01900000-0000-4000-8000-000000000802';
 const proposalPath = `/api/ingestion/import-setup-proposals/${proposalId}`;
+async function openTask(page: Page, de: boolean, en: string, german: string) {
+  await page.getByRole('navigation', { name: de ? 'Struktur' : 'Structure', exact: true }).getByRole('button', { name: de ? german : en, exact: true }).click();
+}
+
 
 for (const { language, width } of [{ language: 'en', width: 1440 }, { language: 'de', width: 390 }]) {
   test(`MCP proposal feedback, revision comparison and exact confirmation ${language} ${width}`, async ({ page, request }, testInfo) => {
@@ -25,17 +29,17 @@ for (const { language, width } of [{ language: 'en', width: 1440 }, { language: 
     const confirmName = de ? 'Struktur bestätigen und vollständigen Upload ermöglichen' : 'Confirm structure and enable full upload';
     await expect(page.getByRole('heading', { name: de ? 'Ihre Bestätigung ist erforderlich' : 'Your confirmation is required' })).toBeVisible();
     await expect(page.getByRole('button', { name: /Add deeper layer|Tiefere Ebene/ })).toHaveCount(0);
-    await page.getByText(de ? 'Darstellung anpassen' : 'Display settings', { exact: true }).click();
-    await page.getByLabel(de ? 'Angezeigte Einheitsbezeichnung' : 'Displayed unit name', { exact: true }).first().fill('Art.');
+    await page.getByLabel(de ? 'Name in der Leseansicht' : 'Reader-facing name', { exact: true }).first().fill('Art.');
     await expect(page.locator('[data-preview-kind="article"]').first()).toContainText('Art. 1');
     await page.getByRole('button', { name: de ? 'Darstellung speichern' : 'Save display settings' }).click();
     await expect.poll(async () => (await (await request.get(`${mockOrigin}${proposalPath}`)).json()).revision).toBe(2);
     await page.reload();
     await expect(page.locator('[data-preview-kind="article"]').first()).toContainText('Art. 1');
-    await page.getByText(de ? 'Änderungen über den Chat-Client anfordern' : 'Request changes through your chat client', { exact: true }).click();
+    await page.getByRole('button', { name: de ? 'Änderungen anfordern' : 'Request changes', exact: true }).click();
     await page.getByLabel(de ? 'Gewünschte Änderungen' : 'Requested changes', { exact: true }).fill('Bitte eine Satzebene einfügen und den Wortlaut bewahren.');
     await page.getByRole('button', { name: de ? 'Änderungswünsche speichern' : 'Record requested changes' }).click();
     await expect(page.getByRole('heading', { name: de ? 'Wartet auf einen überarbeiteten Vorschlag' : 'Waiting for a revised proposal' })).toBeVisible();
+    await openTask(page, de, 'Review', 'Prüfung');
     await expect(page.getByRole('button', { name: confirmName })).toBeDisabled();
     const feedback = await (await request.get(`${mockOrigin}${proposalPath}`)).json();
     expect(feedback.requestedChanges).toContain('Satzebene');
@@ -47,9 +51,12 @@ for (const { language, width } of [{ language: 'en', width: 1440 }, { language: 
     expect((await request.put(`${mockOrigin}${proposalPath}`, { headers: { 'If-Match': String(feedback.revision) }, data: revised })).ok()).toBeTruthy();
     await page.getByRole('link', { name: de ? 'Aktuellen Vorschlag laden' : 'Load latest proposal' }).click();
     await expect(page.getByRole('heading', { name: de ? 'Überarbeiteter Vorschlag liegt zur Prüfung vor' : 'Revised proposal ready for review' })).toBeVisible();
+    await openTask(page, de, 'Changes', 'Änderungen');
     await expect(page.getByText(de ? 'Gliederung oder Bearbeitungsregeln wurden geändert.' : 'Hierarchy or editing rules changed.')).toBeVisible();
-    await expect(page.locator('[data-preview-kind="sentence"]')).toHaveCount(2);
+    await openTask(page, de, 'Preview', 'Vorschau');
+    await expect(page.locator('[data-preview-kind="sentence"]:visible')).toHaveCount(2);
     await expect(page.locator('[data-preview-kind="article"]').first()).toContainText('Art. 1');
+    await openTask(page, de, 'Review', 'Prüfung');
     await expect(page.getByRole('button', { name: confirmName })).toBeEnabled();
     await page.addScriptTag({ path: path.join(process.cwd(), 'node_modules/axe-core/axe.min.js') });
     expect(await page.evaluate(async () => {
@@ -64,6 +71,7 @@ for (const { language, width } of [{ language: 'en', width: 1440 }, { language: 
     await page.getByRole('button', { name: confirmName }).click();
     await expect(page.getByText(de ? 'Der Vorschlag wurde geändert. Laden und prüfen Sie die aktuelle Überarbeitung, bevor Sie speichern oder bestätigen.' : 'The proposal changed. Load the latest revision and review it before saving or confirming.')).toBeVisible();
     expect((await (await request.get(`${mockOrigin}${proposalPath}`)).json()).status).toBe('proposed');
+    await openTask(page, de, 'Review', 'Prüfung');
     await page.getByRole('button', { name: confirmName }).click();
     await expect(page.getByRole('heading', { name: de ? 'Struktur bestätigt – vollständiger Upload möglich' : 'Structure confirmed – full upload enabled' })).toBeVisible();
     await page.reload();

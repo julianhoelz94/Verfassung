@@ -1,6 +1,7 @@
 import { expect, test } from '../fixtures/consent';
 import { signIn } from './auth';
 import { adminHeaders, createIsolatedConstitution } from './api-fixtures';
+import { openStructureTask } from '../structure-workspace';
 
 test('document revisions link from both editors and appear on public readers without creating a legal hop', async ({ page, request }) => {
   test.setTimeout(120_000);
@@ -34,6 +35,7 @@ test('document revisions link from both editors and appear on public readers wit
   expect((await request.get(`/api/document/documents/${documentId}/revisions`)).status()).toBe(401);
 
   await page.goto(`/admin/constitutions/${fixture.constitutionId}`);
+  await openStructureTask(page, 'Documents');
   await page.getByRole('button', { name: 'Choose existing document', exact: true }).click();
   await page.getByLabel('Search documents').fill(`${title} revised`);
   await page.getByRole('option', { name: new RegExp(`^${title} revised`) }).click();

@@ -103,6 +103,17 @@ describe('annotated reader preview', () => {
     expect(result.violations.map(item => item.id)).toEqual([]);
   });
 
+  it('opens touch explanations on the selected unit without treating touch as hover', async () => {
+    await mount();
+    const touch = new Event('pointerover', { bubbles: true });
+    Object.defineProperty(touch, 'pointerType', { value: 'touch' });
+    await act(async () => fireEvent(sentence(), touch));
+    expect(host.querySelector('[role="tooltip"]')).toBeNull();
+    await act(async () => sentence().click());
+    expect(host.querySelector('[role="tooltip"]')?.textContent).toContain('Text leaf');
+    expect(document.activeElement).toBe(sentence());
+  });
+
   it('demonstrates running text even when parent text is allowed between units', async () => {
     await mount(outline(true));
     const runs = [...host.querySelectorAll('.constitution-concat')];
@@ -119,7 +130,7 @@ describe('annotated reader preview', () => {
     expect(host.textContent).toContain('Alle Menschen haben das Recht auf gleichen Schutz.');
     await act(async () => sentence().focus());
     expect(host.querySelector('[role="tooltip"]')?.textContent).toContain('Textebene · Keine untergeordneten Einheiten');
-    expect(sentence().getAttribute('aria-label')).toBe('Einstellungen für Sentence (1)');
+    expect(sentence().getAttribute('aria-label')).toMatch(/^Einstellungen für Sentence \(1\) · \d+$/);
     await act(async () => root.render(<TranslationProvider locale="de"><OutlineReaderPreview roots={outlineExample(settings)} outline={settings} /></TranslationProvider>));
     expect(host.textContent).toContain('Everyone has the right to equal protection.');
   });

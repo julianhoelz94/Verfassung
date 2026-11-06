@@ -1,3 +1,4 @@
+import { openStructureTask, selectStructureLevel } from '../structure-workspace';
 import { expect, test, type APIRequestContext } from '../fixtures/consent';
 import { randomUUID } from 'node:crypto';
 import { adminHeaders, roleHeaders, createIsolatedConstitution } from './api-fixtures';
@@ -124,10 +125,11 @@ test('MCP setup display controls persist and render the same source through revi
     };
     await page.context().addCookies([{ name: 'ca_session', value: admin.Authorization.slice(7), url: String(testInfo.project.use.baseURL), httpOnly: true, sameSite: 'Lax' }]);
     await page.goto(`/admin/import/setup/${proposalId}`);
-    const controls = page.locator('fieldset').nth(1);
+    const controls = page.getByRole('region', { name: / Structure$/ });
+    let levelName = 'Paragraph';
     const preview = page.locator('[data-preview-kind="paragraph"]:visible').first();
     const heading = preview.locator(':scope > .node-heading');
-    const openSettings = () => page.getByText('Display settings', { exact: true }).click();
+    const openSettings = () => selectStructureLevel(page, levelName);
     const saveAndReload = async (expected: Record<string, unknown>) => {
       const before = await readProposal();
       await page.getByRole('button', { name: 'Save display settings' }).click();
@@ -138,61 +140,64 @@ test('MCP setup display controls persist and render the same source through revi
       const saved = await readProposal();
       expect(saved.payload.outline.kinds[1]).toMatchObject(expected);
       expect(saved.payload.sampleRoots).toEqual(before.payload.sampleRoots);
+      if (typeof expected.displayLabel === 'string') levelName = expected.displayLabel;
       await openSettings();
     };
 
-    await openSettings();
-    await expect(heading).toHaveText('Paragraph (1) — Freedom');
-    const parentPlacement = page.locator('fieldset').first().getByLabel('Label placement', { exact: true });
+    const parentPlacement = controls.getByLabel('Number / identifier placement', { exact: true });
     await expect(parentPlacement.locator('option[value="inline"]')).toBeDisabled();
     await expect(parentPlacement.locator('option[value="superscript"]')).toBeDisabled();
-    await controls.getByLabel('Displayed unit name', { exact: true }).fill('Absatz');
-    await controls.getByLabel('Label placement', { exact: true }).selectOption('after_title');
+    await openSettings();
+    await expect(heading).toHaveText('Paragraph (1) — Freedom');
+    await controls.getByLabel('Reader-facing name', { exact: true }).fill('Absatz');
+    await controls.getByLabel('Number / identifier placement', { exact: true }).selectOption('after_title');
     await expect(heading).toHaveText('Absatz Freedom (1)');
     await saveAndReload({ displayLabel: 'Absatz', labelPlacement: 'after_title' });
-    await expect(controls.getByLabel('Displayed unit name', { exact: true })).toHaveValue('Absatz');
+    await expect(controls.getByLabel('Reader-facing name', { exact: true })).toHaveValue('Absatz');
     await expect(heading).toHaveText('Absatz Freedom (1)');
 
-    await controls.getByLabel('Show unit name', { exact: true }).uncheck();
+    await controls.getByLabel('Show kind name', { exact: true }).uncheck();
     await expect(heading).toHaveText('Freedom (1)');
-    await controls.getByLabel('Show title', { exact: true }).uncheck();
+    await controls.getByLabel('Show heading', { exact: true }).uncheck();
     await expect(heading).toHaveText('(1)');
-    await expect(controls.getByLabel('Label placement', { exact: true }).locator('option[value="after_title"]')).toBeDisabled();
-    await controls.getByLabel('Show source label', { exact: true }).uncheck();
+    await expect(controls.getByLabel('Number / identifier placement', { exact: true }).locator('option[value="after_title"]')).toBeDisabled();
+    await controls.getByLabel('Show number / identifier', { exact: true }).uncheck();
     await expect(heading).toHaveCount(0);
-    await expect(controls.getByLabel('Label placement', { exact: true })).toBeDisabled();
+    await expect(controls.getByLabel('Number / identifier placement', { exact: true })).toBeDisabled();
     await saveAndReload({ showKind: false, showTitle: false, showLabel: false });
     await expect(heading).toHaveCount(0);
-    for (const label of ['Show unit name', 'Show title', 'Show source label']) {
+    for (const label of ['Show kind name', 'Show heading', 'Show number / identifier']) {
       await expect(controls.getByLabel(label, { exact: true })).not.toBeChecked();
       await controls.getByLabel(label, { exact: true }).check();
     }
-    await controls.getByLabel('Label placement', { exact: true }).selectOption('before_title');
+    await controls.getByLabel('Number / identifier placement', { exact: true }).selectOption('before_title');
     await saveAndReload({ showKind: true, showTitle: true, showLabel: true, labelPlacement: 'before_title' });
     await expect(heading).toHaveText('Absatz (1) — Freedom');
-    await controls.getByLabel('Label placement', { exact: true }).selectOption('inline');
+    await controls.getByLabel('Number / identifier placement', { exact: true }).selectOption('inline');
     await saveAndReload({ labelPlacement: 'inline' });
     await expect(heading).toHaveText('Absatz — Freedom');
     await expect(preview.locator(':scope > span.num')).toHaveText('(1)');
     await expect(preview.locator(':scope > sup.num')).toHaveCount(0);
-    await controls.getByLabel('Label placement', { exact: true }).selectOption('superscript');
+    await controls.getByLabel('Number / identifier placement', { exact: true }).selectOption('superscript');
     await saveAndReload({ labelPlacement: 'superscript' });
     await expect(preview.locator(':scope > sup.num')).toHaveText('(1)');
     await expect(preview.locator(':scope > span.num')).toHaveCount(0);
 
-    await controls.getByLabel('Layout', { exact: true }).selectOption('concatenated');
-    await expect(controls.getByLabel('Show unit name', { exact: true })).toBeDisabled();
-    await expect(controls.getByLabel('Show title', { exact: true })).toBeDisabled();
-    await expect(controls.getByLabel('Label placement', { exact: true }).locator('option[value="before_title"]')).toBeDisabled();
+    await controls.getByLabel('How this layer is shown', { exact: true }).selectOption('concatenated');
+    await expect(controls.getByLabel('Show kind name', { exact: true })).toBeDisabled();
+    await expect(controls.getByLabel('Show heading', { exact: true })).toBeDisabled();
+    await expect(controls.getByLabel('Number / identifier placement', { exact: true }).locator('option[value="before_title"]')).toBeDisabled();
     await saveAndReload({ presentation: 'concatenated', labelPlacement: 'superscript' });
-    await expect(controls.getByLabel('Layout', { exact: true })).toHaveValue('concatenated');
+    await expect(controls.getByLabel('How this layer is shown', { exact: true })).toHaveValue('concatenated');
     await expect(page.locator('.constitution-concat:visible')).toHaveCount(1);
     await expect(page.locator('.constitution-concat:visible sup.num')).toHaveText(['(1)', '(2)']);
     await expect(page.locator('.constitution-concat:visible')).toHaveText('(1)Alle Menschen sind frei. (2)Alle Menschen sind gleich.');
     await expect(page.locator('.constitution-concat:visible .node-heading')).toHaveCount(0);
 
     // Confirmation also persists edits made since the last explicit save.
-    await page.locator('fieldset').first().getByLabel('Displayed unit name', { exact: true }).fill('Artikel');
+    await selectStructureLevel(page, 'Article');
+    await page.getByLabel('Reader-facing name', { exact: true }).fill('Artikel');
+    await openStructureTask(page, 'Review');
     await page.getByRole('button', { name: 'Confirm structure and enable full upload' }).click();
     await expect(page.getByRole('heading', { name: 'Structure confirmed – full upload enabled' })).toBeVisible();
     const setup = await tool(request, 'get_import_setup', { countryCode: 'XA', constitutionSlug: slug }, key.token);
@@ -268,17 +273,17 @@ test('MCP waits while an administrator requests and confirms an exact setup revi
     await page.context().addCookies([{ name: 'ca_session', value: admin.Authorization.slice(7), url: String(testInfo.project.use.baseURL), httpOnly: true, sameSite: 'Lax' }]);
     await page.goto(`/admin/import/setup/${proposalId}`);
     await expect(page.getByRole('heading', { name: 'Your confirmation is required' })).toBeVisible();
-    await page.getByText('Display settings', { exact: true }).click();
-    await page.getByLabel('Displayed unit name', { exact: true }).fill('Art.');
+    await page.getByLabel('Reader-facing name', { exact: true }).fill('Art.');
     await page.getByRole('button', { name: 'Save display settings' }).click();
     await expect.poll(async () => (await (await request.get(path, { headers: admin })).json()).revision).toBe(2);
     await expect(page.locator('input[name="revision"]')).toHaveValue('2');
     await page.reload();
     await expect(page.locator('[data-preview-kind="article"]:visible')).toContainText('Art. 1');
-    await page.getByText('Request changes through your chat client', { exact: true }).click();
+    await page.getByRole('button', { name: 'Request changes', exact: true }).click();
     await page.getByLabel('Requested changes', { exact: true }).fill('Add sentence units without changing the original German wording.');
     await page.getByRole('button', { name: 'Record requested changes' }).click();
     await expect(page.getByRole('heading', { name: 'Waiting for a revised proposal' })).toBeVisible();
+    await openStructureTask(page, 'Review');
     await expect(page.getByRole('button', { name: 'Confirm structure and enable full upload' })).toBeDisabled();
     const feedback = (await tool(request, 'get_setup_proposal', { proposalId }, key.token)).structuredContent!;
     expect(feedback.nextAction).toBe('revise_proposal');
@@ -291,11 +296,14 @@ test('MCP waits while an administrator requests and confirms an exact setup revi
     expect((await request.post(`${path}/confirm`, { headers: { ...admin, 'If-Match': String(feedback.revision) } })).status()).toBe(409);
     await page.reload();
     await expect(page.getByRole('heading', { name: 'Revised proposal ready for review' })).toBeVisible();
+    await openStructureTask(page, 'Changes');
     await expect(page.getByText('Hierarchy or editing rules changed.')).toBeVisible();
-    await expect(page.locator('[data-preview-kind="sentence"]')).toHaveCount(2);
+    await openStructureTask(page, 'Preview');
+    await expect(page.locator('[data-preview-kind="sentence"]:visible')).toHaveCount(2);
     await expect(page.locator('[data-preview-kind="article"]:visible')).toContainText('Art. 1');
-    await page.getByText('Display settings', { exact: true }).click();
-    await page.getByLabel('Displayed unit name', { exact: true }).first().fill('Artikel');
+    await openStructureTask(page, 'Structure');
+    await page.getByLabel('Reader-facing name', { exact: true }).fill('Artikel');
+    await openStructureTask(page, 'Review');
     await page.getByRole('button', { name: 'Confirm structure and enable full upload' }).click();
     await expect(page.getByRole('heading', { name: 'Structure confirmed – full upload enabled' })).toBeVisible();
     const confirmed = (await tool(request, 'get_setup_proposal', { proposalId }, key.token)).structuredContent!;

@@ -40,6 +40,48 @@ Das Entfernen eines Zeichens erhält den Fußnotentext. Vor dem Speichern benöt
 
 Auf Länder-, Regional- und historischen Gebietsseiten öffnen Sie **Wiki → Wiki bearbeiten**. Der benannte Arbeitsbereich enthält Kurzbeschreibung, Text, Quellen, Bilder und Revisionsgeschichte. Der gespeicherte Entwurf bleibt privat. **Wiki prüfen** ermöglicht Prüfern/Herausgebern die Vorschau; ein berechtigter Herausgeber/Admin veröffentlicht die ausgewählte Revision. **Öffentliche Seite ansehen** führt mit geöffnetem Wiki zurück. Verfassungs-Wikis behalten ihren Einstieg im Verfassungseditor. Wiki und Verfassungstext werden getrennt veröffentlicht.
 
+### Gemeinsame Dokumentenbibliothek
+
+Über **Dokumente** in der oberen Navigation öffnen Sie die gemeinsame Bibliothek.
+Bearbeiter und Administratoren pflegen Literaturangaben, Zitierschlüssel,
+Schlagwörter und Dateien. Prüfer und Herausgeber können Bibliothek und Geschichte
+lesen, Dateien herunterladen und Literatur exportieren. Die Bibliothek ist privat;
+veröffentlichte Quellen behalten ihre bisherigen Sichtbarkeitsregeln.
+
+**Alle Dokumente** enthält Einträge unabhängig von Projektordnern. Ziehen Sie ein
+Dokument auf einen Ordner oder verwenden Sie **Zu Ordner hinzufügen**, um dessen
+Schlagwort zu vergeben. Ein Dokument kann mehreren Ordnern angehören. **Aus diesem
+Ordner entfernen** entfernt nur diese Zuordnung. **Ordneransicht entfernen** erhält
+Dokumente und Schlagwörter. Sammelaktionen bieten **Rückgängig**. Die Suche erfasst
+Titel, Zitierschlüssel, Verfasser, Jahre und Schlagwörter.
+
+Die gemeinsame Werkzeugleiste blendet Projektordner und Dokumentdetails ein oder
+aus. Ein ausgewählter Eintrag öffnet einen unteren Detailbereich; Schließen oder
+Escape blendet ihn aus und erhält eingegebene Werte. Am Desktop lässt sich seine
+Höhe über den oberen Griff oder die Pfeiltasten ändern. Auf dem Smartphone nutzt
+er nahezu die gesamte Höhe. Beschreibende Schlagwörter stehen in den Details;
+Ordnerschlagwörter erscheinen nicht zusätzlich in einer zweiten Seitenliste.
+
+Zitierschlüssel müssen auch gegenüber archivierten Einträgen eindeutig sein.
+Beim Umbenennen bleibt der alte Schlüssel als Alias erhalten. Details enthält
+Literaturangaben, Dateien, Verwendungen und Geschichte. Dateiänderungen erzeugen
+neue Revisionen; veröffentlichte Verweise behalten die früheren Angaben und Bytes.
+
+**BibTeX importieren** funktioniert für die gesamte Bibliothek und einzelne Ordner.
+Laden Sie eine `.bib`-Datei hoch oder fügen Sie Text ein. Prüfen Sie die Vorschau,
+lösen Sie Dubletten-/Schlüsselkonflikte und bestätigen Sie die Aktion je Eintrag.
+Beim Ordnerimport erhalten neue oder ausdrücklich übernommene Dokumente das
+Ordnerschlagwort und bleiben unter Alle Dokumente erhalten. Dateiverweise erfordern
+gesonderte Uploads. **Ordner exportieren** exportiert den gesamten Ordner über die
+aktuelle Ergebnisseite hinaus. **Auswahl exportieren** und **Bibliothek exportieren**
+bieten die weiteren Umfänge. Ein Import veröffentlicht keine Quellen. Jedes
+Exportmenü bietet **Nur BibTeX (.bib)** und **BibTeX mit Dateien (.zip)**. Die
+ZIP-Datei enthält `references.bib` und alle Anhänge der exportierten Revisionen.
+Das Feld `file` enthält relative Pfade zu diesen Dateien. Entpacken Sie das Archiv,
+bevor Sie die Pfade verwenden. Ohne Dateiexport oder ohne Anhänge entfällt `file`
+vollständig. Ausgewählte archivierte Einträge lassen sich ebenfalls exportieren;
+Bibliotheks- und Ordnerexporte umfassen aktive Einträge.
+
 ## 2. Prüfen
 
 **Erforderlich: Prüfer oder Administrator.**

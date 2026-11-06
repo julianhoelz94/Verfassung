@@ -1,10 +1,12 @@
 package com.constitutionatlas.document.service
 
+import com.constitutionatlas.document.api.BibliographyDto
 import com.constitutionatlas.document.api.DocumentConflictException
 import com.constitutionatlas.document.api.DocumentDto
 import com.constitutionatlas.document.api.DocumentLinkDto
 import com.constitutionatlas.document.api.LinkRequest
 import com.constitutionatlas.document.api.SaveDocumentRequest
+import com.constitutionatlas.document.repo.DocumentFileRepository
 import com.constitutionatlas.document.repo.DocumentRepository
 import com.constitutionatlas.platform.Actor
 import com.constitutionatlas.platform.ForbiddenException
@@ -20,11 +22,12 @@ class DocumentService(
     private val repository: DocumentRepository,
     private val identityClient: IdentityClient,
     private val targetClient: LinkTargetClient,
+    private val files: DocumentFileRepository,
 ) {
     fun requireWriter(authorization: String?): Actor {
         val actor = identityClient.authenticate(authorization)
-        if (actor.roles.none { it in setOf("editor", "publisher", "admin") }) {
-            throw ForbiddenException("Document writes require editor, publisher, or admin")
+        if (actor.roles.none { it in setOf("editor", "admin") }) {
+            throw ForbiddenException("Document writes require editor or admin")
         }
         return actor
     }
@@ -47,7 +50,17 @@ class DocumentService(
         } else if (!publiclyLinked(id, document.revision.id)) {
             throw NotFoundException("Document not found")
         }
-        return document
+        return if (authorization == null) publicDocument(document) else document
+    }
+
+    private fun publicDocument(document: DocumentDto): DocumentDto {
+        val revision = document.revision
+        val bibliography = revision.bibliography.copy(
+            extra = revision.bibliography.extra.filterKeys {
+                !it.equals("file", ignoreCase = true) && !it.startsWith("\$bibtex.")
+            },
+        )
+        return document.copy(citationKey = revision.citationKey, tags = emptyList(), revision = revision.copy(bibliography = bibliography))
     }
 
     private fun publiclyLinked(documentId: UUID, revisionId: UUID): Boolean =
@@ -82,15 +95,18 @@ class DocumentService(
             } else {
                 true
             }
-        }
+        }.map { it.copy(document = publicDocument(it.document)) }
 
     @Transactional
     fun create(request: SaveDocumentRequest, actor: Actor): DocumentDto {
         validate(request)
         val id = UUID.randomUUID()
         val revisionId = UUID.randomUUID()
-        repository.insertDocument(id, actor.id)
+        val key = request.citationKey?.trim() ?: "doc-$id"
+        repository.insertDocument(id, actor.id, key)
+        if (!repository.claimKey(id, key)) throw DocumentConflictException("Citation key is already in use", "citation_key_conflict")
         repository.insertRevision(revisionId, id, 1, request.title.trim(), request.description?.trim(), request.sourceUrl?.trim(), null, null, null, actor.id)
+        repository.updateMetadata(id, revisionId, key, request.bibliography ?: BibliographyDto())
         repository.event(id, "created", actor.id, revisionId)
         return get(id)
     }
@@ -103,28 +119,22 @@ class DocumentService(
         if (current.status != "active" || !repository.advance(id, expected)) {
             throw DocumentConflictException("Document revision changed or document is archived")
         }
-        val bytes = current.revision.fileName?.let { repository.file(current.revision.id) }
+        val key = request.citationKey?.trim() ?: current.citationKey
+        if (!repository.claimKey(id, key)) throw DocumentConflictException("Citation key is already in use", "citation_key_conflict")
         val revisionId = UUID.randomUUID()
         repository.insertRevision(
             revisionId, id, expected + 1, request.title.trim(), request.description?.trim(),
-            request.sourceUrl?.trim(), current.revision.fileName, current.revision.contentType, bytes, actor.id,
+            request.sourceUrl?.trim(), null, null, null, actor.id,
         )
+        files.copy(current.revision.id, revisionId)
+        repository.updateMetadata(id, revisionId, key, request.bibliography ?: current.revision.bibliography)
         repository.event(id, "revised", actor.id, revisionId)
         return get(id)
     }
 
     @Transactional
     fun upload(id: UUID, expectedRevision: Int, fileName: String, contentType: String, bytes: ByteArray, actor: Actor): DocumentDto {
-        require(fileName.isNotBlank()) { "File name is required" }
-        require(bytes.isNotEmpty() && bytes.size <= 20 * 1024 * 1024) { "File must be between 1 byte and 20 MB" }
-        val supportedDocuments = setOf("application/pdf", "text/plain", "application/octet-stream")
-        val supportedImages = setOf("image/jpeg", "image/png", "image/gif", "image/webp", "image/avif")
-        require(contentType in supportedDocuments || contentType in supportedImages) { "Unsupported file type" }
-        if (contentType in supportedImages) {
-            require(ImageValidation.accepts(contentType, bytes)) {
-                "Image content or dimensions are invalid"
-            }
-        }
+        files.validate(fileName, contentType, bytes)
         val current = get(id)
         if (current.status != "active" || !repository.advance(id, expectedRevision)) {
             throw DocumentConflictException("Document revision changed or document is archived")
@@ -132,8 +142,11 @@ class DocumentService(
         val revisionId = UUID.randomUUID()
         repository.insertRevision(
             revisionId, id, expectedRevision + 1, current.revision.title, current.revision.description,
-            current.revision.sourceUrl, fileName.trim(), contentType, bytes, actor.id,
+            current.revision.sourceUrl, null, null, null, actor.id,
         )
+        files.copy(current.revision.id, revisionId)
+        files.storePrimary(revisionId, fileName.trim(), contentType, bytes)
+        repository.updateMetadata(id, revisionId, current.citationKey, current.revision.bibliography)
         repository.event(id, "file_uploaded", actor.id, revisionId)
         return get(id)
     }
@@ -194,11 +207,24 @@ class DocumentService(
 
     private fun validate(request: SaveDocumentRequest) {
         require(request.title.isNotBlank() && request.title.length <= 500) { "Title must be 1 to 500 characters" }
+        require((request.description?.length ?: 0) <= 10000 && (request.sourceUrl?.length ?: 0) <= 2048) { "Document metadata is too long" }
+        request.citationKey?.let { require(validKey(it.trim())) { "Citation key must start with a letter and contain at most 128 letters, digits, underscores, colons or hyphens" } }
+        request.bibliography?.let { bibliography ->
+            require(bibliography.type.matches(Regex("[A-Za-z][A-Za-z0-9_-]{0,63}"))) { "Invalid bibliography type" }
+            require(bibliography.authors.size <= 200 && bibliography.editors.size <= 200 && bibliography.extra.size <= 1000) { "Too many bibliography fields or creators" }
+            BibtexCodec.validateExtra(bibliography.extra)
+            val strings = bibliography.authors.flatMap { listOfNotNull(it.family, it.given, it.literal) } + bibliography.editors.flatMap { listOfNotNull(it.family, it.given, it.literal) } + listOfNotNull(bibliography.issued, bibliography.containerTitle, bibliography.publisher, bibliography.volume, bibliography.issue, bibliography.pages, bibliography.doi, bibliography.isbn, bibliography.language, bibliography.abstract) + bibliography.extra.keys + bibliography.extra.values
+            require(strings.all { it.length <= 20000 } && strings.sumOf { it.length } <= 1000000) { "Bibliography is too long" }
+        }
         request.sourceUrl?.takeIf { it.isNotBlank() }?.let {
             val uri = runCatching { URI(it) }.getOrNull()
             require(uri?.scheme in setOf("http", "https") && !uri?.host.isNullOrBlank()) { "sourceUrl must be an HTTP URL" }
         }
     }
+
+    fun validKey(key: String): Boolean = key.matches(Regex("[A-Za-z][A-Za-z0-9_:-]{0,127}"))
+
+    fun keyDocument(key: String): DocumentDto? = repository.keyOwner(key)?.let { get(it) }
 
     fun requireEditableTarget(targetType: String, targetId: UUID, scopeRevisionId: UUID?, authorization: String?) {
         validateTarget(targetType)

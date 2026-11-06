@@ -110,10 +110,12 @@ import {
   handleImportJob,
   handlePreparedContent,
 } from "./ingestion-routes.mjs";
+import { handleDocumentLibrary } from "./document-library-routes.mjs";
 
 /** Exact original source order, including early Catalog exceptions and scenario interception. */
 export const routes = [
   handleHealth,
+  handleDocumentLibrary,
   handleEditorDocumentsSetup,
   handleEditorDocumentsOverride,
   handleReset,

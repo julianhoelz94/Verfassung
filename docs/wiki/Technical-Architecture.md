@@ -29,6 +29,17 @@ flowchart LR
 
 The source-of-truth boundaries should be checked against the current [repository map](https://github.com/julianhoelz94/Verfassung/blob/main/docs/CODEMAPS/INDEX.md) and [ADR 0001](https://github.com/julianhoelz94/Verfassung/blob/main/docs/adr/0001-platform-boundaries.md) when adding a feature.
 
+Document also owns the central bibliography, globally unique citation keys and
+retained aliases, tag-backed folders, and transactional BibTeX preview/import/export.
+The gateway's protected `/documents` workspace uses bounded server-side search;
+editor pickers share that search and load revision choices lazily. Editors/admins
+write; reviewers/publishers inspect, download and export. A folder is organization,
+not an authorization boundary. Folder imports add its tag; folder exports use its
+complete active membership independent of list pagination. Immutable revision
+manifests reference reusable checksummed files in Document Postgres. Historical
+primary-file routes and wiki media remain compatible, and public attachment reads
+must match the exact published revision's manifest.
+
 ## Deployment setup and transport
 
 <details>

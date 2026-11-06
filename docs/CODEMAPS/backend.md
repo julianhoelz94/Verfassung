@@ -48,7 +48,21 @@ Ordered immutable revisions and version roots are the current write model. Legac
 
 ## document — `services/document-service`
 
-`DocumentController` → `DocumentService` → `DocumentRepository`. Country, constitution and jurisdiction wiki image links require their exact wiki revision (`country_wiki`, `constitution_wiki`, `jurisdiction_wiki`); V8 adds jurisdiction image scopes. Published-image reads retain the existing immutable document/revision checks. Writes require an identity role (`editor`, `publisher`, or `admin`); lifecycle and link events are append-only. `LinkTargetClient` verifies constitution, version, and amendment IDs through the owning services. Document lists and revision history require editorial access. Public metadata and file reads require an active link to a public target and expose only its pinned revision. Amendment links inherit through draft revision ancestry; the published revision determines the public link set and cannot be edited.
+The central library adds `LibraryController` → `LibraryService` → `LibraryRepository`
+for paginated bibliography/key/tag search and tag-backed folders, with
+case-insensitively unique citation keys/retained aliases (V10).
+`DocumentAttachmentController`/`DocumentAttachmentService`/`DocumentFileRepository`
+own immutable blobs and revision manifests (V11), preserving legacy primary-file
+and wiki-image routes. `BibtexController`/`BibtexService` plus parser/codec own
+preview, explicit transactional import and library/folder/selected export.
+`BibtexArchiveService` streams ZIP attachments from immutable revision manifests;
+`BibtexWriter` emits file references only for bundled files. `BibtexText` handles
+TeX decoding and creator names. V12
+stores actor-scoped operation receipts. Library writes require editor/admin;
+reviewer/publisher can read and export. Public projections hide local file paths, internal preservation fields, private tags and
+retain the citation key/attachment manifest of the authorized historical revision.
+
+`DocumentController` → `DocumentService` → `DocumentRepository`. Country, constitution and jurisdiction wiki image links require their exact wiki revision (`country_wiki`, `constitution_wiki`, `jurisdiction_wiki`); V8 adds jurisdiction image scopes. Published-image reads retain the existing immutable document/revision checks. Writes require an identity role (`editor` or `admin`); lifecycle and link events are append-only. `LinkTargetClient` verifies constitution, version, and amendment IDs through the owning services. Document lists and revision history require editorial access. Public metadata and file reads require an active link to a public target and expose only its pinned revision. Amendment links inherit through draft revision ancestry; the published revision determines the public link set and cannot be edited.
 
 | Method | Path |
 | --- | --- |

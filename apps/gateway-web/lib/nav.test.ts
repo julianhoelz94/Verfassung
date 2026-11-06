@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   avatarInitial,
+  canManageDocuments,
+  canReadDocuments,
   countryFromPath,
   isCurrentNavHref,
   menuSections,
@@ -39,16 +41,16 @@ describe('primaryNavLinks', () => {
     expect(hrefs({ email: 'viewer@example.local', roles: ['viewer'] })).toEqual(['/', '/search', '/about']);
   });
 
-  it('shows Editor for editor, reviewer, and publisher', () => {
+  it('shows Editor and Documents for editor, reviewer, and publisher', () => {
     for (const role of ['editor', 'reviewer', 'publisher']) {
-      expect(hrefs({ email: `${role}@example.local`, roles: [role] })).toEqual(['/', '/search', '/about', '/editor']);
+      expect(hrefs({ email: `${role}@example.local`, roles: [role] })).toEqual(['/', '/search', '/about', '/editor', '/documents']);
     }
   });
 
   it('shows Editor, Admin, and API docs for admin when that page exists', () => {
     const admin = { email: 'admin@example.local', roles: ['admin'] };
-    expect(hrefs(admin)).toEqual(['/', '/search', '/about', '/editor', '/admin']);
-    expect(hrefs(admin, true)).toEqual(['/', '/search', '/about', '/editor', '/admin', '/api-docs']);
+    expect(hrefs(admin)).toEqual(['/', '/search', '/about', '/editor', '/documents', '/admin']);
+    expect(hrefs(admin, true)).toEqual(['/', '/search', '/about', '/editor', '/documents', '/admin', '/api-docs']);
   });
 });
 
@@ -73,7 +75,6 @@ describe('menuSections', () => {
     expect(sectionIds(editor)).toEqual(['identity', 'primary', 'editorial', 'account']);
     expect(sectionHrefs(editor, 'editorial')).toEqual([
       '/editor?mine=1',
-      '/editor/documents',
       '/editor/amendments',
       '/editor/history',
     ]);
@@ -81,12 +82,12 @@ describe('menuSections', () => {
 
   it('shows Review queue and Amending laws for a reviewer', () => {
     const reviewer = { email: 'reviewer@example.local', roles: ['reviewer'] };
-    expect(sectionHrefs(reviewer, 'editorial')).toEqual(['/editor?status=reviewing', '/editor/documents', '/editor/amendments', '/editor/history']);
+    expect(sectionHrefs(reviewer, 'editorial')).toEqual(['/editor?status=reviewing', '/editor/amendments', '/editor/history']);
   });
 
   it('shows Ready to publish and Amending laws for a publisher', () => {
     const publisher = { email: 'publisher@example.local', roles: ['publisher'] };
-    expect(sectionHrefs(publisher, 'editorial')).toEqual(['/editor?status=approved', '/editor/documents', '/editor/amendments', '/editor/history']);
+    expect(sectionHrefs(publisher, 'editorial')).toEqual(['/editor?status=approved', '/editor/amendments', '/editor/history']);
   });
 
   it('unions editorial destinations for combined roles', () => {
@@ -98,7 +99,6 @@ describe('menuSections', () => {
       '/editor?mine=1',
       '/editor?status=reviewing',
       '/editor?status=approved',
-      '/editor/documents',
       '/editor/amendments',
       '/editor/history',
     ]);
@@ -111,7 +111,6 @@ describe('menuSections', () => {
       '/editor?mine=1',
       '/editor?status=reviewing',
       '/editor?status=approved',
-      '/editor/documents',
       '/editor/amendments',
       '/editor/history',
     ]);
@@ -124,7 +123,7 @@ describe('menuSections', () => {
       '/admin/legal/impressum',
       '/api-docs',
     ]);
-    expect(sectionHrefs(admin, 'primary', true)).toEqual(['/', '/search', '/about', '/editor', '/admin']);
+    expect(sectionHrefs(admin, 'primary', true)).toEqual(['/', '/search', '/about', '/editor', '/documents', '/admin']);
   });
 });
 
@@ -172,5 +171,26 @@ describe('avatarInitial', () => {
   it('uses the first character of the email', () => {
     expect(avatarInitial('local-editor@example.local')).toBe('L');
     expect(avatarInitial('')).toBe('?');
+  });
+});
+
+
+describe('document capabilities', () => {
+  it('gives editors and admins management and editorial staff read access', () => {
+    for (const role of ['editor', 'admin']) {
+      expect(canReadDocuments([role])).toBe(true);
+      expect(canManageDocuments([role])).toBe(true);
+    }
+    for (const role of ['reviewer', 'publisher']) {
+      expect(canReadDocuments([role])).toBe(true);
+      expect(canManageDocuments([role])).toBe(false);
+      expect(sectionHrefs({email: role, roles: [role]}, 'primary')).toContain('/documents');
+    }
+    for (const roles of [[], ['viewer'], ['unknown']]) {
+      expect(canReadDocuments(roles)).toBe(false);
+      expect(canManageDocuments(roles)).toBe(false);
+    }
+    expect(canManageDocuments(['publisher', 'editor'])).toBe(true);
+    expect(hrefs({ email: 'combined', roles: ['editor', 'reviewer', 'publisher'] }).filter(href => href === '/documents')).toHaveLength(1);
   });
 });

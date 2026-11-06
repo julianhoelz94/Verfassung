@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState, useEffect, type FormEvent } from 'react';
+import { useRef, useState, useEffect, type FormEvent, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import type { SourceEvidence } from '../../lib/api';
 import type { DraftPreview } from '../../lib/editor-api';
@@ -28,9 +28,10 @@ type Props = {
   sourceHref?: string;
   publishedHref?: string;
   error?: string | null;
+  documentsPanel?: ReactNode;
 };
 
-export function SourceEvidenceWorkspace({ preview, publishedEvidence, userId, roles, sourceHref, publishedHref, error }: Props) {
+export function SourceEvidenceWorkspace({ preview, publishedEvidence, userId, roles, sourceHref, publishedHref, error, documentsPanel }: Props) {
   const router = useRouter();
   const t = useTranslation();
   const locale = useLocale();
@@ -117,6 +118,7 @@ export function SourceEvidenceWorkspace({ preview, publishedEvidence, userId, ro
         <Button form="source-evidence-form" disabled={saving || !dirty}><T value={copy.save} /></Button>
       </> : <p>{latest?.reason ?? t(copy.noDraft)}</p>}
     </Stack>
+    {documentsPanel}
     <p><T value={copy.textReminder} /> <a href={`/editor?sessionId=${encodeURIComponent(session.id)}&scope=text`}><T value={copy.inspectText} /></a></p>
     <Inline>
       {canEdit && latest ? <form action="/editor/command" method="post" onSubmit={() => { leaving.current = true; }}>

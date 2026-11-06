@@ -173,7 +173,9 @@ editorial document pages redirect; public `/documents/[id]` retains pinned reads
 
 `components/documents/DocumentAttachmentTemplate` owns the compact shared upload/select interface (`editor/documents/DocumentManagerTemplate` is a compatibility export) in constitution configuration, continuous editing and amendments. Optional upload metadata is grouped in `DocumentUploadForm`/`DocumentBibliographyFields`; `DocumentCreatorFields` is shared with the central inspector. Document controls are independent of a surrounding host form. DocumentLinks loads authorized initial data and folders; DocumentManager updates attachment state without navigation. The gateway endpoint is `/editor/documents/command` (GET history links, POST document commands); `/api/editor/*` belongs to editor-service through Caddy. Document-service owns the transactional create/upload/attach endpoint and actor-scoped retry receipt. Saving an amendment uses the existing command endpoint with a JSON outcome so rejected saves retain entered values; native POST redirects remain supported.
 
-Reuse guide and planned lifecycle/provision integrations: `docs/design/document-attachment-template.md`. Repository skill: `.agents/skills/verfassung-document-attachments/SKILL.md`.
+The same controls now serve published amendment/change materials, saved constitution/provision events (`lifecycle_material` with event scope), and the exact selected version’s archival sources. `lib/document-target.ts` owns link-writing roles, separately from library upload rights. `MaterialContext` retains material edit drafts; scoped `citationNote` values remain separate from library metadata and appear in public references/comparisons.
+
+Reuse guide and integration boundaries: `docs/design/document-attachment-template.md`. Repository skill: `.agents/skills/verfassung-document-attachments/SKILL.md`.
 
 ## Constitution history viewers
 

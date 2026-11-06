@@ -16,7 +16,7 @@ Paths are relative to the repository root.
 | Reusable, transport-independent UI | `apps/gateway-web/app/components/documents/DocumentAttachmentTemplate.tsx` |
 | Immediate live combobox, keyboard selection and folder browsing | `DocumentLibraryPicker.tsx` in that directory |
 | Upload, optional metadata and validation | `DocumentUploadForm.tsx`, `DocumentBibliographyFields.tsx`, `DocumentCreatorFields.tsx` in that directory |
-| Existing constitution/version/amendment client adapter | `apps/gateway-web/app/editor/documents/DocumentManager.tsx` |
+| Constitution/version/amendment and scoped material client adapter | `apps/gateway-web/app/editor/documents/DocumentManager.tsx` |
 | Authorized server-loaded embedding | `apps/gateway-web/app/editor/documents/DocumentLinks.tsx` |
 | Gateway commands and bounded folder search | `apps/gateway-web/app/editor/documents/command/route.ts` |
 | Shared wire types and HTTP clients | `apps/gateway-web/lib/document-api.ts` |
@@ -36,6 +36,7 @@ Paths are relative to the repository root.
 
 ## Invariants
 
+- Citation notes belong on the scoped link (`citationNote`), never in the shared Description or Abstract. Preserve them through material edits, read-only projections and comparisons.
 - Attach an explicit document revision ID. Historical citations must retain their exact bibliography and bytes after later changes.
 - Detach removes the host relationship; it never deletes or moves the library record.
 - Document-service owns documents, immutable files, revisions and attachment relationships. Other services own their entities and publication decisions. Exchange references over HTTP; no cross-service SQL or foreign keys.
@@ -50,9 +51,9 @@ Paths are relative to the repository root.
 
 ## Lifecycle and other new targets
 
-The current lifecycle/provision-event API stores a source URL, not managed document pins. Before wiring a live lifecycle adapter, add an owner-supported pinned-reference contract and the corresponding document target authorization/visibility behavior. An unsaved event stages selection until its save succeeds; retries must not append a duplicate immutable event. Keep publisher event rights separate from editor/admin library-writing rights. Do not simulate a relationship by substituting a private document URL into `sourceUrl`, or attach it to a constitution merely to make it public.
+The live event integration uses `lifecycle_material` links, with constitution ID as target and the saved constitution/provision event ID as scope. The owning Catalog API validates event identity; legacy event `sourceUrl` remains separate. Existing event forms expose attachments after recording the event. A future combined composer must stage choices until the event save succeeds; retries must not append a duplicate event. Keep publisher event rights separate from editor/admin library-writing rights. Do not simulate a relationship by substituting a private document URL into `sourceUrl`, or attach it to a constitution merely to make it public.
 
-The same staged-reference pattern can serve imports, provision events or Wiki citations after their owners support it. A selection callback can reuse the template immediately in a local prototype without claiming persistence.
+The same staged-reference pattern can serve imports or Wiki citations after their owners support it. A selection callback can reuse the template immediately in a local prototype without claiming persistence.
 
 ## Verification
 

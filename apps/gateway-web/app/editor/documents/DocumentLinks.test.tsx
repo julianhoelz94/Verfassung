@@ -19,6 +19,22 @@ beforeEach(() => {
 });
 
 describe('embedded library loading', () => {
+  it('lets publishers select existing event sources while keeping uploads restricted', async () => {
+    vi.mocked(currentUser).mockResolvedValue({ id: 'publisher', email: 'publisher@example.test', roles: ['publisher'] });
+    const element = await DocumentLinks({ targetType: 'lifecycle_material', targetId: 'constitution', scopeRevisionId: 'event', returnTo: '/editor/lifecycle/constitution', canEdit: true });
+    const manager = element.props.children.find((child: { type?: unknown }) => child?.type === DocumentManager);
+    expect(manager.props).toMatchObject({ canEdit: true, canCreate: false, targetType: 'lifecycle_material', scopeRevisionId: 'event' });
+    expect(listLibraryDocuments).toHaveBeenCalled();
+  });
+
+  it('loads published record materials without a session or private library requests', async () => {
+    vi.mocked(currentUser).mockResolvedValue(null);
+    const element = await DocumentLinks({ targetType: 'change_material', targetId: 'amendment', scopeRevisionId: 'change', returnTo: '/', canEdit: false });
+    const manager = element.props.children.find((child: { type?: unknown }) => child?.type === DocumentManager);
+    expect(manager.props).toMatchObject({ canEdit: false, canCreate: false });
+    expect(listDocumentLinks).toHaveBeenCalledWith('change_material', 'amendment', 'change', undefined);
+    expect(listLibraryDocuments).not.toHaveBeenCalled(); expect(listDocumentLinkEvents).not.toHaveBeenCalled();
+  });
   it('loads one bounded library page without eagerly loading any revision histories', async () => {
     const element = await DocumentLinks({ targetType: 'amendment', targetId: 'law', scopeRevisionId: 'draft', returnTo: '/editor', canEdit: true });
     expect(listLibraryDocuments).toHaveBeenCalledWith({ status: 'active', offset: 0, limit: 30, sort: 'title' }, 'Bearer session');

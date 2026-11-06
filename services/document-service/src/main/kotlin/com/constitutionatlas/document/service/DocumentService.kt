@@ -174,6 +174,7 @@ class DocumentService(
     @Transactional
     fun attach(targetType: String, targetId: UUID, request: LinkRequest, actor: Actor, authorization: String?): List<DocumentLinkDto> {
         requireEditableTarget(targetType, targetId, request.scopeRevisionId, authorization)
+        require((request.citationNote?.length ?: 0) <= 4000) { "Citation note is too long" }
         val document = get(request.documentId)
         require(document.status == "active") { "Cannot attach an archived document" }
         require(request.revisionId != null) { "A pinned document revision is required" }
@@ -181,7 +182,7 @@ class DocumentService(
         if (currentLinks(targetType, targetId, request.scopeRevisionId, authorization).any { it.documentId == request.documentId }) {
             throw DocumentConflictException("Document is already linked")
         }
-        repository.linkEvent(targetType, targetId, request.scopeRevisionId, request.documentId, request.revisionId, "attach", actor.id)
+        repository.linkEvent(targetType, targetId, request.scopeRevisionId, request.documentId, request.revisionId, "attach", actor.id, request.citationNote?.trim()?.takeIf { it.isNotEmpty() })
         return currentLinks(targetType, targetId, request.scopeRevisionId, authorization)
     }
 
@@ -203,6 +204,9 @@ class DocumentService(
         repository.lockDocument(documentId)
         val link = currentLinks(targetType, targetId, request.scopeRevisionId, authorization).find { it.documentId == documentId }
             ?: throw NotFoundException("Material not found")
+        if (actor.roles.none { it == "editor" || it == "admin" }) {
+            if (link.document.revision.fileName != null || link.document.revision.attachments.isNotEmpty() || (link.document.revision.bibliography.type != "commentary" && !link.document.revision.sourceUrl.isNullOrBlank())) throw ForbiddenException("Library metadata requires editor or admin")
+        }
         if (link.revisionId != request.expectedLinkedRevisionId) throw DocumentConflictException("Material changed; reload before saving")
         require((request.description?.length ?: 0) <= 10000) { "Commentary is too long" }
         if (link.document.revision.revision != request.expectedRevision) throw DocumentConflictException("Material revision changed; reload before saving")
@@ -211,7 +215,7 @@ class DocumentService(
         validate(edit)
         if (!repository.advance(documentId, current.currentRevision)) throw DocumentConflictException("Document is archived")
         val revision = appendMetadataRevision(documentId, current.currentRevision + 1, edit, link.document.revision, actor)
-        repository.linkEvent(targetType, targetId, request.scopeRevisionId, documentId, revision, "attach", actor.id)
+        repository.linkEvent(targetType, targetId, request.scopeRevisionId, documentId, revision, "attach", actor.id, link.citationNote)
         return currentLinks(targetType, targetId, request.scopeRevisionId, authorization)
     }
 
@@ -233,7 +237,7 @@ class DocumentService(
             .filter { it.action == "attach" }
             .map { event ->
                 val revision = event.revisionId?.let { repository.revisionById(it)?.revision }
-                DocumentLinkDto(event.documentId, event.revisionId, get(event.documentId, revision))
+                DocumentLinkDto(event.documentId, event.revisionId, get(event.documentId, revision), event.citationNote)
             }
     }
 

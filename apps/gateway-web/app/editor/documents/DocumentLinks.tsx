@@ -3,14 +3,17 @@ import { T } from '../../components/TranslationProvider';
 import { ui } from '../../../lib/messages';
 import { listDocumentLinkEvents, listDocumentLinks, listLibraryDocuments, listDocumentFolders } from '../../../lib/document-api';
 import { currentUser, requireSessionBearer } from '../../../lib/session';
-import { canManageDocuments } from '../../../lib/nav';
+import { canManageDocuments, canReadDocuments } from '../../../lib/nav';
+import { canChangeDocumentLinks, isMaterialTarget, type EditableDocumentTarget } from '../../../lib/document-target';
 import { DocumentManager } from './DocumentManager';
 import { Alert } from '../../components/ui';
 import { Stack } from '../../components/layout/Layout';
 import surfaceStyles from '../../components/surfaces.module.css';
 
 export async function DocumentLinks(props: {
-  targetType: 'constitution' | 'version' | 'amendment';
+  heading?: string;
+  headingLevel?: 'h2' | 'h3' | 'h4';
+  targetType: EditableDocumentTarget;
   targetId: string;
   scopeRevisionId?: string | null;
   returnTo: string;
@@ -18,13 +21,14 @@ export async function DocumentLinks(props: {
 }) {
   const locale = await currentLocale();
   const user = await currentUser();
-  const canEdit = props.canEdit && !!user && canManageDocuments(user.roles);
-  const authorization = await requireSessionBearer();
+  const canEdit = props.canEdit && !!user && canChangeDocumentLinks(user.roles, props.targetType);
+  const canCreate = canEdit && !!user && canManageDocuments(user.roles);
+  const authorization = isMaterialTarget(props.targetType) && (!user || !canReadDocuments(user.roles)) ? undefined : await requireSessionBearer();
   const [linksResult, documentsResult, eventsResult, foldersResult] = await Promise.allSettled([
     listDocumentLinks(props.targetType, props.targetId, props.scopeRevisionId, authorization),
-    canEdit ? listLibraryDocuments({ status: 'active', offset: 0, limit: 30, sort: 'title' }, authorization) : Promise.resolve({ items: [], total: 0, offset: 0, limit: 30 }),
-    listDocumentLinkEvents(props.targetType, props.targetId, authorization, props.scopeRevisionId),
-    canEdit ? listDocumentFolders(authorization) : Promise.resolve([]),
+    canEdit ? listLibraryDocuments({ status: 'active', offset: 0, limit: 30, sort: 'title' }, authorization!) : Promise.resolve({ items: [], total: 0, offset: 0, limit: 30 }),
+    authorization ? listDocumentLinkEvents(props.targetType, props.targetId, authorization, props.scopeRevisionId) : Promise.resolve([]),
+    canEdit ? listDocumentFolders(authorization!) : Promise.resolve([]),
   ]);
   const unavailable = linksResult.status === 'rejected' || documentsResult.status === 'rejected' || eventsResult.status === 'rejected';
   const links = linksResult.status === 'fulfilled' ? linksResult.value : [];
@@ -34,7 +38,7 @@ export async function DocumentLinks(props: {
   const available = documents.filter(document => document.status === 'active');
   return <Stack as="section" className={surfaceStyles.card}>
     {unavailable ? <Alert tone="error"><T value={ui.editor.documents.documentlinks.documentServiceIsUnavailableLinksMayBe} /></Alert> : null}
-    <DocumentManager key={`${props.targetType}:${props.targetId}:${props.scopeRevisionId ?? ''}`} links={links} documents={available}
+    <DocumentManager heading={props.heading} headingLevel={props.headingLevel} canCreate={canCreate} key={`${props.targetType}:${props.targetId}:${props.scopeRevisionId ?? ''}`} links={links} documents={available}
       revisions={{}} documentTotal={page.total} folders={foldersResult.status === 'fulfilled' ? foldersResult.value : []} remoteSearch
       targetType={props.targetType} targetId={props.targetId} scopeRevisionId={props.scopeRevisionId} canEdit={canEdit && !unavailable} />
     {events.length ? <details><summary><T value={ui.editor.documents.documentlinks.linkHistory} /></summary><ol>{events.map((event) => <li key={event.id}>

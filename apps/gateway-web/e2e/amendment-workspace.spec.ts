@@ -9,6 +9,7 @@ test.beforeEach(async({request})=>{await request.post(mock+'/__reset');await req
 test('one constitution pair, draft context, and one-step reusable documents',async({page,request},testInfo)=>{
   await signInAdmin(page);await page.goto('/editor/amendments/'+law);
   const menu=page.getByRole('navigation',{name:'Amendment workspace'});
+  await expect(page.getByLabel('Public amendment comment')).toHaveValue('The published legal-change comment.');
   await page.getByLabel('Public amendment comment').fill('Unsaved amendment rationale stays here.');
   await page.getByRole('button',{name:'Choose constitution versions',exact:true}).click();
   await page.getByLabel('Before constitution').selectOption(VERSION_1949);
@@ -49,6 +50,7 @@ test('one constitution pair, draft context, and one-step reusable documents',asy
 test('mobile task views retain edits, keyboard navigation, and accessible upload controls',async({page},testInfo)=>{
   await page.setViewportSize({width:390,height:844});await signInEditor(page);await page.goto('/editor/amendments/'+law);
   const menu=page.getByRole('navigation',{name:'Amendment workspace'});
+  await expect(page.getByLabel('Public amendment comment')).toHaveValue('The published legal-change comment.');
   await page.getByLabel('Public amendment comment').fill('Mobile draft rationale');
   await menu.getByRole('button',{name:'History',exact:true}).click();
   await page.locator('.revision-panel-desktop .revision-item').first().click();

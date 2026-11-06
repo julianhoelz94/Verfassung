@@ -82,6 +82,12 @@ bevor Sie die Pfade verwenden. Ohne Dateiexport oder ohne Anhänge entfällt `fi
 vollständig. Ausgewählte archivierte Einträge lassen sich ebenfalls exportieren;
 Bibliotheks- und Ordnerexporte umfassen aktive Einträge.
 
+### Quellen im jeweiligen Kontext wiederverwenden
+
+Die kompakten Dokumentfunktionen stehen auch bei Materialien zu veröffentlichten Rechtsänderungen und einzelnen Änderungen, bei gespeicherten Verfassungs- und Artikelereignissen sowie unter **Quellen dieser Textversion** in **Angaben → Archivquelle** und in der Quellenbearbeitung bereit. Allgemeine Verfassungsquellen und Quellen einer bestimmten Textversion haben getrennte Zuordnungen. Erfassen Sie ein Ereignis zuerst und öffnen Sie anschließend dessen Quellenbereich. Veröffentlichende können vorhandene Ereignisquellen auswählen; Bibliotheksuploads benötigen zusätzlich Editor- oder Admin-Rechte.
+
+Die Suche aktualisiert sich beim Tippen und behält die Trefferliste bei. Wählen Sie mit den Pfeiltasten und Enter einen Treffer und speichern Sie mit **Dokument verknüpfen**. **Zitieroptionen** bestimmt die gespeicherte Dokumentrevision. **Zitiernotiz / relevante Stelle** speichert Kapitel, Seitenangaben oder Erläuterungen zu dieser Verknüpfung, getrennt von der gemeinsamen Beschreibung und der veröffentlichten Zusammenfassung. Andere Zuordnungen derselben Quelle behalten ihre eigenen Notizen. Uploads und Verknüpfungen verwerfen keinen umgebenden Textentwurf. Ergänzende Quelldokumente werden getrennt von geprüften Korrekturen der Quellenbeschreibung gespeichert.
+
 ## 2. Prüfen
 
 **Erforderlich: Prüfer oder Administrator.**

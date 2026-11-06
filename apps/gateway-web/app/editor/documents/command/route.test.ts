@@ -30,7 +30,7 @@ it('forwards one create-and-link operation with the exact draft scope, without a
 it('returns attachment state in place and never changes a document revision',async()=>{
   vi.mocked(attachDocument).mockResolvedValue([]);vi.mocked(detachDocument).mockResolvedValue([]);
   expect((await POST(request({command:'attach',documentId:'document',revisionId:'revision'}))).status).toBe(200);
-  expect(attachDocument).toHaveBeenCalledWith('amendment','law','document','revision','Bearer session','draft');
+  expect(attachDocument).toHaveBeenCalledWith('amendment','law','document','revision','Bearer session','draft',undefined);
   expect((await POST(request({command:'detach',documentId:'document'}))).status).toBe(200);
   expect(detachDocument).toHaveBeenCalledWith('amendment','law','document','Bearer session','draft');
   expect(createLinkedDocument).not.toHaveBeenCalled();
@@ -79,4 +79,20 @@ it('keeps embedded browsing scoped to the selected project folder', async () => 
   vi.mocked(listLibraryDocuments).mockResolvedValue({ items: [], total: 0, offset: 0, limit: 30 });
   expect((await GET(new NextRequest('http://localhost/editor/documents/command?command=search&folderId=project&q=Law'))).status).toBe(200);
   expect(listLibraryDocuments).toHaveBeenCalledWith(expect.objectContaining({ folderId: 'project', q: 'Law', offset: 0 }), 'Bearer session');
+});
+
+it('preserves the exact material scope and citation note when attaching a shared source', async () => {
+  vi.mocked(attachDocument).mockResolvedValue([]);
+  expect((await POST(request({command:'attach',targetType:'change_material',scopeRevisionId:'change-28',documentId:'source',revisionId:'pin',citationNote:'Chapter 3, pp. 42–45'}))).status).toBe(200);
+  expect(attachDocument).toHaveBeenCalledWith('change_material','law','source','pin','Bearer session','change-28','Chapter 3, pp. 42–45');
+  expect((await POST(request({command:'attach',citationNote:'x'.repeat(4001)}))).status).toBe(400);
+});
+
+it('permits publisher event attachments without granting library upload or amendment rights', async () => {
+  vi.mocked(currentUser).mockResolvedValue({id:'publisher',email:'publisher@example.test',roles:['publisher']});
+  vi.mocked(attachDocument).mockResolvedValue([]);
+  expect((await POST(request({command:'attach',targetType:'lifecycle_material',scopeRevisionId:'event',documentId:'source',revisionId:'pin'}))).status).toBe(200);
+  expect((await POST(request({targetType:'lifecycle_material',scopeRevisionId:'event'}))).status).toBe(403);
+  expect((await POST(request({command:'attach',targetType:'change_material',documentId:'source',revisionId:'pin'}))).status).toBe(403);
+  expect(createLinkedDocument).not.toHaveBeenCalled();
 });

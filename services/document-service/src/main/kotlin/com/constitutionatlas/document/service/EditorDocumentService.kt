@@ -7,6 +7,7 @@ import com.constitutionatlas.document.api.LinkRequest
 import com.constitutionatlas.document.api.SaveDocumentRequest
 import com.constitutionatlas.document.repo.EditorDocumentRepository
 import com.constitutionatlas.platform.Actor
+import com.constitutionatlas.platform.ForbiddenException
 import com.fasterxml.jackson.annotation.JsonInclude
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -24,6 +25,8 @@ data class CreateLinkedDocumentRequest(
     val citationKey: String? = null,
     @get:JsonInclude(JsonInclude.Include.NON_NULL)
     val bibliography: BibliographyDto? = null,
+    @get:JsonInclude(JsonInclude.Include.NON_NULL)
+    val citationNote: String? = null,
 )
 
 @Service
@@ -45,6 +48,10 @@ class EditorDocumentService(
         authorization: String?,
     ): DocumentDto {
         require(targetType in setOf("constitution", "version", "amendment") || targetType in materialLinkTypes) { "Unsupported editor target" }
+        if (actor.roles.none { it == "editor" || it == "admin" }) {
+            if (bytes != null || request.citationKey != null || request.description.isNullOrBlank()) throw ForbiddenException("Library uploads require editor or admin")
+            if (request.bibliography != null && request.bibliography != BibliographyDto(type = "commentary")) throw ForbiddenException("Library metadata requires editor or admin")
+        }
         require(bytes != null || !request.sourceUrl.isNullOrBlank() || (targetType in materialLinkTypes && !request.description.isNullOrBlank())) { "A file, source URL or commentary is required" }
         require((request.description?.length ?: 0) <= 10000 && (request.sourceUrl?.length ?: 0) <= 2048) { "Document metadata is too long" }
         documents.requireEditableTarget(targetType, targetId, request.scopeRevisionId, authorization)
@@ -70,7 +77,7 @@ class EditorDocumentService(
                 actor,
             )
         }
-        documents.attach(targetType, targetId, LinkRequest(stored.id, stored.revision.id, request.scopeRevisionId), actor, authorization)
+        documents.attach(targetType, targetId, LinkRequest(stored.id, stored.revision.id, request.scopeRevisionId, request.citationNote), actor, authorization)
         operations.save(actor.id, request.operationId, hash, stored.id, stored.revision.revision)
         return stored
     }

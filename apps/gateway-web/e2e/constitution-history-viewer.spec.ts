@@ -1,5 +1,5 @@
 import { expect, test } from "./fixtures/consent";
-import { signInAdmin, VERSION_1949, VERSION_2022 } from "./helpers";
+import { signInAdmin, signInPublisher, VERSION_1949, VERSION_2022 } from "./helpers";
 import path from "node:path";
 const mock = `http://127.0.0.1:${process.env.E2E_MOCK_PORT ?? 4010}`;
 const base = "/countries/DE/constitutions/01900000-0000-4000-8000-000000000002";
@@ -136,7 +136,7 @@ test("authorized editors add persisted commentary separately to the act and chan
   ).toBeVisible();
   const materials = page.locator("#amendment-materials");
   await materials
-    .getByText("Add commentary or material", { exact: true })
+    .getByText("Add commentary", { exact: true })
     .click();
   await materials
     .getByRole("textbox", { name: "Title", exact: true })
@@ -148,7 +148,7 @@ test("authorized editors add persisted commentary separately to the act and chan
     .getByRole("button", { name: "Save and publish material", exact: true })
     .click();
   await expect(
-    page.getByRole("heading", { name: "Background to this act", exact: true }),
+    page.getByRole("link", { name: "Background to this act", exact: true }),
   ).toBeVisible();
   await page.reload();
   await expect(materials.locator("article p").first()).toHaveText(
@@ -158,13 +158,13 @@ test("authorized editors add persisted commentary separately to the act and chan
     "[data-material-target=change_material]",
   );
   await expect(
-    changeMaterials.getByRole("heading", {
+    changeMaterials.getByRole("link", {
       name: "Background to this act",
       exact: true,
     }),
   ).toHaveCount(0);
   await changeMaterials
-    .getByText("Add commentary or material", { exact: true })
+    .getByText("Add commentary", { exact: true })
     .click();
   await changeMaterials
     .getByRole("textbox", { name: "Title", exact: true })
@@ -176,7 +176,7 @@ test("authorized editors add persisted commentary separately to the act and chan
     .getByRole("button", { name: "Save and publish material", exact: true })
     .click();
   await expect(
-    changeMaterials.getByRole("heading", {
+    changeMaterials.getByRole("link", {
       name: "Passage context",
       exact: true,
     }),
@@ -195,4 +195,43 @@ test("authorized editors add persisted commentary separately to the act and chan
   await expect(
     page.getByRole("heading", { name: "Edit event evidence", exact: true }),
   ).toBeVisible();
+});
+
+
+test('reuses one source with different passage notes and lets publishers attach event evidence without upload rights', async ({page,request}) => {
+  await request.post(mock + '/__editor_documents');
+  await signInAdmin(page); await page.goto(amendment);
+  const act = page.locator('#amendment-materials');
+  await act.getByRole('button',{name:'Upload new document',exact:true}).click();
+  await act.getByRole('textbox',{name:'Title',exact:true}).fill('Shared gazette source');
+  await act.getByText('Optional details',{exact:true}).click();
+  await act.getByRole('textbox',{name:'Source URL',exact:true}).fill('https://example.org/gazette');
+  await act.getByRole('button',{name:'Create and attach',exact:true}).click();
+  const actSource = act.getByRole('link',{name:'Shared gazette source',exact:true});
+  await expect(actSource).toBeVisible(); const pin = await actSource.getAttribute('href');
+  const change = page.locator('[data-material-target=change_material]').first();
+  await change.getByRole('button',{name:'Choose existing document',exact:true}).click();
+  const search = change.getByRole('combobox',{name:'Search documents',exact:true});
+  await search.fill('Shared gazette');
+  await expect(change.getByRole('listbox')).toHaveAttribute('aria-busy','false');
+  await change.getByRole('option',{name:/Shared gazette source/}).click();
+  await change.getByText('Citation note / relevant passage',{exact:true}).click();
+  await change.getByRole('textbox',{name:'Note for this attachment',exact:true}).fill('Chapter 3 explains this change.');
+  await change.getByRole('button',{name:'Attach document',exact:true}).click();
+  await expect(change.getByText('Chapter 3 explains this change.',{exact:true})).toBeVisible();
+  await page.reload();
+  await expect(change.getByRole('link',{name:'Shared gazette source',exact:true})).toHaveAttribute('href',pin!);
+  await expect(change.getByText('Chapter 3 explains this change.',{exact:true})).toBeVisible();
+  await expect(act.getByText('Chapter 3 explains this change.',{exact:true})).toHaveCount(0);
+  await page.context().clearCookies();
+  await signInPublisher(page); await page.goto(event);
+  const eventMaterials=page.locator('#event-materials');
+  await expect(eventMaterials.getByRole('button',{name:'Upload new document',exact:true})).toHaveCount(0);
+  await eventMaterials.getByRole('button',{name:'Choose existing document',exact:true}).click();
+  await eventMaterials.getByRole('combobox',{name:'Search documents',exact:true}).fill('Shared gazette');
+  await expect(eventMaterials.getByRole('listbox')).toHaveAttribute('aria-busy','false');
+  await eventMaterials.getByRole('option',{name:/Shared gazette source/}).click();
+  await eventMaterials.getByRole('button',{name:'Attach document',exact:true}).click();
+  await page.reload();
+  await expect(eventMaterials.getByRole('link',{name:'Shared gazette source',exact:true})).toHaveAttribute('href',pin!);
 });

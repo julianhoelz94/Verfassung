@@ -127,10 +127,10 @@ class DocumentRepository(private val jdbc: JdbcTemplate, private val mapper: Obj
             id,
         )
 
-    fun linkEvent(targetType: String, targetId: UUID, scopeRevisionId: UUID?, documentId: UUID, revisionId: UUID?, action: String, actorId: UUID) {
+    fun linkEvent(targetType: String, targetId: UUID, scopeRevisionId: UUID?, documentId: UUID, revisionId: UUID?, action: String, actorId: UUID, citationNote: String? = null) {
         jdbc.update(
-            """INSERT INTO document_link_events (id, target_type, target_id, scope_revision_id, document_id, revision_id, action, actor_id)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+            """INSERT INTO document_link_events (id, target_type, target_id, scope_revision_id, document_id, revision_id, action, actor_id, citation_note)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             UUID.randomUUID(),
             targetType,
             targetId,
@@ -139,12 +139,13 @@ class DocumentRepository(private val jdbc: JdbcTemplate, private val mapper: Obj
             revisionId,
             action,
             actorId,
+            citationNote,
         )
     }
 
     fun linkEvents(targetType: String, targetId: UUID, scopeRevisionId: UUID?): List<DocumentLinkEventDto> =
         jdbc.query(
-            """SELECT id, target_type, target_id, document_id, revision_id, scope_revision_id, action, actor_id, occurred_at
+            """SELECT id, target_type, target_id, document_id, revision_id, scope_revision_id, action, actor_id, occurred_at, citation_note
                FROM document_link_events WHERE target_type = ? AND target_id = ? AND scope_revision_id IS NOT DISTINCT FROM ?
                ORDER BY occurred_at DESC, id DESC""",
             { rs, _ ->
@@ -158,6 +159,7 @@ class DocumentRepository(private val jdbc: JdbcTemplate, private val mapper: Obj
                     rs.getString("action"),
                     rs.getObject("actor_id", UUID::class.java),
                     rs.getTimestamp("occurred_at").toInstant().atOffset(ZoneOffset.UTC),
+                    rs.getString("citation_note"),
                 )
             },
             targetType,
@@ -168,7 +170,7 @@ class DocumentRepository(private val jdbc: JdbcTemplate, private val mapper: Obj
     fun activeLinksForDocument(documentId: UUID): List<DocumentLinkEventDto> =
         jdbc.query(
             """SELECT DISTINCT ON (target_type, target_id, scope_revision_id) id, target_type, target_id,
-                      document_id, revision_id, scope_revision_id, action, actor_id, occurred_at
+                      document_id, revision_id, scope_revision_id, action, actor_id, occurred_at, citation_note
                FROM document_link_events WHERE document_id = ?
                ORDER BY target_type, target_id, scope_revision_id, occurred_at DESC, id DESC""",
             { rs, _ ->
@@ -178,6 +180,7 @@ class DocumentRepository(private val jdbc: JdbcTemplate, private val mapper: Obj
                     rs.getObject("revision_id", UUID::class.java), rs.getObject("scope_revision_id", UUID::class.java),
                     rs.getString("action"), rs.getObject("actor_id", UUID::class.java),
                     rs.getTimestamp("occurred_at").toInstant().atOffset(ZoneOffset.UTC),
+                    rs.getString("citation_note"),
                 )
             },
             documentId,

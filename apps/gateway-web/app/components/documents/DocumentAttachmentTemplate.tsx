@@ -10,6 +10,8 @@ import { DocumentUploadForm } from './DocumentUploadForm';
 import styles from './DocumentAttachmentTemplate.module.css';
 
 export type DocumentAttachmentTemplateProps = {
+  heading?: string;
+  headingLevel?: 'h2' | 'h3' | 'h4';
   links: DocumentLink[];
   documents: DocumentRecord[];
   revisions: Record<string, DocumentRevision[]>;
@@ -34,7 +36,7 @@ export type DocumentAttachmentTemplateProps = {
 };
 
 /** Shared editor presentation; route adapters retain authorization and target ownership. */
-export function DocumentAttachmentTemplate({ links, documents, revisions, canEdit, canCreate = canEdit, folders = [], pending, error, notice, documentTotal, documentOffset = 0, searchPending, revisionPending, onSearch, onSelect, onInspect, onCreate, onAttach, onDetach, contextFields, renderAttachmentContext }: DocumentAttachmentTemplateProps) {
+export function DocumentAttachmentTemplate({ heading, headingLevel: Heading = 'h2', links, documents, revisions, canEdit, canCreate = canEdit, folders = [], pending, error, notice, documentTotal, documentOffset = 0, searchPending, revisionPending, onSearch, onSelect, onInspect, onCreate, onAttach, onDetach, contextFields, renderAttachmentContext }: DocumentAttachmentTemplateProps) {
   const t = useTranslation(), copy = (en: string, de: string) => t({ en, de });
   const id = useId();
   const [opened,setOpened]=useState({new:false,existing:false});
@@ -54,7 +56,7 @@ export function DocumentAttachmentTemplate({ links, documents, revisions, canEdi
     return <div id={`${id}-existing`} hidden={task !== 'existing'}>{opened.existing ? <DocumentLibraryPicker documents={documents} revisions={revisions} folders={folders} attachedIds={links.map(link => link.documentId)} pending={pending} searchPending={searchPending} revisionPending={revisionPending} documentTotal={documentTotal} documentOffset={documentOffset} onSearch={onSearch} onSelect={onSelect} onAttach={onAttach} onCancel={() => setTask(null)} contextFields={contextFields?.('select')} /> : null}</div>;
   }
   return <Stack as="section" gap="field" aria-labelledby={`${id}-title`} className={styles.manager}>
-    <h2 id={`${id}-title`}>{copy('Documents', 'Dokumente')}</h2>
+    <Heading id={`${id}-title`}>{heading ?? copy('Documents', 'Dokumente')}</Heading>
     {error ? <Alert tone="error">{error}</Alert> : null}
     {notice ? <p role="status" className={styles.muted}>{notice}</p> : null}
     {renderLinks()}

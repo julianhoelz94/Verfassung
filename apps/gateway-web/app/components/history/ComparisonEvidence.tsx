@@ -41,7 +41,7 @@ export async function ComparisonEvidence({
   >();
   for (const result of loaded)
     for (const link of result?.links ?? []) {
-      const key = link.documentId + ":" + link.document.revision.id,
+      const key = JSON.stringify([link.documentId, link.document.revision.id, link.citationNote ?? '']),
         current = documents.get(key) ?? { link, titles: new Set<string>() };
       current.titles.add(result!.title);
       documents.set(key, current);
@@ -73,6 +73,7 @@ export async function ComparisonEvidence({
             <article key={key}>
               <h4>{link.document.revision.title}</h4>
               <p>{link.document.revision.description}</p>
+              {link.citationNote ? <p>{link.citationNote}</p> : null}
               <small>{[...titles].join(" · ")}</small>
               {link.document.revision.sourceUrl ? (
                 <p>

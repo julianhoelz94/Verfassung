@@ -67,8 +67,11 @@ class RestLinkTargetClient(
                         }
                 }
                 "lifecycle_material" -> {
-                    val events = catalog.get().uri("/constitutions/$targetId/lifecycle-events").retrieve().body(JsonNode::class.java)
-                    scopeRevisionId != null && events?.any { it.path("id").scalarText() == scopeRevisionId.toString() } == true
+                    scopeRevisionId != null &&
+                        listOf("lifecycle-events", "provision-events").any { kind ->
+                            val events = catalog.get().uri("/constitutions/$targetId/$kind").retrieve().body(JsonNode::class.java)
+                            events?.any { it.path("id").scalarText() == scopeRevisionId.toString() } == true
+                        }
                 }
                 "constitution" -> {
                     val versions = catalog.get().uri("/constitutions/$targetId/versions").retrieve().body(JsonNode::class.java)

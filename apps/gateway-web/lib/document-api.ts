@@ -60,6 +60,7 @@ export type DocumentRecord = {
 };
 
 export type DocumentLink = {
+  citationNote?: string | null;
   documentId: string;
   revisionId: string | null;
   document: DocumentRecord;
@@ -142,6 +143,7 @@ export function uploadDocument(id: string, expectedRevision: number, file: File,
 export function createLinkedDocument(targetType: 'constitution' | 'version' | 'amendment' | MaterialTarget, targetId: string, metadata: {
   operationId: string; title: string; description: string; sourceUrl: string; scopeRevisionId: string | null;
   citationKey?: string; bibliography?: DocumentBibliography;
+  citationNote?: string;
 }, file: File | null, authorization: string): Promise<DocumentRecord> {
   const body = new FormData();
   body.set('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
@@ -163,8 +165,8 @@ export function listDocumentLinkEvents(targetType: DocumentTarget, targetId: str
   return request(`/links/${targetType}/${encodeURIComponent(targetId)}/events${scopeQuery(scopeRevisionId)}`, { headers: { Authorization: authorization } });
 }
 
-export function attachDocument(targetType: DocumentTarget, targetId: string, documentId: string, revisionId: string | null, authorization: string, scopeRevisionId?: string | null): Promise<DocumentLink[]> {
-  return request(`/links/${targetType}/${encodeURIComponent(targetId)}`, json(authorization, 'POST', { documentId, revisionId, scopeRevisionId }));
+export function attachDocument(targetType: DocumentTarget, targetId: string, documentId: string, revisionId: string | null, authorization: string, scopeRevisionId?: string | null, citationNote?: string): Promise<DocumentLink[]> {
+  return request(`/links/${targetType}/${encodeURIComponent(targetId)}`, json(authorization, 'POST', { documentId, revisionId, scopeRevisionId, ...(citationNote ? { citationNote } : {}) }));
 }
 
 export function detachDocument(targetType: DocumentTarget, targetId: string, documentId: string, authorization: string, scopeRevisionId?: string | null): Promise<DocumentLink[]> {

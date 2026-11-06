@@ -11,7 +11,7 @@ export async function VersionDocuments({ constitutionId, versionId, legalVersion
   ])).flat();
   const documents = new Map<string, DocumentLink>();
   for (const link of links) {
-    const key = `${link.documentId}:${link.document.revision.id}`;
+    const key = JSON.stringify([link.documentId, link.document.revision.id, link.citationNote ?? '']);
     if (!documents.has(key) || link.revisionId) documents.set(key, link);
   }
   if (!documents.size) return null;
@@ -20,6 +20,7 @@ export async function VersionDocuments({ constitutionId, versionId, legalVersion
     <ul className="link-list">{[...documents].map(([key, link]) => <li key={key}>
       <a href={`/documents/${link.documentId}${link.revisionId ? `?revision=${link.document.revision.revision}` : ''}`}>{link.document.revision.title}</a>
       {link.revisionId ? <> · <T value={reviewUi.documentRevision} /> {link.document.revision.revision}</> : null}
+      {link.citationNote ? <p>{link.citationNote}</p> : null}
     </li>)}</ul>
   </section>;
 }

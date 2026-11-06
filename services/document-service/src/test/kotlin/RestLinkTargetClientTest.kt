@@ -14,9 +14,11 @@ class RestLinkTargetClientTest {
         val change = UUID.randomUUID()
         val constitution = UUID.randomUUID()
         val event = UUID.randomUUID()
+        val provisionEvent = UUID.randomUUID()
         val responses = mutableMapOf(
             "/amendments/$amendment" to """{"publishedRevisionId":"${UUID.randomUUID()}","changes":[{"id":"$change"}]}""",
             "/constitutions/$constitution/lifecycle-events" to """[{"id":"$event"}]""",
+            "/constitutions/$constitution/provision-events" to """[{"id":"$provisionEvent"}]""",
         )
         withResponses(responses) { client, _ ->
             assertThat(client.isPublic("amendment_material", amendment, null)).isTrue()
@@ -24,6 +26,7 @@ class RestLinkTargetClientTest {
             assertThat(client.isPublic("change_material", amendment, change)).isTrue()
             assertThat(client.isPublic("change_material", amendment, UUID.randomUUID())).isFalse()
             assertThat(client.isPublic("lifecycle_material", constitution, event)).isTrue()
+            assertThat(client.isPublic("lifecycle_material", constitution, provisionEvent)).isTrue()
             assertThat(client.isPublic("lifecycle_material", constitution, UUID.randomUUID())).isFalse()
             responses["/amendments/$amendment"] = """{"changes":[{"id":"$change"}]}"""
             assertThat(client.isPublic("amendment_material", amendment, null)).isFalse()

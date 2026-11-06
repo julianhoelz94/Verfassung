@@ -12,6 +12,7 @@ import { EditorLanding } from './EditorLanding';
 import { ImportReview } from './ImportReview';
 import { loginHref } from '../../lib/return-to';
 import { SourceEvidenceWorkspace } from './SourceEvidenceWorkspace';
+import { DocumentLinks } from './documents/DocumentLinks';
 import {
   loadEditorSession,
   type EditorSearchParams,
@@ -93,6 +94,10 @@ export default async function EditorPage(props: EditorPageProps) {
         publishedEvidence={source?.sourceEvidence ?? null}
         userId={user.id}
         roles={user.roles}
+        documentsPanel={<DocumentLinks targetType="version" targetId={session.versionId}
+          returnTo={`/editor?sessionId=${encodeURIComponent(session.id)}&scope=sources`}
+          canEdit={canEdit && session.status === 'open' && session.actorId === user.id}
+          heading={locale === 'de' ? 'Quellen dieser Textversion' : 'Sources for this text version'} />}
         sourceHref={href(session.versionId)}
         publishedHref={
           preview.newVersionId ? href(preview.newVersionId) : undefined

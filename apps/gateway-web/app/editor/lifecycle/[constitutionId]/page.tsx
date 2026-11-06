@@ -13,6 +13,8 @@ import { currentUser } from '../../../../lib/session';
 import { reviseLifecycleEvidenceAction, appendLifecycleAction, appendProvisionAction } from '../actions';
 import { Stack } from '../../../components/layout/Layout';
 import surfaceStyles from '../../../components/surfaces.module.css';
+import { DocumentLinks } from '../../documents/DocumentLinks';
+import { currentLocale } from '../../../../lib/server-locale';
 
 type Props = {
   params: Promise<{ constitutionId: string }>;
@@ -46,6 +48,7 @@ export default async function LifecycleEditor({ params, searchParams }: Props) {
   const query = await searchParams;
   const code = query.code?.toUpperCase() ?? '';
   const user = await currentUser();
+  const locale = await currentLocale();
   if (!user) redirect(loginHref(`/editor/lifecycle/${encodeURIComponent(constitutionId)}`, query));
   if (!user.roles.some((role) => role === 'publisher' || role === 'admin')) notFound();
   const context = await loadConstitutionCollection(query.jurisdictionId ? {id:query.jurisdictionId} : {code});
@@ -80,6 +83,11 @@ export default async function LifecycleEditor({ params, searchParams }: Props) {
           <li key={event.id}>
             <time dateTime={event.eventDate}>{event.dateCertainty === 'approximate' ? <T value={ui.remainingStatus.circa} /> : ''}{event.eventDate}</time> · {<T value={labels[event.eventType]} />}
             {event.note ? ` · ${event.note}` : ''}
+            <details><summary><T value={{en:'Sources and commentary',de:'Quellen und Kommentare'}} /></summary>
+              <DocumentLinks targetType="lifecycle_material" targetId={constitutionId} scopeRevisionId={event.id}
+                returnTo={`/editor/lifecycle/${constitutionId}?${new URLSearchParams({code, ...(query.jurisdictionId ? {jurisdictionId:query.jurisdictionId} : {})})}`}
+                heading={locale === 'de' ? 'Quellen dieses Ereignisses' : 'Sources for this event'} headingLevel="h3" canEdit />
+            </details>
           </li>
         ))}
       </ol>
@@ -88,7 +96,13 @@ export default async function LifecycleEditor({ params, searchParams }: Props) {
           <h2><T value={ui.editor.lifecycle.constitutionid.page.provisionEvents} /></h2>
           <ol>
             {provisionEvents.map((event) => (
-              <li key={event.id}><time dateTime={event.eventDate}>{event.eventDate}</time> · {event.eventType} · {event.logicalUnitIds.length} <T value={ui.editor.lifecycle.constitutionid.page.unitS} /></li>
+              <li key={event.id}><time dateTime={event.eventDate}>{event.eventDate}</time> · {event.eventType} · {event.logicalUnitIds.length} <T value={ui.editor.lifecycle.constitutionid.page.unitS} />
+                <details><summary><T value={{en:'Source documents',de:'Quelldokumente'}} /></summary>
+                  <DocumentLinks targetType="lifecycle_material" targetId={constitutionId} scopeRevisionId={event.id}
+                    returnTo={`/editor/lifecycle/${constitutionId}?${new URLSearchParams({code,versionId:event.sourceVersionId,...(query.jurisdictionId ? {jurisdictionId:query.jurisdictionId} : {})})}`}
+                    heading={locale === 'de' ? 'Quellen dieses Artikelereignisses' : 'Sources for this provision event'} headingLevel="h3" canEdit />
+                </details>
+              </li>
             ))}
           </ol>
         </section>
@@ -111,6 +125,7 @@ export default async function LifecycleEditor({ params, searchParams }: Props) {
           <p><T value={ui.editor.lifecycle.constitutionid.page.ifTheDateIsUnknownLeaveThe} /></p>
           <label htmlFor="event-source"><T value={ui.editor.lifecycle.constitutionid.page.sourceUrl} /></label>
           <input id="event-source" type="url" name="sourceUrl" />
+          <p><T value={{en:'After recording the event, add documents from its Sources and commentary section above.',de:'Nach dem Erfassen kannst du Dokumente im Bereich Quellen und Kommentare des Ereignisses oben hinzufügen.'}} /></p>
           <label htmlFor="event-note"><T value={ui.editor.lifecycle.constitutionid.page.note} /></label>
           <textarea id="event-note" name="note" rows={3} />
           <button className="btn" type="submit"><T value={ui.editor.lifecycle.constitutionid.page.recordEvent} /></button>
@@ -152,6 +167,7 @@ export default async function LifecycleEditor({ params, searchParams }: Props) {
             </fieldset>
             <label htmlFor="provision-event-source"><T value={ui.editor.lifecycle.constitutionid.page.sourceUrl} /></label>
             <input id="provision-event-source" type="url" name="sourceUrl" />
+            <p><T value={{en:'After recording the event, add documents from its Source documents section above.',de:'Nach dem Erfassen kannst du Dokumente im Bereich Quelldokumente des Ereignisses oben hinzufügen.'}} /></p>
             <label htmlFor="provision-event-note"><T value={ui.editor.lifecycle.constitutionid.page.note} /></label>
             <textarea id="provision-event-note" name="note" rows={3} />
             <button className="btn" type="submit"><T value={ui.editor.lifecycle.constitutionid.page.recordProvisionEvent} /></button>

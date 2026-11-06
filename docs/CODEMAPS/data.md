@@ -33,6 +33,14 @@ Document citation links pin an immutable document revision and, for amendments o
 wiki content, the owning revision scope. Legal prose and shared contact publication
 remain in the same Document database transaction.
 
+Document V10 adds citation keys and an alias registry sharing one case-insensitive
+uniqueness boundary, revision bibliography, tags/folders and additive membership.
+V11 migrates old primary files into immutable checksummed file identities and
+revision manifests while retaining historical legacy bytes. Metadata-only
+revisions reuse manifests. V12 adds actor-scoped payload-bound BibTeX import
+receipts; imports and folder membership commit together. Folder deletion removes
+only the view, preserving tags/documents and all published pins.
+
 Fresh content fixtures are generated and uploaded through real APIs, then read back.
 Do not restore historical seed writes or flatten mixed content to simplify a test.
 

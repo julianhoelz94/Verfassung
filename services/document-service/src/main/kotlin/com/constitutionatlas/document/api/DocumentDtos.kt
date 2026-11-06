@@ -9,6 +9,8 @@ data class DocumentDto(
     val status: String,
     val createdAt: OffsetDateTime,
     val revision: DocumentRevisionDto,
+    val citationKey: String = revision.citationKey,
+    val tags: List<DocumentTagDto> = emptyList(),
 )
 
 data class DocumentRevisionDto(
@@ -22,6 +24,9 @@ data class DocumentRevisionDto(
     val contentType: String?,
     val createdAt: OffsetDateTime,
     val createdBy: UUID,
+    val citationKey: String = "",
+    val bibliography: BibliographyDto = BibliographyDto(),
+    val attachments: List<DocumentAttachmentDto> = emptyList(),
 )
 
 data class SaveDocumentRequest(
@@ -29,6 +34,8 @@ data class SaveDocumentRequest(
     val description: String? = null,
     val sourceUrl: String? = null,
     val expectedRevision: Int? = null,
+    val citationKey: String? = null,
+    val bibliography: BibliographyDto? = null,
 )
 
 data class DocumentEventDto(
@@ -62,4 +69,38 @@ data class DocumentLinkEventDto(
     val action: String,
     val actorId: UUID,
     val occurredAt: OffsetDateTime,
+)
+
+data class CreatorDto(val family: String? = null, val given: String? = null, val literal: String? = null)
+
+data class BibliographyDto(
+    val type: String = "misc",
+    val authors: List<CreatorDto> = emptyList(),
+    val editors: List<CreatorDto> = emptyList(),
+    val issued: String? = null,
+    val containerTitle: String? = null,
+    val publisher: String? = null,
+    val volume: String? = null,
+    val issue: String? = null,
+    val pages: String? = null,
+    val doi: String? = null,
+    val isbn: String? = null,
+    val language: String? = null,
+    val abstract: String? = null,
+    val extra: Map<String, String> = emptyMap(),
+)
+
+data class DocumentTagDto(val id: UUID, val name: String)
+
+data class DocumentFolderDto(val id: UUID, val name: String, val tagId: UUID)
+
+data class DocumentPageDto(val items: List<DocumentDto>, val total: Int, val offset: Int, val limit: Int)
+
+data class DocumentAttachmentDto(
+    val id: UUID,
+    val fileName: String,
+    val contentType: String,
+    val size: Long,
+    val sha256: String,
+    val primary: Boolean,
 )

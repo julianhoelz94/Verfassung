@@ -152,6 +152,17 @@ Pre-launch routing aliases (`/legacy`, country `constitution-timeline`, `/admin/
 
 ## Amendment workspace and document evidence
 
+`app/documents/page.tsx` authenticates the central library;
+`DocumentLibrary`, `DocumentInspector` and `BibtexImport` own its responsive
+folder/list/details UI. `app/documents/command/route.ts` owns trusted-origin
+mutations, bounded search, exact file downloads and complete folder/selection
+exports. `DocumentDetailsDrawer` owns the resizable bottom drawer and retained
+drafts; `DocumentExport` offers bibliography-only and ZIP downloads in each scope.
+`lib/document-api.ts` supplies server-only HTTP clients and shared types;
+`document-library-messages.ts` owns localized chrome. Navigation uses
+`canReadDocuments`/`canManageDocuments`; publishers/reviewers cannot edit. Legacy
+editorial document pages redirect; public `/documents/[id]` retains pinned reads.
+
 `editor/amendments/AmendmentForm` owns task navigation, the single constitution-wide version pair, visible public comment and the mounted draft form. `AmendmentChangesTable` navigates recorded passages; `editor/PassageComparison` shares bounded wording comparison with DiffReviewQueue. Source formatting uses OrderedContentTree inside ConstitutionDocument. AmendmentEditorLayout keeps historical inspection separate from the current form; revision attachments are loaded read-only.
 
 `editor/documents/DocumentManagerTemplate` owns the shared upload/select interface in constitution configuration, continuous editing and amendments. DocumentLinks loads authorized initial data; DocumentManager updates attachment state without navigation. The gateway endpoint is `/editor/documents/command` (GET history links, POST document commands); `/api/editor/*` belongs to editor-service through Caddy. Document-service owns the transactional create/upload/attach endpoint and actor-scoped retry receipt. Saving an amendment uses the existing command endpoint with a JSON outcome so rejected saves retain entered values; native POST redirects remain supported.

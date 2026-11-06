@@ -1,0 +1,160 @@
+.inspector {
+  min-width: 0;
+  padding: var(--space-5);
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+}
+.embedded { min-width: 0; }
+
+.heading {
+  justify-content: space-between;
+}
+
+.heading > :first-child {
+  min-width: 0;
+  flex: 1 1 12rem;
+}
+
+.heading h2 {
+  overflow-wrap: anywhere;
+  font-family: var(--font-heading);
+  font-size: var(--text-xl);
+  font-weight: var(--weight-heading);
+}
+
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--gap-related);
+  border-bottom: 1px solid var(--color-line);
+  padding-bottom: var(--space-3);
+}
+
+.tabs button {
+  flex: 1 1 auto;
+  white-space: normal;
+}
+
+.meta {
+  color: var(--color-ink-2);
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}
+
+.key {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.placeholder {
+  color: var(--color-ink-2);
+  padding: var(--space-5);
+  margin: 0;
+}
+
+.creatorGroup {
+  border: 0;
+  padding: 0;
+  min-width: 0;
+}
+
+.formFields {
+  border: 0;
+  padding: 0;
+  min-width: 0;
+}
+
+.creatorGroup legend {
+  font-weight: var(--weight-ui-emphasis);
+  padding: 0 0 var(--space-2);
+}
+
+.creator {
+  padding: var(--space-3);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-sm);
+}
+
+.details {
+  min-width: 0;
+}
+
+.details > summary {
+  min-height: var(--control-min);
+  align-content: center;
+  cursor: pointer;
+  font-weight: var(--weight-ui-emphasis);
+  overflow-wrap: anywhere;
+}
+
+.details[open] > summary {
+  margin-bottom: var(--gap-control);
+}
+
+.metadata {
+  display: grid;
+  gap: var(--gap-control);
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.metadata dt {
+  color: var(--color-ink-2);
+  font-size: var(--text-sm);
+}
+
+.metadata dd {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.metadata > div {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.prose {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.fileList,
+.tagList,
+.history {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: var(--gap-field);
+}
+
+.fileList > li,
+.history > li {
+  border-bottom: 1px solid var(--color-line);
+  padding-bottom: var(--space-4);
+  min-width: 0;
+}
+
+.fileName {
+  font-weight: var(--weight-ui-emphasis);
+  overflow-wrap: anywhere;
+}
+
+.tagList > li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--gap-related);
+  justify-content: space-between;
+  align-items: center;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 640px) {
+  .inspector {
+    padding: var(--space-4);
+  }
+}

@@ -1,5 +1,9 @@
 # Document service plan
 
+Historical initial-service plan. [Central document library](document-library.md)
+supersedes the navigation, library and storage proposals below. Code remains
+authoritative for delivered behavior.
+
 ## Goal
 
 Give editors a **Documents** workspace to create and maintain source documents, link them to constitutions and legal change records, and inspect every editorial change. A document revision is an editorial revision only: saving one never creates a constitutional legal version, amendment, or timeline event.

@@ -189,6 +189,15 @@ The menu disclosure always renders sections in this order and skips empty ones:
 4. Admin — admin only
 5. Account, Sign out — signed-in only; **Log in** for anonymous
 
+## Documents library extension
+
+Editors, reviewers, publishers and admins also have **Documents** in the primary
+bar and phone navigation, pointing to `/documents`. Editors/admins manage the
+library; reviewers/publishers inspect history, download and export. Viewer and
+anonymous navigation does not expose the internal library. Legacy
+`/editor/documents` entry points redirect with their document/search/return context
+preserved; public `/documents/[id]?revision=` citations remain separate.
+
 ## Test matrix for `lib/nav.test.ts`
 
 Copy **Legal changes** (was “Amending laws”) lands in `nav.ts` with UI-57. Until then the gateway label is still “Amending laws”; the trees above are the product name.

@@ -88,4 +88,25 @@ describe('shared document attachment contract', () => {
     await click('Create and attach'); expect(getByRole(host, 'alert').textContent).toContain('Choose a file or enter its source URL.');
     expect(send).not.toHaveBeenCalled();
   });
+
+  it('searches beyond the first page and lazily fetches only selected document revisions', async () => {
+    const latest = { ...revision, id: 'revision-2', revision: 2, title: 'Later title' };
+    const current = { ...documentRecord, currentRevision: 2, revision: latest };
+    send.mockResolvedValueOnce(response({ items: [current], total: 65, offset: 0, limit: 30 }))
+      .mockResolvedValueOnce(response({ items: [current], total: 65, offset: 30, limit: 30 }))
+      .mockResolvedValueOnce(response({ revisions: [latest, revision] }))
+      .mockResolvedValueOnce(response({ links: [{ documentId: 'law', revisionId: revision.id, document: documentRecord }] }));
+    await render({ remoteSearch: true, documentTotal: 0 });
+    expect(send).not.toHaveBeenCalled();
+    await click('Choose existing document'); await fill('Search documents', 'Mueller2024'); await click('Search library');
+    expect(send.mock.calls[0][0]).toBe('/editor/documents/command?command=search&q=Mueller2024&offset=0');
+    expect(queryByRole(host, 'option', { name: 'Revision 1' })).toBeNull();
+    await click('Next');
+    expect(send.mock.calls[1][0]).toBe('/editor/documents/command?command=search&q=Mueller2024&offset=30');
+    await fill('Document', 'law');
+    expect(send.mock.calls[2][0]).toBe('/editor/documents/command?command=revisions&documentId=law');
+    await fill('Revision to cite', 'revision-1'); await click('Attach document');
+    expect(Object.fromEntries(submitted(3))).toMatchObject({ command: 'attach', documentId: 'law', revisionId: 'revision-1' });
+    expect(getByRole(host, 'link', { name: 'Enacting law' }).getAttribute('href')).toBe('/documents/law?revision=1');
+  });
 });

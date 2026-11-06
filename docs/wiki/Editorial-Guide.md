@@ -40,6 +40,41 @@ Removing a marker keeps the note. Every note needs at least one marker before sa
 
 ### Documents and legal amendments
 
+Open **Documents** in the top bar for the shared library. Editors/admins maintain
+bibliography, citation keys, tags and files. Reviewers/publishers read the library
+and history, download and export. The library is private; published citations keep
+their existing visibility rules.
+
+**All documents** contains every record regardless of project folders. Drag a
+document onto a folder or use **Add to folder** to assign its tag. A record may
+belong to several folders. **Remove from this folder** removes only that membership;
+**Remove folder view** keeps documents and tags. Bulk organization offers **Undo**.
+Search covers titles, keys, authors, years and tags.
+
+The shared toolbar shows or hides project folders and document details. Select a
+record to open its bottom drawer; Close or Escape hides it while preserving typed
+fields. Resize the drawer on desktop using its top handle or arrow keys. Phones
+use a nearly full-height drawer. Descriptive tags are managed in document details;
+folder backing tags are not repeated as a second sidebar list.
+
+Citation keys must be unique across the library, including archived records.
+Renaming retains the old key as an alias. Details provides bibliography, files,
+usage and history. File changes create revisions; existing published citations
+retain their original bibliography and files.
+
+**Import BibTeX** works in All documents or a project folder. Upload a `.bib` file
+or paste its content, preview, resolve duplicate/key conflicts and confirm each
+entry's action. Folder import adds its tag to created or explicitly reused records,
+which remain in All documents. File references require separate uploads.
+**Export folder** includes the whole folder beyond the current results page;
+**Export selected** and **Export library** provide the other scopes. Importing
+references does not publish them. Every export menu offers **BibTeX only (.bib)**
+or **BibTeX with files (.zip)**. ZIP exports contain `references.bib` and all files
+in the exported revisions, with relative paths in each entry's `file` field.
+Extract the ZIP before using those paths. BibTeX-only exports omit `file` entirely;
+entries without attachments also omit it. Selected archived records can be
+exported; library/folder exports include active records.
+
 **Documents** in the constitution editor opens the central document library controls in place. **Upload new document** and **Choose existing document** have the same visual weight. Upload a PDF or text file (up to 20 MB), enter its title, and choose **Upload and attach**. Alternatively, supply a source URL and choose **Create and attach**. One submission creates the central record and links its pinned revision. Existing records can be searched and attached at a selected revision; **Detach** removes the link while retaining the library record. Text, comments and unfinished inputs stay in the workspace while these controls are open. Document history opens separately.
 
 A legal amendment has **one before constitution and one after constitution**, selected above **Affected passages**. **Find affected passages** uses this pair across the whole constitution; unchanged articles do not each require review. The public amendment comment remains visible above the affected passages. Passage notes describe individual changes. **Correct passage mapping** selects exact locations within the amendment's shared pair; it does not choose another pair for that article. Source formatting and exact snapshot identities are available on demand.

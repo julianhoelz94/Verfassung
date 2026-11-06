@@ -5,10 +5,11 @@ import { redirect } from 'next/navigation';
 import { currentUser, requireSessionBearer } from '../../../lib/session';
 import { createDocument, reviseDocument, uploadDocument } from '../../../lib/document-api';
 import { safeReturnTo } from '../../../lib/return-to';
+import { canManageDocuments } from '../../../lib/nav';
 
 async function writer(): Promise<string> {
   const user = await currentUser();
-  if (!user?.roles.some((role) => ['admin', 'editor', 'publisher'].includes(role))) {
+  if (!user || !canManageDocuments(user.roles)) {
     redirect('/editor/documents?error=forbidden');
   }
   return requireSessionBearer();

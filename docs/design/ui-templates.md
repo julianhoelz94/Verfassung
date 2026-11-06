@@ -77,6 +77,19 @@ Wiki translation uses `ContentTranslationRegion compact`: a labelled Languages i
 
 ## Amendment workspace and evidence
 
+The central `/documents` library uses `FullWidthPage`, `PageChromeSurface`, the
+shared sticky `PageMenuFrame`/`PageMenuBar`, and measured header/menu offsets.
+Library actions and the project-folder toggle live in that toolbar. Selecting a
+record opens a nonmodal bottom drawer, resizable by pointer or keyboard on desktop
+and nearly full-height on phones. Close/Escape hides it without unmounting draft
+fields; changing records still requires explicit discard for unsaved changes.
+The list does not move when details open. Generic tags live in document details;
+folder backing tags are not duplicated in the sidebar. Bulk organization retains
+keyboard/touch alternatives and Undo after partial completion. Pending record
+loads disable the outgoing form so late reads cannot discard edits entered while
+loading. Internal BibTeX preservation fields stay outside product forms.
+Folder import and complete-folder export accompany whole-library actions.
+
 The amendment route uses WorkspacePage and shared PageChrome with task views. Its current draft form stays mounted when opening Documents, Review or History. The constitution-wide version selector belongs to the amendment; exact passage controls only select locations inside that pair. `editor/PassageComparison` owns bounded wording differences and source/reference disclosure for both amendment records and difference review. Rich source formatting uses OrderedContentTree inside ConstitutionDocument with per-comparison anchor prefixes.
 
 `editor/documents/DocumentManagerTemplate` is shared by the continuous constitution editor, constitution settings and amendment editor. It owns the peer upload/select actions and forms. The server DocumentLinks loader and client DocumentManager adapter retain target/scope and command ownership. Attachments update in place without refreshing the text editor. The gateway command route retains authentication and trusted-origin checks; document-service atomically creates, uploads, attaches and records an idempotent operation receipt in its own database.

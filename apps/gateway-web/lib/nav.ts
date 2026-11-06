@@ -33,6 +33,14 @@ export function canVisitEditor(roles: string[]): boolean {
   return roles.includes('admin') || roles.includes('editor') || roles.includes('reviewer') || roles.includes('publisher');
 }
 
+export function canReadDocuments(roles: string[]): boolean {
+  return canVisitEditor(roles);
+}
+
+export function canManageDocuments(roles: string[]): boolean {
+  return roles.includes('admin') || roles.includes('editor');
+}
+
 export function canVisitAdmin(roles: string[]): boolean {
   return roles.includes('admin');
 }
@@ -48,6 +56,7 @@ export function primaryNavLinks(user: NavUser | null, apiDocsAvailable = false, 
   }
   if (canVisitEditor(user.roles)) {
     links.push({ href: '/editor', label: 'Editor', message: ui.nav.editor });
+    links.push({ href: '/documents', label: 'Documents', message: ui.nav.documents });
   }
   if (canVisitAdmin(user.roles)) {
     links.push({ href: '/admin', label: 'Admin', message: ui.nav.admin });
@@ -74,7 +83,6 @@ export function editorialLinks(roles: string[], needsReviewCount = 0): NavLink[]
     links.push({ href: '/editor?status=approved', label: 'Ready to publish', message: ui.nav.readyToPublish });
   }
   if (isEditor || isReviewer || isPublisher) {
-    links.push({ href: '/editor/documents', label: 'Documents', message: ui.nav.documents });
     links.push({ href: '/editor/amendments', label: 'Legal changes', message: ui.nav.legalChanges, badgeCount: needsReviewCount || undefined });
     links.push({ href: '/editor/history', label: 'Text history', message: workflowUi.textHistory });
   }

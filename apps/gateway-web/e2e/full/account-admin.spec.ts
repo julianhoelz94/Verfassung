@@ -1,3 +1,4 @@
+import { openStructureTask, selectStructureLevel } from '../structure-workspace';
 import { setupSecretFromQr } from '../qr';
 import { expect, test } from '../fixtures/consent';
 import { authenticatorCode, signIn, signOut } from './auth';
@@ -128,20 +129,24 @@ test('administrator creates a constitution and updates its outline presentation'
   await page.getByLabel('Country').selectOption('XA');
   await page.getByLabel('Constitution title').fill(title);
   await page.getByRole('button', { name: 'Continue to structure' }).click();
-  await page.getByRole('button', { name: 'Add deeper layer' }).click();
-  await page.getByRole('textbox', { name: 'Label' }).nth(1).fill('Clause');
+  await page.getByRole('button', { name: 'Use this template', exact: true }).click();
+  await selectStructureLevel(page, 'Paragraph');
+  await page.getByRole('textbox', { name: 'Reader-facing name', exact: true }).fill('Clause');
   await page.getByRole('button', { name: 'Continue to review' }).click();
   await page.getByRole('button', { name: 'Create constitution' }).click();
   await expect(page).toHaveURL(/\/admin\/constitutions\/[^/?]+$/, { timeout: 30000 });
   await expect(page.getByRole('heading', { name: title })).toBeVisible();
-  await expect(page.getByRole('textbox', { name: 'Label' }).nth(1)).toHaveValue('Clause');
-  await page.getByLabel('How this layer is shown').nth(1).selectOption('concatenated');
+  await selectStructureLevel(page, 'Clause');
+  await expect(page.getByRole('textbox', { name: 'Reader-facing name', exact: true })).toHaveValue('Clause');
+  await page.getByLabel('How this layer is shown').selectOption('concatenated');
+  await openStructureTask(page, 'Review impact');
   await page.getByRole('button', { name: 'Preview change impact' }).click();
   await expect(page.getByRole('heading', { name: 'Safe to save' })).toBeVisible();
   await page.getByRole('button', { name: 'Save outline' }).click();
   await expect(page.getByText('Settings saved. Historical versions retain their structural settings.')).toBeVisible();
   await page.reload();
-  await expect(page.getByLabel('How this layer is shown').nth(1)).toHaveValue('concatenated');
+  await selectStructureLevel(page, 'Clause');
+  await expect(page.getByLabel('How this layer is shown')).toHaveValue('concatenated');
 });
 
 test('publisher enrolls with the rendered QR and uses a recovery code once', async ({ page }) => {

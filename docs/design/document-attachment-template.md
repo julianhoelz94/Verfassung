@@ -79,6 +79,19 @@ The first three integrations are implemented. Wiki citations and import reconcil
 
 Do not broaden public access merely because a document is selected. Each new host must define publication/readability rules for the exact cited revision. Existing event source URLs and historical citations remain compatible; new managed pins need a deliberate contract rather than an inferred URL relationship.
 
+## Reuse audit after the main update
+
+Reviewed 7 November 2026 against `main` at `d970ee0` (merged PR #247). The shared History, amendment and lifecycle viewers are now on main. Compared with the commentary branch already integrated into this PR, the final main update adds History/viewer regression coverage rather than another source-owning workflow.
+
+- **Amendments and exact changes:** `RecordViewerPage.tsx` renders `RecordMaterials` for both the published act and each stable change ID. This PR already uses the shared attachment template at those entry points. The same viewer handles country and regional routes; no separate regional picker is needed.
+- **Lifecycle and provision events:** the published lifecycle viewer and saved event editor remain the correct attachment owners. This PR covers both. A newly composed event still needs its saved event ID before linking sources.
+- **Consolidated comparisons:** `ComparisonEvidence.tsx` now has direct regression coverage on main. It displays the owners' published evidence; `ConsolidatedComparisonView.tsx` already links each contributing change to its exact amendment/change anchor while preserving the return comparison. Keep source editing on those owners instead of adding a comparison-owned attachment store. The combined tests also check that different passage notes survive reuse of the same document snapshot.
+- **Next practical addition — Wiki image reuse:** Wiki images already have document/revision pins. The picker can offer existing compatible images while the Wiki retains alt text, captions, rights, credits and placement. Bibliographic Wiki citations are a separate change: `WikiPageRevision.sourceUrls` is still a URL list and needs a pinned-source contract.
+- **Import/setup/migration review:** the source-URL displays and captured document/revision references are unchanged. Reuse stored captures and add supplementary evidence only through a job/proposal-supported contract; keep captured bytes and checksums intact.
+- **Article annotations and footnotes:** the structured annotation/reference model is unchanged. Define authored document citations and their rendering before embedding an attachment picker there.
+
+No additional automatic migration of a source form is needed for this main update. The next recommended reuse work is existing-image selection in Wiki editing, followed by managed Wiki bibliography and supplementary import evidence. The interactive mock remains a sample-data preview; this audit does not deploy the platform.
+
 ## Skill and interactive preview
 
 Use `$verfassung-document-attachments`, defined in `.agents/skills/verfassung-document-attachments/SKILL.md`, for subsequent integrations.

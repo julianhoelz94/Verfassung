@@ -2,6 +2,13 @@
 
 Identity owns users and roles. Editor-service enforces capabilities on each command. The gateway hides buttons that the current user cannot use; that is not authorization.
 
+Document-service enforces library capabilities separately: editor/admin can edit
+documents, keys, tags, folders and files, archive and import. Reviewer/publisher
+can read the library/history, download and export. Combined roles grant the union.
+Viewer/anonymous access remains limited to revisions cited by public records;
+folders never change visibility. Documents has its own top-bar entry for all four
+editorial roles.
+
 | Role | Open/save/submit | Approve review | Publish article | Draft a change record | Publish/withdraw change record |
 | --- | --- | --- | --- | --- | --- |
 | `editor` | yes | no | no | yes | no |

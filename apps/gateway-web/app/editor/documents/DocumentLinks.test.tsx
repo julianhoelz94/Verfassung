@@ -1,0 +1,36 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { DocumentLinks } from './DocumentLinks';
+import { DocumentManager } from './DocumentManager';
+import { currentUser } from '../../../lib/session';
+import { listDocumentLinkEvents, listDocumentLinks, listLibraryDocuments } from '../../../lib/document-api';
+
+vi.mock('../../../lib/server-locale', () => ({ currentLocale: async () => 'en' }));
+vi.mock('../../../lib/session', () => ({ currentUser: vi.fn(), requireSessionBearer: async () => 'Bearer session' }));
+vi.mock('../../../lib/document-api', () => ({ listDocumentLinkEvents: vi.fn(), listDocumentLinks: vi.fn(), listLibraryDocuments: vi.fn() }));
+vi.mock('./DocumentManager', () => ({ DocumentManager: vi.fn(() => null) }));
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  vi.mocked(currentUser).mockResolvedValue({ id: 'editor', email: 'editor@example.test', roles: ['editor'] });
+  vi.mocked(listDocumentLinkEvents).mockResolvedValue([]);
+  vi.mocked(listDocumentLinks).mockResolvedValue([]);
+  vi.mocked(listLibraryDocuments).mockResolvedValue({ items: [], total: 100, offset: 0, limit: 30 });
+});
+
+describe('embedded library loading', () => {
+  it('loads one bounded library page without eagerly loading any revision histories', async () => {
+    const element = await DocumentLinks({ targetType: 'amendment', targetId: 'law', scopeRevisionId: 'draft', returnTo: '/editor', canEdit: true });
+    expect(listLibraryDocuments).toHaveBeenCalledWith({ status: 'active', offset: 0, limit: 30, sort: 'title' }, 'Bearer session');
+    const manager = element.props.children.find((child: { type?: unknown }) => child?.type === DocumentManager);
+    expect(manager.props).toMatchObject({ revisions: {}, remoteSearch: true, documentTotal: 100, canEdit: true });
+  });
+
+  it('keeps publisher-only views read-only even when the parent supplied editing access', async () => {
+    vi.mocked(currentUser).mockResolvedValue({ id: 'publisher', email: 'publisher@example.test', roles: ['publisher'] });
+    const element = await DocumentLinks({ targetType: 'amendment', targetId: 'law', scopeRevisionId: 'draft', returnTo: '/editor', canEdit: true });
+    expect(listLibraryDocuments).not.toHaveBeenCalled();
+    const manager = element.props.children.find((child: { type?: unknown }) => child?.type === DocumentManager);
+    expect(manager.props.canEdit).toBe(false);
+    expect(listDocumentLinks).toHaveBeenCalledWith('amendment', 'law', 'draft', 'Bearer session');
+  });
+});

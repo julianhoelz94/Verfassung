@@ -123,7 +123,16 @@ def document_snapshot(client, document_id, revision):
 
 
 def public_document_snapshot(stack, client):
-    candidates = stack.sql("document", "SELECT document_id::text || '|' || revision FROM document_revisions WHERE file_bytes IS NOT NULL AND octet_length(file_bytes) > 0 ORDER BY created_at DESC LIMIT 100;")
+    candidates = stack.sql("document", """
+        SELECT CAST(r.document_id AS TEXT) || '|' || r.revision
+        FROM document_revisions r
+        WHERE EXISTS (
+            SELECT 1 FROM document_revision_attachments a
+            JOIN document_files f ON f.id = a.file_id
+            WHERE a.revision_id = r.id AND a.is_primary AND f.size_bytes > 0
+        ) OR (r.file_bytes IS NOT NULL AND octet_length(r.file_bytes) > 0)
+        ORDER BY r.created_at DESC LIMIT 100;
+    """)
     for candidate in candidates.splitlines():
         try:
             document_id, revision = candidate.split("|")

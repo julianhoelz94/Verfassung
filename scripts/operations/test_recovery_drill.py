@@ -2,12 +2,13 @@ import os
 import subprocess
 import hashlib
 import json
+import sqlite3
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from threading import Thread
 import unittest
 from unittest.mock import patch
 
-from recovery_drill import Client, DATABASES, document_snapshot, validate_target, verify_fixture_readback
+from recovery_drill import Client, DATABASES, document_snapshot, public_document_snapshot, validate_target, verify_fixture_readback
 
 
 def config(project="verfassung-recovery-test"):
@@ -65,6 +66,40 @@ class FixtureReadbackTest(unittest.TestCase):
 
 
 class DocumentRecoveryTest(unittest.TestCase):
+    def test_discovery_uses_primary_manifests_and_retains_legacy_fallback(self):
+        with sqlite3.connect(":memory:") as database:
+            database.create_function("octet_length", 1, lambda value: len(value))
+            database.executescript("""
+                CREATE TABLE document_revisions (id TEXT, document_id TEXT, revision INTEGER, file_bytes BLOB, created_at TEXT);
+                CREATE TABLE document_files (id TEXT, size_bytes INTEGER);
+                CREATE TABLE document_revision_attachments (revision_id TEXT, file_id TEXT, is_primary BOOLEAN);
+                INSERT INTO document_revisions VALUES
+                    ('legacy', 'legacy-document', 1, X'0102', '2024-01-01'),
+                    ('manifest', 'manifest-document', 2, NULL, '2024-02-01'),
+                    ('secondary', 'secondary-only-document', 1, NULL, '2024-03-01'),
+                    ('metadata', 'metadata-only-document', 1, NULL, '2024-04-01'),
+                    ('private', 'private-document', 1, NULL, '2024-05-01');
+                INSERT INTO document_files VALUES ('primary', 2), ('extra', 3);
+                INSERT INTO document_revision_attachments VALUES
+                    ('manifest', 'primary', TRUE), ('manifest', 'extra', FALSE),
+                    ('secondary', 'extra', FALSE), ('private', 'primary', TRUE);
+            """)
+
+            class Stack:
+                def sql(self, name, query):
+                    return "\n".join(row[0] for row in database.execute(query))
+
+            with patch("recovery_drill.document_snapshot", side_effect=[ValueError("Private"), {"source": "manifest"}]) as snapshot:
+                self.assertEqual(public_document_snapshot(Stack(), "public-client"), {"source": "manifest"})
+                self.assertEqual([call.args[1:] for call in snapshot.call_args_list],
+                                 [("private-document", "1"), ("manifest-document", "2")])
+            with patch("recovery_drill.document_snapshot", side_effect=[ValueError("Private"), ValueError("Private"), {"source": "legacy"}]) as snapshot:
+                self.assertEqual(public_document_snapshot(Stack(), "public-client"), {"source": "legacy"})
+                self.assertEqual(snapshot.call_args_list[-1].args[1:], ("legacy-document", "1"))
+            database.execute("DELETE FROM document_revisions")
+            with self.assertRaisesRegex(RuntimeError, "publicly readable pinned"):
+                public_document_snapshot(Stack(), "public-client")
+
     def test_pinned_file_digest_detects_changed_bytes_and_wrong_revision(self):
         document_id = "01900000-0000-4000-8000-000000000001"
         state = {"bytes": b"original source\xff\x00", "revision": 2}

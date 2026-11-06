@@ -8,6 +8,7 @@ Design concept for the responsive UI redesign (backlog Sprints 19–21, UI-29 �
 | [`sprint-63-ui-templates.md`](sprint-63-ui-templates.md) | Sprint 63 scope and delivery evidence |
 | [`ui-concept.md`](ui-concept.md) | The concept: principles, layout system and breakpoints, shell, page-by-page specs, component inventory, tokens, migration plan |
 | [`role-link-trees.md`](role-link-trees.md) | Navigation tree per role (anonymous, viewer, editor, reviewer, publisher, admin) and the `nav.test.ts` matrix |
+| [`document-library.md`](document-library.md) | Bibliography, citation keys, tag-backed folders, immutable attachments and library/folder/selection BibTeX import/export |
 | [`two-axis-versions.md`](two-axis-versions.md) | Legal × editorial versioning ([ADR 0005](../adr/0005-two-axis-versions.md)). **Sprint UI reference** maps stories to configured prototype hashes. Canvas: [legal vs editorial chain](/Users/julianhoelz/.cursor/projects/Users-julianhoelz-Documents-Verfassung/canvases/legal-vs-editorial-chain.canvas.tsx) |
 | [`constitution-settings-and-editor-compatibility.md`](constitution-settings-and-editor-compatibility.md) | Proposed constitution settings taxonomy, migration safety, and the valid-configuration → editable-configuration contract for Sprints 40–43 |
 | [`tokens.css`](tokens.css) | Prototype import of the canonical runtime tokens in `apps/gateway-web/app/styles/tokens.css` |

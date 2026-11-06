@@ -7,6 +7,16 @@ Start with [[Development and operations|Technical-Development]] for everyday com
 
 Each service's Postgres database must be backed up with its migration history. The local [backup and restore scripts](https://github.com/julianhoelz94/Verfassung/tree/main/infra/backup) support development drills; restoring replaces data and is not a production runbook. Search and Audit are derived or secondary records; do not treat either as the canonical source for published constitutional text. Reindex Search after changes that affect published text or metadata using the supported application flow.
 
+The document-library upgrade keeps file bytes in Document Postgres: immutable
+`document_files`, revision attachment manifests, and historical legacy file bytes
+are included in its existing dump. Citation keys/aliases, folder/tag membership and
+BibTeX retry receipts are database state too. Apply new Flyway migrations in order;
+never edit historical document revisions to move citations to newer attachments.
+The recovery drill discovers downloadable primary files through revision manifests,
+with a fallback for legacy inline bytes. It verifies exact pinned metadata and
+file bytes before and after restoring the complete Document database.
+Object storage and Zotero synchronization are not prerequisites for this release.
+
 Identity also stores the registration switch, mail configuration, email confirmation tokens, TOTP secrets, and passkey credentials. Preserve `IDENTITY_MFA_ENCRYPTION_KEY` with its database backup; it encrypts SMTP credentials. Configure a stable HTTPS `PUBLIC_BASE_URL` before enrolling passkeys because WebAuthn validates its origin and relying party ID. New installations leave outgoing mail and self-registration disabled. The [account registration runbook](https://github.com/julianhoelz94/Verfassung/blob/main/docs/operations/account-registration.md) describes setup, the test email, and confirmation behavior. The CI full-stack profile uses Mailpit to exercise confirmation mail.
 
 

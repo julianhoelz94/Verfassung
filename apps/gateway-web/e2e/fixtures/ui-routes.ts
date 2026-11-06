@@ -40,13 +40,15 @@ export const uiRoutes = [
   { entry: '/countries/[code]/versions/[versionId]/articles/[articleId]', path: `${country}/versions/${version}/articles/${article}` },
   { entry: '/countries/[code]/versions/[versionId]/units/[unitId]', path: `${country}/versions/${version}/units/${article}`, snapshot: true },
   { entry: '/datenschutz', path: '/datenschutz' },
+  { entry: '/documents', path: '/documents', staff: true },
   { entry: '/documents/[id]', path: `/documents/${document}`, snapshot: true },
   { entry: '/editor', path: '/editor', staff: true },
   { entry: '/editor/amendments', path: '/editor/amendments', staff: true, snapshot: true },
   { entry: '/editor/amendments/[id]', path: `/editor/amendments/${amendment}`, staff: true, snapshot: true },
-  { entry: '/editor/documents', path: '/editor/documents', staff: true, snapshot: true },
-  { entry: '/editor/documents/new', path: '/editor/documents/new', staff: true, snapshot: true },
-  { entry: '/editor/documents/[id]', path: `/editor/documents/${document}`, staff: true, snapshot: true },
+  // Legacy entry points verify redirects; canonical library reflow and captures live in document-library.spec.ts.
+  { entry: '/editor/documents', path: '/editor/documents', expectedPath: '/documents', staff: true },
+  { entry: '/editor/documents/new', path: '/editor/documents/new', expectedPath: '/documents', staff: true },
+  { entry: '/editor/documents/[id]', path: `/editor/documents/${document}`, expectedPath: '/documents', staff: true },
   { entry: '/editor/history', path: '/editor/history', staff: true, snapshot: true },
   { entry: '/editor/lifecycle/[constitutionId]', path: `/editor/lifecycle/${constitution}?code=DE`, staff: true, snapshot: true },
   { entry: '/editor/wiki/[targetType]/[targetId]', path: '/editor/wiki/country/01900000-0000-4000-8000-000000000001?code=DE', staff: true, snapshot: true },
@@ -60,7 +62,7 @@ export const uiRoutes = [
   { entry: '/reset', path: '/reset?token=e2e-reset-token' },
   { entry: '/search', path: '/search?q=dignity' },
   { entry: '/setup', path: '/setup', staff: true, setup: true, snapshot: true },
-] satisfies Array<{ entry: string; path: string; staff?: boolean; challenged?: boolean; setup?: boolean; snapshot?: boolean }>;
+] satisfies Array<{ entry: string; path: string; expectedPath?: string; staff?: boolean; challenged?: boolean; setup?: boolean; snapshot?: boolean }>;
 
 // Query and dynamic variants that share an entry point but expose another task.
 export const uiStates = [

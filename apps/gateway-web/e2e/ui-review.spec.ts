@@ -40,7 +40,7 @@ for (const locale of ['en', 'de']) for (const width of sizes) {
         const page = 'staff' in route && route.staff ? staffPage : publicPage;
         const response = await page.goto(route.path);
         expect(response?.status(), route.path).toBeLessThan(400);
-        const expectedPath = new URL(route.path, baseURL).pathname;
+        const expectedPath = 'expectedPath' in route ? route.expectedPath : new URL(route.path, baseURL).pathname;
         await expect.poll(() => new URL(page.url()).pathname, { message: `Unexpected redirect for ${route.path}` }).toBe(expectedPath);
         const heading = await assertReviewPage(page, route, locale);
         await auditReviewAccessibility(page, route, locale, width);
